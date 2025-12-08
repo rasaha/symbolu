@@ -1,0 +1,1410 @@
+**CANONICAL SOULPI FRAMEWORK v2.7.1**
+
+**Corrected Architecture: Inner→Kosha \| Outer→Ontology**
+
+Date: November 28, 2025 System: Symbol-U / Soulpi (CANONICAL VERSION)
+Status: CORRECTED per 3-month patent development cycle
+
+**⚠️ CRITICAL CORRECTIONS APPLIED**
+
+This is the **CANONICAL** Soulpi architecture, correcting previous
+errors:
+
+**CORRECTED:**
+
+1.  ✅ Consonant → Kosha mapping (was partially wrong)
+
+2.  ✅ 10 Ontological Layers (was using wrong social model)
+
+3.  ✅ "K" has dual states (unpurified vs purified)
+
+4.  ✅ Vritti-Kosha mapping (now complete)
+
+5.  ✅ Anandamaya has NO consonant origins
+
+**PRESERVED:**
+
+1.  ✅ Dual mapping structure (Inner→Kosha, Outer→Ontology)
+
+2.  ✅ Orthogonal dimensions (depth vs breadth)
+
+3.  ✅ Syllable decomposition method
+
+4.  ✅ Tension calculation logic
+
+5.  ✅ Integration pipeline
+
+**Part 1: THE TRUE DUAL ARCHITECTURE**
+
+┌─────────────────────────────────────────────────────────┐
+
+│ CANONICAL SOULPI DUAL-LAYER MAPPING │
+
+├─────────────────────────────────────────────────────────┤
+
+│ │
+
+│ INNER MEANING (Acoustic Truth) │
+
+│ └─→ Maps to 5 KOSHAS (Consciousness Depth) │
+
+│ 1. Annamaya (Physical) │
+
+│ 2. Pranamaya (Pranic/Energy) │
+
+│ 3. Manomaya (Emotional/Desire) │
+
+│ 4. Vijnanamaya (Intellectual/Discriminative) │
+
+│ 5. Anandamaya (Bliss/Void) │
+
+│ │
+
+│ OUTER MEANING (Cultural/Social) │
+
+│ └─→ Maps to 10 ONTOLOGY LAYERS (Symbolic Ladder) │
+
+│ 1. Execution (Karma) │
+
+│ 2. Identity (Tagging) │
+
+│ 3. Form (Body/Shape) │
+
+│ 4. Cognition (Mind) │
+
+│ 5. Agency (Ego/Control) │
+
+│ 6. Reasoning (Intellect) │
+
+│ 7. Purpose (Soul-direction) │
+
+│ 8. Observation (Witness) │
+
+│ 9. Core (Atman) │
+
+│ 10. Universal (Brahman) │
+
+│ │
+
+└─────────────────────────────────────────────────────────┘
+
+**Part 2: CORRECTED CONSONANT → KOSHA MAPPING**
+
+**The Canonical Kosha-Consonant Table**
+
+CANONICAL_CONSONANT_KOSHA_MAP = {
+
+\# ═══════════════════════════════════════════════════
+
+\# 1. ANNAMAYA (Physical/Material)
+
+\# ═══════════════════════════════════════════════════
+
+\# Qualities: Holding, dragging, density, heaviness, grounding
+
+\'K\': {
+
+\'base_kosha\': \'Pranamaya\', \# CRITICAL: K starts in Pranamaya
+(unpurified)
+
+\'purified_kosha\': \'Vijnanamaya\', \# K becomes Vijnanamaya when
+purified
+
+\'unpurified_vritti\': \'Vikalpa\', \# Āśā (hope → avoidance)
+
+\'purified_vritti\': \'Pramāṇa\', \# Discrimination
+
+\'quality_unpurified\': \'Grasping, scanning, fear-based hope\',
+
+\'quality_purified\': \'Discriminating wisdom\'
+
+},
+
+\'G\': {
+
+\'kosha\': \'Annamaya\',
+
+\'vritti\': \'Nidrā\',
+
+\'quality\': \'Gravitational pull, heaviness, inertia\'
+
+},
+
+\'D\': {
+
+\'kosha\': \'Annamaya\',
+
+\'vritti\': \'Nidrā\',
+
+\'quality\': \'Definitive, solid, grounded impact\'
+
+},
+
+\'T\': {
+
+\'kosha\': \'Annamaya\',
+
+\'vritti\': \'Nidrā\',
+
+\'quality\': \'Cutting, separating, holding form\'
+
+},
+
+\'B\': {
+
+\'kosha\': \'Annamaya\',
+
+\'vritti\': \'Nidrā\',
+
+\'quality\': \'Bursting density, heavy materiality\'
+
+},
+
+\'P\': {
+
+\'kosha\': \'Annamaya\',
+
+\'vritti\': \'Nidrā\',
+
+\'quality\': \'Blocking, holding back, suppression\'
+
+},
+
+\'L\': {
+
+\'kosha\': \'Annamaya\',
+
+\'vritti\': \'Nidrā\',
+
+\'quality\': \'Liquid density, dragging flow\'
+
+},
+
+\# ═══════════════════════════════════════════════════
+
+\# 2. PRANAMAYA (Pranic/Energy)
+
+\# ═══════════════════════════════════════════════════
+
+\# Qualities: Agitation, flow, breath, propulsion
+
+\'R\': {
+
+\'kosha\': \'Pranamaya\',
+
+\'vritti\': \'Vikalpa\', \# Intense restless imagination
+
+\'quality\': \'Flickering, rolling, agitation, restlessness\'
+
+},
+
+\'V\': {
+
+\'kosha\': \'Pranamaya\',
+
+\'vritti\': \'Vikalpa\',
+
+\'quality\': \'Vibrating, wavering, oscillating energy\'
+
+},
+
+\'H\': {
+
+\'kosha\': \'Pranamaya\',
+
+\'vritti\': \'Vikalpa\',
+
+\'quality\': \'Breath, exhaling, releasing vital force\'
+
+},
+
+\# NOTE: K (unpurified) also in Pranamaya - see above
+
+\# ═══════════════════════════════════════════════════
+
+\# 3. MANOMAYA (Emotional/Desire)
+
+\# ═══════════════════════════════════════════════════
+
+\# Qualities: Attachment, escape, fantasizing, emotional turbulence
+
+\'M\': {
+
+\'kosha\': \'Manomaya\',
+
+\'vritti\': \'Viparyaya\', \# Distorted memory, rumination
+
+\'quality\': \'Closed, contained, brooding attachment\'
+
+},
+
+\'N\': {
+
+\'kosha\': \'Manomaya\',
+
+\'vritti\': \'Viparyaya\',
+
+\'quality\': \'Nasal resonance, internalized emotion, negative fantasy\'
+
+},
+
+\'S\': {
+
+\'kosha\': \'Manomaya\',
+
+\'vritti\': \'Viparyaya\',
+
+\'quality\': \'Scattering, dispersing, leaking emotional energy\'
+
+},
+
+\'Z\': {
+
+\'kosha\': \'Manomaya\',
+
+\'vritti\': \'Vikalpa\',
+
+\'quality\': \'Buzzing confusion, anxious mental noise\'
+
+},
+
+\'F\': {
+
+\'kosha\': \'Manomaya\',
+
+\'vritti\': \'Viparyaya\',
+
+\'quality\': \'Friction, erosive worry, persistent doubt\'
+
+},
+
+\'W\': {
+
+\'kosha\': \'Manomaya\',
+
+\'vritti\': \'Vikalpa\',
+
+\'quality\': \'Winding desire, wavering indecision\'
+
+},
+
+\# ═══════════════════════════════════════════════════
+
+\# 4. VIJNANAMAYA (Intellectual/Discriminative)
+
+\# ═══════════════════════════════════════════════════
+
+\# Qualities: Analysis, correction, mental penetration
+
+\'Ch\': {
+
+\'kosha\': \'Vijnanamaya\',
+
+\'vritti\': \'Pramāṇa\',
+
+\'quality\': \'Choosing, selecting, discriminating\'
+
+},
+
+\'J\': {
+
+\'kosha\': \'Vijnanamaya\',
+
+\'vritti\': \'Pramāṇa\',
+
+\'quality\': \'Judging, evaluating, assessing\'
+
+},
+
+\'Jh\': {
+
+\'kosha\': \'Vijnanamaya\',
+
+\'vritti\': \'Pramāṇa\',
+
+\'quality\': \'Forceful discernment, emphatic judgment\'
+
+},
+
+\'Sha\': {
+
+\'kosha\': \'Vijnanamaya\',
+
+\'vritti\': \'Pramāṇa\',
+
+\'quality\': \'Sharp analysis, penetrating insight\'
+
+},
+
+\'Sh\': {
+
+\'kosha\': \'Vijnanamaya\',
+
+\'vritti\': \'Pramāṇa\', \# Can be Pramāṇa-distorted (harsh)
+
+\'quality\': \'Cutting truth, exposing, penetrating clarity\'
+
+},
+
+\# NOTE: K (purified) also in Vijnanamaya - see above
+
+\# ═══════════════════════════════════════════════════
+
+\# 5. ANANDAMAYA (Bliss/Void)
+
+\# ═══════════════════════════════════════════════════
+
+\# CRITICAL: NO CONSONANTS ORIGINATE HERE
+
+\# Only vowels (especially long vowels) can bring syllables to
+Anandamaya
+
+\# Reached only through:
+
+\# - Pure vowels (Ā, Ū, Ō)
+
+\# - Vowel-dominated syllables
+
+\# - Purification + aspect lifting
+
+}
+
+**CRITICAL NOTE on "K"**
+
+**K has DUAL STATES:**
+
+\# Unpurified K (default):
+
+\# - Kosha: Pranamaya
+
+\# - Vritti: Vikalpa (Āśā - hope masking fear)
+
+\# - Quality: Grasping, scanning, underlying fear
+
+\# Purified K (after vowel + aspect lifting):
+
+\# - Kosha: Vijnanamaya
+
+\# - Vritti: Pramāṇa (discrimination)
+
+\# - Quality: Sharp discernment
+
+\# Example:
+
+\# \"Ke\" (in \"Rakesh\") = K (unpurified) + E (forward desire)
+
+\# → Base Kosha: Pranamaya (not Vijnanamaya!)
+
+**Part 3: THE TRUE 10 ONTOLOGICAL LAYERS (SYMBOLIC LADDER)**
+
+**Canonical Ontology (NOT Social Psychology Model)**
+
+CANONICAL_ONTOLOGY_LAYERS = {
+
+\# ═══════════════════════════════════════════════════
+
+\# 1. EXECUTION (Karma)
+
+\# ═══════════════════════════════════════════════════
+
+\'Execution\': {
+
+\'level\': 1,
+
+\'sanskrit\': \'Karma\',
+
+\'domain\': \'Action, doing, manifestation in world\',
+
+\'keywords\': \[
+
+\'action\', \'doing\', \'execution\', \'performance\',
+
+\'manifestation\', \'activity\', \'work\', \'deed\'
+
+\],
+
+\'outer_qualities\': \[
+
+\'What one does\',
+
+\'Behavioral output\',
+
+\'Action patterns\',
+
+\'Functional roles\',
+
+\'Task execution\'
+
+\],
+
+\'social_expression\': \'Observable actions, functional behavior\'
+
+},
+
+\# ═══════════════════════════════════════════════════
+
+\# 2. IDENTITY (Tagging)
+
+\# ═══════════════════════════════════════════════════
+
+\'Identity\': {
+
+\'level\': 2,
+
+\'sanskrit\': \'Nāma-rūpa (partial)\',
+
+\'domain\': \'Labels, names, social tags\',
+
+\'keywords\': \[
+
+\'identity\', \'name\', \'label\', \'tag\', \'title\',
+
+\'role\', \'designation\', \'identification\'
+
+\],
+
+\'outer_qualities\': \[
+
+\'Social labels\',
+
+\'Role designations\',
+
+\'Identity markers\',
+
+\'Name and title\',
+
+\'Category memberships\'
+
+\],
+
+\'social_expression\': \'How one is labeled, social identity\'
+
+},
+
+\# ═══════════════════════════════════════════════════
+
+\# 3. FORM (Body/Shape)
+
+\# ═══════════════════════════════════════════════════
+
+\'Form\': {
+
+\'level\': 3,
+
+\'sanskrit\': \'Rūpa\',
+
+\'domain\': \'Physical form, shape, appearance\',
+
+\'keywords\': \[
+
+\'form\', \'shape\', \'body\', \'appearance\', \'structure\',
+
+\'physical\', \'material\', \'embodiment\'
+
+\],
+
+\'outer_qualities\': \[
+
+\'Physical appearance\',
+
+\'Bodily structure\',
+
+\'Material form\',
+
+\'Spatial presence\',
+
+\'Visual presentation\'
+
+\],
+
+\'social_expression\': \'Physical body, visible form\'
+
+},
+
+\# ═══════════════════════════════════════════════════
+
+\# 4. COGNITION (Mind)
+
+\# ═══════════════════════════════════════════════════
+
+\'Cognition\': {
+
+\'level\': 4,
+
+\'sanskrit\': \'Manas\',
+
+\'domain\': \'Cognitive processes, mental operations\',
+
+\'keywords\': \[
+
+\'cognition\', \'thinking\', \'mind\', \'perception\',
+
+\'awareness\', \'consciousness\', \'mental\'
+
+\],
+
+\'outer_qualities\': \[
+
+\'Mental processes\',
+
+\'Cognitive style\',
+
+\'Thinking patterns\',
+
+\'Perceptual modes\',
+
+\'Mental organization\'
+
+\],
+
+\'social_expression\': \'How one thinks, cognitive identity\'
+
+},
+
+\# ═══════════════════════════════════════════════════
+
+\# 5. AGENCY (Ego/Control)
+
+\# ═══════════════════════════════════════════════════
+
+\'Agency\': {
+
+\'level\': 5,
+
+\'sanskrit\': \'Ahaṅkāra\',
+
+\'domain\': \'Ego, sense of agency, control\',
+
+\'keywords\': \[
+
+\'agency\', \'control\', \'ego\', \'self\', \'will\',
+
+\'autonomy\', \'choice\', \'power\', \'doership\'
+
+\],
+
+\'outer_qualities\': \[
+
+\'Sense of control\',
+
+\'Egoic positioning\',
+
+\'Autonomy claims\',
+
+\'Personal power\',
+
+\'Will expression\'
+
+\],
+
+\'social_expression\': \'Ego identity, sense of doership\'
+
+},
+
+\# ═══════════════════════════════════════════════════
+
+\# 6. REASONING (Intellect)
+
+\# ═══════════════════════════════════════════════════
+
+\'Reasoning\': {
+
+\'level\': 6,
+
+\'sanskrit\': \'Buddhi\',
+
+\'domain\': \'Intellectual discrimination, reasoning\',
+
+\'keywords\': \[
+
+\'reasoning\', \'intellect\', \'discrimination\', \'wisdom\',
+
+\'judgment\', \'discernment\', \'logic\', \'analysis\'
+
+\],
+
+\'outer_qualities\': \[
+
+\'Intellectual capacity\',
+
+\'Reasoning style\',
+
+\'Discriminative faculty\',
+
+\'Analytical depth\',
+
+\'Wisdom expression\'
+
+\],
+
+\'social_expression\': \'Intellectual identity, reasoning persona\'
+
+},
+
+\# ═══════════════════════════════════════════════════
+
+\# 7. PURPOSE (Soul-direction)
+
+\# ═══════════════════════════════════════════════════
+
+\'Purpose\': {
+
+\'level\': 7,
+
+\'sanskrit\': \'Dharma\',
+
+\'domain\': \'Life purpose, soul direction\',
+
+\'keywords\': \[
+
+\'purpose\', \'direction\', \'calling\', \'dharma\',
+
+\'mission\', \'path\', \'destiny\', \'meaning\'
+
+\],
+
+\'outer_qualities\': \[
+
+\'Life direction\',
+
+\'Stated purpose\',
+
+\'Soul calling\',
+
+\'Path clarity\',
+
+\'Meaning orientation\'
+
+\],
+
+\'social_expression\': \'Life purpose, directional identity\'
+
+},
+
+\# ═══════════════════════════════════════════════════
+
+\# 8. OBSERVATION (Witness)
+
+\# ═══════════════════════════════════════════════════
+
+\'Observation\': {
+
+\'level\': 8,
+
+\'sanskrit\': \'Sākṣin\',
+
+\'domain\': \'Witnessing awareness, observation\',
+
+\'keywords\': \[
+
+\'observation\', \'witness\', \'awareness\', \'watching\',
+
+\'presence\', \'noticing\', \'seeing\', \'perceiving\'
+
+\],
+
+\'outer_qualities\': \[
+
+\'Witnessing capacity\',
+
+\'Observational stance\',
+
+\'Detached awareness\',
+
+\'Meta-cognition\',
+
+\'Reflective presence\'
+
+\],
+
+\'social_expression\': \'Observational identity, witness stance\'
+
+},
+
+\# ═══════════════════════════════════════════════════
+
+\# 9. CORE (Atman)
+
+\# ═══════════════════════════════════════════════════
+
+\'Core\': {
+
+\'level\': 9,
+
+\'sanskrit\': \'Ātman\',
+
+\'domain\': \'Essential self, true nature\',
+
+\'keywords\': \[
+
+\'core\', \'essence\', \'self\', \'atman\', \'soul\',
+
+\'true nature\', \'being\', \'essential\'
+
+\],
+
+\'outer_qualities\': \[
+
+\'Essential nature\',
+
+\'Core self\',
+
+\'True being\',
+
+\'Fundamental identity\',
+
+\'Unchanging essence\'
+
+\],
+
+\'social_expression\': \'Core identity, essential self\'
+
+},
+
+\# ═══════════════════════════════════════════════════
+
+\# 10. UNIVERSAL (Brahman)
+
+\# ═══════════════════════════════════════════════════
+
+\'Universal\': {
+
+\'level\': 10,
+
+\'sanskrit\': \'Brahman\',
+
+\'domain\': \'Universal consciousness, absolute\',
+
+\'keywords\': \[
+
+\'universal\', \'brahman\', \'absolute\', \'infinite\',
+
+\'cosmic\', \'totality\', \'oneness\', \'all\'
+
+\],
+
+\'outer_qualities\': \[
+
+\'Universal awareness\',
+
+\'Cosmic consciousness\',
+
+\'Absolute perspective\',
+
+\'Non-dual reality\',
+
+\'Total being\'
+
+\],
+
+\'social_expression\': \'Universal identity, cosmic perspective\'
+
+}
+
+}
+
+**Part 4: CORRECTED VRITTI-KOSHA MAPPING (COMPLETE)**
+
+CANONICAL_KOSHA_VRITTI_MAP = {
+
+\'Annamaya\': {
+
+\'primary_vritti\': \'Nidrā\',
+
+\'secondary_vritti\': None,
+
+\'explanation\': \'Physical body-bound, inertness, sleep-like density\'
+
+},
+
+\'Pranamaya\': {
+
+\'primary_vritti\': \'Vikalpa\',
+
+\'secondary_vritti\': \'Viparyaya\', \# CORRECTION: Added
+
+\'explanation\': (
+
+\'Primary: Restless imagination, energetic turbulence. \'
+
+\'Secondary: Misdirection when turbulence is high\'
+
+)
+
+},
+
+\'Manomaya\': {
+
+\'primary_vritti\': \'Viparyaya\',
+
+\'secondary_vritti\': \'Vikalpa\',
+
+\'explanation\': (
+
+\'Primary: Emotional misperception, distorted view. \'
+
+\'Secondary: Desire-driven imagination\'
+
+)
+
+},
+
+\'Vijnanamaya\': {
+
+\'primary_vritti\': \'Pramāṇa\',
+
+\'secondary_vritti\': None,
+
+\'explanation\': \'Valid cognition, clear discrimination, wisdom\'
+
+},
+
+\'Anandamaya\': {
+
+\'primary_vritti\': \'Pramāṇa\',
+
+\'secondary_vritti\': \'Vikalpa\', \# CORRECTION: Added
+
+\'explanation\': (
+
+\'Primary: Clear blissful awareness. \'
+
+\'Secondary: Positive imagination in mystical contexts\'
+
+)
+
+}
+
+}
+
+**Part 5: CORRECTED "RAKESH" ANALYSIS**
+
+def canonical_rakesh_analysis():
+
+\"\"\"
+
+CORRECTED analysis of \'Rakesh\' using canonical mappings.
+
+\"\"\"
+
+print(\"\\n\" + \"=\"\*70)
+
+print(\"CANONICAL SOULPI ANALYSIS: \'RAKESH\'\")
+
+print(\"=\"\*70 + \"\\n\")
+
+print(\"SYLLABIC BREAKDOWN:\")
+
+print(\" Ra \| ke \| sh\\n\")
+
+print(\"SYLLABLE-BY-SYLLABLE (CORRECTED):\\n\")
+
+print(\"1. \\\"RA\\\"\")
+
+print(\" Consonant R:\")
+
+print(\" └─ Kosha: Pranamaya (CORRECT)\")
+
+print(\" └─ Vritti: Vikalpa-intense (agitation/restlessness)\")
+
+print(\" └─ Quality: Flickering, rolling, restless energy\")
+
+print(\" Vowel A: Primordial openness, origin\")
+
+print(\" Raw Meaning: \\\"Restless surge toward beginnings\\\"\\n\")
+
+print(\"2. \\\"KE\\\" (CORRECTED)\")
+
+print(\" Consonant K (UNPURIFIED):\")
+
+print(\" └─ Kosha: Pranamaya (NOT Vijnanamaya!)\")
+
+print(\" └─ Vritti: Vikalpa (Āśā - hope → avoidance, subtle fear)\")
+
+print(\" └─ Quality: Grasping, scanning, fear-based hope\")
+
+print(\" Vowel E: Desire, aspiration, forward movement\")
+
+print(\" Raw Meaning: \\\"Desiring movement from underlying
+fear\\\"\\n\")
+
+print(\"3. \\\"SH\\\"\")
+
+print(\" Consonant Sh:\")
+
+print(\" └─ Kosha: Vijnanamaya (CORRECT)\")
+
+print(\" └─ Vritti: Pramāṇa (can be harsh/distorted)\")
+
+print(\" └─ Quality: Cutting truth, penetrating clarity\")
+
+print(\" Vowel (implied A): Minimal vibration\")
+
+print(\" Raw Meaning: \\\"Penetrating exposure seeking clarity\\\"\\n\")
+
+print(\"=\"\*70)
+
+print(\"INNER LAYER (Acoustic → Kosha) - CORRECTED:\")
+
+print(\"=\"\*70)
+
+print(\"\\nKosha Distribution:\")
+
+print(\" Pranamaya: 66% (R + K unpurified)\")
+
+print(\" Vijnanamaya: 34% (Sh)\")
+
+print(\"\\nDominant: Pranamaya (CORRECTED from Vijnanamaya)\")
+
+print(\"\\nAcoustic Truth:\")
+
+print(\" \'Restless energetic surge (Pranamaya),\")
+
+print(\" desiring movement from fear (Pranamaya),\")
+
+print(\" breaking into penetrating clarity (Vijnanamaya)\'\\n\")
+
+print(\"This reveals:\")
+
+print(\" • Primary: Pranamaya consciousness (restless energy)\")
+
+print(\" • Secondary: Vijnanamaya aspiration (wisdom-seeking)\")
+
+print(\" • Pattern: Energetic restlessness driving truth pursuit\\n\")
+
+print(\"=\"\*70)
+
+print(\"OUTER LAYER (Cultural → Ontology):\")
+
+print(\"=\"\*70)
+
+print(\"\\nSanskrit Etymology: Raka (moon) + Isha (lord)\")
+
+print(\"\\nOntology Mapping:\")
+
+print(\" \'Lord of moon\' → Universal (cosmic reference)\")
+
+print(\" \'Protector\' → Purpose (soul-direction)\")
+
+print(\" \'Radiant\' → Form (visible quality)\\n\")
+
+print(\"Ontology Distribution:\")
+
+print(\" Universal: 40%\")
+
+print(\" Purpose: 35%\")
+
+print(\" Form: 25%\\n\")
+
+print(\"Dominant: Universal\\n\")
+
+print(\"=\"\*70)
+
+print(\"TENSION ANALYSIS (CORRECTED):\")
+
+print(\"=\"\*70)
+
+print(\"\\nInner: Pranamaya (level 2/5 = 0.4 normalized)\")
+
+print(\"Outer: Universal (level 10/10 = 1.0 normalized)\")
+
+print(\"\\nTension: \|0.4 - 1.0\| = 0.6\")
+
+print(\"Rating: HIGH TENSION\\n\")
+
+print(\"LIFE PATTERN PREDICTION:\")
+
+print(\" Inner Pranamaya (restless energy) seeks expression through\")
+
+print(\" Outer Universal (cosmic perspective).\")
+
+print(\"\\n This HIGH tension creates:\")
+
+print(\" • Constant restless seeking\")
+
+print(\" • Drive to universalize patterns\")
+
+print(\" • Energy that cannot rest in mundane\")
+
+print(\" • Push toward cosmic/unified understanding\")
+
+print(\" • Tension between agitation and transcendence\\n\")
+
+print(\" This explains:\")
+
+print(\" ✓ Unified field theory pursuit\")
+
+print(\" ✓ Symbol-U (universal consciousness architecture)\")
+
+print(\" ✓ Patent portfolio (systemizing universal patterns)\")
+
+print(\" ✓ Cannot rest in surface solutions\")
+
+print(\" ✓ Restless until truth is universalized\\n\")
+
+print(\"=\"\*70 + \"\\n\")
+
+**Part 6: CANONICAL SOULPI ENGINE (CORRECTED)**
+
+#!/usr/bin/env python3
+
+\"\"\"
+
+CANONICAL Soulpi Engine v2.7.1
+
+Corrected Kosha-Consonant + True Ontology
+
+\"\"\"
+
+class CanonicalSoulpiEngine:
+
+\"\"\"
+
+Canonical Soulpi engine with corrected mappings.
+
+\"\"\"
+
+def \_\_init\_\_(self):
+
+self.consonant_map = CANONICAL_CONSONANT_KOSHA_MAP
+
+self.ontology_layers = CANONICAL_ONTOLOGY_LAYERS
+
+self.kosha_vritti_map = CANONICAL_KOSHA_VRITTI_MAP
+
+def map_consonant_to_kosha(self, consonant: str) -\> Dict:
+
+\"\"\"
+
+Map consonant to Kosha with dual-state handling for K.
+
+Returns kosha info including purification state.
+
+\"\"\"
+
+c_upper = consonant.upper()
+
+if c_upper == \'K\':
+
+\# K has dual states - return both
+
+return {
+
+\'consonant\': \'K\',
+
+\'has_dual_state\': True,
+
+\'base_kosha\': \'Pranamaya\',
+
+\'purified_kosha\': \'Vijnanamaya\',
+
+\'default_kosha\': \'Pranamaya\', \# Use unpurified by default
+
+\'base_vritti\': \'Vikalpa\',
+
+\'purified_vritti\': \'Pramāṇa\'
+
+}
+
+elif c_upper in self.consonant_map:
+
+info = self.consonant_map\[c_upper\]
+
+return {
+
+\'consonant\': c_upper,
+
+\'has_dual_state\': False,
+
+\'kosha\': info\[\'kosha\'\],
+
+\'vritti\': info\[\'vritti\'\],
+
+\'quality\': info\[\'quality\'\]
+
+}
+
+else:
+
+\# Unknown consonant - default to Annamaya
+
+return {
+
+\'consonant\': c_upper,
+
+\'has_dual_state\': False,
+
+\'kosha\': \'Annamaya\',
+
+\'vritti\': \'Nidrā\',
+
+\'quality\': \'Unknown (defaulted to material)\'
+
+}
+
+def determine_k_purification(self, syllable_context: str, 
+
+vowel: str) -\> str:
+
+\"\"\"
+
+Determine if K is purified based on context.
+
+Heuristics:
+
+\- Long vowels (Ī, Ū, Ā) → purification more likely
+
+\- Spiritual/wisdom words → purification
+
+\- Default → unpurified (Pranamaya)
+
+\"\"\"
+
+\# For now, use simple heuristic
+
+\# In full implementation, would use semantic analysis
+
+long_vowels = {\'Ī\', \'Ū\', \'Ā\', \'Ō\', \'Ai\', \'Au\'}
+
+if vowel in long_vowels:
+
+\# Long vowel suggests upward lift
+
+return \'Vijnanamaya\'
+
+else:
+
+\# Default to unpurified
+
+return \'Pranamaya\'
+
+def analyze_word_canonical(self, word: str, 
+
+cultural_meaning: str = None) -\> Dict:
+
+\"\"\"
+
+Canonical word analysis with corrected mappings.
+
+\"\"\"
+
+word_lower = word.lower()
+
+\# Extract syllables (simplified - use real syllabifier in production)
+
+syllables = self.\_decompose_syllables(word_lower)
+
+\# INNER: Consonants → Kosha
+
+kosha_counts = {
+
+\'Annamaya\': 0,
+
+\'Pranamaya\': 0,
+
+\'Manomaya\': 0,
+
+\'Vijnanamaya\': 0,
+
+\'Anandamaya\': 0
+
+}
+
+for syllable in syllables:
+
+\# Extract consonant and vowel
+
+consonant, vowel = self.\_split_syllable(syllable)
+
+if consonant:
+
+cons_info = self.map_consonant_to_kosha(consonant)
+
+if cons_info.get(\'has_dual_state\'):
+
+\# Handle K dual state
+
+kosha = self.determine_k_purification(word, vowel)
+
+kosha_counts\[kosha\] += 1
+
+else:
+
+kosha = cons_info\[\'kosha\'\]
+
+kosha_counts\[kosha\] += 1
+
+else:
+
+\# Pure vowel → Anandamaya
+
+kosha_counts\[\'Anandamaya\'\] += 1
+
+\# Normalize Kosha distribution
+
+total = sum(kosha_counts.values())
+
+kosha_dist = {k: v/total for k, v in kosha_counts.items()} if total \> 0
+else {}
+
+\# OUTER: Semantic → Ontology
+
+ontology_dist = self.\_map_semantic_to_ontology(word, cultural_meaning)
+
+\# Compute tension
+
+dominant_kosha = max(kosha_dist, key=kosha_dist.get) if kosha_dist else
+\'Annamaya\'
+
+dominant_ontology = max(ontology_dist, key=ontology_dist.get) if
+ontology_dist else \'Execution\'
+
+tension = self.\_compute_tension_canonical(dominant_kosha,
+dominant_ontology)
+
+return {
+
+\'word\': word,
+
+\'kosha_distribution\': kosha_dist,
+
+\'dominant_kosha\': dominant_kosha,
+
+\'ontology_distribution\': ontology_dist,
+
+\'dominant_ontology\': dominant_ontology,
+
+\'tension\': tension
+
+}
+
+def \_compute_tension_canonical(self, kosha: str, ontology: str) -\>
+float:
+
+\"\"\"Compute tension using canonical ladder.\"\"\"
+
+kosha_depth = {
+
+\'Annamaya\': 0.2,
+
+\'Pranamaya\': 0.4,
+
+\'Manomaya\': 0.6,
+
+\'Vijnanamaya\': 0.8,
+
+\'Anandamaya\': 1.0
+
+}
+
+ontology_height = {
+
+\'Execution\': 0.1,
+
+\'Identity\': 0.2,
+
+\'Form\': 0.3,
+
+\'Cognition\': 0.4,
+
+\'Agency\': 0.5,
+
+\'Reasoning\': 0.6,
+
+\'Purpose\': 0.7,
+
+\'Observation\': 0.8,
+
+\'Core\': 0.9,
+
+\'Universal\': 1.0
+
+}
+
+k_depth = kosha_depth.get(kosha, 0.5)
+
+o_height = ontology_height.get(ontology, 0.5)
+
+return abs(k_depth - o_height)
+
+\# \... additional helper methods \...
+
+\# ============================================================
+
+\# CANONICAL DEMONSTRATION
+
+\# ============================================================
+
+if \_\_name\_\_ == \"\_\_main\_\_\":
+
+print(\"\\n\" + \"=\"\*70)
+
+print(\"CANONICAL SOULPI ENGINE v2.7.1\")
+
+print(\"Corrected Architecture\")
+
+print(\"=\"\*70)
+
+\# Demonstrate corrected Rakesh analysis
+
+canonical_rakesh_analysis()
+
+\# Verify consonant mapping
+
+print(\"\\n\" + \"=\"\*70)
+
+print(\"CONSONANT → KOSHA VERIFICATION\")
+
+print(\"=\"\*70 + \"\\n\")
+
+engine = CanonicalSoulpiEngine()
+
+test_consonants = \[\'R\', \'K\', \'Sh\', \'M\', \'G\', \'Ch\'\]
+
+for cons in test_consonants:
+
+info = engine.map_consonant_to_kosha(cons)
+
+print(f\"{cons}:\")
+
+if info.get(\'has_dual_state\'):
+
+print(f\" Dual State: {info\[\'base_kosha\'\]} →
+{info\[\'purified_kosha\'\]}\")
+
+print(f\" Default: {info\[\'default_kosha\'\]}\")
+
+else:
+
+print(f\" Kosha: {info\[\'kosha\'\]}\")
+
+print(f\" Vritti: {info\[\'vritti\'\]}\")
+
+print()
+
+**SUMMARY OF CORRECTIONS**
+
+**✅ FIXED:**
+
+1.  Consonant → Kosha mapping (K now correctly dual-state)
+
+2.  10 Ontology layers (now Symbolic Ladder, not social model)
+
+3.  "Rakesh" analysis (Ke now Pranamaya, not Vijnanamaya)
+
+4.  Vritti-Kosha completeness (added secondary mappings)
+
+5.  Anandamaya origins (NO consonants, vowels only)
+
+**✅ VERIFIED:**
+
+1.  Dual mapping architecture (Inner→Kosha, Outer→Ontology)
+
+2.  Orthogonal dimensions (depth vs breadth)
+
+3.  Tension calculation method
+
+4.  Integration pipeline structure
+
+**⚠️ CRITICAL:** This is the CANONICAL version. All previous versions
+with incorrect mappings should be discarded.

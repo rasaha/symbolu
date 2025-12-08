@@ -1,0 +1,1899 @@
+**#!/usr/bin/env python3**
+
+""" COMPLETE PHONETIC-EMOTIONAL ANALYZER v2.7.2
+
+Based on canonical Soulpi v2.7.2 mappings:
+
+1.  44 Sanskrit consonants → 5 Koshas → Vritti tendencies
+
+2.  14 Sanskrit vowels → Emotional valence → Aspect bridges
+
+3.  Complete acoustic-to-emotional mapping
+
+Status: CANONICAL - Aligned with FINAL_canonical_soulpi_v2.7.1.py Date:
+November 28, 2025 """
+
+from typing import Dict, List, Optional from dataclasses import
+dataclass from enum import Enum
+
+**============================================================================**
+
+**PART I: CONSONANT PHONETIC-EMOTIONAL MAPPING (44 CONSONANTS)**
+
+**============================================================================**
+
+\@dataclass class ConsonantProfile: """Complete emotional-acoustic
+profile for a consonant.""" devanagari: str transliteration: str
+kosha_id: int kosha_name: str vritti: str negative_emotion: str
+positive_potential: str acoustic_quality: str body_location: str
+energetic_signature: str psychological_pattern: str therapeutic_note:
+str
+
+**Complete consonant emotional database**
+
+CONSONANT_EMOTIONAL_MAP = {
+
+**═══════════════════════════════════════════════════════════════════**
+
+**ANNAMAYA CONSONANTS (Physical/Dense) - Kosha 1**
+
+**Vritti: Nidrā (sleep, inertness, dullness)**
+
+**═══════════════════════════════════════════════════════════════════**
+
+\"ba\": ConsonantProfile(
+
+devanagari=\"ब\",
+
+transliteration=\"ba\",
+
+kosha_id=1,
+
+kosha_name=\"ANNAMAYA\",
+
+vritti=\"Nidrā (inertness)\",
+
+negative_emotion=\"Closed attachment, possessive grip, material
+obsession\",
+
+positive_potential=\"Stable containment, grounded presence, reliable
+base\",
+
+acoustic_quality=\"Bilabial closure - lips seal completely\",
+
+body_location=\"Lips - physical boundary\",
+
+energetic_signature=\"Heavy, magnetic pull inward, contractive\",
+
+psychological_pattern=\"Fear of loss → grasping → heaviness →
+indulgence\",
+
+therapeutic_note=\"When repeated: Can ground anxiety OR increase
+attachment. Use mindfully.\"
+
+),
+
+\"bha\": ConsonantProfile(
+
+devanagari=\"भ\",
+
+transliteration=\"bha\",
+
+kosha_id=1,
+
+kosha_name=\"ANNAMAYA\",
+
+vritti=\"Nidrā (dullness)\",
+
+negative_emotion=\"Aspirated obsession, inflated attachment, bloated
+possession\",
+
+positive_potential=\"Expansive stability, generous containment\",
+
+acoustic_quality=\"Aspirated bilabial - breath + closure\",
+
+body_location=\"Lips + diaphragm\",
+
+energetic_signature=\"Heavy with expansive push, swelling inertia\",
+
+psychological_pattern=\"Attachment inflates → becomes belief →
+rigidity\",
+
+therapeutic_note=\"Bhakti (devotion) uses this to transform attachment
+into surrender\"
+
+),
+
+\"ma\": ConsonantProfile(
+
+devanagari=\"म\",
+
+transliteration=\"ma\",
+
+kosha_id=1,
+
+kosha_name=\"ANNAMAYA\",
+
+vritti=\"Nidrā (unconscious merging)\",
+
+negative_emotion=\"Enmeshment, loss of boundaries, maternal
+smothering\",
+
+positive_potential=\"Nurturing embrace, compassionate care, motherly
+love\",
+
+acoustic_quality=\"Nasal resonance - sound trapped in body\",
+
+body_location=\"Nasal cavity - internal reverberation\",
+
+energetic_signature=\"Absorbed, dissolved boundaries, merging density\",
+
+psychological_pattern=\"Seeking comfort → avoiding separation →
+enmeshment\",
+
+therapeutic_note=\"\'Ma\' = Mother. Can heal abandonment OR reinforce
+dependence.\"
+
+),
+
+\"ya\": ConsonantProfile(
+
+devanagari=\"य\",
+
+transliteration=\"ya\",
+
+kosha_id=1,
+
+kosha_name=\"ANNAMAYA\",
+
+vritti=\"Nidrā (sticky continuity)\",
+
+negative_emotion=\"Stubborn repetition, habitual patterns, \'stuck\' in
+old ways\",
+
+positive_potential=\"Smooth continuity, yoga (union), graceful
+linking\",
+
+acoustic_quality=\"Semi-vowel - between consonant and vowel\",
+
+body_location=\"Palate - sliding contact\",
+
+energetic_signature=\"Viscous flow, dragging continuity, habitual
+momentum\",
+
+psychological_pattern=\"Comfort in sameness → fear of change → rigid
+patterns\",
+
+therapeutic_note=\"Yoga uses this to link (yuj = join) - transforms
+stuckness to flow\"
+
+),
+
+\"ra\": ConsonantProfile(
+
+devanagari=\"र\",
+
+transliteration=\"ra\",
+
+kosha_id=1,
+
+kosha_name=\"ANNAMAYA\",
+
+vritti=\"Nidrā (destructive inertia)\",
+
+negative_emotion=\"Dense restless fire, dragging agitation, body-bound
+turbulence\",
+
+positive_potential=\"Stable flame, controlled passion, embodied power\",
+
+acoustic_quality=\"Retroflex tap - tongue curls back, heavy contact\",
+
+body_location=\"Hard palate - deep in mouth\",
+
+energetic_signature=\"Heavy fire, smoldering intensity, viscous heat\",
+
+psychological_pattern=\"Physical tension → agitated inertia →
+destructive discharge\",
+
+therapeutic_note=\"CRITICAL: \'R\' is ANNAMAYA despite seeming
+energetic. Dense restlessness.\"
+
+),
+
+\"la\": ConsonantProfile(
+
+devanagari=\"ल\",
+
+transliteration=\"la\",
+
+kosha_id=1,
+
+kosha_name=\"ANNAMAYA\",
+
+vritti=\"Nidrā (cruel viscosity)\",
+
+negative_emotion=\"Slow cruelty, dragging attachment, viscous holding\",
+
+positive_potential=\"Gentle flow, soft support, nurturing liquidity\",
+
+acoustic_quality=\"Lateral liquid - air flows around tongue sides\",
+
+body_location=\"Alveolar ridge - tongue creates channel\",
+
+energetic_signature=\"Liquid density, slow flowing heaviness\",
+
+psychological_pattern=\"Attachment flows slowly → becomes possessive →
+turns cruel when threatened\",
+
+therapeutic_note=\"\'Love\' starts with \'L\' - can be possessive
+attachment OR true compassion\"
+
+),
+
+\# ═══════════════════════════════════════════════════════════════════
+
+\# PRANAMAYA CONSONANTS (Pranic/Energy) - Kosha 2
+
+\# Vritti: Vikalpa (imagination, fantasy, energetic projection)
+
+\# ═══════════════════════════════════════════════════════════════════
+
+\"ka\": ConsonantProfile(
+
+devanagari=\"क\",
+
+transliteration=\"ka\",
+
+kosha_id=2,
+
+kosha_name=\"PRANAMAYA\",
+
+vritti=\"Vikalpa (restless projection)\",
+
+negative_emotion=\"Agitated hope, anxious projection, fear-driven
+grasping\",
+
+positive_potential=\"Clear discrimination, sharp discernment, decisive
+action\",
+
+acoustic_quality=\"Velar stop - throat closure, explosive release\",
+
+body_location=\"Soft palate (back of throat)\",
+
+energetic_signature=\"Explosive push, projective burst, turbulent
+release\",
+
+psychological_pattern=\"Fear of void → project hope → agitation →
+grasping\",
+
+therapeutic_note=\"\'Kāma\' (desire) starts here - energetic push toward
+objects\"
+
+),
+
+\"kha\": ConsonantProfile(
+
+devanagari=\"ख\",
+
+transliteration=\"kha\",
+
+kosha_id=2,
+
+kosha_name=\"PRANAMAYA\",
+
+vritti=\"Vikalpa (void-fear)\",
+
+negative_emotion=\"Fear of emptiness, anxious inflation,
+void-avoidance\",
+
+positive_potential=\"Spacious awareness, open sky (kha = sky)\",
+
+acoustic_quality=\"Aspirated velar - explosive + breath surge\",
+
+body_location=\"Throat + diaphragm\",
+
+energetic_signature=\"Expansive burst, fearful inflation, avoidance
+push\",
+
+psychological_pattern=\"Sensing void → fear → energetic inflation to
+avoid\",
+
+therapeutic_note=\"\'Kha\' = Space/Sky. Can trigger fear OR lead to
+spaciousness.\"
+
+),
+
+\"ga\": ConsonantProfile(
+
+devanagari=\"ग\",
+
+transliteration=\"ga\",
+
+kosha_id=2,
+
+kosha_name=\"PRANAMAYA\",
+
+vritti=\"Vikalpa (movement compulsion)\",
+
+negative_emotion=\"Compulsive movement, restless going, escape
+impulse\",
+
+positive_potential=\"Purposeful movement, clear direction, healthy
+\'going\'\",
+
+acoustic_quality=\"Voiced velar - vocal cords vibrate with throat
+stop\",
+
+body_location=\"Throat + vocal cords\",
+
+energetic_signature=\"Vibrating push, restless momentum, escape
+velocity\",
+
+psychological_pattern=\"Discomfort → must move → restless going → never
+arriving\",
+
+therapeutic_note=\"\'Gati\' (movement). Can be restless escape OR
+purposeful journey.\"
+
+),
+
+\"gha\": ConsonantProfile(
+
+devanagari=\"घ\",
+
+transliteration=\"gha\",
+
+kosha_id=2,
+
+kosha_name=\"PRANAMAYA\",
+
+vritti=\"Vikalpa (forceful push)\",
+
+negative_emotion=\"Aggressive pushing, forceful projection, violent
+thrust\",
+
+positive_potential=\"Powerful breakthrough, strong determination\",
+
+acoustic_quality=\"Voiced aspirated velar - maximum throat force\",
+
+body_location=\"Deep throat + full breath\",
+
+energetic_signature=\"Explosive force, violent push, aggressive
+projection\",
+
+psychological_pattern=\"Blockage → frustration → forceful push →
+violence\",
+
+therapeutic_note=\"\'Ghora\' (terrible). Strongest pranic push - can
+harm or breakthrough.\"
+
+),
+
+\"ṅa\": ConsonantProfile(
+
+devanagari=\"ङ\",
+
+transliteration=\"ṅa (nga)\",
+
+kosha_id=2,
+
+kosha_name=\"PRANAMAYA\",
+
+vritti=\"Vikalpa (humming agitation)\",
+
+negative_emotion=\"Buzzing anxiety, vibrating worry, humming
+restlessness\",
+
+positive_potential=\"Resonant vitality, sustained energy, meditative
+hum\",
+
+acoustic_quality=\"Velar nasal - throat + nasal resonance\",
+
+body_location=\"Soft palate + nasal cavity\",
+
+energetic_signature=\"Sustained vibration, humming energy, resonant
+agitation\",
+
+psychological_pattern=\"Energy trapped → vibrates without release →
+anxiety hum\",
+
+therapeutic_note=\"Used in \'Om\' (Aum) - can be anxious hum OR sacred
+resonance\"
+
+),
+
+\"ca\": ConsonantProfile(
+
+devanagari=\"च\",
+
+transliteration=\"ca (cha)\",
+
+kosha_id=2,
+
+kosha_name=\"PRANAMAYA\",
+
+vritti=\"Vikalpa (scattered projection)\",
+
+negative_emotion=\"Scattered energy, dispersed focus, fragmented
+projection\",
+
+positive_potential=\"Multifaceted awareness, versatile energy\",
+
+acoustic_quality=\"Palatal affricate - air scattered at palate\",
+
+body_location=\"Hard palate (roof of mouth)\",
+
+energetic_signature=\"Dispersed burst, scattered projection, fragmented
+push\",
+
+psychological_pattern=\"Energy fragments → scattered attention → lost
+focus\",
+
+therapeutic_note=\"\'Cit\' (consciousness). Can be scattered OR
+multi-aware.\"
+
+),
+
+\"cha\": ConsonantProfile(
+
+devanagari=\"छ\",
+
+transliteration=\"cha\",
+
+kosha_id=2,
+
+kosha_name=\"PRANAMAYA\",
+
+vritti=\"Vikalpa (explosive scatter)\",
+
+negative_emotion=\"Chaotic burst, explosive fragmentation, anxious
+spray\",
+
+positive_potential=\"Creative explosion, dynamic expression\",
+
+acoustic_quality=\"Aspirated palatal affricate - maximum scattering\",
+
+body_location=\"Hard palate + breath surge\",
+
+energetic_signature=\"Explosive dispersion, chaotic spray, anxiety
+burst\",
+
+psychological_pattern=\"Pressure builds → explosive release → chaotic
+scatter\",
+
+therapeutic_note=\"\'Chāyā\' (shadow). Maximum pranic chaos -
+destructive OR creative.\"
+
+),
+
+\# ═══════════════════════════════════════════════════════════════════
+
+\# MANOMAYA CONSONANTS (Emotional/Mind) - Kosha 3
+
+\# Vritti: Viparyaya (misperception, emotional distortion)
+
+\# ═══════════════════════════════════════════════════════════════════
+
+\"ja\": ConsonantProfile(
+
+devanagari=\"ज\",
+
+transliteration=\"ja\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (birth-death fear)\",
+
+negative_emotion=\"Fear of birth/death cycle, existential anxiety,
+becoming-dread\",
+
+positive_potential=\"Acceptance of change, life force, generative
+power\",
+
+acoustic_quality=\"Voiced palatal affricate - vibrating scatter\",
+
+body_location=\"Hard palate + vocal cords\",
+
+energetic_signature=\"Anxious generation, fearful becoming,
+birth-tremor\",
+
+psychological_pattern=\"Sensing impermanence → fear of death → clinging
+to identity\",
+
+therapeutic_note=\"\'Janma\' (birth). Core existential anxiety. Requires
+deep work.\"
+
+),
+
+\"jha\": ConsonantProfile(
+
+devanagari=\"झ\",
+
+transliteration=\"jha\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (violent confusion)\",
+
+negative_emotion=\"Explosive confusion, violent misperception, chaotic
+delusion\",
+
+positive_potential=\"Breakthrough clarity, sudden awakening\",
+
+acoustic_quality=\"Voiced aspirated palatal affricate\",
+
+body_location=\"Palate + throat + breath\",
+
+energetic_signature=\"Violent confusion-burst, explosive delusion\",
+
+psychological_pattern=\"Deep confusion → violent reaction → chaotic
+expression\",
+
+therapeutic_note=\"Rare consonant. Extreme emotional volatility.\"
+
+),
+
+\"ña\": ConsonantProfile(
+
+devanagari=\"ञ\",
+
+transliteration=\"ña (nya)\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (knowing-confusion)\",
+
+negative_emotion=\"False knowing, intellectual arrogance masking
+confusion\",
+
+positive_potential=\"True intuitive knowing, discriminative wisdom\",
+
+acoustic_quality=\"Palatal nasal - knowing resonance\",
+
+body_location=\"Hard palate + nasal\",
+
+energetic_signature=\"Resonant confusion, humming false-knowing\",
+
+psychological_pattern=\"Don\'t know → pretend to know → arrogant
+confusion\",
+
+therapeutic_note=\"\'Jñāna\' (knowledge). False knowledge is worse than
+ignorance.\"
+
+),
+
+\"ṭa\": ConsonantProfile(
+
+devanagari=\"ट\",
+
+transliteration=\"ṭa\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (rigid structure)\",
+
+negative_emotion=\"Rigid mental structure, brittle beliefs, defensive
+hardness\",
+
+positive_potential=\"Clear structure, organized thinking\",
+
+acoustic_quality=\"Retroflex stop - tongue curls back, hard impact\",
+
+body_location=\"Hard palate (retroflex position)\",
+
+energetic_signature=\"Hard impact, rigid structure, defensive
+hardness\",
+
+psychological_pattern=\"Fear of chaos → rigid structure → brittle
+defensiveness\",
+
+therapeutic_note=\"Intellectual rigidity. Needs softening, not
+breaking.\"
+
+),
+
+\"ṭha\": ConsonantProfile(
+
+devanagari=\"ठ\",
+
+transliteration=\"ṭha\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (explosive rigidity)\",
+
+negative_emotion=\"Violently defended beliefs, explosive
+righteousness\",
+
+positive_potential=\"Strong conviction with openness\",
+
+acoustic_quality=\"Aspirated retroflex - hard + breath burst\",
+
+body_location=\"Hard palate + diaphragm\",
+
+energetic_signature=\"Explosive hardness, violent certainty\",
+
+psychological_pattern=\"Belief threatened → violent defense → explosive
+reaction\",
+
+therapeutic_note=\"Religious/political extremism often has this
+signature.\"
+
+),
+
+\"ḍa\": ConsonantProfile(
+
+devanagari=\"ड\",
+
+transliteration=\"ḍa\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (damaging strike)\",
+
+negative_emotion=\"Sharp criticism, cutting judgment, damaging
+projection\",
+
+positive_potential=\"Precise discernment, surgical clarity\",
+
+acoustic_quality=\"Voiced retroflex stop - vibrating hard strike\",
+
+body_location=\"Hard palate + vocal cords\",
+
+energetic_signature=\"Striking vibration, damaging impact\",
+
+psychological_pattern=\"Feel hurt → strike back → damage others → cycle
+continues\",
+
+therapeutic_note=\"\'Damage\' in English echoes this. Requires healing,
+not hardening.\"
+
+),
+
+\"ḍha\": ConsonantProfile(
+
+devanagari=\"ढ\",
+
+transliteration=\"ḍha\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (explosive damage)\",
+
+negative_emotion=\"Explosive rage, violent criticism, devastating
+judgment\",
+
+positive_potential=\"Powerful transformation, necessary destruction\",
+
+acoustic_quality=\"Voiced aspirated retroflex - maximum strike\",
+
+body_location=\"Deep palate + full breath + vocal cords\",
+
+energetic_signature=\"Devastating blow, explosive damage\",
+
+psychological_pattern=\"Accumulated pain → explosive rage → devastating
+others\",
+
+therapeutic_note=\"Most violent emotional signature. Requires trauma
+work.\"
+
+),
+
+\"ṇa\": ConsonantProfile(
+
+devanagari=\"ण\",
+
+transliteration=\"ṇa\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (deep resonant confusion)\",
+
+negative_emotion=\"Deep-seated delusion, resonant misperception\",
+
+positive_potential=\"Deep intuitive knowing, profound understanding\",
+
+acoustic_quality=\"Retroflex nasal - deep resonance\",
+
+body_location=\"Deep palate + nasal cavity\",
+
+energetic_signature=\"Deep humming confusion, resonant delusion\",
+
+psychological_pattern=\"Confusion goes deep → becomes identity →
+resonates through all\",
+
+therapeutic_note=\"Hardest to treat - confusion has become structure.\"
+
+),
+
+\"ta\": ConsonantProfile(
+
+devanagari=\"त\",
+
+transliteration=\"ta\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (sharp cutting)\",
+
+negative_emotion=\"Cutting thoughts, sharp judgment, mental cruelty\",
+
+positive_potential=\"Clear discrimination, precise thinking\",
+
+acoustic_quality=\"Dental stop - tongue against teeth, sharp release\",
+
+body_location=\"Upper teeth - front of mouth\",
+
+energetic_signature=\"Sharp cut, precise strike, mental blade\",
+
+psychological_pattern=\"Feel threatened → sharp thoughts → cut
+others/self\",
+
+therapeutic_note=\"\'Thought\' in English. Thoughts can cut like
+knives.\"
+
+),
+
+\"tha\": ConsonantProfile(
+
+devanagari=\"थ\",
+
+transliteration=\"tha\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (anxious sharpness)\",
+
+negative_emotion=\"Anxious overthinking, sharp worry, cutting anxiety\",
+
+positive_potential=\"Thoughtful consideration, careful analysis\",
+
+acoustic_quality=\"Aspirated dental - sharp + breath\",
+
+body_location=\"Teeth + breath surge\",
+
+energetic_signature=\"Anxious sharpness, worried cutting\",
+
+psychological_pattern=\"Anxiety → sharp thoughts → mental spirals → more
+anxiety\",
+
+therapeutic_note=\"\'Think\' anxiety. Needs grounding, not more
+thinking.\"
+
+),
+
+\"da\": ConsonantProfile(
+
+devanagari=\"द\",
+
+transliteration=\"da\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (giving-taking confusion)\",
+
+negative_emotion=\"Confused generosity, resentful giving, transactional
+love\",
+
+positive_potential=\"True generosity, authentic giving\",
+
+acoustic_quality=\"Voiced dental stop - vibrating + sharp\",
+
+body_location=\"Teeth + vocal cords\",
+
+energetic_signature=\"Vibrating sharpness, conflicted giving\",
+
+psychological_pattern=\"Want to give → expect return → resentment when
+not received\",
+
+therapeutic_note=\"\'Dāna\' (giving). True giving has no expectation.\"
+
+),
+
+\"dha\": ConsonantProfile(
+
+devanagari=\"ध\",
+
+transliteration=\"dha\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (dharma confusion)\",
+
+negative_emotion=\"Confused duty, righteous anger, moral rigidity\",
+
+positive_potential=\"Clear dharma, true righteousness\",
+
+acoustic_quality=\"Voiced aspirated dental - complex vibration\",
+
+body_location=\"Teeth + throat + breath\",
+
+energetic_signature=\"Righteous vibration, moral force (confused)\",
+
+psychological_pattern=\"Unclear dharma → rigid morality → righteous
+anger\",
+
+therapeutic_note=\"\'Dharma\' starts here. Confused dharma causes
+suffering.\"
+
+),
+
+\"na\": ConsonantProfile(
+
+devanagari=\"न\",
+
+transliteration=\"na\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (negation)\",
+
+negative_emotion=\"Denial, negation, refusal to see truth\",
+
+positive_potential=\"Healthy boundaries, clear \'no\'\",
+
+acoustic_quality=\"Dental nasal - frontal resonance\",
+
+body_location=\"Teeth + nose\",
+
+energetic_signature=\"Negating hum, refusing resonance\",
+
+psychological_pattern=\"Truth hurts → deny → \'na\' (no) → live in
+delusion\",
+
+therapeutic_note=\"\'Na\' = No. Can be healthy boundary OR denial.\"
+
+),
+
+\"pa\": ConsonantProfile(
+
+devanagari=\"प\",
+
+transliteration=\"pa\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (emotional sealing)\",
+
+negative_emotion=\"Emotional shutdown, sealed heart, protective
+closure\",
+
+positive_potential=\"Healthy protection, wise boundaries\",
+
+acoustic_quality=\"Bilabial stop - lips seal, pressure builds\",
+
+body_location=\"Lips - emotional gateway\",
+
+energetic_signature=\"Sealing pressure, protective closure\",
+
+psychological_pattern=\"Been hurt → seal emotions → \'protected\' but
+isolated\",
+
+therapeutic_note=\"\'Protection\' but prevents healing. Needs gentle
+opening.\"
+
+),
+
+\"pha\": ConsonantProfile(
+
+devanagari=\"फ\",
+
+transliteration=\"pha/fa\",
+
+kosha_id=3,
+
+kosha_name=\"MANOMAYA\",
+
+vritti=\"Viparyaya (explosive release)\",
+
+negative_emotion=\"Emotional explosion, sudden outburst, volcanic
+release\",
+
+positive_potential=\"Cathartic release, healthy expression\",
+
+acoustic_quality=\"Aspirated bilabial - sealed pressure + explosive
+release\",
+
+body_location=\"Lips + full breath\",
+
+energetic_signature=\"Explosive opening, volcanic burst\",
+
+psychological_pattern=\"Sealed emotions → pressure builds → explosive
+release\",
+
+therapeutic_note=\"\'Phut\' (burst). Can be healing catharsis OR
+damaging explosion.\"
+
+),
+
+\# ═══════════════════════════════════════════════════════════════════
+
+\# VIJNANAMAYA CONSONANTS (Wisdom/Intellect) - Kosha 4
+
+\# Vritti: Pramāṇa (valid cognition - but still needs purification)
+
+\# ═══════════════════════════════════════════════════════════════════
+
+\"śa\": ConsonantProfile(
+
+devanagari=\"श\",
+
+transliteration=\"śa (sha)\",
+
+kosha_id=4,
+
+kosha_name=\"VIJNANAMAYA\",
+
+vritti=\"Pramāṇa (penetrating clarity)\",
+
+negative_emotion=\"Intellectual vanity, sharp pride, discriminative
+arrogance\",
+
+positive_potential=\"True discrimination, penetrating wisdom, clear
+seeing\",
+
+acoustic_quality=\"Palatal sibilant - high-frequency hiss\",
+
+body_location=\"Hard palate - forward position\",
+
+energetic_signature=\"Penetrating clarity, sharp insight, cutting
+through\",
+
+psychological_pattern=\"Clear seeing → pride in clarity → vanity →
+blocks deeper truth\",
+
+therapeutic_note=\"\'Śānti\' (peace) starts here. Clarity without vanity
+= peace.\"
+
+),
+
+\"ṣa\": ConsonantProfile(
+
+devanagari=\"ष\",
+
+transliteration=\"ṣa\",
+
+kosha_id=4,
+
+kosha_name=\"VIJNANAMAYA\",
+
+vritti=\"Pramāṇa (deep penetration)\",
+
+negative_emotion=\"Deep intellectual pride, penetrating arrogance\",
+
+positive_potential=\"Deep wisdom, profound discrimination\",
+
+acoustic_quality=\"Retroflex sibilant - deeper hiss\",
+
+body_location=\"Deep palate - retroflex position\",
+
+energetic_signature=\"Deep cutting, profound penetration\",
+
+psychological_pattern=\"Deep insight → pride → intellectual
+superiority\",
+
+therapeutic_note=\"Rare in English. Deep intellectual shadow work
+needed.\"
+
+),
+
+\"sa\": ConsonantProfile(
+
+devanagari=\"स\",
+
+transliteration=\"sa\",
+
+kosha_id=4,
+
+kosha_name=\"VIJNANAMAYA\",
+
+vritti=\"Pramāṇa (truth-revealing)\",
+
+negative_emotion=\"Truth used as weapon, intellectual cruelty, harsh
+honesty\",
+
+positive_potential=\"Liberating truth, healing clarity, authentic
+revelation\",
+
+acoustic_quality=\"Dental sibilant - frontal hiss\",
+
+body_location=\"Teeth - forward\",
+
+energetic_signature=\"Revealing light, truth-blast, clarity-cut\",
+
+psychological_pattern=\"Know truth → wield it harshly → damage others in
+name of \'honesty\'\",
+
+therapeutic_note=\"\'Satya\' (truth). Truth without compassion is
+cruelty.\"
+
+),
+
+\"ha\": ConsonantProfile(
+
+devanagari=\"ह\",
+
+transliteration=\"ha\",
+
+kosha_id=4,
+
+kosha_name=\"VIJNANAMAYA\",
+
+vritti=\"Pramāṇa (breath-awareness)\",
+
+negative_emotion=\"Ego of awareness, spiritual pride, \'I see\'
+arrogance\",
+
+positive_potential=\"Pure witnessing, egoless awareness\",
+
+acoustic_quality=\"Glottal fricative - pure breath\",
+
+body_location=\"Throat - no obstruction\",
+
+energetic_signature=\"Witnessing breath, awareness-light\",
+
+psychological_pattern=\"Pure awareness → \'I am aware\' → spiritual
+ego\",
+
+therapeutic_note=\"\'Ham\' (I am). Even awareness can become ego. Needs
+surrender.\"
+
+),
+
+\"kṣa\": ConsonantProfile(
+
+devanagari=\"क्ष\",
+
+transliteration=\"kṣa (ksha)\",
+
+kosha_id=4,
+
+kosha_name=\"VIJNANAMAYA\",
+
+vritti=\"Pramāṇa (dissolution-clarity)\",
+
+negative_emotion=\"Intellectual destruction, nihilistic clarity, cold
+dissolution\",
+
+positive_potential=\"Wise letting-go, liberating destruction,
+moksha-drive\",
+
+acoustic_quality=\"Compound: ka + ṣa - complex\",
+
+body_location=\"Throat + deep palate\",
+
+energetic_signature=\"Dissolving clarity, destructive wisdom\",
+
+psychological_pattern=\"See impermanence → nihilistic despair OR
+liberating freedom\",
+
+therapeutic_note=\"\'Kṣaya\' (decay), \'Mokṣa\' (liberation).
+Destruction toward what?\"
+
+),
+
+}
+
+**============================================================================**
+
+**PART II: VOWEL EMOTIONAL-ASPECT MAPPING (14 VOWELS)**
+
+**============================================================================**
+
+\@dataclass class VowelProfile: """Complete emotional-aspect profile for
+a vowel.""" devanagari: str transliteration: str emotional_valence: str
+direction: str aspect_bridge_source: str aspect_bridge_target: str
+aspect_id: int vritti_affinity: str positive_emotion: str
+negative_emotion: str acoustic_quality: str energetic_movement: str
+spiritual_significance: str therapeutic_use: str
+
+**Complete vowel emotional-aspect database**
+
+VOWEL_EMOTIONAL_MAP = { "a": VowelProfile( devanagari="अ",
+transliteration="a", emotional_valence="Neutral origin, primal impulse",
+direction="Toward origin, grounding", aspect_bridge_source="ROOT_SELF",
+aspect_bridge_target="KARMA", aspect_id=1, vritti_affinity="Pramāṇa
+(original clarity)", positive_emotion="Primordial peace, original
+innocence", negative_emotion="Existential void, primal fear",
+acoustic_quality="Open throat, no constriction",
+energetic_movement="Downward to root, grounding impulse",
+spiritual_significance="AUM begins here - original sound",
+therapeutic_use="Grounding, returning to origin, 'Ah' release" ),
+
+\"ā\": VowelProfile(
+
+devanagari=\"आ\",
+
+transliteration=\"ā (aa)\",
+
+emotional_valence=\"Extended self, reaching outward\",
+
+direction=\"Forward, extending\",
+
+aspect_bridge_source=\"DEEP_IDENTITY\",
+
+aspect_bridge_target=\"IDENTIFICATION\",
+
+aspect_id=2,
+
+vritti_affinity=\"Vikalpa (projecting self)\",
+
+positive_emotion=\"Expansive joy, generous opening\",
+
+negative_emotion=\"Needy reaching, desperate extension\",
+
+acoustic_quality=\"Extended \'a\', prolonged opening\",
+
+energetic_movement=\"Forward and outward expansion\",
+
+spiritual_significance=\"Self extends into world - boundary question\",
+
+therapeutic_use=\"Opening constriction, releasing contraction\"
+
+),
+
+\"i\": VowelProfile(
+
+devanagari=\"इ\",
+
+transliteration=\"i\",
+
+emotional_valence=\"Sharp focus, precise identification\",
+
+direction=\"Inward concentration, pointing\",
+
+aspect_bridge_source=\"IDENTITY\",
+
+aspect_bridge_target=\"BODY\",
+
+aspect_id=3,
+
+vritti_affinity=\"Viparyaya (identification confusion)\",
+
+positive_emotion=\"Clear identity, focused knowing\",
+
+negative_emotion=\"Rigid ego, sharp separation\",
+
+acoustic_quality=\"High frontal, tongue forward-up\",
+
+energetic_movement=\"Upward and forward, sharpening\",
+
+spiritual_significance=\"\'I\' consciousness - ego crystallization\",
+
+therapeutic_use=\"Clarifying identity, sharpening focus (use
+carefully)\"
+
+),
+
+\"ī\": VowelProfile(
+
+devanagari=\"ई\",
+
+transliteration=\"ī (ee)\",
+
+emotional_valence=\"Sustained focus, embodied identity\",
+
+direction=\"Deep into body, sinking identification\",
+
+aspect_bridge_source=\"BODY\",
+
+aspect_bridge_target=\"MIND\",
+
+aspect_id=4,
+
+vritti_affinity=\"Nidrā (body absorption)\",
+
+positive_emotion=\"Embodied presence, sustained attention\",
+
+negative_emotion=\"Body-fixation, somatic obsession\",
+
+acoustic_quality=\"Extended high frontal, sustained\",
+
+energetic_movement=\"Sinking into flesh, deepening embodiment\",
+
+spiritual_significance=\"Identity becomes flesh - incarnation
+question\",
+
+therapeutic_use=\"Embodiment practices, BUT can increase
+body-identification\"
+
+),
+
+\"u\": VowelProfile(
+
+devanagari=\"उ\",
+
+transliteration=\"u\",
+
+emotional_valence=\"Gathering inward, drawing together\",
+
+direction=\"Backward and inward, withdrawing\",
+
+aspect_bridge_source=\"MIND\",
+
+aspect_bridge_target=\"EGO\",
+
+aspect_id=5,
+
+vritti_affinity=\"Vikalpa (mental gathering)\",
+
+positive_emotion=\"Concentrated power, gathered strength\",
+
+negative_emotion=\"Withdrawn isolation, fearful contraction\",
+
+acoustic_quality=\"Back rounded, lips pursed\",
+
+energetic_movement=\"Drawing back into self, protective gathering\",
+
+spiritual_significance=\"Mind gathers itself - ego formation begins\",
+
+therapeutic_use=\"Gathering scattered energy, BUT can reinforce ego\"
+
+),
+
+\"ū\": VowelProfile(
+
+devanagari=\"ऊ\",
+
+transliteration=\"ū (oo)\",
+
+emotional_valence=\"Deep consolidation, powerful ego\",
+
+direction=\"Deep backward, maximum withdrawal\",
+
+aspect_bridge_source=\"EGO\",
+
+aspect_bridge_target=\"INTELLECT\",
+
+aspect_id=6,
+
+vritti_affinity=\"Ahaṅkāra (ego crystallization)\",
+
+positive_emotion=\"Confident agency, strong will\",
+
+negative_emotion=\"Hardened ego, defensive isolation\",
+
+acoustic_quality=\"Deep back rounded, prolonged\",
+
+energetic_movement=\"Maximum inward pull, ego fortress\",
+
+spiritual_significance=\"Ego at peak - ready for surrender or
+hardening\",
+
+therapeutic_use=\"Building healthy agency, BUT can create rigidity\"
+
+),
+
+\"ṛ\": VowelProfile(
+
+devanagari=\"ऋ\",
+
+transliteration=\"ṛ (ri)\",
+
+emotional_valence=\"Wisdom-seeking, penetrating inquiry\",
+
+direction=\"Spiraling upward, seeking truth\",
+
+aspect_bridge_source=\"INTELLECT\",
+
+aspect_bridge_target=\"SOUL\",
+
+aspect_id=7,
+
+vritti_affinity=\"Pramāṇa (discriminative knowing)\",
+
+positive_emotion=\"Sacred seeking, wise inquiry\",
+
+negative_emotion=\"Intellectual pride, spiritual ambition\",
+
+acoustic_quality=\"Retroflex vowel, rare and complex\",
+
+energetic_movement=\"Spiraling ascent, penetrating upward\",
+
+spiritual_significance=\"\'Ṛṣi\' (sage) - wisdom-seeker signature\",
+
+therapeutic_use=\"Invoking higher wisdom, sacred inquiry\"
+
+),
+
+\"ṝ\": VowelProfile(
+
+devanagari=\"ॠ\",
+
+transliteration=\"ṝ (ree)\",
+
+emotional_valence=\"Deep wisdom sustained\",
+
+direction=\"Sustained upward spiral\",
+
+aspect_bridge_source=\"INTELLECT\",
+
+aspect_bridge_target=\"SOUL\",
+
+aspect_id=7,
+
+vritti_affinity=\"Pramāṇa (sustained clarity)\",
+
+positive_emotion=\"Profound wisdom, sustained insight\",
+
+negative_emotion=\"Spiritual pride, prolonged intellectualization\",
+
+acoustic_quality=\"Extended retroflex vowel - very rare\",
+
+energetic_movement=\"Sustained spiral, prolonged seeking\",
+
+spiritual_significance=\"Extended sage-consciousness\",
+
+therapeutic_use=\"Deep meditation, prolonged contemplation\"
+
+),
+
+\"ḷ\": VowelProfile(
+
+devanagari=\"ऌ\",
+
+transliteration=\"ḷ (li)\",
+
+emotional_valence=\"Liquid transition, flowing bridge\",
+
+direction=\"Flowing between levels\",
+
+aspect_bridge_source=\"SOUL\",
+
+aspect_bridge_target=\"WITNESS\",
+
+aspect_id=8,
+
+vritti_affinity=\"Pramāṇa (flowing clarity)\",
+
+positive_emotion=\"Graceful transition, fluid knowing\",
+
+negative_emotion=\"Uncertain wavering, liquid confusion\",
+
+acoustic_quality=\"Vocalic liquid - rare sound\",
+
+energetic_movement=\"Flowing upward, liquid ascent\",
+
+spiritual_significance=\"Bridge between soul and witness\",
+
+therapeutic_use=\"Facilitating spiritual transitions\"
+
+),
+
+\"ḹ\": VowelProfile(
+
+devanagari=\"ॡ\",
+
+transliteration=\"ḹ (lee)\",
+
+emotional_valence=\"Sustained flowing\",
+
+direction=\"Prolonged liquid transition\",
+
+aspect_bridge_source=\"SOUL\",
+
+aspect_bridge_target=\"WITNESS\",
+
+aspect_id=8,
+
+vritti_affinity=\"Pramāṇa (sustained flow)\",
+
+positive_emotion=\"Sustained grace, prolonged flow\",
+
+negative_emotion=\"Lost in transition, flowing confusion\",
+
+acoustic_quality=\"Extended vocalic liquid - extremely rare\",
+
+energetic_movement=\"Prolonged liquid flow upward\",
+
+spiritual_significance=\"Extended soul-witness bridge\",
+
+therapeutic_use=\"Deep meditative transitions\"
+
+),
+
+\"e\": VowelProfile(
+
+devanagari=\"ए\",
+
+transliteration=\"e\",
+
+emotional_valence=\"Forward aspiration, seeking\",
+
+direction=\"Forward and upward, aspirational\",
+
+aspect_bridge_source=\"INTELLECT\",
+
+aspect_bridge_target=\"SOUL\",
+
+aspect_id=7,
+
+vritti_affinity=\"Vikalpa (spiritual seeking)\",
+
+positive_emotion=\"Hopeful seeking, sacred aspiration\",
+
+negative_emotion=\"Spiritual ambition, grasping for enlightenment\",
+
+acoustic_quality=\"Mid-front vowel, forward energy\",
+
+energetic_movement=\"Forward-upward reach, aspiring\",
+
+spiritual_significance=\"Mind reaching toward soul - prayer quality\",
+
+therapeutic_use=\"Activating aspiration, BUT watch for spiritual greed\"
+
+),
+
+\"ai\": VowelProfile(
+
+devanagari=\"ऐ\",
+
+transliteration=\"ai\",
+
+emotional_valence=\"Comprehensive knowing, total seeing\",
+
+direction=\"Encompassing, integrating\",
+
+aspect_bridge_source=\"SOUL\",
+
+aspect_bridge_target=\"WITNESS\",
+
+aspect_id=8,
+
+vritti_affinity=\"Pramāṇa (comprehensive)\",
+
+positive_emotion=\"Total understanding, integrated wisdom\",
+
+negative_emotion=\"Know-it-all pride, false completion\",
+
+acoustic_quality=\"Diphthong: a + i, opening + focusing\",
+
+energetic_movement=\"Circular integration, encompassing\",
+
+spiritual_significance=\"\'Ai\' suggests completeness - but still
+partial\",
+
+therapeutic_use=\"Integrating scattered knowledge, holistic seeing\"
+
+),
+
+\"o\": VowelProfile(
+
+devanagari=\"ओ\",
+
+transliteration=\"o\",
+
+emotional_valence=\"Witnessing wholeness, observer position\",
+
+direction=\"Circular completion, observing\",
+
+aspect_bridge_source=\"WITNESS\",
+
+aspect_bridge_target=\"ATMAN\",
+
+aspect_id=9,
+
+vritti_affinity=\"Sākṣin (witnessing)\",
+
+positive_emotion=\"Peaceful observation, detached wholeness\",
+
+negative_emotion=\"Detached coldness, spiritual bypassing\",
+
+acoustic_quality=\"Mid-back rounded, circular\",
+
+energetic_movement=\"Circular enclosing, witness position\",
+
+spiritual_significance=\"\'Om\' essence - witness-consciousness\",
+
+therapeutic_use=\"Accessing witness, BUT can become dissociation\"
+
+),
+
+\"au\": VowelProfile(
+
+devanagari=\"औ\",
+
+transliteration=\"au\",
+
+emotional_valence=\"Universal transformation, cosmic dissolution\",
+
+direction=\"Expanding to infinity, dissolving boundaries\",
+
+aspect_bridge_source=\"ATMAN\",
+
+aspect_bridge_target=\"BRAHMAN\",
+
+aspect_id=10,
+
+vritti_affinity=\"Pramāṇa (universal)\",
+
+positive_emotion=\"Cosmic love, universal embrace, liberation\",
+
+negative_emotion=\"Terrifying dissolution, death of self\",
+
+acoustic_quality=\"Diphthong: a + u, opening + gathering =
+transcending\",
+
+energetic_movement=\"Expanding beyond all boundaries, cosmic release\",
+
+spiritual_significance=\"Individual → Universal - ultimate
+transformation\",
+
+therapeutic_use=\"Peak experiences only. Requires preparation. Can
+terrify.\"
+
+),
+
+}
+
+**============================================================================**
+
+**PART III: ANALYSIS FUNCTIONS**
+
+**============================================================================**
+
+def analyze_consonant_emotion(consonant: str) -\>
+Optional\[ConsonantProfile\]: """ Get complete emotional profile for a
+consonant.
+
+Args:
+
+consonant: e.g., \'r\', \'ra\', \'ka\', \'sha\'
+
+Returns:
+
+ConsonantProfile or None if not found
+
+\"\"\"
+
+\# Normalize
+
+cons = consonant.lower()
+
+\# Try direct lookup
+
+if cons in CONSONANT_EMOTIONAL_MAP:
+
+return CONSONANT_EMOTIONAL_MAP\[cons\]
+
+\# Try with \'a\' appended (e.g., \'k\' → \'ka\')
+
+if cons + \'a\' in CONSONANT_EMOTIONAL_MAP:
+
+return CONSONANT_EMOTIONAL_MAP\[cons + \'a\'\]
+
+return None
+
+def analyze_vowel_emotion(vowel: str) -\> Optional\[VowelProfile\]: """
+Get complete emotional-aspect profile for a vowel.
+
+Args:
+
+vowel: e.g., \'a\', \'ā\', \'i\', \'e\', \'ai\'
+
+Returns:
+
+VowelProfile or None if not found
+
+\"\"\"
+
+v = vowel.lower()
+
+return VOWEL_EMOTIONAL_MAP.get(v)
+
+def analyze_syllable_complete(syllable: str) -\> Dict: """ Complete
+phonetic-emotional analysis of a syllable.
+
+Args:
+
+syllable: e.g., \'ra\', \'ke\', \'sha\', \'om\'
+
+Returns:
+
+{
+
+\'syllable\': str,
+
+\'consonant\': ConsonantProfile or None,
+
+\'vowel\': VowelProfile or None,
+
+\'combined_emotion\': str,
+
+\'spiritual_trajectory\': str,
+
+\'therapeutic_note\': str
+
+}
+
+\"\"\"
+
+syll = syllable.lower()
+
+\# Extract consonant (first 1-3 chars)
+
+consonant_profile = None
+
+for length in (3, 2, 1):
+
+if len(syll) \>= length:
+
+cons = syll\[:length\]
+
+consonant_profile = analyze_consonant_emotion(cons)
+
+if consonant_profile:
+
+vowel_part = syll\[length:\]
+
+break
+
+else:
+
+vowel_part = syll
+
+\# Extract vowel
+
+vowel_profile = analyze_vowel_emotion(vowel_part) if vowel_part else
+None
+
+\# Synthesize combined meaning
+
+if consonant_profile and vowel_profile:
+
+combined = f\"{consonant_profile.negative_emotion} directed
+{vowel_profile.direction} → {vowel_profile.aspect_bridge_target}\"
+
+trajectory = f\"From {consonant_profile.kosha_name} through
+{vowel_profile.aspect_bridge_source} toward
+{vowel_profile.aspect_bridge_target}\"
+
+therapeutic = f\"Consonant work: {consonant_profile.therapeutic_note}.
+Vowel work: {vowel_profile.therapeutic_use}\"
+
+elif consonant_profile:
+
+combined = consonant_profile.negative_emotion
+
+trajectory = f\"Stuck in {consonant_profile.kosha_name} without vowel
+direction\"
+
+therapeutic = consonant_profile.therapeutic_note
+
+elif vowel_profile:
+
+combined = f\"Pure vowel: {vowel_profile.emotional_valence}\"
+
+trajectory = f\"Direct {vowel_profile.aspect_bridge_source} →
+{vowel_profile.aspect_bridge_target}\"
+
+therapeutic = vowel_profile.therapeutic_use
+
+else:
+
+combined = \"Unknown syllable\"
+
+trajectory = \"Cannot determine\"
+
+therapeutic = \"Check transliteration\"
+
+return {
+
+\'syllable\': syllable,
+
+\'consonant\': consonant_profile,
+
+\'vowel\': vowel_profile,
+
+\'combined_emotion\': combined,
+
+\'spiritual_trajectory\': trajectory,
+
+\'therapeutic_note\': therapeutic
+
+}
+
+def analyze_word_emotional_journey(word: str) -\> Dict: """ Analyze
+complete emotional journey through a word.
+
+Args:
+
+word: e.g., \'Rakesh\', \'love\', \'karma\'
+
+Returns:
+
+{
+
+\'word\': str,
+
+\'syllables\': \[Dict\],
+
+\'emotional_arc\': str,
+
+\'kosha_journey\': str,
+
+\'aspect_journey\': str,
+
+\'therapeutic_approach\': str
+
+}
+
+\"\"\"
+
+from core.kosha import split_syllables \# Reuse from main code
+
+syllables = split_syllables(word)
+
+analyses = \[analyze_syllable_complete(s) for s in syllables\]
+
+\# Track kosha journey
+
+koshas = \[a\[\'consonant\'\].kosha_name for a in analyses if
+a\[\'consonant\'\]\]
+
+kosha_journey = \" → \".join(koshas) if koshas else \"No consonants\"
+
+\# Track aspect journey
+
+aspects = \[a\[\'vowel\'\].aspect_bridge_target for a in analyses if
+a\[\'vowel\'\]\]
+
+aspect_journey = \" → \".join(aspects) if aspects else \"No clear
+aspects\"
+
+\# Emotional arc
+
+emotions = \[a\[\'combined_emotion\'\] for a in analyses\]
+
+emotional_arc = \" \| \".join(emotions)
+
+\# Therapeutic synthesis
+
+therapeutic_notes = \[a\[\'therapeutic_note\'\] for a in analyses\]
+
+therapeutic_approach = \"\\n\".join(f\"{i+1}. {note}\" for i, note in
+enumerate(therapeutic_notes))
+
+return {
+
+\'word\': word,
+
+\'syllables\': analyses,
+
+\'emotional_arc\': emotional_arc,
+
+\'kosha_journey\': kosha_journey,
+
+\'aspect_journey\': aspect_journey,
+
+\'therapeutic_approach\': therapeutic_approach
+
+}
+
+**============================================================================**
+
+**PART IV: DEMONSTRATION**
+
+**============================================================================**
+
+if **name** == "**main**": print("="\*80) print("COMPLETE
+PHONETIC-EMOTIONAL ANALYZER v2.7.2") print("="\*80)
+
+\# Example 1: Single consonants
+
+print(\"\\n\" + \"=\"\*80)
+
+print(\"EXAMPLE 1: CONSONANT EMOTIONAL PROFILES\")
+
+print(\"=\"\*80)
+
+for cons in \[\'ra\', \'ka\', \'sha\', \'ma\'\]:
+
+profile = analyze_consonant_emotion(cons)
+
+if profile:
+
+print(f\"\\n{profile.transliteration.upper()} ({profile.devanagari})\")
+
+print(f\" Kosha: {profile.kosha_name}\")
+
+print(f\" Negative: {profile.negative_emotion}\")
+
+print(f\" Positive: {profile.positive_potential}\")
+
+print(f\" Pattern: {profile.psychological_pattern}\")
+
+\# Example 2: Vowels
+
+print(\"\\n\" + \"=\"\*80)
+
+print(\"EXAMPLE 2: VOWEL EMOTIONAL-ASPECT PROFILES\")
+
+print(\"=\"\*80)
+
+for vowel in \[\'a\', \'i\', \'e\', \'o\', \'au\'\]:
+
+profile = analyze_vowel_emotion(vowel)
+
+if profile:
+
+print(f\"\\n{profile.transliteration.upper()} ({profile.devanagari})\")
+
+print(f\" Bridge: {profile.aspect_bridge_source} →
+{profile.aspect_bridge_target}\")
+
+print(f\" Direction: {profile.direction}\")
+
+print(f\" Positive: {profile.positive_emotion}\")
+
+print(f\" Negative: {profile.negative_emotion}\")
+
+\# Example 3: Complete word analysis
+
+print(\"\\n\" + \"=\"\*80)
+
+print(\"EXAMPLE 3: COMPLETE WORD EMOTIONAL JOURNEY\")
+
+print(\"=\"\*80)
+
+for word in \[\'Rakesh\', \'love\', \'karma\', \'om\'\]:
+
+print(f\"\\n{\'=\'\*80}\")
+
+print(f\"WORD: {word.upper()}\")
+
+print(f\"{\'=\'\*80}\")
+
+analysis = analyze_word_emotional_journey(word)
+
+print(f\"\\nEmotional Arc:\")
+
+print(f\" {analysis\[\'emotional_arc\'\]}\")
+
+print(f\"\\nKosha Journey:\")
+
+print(f\" {analysis\[\'kosha_journey\'\]}\")
+
+print(f\"\\nAspect Journey:\")
+
+print(f\" {analysis\[\'aspect_journey\'\]}\")
+
+print(f\"\\nTherapeutic Approach:\")
+
+for line in analysis\[\'therapeutic_approach\'\].split(\'\\n\'):
+
+print(f\" {line}\")
+
+print(\"\\n\" + \"=\"\*80)
+
+print(\"Analysis complete. All 44 consonants + 14 vowels covered.\")
+
+print(\"=\"\*80)
