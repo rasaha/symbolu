@@ -1,0 +1,223 @@
+"""
+Persona Engine Models (v2.8.2)
+===============================
+
+Pydantic models for type-safe data structures used throughout the Persona Engine.
+All models include validation, documentation, and example schemas.
+"""
+
+from typing import Dict, Any, Optional, List
+from pydantic import BaseModel, Field, field_validator
+
+
+class PersonaProfile(BaseModel):
+    """
+    Defines a persona's characteristics and behavioral patterns.
+    Each persona has unique traits that influence response composition.
+    
+    Traits are normalized to [0.0, 1.0] scale where:
+        0.0 = minimum expression of trait
+        0.5 = balanced/neutral
+        1.0 = maximum expression of trait
+    """
+    id: str = Field(..., description="Unique persona identifier")
+    display_name: str = Field(..., description="Human-readable persona name")
+    description: str = Field(..., description="Persona purpose and use cases")
+    
+    # Personality traits (0.0 to 1.0 scale)
+    formality: float = Field(0.5, ge=0.0, le=1.0, description="Language formality level")
+    warmth: float = Field(0.5, ge=0.0, le=1.0, description="Emotional warmth level")
+    directness: float = Field(0.5, ge=0.0, le=1.0, description="Communication directness")
+    metaphor_level: float = Field(0.5, ge=0.0, le=1.0, description="Use of metaphors/analogies")
+    structure_level: float = Field(0.5, ge=0.0, le=1.0, description="Response structure rigidity")
+    caution_level: float = Field(0.5, ge=0.0, le=1.0, description="Risk/caution emphasis")
+    humor_level: float = Field(0.0, ge=0.0, le=1.0, description="Humor incorporation level")
+    
+    # Domain preferences
+    preferred_domains: List[str] = Field(default_factory=list, description="Domains this persona excels in")
+    
+    # Templates for framing
+    intro_template: str = Field("", description="Opening template for responses")
+    outro_template: str = Field("", description="Closing template for responses")
+    
+    @field_validator('formality', 'warmth', 'directness', 'metaphor_level', 
+                     'structure_level', 'caution_level', 'humor_level')
+    @classmethod
+    def validate_trait_range(cls, v: float) -> float:
+        """Ensure all trait values are within valid range."""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError("Trait values must be between 0.0 and 1.0")
+        return v
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "id": "analyst",
+                "display_name": "The Analyst",
+                "description": "Structured, data-driven analysis for technical and financial domains",
+                "formality": 0.8,
+                "warmth": 0.3,
+                "directness": 0.9,
+                "metaphor_level": 0.2,
+                "structure_level": 0.9,
+                "caution_level": 0.7,
+                "humor_level": 0.1,
+                "preferred_domains": ["trading", "financial", "technical"],
+                "intro_template": "Let's break this down step-by-step:\n",
+                "outro_template": "Review these factors before proceeding."
+            }
+        }
+    }
+
+
+class RendererOutputV3(BaseModel):
+    """
+    Output from the FusionRenderer v3.0.
+    Contains three layers of analysis with processing metadata.
+    
+    Layers:
+        - symbolic_layer: Deeper meaning and patterns
+        - practical_layer: Actionable steps and concrete advice
+        - mirror_truth_layer: Reflective insights and hidden patterns
+    """
+    symbolic_layer: Dict[str, Any] = Field(..., description="Symbolic/deeper meaning layer")
+    practical_layer: Dict[str, Any] = Field(..., description="Practical/actionable layer")
+    mirror_truth_layer: Dict[str, Any] = Field(..., description="Reflection/mirror truth layer")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Processing metadata")
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "symbolic_layer": {
+                    "pattern": "seeking certainty in uncertainty",
+                    "kosha_state": "VIJNANAMAYA",
+                    "depth": 0.71
+                },
+                "practical_layer": {
+                    "steps": ["assess risk tolerance", "define position size", "set stop-loss"],
+                    "confidence": 0.88
+                },
+                "mirror_truth_layer": {
+                    "reflection": "avoiding emotional decision-making",
+                    "bhava_direction": "upward"
+                },
+                "metadata": {
+                    "tier": "HYBRID",
+                    "domain": "trading",
+                    "intent": "how",
+                    "confidence": {"symbolic": 0.71, "practical": 0.88, "mirror": 0.65}
+                }
+            }
+        }
+    }
+
+
+class DHAResult(BaseModel):
+    """
+    Result from Delivery Harmonization Algorithm (DHA) v2.8.1.
+    Determines the tonal approach for response delivery.
+    
+    Tones:
+        - resonance: Balanced, harmonious delivery
+        - inverse_jolt: Direct, disruptive delivery to break patterns
+        - symbolic: Metaphorical, reframing delivery
+    """
+    tone: str = Field(..., description="Selected tone: resonance, inverse_jolt, or symbolic")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in tone selection")
+    justification: Dict[str, Any] = Field(default_factory=dict, description="Reasoning for tone selection")
+    
+    @field_validator('tone')
+    @classmethod
+    def validate_tone(cls, v: str) -> str:
+        """Ensure tone is one of the valid options."""
+        valid_tones = ["resonance", "inverse_jolt", "symbolic"]
+        if v not in valid_tones:
+            raise ValueError(f"Tone must be one of: {valid_tones}, got: {v}")
+        return v
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "tone": "resonance",
+                "confidence": 0.82,
+                "justification": {
+                    "entropy_reason": "Low entropy (0.35) suggests stability",
+                    "bhava_reason": "Upward Bhava indicates receptivity",
+                    "tier_reason": "HYBRID tier supports balanced delivery",
+                    "intent_reason": "How-type query benefits from clear structure"
+                }
+            }
+        }
+    }
+
+
+class PersonaMetadata(BaseModel):
+    """
+    Metadata about persona application and processing context.
+    Tracks the complete processing pipeline for auditability.
+    """
+    tier: str = Field(..., description="Processing tier: UPPER/HYBRID/LOWER")
+    domain: str = Field(..., description="Domain context: trading/emotional/medical/spiritual/technical/etc")
+    intent: str = Field(..., description="User intent: why/how/meaning/what")
+    persona_id: str = Field(..., description="Selected persona identifier")
+    persona_name: str = Field(..., description="Persona display name")
+    persona_description: str = Field(..., description="Persona description")
+    dha_tone: str = Field(..., description="DHA selected tone")
+    dha_confidence: float = Field(..., ge=0.0, le=1.0, description="DHA confidence")
+    confidence: Optional[Dict[str, float]] = Field(None, description="Layer-wise confidence scores")
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "tier": "HYBRID",
+                "domain": "trading",
+                "intent": "how",
+                "persona_id": "analyst",
+                "persona_name": "The Analyst",
+                "persona_description": "Structured, data-driven analysis",
+                "dha_tone": "resonance",
+                "dha_confidence": 0.82,
+                "confidence": {"symbolic": 0.71, "practical": 0.88, "mirror": 0.65}
+            }
+        }
+    }
+
+
+class PersonaResponse(BaseModel):
+    """
+    Final output from Persona Engine v2.8.2.
+    Contains persona-styled text with preserved analytical layers.
+    
+    Critical Constraints:
+        - Text is styled but meaning is NEVER altered
+        - All three layers are preserved unchanged
+        - Metadata tracks complete processing chain
+    """
+    persona_id: str = Field(..., description="Applied persona identifier")
+    text: str = Field(..., description="Persona-styled response text")
+    layers: Dict[str, Any] = Field(..., description="Preserved analytical layers")
+    metadata: PersonaMetadata = Field(..., description="Complete processing metadata")
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "persona_id": "analyst",
+                "text": "Let's break this down step-by-step:\n● Practical explanation:\n...",
+                "layers": {
+                    "symbolic_layer": {"pattern": "seeking certainty"},
+                    "practical_layer": {"steps": ["assess risk"]},
+                    "mirror_truth_layer": {"reflection": "avoiding emotion"}
+                },
+                "metadata": {
+                    "tier": "HYBRID",
+                    "domain": "trading",
+                    "intent": "how",
+                    "persona_id": "analyst",
+                    "persona_name": "The Analyst",
+                    "persona_description": "Structured analysis",
+                    "dha_tone": "resonance",
+                    "dha_confidence": 0.82
+                }
+            }
+        }
+    }

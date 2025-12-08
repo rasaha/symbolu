@@ -1,0 +1,155 @@
+"""
+PERSONA ENGINE v2.8.2 - QUICK START GUIDE
+==========================================
+
+Get started with the Persona Engine in 5 minutes.
+
+STEP 1: Install
+---------------
+pip install pydantic
+
+STEP 2: Import
+--------------
+from symbolu.mechanical.persona import PersonaEngine
+from symbolu.mechanical.persona.models import RendererOutputV3, DHAResult
+
+STEP 3: Initialize
+------------------
+engine = PersonaEngine()
+
+STEP 4: Create Inputs
+---------------------
+# From FusionRenderer v3.0
+renderer_output = RendererOutputV3(
+    symbolic_layer={"pattern": "your_symbolic_analysis"},
+    practical_layer={"steps": ["step1", "step2"]},
+    mirror_truth_layer={"reflection": "your_reflection"},
+    metadata={"tier": "HYBRID", "domain": "trading", "intent": "how"}
+)
+
+# From DHA v2.8.1
+dha_result = DHAResult(
+    tone="resonance",  # or "inverse_jolt" or "symbolic"
+    confidence=0.82,
+    justification={}
+)
+
+# From MLCR
+explain_log = {
+    "meta": {
+        "domain": "trading",  # or "emotional", "medical", etc.
+        "tier": "HYBRID",     # or "UPPER", "LOWER"
+        "intent": "how"       # or "why", "what", "meaning"
+    }
+}
+
+STEP 5: Apply Persona
+---------------------
+response = engine.apply(renderer_output, dha_result, explain_log)
+
+STEP 6: Use Results
+-------------------
+print(f"Persona: {response.persona_id}")
+print(f"Text: {response.text}")
+print(f"Layers preserved: {list(response.layers.keys())}")
+
+THAT'S IT!
+
+================================================================================
+COMMON PATTERNS
+================================================================================
+
+Pattern 1: User Override
+------------------------
+response = engine.apply(
+    renderer_output,
+    dha_result,
+    explain_log,
+    user_persona_override="coach"  # User explicitly wants coach
+)
+
+Pattern 2: Custom Persona
+--------------------------
+from symbolu.mechanical.persona.models import PersonaProfile
+
+custom = PersonaProfile(
+    id="my_persona",
+    display_name="My Custom Persona",
+    description="Description here",
+    formality=0.7,
+    warmth=0.6,
+    directness=0.8,
+    metaphor_level=0.4,
+    structure_level=0.6,
+    caution_level=0.5,
+    humor_level=0.2
+)
+
+engine.registry.register(custom)
+
+Pattern 3: List Available Personas
+-----------------------------------
+print(engine.registry.list_ids())
+# Output: ['sage', 'analyst', 'coach', 'friendly', 'regulator', 'neutral']
+
+Pattern 4: Get Persona Details
+-------------------------------
+persona = engine.registry.get("analyst")
+print(f"Formality: {persona.formality}")
+print(f"Domains: {persona.preferred_domains}")
+
+================================================================================
+QUICK REFERENCE
+================================================================================
+
+PERSONAS:
+  sage       → Philosophical, metaphorical (UPPER tier)
+  analyst    → Structured, data-driven (trading, technical)
+  coach      → Direct, action-oriented (execution)
+  friendly   → Warm, empathetic (emotional support)
+  regulator  → Cautious, compliant (medical, legal)
+  neutral    → Balanced, objective (fallback)
+
+TONES:
+  resonance     → Balanced delivery
+  inverse_jolt  → Direct confrontation (mirror first)
+  symbolic      → Metaphorical delivery (symbolic first)
+
+DOMAINS:
+  trading, financial, technical     → analyst
+  emotional, relationship, personal → friendly
+  medical, legal, regulatory        → regulator (always)
+  spiritual, philosophical          → sage
+  execution, action, goals          → coach
+
+TIERS:
+  UPPER  → Abstract reasoning (prefers sage)
+  HYBRID → Balanced (context-dependent)
+  LOWER  → Concrete focus (prefers analyst/coach)
+
+INTENTS:
+  why, meaning → sage
+  how          → coach (downward bhava) or analyst (neutral/upward)
+  what         → analyst
+
+================================================================================
+TESTING
+================================================================================
+
+Run Tests:
+  pytest test_persona_engine.py -v
+
+Run Examples:
+  python examples.py
+
+================================================================================
+NEED HELP?
+================================================================================
+
+1. Check README.md for full documentation
+2. Run examples.py to see usage patterns
+3. Review test_persona_engine.py for edge cases
+4. Check MODULE_SUMMARY.txt for complete overview
+
+================================================================================
+"""
