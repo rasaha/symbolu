@@ -1,0 +1,99 @@
+name: TTOR CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'mechanical/pipeline/ttor/**'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'mechanical/pipeline/ttor/**'
+  workflow_dispatch:
+
+jobs:
+  ttor-ci:
+    name: TTOR Tests, Coverage, Type Check & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          pip install pytest pytest-cov coverage pydantic mypy flake8
+
+      - name: Run TTOR tests with coverage
+        run: |
+          pytest mechanical/pipeline/ttor/tests/ -q \
+            --cov=mechanical/pipeline/ttor \
+            --cov-fail-under=90 \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:coverage-html \
+            2>&1 | tee pytest-output.log
+
+      - name: Run type checking (mypy strict)
+        run: mypy mechanical/pipeline/ttor --strict
+
+      - name: Run linting (flake8)
+        run: flake8 mechanical/pipeline/ttor --max-line-length=120
+
+      - name: Collect TTOR debug logs
+        if: always()
+        run: |
+          mkdir -p ttor-artifacts
+          cp pytest-output.log ttor-artifacts/ 2>/dev/null || true
+          cp ttor-debug.log ttor-artifacts/ 2>/dev/null || true
+          find . -name "router.debug*" -exec cp {} ttor-artifacts/ \; 2>/dev/null || true
+
+      - name: Upload TTOR test logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ttor-test-logs
+          path: |
+            ttor-artifacts/pytest-output.log
+            ttor-artifacts/ttor-debug.log
+          retention-days: 14
+
+      - name: Upload TTOR coverage report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ttor-coverage-report
+          path: |
+            coverage.xml
+            coverage-html/
+          retention-days: 14
+
+      - name: Upload TTOR debug snapshots
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ttor-debug-snapshots
+          path: ttor-artifacts/router.debug*
+          retention-days: 14
