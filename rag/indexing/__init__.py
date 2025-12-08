@@ -1,4 +1,7 @@
-"""RAG Indexing Submodule"""
-from symbolu.rag.indexing.index_builder import IndexBuilder
-from symbolu.rag.indexing.index_manager import IndexManager
-__all__ = ["IndexBuilder", "IndexManager"]
+"""
+Symbol-U RAG v3.0 - Indexing Package
+"""
+
+from .indexer import chunk_text, chunk_documents, build_index
+
+__all__ = ["chunk_text", "chunk_documents", "build_index"]

@@ -1,4 +1,11 @@
-"""RAG Vectorstore Submodule"""
-from symbolu.rag.vectorstore.vectorstore_interface import VectorstoreInterface
-from symbolu.rag.vectorstore.chroma_manager import ChromaManager
-__all__ = ["VectorstoreInterface", "ChromaManager"]
+"""
+Symbol-U RAG v3.0 - Vector Store Package
+"""
+
+from .memory_store import (
+    MemoryVectorStore,
+    get_global_store,
+    reset_global_store
+)
+
+__all__ = ["MemoryVectorStore", "get_global_store", "reset_global_store"]
