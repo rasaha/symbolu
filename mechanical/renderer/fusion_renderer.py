@@ -1,76 +1,747 @@
 """
-Fusion Renderer
-================
+SOULPI Fusion Renderer v3.0
+============================
 
-Combines rule-based and LLM rendering with intelligent routing.
-Implements "stylist not thinker" principle.
+The deterministic bridge between FusionEngine cognition and presentation layers.
+Structures raw fusion output into three clean layers without LLM interpretation.
+
+Core Purpose:
+- Transform FusionOutput into structured, human-interpretable format
+- Maintain 100% deterministic behavior (no LLM)
+- Preserve meaning without modification
+- Expose contradictions, don't resolve them
+
+Architecture:
+- Symbolic Layer: The "WHY" (theme, archetype, causal patterns, meaning vectors)
+- Practical Layer: The "WHAT/HOW" (domain facts, constraints, procedures, coherence)
+- Mirror-Truth Layer: Reflective synthesis (contradictions, entropy, tensions, alignment)
+
+Operating Modes:
+- minimal: practical layer only
+- standard: all 3 layers (default)
+- symbolic: symbolic expanded, practical condensed
+- regulated: compliance-safe, minimal metaphors
+
+Version: 3.0
+Author: Rakesh Mohan (Symbol-U AGI)
+Patent Protected: Core algorithms immutable
 """
 
-from typing import Dict, Any, Optional
-from symbolu.mechanical.renderer.rules_renderer import RulesRenderer
-from symbolu.mechanical.renderer.llm_renderer import LLMRenderer
+import json
+import hashlib
+import numpy as np
+from typing import Dict, List, Optional, Any, Tuple
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
 
+
+# ============================================================================
+# ENUMS & CONSTANTS
+# ============================================================================
+
+class RenderMode(Enum):
+    """Operating modes for different use cases"""
+    MINIMAL = "minimal"           # Practical layer only
+    STANDARD = "standard"         # All 3 layers (default)
+    SYMBOLIC = "symbolic"         # Symbolic expanded, practical condensed
+    REGULATED = "regulated"       # Compliance-safe, minimal metaphors
+
+
+class Domain(Enum):
+    """Application domains with different rendering requirements"""
+    GENERAL = "general"
+    FINANCE = "finance"
+    MEDICAL = "medical"
+    LEGAL = "legal"
+    EDUCATION = "education"
+    PSYCHOLOGY = "psychology"
+
+
+# Regulated domains requiring strict controls
+REGULATED_DOMAINS = {Domain.FINANCE, Domain.MEDICAL, Domain.LEGAL}
+
+# Layer weight defaults for mode overrides
+MODE_WEIGHTS = {
+    RenderMode.MINIMAL: {"symbolic": 0.0, "practical": 1.0, "mirror": 0.0},
+    RenderMode.STANDARD: {"symbolic": 0.33, "practical": 0.34, "mirror": 0.33},
+    RenderMode.SYMBOLIC: {"symbolic": 0.6, "practical": 0.2, "mirror": 0.2},
+    RenderMode.REGULATED: {"symbolic": 0.1, "practical": 0.8, "mirror": 0.1}
+}
+
+
+# ============================================================================
+# DATA STRUCTURES
+# ============================================================================
+
+@dataclass
+class FusionOutput:
+    """Input from FusionEngine (upstream module)"""
+    query: str
+    merged_response: str
+    hrm_content: Dict[str, Any]
+    lcm_content: Dict[str, Any]
+    moe_content: Dict[str, Any]
+    channel_weights: Dict[str, float]
+    conflict_resolution: List[Dict[str, Any]]
+    metadata: Dict[str, Any]
+    timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
+
+
+@dataclass
+class SymbolicLayer:
+    """The 'WHY' - Theme, archetype, causal patterns, meaning vectors"""
+    theme: str
+    archetype: str
+    causal_patterns: List[str]
+    meaning_vectors: Dict[str, float]
+    dominant_channel: str
+    reasoning_depth: float
+    
+    def to_dict(self) -> Dict:
+        return {
+            "theme": self.theme,
+            "archetype": self.archetype,
+            "causal_patterns": self.causal_patterns,
+            "meaning_vectors": self.meaning_vectors,
+            "dominant_channel": self.dominant_channel,
+            "reasoning_depth": self.reasoning_depth
+        }
+
+
+@dataclass
+class PracticalLayer:
+    """The 'WHAT/HOW' - Domain facts, constraints, procedures, coherence"""
+    key_facts: List[str]
+    constraints: List[str]
+    procedures: List[str]
+    coherence_score: float
+    domain: str
+    actionable_items: List[str]
+    
+    def to_dict(self) -> Dict:
+        return {
+            "key_facts": self.key_facts,
+            "constraints": self.constraints,
+            "procedures": self.procedures,
+            "coherence_score": self.coherence_score,
+            "domain": self.domain,
+            "actionable_items": self.actionable_items
+        }
+
+
+@dataclass
+class MirrorTruthLayer:
+    """Reflective synthesis - Contradictions, entropy, tensions, alignment"""
+    contradictions: List[Dict[str, Any]]
+    entropy_measures: Dict[str, float]
+    tensions: List[str]
+    alignment_score: float
+    stability_indicator: str
+    reflection: str
+    
+    def to_dict(self) -> Dict:
+        return {
+            "contradictions": self.contradictions,
+            "entropy_measures": self.entropy_measures,
+            "tensions": self.tensions,
+            "alignment_score": self.alignment_score,
+            "stability_indicator": self.stability_indicator,
+            "reflection": self.reflection
+        }
+
+
+@dataclass
+class RenderedOutput:
+    """Final structured output from Fusion Renderer"""
+    query: str
+    mode: str
+    symbolic_layer: Optional[SymbolicLayer]
+    practical_layer: Optional[PracticalLayer]
+    mirror_truth_layer: Optional[MirrorTruthLayer]
+    metadata: Dict[str, Any]
+    render_timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
+    
+    def to_dict(self) -> Dict:
+        return {
+            "query": self.query,
+            "mode": self.mode,
+            "symbolic_layer": self.symbolic_layer.to_dict() if self.symbolic_layer else None,
+            "practical_layer": self.practical_layer.to_dict() if self.practical_layer else None,
+            "mirror_truth_layer": self.mirror_truth_layer.to_dict() if self.mirror_truth_layer else None,
+            "metadata": self.metadata,
+            "render_timestamp": self.render_timestamp
+        }
+    
+    def to_json(self, indent: int = 2) -> str:
+        return json.dumps(self.to_dict(), indent=indent)
+
+
+# ============================================================================
+# FUSION RENDERER CORE
+# ============================================================================
 
 class FusionRenderer:
     """
-    Fusion renderer that intelligently routes between rule-based and LLM rendering.
+    Deterministic bridge between FusionEngine and presentation layers.
     
-    - Rule-based for deterministic, low-risk outputs
-    - LLM for polishing when safety thresholds allow
-    - Automatic fallback to rules when LLM fails safety checks
+    Algorithm (6 steps):
+    1. Validate FusionOutput input
+    2. Build Symbolic Layer (theme, archetype, patterns)
+    3. Build Practical Layer (facts, constraints, actions)
+    4. Build Mirror-Truth Layer (contradictions, tensions)
+    5. Propagate metadata exactly
+    6. Apply mode-specific rendering rules
+    
+    Constraints:
+    - 100% deterministic (no LLM)
+    - Preserve meaning without modification
+    - Expose contradictions, don't resolve them
+    - Metadata propagation exact
     """
     
-    def __init__(self, safety_threshold: float = 0.7):
-        self.rules_renderer = RulesRenderer()
-        self.llm_renderer = LLMRenderer()
-        self.safety_threshold = safety_threshold
-    
-    def render(
+    def __init__(
         self,
-        analysis: Dict[str, Any],
-        mode: str = "auto",
-        **kwargs
-    ) -> str:
+        mode: RenderMode = RenderMode.STANDARD,
+        domain: Domain = Domain.GENERAL
+    ):
+        self.mode = mode
+        self.domain = domain
+        self.is_regulated = domain in REGULATED_DOMAINS
+        
+        # Mode-specific weights
+        self.layer_weights = MODE_WEIGHTS[mode]
+        
+        # Statistics tracking
+        self.stats = {
+            "total_renders": 0,
+            "mode_counts": {m.value: 0 for m in RenderMode},
+            "avg_render_time_ms": 0.0
+        }
+    
+    def render(self, fusion_output: FusionOutput) -> RenderedOutput:
         """
-        Render analysis to human-readable output.
+        Main rendering pipeline - transforms FusionOutput into RenderedOutput.
         
         Args:
-            analysis: Core analysis result
-            mode: "rules", "llm", or "auto"
-            **kwargs: Additional rendering parameters
+            fusion_output: Raw output from FusionEngine
             
         Returns:
-            Rendered output string
+            RenderedOutput: Structured 3-layer output
         """
-        if mode == "rules":
-            return self.rules_renderer.render(analysis, **kwargs)
-        elif mode == "llm":
-            return self._render_with_fallback(analysis, **kwargs)
-        else:  # auto
-            return self._auto_route(analysis, **kwargs)
-    
-    def _auto_route(self, analysis: Dict[str, Any], **kwargs) -> str:
-        """Automatically route to appropriate renderer."""
-        # Use rules for high-tension or regulated domains
-        tension = analysis.get("average_smi", 0.5)
-        domain = kwargs.get("domain", "general")
+        start_time = datetime.now().timestamp()
         
-        if tension > self.safety_threshold or domain in ["medical", "legal", "financial"]:
-            return self.rules_renderer.render(analysis, **kwargs)
+        # Step 1: Validate input
+        self._validate_input(fusion_output)
+        
+        # Step 2: Build Symbolic Layer
+        symbolic_layer = None
+        if self.layer_weights["symbolic"] > 0:
+            symbolic_layer = self._build_symbolic_layer(fusion_output)
+        
+        # Step 3: Build Practical Layer
+        practical_layer = None
+        if self.layer_weights["practical"] > 0:
+            practical_layer = self._build_practical_layer(fusion_output)
+        
+        # Step 4: Build Mirror-Truth Layer
+        mirror_layer = None
+        if self.layer_weights["mirror"] > 0:
+            mirror_layer = self._build_mirror_truth_layer(fusion_output)
+        
+        # Step 5: Propagate metadata
+        metadata = self._propagate_metadata(fusion_output)
+        
+        # Step 6: Apply mode overrides
+        symbolic_layer, practical_layer, mirror_layer = self._apply_mode_overrides(
+            symbolic_layer, practical_layer, mirror_layer
+        )
+        
+        # Create output
+        rendered = RenderedOutput(
+            query=fusion_output.query,
+            mode=self.mode.value,
+            symbolic_layer=symbolic_layer,
+            practical_layer=practical_layer,
+            mirror_truth_layer=mirror_layer,
+            metadata=metadata
+        )
+        
+        # Update statistics
+        render_time = (datetime.now().timestamp() - start_time) * 1000
+        self._update_stats(render_time)
+        
+        return rendered
+    
+    # ========================================================================
+    # LAYER BUILDERS
+    # ========================================================================
+    
+    def _build_symbolic_layer(self, fusion_output: FusionOutput) -> SymbolicLayer:
+        """
+        Build the Symbolic Layer - the 'WHY'.
+        
+        Extracts:
+        - Theme: Core meaning/purpose
+        - Archetype: Universal pattern
+        - Causal patterns: Cause-effect chains
+        - Meaning vectors: Semantic dimensions
+        - Dominant channel: Primary reasoning source
+        - Reasoning depth: Abstraction level
+        """
+        # Extract theme from HRM (symbolic reasoning)
+        theme = self._extract_theme(fusion_output.hrm_content)
+        
+        # Identify archetype from channel dominance
+        archetype = self._identify_archetype(fusion_output.channel_weights)
+        
+        # Extract causal patterns from HRM
+        causal_patterns = self._extract_causal_patterns(fusion_output.hrm_content)
+        
+        # Compute meaning vectors across channels
+        meaning_vectors = self._compute_meaning_vectors(fusion_output)
+        
+        # Determine dominant channel
+        dominant_channel = max(
+            fusion_output.channel_weights.items(),
+            key=lambda x: x[1]
+        )[0]
+        
+        # Infer reasoning depth from HRM weight
+        reasoning_depth = fusion_output.channel_weights.get("hrm", 0.0)
+        
+        return SymbolicLayer(
+            theme=theme,
+            archetype=archetype,
+            causal_patterns=causal_patterns,
+            meaning_vectors=meaning_vectors,
+            dominant_channel=dominant_channel,
+            reasoning_depth=reasoning_depth
+        )
+    
+    def _build_practical_layer(self, fusion_output: FusionOutput) -> PracticalLayer:
+        """
+        Build the Practical Layer - the 'WHAT/HOW'.
+        
+        Extracts:
+        - Key facts: Essential information
+        - Constraints: Limitations/boundaries
+        - Procedures: Step-by-step actions
+        - Coherence score: Logical consistency
+        - Domain: Application area
+        - Actionable items: Concrete next steps
+        """
+        # Extract key facts from LCM (linguistic clarity)
+        key_facts = self._extract_key_facts(fusion_output.lcm_content)
+        
+        # Extract constraints from MoE (domain expertise)
+        constraints = self._extract_constraints(fusion_output.moe_content)
+        
+        # Extract procedures from MoE
+        procedures = self._extract_procedures(fusion_output.moe_content)
+        
+        # Compute coherence from LCM weight
+        coherence_score = fusion_output.channel_weights.get("lcm", 0.0)
+        
+        # Infer domain from MoE metadata
+        domain = fusion_output.moe_content.get("domain", "general")
+        
+        # Extract actionable items
+        actionable_items = self._extract_actionable_items(fusion_output)
+        
+        return PracticalLayer(
+            key_facts=key_facts,
+            constraints=constraints,
+            procedures=procedures,
+            coherence_score=coherence_score,
+            domain=domain,
+            actionable_items=actionable_items
+        )
+    
+    def _build_mirror_truth_layer(self, fusion_output: FusionOutput) -> MirrorTruthLayer:
+        """
+        Build the Mirror-Truth Layer - reflective synthesis.
+        
+        Extracts:
+        - Contradictions: Conflicts between channels
+        - Entropy measures: Uncertainty/disorder
+        - Tensions: Unresolved opposing forces
+        - Alignment score: Channel agreement
+        - Stability indicator: System state
+        - Reflection: Meta-analysis
+        """
+        # Detect contradictions from conflict_resolution
+        contradictions = fusion_output.conflict_resolution
+        
+        # Compute entropy measures
+        entropy_measures = self._compute_entropy_measures(fusion_output)
+        
+        # Identify tensions between channels
+        tensions = self._identify_tensions(fusion_output)
+        
+        # Compute alignment score
+        alignment_score = self._compute_alignment(fusion_output.channel_weights)
+        
+        # Determine stability indicator
+        stability_indicator = self._assess_stability(entropy_measures, alignment_score)
+        
+        # Generate reflection
+        reflection = self._generate_reflection(
+            contradictions, tensions, alignment_score
+        )
+        
+        return MirrorTruthLayer(
+            contradictions=contradictions,
+            entropy_measures=entropy_measures,
+            tensions=tensions,
+            alignment_score=alignment_score,
+            stability_indicator=stability_indicator,
+            reflection=reflection
+        )
+    
+    # ========================================================================
+    # HELPER METHODS (DETERMINISTIC LOGIC)
+    # ========================================================================
+    
+    def _extract_theme(self, hrm_content: Dict[str, Any]) -> str:
+        """Extract core theme from HRM symbolic reasoning"""
+        # Use HRM's primary reasoning or fallback to hash-based selection
+        if "reasoning" in hrm_content:
+            # Extract first sentence as theme
+            text = hrm_content["reasoning"]
+            sentences = text.split(".")
+            if sentences:
+                return sentences[0].strip() + "."
+        
+        # Fallback: deterministic theme from content hash
+        content_hash = hashlib.md5(str(hrm_content).encode()).hexdigest()
+        theme_index = int(content_hash[:8], 16) % 5
+        themes = [
+            "Exploration of possibilities",
+            "Resolution of complexity",
+            "Integration of perspectives",
+            "Analysis of structure",
+            "Synthesis of understanding"
+        ]
+        return themes[theme_index]
+    
+    def _identify_archetype(self, channel_weights: Dict[str, float]) -> str:
+        """Identify universal pattern from channel dominance"""
+        dominant = max(channel_weights.items(), key=lambda x: x[1])[0]
+        
+        archetype_map = {
+            "hrm": "Philosopher - seeks deep understanding",
+            "lcm": "Communicator - values clarity and precision",
+            "moe": "Expert - applies domain knowledge"
+        }
+        
+        return archetype_map.get(dominant, "Balanced - integrates multiple perspectives")
+    
+    def _extract_causal_patterns(self, hrm_content: Dict[str, Any]) -> List[str]:
+        """Extract cause-effect chains from HRM reasoning"""
+        patterns = []
+        
+        if "reasoning" in hrm_content:
+            text = hrm_content["reasoning"]
+            # Look for causal indicators
+            causal_keywords = ["because", "therefore", "thus", "hence", "consequently"]
+            sentences = text.split(".")
+            
+            for sentence in sentences:
+                if any(keyword in sentence.lower() for keyword in causal_keywords):
+                    patterns.append(sentence.strip())
+        
+        # Ensure at least one pattern
+        if not patterns:
+            patterns.append("Direct causal relationship detected")
+        
+        return patterns[:3]  # Limit to top 3
+    
+    def _compute_meaning_vectors(self, fusion_output: FusionOutput) -> Dict[str, float]:
+        """Compute semantic dimensions across channels"""
+        vectors = {}
+        
+        # Abstractness: HRM weight
+        vectors["abstractness"] = fusion_output.channel_weights.get("hrm", 0.0)
+        
+        # Clarity: LCM weight
+        vectors["clarity"] = fusion_output.channel_weights.get("lcm", 0.0)
+        
+        # Practicality: MoE weight
+        vectors["practicality"] = fusion_output.channel_weights.get("moe", 0.0)
+        
+        # Complexity: inverse of alignment (more channels = more complex)
+        weights_std = np.std(list(fusion_output.channel_weights.values()))
+        vectors["complexity"] = float(weights_std)
+        
+        return vectors
+    
+    def _extract_key_facts(self, lcm_content: Dict[str, Any]) -> List[str]:
+        """Extract essential information from LCM"""
+        facts = []
+        
+        if "content" in lcm_content:
+            text = lcm_content["content"]
+            sentences = text.split(".")
+            
+            # Extract declarative sentences
+            for sentence in sentences[:5]:  # Limit to 5
+                sentence = sentence.strip()
+                if sentence and len(sentence) > 10:
+                    facts.append(sentence + ".")
+        
+        return facts if facts else ["Core information preserved"]
+    
+    def _extract_constraints(self, moe_content: Dict[str, Any]) -> List[str]:
+        """Extract limitations from MoE domain expertise"""
+        constraints = []
+        
+        if "constraints" in moe_content:
+            constraints = moe_content["constraints"]
+        elif "content" in moe_content:
+            # Look for constraint indicators
+            text = moe_content["content"]
+            constraint_keywords = ["must", "cannot", "limited", "restricted", "requires"]
+            sentences = text.split(".")
+            
+            for sentence in sentences:
+                if any(keyword in sentence.lower() for keyword in constraint_keywords):
+                    constraints.append(sentence.strip())
+        
+        return constraints[:3] if constraints else ["Standard constraints apply"]
+    
+    def _extract_procedures(self, moe_content: Dict[str, Any]) -> List[str]:
+        """Extract step-by-step actions from MoE"""
+        procedures = []
+        
+        if "procedures" in moe_content:
+            procedures = moe_content["procedures"]
+        elif "content" in moe_content:
+            # Look for procedural indicators
+            text = moe_content["content"]
+            proc_keywords = ["first", "then", "next", "finally", "step"]
+            sentences = text.split(".")
+            
+            for sentence in sentences:
+                if any(keyword in sentence.lower() for keyword in proc_keywords):
+                    procedures.append(sentence.strip())
+        
+        return procedures[:3] if procedures else ["Follow standard procedures"]
+    
+    def _extract_actionable_items(self, fusion_output: FusionOutput) -> List[str]:
+        """Extract concrete next steps from merged response"""
+        items = []
+        
+        text = fusion_output.merged_response
+        # Look for action verbs
+        action_keywords = ["should", "must", "need to", "consider", "implement", "apply"]
+        sentences = text.split(".")
+        
+        for sentence in sentences:
+            if any(keyword in sentence.lower() for keyword in action_keywords):
+                items.append(sentence.strip())
+        
+        return items[:3] if items else ["Review and apply insights"]
+    
+    def _compute_entropy_measures(self, fusion_output: FusionOutput) -> Dict[str, float]:
+        """Compute uncertainty/disorder measures"""
+        measures = {}
+        
+        # Channel entropy: Shannon entropy of weights
+        weights = list(fusion_output.channel_weights.values())
+        weights_norm = np.array(weights) / sum(weights)
+        measures["channel_entropy"] = float(-np.sum(weights_norm * np.log2(weights_norm + 1e-10)))
+        
+        # Conflict entropy: based on number of conflicts
+        num_conflicts = len(fusion_output.conflict_resolution)
+        measures["conflict_entropy"] = min(num_conflicts / 10.0, 1.0)
+        
+        # Response entropy: from metadata if available
+        if "entropy" in fusion_output.metadata:
+            measures["response_entropy"] = fusion_output.metadata["entropy"]
         else:
-            return self._render_with_fallback(analysis, **kwargs)
+            measures["response_entropy"] = 0.5  # Default moderate
+        
+        return measures
     
-    def _render_with_fallback(self, analysis: Dict[str, Any], **kwargs) -> str:
-        """Render with LLM, fallback to rules on failure."""
-        try:
-            result = self.llm_renderer.render(analysis, **kwargs)
-            if self._passes_safety_check(result):
-                return result
-        except Exception:
-            pass
-        return self.rules_renderer.render(analysis, **kwargs)
+    def _identify_tensions(self, fusion_output: FusionOutput) -> List[str]:
+        """Identify unresolved opposing forces"""
+        tensions = []
+        
+        # Check for conflicts
+        for conflict in fusion_output.conflict_resolution:
+            tension_desc = f"{conflict.get('source1', 'Channel A')} vs {conflict.get('source2', 'Channel B')}: {conflict.get('type', 'disagreement')}"
+            tensions.append(tension_desc)
+        
+        # Check for weight imbalances
+        weights = fusion_output.channel_weights
+        max_weight = max(weights.values())
+        min_weight = min(weights.values())
+        
+        if max_weight - min_weight > 0.5:
+            tensions.append(f"Channel imbalance: dominant vs. suppressed perspectives")
+        
+        return tensions if tensions else ["System in equilibrium"]
     
-    def _passes_safety_check(self, output: str) -> bool:
-        """Check if LLM output passes safety requirements."""
-        # Placeholder - implement actual safety checks
-        return len(output) > 0 and len(output) < 10000
+    def _compute_alignment(self, channel_weights: Dict[str, float]) -> float:
+        """
+        Compute channel agreement score.
+        
+        Uses inverse of standard deviation:
+        - Low std = high alignment (channels agree)
+        - High std = low alignment (channels diverge)
+        """
+        weights = list(channel_weights.values())
+        weights_std = np.std(weights)
+        
+        # Normalize to [0, 1] where 1 = perfect alignment
+        alignment = 1.0 / (1.0 + weights_std)
+        
+        return float(alignment)
+    
+    def _assess_stability(
+        self,
+        entropy_measures: Dict[str, float],
+        alignment_score: float
+    ) -> str:
+        """Determine system stability state"""
+        avg_entropy = np.mean(list(entropy_measures.values()))
+        
+        if avg_entropy < 0.3 and alignment_score > 0.7:
+            return "STABLE - Low entropy, high alignment"
+        elif avg_entropy > 0.7 or alignment_score < 0.3:
+            return "UNSTABLE - High entropy or low alignment"
+        else:
+            return "MODERATE - Balanced state"
+    
+    def _generate_reflection(
+        self,
+        contradictions: List[Dict[str, Any]],
+        tensions: List[str],
+        alignment_score: float
+    ) -> str:
+        """Generate meta-analysis of rendering"""
+        if alignment_score > 0.8:
+            base = "High coherence across reasoning channels."
+        elif alignment_score > 0.5:
+            base = "Moderate coherence with some divergence."
+        else:
+            base = "Significant divergence between channels."
+        
+        if contradictions:
+            base += f" {len(contradictions)} conflict(s) detected and exposed."
+        
+        if len(tensions) > 2:
+            base += " Multiple tensions remain unresolved."
+        
+        return base
+    
+    # ========================================================================
+    # UTILITY METHODS
+    # ========================================================================
+    
+    def _validate_input(self, fusion_output: FusionOutput) -> None:
+        """Validate FusionOutput structure"""
+        required_fields = ["query", "merged_response", "hrm_content", 
+                          "lcm_content", "moe_content", "channel_weights"]
+        
+        for field in required_fields:
+            if not hasattr(fusion_output, field):
+                raise ValueError(f"FusionOutput missing required field: {field}")
+        
+        # Validate channel weights sum
+        total_weight = sum(fusion_output.channel_weights.values())
+        if not (0.99 <= total_weight <= 1.01):
+            raise ValueError(f"Channel weights must sum to 1.0, got {total_weight}")
+    
+    def _propagate_metadata(self, fusion_output: FusionOutput) -> Dict[str, Any]:
+        """Propagate metadata exactly from FusionOutput"""
+        metadata = fusion_output.metadata.copy()
+        
+        # Add rendering metadata
+        metadata["render_mode"] = self.mode.value
+        metadata["render_domain"] = self.domain.value
+        metadata["is_regulated"] = self.is_regulated
+        metadata["layer_weights"] = self.layer_weights
+        
+        return metadata
+    
+    def _apply_mode_overrides(
+        self,
+        symbolic: Optional[SymbolicLayer],
+        practical: Optional[PracticalLayer],
+        mirror: Optional[MirrorTruthLayer]
+    ) -> Tuple[Optional[SymbolicLayer], Optional[PracticalLayer], Optional[MirrorTruthLayer]]:
+        """Apply mode-specific rendering rules"""
+        if self.mode == RenderMode.MINIMAL:
+            # Only practical layer
+            return None, practical, None
+        
+        elif self.mode == RenderMode.SYMBOLIC:
+            # Expand symbolic, condense practical
+            if practical:
+                # Keep only top 2 facts and 1 action
+                practical.key_facts = practical.key_facts[:2]
+                practical.actionable_items = practical.actionable_items[:1]
+            return symbolic, practical, mirror
+        
+        elif self.mode == RenderMode.REGULATED:
+            # Minimize metaphors in symbolic layer
+            if symbolic:
+                # Use plain language for theme
+                if "like" in symbolic.theme.lower() or "as" in symbolic.theme.lower():
+                    symbolic.theme = "Core purpose identified"
+                # Simplify archetype
+                symbolic.archetype = symbolic.archetype.split("-")[0].strip()
+            return symbolic, practical, mirror
+        
+        else:  # STANDARD
+            return symbolic, practical, mirror
+    
+    def _update_stats(self, render_time_ms: float) -> None:
+        """Update rendering statistics"""
+        self.stats["total_renders"] += 1
+        self.stats["mode_counts"][self.mode.value] += 1
+        
+        # Update average render time
+        n = self.stats["total_renders"]
+        old_avg = self.stats["avg_render_time_ms"]
+        self.stats["avg_render_time_ms"] = (old_avg * (n - 1) + render_time_ms) / n
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get rendering statistics"""
+        return self.stats.copy()
+
+
+# ============================================================================
+# CONVENIENCE FUNCTIONS
+# ============================================================================
+
+def render_fusion_output(
+    fusion_output: FusionOutput,
+    mode: RenderMode = RenderMode.STANDARD,
+    domain: Domain = Domain.GENERAL
+) -> RenderedOutput:
+    """
+    Convenience function to render FusionOutput.
+    
+    Args:
+        fusion_output: Raw output from FusionEngine
+        mode: Rendering mode
+        domain: Application domain
+        
+    Returns:
+        RenderedOutput: Structured 3-layer output
+    """
+    renderer = FusionRenderer(mode=mode, domain=domain)
+    return renderer.render(fusion_output)
+
+
+if __name__ == "__main__":
+    # Simple test
+    print("SOULPI Fusion Renderer v3.0")
+    print("=" * 50)
+    print("✓ Module loaded successfully")
+    print(f"✓ Available modes: {[m.value for m in RenderMode]}")
+    print(f"✓ Available domains: {[d.value for d in Domain]}")
+    print("\nUse examples.py for usage examples")
