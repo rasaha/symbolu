@@ -1,0 +1,73 @@
+name: SymbolU Pipeline CI
+
+on:
+  push:
+    branches: ["main", "master"]
+    paths:
+      - "mechanical/pipeline/**"
+      - ".github/workflows/pipeline-ci.yml"
+  pull_request:
+    branches: ["main", "master"]
+    paths:
+      - "mechanical/pipeline/**"
+      - ".github/workflows/pipeline-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  pipeline-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Load cached dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pytest-cov coverage pydantic
+
+      - name: Run pipeline integration tests with coverage
+        run: |
+          pytest mechanical/pipeline/integration_tests \
+            --cov=mechanical/pipeline \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-fail-under=85 \
+            --disable-warnings --maxfail=1 -q \
+            2>&1 | tee pipeline-pytest.log
+
+      - name: Upload pipeline CI snapshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-ci-snapshots
+          path: |
+            coverage.xml
+            htmlcov/
+            pipeline-pytest.log
+
+      - name: Upload pipeline debug logs
+        if: hashFiles('mechanical/pipeline/**/*.log') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-debug-logs
+          path: |
+            mechanical/pipeline/pipeline-debug.log
+            mechanical/pipeline/persona.log
+            mechanical/pipeline/fusion.log
+            mechanical/pipeline/mlcr.log
+            mechanical/pipeline/dha.log
+            mechanical/pipeline/renderer.log
