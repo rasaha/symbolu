@@ -11,12 +11,16 @@ Non-patented mechanical processing components:
 - Router: Ontology routing
 - Logging: Explainability and audit
 - Schemas: Message and state schemas
+- Pipeline: v3.0 linear pipeline orchestrator
 
 Core Bridge provides connection to Symbol-U core.
 """
 
-from symbolu.mechanical.core_bridge import CoreBridge
-
-__all__ = [
-    "CoreBridge",
-]
+# CoreBridge requires symbolu.core which may not be available
+# Make import optional to allow submodules to work independently
+try:
+    from mechanical.core_bridge import CoreBridge
+    __all__ = ["CoreBridge"]
+except ImportError:
+    # symbolu.core not available - CoreBridge won't be exported
+    __all__ = []

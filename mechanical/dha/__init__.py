@@ -36,38 +36,38 @@ Integration:
     FusionEngine -> PersonaEngine -> FusionRenderer -> DHAEngine -> Output
 """
 
-from symbolu.mechanical.dha.dha_engine import (
+from mechanical.dha.dha_engine import (
     DHAEngine,
     DHAInput,
     DHAOutput,
     run_dha,
     adapt_message
 )
-from symbolu.mechanical.dha.adaptation_rules import (
+from mechanical.dha.adaptation_rules import (
     DeliveryProfile,
     Level
 )
-from symbolu.mechanical.dha.tone_selector import (
+from mechanical.dha.tone_selector import (
     ToneSelector,
     select_tone,
     get_delivery_profile
 )
-from symbolu.mechanical.dha.delivery_modulator import (
+from mechanical.dha.delivery_modulator import (
     DeliveryModulator,
     modulate_delivery,
     get_adapted_message
 )
-from symbolu.mechanical.dha.readiness_analyzer import (
+from mechanical.dha.readiness_analyzer import (
     ReadinessAnalyzer,
     analyze_readiness,
     get_readiness_level
 )
-from symbolu.mechanical.dha.resistance_detector import (
+from mechanical.dha.resistance_detector import (
     ResistanceDetector,
     detect_resistance,
     get_resistance_level
 )
-from symbolu.mechanical.dha.safety_filters import (
+from mechanical.dha.safety_filters import (
     SafetyFilters,
     filter_text,
     is_text_safe,
