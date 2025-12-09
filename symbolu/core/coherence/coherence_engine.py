@@ -105,6 +105,9 @@ class CoherenceEngine:
         # Update Phase 2 formula aggregates (observation only)
         self._update_formula_aggregates(state)
 
+        # Update Phase 3 derived formula metrics (observation only)
+        self._update_derived_formula_metrics(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -298,3 +301,73 @@ class CoherenceEngine:
         else:
             state.avg_tension_corridor = None
             state.max_tension_corridor = None
+
+    def _update_derived_formula_metrics(self, state: CoherenceState) -> None:
+        """
+        Update Phase 3 derived formula metrics (observation only).
+
+        Computes three derived indices from Phase 1 formulas:
+        1. resonance_index: overall stabilizing signal (high SMI, small gap, small delta)
+        2. tension_index: session tension (from Tension Corridor)
+        3. arc_alignment_index: temporal pattern alignment (improving trajectory)
+
+        These metrics are for observability only and do NOT affect existing scoring.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        # Get most recent formula values
+        smi = state.smi_history[-1] if state.smi_history else None
+        delta_smi = state.delta_smi_history[-1] if state.delta_smi_history else None
+        bhava_gap = state.bhava_gap_history[-1] if state.bhava_gap_history else None
+        tension = state.tension_corridor_history[-1] if state.tension_corridor_history else None
+
+        # Only compute if we have formula data
+        if smi is None or bhava_gap is None or tension is None:
+            state.resonance_index = None
+            state.tension_index = None
+            state.arc_alignment_index = None
+            return
+
+        # Helper: clamp function
+        def clamp(value: float, min_val: float, max_val: float) -> float:
+            return max(min_val, min(max_val, value))
+
+        # 1. RESONANCE INDEX
+        # Intuition: high SMI + small Bhava Gap + small |ΔSMI|
+        # Normalize gap: 1 = close (gap=0), 0 = far (gap=1.0)
+        gap_norm = 1.0 - bhava_gap
+
+        # Normalize delta: 1 = stable (delta=0), 0 = very jumpy (|delta|=1.0)
+        if delta_smi is not None:
+            delta_norm = 1.0 - min(abs(delta_smi), 1.0)
+        else:
+            delta_norm = 1.0  # First turn, assume stable
+
+        state.resonance_index = clamp(
+            0.5 * smi + 0.3 * gap_norm + 0.2 * delta_norm,
+            0.0,
+            1.0,
+        )
+
+        # 2. TENSION INDEX
+        # Intuition: directly from Tension Corridor, smoothed with delta volatility
+        state.tension_index = clamp(
+            0.7 * tension + 0.3 * (1.0 - delta_norm),
+            0.0,
+            1.0,
+        )
+
+        # 3. ARC ALIGNMENT INDEX
+        # Intuition: how well SMI + ΔSMI + gap match a smooth, improving trajectory
+        # improving = 1.0 if delta > 0, else 0.0
+        if delta_smi is not None and delta_smi > 0.0:
+            improving = 1.0
+        else:
+            improving = 0.0
+
+        state.arc_alignment_index = clamp(
+            0.4 * smi + 0.3 * gap_norm + 0.3 * improving,
+            0.0,
+            1.0,
+        )
