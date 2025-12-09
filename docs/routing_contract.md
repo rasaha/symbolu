@@ -407,4 +407,87 @@ Any change causing drift test failures requires approval and documentation.
 
 ---
 
+## 9. Mapper-Driven Expression Modulation Contract
+
+The routing signals produced by TTOR and MLCR (`use_hrm`, `use_lcm`, `use_lam`) are converted into a **MapperProfile** that modulates presentation style across downstream engines.
+
+**Complete Documentation:** See `docs/expression_modulation.md` for full specification.
+
+### 9.1 Core Principle
+
+**Expression modulation changes STYLE, not SEMANTIC TRUTH.**
+
+All downstream engines (Persona → Fusion → DHA → Renderer) MUST treat `mapper_profile` as a **style/depth modulation layer only**, without altering semantic truth.
+
+### 9.2 Semantic Preservation Guarantee
+
+**Guarantee:**
+Semantic content is **PURELY** determined by upstream logic (TTOR → MLCR → Fusion/DHA). Modulation changes **expression**, not **meaning**.
+
+**Enforcement:**
+- Content tokens are preserved across all mapper modes
+- Structural fields (symbolic/practical/mirror layers, DHA insight) are always present
+- Modulation operates on presentation markers only (e.g., `[Examined in detail]`, arc framing prefixes)
+- CI-enforced semantic-shape tests verify content preservation
+
+### 9.3 MapperProfile Summary
+
+**MapperProfile Fields:**
+- `resolution_level`: `"low"` | `"medium"` | `"high"` — Detail granularity
+- `arc_mode`: `"none"` | `"temporal"` | `"identity"` | `"deep_context"` — Long-arc framing
+- `detail_bias`: `0.0 – 1.0` — Preference for fine-grained detail
+- `practical_bias`: `0.0 – 1.0` — Preference for concrete/task-focused delivery
+- `reflective_bias`: `0.0 – 1.0` — Preference for introspective/philosophical framing
+
+### 9.4 Mapper Effects on Expression
+
+**HRM Effects (High-Resolution Mapper):**
+- **Resolution:** More granularity, precision markers, expanded symbolic layers
+- **Detail:** Fine-grained causal patterns, nuanced facts, "examined in detail" markers
+- **Reflection:** Deeper introspection, contrastive phrasing, symbolic mirrors emphasized
+
+**LCM Effects (Low-Context Mapper):**
+- **Resolution:** Surface-level compression, simplified themes, minimal symbolic content
+- **Practical Focus:** Top facts only, actionable items prioritized, coherence emphasized
+- **Reflection:** Minimal introspection, no metaphor, "practical focus maintained" framing
+
+**LAM Effects (Long-Arc Mapper):**
+- **Arc Framing:** Temporal/identity/deep-context prefixes, long-arc pattern markers
+- **Reflection:** Arc-aware introspection, trajectory/momentum keywords, identity evolution markers
+- **Stabilization:** If `long_arc_tension > 0.7`, add stabilization framing
+
+### 9.5 CI Enforcement
+
+Expression modulation is enforced by:
+
+**Semantic-Shape Tests:** `symbolu/mechanical/pipeline/integration_tests/test_pipeline_semantic_shape.py`
+- Verify semantic core unchanged across mappers
+- Verify required DHA fields always present
+- Verify structural layers in fusion renderer always present
+- Verify LLM renderer preserves content tokens
+- Verify no semantic loss under LCM compression
+
+**Routing Drift Tests:** `symbolu/core/drift_tests/test_mapper_activation_regions.py`
+- Verify mapper activation regions unchanged
+- Verify canonical thresholds preserved
+
+### 9.6 Contract Violations
+
+Any change that causes semantic-shape test failures is a **contract violation** and requires one of:
+
+**Semantic Drift (Restore Contract):**
+- If modulation logic unintentionally changed semantic content, revert and fix
+- Verify semantic-shape tests pass
+- Document the incident
+
+**Intentional Modulation Update (Requires Approval):**
+1. Document rationale
+2. Update `compute_mapper_profile()` and renderer modulation methods
+3. Update semantic-shape tests to reflect new guarantees
+4. Update `docs/expression_modulation.md`
+5. Obtain approval from project maintainers
+6. Verify all tests pass
+
+---
+
 **End of Routing Contract v2.0**
