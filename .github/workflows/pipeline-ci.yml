@@ -12,6 +12,7 @@ on:
       - "symbolu/mechanical/lam/**"
       - "symbolu/temporal/**"
       - "symbolu/api/**"
+      - "symbolu/policy/**"
       - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   pull_request:
@@ -25,6 +26,7 @@ on:
       - "symbolu/mechanical/lam/**"
       - "symbolu/temporal/**"
       - "symbolu/api/**"
+      - "symbolu/policy/**"
       - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   workflow_dispatch:
@@ -146,6 +148,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee unified-api-pytest.log
 
+      - name: Run Policy Engine Tests
+        run: |
+          pytest symbolu/policy/tests/test_policy_engine.py \
+            --disable-warnings -q \
+            2>&1 | tee policy-engine-pytest.log
+
       - name: Upload Coherence Reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -187,6 +195,7 @@ jobs:
             coherence-observability-pytest.log
             persona-drift-pytest.log
             unified-api-pytest.log
+            policy-engine-pytest.log
 
       - name: Upload snapshot diffs
         if: failure()
