@@ -51,6 +51,12 @@ jobs:
             --disable-warnings --maxfail=1 -q \
             2>&1 | tee ttor-pytest.log
 
+      - name: Run TTOR Mapper Switching Tests
+        run: |
+          pytest symbolu/mechanical/pipeline/ttor/tests_mapper_switching/test_mapper_switching_profiles.py \
+            --disable-warnings -q \
+            2>&1 | tee ttor-mapper-switching.log
+
       - name: Type check with mypy
         run: |
           mypy symbolu/mechanical/pipeline/ttor --strict \
@@ -69,6 +75,14 @@ jobs:
             ttor-pytest.log
             ttor-mypy.log
             ttor-flake8.log
+            ttor-mapper-switching.log
+
+      - name: Upload Mapper Switching Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mapper-switching-report
+          path: symbolu/mechanical/pipeline/ttor/tests_mapper_switching/mapper_switching_report.json
 
       - name: Upload TTOR coverage report
         uses: actions/upload-artifact@v4
