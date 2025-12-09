@@ -46,6 +46,13 @@ class CoherenceState:
     bhava_gap_history: List[Optional[float]] = field(default_factory=list)  # Bhava gap per turn
     tension_corridor_history: List[Optional[float]] = field(default_factory=list)  # Tension corridor per turn
 
+    # Phase 2 formula aggregates (observation only - not used in scoring)
+    avg_smi: Optional[float] = None  # Average SMI across session
+    max_smi: Optional[float] = None  # Maximum SMI observed
+    min_smi: Optional[float] = None  # Minimum SMI observed
+    avg_tension_corridor: Optional[float] = None  # Average tension corridor
+    max_tension_corridor: Optional[float] = None  # Maximum tension corridor
+
     # Derived metrics (0.0-1.0)
     persona_drift_score: float = 0.0  # Higher = more drift (worse)
     semantic_stability_score: float = 0.0  # Higher = more stable (better)

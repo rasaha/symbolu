@@ -65,11 +65,17 @@ class MemoryEntry:
         description: Human-readable deterministic description of the event
         metrics: Dictionary of raw metrics that triggered this event
                  (e.g., {"coherence_score": 0.85, "coherence_delta": 0.15, ...})
+        smi: Optional SMI value at time of event (Phase 2 context)
+        tension_corridor: Optional tension corridor at time of event (Phase 2 context)
     """
     turn_index: int
     event_type: str
     description: str
     metrics: Dict[str, float] = field(default_factory=dict)
+
+    # Phase 2 formula context (observation only)
+    smi: Optional[float] = None
+    tension_corridor: Optional[float] = None
 
     def serialize(self) -> Dict[str, Any]:
         """
@@ -78,12 +84,20 @@ class MemoryEntry:
         Returns:
             Dictionary with all memory entry fields
         """
-        return {
+        result = {
             "turn_index": self.turn_index,
             "event_type": self.event_type,
             "description": self.description,
             "metrics": self.metrics,
         }
+
+        # Include Phase 2 formula context if available
+        if self.smi is not None:
+            result["smi"] = self.smi
+        if self.tension_corridor is not None:
+            result["tension_corridor"] = self.tension_corridor
+
+        return result
 
 
 # ============================================================================

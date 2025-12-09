@@ -43,6 +43,16 @@ class CoherenceObservation:
     is_recovering: bool = False
     is_volatile: bool = False
 
+    # Phase 2 formula aggregates (observation only)
+    avg_smi: Optional[float] = None
+    max_smi: Optional[float] = None
+    min_smi: Optional[float] = None
+    avg_tension_corridor: Optional[float] = None
+    max_tension_corridor: Optional[float] = None
+    delta_smi: Optional[float] = None
+    bhava_gap: Optional[float] = None
+    tension_corridor: Optional[float] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -142,6 +152,36 @@ class CoherenceObserver:
         is_recovering = self._check_recovering(coherence_state)
         is_volatile = mapper_volatility > 0.5
 
+        # Phase 2: Extract formula aggregates from coherence_state
+        avg_smi = None
+        max_smi = None
+        min_smi = None
+        avg_tension_corridor = None
+        max_tension_corridor = None
+        delta_smi = None
+        bhava_gap = None
+        tension_corridor = None
+
+        if coherence_state is not None:
+            avg_smi = getattr(coherence_state, 'avg_smi', None)
+            max_smi = getattr(coherence_state, 'max_smi', None)
+            min_smi = getattr(coherence_state, 'min_smi', None)
+            avg_tension_corridor = getattr(coherence_state, 'avg_tension_corridor', None)
+            max_tension_corridor = getattr(coherence_state, 'max_tension_corridor', None)
+
+            # Extract most recent delta_smi, bhava_gap, tension_corridor from histories
+            delta_smi_hist = getattr(coherence_state, 'delta_smi_history', [])
+            if delta_smi_hist and delta_smi_hist[-1] is not None:
+                delta_smi = delta_smi_hist[-1]
+
+            bhava_gap_hist = getattr(coherence_state, 'bhava_gap_history', [])
+            if bhava_gap_hist and bhava_gap_hist[-1] is not None:
+                bhava_gap = bhava_gap_hist[-1]
+
+            tension_corridor_hist = getattr(coherence_state, 'tension_corridor_history', [])
+            if tension_corridor_hist and tension_corridor_hist[-1] is not None:
+                tension_corridor = tension_corridor_hist[-1]
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -162,6 +202,14 @@ class CoherenceObserver:
             is_stabilizing=is_stabilizing,
             is_recovering=is_recovering,
             is_volatile=is_volatile,
+            avg_smi=avg_smi,
+            max_smi=max_smi,
+            min_smi=min_smi,
+            avg_tension_corridor=avg_tension_corridor,
+            max_tension_corridor=max_tension_corridor,
+            delta_smi=delta_smi,
+            bhava_gap=bhava_gap,
+            tension_corridor=tension_corridor,
         )
 
         # Store observation
@@ -250,7 +298,7 @@ class CoherenceObserver:
             }
 
         obs = self._last_observation
-        return {
+        snapshot = {
             "coherence": round(obs.coherence_score, 3),
             "drift": round(obs.persona_drift_score, 3),
             "stability": round(obs.semantic_stability_score, 3),
@@ -262,6 +310,46 @@ class CoherenceObserver:
             "turn": obs.turn_number,
             "status": self._get_status_label(obs),
         }
+
+        # Phase 2: Add formulas section from coherence_state if available
+        formulas = self._extract_formulas_from_observation(obs)
+        if formulas:
+            snapshot["formulas"] = formulas
+
+        return snapshot
+
+    def _extract_formulas_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Optional[float]]]:
+        """
+        Extract Phase 2 formulas from observation.
+
+        Returns formula dict if formulas are available, None otherwise.
+        """
+        # Build formulas dict from observation
+        formulas = {}
+
+        # Current turn formulas
+        if obs.smi_value is not None:
+            formulas["smi"] = obs.smi_value
+        if obs.delta_smi is not None:
+            formulas["delta_smi"] = obs.delta_smi
+        if obs.bhava_gap is not None:
+            formulas["bhava_gap"] = obs.bhava_gap
+        if obs.tension_corridor is not None:
+            formulas["tension_corridor"] = obs.tension_corridor
+
+        # Aggregates
+        if obs.avg_smi is not None:
+            formulas["avg_smi"] = obs.avg_smi
+        if obs.max_smi is not None:
+            formulas["max_smi"] = obs.max_smi
+        if obs.min_smi is not None:
+            formulas["min_smi"] = obs.min_smi
+        if obs.avg_tension_corridor is not None:
+            formulas["avg_tension_corridor"] = obs.avg_tension_corridor
+        if obs.max_tension_corridor is not None:
+            formulas["max_tension_corridor"] = obs.max_tension_corridor
+
+        return formulas if formulas else None
 
     def _get_status_label(self, obs: CoherenceObservation) -> str:
         """Get human-readable status label."""
