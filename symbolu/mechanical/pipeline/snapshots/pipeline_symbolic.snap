@@ -1,0 +1,57 @@
+======================================================================
+PIPELINE END-TO-END SNAPSHOT
+======================================================================
+
+Render Mode: enhanced
+
+--- RAW TEXT OUTPUT ---
+Gently speaking, To clarify: I feel conflicted about my progress today.
+
+You're doing meaningful work here.
+
+--- OUTPUT METADATA ---
+{
+  "mlcr_intent": null,
+  "mlcr_tier": null,
+  "persona_id": "neutral",
+  "pipeline_version": "3.0",
+  "readiness_level": "HIGH",
+  "router_mode": "linear",
+  "tone_profile": "SWEET_RESONANCE"
+}
+
+--- PIPELINE CONTEXT SUMMARY ---
+
+Persona:
+  Active ID: neutral
+  Config: {
+    "caution_level": 0.5,
+    "description": "Objective, minimal personality for general-purpose responses",
+    "directness": 0.5,
+    "display_name": "Neutral Voice",
+    "formality": 0.5,
+    "id": "neutral",
+    "metaphor_level": 0.5,
+    "structure_level": 0.5,
+    "warmth": 0.5
+}
+
+MLCR:
+  Tier: N/A
+  Domain: N/A
+  Intent: N/A
+  Entropy: {}
+
+Fusion:
+  Candidate Count: 3
+  Tier: HYBRID
+  Intent: WHAT
+
+DHA:
+  Tone Profile: SWEET_RESONANCE
+  Readiness Level: HIGH
+  Safety Flags: {"is_safe": true, "modifications": [], "warnings": []}
+
+Router Mode: linear
+
+======================================================================
