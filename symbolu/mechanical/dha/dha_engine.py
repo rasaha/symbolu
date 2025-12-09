@@ -29,9 +29,12 @@ Version: 3.0
 Author: Symbol-U AGI
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 from dataclasses import dataclass, field
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from symbolu.mechanical.pipeline.models import MapperProfile
 
 from .adaptation_rules import DeliveryProfile, get_delivery_profile_metadata
 from .readiness_analyzer import ReadinessAnalyzer
@@ -404,6 +407,87 @@ class DHAEngine:
         n = self.stats["total_runs"]
         old_avg = self.stats["avg_process_time_ms"]
         self.stats["avg_process_time_ms"] = (old_avg * (n - 1) + process_time_ms) / n
+
+    def modulate_dha_depth(
+        self,
+        insight: Dict[str, Any],
+        mapper_profile: Optional["MapperProfile"]
+    ) -> Dict[str, Any]:
+        """
+        Modulate DHA depth based on mapper profile.
+
+        Adjusts introspection level, metaphor usage, and framing
+        based on mapper signals WITHOUT changing semantic truth.
+
+        Rules:
+        ------
+        LCM Active (practical_bias high, resolution_level low):
+            - Minimal introspection
+            - No metaphor
+            - Surface-truth only
+            - No long-range implications
+
+        HRM Active (detail_bias high, resolution_level high):
+            - Deeper introspection
+            - Contrastive phrasing allowed
+            - Symbolic mirrors emphasized
+
+        LAM Active (reflective_bias high, arc_mode set):
+            - Long-arc identity reflection
+            - "trajectory", "momentum", "directionality" allowed
+            - Emphasize coherence across turns
+            - If tension > 0.7 → add stabilization framing
+
+        Args:
+            insight: DHA insight dictionary (readiness, tone, etc.)
+            mapper_profile: Mapper profile from MLCR/TTOR
+
+        Returns:
+            Modulated insight dictionary
+        """
+        if mapper_profile is None:
+            return insight
+
+        modulated = insight.copy()
+
+        # LCM: Shallow insight
+        if mapper_profile.practical_bias > 0.6 and mapper_profile.resolution_level == "low":
+            modulated["introspection_level"] = "minimal"
+            modulated["metaphor_allowed"] = False
+            modulated["reflection_depth"] = "surface"
+            modulated["long_range_implications"] = False
+            modulated["framing_note"] = "Focused on immediate practical delivery"
+
+        # HRM: Rich framing
+        elif mapper_profile.detail_bias > 0.6 and mapper_profile.resolution_level == "high":
+            modulated["introspection_level"] = "deep"
+            modulated["metaphor_allowed"] = True
+            modulated["reflection_depth"] = "detailed"
+            modulated["contrastive_phrasing"] = True
+            modulated["symbolic_mirrors"] = "emphasized"
+            modulated["framing_note"] = "High-resolution analysis with nuanced framing"
+
+        # LAM: Long-arc identity-level framing
+        elif mapper_profile.reflective_bias > 0.6 and mapper_profile.arc_mode != "none":
+            modulated["introspection_level"] = "arc-aware"
+            modulated["metaphor_allowed"] = True
+            modulated["reflection_depth"] = "identity"
+            modulated["arc_keywords"] = ["trajectory", "momentum", "directionality", "coherence"]
+            modulated["emphasize_coherence"] = True
+
+            # Add arc-specific framing
+            if mapper_profile.arc_mode == "temporal":
+                modulated["arc_framing"] = "This shift seems part of a broader movement across sessions."
+            elif mapper_profile.arc_mode == "identity":
+                modulated["arc_framing"] = "This reflects ongoing identity development and self-concept evolution."
+            elif mapper_profile.arc_mode == "deep_context":
+                modulated["arc_framing"] = "This emerges from deep contextual patterns showing trajectory alignment."
+
+            # Add stabilization framing if high tension
+            if "long_arc_tension" in insight and insight.get("long_arc_tension", 0) > 0.7:
+                modulated["stabilization_framing"] = "Pattern suggests need for integration and stabilization."
+
+        return modulated
 
 
 # ============================================================================

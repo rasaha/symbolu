@@ -6,10 +6,13 @@ Uses LLM for polishing while preserving core intelligence.
 Implements "stylist not thinker" principle.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 from symbolu.mechanical.renderer.prompts import PromptTemplates
 from symbolu.mechanical.renderer.style_modifiers import StyleModifiers
 from symbolu.mechanical.renderer.safety_guardrails import SafetyGuardrails
+
+if TYPE_CHECKING:
+    from symbolu.mechanical.pipeline.models import MapperProfile
 
 
 class LLMRenderer:
@@ -67,3 +70,117 @@ class LLMRenderer:
         """Call LLM API - placeholder."""
         # Placeholder - actual implementation would call LLM
         raise NotImplementedError("LLM integration pending.")
+
+    def apply_mapper_tone(
+        self,
+        text: str,
+        mapper_profile: Optional["MapperProfile"]
+    ) -> str:
+        """
+        Apply mapper tone modulation to text.
+
+        Modulates TONE and CADENCE only, not semantic content.
+        LLM renderer must remain optional and non-semantic.
+
+        Tones:
+        ------
+        LCM: Short, clipped, actionable
+            - Sentence length: 8-12 words
+            - Structure: Direct, imperative
+            - Avoid: subordinate clauses, complex transitions
+
+        HRM: Clearer transitions, deeper detail, parallel structures
+            - Sentence length: 15-25 words
+            - Structure: Compound-complex, contrastive
+            - Use: transitional phrases, parallel constructions
+
+        LAM: Reflective, slow cadence, stabilizing tone
+            - Sentence length: 18-30 words
+            - Structure: Flowing, contemplative
+            - Use: cohesive devices, temporal markers
+            - Avoid: therapy language (unless domain=therapy)
+
+        Args:
+            text: Original text
+            mapper_profile: Mapper profile from MLCR/TTOR
+
+        Returns:
+            Tone-modulated text
+        """
+        if mapper_profile is None:
+            return text
+
+        # LCM: Short, clipped, actionable
+        if mapper_profile.practical_bias > 0.6 and mapper_profile.resolution_level == "low":
+            return self._apply_lcm_tone(text)
+
+        # HRM: Clearer transitions, deeper detail
+        elif mapper_profile.detail_bias > 0.6 and mapper_profile.resolution_level == "high":
+            return self._apply_hrm_tone(text)
+
+        # LAM: Reflective, slow cadence
+        elif mapper_profile.reflective_bias > 0.6 and mapper_profile.arc_mode != "none":
+            return self._apply_lam_tone(text, mapper_profile.arc_mode)
+
+        # Default: return unchanged
+        return text
+
+    def _apply_lcm_tone(self, text: str) -> str:
+        """Apply LCM tone: short, clipped, actionable."""
+        # Split into sentences and keep them short
+        sentences = [s.strip() for s in text.split('.') if s.strip()]
+
+        # Shorten each sentence - keep only main clause
+        shortened = []
+        for sent in sentences:
+            # Remove subordinate clauses (basic heuristic)
+            if ',' in sent:
+                parts = sent.split(',')
+                # Keep first part (usually main clause)
+                shortened.append(parts[0].strip())
+            else:
+                shortened.append(sent)
+
+        # Join with periods, limit to 3 sentences max
+        result = '. '.join(shortened[:3]) + '.'
+        return result
+
+    def _apply_hrm_tone(self, text: str) -> str:
+        """Apply HRM tone: clearer transitions, deeper detail, parallel structures."""
+        sentences = [s.strip() for s in text.split('.') if s.strip()]
+
+        # Add transitional phrases between sentences
+        transitions = ["Furthermore", "Moreover", "In addition", "Specifically"]
+        enhanced = []
+
+        for i, sent in enumerate(sentences):
+            if i > 0 and i < len(transitions):
+                # Add transition to second+ sentences
+                enhanced.append(f"{transitions[i-1].lower()}, {sent.lower()}")
+            else:
+                enhanced.append(sent)
+
+        result = '. '.join(enhanced) + '.'
+        return result
+
+    def _apply_lam_tone(self, text: str, arc_mode: str) -> str:
+        """Apply LAM tone: reflective, slow cadence, stabilizing."""
+        sentences = [s.strip() for s in text.split('.') if s.strip()]
+
+        # Add cohesive devices and temporal markers
+        arc_markers = {
+            "temporal": ["Over time", "As patterns emerge", "Through this progression"],
+            "identity": ["In this evolution", "Through self-development", "Within this growth"],
+            "deep_context": ["In this broader context", "Through these patterns", "Within this framework"]
+        }
+
+        markers = arc_markers.get(arc_mode, ["In this context"])
+
+        # Add marker to first sentence
+        if sentences:
+            first = sentences[0]
+            sentences[0] = f"{markers[0]}, {first.lower()}"
+
+        # Join with more flowing connectors
+        result = '. '.join(sentences) + '.'
+        return result
