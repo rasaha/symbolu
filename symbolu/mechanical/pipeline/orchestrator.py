@@ -298,6 +298,7 @@ class SymbolUPipeline:
         # ================================================================
         # Only compute session policy if session_id is provided in metadata
         ctx.session_policy_flags = None
+        ctx.session_memory = None
         session_id = ctx.request.metadata.get("session_id")
         if session_id:
             try:
@@ -318,10 +319,26 @@ class SymbolUPipeline:
 
                     # Compute session policy flags (deterministic, zero-LLM)
                     ctx.session_policy_flags = compute_session_policy_flags(session_summary)
+
+                    # ================================================================
+                    # SESSION MEMORY v2.0: Update memory and attach to context (optional, non-invasive)
+                    # Extracts episodic memory events using deterministic rules
+                    # Does NOT modify pipeline behavior - purely additive observability
+                    # ================================================================
+                    try:
+                        # Update session memory (detects new events)
+                        session_store.update_session(session_id, ctx)
+
+                        # Attach memory to context for unified API and DILchat adapter
+                        ctx.session_memory = session_state.session_memory
+                    except Exception:
+                        # If memory update fails, continue without it (fail-safe)
+                        ctx.session_memory = None
             except Exception:
                 # If session policy layer fails, continue without it (fail-safe)
                 # This ensures pipeline robustness even if session tracking has issues
                 ctx.session_policy_flags = None
+                ctx.session_memory = None
 
         # ================================================================
         # UNIFIED API: Generate unified output (optional, non-invasive)

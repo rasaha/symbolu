@@ -192,6 +192,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee session-policy-pytest.log
 
+      - name: Run Session Memory Tests
+        run: |
+          pytest symbolu/service/tests/test_session_memory.py \
+            --disable-warnings -q \
+            2>&1 | tee session-memory-pytest.log
+
       - name: Upload Coherence Reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -239,6 +245,7 @@ jobs:
             api-security-pytest.log
             sessions-pytest.log
             session-policy-pytest.log
+            session-memory-pytest.log
 
       - name: Upload snapshot diffs
         if: failure()

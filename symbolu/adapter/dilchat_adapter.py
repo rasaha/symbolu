@@ -210,18 +210,22 @@ def build_dilchat_response(
         combined_flags["session_policy_flags"] = session_policy_flags
 
     # ========================================================================
-    # STEP 5: Build badges
+    # STEP 5: Build badges (includes session memory badges)
     # ========================================================================
+    # Extract session memory for memory-based badges
+    session_memory = unified_output.get("session_memory", {})
+
     badges = _build_badges(
         stability_status=stability_status,
         policy_flags=combined_flags,
         coherence_score=coherence_score,
+        session_memory=session_memory,
     )
 
     # ========================================================================
-    # STEP 6: Build hints
+    # STEP 6: Build hints (includes session memory hints)
     # ========================================================================
-    hints = _build_hints(combined_flags)
+    hints = _build_hints(combined_flags, session_memory)
 
     # ========================================================================
     # STEP 7: Assemble DILchatResponse
@@ -285,6 +289,7 @@ def _build_badges(
     stability_status: Optional[str],
     policy_flags: Dict[str, Any],
     coherence_score: Optional[float],
+    session_memory: Optional[Dict[str, Any]] = None,
 ) -> List[DILchatBadge]:
     """
     Build UI badges based on stability status and policy flags.
@@ -297,11 +302,14 @@ def _build_badges(
         5. Session Fragmented Badge (if session_is_fragmented=True)
         6. Session Grounding Needed Badge (if session_needs_grounding=True)
         7. Session Deep Reflection Allowed Badge (if session_allow_deep_reflection=True)
+        8. Memory Breakthrough Badge (if recent breakthrough event)
+        9. Memory Fragmentation Badge (if recent fragmentation event)
 
     Args:
         stability_status: Stability classification from policy engine
         policy_flags: Policy flags dictionary (includes session_policy_flags if available)
         coherence_score: Coherence score (0-1)
+        session_memory: Session memory dictionary with events
 
     Returns:
         List of DILchatBadge objects
@@ -394,6 +402,28 @@ def _build_badges(
             description="Session is stable enough for deeper multi-turn exploration."
         ))
 
+    # ========================================================================
+    # MEMORY v2.0 BADGES (from session memory events)
+    # ========================================================================
+    if session_memory:
+        recent_events = _get_recent_memory_events(session_memory, n=3)
+
+        # BADGE 8: Memory Breakthrough
+        if _has_event_type(recent_events, "breakthrough"):
+            badges.append(DILchatBadge(
+                label="Breakthrough Moment",
+                level="info",
+                description="Notable upward clarity shift detected in conversation."
+            ))
+
+        # BADGE 9: Memory Fragmentation
+        if _has_event_type(recent_events, "fragmentation"):
+            badges.append(DILchatBadge(
+                label="Moment of Fragmentation",
+                level="warning",
+                description="Conversation stability momentarily broke. Consider grounding."
+            ))
+
     return badges
 
 
@@ -402,7 +432,10 @@ def _build_badges(
 # ============================================================================
 
 
-def _build_hints(policy_flags: Dict[str, Any]) -> List[DILchatHint]:
+def _build_hints(
+    policy_flags: Dict[str, Any],
+    session_memory: Optional[Dict[str, Any]] = None
+) -> List[DILchatHint]:
     """
     Build UI hints based on policy flags.
 
@@ -415,9 +448,12 @@ def _build_hints(policy_flags: Dict[str, Any]) -> List[DILchatHint]:
         6. GROUNDING_MODE - if session_recommended_style="grounded"
         7. REFLECTION_MODE - if session_recommended_style="reflective"
         8. EXPLORATION_OK - if session_recommended_style="exploratory"
+        9. STATE_CHANGED - if recent mapper flip
+        10. SESSION_RECOVERING - if recent stabilization
 
     Args:
         policy_flags: Policy flags dictionary (includes session_policy_flags if available)
+        session_memory: Session memory dictionary with events
 
     Returns:
         List of DILchatHint objects
@@ -499,6 +535,26 @@ def _build_hints(policy_flags: Dict[str, Any]) -> List[DILchatHint]:
             message="Session trajectory supports exploration. Curious, open-ended responses work well."
         ))
 
+    # ========================================================================
+    # MEMORY v2.0 HINTS (from session memory events)
+    # ========================================================================
+    if session_memory:
+        recent_events = _get_recent_memory_events(session_memory, n=3)
+
+        # HINT 9: STATE_CHANGED
+        if _has_event_type(recent_events, "mapper_flip"):
+            hints.append(DILchatHint(
+                code="STATE_CHANGED",
+                message="Mapper configuration changed. System adapted to new query patterns."
+            ))
+
+        # HINT 10: SESSION_RECOVERING
+        if _has_event_type(recent_events, "stabilization"):
+            hints.append(DILchatHint(
+                code="SESSION_RECOVERING",
+                message="Conversation trajectory is stabilizing. Coherence is improving."
+            ))
+
     return hints
 
 
@@ -523,6 +579,38 @@ def _remove_none_values(d: Any) -> Any:
         return [_remove_none_values(item) for item in d if item is not None]
     else:
         return d
+
+
+def _get_recent_memory_events(session_memory: Dict[str, Any], n: int) -> List[Dict[str, Any]]:
+    """
+    Get the N most recent memory events from session memory.
+
+    Args:
+        session_memory: Session memory dictionary
+        n: Number of recent events to retrieve
+
+    Returns:
+        List of recent memory event dictionaries
+    """
+    if not session_memory or 'events' not in session_memory:
+        return []
+
+    events = session_memory.get('events', [])
+    return events[-n:] if n > 0 else []
+
+
+def _has_event_type(events: List[Dict[str, Any]], event_type: str) -> bool:
+    """
+    Check if any event in the list matches the given event type.
+
+    Args:
+        events: List of memory event dictionaries
+        event_type: Event type to check for
+
+    Returns:
+        True if any event matches the type, False otherwise
+    """
+    return any(e.get('event_type') == event_type for e in events)
 
 
 # ============================================================================

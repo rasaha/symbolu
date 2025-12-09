@@ -19,12 +19,13 @@ Usage:
     summary = compute_session_summary(session)
 """
 
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Set
 from uuid import uuid4
 from datetime import datetime
 import threading
 
 from .session_models import SessionState, SessionSummary
+from .session_memory import SessionMemory, SessionMemoryExtractor
 
 
 class SessionStore:
@@ -46,6 +47,7 @@ class SessionStore:
         """Initialize the session store with empty state."""
         self._sessions: Dict[str, SessionState] = {}
         self._lock = threading.Lock()
+        self._memory_extractor = SessionMemoryExtractor()
 
     def create_session(self, domain: str = "generic") -> SessionState:
         """
@@ -62,7 +64,8 @@ class SessionStore:
             state = SessionState(
                 session_id=session_id,
                 created_at=datetime.utcnow(),
-                domain=domain
+                domain=domain,
+                session_memory=SessionMemory(),
             )
             self._sessions[session_id] = state
             return state
@@ -158,6 +161,32 @@ class SessionStore:
         """
         with self._lock:
             return len(self._sessions)
+
+    def update_session(self, session_id: str, ctx: Any = None) -> None:
+        """
+        Update session with memory extraction.
+
+        This method should be called after each turn to:
+        1. Compute session summary
+        2. Extract memory events using SessionMemoryExtractor
+
+        Args:
+            session_id: Session identifier
+            ctx: Optional pipeline context (for future use)
+
+        Raises:
+            KeyError: If session_id does not exist
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise KeyError(f"Session {session_id} not found")
+
+            # Compute session summary
+            summary = compute_session_summary(session)
+
+            # Update memory using extractor
+            self._memory_extractor.update_memory(session, summary)
 
 
 def compute_session_summary(state: SessionState) -> SessionSummary:
@@ -281,6 +310,34 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
             last_tier = last_routing.get("tier", "HYBRID")
             last_domain = last_routing.get("domain", state.domain)
 
+    # Build coherence timeline (Memory v2.0)
+    coherence_timeline = []
+    for coh in state.coherence_history:
+        if isinstance(coh, dict):
+            if "stability" in coh:
+                coherence_timeline.append(coh["stability"])
+            elif "coherence_score" in coh:
+                coherence_timeline.append(coh["coherence_score"])
+
+    # Build temporal arc timeline (Memory v2.0)
+    temporal_arc_timeline = []
+    for temp in state.temporal_history:
+        if isinstance(temp, dict) and "arc_score" in temp:
+            temporal_arc_timeline.append(temp["arc_score"])
+
+    # Build mapper sets timeline (Memory v2.0)
+    mapper_sets = []
+    for mapper in state.mapper_history:
+        if isinstance(mapper, dict):
+            active_set: Set[str] = set()
+            if mapper.get("hrm_active"):
+                active_set.add("HRM")
+            if mapper.get("lcm_active"):
+                active_set.add("LCM")
+            if mapper.get("lam_active"):
+                active_set.add("LAM")
+            mapper_sets.append(active_set)
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -292,4 +349,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         last_tier=last_tier,
         last_domain=last_domain,
         created_at=state.created_at,
+        coherence_timeline=coherence_timeline,
+        temporal_arc_timeline=temporal_arc_timeline,
+        mapper_sets=mapper_sets,
     )

@@ -18,7 +18,7 @@ Design Principles:
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 from datetime import datetime
 
 
@@ -50,6 +50,9 @@ class SessionState:
     routing_history: List[Dict[str, Any]] = field(default_factory=list)
     mapper_history: List[Dict[str, Any]] = field(default_factory=list)
     turns: List[Dict[str, Any]] = field(default_factory=list)
+
+    # Session memory (episodic memory v2.0)
+    session_memory: Optional["SessionMemory"] = None
 
 
 @dataclass
@@ -109,3 +112,13 @@ class SessionSummary:
     def turn_count(self) -> int:
         """Alias for total_turns for policy layer compatibility."""
         return self.total_turns
+
+    # Memory v2.0 fields (timelines for event detection)
+    coherence_timeline: List[float] = field(default_factory=list)
+    temporal_arc_timeline: List[float] = field(default_factory=list)
+    mapper_sets: List[Set[str]] = field(default_factory=list)
+
+    @property
+    def last_mapper_set(self) -> Set[str]:
+        """Get the most recent mapper set."""
+        return self.mapper_sets[-1] if self.mapper_sets else set()
