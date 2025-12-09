@@ -16,6 +16,7 @@ on:
       - "symbolu/adapter/**"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
+      - "symbolu/service/sessions/**"
       - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   pull_request:
@@ -33,6 +34,7 @@ on:
       - "symbolu/adapter/**"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
+      - "symbolu/service/sessions/**"
       - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   workflow_dispatch:
@@ -178,6 +180,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee api-security-pytest.log
 
+      - name: Run Session Management Tests
+        run: |
+          pytest symbolu/service/tests/test_sessions.py \
+            --disable-warnings -q \
+            2>&1 | tee sessions-pytest.log
+
       - name: Upload Coherence Reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -223,6 +231,7 @@ jobs:
             dilchat-adapter-pytest.log
             api-server-pytest.log
             api-security-pytest.log
+            sessions-pytest.log
 
       - name: Upload snapshot diffs
         if: failure()

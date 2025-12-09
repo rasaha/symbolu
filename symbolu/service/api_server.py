@@ -53,6 +53,9 @@ from symbolu.service.request_models import (
 from symbolu.service.security.api_key_auth import verify_api_key
 from symbolu.service.security.rate_limiter import enforce_rate_limit
 
+# Import session management (optional, non-invasive)
+from symbolu.service.sessions import SessionStore, compute_session_summary
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -95,6 +98,9 @@ def create_app() -> "FastAPI":
 
     # Initialize pipeline (stateless, reusable)
     pipeline = SymbolUPipeline()
+
+    # Initialize session store (singleton, thread-safe)
+    session_store = SessionStore()
 
     # ========================================================================
     # ENDPOINT: /dilchat/analyze
@@ -250,6 +256,210 @@ def create_app() -> "FastAPI":
             raise HTTPException(
                 status_code=500,
                 detail=f"Pipeline execution failed: {str(e)}"
+            )
+
+    # ========================================================================
+    # SESSION MANAGEMENT ENDPOINTS
+    # ========================================================================
+
+    @app.post("/session/start")
+    def start_session(request: Request, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create a new multi-turn session for conversation tracking.
+
+        This endpoint creates a session container that persists state across
+        multiple analyze calls, enabling coherence tracking, temporal arc
+        analysis, and conversation continuity.
+
+        Args:
+            request: FastAPI Request object (for security checks)
+            payload: Dict with optional "domain" key
+
+        Returns:
+            Dict with session_id and created_at timestamp
+
+        Raises:
+            HTTPException: If security checks fail
+        """
+        # Security layer (optional, non-invasive)
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
+        try:
+            domain = payload.get("domain", "generic")
+            session = session_store.create_session(domain=domain)
+
+            return {
+                "session_id": session.session_id,
+                "created_at": session.created_at.isoformat(),
+                "domain": session.domain,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in /session/start: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Session creation failed: {str(e)}"
+            )
+
+    @app.post("/session/{session_id}/analyze")
+    def analyze_session_turn(
+        session_id: str,
+        request: Request,
+        req: AnalyzeRequest
+    ) -> Dict[str, Any]:
+        """
+        Analyze a turn within an existing session.
+
+        This endpoint runs the Symbol-U pipeline for the given text and
+        appends the unified output to the session's history, preserving:
+        - Coherence state
+        - Temporal arc data
+        - Routing decisions
+        - Mapper outputs
+
+        Args:
+            session_id: Existing session identifier
+            request: FastAPI Request object (for security checks)
+            req: AnalyzeRequest with text and optional metadata
+
+        Returns:
+            Dict with DILchat-formatted response and session metadata
+
+        Raises:
+            HTTPException: If session not found or security checks fail
+        """
+        # Security layer (optional, non-invasive)
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
+        try:
+            # Retrieve session
+            session = session_store.get(session_id)
+            if session is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Session {session_id} not found"
+                )
+
+            # Build UserRequest for pipeline
+            # Use session domain, not request domain (domain is fixed at session creation)
+            user_request = UserRequest(
+                text=req.text,
+                user_id=req.metadata.get("user_id") if req.metadata else None,
+                metadata={
+                    "domain": session.domain,  # Use session domain
+                    "session_id": session_id,
+                    **(req.metadata or {})
+                }
+            )
+
+            # Run pipeline (zero modification to behavior)
+            result = pipeline.run(user_request)
+
+            # Extract context from result
+            ctx = result.meta.get("context")
+            if not ctx:
+                raise ValueError("Pipeline did not return context")
+
+            # Retrieve unified output
+            unified_output = ctx.unified_output or {}
+
+            # Append turn to session history
+            session_store.append_turn(session_id, unified_output)
+
+            # Retrieve DILchat payload for response
+            dilchat_payload = ctx.dilchat_payload or {}
+
+            # Build response with session metadata
+            response = {
+                "text": dilchat_payload.get("text", result.raw_text),
+                "badges": dilchat_payload.get("badges", []),
+                "hints": dilchat_payload.get("hints", []),
+                "coherence": dilchat_payload.get("coherence", {}),
+                "domain": session.domain,
+                "layers": {
+                    "symbolic": dilchat_payload.get("symbolic_summary"),
+                    "practical": dilchat_payload.get("practical_summary"),
+                    "mirror": dilchat_payload.get("mirror_summary")
+                },
+                "metadata": {
+                    **dilchat_payload.get("metadata", {}),
+                    "session_id": session_id,
+                    "turn_number": len(session.turns),
+                },
+            }
+
+            return response
+
+        except HTTPException:
+            # Re-raise HTTP exceptions
+            raise
+        except Exception as e:
+            logger.error(f"Error in /session/{session_id}/analyze: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Session analysis failed: {str(e)}"
+            )
+
+    @app.get("/session/{session_id}/summary")
+    def session_summary(session_id: str, request: Request) -> Dict[str, Any]:
+        """
+        Get aggregated statistics and trends for a session.
+
+        This endpoint computes summary metrics including:
+        - Total turn count
+        - Coherence trend (average stability)
+        - Persona drift (average drift across turns)
+        - Temporal arc patterns
+        - Last routing state
+
+        Args:
+            session_id: Session identifier
+            request: FastAPI Request object (for security checks)
+
+        Returns:
+            Dict with session summary statistics
+
+        Raises:
+            HTTPException: If session not found or security checks fail
+        """
+        # Security layer (optional, non-invasive)
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
+        try:
+            # Retrieve session
+            state = session_store.get(session_id)
+            if state is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Session {session_id} not found"
+                )
+
+            # Compute summary
+            summary = compute_session_summary(state)
+
+            # Convert to dict and add ISO timestamps
+            return {
+                "session_id": summary.session_id,
+                "total_turns": summary.total_turns,
+                "coherence_trend": summary.coherence_trend,
+                "persona_drift_avg": summary.persona_drift_avg,
+                "temporal_arc_avg": summary.temporal_arc_avg,
+                "last_tier": summary.last_tier,
+                "last_domain": summary.last_domain,
+                "created_at": summary.created_at.isoformat(),
+            }
+
+        except HTTPException:
+            # Re-raise HTTP exceptions
+            raise
+        except Exception as e:
+            logger.error(f"Error in /session/{session_id}/summary: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Session summary failed: {str(e)}"
             )
 
     # ========================================================================
