@@ -1,0 +1,75 @@
+name: Renderer CI
+
+on:
+  push:
+    branches: ["main", "master"]
+    paths:
+      - "renderer/**"
+      - "core/**renderer**"
+      - "mechanical/**renderer**"
+      - "mechanical/pipeline/**renderer**"
+      - ".github/workflows/renderer-ci.yml"
+  pull_request:
+    branches: ["main", "master"]
+    paths:
+      - "renderer/**"
+      - "core/**renderer**"
+      - "mechanical/**renderer**"
+      - "mechanical/pipeline/**renderer**"
+      - ".github/workflows/renderer-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  renderer-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pytest-cov coverage pydantic numpy
+
+      - name: Run Renderer tests with coverage
+        run: |
+          pytest \
+            renderer/tests \
+            --cov=renderer \
+            --cov=mechanical/renderer \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-fail-under=85 \
+            --disable-warnings --maxfail=1 -q \
+            2>&1 | tee renderer-pytest.log
+
+      - name: Upload Renderer test logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: renderer-test-logs
+          path: renderer-pytest.log
+
+      - name: Upload Renderer coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: renderer-coverage-report
+          path: |
+            coverage.xml
+            htmlcov/
