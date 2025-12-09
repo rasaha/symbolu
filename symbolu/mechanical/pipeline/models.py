@@ -241,6 +241,7 @@ class PipelineContext:
     mapper_profile: Optional[MapperProfile] = None
     coherence_state: Optional["CoherenceState"] = None  # Multi-turn coherence tracking
     coherence_report: Optional[Dict[str, Any]] = None  # Observability report from CoherenceObserver
+    unified_output: Optional[Dict[str, Any]] = None  # Unified API output (USU-API v1.0)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize context to dictionary for logging/debugging."""
