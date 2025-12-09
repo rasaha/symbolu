@@ -13,6 +13,7 @@ on:
       - "symbolu/temporal/**"
       - "symbolu/api/**"
       - "symbolu/policy/**"
+      - "symbolu/adapter/**"
       - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   pull_request:
@@ -27,6 +28,7 @@ on:
       - "symbolu/temporal/**"
       - "symbolu/api/**"
       - "symbolu/policy/**"
+      - "symbolu/adapter/**"
       - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   workflow_dispatch:
@@ -154,6 +156,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee policy-engine-pytest.log
 
+      - name: Run DILchat Adapter Tests
+        run: |
+          pytest symbolu/adapter/tests/test_dilchat_adapter.py \
+            --disable-warnings -q \
+            2>&1 | tee dilchat-adapter-pytest.log
+
       - name: Upload Coherence Reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -196,6 +204,7 @@ jobs:
             persona-drift-pytest.log
             unified-api-pytest.log
             policy-engine-pytest.log
+            dilchat-adapter-pytest.log
 
       - name: Upload snapshot diffs
         if: failure()
