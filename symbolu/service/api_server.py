@@ -27,13 +27,14 @@ from typing import Any, Dict
 
 # Optional FastAPI imports
 try:
-    from fastapi import FastAPI, HTTPException
+    from fastapi import FastAPI, HTTPException, Request
     from fastapi.responses import JSONResponse
     FASTAPI_AVAILABLE = True
 except ImportError:
     FastAPI = None
     HTTPException = None
     JSONResponse = None
+    Request = None
     FASTAPI_AVAILABLE = False
 
 # Import Symbol-U pipeline components
@@ -47,6 +48,10 @@ from symbolu.service.request_models import (
     UnifiedAPIResponse,
     PYDANTIC_AVAILABLE
 )
+
+# Import security components (optional, non-invasive)
+from symbolu.service.security.api_key_auth import verify_api_key
+from symbolu.service.security.rate_limiter import enforce_rate_limit
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -96,7 +101,7 @@ def create_app() -> "FastAPI":
     # ========================================================================
 
     @app.post("/dilchat/analyze", response_model=DILchatAPIResponse)
-    def dilchat_analyze(req: AnalyzeRequest) -> Dict[str, Any]:
+    def dilchat_analyze(req: AnalyzeRequest, request: Request) -> Dict[str, Any]:
         """
         Analyze user text and return DILchat-formatted response.
 
@@ -110,13 +115,18 @@ def create_app() -> "FastAPI":
 
         Args:
             req: AnalyzeRequest with text, domain, and optional metadata
+            request: FastAPI Request object (for security checks)
 
         Returns:
             DILchatAPIResponse with presentation-ready payload
 
         Raises:
-            HTTPException: If pipeline execution fails
+            HTTPException: If pipeline execution fails or security checks fail
         """
+        # Security layer (optional, non-invasive)
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
         try:
             # Build UserRequest for pipeline
             user_request = UserRequest(
@@ -173,7 +183,7 @@ def create_app() -> "FastAPI":
     # ========================================================================
 
     @app.post("/symbolu/analyze", response_model=UnifiedAPIResponse)
-    def symbolu_analyze(req: AnalyzeRequest) -> Dict[str, Any]:
+    def symbolu_analyze(req: AnalyzeRequest, request: Request) -> Dict[str, Any]:
         """
         Analyze user text and return full unified diagnostic output.
 
@@ -190,13 +200,18 @@ def create_app() -> "FastAPI":
 
         Args:
             req: AnalyzeRequest with text, domain, and optional metadata
+            request: FastAPI Request object (for security checks)
 
         Returns:
             UnifiedAPIResponse with complete pipeline output
 
         Raises:
-            HTTPException: If pipeline execution fails
+            HTTPException: If pipeline execution fails or security checks fail
         """
+        # Security layer (optional, non-invasive)
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
         try:
             # Build UserRequest for pipeline
             user_request = UserRequest(
