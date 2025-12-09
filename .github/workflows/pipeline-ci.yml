@@ -87,6 +87,18 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee temporal-pipeline-snapshot-pytest.log
 
+      - name: Run Delta Snapshot Tests
+        run: |
+          pytest symbolu/mechanical/pipeline/tests_delta/test_delta_pipeline.py \
+            --disable-warnings -q \
+            2>&1 | tee delta-snapshot-pytest.log
+
+      - name: Upload Delta Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: delta-report
+          path: symbolu/mechanical/pipeline/tests_delta/delta_report.json
+
       - name: Upload pipeline CI snapshots
         uses: actions/upload-artifact@v4
         with:
@@ -100,6 +112,7 @@ jobs:
             pipeline-e2e-snapshot-pytest.log
             pipeline-multiturn-snapshot-pytest.log
             temporal-pipeline-snapshot-pytest.log
+            delta-snapshot-pytest.log
 
       - name: Upload snapshot diffs
         if: failure()
@@ -112,6 +125,8 @@ jobs:
             symbolu/mechanical/pipeline/tests_fusion/*.diff
             symbolu/mechanical/pipeline/tests_pipeline_snapshots/*.diff
             symbolu/mechanical/pipeline/tests_pipeline_temporal/*.diff
+            symbolu/mechanical/pipeline/tests_delta/*.diff
+            symbolu/mechanical/pipeline/tests_delta/delta_report.json
 
       - name: Upload Temporal Snapshot Diffs
         if: failure()
