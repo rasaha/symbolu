@@ -268,6 +268,9 @@ class TTORRouter:
             use_lam=use_lam,
             regulated_mode=regulated_mode,
             allow_metaphor=allow_metaphor,
+            normalized_entropy=normalized_entropy,
+            long_arc_tension=context.long_arc_tension,
+            domain=context.domain,
             explanation=explanation,
             debug=debug,
         )

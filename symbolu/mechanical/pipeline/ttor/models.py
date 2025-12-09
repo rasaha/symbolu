@@ -211,6 +211,7 @@ class RoutingPlan:
     - Engine family recommendation
     - Module activation flags (HRM, LCM, LAM)
     - Safety flags (regulated mode, metaphor allowance)
+    - Key routing signals (normalized_entropy, long_arc_tension, domain)
     - Human-readable explanation
     - Complete debug dictionary for auditability
     """
@@ -229,6 +230,11 @@ class RoutingPlan:
     regulated_mode: bool
     allow_metaphor: bool
 
+    # Key routing signals (for introspection and debugging)
+    normalized_entropy: float
+    long_arc_tension: float
+    domain: str
+
     # Audit trail
     explanation: str
     debug: Dict[str, Any] = field(default_factory=dict)
@@ -244,6 +250,9 @@ class RoutingPlan:
             "use_lam": self.use_lam,
             "regulated_mode": self.regulated_mode,
             "allow_metaphor": self.allow_metaphor,
+            "normalized_entropy": self.normalized_entropy,
+            "long_arc_tension": self.long_arc_tension,
+            "domain": self.domain,
             "explanation": self.explanation,
             "debug": self.debug,
         }

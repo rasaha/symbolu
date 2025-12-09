@@ -102,12 +102,15 @@ class MLCR:
             H_K=H_K
         )
         
-        # Step 5: Route to experts
+        # Step 5: Route to experts (using TTOR canonical mapper rules)
         activation = self.expert_router.route(
             tier=tier,
             intent=intent,
             domain=domain,
-            user_state=user_state
+            user_state=user_state,
+            H_D=H_D,
+            H_G=H_G,
+            long_arc_tension=0.0,  # TODO: Add temporal tracking for long_arc_tension
         )
         
         # Step 6: Build renderer context
