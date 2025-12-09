@@ -88,4 +88,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: renderer-snapshot-diffs
-          path: renderer/snapshots/*.diff
+          path: |
+            renderer/tests/*.diff
+            renderer/tests/**/*.diff
