@@ -17,7 +17,10 @@ The design follows the Symbol-U AGI architecture where:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from symbolu.core.coherence import CoherenceState
 
 
 @dataclass
@@ -221,6 +224,7 @@ class PipelineContext:
         rendered: RenderedOutput after final rendering.
         router_mode: Pipeline routing mode ("linear" for v3.0).
         mapper_profile: Mapper influence profile for renderer/DHA modulation.
+        coherence_state: Optional CoherenceState tracking multi-turn conversation coherence.
     """
 
     request: UserRequest
@@ -234,6 +238,7 @@ class PipelineContext:
     rendered: Optional[RenderedOutput] = None
     router_mode: str = "linear"
     mapper_profile: Optional[MapperProfile] = None
+    coherence_state: Optional["CoherenceState"] = None  # Multi-turn coherence tracking
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize context to dictionary for logging/debugging."""
@@ -271,6 +276,12 @@ class PipelineContext:
                 "has_text": self.rendered is not None and bool(self.rendered.raw_text),
             },
             "router_mode": self.router_mode,
+            "coherence": {
+                "has_state": self.coherence_state is not None,
+                "coherence_score": self.coherence_state.coherence_score if self.coherence_state else None,
+                "persona_drift": self.coherence_state.persona_drift_score if self.coherence_state else None,
+                "semantic_stability": self.coherence_state.semantic_stability_score if self.coherence_state else None,
+            },
         }
 
 
