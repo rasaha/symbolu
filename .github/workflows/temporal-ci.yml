@@ -1,0 +1,73 @@
+name: Temporal CI
+
+on:
+  push:
+    branches: ["main", "master"]
+    paths:
+      - "temporal/**"
+      - "examples/temporal_analysis.py"
+      - "mechanical/pipeline/integration_tests/test_temporal_integration.py"
+      - ".github/workflows/temporal-ci.yml"
+  pull_request:
+    branches: ["main", "master"]
+    paths:
+      - "temporal/**"
+      - "examples/temporal_analysis.py"
+      - "mechanical/pipeline/integration_tests/test_temporal_integration.py"
+      - ".github/workflows/temporal-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  temporal-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pytest-cov coverage pydantic
+
+      - name: Run tests with coverage
+        run: |
+          pytest \
+            temporal/tests \
+            mechanical/pipeline/integration_tests/test_temporal_integration.py \
+            --cov=temporal \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-fail-under=85 \
+            --disable-warnings --maxfail=1 -q \
+            2>&1 | tee temporal-pytest.log
+
+      - name: Upload Temporal test logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: temporal-test-logs
+          path: temporal-pytest.log
+
+      - name: Upload Temporal coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: temporal-coverage-report
+          path: |
+            coverage.xml
+            htmlcov/
