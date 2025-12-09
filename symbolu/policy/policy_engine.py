@@ -49,6 +49,54 @@ RecommendedStyle = Literal["precise", "reflective", "exploratory", "neutral"]
 RecommendedMapper = Literal["LCM", "HRM", "LAM"]
 
 
+def _get_active_coherence_score(
+    unified_output: Dict[str, Any],
+    profile: Dict[str, Any],
+) -> float:
+    """
+    Returns the coherence score that should be used for policy rules.
+
+    v1 is always available; v2 is optional and gated by profile.use_coherence_v2.
+
+    This helper enables Phase 4 coherence v2 integration into policy layer while
+    maintaining complete backward compatibility. By default (use_coherence_v2=False),
+    this always returns v1 score, preserving existing behavior.
+
+    Args:
+        unified_output: Unified output dictionary from USU-API v1.0
+        profile: Domain profile dictionary (from get_domain_profile)
+
+    Returns:
+        float: Active coherence score (v2 if enabled and available, else v1)
+
+    Examples:
+        >>> unified = {"coherence": {"coherence_score": 0.6, "coherence_score_v2": 0.75}}
+        >>> profile = {"use_coherence_v2": True, ...}
+        >>> _get_active_coherence_score(unified, profile)
+        0.75
+
+        >>> profile_v1_only = {"use_coherence_v2": False, ...}
+        >>> _get_active_coherence_score(unified, profile_v1_only)
+        0.6
+    """
+    coherence = unified_output.get("coherence", {})
+
+    # v1 is always available (default to 1.0 if missing)
+    coherence_score_v1 = coherence.get("coherence_score", 1.0)
+
+    # Check if profile enables v2
+    use_v2 = profile.get("use_coherence_v2", False)
+
+    # If v2 is enabled AND v2 score is available, use it
+    if use_v2:
+        coherence_score_v2 = coherence.get("coherence_score_v2")
+        if coherence_score_v2 is not None:
+            return coherence_score_v2
+
+    # Default: return v1 (backward compatible)
+    return coherence_score_v1
+
+
 def compute_policy_flags(unified: Dict[str, Any], domain: str) -> Dict[str, Any]:
     """
     Compute policy flags from unified output and domain profile.
@@ -102,7 +150,10 @@ def compute_policy_flags(unified: Dict[str, Any], domain: str) -> Dict[str, Any]
     coherence = unified.get("coherence", {})
     entropy = unified.get("entropy", {})
 
-    coherence_score = coherence.get("coherence_score", 1.0)
+    # Phase 4: Use active coherence score (v2 if enabled, else v1)
+    coherence_score = _get_active_coherence_score(unified, profile)
+
+    # Other metrics (always from v1 - not affected by v2)
     persona_drift_score = coherence.get("persona_drift_score", 0.0)
     mapper_volatility_score = coherence.get("mapper_volatility_score", 0.0)
     temporal_arc_score = coherence.get("temporal_arc_score", 1.0)

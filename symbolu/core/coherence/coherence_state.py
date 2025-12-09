@@ -65,7 +65,10 @@ class CoherenceState:
     temporal_arc_score: float = 0.0  # Higher = better arc (better)
 
     # Overall coherence score (0.0-1.0, higher = better)
-    coherence_score: float = 0.0
+    coherence_score: float = 0.0  # v1 canonical (always used)
+
+    # Phase 4: Formula-aware coherence v2 (optional, feature-flag gated)
+    coherence_score_v2: Optional[float] = None  # v2 formula-aware (optional)
 
     def window_trim(self, window: int) -> None:
         """
