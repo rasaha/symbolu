@@ -4,16 +4,16 @@ on:
   push:
     branches: ["main", "master"]
     paths:
-      - "core/**"
-      - "rag/**"
-      - "mechanical/pipeline/integration_tests/test_core_rag_integration.py"
+      - "symbolu/core/**"
+      - "symbolu/rag/**"
+      - "symbolu/mechanical/pipeline/integration_tests/test_core_rag_integration.py"
       - ".github/workflows/core-rag-ci.yml"
   pull_request:
     branches: ["main", "master"]
     paths:
-      - "core/**"
-      - "rag/**"
-      - "mechanical/pipeline/integration_tests/test_core_rag_integration.py"
+      - "symbolu/core/**"
+      - "symbolu/rag/**"
+      - "symbolu/mechanical/pipeline/integration_tests/test_core_rag_integration.py"
       - ".github/workflows/core-rag-ci.yml"
   workflow_dispatch:
 
@@ -48,10 +48,10 @@ jobs:
       - name: Run Core & RAG tests with coverage
         run: |
           pytest \
-            core/tests \
-            rag/tests \
-            mechanical/pipeline/integration_tests/test_core_rag_integration.py \
-            --cov=core --cov=rag \
+            symbolu/core/tests \
+            symbolu/rag/tests \
+            symbolu/mechanical/pipeline/integration_tests/test_core_rag_integration.py \
+            --cov=symbolu/core --cov=symbolu/rag \
             --cov-report=xml \
             --cov-report=html \
             --cov-fail-under=85 \

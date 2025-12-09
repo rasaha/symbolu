@@ -4,12 +4,12 @@ on:
   push:
     branches: ["main", "master"]
     paths:
-      - "mechanical/pipeline/**"
+      - "symbolu/mechanical/pipeline/**"
       - ".github/workflows/pipeline-ci.yml"
   pull_request:
     branches: ["main", "master"]
     paths:
-      - "mechanical/pipeline/**"
+      - "symbolu/mechanical/pipeline/**"
       - ".github/workflows/pipeline-ci.yml"
   workflow_dispatch:
 
@@ -43,8 +43,8 @@ jobs:
 
       - name: Run pipeline integration tests with coverage
         run: |
-          pytest mechanical/pipeline/integration_tests \
-            --cov=mechanical/pipeline \
+          pytest symbolu/mechanical/pipeline/integration_tests \
+            --cov=symbolu/mechanical/pipeline \
             --cov-report=xml \
             --cov-report=html \
             --cov-fail-under=85 \
@@ -61,14 +61,14 @@ jobs:
             pipeline-pytest.log
 
       - name: Upload pipeline debug logs
-        if: hashFiles('mechanical/pipeline/**/*.log') != ''
+        if: hashFiles('symbolu/mechanical/pipeline/**/*.log') != ''
         uses: actions/upload-artifact@v4
         with:
           name: pipeline-debug-logs
           path: |
-            mechanical/pipeline/pipeline-debug.log
-            mechanical/pipeline/persona.log
-            mechanical/pipeline/fusion.log
-            mechanical/pipeline/mlcr.log
-            mechanical/pipeline/dha.log
-            mechanical/pipeline/renderer.log
+            symbolu/mechanical/pipeline/pipeline-debug.log
+            symbolu/mechanical/pipeline/persona.log
+            symbolu/mechanical/pipeline/fusion.log
+            symbolu/mechanical/pipeline/mlcr.log
+            symbolu/mechanical/pipeline/dha.log
+            symbolu/mechanical/pipeline/renderer.log

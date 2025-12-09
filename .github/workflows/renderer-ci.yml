@@ -4,18 +4,18 @@ on:
   push:
     branches: ["main", "master"]
     paths:
-      - "renderer/**"
-      - "core/**renderer**"
-      - "mechanical/**renderer**"
-      - "mechanical/pipeline/**renderer**"
+      - "symbolu/renderer/**"
+      - "symbolu/core/**renderer**"
+      - "symbolu/mechanical/**renderer**"
+      - "symbolu/mechanical/pipeline/**renderer**"
       - ".github/workflows/renderer-ci.yml"
   pull_request:
     branches: ["main", "master"]
     paths:
-      - "renderer/**"
-      - "core/**renderer**"
-      - "mechanical/**renderer**"
-      - "mechanical/pipeline/**renderer**"
+      - "symbolu/renderer/**"
+      - "symbolu/core/**renderer**"
+      - "symbolu/mechanical/**renderer**"
+      - "symbolu/mechanical/pipeline/**renderer**"
       - ".github/workflows/renderer-ci.yml"
   workflow_dispatch:
 
@@ -50,9 +50,9 @@ jobs:
       - name: Run Renderer tests with coverage
         run: |
           pytest \
-            renderer/tests \
-            --cov=renderer \
-            --cov=mechanical/renderer \
+            symbolu/renderer/tests \
+            --cov=symbolu/renderer \
+            --cov=symbolu/mechanical/renderer \
             --cov-report=xml \
             --cov-report=html \
             --cov-fail-under=85 \
@@ -80,9 +80,9 @@ jobs:
           REGENERATE_SNAPSHOTS: "0"
         run: |
           echo "Running Rule-Based Renderer snapshot tests..."
-          REGENERATE_SNAPSHOTS=0 pytest renderer/tests/test_rule_based_renderer_snapshots.py -q
+          REGENERATE_SNAPSHOTS=0 pytest symbolu/renderer/tests/test_rule_based_renderer_snapshots.py -q
           echo "Running LLM Renderer snapshot tests..."
-          REGENERATE_SNAPSHOTS=0 pytest renderer/tests/test_llm_renderer_snapshots.py -q
+          REGENERATE_SNAPSHOTS=0 pytest symbolu/renderer/tests/test_llm_renderer_snapshots.py -q
 
       - name: Upload snapshot diffs
         if: failure()
@@ -90,5 +90,5 @@ jobs:
         with:
           name: renderer-snapshot-diffs
           path: |
-            renderer/tests/*.diff
-            renderer/tests/**/*.diff
+            symbolu/renderer/tests/*.diff
+            symbolu/renderer/tests/**/*.diff
