@@ -49,6 +49,7 @@ jobs:
         run: |
           pytest \
             symbolu/core/tests \
+            symbolu/core/formula_drift_tests \
             symbolu/rag/tests \
             symbolu/mechanical/pipeline/integration_tests/test_core_rag_integration.py \
             --cov=symbolu/core --cov=symbolu/rag \

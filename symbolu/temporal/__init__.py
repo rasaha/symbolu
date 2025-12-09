@@ -12,12 +12,13 @@ Main Classes:
 Version: 2.7 (Phase 3)
 """
 
-from .temporal_bhava_tracker import TemporalBhavaTracker, TemporalEntry
+from .temporal_bhava_tracker import TemporalBhavaTracker, TemporalEntry, TemporalState
 from .cross_domain_intelligence import CrossDomainIntelligence, PatternConfig
 
 __all__ = [
     "TemporalBhavaTracker",
     "TemporalEntry",
+    "TemporalState",
     "CrossDomainIntelligence",
     "PatternConfig",
 ]
