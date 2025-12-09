@@ -15,6 +15,7 @@ on:
       - "symbolu/policy/**"
       - "symbolu/adapter/**"
       - "symbolu/service/**"
+      - "symbolu/service/security/**"
       - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   pull_request:
@@ -31,6 +32,7 @@ on:
       - "symbolu/policy/**"
       - "symbolu/adapter/**"
       - "symbolu/service/**"
+      - "symbolu/service/security/**"
       - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   workflow_dispatch:
@@ -170,6 +172,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee api-server-pytest.log
 
+      - name: Run API Security Tests
+        run: |
+          pytest symbolu/service/tests/test_api_security.py \
+            --disable-warnings -q \
+            2>&1 | tee api-security-pytest.log
+
       - name: Upload Coherence Reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -214,6 +222,7 @@ jobs:
             policy-engine-pytest.log
             dilchat-adapter-pytest.log
             api-server-pytest.log
+            api-security-pytest.log
 
       - name: Upload snapshot diffs
         if: failure()
