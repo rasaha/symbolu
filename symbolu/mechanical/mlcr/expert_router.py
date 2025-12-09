@@ -2,25 +2,33 @@
 Expert Router - Activation Planning Logic
 ==========================================
 
-Routes queries to appropriate expert systems based on tier and intent.
+Routes queries to appropriate expert systems using TTOR canonical mapper rules v2.0.
 
-Routing Rules:
-- LOWER tier → LCM + MoE (if domain)
-- UPPER tier → HRM only
-- HYBRID tier → HRM + LCM + MoE + FusionEngine
+Canonical Mapper Switching Rules:
+- HRM: (tier != LOWER) and (normalized_entropy > 0.40)
+- LCM: (tier == LOWER) and (normalized_entropy > 0.50)
+- LAM: long_arc_tension > 0.50 OR temporal_patterns_detected
+      OR (domain in ["therapy", "identity", "spiritual"] and normalized_entropy > 0.60)
 
-Version: v3.1
+Version: v3.2 (TTOR Integration)
 Status: Production
 """
 
 from typing import Dict, Optional, List
 from .activation_plan import TierType, IntentType, ExpertTarget
 
+# Constants for entropy computation (mirrored from TTOR)
+H_D_MAX = 2.302585093  # ln(10)
+H_G_MAX = 1.098612289  # ln(3)
+
 
 class ExpertRouter:
     """
-    Routes to expert systems based on tier and intent.
-    
+    Routes to expert systems using TTOR canonical mapper switching rules.
+
+    Applies deterministic rules based on tier, entropy, domain, and long-arc tension
+    to decide which mappers (HRM, LCM, LAM) should be activated.
+
     Expert Systems:
     - HRM: High Reasoning Module (abstract/symbolic)
     - LCM: Linguistic Coherence Module (concrete/semantic)
@@ -28,7 +36,14 @@ class ExpertRouter:
     - MoE: Mixture of Experts (domain-specific)
     - FusionEngine: Multi-channel blending (HYBRID only)
     """
-    
+
+    # Canonical thresholds (frozen in TTOR v2.0 specification)
+    HRM_ENTROPY_THRESHOLD = 0.40
+    LCM_ENTROPY_THRESHOLD = 0.50
+    LAM_TENSION_THRESHOLD = 0.50
+    LAM_DOMAIN_ENTROPY_THRESHOLD = 0.60
+    LAM_DOMAINS = ["therapy", "identity", "spiritual"]
+
     def __init__(self):
         pass
     
@@ -37,24 +52,31 @@ class ExpertRouter:
         tier: TierType,
         intent: IntentType,
         domain: Optional[str] = None,
-        user_state: Optional[str] = None
+        user_state: Optional[str] = None,
+        H_D: Optional[float] = None,
+        H_G: Optional[float] = None,
+        long_arc_tension: Optional[float] = None,
     ) -> Dict[str, bool]:
         """
-        Determine expert activation.
-        
+        Determine expert activation using TTOR canonical mapper rules v2.0.
+
         Args:
             tier: Selected tier (LOWER/UPPER/HYBRID)
             intent: Query intent type
             domain: Optional domain hint
             user_state: Optional user emotional state
-            
+            H_D: Optional dimensional entropy (for normalized_entropy computation)
+            H_G: Optional guna entropy (for normalized_entropy computation)
+            long_arc_tension: Optional long-arc tension value [0, 1]
+
         Returns:
             {
                 "use_hrm": bool,
                 "use_lcm": bool,
                 "use_lam": bool,
                 "use_moe": bool,
-                "use_fusion": bool
+                "use_fusion": bool,
+                "long_arc_tension": float  # for downstream use
             }
         """
         # Initialize all experts as inactive
@@ -63,52 +85,85 @@ class ExpertRouter:
             "use_lcm": False,
             "use_lam": False,
             "use_moe": False,
-            "use_fusion": False
+            "use_fusion": False,
+            "long_arc_tension": long_arc_tension if long_arc_tension is not None else 0.0,
         }
-        
-        # LOWER tier routing
-        if tier == TierType.LOWER:
-            activation["use_lcm"] = True
-            
-            # Activate MoE if domain-specific
-            if domain and domain != "general":
-                activation["use_moe"] = True
-        
-        # UPPER tier routing
-        elif tier == TierType.UPPER:
-            activation["use_hrm"] = True
-            
-            # Special case: reflection/emotional queries may need LAM
-            if intent in [IntentType.REFLECTION, IntentType.FEELING]:
-                activation["use_lam"] = True
-        
-        # HYBRID tier routing
-        elif tier == TierType.HYBRID:
-            activation["use_hrm"] = True
-            activation["use_lcm"] = True
-            
-            # Activate MoE if domain-specific
-            if domain and domain != "general":
-                activation["use_moe"] = True
-            
-            # Activate FusionEngine for multi-channel blending
-            # (only if 2+ experts are active)
-            active_count = sum([
-                activation["use_hrm"],
-                activation["use_lcm"],
-                activation["use_moe"]
-            ])
-            if active_count >= 2:
-                activation["use_fusion"] = True
-            
-            # Special case: reflection/emotional may need LAM
-            if intent in [IntentType.REFLECTION, IntentType.FEELING]:
-                activation["use_lam"] = True
-                # LAM counts as an expert for fusion
-                if active_count >= 1:
-                    activation["use_fusion"] = True
-        
+
+        # Compute normalized_entropy from H_D and H_G (if provided)
+        normalized_entropy = self._compute_normalized_entropy(H_D, H_G)
+
+        # Canonical TTOR mapper switching rules v2.0
+        # ------------------------------------------
+
+        # HRM: (tier != LOWER) and (normalized_entropy > 0.40)
+        activation["use_hrm"] = (
+            tier != TierType.LOWER and normalized_entropy > self.HRM_ENTROPY_THRESHOLD
+        )
+
+        # LCM: (tier == LOWER) and (normalized_entropy > 0.50)
+        activation["use_lcm"] = (
+            tier == TierType.LOWER and normalized_entropy > self.LCM_ENTROPY_THRESHOLD
+        )
+
+        # LAM: long_arc_tension > 0.50 OR temporal_patterns_detected
+        #      OR (domain in ["therapy", "identity", "spiritual"] and normalized_entropy > 0.60)
+        lat = activation["long_arc_tension"]
+        temporal_patterns_detected = False  # TODO: Add temporal tracking
+        activation["use_lam"] = (
+            lat > self.LAM_TENSION_THRESHOLD
+            or temporal_patterns_detected
+            or (
+                domain in self.LAM_DOMAINS
+                and normalized_entropy > self.LAM_DOMAIN_ENTROPY_THRESHOLD
+            )
+        )
+
+        # MoE: Activate if domain-specific (non-general domain)
+        if domain and domain not in ("general", "generic", None):
+            activation["use_moe"] = True
+
+        # FusionEngine: Activate if 2+ experts are active
+        active_count = sum([
+            activation["use_hrm"],
+            activation["use_lcm"],
+            activation["use_lam"],
+            activation["use_moe"],
+        ])
+        if active_count >= 2:
+            activation["use_fusion"] = True
+
         return activation
+
+    def _compute_normalized_entropy(
+        self,
+        H_D: Optional[float],
+        H_G: Optional[float],
+    ) -> float:
+        """
+        Compute normalized entropy from H_D and H_G using TTOR formula.
+
+        normalized_entropy = 0.5 * (H_D / H_D_MAX) + 0.3 * (H_G / H_G_MAX)
+
+        Args:
+            H_D: Dimensional entropy [0, ln(10)]
+            H_G: Guna entropy [0, ln(3)]
+
+        Returns:
+            Normalized entropy in [0, 1]
+        """
+        if H_D is None or H_G is None:
+            # Default to medium entropy if not provided
+            return 0.5
+
+        # Normalize to [0, 1]
+        H_D_norm = min(1.0, max(0.0, H_D / H_D_MAX)) if H_D_MAX > 0 else 0.0
+        H_G_norm = min(1.0, max(0.0, H_G / H_G_MAX)) if H_G_MAX > 0 else 0.0
+
+        # Weighted entropy mix (same formula as TTOR)
+        # H_D has higher weight (0.5), H_G (0.3), H_K would be (0.2) but not used here
+        normalized_entropy = 0.5 * H_D_norm + 0.3 * H_G_norm
+
+        return normalized_entropy
     
     def get_activated_experts(
         self,

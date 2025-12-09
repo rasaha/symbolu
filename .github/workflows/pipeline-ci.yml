@@ -93,6 +93,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee lam-pytest.log
 
+      - name: Run Pipeline Mapper Integration Tests
+        run: |
+          pytest symbolu/mechanical/pipeline/integration_tests/test_mapper_integration.py \
+            --disable-warnings -q \
+            2>&1 | tee mapper-integration-pytest.log
+
       - name: Run Pipeline End-to-End Snapshot Tests
         run: |
           REGENERATE_SNAPSHOTS=0 pytest symbolu/mechanical/pipeline/tests_pipeline_snapshots/test_pipeline_snapshots.py \
@@ -149,6 +155,7 @@ jobs:
             hrm-pytest.log
             lcm-pytest.log
             lam-pytest.log
+            mapper-integration-pytest.log
             pipeline-e2e-snapshot-pytest.log
             pipeline-multiturn-snapshot-pytest.log
             temporal-pipeline-snapshot-pytest.log
