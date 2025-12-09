@@ -16,7 +16,7 @@ This script is deterministic and requires no external dependencies.
 from typing import Dict, Any, List
 
 # Import temporal module
-from temporal import TemporalBhavaTracker, CrossDomainIntelligence
+from symbolu.temporal import TemporalBhavaTracker, CrossDomainIntelligence
 
 
 class DummyAnalysisEngine:
