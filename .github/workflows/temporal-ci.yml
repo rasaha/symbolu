@@ -4,16 +4,16 @@ on:
   push:
     branches: ["main", "master"]
     paths:
-      - "temporal/**"
+      - "symbolu/temporal/**"
       - "examples/temporal_analysis.py"
-      - "mechanical/pipeline/integration_tests/test_temporal_integration.py"
+      - "symbolu/mechanical/pipeline/integration_tests/test_temporal_integration.py"
       - ".github/workflows/temporal-ci.yml"
   pull_request:
     branches: ["main", "master"]
     paths:
-      - "temporal/**"
+      - "symbolu/temporal/**"
       - "examples/temporal_analysis.py"
-      - "mechanical/pipeline/integration_tests/test_temporal_integration.py"
+      - "symbolu/mechanical/pipeline/integration_tests/test_temporal_integration.py"
       - ".github/workflows/temporal-ci.yml"
   workflow_dispatch:
 
@@ -48,9 +48,9 @@ jobs:
       - name: Run tests with coverage
         run: |
           pytest \
-            temporal/tests \
-            mechanical/pipeline/integration_tests/test_temporal_integration.py \
-            --cov=temporal \
+            symbolu/temporal/tests \
+            symbolu/mechanical/pipeline/integration_tests/test_temporal_integration.py \
+            --cov=symbolu/temporal \
             --cov-report=xml \
             --cov-report=html \
             --cov-fail-under=85 \

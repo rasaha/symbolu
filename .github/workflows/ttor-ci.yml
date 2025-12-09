@@ -4,12 +4,12 @@ on:
   push:
     branches: ["main", "master"]
     paths:
-      - "mechanical/pipeline/ttor/**"
+      - "symbolu/mechanical/pipeline/ttor/**"
       - ".github/workflows/ttor-ci.yml"
   pull_request:
     branches: ["main", "master"]
     paths:
-      - "mechanical/pipeline/ttor/**"
+      - "symbolu/mechanical/pipeline/ttor/**"
       - ".github/workflows/ttor-ci.yml"
   workflow_dispatch:
 
@@ -43,8 +43,8 @@ jobs:
 
       - name: Run TTOR unit + integration tests with coverage
         run: |
-          pytest mechanical/pipeline/ttor/tests \
-            --cov=mechanical/pipeline/ttor \
+          pytest symbolu/mechanical/pipeline/ttor/tests \
+            --cov=symbolu/mechanical/pipeline/ttor \
             --cov-report=xml \
             --cov-report=html \
             --cov-fail-under=90 \
@@ -53,12 +53,12 @@ jobs:
 
       - name: Type check with mypy
         run: |
-          mypy mechanical/pipeline/ttor --strict \
+          mypy symbolu/mechanical/pipeline/ttor --strict \
             2>&1 | tee ttor-mypy.log
 
       - name: Lint with flake8
         run: |
-          flake8 mechanical/pipeline/ttor --max-line-length=120 \
+          flake8 symbolu/mechanical/pipeline/ttor --max-line-length=120 \
             2>&1 | tee ttor-flake8.log
 
       - name: Upload TTOR test logs
@@ -79,8 +79,8 @@ jobs:
             coverage.xml
 
       - name: Upload TTOR debug snapshots
-        if: hashFiles('mechanical/pipeline/ttor/**/*.log') != ''
+        if: hashFiles('symbolu/mechanical/pipeline/ttor/**/*.log') != ''
         uses: actions/upload-artifact@v4
         with:
           name: ttor-debug-snapshots
-          path: mechanical/pipeline/ttor/**/*.log
+          path: symbolu/mechanical/pipeline/ttor/**/*.log
