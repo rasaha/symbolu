@@ -73,3 +73,19 @@ jobs:
           path: |
             coverage.xml
             htmlcov/
+
+      - name: Run Renderer Snapshot Tests
+        env:
+          REGENERATE_SNAPSHOTS: "0"
+        run: |
+          echo "Running Rule-Based Renderer snapshot tests..."
+          REGENERATE_SNAPSHOTS=0 pytest renderer/tests/test_rule_based_renderer_snapshots.py -q
+          echo "Running LLM Renderer snapshot tests..."
+          REGENERATE_SNAPSHOTS=0 pytest renderer/tests/test_llm_renderer_snapshots.py -q
+
+      - name: Upload snapshot diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: renderer-snapshot-diffs
+          path: renderer/snapshots/*.diff
