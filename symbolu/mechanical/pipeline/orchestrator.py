@@ -99,6 +99,9 @@ from symbolu.api.unified_api import get_unified_json
 # Policy Layer (Domain Coherence Profiles + Advisory Flags)
 from symbolu.policy import compute_policy_flags
 
+# DILchat Adapter (Presentation Layer for DILchat Integration)
+from symbolu.adapter import build_dilchat_payload
+
 # Renderer Components
 from symbolu.mechanical.renderer.fusion_renderer import (
     FusionOutput,
@@ -317,6 +320,31 @@ class SymbolUPipeline:
                 ctx.policy_flags = None
         else:
             ctx.policy_flags = None
+
+        # ================================================================
+        # DILCHAT ADAPTER: Generate DILchat-facing payload (optional, non-invasive)
+        # Transforms unified output + policy flags into DILchat presentation format
+        # Does NOT modify pipeline behavior - purely additive presentation layer
+        # ================================================================
+        # Only build DILchat payload if both unified output and policy flags are available
+        if ctx.unified_output is not None and ctx.policy_flags is not None:
+            try:
+                # Extract domain (same as policy layer)
+                domain = ctx.request.metadata.get("domain", "generic")
+                if not domain or domain == "unknown":
+                    domain = ctx.unified_output.get("metadata", {}).get("domain", "generic")
+
+                # Build DILchat payload (deterministic, zero-LLM)
+                ctx.dilchat_payload = build_dilchat_payload(
+                    ctx.unified_output,
+                    ctx.policy_flags,
+                    domain
+                )
+            except Exception:
+                # If DILchat adapter fails, continue without it (fail-safe)
+                ctx.dilchat_payload = None
+        else:
+            ctx.dilchat_payload = None
 
         self._run_count += 1
 
