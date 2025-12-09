@@ -225,6 +225,7 @@ class PipelineContext:
         router_mode: Pipeline routing mode ("linear" for v3.0).
         mapper_profile: Mapper influence profile for renderer/DHA modulation.
         coherence_state: Optional CoherenceState tracking multi-turn conversation coherence.
+        coherence_report: Optional observability report dict from CoherenceObserver.
     """
 
     request: UserRequest
@@ -239,6 +240,7 @@ class PipelineContext:
     router_mode: str = "linear"
     mapper_profile: Optional[MapperProfile] = None
     coherence_state: Optional["CoherenceState"] = None  # Multi-turn coherence tracking
+    coherence_report: Optional[Dict[str, Any]] = None  # Observability report from CoherenceObserver
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize context to dictionary for logging/debugging."""
@@ -282,6 +284,7 @@ class PipelineContext:
                 "persona_drift": self.coherence_state.persona_drift_score if self.coherence_state else None,
                 "semantic_stability": self.coherence_state.semantic_stability_score if self.coherence_state else None,
             },
+            "coherence_report": self.coherence_report,
         }
 
 

@@ -90,6 +90,9 @@ from .lcm_integration import maybe_run_lcm
 # LAM Integration (Long-Arc Mapper)
 from .lam_integration import maybe_run_lam
 
+# Coherence Observer (Observability Layer)
+from .coherence_observer import CoherenceObserver
+
 # Renderer Components
 from symbolu.mechanical.renderer.fusion_renderer import (
     FusionOutput,
@@ -168,6 +171,9 @@ class SymbolUPipeline:
         self.persona_registry = persona_registry or get_default_registry()
         self.fusion_engine = fusion_engine or FusionEngine()
         self.dha_engine = dha_engine or DHAEngine()
+
+        # Observability layer (non-invasive)
+        self.coherence_observer = CoherenceObserver()
 
         # Statistics
         self._run_count = 0
@@ -261,6 +267,17 @@ class SymbolUPipeline:
         # Generate human-readable output
         # ================================================================
         ctx = self._run_renderer(ctx)
+
+        # ================================================================
+        # OBSERVABILITY: Coherence Observer (non-invasive)
+        # Generate observability report after pipeline completion
+        # ================================================================
+        observation = self.coherence_observer.observe(
+            text=request.text,
+            pipeline_context=ctx,
+            coherence_state=ctx.coherence_state,
+        )
+        ctx.coherence_report = observation.to_dict()
 
         self._run_count += 1
 

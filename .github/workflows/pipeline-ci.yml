@@ -11,6 +11,8 @@ on:
       - "symbolu/mechanical/lcm/**"
       - "symbolu/mechanical/lam/**"
       - "symbolu/temporal/**"
+      - "symbolu/api/**"
+      - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   pull_request:
     branches: ["main", "master"]
@@ -22,6 +24,8 @@ on:
       - "symbolu/mechanical/lcm/**"
       - "symbolu/mechanical/lam/**"
       - "symbolu/temporal/**"
+      - "symbolu/api/**"
+      - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   workflow_dispatch:
 
@@ -129,6 +133,20 @@ jobs:
           name: delta-report
           path: symbolu/mechanical/pipeline/tests_delta/delta_report.json
 
+      - name: Run Coherence Observability Tests
+        run: |
+          pytest symbolu/mechanical/pipeline/integration_tests/test_pipeline_coherence_api.py \
+            symbolu/mechanical/pipeline/integration_tests/test_coherence_observability.py \
+            --disable-warnings -q \
+            2>&1 | tee coherence-observability-pytest.log
+
+      - name: Upload Coherence Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coherence-observability-reports
+          path: symbolu/tools/coherence_dashboard/output/
+
       - name: Run Temporal Persona Drift Tests
         run: |
           pytest symbolu/mechanical/pipeline/tests_persona_temporal/test_temporal_persona_drift.py \
@@ -160,6 +178,7 @@ jobs:
             pipeline-multiturn-snapshot-pytest.log
             temporal-pipeline-snapshot-pytest.log
             delta-snapshot-pytest.log
+            coherence-observability-pytest.log
             persona-drift-pytest.log
 
       - name: Upload snapshot diffs
