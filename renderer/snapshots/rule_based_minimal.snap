@@ -1,0 +1,41 @@
+{
+  "metadata": {
+    "entropy": 0.42,
+    "is_regulated": false,
+    "layer_weights": {
+      "mirror": 0.0,
+      "practical": 1.0,
+      "symbolic": 0.0
+    },
+    "render_domain": "general",
+    "render_mode": "minimal",
+    "session_id": "snapshot-test-session",
+    "user_id": "snapshot-test-user"
+  },
+  "mirror_truth_layer": null,
+  "mode": "minimal",
+  "practical_layer": {
+    "actionable_items": [
+      "Consider exploring both growth and stability paths"
+    ],
+    "coherence_score": 0.35,
+    "constraints": [
+      "limited time",
+      "competing priorities"
+    ],
+    "domain": "life_guidance",
+    "key_facts": [
+      "User requested help.",
+      "The situation involves decision-making.",
+      "Multiple paths are available.",
+      "Assessment is recommended."
+    ],
+    "procedures": [
+      "self-assessment",
+      "goal-setting",
+      "action-planning"
+    ]
+  },
+  "query": "What should I focus on in my life?",
+  "symbolic_layer": null
+}

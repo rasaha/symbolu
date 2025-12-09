@@ -1,0 +1,74 @@
+{
+  "metadata": {
+    "entropy": 0.42,
+    "is_regulated": false,
+    "layer_weights": {
+      "mirror": 0.2,
+      "practical": 0.2,
+      "symbolic": 0.6
+    },
+    "render_domain": "general",
+    "render_mode": "symbolic",
+    "session_id": "snapshot-test-session",
+    "user_id": "snapshot-test-user"
+  },
+  "mirror_truth_layer": {
+    "alignment_score": 0.9412996533166658,
+    "contradictions": [
+      {
+        "resolution": "weighted_blend",
+        "source1": "hrm",
+        "source2": "moe",
+        "type": "fear vs desire"
+      }
+    ],
+    "entropy_measures": {
+      "channel_entropy": 1.5588718480125516,
+      "conflict_entropy": 0.1,
+      "response_entropy": 0.42
+    },
+    "reflection": "High coherence across reasoning channels. 1 conflict(s) detected and exposed.",
+    "stability_indicator": "MODERATE - Balanced state",
+    "tensions": [
+      "hrm vs moe: fear vs desire"
+    ]
+  },
+  "mode": "symbolic",
+  "practical_layer": {
+    "actionable_items": [
+      "Consider exploring both growth and stability paths"
+    ],
+    "coherence_score": 0.35,
+    "constraints": [
+      "limited time",
+      "competing priorities"
+    ],
+    "domain": "life_guidance",
+    "key_facts": [
+      "User requested help.",
+      "The situation involves decision-making."
+    ],
+    "procedures": [
+      "self-assessment",
+      "goal-setting",
+      "action-planning"
+    ]
+  },
+  "query": "What should I focus on in my life?",
+  "symbolic_layer": {
+    "archetype": "Philosopher - seeks deep understanding",
+    "causal_patterns": [
+      "The user seeks understanding because their path feels uncertain",
+      "Therefore, exploring alternatives provides clarity"
+    ],
+    "dominant_channel": "hrm",
+    "meaning_vectors": {
+      "abstractness": 0.4,
+      "clarity": 0.35,
+      "complexity": 0.062360956446232366,
+      "practicality": 0.25
+    },
+    "reasoning_depth": 0.4,
+    "theme": "The user seeks understanding because their path feels uncertain."
+  }
+}
