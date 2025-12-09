@@ -108,6 +108,9 @@ from symbolu.intent.intent_arc_engine import compute_intent_arc
 # Identity Signature Engine (Identity Trajectory Classification)
 from symbolu.identity.identity_signature_engine import compute_identity_signature
 
+# Motivation Flow Engine (Motivational Driver Classification)
+from symbolu.motivation.motivation_engine import compute_motivation_flow
+
 # DILchat Adapter (Presentation Layer for DILchat Integration)
 from symbolu.adapter import build_dilchat_payload
 
@@ -420,6 +423,34 @@ class SymbolUPipeline:
                     except Exception:
                         # If identity signature computation fails, continue without it (fail-safe)
                         ctx.identity_signature = None
+
+                    # ================================================================
+                    # MOTIVATION FLOW ENGINE: Classify motivational driver (v1.0)
+                    # Deterministic, zero-LLM layer that classifies the motivational
+                    # driver behind a multi-turn session into 8 canonical types:
+                    # - hope_driven, fear_driven, avoidance_driven, expansion_driven
+                    # - stabilization_driven, overcorrection, assertion_driven, ambiguous_motivation
+                    # Uses signals from:
+                    # - SessionSummary metrics (coherence, temporal arc, volatility)
+                    # - SessionMemory events (breakthrough, fragmentation, stabilization)
+                    # - SessionPolicyFlags (recommended styles, grounding needs)
+                    # - IntentArc classification (arc types)
+                    # - IdentitySignature classification (identity types)
+                    # Does NOT modify pipeline behavior - purely additive observability
+                    # ================================================================
+                    try:
+                        # Compute motivation flow if we have session components
+                        if session_summary:
+                            ctx.motivation_profile = compute_motivation_flow(
+                                session_summary=session_summary,
+                                session_memory=session_state.session_memory,
+                                session_policy=ctx.session_policy_flags,
+                                intent_arc=ctx.intent_arc,
+                                identity_signature=ctx.identity_signature,
+                            )
+                    except Exception:
+                        # If motivation flow computation fails, continue without it (fail-safe)
+                        ctx.motivation_profile = None
             except Exception:
                 # If session policy layer fails, continue without it (fail-safe)
                 # This ensures pipeline robustness even if session tracking has issues

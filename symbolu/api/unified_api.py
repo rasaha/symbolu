@@ -52,6 +52,7 @@ class UnifiedOutput:
         session_recap: Session recap v1.0 (multi-turn summary)
         intent_arc: Intent Arc Engine v1.0 (trajectory classification)
         identity_signature: Identity Signature Engine v1.0 (identity trajectory classification)
+        motivation_profile: Motivation Flow Engine v1.0 (motivational driver classification)
     """
 
     text: str
@@ -68,6 +69,7 @@ class UnifiedOutput:
     session_recap: Dict[str, Any] = field(default_factory=dict)
     intent_arc: Dict[str, Any] = field(default_factory=dict)
     identity_signature: Dict[str, Any] = field(default_factory=dict)
+    motivation_profile: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -253,6 +255,11 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
     if hasattr(ctx, 'identity_signature') and ctx.identity_signature is not None:
         identity_signature_data = ctx.identity_signature.serialize()
 
+    # Extract motivation profile (Motivation Flow Engine v1.0)
+    motivation_profile_data = {}
+    if hasattr(ctx, 'motivation_profile') and ctx.motivation_profile is not None:
+        motivation_profile_data = ctx.motivation_profile.serialize()
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -268,6 +275,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         session_recap=session_recap_data,
         intent_arc=intent_arc_data,
         identity_signature=identity_signature_data,
+        motivation_profile=motivation_profile_data,
     )
 
 
