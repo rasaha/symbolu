@@ -19,6 +19,7 @@ on:
       - "symbolu/service/sessions/**"
       - "symbolu/intent/**"
       - "symbolu/identity/**"
+      - "symbolu/motivation/**"
       - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   pull_request:
@@ -39,6 +40,7 @@ on:
       - "symbolu/service/sessions/**"
       - "symbolu/intent/**"
       - "symbolu/identity/**"
+      - "symbolu/motivation/**"
       - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   workflow_dispatch:
@@ -220,6 +222,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee identity-signature-pytest.log
 
+      - name: Run Motivation Flow Tests
+        run: |
+          pytest symbolu/motivation/tests/test_motivation_engine.py \
+            --disable-warnings -q \
+            2>&1 | tee motivation-flow-pytest.log
+
       - name: Upload Coherence Reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -271,6 +279,7 @@ jobs:
             session-summarizer-pytest.log
             intent-arc-pytest.log
             identity-signature-pytest.log
+            motivation-flow-pytest.log
 
       - name: Upload snapshot diffs
         if: failure()

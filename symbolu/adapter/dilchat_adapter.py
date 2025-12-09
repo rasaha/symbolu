@@ -224,6 +224,9 @@ def build_dilchat_response(
     # Extract identity signature for identity-based badges
     identity_signature = unified_output.get("identity_signature", {})
 
+    # Extract motivation profile for motivation-based badges
+    motivation_profile = unified_output.get("motivation_profile", {})
+
     badges = _build_badges(
         stability_status=stability_status,
         policy_flags=combined_flags,
@@ -232,12 +235,13 @@ def build_dilchat_response(
         session_recap=session_recap,
         intent_arc=intent_arc,
         identity_signature=identity_signature,
+        motivation_profile=motivation_profile,
     )
 
     # ========================================================================
-    # STEP 6: Build hints (includes session memory + session recap + intent arc + identity signature hints)
+    # STEP 6: Build hints (includes session memory + session recap + intent arc + identity signature + motivation hints)
     # ========================================================================
-    hints = _build_hints(combined_flags, session_memory, session_recap, intent_arc, identity_signature)
+    hints = _build_hints(combined_flags, session_memory, session_recap, intent_arc, identity_signature, motivation_profile)
 
     # ========================================================================
     # STEP 7: Assemble DILchatResponse
@@ -305,6 +309,7 @@ def _build_badges(
     session_recap: Optional[Dict[str, Any]] = None,
     intent_arc: Optional[Dict[str, Any]] = None,
     identity_signature: Optional[Dict[str, Any]] = None,
+    motivation_profile: Optional[Dict[str, Any]] = None,
 ) -> List[DILchatBadge]:
     """
     Build UI badges based on stability status and policy flags.
@@ -324,6 +329,7 @@ def _build_badges(
         12. Session Recap Breakthrough Badge (if "breakthrough_detected" in recap.key_patterns)
         13. Intent Arc Badges (insight, stabilization, identity exploration, etc.)
         14. Identity Signature Badges (self_stable, self_expanding, self_fragmented, etc.)
+        15. Motivation Profile Badges (hope, fear, expansion, stabilization, avoidance, assertion)
 
     Args:
         stability_status: Stability classification from policy engine
@@ -333,6 +339,7 @@ def _build_badges(
         session_recap: Session recap dictionary with multi-turn summary
         intent_arc: Intent arc dictionary with arc classification
         identity_signature: Identity signature dictionary with signature classification
+        motivation_profile: Motivation profile dictionary with motivational driver classification
 
     Returns:
         List of DILchatBadge objects
@@ -584,6 +591,51 @@ def _build_badges(
                 description="Self-discovery signature. Identity breakthrough with improving trajectory."
             ))
 
+    # ========================================================================
+    # BADGE 15: Motivation Profile Badges (Motivation Flow Engine v1.0)
+    # ========================================================================
+    if motivation_profile:
+        motivation_type = motivation_profile.get("motivation_type")
+
+        # Add motivation-specific badges (only for 6 non-ambiguous types)
+        if motivation_type == "hope_driven":
+            badges.append(DILchatBadge(
+                label="HOPE_DRIVEN",
+                level="info",
+                description="Hope-driven motivation. Upward trajectory with breakthrough moments."
+            ))
+        elif motivation_type == "fear_driven":
+            badges.append(DILchatBadge(
+                label="FEAR_DRIVEN",
+                level="warning",
+                description="Fear-driven motivation. Fragmentation and volatility present. Needs support."
+            ))
+        elif motivation_type == "avoidance_driven":
+            badges.append(DILchatBadge(
+                label="AVOIDANCE",
+                level="warning",
+                description="Avoidance-driven motivation. Suppressed expression with defensive patterns."
+            ))
+        elif motivation_type == "expansion_driven":
+            badges.append(DILchatBadge(
+                label="EXPANSION",
+                level="info",
+                description="Expansion-driven motivation. Active exploration with rising temporal arc."
+            ))
+        elif motivation_type == "stabilization_driven":
+            badges.append(DILchatBadge(
+                label="STABILIZATION",
+                level="info",
+                description="Stabilization-driven motivation. Recovery pattern with decreasing volatility."
+            ))
+        elif motivation_type == "assertion_driven":
+            badges.append(DILchatBadge(
+                label="ASSERTIVE",
+                level="info",
+                description="Assertion-driven motivation. Strong self-expression with HRM dominance."
+            ))
+        # Note: overcorrection and ambiguous_motivation don't get badges (as specified)
+
     return badges
 
 
@@ -597,7 +649,8 @@ def _build_hints(
     session_memory: Optional[Dict[str, Any]] = None,
     session_recap: Optional[Dict[str, Any]] = None,
     intent_arc: Optional[Dict[str, Any]] = None,
-    identity_signature: Optional[Dict[str, Any]] = None
+    identity_signature: Optional[Dict[str, Any]] = None,
+    motivation_profile: Optional[Dict[str, Any]] = None,
 ) -> List[DILchatHint]:
     """
     Build UI hints based on policy flags.
@@ -617,6 +670,7 @@ def _build_hints(
         12. RECAP_REFLECTION_MODE - if recap.recommended_style="reflective"
         13. RECAP_EXPLORATION_OK - if recap.recommended_style="exploratory"
         14. Identity Signature Hints (explore_identity, stabilize_identity, etc.)
+        15. Motivation Profile Hints (encourage_exploration, stabilize_self, address_avoidance, etc.)
 
     Args:
         policy_flags: Policy flags dictionary (includes session_policy_flags if available)
@@ -624,6 +678,7 @@ def _build_hints(
         session_recap: Session recap dictionary with multi-turn summary
         intent_arc: Intent arc dictionary with arc classification
         identity_signature: Identity signature dictionary with signature classification
+        motivation_profile: Motivation profile dictionary with motivational driver classification
 
     Returns:
         List of DILchatHint objects
@@ -822,6 +877,45 @@ def _build_hints(
                 code="REFLECT_IDENTITY",
                 message="Identity signature is self-discovery. Support identity breakthroughs with reflective responses."
             ))
+
+    # ========================================================================
+    # MOTIVATION FLOW ENGINE v1.0 HINTS (from motivation profile classification)
+    # ========================================================================
+    if motivation_profile:
+        motivation_type = motivation_profile.get("motivation_type")
+
+        # Add motivation-specific hints (5 deterministic mappings)
+        if motivation_type == "hope_driven":
+            hints.append(DILchatHint(
+                code="ENCOURAGE_EXPLORATION",
+                message="Motivation is hope-driven. Encourage continued exploration and positive momentum."
+            ))
+        elif motivation_type == "fear_driven":
+            hints.append(DILchatHint(
+                code="CALM_FEAR",
+                message="Motivation is fear-driven. Use calming, supportive responses to address fragmentation."
+            ))
+        elif motivation_type == "avoidance_driven":
+            hints.append(DILchatHint(
+                code="ADDRESS_AVOIDANCE",
+                message="Motivation is avoidance-driven. Gently encourage expression while respecting boundaries."
+            ))
+        elif motivation_type == "expansion_driven":
+            hints.append(DILchatHint(
+                code="ENCOURAGE_EXPLORATION",
+                message="Motivation is expansion-driven. Support active exploration and LAM-driven identity themes."
+            ))
+        elif motivation_type == "stabilization_driven":
+            hints.append(DILchatHint(
+                code="STABILIZE_SELF",
+                message="Motivation is stabilization-driven. Maintain stable, supportive responses to aid recovery."
+            ))
+        elif motivation_type == "assertion_driven":
+            hints.append(DILchatHint(
+                code="SUPPORT_ASSERTION",
+                message="Motivation is assertion-driven. Support strong self-expression and symbolic reasoning."
+            ))
+        # Note: overcorrection and ambiguous_motivation don't get hints
 
     return hints
 
