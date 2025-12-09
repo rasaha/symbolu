@@ -69,3 +69,7 @@ venv.bak/
 # OS
 .DS_Store
 Thumbs.db
+
+# TTOR CI artifacts (generated at runtime, uploaded separately)
+symbolu/mechanical/pipeline/ttor/tests_mapper_switching/mapper_switching_report.json
+symbolu/mechanical/pipeline/ttor/tests_mapper_switching_v2/mapper_switching_report_v2.json
