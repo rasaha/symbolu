@@ -41,6 +41,11 @@ class CoherenceState:
     tension_history: List[float] = field(default_factory=list)  # long_arc_tension per turn
     temporal_flags_history: List[Dict[str, bool]] = field(default_factory=list)  # temporal flags per turn
 
+    # Phase 1 formula histories (passive observation - not used in scoring yet)
+    delta_smi_history: List[Optional[float]] = field(default_factory=list)  # ΔSMI per turn
+    bhava_gap_history: List[Optional[float]] = field(default_factory=list)  # Bhava gap per turn
+    tension_corridor_history: List[Optional[float]] = field(default_factory=list)  # Tension corridor per turn
+
     # Derived metrics (0.0-1.0)
     persona_drift_score: float = 0.0  # Higher = more drift (worse)
     semantic_stability_score: float = 0.0  # Higher = more stable (better)
@@ -68,6 +73,11 @@ class CoherenceState:
         self.bhava_direction_history = self.bhava_direction_history[-window:]
         self.tension_history = self.tension_history[-window:]
         self.temporal_flags_history = self.temporal_flags_history[-window:]
+
+        # Phase 1 formula histories
+        self.delta_smi_history = self.delta_smi_history[-window:]
+        self.bhava_gap_history = self.bhava_gap_history[-window:]
+        self.tension_corridor_history = self.tension_corridor_history[-window:]
 
     def get_history_length(self) -> int:
         """

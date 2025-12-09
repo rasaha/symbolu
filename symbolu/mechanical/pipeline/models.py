@@ -243,6 +243,12 @@ class PipelineContext:
     coherence_report: Optional[Dict[str, Any]] = None  # Observability report from CoherenceObserver
     unified_output: Optional[Dict[str, Any]] = None  # Unified API output (USU-API v1.0)
 
+    # Phase 1 temporal formulas (observation only - not used in routing/behavior yet)
+    smi: Optional[float] = None  # Symbolic Mental Index (0.0 to 1.0)
+    delta_smi: Optional[float] = None  # SMI momentum (-1.0 to 1.0)
+    bhava_gap: Optional[float] = None  # Bhava circular distance (0.0 to 1.0)
+    tension_corridor: Optional[float] = None  # Tension dynamics signal (0.0 to 1.0)
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize context to dictionary for logging/debugging."""
         return {

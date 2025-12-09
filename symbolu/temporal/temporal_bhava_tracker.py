@@ -17,6 +17,13 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 import math
 
+from symbolu.formulas.resonance_formulas import (
+    compute_smi as _compute_smi_formula,
+    compute_delta_smi as _compute_delta_smi_formula,
+    compute_bhava_gap as _compute_bhava_gap_formula,
+    compute_tension_corridor as _compute_tension_corridor_formula,
+)
+
 
 @dataclass
 class TemporalEntry:
@@ -29,6 +36,27 @@ class TemporalEntry:
     kosha_id: int
     ontology_id: int
     timestamp: Optional[float] = None
+
+
+@dataclass
+class TemporalState:
+    """
+    Computed temporal state including Phase 1 resonance formulas.
+
+    This dataclass holds the computed values from the four foundational
+    temporal formulas introduced in Symbol-U v3.0 Phase 1.
+
+    Attributes:
+        smi: Symbolic Mental Index (0.0 to 1.0)
+        delta_smi: SMI momentum (-1.0 to 1.0)
+        bhava_gap: Bhava circular distance (0.0 to 1.0)
+        tension_corridor: Tension dynamics signal (0.0 to 1.0)
+    """
+
+    smi: Optional[float] = None
+    delta_smi: Optional[float] = None
+    bhava_gap: Optional[float] = None
+    tension_corridor: Optional[float] = None
 
 
 class TemporalBhavaTracker:
@@ -59,6 +87,9 @@ class TemporalBhavaTracker:
             raise ValueError("window_size must be at least 1")
         self._window_size = window_size
         self._entries: List[TemporalEntry] = []
+        self._temporal_state: TemporalState = TemporalState()
+        self._previous_smi: Optional[float] = None
+        self._previous_bhava: Optional[int] = None
 
     @property
     def window_size(self) -> int:
@@ -179,6 +210,103 @@ class TemporalBhavaTracker:
     def reset(self) -> None:
         """Clear the history."""
         self._entries.clear()
+        self._temporal_state = TemporalState()
+        self._previous_smi = None
+        self._previous_bhava = None
+
+    def get_temporal_state(self) -> TemporalState:
+        """
+        Get the current temporal state with computed formulas.
+
+        Returns:
+            TemporalState with computed SMI, delta_smi, bhava_gap, tension_corridor
+        """
+        return self._temporal_state
+
+    def compute_formulas(
+        self,
+        dimensional_resonance: float,
+        vrtti_intensity: float,
+        bhava_position: float,
+        current_bhava: int,
+    ) -> TemporalState:
+        """
+        Compute all Phase 1 temporal formulas with fail-safe wrappers.
+
+        This method computes:
+        - SMI from dimensional_resonance, vrtti_intensity, bhava_position
+        - ΔSMI from current and previous SMI
+        - Bhava Gap from current and previous bhava
+        - Tension Corridor from ΔSMI and bhava_gap
+
+        All computations are wrapped in try/except blocks for fail-safety.
+
+        Args:
+            dimensional_resonance: Dimensional resonance value (0.0 to 1.0)
+            vrtti_intensity: Vrtti intensity value (0.0 to 1.0)
+            bhava_position: Bhava position value (0.0 to 1.0)
+            current_bhava: Current bhava ID (0 to 11)
+
+        Returns:
+            TemporalState with computed values (fields set to None on error)
+        """
+        state = TemporalState()
+
+        # Compute SMI with fail-safe wrapper
+        try:
+            state.smi = _compute_smi_formula(
+                dimensional_resonance=dimensional_resonance,
+                vrtti_intensity=vrtti_intensity,
+                bhava_position=bhava_position,
+            )
+        except Exception as e:
+            # Log error and set to None (fail-safe)
+            state.smi = None
+            # Silent fail - maintain backward compatibility
+
+        # Compute ΔSMI with fail-safe wrapper
+        try:
+            if state.smi is not None:
+                state.delta_smi = _compute_delta_smi_formula(
+                    smi=state.smi,
+                    previous_smi=self._previous_smi,
+                )
+            else:
+                state.delta_smi = None
+        except Exception as e:
+            # Log error and set to None (fail-safe)
+            state.delta_smi = None
+
+        # Compute Bhava Gap with fail-safe wrapper
+        try:
+            state.bhava_gap = _compute_bhava_gap_formula(
+                current_bhava=current_bhava,
+                previous_bhava=self._previous_bhava,
+            )
+        except Exception as e:
+            # Log error and set to None (fail-safe)
+            state.bhava_gap = None
+
+        # Compute Tension Corridor with fail-safe wrapper
+        try:
+            if state.delta_smi is not None and state.bhava_gap is not None:
+                state.tension_corridor = _compute_tension_corridor_formula(
+                    delta_smi=state.delta_smi,
+                    bhava_gap=state.bhava_gap,
+                )
+            else:
+                state.tension_corridor = None
+        except Exception as e:
+            # Log error and set to None (fail-safe)
+            state.tension_corridor = None
+
+        # Update internal state for next turn
+        if state.smi is not None:
+            self._previous_smi = state.smi
+        self._previous_bhava = current_bhava
+        self._temporal_state = state
+
+        return state
 
     def _compute_stats(self) -> Dict[str, Any]:
         """Compute basic statistical measures."""

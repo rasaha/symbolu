@@ -72,6 +72,9 @@ class CoherenceEngine:
                 bhava_direction_history=prev_state.bhava_direction_history.copy(),
                 tension_history=prev_state.tension_history.copy(),
                 temporal_flags_history=prev_state.temporal_flags_history.copy(),
+                delta_smi_history=prev_state.delta_smi_history.copy(),
+                bhava_gap_history=prev_state.bhava_gap_history.copy(),
+                tension_corridor_history=prev_state.tension_corridor_history.copy(),
             )
 
         # Append new turn data to histories
@@ -83,6 +86,11 @@ class CoherenceEngine:
         state.bhava_direction_history.append(self._extract_bhava_direction(temporal_summary))
         state.tension_history.append(self._extract_tension(routing_plan))
         state.temporal_flags_history.append(self._extract_temporal_flags(temporal_summary))
+
+        # Phase 1 formulas (passive observation - not used in scoring yet)
+        state.delta_smi_history.append(self._extract_delta_smi(temporal_summary))
+        state.bhava_gap_history.append(self._extract_bhava_gap(temporal_summary))
+        state.tension_corridor_history.append(self._extract_tension_corridor(temporal_summary))
 
         # Trim to sliding window
         state.window_trim(self.window)
@@ -151,6 +159,24 @@ class CoherenceEngine:
             "chronic_stress": False,
             "breakthrough_insight": False,
         }
+
+    def _extract_delta_smi(self, temporal_summary: Optional[Dict]) -> Optional[float]:
+        """Extract delta_smi from temporal summary (Phase 1 formula)."""
+        if temporal_summary and "delta_smi" in temporal_summary:
+            return temporal_summary["delta_smi"]
+        return None
+
+    def _extract_bhava_gap(self, temporal_summary: Optional[Dict]) -> Optional[float]:
+        """Extract bhava_gap from temporal summary (Phase 1 formula)."""
+        if temporal_summary and "bhava_gap" in temporal_summary:
+            return temporal_summary["bhava_gap"]
+        return None
+
+    def _extract_tension_corridor(self, temporal_summary: Optional[Dict]) -> Optional[float]:
+        """Extract tension_corridor from temporal summary (Phase 1 formula)."""
+        if temporal_summary and "tension_corridor" in temporal_summary:
+            return temporal_summary["tension_corridor"]
+        return None
 
     def _compute_persona_drift(self, state: CoherenceState) -> float:
         """Compute persona drift score."""
