@@ -105,6 +105,9 @@ from symbolu.policy.session_policy import compute_session_policy_flags
 # Intent Arc Engine (Multi-Turn Trajectory Classification)
 from symbolu.intent.intent_arc_engine import compute_intent_arc
 
+# Identity Signature Engine (Identity Trajectory Classification)
+from symbolu.identity.identity_signature_engine import compute_identity_signature
+
 # DILchat Adapter (Presentation Layer for DILchat Integration)
 from symbolu.adapter import build_dilchat_payload
 
@@ -304,6 +307,7 @@ class SymbolUPipeline:
         ctx.session_memory = None
         ctx.session_recap = None
         ctx.intent_arc = None
+        ctx.identity_signature = None
         session_id = ctx.request.metadata.get("session_id")
         if session_id:
             try:
@@ -388,6 +392,34 @@ class SymbolUPipeline:
                     except Exception:
                         # If intent arc computation fails, continue without it (fail-safe)
                         ctx.intent_arc = None
+
+                    # ================================================================
+                    # IDENTITY SIGNATURE ENGINE v1.0: Compute identity signature classification (optional, non-invasive)
+                    # Deterministic identity trajectory classification based on:
+                    # - SessionSummary metrics (coherence, temporal arc, persona drift, mapper volatility)
+                    # - SessionMemory events (breakthrough, fragmentation, stabilization, arc_shift)
+                    # - SessionPolicyFlags (recommended styles, grounding needs)
+                    # - IntentArc classification (arc types and reasons)
+                    # - Mapper journeys (HRM/LCM/LAM synergy and dominance)
+                    # - Domain context (identity, therapy, generic)
+                    # Does NOT modify pipeline behavior - purely additive observability
+                    # ================================================================
+                    try:
+                        # Compute identity signature if we have session components
+                        if session_summary:
+                            # Get domain from request metadata or summary
+                            identity_domain = ctx.request.metadata.get("domain", session_summary.last_domain)
+
+                            ctx.identity_signature = compute_identity_signature(
+                                session_summary=session_summary,
+                                session_memory=session_state.session_memory,
+                                session_policy=ctx.session_policy_flags,
+                                intent_arc=ctx.intent_arc,
+                                domain=identity_domain,
+                            )
+                    except Exception:
+                        # If identity signature computation fails, continue without it (fail-safe)
+                        ctx.identity_signature = None
             except Exception:
                 # If session policy layer fails, continue without it (fail-safe)
                 # This ensures pipeline robustness even if session tracking has issues

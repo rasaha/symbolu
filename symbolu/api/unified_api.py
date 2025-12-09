@@ -51,6 +51,7 @@ class UnifiedOutput:
         session_memory: Session memory v2.0 (episodic events)
         session_recap: Session recap v1.0 (multi-turn summary)
         intent_arc: Intent Arc Engine v1.0 (trajectory classification)
+        identity_signature: Identity Signature Engine v1.0 (identity trajectory classification)
     """
 
     text: str
@@ -66,6 +67,7 @@ class UnifiedOutput:
     session_memory: Dict[str, Any] = field(default_factory=dict)
     session_recap: Dict[str, Any] = field(default_factory=dict)
     intent_arc: Dict[str, Any] = field(default_factory=dict)
+    identity_signature: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -246,6 +248,11 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
     if hasattr(ctx, 'intent_arc') and ctx.intent_arc is not None:
         intent_arc_data = ctx.intent_arc.serialize()
 
+    # Extract identity signature (Identity Signature Engine v1.0)
+    identity_signature_data = {}
+    if hasattr(ctx, 'identity_signature') and ctx.identity_signature is not None:
+        identity_signature_data = ctx.identity_signature.serialize()
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -260,6 +267,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         session_memory=session_memory_data,
         session_recap=session_recap_data,
         intent_arc=intent_arc_data,
+        identity_signature=identity_signature_data,
     )
 
 
@@ -324,6 +332,10 @@ def get_public_response(ctx: Any) -> Dict[str, Any]:
     session_recap = unified.get('session_recap', {})
     trimmed_recap = _trim_session_recap_for_public(session_recap)
 
+    # Extract identity signature (Identity Signature Engine v1.0) - trim to public fields
+    identity_signature = unified.get('identity_signature', {})
+    trimmed_identity_signature = _trim_identity_signature_for_public(identity_signature)
+
     # Build public response
     return {
         'text': unified.get('text', ''),
@@ -340,6 +352,7 @@ def get_public_response(ctx: Any) -> Dict[str, Any]:
         'timestamp': unified.get('metadata', {}).get('timestamp', ''),
         'session_memory': trimmed_memory,
         'session_recap': trimmed_recap,
+        'identity_signature': trimmed_identity_signature,
     }
 
 
@@ -519,6 +532,50 @@ def _trim_session_recap_for_public(session_recap: Dict[str, Any]) -> Dict[str, A
         'net_trajectory': net_trajectory,
         'recommended_style': recommended_style,
         'recent_turning_points': trimmed_turning_points,
+    }
+
+
+def _trim_identity_signature_for_public(identity_signature: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Trim identity signature to public-safe fields.
+
+    Exposes only:
+    - signature_type
+    - confidence
+    - last 2 markers (identity-related session markers)
+    - driver summary (count of drivers, not full list)
+
+    Never exposes full driver list or all markers.
+
+    Args:
+        identity_signature: Full identity signature dictionary
+
+    Returns:
+        Trimmed identity signature dictionary for public API
+    """
+    if not identity_signature:
+        return {}
+
+    # Extract public fields
+    signature_type = identity_signature.get('signature_type')
+    confidence = identity_signature.get('confidence')
+    markers = identity_signature.get('markers', [])
+    drivers = identity_signature.get('drivers', [])
+
+    # Get last 2 markers
+    recent_markers = markers[-2:] if len(markers) >= 2 else markers
+
+    # Driver summary (count only, not full list)
+    driver_summary = {
+        'count': len(drivers),
+        'primary': drivers[0] if drivers else None,
+    }
+
+    return {
+        'signature_type': signature_type,
+        'confidence': confidence,
+        'recent_markers': recent_markers,
+        'driver_summary': driver_summary,
     }
 
 
