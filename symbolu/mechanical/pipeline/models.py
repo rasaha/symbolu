@@ -168,6 +168,39 @@ class RenderedOutput:
 
 
 @dataclass
+class MapperProfile:
+    """
+    Mapper influence profile for renderer and DHA modulation.
+
+    Computed deterministically from HRM/LCM/LAM activation flags
+    and routing signals. Used to modulate expression (NOT semantic truth).
+
+    Attributes:
+        resolution_level: "low" | "medium" | "high" - Detail granularity
+        arc_mode: "none" | "temporal" | "identity" | "deep_context" - Long-arc framing
+        detail_bias: 0.0–1.0 - Preference for fine-grained detail
+        practical_bias: 0.0–1.0 - Preference for concrete/task-focused delivery
+        reflective_bias: 0.0–1.0 - Preference for introspective/philosophical framing
+    """
+
+    resolution_level: str = "medium"  # "low" | "medium" | "high"
+    arc_mode: str = "none"  # "none" | "temporal" | "identity" | "deep_context"
+    detail_bias: float = 0.5  # 0.0–1.0
+    practical_bias: float = 0.5  # 0.0–1.0
+    reflective_bias: float = 0.5  # 0.0–1.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "resolution_level": self.resolution_level,
+            "arc_mode": self.arc_mode,
+            "detail_bias": self.detail_bias,
+            "practical_bias": self.practical_bias,
+            "reflective_bias": self.reflective_bias,
+        }
+
+
+@dataclass
 class PipelineContext:
     """
     Full context object passed through the pipeline stages.
@@ -187,6 +220,7 @@ class PipelineContext:
         dha: DhaDecision after delivery harmonization.
         rendered: RenderedOutput after final rendering.
         router_mode: Pipeline routing mode ("linear" for v3.0).
+        mapper_profile: Mapper influence profile for renderer/DHA modulation.
     """
 
     request: UserRequest
@@ -199,6 +233,7 @@ class PipelineContext:
     dha: Optional[DhaDecision] = None
     rendered: Optional[RenderedOutput] = None
     router_mode: str = "linear"
+    mapper_profile: Optional[MapperProfile] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize context to dictionary for logging/debugging."""
@@ -248,4 +283,5 @@ __all__ = [
     "DhaDecision",
     "RenderedOutput",
     "PipelineContext",
+    "MapperProfile",
 ]

@@ -30,10 +30,13 @@ Patent Protected: Core algorithms immutable
 import json
 import hashlib
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+
+if TYPE_CHECKING:
+    from symbolu.mechanical.pipeline.models import MapperProfile
 
 
 # ============================================================================
@@ -711,6 +714,250 @@ class FusionRenderer:
     def get_stats(self) -> Dict[str, Any]:
         """Get rendering statistics"""
         return self.stats.copy()
+
+    def apply_mapper_profile(
+        self,
+        rendered_output: RenderedOutput,
+        mapper_profile: Optional["MapperProfile"]
+    ) -> RenderedOutput:
+        """
+        Apply mapper profile modulation to rendered output.
+
+        Modulates EXPRESSION only, not semantic truth.
+
+        Rules:
+        ------
+        LCM Active (practical_bias high, resolution_level low):
+            - Collapse symbolic layer (reduce complexity)
+            - Prioritize concrete/task-oriented text in practical layer
+            - Mirror-truth layer becomes minimal
+
+        HRM Active (detail_bias high, resolution_level high):
+            - Expand symbolic layer (add explanation + precision)
+            - Increase specificity and nuance
+            - Mirror-truth layer stays balanced
+
+        LAM Active (reflective_bias high, arc_mode set):
+            - Add long-arc framing to symbolic layer
+            - Mirror-truth layer includes pattern/identity/trajectory markers
+
+        Args:
+            rendered_output: Original rendered output from render()
+            mapper_profile: Mapper profile from MLCR/TTOR
+
+        Returns:
+            Modulated RenderedOutput (new instance)
+        """
+        if mapper_profile is None:
+            return rendered_output
+
+        # Create modulated copies of layers
+        symbolic_layer = self._modulate_symbolic_layer(
+            rendered_output.symbolic_layer,
+            mapper_profile
+        )
+
+        practical_layer = self._modulate_practical_layer(
+            rendered_output.practical_layer,
+            mapper_profile
+        )
+
+        mirror_layer = self._modulate_mirror_layer(
+            rendered_output.mirror_truth_layer,
+            mapper_profile
+        )
+
+        # Create new rendered output with modulated layers
+        return RenderedOutput(
+            query=rendered_output.query,
+            mode=rendered_output.mode,
+            symbolic_layer=symbolic_layer,
+            practical_layer=practical_layer,
+            mirror_truth_layer=mirror_layer,
+            metadata={
+                **rendered_output.metadata,
+                "mapper_profile_applied": mapper_profile.to_dict()
+            },
+            render_timestamp=rendered_output.render_timestamp
+        )
+
+    def _modulate_symbolic_layer(
+        self,
+        layer: Optional[SymbolicLayer],
+        profile: "MapperProfile"
+    ) -> Optional[SymbolicLayer]:
+        """Modulate symbolic layer based on mapper profile."""
+        if layer is None:
+            return None
+
+        # LCM: Collapse symbolic layer
+        if profile.practical_bias > 0.6 and profile.resolution_level == "low":
+            # Minimize symbolic content for LCM
+            return SymbolicLayer(
+                theme=self._simplify_text(layer.theme),
+                archetype="Pragmatic - focuses on concrete outcomes",
+                causal_patterns=layer.causal_patterns[:1],  # Keep only 1
+                meaning_vectors={
+                    k: v for k, v in layer.meaning_vectors.items()
+                    if k == "practicality"
+                },
+                dominant_channel=layer.dominant_channel,
+                reasoning_depth=max(0.2, layer.reasoning_depth - 0.3)
+            )
+
+        # HRM: Expand symbolic layer
+        if profile.detail_bias > 0.6 and profile.resolution_level == "high":
+            # Add granularity markers
+            enhanced_theme = layer.theme
+            if not any(marker in enhanced_theme for marker in ["specifically", "precisely", "in detail"]):
+                enhanced_theme = f"{enhanced_theme} [Examined in detail]"
+
+            return SymbolicLayer(
+                theme=enhanced_theme,
+                archetype=f"{layer.archetype} (high-resolution analysis)",
+                causal_patterns=layer.causal_patterns + ["Fine-grained causal nuance detected"],
+                meaning_vectors=layer.meaning_vectors,
+                dominant_channel=layer.dominant_channel,
+                reasoning_depth=min(1.0, layer.reasoning_depth + 0.2)
+            )
+
+        # LAM: Add long-arc framing
+        if profile.reflective_bias > 0.6 and profile.arc_mode != "none":
+            arc_theme = self._add_arc_framing(layer.theme, profile.arc_mode)
+            arc_patterns = layer.causal_patterns + [
+                self._get_arc_pattern_text(profile.arc_mode)
+            ]
+
+            return SymbolicLayer(
+                theme=arc_theme,
+                archetype=layer.archetype,
+                causal_patterns=arc_patterns,
+                meaning_vectors=layer.meaning_vectors,
+                dominant_channel=layer.dominant_channel,
+                reasoning_depth=layer.reasoning_depth
+            )
+
+        # Default: return unchanged
+        return layer
+
+    def _modulate_practical_layer(
+        self,
+        layer: Optional[PracticalLayer],
+        profile: "MapperProfile"
+    ) -> Optional[PracticalLayer]:
+        """Modulate practical layer based on mapper profile."""
+        if layer is None:
+            return None
+
+        # LCM: Prioritize concrete/actionable content
+        if profile.practical_bias > 0.6 and profile.resolution_level == "low":
+            return PracticalLayer(
+                key_facts=layer.key_facts[:3],  # Keep top 3 only
+                constraints=layer.constraints[:2],
+                procedures=layer.procedures,
+                coherence_score=min(1.0, layer.coherence_score + 0.1),
+                domain=layer.domain,
+                actionable_items=layer.actionable_items  # Keep all actionable items
+            )
+
+        # HRM: Expand with more detail
+        if profile.detail_bias > 0.6 and profile.resolution_level == "high":
+            enhanced_facts = [f"{fact} [with nuance]" for fact in layer.key_facts]
+
+            return PracticalLayer(
+                key_facts=enhanced_facts,
+                constraints=layer.constraints,
+                procedures=layer.procedures,
+                coherence_score=layer.coherence_score,
+                domain=layer.domain,
+                actionable_items=layer.actionable_items
+            )
+
+        # Default: return unchanged
+        return layer
+
+    def _modulate_mirror_layer(
+        self,
+        layer: Optional[MirrorTruthLayer],
+        profile: "MapperProfile"
+    ) -> Optional[MirrorTruthLayer]:
+        """Modulate mirror-truth layer based on mapper profile."""
+        if layer is None:
+            return None
+
+        # LCM: Minimize mirror layer
+        if profile.practical_bias > 0.6 and profile.resolution_level == "low":
+            return MirrorTruthLayer(
+                contradictions=[],
+                entropy_measures={k: v for k, v in layer.entropy_measures.items() if v > 0.5},
+                tensions=["Minimal reflection - focus on action"],
+                alignment_score=layer.alignment_score,
+                stability_indicator=layer.stability_indicator,
+                reflection="Practical focus maintained."
+            )
+
+        # LAM: Add pattern/identity/trajectory markers
+        if profile.reflective_bias > 0.6 and profile.arc_mode != "none":
+            arc_markers = self._get_arc_markers(profile.arc_mode)
+            enhanced_tensions = layer.tensions + arc_markers
+            enhanced_reflection = f"{layer.reflection} {self._get_arc_reflection(profile.arc_mode)}"
+
+            return MirrorTruthLayer(
+                contradictions=layer.contradictions,
+                entropy_measures=layer.entropy_measures,
+                tensions=enhanced_tensions,
+                alignment_score=layer.alignment_score,
+                stability_indicator=layer.stability_indicator,
+                reflection=enhanced_reflection
+            )
+
+        # Default: return unchanged
+        return layer
+
+    # Helper methods for mapper profile modulation
+
+    def _simplify_text(self, text: str) -> str:
+        """Simplify text for LCM."""
+        # Remove bracketed content and complex phrases
+        simplified = text.replace(" [", " - ").replace("]", "")
+        return simplified.split(".")[0] + "."  # Keep first sentence only
+
+    def _add_arc_framing(self, theme: str, arc_mode: str) -> str:
+        """Add long-arc framing to theme."""
+        arc_prefixes = {
+            "temporal": "Across time and context: ",
+            "identity": "In the context of identity evolution: ",
+            "deep_context": "Within the broader pattern: "
+        }
+        prefix = arc_prefixes.get(arc_mode, "")
+        return f"{prefix}{theme}"
+
+    def _get_arc_pattern_text(self, arc_mode: str) -> str:
+        """Get arc pattern text for symbolic layer."""
+        patterns = {
+            "temporal": "This fits a broader temporal pattern across sessions.",
+            "identity": "This reflects ongoing identity development and evolution.",
+            "deep_context": "This emerges from deep contextual understanding."
+        }
+        return patterns.get(arc_mode, "Long-arc pattern detected.")
+
+    def _get_arc_markers(self, arc_mode: str) -> List[str]:
+        """Get arc markers for mirror layer."""
+        markers = {
+            "temporal": ["Pattern continuity", "Temporal coherence"],
+            "identity": ["Identity tension", "Self-concept evolution"],
+            "deep_context": ["Trajectory contrast", "Context integration"]
+        }
+        return markers.get(arc_mode, ["Arc pattern present"])
+
+    def _get_arc_reflection(self, arc_mode: str) -> str:
+        """Get arc reflection text for mirror layer."""
+        reflections = {
+            "temporal": "Temporal patterns show coherence across sessions.",
+            "identity": "Identity tensions reveal ongoing self-development.",
+            "deep_context": "Deep context patterns suggest trajectory alignment."
+        }
+        return reflections.get(arc_mode, "Long-arc patterns detected.")
 
 
 # ============================================================================
