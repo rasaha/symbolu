@@ -67,6 +67,11 @@ jobs:
           pytest symbolu/core/drift_tests -q \
             2>&1 | tee ttor-drift-tests.log
 
+      - name: Analyze Routing Drift
+        run: |
+          python -m symbolu.tools.drift_dashboard.dashboard
+        continue-on-error: false
+
       - name: Type check with mypy
         run: |
           mypy symbolu/mechanical/pipeline/ttor --strict \

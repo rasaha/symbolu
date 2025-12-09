@@ -220,11 +220,16 @@ class TTORRouter:
             normalized_entropy=normalized_entropy,
             domain=context.domain,
             long_arc_tension=context.long_arc_tension,
+            temporal_patterns_detected=context.temporal_patterns_detected,
         )
         debug["use_hrm"] = use_hrm
         debug["use_lcm"] = use_lcm
         debug["use_lam"] = use_lam
-        logger.debug(f"{self._log_prefix} Module flags: HRM={use_hrm}, LCM={use_lcm}, LAM={use_lam}")
+        debug["temporal_patterns_detected"] = context.temporal_patterns_detected
+        logger.debug(
+            f"{self._log_prefix} Module flags: HRM={use_hrm}, LCM={use_lcm}, LAM={use_lam}, "
+            f"temporal={context.temporal_patterns_detected}"
+        )
 
         # =====================================================================
         # STEP 10: Apply safety overrides
@@ -378,6 +383,7 @@ class TTORRouter:
         normalized_entropy: float,
         domain: str,
         long_arc_tension: float,
+        temporal_patterns_detected: bool = False,
     ) -> tuple[bool, bool, bool]:
         """
         Compute HRM/LCM/LAM activation flags using CANONICAL RULES v2.0.
@@ -406,6 +412,7 @@ class TTORRouter:
             normalized_entropy: Combined normalized entropy (entropy_mix)
             domain: Domain classification string
             long_arc_tension: Long-arc tension value [0, 1]
+            temporal_patterns_detected: Signal from TemporalBhavaTracker
 
         Returns:
             Tuple of (use_hrm, use_lcm, use_lam) boolean flags
@@ -416,10 +423,6 @@ class TTORRouter:
         LAM_TENSION_THRESHOLD = 0.50
         LAM_DOMAIN_ENTROPY_THRESHOLD = 0.60
         LAM_DOMAINS = ["therapy", "identity", "spiritual"]
-
-        # Temporal patterns detection (future enhancement - currently False)
-        # TODO: Add temporal_patterns_detected to RouterContext when implemented
-        temporal_patterns_detected = False
 
         # Apply canonical formulas exactly as specified
         use_hrm = (tier != Tier.LOWER) and (normalized_entropy > HRM_ENTROPY_THRESHOLD)

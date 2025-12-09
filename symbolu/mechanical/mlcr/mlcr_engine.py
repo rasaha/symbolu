@@ -103,6 +103,10 @@ class MLCR:
         )
         
         # Step 5: Route to experts (using TTOR canonical mapper rules)
+        # Extract temporal signal if provided in context
+        temporal_patterns_detected = context.get("temporal_patterns_detected", False) if context else False
+        long_arc_tension = context.get("long_arc_tension", 0.0) if context else 0.0
+
         activation = self.expert_router.route(
             tier=tier,
             intent=intent,
@@ -110,7 +114,8 @@ class MLCR:
             user_state=user_state,
             H_D=H_D,
             H_G=H_G,
-            long_arc_tension=0.0,  # TODO: Add temporal tracking for long_arc_tension
+            long_arc_tension=long_arc_tension,
+            temporal_patterns_detected=temporal_patterns_detected,
         )
         
         # Step 6: Build renderer context

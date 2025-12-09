@@ -56,6 +56,7 @@ class ExpertRouter:
         H_D: Optional[float] = None,
         H_G: Optional[float] = None,
         long_arc_tension: Optional[float] = None,
+        temporal_patterns_detected: bool = False,
     ) -> Dict[str, bool]:
         """
         Determine expert activation using TTOR canonical mapper rules v2.0.
@@ -68,6 +69,7 @@ class ExpertRouter:
             H_D: Optional dimensional entropy (for normalized_entropy computation)
             H_G: Optional guna entropy (for normalized_entropy computation)
             long_arc_tension: Optional long-arc tension value [0, 1]
+            temporal_patterns_detected: Signal from TemporalBhavaTracker
 
         Returns:
             {
@@ -76,10 +78,18 @@ class ExpertRouter:
                 "use_lam": bool,
                 "use_moe": bool,
                 "use_fusion": bool,
-                "long_arc_tension": float  # for downstream use
+                "long_arc_tension": float,
+                "normalized_entropy": float,  # TTOR-unified formula
+                "tier": str,
+                "domain": str | None,
+                "temporal_patterns_detected": bool
             }
         """
+        # Compute normalized_entropy from H_D and H_G (if provided)
+        normalized_entropy = self._compute_normalized_entropy(H_D, H_G)
+
         # Initialize all experts as inactive
+        # Include normalized_entropy for downstream introspection (PipelineContext)
         activation = {
             "use_hrm": False,
             "use_lcm": False,
@@ -87,10 +97,11 @@ class ExpertRouter:
             "use_moe": False,
             "use_fusion": False,
             "long_arc_tension": long_arc_tension if long_arc_tension is not None else 0.0,
+            "normalized_entropy": normalized_entropy,
+            "tier": tier.value,
+            "domain": domain,
+            "temporal_patterns_detected": temporal_patterns_detected,
         }
-
-        # Compute normalized_entropy from H_D and H_G (if provided)
-        normalized_entropy = self._compute_normalized_entropy(H_D, H_G)
 
         # Canonical TTOR mapper switching rules v2.0
         # ------------------------------------------
@@ -108,7 +119,6 @@ class ExpertRouter:
         # LAM: long_arc_tension > 0.50 OR temporal_patterns_detected
         #      OR (domain in ["therapy", "identity", "spiritual"] and normalized_entropy > 0.60)
         lat = activation["long_arc_tension"]
-        temporal_patterns_detected = False  # TODO: Add temporal tracking
         activation["use_lam"] = (
             lat > self.LAM_TENSION_THRESHOLD
             or temporal_patterns_detected
@@ -140,9 +150,12 @@ class ExpertRouter:
         H_G: Optional[float],
     ) -> float:
         """
-        Compute normalized entropy from H_D and H_G using TTOR formula.
+        Compute normalized entropy from H_D and H_G using TTOR canonical formula.
 
-        normalized_entropy = 0.5 * (H_D / H_D_MAX) + 0.3 * (H_G / H_G_MAX)
+        UNIFIED FORMULA (TTOR v1.4 canonical):
+            normalized_entropy = 0.6 * (H_D / H_D_MAX) + 0.4 * (H_G / H_G_MAX)
+
+        This formula is frozen in v2.0 specification and must match TTOR exactly.
 
         Args:
             H_D: Dimensional entropy [0, ln(10)]
@@ -159,9 +172,10 @@ class ExpertRouter:
         H_D_norm = min(1.0, max(0.0, H_D / H_D_MAX)) if H_D_MAX > 0 else 0.0
         H_G_norm = min(1.0, max(0.0, H_G / H_G_MAX)) if H_G_MAX > 0 else 0.0
 
-        # Weighted entropy mix (same formula as TTOR)
-        # H_D has higher weight (0.5), H_G (0.3), H_K would be (0.2) but not used here
-        normalized_entropy = 0.5 * H_D_norm + 0.3 * H_G_norm
+        # UNIFIED ENTROPY MIX (matches TTOR formulas.py exactly)
+        # H_D has higher weight (0.6) as it captures more dimensional uncertainty
+        # H_G contributes (0.4) for guna-based emotional/quality uncertainty
+        normalized_entropy = 0.6 * H_D_norm + 0.4 * H_G_norm
 
         return normalized_entropy
     

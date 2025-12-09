@@ -99,6 +99,10 @@ class RouterContext(BaseModel):
     # Long-arc tension for LAM integration
     long_arc_tension: float = 0.0
 
+    # Temporal patterns signal from TemporalBhavaTracker
+    # When True, activates LAM regardless of other conditions
+    temporal_patterns_detected: bool = False
+
     @field_validator("aspect_probs")
     @classmethod
     def validate_aspect_probs(cls, v: Dict[str, float]) -> Dict[str, float]:

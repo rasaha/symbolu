@@ -361,6 +361,106 @@ class TemporalBhavaTracker:
             "strength": round(strength, 4),
         }
 
+    def detect_activation_window(self, window: int = 5) -> bool:
+        """
+        Detect if temporal patterns warrant LAM activation.
+
+        This method is used by TTOR router to determine if temporal patterns
+        should trigger Long-Arc Mapper (LAM) activation.
+
+        Activation Conditions (any of):
+        1. Bhava momentum is accelerating upward OR downward (strength > 0.3)
+        2. Trajectory slope magnitude > threshold (0.15)
+        3. Tension corridor detected in recent entries (corridor_length >= 2)
+
+        Args:
+            window: Number of recent entries to analyze (default: 5)
+
+        Returns:
+            True if temporal patterns indicate LAM should be activated
+        """
+        if len(self._entries) < 2:
+            # Not enough data to detect patterns
+            return False
+
+        # Analyze recent entries only (within window)
+        effective_window = min(window, len(self._entries))
+        recent_entries = self._entries[-effective_window:]
+
+        # Build temporary summary for analysis
+        summary = self.get_pattern_summary()
+
+        # Condition 1: Bhava momentum is accelerating
+        momentum = summary["momentum"]
+        momentum_active = (
+            momentum["direction"] in ("upward", "downward")
+            and momentum["strength"] > 0.3
+        )
+
+        # Condition 2: Trajectory slope magnitude > threshold (0.15)
+        trajectory = summary["trajectory"]
+        trajectory_active = abs(trajectory["slope"]) > 0.15
+
+        # Condition 3: Tension corridor detected in recent entries
+        tension = summary["tension"]
+        tension_corridor_active = tension["corridor_length"] >= 2
+
+        # Return True if ANY condition is met
+        return momentum_active or trajectory_active or tension_corridor_active
+
+    def get_lam_activation_signals(self, window: int = 5) -> Dict[str, Any]:
+        """
+        Get detailed LAM activation signals for debugging/introspection.
+
+        Returns a dictionary with all signals used to determine LAM activation.
+
+        Args:
+            window: Number of recent entries to analyze
+
+        Returns:
+            Dictionary with activation signals and decision
+        """
+        if len(self._entries) < 2:
+            return {
+                "temporal_patterns_detected": False,
+                "momentum_active": False,
+                "trajectory_active": False,
+                "tension_corridor_active": False,
+                "momentum_direction": "neutral",
+                "momentum_strength": 0.0,
+                "trajectory_slope": 0.0,
+                "tension_corridor_length": 0,
+                "entry_count": len(self._entries),
+                "window_size": window,
+            }
+
+        summary = self.get_pattern_summary()
+
+        momentum = summary["momentum"]
+        momentum_active = (
+            momentum["direction"] in ("upward", "downward")
+            and momentum["strength"] > 0.3
+        )
+
+        trajectory = summary["trajectory"]
+        trajectory_active = abs(trajectory["slope"]) > 0.15
+
+        tension = summary["tension"]
+        tension_corridor_active = tension["corridor_length"] >= 2
+
+        return {
+            "temporal_patterns_detected": momentum_active or trajectory_active or tension_corridor_active,
+            "momentum_active": momentum_active,
+            "trajectory_active": trajectory_active,
+            "tension_corridor_active": tension_corridor_active,
+            "momentum_direction": momentum["direction"],
+            "momentum_strength": momentum["strength"],
+            "trajectory_slope": trajectory["slope"],
+            "tension_corridor_length": tension["corridor_length"],
+            "entry_count": len(self._entries),
+            "window_size": window,
+        }
+
     def _classify_state(
         self,
         stats: Dict[str, Any],
