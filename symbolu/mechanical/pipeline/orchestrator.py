@@ -299,6 +299,7 @@ class SymbolUPipeline:
         # Only compute session policy if session_id is provided in metadata
         ctx.session_policy_flags = None
         ctx.session_memory = None
+        ctx.session_recap = None
         session_id = ctx.request.metadata.get("session_id")
         if session_id:
             try:
@@ -334,6 +335,33 @@ class SymbolUPipeline:
                     except Exception:
                         # If memory update fails, continue without it (fail-safe)
                         ctx.session_memory = None
+
+                    # ================================================================
+                    # SESSION RECAP v1.0: Compute session-level recap (optional, non-invasive)
+                    # Generates deterministic multi-turn recap using SessionSummary,
+                    # SessionMemory, and SessionPolicyFlags
+                    # Does NOT modify pipeline behavior - purely additive observability
+                    # ================================================================
+                    try:
+                        # Import session recap module
+                        from symbolu.service.sessions.session_summarizer import compute_session_recap
+
+                        # Compute session summary from accumulated state
+                        session_summary = compute_session_summary(session_state)
+
+                        # Get domain from request metadata or summary
+                        recap_domain = ctx.request.metadata.get("domain", session_summary.last_domain)
+
+                        # Compute session recap (deterministic, zero-LLM)
+                        ctx.session_recap = compute_session_recap(
+                            session_summary=session_summary,
+                            session_memory=session_state.session_memory,
+                            session_policy=ctx.session_policy_flags,
+                            domain=recap_domain,
+                        )
+                    except Exception:
+                        # If session recap fails, continue without it (fail-safe)
+                        ctx.session_recap = None
             except Exception:
                 # If session policy layer fails, continue without it (fail-safe)
                 # This ensures pipeline robustness even if session tracking has issues

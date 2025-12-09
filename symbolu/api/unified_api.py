@@ -49,6 +49,7 @@ class UnifiedOutput:
         coherence: Coherence report from CoherenceObserver
         metadata: Turn number, timestamp, domain, etc.
         session_memory: Session memory v2.0 (episodic events)
+        session_recap: Session recap v1.0 (multi-turn summary)
     """
 
     text: str
@@ -62,6 +63,7 @@ class UnifiedOutput:
     coherence: Dict[str, Any]
     metadata: Dict[str, Any]
     session_memory: Dict[str, Any] = field(default_factory=dict)
+    session_recap: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -232,6 +234,11 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
     if hasattr(ctx, 'session_memory') and ctx.session_memory is not None:
         session_memory_data = ctx.session_memory.serialize()
 
+    # Extract session recap (Session Summarizer v1.0)
+    session_recap_data = {}
+    if hasattr(ctx, 'session_recap') and ctx.session_recap is not None:
+        session_recap_data = ctx.session_recap.serialize()
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -244,6 +251,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         coherence=coherence_report,
         metadata=metadata,
         session_memory=session_memory_data,
+        session_recap=session_recap_data,
     )
 
 
@@ -304,6 +312,10 @@ def get_public_response(ctx: Any) -> Dict[str, Any]:
     session_memory = unified.get('session_memory', {})
     trimmed_memory = _trim_session_memory_for_public(session_memory)
 
+    # Extract session recap (Session Summarizer v1.0) - trim to public fields
+    session_recap = unified.get('session_recap', {})
+    trimmed_recap = _trim_session_recap_for_public(session_recap)
+
     # Build public response
     return {
         'text': unified.get('text', ''),
@@ -319,6 +331,7 @@ def get_public_response(ctx: Any) -> Dict[str, Any]:
         'domain': unified.get('metadata', {}).get('domain', 'unknown'),
         'timestamp': unified.get('metadata', {}).get('timestamp', ''),
         'session_memory': trimmed_memory,
+        'session_recap': trimmed_recap,
     }
 
 
@@ -444,6 +457,60 @@ def _trim_session_memory_for_public(session_memory: Dict[str, Any]) -> Dict[str,
     return {
         'events': trimmed_events,
         'event_count': len(events),
+    }
+
+
+def _trim_session_recap_for_public(session_recap: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Trim session recap to public-safe fields.
+
+    Exposes only:
+    - overall_state
+    - net_trajectory
+    - last 1-2 turning points (breakthrough, stabilization, fragmentation)
+    - recommended_style
+
+    Never exposes raw metrics or full mapper journey.
+
+    Args:
+        session_recap: Full session recap dictionary
+
+    Returns:
+        Trimmed session recap dictionary for public API
+    """
+    if not session_recap:
+        return {}
+
+    # Extract public fields
+    overall_state = session_recap.get('overall_state')
+    net_trajectory = session_recap.get('net_trajectory')
+    recommended_style = session_recap.get('recommended_style')
+    turning_points = session_recap.get('turning_points', [])
+
+    # Filter turning points to significant types only
+    significant_types = {'breakthrough', 'stabilization', 'fragmentation'}
+    significant_turning_points = [
+        tp for tp in turning_points
+        if tp.get('event_type') in significant_types
+    ]
+
+    # Get last 1-2 significant turning points
+    recent_turning_points = significant_turning_points[-2:] if len(significant_turning_points) >= 2 else significant_turning_points
+
+    # Remove metrics from turning points for public API
+    trimmed_turning_points = []
+    for tp in recent_turning_points:
+        trimmed_turning_points.append({
+            'turn_index': tp.get('turn_index'),
+            'event_type': tp.get('event_type'),
+            'description': tp.get('description'),
+        })
+
+    return {
+        'overall_state': overall_state,
+        'net_trajectory': net_trajectory,
+        'recommended_style': recommended_style,
+        'recent_turning_points': trimmed_turning_points,
     }
 
 

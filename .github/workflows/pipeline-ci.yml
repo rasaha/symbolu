@@ -198,6 +198,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee session-memory-pytest.log
 
+      - name: Run Session Summarizer Tests
+        run: |
+          pytest symbolu/service/tests/test_session_summarizer.py \
+            --disable-warnings -q \
+            2>&1 | tee session-summarizer-pytest.log
+
       - name: Upload Coherence Reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -246,6 +252,7 @@ jobs:
             sessions-pytest.log
             session-policy-pytest.log
             session-memory-pytest.log
+            session-summarizer-pytest.log
 
       - name: Upload snapshot diffs
         if: failure()

@@ -210,22 +210,26 @@ def build_dilchat_response(
         combined_flags["session_policy_flags"] = session_policy_flags
 
     # ========================================================================
-    # STEP 5: Build badges (includes session memory badges)
+    # STEP 5: Build badges (includes session memory + session recap badges)
     # ========================================================================
     # Extract session memory for memory-based badges
     session_memory = unified_output.get("session_memory", {})
+
+    # Extract session recap for recap-based badges
+    session_recap = unified_output.get("session_recap", {})
 
     badges = _build_badges(
         stability_status=stability_status,
         policy_flags=combined_flags,
         coherence_score=coherence_score,
         session_memory=session_memory,
+        session_recap=session_recap,
     )
 
     # ========================================================================
-    # STEP 6: Build hints (includes session memory hints)
+    # STEP 6: Build hints (includes session memory + session recap hints)
     # ========================================================================
-    hints = _build_hints(combined_flags, session_memory)
+    hints = _build_hints(combined_flags, session_memory, session_recap)
 
     # ========================================================================
     # STEP 7: Assemble DILchatResponse
@@ -290,6 +294,7 @@ def _build_badges(
     policy_flags: Dict[str, Any],
     coherence_score: Optional[float],
     session_memory: Optional[Dict[str, Any]] = None,
+    session_recap: Optional[Dict[str, Any]] = None,
 ) -> List[DILchatBadge]:
     """
     Build UI badges based on stability status and policy flags.
@@ -304,12 +309,16 @@ def _build_badges(
         7. Session Deep Reflection Allowed Badge (if session_allow_deep_reflection=True)
         8. Memory Breakthrough Badge (if recent breakthrough event)
         9. Memory Fragmentation Badge (if recent fragmentation event)
+        10. Session Recap Fragmented Badge (if recap.overall_state == "fragmented")
+        11. Session Recap Recovering Badge (if recap.overall_state == "recovering")
+        12. Session Recap Breakthrough Badge (if "breakthrough_detected" in recap.key_patterns)
 
     Args:
         stability_status: Stability classification from policy engine
         policy_flags: Policy flags dictionary (includes session_policy_flags if available)
         coherence_score: Coherence score (0-1)
         session_memory: Session memory dictionary with events
+        session_recap: Session recap dictionary with multi-turn summary
 
     Returns:
         List of DILchatBadge objects
@@ -424,6 +433,37 @@ def _build_badges(
                 description="Conversation stability momentarily broke. Consider grounding."
             ))
 
+    # ========================================================================
+    # SESSION RECAP v1.0 BADGES (from session summarizer)
+    # ========================================================================
+    if session_recap:
+        overall_state = session_recap.get("overall_state")
+        key_patterns = session_recap.get("key_patterns", [])
+
+        # BADGE 10: Session Recap Fragmented
+        if overall_state == "fragmented":
+            badges.append(DILchatBadge(
+                label="SESSION_FRAGMENTED",
+                level="warning",
+                description="Multi-turn session is in fragmented state. Consider grounding."
+            ))
+
+        # BADGE 11: Session Recap Recovering
+        if overall_state == "recovering":
+            badges.append(DILchatBadge(
+                label="SESSION_RECOVERING",
+                level="info",
+                description="Multi-turn session is recovering. Coherence improving."
+            ))
+
+        # BADGE 12: Session Recap Breakthrough
+        if "breakthrough_detected" in key_patterns:
+            badges.append(DILchatBadge(
+                label="BREAKTHROUGH",
+                level="info",
+                description="Session breakthrough detected. Notable clarity shift."
+            ))
+
     return badges
 
 
@@ -434,7 +474,8 @@ def _build_badges(
 
 def _build_hints(
     policy_flags: Dict[str, Any],
-    session_memory: Optional[Dict[str, Any]] = None
+    session_memory: Optional[Dict[str, Any]] = None,
+    session_recap: Optional[Dict[str, Any]] = None
 ) -> List[DILchatHint]:
     """
     Build UI hints based on policy flags.
@@ -450,10 +491,14 @@ def _build_hints(
         8. EXPLORATION_OK - if session_recommended_style="exploratory"
         9. STATE_CHANGED - if recent mapper flip
         10. SESSION_RECOVERING - if recent stabilization
+        11. RECAP_GROUNDING_MODE - if recap.recommended_style="grounded"
+        12. RECAP_REFLECTION_MODE - if recap.recommended_style="reflective"
+        13. RECAP_EXPLORATION_OK - if recap.recommended_style="exploratory"
 
     Args:
         policy_flags: Policy flags dictionary (includes session_policy_flags if available)
         session_memory: Session memory dictionary with events
+        session_recap: Session recap dictionary with multi-turn summary
 
     Returns:
         List of DILchatHint objects
@@ -553,6 +598,33 @@ def _build_hints(
             hints.append(DILchatHint(
                 code="SESSION_RECOVERING",
                 message="Conversation trajectory is stabilizing. Coherence is improving."
+            ))
+
+    # ========================================================================
+    # SESSION RECAP v1.0 HINTS (from session summarizer)
+    # ========================================================================
+    if session_recap:
+        recommended_style = session_recap.get("recommended_style")
+
+        # HINT 11: RECAP_GROUNDING_MODE
+        if recommended_style == "grounded":
+            hints.append(DILchatHint(
+                code="GROUNDING_MODE",
+                message="Session recap recommends grounding mode. Use concrete, practical responses."
+            ))
+
+        # HINT 12: RECAP_REFLECTION_MODE
+        elif recommended_style == "reflective":
+            hints.append(DILchatHint(
+                code="REFLECTION_MODE",
+                message="Session recap recommends reflective mode. Deep exploration is safe."
+            ))
+
+        # HINT 13: RECAP_EXPLORATION_OK
+        elif recommended_style == "exploratory":
+            hints.append(DILchatHint(
+                code="EXPLORATION_OK",
+                message="Session recap supports exploration. Curious, open-ended responses work well."
             ))
 
     return hints
