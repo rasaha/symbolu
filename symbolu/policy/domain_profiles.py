@@ -36,6 +36,7 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "prefer_mappers": ["LCM", "HRM"],
         "allow_lam": False,
         "style": "precise",
+        "use_coherence_v2": False,  # Phase 4: Stay ultra-conservative, use v1 only
     },
     "therapy": {
         "min_coherence": 0.45,
@@ -44,6 +45,7 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "prefer_mappers": ["HRM", "LAM"],
         "allow_lam": True,
         "style": "reflective",
+        "use_coherence_v2": True,  # Phase 4: Enable formula-aware coherence
     },
     "identity": {
         "min_coherence": 0.50,
@@ -52,6 +54,7 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "prefer_mappers": ["LAM", "HRM"],
         "allow_lam": True,
         "style": "exploratory",
+        "use_coherence_v2": True,  # Phase 4: Enable formula-aware coherence
     },
     "generic": {
         "min_coherence": 0.40,
@@ -60,6 +63,7 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "prefer_mappers": ["HRM"],
         "allow_lam": False,
         "style": "neutral",
+        "use_coherence_v2": False,  # Phase 4: Stay conservative, use v1 by default
     },
 }
 

@@ -58,6 +58,8 @@ class CoherenceObservation:
     tension_index: Optional[float] = None
     arc_alignment_index: Optional[float] = None
 
+    # Phase 4: Formula-aware coherence v2 (observation only)
+    coherence_score_v2: Optional[float] = None
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -196,6 +198,11 @@ class CoherenceObserver:
             resonance_index = getattr(coherence_state, 'resonance_index', None)
             tension_index = getattr(coherence_state, 'tension_index', None)
             arc_alignment_index = getattr(coherence_state, 'arc_alignment_index', None)
+        # Phase 4: Extract coherence v2 from coherence_state
+        coherence_score_v2 = None
+
+        if coherence_state is not None:
+            coherence_score_v2 = getattr(coherence_state, 'coherence_score_v2', None)
 
         # Create observation
         observation = CoherenceObservation(
@@ -228,6 +235,7 @@ class CoherenceObserver:
             resonance_index=resonance_index,
             tension_index=tension_index,
             arc_alignment_index=arc_alignment_index,
+            coherence_score_v2=coherence_score_v2,
         )
 
         # Store observation

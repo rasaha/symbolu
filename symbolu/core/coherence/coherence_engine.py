@@ -108,6 +108,9 @@ class CoherenceEngine:
         # Update Phase 3 derived formula metrics (observation only)
         self._update_derived_formula_metrics(state)
 
+        # Update Phase 4 coherence v2 (formula-aware, observation only)
+        state.coherence_score_v2 = self._compute_coherence_score_v2(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -371,3 +374,62 @@ class CoherenceEngine:
             0.0,
             1.0,
         )
+
+    def _compute_coherence_score_v2(self, state: CoherenceState) -> Optional[float]:
+        """
+        Compute Phase 4 formula-aware coherence score v2.
+
+        This is the formula-aware coherence score that incorporates Phase 1 + Phase 3
+        formula signals (SMI, ΔSMI, Bhava Gap, Tension Corridor, Resonance Index,
+        Tension Index, Arc Alignment Index).
+
+        Formula:
+            coherence_score_v2 = clamp(
+                0.55 * base +
+                0.20 * resonance_index +
+                0.15 * arc_alignment_index +
+                0.10 * (1.0 - tension_index),
+                0.0,
+                1.0
+            )
+
+        Where:
+            - base = coherence_score (v1 canonical)
+            - resonance_index = Phase 3 stabilizing signal
+            - arc_alignment_index = Phase 3 temporal pattern alignment
+            - tension_index = Phase 3 session tension
+            - tension_penalty = 1.0 - tension_index (high tension → low penalty)
+
+        Returns:
+            Optional[float]: v2 coherence score (0.0-1.0), or None if required
+                           derived metrics are not available
+
+        Note:
+            This score is NOT used in existing pipeline behavior unless explicitly
+            enabled via domain profile feature flags (Phase 4 policy integration).
+        """
+        # Get required inputs
+        base = state.coherence_score  # v1 canonical
+        res = state.resonance_index
+        ten = state.tension_index
+        arc = state.arc_alignment_index
+
+        # If any required derived metric is missing, return None
+        if res is None or ten is None or arc is None:
+            return None
+
+        # Helper: clamp function (reuse from Phase 3)
+        def clamp(value: float, min_val: float, max_val: float) -> float:
+            return max(min_val, min(max_val, value))
+
+        # Normalize tension: higher tension_index → lower coherence
+        tension_penalty = 1.0 - ten
+
+        # Compute v2 score with canonical Phase 4 formula
+        coherence_score_v2 = clamp(
+            0.55 * base + 0.20 * res + 0.15 * arc + 0.10 * tension_penalty,
+            0.0,
+            1.0,
+        )
+
+        return coherence_score_v2
