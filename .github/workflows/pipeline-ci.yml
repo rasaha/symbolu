@@ -99,6 +99,19 @@ jobs:
           name: delta-report
           path: symbolu/mechanical/pipeline/tests_delta/delta_report.json
 
+      - name: Run Temporal Persona Drift Tests
+        run: |
+          pytest symbolu/mechanical/pipeline/tests_persona_temporal/test_temporal_persona_drift.py \
+            --disable-warnings -q \
+            2>&1 | tee persona-drift-pytest.log
+
+      - name: Upload Temporal Persona Drift Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: persona-temporal-drift-report
+          path: symbolu/mechanical/pipeline/tests_persona_temporal/persona_temporal_drift_report.json
+
       - name: Upload pipeline CI snapshots
         uses: actions/upload-artifact@v4
         with:
@@ -113,6 +126,7 @@ jobs:
             pipeline-multiturn-snapshot-pytest.log
             temporal-pipeline-snapshot-pytest.log
             delta-snapshot-pytest.log
+            persona-drift-pytest.log
 
       - name: Upload snapshot diffs
         if: failure()
@@ -127,6 +141,8 @@ jobs:
             symbolu/mechanical/pipeline/tests_pipeline_temporal/*.diff
             symbolu/mechanical/pipeline/tests_delta/*.diff
             symbolu/mechanical/pipeline/tests_delta/delta_report.json
+            symbolu/mechanical/pipeline/tests_persona_temporal/*.diff
+            symbolu/mechanical/pipeline/tests_persona_temporal/persona_temporal_drift_report.json
 
       - name: Upload Temporal Snapshot Diffs
         if: failure()
