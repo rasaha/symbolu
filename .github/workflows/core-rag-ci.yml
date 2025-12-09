@@ -1,0 +1,74 @@
+name: Core & RAG CI
+
+on:
+  push:
+    branches: ["main", "master"]
+    paths:
+      - "core/**"
+      - "rag/**"
+      - "mechanical/pipeline/integration_tests/test_core_rag_integration.py"
+      - ".github/workflows/core-rag-ci.yml"
+  pull_request:
+    branches: ["main", "master"]
+    paths:
+      - "core/**"
+      - "rag/**"
+      - "mechanical/pipeline/integration_tests/test_core_rag_integration.py"
+      - ".github/workflows/core-rag-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  core-rag-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pytest-cov coverage pydantic
+
+      - name: Run Core & RAG tests with coverage
+        run: |
+          pytest \
+            core/tests \
+            rag/tests \
+            mechanical/pipeline/integration_tests/test_core_rag_integration.py \
+            --cov=core --cov=rag \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-fail-under=85 \
+            --disable-warnings --maxfail=1 -q \
+            2>&1 | tee core-rag-pytest.log
+
+      - name: Upload Core & RAG test logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-rag-test-logs
+          path: core-rag-pytest.log
+
+      - name: Upload Core & RAG coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-rag-coverage-report
+          path: |
+            coverage.xml
+            htmlcov/
