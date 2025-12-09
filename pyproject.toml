@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "symbolu"
+version = "0.1.0"
+description = "Symbol-U / Soulpi AGI deterministic engine"
+authors = [
+    { name = "Rakesh Mohan" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+
+# All the package folders we want setuptools to treat as modules
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "symbolu*",      # if future top-level is created
+    "core*",
+    "mechanical*",
+    "rag*",
+    "renderer*",
+    "temporal*",
+]
