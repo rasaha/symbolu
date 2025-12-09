@@ -102,6 +102,9 @@ from symbolu.policy import compute_policy_flags
 # Session Policy Layer (Session-Level Coherence Influencers)
 from symbolu.policy.session_policy import compute_session_policy_flags
 
+# Intent Arc Engine (Multi-Turn Trajectory Classification)
+from symbolu.intent.intent_arc_engine import compute_intent_arc
+
 # DILchat Adapter (Presentation Layer for DILchat Integration)
 from symbolu.adapter import build_dilchat_payload
 
@@ -300,6 +303,7 @@ class SymbolUPipeline:
         ctx.session_policy_flags = None
         ctx.session_memory = None
         ctx.session_recap = None
+        ctx.intent_arc = None
         session_id = ctx.request.metadata.get("session_id")
         if session_id:
             try:
@@ -362,6 +366,28 @@ class SymbolUPipeline:
                     except Exception:
                         # If session recap fails, continue without it (fail-safe)
                         ctx.session_recap = None
+
+                    # ================================================================
+                    # INTENT ARC ENGINE v1.0: Compute intent arc classification (optional, non-invasive)
+                    # Deterministic multi-turn trajectory classification based on:
+                    # - SessionSummary metrics (coherence, temporal arc, mapper volatility)
+                    # - SessionMemory events (breakthrough, fragmentation, stabilization)
+                    # - SessionRecap trajectory analysis (net_trajectory, overall_state)
+                    # - SessionPolicyFlags style recommendations
+                    # Does NOT modify pipeline behavior - purely additive observability
+                    # ================================================================
+                    try:
+                        # Compute intent arc if we have session components
+                        if session_summary:
+                            ctx.intent_arc = compute_intent_arc(
+                                session_summary=session_summary,
+                                session_memory=session_state.session_memory,
+                                session_policy=ctx.session_policy_flags,
+                                session_recap=ctx.session_recap,
+                            )
+                    except Exception:
+                        # If intent arc computation fails, continue without it (fail-safe)
+                        ctx.intent_arc = None
             except Exception:
                 # If session policy layer fails, continue without it (fail-safe)
                 # This ensures pipeline robustness even if session tracking has issues

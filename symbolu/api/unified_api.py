@@ -50,6 +50,7 @@ class UnifiedOutput:
         metadata: Turn number, timestamp, domain, etc.
         session_memory: Session memory v2.0 (episodic events)
         session_recap: Session recap v1.0 (multi-turn summary)
+        intent_arc: Intent Arc Engine v1.0 (trajectory classification)
     """
 
     text: str
@@ -64,6 +65,7 @@ class UnifiedOutput:
     metadata: Dict[str, Any]
     session_memory: Dict[str, Any] = field(default_factory=dict)
     session_recap: Dict[str, Any] = field(default_factory=dict)
+    intent_arc: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -239,6 +241,11 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
     if hasattr(ctx, 'session_recap') and ctx.session_recap is not None:
         session_recap_data = ctx.session_recap.serialize()
 
+    # Extract intent arc (Intent Arc Engine v1.0)
+    intent_arc_data = {}
+    if hasattr(ctx, 'intent_arc') and ctx.intent_arc is not None:
+        intent_arc_data = ctx.intent_arc.serialize()
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -252,6 +259,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         metadata=metadata,
         session_memory=session_memory_data,
         session_recap=session_recap_data,
+        intent_arc=intent_arc_data,
     )
 
 

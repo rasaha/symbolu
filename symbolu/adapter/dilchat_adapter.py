@@ -210,7 +210,7 @@ def build_dilchat_response(
         combined_flags["session_policy_flags"] = session_policy_flags
 
     # ========================================================================
-    # STEP 5: Build badges (includes session memory + session recap badges)
+    # STEP 5: Build badges (includes session memory + session recap + intent arc badges)
     # ========================================================================
     # Extract session memory for memory-based badges
     session_memory = unified_output.get("session_memory", {})
@@ -218,18 +218,22 @@ def build_dilchat_response(
     # Extract session recap for recap-based badges
     session_recap = unified_output.get("session_recap", {})
 
+    # Extract intent arc for arc-based badges
+    intent_arc = unified_output.get("intent_arc", {})
+
     badges = _build_badges(
         stability_status=stability_status,
         policy_flags=combined_flags,
         coherence_score=coherence_score,
         session_memory=session_memory,
         session_recap=session_recap,
+        intent_arc=intent_arc,
     )
 
     # ========================================================================
-    # STEP 6: Build hints (includes session memory + session recap hints)
+    # STEP 6: Build hints (includes session memory + session recap + intent arc hints)
     # ========================================================================
-    hints = _build_hints(combined_flags, session_memory, session_recap)
+    hints = _build_hints(combined_flags, session_memory, session_recap, intent_arc)
 
     # ========================================================================
     # STEP 7: Assemble DILchatResponse
@@ -295,6 +299,7 @@ def _build_badges(
     coherence_score: Optional[float],
     session_memory: Optional[Dict[str, Any]] = None,
     session_recap: Optional[Dict[str, Any]] = None,
+    intent_arc: Optional[Dict[str, Any]] = None,
 ) -> List[DILchatBadge]:
     """
     Build UI badges based on stability status and policy flags.
@@ -464,6 +469,62 @@ def _build_badges(
                 description="Session breakthrough detected. Notable clarity shift."
             ))
 
+    # ========================================================================
+    # INTENT ARC ENGINE v1.0 BADGES (from intent arc classification)
+    # ========================================================================
+    if intent_arc:
+        arc_type = intent_arc.get("arc_type")
+
+        # Add arc-specific badges
+        if arc_type == "insight_arc":
+            badges.append(DILchatBadge(
+                label="INSIGHT",
+                level="info",
+                description="Insight arc detected. Breakthrough moments with strong upward trajectory."
+            ))
+        elif arc_type == "stabilization_arc":
+            badges.append(DILchatBadge(
+                label="STABILIZING",
+                level="info",
+                description="Stabilization arc detected. Coherence rising with low volatility."
+            ))
+        elif arc_type == "identity_arc":
+            badges.append(DILchatBadge(
+                label="IDENTITY_EXPLORATION",
+                level="info",
+                description="Identity arc detected. LAM-driven self-exploration in progress."
+            ))
+        elif arc_type == "resolution_arc":
+            badges.append(DILchatBadge(
+                label="RECOVERY_PATH",
+                level="info",
+                description="Resolution arc detected. Recovering from fragmentation through stabilization."
+            ))
+        elif arc_type == "chaotic_arc":
+            badges.append(DILchatBadge(
+                label="UNSTABLE_PATTERN",
+                level="warning",
+                description="Chaotic arc detected. High volatility with unstable coherence patterns."
+            ))
+        elif arc_type == "dissonance_arc":
+            badges.append(DILchatBadge(
+                label="DISSONANCE",
+                level="warning",
+                description="Dissonance arc detected. High persona drift with oscillating trajectory."
+            ))
+        elif arc_type == "expansion_arc":
+            badges.append(DILchatBadge(
+                label="EXPANSION",
+                level="info",
+                description="Expansion arc detected. HRM+LAM synergy with expanding context."
+            ))
+        elif arc_type == "avoidance_arc":
+            badges.append(DILchatBadge(
+                label="AVOIDANCE",
+                level="warning",
+                description="Avoidance arc detected. Flat coherence with minimal progression."
+            ))
+
     return badges
 
 
@@ -475,7 +536,8 @@ def _build_badges(
 def _build_hints(
     policy_flags: Dict[str, Any],
     session_memory: Optional[Dict[str, Any]] = None,
-    session_recap: Optional[Dict[str, Any]] = None
+    session_recap: Optional[Dict[str, Any]] = None,
+    intent_arc: Optional[Dict[str, Any]] = None
 ) -> List[DILchatHint]:
     """
     Build UI hints based on policy flags.
@@ -625,6 +687,34 @@ def _build_hints(
             hints.append(DILchatHint(
                 code="EXPLORATION_OK",
                 message="Session recap supports exploration. Curious, open-ended responses work well."
+            ))
+
+    # ========================================================================
+    # INTENT ARC ENGINE v1.0 HINTS (from intent arc classification)
+    # ========================================================================
+    if intent_arc:
+        arc_type = intent_arc.get("arc_type")
+
+        # Add arc-specific hints
+        if arc_type in ["insight_arc", "identity_arc"]:
+            hints.append(DILchatHint(
+                code="PROMOTE_REFLECTION",
+                message="Intent arc suggests reflective mode. Deep exploration and identity themes are safe."
+            ))
+        elif arc_type in ["chaotic_arc", "dissonance_arc"]:
+            hints.append(DILchatHint(
+                code="PROMOTE_GROUNDING",
+                message="Intent arc suggests grounding mode. Use concrete, stabilizing responses."
+            ))
+        elif arc_type == "stabilization_arc":
+            hints.append(DILchatHint(
+                code="ENCOURAGE_STABILITY",
+                message="Intent arc shows stabilization. Continue current approach to maintain coherence."
+            ))
+        elif arc_type == "expansion_arc":
+            hints.append(DILchatHint(
+                code="EXPLORATION_OK",
+                message="Intent arc shows expansion. Complex, multi-layered exploration is appropriate."
             ))
 
     return hints
