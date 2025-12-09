@@ -18,6 +18,7 @@ on:
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
       - "symbolu/intent/**"
+      - "symbolu/identity/**"
       - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   pull_request:
@@ -37,6 +38,7 @@ on:
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
       - "symbolu/intent/**"
+      - "symbolu/identity/**"
       - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   workflow_dispatch:
@@ -212,6 +214,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee intent-arc-pytest.log
 
+      - name: Run Identity Signature Tests
+        run: |
+          pytest symbolu/identity/tests/test_identity_signature_engine.py \
+            --disable-warnings -q \
+            2>&1 | tee identity-signature-pytest.log
+
       - name: Upload Coherence Reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -262,6 +270,7 @@ jobs:
             session-memory-pytest.log
             session-summarizer-pytest.log
             intent-arc-pytest.log
+            identity-signature-pytest.log
 
       - name: Upload snapshot diffs
         if: failure()

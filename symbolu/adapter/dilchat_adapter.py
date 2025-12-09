@@ -221,6 +221,9 @@ def build_dilchat_response(
     # Extract intent arc for arc-based badges
     intent_arc = unified_output.get("intent_arc", {})
 
+    # Extract identity signature for identity-based badges
+    identity_signature = unified_output.get("identity_signature", {})
+
     badges = _build_badges(
         stability_status=stability_status,
         policy_flags=combined_flags,
@@ -228,12 +231,13 @@ def build_dilchat_response(
         session_memory=session_memory,
         session_recap=session_recap,
         intent_arc=intent_arc,
+        identity_signature=identity_signature,
     )
 
     # ========================================================================
-    # STEP 6: Build hints (includes session memory + session recap + intent arc hints)
+    # STEP 6: Build hints (includes session memory + session recap + intent arc + identity signature hints)
     # ========================================================================
-    hints = _build_hints(combined_flags, session_memory, session_recap, intent_arc)
+    hints = _build_hints(combined_flags, session_memory, session_recap, intent_arc, identity_signature)
 
     # ========================================================================
     # STEP 7: Assemble DILchatResponse
@@ -300,6 +304,7 @@ def _build_badges(
     session_memory: Optional[Dict[str, Any]] = None,
     session_recap: Optional[Dict[str, Any]] = None,
     intent_arc: Optional[Dict[str, Any]] = None,
+    identity_signature: Optional[Dict[str, Any]] = None,
 ) -> List[DILchatBadge]:
     """
     Build UI badges based on stability status and policy flags.
@@ -317,6 +322,8 @@ def _build_badges(
         10. Session Recap Fragmented Badge (if recap.overall_state == "fragmented")
         11. Session Recap Recovering Badge (if recap.overall_state == "recovering")
         12. Session Recap Breakthrough Badge (if "breakthrough_detected" in recap.key_patterns)
+        13. Intent Arc Badges (insight, stabilization, identity exploration, etc.)
+        14. Identity Signature Badges (self_stable, self_expanding, self_fragmented, etc.)
 
     Args:
         stability_status: Stability classification from policy engine
@@ -324,6 +331,8 @@ def _build_badges(
         coherence_score: Coherence score (0-1)
         session_memory: Session memory dictionary with events
         session_recap: Session recap dictionary with multi-turn summary
+        intent_arc: Intent arc dictionary with arc classification
+        identity_signature: Identity signature dictionary with signature classification
 
     Returns:
         List of DILchatBadge objects
@@ -525,6 +534,56 @@ def _build_badges(
                 description="Avoidance arc detected. Flat coherence with minimal progression."
             ))
 
+    # ========================================================================
+    # IDENTITY SIGNATURE ENGINE v1.0 BADGES (from identity signature classification)
+    # ========================================================================
+    if identity_signature:
+        signature_type = identity_signature.get("signature_type")
+
+        # Add signature-specific badges
+        if signature_type == "self_anchoring":
+            badges.append(DILchatBadge(
+                label="SELF_STABLE",
+                level="info",
+                description="Self-anchoring signature. Coherence rising with low persona drift."
+            ))
+        elif signature_type == "self_expansion":
+            badges.append(DILchatBadge(
+                label="SELF_EXPANDING",
+                level="info",
+                description="Self-expansion signature. LAM-driven identity exploration with high temporal arc."
+            ))
+        elif signature_type == "self_fragmentation":
+            badges.append(DILchatBadge(
+                label="SELF_FRAGMENTED",
+                level="warning",
+                description="Self-fragmentation signature. High persona drift with identity instability."
+            ))
+        elif signature_type == "self_suppression":
+            badges.append(DILchatBadge(
+                label="SELF_SUPPRESSED",
+                level="warning",
+                description="Self-suppression signature. Flat coherence with identity avoidance patterns."
+            ))
+        elif signature_type == "self_integration":
+            badges.append(DILchatBadge(
+                label="SELF_INTEGRATED",
+                level="info",
+                description="Self-integration signature. Breakthrough + stabilization with HRM+LAM synergy."
+            ))
+        elif signature_type == "self_dissonance":
+            badges.append(DILchatBadge(
+                label="SELF_DISSONANT",
+                level="warning",
+                description="Self-dissonance signature. Internal identity conflict with high volatility."
+            ))
+        elif signature_type == "self_discovery":
+            badges.append(DILchatBadge(
+                label="SELF_DISCOVERY",
+                level="info",
+                description="Self-discovery signature. Identity breakthrough with improving trajectory."
+            ))
+
     return badges
 
 
@@ -537,7 +596,8 @@ def _build_hints(
     policy_flags: Dict[str, Any],
     session_memory: Optional[Dict[str, Any]] = None,
     session_recap: Optional[Dict[str, Any]] = None,
-    intent_arc: Optional[Dict[str, Any]] = None
+    intent_arc: Optional[Dict[str, Any]] = None,
+    identity_signature: Optional[Dict[str, Any]] = None
 ) -> List[DILchatHint]:
     """
     Build UI hints based on policy flags.
@@ -556,11 +616,14 @@ def _build_hints(
         11. RECAP_GROUNDING_MODE - if recap.recommended_style="grounded"
         12. RECAP_REFLECTION_MODE - if recap.recommended_style="reflective"
         13. RECAP_EXPLORATION_OK - if recap.recommended_style="exploratory"
+        14. Identity Signature Hints (explore_identity, stabilize_identity, etc.)
 
     Args:
         policy_flags: Policy flags dictionary (includes session_policy_flags if available)
         session_memory: Session memory dictionary with events
         session_recap: Session recap dictionary with multi-turn summary
+        intent_arc: Intent arc dictionary with arc classification
+        identity_signature: Identity signature dictionary with signature classification
 
     Returns:
         List of DILchatHint objects
@@ -715,6 +778,49 @@ def _build_hints(
             hints.append(DILchatHint(
                 code="EXPLORATION_OK",
                 message="Intent arc shows expansion. Complex, multi-layered exploration is appropriate."
+            ))
+
+    # ========================================================================
+    # IDENTITY SIGNATURE ENGINE v1.0 HINTS (from identity signature classification)
+    # ========================================================================
+    if identity_signature:
+        signature_type = identity_signature.get("signature_type")
+
+        # Add signature-specific hints
+        if signature_type == "self_anchoring":
+            hints.append(DILchatHint(
+                code="MAINTAIN_STABILITY",
+                message="Identity signature is self-anchoring. Continue current approach to maintain stability."
+            ))
+        elif signature_type == "self_expansion":
+            hints.append(DILchatHint(
+                code="EXPLORE_IDENTITY",
+                message="Identity signature is self-expanding. Support identity exploration and LAM-driven themes."
+            ))
+        elif signature_type == "self_fragmentation":
+            hints.append(DILchatHint(
+                code="STABILIZE_IDENTITY",
+                message="Identity signature is self-fragmenting. Use grounding responses to stabilize identity coherence."
+            ))
+        elif signature_type == "self_suppression":
+            hints.append(DILchatHint(
+                code="GROUNDSELF",
+                message="Identity signature is self-suppressing. Avoid deep identity exploration, use concrete grounding."
+            ))
+        elif signature_type == "self_integration":
+            hints.append(DILchatHint(
+                code="SUPPORT_INTEGRATION",
+                message="Identity signature is self-integrating. Support integration process with balanced responses."
+            ))
+        elif signature_type == "self_dissonance":
+            hints.append(DILchatHint(
+                code="ADDRESS_DISSONANCE",
+                message="Identity signature is self-dissonant. Address internal conflicts with empathetic responses."
+            ))
+        elif signature_type == "self_discovery":
+            hints.append(DILchatHint(
+                code="REFLECT_IDENTITY",
+                message="Identity signature is self-discovery. Support identity breakthroughs with reflective responses."
             ))
 
     return hints
