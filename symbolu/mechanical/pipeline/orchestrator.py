@@ -4,15 +4,17 @@ Symbol-U Pipeline Orchestrator (v3.0 - Linear Pipeline with Option C Router)
 Main orchestration layer that coordinates all engines in a clean sequential flow.
 
 Pipeline Sequence:
-    1. Persona  -> Resolve communicative identity (Bhava awareness)
-    2. MLCR     -> Multi-Layer Consciousness Routing (query understanding)
+    1. MLCR     -> Multi-Layer Consciousness Routing (query understanding)
+    1.5 HRM     -> High-Resolution Mapper (conditional, when use_hrm=True)
+    2. Persona  -> Resolve communicative identity (Bhava awareness)
     3. Fusion   -> Blend HRM/LCM/MoE channels (Kosha integration)
     4. DHA      -> Delivery Harmonization & Adaptation (tone/readiness)
     5. Renderer -> Final output surface generation
 
 Symbol-U AGI Architecture Mapping:
-    - Persona: The voice/identity layer (WHO speaks)
     - MLCR: Consciousness routing layer (WHY/HOW routing)
+    - HRM: High-Resolution Mapper (deep cognitive mapping when activated)
+    - Persona: The voice/identity layer (WHO speaks)
     - Fusion: Multi-channel blending (WHAT to say - HRM symbolic, LCM semantic, MoE domain)
     - DHA: Delivery layer (HOW to say it - readiness, resistance, adaptation)
     - Renderer: Surface layer (formatted output for user consumption)
@@ -74,6 +76,9 @@ from symbolu.mechanical.fusion.schemas.fusion_result import FusionContext
 
 # DHA Engine
 from symbolu.mechanical.dha.dha_engine import DHAEngine
+
+# HRM Integration (High-Resolution Mapper)
+from .hrm_integration import maybe_run_hrm
 
 # Renderer Components
 from symbolu.mechanical.renderer.fusion_renderer import (
@@ -188,6 +193,13 @@ class SymbolUPipeline:
         # ================================================================
         ctx = self._run_mlcr(ctx)
         ensure_mlcr(ctx)
+
+        # ================================================================
+        # STAGE 1.5: HRM - High-Resolution Mapper (conditional)
+        # Runs only when use_hrm=True in activation plan
+        # Produces high-resolution cognitive map for Fusion/DHA
+        # ================================================================
+        ctx.hrm_map = maybe_run_hrm(ctx)
 
         # ================================================================
         # STAGE 2: PERSONA - Resolve Communicative Identity
