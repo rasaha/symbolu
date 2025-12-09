@@ -338,6 +338,57 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
                 active_set.add("LAM")
             mapper_sets.append(active_set)
 
+    # Phase 2: Extract formula aggregates from coherence history
+    avg_smi = None
+    net_delta_smi = None
+    avg_bhava_gap = None
+    avg_tension_corridor = None
+
+    if state.coherence_history:
+        # Extract SMI values for averaging
+        smi_values = []
+        delta_smi_values = []
+        bhava_gap_values = []
+        tension_corridor_values = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract avg_smi if available (from CoherenceState aggregates)
+                if "avg_smi" in coh and coh["avg_smi"] is not None:
+                    smi_values.append(coh["avg_smi"])
+
+                # Extract delta_smi for net calculation
+                # Look for delta_smi_history in coherence state
+                if "delta_smi_history" in coh:
+                    delta_history = coh["delta_smi_history"]
+                    if isinstance(delta_history, list):
+                        delta_smi_values.extend([d for d in delta_history if d is not None])
+
+                # Extract bhava_gap_history
+                if "bhava_gap_history" in coh:
+                    gap_history = coh["bhava_gap_history"]
+                    if isinstance(gap_history, list):
+                        bhava_gap_values.extend([g for g in gap_history if g is not None])
+
+                # Extract tension_corridor_history
+                if "tension_corridor_history" in coh:
+                    corridor_history = coh["tension_corridor_history"]
+                    if isinstance(corridor_history, list):
+                        tension_corridor_values.extend([tc for tc in corridor_history if tc is not None])
+
+        # Compute aggregates
+        if smi_values:
+            avg_smi = sum(smi_values) / len(smi_values)
+
+        if delta_smi_values:
+            net_delta_smi = sum(delta_smi_values)
+
+        if bhava_gap_values:
+            avg_bhava_gap = sum(bhava_gap_values) / len(bhava_gap_values)
+
+        if tension_corridor_values:
+            avg_tension_corridor = sum(tension_corridor_values) / len(tension_corridor_values)
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -352,4 +403,8 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         coherence_timeline=coherence_timeline,
         temporal_arc_timeline=temporal_arc_timeline,
         mapper_sets=mapper_sets,
+        avg_smi=avg_smi,
+        net_delta_smi=net_delta_smi,
+        avg_bhava_gap=avg_bhava_gap,
+        avg_tension_corridor=avg_tension_corridor,
     )

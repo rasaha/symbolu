@@ -102,6 +102,9 @@ class CoherenceEngine:
         state.temporal_arc_score = self._compute_temporal_arc(state)
         state.coherence_score = self._compute_overall_coherence(state)
 
+        # Update Phase 2 formula aggregates (observation only)
+        self._update_formula_aggregates(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -262,3 +265,36 @@ class CoherenceEngine:
         )
 
         return max(0.0, min(1.0, coherence))
+
+    def _update_formula_aggregates(self, state: CoherenceState) -> None:
+        """
+        Update Phase 2 formula aggregates (observation only).
+
+        This method computes aggregate statistics from formula histories:
+        - avg_smi, max_smi, min_smi from smi_history
+        - avg_tension_corridor, max_tension_corridor from tension_corridor_history
+
+        These aggregates are for observability only and do NOT affect scoring.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        # Compute SMI aggregates
+        valid_smis = [s for s in state.smi_history if s is not None]
+        if valid_smis:
+            state.avg_smi = sum(valid_smis) / len(valid_smis)
+            state.max_smi = max(valid_smis)
+            state.min_smi = min(valid_smis)
+        else:
+            state.avg_smi = None
+            state.max_smi = None
+            state.min_smi = None
+
+        # Compute tension corridor aggregates
+        valid_corridors = [tc for tc in state.tension_corridor_history if tc is not None]
+        if valid_corridors:
+            state.avg_tension_corridor = sum(valid_corridors) / len(valid_corridors)
+            state.max_tension_corridor = max(valid_corridors)
+        else:
+            state.avg_tension_corridor = None
+            state.max_tension_corridor = None

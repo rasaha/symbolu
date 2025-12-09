@@ -122,3 +122,9 @@ class SessionSummary:
     def last_mapper_set(self) -> Set[str]:
         """Get the most recent mapper set."""
         return self.mapper_sets[-1] if self.mapper_sets else set()
+
+    # Phase 2 formula aggregates (observation only)
+    avg_smi: Optional[float] = None  # Average SMI across session
+    net_delta_smi: Optional[float] = None  # Net ΔSMI (cumulative change)
+    avg_bhava_gap: Optional[float] = None  # Average bhava gap
+    avg_tension_corridor: Optional[float] = None  # Average tension corridor

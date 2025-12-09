@@ -39,9 +39,9 @@ class TemporalEntry:
 
 
 @dataclass
-class TemporalState:
+class TemporalFormulaSnapshot:
     """
-    Computed temporal state including Phase 1 resonance formulas.
+    Per-turn snapshot of Phase 1 temporal formula values.
 
     This dataclass holds the computed values from the four foundational
     temporal formulas introduced in Symbol-U v3.0 Phase 1.
@@ -57,6 +57,51 @@ class TemporalState:
     delta_smi: Optional[float] = None
     bhava_gap: Optional[float] = None
     tension_corridor: Optional[float] = None
+
+    def to_dict(self) -> Dict[str, Optional[float]]:
+        """Convert snapshot to JSON-safe dictionary."""
+        return {
+            "smi": self.smi,
+            "delta_smi": self.delta_smi,
+            "bhava_gap": self.bhava_gap,
+            "tension_corridor": self.tension_corridor,
+        }
+
+
+@dataclass
+class TemporalState:
+    """
+    Computed temporal state including Phase 1 resonance formulas.
+
+    This dataclass wraps TemporalFormulaSnapshot for backward compatibility
+    and future extensibility.
+
+    Attributes:
+        formulas: Snapshot of current formula values
+    """
+
+    formulas: TemporalFormulaSnapshot = field(default_factory=TemporalFormulaSnapshot)
+
+    # Backward compatibility properties
+    @property
+    def smi(self) -> Optional[float]:
+        """Get SMI from formulas snapshot."""
+        return self.formulas.smi
+
+    @property
+    def delta_smi(self) -> Optional[float]:
+        """Get delta_smi from formulas snapshot."""
+        return self.formulas.delta_smi
+
+    @property
+    def bhava_gap(self) -> Optional[float]:
+        """Get bhava_gap from formulas snapshot."""
+        return self.formulas.bhava_gap
+
+    @property
+    def tension_corridor(self) -> Optional[float]:
+        """Get tension_corridor from formulas snapshot."""
+        return self.formulas.tension_corridor
 
 
 class TemporalBhavaTracker:
@@ -138,9 +183,12 @@ class TemporalBhavaTracker:
         if len(self._entries) > self._window_size:
             self._entries = self._entries[-self._window_size:]
 
-    def get_pattern_summary(self) -> Dict[str, Any]:
+    def get_pattern_summary(self, include_formulas: bool = True) -> Dict[str, Any]:
         """
         Return a comprehensive summary of temporal patterns.
+
+        Args:
+            include_formulas: Whether to include Phase 1 formula snapshot (default: True)
 
         Returns:
             A dictionary containing:
@@ -150,9 +198,10 @@ class TemporalBhavaTracker:
             - tension: Tension corridor analysis
             - recovery: Recovery pattern analysis
             - stats: Basic statistical measures
+            - formulas: Phase 1 formula snapshot (optional)
         """
         if not self._entries:
-            return {
+            base_summary = {
                 "state": "UNKNOWN",
                 "trajectory": {
                     "trend": "stable",
@@ -179,6 +228,9 @@ class TemporalBhavaTracker:
                     "count": 0,
                 },
             }
+            if include_formulas:
+                base_summary["formulas"] = self._temporal_state.formulas.to_dict()
+            return base_summary
 
         # Compute basic stats
         stats = self._compute_stats()
@@ -198,7 +250,7 @@ class TemporalBhavaTracker:
         # Classify overall state
         state = self._classify_state(stats, trajectory, tension, recovery)
 
-        return {
+        summary = {
             "state": state,
             "trajectory": trajectory,
             "momentum": momentum,
@@ -206,6 +258,12 @@ class TemporalBhavaTracker:
             "recovery": recovery,
             "stats": stats,
         }
+
+        # Optionally include Phase 1 formulas
+        if include_formulas:
+            summary["formulas"] = self._temporal_state.formulas.to_dict()
+
+        return summary
 
     def reset(self) -> None:
         """Clear the history."""
@@ -250,59 +308,62 @@ class TemporalBhavaTracker:
         Returns:
             TemporalState with computed values (fields set to None on error)
         """
-        state = TemporalState()
+        snapshot = TemporalFormulaSnapshot()
 
         # Compute SMI with fail-safe wrapper
         try:
-            state.smi = _compute_smi_formula(
+            snapshot.smi = _compute_smi_formula(
                 dimensional_resonance=dimensional_resonance,
                 vrtti_intensity=vrtti_intensity,
                 bhava_position=bhava_position,
             )
         except Exception as e:
             # Log error and set to None (fail-safe)
-            state.smi = None
+            snapshot.smi = None
             # Silent fail - maintain backward compatibility
 
         # Compute ΔSMI with fail-safe wrapper
         try:
-            if state.smi is not None:
-                state.delta_smi = _compute_delta_smi_formula(
-                    smi=state.smi,
+            if snapshot.smi is not None:
+                snapshot.delta_smi = _compute_delta_smi_formula(
+                    smi=snapshot.smi,
                     previous_smi=self._previous_smi,
                 )
             else:
-                state.delta_smi = None
+                snapshot.delta_smi = None
         except Exception as e:
             # Log error and set to None (fail-safe)
-            state.delta_smi = None
+            snapshot.delta_smi = None
 
         # Compute Bhava Gap with fail-safe wrapper
         try:
-            state.bhava_gap = _compute_bhava_gap_formula(
+            snapshot.bhava_gap = _compute_bhava_gap_formula(
                 current_bhava=current_bhava,
                 previous_bhava=self._previous_bhava,
             )
         except Exception as e:
             # Log error and set to None (fail-safe)
-            state.bhava_gap = None
+            snapshot.bhava_gap = None
 
         # Compute Tension Corridor with fail-safe wrapper
         try:
-            if state.delta_smi is not None and state.bhava_gap is not None:
-                state.tension_corridor = _compute_tension_corridor_formula(
-                    delta_smi=state.delta_smi,
-                    bhava_gap=state.bhava_gap,
+            if snapshot.delta_smi is not None and snapshot.bhava_gap is not None:
+                snapshot.tension_corridor = _compute_tension_corridor_formula(
+                    delta_smi=snapshot.delta_smi,
+                    bhava_gap=snapshot.bhava_gap,
                 )
             else:
-                state.tension_corridor = None
+                snapshot.tension_corridor = None
         except Exception as e:
             # Log error and set to None (fail-safe)
-            state.tension_corridor = None
+            snapshot.tension_corridor = None
+
+        # Create state with snapshot
+        state = TemporalState(formulas=snapshot)
 
         # Update internal state for next turn
-        if state.smi is not None:
-            self._previous_smi = state.smi
+        if snapshot.smi is not None:
+            self._previous_smi = snapshot.smi
         self._previous_bhava = current_bhava
         self._temporal_state = state
 

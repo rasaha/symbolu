@@ -108,6 +108,9 @@ class DILchatResponse:
     raw_unified: Optional[Dict[str, Any]] = None
     policy_flags: Optional[Dict[str, Any]] = None
 
+    # Phase 2: Temporal formulas (diagnostics only - not used for badges/hints)
+    formulas: Optional[Dict[str, Optional[float]]] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert to JSON-serializable dictionary.
@@ -244,7 +247,12 @@ def build_dilchat_response(
     hints = _build_hints(combined_flags, session_memory, session_recap, intent_arc, identity_signature, motivation_profile)
 
     # ========================================================================
-    # STEP 7: Assemble DILchatResponse
+    # STEP 7: Extract Phase 2 formulas (diagnostics only)
+    # ========================================================================
+    formulas_data = unified_output.get("formulas")
+
+    # ========================================================================
+    # STEP 8: Assemble DILchatResponse
     # ========================================================================
     return DILchatResponse(
         text=text,
@@ -258,6 +266,7 @@ def build_dilchat_response(
         domain=response_domain,
         raw_unified=unified_output,
         policy_flags=policy_flags,
+        formulas=formulas_data,
     )
 
 

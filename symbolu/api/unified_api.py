@@ -53,6 +53,7 @@ class UnifiedOutput:
         intent_arc: Intent Arc Engine v1.0 (trajectory classification)
         identity_signature: Identity Signature Engine v1.0 (identity trajectory classification)
         motivation_profile: Motivation Flow Engine v1.0 (motivational driver classification)
+        formulas: Phase 2 temporal formulas (SMI, ΔSMI, Bhava Gap, Tension Corridor) - observation only
     """
 
     text: str
@@ -70,6 +71,7 @@ class UnifiedOutput:
     intent_arc: Dict[str, Any] = field(default_factory=dict)
     identity_signature: Dict[str, Any] = field(default_factory=dict)
     motivation_profile: Dict[str, Any] = field(default_factory=dict)
+    formulas: Optional[Dict[str, Optional[float]]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -260,6 +262,51 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
     if hasattr(ctx, 'motivation_profile') and ctx.motivation_profile is not None:
         motivation_profile_data = ctx.motivation_profile.serialize()
 
+    # Phase 2: Extract formulas from coherence state or pipeline context
+    formulas_data = None
+    if hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        coherence_state = ctx.coherence_state
+        formulas_data = {}
+
+        # Get most recent values from histories
+        delta_smi_hist = getattr(coherence_state, 'delta_smi_history', [])
+        if delta_smi_hist and delta_smi_hist[-1] is not None:
+            formulas_data["delta_smi"] = delta_smi_hist[-1]
+
+        bhava_gap_hist = getattr(coherence_state, 'bhava_gap_history', [])
+        if bhava_gap_hist and bhava_gap_hist[-1] is not None:
+            formulas_data["bhava_gap"] = bhava_gap_hist[-1]
+
+        tension_corridor_hist = getattr(coherence_state, 'tension_corridor_history', [])
+        if tension_corridor_hist and tension_corridor_hist[-1] is not None:
+            formulas_data["tension_corridor"] = tension_corridor_hist[-1]
+
+        # Get aggregates
+        avg_smi = getattr(coherence_state, 'avg_smi', None)
+        if avg_smi is not None:
+            formulas_data["avg_smi"] = avg_smi
+
+        max_smi = getattr(coherence_state, 'max_smi', None)
+        if max_smi is not None:
+            formulas_data["max_smi"] = max_smi
+
+        min_smi = getattr(coherence_state, 'min_smi', None)
+        if min_smi is not None:
+            formulas_data["min_smi"] = min_smi
+
+        avg_tension_corridor = getattr(coherence_state, 'avg_tension_corridor', None)
+        if avg_tension_corridor is not None:
+            formulas_data["avg_tension_corridor"] = avg_tension_corridor
+
+        max_tension_corridor = getattr(coherence_state, 'max_tension_corridor', None)
+        if max_tension_corridor is not None:
+            formulas_data["max_tension_corridor"] = max_tension_corridor
+
+        # Get current SMI from smi_history
+        smi_hist = getattr(coherence_state, 'smi_history', [])
+        if smi_hist and smi_hist[-1] is not None:
+            formulas_data["smi"] = smi_hist[-1]
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -276,6 +323,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         intent_arc=intent_arc_data,
         identity_signature=identity_signature_data,
         motivation_profile=motivation_profile_data,
+        formulas=formulas_data,
     )
 
 
