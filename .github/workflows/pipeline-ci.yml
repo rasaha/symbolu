@@ -5,11 +5,15 @@ on:
     branches: ["main", "master"]
     paths:
       - "symbolu/mechanical/pipeline/**"
+      - "symbolu/mechanical/persona/**"
+      - "symbolu/mechanical/fusion/**"
       - ".github/workflows/pipeline-ci.yml"
   pull_request:
     branches: ["main", "master"]
     paths:
       - "symbolu/mechanical/pipeline/**"
+      - "symbolu/mechanical/persona/**"
+      - "symbolu/mechanical/fusion/**"
       - ".github/workflows/pipeline-ci.yml"
   workflow_dispatch:
 
@@ -51,6 +55,18 @@ jobs:
             --disable-warnings --maxfail=1 -q \
             2>&1 | tee pipeline-pytest.log
 
+      - name: Run Persona Snapshot Tests
+        run: |
+          REGENERATE_SNAPSHOTS=0 pytest symbolu/mechanical/pipeline/tests_persona/test_persona_snapshots.py \
+            --disable-warnings -q \
+            2>&1 | tee persona-snapshot-pytest.log
+
+      - name: Run Fusion Snapshot Tests
+        run: |
+          REGENERATE_SNAPSHOTS=0 pytest symbolu/mechanical/pipeline/tests_fusion/test_fusion_snapshots.py \
+            --disable-warnings -q \
+            2>&1 | tee fusion-snapshot-pytest.log
+
       - name: Upload pipeline CI snapshots
         uses: actions/upload-artifact@v4
         with:
@@ -59,6 +75,18 @@ jobs:
             coverage.xml
             htmlcov/
             pipeline-pytest.log
+            persona-snapshot-pytest.log
+            fusion-snapshot-pytest.log
+
+      - name: Upload persona/fusion snapshot diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: persona-fusion-snapshot-diffs
+          path: |
+            symbolu/mechanical/pipeline/snapshots/*.diff
+            symbolu/mechanical/pipeline/tests_persona/*.diff
+            symbolu/mechanical/pipeline/tests_fusion/*.diff
 
       - name: Upload pipeline debug logs
         if: hashFiles('symbolu/mechanical/pipeline/**/*.log') != ''
