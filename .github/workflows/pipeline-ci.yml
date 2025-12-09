@@ -9,6 +9,7 @@ on:
       - "symbolu/mechanical/fusion/**"
       - "symbolu/mechanical/hrm/**"
       - "symbolu/mechanical/lcm/**"
+      - "symbolu/mechanical/lam/**"
       - "symbolu/temporal/**"
       - ".github/workflows/pipeline-ci.yml"
   pull_request:
@@ -19,6 +20,7 @@ on:
       - "symbolu/mechanical/fusion/**"
       - "symbolu/mechanical/hrm/**"
       - "symbolu/mechanical/lcm/**"
+      - "symbolu/mechanical/lam/**"
       - "symbolu/temporal/**"
       - ".github/workflows/pipeline-ci.yml"
   workflow_dispatch:
@@ -85,6 +87,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee lcm-pytest.log
 
+      - name: Run LAM Tests
+        run: |
+          pytest symbolu/mechanical/lam/tests \
+            --disable-warnings -q \
+            2>&1 | tee lam-pytest.log
+
       - name: Run Pipeline End-to-End Snapshot Tests
         run: |
           REGENERATE_SNAPSHOTS=0 pytest symbolu/mechanical/pipeline/tests_pipeline_snapshots/test_pipeline_snapshots.py \
@@ -140,6 +148,7 @@ jobs:
             fusion-snapshot-pytest.log
             hrm-pytest.log
             lcm-pytest.log
+            lam-pytest.log
             pipeline-e2e-snapshot-pytest.log
             pipeline-multiturn-snapshot-pytest.log
             temporal-pipeline-snapshot-pytest.log

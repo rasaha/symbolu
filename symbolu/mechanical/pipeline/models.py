@@ -9,7 +9,7 @@ These models provide a clean, typed interface for data flowing through:
 The design follows the Symbol-U AGI architecture where:
 - Persona represents the communicative identity layer
 - MLCR handles multi-layer consciousness routing (Bhava awareness)
-- Fusion blends HRM/LCM/MoE channels (Kosha integration)
+- Fusion blends HRM/LCM/LAM/MoE channels (Kosha integration)
 - DHA manages delivery harmonization & adaptation
 - Renderer produces the final output surface
 """
@@ -182,6 +182,7 @@ class PipelineContext:
         mlcr: MlcrResult after MLCR routing.
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
+        lam_map: Optional LongArcMap from LAM engine (when use_lam=True or long_arc_tension high).
         fusion: FusionResult after candidate fusion.
         dha: DhaDecision after delivery harmonization.
         rendered: RenderedOutput after final rendering.
@@ -193,6 +194,7 @@ class PipelineContext:
     mlcr: Optional[MlcrResult] = None
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
+    lam_map: Optional[Any] = None  # LongArcMap from LAM engine
     fusion: Optional[FusionResult] = None
     dha: Optional[DhaDecision] = None
     rendered: Optional[RenderedOutput] = None
@@ -216,6 +218,11 @@ class PipelineContext:
                 "has_map": self.hrm_map is not None,
                 "tier": self.hrm_map.tier if self.hrm_map else None,
                 "conflict_count": len(self.hrm_map.conflict_zones) if self.hrm_map else 0,
+            },
+            "lam": {
+                "has_map": self.lam_map is not None,
+                "arc_state": self.lam_map.arc_state if self.lam_map else None,
+                "pattern_count": len(self.lam_map.active_patterns) if self.lam_map else 0,
             },
             "fusion": {
                 "has_candidates": self.fusion is not None,
