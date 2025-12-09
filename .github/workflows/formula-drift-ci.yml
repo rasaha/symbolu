@@ -57,12 +57,14 @@ jobs:
             --maxfail=1 \
             2>&1 | tee formula-drift-pytest.log
 
-      - name: Upload Formula Drift test logs
+      - name: Upload Formula Drift test logs and fixtures
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: formula-drift-test-logs
-          path: formula-drift-pytest.log
+          path: |
+            formula-drift-pytest.log
+            symbolu/core/formula_drift_tests/phase1_resonance_fixtures.json
 
       - name: Check for drift
         run: |
