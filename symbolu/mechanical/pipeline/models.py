@@ -180,6 +180,7 @@ class PipelineContext:
         request: The original UserRequest.
         persona: PersonaContext after persona resolution.
         mlcr: MlcrResult after MLCR routing.
+        hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         fusion: FusionResult after candidate fusion.
         dha: DhaDecision after delivery harmonization.
         rendered: RenderedOutput after final rendering.
@@ -189,6 +190,7 @@ class PipelineContext:
     request: UserRequest
     persona: Optional[PersonaContext] = None
     mlcr: Optional[MlcrResult] = None
+    hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     fusion: Optional[FusionResult] = None
     dha: Optional[DhaDecision] = None
     rendered: Optional[RenderedOutput] = None
@@ -207,6 +209,11 @@ class PipelineContext:
             },
             "mlcr": {
                 "has_entries": self.mlcr is not None and self.mlcr.entries is not None,
+            },
+            "hrm": {
+                "has_map": self.hrm_map is not None,
+                "tier": self.hrm_map.tier if self.hrm_map else None,
+                "conflict_count": len(self.hrm_map.conflict_zones) if self.hrm_map else 0,
             },
             "fusion": {
                 "has_candidates": self.fusion is not None,
