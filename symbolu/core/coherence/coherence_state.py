@@ -53,6 +53,11 @@ class CoherenceState:
     avg_tension_corridor: Optional[float] = None  # Average tension corridor
     max_tension_corridor: Optional[float] = None  # Maximum tension corridor
 
+    # Phase 3 derived formula metrics (observation only - not used in scoring)
+    resonance_index: Optional[float] = None  # [0.0, 1.0] - formula-weighted stabilizing signal
+    tension_index: Optional[float] = None  # [0.0, 1.0] - session tension from Tension Corridor
+    arc_alignment_index: Optional[float] = None  # [0.0, 1.0] - temporal pattern alignment
+
     # Derived metrics (0.0-1.0)
     persona_drift_score: float = 0.0  # Higher = more drift (worse)
     semantic_stability_score: float = 0.0  # Higher = more stable (better)

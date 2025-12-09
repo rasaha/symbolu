@@ -53,6 +53,11 @@ class CoherenceObservation:
     bhava_gap: Optional[float] = None
     tension_corridor: Optional[float] = None
 
+    # Phase 3 derived formula metrics (observation only)
+    resonance_index: Optional[float] = None
+    tension_index: Optional[float] = None
+    arc_alignment_index: Optional[float] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -182,6 +187,16 @@ class CoherenceObserver:
             if tension_corridor_hist and tension_corridor_hist[-1] is not None:
                 tension_corridor = tension_corridor_hist[-1]
 
+        # Phase 3: Extract derived formula metrics from coherence_state
+        resonance_index = None
+        tension_index = None
+        arc_alignment_index = None
+
+        if coherence_state is not None:
+            resonance_index = getattr(coherence_state, 'resonance_index', None)
+            tension_index = getattr(coherence_state, 'tension_index', None)
+            arc_alignment_index = getattr(coherence_state, 'arc_alignment_index', None)
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -210,6 +225,9 @@ class CoherenceObserver:
             delta_smi=delta_smi,
             bhava_gap=bhava_gap,
             tension_corridor=tension_corridor,
+            resonance_index=resonance_index,
+            tension_index=tension_index,
+            arc_alignment_index=arc_alignment_index,
         )
 
         # Store observation
@@ -320,7 +338,7 @@ class CoherenceObserver:
 
     def _extract_formulas_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Optional[float]]]:
         """
-        Extract Phase 2 formulas from observation.
+        Extract Phase 2 formulas and Phase 3 derived metrics from observation.
 
         Returns formula dict if formulas are available, None otherwise.
         """
@@ -348,6 +366,14 @@ class CoherenceObserver:
             formulas["avg_tension_corridor"] = obs.avg_tension_corridor
         if obs.max_tension_corridor is not None:
             formulas["max_tension_corridor"] = obs.max_tension_corridor
+
+        # Phase 3 derived metrics
+        if obs.resonance_index is not None:
+            formulas["resonance_index"] = obs.resonance_index
+        if obs.tension_index is not None:
+            formulas["tension_index"] = obs.tension_index
+        if obs.arc_alignment_index is not None:
+            formulas["arc_alignment_index"] = obs.arc_alignment_index
 
         return formulas if formulas else None
 

@@ -262,7 +262,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
     if hasattr(ctx, 'motivation_profile') and ctx.motivation_profile is not None:
         motivation_profile_data = ctx.motivation_profile.serialize()
 
-    # Phase 2: Extract formulas from coherence state or pipeline context
+    # Phase 2 & 3: Extract formulas from coherence state or pipeline context
     formulas_data = None
     if hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
         coherence_state = ctx.coherence_state
@@ -306,6 +306,22 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         smi_hist = getattr(coherence_state, 'smi_history', [])
         if smi_hist and smi_hist[-1] is not None:
             formulas_data["smi"] = smi_hist[-1]
+
+        # Phase 3: Extract derived metrics
+        resonance_index = getattr(coherence_state, 'resonance_index', None)
+        tension_index = getattr(coherence_state, 'tension_index', None)
+        arc_alignment_index = getattr(coherence_state, 'arc_alignment_index', None)
+
+        # Add derived metrics to formulas dict if any exist
+        if resonance_index is not None or tension_index is not None or arc_alignment_index is not None:
+            derived = {}
+            if resonance_index is not None:
+                derived["resonance_index"] = resonance_index
+            if tension_index is not None:
+                derived["tension_index"] = tension_index
+            if arc_alignment_index is not None:
+                derived["arc_alignment_index"] = arc_alignment_index
+            formulas_data["derived"] = derived
 
     return UnifiedOutput(
         text=text,

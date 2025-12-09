@@ -128,3 +128,8 @@ class SessionSummary:
     net_delta_smi: Optional[float] = None  # Net ΔSMI (cumulative change)
     avg_bhava_gap: Optional[float] = None  # Average bhava gap
     avg_tension_corridor: Optional[float] = None  # Average tension corridor
+
+    # Phase 3 derived formula metrics (observation only)
+    avg_resonance_index: Optional[float] = None  # Average resonance index across session
+    avg_tension_index: Optional[float] = None  # Average tension index across session
+    avg_arc_alignment_index: Optional[float] = None  # Average arc alignment index across session

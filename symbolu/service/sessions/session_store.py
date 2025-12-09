@@ -389,6 +389,41 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if tension_corridor_values:
             avg_tension_corridor = sum(tension_corridor_values) / len(tension_corridor_values)
 
+    # Phase 3: Extract derived formula metrics from coherence history
+    avg_resonance_index = None
+    avg_tension_index = None
+    avg_arc_alignment_index = None
+
+    if state.coherence_history:
+        # Extract derived metric values for averaging
+        resonance_values = []
+        tension_index_values = []
+        arc_alignment_values = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract resonance_index
+                if "resonance_index" in coh and coh["resonance_index"] is not None:
+                    resonance_values.append(coh["resonance_index"])
+
+                # Extract tension_index
+                if "tension_index" in coh and coh["tension_index"] is not None:
+                    tension_index_values.append(coh["tension_index"])
+
+                # Extract arc_alignment_index
+                if "arc_alignment_index" in coh and coh["arc_alignment_index"] is not None:
+                    arc_alignment_values.append(coh["arc_alignment_index"])
+
+        # Compute averages
+        if resonance_values:
+            avg_resonance_index = sum(resonance_values) / len(resonance_values)
+
+        if tension_index_values:
+            avg_tension_index = sum(tension_index_values) / len(tension_index_values)
+
+        if arc_alignment_values:
+            avg_arc_alignment_index = sum(arc_alignment_values) / len(arc_alignment_values)
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -407,4 +442,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         net_delta_smi=net_delta_smi,
         avg_bhava_gap=avg_bhava_gap,
         avg_tension_corridor=avg_tension_corridor,
+        avg_resonance_index=avg_resonance_index,
+        avg_tension_index=avg_tension_index,
+        avg_arc_alignment_index=avg_arc_alignment_index,
     )
