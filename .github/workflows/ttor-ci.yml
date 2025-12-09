@@ -57,6 +57,11 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee ttor-mapper-switching.log
 
+      - name: Run Mapper Switching CI (Corrected v2.0)
+        run: |
+          pytest symbolu/mechanical/pipeline/ttor/tests_mapper_switching_v2 -q \
+            2>&1 | tee ttor-mapper-switching-v2.log
+
       - name: Type check with mypy
         run: |
           mypy symbolu/mechanical/pipeline/ttor --strict \
@@ -76,6 +81,7 @@ jobs:
             ttor-mypy.log
             ttor-flake8.log
             ttor-mapper-switching.log
+            ttor-mapper-switching-v2.log
 
       - name: Upload Mapper Switching Report
         if: always()
@@ -83,6 +89,13 @@ jobs:
         with:
           name: mapper-switching-report
           path: symbolu/mechanical/pipeline/ttor/tests_mapper_switching/mapper_switching_report.json
+
+      - name: Upload Mapper Switching Report v2
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mapper-switching-report-v2
+          path: symbolu/mechanical/pipeline/ttor/tests_mapper_switching_v2/mapper_switching_report_v2.json
 
       - name: Upload TTOR coverage report
         uses: actions/upload-artifact@v4
