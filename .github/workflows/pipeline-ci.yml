@@ -67,6 +67,18 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee fusion-snapshot-pytest.log
 
+      - name: Run Pipeline End-to-End Snapshot Tests
+        run: |
+          REGENERATE_SNAPSHOTS=0 pytest symbolu/mechanical/pipeline/tests_pipeline_snapshots/test_pipeline_snapshots.py \
+            --disable-warnings -q \
+            2>&1 | tee pipeline-e2e-snapshot-pytest.log
+
+      - name: Run Pipeline Multi-Turn Snapshot Tests
+        run: |
+          REGENERATE_SNAPSHOTS=0 pytest symbolu/mechanical/pipeline/tests_pipeline_snapshots/test_pipeline_multiturn_snapshots.py \
+            --disable-warnings -q \
+            2>&1 | tee pipeline-multiturn-snapshot-pytest.log
+
       - name: Upload pipeline CI snapshots
         uses: actions/upload-artifact@v4
         with:
@@ -77,16 +89,19 @@ jobs:
             pipeline-pytest.log
             persona-snapshot-pytest.log
             fusion-snapshot-pytest.log
+            pipeline-e2e-snapshot-pytest.log
+            pipeline-multiturn-snapshot-pytest.log
 
-      - name: Upload persona/fusion snapshot diffs
+      - name: Upload snapshot diffs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: persona-fusion-snapshot-diffs
+          name: pipeline-snapshot-diffs
           path: |
             symbolu/mechanical/pipeline/snapshots/*.diff
             symbolu/mechanical/pipeline/tests_persona/*.diff
             symbolu/mechanical/pipeline/tests_fusion/*.diff
+            symbolu/mechanical/pipeline/tests_pipeline_snapshots/*.diff
 
       - name: Upload pipeline debug logs
         if: hashFiles('symbolu/mechanical/pipeline/**/*.log') != ''
