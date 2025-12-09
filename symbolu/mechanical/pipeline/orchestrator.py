@@ -96,6 +96,9 @@ from .coherence_observer import CoherenceObserver
 # Unified API (Observability/API Contract Layer)
 from symbolu.api.unified_api import get_unified_json
 
+# Policy Layer (Domain Coherence Profiles + Advisory Flags)
+from symbolu.policy import compute_policy_flags
+
 # Renderer Components
 from symbolu.mechanical.renderer.fusion_renderer import (
     FusionOutput,
@@ -293,6 +296,27 @@ class SymbolUPipeline:
         except Exception:
             # If unified API fails, continue without it (fail-safe)
             ctx.unified_output = None
+
+        # ================================================================
+        # POLICY LAYER: Compute policy flags (optional, non-invasive)
+        # Generates domain-specific advisory flags for UI/application
+        # Does NOT modify pipeline, routing, or renderer behavior
+        # ================================================================
+        # Only compute policy flags if unified output is available
+        if ctx.unified_output is not None:
+            try:
+                # Extract domain from request metadata or unified output
+                domain = ctx.request.metadata.get("domain", "generic")
+                if not domain or domain == "unknown":
+                    domain = ctx.unified_output.get("metadata", {}).get("domain", "generic")
+
+                # Compute policy flags (deterministic, zero-LLM)
+                ctx.policy_flags = compute_policy_flags(ctx.unified_output, domain)
+            except Exception:
+                # If policy layer fails, continue without it (fail-safe)
+                ctx.policy_flags = None
+        else:
+            ctx.policy_flags = None
 
         self._run_count += 1
 
