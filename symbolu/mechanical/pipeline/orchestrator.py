@@ -99,6 +99,9 @@ from symbolu.api.unified_api import get_unified_json
 # Policy Layer (Domain Coherence Profiles + Advisory Flags)
 from symbolu.policy import compute_policy_flags
 
+# Session Policy Layer (Session-Level Coherence Influencers)
+from symbolu.policy.session_policy import compute_session_policy_flags
+
 # DILchat Adapter (Presentation Layer for DILchat Integration)
 from symbolu.adapter import build_dilchat_payload
 
@@ -289,6 +292,38 @@ class SymbolUPipeline:
         ctx.coherence_report = observation.to_dict()
 
         # ================================================================
+        # SESSION POLICY LAYER: Compute session-level policy flags (optional, non-invasive)
+        # Generates trajectory-aware policy hints from multi-turn session metrics
+        # Does NOT modify pipeline, routing, or renderer behavior
+        # ================================================================
+        # Only compute session policy if session_id is provided in metadata
+        ctx.session_policy_flags = None
+        session_id = ctx.request.metadata.get("session_id")
+        if session_id:
+            try:
+                # Import session store here to avoid circular dependency
+                from symbolu.service.sessions import SessionStore, compute_session_summary
+
+                # Get session store (singleton pattern)
+                # In production, this should be injected via dependency injection
+                # For now, we create a temporary instance (stateless for this request)
+                # The actual session data comes from the shared session store in api_server
+                # This is safe because we're only reading, not modifying
+                session_store = SessionStore()
+                session_state = session_store.get(session_id)
+
+                if session_state:
+                    # Compute session summary from accumulated state
+                    session_summary = compute_session_summary(session_state)
+
+                    # Compute session policy flags (deterministic, zero-LLM)
+                    ctx.session_policy_flags = compute_session_policy_flags(session_summary)
+            except Exception:
+                # If session policy layer fails, continue without it (fail-safe)
+                # This ensures pipeline robustness even if session tracking has issues
+                ctx.session_policy_flags = None
+
+        # ================================================================
         # UNIFIED API: Generate unified output (optional, non-invasive)
         # Provides complete API contract for downstream consumers
         # ================================================================
@@ -335,10 +370,16 @@ class SymbolUPipeline:
                     domain = ctx.unified_output.get("metadata", {}).get("domain", "generic")
 
                 # Build DILchat payload (deterministic, zero-LLM)
+                # Pass session policy flags if available
+                session_policy_dict = None
+                if ctx.session_policy_flags:
+                    session_policy_dict = ctx.session_policy_flags.to_dict()
+
                 ctx.dilchat_payload = build_dilchat_payload(
                     ctx.unified_output,
                     ctx.policy_flags,
-                    domain
+                    domain,
+                    session_policy_dict
                 )
             except Exception:
                 # If DILchat adapter fails, continue without it (fail-safe)

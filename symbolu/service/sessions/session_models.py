@@ -62,6 +62,8 @@ class SessionSummary:
     - Average coherence trends
     - Persona drift detection
     - Temporal arc patterns
+    - Semantic stability metrics
+    - Mapper volatility tracking
     - Last routing state
 
     Attributes:
@@ -70,6 +72,8 @@ class SessionSummary:
         coherence_trend: Average coherence score across all turns
         persona_drift_avg: Average persona drift/change across turns
         temporal_arc_avg: Average temporal arc score across turns
+        semantic_stability_score: Average semantic stability (lower = more drift)
+        mapper_volatility_score: Volatility in mapper outputs (HRM/LCM/LAM changes)
         last_tier: Last MLCR tier selected (UPPER/LOWER/HYBRID)
         last_domain: Last detected domain
         created_at: Session creation timestamp
@@ -79,6 +83,29 @@ class SessionSummary:
     coherence_trend: float
     persona_drift_avg: float
     temporal_arc_avg: float
-    last_tier: str
-    last_domain: str
-    created_at: datetime
+    semantic_stability_score: float = 0.5
+    mapper_volatility_score: float = 0.5
+    last_tier: str = "HYBRID"
+    last_domain: str = "generic"
+    created_at: Optional[datetime] = None
+
+    # Convenience properties for policy layer compatibility
+    @property
+    def coherence_score(self) -> float:
+        """Alias for coherence_trend for policy layer compatibility."""
+        return self.coherence_trend
+
+    @property
+    def persona_drift_score(self) -> float:
+        """Alias for persona_drift_avg for policy layer compatibility."""
+        return self.persona_drift_avg
+
+    @property
+    def temporal_arc_score(self) -> float:
+        """Alias for temporal_arc_avg for policy layer compatibility."""
+        return self.temporal_arc_avg
+
+    @property
+    def turn_count(self) -> int:
+        """Alias for total_turns for policy layer compatibility."""
+        return self.total_turns
