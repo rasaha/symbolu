@@ -17,6 +17,7 @@ on:
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
+      - "symbolu/intent/**"
       - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   pull_request:
@@ -35,6 +36,7 @@ on:
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
+      - "symbolu/intent/**"
       - "symbolu/tools/coherence_dashboard/**"
       - ".github/workflows/pipeline-ci.yml"
   workflow_dispatch:
@@ -204,6 +206,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee session-summarizer-pytest.log
 
+      - name: Run Intent Arc Tests
+        run: |
+          pytest symbolu/intent/tests/test_intent_arc_engine.py \
+            --disable-warnings -q \
+            2>&1 | tee intent-arc-pytest.log
+
       - name: Upload Coherence Reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -253,6 +261,7 @@ jobs:
             session-policy-pytest.log
             session-memory-pytest.log
             session-summarizer-pytest.log
+            intent-arc-pytest.log
 
       - name: Upload snapshot diffs
         if: failure()
