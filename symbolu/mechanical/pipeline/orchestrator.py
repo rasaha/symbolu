@@ -6,6 +6,7 @@ Main orchestration layer that coordinates all engines in a clean sequential flow
 Pipeline Sequence:
     1. MLCR     -> Multi-Layer Consciousness Routing (query understanding)
     1.5 HRM     -> High-Resolution Mapper (conditional, when use_hrm=True)
+    1.6 LCM     -> Low-Context Mapper (conditional, when use_lcm=True)
     2. Persona  -> Resolve communicative identity (Bhava awareness)
     3. Fusion   -> Blend HRM/LCM/MoE channels (Kosha integration)
     4. DHA      -> Delivery Harmonization & Adaptation (tone/readiness)
@@ -14,6 +15,7 @@ Pipeline Sequence:
 Symbol-U AGI Architecture Mapping:
     - MLCR: Consciousness routing layer (WHY/HOW routing)
     - HRM: High-Resolution Mapper (deep cognitive mapping when activated)
+    - LCM: Low-Context Mapper (minimal structural summary for simple queries)
     - Persona: The voice/identity layer (WHO speaks)
     - Fusion: Multi-channel blending (WHAT to say - HRM symbolic, LCM semantic, MoE domain)
     - DHA: Delivery layer (HOW to say it - readiness, resistance, adaptation)
@@ -79,6 +81,9 @@ from symbolu.mechanical.dha.dha_engine import DHAEngine
 
 # HRM Integration (High-Resolution Mapper)
 from .hrm_integration import maybe_run_hrm
+
+# LCM Integration (Low-Context Mapper)
+from .lcm_integration import maybe_run_lcm
 
 # Renderer Components
 from symbolu.mechanical.renderer.fusion_renderer import (
@@ -200,6 +205,13 @@ class SymbolUPipeline:
         # Produces high-resolution cognitive map for Fusion/DHA
         # ================================================================
         ctx.hrm_map = maybe_run_hrm(ctx)
+
+        # ================================================================
+        # STAGE 1.6: LCM - Low-Context Mapper (conditional)
+        # Runs only when use_lcm=True in activation plan
+        # Produces minimal structural summary for simple task-like queries
+        # ================================================================
+        ctx.lcm_map = maybe_run_lcm(ctx)
 
         # ================================================================
         # STAGE 2: PERSONA - Resolve Communicative Identity

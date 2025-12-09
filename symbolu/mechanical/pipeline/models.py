@@ -181,6 +181,7 @@ class PipelineContext:
         persona: PersonaContext after persona resolution.
         mlcr: MlcrResult after MLCR routing.
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
+        lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
         fusion: FusionResult after candidate fusion.
         dha: DhaDecision after delivery harmonization.
         rendered: RenderedOutput after final rendering.
@@ -191,6 +192,7 @@ class PipelineContext:
     persona: Optional[PersonaContext] = None
     mlcr: Optional[MlcrResult] = None
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
+    lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     fusion: Optional[FusionResult] = None
     dha: Optional[DhaDecision] = None
     rendered: Optional[RenderedOutput] = None
