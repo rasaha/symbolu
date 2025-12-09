@@ -43,16 +43,23 @@ logger = logging.getLogger(__name__)
 
 class TTORRouter:
     """
-    Two-Tier Ontology Router v1.4
+    Two-Tier Ontology Router v1.4 (Canonical Rules v2.0)
 
     Deterministic routing engine that computes:
     - Tier selection (LOWER / UPPER / HYBRID)
     - Flow mode (OUTER_ONLY / OUTER_PLUS_INNER / INNER_PRIORITY)
     - Engine family recommendation (persona / fusion / dha / renderer_only)
-    - Module activation flags (HRM, LCM, LAM)
+    - Module activation flags (HRM, LCM, LAM) using CANONICAL RULES v2.0
     - Safety flags (regulated_mode, allow_metaphor)
 
     All decisions are fully auditable via the debug dictionary.
+
+    CANONICAL MAPPER SWITCHING RULES v2.0:
+    ---------------------------------------
+    HRM: (tier != LOWER) and (entropy_mix > 0.40)
+    LCM: (tier == LOWER) and (entropy_mix > 0.50)
+    LAM: (long_arc_tension > 0.50) or temporal_patterns_detected
+         or (domain in ["therapy", "identity", "spiritual"] and entropy_mix > 0.60)
     """
 
     def __init__(self) -> None:
@@ -72,7 +79,7 @@ class TTORRouter:
         6. Determine Tier (LOWER / UPPER / HYBRID) using threshold
         7. Determine FlowMode based on tier and entropy/tension
         8. Select engine family
-        9. Set HRM/LCM/LAM flags
+        9. Set HRM/LCM/LAM flags using CANONICAL RULES v2.0
         10. Apply safety overrides (regulated_mode, allow_metaphor)
         11. Construct explanation string
         12. Return complete RoutingPlan with debug dictionary
@@ -206,14 +213,13 @@ class TTORRouter:
         logger.info(f"{self._log_prefix} Engine family selected: {engine_family}")
 
         # =====================================================================
-        # STEP 9: Set HRM/LCM/LAM flags
+        # STEP 9: Set HRM/LCM/LAM flags (CANONICAL RULES v2.0)
         # =====================================================================
         use_hrm, use_lcm, use_lam = self._compute_module_flags(
             tier=tier,
-            flow_mode=flow_mode,
-            is_high_entropy=is_high_entropy,
-            is_high_tension=is_high_tension,
-            conflict_score=conflict_score,
+            normalized_entropy=normalized_entropy,
+            domain=context.domain,
+            long_arc_tension=context.long_arc_tension,
         )
         debug["use_hrm"] = use_hrm
         debug["use_lcm"] = use_lcm
@@ -366,45 +372,60 @@ class TTORRouter:
     def _compute_module_flags(
         self,
         tier: Tier,
-        flow_mode: FlowMode,
-        is_high_entropy: bool,
-        is_high_tension: bool,
-        conflict_score: float,
+        normalized_entropy: float,
+        domain: str,
+        long_arc_tension: float,
     ) -> tuple[bool, bool, bool]:
         """
-        Compute HRM/LCM/LAM activation flags.
+        Compute HRM/LCM/LAM activation flags using CANONICAL RULES v2.0.
 
-        HRM (Harmonic Response Module):
-        - Active when: HYBRID tier, high entropy, or high conflict
+        CANONICAL RULES:
+        ----------------
+        HRM (High-Resolution Mapper):
+            use_hrm = (tier != LOWER) and (entropy_mix > 0.40)
 
-        LCM (Local Context Module):
-        - Active when: OUTER_PLUS_INNER or INNER_PRIORITY flow
+        LCM (Low-Context Mapper):
+            use_lcm = (tier == LOWER) and (entropy_mix > 0.50)
 
-        LAM (Long-Arc Module):
-        - Active when: High tension or INNER_PRIORITY flow
+        LAM (Long-Arc Mapper):
+            use_lam = (
+                long_arc_tension > 0.50
+                or temporal_patterns_detected
+                or (domain in ["therapy", "identity", "spiritual"] and entropy_mix > 0.60)
+            )
+
+        Conflict Resolution Priority: LAM > HRM > LCM
+        (Note: Priority resolution is implicit in the independent flag computation.
+         In routing contexts requiring exclusive mapper selection, apply priority explicitly.)
 
         Args:
             tier: Selected routing tier
-            flow_mode: Selected flow mode
-            is_high_entropy: Whether normalized entropy exceeds threshold
-            is_high_tension: Whether long-arc tension exceeds threshold
-            conflict_score: Anchor conflict score
+            normalized_entropy: Combined normalized entropy (entropy_mix)
+            domain: Domain classification string
+            long_arc_tension: Long-arc tension value [0, 1]
 
         Returns:
             Tuple of (use_hrm, use_lcm, use_lam) boolean flags
         """
-        # HRM: Active for hybrid situations or high uncertainty/conflict
-        use_hrm = (
-            tier == Tier.HYBRID
-            or is_high_entropy
-            or conflict_score > 0.5
+        # Canonical thresholds (frozen in v2.0 specification)
+        HRM_ENTROPY_THRESHOLD = 0.40
+        LCM_ENTROPY_THRESHOLD = 0.50
+        LAM_TENSION_THRESHOLD = 0.50
+        LAM_DOMAIN_ENTROPY_THRESHOLD = 0.60
+        LAM_DOMAINS = ["therapy", "identity", "spiritual"]
+
+        # Temporal patterns detection (future enhancement - currently False)
+        # TODO: Add temporal_patterns_detected to RouterContext when implemented
+        temporal_patterns_detected = False
+
+        # Apply canonical formulas exactly as specified
+        use_hrm = (tier != Tier.LOWER) and (normalized_entropy > HRM_ENTROPY_THRESHOLD)
+        use_lcm = (tier == Tier.LOWER) and (normalized_entropy > LCM_ENTROPY_THRESHOLD)
+        use_lam = (
+            long_arc_tension > LAM_TENSION_THRESHOLD
+            or temporal_patterns_detected
+            or (domain in LAM_DOMAINS and normalized_entropy > LAM_DOMAIN_ENTROPY_THRESHOLD)
         )
-
-        # LCM: Active when inner processing is involved
-        use_lcm = flow_mode in (FlowMode.OUTER_PLUS_INNER, FlowMode.INNER_PRIORITY)
-
-        # LAM: Active for long-arc concerns or deep inner processing
-        use_lam = is_high_tension or flow_mode == FlowMode.INNER_PRIORITY
 
         return (use_hrm, use_lcm, use_lam)
 
