@@ -48,6 +48,7 @@ class UnifiedOutput:
         entropy: Entropy measures (H_D, H_G, H_K, normalized)
         coherence: Coherence report from CoherenceObserver
         metadata: Turn number, timestamp, domain, etc.
+        session_memory: Session memory v2.0 (episodic events)
     """
 
     text: str
@@ -60,6 +61,7 @@ class UnifiedOutput:
     entropy: Dict[str, float]
     coherence: Dict[str, Any]
     metadata: Dict[str, Any]
+    session_memory: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -225,6 +227,11 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
     if hasattr(ctx, 'request') and ctx.request is not None:
         metadata['user_id'] = ctx.request.user_id
 
+    # Extract session memory (Memory v2.0)
+    session_memory_data = {}
+    if hasattr(ctx, 'session_memory') and ctx.session_memory is not None:
+        session_memory_data = ctx.session_memory.serialize()
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -236,6 +243,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         entropy=entropy_values,
         coherence=coherence_report,
         metadata=metadata,
+        session_memory=session_memory_data,
     )
 
 
@@ -292,6 +300,10 @@ def get_public_response(ctx: Any) -> Dict[str, Any]:
         'state': _get_coherence_state_label(coherence.get('coherence_score', 0.0)),
     }
 
+    # Extract session memory (Memory v2.0) - trim to last 1-2 significant events
+    session_memory = unified.get('session_memory', {})
+    trimmed_memory = _trim_session_memory_for_public(session_memory)
+
     # Build public response
     return {
         'text': unified.get('text', ''),
@@ -306,6 +318,7 @@ def get_public_response(ctx: Any) -> Dict[str, Any]:
         'mappers': unified.get('mappers', {}),
         'domain': unified.get('metadata', {}).get('domain', 'unknown'),
         'timestamp': unified.get('metadata', {}).get('timestamp', ''),
+        'session_memory': trimmed_memory,
     }
 
 
@@ -385,6 +398,53 @@ def _get_coherence_state_label(score: float) -> str:
         return "Fair"
     else:
         return "Poor"
+
+
+def _trim_session_memory_for_public(session_memory: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Trim session memory to only significant events for public API.
+
+    Shows only last 1-2 memory entries of types:
+    - breakthrough
+    - stabilization
+    - mapper_flip
+
+    Filters out raw metrics for public consumption.
+
+    Args:
+        session_memory: Full session memory dictionary
+
+    Returns:
+        Trimmed session memory dictionary
+    """
+    if not session_memory or 'events' not in session_memory:
+        return {}
+
+    events = session_memory.get('events', [])
+
+    # Filter to significant event types
+    significant_types = {'breakthrough', 'stabilization', 'mapper_flip'}
+    significant_events = [
+        e for e in events
+        if e.get('event_type') in significant_types
+    ]
+
+    # Get last 2 significant events
+    recent_significant = significant_events[-2:] if len(significant_events) >= 2 else significant_events
+
+    # Remove raw metrics for public API (keep only description and type)
+    trimmed_events = []
+    for event in recent_significant:
+        trimmed_events.append({
+            'turn_index': event.get('turn_index'),
+            'event_type': event.get('event_type'),
+            'description': event.get('description'),
+        })
+
+    return {
+        'events': trimmed_events,
+        'event_count': len(events),
+    }
 
 
 # Public API
