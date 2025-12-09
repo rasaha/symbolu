@@ -348,6 +348,11 @@ class SymbolUPipeline:
 
         self._run_count += 1
 
+        # Store context reference in rendered output meta for API access
+        # This is non-invasive and only affects the meta field
+        if ctx.rendered:
+            ctx.rendered.meta["context"] = ctx
+
         return ctx.rendered
 
     # ========================================================================
