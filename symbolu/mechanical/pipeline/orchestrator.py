@@ -7,8 +7,9 @@ Pipeline Sequence:
     1. MLCR     -> Multi-Layer Consciousness Routing (query understanding)
     1.5 HRM     -> High-Resolution Mapper (conditional, when use_hrm=True)
     1.6 LCM     -> Low-Context Mapper (conditional, when use_lcm=True)
+    1.7 LAM     -> Long-Arc Mapper (conditional, when use_lam=True or long_arc_tension high)
     2. Persona  -> Resolve communicative identity (Bhava awareness)
-    3. Fusion   -> Blend HRM/LCM/MoE channels (Kosha integration)
+    3. Fusion   -> Blend HRM/LCM/LAM/MoE channels (Kosha integration)
     4. DHA      -> Delivery Harmonization & Adaptation (tone/readiness)
     5. Renderer -> Final output surface generation
 
@@ -16,8 +17,9 @@ Symbol-U AGI Architecture Mapping:
     - MLCR: Consciousness routing layer (WHY/HOW routing)
     - HRM: High-Resolution Mapper (deep cognitive mapping when activated)
     - LCM: Low-Context Mapper (minimal structural summary for simple queries)
+    - LAM: Long-Arc Mapper (temporal-longitudinal cognitive mapping for trajectory reasoning)
     - Persona: The voice/identity layer (WHO speaks)
-    - Fusion: Multi-channel blending (WHAT to say - HRM symbolic, LCM semantic, MoE domain)
+    - Fusion: Multi-channel blending (WHAT to say - HRM symbolic, LCM semantic, LAM temporal, MoE domain)
     - DHA: Delivery layer (HOW to say it - readiness, resistance, adaptation)
     - Renderer: Surface layer (formatted output for user consumption)
 
@@ -84,6 +86,9 @@ from .hrm_integration import maybe_run_hrm
 
 # LCM Integration (Low-Context Mapper)
 from .lcm_integration import maybe_run_lcm
+
+# LAM Integration (Long-Arc Mapper)
+from .lam_integration import maybe_run_lam
 
 # Renderer Components
 from symbolu.mechanical.renderer.fusion_renderer import (
@@ -212,6 +217,13 @@ class SymbolUPipeline:
         # Produces minimal structural summary for simple task-like queries
         # ================================================================
         ctx.lcm_map = maybe_run_lcm(ctx)
+
+        # ================================================================
+        # STAGE 1.7: LAM - Long-Arc Mapper (conditional)
+        # Runs when use_lam=True or long_arc_tension > threshold
+        # Produces temporal-longitudinal cognitive map for trajectory reasoning
+        # ================================================================
+        ctx.lam_map = maybe_run_lam(ctx)
 
         # ================================================================
         # STAGE 2: PERSONA - Resolve Communicative Identity
