@@ -93,6 +93,9 @@ from .lam_integration import maybe_run_lam
 # Coherence Observer (Observability Layer)
 from .coherence_observer import CoherenceObserver
 
+# Unified API (Observability/API Contract Layer)
+from symbolu.api.unified_api import get_unified_json
+
 # Renderer Components
 from symbolu.mechanical.renderer.fusion_renderer import (
     FusionOutput,
@@ -278,6 +281,18 @@ class SymbolUPipeline:
             coherence_state=ctx.coherence_state,
         )
         ctx.coherence_report = observation.to_dict()
+
+        # ================================================================
+        # UNIFIED API: Generate unified output (optional, non-invasive)
+        # Provides complete API contract for downstream consumers
+        # ================================================================
+        # Store unified output in context for optional access
+        # Does not modify any pipeline behavior
+        try:
+            ctx.unified_output = get_unified_json(ctx)
+        except Exception:
+            # If unified API fails, continue without it (fail-safe)
+            ctx.unified_output = None
 
         self._run_count += 1
 

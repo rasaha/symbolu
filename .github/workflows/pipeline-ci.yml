@@ -140,6 +140,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee coherence-observability-pytest.log
 
+      - name: Run Unified API Tests
+        run: |
+          pytest symbolu/mechanical/pipeline/integration_tests/test_unified_api_output.py \
+            --disable-warnings -q \
+            2>&1 | tee unified-api-pytest.log
+
       - name: Upload Coherence Reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -180,6 +186,7 @@ jobs:
             delta-snapshot-pytest.log
             coherence-observability-pytest.log
             persona-drift-pytest.log
+            unified-api-pytest.log
 
       - name: Upload snapshot diffs
         if: failure()
