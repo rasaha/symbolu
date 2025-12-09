@@ -135,7 +135,8 @@ class DILchatResponse:
 def build_dilchat_response(
     unified_output: Dict[str, Any],
     policy_flags: Dict[str, Any],
-    domain: str
+    domain: str,
+    session_policy_flags: Optional[Dict[str, Any]] = None
 ) -> DILchatResponse:
     """
     Convert Symbol-U unified output + policy flags into DILchat-ready response.
@@ -147,6 +148,7 @@ def build_dilchat_response(
         unified_output: Unified output dictionary from USU-API v1.0
         policy_flags: Policy flags from policy engine
         domain: Domain identifier (e.g., "trading", "therapy", "identity")
+        session_policy_flags: Optional session policy flags from session policy layer
 
     Returns:
         DILchatResponse with complete presentation data
@@ -200,21 +202,29 @@ def build_dilchat_response(
     mirror_summary = mirror.get("summary")
 
     # ========================================================================
-    # STEP 4: Build badges
+    # STEP 4: Merge session policy flags into policy_flags for badge/hint building
+    # ========================================================================
+    # Create a combined flags dict that includes session policy flags
+    combined_flags = {**policy_flags}
+    if session_policy_flags:
+        combined_flags["session_policy_flags"] = session_policy_flags
+
+    # ========================================================================
+    # STEP 5: Build badges
     # ========================================================================
     badges = _build_badges(
         stability_status=stability_status,
-        policy_flags=policy_flags,
+        policy_flags=combined_flags,
         coherence_score=coherence_score,
     )
 
     # ========================================================================
-    # STEP 5: Build hints
+    # STEP 6: Build hints
     # ========================================================================
-    hints = _build_hints(policy_flags)
+    hints = _build_hints(combined_flags)
 
     # ========================================================================
-    # STEP 6: Assemble DILchatResponse
+    # STEP 7: Assemble DILchatResponse
     # ========================================================================
     return DILchatResponse(
         text=text,
@@ -234,7 +244,8 @@ def build_dilchat_response(
 def build_dilchat_payload(
     unified_output: Dict[str, Any],
     policy_flags: Dict[str, Any],
-    domain: str
+    domain: str,
+    session_policy_flags: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Build fully serialized DILchat payload.
@@ -246,6 +257,7 @@ def build_dilchat_payload(
         unified_output: Unified output dictionary from USU-API v1.0
         policy_flags: Policy flags from policy engine
         domain: Domain identifier
+        session_policy_flags: Optional session policy flags from session policy layer
 
     Returns:
         JSON-serializable dictionary with complete DILchat response
@@ -255,11 +267,12 @@ def build_dilchat_payload(
         dilchat_payload = build_dilchat_payload(
             ctx.unified_output,
             ctx.policy_flags or {},
-            ctx.domain
+            ctx.domain,
+            ctx.session_policy_flags.to_dict() if ctx.session_policy_flags else None
         )
         return jsonify(dilchat_payload)  # Flask example
     """
-    response = build_dilchat_response(unified_output, policy_flags, domain)
+    response = build_dilchat_response(unified_output, policy_flags, domain, session_policy_flags)
     return response.to_dict()
 
 
@@ -281,10 +294,13 @@ def _build_badges(
         2. Grounding Needed Badge (if needs_grounding=True)
         3. Deep Reflection Badge (if allow_deep_reflection=True)
         4. Long-Arc Active Badge (if prefer_arc_mode=True)
+        5. Session Fragmented Badge (if session_is_fragmented=True)
+        6. Session Grounding Needed Badge (if session_needs_grounding=True)
+        7. Session Deep Reflection Allowed Badge (if session_allow_deep_reflection=True)
 
     Args:
         stability_status: Stability classification from policy engine
-        policy_flags: Policy flags dictionary
+        policy_flags: Policy flags dictionary (includes session_policy_flags if available)
         coherence_score: Coherence score (0-1)
 
     Returns:
@@ -348,6 +364,36 @@ def _build_badges(
             description="Temporal/identity arc reasoning is recommended."
         ))
 
+    # ========================================================================
+    # SESSION-LEVEL BADGES (from session policy layer)
+    # ========================================================================
+    # Extract session policy flags if available
+    session_policy = policy_flags.get("session_policy_flags", {})
+
+    # BADGE 5: Session Fragmented
+    if session_policy.get("session_is_fragmented"):
+        badges.append(DILchatBadge(
+            label="Session Fragmented",
+            level="warning",
+            description="Multi-turn conversation coherence is fragmented. Consider stabilizing."
+        ))
+
+    # BADGE 6: Session Grounding Needed
+    if session_policy.get("session_needs_grounding"):
+        badges.append(DILchatBadge(
+            label="Session Grounding Needed",
+            level="warning",
+            description="Session trajectory requires grounding. Use concrete, stabilizing responses."
+        ))
+
+    # BADGE 7: Session Deep Reflection Allowed
+    if session_policy.get("session_allow_deep_reflection"):
+        badges.append(DILchatBadge(
+            label="Session Deep Reflection Allowed",
+            level="info",
+            description="Session is stable enough for deeper multi-turn exploration."
+        ))
+
     return badges
 
 
@@ -366,9 +412,12 @@ def _build_hints(policy_flags: Dict[str, Any]) -> List[DILchatHint]:
         3. PREFER_CONCRETE - if prefer_concrete=True
         4. PREFER_ARC - if prefer_arc_mode=True
         5. COHERENCE_ALERT - if coherence_warning=True
+        6. GROUNDING_MODE - if session_recommended_style="grounded"
+        7. REFLECTION_MODE - if session_recommended_style="reflective"
+        8. EXPLORATION_OK - if session_recommended_style="exploratory"
 
     Args:
-        policy_flags: Policy flags dictionary
+        policy_flags: Policy flags dictionary (includes session_policy_flags if available)
 
     Returns:
         List of DILchatHint objects
@@ -418,6 +467,36 @@ def _build_hints(policy_flags: Dict[str, Any]) -> List[DILchatHint]:
         hints.append(DILchatHint(
             code="COHERENCE_ALERT",
             message="Conversation coherence is degraded. Suggest recentering or summarizing."
+        ))
+
+    # ========================================================================
+    # SESSION-LEVEL HINTS (from session policy layer)
+    # ========================================================================
+    # Extract session policy flags if available
+    session_policy = policy_flags.get("session_policy_flags", {})
+
+    # Get recommended style from session policy
+    recommended_style = session_policy.get("session_recommended_style")
+
+    # HINT 6: GROUNDING_MODE
+    if recommended_style == "grounded":
+        hints.append(DILchatHint(
+            code="GROUNDING_MODE",
+            message="Session trajectory recommends grounding mode. Use concrete, practical responses."
+        ))
+
+    # HINT 7: REFLECTION_MODE
+    elif recommended_style == "reflective":
+        hints.append(DILchatHint(
+            code="REFLECTION_MODE",
+            message="Session trajectory recommends reflective mode. Deep exploration is safe."
+        ))
+
+    # HINT 8: EXPLORATION_OK
+    elif recommended_style == "exploratory":
+        hints.append(DILchatHint(
+            code="EXPLORATION_OK",
+            message="Session trajectory supports exploration. Curious, open-ended responses work well."
         ))
 
     return hints

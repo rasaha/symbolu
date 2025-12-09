@@ -154,11 +154,22 @@ def create_app() -> "FastAPI":
 
             # Retrieve pre-computed outputs
             dilchat_payload = ctx.dilchat_payload or {}
+            session_policy_flags = ctx.session_policy_flags
 
             # Determine domain (prefer request domain over dilchat if unknown)
             domain = dilchat_payload.get("domain", req.domain)
             if domain == "unknown" or not domain:
                 domain = req.domain
+
+            # Build session policy summary (public-safe fields only)
+            session_policy = {}
+            if session_policy_flags:
+                session_policy = {
+                    "session_is_stable": session_policy_flags.session_is_stable,
+                    "session_is_fragmented": session_policy_flags.session_is_fragmented,
+                    "session_needs_grounding": session_policy_flags.session_needs_grounding,
+                    "session_recommended_style": session_policy_flags.session_recommended_style,
+                }
 
             # Build response (presentation layer only)
             response = {
@@ -172,6 +183,7 @@ def create_app() -> "FastAPI":
                     "practical": dilchat_payload.get("practical_summary"),
                     "mirror": dilchat_payload.get("mirror_summary")
                 },
+                "session_policy": session_policy,
                 "metadata": dilchat_payload.get("metadata", {})
             }
 
@@ -241,11 +253,18 @@ def create_app() -> "FastAPI":
             unified_output = ctx.unified_output or {}
             policy_flags = ctx.policy_flags or {}
             dilchat_payload = ctx.dilchat_payload or {}
+            session_policy_flags = ctx.session_policy_flags
+
+            # Serialize session policy flags if available
+            session_policy = {}
+            if session_policy_flags:
+                session_policy = session_policy_flags.to_dict()
 
             # Build response (complete diagnostic output)
             response = {
                 "unified_output": unified_output,
                 "policy_flags": policy_flags,
+                "session_policy": session_policy,
                 "dilchat_payload": dilchat_payload
             }
 
@@ -368,8 +387,19 @@ def create_app() -> "FastAPI":
             # Append turn to session history
             session_store.append_turn(session_id, unified_output)
 
-            # Retrieve DILchat payload for response
+            # Retrieve DILchat payload and session policy for response
             dilchat_payload = ctx.dilchat_payload or {}
+            session_policy_flags = ctx.session_policy_flags
+
+            # Build session policy summary (public-safe fields only)
+            session_policy = {}
+            if session_policy_flags:
+                session_policy = {
+                    "session_is_stable": session_policy_flags.session_is_stable,
+                    "session_is_fragmented": session_policy_flags.session_is_fragmented,
+                    "session_needs_grounding": session_policy_flags.session_needs_grounding,
+                    "session_recommended_style": session_policy_flags.session_recommended_style,
+                }
 
             # Build response with session metadata
             response = {
@@ -383,6 +413,7 @@ def create_app() -> "FastAPI":
                     "practical": dilchat_payload.get("practical_summary"),
                     "mirror": dilchat_payload.get("mirror_summary")
                 },
+                "session_policy": session_policy,
                 "metadata": {
                     **dilchat_payload.get("metadata", {}),
                     "session_id": session_id,

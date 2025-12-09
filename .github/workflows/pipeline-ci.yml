@@ -186,6 +186,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee sessions-pytest.log
 
+      - name: Run Session Policy Tests
+        run: |
+          pytest symbolu/policy/tests/test_session_policy.py \
+            --disable-warnings -q \
+            2>&1 | tee session-policy-pytest.log
+
       - name: Upload Coherence Reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -232,6 +238,7 @@ jobs:
             api-server-pytest.log
             api-security-pytest.log
             sessions-pytest.log
+            session-policy-pytest.log
 
       - name: Upload snapshot diffs
         if: failure()

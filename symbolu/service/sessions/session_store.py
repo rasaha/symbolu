@@ -168,6 +168,8 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
     - Average coherence trend
     - Persona drift detection
     - Temporal arc patterns
+    - Semantic stability metrics
+    - Mapper volatility tracking
     - Last routing state
 
     All computations are deterministic and zero-LLM.
@@ -188,6 +190,8 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         for coh in state.coherence_history:
             if isinstance(coh, dict) and "stability" in coh:
                 stabilities.append(coh["stability"])
+            elif isinstance(coh, dict) and "coherence_score" in coh:
+                stabilities.append(coh["coherence_score"])
         if stabilities:
             coherence_trend = sum(stabilities) / len(stabilities)
 
@@ -213,6 +217,61 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if arcs:
             temporal_arc_avg = sum(arcs) / len(arcs)
 
+    # Compute semantic stability score
+    # Measures consistency of semantic representation across turns
+    # Lower score = more semantic drift, Higher score = more stable
+    semantic_stability_score = 0.5  # Default neutral score
+    if state.coherence_history:
+        semantic_scores = []
+        for coh in state.coherence_history:
+            if isinstance(coh, dict) and "semantic_stability" in coh:
+                semantic_scores.append(coh["semantic_stability"])
+        if semantic_scores:
+            semantic_stability_score = sum(semantic_scores) / len(semantic_scores)
+        elif stabilities:
+            # Fallback: use coherence trend as proxy for semantic stability
+            semantic_stability_score = coherence_trend
+
+    # Compute mapper volatility score
+    # Measures how much mapper outputs (HRM/LCM/LAM) change across turns
+    # Higher score = more volatility (unstable mapping)
+    mapper_volatility_score = 0.5  # Default neutral score
+    if len(state.mapper_history) >= 2:
+        # Calculate volatility based on mapper activation changes
+        volatilities = []
+        for i in range(1, len(state.mapper_history)):
+            prev_mapper = state.mapper_history[i - 1]
+            curr_mapper = state.mapper_history[i]
+
+            if isinstance(prev_mapper, dict) and isinstance(curr_mapper, dict):
+                # Track which mappers are active in each turn
+                prev_active = set()
+                curr_active = set()
+
+                if prev_mapper.get("hrm_active"):
+                    prev_active.add("hrm")
+                if prev_mapper.get("lcm_active"):
+                    prev_active.add("lcm")
+                if prev_mapper.get("lam_active"):
+                    prev_active.add("lam")
+
+                if curr_mapper.get("hrm_active"):
+                    curr_active.add("hrm")
+                if curr_mapper.get("lcm_active"):
+                    curr_active.add("lcm")
+                if curr_mapper.get("lam_active"):
+                    curr_active.add("lam")
+
+                # Compute change ratio (0 = no change, 1 = complete change)
+                if prev_active or curr_active:
+                    symmetric_diff = len(prev_active.symmetric_difference(curr_active))
+                    total_unique = len(prev_active.union(curr_active))
+                    if total_unique > 0:
+                        volatilities.append(symmetric_diff / total_unique)
+
+        if volatilities:
+            mapper_volatility_score = sum(volatilities) / len(volatilities)
+
     # Get last tier and domain
     last_tier = "HYBRID"
     last_domain = state.domain
@@ -228,6 +287,8 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         coherence_trend=coherence_trend,
         persona_drift_avg=persona_drift_avg,
         temporal_arc_avg=temporal_arc_avg,
+        semantic_stability_score=semantic_stability_score,
+        mapper_volatility_score=mapper_volatility_score,
         last_tier=last_tier,
         last_domain=last_domain,
         created_at=state.created_at,
