@@ -65,6 +65,13 @@ class CoherenceState:
     max_arc_tension_harmonizer: Optional[float] = None  # Maximum Arc-Tension Harmonizer
     min_arc_tension_harmonizer: Optional[float] = None  # Minimum Arc-Tension Harmonizer
 
+    # Phase 13: Enhanced SMI (observation only - not used in scoring)
+    enhanced_smi_history: List[Optional[float]] = field(default_factory=list)  # Enhanced SMI per turn
+    current_enhanced_smi: Optional[float] = None  # Current Enhanced SMI value
+    avg_enhanced_smi: Optional[float] = None  # Average Enhanced SMI
+    max_enhanced_smi: Optional[float] = None  # Maximum Enhanced SMI
+    min_enhanced_smi: Optional[float] = None  # Minimum Enhanced SMI
+
     # Phase 3 derived formula metrics (observation only - not used in scoring)
     resonance_index: Optional[float] = None  # [0.0, 1.0] - formula-weighted stabilizing signal
     tension_index: Optional[float] = None  # [0.0, 1.0] - session tension from Tension Corridor
@@ -123,6 +130,14 @@ class CoherenceState:
     temporal_entropy_volatility: Optional[float] = None  # Entropy volatility [0.0, 1.0]
     temporal_entropy_diff_history: List[Optional[float]] = field(default_factory=list)  # Diff history
     temporal_entropy_volatility_history: List[Optional[float]] = field(default_factory=list)  # Volatility history
+
+    # Phase 19: Semantic-Temporal Drift Fusion (observation only - not used in scoring)
+    drift_fusion_index: Optional[float] = None  # Current drift fusion index [0.0, 1.0]
+    drift_risk_band: Optional[str] = None  # Current drift risk band: "low", "moderate", "high"
+    drift_pattern_tags: List[str] = field(default_factory=list)  # Current drift pattern tags
+    drift_fusion_index_history: List[Optional[float]] = field(default_factory=list)  # Drift fusion index per turn
+    drift_risk_band_history: List[str] = field(default_factory=list)  # Drift risk band per turn
+    drift_pattern_tags_history: List[List[str]] = field(default_factory=list)  # Drift pattern tags per turn
 
     # Phase 21: Mirror-Time Loop (observation only - not used in scoring)
     mirror_time_loop_snapshot: Optional[Any] = None  # MirrorTimeLoopSnapshot
@@ -317,6 +332,9 @@ class CoherenceState:
         self.vritti_momentum_history = self.vritti_momentum_history[-window:]
         self.arc_tension_harmonizer_history = self.arc_tension_harmonizer_history[-window:]
 
+        # Phase 13 formula histories
+        self.enhanced_smi_history = self.enhanced_smi_history[-window:]
+
         # Phase 16 formula histories
         self.coherence_fused_history = self.coherence_fused_history[-window:]
 
@@ -330,6 +348,11 @@ class CoherenceState:
         # Phase 18 formula histories
         self.temporal_entropy_diff_history = self.temporal_entropy_diff_history[-window:]
         self.temporal_entropy_volatility_history = self.temporal_entropy_volatility_history[-window:]
+
+        # Phase 19 drift fusion histories
+        self.drift_fusion_index_history = self.drift_fusion_index_history[-window:]
+        self.drift_risk_band_history = self.drift_risk_band_history[-window:]
+        self.drift_pattern_tags_history = self.drift_pattern_tags_history[-window:]
 
         # Phase 21 formula histories
         self.loop_alignment_history = self.loop_alignment_history[-window:]

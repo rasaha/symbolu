@@ -23,6 +23,7 @@ from typing import Dict, Optional, Any, Set
 from uuid import uuid4
 from datetime import datetime
 import threading
+from collections import Counter
 
 from .session_models import SessionState, SessionSummary
 from .session_memory import SessionMemory, SessionMemoryExtractor
@@ -961,6 +962,46 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_shf_notes:
             symbolic_harmonization_notes_list = sorted(set(all_shf_notes))
 
+    # ============================================================================
+    # Phase 19: Drift Fusion aggregates (observation only)
+    # ============================================================================
+    avg_drift_fusion_index = None
+    dominant_drift_risk_band = None
+    drift_pattern_frequency = {}
+
+    if state.coherence_history:
+        # Extract drift fusion indices
+        drift_indices = [
+            turn.get("drift_fusion_index")
+            for turn in state.coherence_history
+            if isinstance(turn, dict) and turn.get("drift_fusion_index") is not None
+        ]
+        if drift_indices:
+            avg_drift_fusion_index = sum(drift_indices) / len(drift_indices)
+
+        # Extract drift risk bands
+        drift_bands = [
+            turn.get("drift_risk_band")
+            for turn in state.coherence_history
+            if isinstance(turn, dict) and turn.get("drift_risk_band") and turn.get("drift_risk_band") != ""
+        ]
+        if drift_bands:
+            from collections import Counter
+            band_counts = Counter(drift_bands)
+            dominant_drift_risk_band = band_counts.most_common(1)[0][0]
+
+        # Extract drift pattern tags
+        all_tags = []
+        for turn in state.coherence_history:
+            if isinstance(turn, dict):
+                tags = turn.get("drift_pattern_tags", [])
+                if tags:
+                    all_tags.extend(tags)
+        if all_tags:
+            from collections import Counter
+            tag_counts = Counter(all_tags)
+            drift_pattern_frequency = dict(tag_counts)
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -1020,4 +1061,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_symbolic_harmonization=avg_symbolic_harmonization_val,
         dominant_symbolic_harmonization_pattern=dominant_symbolic_harmonization_pattern_val,
         symbolic_harmonization_notes=symbolic_harmonization_notes_list,
+        avg_drift_fusion_index=avg_drift_fusion_index,
+        dominant_drift_risk_band=dominant_drift_risk_band,
+        drift_pattern_frequency=drift_pattern_frequency,
     )

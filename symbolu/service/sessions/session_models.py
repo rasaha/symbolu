@@ -92,6 +92,11 @@ class SessionSummary:
     last_domain: str = "generic"
     created_at: Optional[datetime] = None
 
+    # Phase 19: Drift Fusion aggregates (observation only)
+    avg_drift_fusion_index: Optional[float] = None
+    dominant_drift_risk_band: Optional[str] = None
+    drift_pattern_frequency: Dict[str, int] = field(default_factory=dict)
+
     # Convenience properties for policy layer compatibility
     @property
     def coherence_score(self) -> float:

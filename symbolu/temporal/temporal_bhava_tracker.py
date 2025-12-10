@@ -151,6 +151,11 @@ class TemporalState:
         return self.formulas.arc_tension_harmonizer
 
     @property
+    def enhanced_smi(self) -> Optional[float]:
+        """Get enhanced_smi from formulas snapshot (Phase 13)."""
+        return self.formulas.enhanced_smi
+
+    @property
     def mirror_time_loop(self) -> Optional[Any]:
         """Get mirror_time_loop from formulas snapshot (Phase 21)."""
         return self.formulas.mirror_time_loop
@@ -477,6 +482,26 @@ class TemporalBhavaTracker:
         except Exception as e:
             # Log error and set to None (fail-safe)
             snapshot.arc_tension_harmonizer = None
+
+        # ====================================================================
+        # PHASE 13: Compute Enhanced SMI (observation only)
+        # ====================================================================
+        try:
+            enhanced_smi_snapshot_result = compute_enhanced_smi_snapshot(
+                dim_resonance=dimensional_resonance if dimensional_resonance is not None else None,
+                vrtti_balance=vrtti_intensity if vrtti_intensity is not None else None,
+                bhava_alignment=bhava_position if bhava_position is not None else None,
+                semantic_weighting=0.5,  # Default neutral value
+                temporal_decay=0.5,  # Default neutral value
+                noise_suppression=0.7,  # Default moderate suppression
+            )
+            if enhanced_smi_snapshot_result is not None:
+                snapshot.enhanced_smi = enhanced_smi_snapshot_result.enhanced_smi
+            else:
+                snapshot.enhanced_smi = None
+        except Exception as e:
+            # Log error and set to None (fail-safe)
+            snapshot.enhanced_smi = None
 
         # Create state with snapshot
         state = TemporalState(formulas=snapshot)
