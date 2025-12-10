@@ -100,6 +100,10 @@ class LLMRenderer:
             - Use: cohesive devices, temporal markers
             - Avoid: therapy language (unless domain=therapy)
 
+        Phase 9 Resonance Modulation:
+            - Positive resonance bias → smoother transitions
+            - Negative resonance bias → tighter, more compressed tone
+
         Args:
             text: Original text
             mapper_profile: Mapper profile from MLCR/TTOR
@@ -110,19 +114,33 @@ class LLMRenderer:
         if mapper_profile is None:
             return text
 
+        # Check if mapper-specific tone should be applied
+        has_mapper_tone = False
+
         # LCM: Short, clipped, actionable
         if mapper_profile.practical_bias > 0.6 and mapper_profile.resolution_level == "low":
-            return self._apply_lcm_tone(text)
+            text = self._apply_lcm_tone(text)
+            has_mapper_tone = True
 
         # HRM: Clearer transitions, deeper detail
         elif mapper_profile.detail_bias > 0.6 and mapper_profile.resolution_level == "high":
-            return self._apply_hrm_tone(text)
+            text = self._apply_hrm_tone(text)
+            has_mapper_tone = True
 
         # LAM: Reflective, slow cadence
         elif mapper_profile.reflective_bias > 0.6 and mapper_profile.arc_mode != "none":
-            return self._apply_lam_tone(text, mapper_profile.arc_mode)
+            text = self._apply_lam_tone(text, mapper_profile.arc_mode)
+            has_mapper_tone = True
 
-        # Default: return unchanged
+        # Phase 9: Apply resonance tone shaping only if no mapper-specific tone applied
+        if not has_mapper_tone and hasattr(mapper_profile, 'guna_resonance_bias') and hasattr(mapper_profile, 'kosha_resonance_bias'):
+            # Check for positive resonance (smoother)
+            if mapper_profile.guna_resonance_bias > 0 or mapper_profile.kosha_resonance_bias > 0:
+                text = self._apply_smooth_tone(text)
+            # Check for negative resonance (tighter)
+            elif mapper_profile.guna_resonance_bias < 0 or mapper_profile.kosha_resonance_bias < 0:
+                text = self._apply_compressed_tone(text)
+
         return text
 
     def _apply_lcm_tone(self, text: str) -> str:
@@ -184,3 +202,54 @@ class LLMRenderer:
         # Join with more flowing connectors
         result = '. '.join(sentences) + '.'
         return result
+
+    def _apply_smooth_tone(self, text: str) -> str:
+        """
+        Apply Phase 9 smooth tone (positive resonance bias).
+
+        Makes transitions smoother and more flowing.
+        """
+        sentences = [s.strip() for s in text.split('.') if s.strip()]
+
+        # Add smooth connectors between sentences
+        if len(sentences) > 1:
+            smooth_connectors = ["Additionally", "Furthermore", "Also"]
+            enhanced = [sentences[0]]
+
+            for i, sent in enumerate(sentences[1:], 1):
+                if i <= len(smooth_connectors):
+                    enhanced.append(f"{smooth_connectors[i-1].lower()}, {sent.lower()}")
+                else:
+                    enhanced.append(sent)
+
+            return '. '.join(enhanced) + '.'
+
+        return text
+
+    def _apply_compressed_tone(self, text: str) -> str:
+        """
+        Apply Phase 9 compressed tone (negative resonance bias).
+
+        Makes text tighter and more compressed.
+        """
+        sentences = [s.strip() for s in text.split('.') if s.strip()]
+
+        # Remove connectors and make more direct
+        compressed = []
+        for sent in sentences:
+            # Remove transition words at start (with or without comma)
+            words = sent.split()
+            if words:
+                first_word = words[0].rstrip(',').lower()
+                if first_word in ['additionally', 'furthermore', 'moreover', 'also', 'however']:
+                    # Remove first word (and potential comma)
+                    sent = ' '.join(words[1:])
+                    # Remove leading comma if present
+                    sent = sent.lstrip(', ')
+                    # Capitalize first letter
+                    if sent:
+                        sent = sent[0].upper() + sent[1:] if len(sent) > 1 else sent.upper()
+            compressed.append(sent)
+
+        # Keep maximum 3 sentences for compression
+        return '. '.join(compressed[:3]) + '.'

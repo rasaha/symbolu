@@ -10,6 +10,9 @@ on:
       - "symbolu/mechanical/hrm/**"
       - "symbolu/mechanical/lcm/**"
       - "symbolu/mechanical/lam/**"
+      - "symbolu/mechanical/mlcr/**"
+      - "symbolu/mechanical/renderer/**"
+      - "symbolu/mechanical/dha/**"
       - "symbolu/temporal/**"
       - "symbolu/core/coherence/**"
       - "symbolu/formulas/**"
@@ -35,6 +38,9 @@ on:
       - "symbolu/mechanical/hrm/**"
       - "symbolu/mechanical/lcm/**"
       - "symbolu/mechanical/lam/**"
+      - "symbolu/mechanical/mlcr/**"
+      - "symbolu/mechanical/renderer/**"
+      - "symbolu/mechanical/dha/**"
       - "symbolu/temporal/**"
       - "symbolu/core/coherence/**"
       - "symbolu/formulas/**"
@@ -194,6 +200,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee phase8-resonance-integration-pytest.log
 
+      - name: Run Phase 9 Guna/Kosha Mapper Modulation Tests
+        run: |
+          pytest symbolu/mechanical/pipeline/integration_tests/test_phase9_guna_kosha_mapper_modulation.py \
+            --disable-warnings -q \
+            2>&1 | tee phase9-mapper-modulation-pytest.log
+
       - name: Run Policy Engine Tests
         run: |
           pytest symbolu/policy/tests/test_policy_engine.py \
@@ -324,6 +336,8 @@ jobs:
             phase3-derived-metrics-pytest.log
             phase4-coherence-v2-pytest.log
             phase5-formula-ui-pytest.log
+            phase8-resonance-integration-pytest.log
+            phase9-mapper-modulation-pytest.log
             policy-engine-pytest.log
             dilchat-adapter-pytest.log
             api-server-pytest.log
