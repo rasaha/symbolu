@@ -163,6 +163,13 @@ class UnifiedSessionAnalytics:
     symbolic_harmonization_sparkline: Optional[MetricSparkline] = None
     symbolic_harmonization_notes: List[str] = field(default_factory=list)  # SHF diagnostic notes
 
+    # ========================================================================
+    # Phase 41: Coherence-Regime Scenario Mapper
+    # ========================================================================
+    coherence_regime: Optional[str] = None  # Dominant regime name
+    coherence_regime_band: Optional[str] = None  # "stable" | "mixed" | "volatile"
+    coherence_regime_tags: List[str] = field(default_factory=list)  # Regime diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert to JSON-serializable dictionary.

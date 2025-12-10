@@ -215,3 +215,9 @@ class SessionSummary:
     avg_ida: Optional[float] = None  # Average Identity Drift Anchoring [0.0, 1.0]
     dominant_memory_band: Optional[str] = None  # Most common memory band: "LOW" | "MEDIUM" | "HIGH"
     aggregated_memory_tags: List[str] = field(default_factory=list)  # Collected IRM diagnostic tags
+
+    # Phase 41 Coherence-Regime Scenario Mapper (observation only)
+    dominant_coherence_regime: Optional[str] = None  # Most frequent coherence regime
+    regime_band: Optional[str] = None  # Most frequent regime band: "stable" | "mixed" | "volatile"
+    regime_frequency: Dict[str, int] = field(default_factory=dict)  # Regime name → occurrence count
+    regime_notes: List[str] = field(default_factory=list)  # Collected regime notes (deduped)
