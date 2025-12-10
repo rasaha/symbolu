@@ -189,3 +189,17 @@ class SessionSummary:
     avg_symbolic_harmonization: Optional[float] = None  # Average Symbolic Harmonization Index [0.0, 1.0]
     dominant_symbolic_harmonization_pattern: Optional[str] = None  # "high_harmony" | "medium_harmony" | "low_harmony"
     symbolic_harmonization_notes: List[str] = field(default_factory=list)  # Collected SHF diagnostic notes
+
+    # Phase 34 Identity Harmonics Layer (observation only)
+    avg_core_identity_harmonic: Optional[float] = None  # Average CIH [0.0, 1.0]
+    avg_adaptive_identity_harmonic: Optional[float] = None  # Average AIH [0.0, 1.0]
+    avg_relational_identity_harmonic: Optional[float] = None  # Average RIH [0.0, 1.0]
+    avg_identity_harmonics_index: Optional[float] = None  # Average IHI [0.0, 1.0]
+    identity_harmonics_pattern: Optional[str] = None  # "converging" | "balanced" | "diverging"
+    identity_harmonics_notes: List[str] = field(default_factory=list)  # Collected IHL diagnostic notes
+
+    # Phase 35 Predictive Persona Drift Model (observation only)
+    avg_predicted_drift_magnitude: Optional[float] = None  # Average predicted drift magnitude [0.0, 1.0]
+    avg_predicted_drift_stability: Optional[float] = None  # Average drift stability score [0.0, 1.0]
+    dominant_drift_band: Optional[str] = None  # Most common drift band: "LOW" | "MEDIUM" | "HIGH"
+    drift_prediction_notes: List[str] = field(default_factory=list)  # Collected PPDM diagnostic notes

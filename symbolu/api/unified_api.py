@@ -82,6 +82,7 @@ class UnifiedOutput:
     insight_window: Optional[Dict[str, Any]] = None  # Phase 32: Insight window gating result
     schema_adaptive_map: Optional[Dict[str, Any]] = None  # Phase 33: Persona schema adaptive routing (observation-only)
     identity_harmonics: Optional[Dict[str, Any]] = None  # Phase 34: Identity harmonics layer (observation-only, tone-level only)
+    predictive_persona_drift: Optional[Dict[str, Any]] = None  # Phase 35: Predictive persona drift model (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -930,6 +931,30 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "notes": getattr(ihl_snapshot, 'notes', []),
             }
 
+    # Phase 35: Extract predictive persona drift profile from persona response
+    predictive_drift_data = None
+    if hasattr(ctx, 'persona_response') and ctx.persona_response is not None:
+        # Try to extract predictive_drift_profile from PersonaResponse
+        predictive_drift_profile = getattr(ctx.persona_response, 'predictive_drift_profile', None)
+        if predictive_drift_profile is not None:
+            # Predictive drift profile is already a dict from persona engine
+            # Just pass it through (JSON-safe)
+            predictive_drift_data = predictive_drift_profile
+
+    # Also try to extract from coherence block for observability
+    if predictive_drift_data is None and hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        ppdm_snapshot = getattr(ctx.coherence_state, 'predictive_drift_snapshot', None)
+        if ppdm_snapshot is not None:
+            # Build dict from snapshot fields
+            drift_direction_scores = getattr(ppdm_snapshot, 'drift_direction_scores', {})
+            predictive_drift_data = {
+                "magnitude": getattr(ppdm_snapshot, 'drift_magnitude_prediction', None),
+                "direction": drift_direction_scores,
+                "stability": getattr(ppdm_snapshot, 'drift_stability_score', None),
+                "band": getattr(ppdm_snapshot, 'drift_likelihood_band', None),
+                "tags": getattr(ppdm_snapshot, 'notes', []),
+            }
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -954,6 +979,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         insight_window=insight_window_data,  # Phase 32
         schema_adaptive_map=schema_adaptive_map_data,  # Phase 33
         identity_harmonics=identity_harmonics_data,  # Phase 34
+        predictive_persona_drift=predictive_drift_data,  # Phase 35
     )
 
 

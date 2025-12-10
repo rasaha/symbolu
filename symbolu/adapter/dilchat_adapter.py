@@ -967,6 +967,85 @@ def _build_badges(
             ))
 
     # ========================================================================
+    # Phase 35: Predictive Persona Drift Model Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract predictive_persona_drift from unified_output
+    predictive_drift = unified_output.get("predictive_persona_drift") if unified_output else None
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and predictive_drift is not None:
+        # Extract predictive drift metrics
+        drift_magnitude = predictive_drift.get("magnitude")
+        drift_direction = predictive_drift.get("direction", {})
+        drift_stability = predictive_drift.get("stability")
+        drift_band = predictive_drift.get("band")
+        drift_tags = predictive_drift.get("tags", [])
+
+        # PREDICTIVE_DRIFT_HIGH: Drift magnitude >= 0.65 OR drift band = HIGH
+        if (drift_magnitude is not None and drift_magnitude >= 0.65) or drift_band == "HIGH":
+            badges.append(DILchatBadge(
+                label="PREDICTIVE_DRIFT_HIGH",
+                level="warning",
+                description=f"High predicted persona drift (magnitude: {drift_magnitude:.2f if drift_magnitude else 'N/A'}). Tone may shift in coming turns."
+            ))
+
+        # PREDICTIVE_DRIFT_MEDIUM: Drift band = MEDIUM
+        elif drift_band == "MEDIUM":
+            badges.append(DILchatBadge(
+                label="PREDICTIVE_DRIFT_MEDIUM",
+                level="info",
+                description=f"Medium predicted persona drift (magnitude: {drift_magnitude:.2f if drift_magnitude else 'N/A'}). Moderate drift tendency detected."
+            ))
+
+        # PREDICTIVE_DRIFT_LOW: Drift band = LOW
+        elif drift_band == "LOW":
+            badges.append(DILchatBadge(
+                label="PREDICTIVE_DRIFT_LOW",
+                level="info",
+                description=f"Low predicted persona drift (magnitude: {drift_magnitude:.2f if drift_magnitude else 'N/A'}). Stable trajectory expected."
+            ))
+
+        # DRIFT_DIRECTION_STRUCTURE: toward_structure >= 0.60
+        if drift_direction.get("toward_structure", 0.0) >= 0.60:
+            badges.append(DILchatBadge(
+                label="DRIFT_DIRECTION_STRUCTURE",
+                level="info",
+                description="Drift direction: toward structure. Future tone may become more logical and precise."
+            ))
+
+        # DRIFT_DIRECTION_WARMTH: toward_warmth >= 0.60
+        if drift_direction.get("toward_warmth", 0.0) >= 0.60:
+            badges.append(DILchatBadge(
+                label="DRIFT_DIRECTION_WARMTH",
+                level="info",
+                description="Drift direction: toward warmth. Future tone may become more empathic and connected."
+            ))
+
+        # DRIFT_DIRECTION_GROUNDING: toward_grounding >= 0.60
+        if drift_direction.get("toward_grounding", 0.0) >= 0.60:
+            badges.append(DILchatBadge(
+                label="DRIFT_DIRECTION_GROUNDING",
+                level="info",
+                description="Drift direction: toward grounding. Future tone may become more stable and rooted."
+            ))
+
+        # DRIFT_STABILITY_STRONG: Drift stability >= 0.70
+        if drift_stability is not None and drift_stability >= 0.70:
+            badges.append(DILchatBadge(
+                label="DRIFT_STABILITY_STRONG",
+                level="info",
+                description=f"Strong drift trajectory stability (DSS: {drift_stability:.2f}). Prediction confidence is high."
+            ))
+
+        # DRIFT_STABILITY_WEAK: Drift stability < 0.40
+        elif drift_stability is not None and drift_stability < 0.40:
+            badges.append(DILchatBadge(
+                label="DRIFT_STABILITY_WEAK",
+                level="warning",
+                description=f"Weak drift trajectory stability (DSS: {drift_stability:.2f}). Prediction confidence is low."
+            ))
+
+    # ========================================================================
     # BADGE 16: Trading Guardrail Badges (Phase 7: Formula-Aware Trading Guardrails v1.0)
     # ========================================================================
     if trading_guardrails:

@@ -159,6 +159,24 @@ class CoherenceObservation:
     persona_schema_drift: Optional[float] = None  # Schema drift score [0.0, 1.0]
     persona_schema_tags: List[str] = field(default_factory=list)  # Schema diagnostic tags
 
+    # Phase 34: Identity Harmonics Layer (observation only)
+    identity_harmonics_snapshot: Optional[Any] = None  # IdentityHarmonicsSnapshot
+    core_identity_harmonic: Optional[float] = None  # CIH [0.0, 1.0]
+    adaptive_identity_harmonic: Optional[float] = None  # AIH [0.0, 1.0]
+    relational_identity_harmonic: Optional[float] = None  # RIH [0.0, 1.0]
+    identity_harmonics_index: Optional[float] = None  # IHI [0.0, 1.0]
+    identity_stability_score: Optional[float] = None  # Identity stability [0.0, 1.0]
+    identity_flexibility_score: Optional[float] = None  # Identity flexibility [0.0, 1.0]
+    identity_harmonics_notes: List[str] = field(default_factory=list)  # IHL diagnostic notes
+
+    # Phase 35: Predictive Persona Drift Model (observation only)
+    predictive_drift_snapshot: Optional[Any] = None  # PredictivePersonaDriftSnapshot
+    predicted_drift_magnitude: Optional[float] = None  # DMP [0.0, 1.0]
+    predicted_drift_direction: Optional[Dict[str, float]] = None  # Direction scores
+    predicted_drift_stability: Optional[float] = None  # DSS [0.0, 1.0]
+    predicted_drift_band: Optional[str] = None  # Drift likelihood band: "LOW", "MEDIUM", "HIGH"
+    predicted_drift_tags: List[str] = field(default_factory=list)  # PPDM diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -598,6 +616,44 @@ class CoherenceObserver:
                 persona_schema_drift = getattr(schema_adaptive_map, 'schema_drift', None)
                 persona_schema_tags = getattr(schema_adaptive_map, 'schema_tags', [])
 
+        # Phase 34: Extract Identity Harmonics from coherence state
+        identity_harmonics_snapshot = None
+        core_identity_harmonic = None
+        adaptive_identity_harmonic = None
+        relational_identity_harmonic = None
+        identity_harmonics_index = None
+        identity_stability_score = None
+        identity_flexibility_score = None
+        identity_harmonics_notes = []
+
+        if coherence_state is not None:
+            identity_harmonics_snapshot = getattr(coherence_state, 'identity_harmonics_snapshot', None)
+            if identity_harmonics_snapshot is not None:
+                core_identity_harmonic = getattr(identity_harmonics_snapshot, 'core_identity_harmonic', None)
+                adaptive_identity_harmonic = getattr(identity_harmonics_snapshot, 'adaptive_identity_harmonic', None)
+                relational_identity_harmonic = getattr(identity_harmonics_snapshot, 'relational_identity_harmonic', None)
+                identity_harmonics_index = getattr(identity_harmonics_snapshot, 'identity_harmonics_index', None)
+                identity_stability_score = getattr(identity_harmonics_snapshot, 'identity_stability_score', None)
+                identity_flexibility_score = getattr(identity_harmonics_snapshot, 'identity_flexibility_score', None)
+                identity_harmonics_notes = getattr(identity_harmonics_snapshot, 'notes', [])
+
+        # Phase 35: Extract Predictive Persona Drift from coherence state
+        predictive_drift_snapshot = None
+        predicted_drift_magnitude = None
+        predicted_drift_direction = None
+        predicted_drift_stability = None
+        predicted_drift_band = None
+        predicted_drift_tags = []
+
+        if coherence_state is not None:
+            predictive_drift_snapshot = getattr(coherence_state, 'predictive_drift_snapshot', None)
+            if predictive_drift_snapshot is not None:
+                predicted_drift_magnitude = getattr(predictive_drift_snapshot, 'drift_magnitude_prediction', None)
+                predicted_drift_direction = getattr(predictive_drift_snapshot, 'drift_direction_scores', None)
+                predicted_drift_stability = getattr(predictive_drift_snapshot, 'drift_stability_score', None)
+                predicted_drift_band = getattr(predictive_drift_snapshot, 'drift_likelihood_band', None)
+                predicted_drift_tags = getattr(predictive_drift_snapshot, 'notes', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -698,6 +754,20 @@ class CoherenceObserver:
             persona_schema_stability=persona_schema_stability,  # Phase 33
             persona_schema_drift=persona_schema_drift,  # Phase 33
             persona_schema_tags=persona_schema_tags,  # Phase 33
+            identity_harmonics_snapshot=identity_harmonics_snapshot,  # Phase 34
+            core_identity_harmonic=core_identity_harmonic,  # Phase 34
+            adaptive_identity_harmonic=adaptive_identity_harmonic,  # Phase 34
+            relational_identity_harmonic=relational_identity_harmonic,  # Phase 34
+            identity_harmonics_index=identity_harmonics_index,  # Phase 34
+            identity_stability_score=identity_stability_score,  # Phase 34
+            identity_flexibility_score=identity_flexibility_score,  # Phase 34
+            identity_harmonics_notes=identity_harmonics_notes,  # Phase 34
+            predictive_drift_snapshot=predictive_drift_snapshot,  # Phase 35
+            predicted_drift_magnitude=predicted_drift_magnitude,  # Phase 35
+            predicted_drift_direction=predicted_drift_direction,  # Phase 35
+            predicted_drift_stability=predicted_drift_stability,  # Phase 35
+            predicted_drift_band=predicted_drift_band,  # Phase 35
+            predicted_drift_tags=predicted_drift_tags,  # Phase 35
         )
 
         # Store observation
