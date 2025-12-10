@@ -248,6 +248,7 @@ def build_dilchat_response(
         trading_guardrails=trading_guardrails,
         coherence=coherence,
         domain=response_domain,
+        unified_output=unified_output,
     )
 
     # ========================================================================
@@ -338,6 +339,7 @@ def _build_badges(
     trading_guardrails: Optional[Dict[str, Any]] = None,
     coherence: Optional[Dict[str, Any]] = None,
     domain: Optional[str] = None,
+    unified_output: Optional[Dict[str, Any]] = None,
 ) -> List[DILchatBadge]:
     """
     Build UI badges based on stability status and policy flags.
@@ -737,7 +739,7 @@ def _build_badges(
     # Phase 30: Cross-Layer Resonance Persona Mapping Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
     # ========================================================================
     # Extract persona_resonance_map from unified_output
-    persona_resonance_map = unified_output.get("persona_resonance_map")
+    persona_resonance_map = unified_output.get("persona_resonance_map") if unified_output else None
 
     # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
     if therapy_or_identity_domain and smart_or_deep_mode and persona_resonance_map is not None:
@@ -852,6 +854,59 @@ def _build_badges(
                 label="INSIGHT_WINDOW_CLOSED",
                 level="info",
                 description="Insight window closed. UCF signals indicate reflection not recommended at this time."
+            ))
+
+    # ========================================================================
+    # Phase 33: Persona Schema Adaptive Routing Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract schema_adaptive_map from unified_output
+    schema_adaptive_map = unified_output.get("schema_adaptive_map") if unified_output else None
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and schema_adaptive_map is not None:
+        # Extract schema alignment metrics
+        schema_alignment_scores = schema_adaptive_map.get("schema_alignment_scores", {})
+        schema_confidence = schema_adaptive_map.get("schema_confidence")
+        schema_stability = schema_adaptive_map.get("schema_stability")
+        schema_drift = schema_adaptive_map.get("schema_drift")
+        schema_tags = schema_adaptive_map.get("schema_tags", [])
+
+        # SCHEMA_ALIGNMENT_HIGH: Dominant persona alignment >= 0.70
+        if schema_alignment_scores:
+            max_alignment = max(schema_alignment_scores.values()) if schema_alignment_scores else 0.0
+            if max_alignment >= 0.70:
+                # Find the persona with max alignment
+                max_persona = max(schema_alignment_scores, key=schema_alignment_scores.get)
+                badges.append(DILchatBadge(
+                    label="SCHEMA_ALIGNMENT_HIGH",
+                    level="info",
+                    description=f"High persona schema alignment detected ({max_persona.title()}: {max_alignment:.2f}). User patterns strongly match {max_persona} schema."
+                ))
+
+        # SCHEMA_ALIGNMENT_LOW: All persona alignments < 0.40
+        if schema_alignment_scores:
+            all_low = all(score < 0.40 for score in schema_alignment_scores.values())
+            if all_low:
+                badges.append(DILchatBadge(
+                    label="SCHEMA_ALIGNMENT_LOW",
+                    level="warning",
+                    description="Low schema alignment across all personas. User patterns do not strongly match any schema."
+                ))
+
+        # SCHEMA_STABILITY_STRONG: Schema stability >= 0.80
+        if schema_stability is not None and schema_stability >= 0.80:
+            badges.append(DILchatBadge(
+                label="SCHEMA_STABILITY_STRONG",
+                level="info",
+                description="Schema fit is highly stable. User patterns show consistent persona alignment over time."
+            ))
+
+        # SCHEMA_DRIFT_CAUTION: Schema drift >= 0.50
+        if schema_drift is not None and schema_drift >= 0.50:
+            badges.append(DILchatBadge(
+                label="SCHEMA_DRIFT_CAUTION",
+                level="warning",
+                description="Schema drift detected. User's persona alignment patterns are shifting significantly."
             ))
 
     # ========================================================================

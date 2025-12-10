@@ -263,6 +263,12 @@ class PersonaResponse(BaseModel):
         description="Phase 30: Cross-layer resonance persona mapping (optional)"
     )
 
+    # Phase 33: Optional persona schema adaptive routing map
+    schema_adaptive_map: Optional[Any] = Field(
+        None,
+        description="Phase 33: Persona schema adaptive routing (observation-only, experimental)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {
