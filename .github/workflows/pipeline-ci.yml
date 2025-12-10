@@ -24,6 +24,7 @@ on:
       - "tests/test_phase30_cross_layer_resonance_mapping.py"
       - "tests/test_phase32_insight_window.py"
       - "tests/test_phase33_schema_adaptive_routing.py"
+      - "tests/test_phase34_identity_harmonics.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -59,6 +60,7 @@ on:
       - "tests/test_phase30_cross_layer_resonance_mapping.py"
       - "tests/test_phase32_insight_window.py"
       - "tests/test_phase33_schema_adaptive_routing.py"
+      - "tests/test_phase34_identity_harmonics.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -389,6 +391,28 @@ jobs:
             --disable-warnings -q \
             --maxfail=1 \
             2>&1 | tee phase32-insight-window.log
+
+      - name: Run Phase 33 Persona Schema Adaptive Routing Tests
+        run: |
+          pytest tests/test_phase33_schema_adaptive_routing.py \
+            --disable-warnings -q \
+            --maxfail=1 \
+            2>&1 | tee phase33-schema-adaptive-routing.log
+
+      - name: Run Phase 34 Identity Harmonics Layer Tests
+        run: |
+          pytest tests/test_phase34_identity_harmonics.py \
+            --disable-warnings -q \
+            --maxfail=1 \
+            2>&1 | tee phase34-identity-harmonics.log
+
+      - name: Upload Phase 34 Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase34-identity-harmonics-log
+          path: phase34-identity-harmonics.log
+          if-no-files-found: ignore
 
       - name: Run Phase 20 Unified Dashboard Tests
         run: |

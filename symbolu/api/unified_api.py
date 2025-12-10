@@ -81,6 +81,7 @@ class UnifiedOutput:
     persona_resonance_map: Optional[Dict[str, Any]] = None  # Phase 30: Cross-layer resonance persona map
     insight_window: Optional[Dict[str, Any]] = None  # Phase 32: Insight window gating result
     schema_adaptive_map: Optional[Dict[str, Any]] = None  # Phase 33: Persona schema adaptive routing (observation-only)
+    identity_harmonics: Optional[Dict[str, Any]] = None  # Phase 34: Identity harmonics layer (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -904,6 +905,31 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 # Fallback to dict conversion
                 schema_adaptive_map_data = dict(schema_adaptive_map.__dict__)
 
+    # Phase 34: Extract identity harmonics profile from persona response
+    identity_harmonics_data = None
+    if hasattr(ctx, 'persona_response') and ctx.persona_response is not None:
+        # Try to extract identity_harmonics_profile from PersonaResponse
+        identity_harmonics_profile = getattr(ctx.persona_response, 'identity_harmonics_profile', None)
+        if identity_harmonics_profile is not None:
+            # Identity harmonics profile is already a dict from persona engine
+            # Just pass it through (JSON-safe)
+            identity_harmonics_data = identity_harmonics_profile
+
+    # Also try to extract from coherence block for observability
+    if identity_harmonics_data is None and hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        ihl_snapshot = getattr(ctx.coherence_state, 'identity_harmonics_snapshot', None)
+        if ihl_snapshot is not None:
+            # Build dict from snapshot fields
+            identity_harmonics_data = {
+                "cih": getattr(ihl_snapshot, 'core_identity_harmonic', None),
+                "aih": getattr(ihl_snapshot, 'adaptive_identity_harmonic', None),
+                "rih": getattr(ihl_snapshot, 'relational_identity_harmonic', None),
+                "ihi": getattr(ihl_snapshot, 'identity_harmonics_index', None),
+                "identity_stability_score": getattr(ihl_snapshot, 'identity_stability_score', None),
+                "identity_flexibility_score": getattr(ihl_snapshot, 'identity_flexibility_score', None),
+                "notes": getattr(ihl_snapshot, 'notes', []),
+            }
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -927,6 +953,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         persona_resonance_map=persona_resonance_map_data,  # Phase 30
         insight_window=insight_window_data,  # Phase 32
         schema_adaptive_map=schema_adaptive_map_data,  # Phase 33
+        identity_harmonics=identity_harmonics_data,  # Phase 34
     )
 
 

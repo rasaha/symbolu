@@ -172,6 +172,17 @@ class CoherenceState:
     current_symbolic_harmonization_index: Optional[float] = None  # Symbolic Harmonization Index [0.0, 1.0]
     harmonization_entropy_history: List[Optional[float]] = field(default_factory=list)  # Entropy history
 
+    # Phase 34: Identity Harmonics Layer (observation only - not used in scoring)
+    identity_harmonics_snapshot: Optional[Any] = None  # IdentityHarmonicsSnapshot (latest)
+    identity_harmonics_history: List[Optional[Any]] = field(default_factory=list)  # List of IdentityHarmonicsSnapshot
+    current_cih: Optional[float] = None  # Core Identity Harmonic [0.0, 1.0]
+    current_aih: Optional[float] = None  # Adaptive Identity Harmonic [0.0, 1.0]
+    current_rih: Optional[float] = None  # Relational Identity Harmonic [0.0, 1.0]
+    current_identity_harmonics_index: Optional[float] = None  # Identity Harmonics Index [0.0, 1.0]
+    identity_entropy_history: List[Optional[float]] = field(default_factory=list)  # Identity entropy history
+    identity_stability_history: List[Optional[float]] = field(default_factory=list)  # Identity stability history
+    identity_flexibility_history: List[Optional[float]] = field(default_factory=list)  # Identity flexibility history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -236,6 +247,12 @@ class CoherenceState:
         # Phase 27 symbolic harmonization formula history
         self.symbolic_harmonization_history = self.symbolic_harmonization_history[-window:]
         self.harmonization_entropy_history = self.harmonization_entropy_history[-window:]
+
+        # Phase 34 identity harmonics formula history
+        self.identity_harmonics_history = self.identity_harmonics_history[-window:]
+        self.identity_entropy_history = self.identity_entropy_history[-window:]
+        self.identity_stability_history = self.identity_stability_history[-window:]
+        self.identity_flexibility_history = self.identity_flexibility_history[-window:]
 
     def get_history_length(self) -> int:
         """

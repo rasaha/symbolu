@@ -105,6 +105,10 @@ class CoherenceEngine:
                 ucf_history=prev_state.ucf_history.copy(),
                 symbolic_harmonization_history=prev_state.symbolic_harmonization_history.copy(),
                 harmonization_entropy_history=prev_state.harmonization_entropy_history.copy(),
+                identity_harmonics_history=prev_state.identity_harmonics_history.copy(),
+                identity_entropy_history=prev_state.identity_entropy_history.copy(),
+                identity_stability_history=prev_state.identity_stability_history.copy(),
+                identity_flexibility_history=prev_state.identity_flexibility_history.copy(),
             )
 
         # Append new turn data to histories
@@ -195,6 +199,9 @@ class CoherenceEngine:
 
         # Update Phase 27 symbolic harmonization formula (observation only)
         self._update_symbolic_harmonization(state)
+
+        # Update Phase 34 identity harmonics layer (observation only)
+        self._update_identity_harmonics(state)
 
         return state
 
@@ -1921,3 +1928,126 @@ class CoherenceEngine:
             state.harmonization_entropy_history.append(None)
             state.symbolic_harmonization_snapshot = None
             state.current_symbolic_harmonization_index = None
+
+    def _update_identity_harmonics(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 34 Identity Harmonics Layer (observation only).
+
+        This method computes the identity harmonics snapshot by measuring identity
+        resonance patterns across semantic, emotional, symbolic, and temporal dimensions.
+
+        The IHL produces three harmonics:
+          1. Core Identity Harmonic (CIH): Stability of identity signals
+          2. Adaptive Identity Harmonic (AIH): Ability to shift identity coherently
+          3. Relational Identity Harmonic (RIH): Persona-symbolic resonance
+
+        The IHL is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for persona tone micro-adjustments (±0.02 max) and analytics.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.identity_harmonics import compute_identity_harmonics
+
+        # ====================================================================
+        # STEP 1: GATHER SEMANTIC + SYMBOLIC SIGNALS (Core Identity)
+        # ====================================================================
+
+        semantic_integrity = state.semantic_integrity_score
+        symbolic_harmonization_index = state.current_symbolic_harmonization_index
+        consciousness_order_index = state.current_coi  # From UCF (Phase 26)
+
+        # ====================================================================
+        # STEP 2: GATHER TEMPORAL + ADAPTIVE SIGNALS (Adaptive Identity)
+        # ====================================================================
+
+        cognitive_drift_v3 = state.cognitive_drift_v3
+        temporal_entropy_volatility = state.temporal_entropy_volatility
+
+        # Loop alignment (from mirror-time loop, Phase 21)
+        loop_alignment = state.avg_loop_alignment
+
+        # ====================================================================
+        # STEP 3: GATHER PERSONA + RELATIONAL SIGNALS (Relational Identity)
+        # ====================================================================
+
+        persona_drift_score = state.persona_drift_score
+        guna_resonance_index = state.guna_resonance_index
+        kosha_resonance_index = state.kosha_resonance_index
+
+        # ====================================================================
+        # STEP 4: GATHER HISTORICAL CONTEXT (For Stability Computation)
+        # ====================================================================
+
+        # Extract recent values for variance computation
+        semantic_integrity_history = None
+        if state.semantic_integrity_history:
+            semantic_integrity_history = [
+                si for si in state.semantic_integrity_history if si is not None
+            ]
+
+        symbolic_harmonization_history = None
+        if state.symbolic_harmonization_history:
+            # Extract symbolic_harmonization_index from snapshots
+            symbolic_harmonization_history = [
+                snapshot.symbolic_harmonization_index
+                for snapshot in state.symbolic_harmonization_history
+                if snapshot is not None
+            ]
+
+        cognitive_drift_history = None
+        if state.cognitive_drift_v3_history:
+            cognitive_drift_history = [
+                cd for cd in state.cognitive_drift_v3_history if cd is not None
+            ]
+
+        # ====================================================================
+        # STEP 5: COMPUTE IDENTITY HARMONICS
+        # ====================================================================
+
+        snapshot = compute_identity_harmonics(
+            semantic_integrity=semantic_integrity,
+            symbolic_harmonization_index=symbolic_harmonization_index,
+            consciousness_order_index=consciousness_order_index,
+            cognitive_drift_v3=cognitive_drift_v3,
+            temporal_entropy_volatility=temporal_entropy_volatility,
+            loop_alignment=loop_alignment,
+            persona_drift_score=persona_drift_score,
+            guna_resonance_index=guna_resonance_index,
+            kosha_resonance_index=kosha_resonance_index,
+            semantic_integrity_history=semantic_integrity_history,
+            symbolic_harmonization_history=symbolic_harmonization_history,
+            cognitive_drift_history=cognitive_drift_history,
+        )
+
+        # ====================================================================
+        # STEP 6: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Append to histories
+            state.identity_harmonics_history.append(snapshot)
+            state.identity_entropy_history.append(snapshot.identity_entropy)
+            state.identity_stability_history.append(snapshot.identity_stability_score)
+            state.identity_flexibility_history.append(snapshot.identity_flexibility_score)
+
+            # Update current metrics
+            state.identity_harmonics_snapshot = snapshot
+            state.current_cih = snapshot.core_identity_harmonic
+            state.current_aih = snapshot.adaptive_identity_harmonic
+            state.current_rih = snapshot.relational_identity_harmonic
+            state.current_identity_harmonics_index = snapshot.identity_harmonics_index
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.identity_harmonics_history.append(None)
+            state.identity_entropy_history.append(None)
+            state.identity_stability_history.append(None)
+            state.identity_flexibility_history.append(None)
+            state.identity_harmonics_snapshot = None
+            state.current_cih = None
+            state.current_aih = None
+            state.current_rih = None
+            state.current_identity_harmonics_index = None

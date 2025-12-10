@@ -269,6 +269,12 @@ class PersonaResponse(BaseModel):
         description="Phase 33: Persona schema adaptive routing (observation-only, experimental)"
     )
 
+    # Phase 34: Optional identity harmonics profile
+    identity_harmonics_profile: Optional[Any] = Field(
+        None,
+        description="Phase 34: Identity harmonics layer (observation-only, tone-level only)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {

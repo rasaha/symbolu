@@ -162,7 +162,19 @@ class PersonaEngine:
             # Attach schema_map to response for observability (NEVER affects routing)
             persona_response.schema_adaptive_map = schema_map
 
-        # Step 10: Return complete response
+        # Phase 34 Step 10: Extract identity harmonics and apply tone adjustments
+        # Extract identity harmonics snapshot from coherence state
+        ihl_snapshot = self._extract_identity_harmonics(explain_log)
+        if ihl_snapshot is not None:
+            # Compute identity harmonics profile (tone-level adjustments only, ±0.02 max)
+            identity_harmonics_profile = self._apply_identity_harmonics_to_tone(
+                persona,
+                ihl_snapshot
+            )
+            # Attach profile to response for observability (NEVER affects routing)
+            persona_response.identity_harmonics_profile = identity_harmonics_profile
+
+        # Step 11: Return complete response
         return persona_response
     
     def _order_layers(
@@ -633,6 +645,148 @@ class PersonaEngine:
             # Graceful degradation: any error → return None
             # This ensures schema adaptive routing NEVER breaks the pipeline
             return None
+
+    def _extract_identity_harmonics(
+        self,
+        explain_log: Dict[str, Any]
+    ) -> Optional[Any]:
+        """
+        Phase 34: Extract identity harmonics snapshot from coherence state.
+
+        This method safely extracts the identity harmonics snapshot from the
+        coherence state if available.
+
+        Args:
+            explain_log: MLCR explain log with coherence state
+
+        Returns:
+            IdentityHarmonicsSnapshot or None if not available
+
+        Graceful Degradation:
+            Returns None if identity harmonics not available in coherence state.
+        """
+        # Try to extract from coherence_state or coherence_observation
+        if not explain_log:
+            return None
+
+        # Try coherence_state path
+        coherence_state = explain_log.get('coherence_state')
+        if coherence_state is not None:
+            ihl_snapshot = getattr(coherence_state, 'identity_harmonics_snapshot', None)
+            if ihl_snapshot is not None:
+                return ihl_snapshot
+
+        # Try coherence_observation path (if it has IHL data)
+        coherence_observation = explain_log.get('coherence_observation')
+        if coherence_observation is not None:
+            ihl_snapshot = getattr(coherence_observation, 'identity_harmonics_snapshot', None)
+            if ihl_snapshot is not None:
+                return ihl_snapshot
+
+        return None
+
+    def _apply_identity_harmonics_to_tone(
+        self,
+        persona: PersonaProfile,
+        ihl_snapshot: Optional[Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Phase 34: Apply identity harmonics to persona tone.
+
+        This method maps IHL outputs into micro-adjustments of persona tone
+        parameters. It is tone-level only and never affects semantic content.
+
+        Mapping Rules:
+            • High CIH (≥0.75) → more confident tone (+0.02 confidence boost)
+            • High AIH (≥0.70) → more flexible/adaptive tone (+0.02 flexibility)
+            • High RIH (≥0.70) → more relational warmth (+0.02 warmth)
+
+        Tone Adjustments (all ≤ ±0.02):
+            • confidence_adjustment: [-0.02, +0.02]
+            • flexibility_adjustment: [-0.02, +0.02]
+            • warmth_adjustment: [-0.02, +0.02]
+
+        Args:
+            persona: Selected PersonaProfile
+            ihl_snapshot: IdentityHarmonicsSnapshot (or None)
+
+        Returns:
+            Dict with identity harmonics profile or None if IHL not available
+
+        Invariants:
+            • All adjustments are ≤ ±0.02 (2% max deviation)
+            • Deterministic: same inputs → same outputs
+            • Safe default: if IHL missing → no modulation (returns None)
+        """
+        # Graceful degradation: if IHL not available, return None
+        if ihl_snapshot is None:
+            return None
+
+        # Extract harmonics from snapshot
+        cih = getattr(ihl_snapshot, 'core_identity_harmonic', None)
+        aih = getattr(ihl_snapshot, 'adaptive_identity_harmonic', None)
+        rih = getattr(ihl_snapshot, 'relational_identity_harmonic', None)
+        ihi = getattr(ihl_snapshot, 'identity_harmonics_index', None)
+        notes = getattr(ihl_snapshot, 'notes', [])
+
+        # If any harmonic is missing, return None
+        if cih is None or aih is None or rih is None:
+            return None
+
+        # ========================================================================
+        # STEP 1: Compute confidence adjustment based on CIH
+        # ========================================================================
+        if cih >= 0.75:
+            # High core identity → more confident tone
+            confidence_adjustment = 0.02
+        elif cih >= 0.50:
+            # Medium core identity → neutral
+            confidence_adjustment = 0.0
+        else:
+            # Low core identity → less confident tone
+            confidence_adjustment = -0.02
+
+        # ========================================================================
+        # STEP 2: Compute flexibility adjustment based on AIH
+        # ========================================================================
+        if aih >= 0.70:
+            # High adaptive identity → more flexible tone
+            flexibility_adjustment = 0.02
+        elif aih >= 0.40:
+            # Medium adaptive identity → neutral
+            flexibility_adjustment = 0.0
+        else:
+            # Low adaptive identity → more rigid tone
+            flexibility_adjustment = -0.02
+
+        # ========================================================================
+        # STEP 3: Compute warmth adjustment based on RIH
+        # ========================================================================
+        if rih >= 0.70:
+            # High relational identity → more warmth
+            warmth_adjustment = 0.02
+        elif rih >= 0.40:
+            # Medium relational identity → neutral
+            warmth_adjustment = 0.0
+        else:
+            # Low relational identity → less warmth
+            warmth_adjustment = -0.02
+
+        # ========================================================================
+        # STEP 4: Build identity harmonics profile
+        # ========================================================================
+        identity_harmonics_profile = {
+            "cih": round(cih, 4),
+            "aih": round(aih, 4),
+            "rih": round(rih, 4),
+            "ihi": round(ihi, 4) if ihi is not None else None,
+            "confidence_adjustment": round(confidence_adjustment, 4),
+            "flexibility_adjustment": round(flexibility_adjustment, 4),
+            "warmth_adjustment": round(warmth_adjustment, 4),
+            "identity_harmonics_tags": notes,
+        }
+
+        return identity_harmonics_profile
 
     def get_persona_summary(self) -> str:
         """
