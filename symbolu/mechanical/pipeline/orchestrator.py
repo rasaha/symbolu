@@ -111,6 +111,10 @@ from symbolu.identity.identity_signature_engine import compute_identity_signatur
 # Motivation Flow Engine (Motivational Driver Classification)
 from symbolu.motivation.motivation_engine import compute_motivation_flow
 
+# Trading Guardrail Engine (Phase 7: Formula-Aware Trading Guardrails)
+from symbolu.policy.trading_guardrail_engine import compute_trading_guardrails
+from symbolu.policy.domain_profiles import get_domain_profile
+
 # DILchat Adapter (Presentation Layer for DILchat Integration)
 from symbolu.adapter import build_dilchat_payload
 
@@ -451,6 +455,38 @@ class SymbolUPipeline:
                     except Exception:
                         # If motivation flow computation fails, continue without it (fail-safe)
                         ctx.motivation_profile = None
+
+                    # ================================================================
+                    # TRADING GUARDRAIL ENGINE v1.0: Compute trading formula guardrails (optional, non-invasive)
+                    # Deterministic trading safety checks based on Symbol-U formulas
+                    # Does NOT modify pipeline behavior - purely additive observability
+                    # Only runs for trading domain when formula_guardrails_enabled=True
+                    # ================================================================
+                    try:
+                        # Get domain from request metadata or summary
+                        guardrail_domain = ctx.request.metadata.get("domain", session_summary.last_domain)
+
+                        # Only compute for trading domain
+                        if guardrail_domain == "trading":
+                            # Get domain profile to check if guardrails are enabled
+                            domain_profile = get_domain_profile(guardrail_domain)
+
+                            if domain_profile.get("formula_guardrails_enabled", False):
+                                # Compute trading guardrails (deterministic, zero-LLM)
+                                ctx.trading_guardrails = compute_trading_guardrails(
+                                    summary=session_summary,
+                                    policy=ctx.policy_flags,
+                                    motivation=ctx.motivation_profile,
+                                    intent_arc=ctx.intent_arc,
+                                    identity_signature=ctx.identity_signature,
+                                )
+                            else:
+                                ctx.trading_guardrails = None
+                        else:
+                            ctx.trading_guardrails = None
+                    except Exception:
+                        # If trading guardrails computation fails, continue without it (fail-safe)
+                        ctx.trading_guardrails = None
             except Exception:
                 # If session policy layer fails, continue without it (fail-safe)
                 # This ensures pipeline robustness even if session tracking has issues

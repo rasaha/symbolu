@@ -54,6 +54,7 @@ class UnifiedOutput:
         identity_signature: Identity Signature Engine v1.0 (identity trajectory classification)
         motivation_profile: Motivation Flow Engine v1.0 (motivational driver classification)
         formulas: Phase 2 temporal formulas (SMI, ΔSMI, Bhava Gap, Tension Corridor) - observation only
+        trading_guardrails: Phase 7 trading formula guardrails (trading safety risk flags)
     """
 
     text: str
@@ -72,6 +73,7 @@ class UnifiedOutput:
     identity_signature: Dict[str, Any] = field(default_factory=dict)
     motivation_profile: Dict[str, Any] = field(default_factory=dict)
     formulas: Optional[Dict[str, Optional[float]]] = None
+    trading_guardrails: Optional[Dict[str, bool]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -262,6 +264,11 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
     if hasattr(ctx, 'motivation_profile') and ctx.motivation_profile is not None:
         motivation_profile_data = ctx.motivation_profile.serialize()
 
+    # Phase 7: Extract trading guardrails (Trading Formula Guardrails v1.0)
+    trading_guardrails_data = None
+    if hasattr(ctx, 'trading_guardrails') and ctx.trading_guardrails is not None:
+        trading_guardrails_data = ctx.trading_guardrails.to_dict()
+
     # Phase 2 & 3: Extract formulas from coherence state or pipeline context
     formulas_data = None
     if hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
@@ -340,6 +347,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         identity_signature=identity_signature_data,
         motivation_profile=motivation_profile_data,
         formulas=formulas_data,
+        trading_guardrails=trading_guardrails_data,
     )
 
 

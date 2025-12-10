@@ -230,6 +230,9 @@ def build_dilchat_response(
     # Extract motivation profile for motivation-based badges
     motivation_profile = unified_output.get("motivation_profile", {})
 
+    # Extract trading guardrails for trading-specific badges
+    trading_guardrails = unified_output.get("trading_guardrails", {})
+
     badges = _build_badges(
         stability_status=stability_status,
         policy_flags=combined_flags,
@@ -239,12 +242,13 @@ def build_dilchat_response(
         intent_arc=intent_arc,
         identity_signature=identity_signature,
         motivation_profile=motivation_profile,
+        trading_guardrails=trading_guardrails,
     )
 
     # ========================================================================
-    # STEP 6: Build hints (includes session memory + session recap + intent arc + identity signature + motivation hints)
+    # STEP 6: Build hints (includes session memory + session recap + intent arc + identity signature + motivation + trading guardrail hints)
     # ========================================================================
-    hints = _build_hints(combined_flags, session_memory, session_recap, intent_arc, identity_signature, motivation_profile)
+    hints = _build_hints(combined_flags, session_memory, session_recap, intent_arc, identity_signature, motivation_profile, trading_guardrails)
 
     # ========================================================================
     # STEP 7: Extract Phase 2 formulas (diagnostics only)
@@ -319,6 +323,7 @@ def _build_badges(
     intent_arc: Optional[Dict[str, Any]] = None,
     identity_signature: Optional[Dict[str, Any]] = None,
     motivation_profile: Optional[Dict[str, Any]] = None,
+    trading_guardrails: Optional[Dict[str, Any]] = None,
 ) -> List[DILchatBadge]:
     """
     Build UI badges based on stability status and policy flags.
@@ -339,6 +344,7 @@ def _build_badges(
         13. Intent Arc Badges (insight, stabilization, identity exploration, etc.)
         14. Identity Signature Badges (self_stable, self_expanding, self_fragmented, etc.)
         15. Motivation Profile Badges (hope, fear, expansion, stabilization, avoidance, assertion)
+        16. Trading Guardrail Badges (high_tension_risk, neg_momentum_risk, volatility_risk, no_action_recommended)
 
     Args:
         stability_status: Stability classification from policy engine
@@ -349,6 +355,7 @@ def _build_badges(
         intent_arc: Intent arc dictionary with arc classification
         identity_signature: Identity signature dictionary with signature classification
         motivation_profile: Motivation profile dictionary with motivational driver classification
+        trading_guardrails: Trading guardrails dictionary with risk flags
 
     Returns:
         List of DILchatBadge objects
@@ -645,6 +652,42 @@ def _build_badges(
             ))
         # Note: overcorrection and ambiguous_motivation don't get badges (as specified)
 
+    # ========================================================================
+    # BADGE 16: Trading Guardrail Badges (Phase 7: Formula-Aware Trading Guardrails v1.0)
+    # ========================================================================
+    if trading_guardrails:
+        # HIGH_TENSION_RISK badge
+        if trading_guardrails.get("high_tension_risk"):
+            badges.append(DILchatBadge(
+                label="HIGH_TENSION_RISK",
+                level="critical",
+                description="High tension corridor with low resonance detected. Trading risk elevated."
+            ))
+
+        # NEG_MOMENTUM_RISK badge
+        if trading_guardrails.get("negative_momentum_risk"):
+            badges.append(DILchatBadge(
+                label="NEG_MOMENTUM_RISK",
+                level="critical",
+                description="Negative delta SMI with low coherence detected. Downward momentum present."
+            ))
+
+        # VOLATILITY_RISK badge
+        if trading_guardrails.get("volatility_risk"):
+            badges.append(DILchatBadge(
+                label="VOLATILITY_RISK",
+                level="critical",
+                description="High mapper volatility with persona drift detected. Market instability elevated."
+            ))
+
+        # NO_ACTION_RECOMMENDED badge (master switch)
+        if trading_guardrails.get("recommend_no_action"):
+            badges.append(DILchatBadge(
+                label="NO_ACTION_RECOMMENDED",
+                level="critical",
+                description="Trading guardrails recommend no action. Wait for stability before trading."
+            ))
+
     return badges
 
 
@@ -660,6 +703,7 @@ def _build_hints(
     intent_arc: Optional[Dict[str, Any]] = None,
     identity_signature: Optional[Dict[str, Any]] = None,
     motivation_profile: Optional[Dict[str, Any]] = None,
+    trading_guardrails: Optional[Dict[str, Any]] = None,
 ) -> List[DILchatHint]:
     """
     Build UI hints based on policy flags.
@@ -680,6 +724,7 @@ def _build_hints(
         13. RECAP_EXPLORATION_OK - if recap.recommended_style="exploratory"
         14. Identity Signature Hints (explore_identity, stabilize_identity, etc.)
         15. Motivation Profile Hints (encourage_exploration, stabilize_self, address_avoidance, etc.)
+        16. Trading Guardrail Hints (avoid_trade, wait_for_stability, market_volatility_alert)
 
     Args:
         policy_flags: Policy flags dictionary (includes session_policy_flags if available)
@@ -688,6 +733,7 @@ def _build_hints(
         intent_arc: Intent arc dictionary with arc classification
         identity_signature: Identity signature dictionary with signature classification
         motivation_profile: Motivation profile dictionary with motivational driver classification
+        trading_guardrails: Trading guardrails dictionary with risk flags
 
     Returns:
         List of DILchatHint objects
@@ -925,6 +971,31 @@ def _build_hints(
                 message="Motivation is assertion-driven. Support strong self-expression and symbolic reasoning."
             ))
         # Note: overcorrection and ambiguous_motivation don't get hints
+
+    # ========================================================================
+    # TRADING GUARDRAIL HINTS (Phase 7: Formula-Aware Trading Guardrails v1.0)
+    # ========================================================================
+    if trading_guardrails:
+        # AVOID_TRADE hint (if recommend_no_action is True)
+        if trading_guardrails.get("recommend_no_action"):
+            hints.append(DILchatHint(
+                code="AVOID_TRADE",
+                message="Trading guardrails recommend avoiding trades. High risk conditions detected."
+            ))
+
+        # WAIT_FOR_STABILITY hint (if high_tension_risk or negative_momentum_risk)
+        if trading_guardrails.get("high_tension_risk") or trading_guardrails.get("negative_momentum_risk"):
+            hints.append(DILchatHint(
+                code="WAIT_FOR_STABILITY",
+                message="Wait for coherence and momentum stability before trading."
+            ))
+
+        # MARKET_VOLATILITY_ALERT hint (if volatility_risk)
+        if trading_guardrails.get("volatility_risk"):
+            hints.append(DILchatHint(
+                code="MARKET_VOLATILITY_ALERT",
+                message="Market volatility elevated. Mapper instability and persona drift detected."
+            ))
 
     return hints
 
