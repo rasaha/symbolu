@@ -12,7 +12,7 @@ Usage:
 """
 
 from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 import json
 
 
@@ -131,6 +131,14 @@ class CoherenceObservation:
     resonance_weighting: Optional[Any] = None  # ResonanceWeightingSnapshot
     resonance_entropy: Optional[float] = None
     dominant_resonance_metrics: List[str] = field(default_factory=list)
+
+    # Phase 26: Unified Consciousness Formula (observation only)
+    unified_consciousness: Optional[Any] = None  # UnifiedConsciousnessSnapshot
+    consciousness_order_index: Optional[float] = None  # COI [0.0, 1.0]
+    consciousness_stability_index: Optional[float] = None  # CSI [0.0, 1.0]
+    consciousness_integration_potential: Optional[float] = None  # CIP [0.0, 1.0]
+    ucf_entropy: Optional[float] = None  # UCF weight distribution entropy [0.0, 1.0]
+    ucf_notes: List[str] = field(default_factory=list)  # UCF diagnostic notes
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
@@ -489,6 +497,35 @@ class CoherenceObserver:
                 if latest_snapshot is not None:
                     resonance_weighting = latest_snapshot
 
+        # Phase 26: Extract Unified Consciousness Formula from coherence_state
+        unified_consciousness = None
+        consciousness_order_index = None
+        consciousness_stability_index = None
+        consciousness_integration_potential = None
+        ucf_entropy = None
+        ucf_notes = []
+
+        if coherence_state is not None:
+            # Extract current COI, CSI, CIP
+            consciousness_order_index = getattr(coherence_state, 'current_coi', None)
+            consciousness_stability_index = getattr(coherence_state, 'current_csi', None)
+            consciousness_integration_potential = getattr(coherence_state, 'current_cip', None)
+
+            # Extract UCF entropy
+            ucf_entropy = getattr(coherence_state, 'ucf_entropy', None)
+
+            # Extract UCF notes
+            notes = getattr(coherence_state, 'ucf_notes', None)
+            if notes:
+                ucf_notes = list(notes)
+
+            # Extract current snapshot
+            ucf_history = getattr(coherence_state, 'ucf_history', None)
+            if ucf_history and len(ucf_history) > 0:
+                latest_snapshot = ucf_history[-1]
+                if latest_snapshot is not None:
+                    unified_consciousness = latest_snapshot
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -570,6 +607,12 @@ class CoherenceObserver:
             resonance_weighting=resonance_weighting,
             resonance_entropy=resonance_entropy,
             dominant_resonance_metrics=dominant_resonance_metrics,
+            unified_consciousness=unified_consciousness,
+            consciousness_order_index=consciousness_order_index,
+            consciousness_stability_index=consciousness_stability_index,
+            consciousness_integration_potential=consciousness_integration_potential,
+            ucf_entropy=ucf_entropy,
+            ucf_notes=ucf_notes,
         )
 
         # Store observation
@@ -695,6 +738,11 @@ class CoherenceObserver:
         resonance_weighting = self._extract_resonance_weighting_from_observation(obs)
         if resonance_weighting:
             snapshot["resonance_weighting"] = resonance_weighting
+
+        # Phase 26: Add unified consciousness section if available
+        unified_consciousness = self._extract_unified_consciousness_from_observation(obs)
+        if unified_consciousness:
+            snapshot["unified_consciousness"] = unified_consciousness
 
         return snapshot
 
@@ -845,6 +893,56 @@ class CoherenceObserver:
                 resonance_weighting["snapshot"] = obs.resonance_weighting
 
         return resonance_weighting if resonance_weighting else None
+
+    def _extract_unified_consciousness_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Any]]:
+        """
+        Extract Phase 26 Unified Consciousness Formula metrics from observation.
+
+        Returns unified_consciousness dict if metrics are available, None otherwise.
+        """
+        # Build unified_consciousness dict from observation
+        unified_consciousness = {}
+
+        # Core indices (COI, CSI, CIP)
+        if obs.consciousness_order_index is not None:
+            unified_consciousness["consciousness_order_index"] = obs.consciousness_order_index
+            unified_consciousness["coi"] = obs.consciousness_order_index  # Alias
+
+        if obs.consciousness_stability_index is not None:
+            unified_consciousness["consciousness_stability_index"] = obs.consciousness_stability_index
+            unified_consciousness["csi"] = obs.consciousness_stability_index  # Alias
+
+        if obs.consciousness_integration_potential is not None:
+            unified_consciousness["consciousness_integration_potential"] = obs.consciousness_integration_potential
+            unified_consciousness["cip"] = obs.consciousness_integration_potential  # Alias
+
+        # UCF entropy
+        if obs.ucf_entropy is not None:
+            unified_consciousness["entropy"] = obs.ucf_entropy
+
+        # UCF notes
+        if obs.ucf_notes:
+            unified_consciousness["notes"] = obs.ucf_notes
+
+        # Full snapshot if available
+        if obs.unified_consciousness is not None:
+            # Try to serialize the snapshot
+            if hasattr(obs.unified_consciousness, '__dict__'):
+                # Convert snapshot object to dict
+                snapshot_dict = {
+                    "consciousness_order_index": getattr(obs.unified_consciousness, 'consciousness_order_index', None),
+                    "consciousness_stability_index": getattr(obs.unified_consciousness, 'consciousness_stability_index', None),
+                    "consciousness_integration_potential": getattr(obs.unified_consciousness, 'consciousness_integration_potential', None),
+                    "weighted_component_breakdown": getattr(obs.unified_consciousness, 'weighted_component_breakdown', {}),
+                    "normalized_weights": getattr(obs.unified_consciousness, 'normalized_weights', {}),
+                    "entropy_of_weights": getattr(obs.unified_consciousness, 'entropy_of_weights', None),
+                    "diagnostic_notes": getattr(obs.unified_consciousness, 'diagnostic_notes', []),
+                }
+                unified_consciousness["snapshot"] = snapshot_dict
+            elif isinstance(obs.unified_consciousness, dict):
+                unified_consciousness["snapshot"] = obs.unified_consciousness
+
+        return unified_consciousness if unified_consciousness else None
 
     def _get_status_label(self, obs: CoherenceObservation) -> str:
         """Get human-readable status label."""

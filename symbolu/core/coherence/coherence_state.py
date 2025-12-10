@@ -157,6 +157,15 @@ class CoherenceState:
     current_resonance_entropy: Optional[float] = None  # Current entropy [0.0, 1.0]
     dominant_resonance_metrics: List[str] = field(default_factory=list)  # Top metrics by weight
 
+    # Phase 26: Unified Consciousness Formula (observation only - not used in scoring)
+    unified_consciousness_snapshot: Optional[Any] = None  # UnifiedConsciousnessSnapshot (latest)
+    ucf_history: List[Optional[Any]] = field(default_factory=list)  # List of UnifiedConsciousnessSnapshot
+    current_coi: Optional[float] = None  # Consciousness Order Index [0.0, 1.0]
+    current_csi: Optional[float] = None  # Consciousness Stability Index [0.0, 1.0]
+    current_cip: Optional[float] = None  # Consciousness Integration Potential [0.0, 1.0]
+    ucf_entropy: Optional[float] = None  # UCF weight distribution entropy [0.0, 1.0]
+    ucf_notes: List[str] = field(default_factory=list)  # Current UCF diagnostic notes
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -214,6 +223,9 @@ class CoherenceState:
         # Phase 24 resonance weighting history
         self.resonance_weighting_history = self.resonance_weighting_history[-window:]
         self.resonance_weighting_entropy_history = self.resonance_weighting_entropy_history[-window:]
+
+        # Phase 26 unified consciousness formula history
+        self.ucf_history = self.ucf_history[-window:]
 
     def get_history_length(self) -> int:
         """

@@ -176,3 +176,11 @@ class SessionSummary:
     avg_resonance_entropy: Optional[float] = None  # Average resonance entropy [0.0, 1.0]
     dominant_resonance_metrics: List[str] = field(default_factory=list)  # Top metrics by normalized weight
     resonance_weighting_notes: List[str] = field(default_factory=list)  # Collected diagnostic notes
+
+    # Phase 26 Unified Consciousness Formula (observation only)
+    avg_coi: Optional[float] = None  # Average Consciousness Order Index [0.0, 1.0]
+    avg_csi: Optional[float] = None  # Average Consciousness Stability Index [0.0, 1.0]
+    avg_cip: Optional[float] = None  # Average Consciousness Integration Potential [0.0, 1.0]
+    ucf_entropy_band: Optional[str] = None  # "focused" | "balanced" | "diffuse"
+    dominant_ucf_signals: List[str] = field(default_factory=list)  # Top 3 weighted metric keys
+    ucf_notes: List[str] = field(default_factory=list)  # Collected UCF diagnostic summaries
