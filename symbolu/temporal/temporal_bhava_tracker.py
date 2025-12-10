@@ -487,19 +487,16 @@ class TemporalBhavaTracker:
         # PHASE 13: Compute Enhanced SMI (observation only)
         # ====================================================================
         try:
-            if len(self.entries) > 0:
-                enhanced_smi_snapshot_result = compute_enhanced_smi_snapshot(
-                    dim_resonance=dimensional_resonance if dimensional_resonance is not None else None,
-                    vrtti_balance=vrtti_intensity if vrtti_intensity is not None else None,
-                    bhava_alignment=bhava_position if bhava_position is not None else None,
-                    semantic_weighting=0.5,  # Default neutral value
-                    temporal_decay=0.5,  # Default neutral value
-                    noise_suppression=0.7,  # Default moderate suppression
-                )
-                if enhanced_smi_snapshot_result is not None:
-                    snapshot.enhanced_smi = enhanced_smi_snapshot_result.enhanced_smi
-                else:
-                    snapshot.enhanced_smi = None
+            enhanced_smi_snapshot_result = compute_enhanced_smi_snapshot(
+                dim_resonance=dimensional_resonance if dimensional_resonance is not None else None,
+                vrtti_balance=vrtti_intensity if vrtti_intensity is not None else None,
+                bhava_alignment=bhava_position if bhava_position is not None else None,
+                semantic_weighting=0.5,  # Default neutral value
+                temporal_decay=0.5,  # Default neutral value
+                noise_suppression=0.7,  # Default moderate suppression
+            )
+            if enhanced_smi_snapshot_result is not None:
+                snapshot.enhanced_smi = enhanced_smi_snapshot_result.enhanced_smi
             else:
                 snapshot.enhanced_smi = None
         except Exception as e:
