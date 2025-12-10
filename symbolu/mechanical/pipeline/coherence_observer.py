@@ -61,6 +61,9 @@ class CoherenceObservation:
     # Phase 4: Formula-aware coherence v2 (observation only)
     coherence_score_v2: Optional[float] = None
 
+    # Phase 10: Coherence v3 megafusion (experimental, observation only)
+    coherence_score_v3: Optional[float] = None
+
     # Phase 8: Guna/Kosha resonance (observation only)
     guna_resonance_index: Optional[float] = None
     kosha_resonance_index: Optional[float] = None
@@ -209,6 +212,12 @@ class CoherenceObserver:
         if coherence_state is not None:
             coherence_score_v2 = getattr(coherence_state, 'coherence_score_v2', None)
 
+        # Phase 10: Extract coherence v3 from coherence_state
+        coherence_score_v3 = None
+
+        if coherence_state is not None:
+            coherence_score_v3 = getattr(coherence_state, 'coherence_score_v3', None)
+
         # Phase 8: Extract Guna/Kosha resonance from coherence_state
         guna_resonance_index = None
         kosha_resonance_index = None
@@ -249,6 +258,7 @@ class CoherenceObserver:
             tension_index=tension_index,
             arc_alignment_index=arc_alignment_index,
             coherence_score_v2=coherence_score_v2,
+            coherence_score_v3=coherence_score_v3,
             guna_resonance_index=guna_resonance_index,
             kosha_resonance_index=kosha_resonance_index,
         )
