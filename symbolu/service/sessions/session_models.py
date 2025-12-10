@@ -184,3 +184,8 @@ class SessionSummary:
     ucf_entropy_band: Optional[str] = None  # "focused" | "balanced" | "diffuse"
     dominant_ucf_signals: List[str] = field(default_factory=list)  # Top 3 weighted metric keys
     ucf_notes: List[str] = field(default_factory=list)  # Collected UCF diagnostic summaries
+
+    # Phase 27 Symbolic Harmonization Formula (observation only)
+    avg_symbolic_harmonization: Optional[float] = None  # Average Symbolic Harmonization Index [0.0, 1.0]
+    dominant_symbolic_harmonization_pattern: Optional[str] = None  # "high_harmony" | "medium_harmony" | "low_harmony"
+    symbolic_harmonization_notes: List[str] = field(default_factory=list)  # Collected SHF diagnostic notes

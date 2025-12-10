@@ -127,6 +127,14 @@ def build_unified_session_analytics(
         else:
             resonance_entropy_band = "diffuse"
 
+    # Phase 27: Symbolic Harmonization Formula
+    avg_symbolic_harmonization = summary.avg_symbolic_harmonization
+    dominant_symbolic_harmonization_pattern = summary.dominant_symbolic_harmonization_pattern
+    symbolic_harmonization_notes = summary.symbolic_harmonization_notes
+
+    # Use dominant pattern as band classification
+    symbolic_harmonization_band = dominant_symbolic_harmonization_pattern
+
     # ========================================================================
     # Extract from Last Coherence State (Phase 11/12/16/17/18)
     # ========================================================================
@@ -365,6 +373,40 @@ def build_unified_session_analytics(
         labels=inversion_labels,
     ) if inversion_values else None
 
+    # Symbolic Harmonization sparkline (Phase 27: symbolic_harmonization_index)
+    shi_values = []
+    shi_labels = []
+
+    for i, coh in enumerate(session_state.coherence_history[-max_sparkline_points:]):
+        if isinstance(coh, dict):
+            val = None
+            # Try to extract from current_symbolic_harmonization_index
+            if 'current_symbolic_harmonization_index' in coh:
+                val = coh['current_symbolic_harmonization_index']
+
+            # Fallback to symbolic_harmonization_history if available
+            if val is None and 'symbolic_harmonization_history' in coh:
+                shf_history = coh['symbolic_harmonization_history']
+                if isinstance(shf_history, list) and len(shf_history) > 0:
+                    latest_snapshot = shf_history[-1]
+                    if latest_snapshot is not None:
+                        if hasattr(latest_snapshot, 'symbolic_harmonization_index'):
+                            val = latest_snapshot.symbolic_harmonization_index
+                        elif isinstance(latest_snapshot, dict) and 'symbolic_harmonization_index' in latest_snapshot:
+                            val = latest_snapshot['symbolic_harmonization_index']
+
+            if val is not None:
+                # Clamp to [0, 1] for sparkline
+                val = max(0.0, min(1.0, val))
+                shi_values.append(val)
+                shi_labels.append(f"Turn {i+1}")
+
+    symbolic_harmonization_sparkline = MetricSparkline(
+        name="symbolic_harmonization",
+        values=shi_values,
+        labels=shi_labels,
+    ) if shi_values else None
+
     # ========================================================================
     # Assemble Session Pattern Tags
     # ========================================================================
@@ -491,6 +533,10 @@ def build_unified_session_analytics(
         resonance_entropy_band=resonance_entropy_band,
         dominant_resonance_metrics=dominant_resonance_metrics,
         resonance_notes=resonance_weighting_notes,
+        # Phase 27: Symbolic Harmonization Formula
+        symbolic_harmonization_band=symbolic_harmonization_band,
+        symbolic_harmonization_sparkline=symbolic_harmonization_sparkline,
+        symbolic_harmonization_notes=symbolic_harmonization_notes,
     )
 
 

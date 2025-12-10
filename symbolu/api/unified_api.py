@@ -535,6 +535,59 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
 
             coherence_report['unified_consciousness'] = unified_consciousness_data
 
+        # Phase 27: Extract Symbolic Harmonization Formula (SHF) from coherence_state
+        current_shi = getattr(coherence_state, 'current_symbolic_harmonization_index', None)
+        shf_snapshot = getattr(coherence_state, 'symbolic_harmonization_snapshot', None)
+
+        # Add symbolic harmonization to coherence report if available
+        if current_shi is not None or shf_snapshot is not None:
+            symbolic_harmonization_data = {}
+
+            # Symbolic Harmonization Index (SHI)
+            if current_shi is not None:
+                symbolic_harmonization_data['index'] = current_shi
+                symbolic_harmonization_data['symbolic_harmonization_index'] = current_shi  # Explicit
+
+            # Add detailed breakdown if snapshot exists
+            if shf_snapshot is not None:
+                # Extract component alignments
+                symbolic_alignment = getattr(shf_snapshot, 'symbolic_alignment', None)
+                mirror_alignment = getattr(shf_snapshot, 'mirror_alignment', None)
+                guna_symbolic_resonance = getattr(shf_snapshot, 'guna_symbolic_resonance', None)
+                kosha_symbolic_resonance = getattr(shf_snapshot, 'kosha_symbolic_resonance', None)
+                semantic_integrity_weight = getattr(shf_snapshot, 'semantic_integrity_weight', None)
+                harmonization_entropy = getattr(shf_snapshot, 'harmonization_entropy', None)
+                notes = getattr(shf_snapshot, 'notes', None)
+
+                if symbolic_alignment is not None:
+                    symbolic_harmonization_data['symbolic_alignment'] = symbolic_alignment
+                if mirror_alignment is not None:
+                    symbolic_harmonization_data['mirror_alignment'] = mirror_alignment
+                if guna_symbolic_resonance is not None:
+                    symbolic_harmonization_data['guna_symbolic_resonance'] = guna_symbolic_resonance
+                if kosha_symbolic_resonance is not None:
+                    symbolic_harmonization_data['kosha_symbolic_resonance'] = kosha_symbolic_resonance
+                if semantic_integrity_weight is not None:
+                    symbolic_harmonization_data['semantic_integrity_weight'] = semantic_integrity_weight
+                if harmonization_entropy is not None:
+                    symbolic_harmonization_data['entropy'] = harmonization_entropy
+                if notes:
+                    symbolic_harmonization_data['notes'] = list(notes) if isinstance(notes, list) else []
+
+                # Add full snapshot for detailed analysis
+                symbolic_harmonization_data['snapshot'] = {
+                    'symbolic_alignment': symbolic_alignment,
+                    'mirror_alignment': mirror_alignment,
+                    'guna_symbolic_resonance': guna_symbolic_resonance,
+                    'kosha_symbolic_resonance': kosha_symbolic_resonance,
+                    'semantic_integrity_weight': semantic_integrity_weight,
+                    'symbolic_harmonization_index': getattr(shf_snapshot, 'symbolic_harmonization_index', None),
+                    'harmonization_entropy': harmonization_entropy,
+                    'notes': notes if notes else [],
+                }
+
+            coherence_report['symbolic_harmonization'] = symbolic_harmonization_data
+
     # Build metadata
     metadata = {
         'timestamp': datetime.utcnow().isoformat() + 'Z',

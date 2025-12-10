@@ -1359,6 +1359,35 @@ def _build_hints(
                     message="Resonance weighting considers drift control. Low-drift signals are contributing to overall trust."
                 ))
 
+    # ========================================================================
+    # Phase 27: Symbolic Harmonization Formula Hints (diagnostic only)
+    # ========================================================================
+    # Only add for therapy/identity domains and SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and coherence:
+        symbolic_harmonization_data = coherence.get("symbolic_harmonization", {})
+        symbolic_harmonization_index = symbolic_harmonization_data.get("index")
+
+        # Add harmonization hints based on SHI level
+        if symbolic_harmonization_index is not None:
+            # SYMBOLIC_HARMONY_HIGH: >= 0.75
+            if symbolic_harmonization_index >= 0.75:
+                hints.append(DILchatHint(
+                    code="SYMBOLIC_HARMONY_HIGH",
+                    message="Symbolic harmonization is high. Meaning layers, practical grounding, and mirror tensions are well-aligned. Deep symbolic exploration is supported."
+                ))
+            # SYMBOLIC_HARMONY_MEDIUM: 0.50 - 0.75
+            elif symbolic_harmonization_index >= 0.50:
+                hints.append(DILchatHint(
+                    code="SYMBOLIC_HARMONY_MEDIUM",
+                    message="Symbolic harmonization is moderate. Core meaning structures are coherent but some tension between symbolic and practical layers exists."
+                ))
+            # SYMBOLIC_HARMONY_LOW: < 0.50
+            else:
+                hints.append(DILchatHint(
+                    code="SYMBOLIC_HARMONY_LOW",
+                    message="Symbolic harmonization is low. Meaning layers show misalignment. Use concrete grounding to stabilize symbolic coherence."
+                ))
+
     return hints
 
 
