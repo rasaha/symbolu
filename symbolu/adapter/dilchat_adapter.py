@@ -1299,6 +1299,66 @@ def _build_hints(
                     message="Cause-chain is unstable. Temporal coherence is low, patterns may be unclear or contradictory."
                 ))
 
+    # ========================================================================
+    # Phase 24: Resonance Weighting Function Hints (diagnostic only)
+    # ========================================================================
+    # Only add for therapy/identity domains and SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and coherence:
+        resonance_data = coherence.get("resonance_weighting", {})
+        resonance_entropy = resonance_data.get("entropy")
+        dominant_metrics = resonance_data.get("dominant_metrics", [])
+
+        # Add resonance focus hints based on entropy
+        if resonance_entropy is not None:
+            # RESONANCE_FOCUSED: low entropy (< 0.35) - one or few metrics dominate
+            if resonance_entropy < 0.35:
+                hints.append(DILchatHint(
+                    code="RESONANCE_FOCUSED",
+                    message="Resonance weighting is focused. Signal clarity is high, one or few metrics strongly dominate trustworthiness."
+                ))
+            # RESONANCE_BALANCED: medium entropy (0.35 <= entropy < 0.70) - balanced trust across metrics
+            elif resonance_entropy < 0.70:
+                hints.append(DILchatHint(
+                    code="RESONANCE_BALANCED",
+                    message="Resonance weighting is balanced. Trust is distributed evenly across multiple metrics."
+                ))
+            # RESONANCE_DIFFUSE: high entropy (>= 0.70) - trust is spread widely
+            else:
+                hints.append(DILchatHint(
+                    code="RESONANCE_DIFFUSE",
+                    message="Resonance weighting is diffuse. Trust is spread broadly across many metrics, signal clarity is lower."
+                ))
+
+        # Add dominant metric hints if available
+        if dominant_metrics:
+            # RESONANCE_COEFF_COHERENCE_DOMINANT: coherence_fused is top metric
+            if any("coherence" in metric for metric in dominant_metrics[:1]):
+                hints.append(DILchatHint(
+                    code="RESONANCE_COEFF_COHERENCE_DOMINANT",
+                    message="Resonance weighting favors coherence metrics. Conversation stability signals are most trustworthy."
+                ))
+
+            # RESONANCE_COEFF_SEMANTIC_DOMINANT: semantic_integrity is top metric
+            if any("semantic" in metric for metric in dominant_metrics[:1]):
+                hints.append(DILchatHint(
+                    code="RESONANCE_COEFF_SEMANTIC_DOMINANT",
+                    message="Resonance weighting favors semantic integrity. Self-consistency signals are most trustworthy."
+                ))
+
+            # RESONANCE_COEFF_RESONANCE_DOMINANT: resonance_index is top metric
+            if "resonance_index" in dominant_metrics[:1]:
+                hints.append(DILchatHint(
+                    code="RESONANCE_COEFF_RESONANCE_DOMINANT",
+                    message="Resonance weighting favors resonance index. Formula-based stabilizing signals are most trustworthy."
+                ))
+
+            # RESONANCE_COEFF_DRIFT_INVERSE_WEIGHTED: drift_inverse or cognitive_stability is weighted
+            if any("drift_inverse" in metric or "cognitive_stability" in metric for metric in dominant_metrics):
+                hints.append(DILchatHint(
+                    code="RESONANCE_COEFF_DRIFT_INVERSE_WEIGHTED",
+                    message="Resonance weighting considers drift control. Low-drift signals are contributing to overall trust."
+                ))
+
     return hints
 
 

@@ -149,6 +149,14 @@ class CoherenceState:
     avg_inversion_score: Optional[float] = None  # Average inversion score across session [0.0, 1.0]
     cause_chain_stability_avg: Optional[float] = None  # Average cause-chain stability [0.0, 1.0]
 
+    # Phase 24: Resonance Weighting Function (observation only - not used in scoring)
+    resonance_weighting_history: List[Optional[Any]] = field(default_factory=list)  # List of ResonanceWeightingSnapshot
+    resonance_weighting_entropy_history: List[Optional[float]] = field(default_factory=list)  # Entropy history
+    current_resonance_weights: Optional[Dict[str, float]] = None  # Current raw weights
+    current_normalized_resonance_weights: Optional[Dict[str, float]] = None  # Current normalized weights
+    current_resonance_entropy: Optional[float] = None  # Current entropy [0.0, 1.0]
+    dominant_resonance_metrics: List[str] = field(default_factory=list)  # Top metrics by weight
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -202,6 +210,10 @@ class CoherenceState:
 
         # Phase 23 cause-effect inversion history
         self.cause_effect_inversion_history = self.cause_effect_inversion_history[-window:]
+
+        # Phase 24 resonance weighting history
+        self.resonance_weighting_history = self.resonance_weighting_history[-window:]
+        self.resonance_weighting_entropy_history = self.resonance_weighting_entropy_history[-window:]
 
     def get_history_length(self) -> int:
         """

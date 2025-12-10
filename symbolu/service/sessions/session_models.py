@@ -171,3 +171,8 @@ class SessionSummary:
     dominant_inversion_band: Optional[str] = None  # Most common inversion band: "forward_dominant" | "ambiguous" | "inversion_plausible" | "inversion_dominant"
     cause_chain_stability_avg: Optional[float] = None  # Average cause-chain stability [0.0, 1.0]
     inversion_pattern_tags: List[str] = field(default_factory=list)  # Collected diagnostic tags
+
+    # Phase 24 Resonance Weighting Function (observation only)
+    avg_resonance_entropy: Optional[float] = None  # Average resonance entropy [0.0, 1.0]
+    dominant_resonance_metrics: List[str] = field(default_factory=list)  # Top metrics by normalized weight
+    resonance_weighting_notes: List[str] = field(default_factory=list)  # Collected diagnostic notes

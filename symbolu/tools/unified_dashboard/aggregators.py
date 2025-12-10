@@ -112,6 +112,21 @@ def build_unified_session_analytics(
     inversion_band = summary.dominant_inversion_band
     inversion_pattern_tags = summary.inversion_pattern_tags
 
+    # Phase 24: Resonance Weighting Function
+    avg_resonance_entropy = summary.avg_resonance_entropy
+    dominant_resonance_metrics = summary.dominant_resonance_metrics
+    resonance_weighting_notes = summary.resonance_weighting_notes
+
+    # Derive resonance entropy band from avg_resonance_entropy
+    resonance_entropy_band = None
+    if avg_resonance_entropy is not None:
+        if avg_resonance_entropy < 0.35:
+            resonance_entropy_band = "focused"
+        elif avg_resonance_entropy < 0.70:
+            resonance_entropy_band = "balanced"
+        else:
+            resonance_entropy_band = "diffuse"
+
     # ========================================================================
     # Extract from Last Coherence State (Phase 11/12/16/17/18)
     # ========================================================================
@@ -472,6 +487,10 @@ def build_unified_session_analytics(
         inversion_band=inversion_band,
         inversion_sparkline=inversion_sparkline,
         inversion_notes=inversion_pattern_tags,
+        # Phase 24: Resonance Weighting Function
+        resonance_entropy_band=resonance_entropy_band,
+        dominant_resonance_metrics=dominant_resonance_metrics,
+        resonance_notes=resonance_weighting_notes,
     )
 
 

@@ -127,6 +127,11 @@ class CoherenceObservation:
     mirror_alignment: Optional[float] = None
     inversion_notes: Optional[List[str]] = None
 
+    # Phase 24: Resonance Weighting Function (observation only)
+    resonance_weighting: Optional[Any] = None  # ResonanceWeightingSnapshot
+    resonance_entropy: Optional[float] = None
+    dominant_resonance_metrics: List[str] = field(default_factory=list)
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -463,6 +468,27 @@ class CoherenceObserver:
                     mirror_alignment = getattr(latest_snapshot, 'mirror_alignment', None)
                     inversion_notes = getattr(latest_snapshot, 'notes', None)
 
+        # Phase 24: Extract Resonance Weighting from coherence_state
+        resonance_weighting = None
+        resonance_entropy = None
+        dominant_resonance_metrics = []
+
+        if coherence_state is not None:
+            # Extract current resonance entropy
+            resonance_entropy = getattr(coherence_state, 'current_resonance_entropy', None)
+
+            # Extract dominant resonance metrics
+            dominant_metrics = getattr(coherence_state, 'dominant_resonance_metrics', None)
+            if dominant_metrics:
+                dominant_resonance_metrics = list(dominant_metrics) if isinstance(dominant_metrics, list) else []
+
+            # Extract current snapshot
+            weighting_history = getattr(coherence_state, 'resonance_weighting_history', None)
+            if weighting_history and len(weighting_history) > 0:
+                latest_snapshot = weighting_history[-1]
+                if latest_snapshot is not None:
+                    resonance_weighting = latest_snapshot
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -541,6 +567,9 @@ class CoherenceObserver:
             forward_alignment=forward_alignment,
             mirror_alignment=mirror_alignment,
             inversion_notes=inversion_notes,
+            resonance_weighting=resonance_weighting,
+            resonance_entropy=resonance_entropy,
+            dominant_resonance_metrics=dominant_resonance_metrics,
         )
 
         # Store observation
@@ -662,6 +691,11 @@ class CoherenceObserver:
         if temporal_entropy:
             snapshot["temporal_entropy"] = temporal_entropy
 
+        # Phase 24: Add resonance weighting section if available
+        resonance_weighting = self._extract_resonance_weighting_from_observation(obs)
+        if resonance_weighting:
+            snapshot["resonance_weighting"] = resonance_weighting
+
         return snapshot
 
     def _extract_formulas_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Optional[float]]]:
@@ -777,6 +811,40 @@ class CoherenceObserver:
             temporal_entropy["details"] = obs.temporal_entropy_details
 
         return temporal_entropy if temporal_entropy else None
+
+    def _extract_resonance_weighting_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Any]]:
+        """
+        Extract Phase 24 Resonance Weighting metrics from observation.
+
+        Returns resonance_weighting dict if metrics are available, None otherwise.
+        """
+        # Build resonance_weighting dict from observation
+        resonance_weighting = {}
+
+        # Core metrics
+        if obs.resonance_entropy is not None:
+            resonance_weighting["entropy"] = obs.resonance_entropy
+
+        if obs.dominant_resonance_metrics:
+            resonance_weighting["dominant_metrics"] = obs.dominant_resonance_metrics
+
+        # Full snapshot if available
+        if obs.resonance_weighting is not None:
+            # Try to serialize the snapshot
+            if hasattr(obs.resonance_weighting, '__dict__'):
+                # Convert snapshot object to dict
+                snapshot_dict = {
+                    "weights": getattr(obs.resonance_weighting, 'weights', {}),
+                    "normalized_weights": getattr(obs.resonance_weighting, 'normalized_weights', {}),
+                    "entropy": getattr(obs.resonance_weighting, 'entropy_of_weights', None),
+                    "dominant_metrics": getattr(obs.resonance_weighting, 'dominant_metrics', {}),
+                    "notes": getattr(obs.resonance_weighting, 'notes', []),
+                }
+                resonance_weighting["snapshot"] = snapshot_dict
+            elif isinstance(obs.resonance_weighting, dict):
+                resonance_weighting["snapshot"] = obs.resonance_weighting
+
+        return resonance_weighting if resonance_weighting else None
 
     def _get_status_label(self, obs: CoherenceObservation) -> str:
         """Get human-readable status label."""

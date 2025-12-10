@@ -182,6 +182,9 @@ class CoherenceEngine:
         # Update Phase 23 cause-effect inversion analytics (observation only)
         self._update_cause_effect_inversion(state)
 
+        # Update Phase 24 resonance weighting function (observation only)
+        self._update_resonance_weighting(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -1515,3 +1518,105 @@ class CoherenceEngine:
             state.current_inversion_band = None
             state.avg_inversion_score = None
             state.cause_chain_stability_avg = None
+
+    def _update_resonance_weighting(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 24 Resonance Weighting Function (observation only).
+
+        This method computes adaptive weights for all major Symbol-U metrics based on
+        their "resonance quality," without changing any existing formulas or behavior.
+
+        The resonance weights say: "Given all these signals (coherence, formulas,
+        resonance, mirror-time, drift…), which ones are currently most trustworthy?"
+
+        These weights are:
+          • Exposed to Unified API and Unified Dashboard
+          • Optionally surfaced as DILchat diagnostics
+          • NOT used to change any v1/v2/v3/coherence_fused scores
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.resonance_weighting import compute_resonance_weighting
+
+        # Gather all available metrics from state
+        # Coherence variants
+        coherence_v1 = state.coherence_score if state.coherence_score > 0.0 else None
+        coherence_v2 = state.coherence_score_v2
+        coherence_v3 = state.coherence_score_v3
+        coherence_fused = state.coherence_fused
+        coherence_v3_quality = state.coherence_v3_quality
+
+        # Enhanced SMI (Phase 13)
+        enhanced_smi = state.smi_history[-1] if state.smi_history else None
+
+        # Phase 14 formulas
+        vritti_momentum = state.vritti_momentum_history[-1] if state.vritti_momentum_history else None
+        arc_tension_harmonizer = state.arc_tension_harmonizer_history[-1] if state.arc_tension_harmonizer_history else None
+
+        # Phase 3 derived metrics
+        resonance_index = state.resonance_index
+        tension_index = state.tension_index
+        arc_alignment_index = state.arc_alignment_index
+
+        # Phase 8 Guna/Kosha resonance
+        guna_resonance_index = state.guna_resonance_index
+        kosha_resonance_index = state.kosha_resonance_index
+
+        # Phase 17 semantic integrity & drift
+        semantic_integrity_score = state.semantic_integrity_score
+        cognitive_drift_v3 = state.cognitive_drift_v3
+
+        # Phase 18 temporal entropy
+        temporal_entropy_volatility = state.temporal_entropy_volatility
+
+        # Phase 19 drift fusion index (if available in state)
+        # Note: drift_fusion_index might not be directly stored in state
+        # For now, we'll use cognitive_drift_v3 as a proxy
+        drift_fusion_index = cognitive_drift_v3
+
+        # Compute resonance weighting snapshot
+        snapshot = compute_resonance_weighting(
+            coherence_v1=coherence_v1,
+            coherence_v2=coherence_v2,
+            coherence_v3=coherence_v3,
+            coherence_fused=coherence_fused,
+            coherence_v3_quality=coherence_v3_quality,
+            enhanced_smi=enhanced_smi,
+            vritti_momentum=vritti_momentum,
+            arc_tension_harmonizer=arc_tension_harmonizer,
+            resonance_index=resonance_index,
+            tension_index=tension_index,
+            arc_alignment_index=arc_alignment_index,
+            guna_resonance_index=guna_resonance_index,
+            kosha_resonance_index=kosha_resonance_index,
+            drift_fusion_index=drift_fusion_index,
+            semantic_integrity_score=semantic_integrity_score,
+            cognitive_drift_v3=cognitive_drift_v3,
+            temporal_entropy_volatility=temporal_entropy_volatility,
+        )
+
+        # Store results in state
+        if snapshot is not None:
+            # Append to history
+            state.resonance_weighting_history.append(snapshot)
+            state.resonance_weighting_entropy_history.append(snapshot.entropy_of_weights)
+
+            # Update current metrics
+            state.current_resonance_weights = snapshot.weights
+            state.current_normalized_resonance_weights = snapshot.normalized_weights
+            state.current_resonance_entropy = snapshot.entropy_of_weights
+
+            # Update dominant metrics (top 3 keys)
+            state.dominant_resonance_metrics = list(snapshot.dominant_metrics.keys())
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.resonance_weighting_history.append(None)
+            state.resonance_weighting_entropy_history.append(None)
+            state.current_resonance_weights = None
+            state.current_normalized_resonance_weights = None
+            state.current_resonance_entropy = None
+            state.dominant_resonance_metrics = []
