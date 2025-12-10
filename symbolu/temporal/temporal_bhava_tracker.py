@@ -23,6 +23,12 @@ from symbolu.formulas.resonance_formulas import (
     compute_bhava_gap as _compute_bhava_gap_formula,
     compute_tension_corridor as _compute_tension_corridor_formula,
 )
+from symbolu.formulas.vritti_momentum import (
+    compute_vritti_momentum as _compute_vritti_momentum_formula,
+)
+from symbolu.formulas.arc_tension_harmonizer import (
+    compute_arc_tension_harmonizer as _compute_arc_tension_harmonizer_formula,
+)
 
 
 @dataclass
@@ -44,19 +50,24 @@ class TemporalFormulaSnapshot:
     Per-turn snapshot of Phase 1 temporal formula values.
 
     This dataclass holds the computed values from the four foundational
-    temporal formulas introduced in Symbol-U v3.0 Phase 1.
+    temporal formulas introduced in Symbol-U v3.0 Phase 1, plus Phase 14
+    advanced temporal formulas.
 
     Attributes:
         smi: Symbolic Mental Index (0.0 to 1.0)
         delta_smi: SMI momentum (-1.0 to 1.0)
         bhava_gap: Bhava circular distance (0.0 to 1.0)
         tension_corridor: Tension dynamics signal (0.0 to 1.0)
+        vritti_momentum: Phase 14 Vritti Momentum Formula (-1.0 to 1.0) - observation only
+        arc_tension_harmonizer: Phase 14 Arc-Tension Harmonizer (0.0 to 1.0) - observation only
     """
 
     smi: Optional[float] = None
     delta_smi: Optional[float] = None
     bhava_gap: Optional[float] = None
     tension_corridor: Optional[float] = None
+    vritti_momentum: Optional[float] = None
+    arc_tension_harmonizer: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Optional[float]]:
         """Convert snapshot to JSON-safe dictionary."""
@@ -65,6 +76,8 @@ class TemporalFormulaSnapshot:
             "delta_smi": self.delta_smi,
             "bhava_gap": self.bhava_gap,
             "tension_corridor": self.tension_corridor,
+            "vritti_momentum": self.vritti_momentum,
+            "arc_tension_harmonizer": self.arc_tension_harmonizer,
         }
 
 
@@ -102,6 +115,16 @@ class TemporalState:
     def tension_corridor(self) -> Optional[float]:
         """Get tension_corridor from formulas snapshot."""
         return self.formulas.tension_corridor
+
+    @property
+    def vritti_momentum(self) -> Optional[float]:
+        """Get vritti_momentum from formulas snapshot (Phase 14)."""
+        return self.formulas.vritti_momentum
+
+    @property
+    def arc_tension_harmonizer(self) -> Optional[float]:
+        """Get arc_tension_harmonizer from formulas snapshot (Phase 14)."""
+        return self.formulas.arc_tension_harmonizer
 
 
 class TemporalBhavaTracker:
@@ -287,15 +310,18 @@ class TemporalBhavaTracker:
         vrtti_intensity: float,
         bhava_position: float,
         current_bhava: int,
+        bhava_direction: str = "neutral",
     ) -> TemporalState:
         """
-        Compute all Phase 1 temporal formulas with fail-safe wrappers.
+        Compute all Phase 1 + Phase 14 temporal formulas with fail-safe wrappers.
 
         This method computes:
         - SMI from dimensional_resonance, vrtti_intensity, bhava_position
         - ΔSMI from current and previous SMI
         - Bhava Gap from current and previous bhava
         - Tension Corridor from ΔSMI and bhava_gap
+        - Vritti Momentum (Phase 14) from ΔSMI and bhava_direction
+        - Arc-Tension Harmonizer (Phase 14) from vritti_momentum, tension_corridor, arc_alignment
 
         All computations are wrapped in try/except blocks for fail-safety.
 
@@ -304,6 +330,7 @@ class TemporalBhavaTracker:
             vrtti_intensity: Vrtti intensity value (0.0 to 1.0)
             bhava_position: Bhava position value (0.0 to 1.0)
             current_bhava: Current bhava ID (0 to 11)
+            bhava_direction: Direction of bhava evolution ("upward", "downward", "neutral")
 
         Returns:
             TemporalState with computed values (fields set to None on error)
@@ -357,6 +384,65 @@ class TemporalBhavaTracker:
         except Exception as e:
             # Log error and set to None (fail-safe)
             snapshot.tension_corridor = None
+
+        # ====================================================================
+        # PHASE 14: Compute Vritti Momentum Formula (VMF)
+        # ====================================================================
+        try:
+            if snapshot.delta_smi is not None:
+                vmf_result = _compute_vritti_momentum_formula(
+                    delta_smi=snapshot.delta_smi,
+                    bhava_direction=bhava_direction,
+                )
+                if vmf_result is not None:
+                    snapshot.vritti_momentum = vmf_result.vritti_momentum
+                else:
+                    snapshot.vritti_momentum = None
+            else:
+                snapshot.vritti_momentum = None
+        except Exception as e:
+            # Log error and set to None (fail-safe)
+            snapshot.vritti_momentum = None
+
+        # ====================================================================
+        # PHASE 14: Compute Arc-Tension Harmonizer (ATH)
+        # ====================================================================
+        try:
+            # ATH requires: vritti_momentum, tension_corridor, arc_alignment_index
+            # For arc_alignment_index, we use the arc_alignment_index from CoherenceState
+            # if available. For temporal tracker, we compute a simple proxy based on
+            # current metrics (this is a simplified version for standalone usage).
+
+            # Simple arc_alignment proxy: improvement signal from delta_smi
+            # If we're improving (positive delta_smi), arc alignment is higher
+            if snapshot.delta_smi is not None:
+                # Map delta_smi [-1, +1] to arc_alignment [0, 1]
+                # Positive delta = good alignment (0.5 to 1.0)
+                # Negative delta = poor alignment (0.0 to 0.5)
+                arc_alignment_proxy = 0.5 + (snapshot.delta_smi * 0.5)
+                arc_alignment_proxy = max(0.0, min(1.0, arc_alignment_proxy))
+            else:
+                arc_alignment_proxy = 0.5  # Neutral default
+
+            if (
+                snapshot.vritti_momentum is not None
+                and snapshot.tension_corridor is not None
+            ):
+                ath_result = _compute_arc_tension_harmonizer_formula(
+                    vritti_momentum=snapshot.vritti_momentum,
+                    tension_corridor=snapshot.tension_corridor,
+                    arc_alignment_index=arc_alignment_proxy,
+                    delta_smi=snapshot.delta_smi,
+                )
+                if ath_result is not None:
+                    snapshot.arc_tension_harmonizer = ath_result.arc_tension_harmonizer
+                else:
+                    snapshot.arc_tension_harmonizer = None
+            else:
+                snapshot.arc_tension_harmonizer = None
+        except Exception as e:
+            # Log error and set to None (fail-safe)
+            snapshot.arc_tension_harmonizer = None
 
         # Create state with snapshot
         state = TemporalState(formulas=snapshot)

@@ -137,3 +137,11 @@ class SessionSummary:
     # Phase 8 Guna/Kosha resonance metrics (observation only)
     avg_guna_resonance: Optional[float] = None  # Average Guna resonance index across session
     avg_kosha_resonance: Optional[float] = None  # Average Kosha resonance index across session
+
+    # Phase 14 Vritti Momentum & Arc-Tension Harmonizer (observation only)
+    avg_vritti_momentum: Optional[float] = None  # Average Vritti Momentum across session
+    max_vritti_momentum: Optional[float] = None  # Maximum Vritti Momentum observed
+    min_vritti_momentum: Optional[float] = None  # Minimum Vritti Momentum observed
+    avg_arc_tension_harmonizer: Optional[float] = None  # Average Arc-Tension Harmonizer across session
+    max_arc_tension_harmonizer: Optional[float] = None  # Maximum Arc-Tension Harmonizer observed
+    min_arc_tension_harmonizer: Optional[float] = None  # Minimum Arc-Tension Harmonizer observed

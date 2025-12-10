@@ -46,12 +46,24 @@ class CoherenceState:
     bhava_gap_history: List[Optional[float]] = field(default_factory=list)  # Bhava gap per turn
     tension_corridor_history: List[Optional[float]] = field(default_factory=list)  # Tension corridor per turn
 
+    # Phase 14 formula histories (observation only - not used in scoring)
+    vritti_momentum_history: List[Optional[float]] = field(default_factory=list)  # Vritti Momentum per turn
+    arc_tension_harmonizer_history: List[Optional[float]] = field(default_factory=list)  # Arc-Tension Harmonizer per turn
+
     # Phase 2 formula aggregates (observation only - not used in scoring)
     avg_smi: Optional[float] = None  # Average SMI across session
     max_smi: Optional[float] = None  # Maximum SMI observed
     min_smi: Optional[float] = None  # Minimum SMI observed
     avg_tension_corridor: Optional[float] = None  # Average tension corridor
     max_tension_corridor: Optional[float] = None  # Maximum tension corridor
+
+    # Phase 14 formula aggregates (observation only - not used in scoring)
+    avg_vritti_momentum: Optional[float] = None  # Average Vritti Momentum
+    max_vritti_momentum: Optional[float] = None  # Maximum Vritti Momentum
+    min_vritti_momentum: Optional[float] = None  # Minimum Vritti Momentum
+    avg_arc_tension_harmonizer: Optional[float] = None  # Average Arc-Tension Harmonizer
+    max_arc_tension_harmonizer: Optional[float] = None  # Maximum Arc-Tension Harmonizer
+    min_arc_tension_harmonizer: Optional[float] = None  # Minimum Arc-Tension Harmonizer
 
     # Phase 3 derived formula metrics (observation only - not used in scoring)
     resonance_index: Optional[float] = None  # [0.0, 1.0] - formula-weighted stabilizing signal
@@ -104,6 +116,10 @@ class CoherenceState:
         self.delta_smi_history = self.delta_smi_history[-window:]
         self.bhava_gap_history = self.bhava_gap_history[-window:]
         self.tension_corridor_history = self.tension_corridor_history[-window:]
+
+        # Phase 14 formula histories
+        self.vritti_momentum_history = self.vritti_momentum_history[-window:]
+        self.arc_tension_harmonizer_history = self.arc_tension_harmonizer_history[-window:]
 
     def get_history_length(self) -> int:
         """
