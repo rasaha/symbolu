@@ -243,6 +243,12 @@ class CoherenceObservation:
     ch_alignment_band: Optional[str] = None  # Alignment Band: HIGH_ALIGNMENT | MIXED_ALIGNMENT | LOW_ALIGNMENT
     ch_alignment_tags: List[str] = field(default_factory=list)  # CHRAE diagnostic tags
 
+    # Phase 41: Coherence-Regime Scenario Mapper (observation only)
+    regime_name: Optional[str] = None  # Dominant coherence regime
+    regime_band: Optional[str] = None  # Regime band: "stable" | "mixed" | "volatile"
+    regime_scores: Dict[str, float] = field(default_factory=dict)  # Regime name → score
+    regime_tags: List[str] = field(default_factory=list)  # CRSM diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -872,6 +878,20 @@ class CoherenceObserver:
                 ch_alignment_band = getattr(cross_horizon_resonance_snapshot, 'alignment_band', None)
                 ch_alignment_tags = getattr(cross_horizon_resonance_snapshot, 'diagnostic_tags', [])
 
+        # Phase 41: Extract Coherence-Regime Scenario Mapper from coherence state
+        regime_name = None
+        regime_band = None
+        regime_scores = {}
+        regime_tags = []
+
+        if coherence_state is not None:
+            coherence_regime_snapshot = getattr(coherence_state, 'coherence_regime_snapshot', None)
+            if coherence_regime_snapshot is not None:
+                regime_name = getattr(coherence_regime_snapshot, 'dominant_regime', None)
+                regime_band = getattr(coherence_regime_snapshot, 'regime_band', None)
+                regime_scores = getattr(coherence_regime_snapshot, 'regime_scores', {})
+                regime_tags = getattr(coherence_regime_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -1040,6 +1060,10 @@ class CoherenceObserver:
             ch_dft=ch_dft,  # Phase 40
             ch_alignment_band=ch_alignment_band,  # Phase 40
             ch_alignment_tags=ch_alignment_tags,  # Phase 40
+            regime_name=regime_name,  # Phase 41
+            regime_band=regime_band,  # Phase 41
+            regime_scores=regime_scores,  # Phase 41
+            regime_tags=regime_tags,  # Phase 41
         )
 
         # Store observation

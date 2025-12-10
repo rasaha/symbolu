@@ -1002,6 +1002,58 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
             tag_counts = Counter(all_tags)
             drift_pattern_frequency = dict(tag_counts)
 
+    # Phase 41: Extract Coherence-Regime Scenario Mapper metrics from coherence history
+    dominant_coherence_regime_val = None
+    regime_band_val = None
+    regime_frequency_val = {}
+    regime_notes_list = []
+
+    if state.coherence_history:
+        # Extract regime metrics from CoherenceState
+        all_regimes = []
+        all_regime_bands = []
+        all_regime_notes = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract current_dominant_regime from CoherenceState
+                if "current_dominant_regime" in coh and coh["current_dominant_regime"] is not None:
+                    all_regimes.append(coh["current_dominant_regime"])
+
+                # Extract current_regime_band from CoherenceState
+                if "current_regime_band" in coh and coh["current_regime_band"] is not None:
+                    all_regime_bands.append(coh["current_regime_band"])
+
+                # Also extract from coherence_regime_history for detailed analysis
+                if "coherence_regime_history" in coh:
+                    regime_history = coh["coherence_regime_history"]
+                    if isinstance(regime_history, list):
+                        for snapshot in regime_history:
+                            if snapshot is not None and hasattr(snapshot, 'dominant_regime'):
+                                all_regimes.append(snapshot.dominant_regime)
+                            if snapshot is not None and hasattr(snapshot, 'regime_band'):
+                                all_regime_bands.append(snapshot.regime_band)
+                            if snapshot is not None and hasattr(snapshot, 'notes'):
+                                all_regime_notes.extend(snapshot.notes)
+
+        # Compute aggregates
+        # Dominant coherence regime (most frequent)
+        if all_regimes:
+            from collections import Counter
+            regime_counts = Counter(all_regimes)
+            dominant_coherence_regime_val = regime_counts.most_common(1)[0][0]
+            regime_frequency_val = dict(regime_counts)
+
+        # Regime band (most frequent)
+        if all_regime_bands:
+            from collections import Counter
+            band_counts = Counter(all_regime_bands)
+            regime_band_val = band_counts.most_common(1)[0][0]
+
+        # Collect unique regime notes (deduplicate and sort for determinism)
+        if all_regime_notes:
+            regime_notes_list = sorted(set(all_regime_notes))
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -1064,4 +1116,8 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_drift_fusion_index=avg_drift_fusion_index,
         dominant_drift_risk_band=dominant_drift_risk_band,
         drift_pattern_frequency=drift_pattern_frequency,
+        dominant_coherence_regime=dominant_coherence_regime_val,
+        regime_band=regime_band_val,
+        regime_frequency=regime_frequency_val,
+        regime_notes=regime_notes_list,
     )

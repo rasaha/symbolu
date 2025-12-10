@@ -135,6 +135,21 @@ def build_unified_session_analytics(
     # Use dominant pattern as band classification
     symbolic_harmonization_band = dominant_symbolic_harmonization_pattern
 
+    # Phase 41: Coherence-Regime Scenario Mapper
+    coherence_regime = summary.dominant_coherence_regime
+    coherence_regime_band = summary.regime_band
+    coherence_regime_tags = []
+
+    # Extract regime tags from latest coherence state
+    if session_state.coherence_history:
+        last_coh = session_state.coherence_history[-1]
+        if isinstance(last_coh, dict):
+            # Try to get regime snapshot from coherence history
+            if "coherence_regime_snapshot" in last_coh and last_coh["coherence_regime_snapshot"] is not None:
+                regime_snapshot = last_coh["coherence_regime_snapshot"]
+                if hasattr(regime_snapshot, "diagnostic_tags"):
+                    coherence_regime_tags = regime_snapshot.diagnostic_tags
+
     # ========================================================================
     # Extract from Last Coherence State (Phase 11/12/16/17/18)
     # ========================================================================
@@ -537,6 +552,10 @@ def build_unified_session_analytics(
         symbolic_harmonization_band=symbolic_harmonization_band,
         symbolic_harmonization_sparkline=symbolic_harmonization_sparkline,
         symbolic_harmonization_notes=symbolic_harmonization_notes,
+        # Phase 41: Coherence-Regime Scenario Mapper
+        coherence_regime=coherence_regime,
+        coherence_regime_band=coherence_regime_band,
+        coherence_regime_tags=coherence_regime_tags,
     )
 
 

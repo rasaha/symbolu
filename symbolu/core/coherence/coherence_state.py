@@ -304,6 +304,13 @@ class CoherenceState:
     dft_history: List[Optional[float]] = field(default_factory=list)  # DFT history
     chra_alignment_band_history: List[Optional[str]] = field(default_factory=list)  # Alignment band history
 
+    # Phase 41: Coherence-Regime Scenario Mapper (observation only - not used in scoring)
+    coherence_regime_snapshot: Optional[Any] = None  # CoherenceRegimeSnapshot (latest)
+    coherence_regime_history: List[Optional[Any]] = field(default_factory=list)  # List of CoherenceRegimeSnapshot
+    current_dominant_regime: Optional[str] = None  # Dominant coherence regime
+    current_regime_band: Optional[str] = None  # Regime band: "stable" | "mixed" | "volatile"
+    current_regime_scores: Dict[str, float] = field(default_factory=dict)  # Regime scores {regime_name: score}
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -426,6 +433,9 @@ class CoherenceState:
         self.ifa_history = self.ifa_history[-window:]
         self.dft_history = self.dft_history[-window:]
         self.chra_alignment_band_history = self.chra_alignment_band_history[-window:]
+
+        # Phase 41 coherence regime scenario mapper formula history
+        self.coherence_regime_history = self.coherence_regime_history[-window:]
 
     def get_history_length(self) -> int:
         """

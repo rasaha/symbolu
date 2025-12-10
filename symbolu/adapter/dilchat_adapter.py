@@ -1206,6 +1206,65 @@ def _build_badges(
                 description="Long-term forecast (H3) shows weak alignment with stability signals."
             ))
 
+    # ========================================================================
+    # Phase 41: Coherence-Regime Scenario Mapper Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract coherence_regime from unified_output
+    coherence_regime = unified_output.get("coherence_regime") if unified_output else None
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and coherence_regime is not None:
+        dominant_regime = coherence_regime.get("dominant_regime")
+        regime_band = coherence_regime.get("band")
+
+        # COHERENCE_REGIME_STABLE: stable regime with high scores
+        if dominant_regime == "stable_therapeutic_processing" or regime_band == "stable":
+            badges.append(DILchatBadge(
+                label="COHERENCE_REGIME_STABLE",
+                level="info",
+                description="Session exhibits stable therapeutic processing pattern. Coherence and continuity are strong."
+            ))
+
+        # COHERENCE_REGIME_VOLATILE: volatile identity drift or ambivalent state
+        if dominant_regime in ["volatile_identity_drift", "ambivalent_conflicted_state"] or regime_band == "volatile":
+            badges.append(DILchatBadge(
+                label="COHERENCE_REGIME_VOLATILE",
+                level="warning",
+                description="Session exhibits volatility in identity or coherence. High drift or conflict detected."
+            ))
+
+        # COHERENCE_REGIME_MIXED: mixed regime signals
+        if regime_band == "mixed":
+            badges.append(DILchatBadge(
+                label="COHERENCE_REGIME_MIXED",
+                level="info",
+                description="Session exhibits mixed regime signals. Multiple coherence patterns detected."
+            ))
+
+        # COHERENCE_REGIME_RECOVERY: recovery/stabilization pattern
+        if dominant_regime == "recovery_stabilization_phase":
+            badges.append(DILchatBadge(
+                label="COHERENCE_REGIME_RECOVERY",
+                level="info",
+                description="Session exhibits recovery stabilization pattern. Coherence is improving."
+            ))
+
+        # COHERENCE_REGIME_IDENTITY_DRIFT: identity drift dominant
+        if dominant_regime == "volatile_identity_drift":
+            badges.append(DILchatBadge(
+                label="COHERENCE_REGIME_IDENTITY_DRIFT",
+                level="warning",
+                description="Session exhibits volatile identity drift. Identity continuity is weak."
+            ))
+
+        # COHERENCE_REGIME_SURFACE_LEVEL: surface level interaction
+        if dominant_regime == "surface_level_interaction":
+            badges.append(DILchatBadge(
+                label="COHERENCE_REGIME_SURFACE_LEVEL",
+                level="info",
+                description="Session exhibits surface-level interaction. Low depth and symbolic harmonization."
+            ))
+
     return badges
 
 

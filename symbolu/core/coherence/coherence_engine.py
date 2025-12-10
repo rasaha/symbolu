@@ -256,6 +256,9 @@ class CoherenceEngine:
         # Update Phase 40 cross-horizon resonance alignment engine (observation only)
         self._update_cross_horizon_resonance(state)
 
+        # Update Phase 41 coherence regime scenario mapper (observation only)
+        self._update_coherence_regime(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -3426,3 +3429,173 @@ class CoherenceEngine:
             state.current_dft = None
             state.current_alignment_band = None
             state.current_chra_alignment_tags = []
+
+    def _update_coherence_regime(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 41 Coherence-Regime Scenario Mapper (observation only).
+
+        This method computes the coherence regime snapshot by classifying the session into
+        high-level regimes based on the full Symbol-U coherence/identity/drift/entropy stack.
+
+        CRSM answers the question: "What kind of session is this?"
+          • Stable therapeutic processing
+          • Volatile identity drift
+          • Deep reflective exploration
+          • Surface level interaction
+          • Ambivalent conflicted state
+          • Recovery stabilization phase
+
+        The CRSM produces:
+          1. Regime scores across canonical regimes [0.0, 1.0]
+          2. Dominant regime (highest score)
+          3. Secondary regimes (sorted by score)
+          4. Regime band: "stable" | "mixed" | "volatile"
+          5. Diagnostic tags
+          6. Deterministic notes
+
+        The CRSM is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for analytics, dashboards, and UI diagnostics only.
+
+        This update runs AFTER all other phases (esp. Phases 37, 38, 39, 40) to leverage
+        the full coherence/continuity/forecast stack.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.coherence_regime_scenario_mapper import compute_coherence_regime
+
+        # ====================================================================
+        # STEP 1: GATHER CORE REQUIRED SIGNALS
+        # ====================================================================
+
+        # Phase 16: Formula Fusion Stabilizer
+        coherence_fused = state.coherence_fused
+        coherence_fused_history = state.coherence_fused_history if state.coherence_fused_history else None
+
+        # Phase 10 & 12: Coherence v3
+        coherence_v3 = state.coherence_score_v3
+        coherence_v3_quality = state.coherence_v3_quality
+
+        # Phase 19: Drift Fusion
+        drift_fusion_index = state.drift_fusion_index
+        drift_fusion_index_history = state.drift_fusion_index_history if state.drift_fusion_index_history else None
+
+        # Phase 37: Adaptive Continuity Engine
+        css = state.current_css
+        css_history = state.css_history if state.css_history else None
+
+        # ====================================================================
+        # STEP 2: GATHER OPTIONAL SIGNALS
+        # ====================================================================
+
+        # Phase 26: Unified Consciousness Formula
+        ucf_coi = state.current_coi
+        ucf_csi = state.current_csi
+        ucf_cip = state.current_cip
+
+        # Phase 27: Symbolic Harmonization
+        symbolic_harmonization_index = state.current_symbolic_harmonization_index
+
+        # Phase 24: Resonance Weighting
+        resonance_weighting_entropy = state.current_resonance_entropy
+
+        # Phase 34: Identity Harmonics
+        identity_stability_score = None
+        if state.identity_harmonics_snapshot is not None:
+            identity_stability_score = state.identity_harmonics_snapshot.identity_stability_score
+
+        # Phase 35: Predictive Persona Drift
+        drift_magnitude_prediction = state.current_drift_magnitude_prediction
+
+        # Phase 36: Identity Resonance Memory
+        identity_memory_strength = state.current_ims
+        identity_echo_persistence = state.current_iep
+        identity_drift_anchoring = state.current_ida
+
+        # Phase 17: Semantic Integrity & Cognitive Drift v3
+        cognitive_drift_v3 = state.cognitive_drift_v3
+
+        # Phase 18: Temporal Entropy
+        temporal_entropy_instant = None
+        temporal_entropy_volatility = state.temporal_entropy_volatility
+        temporal_entropy_volatility_history = state.temporal_entropy_volatility_history if state.temporal_entropy_volatility_history else None
+
+        # Calculate instant entropy from snapshot if available
+        if state.temporal_entropy_snapshot is not None:
+            temporal_entropy_instant = state.temporal_entropy_snapshot.instant_entropy
+
+        # Phase 37: Adaptive Continuity Engine (continued)
+        ncc = state.current_ncc
+        icc = state.current_icc
+
+        # Phase 38: Temporal Coherence Forecasting
+        coherence_slope = state.current_forecast_coherence_slope
+        continuity_slope = state.current_forecast_continuity_slope
+
+        # Phase 40: Cross-Horizon Resonance Alignment
+        drift_forecast_tension = state.current_dft
+
+        # Phase 32: Insight Window Gating (if available)
+        insight_window_active = False
+        # Check if insight window module exists and is active
+        # For now, we'll default to False unless we have access to the insight window state
+
+        # ====================================================================
+        # STEP 3: COMPUTE COHERENCE REGIME
+        # ====================================================================
+
+        snapshot = compute_coherence_regime(
+            coherence_fused=coherence_fused,
+            coherence_fused_history=coherence_fused_history,
+            coherence_v3=coherence_v3,
+            coherence_v3_quality=coherence_v3_quality,
+            ucf_coi=ucf_coi,
+            ucf_csi=ucf_csi,
+            ucf_cip=ucf_cip,
+            symbolic_harmonization_index=symbolic_harmonization_index,
+            resonance_weighting_entropy=resonance_weighting_entropy,
+            identity_stability_score=identity_stability_score,
+            drift_magnitude_prediction=drift_magnitude_prediction,
+            identity_memory_strength=identity_memory_strength,
+            identity_echo_persistence=identity_echo_persistence,
+            identity_drift_anchoring=identity_drift_anchoring,
+            drift_fusion_index=drift_fusion_index,
+            drift_fusion_index_history=drift_fusion_index_history,
+            cognitive_drift_v3=cognitive_drift_v3,
+            temporal_entropy_instant=temporal_entropy_instant,
+            temporal_entropy_volatility=temporal_entropy_volatility,
+            temporal_entropy_volatility_history=temporal_entropy_volatility_history,
+            ncc=ncc,
+            icc=icc,
+            css=css,
+            css_history=css_history,
+            coherence_slope=coherence_slope,
+            continuity_slope=continuity_slope,
+            drift_forecast_tension=drift_forecast_tension,
+            insight_window_active=insight_window_active,
+        )
+
+        # ====================================================================
+        # STEP 4: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Append to history
+            state.coherence_regime_history.append(snapshot)
+
+            # Update current metrics
+            state.coherence_regime_snapshot = snapshot
+            state.current_dominant_regime = snapshot.dominant_regime
+            state.current_regime_band = snapshot.regime_band
+            state.current_regime_scores = snapshot.regime_scores
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.coherence_regime_history.append(None)
+
+            state.coherence_regime_snapshot = None
+            state.current_dominant_regime = None
+            state.current_regime_band = None
+            state.current_regime_scores = {}
