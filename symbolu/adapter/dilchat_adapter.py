@@ -734,6 +734,74 @@ def _build_badges(
             ))
 
     # ========================================================================
+    # Phase 30: Cross-Layer Resonance Persona Mapping Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract persona_resonance_map from unified_output
+    persona_resonance_map = unified_output.get("persona_resonance_map")
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and persona_resonance_map is not None:
+        # Extract modulation parameters from the map
+        modulation_params = persona_resonance_map.get("modulation_parameters", {})
+        raw_signals = persona_resonance_map.get("raw_signals", {})
+
+        metaphor_weight = modulation_params.get("metaphor_weight")
+        warmth_weight = modulation_params.get("warmth_weight")
+        structure_weight = modulation_params.get("structure_weight")
+        grounding_bias = modulation_params.get("grounding_bias")
+
+        cognitive_drift_v3 = raw_signals.get("cognitive_drift_v3")
+        ucf_csi = raw_signals.get("ucf_csi")
+
+        # PERSONA_RESONANCE_HIGH: high metaphor + warmth (≥ 0.65 average)
+        if metaphor_weight is not None and warmth_weight is not None:
+            avg_resonance = (metaphor_weight + warmth_weight) / 2.0
+            if avg_resonance >= 0.65:
+                badges.append(DILchatBadge(
+                    label="PERSONA_RESONANCE_HIGH",
+                    level="info",
+                    description="Cross-layer resonance signals high metaphor and warmth. Tone is expressive and symbolic."
+                ))
+
+        # PERSONA_RESONANCE_LOW: high structure + grounding (≥ 0.65 average)
+        if structure_weight is not None and grounding_bias is not None:
+            avg_grounding = (structure_weight + grounding_bias) / 2.0
+            if avg_grounding >= 0.65:
+                badges.append(DILchatBadge(
+                    label="PERSONA_RESONANCE_LOW",
+                    level="info",
+                    description="Cross-layer resonance signals high structure and grounding. Tone is practical and concrete."
+                ))
+
+        # PERSONA_RESONANCE_BALANCED: mid-range on all weights
+        if (metaphor_weight is not None and warmth_weight is not None and
+            structure_weight is not None and grounding_bias is not None):
+            all_weights = [metaphor_weight, warmth_weight, structure_weight, grounding_bias]
+            avg_all = sum(all_weights) / len(all_weights)
+            if 0.45 <= avg_all <= 0.55:
+                badges.append(DILchatBadge(
+                    label="PERSONA_RESONANCE_BALANCED",
+                    level="info",
+                    description="Cross-layer resonance signals balanced tone modulation across all parameters."
+                ))
+
+        # PERSONA_RESONANCE_DRIFT_CAUTION: high cognitive drift (≥ 0.60)
+        if cognitive_drift_v3 is not None and cognitive_drift_v3 >= 0.60:
+            badges.append(DILchatBadge(
+                label="PERSONA_RESONANCE_DRIFT_CAUTION",
+                level="warning",
+                description="High cognitive drift detected. Grounding bias increased to stabilize tone."
+            ))
+
+        # PERSONA_RESONANCE_STABILITY_STRONG: high UCF stability (≥ 0.70)
+        if ucf_csi is not None and ucf_csi >= 0.70:
+            badges.append(DILchatBadge(
+                label="PERSONA_RESONANCE_STABILITY_STRONG",
+                level="info",
+                description="Unified consciousness stability is high. Tone modulation is stable and consistent."
+            ))
+
+    # ========================================================================
     # BADGE 16: Trading Guardrail Badges (Phase 7: Formula-Aware Trading Guardrails v1.0)
     # ========================================================================
     if trading_guardrails:

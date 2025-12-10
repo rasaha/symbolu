@@ -77,6 +77,7 @@ class UnifiedOutput:
     trading_guardrails: Optional[Dict[str, bool]] = None
     interaction_mode: Optional[str] = None  # Phase 15: Active interaction mode
     persona_resonance: Optional[Dict[str, Any]] = None  # Phase 29: Persona resonance profile
+    persona_resonance_map: Optional[Dict[str, Any]] = None  # Phase 30: Cross-layer resonance persona map
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -855,6 +856,26 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 # Fallback to dict conversion
                 persona_resonance_data = dict(persona_resonance.__dict__)
 
+    # Phase 30: Extract cross-layer resonance map from persona response
+    persona_resonance_map_data = None
+    if hasattr(ctx, 'persona_response') and ctx.persona_response is not None:
+        # Try to extract cross_layer_resonance_map from PersonaResponse
+        cl_resonance_map = getattr(ctx.persona_response, 'cross_layer_resonance_map', None)
+        if cl_resonance_map is not None:
+            # Serialize CrossLayerResonanceMap to dict
+            if hasattr(cl_resonance_map, 'to_dict'):
+                # Use custom to_dict method
+                persona_resonance_map_data = cl_resonance_map.to_dict()
+            elif hasattr(cl_resonance_map, 'model_dump'):
+                # Pydantic v2 style (new method name)
+                persona_resonance_map_data = cl_resonance_map.model_dump()
+            elif hasattr(cl_resonance_map, 'dict'):
+                # Pydantic v1 style (deprecated in v2)
+                persona_resonance_map_data = cl_resonance_map.dict()
+            elif hasattr(cl_resonance_map, '__dict__'):
+                # Fallback to dict conversion
+                persona_resonance_map_data = dict(cl_resonance_map.__dict__)
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -875,6 +896,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         trading_guardrails=trading_guardrails_data,
         interaction_mode=interaction_mode_data,
         persona_resonance=persona_resonance_data,  # Phase 29
+        persona_resonance_map=persona_resonance_map_data,  # Phase 30
     )
 
 
