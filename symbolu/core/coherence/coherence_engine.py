@@ -94,6 +94,11 @@ class CoherenceEngine:
                 identity_signature_history=prev_state.identity_signature_history.copy(),
                 temporal_entropy_diff_history=prev_state.temporal_entropy_diff_history.copy(),
                 temporal_entropy_volatility_history=prev_state.temporal_entropy_volatility_history.copy(),
+                loop_alignment_history=prev_state.loop_alignment_history.copy(),
+                loop_tension_history=prev_state.loop_tension_history.copy(),
+                reversal_probability_history=prev_state.reversal_probability_history.copy(),
+                stability_band_history=prev_state.stability_band_history.copy(),
+                mirror_cycle_history=prev_state.mirror_cycle_history.copy(),
             )
 
         # Append new turn data to histories
@@ -169,6 +174,9 @@ class CoherenceEngine:
 
         # Update Phase 21 mirror-time loop (observation only)
         self._update_mirror_time_loop(state)
+
+        # Update Phase 22 mirror-time cycles (observation only)
+        self._update_mirror_time_cycles(state)
 
         return state
 
@@ -1269,3 +1277,127 @@ class CoherenceEngine:
             state.loop_tension_history.append(None)
             state.reversal_probability_history.append(None)
             state.stability_band_history.append(None)
+
+    def _update_mirror_time_cycles(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 22 Mirror-Time Cycles (observation only).
+
+        This method computes mirror-time cycles by analyzing the history of
+        mirror-time loop snapshots. It segments the loop history into cycles,
+        classifies each cycle, and computes aggregate statistics.
+
+        The mirror-time cycle metrics are stored in state.mirror_cycle_* fields
+        and do NOT affect any existing pipeline behavior. They are purely for
+        observation and diagnostics.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.mirror_time_cycle import detect_mirror_time_cycles
+        from symbolu.formulas.mirror_time_loop import MirrorTimeLoopSnapshot
+
+        # Build loop_history from individual metric histories
+        # We need to reconstruct MirrorTimeLoopSnapshot objects from the histories
+        loop_alignment_hist = state.loop_alignment_history
+        loop_tension_hist = state.loop_tension_history
+        reversal_prob_hist = state.reversal_probability_history
+        stability_band_hist = state.stability_band_history
+
+        # Check if we have sufficient data
+        if not loop_alignment_hist or len(loop_alignment_hist) < 2:
+            # Not enough data to detect cycles
+            state.dominant_cycle_type = None
+            state.dominant_cycle_stability_band = None
+            state.avg_cycle_alignment = None
+            state.avg_cycle_tension = None
+            state.avg_cycle_reversal_probability = None
+            return
+
+        # Reconstruct loop history as list of MirrorTimeLoopSnapshot objects
+        # Note: We don't have all fields (forward_vector, mirror_vector, loop_delta),
+        # but we have the key metrics needed for cycle detection
+        loop_history = []
+        min_len = min(
+            len(loop_alignment_hist),
+            len(loop_tension_hist),
+            len(reversal_prob_hist),
+            len(stability_band_hist),
+        )
+
+        for i in range(min_len):
+            alignment = loop_alignment_hist[i]
+            tension = loop_tension_hist[i]
+            reversal = reversal_prob_hist[i]
+            stability = stability_band_hist[i]
+
+            # Skip None entries
+            if alignment is None or tension is None or reversal is None or stability is None:
+                continue
+
+            # Create a minimal snapshot with the fields needed for cycle detection
+            # We'll estimate forward_vector, mirror_vector, and loop_delta from available metrics
+            # forward_vector ~ (1 - tension) (higher tension → lower forward)
+            # mirror_vector ~ alignment (higher alignment → higher mirror)
+            # loop_delta ~ forward - mirror
+            forward_vector = max(0.0, min(1.0, 1.0 - tension))
+            mirror_vector = alignment
+            loop_delta = forward_vector - mirror_vector
+
+            snapshot = MirrorTimeLoopSnapshot(
+                forward_vector=forward_vector,
+                mirror_vector=mirror_vector,
+                loop_delta=loop_delta,
+                loop_tension=tension,
+                loop_alignment=alignment,
+                reversal_probability=reversal,
+                stability_band=stability,
+            )
+            loop_history.append(snapshot)
+
+        # If still not enough data after filtering, return
+        if len(loop_history) < 2:
+            state.dominant_cycle_type = None
+            state.dominant_cycle_stability_band = None
+            state.avg_cycle_alignment = None
+            state.avg_cycle_tension = None
+            state.avg_cycle_reversal_probability = None
+            return
+
+        # Detect mirror-time cycles
+        cycle_summary = detect_mirror_time_cycles(loop_history)
+
+        # Store results in state
+        if cycle_summary and cycle_summary.cycles:
+            # Append new cycles to history
+            for cycle in cycle_summary.cycles:
+                state.mirror_cycle_history.append(cycle)
+
+            # Update aggregate metrics
+            state.dominant_cycle_type = cycle_summary.dominant_cycle_type
+            state.dominant_cycle_stability_band = cycle_summary.dominant_stability_band
+
+            # Compute averages from cycle summary
+            if cycle_summary.cycles:
+                alignments = [c.avg_loop_alignment for c in cycle_summary.cycles]
+                tensions = [c.avg_loop_tension for c in cycle_summary.cycles]
+                reversals = [c.avg_reversal_probability for c in cycle_summary.cycles]
+
+                state.avg_cycle_alignment = sum(alignments) / len(alignments) if alignments else None
+                state.avg_cycle_tension = sum(tensions) / len(tensions) if tensions else None
+                state.avg_cycle_reversal_probability = (
+                    sum(reversals) / len(reversals) if reversals else None
+                )
+            else:
+                state.avg_cycle_alignment = None
+                state.avg_cycle_tension = None
+                state.avg_cycle_reversal_probability = None
+        else:
+            # No cycles detected
+            state.dominant_cycle_type = None
+            state.dominant_cycle_stability_band = None
+            state.avg_cycle_alignment = None
+            state.avg_cycle_tension = None
+            state.avg_cycle_reversal_probability = None

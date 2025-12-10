@@ -623,6 +623,75 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
             else:
                 reversal_probability_trend = "stable"
 
+    # Phase 22: Extract Mirror-Time Cycles from coherence history
+    dominant_cycle_type = None
+    dominant_cycle_stability_band = None
+    avg_cycle_alignment = None
+    avg_cycle_tension = None
+    avg_cycle_reversal_probability = None
+    cycle_count = 0
+
+    if state.coherence_history:
+        # Extract cycle metrics from CoherenceState
+        cycle_type_values = []
+        cycle_stability_band_values = []
+        cycle_alignment_values = []
+        cycle_tension_values = []
+        cycle_reversal_probability_values = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract dominant_cycle_type from CoherenceState
+                if "dominant_cycle_type" in coh and coh["dominant_cycle_type"] is not None:
+                    cycle_type_values.append(coh["dominant_cycle_type"])
+
+                # Extract dominant_cycle_stability_band from CoherenceState
+                if "dominant_cycle_stability_band" in coh and coh["dominant_cycle_stability_band"] is not None:
+                    cycle_stability_band_values.append(coh["dominant_cycle_stability_band"])
+
+                # Extract avg_cycle_alignment from CoherenceState
+                if "avg_cycle_alignment" in coh and coh["avg_cycle_alignment"] is not None:
+                    cycle_alignment_values.append(coh["avg_cycle_alignment"])
+
+                # Extract avg_cycle_tension from CoherenceState
+                if "avg_cycle_tension" in coh and coh["avg_cycle_tension"] is not None:
+                    cycle_tension_values.append(coh["avg_cycle_tension"])
+
+                # Extract avg_cycle_reversal_probability from CoherenceState
+                if "avg_cycle_reversal_probability" in coh and coh["avg_cycle_reversal_probability"] is not None:
+                    cycle_reversal_probability_values.append(coh["avg_cycle_reversal_probability"])
+
+                # Count cycles from mirror_cycle_history
+                if "mirror_cycle_history" in coh:
+                    cycle_history = coh["mirror_cycle_history"]
+                    if isinstance(cycle_history, list):
+                        cycle_count += len(cycle_history)
+
+        # Compute aggregates
+        # Determine dominant cycle type (most frequent)
+        if cycle_type_values:
+            from collections import Counter
+            type_counts = Counter(cycle_type_values)
+            dominant_cycle_type = type_counts.most_common(1)[0][0]
+
+        # Determine dominant cycle stability band (most frequent)
+        if cycle_stability_band_values:
+            from collections import Counter
+            band_counts = Counter(cycle_stability_band_values)
+            dominant_cycle_stability_band = band_counts.most_common(1)[0][0]
+
+        # Compute average cycle alignment
+        if cycle_alignment_values:
+            avg_cycle_alignment = sum(cycle_alignment_values) / len(cycle_alignment_values)
+
+        # Compute average cycle tension
+        if cycle_tension_values:
+            avg_cycle_tension = sum(cycle_tension_values) / len(cycle_tension_values)
+
+        # Compute average cycle reversal probability
+        if cycle_reversal_probability_values:
+            avg_cycle_reversal_probability = sum(cycle_reversal_probability_values) / len(cycle_reversal_probability_values)
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -660,4 +729,10 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_reversal_probability=avg_reversal_probability,
         dominant_loop_stability_band=dominant_loop_stability_band,
         reversal_probability_trend=reversal_probability_trend,
+        dominant_cycle_type=dominant_cycle_type,
+        dominant_cycle_stability_band=dominant_cycle_stability_band,
+        avg_cycle_alignment=avg_cycle_alignment,
+        avg_cycle_tension=avg_cycle_tension,
+        avg_cycle_reversal_probability=avg_cycle_reversal_probability,
+        cycle_count=cycle_count,
     )

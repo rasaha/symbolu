@@ -365,6 +365,43 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
 
             coherence_report['mirror_time_loop'] = mirror_time_loop_data
 
+        # Phase 22: Add Mirror-Time Cycles metrics
+        dominant_cycle_type = getattr(coherence_state, 'dominant_cycle_type', None)
+        dominant_cycle_stability_band = getattr(coherence_state, 'dominant_cycle_stability_band', None)
+        avg_cycle_alignment = getattr(coherence_state, 'avg_cycle_alignment', None)
+        avg_cycle_tension = getattr(coherence_state, 'avg_cycle_tension', None)
+        avg_cycle_reversal_probability = getattr(coherence_state, 'avg_cycle_reversal_probability', None)
+
+        # Count cycles from mirror_cycle_history
+        cycle_count = 0
+        mirror_cycle_history = getattr(coherence_state, 'mirror_cycle_history', None)
+        if mirror_cycle_history is not None:
+            cycle_count = len(mirror_cycle_history)
+
+        # Add mirror-time cycles to coherence report if available
+        if dominant_cycle_type is not None or cycle_count > 0:
+            mirror_time_cycles_data = {}
+
+            if dominant_cycle_type is not None:
+                mirror_time_cycles_data['dominant_type'] = dominant_cycle_type
+
+            if dominant_cycle_stability_band is not None:
+                mirror_time_cycles_data['dominant_stability_band'] = dominant_cycle_stability_band
+
+            if cycle_count > 0:
+                mirror_time_cycles_data['cycle_count'] = cycle_count
+
+            if avg_cycle_alignment is not None:
+                mirror_time_cycles_data['avg_alignment'] = avg_cycle_alignment
+
+            if avg_cycle_tension is not None:
+                mirror_time_cycles_data['avg_tension'] = avg_cycle_tension
+
+            if avg_cycle_reversal_probability is not None:
+                mirror_time_cycles_data['avg_reversal_probability'] = avg_cycle_reversal_probability
+
+            coherence_report['mirror_time_cycles'] = mirror_time_cycles_data
+
     # Build metadata
     metadata = {
         'timestamp': datetime.utcnow().isoformat() + 'Z',

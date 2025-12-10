@@ -1206,6 +1206,48 @@ def _build_hints(
                 message="Mirror-time loop reversal risk elevated. Monitor for temporal inversion or retrospective drift."
             ))
 
+    # ========================================================================
+    # Phase 22: Mirror-Time Cycle Hints (diagnostic only)
+    # ========================================================================
+    # Only show when interaction_mode in {smart_insight, deep_adaptive}
+    # AND domain in {therapy, identity}
+    if (interaction_mode in ["smart_insight", "deep_adaptive"] and
+        domain in ["therapy", "identity"] and
+        coherence):
+
+        mirror_time_cycles_data = coherence.get("mirror_time_cycles", {})
+        dominant_cycle_type = mirror_time_cycles_data.get("dominant_type")
+
+        # If we have cycle data, add cycle-type based hints
+        if dominant_cycle_type is not None:
+            # MIRROR_CYCLE_CONVERGING: alignment increasing, tension decreasing
+            if dominant_cycle_type == "converging":
+                hints.append(DILchatHint(
+                    code="MIRROR_CYCLE_CONVERGING",
+                    message="Mirror-time cycles converging. Self and reflection are moving toward alignment, integration is improving."
+                ))
+
+            # MIRROR_CYCLE_DIVERGING: alignment decreasing, tension increasing
+            elif dominant_cycle_type == "diverging":
+                hints.append(DILchatHint(
+                    code="MIRROR_CYCLE_DIVERGING",
+                    message="Mirror-time cycles diverging. Self and reflection are separating, internal conflict may be increasing."
+                ))
+
+            # MIRROR_CYCLE_OSCILLATING: multiple sign changes, unstable pattern
+            elif dominant_cycle_type == "oscillating":
+                hints.append(DILchatHint(
+                    code="MIRROR_CYCLE_OSCILLATING",
+                    message="Mirror-time cycles oscillating. Self-reflection patterns are fluctuating, indicating exploration or uncertainty."
+                ))
+
+            # MIRROR_CYCLE_STALLED: low change in alignment and tension
+            elif dominant_cycle_type == "stalled":
+                hints.append(DILchatHint(
+                    code="MIRROR_CYCLE_STALLED",
+                    message="Mirror-time cycles stalled. Self-reflection patterns are static, may indicate plateau or resistance to change."
+                ))
+
     return hints
 
 
