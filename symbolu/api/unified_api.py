@@ -84,6 +84,7 @@ class UnifiedOutput:
     identity_harmonics: Optional[Dict[str, Any]] = None  # Phase 34: Identity harmonics layer (observation-only, tone-level only)
     predictive_persona_drift: Optional[Dict[str, Any]] = None  # Phase 35: Predictive persona drift model (observation-only, tone-level only)
     identity_resonance_memory: Optional[Dict[str, Any]] = None  # Phase 36: Identity resonance memory (observation-only, tone-level only)
+    adaptive_continuity: Optional[Dict[str, Any]] = None  # Phase 37: Adaptive continuity engine (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -979,6 +980,27 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "tags": getattr(irm_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 37: Extract adaptive continuity engine data (observation-only)
+    ace_data = None
+    # Try to extract from persona response first (if available)
+    if hasattr(ctx, 'persona_response') and ctx.persona_response is not None:
+        continuity_profile = getattr(ctx.persona_response, 'continuity_profile', None)
+        if continuity_profile is not None:
+            ace_data = continuity_profile
+
+    # Also try to extract from coherence block for observability
+    if ace_data is None and hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        ace_snapshot = getattr(ctx.coherence_state, 'adaptive_continuity_snapshot', None)
+        if ace_snapshot is not None:
+            # Build dict from snapshot fields
+            ace_data = {
+                "ncc": getattr(ace_snapshot, 'ncc', None),
+                "icc": getattr(ace_snapshot, 'icc', None),
+                "css": getattr(ace_snapshot, 'css', None),
+                "band": getattr(ace_snapshot, 'continuity_band', None),
+                "tags": getattr(ace_snapshot, 'continuity_tags', []),
+            }
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -1005,6 +1027,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         identity_harmonics=identity_harmonics_data,  # Phase 34
         predictive_persona_drift=predictive_drift_data,  # Phase 35
         identity_resonance_memory=irm_data,  # Phase 36
+        adaptive_continuity=ace_data,  # Phase 37
     )
 
 

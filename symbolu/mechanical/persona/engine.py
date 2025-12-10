@@ -198,7 +198,19 @@ class PersonaEngine:
             # Attach profile to response for observability (NEVER affects routing)
             persona_response.identity_resonance_memory_profile = irm_profile
 
-        # Step 13: Return complete response
+        # Phase 37 Step 13: Extract adaptive continuity engine and apply tone adjustments
+        # Extract ACE snapshot from coherence state
+        ace_snapshot = self._extract_continuity_snapshot(explain_log)
+        if ace_snapshot is not None:
+            # Compute continuity profile (tone-level adjustments only, ±0.015 max)
+            continuity_profile = self._apply_continuity_tone_modulation(
+                persona,
+                ace_snapshot
+            )
+            # Attach profile to response for observability (NEVER affects routing)
+            persona_response.continuity_profile = continuity_profile
+
+        # Step 14: Return complete response
         return persona_response
     
     def _order_layers(
@@ -1135,6 +1147,164 @@ class PersonaEngine:
         }
 
         return irm_profile
+
+    def _extract_continuity_snapshot(
+        self,
+        explain_log: Dict[str, Any]
+    ) -> Optional[Any]:
+        """
+        Phase 37: Extract adaptive continuity engine snapshot from coherence state.
+
+        This method safely extracts the ACE snapshot from the
+        coherence state if available.
+
+        Args:
+            explain_log: MLCR explain log with coherence state
+
+        Returns:
+            AdaptiveContinuitySnapshot or None if not available
+
+        Behavior:
+            • Returns None if no coherence state present
+            • Returns None if ACE computation was not run
+            • Returns snapshot if successfully computed
+        """
+        # Try coherence_state path first (most common)
+        coherence_state = explain_log.get('coherence_state')
+        if coherence_state is not None:
+            ace_snapshot = getattr(coherence_state, 'adaptive_continuity_snapshot', None)
+            if ace_snapshot is not None:
+                return ace_snapshot
+
+        # Try coherence_observation path (if it has ACE data)
+        coherence_observation = explain_log.get('coherence_observation')
+        if coherence_observation is not None:
+            ace_snapshot = getattr(coherence_observation, 'adaptive_continuity_snapshot', None)
+            if ace_snapshot is not None:
+                return ace_snapshot
+
+        return None
+
+    def _apply_continuity_tone_modulation(
+        self,
+        persona: PersonaProfile,
+        ace_snapshot: Optional[Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Phase 37: Apply adaptive continuity engine to persona tone.
+
+        This method maps ACE outputs into micro-adjustments of persona tone
+        parameters. It is tone-level only and never affects semantic content.
+
+        Mapping Rules:
+            • High NCC (≥0.70) → increase narrative flow tone (≤ +0.010)
+            • High ICC (≥0.70) → increase warmth + solidarity tone (≤ +0.010)
+            • Low CSS (<0.40) → increase structure + grounding (≤ +0.015)
+
+        Tone Adjustments (all ≤ ±0.015):
+            • narrative_flow_adjustment: Applied to flow parameter [-0.015, +0.015]
+            • warmth_adjustment: Applied to warmth parameter [-0.015, +0.015]
+            • structure_adjustment: Applied to structure parameter [-0.015, +0.015]
+
+        Total adjustment limit: ±0.015 max (enforced by scaling)
+
+        Args:
+            persona: PersonaProfile being applied
+            ace_snapshot: AdaptiveContinuitySnapshot from Phase 37
+
+        Returns:
+            Continuity profile dict or None if snapshot invalid
+
+        Invariants:
+            • Tone-level only (NEVER affects routing, mappers, or semantics)
+            • Bounded adjustments (≤ ±0.015 total)
+            • Deterministic (same inputs → same outputs)
+            • Non-invasive (observation-only)
+        """
+        if ace_snapshot is None:
+            return None
+
+        # ========================================================================
+        # STEP 1: Extract ACE metrics
+        # ========================================================================
+        ncc = getattr(ace_snapshot, 'ncc', None)
+        icc = getattr(ace_snapshot, 'icc', None)
+        css = getattr(ace_snapshot, 'css', None)
+        continuity_band = getattr(ace_snapshot, 'continuity_band', None)
+        tags = getattr(ace_snapshot, 'continuity_tags', [])
+
+        # If any core metric is missing, return None
+        if ncc is None or icc is None or css is None:
+            return None
+
+        # ========================================================================
+        # STEP 2: Compute narrative flow adjustment based on NCC
+        # ========================================================================
+        # High NCC → increase narrative flow tone (smoother transitions)
+        if ncc >= 0.70:
+            narrative_flow_adjustment = +0.010  # Max +0.010
+        elif ncc >= 0.50:
+            narrative_flow_adjustment = +0.005  # Moderate flow
+        else:
+            narrative_flow_adjustment = 0.0  # No adjustment
+
+        # ========================================================================
+        # STEP 3: Compute warmth adjustment based on ICC
+        # ========================================================================
+        # High ICC → increase warmth + solidarity (identity reinforcement)
+        if icc >= 0.70:
+            warmth_adjustment = +0.010  # Max +0.010
+        elif icc >= 0.50:
+            warmth_adjustment = +0.005  # Moderate warmth
+        else:
+            warmth_adjustment = 0.0  # No adjustment
+
+        # ========================================================================
+        # STEP 4: Compute structure adjustment based on CSS
+        # ========================================================================
+        # Low CSS → increase structure + grounding (stability needed)
+        # High CSS → maintain or slightly reduce structure (allow flow)
+        if css < 0.40:
+            structure_adjustment = +0.015  # Max +0.015 (need stability)
+        elif css < 0.55:
+            structure_adjustment = +0.008  # Moderate structure
+        elif css >= 0.70:
+            structure_adjustment = -0.005  # Slightly reduce structure (stable)
+        else:
+            structure_adjustment = 0.0  # No adjustment
+
+        # ========================================================================
+        # STEP 5: Enforce total adjustment limit (±0.015 max)
+        # ========================================================================
+        # Compute total absolute adjustment
+        total_adjustment = (
+            abs(narrative_flow_adjustment) +
+            abs(warmth_adjustment) +
+            abs(structure_adjustment)
+        )
+
+        # If total exceeds 0.015, scale down proportionally
+        if total_adjustment > 0.015:
+            scale_factor = 0.015 / total_adjustment
+            narrative_flow_adjustment *= scale_factor
+            warmth_adjustment *= scale_factor
+            structure_adjustment *= scale_factor
+
+        # ========================================================================
+        # STEP 6: Build adaptive continuity profile
+        # ========================================================================
+        continuity_profile = {
+            "ncc": round(ncc, 4),
+            "icc": round(icc, 4),
+            "css": round(css, 4),
+            "continuity_band": continuity_band,
+            "narrative_flow_adjustment": round(narrative_flow_adjustment, 4),
+            "warmth_adjustment": round(warmth_adjustment, 4),
+            "structure_adjustment": round(structure_adjustment, 4),
+            "continuity_tags": tags,
+        }
+
+        return continuity_profile
 
     def get_persona_summary(self) -> str:
         """

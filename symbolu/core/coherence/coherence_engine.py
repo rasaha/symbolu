@@ -113,6 +113,16 @@ class CoherenceEngine:
                 drift_magnitude_history=prev_state.drift_magnitude_history.copy(),
                 drift_stability_history=prev_state.drift_stability_history.copy(),
                 drift_likelihood_band_history=prev_state.drift_likelihood_band_history.copy(),
+                identity_resonance_memory_history=prev_state.identity_resonance_memory_history.copy(),
+                ims_history=prev_state.ims_history.copy(),
+                iep_history=prev_state.iep_history.copy(),
+                ida_history=prev_state.ida_history.copy(),
+                irm_memory_band_history=prev_state.irm_memory_band_history.copy(),
+                adaptive_continuity_history=prev_state.adaptive_continuity_history.copy(),
+                ncc_history=prev_state.ncc_history.copy(),
+                icc_history=prev_state.icc_history.copy(),
+                css_history=prev_state.css_history.copy(),
+                continuity_band_history=prev_state.continuity_band_history.copy(),
             )
 
         # Append new turn data to histories
@@ -212,6 +222,9 @@ class CoherenceEngine:
 
         # Update Phase 36 identity resonance memory (observation only)
         self._update_identity_resonance_memory(state)
+
+        # Update Phase 37 adaptive continuity engine (observation only)
+        self._update_adaptive_continuity(state)
 
         return state
 
@@ -2477,3 +2490,249 @@ class CoherenceEngine:
             state.current_ida = None
             state.current_irm_memory_band = None
             state.current_irm_tags = []
+
+    def _update_adaptive_continuity(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 37 Adaptive Continuity Engine (observation only).
+
+        This method computes the adaptive continuity snapshot by modeling session-wide
+        continuity across narrative, identity, and symbolic dimensions.
+
+        The ACE produces:
+          1. Narrative Continuity Coefficient (NCC): Theme/intent/symbolic stability
+          2. Identity Continuity Coefficient (ICC): Identity pattern continuity
+          3. Continuity Stability Score (CSS): Overall session resilience
+          4. Continuity Band: LOW / MEDIUM / HIGH classification
+          5. Continuity Tags: CONTINUITY_STRONG, CONTINUITY_FRAGMENTED, etc.
+
+        The ACE is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for tone-only micro-adjustments (±0.015 max) and analytics.
+
+        This update runs AFTER Phase 36 IRM to leverage identity resonance memory.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.adaptive_continuity_engine import compute_adaptive_continuity
+
+        # ====================================================================
+        # STEP 1: GATHER SYMBOLIC HARMONIZATION (Phase 27)
+        # ====================================================================
+
+        symbolic_harmonization_index = state.current_symbolic_harmonization_index
+
+        # Extract history
+        symbolic_harmonization_history = None
+        if state.symbolic_harmonization_history:
+            symbolic_harmonization_history = [
+                snap.symbolic_harmonization_index
+                for snap in state.symbolic_harmonization_history
+                if snap is not None
+            ]
+
+        # ====================================================================
+        # STEP 2: GATHER IDENTITY RESONANCE MEMORY (Phase 36)
+        # ====================================================================
+
+        identity_memory_strength = state.current_ims
+        identity_echo_persistence = state.current_iep
+        identity_drift_anchoring = state.current_ida
+
+        # Extract histories
+        ims_history = None
+        iep_history = None
+        ida_history = None
+
+        if state.ims_history:
+            ims_history = [
+                ims for ims in state.ims_history if ims is not None
+            ]
+
+        if state.iep_history:
+            iep_history = [
+                iep for iep in state.iep_history if iep is not None
+            ]
+
+        if state.ida_history:
+            ida_history = [
+                ida for ida in state.ida_history if ida is not None
+            ]
+
+        # ====================================================================
+        # STEP 3: GATHER IDENTITY HARMONICS (Phase 34)
+        # ====================================================================
+
+        core_identity_harmonic = state.current_cih
+        adaptive_identity_harmonic = state.current_aih
+        relational_identity_harmonic = state.current_rih
+        identity_stability_score = None
+        identity_harmonics_index = state.current_identity_harmonics_index
+
+        # Extract from latest snapshot if available
+        if state.identity_harmonics_snapshot is not None:
+            identity_stability_score = state.identity_harmonics_snapshot.identity_stability_score
+
+        # Extract identity stability history
+        identity_stability_history = None
+        if state.identity_stability_history:
+            identity_stability_history = [
+                ish for ish in state.identity_stability_history if ish is not None
+            ]
+
+        # ====================================================================
+        # STEP 4: GATHER PREDICTIVE DRIFT (Phase 35)
+        # ====================================================================
+
+        drift_magnitude_prediction = state.current_drift_magnitude_prediction
+        drift_stability_score = state.current_drift_stability_score
+        drift_likelihood_band = state.current_drift_likelihood_band
+
+        # Extract drift histories
+        drift_magnitude_history = None
+        drift_stability_history = None
+
+        if state.drift_magnitude_history:
+            drift_magnitude_history = [
+                dmh for dmh in state.drift_magnitude_history if dmh is not None
+            ]
+
+        if state.drift_stability_history:
+            drift_stability_history = [
+                dsh for dsh in state.drift_stability_history if dsh is not None
+            ]
+
+        # ====================================================================
+        # STEP 5: GATHER UNIFIED CONSCIOUSNESS (Phase 26)
+        # ====================================================================
+
+        consciousness_order_index = state.current_coi
+        consciousness_stability_index = state.current_csi
+
+        # Extract consciousness histories
+        consciousness_order_history = None
+        consciousness_stability_history = None
+
+        if state.ucf_history:
+            consciousness_order_history = [
+                snap.consciousness_order_index
+                for snap in state.ucf_history
+                if snap is not None
+            ]
+            consciousness_stability_history = [
+                snap.consciousness_stability_index
+                for snap in state.ucf_history
+                if snap is not None
+            ]
+
+        # ====================================================================
+        # STEP 6: GATHER TEMPORAL ENTROPY (Phase 18)
+        # ====================================================================
+
+        temporal_entropy_volatility = state.temporal_entropy_volatility
+        temporal_entropy_diff = state.temporal_entropy_diff
+
+        # Extract temporal entropy volatility history
+        temporal_entropy_volatility_history = None
+        if state.temporal_entropy_volatility_history:
+            temporal_entropy_volatility_history = [
+                tev for tev in state.temporal_entropy_volatility_history if tev is not None
+            ]
+
+        # ====================================================================
+        # STEP 7: GATHER SEMANTIC INTEGRITY (Phase 17)
+        # ====================================================================
+
+        semantic_integrity = state.semantic_integrity_score
+
+        # Extract semantic integrity history
+        semantic_integrity_history = None
+        if state.semantic_integrity_history:
+            semantic_integrity_history = [
+                sih for sih in state.semantic_integrity_history if sih is not None
+            ]
+
+        # ====================================================================
+        # STEP 8: GATHER RESONANCE WEIGHTING (Phase 24)
+        # ====================================================================
+
+        resonance_weighting_entropy = state.current_resonance_entropy
+
+        # ====================================================================
+        # STEP 9: COMPUTE ADAPTIVE CONTINUITY
+        # ====================================================================
+
+        snapshot = compute_adaptive_continuity(
+            # Phase 27: Symbolic Harmonization
+            symbolic_harmonization_index=symbolic_harmonization_index,
+            symbolic_harmonization_history=symbolic_harmonization_history,
+            # Phase 36: Identity Resonance Memory
+            identity_memory_strength=identity_memory_strength,
+            identity_echo_persistence=identity_echo_persistence,
+            identity_drift_anchoring=identity_drift_anchoring,
+            ims_history=ims_history,
+            iep_history=iep_history,
+            ida_history=ida_history,
+            # Phase 34: Identity Harmonics
+            core_identity_harmonic=core_identity_harmonic,
+            adaptive_identity_harmonic=adaptive_identity_harmonic,
+            relational_identity_harmonic=relational_identity_harmonic,
+            identity_stability_score=identity_stability_score,
+            identity_harmonics_index=identity_harmonics_index,
+            identity_stability_history=identity_stability_history,
+            # Phase 35: Predictive Persona Drift
+            drift_magnitude_prediction=drift_magnitude_prediction,
+            drift_stability_score=drift_stability_score,
+            drift_likelihood_band=drift_likelihood_band,
+            drift_magnitude_history=drift_magnitude_history,
+            drift_stability_history=drift_stability_history,
+            # Phase 26: Unified Consciousness Formula
+            consciousness_order_index=consciousness_order_index,
+            consciousness_stability_index=consciousness_stability_index,
+            consciousness_order_history=consciousness_order_history,
+            consciousness_stability_history=consciousness_stability_history,
+            # Phase 18: Temporal Entropy
+            temporal_entropy_volatility=temporal_entropy_volatility,
+            temporal_entropy_diff=temporal_entropy_diff,
+            temporal_entropy_volatility_history=temporal_entropy_volatility_history,
+            # Phase 17: Semantic Integrity
+            semantic_integrity=semantic_integrity,
+            semantic_integrity_history=semantic_integrity_history,
+            # Phase 24: Resonance Weighting
+            resonance_weighting_entropy=resonance_weighting_entropy,
+        )
+
+        # ====================================================================
+        # STEP 10: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Append to histories
+            state.adaptive_continuity_history.append(snapshot)
+            state.ncc_history.append(snapshot.ncc)
+            state.icc_history.append(snapshot.icc)
+            state.css_history.append(snapshot.css)
+            state.continuity_band_history.append(snapshot.continuity_band)
+
+            # Update current metrics
+            state.adaptive_continuity_snapshot = snapshot
+            state.current_ncc = snapshot.ncc
+            state.current_icc = snapshot.icc
+            state.current_css = snapshot.css
+            state.current_continuity_band = snapshot.continuity_band
+            state.current_continuity_tags = snapshot.continuity_tags
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.adaptive_continuity_history.append(None)
+            state.ncc_history.append(None)
+            state.icc_history.append(None)
+            state.css_history.append(None)
+            state.continuity_band_history.append(None)
+            state.adaptive_continuity_snapshot = None
+            state.current_ncc = None
+            state.current_icc = None
+            state.current_css = None
+            state.current_continuity_band = None
+            state.current_continuity_tags = []
