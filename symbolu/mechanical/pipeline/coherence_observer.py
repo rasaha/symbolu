@@ -227,6 +227,17 @@ class CoherenceObservation:
     mh_stability_envelope: Optional[float] = None  # Future Stability Envelope [0.0, 1.0]
     mh_tags: List[str] = field(default_factory=list)  # MHTFE diagnostic tags
 
+    # Phase 40: Cross-Horizon Resonance Alignment Engine (observation only)
+    cross_horizon_resonance_snapshot: Optional[Any] = None  # CrossHorizonResonanceSnapshot
+    ch_has_H1: Optional[float] = None  # H1 Horizon Alignment Score [0.0, 1.0]
+    ch_has_H2: Optional[float] = None  # H2 Horizon Alignment Score [0.0, 1.0]
+    ch_has_H3: Optional[float] = None  # H3 Horizon Alignment Score [0.0, 1.0]
+    ch_rai: Optional[float] = None  # Resonance Alignment Index [0.0, 1.0]
+    ch_ifa: Optional[float] = None  # Identity–Forecast Agreement [0.0, 1.0]
+    ch_dft: Optional[float] = None  # Drift–Forecast Tension [0.0, 1.0]
+    ch_alignment_band: Optional[str] = None  # Alignment Band: HIGH_ALIGNMENT | MIXED_ALIGNMENT | LOW_ALIGNMENT
+    ch_alignment_tags: List[str] = field(default_factory=list)  # CHRAE diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -821,6 +832,29 @@ class CoherenceObserver:
                 mh_stability_envelope = getattr(multi_horizon_forecast_snapshot, 'future_stability_envelope', None)
                 mh_tags = getattr(multi_horizon_forecast_snapshot, 'diagnostic_tags', [])
 
+        # Phase 40: Extract Cross-Horizon Resonance Alignment Engine from coherence state
+        cross_horizon_resonance_snapshot = None
+        ch_has_H1 = None
+        ch_has_H2 = None
+        ch_has_H3 = None
+        ch_rai = None
+        ch_ifa = None
+        ch_dft = None
+        ch_alignment_band = None
+        ch_alignment_tags = []
+
+        if coherence_state is not None:
+            cross_horizon_resonance_snapshot = getattr(coherence_state, 'cross_horizon_resonance_snapshot', None)
+            if cross_horizon_resonance_snapshot is not None:
+                ch_has_H1 = getattr(cross_horizon_resonance_snapshot, 'has_H1', None)
+                ch_has_H2 = getattr(cross_horizon_resonance_snapshot, 'has_H2', None)
+                ch_has_H3 = getattr(cross_horizon_resonance_snapshot, 'has_H3', None)
+                ch_rai = getattr(cross_horizon_resonance_snapshot, 'rai', None)
+                ch_ifa = getattr(cross_horizon_resonance_snapshot, 'ifa', None)
+                ch_dft = getattr(cross_horizon_resonance_snapshot, 'dft', None)
+                ch_alignment_band = getattr(cross_horizon_resonance_snapshot, 'alignment_band', None)
+                ch_alignment_tags = getattr(cross_horizon_resonance_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -977,6 +1011,15 @@ class CoherenceObserver:
             mh_consensus=mh_consensus,  # Phase 39
             mh_stability_envelope=mh_stability_envelope,  # Phase 39
             mh_tags=mh_tags,  # Phase 39
+            cross_horizon_resonance_snapshot=cross_horizon_resonance_snapshot,  # Phase 40
+            ch_has_H1=ch_has_H1,  # Phase 40
+            ch_has_H2=ch_has_H2,  # Phase 40
+            ch_has_H3=ch_has_H3,  # Phase 40
+            ch_rai=ch_rai,  # Phase 40
+            ch_ifa=ch_ifa,  # Phase 40
+            ch_dft=ch_dft,  # Phase 40
+            ch_alignment_band=ch_alignment_band,  # Phase 40
+            ch_alignment_tags=ch_alignment_tags,  # Phase 40
         )
 
         # Store observation

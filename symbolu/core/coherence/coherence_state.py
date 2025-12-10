@@ -269,6 +269,26 @@ class CoherenceState:
     horizon_band_H2_history: List[Optional[str]] = field(default_factory=list)  # H2 band history
     horizon_band_H3_history: List[Optional[str]] = field(default_factory=list)  # H3 band history
 
+    # Phase 40: Cross-Horizon Resonance Alignment Engine (observation only - not used in scoring)
+    cross_horizon_resonance_snapshot: Optional[Any] = None  # CrossHorizonResonanceSnapshot (latest)
+    cross_horizon_resonance_history: List[Optional[Any]] = field(default_factory=list)  # List of CrossHorizonResonanceSnapshot
+    current_has_H1: Optional[float] = None  # H1 Horizon Alignment Score [0.0, 1.0]
+    current_has_H2: Optional[float] = None  # H2 Horizon Alignment Score [0.0, 1.0]
+    current_has_H3: Optional[float] = None  # H3 Horizon Alignment Score [0.0, 1.0]
+    current_rai: Optional[float] = None  # Resonance Alignment Index [0.0, 1.0]
+    current_ifa: Optional[float] = None  # Identity–Forecast Agreement [0.0, 1.0]
+    current_dft: Optional[float] = None  # Drift–Forecast Tension [0.0, 1.0]
+    current_alignment_band: Optional[str] = None  # Alignment Band: "HIGH_ALIGNMENT", "MIXED_ALIGNMENT", "LOW_ALIGNMENT"
+    current_chra_alignment_tags: List[str] = field(default_factory=list)  # Current CHRA diagnostic tags
+    # Histories
+    has_H1_history: List[Optional[float]] = field(default_factory=list)  # H1 alignment score history
+    has_H2_history: List[Optional[float]] = field(default_factory=list)  # H2 alignment score history
+    has_H3_history: List[Optional[float]] = field(default_factory=list)  # H3 alignment score history
+    rai_history: List[Optional[float]] = field(default_factory=list)  # RAI history
+    ifa_history: List[Optional[float]] = field(default_factory=list)  # IFA history
+    dft_history: List[Optional[float]] = field(default_factory=list)  # DFT history
+    chra_alignment_band_history: List[Optional[str]] = field(default_factory=list)  # Alignment band history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -373,6 +393,16 @@ class CoherenceState:
         self.horizon_band_H1_history = self.horizon_band_H1_history[-window:]
         self.horizon_band_H2_history = self.horizon_band_H2_history[-window:]
         self.horizon_band_H3_history = self.horizon_band_H3_history[-window:]
+
+        # Phase 40 cross-horizon resonance alignment engine formula history
+        self.cross_horizon_resonance_history = self.cross_horizon_resonance_history[-window:]
+        self.has_H1_history = self.has_H1_history[-window:]
+        self.has_H2_history = self.has_H2_history[-window:]
+        self.has_H3_history = self.has_H3_history[-window:]
+        self.rai_history = self.rai_history[-window:]
+        self.ifa_history = self.ifa_history[-window:]
+        self.dft_history = self.dft_history[-window:]
+        self.chra_alignment_band_history = self.chra_alignment_band_history[-window:]
 
     def get_history_length(self) -> int:
         """

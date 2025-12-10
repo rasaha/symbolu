@@ -210,7 +210,19 @@ class PersonaEngine:
             # Attach profile to response for observability (NEVER affects routing)
             persona_response.continuity_profile = continuity_profile
 
-        # Step 14: Return complete response
+        # Phase 40 Step 14: Extract cross-horizon resonance and apply tone adjustments
+        # Extract CHRA snapshot from coherence state
+        chra_snapshot = self._extract_cross_horizon_resonance(explain_log)
+        if chra_snapshot is not None:
+            # Compute CHRA profile (tone-level adjustments only, ±0.015 max)
+            chra_profile = self._apply_cross_horizon_resonance_to_tone(
+                persona,
+                chra_snapshot
+            )
+            # Attach profile to response for observability (NEVER affects routing)
+            persona_response.cross_horizon_resonance_profile = chra_profile
+
+        # Step 15: Return complete response
         return persona_response
     
     def _order_layers(
@@ -1305,6 +1317,182 @@ class PersonaEngine:
         }
 
         return continuity_profile
+
+    def _extract_cross_horizon_resonance(
+        self,
+        explain_log: Dict[str, Any]
+    ) -> Optional[Any]:
+        """
+        Phase 40: Extract cross-horizon resonance alignment snapshot from coherence state.
+
+        This method safely extracts the CHRA snapshot from the
+        coherence state if available.
+
+        Args:
+            explain_log: MLCR explain log with coherence state
+
+        Returns:
+            CrossHorizonResonanceSnapshot or None if not available
+
+        Behavior:
+            • Returns None if no coherence state present
+            • Returns None if CHRA computation was not run
+            • Returns snapshot if successfully computed
+        """
+        # Try coherence_state path first (most common)
+        coherence_state = explain_log.get('coherence_state')
+        if coherence_state is not None:
+            chra_snapshot = getattr(coherence_state, 'cross_horizon_resonance_snapshot', None)
+            if chra_snapshot is not None:
+                return chra_snapshot
+
+        # Try coherence_observation path (if it has CHRA data)
+        coherence_observation = explain_log.get('coherence_observation')
+        if coherence_observation is not None:
+            chra_snapshot = getattr(coherence_observation, 'cross_horizon_resonance_snapshot', None)
+            if chra_snapshot is not None:
+                return chra_snapshot
+
+        return None
+
+    def _apply_cross_horizon_resonance_to_tone(
+        self,
+        persona: PersonaProfile,
+        chra_snapshot: Optional[Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Phase 40: Apply cross-horizon resonance alignment to persona tone.
+
+        This method maps CHRA outputs into micro-adjustments of persona tone
+        parameters. It is tone-level only and never affects semantic content.
+
+        Mapping Rules:
+            • HIGH_ALIGNMENT + low DFT → slight ↑ warmth and flow (≤ +0.010)
+            • MIXED_ALIGNMENT → no change or very mild adjustments (≤ ±0.005)
+            • LOW_ALIGNMENT or high DFT → slight ↑ structure and grounding, ↓ metaphor (≤ +0.010)
+
+        Tone Adjustments (all ≤ ±0.015):
+            • warmth_adjustment: Applied to warmth parameter [-0.015, +0.015]
+            • flow_adjustment: Applied to flow parameter [-0.015, +0.015]
+            • structure_adjustment: Applied to structure parameter [-0.015, +0.015]
+            • metaphor_adjustment: Applied to metaphor parameter [-0.015, +0.015]
+
+        Total adjustment limit: ±0.015 max (enforced by scaling)
+
+        Args:
+            persona: PersonaProfile being applied
+            chra_snapshot: CrossHorizonResonanceSnapshot from Phase 40
+
+        Returns:
+            CHRA profile dict or None if snapshot invalid
+
+        Invariants:
+            • Tone-level only (NEVER affects routing, mappers, or semantics)
+            • Bounded adjustments (≤ ±0.015 total)
+            • Deterministic (same inputs → same outputs)
+            • Non-invasive (observation-only)
+        """
+        if chra_snapshot is None:
+            return None
+
+        # ========================================================================
+        # STEP 1: Extract CHRA metrics
+        # ========================================================================
+        rai = getattr(chra_snapshot, 'rai', None)
+        dft = getattr(chra_snapshot, 'dft', None)
+        ifa = getattr(chra_snapshot, 'ifa', None)
+        alignment_band = getattr(chra_snapshot, 'alignment_band', None)
+        tags = getattr(chra_snapshot, 'diagnostic_tags', [])
+
+        # If any core metric is missing, return None
+        if rai is None or dft is None or alignment_band is None:
+            return None
+
+        # ========================================================================
+        # STEP 2: Compute warmth adjustment based on alignment + DFT
+        # ========================================================================
+        # HIGH_ALIGNMENT + low DFT → increase warmth (supportive tone)
+        # LOW_ALIGNMENT or high DFT → no warmth increase
+        warmth_adjustment = 0.0
+        if alignment_band == "HIGH_ALIGNMENT" and dft <= 0.35:
+            warmth_adjustment = +0.010  # Max +0.010 (aligned, low tension)
+        elif alignment_band == "HIGH_ALIGNMENT" and dft <= 0.50:
+            warmth_adjustment = +0.005  # Moderate warmth
+        elif alignment_band == "MIXED_ALIGNMENT" and dft <= 0.40:
+            warmth_adjustment = +0.003  # Slight warmth
+
+        # ========================================================================
+        # STEP 3: Compute flow adjustment based on RAI
+        # ========================================================================
+        # High RAI → increase flow (smooth narrative)
+        # Low RAI → maintain or reduce flow
+        flow_adjustment = 0.0
+        if rai >= 0.70:
+            flow_adjustment = +0.010  # Max +0.010 (strong alignment)
+        elif rai >= 0.55:
+            flow_adjustment = +0.005  # Moderate flow
+        elif rai < 0.40:
+            flow_adjustment = -0.005  # Reduce flow (misaligned)
+
+        # ========================================================================
+        # STEP 4: Compute structure adjustment based on DFT and alignment
+        # ========================================================================
+        # High DFT → increase structure + grounding (stabilize)
+        # LOW_ALIGNMENT → increase structure
+        structure_adjustment = 0.0
+        if dft >= 0.65:
+            structure_adjustment = +0.010  # Max +0.010 (high tension)
+        elif dft >= 0.50:
+            structure_adjustment = +0.005  # Moderate structure
+        elif alignment_band == "LOW_ALIGNMENT":
+            structure_adjustment = +0.008  # Need structure
+
+        # ========================================================================
+        # STEP 5: Compute metaphor adjustment based on alignment
+        # ========================================================================
+        # LOW_ALIGNMENT or high DFT → reduce metaphor (be more direct)
+        # HIGH_ALIGNMENT → maintain or slightly increase metaphor
+        metaphor_adjustment = 0.0
+        if alignment_band == "LOW_ALIGNMENT" or dft >= 0.60:
+            metaphor_adjustment = -0.008  # Reduce metaphor (be direct)
+        elif alignment_band == "HIGH_ALIGNMENT" and dft <= 0.35:
+            metaphor_adjustment = +0.005  # Slight increase (safe to be poetic)
+
+        # ========================================================================
+        # STEP 6: Enforce total adjustment limit (±0.015 max)
+        # ========================================================================
+        # Compute total absolute adjustment
+        total_adjustment = (
+            abs(warmth_adjustment) +
+            abs(flow_adjustment) +
+            abs(structure_adjustment) +
+            abs(metaphor_adjustment)
+        )
+
+        # If total exceeds 0.015, scale down proportionally
+        if total_adjustment > 0.015:
+            scale_factor = 0.015 / total_adjustment
+            warmth_adjustment *= scale_factor
+            flow_adjustment *= scale_factor
+            structure_adjustment *= scale_factor
+            metaphor_adjustment *= scale_factor
+
+        # ========================================================================
+        # STEP 7: Build cross-horizon resonance profile
+        # ========================================================================
+        chra_profile = {
+            "rai": round(rai, 4),
+            "ifa": round(ifa, 4) if ifa is not None else None,
+            "dft": round(dft, 4),
+            "alignment_band": alignment_band,
+            "warmth_adjustment": round(warmth_adjustment, 4),
+            "flow_adjustment": round(flow_adjustment, 4),
+            "structure_adjustment": round(structure_adjustment, 4),
+            "metaphor_adjustment": round(metaphor_adjustment, 4),
+            "chra_tags": tags,
+        }
+
+        return chra_profile
 
     def get_persona_summary(self) -> str:
         """

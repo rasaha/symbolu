@@ -29,6 +29,7 @@ on:
       - "tests/test_phase36_identity_resonance_memory.py"
       - "symbolu/formulas/tests/test_phase37_adaptive_continuity.py"
       - "tests/test_phase38_temporal_coherence_forecasting.py"
+      - "tests/test_phase40_cross_horizon_resonance_alignment.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -69,6 +70,7 @@ on:
       - "tests/test_phase36_identity_resonance_memory.py"
       - "symbolu/formulas/tests/test_phase37_adaptive_continuity.py"
       - "tests/test_phase38_temporal_coherence_forecasting.py"
+      - "tests/test_phase40_cross_horizon_resonance_alignment.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -480,6 +482,21 @@ jobs:
         with:
           name: phase38-tcfm-log
           path: phase38-tcfm.log
+          if-no-files-found: ignore
+
+      - name: Run Phase 40 Cross-Horizon Resonance Alignment Tests
+        run: |
+          pytest tests/test_phase40_cross_horizon_resonance_alignment.py \
+            --disable-warnings -q \
+            --maxfail=1 \
+            2>&1 | tee phase40-cross-horizon-resonance.log
+
+      - name: Upload Phase 40 Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase40-cross-horizon-resonance-log
+          path: phase40-cross-horizon-resonance.log
           if-no-files-found: ignore
 
       - name: Run Phase 20 Unified Dashboard Tests

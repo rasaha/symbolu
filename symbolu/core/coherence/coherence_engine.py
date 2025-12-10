@@ -236,6 +236,9 @@ class CoherenceEngine:
         # Update Phase 39 multi-horizon temporal forecasting engine (observation only)
         self._update_multi_horizon_forecast(state)
 
+        # Update Phase 40 cross-horizon resonance alignment engine (observation only)
+        self._update_cross_horizon_resonance(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -3194,3 +3197,158 @@ class CoherenceEngine:
             state.forecast_consensus_index = None
             state.future_stability_envelope = None
             state.current_mh_forecast_tags = []
+
+    def _update_cross_horizon_resonance(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 40 Cross-Horizon Resonance Alignment Engine (observation only).
+
+        This method computes the cross-horizon resonance alignment snapshot by measuring
+        how well the multi-horizon temporal forecasts (H1/H2/H3 from Phase 39) align with
+        resonance, identity, and drift metrics.
+
+        CHRAE answers the question:
+          "How well do the forecasted trends line up with the resonance, identity,
+           and symbolic signals we already trust?"
+
+        The CHRAE produces:
+          1. Horizon Alignment Scores (HAS): has_H1, has_H2, has_H3 [0.0, 1.0]
+          2. Resonance Alignment Index (RAI): Global alignment [0.0, 1.0]
+          3. Identity–Forecast Agreement (IFA): Identity support [0.0, 1.0]
+          4. Drift–Forecast Tension (DFT): Forecast/drift conflict [0.0, 1.0]
+          5. Alignment Band: HIGH_ALIGNMENT | MIXED_ALIGNMENT | LOW_ALIGNMENT
+          6. Diagnostic Tags: FORECAST_RES_ON_TRACK, IDENTITY_SUPPORTS_TREND, etc.
+
+        The CHRAE is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for tone-only micro-adjustments (±0.015 max) and analytics.
+
+        This update runs AFTER Phase 39 MHTFE to leverage multi-horizon forecast signals.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.cross_horizon_resonance_alignment import compute_cross_horizon_resonance
+
+        # ====================================================================
+        # STEP 1: GATHER MULTI-HORIZON FORECAST (Phase 39) - REQUIRED
+        # ====================================================================
+
+        multi_horizon_forecast = state.multi_horizon_forecast_snapshot
+
+        # If no multi-horizon forecast, cannot compute CHRAE
+        if multi_horizon_forecast is None:
+            # Append None to histories
+            state.cross_horizon_resonance_history.append(None)
+            state.has_H1_history.append(None)
+            state.has_H2_history.append(None)
+            state.has_H3_history.append(None)
+            state.rai_history.append(None)
+            state.ifa_history.append(None)
+            state.dft_history.append(None)
+            state.chra_alignment_band_history.append(None)
+
+            # Clear current metrics
+            state.cross_horizon_resonance_snapshot = None
+            state.current_has_H1 = None
+            state.current_has_H2 = None
+            state.current_has_H3 = None
+            state.current_rai = None
+            state.current_ifa = None
+            state.current_dft = None
+            state.current_alignment_band = None
+            state.current_chra_alignment_tags = []
+            return
+
+        # ====================================================================
+        # STEP 2: GATHER RESONANCE WEIGHTING (Phase 24) - OPTIONAL
+        # ====================================================================
+
+        resonance_snapshot = None
+        if state.resonance_weighting_history and len(state.resonance_weighting_history) > 0:
+            # Get latest resonance weighting snapshot
+            resonance_snapshot = state.resonance_weighting_history[-1]
+
+        # ====================================================================
+        # STEP 3: GATHER SYMBOLIC HARMONIZATION (Phase 27) - OPTIONAL
+        # ====================================================================
+
+        symbolic_harmonization = state.symbolic_harmonization_snapshot
+
+        # ====================================================================
+        # STEP 4: GATHER IDENTITY HARMONICS (Phase 34) - OPTIONAL
+        # ====================================================================
+
+        identity_harmonics = state.identity_harmonics_snapshot
+
+        # ====================================================================
+        # STEP 5: GATHER IDENTITY RESONANCE MEMORY (Phase 36) - OPTIONAL
+        # ====================================================================
+
+        identity_resonance_memory = state.identity_resonance_memory_snapshot
+
+        # ====================================================================
+        # STEP 6: GATHER PREDICTIVE PERSONA DRIFT (Phase 35) - OPTIONAL
+        # ====================================================================
+
+        predictive_persona_drift = state.predictive_drift_snapshot
+
+        # ====================================================================
+        # STEP 7: COMPUTE CROSS-HORIZON RESONANCE ALIGNMENT
+        # ====================================================================
+
+        snapshot = compute_cross_horizon_resonance(
+            multi_horizon_forecast=multi_horizon_forecast,
+            resonance_snapshot=resonance_snapshot,
+            symbolic_harmonization=symbolic_harmonization,
+            identity_harmonics=identity_harmonics,
+            identity_resonance_memory=identity_resonance_memory,
+            predictive_persona_drift=predictive_persona_drift,
+        )
+
+        # ====================================================================
+        # STEP 8: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Append to histories
+            state.cross_horizon_resonance_history.append(snapshot)
+            state.has_H1_history.append(snapshot.has_H1)
+            state.has_H2_history.append(snapshot.has_H2)
+            state.has_H3_history.append(snapshot.has_H3)
+            state.rai_history.append(snapshot.rai)
+            state.ifa_history.append(snapshot.ifa)
+            state.dft_history.append(snapshot.dft)
+            state.chra_alignment_band_history.append(snapshot.alignment_band)
+
+            # Update current metrics
+            state.cross_horizon_resonance_snapshot = snapshot
+            state.current_has_H1 = snapshot.has_H1
+            state.current_has_H2 = snapshot.has_H2
+            state.current_has_H3 = snapshot.has_H3
+            state.current_rai = snapshot.rai
+            state.current_ifa = snapshot.ifa
+            state.current_dft = snapshot.dft
+            state.current_alignment_band = snapshot.alignment_band
+            state.current_chra_alignment_tags = snapshot.diagnostic_tags
+        else:
+            # Snapshot computation failed (should not happen if multi_horizon_forecast exists, but safeguard)
+            state.cross_horizon_resonance_history.append(None)
+            state.has_H1_history.append(None)
+            state.has_H2_history.append(None)
+            state.has_H3_history.append(None)
+            state.rai_history.append(None)
+            state.ifa_history.append(None)
+            state.dft_history.append(None)
+            state.chra_alignment_band_history.append(None)
+
+            state.cross_horizon_resonance_snapshot = None
+            state.current_has_H1 = None
+            state.current_has_H2 = None
+            state.current_has_H3 = None
+            state.current_rai = None
+            state.current_ifa = None
+            state.current_dft = None
+            state.current_alignment_band = None
+            state.current_chra_alignment_tags = []
