@@ -330,6 +330,38 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
 
             coherence_report['temporal_entropy'] = temporal_entropy_data
 
+        # Phase 19: Add Drift Fusion metrics
+        drift_fusion_index = getattr(coherence_state, 'drift_fusion_index', None)
+        drift_risk_band = getattr(coherence_state, 'drift_risk_band', None)
+        drift_pattern_tags = getattr(coherence_state, 'drift_pattern_tags', [])
+
+        # Extract detailed component breakdowns from snapshot
+        drift_fusion_snapshot = getattr(coherence_state, 'drift_fusion_snapshot', None)
+
+        # Add drift fusion to coherence report if available
+        if drift_fusion_index is not None or drift_risk_band is not None:
+            drift_fusion_data = {}
+
+            if drift_fusion_index is not None:
+                drift_fusion_data['index'] = drift_fusion_index
+
+            if drift_risk_band is not None:
+                drift_fusion_data['risk_band'] = drift_risk_band
+
+            # Always include pattern tags (even if empty list)
+            drift_fusion_data['pattern_tags'] = list(drift_pattern_tags) if drift_pattern_tags else []
+
+            # Add input components if snapshot exists
+            if drift_fusion_snapshot is not None:
+                drift_fusion_data['inputs'] = {
+                    'semantic_integrity_score': getattr(drift_fusion_snapshot, 'semantic_integrity_score', None),
+                    'cognitive_drift_v3': getattr(drift_fusion_snapshot, 'cognitive_drift_v3', None),
+                    'temporal_entropy_diff': getattr(drift_fusion_snapshot, 'temporal_entropy_diff', None),
+                    'temporal_entropy_volatility': getattr(drift_fusion_snapshot, 'temporal_entropy_volatility', None),
+                }
+
+            coherence_report['drift_fusion'] = drift_fusion_data
+
     # Build metadata
     metadata = {
         'timestamp': datetime.utcnow().isoformat() + 'Z',

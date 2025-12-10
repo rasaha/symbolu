@@ -124,6 +124,14 @@ class CoherenceState:
     temporal_entropy_diff_history: List[Optional[float]] = field(default_factory=list)  # Diff history
     temporal_entropy_volatility_history: List[Optional[float]] = field(default_factory=list)  # Volatility history
 
+    # Phase 19: Drift Fusion (observation only - not used in scoring)
+    drift_fusion_snapshot: Optional[Any] = None  # DriftFusionSnapshot
+    drift_fusion_index: Optional[float] = None  # Overall drift index [0.0, 1.0]
+    drift_risk_band: Optional[str] = None  # "low" | "moderate" | "high"
+    drift_pattern_tags: List[str] = field(default_factory=list)  # Pattern indicators
+    drift_fusion_index_history: List[Optional[float]] = field(default_factory=list)  # Index history
+    drift_risk_band_history: List[Optional[str]] = field(default_factory=list)  # Risk band history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -165,6 +173,10 @@ class CoherenceState:
         # Phase 18 formula histories
         self.temporal_entropy_diff_history = self.temporal_entropy_diff_history[-window:]
         self.temporal_entropy_volatility_history = self.temporal_entropy_volatility_history[-window:]
+
+        # Phase 19 formula histories
+        self.drift_fusion_index_history = self.drift_fusion_index_history[-window:]
+        self.drift_risk_band_history = self.drift_risk_band_history[-window:]
 
     def get_history_length(self) -> int:
         """

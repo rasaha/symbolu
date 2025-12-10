@@ -542,6 +542,72 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
             else:
                 temporal_entropy_regime = "volatile"
 
+    # Phase 19: Extract Drift Fusion metrics from coherence history
+    avg_drift_fusion_index = None
+    dominant_drift_risk_band = None
+    drift_pattern_frequency: Dict[str, int] = {}
+
+    if state.coherence_history:
+        # Extract drift fusion index values
+        drift_fusion_index_values = []
+        drift_risk_band_counts: Dict[str, int] = {"low": 0, "moderate": 0, "high": 0}
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract drift_fusion_index from CoherenceState
+                if "drift_fusion_index" in coh and coh["drift_fusion_index"] is not None:
+                    drift_fusion_index_values.append(coh["drift_fusion_index"])
+
+                # Extract drift_risk_band for dominant calculation
+                if "drift_risk_band" in coh and coh["drift_risk_band"] is not None:
+                    band = coh["drift_risk_band"]
+                    if band in drift_risk_band_counts:
+                        drift_risk_band_counts[band] += 1
+
+                # Extract drift_pattern_tags and accumulate frequencies
+                if "drift_pattern_tags" in coh and coh["drift_pattern_tags"] is not None:
+                    tags = coh["drift_pattern_tags"]
+                    if isinstance(tags, list):
+                        for tag in tags:
+                            if isinstance(tag, str):
+                                drift_pattern_frequency[tag] = drift_pattern_frequency.get(tag, 0) + 1
+
+                # Also extract from histories for better coverage
+                if "drift_fusion_index_history" in coh:
+                    index_history = coh["drift_fusion_index_history"]
+                    if isinstance(index_history, list):
+                        drift_fusion_index_values.extend([i for i in index_history if i is not None])
+
+                if "drift_risk_band_history" in coh:
+                    band_history = coh["drift_risk_band_history"]
+                    if isinstance(band_history, list):
+                        for band in band_history:
+                            if band is not None and band in drift_risk_band_counts:
+                                drift_risk_band_counts[band] += 1
+
+        # Compute avg_drift_fusion_index
+        if drift_fusion_index_values:
+            avg_drift_fusion_index = sum(drift_fusion_index_values) / len(drift_fusion_index_values)
+
+        # Determine dominant_drift_risk_band
+        # Priority: high > moderate > low (severity-based tie-break)
+        total_bands = sum(drift_risk_band_counts.values())
+        if total_bands > 0:
+            # If high risk appears frequently, prioritize it
+            if drift_risk_band_counts["high"] > 0 and drift_risk_band_counts["high"] >= total_bands * 0.3:
+                dominant_drift_risk_band = "high"
+            elif drift_risk_band_counts["moderate"] > 0 and drift_risk_band_counts["moderate"] >= total_bands * 0.3:
+                dominant_drift_risk_band = "moderate"
+            elif drift_risk_band_counts["low"] > 0:
+                dominant_drift_risk_band = "low"
+            else:
+                # Fallback to most frequent
+                max_count = max(drift_risk_band_counts.values())
+                for band in ["high", "moderate", "low"]:
+                    if drift_risk_band_counts[band] == max_count:
+                        dominant_drift_risk_band = band
+                        break
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -574,4 +640,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_temporal_entropy_diff=avg_temporal_entropy_diff,
         avg_temporal_entropy_volatility=avg_temporal_entropy_volatility,
         temporal_entropy_regime=temporal_entropy_regime,
+        avg_drift_fusion_index=avg_drift_fusion_index,
+        dominant_drift_risk_band=dominant_drift_risk_band,
+        drift_pattern_frequency=drift_pattern_frequency,
     )

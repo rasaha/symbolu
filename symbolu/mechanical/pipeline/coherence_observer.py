@@ -12,7 +12,7 @@ Usage:
 """
 
 from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 import json
 
 
@@ -97,6 +97,11 @@ class CoherenceObservation:
     temporal_entropy_diff: Optional[float] = None
     temporal_entropy_volatility: Optional[float] = None
     temporal_entropy_details: Optional[Dict[str, Any]] = None
+
+    # Phase 19: Drift Fusion (observation only)
+    drift_fusion_index: Optional[float] = None
+    drift_risk_band: Optional[str] = None
+    drift_pattern_tags: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
@@ -353,6 +358,17 @@ class CoherenceObserver:
                     'entropy_volatility': getattr(entropy_snapshot, 'entropy_volatility', None),
                 }
 
+        # Phase 19: Extract Drift Fusion from coherence_state
+        drift_fusion_index = None
+        drift_risk_band = None
+        drift_pattern_tags = []
+
+        if coherence_state is not None:
+            drift_fusion_index = getattr(coherence_state, 'drift_fusion_index', None)
+            drift_risk_band = getattr(coherence_state, 'drift_risk_band', None)
+            drift_pattern_tags_raw = getattr(coherence_state, 'drift_pattern_tags', [])
+            drift_pattern_tags = list(drift_pattern_tags_raw) if drift_pattern_tags_raw else []
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -408,6 +424,9 @@ class CoherenceObserver:
             temporal_entropy_diff=temporal_entropy_diff,
             temporal_entropy_volatility=temporal_entropy_volatility,
             temporal_entropy_details=temporal_entropy_details,
+            drift_fusion_index=drift_fusion_index,
+            drift_risk_band=drift_risk_band,
+            drift_pattern_tags=drift_pattern_tags,
         )
 
         # Store observation
@@ -529,6 +548,11 @@ class CoherenceObserver:
         if temporal_entropy:
             snapshot["temporal_entropy"] = temporal_entropy
 
+        # Phase 19: Add drift fusion section if available
+        drift_fusion = self._extract_drift_fusion_from_observation(obs)
+        if drift_fusion:
+            snapshot["drift_fusion"] = drift_fusion
+
         return snapshot
 
     def _extract_formulas_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Optional[float]]]:
@@ -644,6 +668,27 @@ class CoherenceObserver:
             temporal_entropy["details"] = obs.temporal_entropy_details
 
         return temporal_entropy if temporal_entropy else None
+
+    def _extract_drift_fusion_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Any]]:
+        """
+        Extract Phase 19 Drift Fusion metrics from observation.
+
+        Returns drift_fusion dict if metrics are available, None otherwise.
+        """
+        # Build drift_fusion dict from observation
+        drift_fusion = {}
+
+        # Core metrics
+        if obs.drift_fusion_index is not None:
+            drift_fusion["index"] = obs.drift_fusion_index
+
+        if obs.drift_risk_band is not None:
+            drift_fusion["risk_band"] = obs.drift_risk_band
+
+        # Pattern tags (always include, even if empty list)
+        drift_fusion["pattern_tags"] = obs.drift_pattern_tags
+
+        return drift_fusion if (obs.drift_fusion_index is not None or obs.drift_risk_band is not None) else None
 
     def _get_status_label(self, obs: CoherenceObservation) -> str:
         """Get human-readable status label."""

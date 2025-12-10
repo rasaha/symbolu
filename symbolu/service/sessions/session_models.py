@@ -150,3 +150,8 @@ class SessionSummary:
     avg_temporal_entropy_diff: Optional[float] = None  # Average normalized entropy diff [0.0, 1.0]
     avg_temporal_entropy_volatility: Optional[float] = None  # Average entropy volatility [0.0, 1.0]
     temporal_entropy_regime: Optional[str] = None  # "stable" | "transition" | "volatile"
+
+    # Phase 19 Drift Fusion (observation only)
+    avg_drift_fusion_index: Optional[float] = None  # Average drift fusion index [0.0, 1.0]
+    dominant_drift_risk_band: Optional[str] = None  # Most frequent risk band ("low" | "moderate" | "high")
+    drift_pattern_frequency: Dict[str, int] = field(default_factory=dict)  # Counts per pattern tag

@@ -21,6 +21,9 @@ from symbolu.formulas.semantic_integrity import (
 from symbolu.formulas.temporal_entropy_differential import (
     compute_temporal_entropy_snapshot,
 )
+from symbolu.formulas.drift_fusion import (
+    compute_drift_fusion_snapshot,
+)
 
 
 class CoherenceEngine:
@@ -94,6 +97,8 @@ class CoherenceEngine:
                 identity_signature_history=prev_state.identity_signature_history.copy(),
                 temporal_entropy_diff_history=prev_state.temporal_entropy_diff_history.copy(),
                 temporal_entropy_volatility_history=prev_state.temporal_entropy_volatility_history.copy(),
+                drift_fusion_index_history=prev_state.drift_fusion_index_history.copy(),
+                drift_risk_band_history=prev_state.drift_risk_band_history.copy(),
             )
 
         # Append new turn data to histories
@@ -166,6 +171,9 @@ class CoherenceEngine:
 
         # Update Phase 18 temporal entropy differential (observation only)
         self._update_temporal_entropy_differential(state)
+
+        # Update Phase 19 drift fusion (observation only)
+        self._update_drift_fusion(state)
 
         return state
 
@@ -1164,3 +1172,67 @@ class CoherenceEngine:
             state.temporal_entropy_volatility = None
             state.temporal_entropy_diff_history.append(None)
             state.temporal_entropy_volatility_history.append(None)
+
+    def _update_drift_fusion(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 19 Drift Fusion (observation only).
+
+        This method computes the drift fusion snapshot by combining:
+        - semantic_integrity_score (Phase 17)
+        - cognitive_drift_v3 (Phase 17)
+        - temporal_entropy_diff (Phase 18)
+        - temporal_entropy_volatility (Phase 18)
+        - coherence_fused (Phase 16)
+
+        The drift fusion metrics are stored in state.drift_fusion_* fields
+        and do NOT affect any existing pipeline behavior. They are purely for
+        observation and diagnostics.
+
+        CRITICAL: This is observation-only. The drift_fusion_index is NOT used in:
+        - Routing decisions (TTOR)
+        - Coherence scoring (v1/v2/v3)
+        - Mappers or guardrails
+        - Any behavior-changing logic
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        # Extract all required inputs from state
+        semantic_integrity_score = state.semantic_integrity_score
+        cognitive_drift_v3 = state.cognitive_drift_v3
+        temporal_entropy_diff = state.temporal_entropy_diff
+        temporal_entropy_volatility = state.temporal_entropy_volatility
+        coherence_fused = state.coherence_fused
+
+        # Compute drift fusion snapshot
+        snapshot = compute_drift_fusion_snapshot(
+            semantic_integrity_score=semantic_integrity_score,
+            cognitive_drift_v3=cognitive_drift_v3,
+            temporal_entropy_diff=temporal_entropy_diff,
+            temporal_entropy_volatility=temporal_entropy_volatility,
+            coherence_fused=coherence_fused,
+        )
+
+        # Store results in state
+        if snapshot is not None:
+            state.drift_fusion_snapshot = snapshot
+            state.drift_fusion_index = snapshot.drift_fusion_index
+            state.drift_risk_band = snapshot.drift_risk_band
+            state.drift_pattern_tags = snapshot.drift_pattern_tags.copy()
+
+            # Append to histories
+            state.drift_fusion_index_history.append(snapshot.drift_fusion_index)
+            state.drift_risk_band_history.append(snapshot.drift_risk_band)
+        else:
+            # Snapshot computation returned None (all inputs None)
+            state.drift_fusion_snapshot = None
+            state.drift_fusion_index = None
+            state.drift_risk_band = None
+            state.drift_pattern_tags = []
+
+            # Append None to histories
+            state.drift_fusion_index_history.append(None)
+            state.drift_risk_band_history.append(None)

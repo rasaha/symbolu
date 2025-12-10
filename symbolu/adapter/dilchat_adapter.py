@@ -1167,6 +1167,45 @@ def _build_hints(
                     message="Temporal field volatile. Emotional/cognitive state is highly variable or unstable."
                 ))
 
+    # ========================================================================
+    # Phase 19: Drift Fusion Hints (diagnostic meta-hints only)
+    # ========================================================================
+    # Only add drift fusion hints for therapy/identity domains OR when interaction mode is
+    # SMART_INSIGHT or DEEP_ADAPTIVE
+    should_add_drift_hints = False
+
+    if domain in ["therapy", "identity"]:
+        should_add_drift_hints = True
+    elif interaction_mode in ["smart_insight", "deep_adaptive"]:
+        should_add_drift_hints = True
+
+    if should_add_drift_hints and coherence:
+        drift_fusion_data = coherence.get("drift_fusion", {})
+        drift_risk_band = drift_fusion_data.get("risk_band")
+
+        # Only add drift hints if we have a risk band classification
+        if drift_risk_band is not None:
+            # DRIFT_LOW_RISK: Drift is low, trajectory is stable
+            if drift_risk_band == "low":
+                hints.append(DILchatHint(
+                    code="DRIFT_LOW_RISK",
+                    message="Semantic/temporal drift is low; trajectory is stable."
+                ))
+
+            # DRIFT_MODERATE_RISK: Some drift present, consider re-centering
+            elif drift_risk_band == "moderate":
+                hints.append(DILchatHint(
+                    code="DRIFT_MODERATE_RISK",
+                    message="Some drift present; consider re-centering."
+                ))
+
+            # DRIFT_HIGH_RISK: High drift, recommend more grounding/stabilization
+            elif drift_risk_band == "high":
+                hints.append(DILchatHint(
+                    code="DRIFT_HIGH_RISK",
+                    message="High drift; recommend more grounding/stabilization."
+                ))
+
     return hints
 
 
