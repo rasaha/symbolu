@@ -518,8 +518,18 @@ class SymbolUPipeline:
                 if not domain or domain == "unknown":
                     domain = ctx.unified_output.get("metadata", {}).get("domain", "generic")
 
+                # Phase 15B: Extract user_id and org_id for preference lookup
+                user_id = ctx.request.metadata.get("user_id")
+                org_id = ctx.request.metadata.get("org_id")
+
                 # Compute policy flags (deterministic, zero-LLM)
-                ctx.policy_flags = compute_policy_flags(ctx.unified_output, domain)
+                # Phase 15B: Passes user_id/org_id for preference lookup
+                ctx.policy_flags = compute_policy_flags(
+                    ctx.unified_output,
+                    domain,
+                    user_id=user_id,
+                    org_id=org_id
+                )
             except Exception:
                 # If policy layer fails, continue without it (fail-safe)
                 ctx.policy_flags = None

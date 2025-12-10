@@ -50,7 +50,7 @@ Usage:
         pass
 """
 
-from typing import Dict, Any, Literal, Optional
+from typing import Dict, Any, Literal, Optional, Tuple
 from .domain_profiles import get_domain_profile
 from .interaction_modes import InteractionMode, resolve_interaction_mode
 
@@ -264,11 +264,66 @@ def _refine_policy_with_formulas(
     return refined_flags
 
 
+def _resolve_mode_from_preferences(
+    user_id: Optional[str],
+    org_id: Optional[str],
+) -> Tuple[Optional[InteractionMode], Optional[InteractionMode]]:
+    """
+    Fetch interaction mode overrides from preference store.
+
+    Returns (admin_mode, user_mode) based on stored preferences.
+    Does NOT apply resolution cascade; just fetches raw overrides.
+
+    Args:
+        user_id: Optional user identifier
+        org_id: Optional organization identifier
+
+    Returns:
+        Tuple of (admin_mode, user_mode) where each can be None
+
+    Thread Safety:
+        Safe to call from multiple threads (PreferenceStore is thread-safe)
+
+    Examples:
+        >>> _resolve_mode_from_preferences("user123", "org456")
+        (InteractionMode.DEEP_ADAPTIVE, None)
+
+        >>> _resolve_mode_from_preferences(None, None)
+        (None, None)
+    """
+    try:
+        # Import here to avoid circular dependency and keep preferences optional
+        from symbolu.service.preferences import get_preference_store
+    except ImportError:
+        # Preferences module not available, return no overrides
+        return (None, None)
+
+    store = get_preference_store()
+
+    # Fetch admin preference
+    admin_mode = None
+    if org_id:
+        admin_pref = store.get_admin_preference(org_id)
+        if admin_pref and admin_pref.forced_interaction_mode:
+            admin_mode = admin_pref.forced_interaction_mode
+
+    # Fetch user preference
+    user_mode = None
+    if user_id:
+        user_pref = store.get_user_preference(user_id)
+        if user_pref and user_pref.preferred_interaction_mode:
+            user_mode = user_pref.preferred_interaction_mode
+
+    return (admin_mode, user_mode)
+
+
 def compute_policy_flags(
     unified: Dict[str, Any],
     domain: str,
     user_mode_override: Optional[str] = None,
     admin_mode_override: Optional[str] = None,
+    user_id: Optional[str] = None,
+    org_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Compute policy flags from unified output and domain profile.
@@ -277,14 +332,20 @@ def compute_policy_flags(
     from the unified output and applies domain-specific thresholds to
     generate behavioral policy flags.
 
-    Phase 15: Supports interaction mode overrides that control how much
+    Phase 15A: Supports interaction mode overrides that control how much
     influence advanced formulas have on the policy output.
+
+    Phase 15B: Automatically fetches user/admin preferences from PreferenceStore
+    when user_id/org_id are provided. Explicit overrides take precedence over
+    stored preferences.
 
     Args:
         unified: Unified output dictionary from USU-API v1.0
         domain: Domain identifier (e.g., "trading", "therapy", "identity")
-        user_mode_override: Optional user-specified interaction mode override
-        admin_mode_override: Optional admin-specified interaction mode override
+        user_mode_override: Optional user-specified interaction mode override (highest priority)
+        admin_mode_override: Optional admin-specified interaction mode override (highest priority)
+        user_id: Optional user identifier for preference lookup
+        org_id: Optional organization identifier for preference lookup
 
     Returns:
         Dictionary with policy flags:
@@ -327,13 +388,32 @@ def compute_policy_flags(
     profile = get_domain_profile(domain)
 
     # ========================================================================
+    # Phase 15B: Fetch preferences from store
+    # If user_id/org_id provided, fetch stored preferences
+    # Explicit overrides take precedence over stored preferences
+    # ========================================================================
+    admin_mode_from_prefs, user_mode_from_prefs = _resolve_mode_from_preferences(
+        user_id=user_id,
+        org_id=org_id,
+    )
+
+    # Merge explicit overrides with stored preferences
+    # Priority: explicit override > stored preference
+    final_admin_override = admin_mode_override if admin_mode_override else admin_mode_from_prefs
+    final_user_override = user_mode_override if user_mode_override else user_mode_from_prefs
+
+    # Convert InteractionMode enums to strings for resolve_interaction_mode
+    final_admin_override_str = final_admin_override.value if isinstance(final_admin_override, InteractionMode) else final_admin_override
+    final_user_override_str = final_user_override.value if isinstance(final_user_override, InteractionMode) else final_user_override
+
+    # ========================================================================
     # Phase 15: Resolve interaction mode
     # Priority: admin_override > user_override > domain_default
     # ========================================================================
     active_mode = resolve_interaction_mode(
         domain_profile=profile,
-        user_override=user_mode_override,
-        admin_override=admin_mode_override,
+        user_override=final_user_override_str,
+        admin_override=final_admin_override_str,
     )
 
     # Extract coherence metrics with safe defaults

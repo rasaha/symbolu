@@ -46,6 +46,9 @@ from symbolu.service.request_models import (
     AnalyzeRequest,
     DILchatAPIResponse,
     UnifiedAPIResponse,
+    UserPreferenceUpdate,
+    AdminPreferenceUpdate,
+    PreferenceResponse,
     PYDANTIC_AVAILABLE
 )
 
@@ -135,11 +138,14 @@ def create_app() -> "FastAPI":
 
         try:
             # Build UserRequest for pipeline
+            # Phase 15B: Include user_id and org_id in metadata for preference lookup
             user_request = UserRequest(
                 text=req.text,
-                user_id=req.metadata.get("user_id") if req.metadata else None,
+                user_id=req.user_id or (req.metadata.get("user_id") if req.metadata else None),
                 metadata={
                     "domain": req.domain,
+                    "user_id": req.user_id,  # Phase 15B: Pass user_id for preference lookup
+                    "org_id": req.org_id,    # Phase 15B: Pass org_id for preference lookup
                     **(req.metadata or {})
                 }
             )
@@ -232,11 +238,14 @@ def create_app() -> "FastAPI":
 
         try:
             # Build UserRequest for pipeline
+            # Phase 15B: Include user_id and org_id in metadata for preference lookup
             user_request = UserRequest(
                 text=req.text,
-                user_id=req.metadata.get("user_id") if req.metadata else None,
+                user_id=req.user_id or (req.metadata.get("user_id") if req.metadata else None),
                 metadata={
                     "domain": req.domain,
+                    "user_id": req.user_id,  # Phase 15B: Pass user_id for preference lookup
+                    "org_id": req.org_id,    # Phase 15B: Pass org_id for preference lookup
                     **(req.metadata or {})
                 }
             )
@@ -363,12 +372,15 @@ def create_app() -> "FastAPI":
 
             # Build UserRequest for pipeline
             # Use session domain, not request domain (domain is fixed at session creation)
+            # Phase 15B: Include user_id and org_id in metadata for preference lookup
             user_request = UserRequest(
                 text=req.text,
-                user_id=req.metadata.get("user_id") if req.metadata else None,
+                user_id=req.user_id or (req.metadata.get("user_id") if req.metadata else None),
                 metadata={
                     "domain": session.domain,  # Use session domain
                     "session_id": session_id,
+                    "user_id": req.user_id,  # Phase 15B: Pass user_id for preference lookup
+                    "org_id": req.org_id,    # Phase 15B: Pass org_id for preference lookup
                     **(req.metadata or {})
                 }
             )
@@ -491,6 +503,242 @@ def create_app() -> "FastAPI":
             raise HTTPException(
                 status_code=500,
                 detail=f"Session summary failed: {str(e)}"
+            )
+
+    # ========================================================================
+    # PREFERENCE ENDPOINTS (Phase 15B)
+    # ========================================================================
+
+    @app.post("/preferences/user", response_model=PreferenceResponse)
+    def set_user_preference(req: UserPreferenceUpdate, request: Request) -> Dict[str, Any]:
+        """
+        Set or update a user's interaction mode preference.
+
+        This endpoint stores a user-level preference that will be
+        automatically applied when the user_id is provided in analysis requests.
+
+        Priority cascade:
+            admin_override > user_preference > domain_default
+
+        Args:
+            req: UserPreferenceUpdate with user_id and preferred_interaction_mode
+            request: FastAPI Request object (for security checks)
+
+        Returns:
+            PreferenceResponse with status and resolved mode
+
+        Raises:
+            HTTPException: If mode is invalid or security checks fail
+        """
+        # Security layer (optional, non-invasive)
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
+        try:
+            # Validate mode if provided
+            if hasattr(req, 'validate_mode'):
+                req.validate_mode()
+
+            # Import preference store and interaction modes
+            from symbolu.service.preferences import get_preference_store, UserPreference
+            from symbolu.policy.interaction_modes import _parse_interaction_mode
+
+            # Parse mode string to InteractionMode enum
+            mode_enum = None
+            if req.preferred_interaction_mode:
+                mode_enum = _parse_interaction_mode(req.preferred_interaction_mode)
+                if mode_enum is None:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Invalid interaction mode: {req.preferred_interaction_mode}"
+                    )
+
+            # Create and store preference
+            user_pref = UserPreference(
+                user_id=req.user_id,
+                preferred_interaction_mode=mode_enum
+            )
+
+            store = get_preference_store()
+            store.set_user_preference(user_pref)
+
+            # Build response
+            return {
+                "status": "ok",
+                "mode": mode_enum.value if mode_enum else None,
+                "user_id": req.user_id,
+                "org_id": None,
+            }
+
+        except HTTPException:
+            # Re-raise HTTP exceptions
+            raise
+        except Exception as e:
+            logger.error(f"Error in /preferences/user: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to set user preference: {str(e)}"
+            )
+
+    @app.post("/preferences/admin", response_model=PreferenceResponse)
+    def set_admin_preference(req: AdminPreferenceUpdate, request: Request) -> Dict[str, Any]:
+        """
+        Set or update an organization's interaction mode preference.
+
+        This endpoint stores an admin-level (organization) preference that
+        will override user preferences when the org_id is provided in analysis requests.
+
+        Priority cascade:
+            admin_override > user_preference > domain_default
+
+        Args:
+            req: AdminPreferenceUpdate with org_id and forced_interaction_mode
+            request: FastAPI Request object (for security checks)
+
+        Returns:
+            PreferenceResponse with status and resolved mode
+
+        Raises:
+            HTTPException: If mode is invalid or security checks fail
+        """
+        # Security layer (optional, non-invasive)
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
+        try:
+            # Validate mode if provided
+            if hasattr(req, 'validate_mode'):
+                req.validate_mode()
+
+            # Import preference store and interaction modes
+            from symbolu.service.preferences import get_preference_store, AdminPreference
+            from symbolu.policy.interaction_modes import _parse_interaction_mode
+
+            # Parse mode string to InteractionMode enum
+            mode_enum = None
+            if req.forced_interaction_mode:
+                mode_enum = _parse_interaction_mode(req.forced_interaction_mode)
+                if mode_enum is None:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Invalid interaction mode: {req.forced_interaction_mode}"
+                    )
+
+            # Create and store preference
+            admin_pref = AdminPreference(
+                org_id=req.org_id,
+                forced_interaction_mode=mode_enum
+            )
+
+            store = get_preference_store()
+            store.set_admin_preference(admin_pref)
+
+            # Build response
+            return {
+                "status": "ok",
+                "mode": mode_enum.value if mode_enum else None,
+                "user_id": None,
+                "org_id": req.org_id,
+            }
+
+        except HTTPException:
+            # Re-raise HTTP exceptions
+            raise
+        except Exception as e:
+            logger.error(f"Error in /preferences/admin: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to set admin preference: {str(e)}"
+            )
+
+    @app.get("/preferences/user/{user_id}", response_model=PreferenceResponse)
+    def get_user_preference_endpoint(user_id: str, request: Request) -> Dict[str, Any]:
+        """
+        Retrieve a user's stored interaction mode preference.
+
+        Args:
+            user_id: User identifier
+            request: FastAPI Request object (for security checks)
+
+        Returns:
+            PreferenceResponse with current preference or None
+
+        Raises:
+            HTTPException: If security checks fail
+        """
+        # Security layer (optional, non-invasive)
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
+        try:
+            # Import preference store
+            from symbolu.service.preferences import get_preference_store
+
+            store = get_preference_store()
+            user_pref = store.get_user_preference(user_id)
+
+            # Build response
+            mode = None
+            if user_pref and user_pref.preferred_interaction_mode:
+                mode = user_pref.preferred_interaction_mode.value
+
+            return {
+                "status": "ok",
+                "mode": mode,
+                "user_id": user_id,
+                "org_id": None,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in /preferences/user/{user_id}: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to get user preference: {str(e)}"
+            )
+
+    @app.get("/preferences/admin/{org_id}", response_model=PreferenceResponse)
+    def get_admin_preference_endpoint(org_id: str, request: Request) -> Dict[str, Any]:
+        """
+        Retrieve an organization's stored interaction mode preference.
+
+        Args:
+            org_id: Organization identifier
+            request: FastAPI Request object (for security checks)
+
+        Returns:
+            PreferenceResponse with current preference or None
+
+        Raises:
+            HTTPException: If security checks fail
+        """
+        # Security layer (optional, non-invasive)
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
+        try:
+            # Import preference store
+            from symbolu.service.preferences import get_preference_store
+
+            store = get_preference_store()
+            admin_pref = store.get_admin_preference(org_id)
+
+            # Build response
+            mode = None
+            if admin_pref and admin_pref.forced_interaction_mode:
+                mode = admin_pref.forced_interaction_mode.value
+
+            return {
+                "status": "ok",
+                "mode": mode,
+                "user_id": None,
+                "org_id": org_id,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in /preferences/admin/{org_id}: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to get admin preference: {str(e)}"
             )
 
     # ========================================================================
