@@ -183,11 +183,64 @@ class PersonaMetadata(BaseModel):
     }
 
 
+class PersonaResonanceProfile(BaseModel):
+    """
+    Phase 29: Symbolic Harmonization → Persona Tone Resonance Profile.
+
+    Maps Symbolic Harmonization Formula (SHF) outputs into micro-adjustments
+    of persona tone parameters. This is UI-layer only (never semantic).
+
+    Attributes:
+        symbolic_harmony_bias: Bias from SHF index [-0.05, +0.05]
+            • +bias → slightly softer, more expressive symbolic tone
+            • -bias → slightly simpler, grounded tone
+            • 0 → neutral (no adjustment)
+        symbolic_resonance_tags: Diagnostic tags from SHF notes
+        persona_resonance_tone: Granular tone adjustment parameters
+    """
+    symbolic_harmony_bias: float = Field(
+        0.0,
+        ge=-0.05,
+        le=0.05,
+        description="Symbolic harmony bias [-0.05, +0.05] for tone micro-adjustment"
+    )
+    symbolic_resonance_tags: List[str] = Field(
+        default_factory=list,
+        description="Diagnostic tags from SHF (e.g., 'high_symbolic_harmonization', 'symbolic_mirror_resonant')"
+    )
+    persona_resonance_tone: Dict[str, float] = Field(
+        default_factory=dict,
+        description="Granular tone adjustments: {metaphor_adjustment, warmth_adjustment, structure_adjustment}"
+    )
+
+    @field_validator('symbolic_harmony_bias')
+    @classmethod
+    def validate_bias_range(cls, v: float) -> float:
+        """Ensure bias is within valid range."""
+        if not -0.05 <= v <= 0.05:
+            raise ValueError("symbolic_harmony_bias must be between -0.05 and +0.05")
+        return v
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "symbolic_harmony_bias": 0.03,
+                "symbolic_resonance_tags": ["high_symbolic_harmonization", "symbolic_mirror_resonant"],
+                "persona_resonance_tone": {
+                    "metaphor_adjustment": 0.02,
+                    "warmth_adjustment": 0.01,
+                    "structure_adjustment": -0.01
+                }
+            }
+        }
+    }
+
+
 class PersonaResponse(BaseModel):
     """
     Final output from Persona Engine v2.8.2.
     Contains persona-styled text with preserved analytical layers.
-    
+
     Critical Constraints:
         - Text is styled but meaning is NEVER altered
         - All three layers are preserved unchanged
@@ -197,7 +250,13 @@ class PersonaResponse(BaseModel):
     text: str = Field(..., description="Persona-styled response text")
     layers: Dict[str, Any] = Field(..., description="Preserved analytical layers")
     metadata: PersonaMetadata = Field(..., description="Complete processing metadata")
-    
+
+    # Phase 29: Optional persona resonance profile
+    persona_resonance: Optional[PersonaResonanceProfile] = Field(
+        None,
+        description="Phase 29: Symbolic harmony → persona tone resonance profile (optional)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {

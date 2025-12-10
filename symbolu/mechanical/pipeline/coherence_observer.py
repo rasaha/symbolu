@@ -148,6 +148,10 @@ class CoherenceObservation:
     harmonization_entropy: Optional[float] = None  # Component entropy [0.0, 1.0]
     symbolic_harmonization_notes: List[str] = field(default_factory=list)  # SHF diagnostic notes
 
+    # Phase 29: Persona Resonance (observation only)
+    persona_resonance_bias: Optional[float] = None  # Symbolic harmony bias applied to persona tone [-0.05, +0.05]
+    persona_resonance_tags: List[str] = field(default_factory=list)  # Persona resonance tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -557,6 +561,18 @@ class CoherenceObserver:
                     symbolic_harmonization_notes = list(notes)
                 symbolic_harmonization = shf_snapshot
 
+        # Phase 29: Extract Persona Resonance from pipeline context
+        persona_resonance_bias = None
+        persona_resonance_tags = []
+
+        # Try to extract persona resonance from persona_response in context
+        if hasattr(pipeline_context, 'persona_response') and pipeline_context.persona_response is not None:
+            persona_response = pipeline_context.persona_response
+            persona_resonance = getattr(persona_response, 'persona_resonance', None)
+            if persona_resonance is not None:
+                persona_resonance_bias = getattr(persona_resonance, 'symbolic_harmony_bias', None)
+                persona_resonance_tags = getattr(persona_resonance, 'symbolic_resonance_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -650,6 +666,8 @@ class CoherenceObserver:
             mirror_alignment_shf=mirror_alignment_shf,
             harmonization_entropy=harmonization_entropy,
             symbolic_harmonization_notes=symbolic_harmonization_notes,
+            persona_resonance_bias=persona_resonance_bias,  # Phase 29
+            persona_resonance_tags=persona_resonance_tags,  # Phase 29
         )
 
         # Store observation

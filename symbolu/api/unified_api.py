@@ -76,6 +76,7 @@ class UnifiedOutput:
     formulas: Optional[Dict[str, Optional[float]]] = None
     trading_guardrails: Optional[Dict[str, bool]] = None
     interaction_mode: Optional[str] = None  # Phase 15: Active interaction mode
+    persona_resonance: Optional[Dict[str, Any]] = None  # Phase 29: Persona resonance profile
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -837,6 +838,23 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
     elif hasattr(ctx, 'interaction_mode') and ctx.interaction_mode is not None:
         interaction_mode_data = ctx.interaction_mode
 
+    # Phase 29: Extract persona resonance from persona response
+    persona_resonance_data = None
+    if hasattr(ctx, 'persona_response') and ctx.persona_response is not None:
+        # Try to extract persona_resonance from PersonaResponse
+        persona_resonance = getattr(ctx.persona_response, 'persona_resonance', None)
+        if persona_resonance is not None:
+            # Serialize PersonaResonanceProfile to dict
+            if hasattr(persona_resonance, 'model_dump'):
+                # Pydantic v2 style (new method name)
+                persona_resonance_data = persona_resonance.model_dump()
+            elif hasattr(persona_resonance, 'dict'):
+                # Pydantic v1 style (deprecated in v2)
+                persona_resonance_data = persona_resonance.dict()
+            elif hasattr(persona_resonance, '__dict__'):
+                # Fallback to dict conversion
+                persona_resonance_data = dict(persona_resonance.__dict__)
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -856,6 +874,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         formulas=formulas_data,
         trading_guardrails=trading_guardrails_data,
         interaction_mode=interaction_mode_data,
+        persona_resonance=persona_resonance_data,  # Phase 29
     )
 
 

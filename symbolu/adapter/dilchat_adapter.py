@@ -704,6 +704,36 @@ def _build_badges(
             ))
 
     # ========================================================================
+    # Phase 29: Persona Resonance Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract persona resonance from coherence observation
+    persona_resonance_bias = coherence.get("persona_resonance_bias") if coherence else None
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and persona_resonance_bias is not None:
+        # PERSONA_HARMONY_POSITIVE: positive bias (+0.02 to +0.05)
+        if persona_resonance_bias >= 0.02:
+            badges.append(DILchatBadge(
+                label="PERSONA_HARMONY_POSITIVE",
+                level="info",
+                description="Persona tone is slightly softer and more expressive due to high symbolic harmonization."
+            ))
+        # PERSONA_HARMONY_NEUTRAL: neutral bias (-0.01 to +0.01)
+        elif -0.01 <= persona_resonance_bias <= 0.01:
+            badges.append(DILchatBadge(
+                label="PERSONA_HARMONY_NEUTRAL",
+                level="info",
+                description="Persona tone is neutral with no harmonization-based adjustment."
+            ))
+        # PERSONA_HARMONY_NEGATIVE: negative bias (-0.05 to -0.02)
+        elif persona_resonance_bias <= -0.02:
+            badges.append(DILchatBadge(
+                label="PERSONA_HARMONY_NEGATIVE",
+                level="info",
+                description="Persona tone is slightly simpler and grounded due to low symbolic harmonization."
+            ))
+
+    # ========================================================================
     # BADGE 16: Trading Guardrail Badges (Phase 7: Formula-Aware Trading Guardrails v1.0)
     # ========================================================================
     if trading_guardrails:

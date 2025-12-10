@@ -16,7 +16,7 @@ It only controls ordering, framing, and presentation style.
 """
 
 from typing import Dict, Any, Optional, List, Tuple
-from .models import RendererOutputV3, DHAResult, PersonaResponse, PersonaMetadata, PersonaProfile
+from .models import RendererOutputV3, DHAResult, PersonaResponse, PersonaMetadata, PersonaProfile, PersonaResonanceProfile
 from .registry import PersonaRegistry
 from .selector import PersonaSelector
 
@@ -79,6 +79,10 @@ class PersonaEngine:
         Returns:
             PersonaResponse with styled text and preserved layers
         """
+        # Safeguard: Handle None explain_log
+        if explain_log is None:
+            explain_log = {}
+
         # Step 1: Choose persona
         persona_id = self.selector.auto_select(explain_log, user_persona_override)
         persona = self.registry.get_safe(persona_id, default="neutral")
@@ -116,8 +120,12 @@ class PersonaEngine:
             dha_confidence=dha_result.confidence,
             confidence=renderer_output.metadata.get("confidence")
         )
-        
-        # Step 6: Return complete response
+
+        # Phase 29 Step 6: Extract SHF and apply persona resonance
+        shf_snapshot = self._extract_symbolic_harmony(explain_log)
+        persona_resonance = self._apply_resonance_to_persona_tone(persona, shf_snapshot)
+
+        # Step 7: Return complete response (with optional persona_resonance)
         return PersonaResponse(
             persona_id=persona.id,
             text=text,
@@ -126,7 +134,8 @@ class PersonaEngine:
                 "practical_layer": practical,
                 "mirror_truth_layer": mirror
             },
-            metadata=metadata
+            metadata=metadata,
+            persona_resonance=persona_resonance  # Phase 29: Optional resonance profile
         )
     
     def _order_layers(
@@ -323,10 +332,146 @@ class PersonaEngine:
         
         return "\n".join(parts) if parts else str(content)
     
+    def _extract_symbolic_harmony(
+        self,
+        explain_log: Dict[str, Any]
+    ) -> Optional[Any]:
+        """
+        Phase 29: Extract Symbolic Harmonization snapshot from pipeline context.
+
+        Args:
+            explain_log: MLCR explain log with metadata
+
+        Returns:
+            SymbolicHarmonizationSnapshot or None if not available
+
+        Graceful Degradation:
+            Returns None if SHF data is not present in context.
+        """
+        # Try to extract SHF snapshot from explain_log
+        # Expected path: explain_log -> coherence_state -> symbolic_harmonization_snapshot
+        if not explain_log:
+            return None
+
+        # Check if coherence_state exists
+        coherence_state = explain_log.get('coherence_state')
+        if not coherence_state:
+            return None
+
+        # Extract symbolic harmonization snapshot
+        shf_snapshot = getattr(coherence_state, 'symbolic_harmonization_snapshot', None)
+
+        return shf_snapshot
+
+    def _apply_resonance_to_persona_tone(
+        self,
+        persona: PersonaProfile,
+        shf_snapshot: Optional[Any]
+    ) -> Optional[PersonaResonanceProfile]:
+        """
+        Phase 29: Apply symbolic harmonization resonance to persona tone.
+
+        This method maps SHF outputs into micro-adjustments of persona tone
+        parameters. It is UI-layer only and never affects semantic content.
+
+        Mapping Rules:
+            • SHI >= 0.75 → +bias (+0.02 to +0.05)
+            • SHI 0.50-0.75 → neutral bias (±0.01)
+            • SHI < 0.50 → -bias (-0.05 to -0.02)
+
+        Tone Adjustments:
+            • +bias → slightly softer, more expressive (↑metaphor, ↑warmth, ↓structure)
+            • -bias → slightly simpler, grounded (↓metaphor, ↓warmth, ↑structure)
+
+        Args:
+            persona: Selected PersonaProfile
+            shf_snapshot: SymbolicHarmonizationSnapshot (or None)
+
+        Returns:
+            PersonaResonanceProfile or None if SHF not available
+
+        Invariants:
+            • All adjustments are ≤ ±0.05 (5% max deviation)
+            • Deterministic: same inputs → same outputs
+            • Safe default: if SHF missing → no modulation (returns None)
+        """
+        # Graceful degradation: if SHF not available, return None
+        if shf_snapshot is None:
+            return None
+
+        # Extract SHI and notes from snapshot
+        shi = getattr(shf_snapshot, 'symbolic_harmonization_index', None)
+        notes = getattr(shf_snapshot, 'notes', [])
+
+        # If SHI is missing, return None
+        if shi is None:
+            return None
+
+        # ========================================================================
+        # STEP 1: Compute symbolic_harmony_bias based on SHI thresholds
+        # ========================================================================
+        if shi >= 0.75:
+            # High harmonization → +bias (softer, more expressive)
+            symbolic_harmony_bias = 0.03
+        elif shi >= 0.50:
+            # Medium harmonization → neutral bias
+            symbolic_harmony_bias = 0.0
+        else:
+            # Low harmonization → -bias (simpler, grounded)
+            symbolic_harmony_bias = -0.03
+
+        # ========================================================================
+        # STEP 2: Compute granular tone adjustments
+        # ========================================================================
+        # Positive bias → increase metaphor/warmth, decrease structure
+        # Negative bias → decrease metaphor/warmth, increase structure
+
+        metaphor_adjustment = symbolic_harmony_bias * 0.67  # Max ±0.02
+        warmth_adjustment = symbolic_harmony_bias * 0.33  # Max ±0.01
+        structure_adjustment = -symbolic_harmony_bias * 0.33  # Max ±0.01 (inverted)
+
+        # Clamp all adjustments to [-0.05, +0.05]
+        metaphor_adjustment = max(-0.05, min(0.05, metaphor_adjustment))
+        warmth_adjustment = max(-0.05, min(0.05, warmth_adjustment))
+        structure_adjustment = max(-0.05, min(0.05, structure_adjustment))
+
+        # ========================================================================
+        # STEP 3: Build persona_resonance_tone dict
+        # ========================================================================
+        persona_resonance_tone = {
+            "metaphor_adjustment": round(metaphor_adjustment, 4),
+            "warmth_adjustment": round(warmth_adjustment, 4),
+            "structure_adjustment": round(structure_adjustment, 4),
+        }
+
+        # ========================================================================
+        # STEP 4: Extract symbolic_resonance_tags from SHF notes
+        # ========================================================================
+        # Filter notes to only include SHF-specific tags
+        symbolic_resonance_tags = []
+        if notes:
+            # Only include notes related to symbolic harmonization
+            # (e.g., "high_symbolic_harmonization", "symbolic_mirror_resonant", etc.)
+            for note in notes:
+                if any(kw in note for kw in [
+                    'symbolic', 'harmonization', 'mirror', 'guna', 'kosha',
+                    'semantic_integrity', 'focused', 'diffuse', 'converging', 'diverging'
+                ]):
+                    symbolic_resonance_tags.append(note)
+
+        # ========================================================================
+        # STEP 5: Return PersonaResonanceProfile
+        # ========================================================================
+        return PersonaResonanceProfile(
+            symbolic_harmony_bias=round(symbolic_harmony_bias, 4),
+            symbolic_resonance_tags=symbolic_resonance_tags,
+            persona_resonance_tone=persona_resonance_tone,
+        )
+
     def get_persona_summary(self) -> str:
         """
         Get a summary of all available personas.
-        
+
         Returns:
             Formatted summary string
         """
