@@ -42,6 +42,11 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "formula_ui_mode": "none",
         "min_resonance_for_reflection": 0.60,
         "max_tension_for_reflection": 0.50,
+        # Phase 7: Trading Formula Guardrails v1.0
+        "formula_guardrails_enabled": True,
+        "max_tension_allowed": 0.70,
+        "max_negative_delta_smi": 0.12,
+        "max_volatility_allowed": 0.60,  # from mapper_volatility_score
     },
     "therapy": {
         "min_coherence": 0.45,
@@ -55,6 +60,8 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "formula_ui_mode": "light",
         "min_resonance_for_reflection": 0.50,
         "max_tension_for_reflection": 0.75,
+        # Phase 7: Trading Formula Guardrails v1.0 (disabled for therapy)
+        "formula_guardrails_enabled": False,
     },
     "identity": {
         "min_coherence": 0.50,
@@ -68,6 +75,8 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "formula_ui_mode": "light",
         "min_resonance_for_reflection": 0.50,
         "max_tension_for_reflection": 0.70,
+        # Phase 7: Trading Formula Guardrails v1.0 (disabled for identity)
+        "formula_guardrails_enabled": False,
     },
     "generic": {
         "min_coherence": 0.40,
@@ -81,6 +90,8 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "formula_ui_mode": "none",
         "min_resonance_for_reflection": 0.55,
         "max_tension_for_reflection": 0.60,
+        # Phase 7: Trading Formula Guardrails v1.0 (disabled for generic)
+        "formula_guardrails_enabled": False,
     },
 }
 

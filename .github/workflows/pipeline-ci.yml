@@ -24,6 +24,7 @@ on:
       - "symbolu/motivation/**"
       - "symbolu/core/motivation_drift_tests/**"
       - "symbolu/tools/coherence_dashboard/**"
+      - "docs/patent_formula_coverage_matrix.md"
       - ".github/workflows/pipeline-ci.yml"
   pull_request:
     branches: ["main", "master"]
@@ -48,6 +49,7 @@ on:
       - "symbolu/motivation/**"
       - "symbolu/core/motivation_drift_tests/**"
       - "symbolu/tools/coherence_dashboard/**"
+      - "docs/patent_formula_coverage_matrix.md"
       - ".github/workflows/pipeline-ci.yml"
   workflow_dispatch:
 
@@ -252,6 +254,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee motivation-flow-pytest.log
 
+      - name: Run Trading Formula Guardrail Tests
+        run: |
+          pytest symbolu/policy/tests/test_trading_formula_guardrails.py \
+            --disable-warnings -q \
+            2>&1 | tee trading-guardrails-pytest.log
+
       - name: Run Motivation Drift Tests
         run: |
           pytest symbolu/core/motivation_drift_tests \
@@ -321,6 +329,7 @@ jobs:
             intent-arc-pytest.log
             identity-signature-pytest.log
             motivation-flow-pytest.log
+            trading-guardrails-pytest.log
             motivation-drift-pytest.log
 
       - name: Upload snapshot diffs
