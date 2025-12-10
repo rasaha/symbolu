@@ -22,8 +22,8 @@ Usage:
 from typing import Dict, Optional, Any, Set
 from uuid import uuid4
 from datetime import datetime
-from collections import Counter
 import threading
+from collections import Counter
 
 from .session_models import SessionState, SessionSummary
 from .session_memory import SessionMemory, SessionMemoryExtractor
@@ -986,6 +986,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
             if isinstance(turn, dict) and turn.get("drift_risk_band") and turn.get("drift_risk_band") != ""
         ]
         if drift_bands:
+            from collections import Counter
             band_counts = Counter(drift_bands)
             dominant_drift_risk_band = band_counts.most_common(1)[0][0]
 
@@ -997,6 +998,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
                 if tags:
                     all_tags.extend(tags)
         if all_tags:
+            from collections import Counter
             tag_counts = Counter(all_tags)
             drift_pattern_frequency = dict(tag_counts)
 
