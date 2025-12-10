@@ -246,9 +246,9 @@ def build_dilchat_response(
     )
 
     # ========================================================================
-    # STEP 6: Build hints (includes session memory + session recap + intent arc + identity signature + motivation + trading guardrail hints)
+    # STEP 6: Build hints (includes session memory + session recap + intent arc + identity signature + motivation + trading guardrail + v3 confidence hints)
     # ========================================================================
-    hints = _build_hints(combined_flags, session_memory, session_recap, intent_arc, identity_signature, motivation_profile, trading_guardrails)
+    hints = _build_hints(combined_flags, session_memory, session_recap, intent_arc, identity_signature, motivation_profile, trading_guardrails, coherence, domain)
 
     # ========================================================================
     # STEP 7: Extract Phase 2 formulas (diagnostics only)
@@ -704,6 +704,8 @@ def _build_hints(
     identity_signature: Optional[Dict[str, Any]] = None,
     motivation_profile: Optional[Dict[str, Any]] = None,
     trading_guardrails: Optional[Dict[str, Any]] = None,
+    coherence: Optional[Dict[str, Any]] = None,
+    domain: Optional[str] = None,
 ) -> List[DILchatHint]:
     """
     Build UI hints based on policy flags.
@@ -725,6 +727,7 @@ def _build_hints(
         14. Identity Signature Hints (explore_identity, stabilize_identity, etc.)
         15. Motivation Profile Hints (encourage_exploration, stabilize_self, address_avoidance, etc.)
         16. Trading Guardrail Hints (avoid_trade, wait_for_stability, market_volatility_alert)
+        17. Phase 12 v3 Confidence Hints (v3_confidence_high, v3_confidence_medium, v3_confidence_low)
 
     Args:
         policy_flags: Policy flags dictionary (includes session_policy_flags if available)
@@ -734,6 +737,8 @@ def _build_hints(
         identity_signature: Identity signature dictionary with signature classification
         motivation_profile: Motivation profile dictionary with motivational driver classification
         trading_guardrails: Trading guardrails dictionary with risk flags
+        coherence: Coherence dictionary with v3 quality (Phase 12)
+        domain: Domain identifier (Phase 12)
 
     Returns:
         List of DILchatHint objects
@@ -996,6 +1001,33 @@ def _build_hints(
                 code="MARKET_VOLATILITY_ALERT",
                 message="Market volatility elevated. Mapper instability and persona drift detected."
             ))
+
+    # ========================================================================
+    # PHASE 12 v3 CONFIDENCE HINTS (v3 quality as interpretation confidence)
+    # ========================================================================
+    # Only expose v3 confidence hints for therapy/identity domains where v3 is enabled
+    if coherence and domain in ["therapy", "identity"]:
+        coherence_score_v3 = coherence.get("coherence_score_v3")
+        coherence_v3_quality = coherence.get("coherence_v3_quality")
+
+        # Only add v3 confidence hints if both v3 and quality are available
+        if coherence_score_v3 is not None and coherence_v3_quality is not None:
+            # Classify quality into 3 ranges: high, medium, low
+            if coherence_v3_quality >= 0.7:
+                hints.append(DILchatHint(
+                    code="V3_CONFIDENCE_HIGH",
+                    message="v3 interpretation confidence is high. Formula signals are stable and aligned."
+                ))
+            elif coherence_v3_quality >= 0.4:
+                hints.append(DILchatHint(
+                    code="V3_CONFIDENCE_MEDIUM",
+                    message="v3 interpretation confidence is medium. Some formula signal instability present."
+                ))
+            else:
+                hints.append(DILchatHint(
+                    code="V3_CONFIDENCE_LOW",
+                    message="v3 interpretation confidence is low. Formula signals are unstable or divergent."
+                ))
 
     return hints
 

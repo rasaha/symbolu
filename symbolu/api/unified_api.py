@@ -226,16 +226,19 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
             'active_mappers': [],
         }
 
-    # Phase 11: Ensure coherence_score_v2 and coherence_score_v3 are included if available
+    # Phase 11 & 12: Ensure coherence_score_v2, coherence_score_v3, and coherence_v3_quality are included if available
     if hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
         coherence_state = ctx.coherence_state
         coherence_score_v2 = getattr(coherence_state, 'coherence_score_v2', None)
         coherence_score_v3 = getattr(coherence_state, 'coherence_score_v3', None)
+        coherence_v3_quality = getattr(coherence_state, 'coherence_v3_quality', None)
 
         if coherence_score_v2 is not None:
             coherence_report['coherence_score_v2'] = coherence_score_v2
         if coherence_score_v3 is not None:
             coherence_report['coherence_score_v3'] = coherence_score_v3
+        if coherence_v3_quality is not None:
+            coherence_report['coherence_v3_quality'] = coherence_v3_quality
 
     # Build metadata
     metadata = {

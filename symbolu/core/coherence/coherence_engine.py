@@ -118,6 +118,15 @@ class CoherenceEngine:
         # Update Phase 10 coherence v3 (megafusion, observation only)
         state.coherence_score_v3 = self._compute_coherence_score_v3(state, mapper_profile)
 
+        # Update Phase 12 coherence v3 quality (soft stability windows)
+        state.coherence_v3_quality = self._compute_coherence_v3_quality(
+            base=state.coherence_score,
+            v3=state.coherence_score_v3,
+            resonance_index=state.resonance_index,
+            arc_alignment_index=state.arc_alignment_index,
+            tension_index=state.tension_index,
+        )
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -663,3 +672,123 @@ class CoherenceEngine:
         )
 
         return coherence_score_v3
+
+    def _compute_coherence_v3_quality(
+        self,
+        base: Optional[float],
+        v3: Optional[float],
+        resonance_index: Optional[float],
+        arc_alignment_index: Optional[float],
+        tension_index: Optional[float],
+    ) -> Optional[float]:
+        """
+        Compute Phase 12 Coherence v3 quality metric (soft stability windows).
+
+        This metric evaluates the STABILITY and RELIABILITY of v3 score by checking:
+        1. Soft stability windows for resonance, arc alignment, and tension
+        2. Divergence between v1 (base) and v3 scores
+        3. Overall quality confidence in [0.0, 1.0]
+
+        The quality score gates v3 usage in policy: if quality is too low, policy
+        cascades to v2 or v1 instead of trusting v3.
+
+        Soft Window Logic (piecewise linear, continuous):
+        - Resonance window: encourages moderate-high resonance [0.3, 0.7]
+        - Arc alignment window: encourages aligned temporal patterns [0.3, 0.7]
+        - Tension window: penalizes high tension, prefers low-moderate [0.3, 0.7]
+
+        Divergence Penalty:
+        - No penalty if |v3 - base| <= 0.05
+        - Max penalty if |v3 - base| >= 0.30
+        - Linear interpolation between
+
+        Final Formula:
+            stability_core = 0.4 * w_r + 0.3 * w_a + 0.3 * w_t
+            divergence_penalty = smooth_penalty(|v3 - base|)
+            quality = stability_core * (1.0 - 0.6 * divergence_penalty)
+            return clamp(quality, 0.0, 1.0)
+
+        Args:
+            base: Coherence score v1 (canonical, always available)
+            v3: Coherence score v3 (optional, megafusion)
+            resonance_index: Phase 3 resonance index [0.0, 1.0]
+            arc_alignment_index: Phase 3 arc alignment index [0.0, 1.0]
+            tension_index: Phase 3 tension index [0.0, 1.0]
+
+        Returns:
+            Optional[float]: v3 quality score [0.0, 1.0], or None if required inputs missing
+
+        Note:
+            This is a ZERO-LLM, deterministic metric. It does NOT modify any existing
+            pipeline behavior. It is purely a gating mechanism for v3 usage in policy.
+        """
+        # Helper: clamp function
+        def clamp(value: float, min_val: float, max_val: float) -> float:
+            return max(min_val, min(max_val, value))
+
+        # Missing data check: If base or v3 are missing, return None
+        if base is None or v3 is None:
+            return None
+
+        # Graceful defaults for missing metrics (neutral 0.5 midpoint)
+        resonance = resonance_index if resonance_index is not None else 0.5
+        arc_alignment = arc_alignment_index if arc_alignment_index is not None else 0.5
+        tension = tension_index if tension_index is not None else 0.5
+
+        # ========================================================================
+        # SOFT STABILITY WINDOWS (piecewise linear, continuous)
+        # ========================================================================
+
+        # Resonance window w_r: encourages moderate-high resonance [0.3, 0.7]
+        if resonance <= 0.3:
+            w_r = 0.0
+        elif resonance >= 0.7:
+            w_r = 1.0
+        else:
+            w_r = (resonance - 0.3) / 0.4
+
+        # Arc alignment window w_a: encourages aligned patterns [0.3, 0.7]
+        if arc_alignment <= 0.3:
+            w_a = 0.0
+        elif arc_alignment >= 0.7:
+            w_a = 1.0
+        else:
+            w_a = (arc_alignment - 0.3) / 0.4
+
+        # Tension window w_t: best when tension is low-moderate [0.0, 0.7]
+        # Higher tension reduces quality
+        if tension <= 0.3:
+            w_t = 1.0
+        elif tension >= 0.7:
+            w_t = 0.0
+        else:
+            w_t = (0.7 - tension) / 0.4
+
+        # Compute base stability factor from windows
+        stability_core = 0.4 * w_r + 0.3 * w_a + 0.3 * w_t
+
+        # ========================================================================
+        # DIVERGENCE PENALTY (soft penalty for v1-v3 disagreement)
+        # ========================================================================
+
+        divergence = abs(v3 - base)  # both in [0, 1]
+
+        # Soft penalty: no penalty below 0.05, max penalty above 0.30
+        if divergence <= 0.05:
+            divergence_penalty = 0.0
+        elif divergence >= 0.30:
+            divergence_penalty = 1.0
+        else:
+            divergence_penalty = (divergence - 0.05) / (0.30 - 0.05)
+
+        # ========================================================================
+        # FINAL QUALITY SCORE
+        # ========================================================================
+
+        # Apply divergence penalty to stability core
+        raw_quality = stability_core * (1.0 - 0.6 * divergence_penalty)
+
+        # Clamp to [0.0, 1.0]
+        coherence_v3_quality = clamp(raw_quality, 0.0, 1.0)
+
+        return coherence_v3_quality
