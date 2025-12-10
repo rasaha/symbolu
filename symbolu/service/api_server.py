@@ -566,6 +566,131 @@ def create_app() -> "FastAPI":
                 detail=f"Dashboard generation failed: {str(e)}"
             )
 
+    @app.get("/sessions/{session_id}/resonance/what_if")
+    def resonance_what_if(
+        session_id: str,
+        preset: str,
+        request: Request,
+    ) -> Dict[str, Any]:
+        """
+        Run a what-if simulation on session resonance weighting (Phase 25).
+
+        This endpoint applies a resonance preset to the session's latest
+        resonance weighting snapshot and returns the simulated outcome.
+
+        This is a read-only analytics tool that does NOT modify any pipeline
+        behavior, routing, policy flags, or live state.
+
+        Args:
+            session_id: Session identifier
+            preset: Preset name to apply (e.g., "safety_first", "insight_heavy")
+            request: FastAPI Request object (for security checks)
+
+        Returns:
+            Dict with simulation results:
+            {
+                "preset": "safety_first",
+                "original": {
+                    "normalized_weights": {...},
+                    "entropy": 0.42,
+                    "dominant_metrics": {...}
+                },
+                "simulated": {
+                    "normalized_weights": {...},
+                    "entropy": 0.36,
+                    "dominant_metrics": {...},
+                    "notes": [...]
+                }
+            }
+
+        Raises:
+            HTTPException:
+                - 404: Session not found or no resonance snapshot available
+                - 400: Invalid preset name
+                - 500: Simulation error
+        """
+        # Security layer (optional, non-invasive)
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
+        try:
+            # Import resonance simulator components
+            from symbolu.tools.resonance_simulator import (
+                is_valid_preset,
+                get_preset,
+                get_preset_names,
+                simulate_resonance_with_preset,
+            )
+            from symbolu.tools.resonance_simulator.cli import (
+                _extract_resonance_snapshot,
+            )
+
+            # Validate preset
+            if not is_valid_preset(preset):
+                available = ", ".join(get_preset_names())
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid preset '{preset}'. Available: {available}"
+                )
+
+            # Retrieve session
+            session = session_store.get(session_id)
+            if session is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Session '{session_id}' not found"
+                )
+
+            # Extract resonance snapshot
+            snapshot = _extract_resonance_snapshot(session_store, session_id)
+            if snapshot is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "No resonance weighting snapshot available for this session. "
+                        "Session may not have any turns with resonance weighting computed."
+                    )
+                )
+
+            # Run simulation
+            preset_obj = get_preset(preset)
+            scenario = simulate_resonance_with_preset(snapshot, preset_obj, top_n=3)
+
+            if scenario is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Simulation failed (all effective weights may be zero)"
+                )
+
+            # Build response
+            return {
+                "preset": scenario.preset_name,
+                "original": {
+                    "normalized_weights": scenario.original_normalized,
+                    "entropy": scenario.entropy_original,
+                    "dominant_metrics": scenario.dominant_original,
+                },
+                "simulated": {
+                    "normalized_weights": scenario.simulated_normalized,
+                    "entropy": scenario.entropy_simulated,
+                    "dominant_metrics": scenario.dominant_simulated,
+                    "notes": scenario.notes,
+                },
+            }
+
+        except HTTPException:
+            # Re-raise HTTP exceptions
+            raise
+        except Exception as e:
+            logger.error(
+                f"Error in /sessions/{session_id}/resonance/what_if: {e}",
+                exc_info=True
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Resonance simulation failed: {str(e)}"
+            )
+
     # ========================================================================
     # PREFERENCE ENDPOINTS (Phase 15B)
     # ========================================================================
