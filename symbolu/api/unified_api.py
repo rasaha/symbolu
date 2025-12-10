@@ -343,6 +343,67 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
     if hasattr(ctx, 'request') and ctx.request is not None:
         metadata['user_id'] = ctx.request.user_id
 
+    # Phase 20: Add optional dashboard-ready bands to metadata
+    # This does NOT affect policy flags or behavior - purely informational
+    if hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        coherence_state = ctx.coherence_state
+        coherence_fused = getattr(coherence_state, 'coherence_fused', None)
+        entropy_volatility = getattr(coherence_state, 'temporal_entropy_volatility', None)
+        semantic_integrity_score = getattr(coherence_state, 'semantic_integrity_score', None)
+        cognitive_drift_v3 = getattr(coherence_state, 'cognitive_drift_v3', None)
+
+        # Compute dashboard bands (deterministic, observation-only)
+        bands = {}
+
+        # Stability band
+        if coherence_fused is not None and entropy_volatility is not None:
+            if coherence_fused >= 0.65 and entropy_volatility <= 0.35:
+                bands['stability_band'] = 'stable'
+            elif coherence_fused < 0.45 or entropy_volatility > 0.65:
+                bands['stability_band'] = 'unstable'
+            else:
+                bands['stability_band'] = 'transition'
+
+        # Drift band
+        if cognitive_drift_v3 is not None:
+            if cognitive_drift_v3 <= 0.35:
+                bands['drift_band'] = 'low'
+            elif cognitive_drift_v3 <= 0.65:
+                bands['drift_band'] = 'moderate'
+            else:
+                bands['drift_band'] = 'high'
+
+        # Semantic band
+        if semantic_integrity_score is not None and cognitive_drift_v3 is not None:
+            if semantic_integrity_score >= 0.70 and cognitive_drift_v3 <= 0.35:
+                bands['semantic_band'] = 'coherent'
+            elif semantic_integrity_score < 0.45 or cognitive_drift_v3 > 0.65:
+                bands['semantic_band'] = 'fragile'
+            else:
+                bands['semantic_band'] = 'mixed'
+
+        # Add motivation band if available from context
+        if hasattr(ctx, 'motivation_profile') and ctx.motivation_profile is not None:
+            motivation_data = ctx.motivation_profile.serialize()
+            motivation_type = motivation_data.get('motivation_type')
+            if motivation_type:
+                motivation_lower = motivation_type.lower()
+                if any(kw in motivation_lower for kw in ['fear', 'avoidance', 'overcorrection']):
+                    bands['motivation_band'] = 'defensive'
+                elif any(kw in motivation_lower for kw in ['hope', 'expansion', 'stabilization']):
+                    bands['motivation_band'] = 'expansive'
+                elif 'assertion' in motivation_lower:
+                    bands['motivation_band'] = 'assertive'
+
+        # Add bands to metadata if any were computed
+        if bands:
+            metadata['bands'] = bands
+            metadata['dashboard_ready'] = True
+        else:
+            metadata['dashboard_ready'] = False
+    else:
+        metadata['dashboard_ready'] = False
+
     # Extract session memory (Memory v2.0)
     session_memory_data = {}
     if hasattr(ctx, 'session_memory') and ctx.session_memory is not None:
