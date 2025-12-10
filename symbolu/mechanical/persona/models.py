@@ -263,6 +263,12 @@ class PersonaResponse(BaseModel):
         description="Phase 30: Cross-layer resonance persona mapping (optional)"
     )
 
+    # Phase 31: Optional adaptive persona echo profile
+    echo_profile: Optional[Any] = Field(
+        None,
+        description="Phase 31: Adaptive persona echo layer profile (optional)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {

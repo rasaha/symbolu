@@ -20,6 +20,7 @@ from .models import RendererOutputV3, DHAResult, PersonaResponse, PersonaMetadat
 from .registry import PersonaRegistry
 from .selector import PersonaSelector
 from .persona_resonance_mapping import CrossLayerResonanceMap, compute_cross_layer_persona_map
+from .persona_echo_layer import AdaptivePersonaEchoProfile, compute_adaptive_persona_echo_profile
 
 
 class PersonaEngine:
@@ -142,6 +143,7 @@ class PersonaEngine:
         # Phase 30 Step 8: Apply cross-layer resonance modulation
         # Extract coherence observation from explain_log
         coherence_observation = self._extract_coherence_observation(explain_log)
+        cl_map = None
         if coherence_observation is not None:
             # Compute cross-layer resonance map
             cl_map = compute_cross_layer_persona_map(coherence_observation)
@@ -150,7 +152,30 @@ class PersonaEngine:
             # Attach cl_map to response for observability
             persona_response.cross_layer_resonance_map = cl_map
 
-        # Step 9: Return complete response
+        # Phase 31 Step 9: Apply adaptive persona echo layer
+        # Extract inputs from explain_log
+        session_summary = explain_log.get("session_summary")
+        identity_signature = explain_log.get("identity_signature")
+        intent_arc = explain_log.get("intent_arc")
+        motivation_profile = explain_log.get("motivation_profile")
+        interaction_mode = explain_log.get("interaction_mode", "SMART_INSIGHT")
+        domain = metadata.domain
+
+        # Compute adaptive persona echo profile
+        echo_profile = compute_adaptive_persona_echo_profile(
+            session_summary=session_summary,
+            resonance_map=cl_map,
+            identity_signature=identity_signature,
+            intent_arc=intent_arc,
+            motivation_profile=motivation_profile,
+            interaction_mode=interaction_mode,
+            domain=domain,
+        )
+
+        # Apply echo profile to response (metadata only)
+        self._apply_adaptive_persona_echo(persona_response, echo_profile)
+
+        # Step 10: Return complete response
         return persona_response
     
     def _order_layers(
@@ -563,6 +588,41 @@ class PersonaEngine:
 
         # No-op for now: future versions will implement live tone modulation
         pass
+
+    def _apply_adaptive_persona_echo(
+        self,
+        response: PersonaResponse,
+        echo_profile: AdaptivePersonaEchoProfile,
+    ) -> None:
+        """
+        Phase 31: Apply adaptive persona echo metadata to PersonaResponse.
+
+        This method applies echo metadata & echo segment placeholders to PersonaResponse.
+
+        IMPORTANT:
+        - Does NOT alter the core semantic explanation.
+        - Echo is represented as a separate, optional field.
+        - Tone-only and structure-only guidance (no LLM, no generation here).
+
+        Args:
+            response: PersonaResponse to modulate (in-place)
+            echo_profile: AdaptivePersonaEchoProfile with echo parameters
+
+        Returns:
+            None (modulates response in-place)
+
+        Invariants:
+            • No semantic changes (core text unchanged)
+            • No LLM calls (pure metadata attachment)
+            • Deterministic: same inputs → same outputs
+            • Safe: no exceptions for disabled echo
+        """
+        # If echo is disabled, do nothing
+        if not echo_profile.echo_enabled:
+            return
+
+        # Attach echo_profile to response for observability
+        response.echo_profile = echo_profile
 
     def get_persona_summary(self) -> str:
         """

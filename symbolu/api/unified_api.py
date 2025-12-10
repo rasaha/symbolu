@@ -78,6 +78,7 @@ class UnifiedOutput:
     interaction_mode: Optional[str] = None  # Phase 15: Active interaction mode
     persona_resonance: Optional[Dict[str, Any]] = None  # Phase 29: Persona resonance profile
     persona_resonance_map: Optional[Dict[str, Any]] = None  # Phase 30: Cross-layer resonance persona map
+    persona_echo_profile: Optional[Dict[str, Any]] = None  # Phase 31: Adaptive persona echo layer profile
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -876,6 +877,26 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 # Fallback to dict conversion
                 persona_resonance_map_data = dict(cl_resonance_map.__dict__)
 
+    # Phase 31: Extract adaptive persona echo profile from persona response
+    persona_echo_profile_data = None
+    if hasattr(ctx, 'persona_response') and ctx.persona_response is not None:
+        # Try to extract echo_profile from PersonaResponse
+        echo_profile = getattr(ctx.persona_response, 'echo_profile', None)
+        if echo_profile is not None:
+            # Serialize AdaptivePersonaEchoProfile to dict
+            if hasattr(echo_profile, 'to_dict'):
+                # Use custom to_dict method
+                persona_echo_profile_data = echo_profile.to_dict()
+            elif hasattr(echo_profile, 'model_dump'):
+                # Pydantic v2 style (new method name)
+                persona_echo_profile_data = echo_profile.model_dump()
+            elif hasattr(echo_profile, 'dict'):
+                # Pydantic v1 style (deprecated in v2)
+                persona_echo_profile_data = echo_profile.dict()
+            elif hasattr(echo_profile, '__dict__'):
+                # Fallback to dict conversion
+                persona_echo_profile_data = dict(echo_profile.__dict__)
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -897,6 +918,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         interaction_mode=interaction_mode_data,
         persona_resonance=persona_resonance_data,  # Phase 29
         persona_resonance_map=persona_resonance_map_data,  # Phase 30
+        persona_echo_profile=persona_echo_profile_data,  # Phase 31
     )
 
 

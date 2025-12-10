@@ -215,6 +215,9 @@ def build_dilchat_response(
     if session_policy_flags:
         combined_flags["session_policy_flags"] = session_policy_flags
 
+    # Add persona echo profile to combined flags for APEL hints (Phase 31)
+    # (will be extracted later from unified_output in STEP 6)
+
     # ========================================================================
     # STEP 5: Build badges (includes session memory + session recap + intent arc badges)
     # ========================================================================
@@ -236,6 +239,16 @@ def build_dilchat_response(
     # Extract trading guardrails for trading-specific badges
     trading_guardrails = unified_output.get("trading_guardrails", {})
 
+    # Extract persona echo profile for APEL hints (Phase 31)
+    persona_echo_profile = unified_output.get("persona_echo_profile", {})
+
+    # Extract persona resonance map (Phase 30)
+    persona_resonance_map = unified_output.get("persona_resonance_map", {})
+
+    # Add persona echo profile to combined flags for hint generation
+    if persona_echo_profile:
+        combined_flags["persona_echo_profile"] = persona_echo_profile
+
     badges = _build_badges(
         stability_status=stability_status,
         policy_flags=combined_flags,
@@ -246,6 +259,7 @@ def build_dilchat_response(
         identity_signature=identity_signature,
         motivation_profile=motivation_profile,
         trading_guardrails=trading_guardrails,
+        persona_resonance_map=persona_resonance_map,
         coherence=coherence,
         domain=response_domain,
     )
@@ -336,6 +350,7 @@ def _build_badges(
     identity_signature: Optional[Dict[str, Any]] = None,
     motivation_profile: Optional[Dict[str, Any]] = None,
     trading_guardrails: Optional[Dict[str, Any]] = None,
+    persona_resonance_map: Optional[Dict[str, Any]] = None,
     coherence: Optional[Dict[str, Any]] = None,
     domain: Optional[str] = None,
 ) -> List[DILchatBadge]:
@@ -736,8 +751,7 @@ def _build_badges(
     # ========================================================================
     # Phase 30: Cross-Layer Resonance Persona Mapping Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
     # ========================================================================
-    # Extract persona_resonance_map from unified_output
-    persona_resonance_map = unified_output.get("persona_resonance_map")
+    # persona_resonance_map is now passed as a parameter
 
     # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
     if therapy_or_identity_domain and smart_or_deep_mode and persona_resonance_map is not None:
@@ -1526,6 +1540,67 @@ def _build_hints(
                     code="SYMBOLIC_HARMONY_LOW",
                     message="Symbolic harmonization is low. Meaning layers show misalignment. Use concrete grounding to stabilize symbolic coherence."
                 ))
+
+    # ========================================================================
+    # Phase 31: Adaptive Persona Echo Layer (APEL) Hints (diagnostic only)
+    # ========================================================================
+    # Only add APEL hints for therapy/identity domains and SMART_INSIGHT/DEEP_ADAPTIVE modes
+    apel_eligible_domain = domain in ["therapy", "identity"]
+    apel_eligible_mode = interaction_mode in ["SMART_INSIGHT", "DEEP_ADAPTIVE"]
+
+    if apel_eligible_domain and apel_eligible_mode:
+        # Extract persona_echo_profile from policy_flags (if available)
+        # Note: In practice, this would come from unified_output passed to build_dilchat_response
+        # For now, we'll extract from policy_flags if it's been added there
+        persona_echo_profile = policy_flags.get("persona_echo_profile")
+
+        if persona_echo_profile:
+            echo_enabled = persona_echo_profile.get("echo_enabled", False)
+            echo_mode = persona_echo_profile.get("echo_mode", "none")
+            echo_focus_tags = persona_echo_profile.get("echo_focus_tags", [])
+            echo_risk_tags = persona_echo_profile.get("echo_risk_tags", [])
+
+            # APEL_ECHO_DISABLED: Echo is disabled
+            if not echo_enabled:
+                hints.append(DILchatHint(
+                    code="APEL_ECHO_DISABLED",
+                    message="Adaptive persona echo layer is disabled. No echo segment will be added."
+                ))
+            else:
+                # APEL_LIGHT_ACTIVE: Echo mode is "light"
+                if echo_mode == "light":
+                    hints.append(DILchatHint(
+                        code="APEL_LIGHT_ACTIVE",
+                        message="Adaptive persona echo layer active in light mode. Brief, stability-focused echo enabled."
+                    ))
+
+                # APEL_REFLECTIVE_ACTIVE: Echo mode is "reflective"
+                elif echo_mode == "reflective":
+                    hints.append(DILchatHint(
+                        code="APEL_REFLECTIVE_ACTIVE",
+                        message="Adaptive persona echo layer active in reflective mode. Identity-focused, deeper echo enabled."
+                    ))
+
+                # APEL_PATTERN_ACTIVE: Echo mode is "pattern"
+                elif echo_mode == "pattern":
+                    hints.append(DILchatHint(
+                        code="APEL_PATTERN_ACTIVE",
+                        message="Adaptive persona echo layer active in pattern mode. Arc-aware, moderate-drift echo enabled."
+                    ))
+
+                # APEL_DRIFT_SENSITIVE: Echo enabled and "drift_caution" in risk tags
+                if "drift_caution" in echo_risk_tags:
+                    hints.append(DILchatHint(
+                        code="APEL_DRIFT_SENSITIVE",
+                        message="Echo layer is drift-sensitive. High drift risk detected, echo strength dampened."
+                    ))
+
+                # APEL_STABILITY_ANCHORED: Echo enabled and "stability" in focus tags
+                if "stability" in echo_focus_tags:
+                    hints.append(DILchatHint(
+                        code="APEL_STABILITY_ANCHORED",
+                        message="Echo layer is stability-anchored. Echo focuses on grounding and coherence."
+                    ))
 
     return hints
 
