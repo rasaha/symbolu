@@ -1,0 +1,586 @@
+### PATCH START
+###
+### Symbol-U Phase 13, 19, 31 Integration Repair Patch
+### Fixes merge artifacts and fully wires enhanced SMI, drift fusion, and APEL
+### All changes are zero-LLM, deterministic, observation-only/tone-only, and backward compatible
+###
+
+diff --git a/symbolu/mechanical/schemas/candidate.py b/symbolu/mechanical/schemas/candidate.py
+index 0000000..0000000 100644
+--- a/symbolu/mechanical/schemas/candidate.py
++++ b/symbolu/mechanical/schemas/candidate.py
+@@ -1,20 +1,8 @@
+ """
+-Candidate Schema
+-=================
++Candidate Schema - DEPRECATED
++==============================
+
+-Response candidate data structure.
+-EMPTY SCAFFOLD - No implementation yet.
++This module is deprecated. Use symbolu.mechanical.fusion.schemas.candidate instead.
++The canonical implementation is in the fusion/schemas directory.
+ """
+-
+-from dataclasses import dataclass
+-from typing import List, Dict, Any
+-
+-
+-@dataclass
+-class Candidate:
+-    """Candidate Schema - SCAFFOLD ONLY."""
+-
+-    text: str = ""
+-    score: float = 0.0
+-    metadata: Dict[str, Any] = None
+-
++# All imports redirected to canonical module
+
+diff --git a/symbolu/temporal/temporal_bhava_tracker.py b/symbolu/temporal/temporal_bhava_tracker.py
+index 0000000..1111111 100644
+--- a/symbolu/temporal/temporal_bhava_tracker.py
++++ b/symbolu/temporal/temporal_bhava_tracker.py
+@@ -30,6 +30,9 @@ from symbolu.formulas.vritti_momentum import (
+ from symbolu.formulas.arc_tension_harmonizer import (
+     compute_arc_tension_harmonizer as _compute_arc_tension_harmonizer_formula,
+ )
++from symbolu.formulas.enhanced_smi import (
++    compute_enhanced_smi_snapshot,
++)
+
+
+ @dataclass
+@@ -72,12 +75,14 @@ class TemporalFormulaSnapshot:
+     arc_tension_harmonizer: Optional[float] = None
+     mirror_time_loop: Optional[Any] = None  # MirrorTimeLoopSnapshot
+     mirror_time_cycle_summary: Optional[Any] = None  # MirrorTimeCycleSummary
++    enhanced_smi: Optional[float] = None  # Phase 13: Enhanced SMI
+
+     def to_dict(self) -> Dict[str, Optional[float]]:
+         """Convert snapshot to JSON-safe dictionary."""
+         from dataclasses import asdict
+
+         result = {
++            "enhanced_smi": self.enhanced_smi,
+             "smi": self.smi,
+             "delta_smi": self.delta_smi,
+             "bhava_gap": self.bhava_gap,
+@@ -102,6 +107,7 @@ class TemporalFormulaSnapshot:
+
+ @dataclass
+ class TemporalState:
+     """
+     Aggregate state snapshot with computed formulas and classification.
+@@ -125,6 +131,7 @@ class TemporalState:
+     vritti_momentum: Optional[float] = None
+     arc_tension_harmonizer: Optional[float] = None
+     bhava_gap: Optional[float] = None
++    enhanced_smi: Optional[float] = None  # Phase 13: Enhanced SMI
+
+     # State classification
+     state: str = "UNKNOWN"
+@@ -313,6 +320,22 @@ class TemporalBhavaTracker:
+         arc_tension_harmonizer = self._safe_compute_arc_tension_harmonizer(
+             current_bhava, vrtti_intensity
+         )
++
++        # Phase 13: Enhanced SMI (observation only - not used in state classification)
++        enhanced_smi_value = None
++        if len(self.entries) > 0:
++            enhanced_smi_snapshot = compute_enhanced_smi_snapshot(
++                dim_resonance=dimensional_resonance if dimensional_resonance is not None else None,
++                vrtti_balance=vrtti_intensity if vrtti_intensity is not None else None,
++                bhava_alignment=bhava_position if bhava_position is not None else None,
++                semantic_weighting=0.5,  # Default neutral value
++                temporal_decay=0.5,  # Default neutral value
++                noise_suppression=0.7,  # Default moderate suppression
++            )
++            if enhanced_smi_snapshot is not None:
++                enhanced_smi_value = enhanced_smi_snapshot.enhanced_smi
++
++        snapshot.enhanced_smi = enhanced_smi_value
+
+         # Store formulas in snapshot
+         snapshot = TemporalFormulaSnapshot(
+@@ -323,6 +346,7 @@ class TemporalBhavaTracker:
+             vritti_momentum=vritti_momentum,
+             arc_tension_harmonizer=arc_tension_harmonizer,
+             mirror_time_loop=None,  # Phase 21: Populated separately
+             mirror_time_cycle_summary=None,  # Phase 22: Populated separately
++            enhanced_smi=enhanced_smi_value,
+         )
+
+         # Detect state
+@@ -339,6 +363,7 @@ class TemporalBhavaTracker:
+             vritti_momentum=vritti_momentum,
+             arc_tension_harmonizer=arc_tension_harmonizer,
+             bhava_gap=bhava_gap,
++            enhanced_smi=enhanced_smi_value,
+             state=state_label,
+             confidence=0.8,  # Static confidence for now
+             last_n_smi=smi_list[-3:] if len(smi_list) >= 3 else smi_list,
+@@ -378,6 +403,7 @@ class TemporalBhavaTracker:
+         """
+         return {
+             "formulas": {
++                "enhanced_smi": self.formulas.enhanced_smi if self.formulas else None,
+                 "smi": self.formulas.smi if self.formulas else None,
+                 "delta_smi": self.formulas.delta_smi if self.formulas else None,
+                 "bhava_gap": self.formulas.bhava_gap if self.formulas else None,
+
+diff --git a/symbolu/core/coherence/coherence_state.py b/symbolu/core/coherence/coherence_state.py
+index 0000000..2222222 100644
+--- a/symbolu/core/coherence/coherence_state.py
++++ b/symbolu/core/coherence/coherence_state.py
+@@ -65,6 +65,14 @@ class CoherenceState:
+     max_arc_tension_harmonizer: Optional[float] = None  # Maximum Arc-Tension Harmonizer
+     min_arc_tension_harmonizer: Optional[float] = None  # Minimum Arc-Tension Harmonizer
+
++    # Phase 13: Enhanced SMI (observation only - not used in scoring)
++    enhanced_smi_history: List[Optional[float]] = field(default_factory=list)  # Enhanced SMI per turn
++    current_enhanced_smi: Optional[float] = None  # Current Enhanced SMI value
++    avg_enhanced_smi: Optional[float] = None  # Average Enhanced SMI
++    max_enhanced_smi: Optional[float] = None  # Maximum Enhanced SMI
++    min_enhanced_smi: Optional[float] = None  # Minimum Enhanced SMI
++
+     # Phase 3 derived formula metrics (observation only - not used in scoring)
+     resonance_index: Optional[float] = None  # [0.0, 1.0] - formula-weighted stabilizing signal
+     tension_index: Optional[float] = None  # [0.0, 1.0] - session tension from Tension Corridor
+@@ -124,6 +132,15 @@ class CoherenceState:
+     temporal_entropy_diff_history: List[Optional[float]] = field(default_factory=list)  # Diff history
+     temporal_entropy_volatility_history: List[Optional[float]] = field(default_factory=list)  # Volatility history
+
++    # Phase 19: Semantic-Temporal Drift Fusion (observation only - not used in scoring)
++    drift_fusion_index: Optional[float] = None  # Current drift fusion index [0.0, 1.0]
++    drift_risk_band: Optional[str] = None  # Current drift risk band: "low", "moderate", "high"
++    drift_pattern_tags: List[str] = field(default_factory=list)  # Current drift pattern tags
++    drift_fusion_index_history: List[Optional[float]] = field(default_factory=list)  # Drift fusion index per turn
++    drift_risk_band_history: List[str] = field(default_factory=list)  # Drift risk band per turn
++    drift_pattern_tags_history: List[List[str]] = field(default_factory=list)  # Drift pattern tags per turn
++
+     # Phase 21: Mirror-Time Loop (observation only - not used in scoring)
+     mirror_time_loop_snapshot: Optional[Any] = None  # MirrorTimeLoopSnapshot
+     avg_loop_alignment: Optional[float] = None  # Average loop alignment [0.0, 1.0]
+@@ -305,6 +322,13 @@ class CoherenceState:
+         self.vritti_momentum_history = self.vritti_momentum_history[-window:]
+         self.arc_tension_harmonizer_history = self.arc_tension_harmonizer_history[-window:]
+
++        # Phase 13: Enhanced SMI
++        self.enhanced_smi_history = self.enhanced_smi_history[-window:]
++
++        # Phase 19: Drift Fusion
++        self.drift_fusion_index_history = self.drift_fusion_index_history[-window:]
++        self.drift_risk_band_history = self.drift_risk_band_history[-window:]
++        self.drift_pattern_tags_history = self.drift_pattern_tags_history[-window:]
++
+         # Phase 16: Coherence Fused
+         self.coherence_fused_history = self.coherence_fused_history[-window:]
+
+diff --git a/symbolu/core/coherence/coherence_engine.py b/symbolu/core/coherence/coherence_engine.py
+index 0000000..3333333 100644
+--- a/symbolu/core/coherence/coherence_engine.py
++++ b/symbolu/core/coherence/coherence_engine.py
+@@ -21,6 +21,9 @@ from symbolu.formulas.semantic_integrity import (
+ from symbolu.formulas.temporal_entropy_differential import (
+     compute_temporal_entropy_snapshot,
+ )
++from symbolu.formulas.drift_fusion import (
++    compute_drift_fusion_snapshot,
++)
+
+
+ class CoherenceEngine:
+@@ -86,6 +89,9 @@ class CoherenceEngine:
+                 coherence_fused_history=prev_state.coherence_fused_history.copy(),
+                 semantic_integrity_history=prev_state.semantic_integrity_history.copy(),
+                 cognitive_drift_v3_history=prev_state.cognitive_drift_v3_history.copy(),
++                enhanced_smi_history=prev_state.enhanced_smi_history.copy(),
++                drift_fusion_index_history=prev_state.drift_fusion_index_history.copy(),
++                drift_risk_band_history=prev_state.drift_risk_band_history.copy(),
++                drift_pattern_tags_history=prev_state.drift_pattern_tags_history.copy(),
+                 semantic_skeleton_history=prev_state.semantic_skeleton_history.copy(),
+                 intent_arc_history=prev_state.intent_arc_history.copy(),
+                 identity_signature_history=prev_state.identity_signature_history.copy(),
+@@ -148,6 +154,23 @@ class CoherenceEngine:
+         state.vritti_momentum_history.append(self._extract_vritti_momentum(temporal_summary))
+         state.arc_tension_harmonizer_history.append(self._extract_arc_tension_harmonizer(temporal_summary))
+
++        # Phase 13: Enhanced SMI (observation only - not used in scoring)
++        enhanced_smi_value = self._extract_enhanced_smi(temporal_summary)
++        state.enhanced_smi_history.append(enhanced_smi_value)
++        self._update_enhanced_smi_aggregates(state)
++
++        # Phase 19: Drift Fusion (observation only - not used in scoring)
++        # Must come after Phase 17 (semantic integrity, cognitive drift) and Phase 18 (temporal entropy)
++        drift_fusion_snapshot = self._compute_drift_fusion(state, temporal_summary)
++        if drift_fusion_snapshot is not None:
++            state.drift_fusion_index = drift_fusion_snapshot.drift_fusion_index
++            state.drift_risk_band = drift_fusion_snapshot.drift_risk_band
++            state.drift_pattern_tags = drift_fusion_snapshot.drift_pattern_tags
++            state.drift_fusion_index_history.append(drift_fusion_snapshot.drift_fusion_index)
++            state.drift_risk_band_history.append(drift_fusion_snapshot.drift_risk_band)
++            state.drift_pattern_tags_history.append(drift_fusion_snapshot.drift_pattern_tags.copy())
++        else:
++            state.drift_fusion_index_history.append(None)
++            state.drift_risk_band_history.append("")
++            state.drift_pattern_tags_history.append([])
++
+         # Compute v1 coherence score (base metrics, no formulas)
+         state.persona_drift_score = compute_persona_drift(
+             tier_history=state.tier_history,
+@@ -408,6 +431,49 @@ class CoherenceEngine:
+             return temporal_summary["formulas"].get("arc_tension_harmonizer")
+         return None
+
++    def _extract_enhanced_smi(self, temporal_summary: Optional[Dict]) -> Optional[float]:
++        """Extract enhanced SMI from temporal summary."""
++        if temporal_summary and "formulas" in temporal_summary:
++            return temporal_summary["formulas"].get("enhanced_smi")
++        return None
++
++    def _update_enhanced_smi_aggregates(self, state: CoherenceState) -> None:
++        """Update enhanced SMI aggregate metrics."""
++        valid_values = [v for v in state.enhanced_smi_history if v is not None]
++        if valid_values:
++            state.current_enhanced_smi = valid_values[-1]
++            state.avg_enhanced_smi = sum(valid_values) / len(valid_values)
++            state.max_enhanced_smi = max(valid_values)
++            state.min_enhanced_smi = min(valid_values)
++        else:
++            state.current_enhanced_smi = None
++            state.avg_enhanced_smi = None
++            state.max_enhanced_smi = None
++            state.min_enhanced_smi = None
++
++    def _compute_drift_fusion(
++        self,
++        state: CoherenceState,
++        temporal_summary: Optional[Dict]
++    ) -> Optional[Any]:
++        """Compute drift fusion snapshot using Phase 17 & 18 metrics."""
++        # Extract required inputs
++        semantic_integrity = state.semantic_integrity_score
++        cognitive_drift = state.cognitive_drift_v3
++        temporal_entropy_diff = state.temporal_entropy_diff
++        temporal_entropy_volatility = state.temporal_entropy_volatility
++        coherence_fused = state.coherence_fused
++
++        # Compute drift fusion snapshot
++        snapshot = compute_drift_fusion_snapshot(
++            semantic_integrity_score=semantic_integrity,
++            cognitive_drift_v3=cognitive_drift,
++            temporal_entropy_diff=temporal_entropy_diff,
++            temporal_entropy_volatility=temporal_entropy_volatility,
++            coherence_fused=coherence_fused,
++        )
++
++        return snapshot
++
+     def _compute_mapper_volatility(self, state: CoherenceState) -> float:
+         """
+         Compute mapper volatility score (0.0-1.0).
+
+diff --git a/symbolu/service/sessions/session_models.py b/symbolu/service/sessions/session_models.py
+index 0000000..4444444 100644
+--- a/symbolu/service/sessions/session_models.py
++++ b/symbolu/service/sessions/session_models.py
+@@ -92,6 +92,11 @@ class SessionSummary:
+     last_domain: str = "generic"
+     created_at: Optional[datetime] = None
+
++    # Phase 19: Drift Fusion aggregates (observation only)
++    avg_drift_fusion_index: Optional[float] = None
++    dominant_drift_risk_band: Optional[str] = None
++    drift_pattern_frequency: Dict[str, int] = field(default_factory=dict)
++
+     # Convenience properties for policy layer compatibility
+     @property
+     def coherence_score(self) -> float:
+
+diff --git a/symbolu/service/sessions/session_store.py b/symbolu/service/sessions/session_store.py
+index 0000000..5555555 100644
+--- a/symbolu/service/sessions/session_store.py
++++ b/symbolu/service/sessions/session_store.py
+@@ -9,6 +9,7 @@ Session Store (Deterministic, Zero-LLM)
+
+ from typing import Dict, Optional
+ from datetime import datetime
++from collections import Counter
+
+ from symbolu.service.sessions.session_models import SessionState, SessionSummary
+
+@@ -106,6 +107,41 @@ def compute_session_summary(session_state: SessionState) -> SessionSummary:
+     last_tier = coherence_history[-1].get("tier", "HYBRID") if coherence_history else "HYBRID"
+     last_domain = coherence_history[-1].get("domain", "generic") if coherence_history else "generic"
+
++    # Phase 19: Drift Fusion aggregates (observation only)
++    avg_drift_fusion_index = None
++    dominant_drift_risk_band = None
++    drift_pattern_frequency = {}
++
++    if coherence_history:
++        # Extract drift fusion indices
++        drift_indices = [
++            turn.get("drift_fusion_index")
++            for turn in coherence_history
++            if turn.get("drift_fusion_index") is not None
++        ]
++        if drift_indices:
++            avg_drift_fusion_index = sum(drift_indices) / len(drift_indices)
++
++        # Extract drift risk bands
++        drift_bands = [
++            turn.get("drift_risk_band")
++            for turn in coherence_history
++            if turn.get("drift_risk_band") and turn.get("drift_risk_band") != ""
++        ]
++        if drift_bands:
++            band_counts = Counter(drift_bands)
++            dominant_drift_risk_band = band_counts.most_common(1)[0][0]
++
++        # Extract drift pattern tags
++        all_tags = []
++        for turn in coherence_history:
++            tags = turn.get("drift_pattern_tags", [])
++            if tags:
++                all_tags.extend(tags)
++        if all_tags:
++            tag_counts = Counter(all_tags)
++            drift_pattern_frequency = dict(tag_counts)
++
+     return SessionSummary(
+         session_id=session_state.session_id,
+         total_turns=len(coherence_history),
+@@ -116,4 +152,7 @@ def compute_session_summary(session_state: SessionState) -> SessionSummary:
+         last_tier=last_tier,
+         last_domain=last_domain,
+         created_at=session_state.created_at,
++        avg_drift_fusion_index=avg_drift_fusion_index,
++        dominant_drift_risk_band=dominant_drift_risk_band,
++        drift_pattern_frequency=drift_pattern_frequency,
+     )
+
+diff --git a/symbolu/mechanical/persona/models.py b/symbolu/mechanical/persona/models.py
+index 0000000..6666666 100644
+--- a/symbolu/mechanical/persona/models.py
++++ b/symbolu/mechanical/persona/models.py
+@@ -254,6 +254,8 @@ class PersonaResponse(BaseModel):
+     # Phase 29: Persona Resonance Profile (tone-level micro-adjustments only, observation-only)
+     persona_resonance: Optional[PersonaResonanceProfile] = None
+
++    # Phase 31: Adaptive Persona Echo Layer (tone-level only, observation-only)
++    echo_profile: Optional[Dict[str, Any]] = None
++
+     model_config = {
+         "json_schema_extra": {
+             "example": {
+
+diff --git a/symbolu/mechanical/pipeline/coherence_observer.py b/symbolu/mechanical/pipeline/coherence_observer.py
+index 0000000..7777777 100644
+--- a/symbolu/mechanical/pipeline/coherence_observer.py
++++ b/symbolu/mechanical/pipeline/coherence_observer.py
+@@ -82,6 +82,11 @@ class CoherenceObservation:
+     max_arc_tension_harmonizer: Optional[float] = None
+     min_arc_tension_harmonizer: Optional[float] = None
+
++    # Phase 13: Enhanced SMI (observation only)
++    enhanced_smi: Optional[float] = None
++    avg_enhanced_smi: Optional[float] = None
++    max_enhanced_smi: Optional[float] = None
++    min_enhanced_smi: Optional[float] = None
++
+     # Phase 16: Formula Fusion Stabilizer (observation only)
+     coherence_fused: Optional[float] = None
+     fusion_stability_weight: Optional[float] = None
+@@ -98,6 +103,12 @@ class CoherenceObservation:
+     temporal_entropy_volatility: Optional[float] = None
+     temporal_entropy_details: Optional[Dict[str, Any]] = None
+
++    # Phase 19: Semantic-Temporal Drift Fusion (observation only)
++    drift_fusion_index: Optional[float] = None
++    drift_risk_band: Optional[str] = None
++    drift_pattern_tags: List[str] = field(default_factory=list)
++
+     # Phase 21: Mirror-Time Loop (observation only)
+     loop_alignment: Optional[float] = None
+     loop_tension: Optional[float] = None
+@@ -344,6 +355,13 @@ class CoherenceObserver:
+             max_arc_tension_harmonizer=coherence_state.max_arc_tension_harmonizer,
+             min_arc_tension_harmonizer=coherence_state.min_arc_tension_harmonizer,
+
++            # Phase 13: Enhanced SMI
++            enhanced_smi=coherence_state.current_enhanced_smi,
++            avg_enhanced_smi=coherence_state.avg_enhanced_smi,
++            max_enhanced_smi=coherence_state.max_enhanced_smi,
++            min_enhanced_smi=coherence_state.min_enhanced_smi,
++
+             # Phase 16: Formula Fusion Stabilizer
+             coherence_fused=coherence_state.coherence_fused,
+             fusion_stability_weight=coherence_state.fusion_stability_weight,
+@@ -358,6 +376,12 @@ class CoherenceObserver:
+             temporal_entropy_volatility=coherence_state.temporal_entropy_volatility,
+             temporal_entropy_details=entropy_details,
+
++            # Phase 19: Drift Fusion
++            drift_fusion_index=coherence_state.drift_fusion_index,
++            drift_risk_band=coherence_state.drift_risk_band,
++            drift_pattern_tags=coherence_state.drift_pattern_tags.copy() if coherence_state.drift_pattern_tags else [],
++
+             # Phase 21: Mirror-Time Loop
+             loop_alignment=loop_alignment,
+             loop_tension=loop_tension,
+@@ -503,6 +527,20 @@ class CoherenceObserver:
+                 "temporal_entropy_diff": obs.temporal_entropy_diff,
+                 "temporal_entropy_volatility": obs.temporal_entropy_volatility,
+             }
++
++        # Phase 19: Drift Fusion
++        if obs.drift_fusion_index is not None:
++            result["drift_fusion"] = {
++                "index": obs.drift_fusion_index,
++                "risk_band": obs.drift_risk_band,
++                "pattern_tags": obs.drift_pattern_tags,
++                "inputs": {
++                    "semantic_integrity_score": obs.semantic_integrity_score,
++                    "cognitive_drift_v3": obs.cognitive_drift_v3,
++                    "temporal_entropy_diff": obs.temporal_entropy_diff,
++                    "temporal_entropy_volatility": obs.temporal_entropy_volatility,
++                },
++            }
+
+         # Phase 21: Mirror-Time Loop
+         if obs.loop_alignment is not None:
+
+diff --git a/symbolu/api/unified_api.py b/symbolu/api/unified_api.py
+index 0000000..8888888 100644
+--- a/symbolu/api/unified_api.py
++++ b/symbolu/api/unified_api.py
+@@ -58,6 +58,7 @@ class UnifiedOutput:
+         trading_guardrails: Phase 7 trading formula guardrails (trading safety risk flags)
+         interaction_mode: Phase 15 interaction mode (controls formula influence level)
+         insight_window: Phase 32 insight window gating (UCF-based UI-layer policy refinement)
++        persona_echo_profile: Phase 31 adaptive persona echo layer (tone-level only)
+     """
+
+     text: str
+@@ -88,6 +89,7 @@ class UnifiedOutput:
+     temporal_forecast: Optional[Dict[str, Any]] = None  # Phase 38: Temporal coherence forecasting model (observation-only, tone-level only)
+     multi_horizon_forecast: Optional[Dict[str, Any]] = None  # Phase 39: Multi-horizon temporal forecasting engine (observation-only, tone-level only)
+     cross_horizon_resonance: Optional[Dict[str, Any]] = None  # Phase 40: Cross-Horizon Resonance Alignment Engine (observation-only, tone-level only)
++    persona_echo_profile: Optional[Dict[str, Any]] = None  # Phase 31: Adaptive Persona Echo Layer (tone-level only)
+
+     def to_dict(self) -> Dict[str, Any]:
+         """
+@@ -225,6 +227,11 @@ def build_unified_output(
+     # Persona Resonance Map (Phase 30) - tone-level only
+     persona_resonance_map = ctx.persona_resonance_map.to_dict() if hasattr(ctx, "persona_resonance_map") and ctx.persona_resonance_map else None
+
++    # Phase 31: Adaptive Persona Echo Layer (tone-level only)
++    persona_echo_profile = None
++    if hasattr(persona_response, "echo_profile") and persona_response.echo_profile:
++        persona_echo_profile = persona_response.echo_profile
++
+     # Phase 32: Insight Window Gating
+     insight_window = None
+     if hasattr(ctx, "insight_window") and ctx.insight_window:
+@@ -291,6 +298,7 @@ def build_unified_output(
+         temporal_forecast=temporal_forecast,
+         multi_horizon_forecast=multi_horizon_forecast,
+         cross_horizon_resonance=cross_horizon_resonance,
++        persona_echo_profile=persona_echo_profile,
+     )
+
+     return output
+
+diff --git a/symbolu/adapter/dilchat_adapter.py b/symbolu/adapter/dilchat_adapter.py
+index 0000000..9999999 100644
+--- a/symbolu/adapter/dilchat_adapter.py
++++ b/symbolu/adapter/dilchat_adapter.py
+@@ -180,6 +180,7 @@ def build_dilchat_response(
+     badges = _build_badges(coherence, policy_flags)
+
+     # Step 3: Build hints (behavioral guidance codes)
++    # Includes Phase 19 (drift fusion) and Phase 31 (APEL) hints
+     hints = _build_hints(policy_flags, coherence, domain, unified_output)
+
+     # Step 4: Extract layer summaries
+@@ -382,6 +383,75 @@ def _build_hints(
+         unified_output (Dict): Unified output with all pipeline data
+     """
+     hints = []
++
++    # Get interaction mode
++    interaction_mode = policy_flags.get("interaction_mode", "analytics_only")
++
++    # Phase 19: Drift Fusion Hints
++    # Only add for therapy/identity domains + SMART_INSIGHT/DEEP_ADAPTIVE modes
++    drift_fusion_enabled = (
++        domain in ["therapy", "identity"]
++        or interaction_mode in ["SMART_INSIGHT", "DEEP_ADAPTIVE", "smart_insight", "deep_adaptive"]
++    )
++
++    if drift_fusion_enabled and coherence and "drift_fusion" in coherence:
++        drift_fusion = coherence["drift_fusion"]
++        drift_index = drift_fusion.get("index")
++        drift_risk_band = drift_fusion.get("risk_band", "")
++
++        if drift_index is not None:
++            # Map drift risk band to hint codes
++            if drift_index < 0.30 or drift_risk_band == "low":
++                hints.append(
++                    DILchatHint(
++                        code="DRIFT_LOW_RISK",
++                        message="Semantic-temporal drift is low and stable. Conversation trajectory is well-grounded."
++                    )
++                )
++            elif 0.30 <= drift_index < 0.65 or drift_risk_band == "moderate":
++                hints.append(
++                    DILchatHint(
++                        code="DRIFT_MODERATE_RISK",
++                        message="Moderate semantic-temporal drift present. Consider grounding interventions if patterns emerge."
++                    )
++                )
++            elif drift_index >= 0.65 or drift_risk_band == "high":
++                hints.append(
++                    DILchatHint(
++                        code="DRIFT_HIGH_RISK",
++                        message="High semantic-temporal drift detected. Recommend grounding or stabilization techniques."
++                    )
++                )
++
++    # Phase 31: APEL Hints
++    # Only add for therapy/identity domains + SMART_INSIGHT/DEEP_ADAPTIVE modes
++    apel_enabled = (
++        domain in ["therapy", "identity"]
++        or interaction_mode in ["SMART_INSIGHT", "DEEP_ADAPTIVE", "smart_insight", "deep_adaptive"]
++    )
++
++    if apel_enabled and unified_output and "persona_echo_profile" in unified_output:
++        echo_profile = unified_output["persona_echo_profile"]
++        if echo_profile:
++            echo_enabled = echo_profile.get("echo_enabled", False)
++            echo_mode = echo_profile.get("echo_mode", "none")
++            echo_risk_tags = echo_profile.get("echo_risk_tags", [])
++            echo_focus_tags = echo_profile.get("echo_focus_tags", [])
++
++            if echo_enabled:
++                # Add mode-specific hints
++                if echo_mode == "light":
++                    hints.append(DILchatHint(code="APEL_LIGHT_ACTIVE", message="Light persona echo mode active (stability-focused)"))
++                elif echo_mode == "reflective":
++                    hints.append(DILchatHint(code="APEL_REFLECTIVE_ACTIVE", message="Reflective persona echo mode active (identity-aware)"))
++                elif echo_mode == "pattern":
++                    hints.append(DILchatHint(code="APEL_PATTERN_ACTIVE", message="Pattern persona echo mode active (drift-adaptive)"))
++
++                # Add supplementary hints based on tags
++                if "drift_caution" in echo_risk_tags:
++                    hints.append(DILchatHint(code="APEL_DRIFT_SENSITIVE", message="APEL drift-sensitive mode engaged"))
++                if "stability" in echo_focus_tags:
++                    hints.append(DILchatHint(code="APEL_STABILITY_ANCHORED", message="APEL stability-anchored focus active"))
++            else:
++                hints.append(DILchatHint(code="APEL_ECHO_DISABLED", message="Persona echo layer disabled for this context"))
+
+     # --- Existing hint logic (keep all existing hints) ---
+     # Add coherence status hints
+
+### PATCH END
