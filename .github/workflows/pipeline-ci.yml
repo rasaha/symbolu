@@ -322,6 +322,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee phase16-fusion-stabilizer-pytest.log
 
+      - name: Run Phase 17 Semantic Integrity & Cognitive Drift Tests
+        run: |
+          pytest symbolu/core/formula_drift_tests/test_phase17_semantic_integrity_and_drift.py \
+            --disable-warnings -q \
+            2>&1 | tee phase17-semantic-integrity-drift-pytest.log
+
       - name: Run Motivation Drift Tests
         run: |
           pytest symbolu/core/motivation_drift_tests \
@@ -401,6 +407,7 @@ jobs:
             phase15-interaction-modes-pytest.log
             phase15b-preferences-pytest.log
             phase16-fusion-stabilizer-pytest.log
+            phase17-semantic-integrity-drift-pytest.log
             motivation-drift-pytest.log
 
       - name: Upload snapshot diffs
