@@ -1712,10 +1712,11 @@ def _build_hints(
     # ========================================================================
     # Phase 31: Adaptive Persona Echo Layer (APEL) Hints (diagnostic only)
     # ========================================================================
-    # Gating: therapy/identity domain OR smart_insight/deep_adaptive mode
+    # Gating: (therapy/identity domain) AND (smart_insight/deep_adaptive mode)
+    interaction_mode_lower = interaction_mode.lower() if interaction_mode else ""
     apel_enabled = (
         domain in ["therapy", "identity"]
-        or interaction_mode in ["smart_insight", "deep_adaptive"]
+        and interaction_mode_lower in ["smart_insight", "deep_adaptive"]
     )
 
     if apel_enabled and persona_echo_profile:
