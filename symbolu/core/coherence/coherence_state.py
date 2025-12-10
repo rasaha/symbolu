@@ -93,6 +93,13 @@ class CoherenceState:
     kosha_resonance_index: Optional[float] = None  # [0.0, 1.0] - Kosha coherence measure
     kosha_activation_vector: Optional[List[float]] = None  # Ordered kosha activation values
 
+    # Phase 16: Formula Fusion Stabilizer (observation only - not used in scoring)
+    coherence_fused: Optional[float] = None  # [0.0, 1.0] - fused coherence score (stability-weighted blend)
+    coherence_fused_history: List[Optional[float]] = field(default_factory=list)  # Fused coherence history
+    fusion_stability_weight: Optional[float] = None  # [0.0, 1.0] - stability weight from variance
+    fusion_inertia_factor: Optional[float] = None  # [0.5, 1.0] - temporal inertia factor
+    fusion_quality_factor: Optional[float] = None  # [0.0, 1.0] - quality gating factor
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -120,6 +127,9 @@ class CoherenceState:
         # Phase 14 formula histories
         self.vritti_momentum_history = self.vritti_momentum_history[-window:]
         self.arc_tension_harmonizer_history = self.arc_tension_harmonizer_history[-window:]
+
+        # Phase 16 formula histories
+        self.coherence_fused_history = self.coherence_fused_history[-window:]
 
     def get_history_length(self) -> int:
         """

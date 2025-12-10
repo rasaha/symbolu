@@ -242,6 +242,26 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         if coherence_v3_quality is not None:
             coherence_report['coherence_v3_quality'] = coherence_v3_quality
 
+        # Phase 16: Add Formula Fusion Stabilizer metrics
+        coherence_fused = getattr(coherence_state, 'coherence_fused', None)
+        fusion_stability_weight = getattr(coherence_state, 'fusion_stability_weight', None)
+        fusion_inertia_factor = getattr(coherence_state, 'fusion_inertia_factor', None)
+        fusion_quality_factor = getattr(coherence_state, 'fusion_quality_factor', None)
+
+        if coherence_fused is not None:
+            coherence_report['coherence_fused'] = coherence_fused
+
+        # Add stabilizer diagnostics if any exist
+        if fusion_stability_weight is not None or fusion_inertia_factor is not None or fusion_quality_factor is not None:
+            stabilizer_diagnostics = {}
+            if fusion_stability_weight is not None:
+                stabilizer_diagnostics['stability_weight'] = fusion_stability_weight
+            if fusion_inertia_factor is not None:
+                stabilizer_diagnostics['inertia_factor'] = fusion_inertia_factor
+            if fusion_quality_factor is not None:
+                stabilizer_diagnostics['quality_factor'] = fusion_quality_factor
+            coherence_report['stabilizer'] = stabilizer_diagnostics
+
     # Build metadata
     metadata = {
         'timestamp': datetime.utcnow().isoformat() + 'Z',

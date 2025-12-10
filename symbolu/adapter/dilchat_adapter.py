@@ -111,6 +111,9 @@ class DILchatResponse:
     # Phase 2: Temporal formulas (diagnostics only - not used for badges/hints)
     formulas: Optional[Dict[str, Optional[float]]] = None
 
+    # Phase 16: Formula Fusion Stabilizer (diagnostics only - not used for badges/hints)
+    stabilizer: Optional[Dict[str, Optional[float]]] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert to JSON-serializable dictionary.
@@ -256,6 +259,12 @@ def build_dilchat_response(
     formulas_data = unified_output.get("formulas")
 
     # ========================================================================
+    # STEP 7b: Extract Phase 16 Formula Fusion Stabilizer (diagnostics only)
+    # ========================================================================
+    # Stabilizer data can come from coherence block or top-level formulas
+    stabilizer_data = coherence.get("stabilizer") or unified_output.get("stabilizer")
+
+    # ========================================================================
     # STEP 8: Assemble DILchatResponse
     # ========================================================================
     return DILchatResponse(
@@ -271,6 +280,7 @@ def build_dilchat_response(
         raw_unified=unified_output,
         policy_flags=policy_flags,
         formulas=formulas_data,
+        stabilizer=stabilizer_data,
     )
 
 
