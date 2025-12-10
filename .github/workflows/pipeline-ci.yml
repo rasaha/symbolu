@@ -302,6 +302,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee trading-guardrails-pytest.log
 
+      - name: Run Phase 15 Interaction Mode Tests
+        run: |
+          pytest symbolu/policy/tests/test_phase15_interaction_modes.py \
+            --disable-warnings -q \
+            2>&1 | tee phase15-interaction-modes-pytest.log
+
       - name: Run Motivation Drift Tests
         run: |
           pytest symbolu/core/motivation_drift_tests \
@@ -378,6 +384,7 @@ jobs:
             identity-signature-pytest.log
             motivation-flow-pytest.log
             trading-guardrails-pytest.log
+            phase15-interaction-modes-pytest.log
             motivation-drift-pytest.log
 
       - name: Upload snapshot diffs

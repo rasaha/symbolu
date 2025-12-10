@@ -728,6 +728,7 @@ def _build_hints(
         15. Motivation Profile Hints (encourage_exploration, stabilize_self, address_avoidance, etc.)
         16. Trading Guardrail Hints (avoid_trade, wait_for_stability, market_volatility_alert)
         17. Phase 12 v3 Confidence Hints (v3_confidence_high, v3_confidence_medium, v3_confidence_low)
+        18. Phase 15 Interaction Mode Hints (stable_neutral, self_reflection_allowed, deep_adaptive_active)
 
     Args:
         policy_flags: Policy flags dictionary (includes session_policy_flags if available)
@@ -1028,6 +1029,72 @@ def _build_hints(
                     code="V3_CONFIDENCE_LOW",
                     message="v3 interpretation confidence is low. Formula signals are unstable or divergent."
                 ))
+
+    # ========================================================================
+    # PHASE 15 INTERACTION MODE HINTS (mode-based adaptive hints)
+    # ========================================================================
+    # Extract interaction mode from policy flags
+    interaction_mode = policy_flags.get("interaction_mode")
+
+    if interaction_mode:
+        # ANALYTICS_ONLY mode: Standard behavior, no formula influence
+        if interaction_mode == "analytics_only":
+            hints.append(DILchatHint(
+                code="HINT_STABLE_NEUTRAL",
+                message="Analytics mode active. Standard deterministic behavior, no formula-based adaptation."
+            ))
+
+        # SMART_INSIGHT mode: Soft UI-layer refinement enabled
+        elif interaction_mode == "smart_insight":
+            hints.append(DILchatHint(
+                code="HINT_SELF_REFLECTION_ALLOWED",
+                message="Smart insight mode active. UI-layer formula refinement enabled for deeper exploration."
+            ))
+
+        # DEEP_ADAPTIVE mode: Full adaptive mode with VMF/ATH hints
+        elif interaction_mode == "deep_adaptive":
+            hints.append(DILchatHint(
+                code="HINT_DEEP_ADAPTIVE_ACTIVE",
+                message="Deep adaptive mode active. VMF/ATH emotional arc hints enabled for adaptive responses."
+            ))
+
+            # Add VMF emotional momentum hint if available
+            vmf_momentum = policy_flags.get("vmf_emotional_momentum")
+            if vmf_momentum:
+                if vmf_momentum == "rising":
+                    hints.append(DILchatHint(
+                        code="VMF_MOMENTUM_RISING",
+                        message="Emotional momentum is rising. User is in an upward emotional arc."
+                    ))
+                elif vmf_momentum == "falling":
+                    hints.append(DILchatHint(
+                        code="VMF_MOMENTUM_FALLING",
+                        message="Emotional momentum is falling. Consider supportive, stabilizing responses."
+                    ))
+                elif vmf_momentum == "stable":
+                    hints.append(DILchatHint(
+                        code="VMF_MOMENTUM_STABLE",
+                        message="Emotional momentum is stable. Current approach is effective."
+                    ))
+
+            # Add ATH arc-tension state hint if available
+            ath_state = policy_flags.get("ath_arc_tension_state")
+            if ath_state:
+                if ath_state == "harmonized":
+                    hints.append(DILchatHint(
+                        code="ATH_HARMONIZED",
+                        message="Arc-tension harmonized. User is in balanced state for exploration."
+                    ))
+                elif ath_state == "building":
+                    hints.append(DILchatHint(
+                        code="ATH_BUILDING",
+                        message="Arc-tension building. Monitor for breakthrough or release moments."
+                    ))
+                elif ath_state == "releasing":
+                    hints.append(DILchatHint(
+                        code="ATH_RELEASING",
+                        message="Arc-tension releasing. Support the emotional resolution process."
+                    ))
 
     return hints
 

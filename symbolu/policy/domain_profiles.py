@@ -11,6 +11,7 @@ Each profile includes:
 - Preferred mapper configurations
 - Stylistic preferences
 - Phase 5: Formula UI modulation settings (therapy/identity only)
+- Phase 15: Interaction mode defaults (controls formula influence level)
 
 Design:
 - Static configuration (no runtime modification)
@@ -26,6 +27,7 @@ Usage:
 """
 
 from typing import Dict, Any
+from .interaction_modes import InteractionMode
 
 
 # Domain profile definitions
@@ -50,6 +52,8 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "max_tension_allowed": 0.70,
         "max_negative_delta_smi": 0.12,
         "max_volatility_allowed": 0.60,  # from mapper_volatility_score
+        # Phase 15: Interaction Mode Layer v1.0
+        "interaction_mode_default": InteractionMode.ANALYTICS_ONLY,
     },
     "therapy": {
         "min_coherence": 0.45,
@@ -68,6 +72,8 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "max_tension_for_reflection": 0.75,
         # Phase 7: Trading Formula Guardrails v1.0 (disabled for therapy)
         "formula_guardrails_enabled": False,
+        # Phase 15: Interaction Mode Layer v1.0
+        "interaction_mode_default": InteractionMode.SMART_INSIGHT,
     },
     "identity": {
         "min_coherence": 0.50,
@@ -86,6 +92,8 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "max_tension_for_reflection": 0.70,
         # Phase 7: Trading Formula Guardrails v1.0 (disabled for identity)
         "formula_guardrails_enabled": False,
+        # Phase 15: Interaction Mode Layer v1.0
+        "interaction_mode_default": InteractionMode.SMART_INSIGHT,
     },
     "generic": {
         "min_coherence": 0.40,
@@ -104,6 +112,8 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "max_tension_for_reflection": 0.60,
         # Phase 7: Trading Formula Guardrails v1.0 (disabled for generic)
         "formula_guardrails_enabled": False,
+        # Phase 15: Interaction Mode Layer v1.0
+        "interaction_mode_default": InteractionMode.ANALYTICS_ONLY,
     },
 }
 
