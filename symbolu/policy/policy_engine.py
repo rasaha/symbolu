@@ -97,6 +97,123 @@ def _get_active_coherence_score(
     return coherence_score_v1
 
 
+def _refine_policy_with_formulas(
+    flags: Dict[str, Any],
+    unified_output: Dict[str, Any],
+    profile: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Optionally adjusts UI-focused policy flags based on formula metrics.
+
+    Phase 5: Formula-based UI modulation for therapy/identity domains only.
+    This function applies gentle refinement to policy flags using Phase 3/4
+    formula signals, ONLY when profile["formula_ui_mode"] == "light".
+
+    Never modifies:
+    - needs_grounding (core safety flag)
+    - coherence_warning (core safety flag)
+    - stability_status (core stability assessment)
+    - recommended_mapper (routing decision)
+
+    May refine (UI-layer only):
+    - allow_deep_reflection
+    - prefer_concrete
+    - prefer_arc_mode
+
+    Rules:
+    1. Safe deeper reflection gate: Enable if coherence >= 0.50, resonance high, tension low
+    2. Arc emphasis: Enable if arc_alignment high AND reflection allowed
+    3. Concrete preference: Enable if tension very high (safety override)
+
+    Args:
+        flags: Policy flags dictionary from compute_policy_flags()
+        unified_output: Unified output dictionary with formula metrics
+        profile: Domain profile dictionary with Phase 5 settings
+
+    Returns:
+        Refined policy flags dictionary (may be unchanged)
+
+    Examples:
+        >>> flags = {"allow_deep_reflection": False, "prefer_arc_mode": False}
+        >>> unified = {
+        ...     "coherence": {
+        ...         "coherence_score_v2": 0.70,
+        ...         "resonance_index": 0.75,
+        ...         "tension_index": 0.30,
+        ...         "arc_alignment_index": 0.65
+        ...     }
+        ... }
+        >>> profile = {
+        ...     "formula_ui_mode": "light",
+        ...     "min_resonance_for_reflection": 0.50,
+        ...     "max_tension_for_reflection": 0.75
+        ... }
+        >>> refined = _refine_policy_with_formulas(flags, unified, profile)
+        >>> refined["allow_deep_reflection"]
+        True
+        >>> refined["prefer_arc_mode"]
+        True
+    """
+    # Early exit: If formula UI mode is disabled, return flags unchanged
+    formula_ui_mode = profile.get("formula_ui_mode", "none")
+    if formula_ui_mode == "none":
+        return flags
+
+    # Extract coherence metrics
+    coherence = unified_output.get("coherence", {})
+
+    # Get active coherence score (v2 if available, else v1)
+    coherence_active = _get_active_coherence_score(unified_output, profile)
+
+    # Extract Phase 3/4 formula metrics
+    resonance_index = coherence.get("resonance_index")
+    tension_index = coherence.get("tension_index")
+    arc_alignment_index = coherence.get("arc_alignment_index")
+
+    # If any required metrics are missing, return flags unchanged
+    if resonance_index is None or tension_index is None or arc_alignment_index is None:
+        return flags
+
+    # Extract profile thresholds
+    min_resonance = profile.get("min_resonance_for_reflection", 0.50)
+    max_tension = profile.get("max_tension_for_reflection", 0.75)
+
+    # Create a copy of flags to avoid mutating the input
+    refined_flags = flags.copy()
+
+    # ========================================================================
+    # RULE 1: Safe deeper reflection gate (therapy/identity only)
+    # Enable deep reflection if coherence is adequate and formula signals are safe
+    # ========================================================================
+    if (
+        coherence_active >= 0.50
+        and resonance_index >= min_resonance
+        and tension_index <= max_tension
+    ):
+        refined_flags["allow_deep_reflection"] = True
+
+    # ========================================================================
+    # RULE 2: Arc emphasis when strong arc alignment
+    # Enable arc mode if arc alignment is high AND reflection is allowed
+    # ========================================================================
+    if (
+        arc_alignment_index >= 0.60
+        and refined_flags.get("allow_deep_reflection", False)
+    ):
+        refined_flags["prefer_arc_mode"] = True
+
+    # ========================================================================
+    # RULE 3: Concrete preference when tension is very high (safety override)
+    # Force concrete mode and disable reflection if tension is dangerous
+    # ========================================================================
+    if tension_index >= 0.75:
+        refined_flags["prefer_concrete"] = True
+        refined_flags["allow_deep_reflection"] = False
+        refined_flags["prefer_arc_mode"] = False
+
+    return refined_flags
+
+
 def compute_policy_flags(unified: Dict[str, Any], domain: str) -> Dict[str, Any]:
     """
     Compute policy flags from unified output and domain profile.
@@ -232,7 +349,7 @@ def compute_policy_flags(unified: Dict[str, Any], domain: str) -> Dict[str, Any]
     )
 
     # Build policy flags dictionary
-    return {
+    flags = {
         "needs_grounding": needs_grounding,
         "allow_deep_reflection": allow_deep_reflection,
         "prefer_concrete": prefer_concrete,
@@ -242,6 +359,14 @@ def compute_policy_flags(unified: Dict[str, Any], domain: str) -> Dict[str, Any]
         "recommended_style": recommended_style,
         "recommended_mapper": recommended_mapper,
     }
+
+    # ========================================================================
+    # Phase 5: Apply formula-based refinement (UI-layer only, therapy/identity)
+    # This gently modulates UI-focused flags based on Phase 3/4 formula signals
+    # ========================================================================
+    flags = _refine_policy_with_formulas(flags, unified, profile)
+
+    return flags
 
 
 def _compute_stability_status(

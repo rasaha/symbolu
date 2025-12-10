@@ -10,6 +10,7 @@ Each profile includes:
 - Mapper volatility bounds
 - Preferred mapper configurations
 - Stylistic preferences
+- Phase 5: Formula UI modulation settings (therapy/identity only)
 
 Design:
 - Static configuration (no runtime modification)
@@ -37,6 +38,10 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "allow_lam": False,
         "style": "precise",
         "use_coherence_v2": False,  # Phase 4: Stay ultra-conservative, use v1 only
+        # Phase 5: Formula UI modulation (disabled for trading)
+        "formula_ui_mode": "none",
+        "min_resonance_for_reflection": 0.60,
+        "max_tension_for_reflection": 0.50,
     },
     "therapy": {
         "min_coherence": 0.45,
@@ -46,6 +51,10 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "allow_lam": True,
         "style": "reflective",
         "use_coherence_v2": True,  # Phase 4: Enable formula-aware coherence
+        # Phase 5: Formula UI modulation (enabled for therapy)
+        "formula_ui_mode": "light",
+        "min_resonance_for_reflection": 0.50,
+        "max_tension_for_reflection": 0.75,
     },
     "identity": {
         "min_coherence": 0.50,
@@ -55,6 +64,10 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "allow_lam": True,
         "style": "exploratory",
         "use_coherence_v2": True,  # Phase 4: Enable formula-aware coherence
+        # Phase 5: Formula UI modulation (enabled for identity)
+        "formula_ui_mode": "light",
+        "min_resonance_for_reflection": 0.50,
+        "max_tension_for_reflection": 0.70,
     },
     "generic": {
         "min_coherence": 0.40,
@@ -64,6 +77,10 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "allow_lam": False,
         "style": "neutral",
         "use_coherence_v2": False,  # Phase 4: Stay conservative, use v1 by default
+        # Phase 5: Formula UI modulation (disabled for generic)
+        "formula_ui_mode": "none",
+        "min_resonance_for_reflection": 0.55,
+        "max_tension_for_reflection": 0.60,
     },
 }
 
