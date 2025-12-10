@@ -8,6 +8,7 @@ on:
       - "symbolu/temporal/**"
       - "symbolu/core/coherence/**"
       - "symbolu/core/formula_drift_tests/**"
+      - "docs/patent_formula_coverage_matrix.md"
       - ".github/workflows/formula-drift-ci.yml"
   pull_request:
     branches: ["main", "master"]
@@ -16,6 +17,7 @@ on:
       - "symbolu/temporal/**"
       - "symbolu/core/coherence/**"
       - "symbolu/core/formula_drift_tests/**"
+      - "docs/patent_formula_coverage_matrix.md"
       - ".github/workflows/formula-drift-ci.yml"
   workflow_dispatch:
 
@@ -57,6 +59,16 @@ jobs:
             --maxfail=1 \
             2>&1 | tee formula-drift-pytest.log
 
+      - name: Run Patent Formula Tag Drift Tests
+        run: |
+          pytest \
+            symbolu/core/formula_drift_tests/test_patent_alignment_tags.py \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            --maxfail=1 \
+            2>&1 | tee patent-formula-tags-pytest.log
+
       - name: Upload Formula Drift test logs and fixtures
         uses: actions/upload-artifact@v4
         if: always()
@@ -64,8 +76,10 @@ jobs:
           name: formula-drift-test-logs
           path: |
             formula-drift-pytest.log
+            patent-formula-tags-pytest.log
             symbolu/core/formula_drift_tests/phase1_resonance_fixtures.json
 
       - name: Check for drift
         run: |
           echo "✅ Formula drift tests passed! All formulas remain deterministic and within expected ranges."
+          echo "✅ Patent formula tag drift tests passed! All formula tags remain stable."
