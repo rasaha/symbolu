@@ -56,6 +56,7 @@ class UnifiedOutput:
         formulas: Phase 2 temporal formulas (SMI, ΔSMI, Bhava Gap, Tension Corridor) - observation only
         trading_guardrails: Phase 7 trading formula guardrails (trading safety risk flags)
         interaction_mode: Phase 15 interaction mode (controls formula influence level)
+        insight_window: Phase 32 insight window gating (UCF-based UI-layer policy refinement)
     """
 
     text: str
@@ -78,6 +79,7 @@ class UnifiedOutput:
     interaction_mode: Optional[str] = None  # Phase 15: Active interaction mode
     persona_resonance: Optional[Dict[str, Any]] = None  # Phase 29: Persona resonance profile
     persona_resonance_map: Optional[Dict[str, Any]] = None  # Phase 30: Cross-layer resonance persona map
+    insight_window: Optional[Dict[str, Any]] = None  # Phase 32: Insight window gating result
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -839,6 +841,11 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
     elif hasattr(ctx, 'interaction_mode') and ctx.interaction_mode is not None:
         interaction_mode_data = ctx.interaction_mode
 
+    # Phase 32: Extract insight window gating result from policy flags
+    insight_window_data = None
+    if hasattr(ctx, 'policy_flags') and ctx.policy_flags is not None:
+        insight_window_data = ctx.policy_flags.get('insight_window')
+
     # Phase 29: Extract persona resonance from persona response
     persona_resonance_data = None
     if hasattr(ctx, 'persona_response') and ctx.persona_response is not None:
@@ -897,6 +904,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         interaction_mode=interaction_mode_data,
         persona_resonance=persona_resonance_data,  # Phase 29
         persona_resonance_map=persona_resonance_map_data,  # Phase 30
+        insight_window=insight_window_data,  # Phase 32
     )
 
 

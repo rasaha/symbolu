@@ -22,6 +22,7 @@ on:
       - "tests/test_phase28_symbolic_harmonization_renderer.py"
       - "tests/test_phase29_persona_resonance.py"
       - "tests/test_phase30_cross_layer_resonance_mapping.py"
+      - "tests/test_phase32_insight_window.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -55,6 +56,7 @@ on:
       - "tests/test_phase28_symbolic_harmonization_renderer.py"
       - "tests/test_phase29_persona_resonance.py"
       - "tests/test_phase30_cross_layer_resonance_mapping.py"
+      - "tests/test_phase32_insight_window.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -379,6 +381,13 @@ jobs:
             --maxfail=1 \
             2>&1 | tee phase30-cross-layer-resonance.log
 
+      - name: Run Phase 32 Insight Window Gating Tests
+        run: |
+          pytest tests/test_phase32_insight_window.py \
+            --disable-warnings -q \
+            --maxfail=1 \
+            2>&1 | tee phase32-insight-window.log
+
       - name: Run Phase 20 Unified Dashboard Tests
         run: |
           pytest symbolu/tools/unified_dashboard/tests/test_unified_dashboard.py \
@@ -472,6 +481,7 @@ jobs:
             phase28-symbolic-harmonization-renderer.log
             phase29-persona-resonance.log
             phase30-cross-layer-resonance.log
+            phase32-insight-window.log
             phase20-unified-dashboard-pytest.log
             motivation-drift-pytest.log
 

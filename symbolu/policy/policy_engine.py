@@ -53,6 +53,7 @@ Usage:
 from typing import Dict, Any, Literal, Optional, Tuple
 from .domain_profiles import get_domain_profile
 from .interaction_modes import InteractionMode, resolve_interaction_mode
+from .insight_window_gating import compute_insight_window, InsightWindowResult
 
 
 # Type aliases for clarity
@@ -260,6 +261,103 @@ def _refine_policy_with_formulas(
         refined_flags["prefer_concrete"] = True
         refined_flags["allow_deep_reflection"] = False
         refined_flags["prefer_arc_mode"] = False
+
+    return refined_flags
+
+
+def _apply_insight_window_to_policy(
+    flags: Dict[str, Any],
+    insight: InsightWindowResult,
+) -> Dict[str, Any]:
+    """
+    Apply insight window gating to refine UI-layer policy flags (Phase 32).
+
+    This function applies deterministic UI-layer refinements based on the
+    Insight Window Gating System. It uses UCF megafusion indicators to
+    softly adjust presentation flags for therapeutic/identity personas.
+
+    CRITICAL INVARIANTS:
+    - UI-layer ONLY: Does NOT change routing, mappers, coherence, or safety flags
+    - Observation-only: Purely informational, never behavior-changing
+    - Zero-LLM: Deterministic rule-based logic only
+    - Graceful degradation: If insight window is closed, no changes applied
+
+    Never modifies:
+    - needs_grounding (core safety flag)
+    - coherence_warning (core safety flag)
+    - stability_status (core stability assessment)
+    - recommended_mapper (routing decision)
+
+    May refine (UI-layer only):
+    - allow_deep_reflection
+    - prefer_arc_mode
+    - allow_meta_insight (new UI-only flag)
+    - prefer_symbolic_interpretation (new UI-only flag)
+
+    Refinement Rules:
+    1. If insight_window_open and insight_mode == "light":
+       - flags.allow_deep_reflection = True
+       - flags.prefer_arc_mode = True
+
+    2. If insight_mode == "deep":
+       - Same as above, plus:
+       - flags.allow_meta_insight = True (new UI-only flag)
+       - flags.prefer_symbolic_interpretation = True (new UI-only flag)
+
+    3. If insight_mode == "none":
+       - No changes (safety default)
+
+    Args:
+        flags: Policy flags dictionary from compute_policy_flags()
+        insight: InsightWindowResult from compute_insight_window()
+
+    Returns:
+        Refined policy flags dictionary (may be unchanged)
+
+    Examples:
+        >>> flags = {"allow_deep_reflection": False, "prefer_arc_mode": False}
+        >>> insight = InsightWindowResult(
+        ...     insight_window_open=True,
+        ...     insight_depth=0.65,
+        ...     insight_mode="light",
+        ...     insight_tags=["structural_alignment"],
+        ...     notes=[]
+        ... )
+        >>> refined = _apply_insight_window_to_policy(flags, insight)
+        >>> refined["allow_deep_reflection"]
+        True
+        >>> refined["prefer_arc_mode"]
+        True
+    """
+    # Create a copy to avoid mutating the input
+    refined_flags = flags.copy()
+
+    # Early exit if insight window is closed
+    if not insight.insight_window_open:
+        return refined_flags
+
+    # Early exit if insight mode is "none"
+    if insight.insight_mode == "none":
+        return refined_flags
+
+    # ========================================================================
+    # RULE 1: Light insight mode → enable basic deeper reflection UI features
+    # ========================================================================
+    if insight.insight_mode == "light":
+        refined_flags["allow_deep_reflection"] = True
+        refined_flags["prefer_arc_mode"] = True
+
+    # ========================================================================
+    # RULE 2: Deep insight mode → enable all deeper reflection UI features
+    # ========================================================================
+    elif insight.insight_mode == "deep":
+        # Same as light mode
+        refined_flags["allow_deep_reflection"] = True
+        refined_flags["prefer_arc_mode"] = True
+
+        # Plus additional deep features (NEW UI-only flags)
+        refined_flags["allow_meta_insight"] = True
+        refined_flags["prefer_symbolic_interpretation"] = True
 
     return refined_flags
 
@@ -545,6 +643,59 @@ def compute_policy_flags(
 
         # Apply VMF/ATH-based adaptive hints (presentation layer only)
         flags = _apply_deep_adaptive_hints(flags, unified)
+
+    # ========================================================================
+    # Phase 32: Apply Insight Window Gating (UI-layer only)
+    # ========================================================================
+    # Only applies in therapy/identity domains + SMART_INSIGHT/DEEP_ADAPTIVE modes
+    # Uses UCF megafusion indicators to softly refine UI-level policy flags
+    # Zero-LLM, deterministic, observation-only, gracefully degrades if data unavailable
+
+    # Extract UCF snapshot and coherence observation
+    # (these are observation-only structures with UCF metrics)
+    ucf_snapshot = None
+    coherence_observation = None
+
+    # Try to extract UCF snapshot from unified output
+    # (it may be in coherence.unified_consciousness.snapshot or elsewhere)
+    coherence_data = unified.get("coherence", {})
+    unified_consciousness = coherence_data.get("unified_consciousness", {})
+    if isinstance(unified_consciousness, dict):
+        ucf_snapshot = unified_consciousness.get("snapshot")
+
+    # For observation structure, we can pass the entire coherence dict
+    # (compute_insight_window will extract what it needs)
+    if coherence_data:
+        # Create a minimal observation-like dict with the key fields
+        coherence_observation = type('obj', (object,), {
+            'consciousness_order_index': unified_consciousness.get('coi') or unified_consciousness.get('consciousness_order_index'),
+            'consciousness_stability_index': unified_consciousness.get('csi') or unified_consciousness.get('consciousness_stability_index'),
+            'consciousness_integration_potential': unified_consciousness.get('cip') or unified_consciousness.get('consciousness_integration_potential'),
+            'ucf_entropy': unified_consciousness.get('entropy'),
+            'ucf_notes': unified_consciousness.get('notes', []),
+            'cognitive_drift_v3': coherence_data.get('semantic', {}).get('cognitive_drift_v3'),
+            'temporal_entropy_volatility': coherence_data.get('temporal_entropy', {}).get('volatility'),
+        })()
+
+    # Compute insight window gating
+    insight_result = compute_insight_window(
+        ucf_snapshot=ucf_snapshot,
+        coherence_observation=coherence_observation,
+        interaction_mode=active_mode.value,
+        domain=domain,
+    )
+
+    # Apply insight window refinement to policy flags (UI-layer only)
+    flags = _apply_insight_window_to_policy(flags, insight_result)
+
+    # Add insight window result to flags for observability
+    flags["insight_window"] = {
+        "insight_window_open": insight_result.insight_window_open,
+        "insight_depth": insight_result.insight_depth,
+        "insight_mode": insight_result.insight_mode,
+        "insight_tags": insight_result.insight_tags,
+        "notes": insight_result.notes,
+    }
 
     return flags
 
