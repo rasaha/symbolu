@@ -220,6 +220,20 @@ class CoherenceState:
     css_history: List[Optional[float]] = field(default_factory=list)  # Continuity Stability Score history
     continuity_band_history: List[Optional[str]] = field(default_factory=list)  # Continuity Band history
 
+    # Phase 38: Temporal Coherence Forecasting Model (observation only - not used in scoring)
+    temporal_forecast_snapshot: Optional[Any] = None  # TemporalCoherenceForecastSnapshot (latest)
+    forecast_history: List[Optional[Any]] = field(default_factory=list)  # List of TemporalCoherenceForecastSnapshot
+    current_forecast_coherence_slope: Optional[float] = None  # Coherence trajectory slope [-1.0, 1.0]
+    current_forecast_continuity_slope: Optional[float] = None  # Continuity trajectory slope [-1.0, 1.0]
+    current_forecast_drift_influence: Optional[float] = None  # Drift influence on forecast [0.0, 1.0]
+    current_forecast_entropy_forward_risk: Optional[float] = None  # Forward entropy risk [0.0, 1.0]
+    current_forecast_strength: Optional[float] = None  # Forecast confidence [0.0, 1.0]
+    current_forecast_band: Optional[str] = None  # Forecast Band: STRONG_UPTREND, MILD_UPTREND, NEUTRAL, etc.
+    current_forecast_tags: List[str] = field(default_factory=list)  # Current forecast diagnostic tags
+    forecast_band_history: List[Optional[str]] = field(default_factory=list)  # Forecast band history
+    forecast_strength_history: List[Optional[float]] = field(default_factory=list)  # Forecast strength history
+    drift_influence_history: List[Optional[float]] = field(default_factory=list)  # Drift influence history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -310,6 +324,12 @@ class CoherenceState:
         self.icc_history = self.icc_history[-window:]
         self.css_history = self.css_history[-window:]
         self.continuity_band_history = self.continuity_band_history[-window:]
+
+        # Phase 38 temporal coherence forecasting model formula history
+        self.forecast_history = self.forecast_history[-window:]
+        self.forecast_band_history = self.forecast_band_history[-window:]
+        self.forecast_strength_history = self.forecast_strength_history[-window:]
+        self.drift_influence_history = self.drift_influence_history[-window:]
 
     def get_history_length(self) -> int:
         """

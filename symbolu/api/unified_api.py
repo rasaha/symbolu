@@ -85,6 +85,7 @@ class UnifiedOutput:
     predictive_persona_drift: Optional[Dict[str, Any]] = None  # Phase 35: Predictive persona drift model (observation-only, tone-level only)
     identity_resonance_memory: Optional[Dict[str, Any]] = None  # Phase 36: Identity resonance memory (observation-only, tone-level only)
     adaptive_continuity: Optional[Dict[str, Any]] = None  # Phase 37: Adaptive continuity engine (observation-only, tone-level only)
+    temporal_forecast: Optional[Dict[str, Any]] = None  # Phase 38: Temporal coherence forecasting model (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -1001,6 +1002,29 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "tags": getattr(ace_snapshot, 'continuity_tags', []),
             }
 
+    # Phase 38: Extract temporal coherence forecasting model data (observation-only)
+    tcfm_data = None
+    # Try to extract from persona response first (if available)
+    if hasattr(ctx, 'persona_response') and ctx.persona_response is not None:
+        forecast_profile = getattr(ctx.persona_response, 'temporal_forecast_profile', None)
+        if forecast_profile is not None:
+            tcfm_data = forecast_profile
+
+    # Also try to extract from coherence block for observability
+    if tcfm_data is None and hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        forecast_snapshot = getattr(ctx.coherence_state, 'temporal_forecast_snapshot', None)
+        if forecast_snapshot is not None:
+            # Build dict from snapshot fields
+            tcfm_data = {
+                "coherence_slope": getattr(forecast_snapshot, 'coherence_slope', None),
+                "continuity_slope": getattr(forecast_snapshot, 'continuity_slope', None),
+                "drift_influence": getattr(forecast_snapshot, 'drift_influence', None),
+                "entropy_forward_risk": getattr(forecast_snapshot, 'entropy_forward_risk', None),
+                "forecast_strength": getattr(forecast_snapshot, 'forecast_strength', None),
+                "forecast_band": getattr(forecast_snapshot, 'forecast_band', None),
+                "diagnostic_tags": getattr(forecast_snapshot, 'diagnostic_tags', []),
+            }
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -1028,6 +1052,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         predictive_persona_drift=predictive_drift_data,  # Phase 35
         identity_resonance_memory=irm_data,  # Phase 36
         adaptive_continuity=ace_data,  # Phase 37
+        temporal_forecast=tcfm_data,  # Phase 38
     )
 
 
