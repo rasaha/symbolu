@@ -123,6 +123,10 @@ class CoherenceEngine:
                 icc_history=prev_state.icc_history.copy(),
                 css_history=prev_state.css_history.copy(),
                 continuity_band_history=prev_state.continuity_band_history.copy(),
+                forecast_history=prev_state.forecast_history.copy(),
+                forecast_band_history=prev_state.forecast_band_history.copy(),
+                forecast_strength_history=prev_state.forecast_strength_history.copy(),
+                drift_influence_history=prev_state.drift_influence_history.copy(),
             )
 
         # Append new turn data to histories
@@ -225,6 +229,9 @@ class CoherenceEngine:
 
         # Update Phase 37 adaptive continuity engine (observation only)
         self._update_adaptive_continuity(state)
+
+        # Update Phase 38 temporal coherence forecasting model (observation only)
+        self._update_temporal_coherence_forecast(state)
 
         return state
 
@@ -2736,3 +2743,219 @@ class CoherenceEngine:
             state.current_css = None
             state.current_continuity_band = None
             state.current_continuity_tags = []
+
+    def _update_temporal_coherence_forecast(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 38 Temporal Coherence Forecasting Model (observation only).
+
+        This method computes the temporal coherence forecast snapshot by predicting how
+        coherence, continuity, identity, and drift metrics are expected to evolve across
+        future turns.
+
+        The TCFM produces:
+          1. Coherence Trajectory Forecast (CTF): Predicts if coherence_fused will rise/fall/remain stable
+          2. Continuity Trajectory Forecast (CNF): Projects NCC/ICC/CSS into next-turn estimates
+          3. Drift Forecast Probability (DFP): Likelihood of future coherence disruption
+          4. Forecast Stability Score (FSS): Confidence in forecast based on variance patterns
+          5. Forecast Band: STRONG_UPTREND / MILD_UPTREND / NEUTRAL / MILD_DOWNTREND / STRONG_DOWNTREND
+          6. Diagnostic Tags: FORECAST_UPTREND, FORECAST_DOWNTREND, etc.
+
+        The TCFM is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for tone-only micro-adjustments (±0.015 max) and analytics.
+
+        This update runs AFTER Phase 37 ACE to leverage continuity signals.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.temporal_coherence_forecasting import compute_temporal_coherence_forecast
+
+        # ====================================================================
+        # STEP 1: GATHER COHERENCE FUSION (Phase 16)
+        # ====================================================================
+
+        coherence_fused = state.coherence_fused
+
+        # Extract coherence_fused history
+        coherence_fused_history = None
+        if state.coherence_fused_history:
+            coherence_fused_history = [
+                cfh for cfh in state.coherence_fused_history if cfh is not None
+            ]
+
+        # ====================================================================
+        # STEP 2: GATHER ADAPTIVE CONTINUITY ENGINE (Phase 37)
+        # ====================================================================
+
+        ncc = state.current_ncc
+        icc = state.current_icc
+        css = state.current_css
+
+        # Extract continuity histories
+        ncc_history = None
+        icc_history = None
+        css_history = None
+
+        if state.ncc_history:
+            ncc_history = [
+                ncc_val for ncc_val in state.ncc_history if ncc_val is not None
+            ]
+
+        if state.icc_history:
+            icc_history = [
+                icc_val for icc_val in state.icc_history if icc_val is not None
+            ]
+
+        if state.css_history:
+            css_history = [
+                css_val for css_val in state.css_history if css_val is not None
+            ]
+
+        # ====================================================================
+        # STEP 3: GATHER PREDICTIVE DRIFT (Phase 35)
+        # ====================================================================
+
+        drift_magnitude_prediction = state.current_drift_magnitude_prediction
+        drift_stability_score = state.current_drift_stability_score
+
+        # Extract drift histories
+        drift_magnitude_history = None
+        if state.drift_magnitude_history:
+            drift_magnitude_history = [
+                dmh for dmh in state.drift_magnitude_history if dmh is not None
+            ]
+
+        # ====================================================================
+        # STEP 4: GATHER IDENTITY RESONANCE MEMORY (Phase 36)
+        # ====================================================================
+
+        identity_memory_strength = state.current_ims
+        identity_drift_anchoring = state.current_ida
+
+        # ====================================================================
+        # STEP 5: GATHER IDENTITY HARMONICS (Phase 34)
+        # ====================================================================
+
+        identity_stability_score = None
+        if state.identity_harmonics_snapshot is not None:
+            identity_stability_score = state.identity_harmonics_snapshot.identity_stability_score
+
+        # ====================================================================
+        # STEP 6: GATHER SYMBOLIC HARMONIZATION (Phase 27)
+        # ====================================================================
+
+        symbolic_harmonization_index = state.current_symbolic_harmonization_index
+
+        # Extract symbolic harmonization history
+        symbolic_harmonization_history = None
+        if state.symbolic_harmonization_history:
+            symbolic_harmonization_history = [
+                snap.symbolic_harmonization_index
+                for snap in state.symbolic_harmonization_history
+                if snap is not None
+            ]
+
+        # ====================================================================
+        # STEP 7: GATHER UNIFIED CONSCIOUSNESS (Phase 26)
+        # ====================================================================
+
+        consciousness_order_index = state.current_coi
+        consciousness_stability_index = state.current_csi
+
+        # Extract consciousness order history
+        consciousness_order_history = None
+        if state.ucf_history:
+            consciousness_order_history = [
+                snap.consciousness_order_index
+                for snap in state.ucf_history
+                if snap is not None
+            ]
+
+        # ====================================================================
+        # STEP 8: GATHER TEMPORAL ENTROPY (Phase 18)
+        # ====================================================================
+
+        temporal_entropy_volatility = state.temporal_entropy_volatility
+        temporal_entropy_diff = state.temporal_entropy_diff
+
+        # Extract temporal entropy volatility history
+        temporal_entropy_volatility_history = None
+        if state.temporal_entropy_volatility_history:
+            temporal_entropy_volatility_history = [
+                tev for tev in state.temporal_entropy_volatility_history if tev is not None
+            ]
+
+        # ====================================================================
+        # STEP 9: COMPUTE TEMPORAL COHERENCE FORECAST
+        # ====================================================================
+
+        snapshot = compute_temporal_coherence_forecast(
+            # Phase 16: Formula Fusion Stabilizer
+            coherence_fused=coherence_fused,
+            coherence_fused_history=coherence_fused_history,
+            # Phase 37: Adaptive Continuity Engine
+            ncc=ncc,
+            icc=icc,
+            css=css,
+            ncc_history=ncc_history,
+            icc_history=icc_history,
+            css_history=css_history,
+            # Phase 35: Predictive Persona Drift
+            drift_magnitude_prediction=drift_magnitude_prediction,
+            drift_stability_score=drift_stability_score,
+            drift_magnitude_history=drift_magnitude_history,
+            # Phase 36: Identity Resonance Memory
+            identity_memory_strength=identity_memory_strength,
+            identity_drift_anchoring=identity_drift_anchoring,
+            # Phase 34: Identity Harmonics
+            identity_stability_score=identity_stability_score,
+            # Phase 27: Symbolic Harmonization
+            symbolic_harmonization_index=symbolic_harmonization_index,
+            symbolic_harmonization_history=symbolic_harmonization_history,
+            # Phase 26: Unified Consciousness Formula
+            consciousness_order_index=consciousness_order_index,
+            consciousness_stability_index=consciousness_stability_index,
+            consciousness_order_history=consciousness_order_history,
+            # Phase 18: Temporal Entropy
+            temporal_entropy_volatility=temporal_entropy_volatility,
+            temporal_entropy_diff=temporal_entropy_diff,
+            temporal_entropy_volatility_history=temporal_entropy_volatility_history,
+        )
+
+        # ====================================================================
+        # STEP 10: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Append to histories
+            state.forecast_history.append(snapshot)
+            state.forecast_band_history.append(snapshot.forecast_band)
+            state.forecast_strength_history.append(snapshot.forecast_strength)
+            state.drift_influence_history.append(snapshot.drift_influence)
+
+            # Update current metrics
+            state.temporal_forecast_snapshot = snapshot
+            state.current_forecast_coherence_slope = snapshot.coherence_slope
+            state.current_forecast_continuity_slope = snapshot.continuity_slope
+            state.current_forecast_drift_influence = snapshot.drift_influence
+            state.current_forecast_entropy_forward_risk = snapshot.entropy_forward_risk
+            state.current_forecast_strength = snapshot.forecast_strength
+            state.current_forecast_band = snapshot.forecast_band
+            state.current_forecast_tags = snapshot.diagnostic_tags
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.forecast_history.append(None)
+            state.forecast_band_history.append(None)
+            state.forecast_strength_history.append(None)
+            state.drift_influence_history.append(None)
+            state.temporal_forecast_snapshot = None
+            state.current_forecast_coherence_slope = None
+            state.current_forecast_continuity_slope = None
+            state.current_forecast_drift_influence = None
+            state.current_forecast_entropy_forward_risk = None
+            state.current_forecast_strength = None
+            state.current_forecast_band = None
+            state.current_forecast_tags = []

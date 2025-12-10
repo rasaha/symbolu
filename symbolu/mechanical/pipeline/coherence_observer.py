@@ -193,6 +193,16 @@ class CoherenceObservation:
     continuity_band: Optional[str] = None  # Continuity Band: "LOW", "MEDIUM", "HIGH"
     continuity_tags: List[str] = field(default_factory=list)  # ACE continuity diagnostic tags
 
+    # Phase 38: Temporal Coherence Forecasting Model (observation only)
+    temporal_forecast_snapshot: Optional[Any] = None  # TemporalCoherenceForecastSnapshot
+    forecast_coherence_slope: Optional[float] = None  # Coherence trajectory slope [-1.0, 1.0]
+    forecast_continuity_slope: Optional[float] = None  # Continuity trajectory slope [-1.0, 1.0]
+    forecast_drift_influence: Optional[float] = None  # Drift influence on forecast [0.0, 1.0]
+    forecast_entropy_forward_risk: Optional[float] = None  # Forward entropy risk [0.0, 1.0]
+    forecast_strength: Optional[float] = None  # Forecast confidence [0.0, 1.0]
+    forecast_band: Optional[str] = None  # Forecast Band: STRONG_UPTREND, MILD_UPTREND, NEUTRAL, etc.
+    forecast_tags: List[str] = field(default_factory=list)  # TCFM forecast diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -704,6 +714,27 @@ class CoherenceObserver:
                 continuity_band = getattr(adaptive_continuity_snapshot, 'continuity_band', None)
                 continuity_tags = getattr(adaptive_continuity_snapshot, 'continuity_tags', [])
 
+        # Phase 38: Extract Temporal Coherence Forecasting Model from coherence state
+        temporal_forecast_snapshot = None
+        forecast_coherence_slope = None
+        forecast_continuity_slope = None
+        forecast_drift_influence = None
+        forecast_entropy_forward_risk = None
+        forecast_strength = None
+        forecast_band = None
+        forecast_tags = []
+
+        if coherence_state is not None:
+            temporal_forecast_snapshot = getattr(coherence_state, 'temporal_forecast_snapshot', None)
+            if temporal_forecast_snapshot is not None:
+                forecast_coherence_slope = getattr(temporal_forecast_snapshot, 'coherence_slope', None)
+                forecast_continuity_slope = getattr(temporal_forecast_snapshot, 'continuity_slope', None)
+                forecast_drift_influence = getattr(temporal_forecast_snapshot, 'drift_influence', None)
+                forecast_entropy_forward_risk = getattr(temporal_forecast_snapshot, 'entropy_forward_risk', None)
+                forecast_strength = getattr(temporal_forecast_snapshot, 'forecast_strength', None)
+                forecast_band = getattr(temporal_forecast_snapshot, 'forecast_band', None)
+                forecast_tags = getattr(temporal_forecast_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -830,6 +861,14 @@ class CoherenceObserver:
             continuity_css=continuity_css,  # Phase 37
             continuity_band=continuity_band,  # Phase 37
             continuity_tags=continuity_tags,  # Phase 37
+            temporal_forecast_snapshot=temporal_forecast_snapshot,  # Phase 38
+            forecast_coherence_slope=forecast_coherence_slope,  # Phase 38
+            forecast_continuity_slope=forecast_continuity_slope,  # Phase 38
+            forecast_drift_influence=forecast_drift_influence,  # Phase 38
+            forecast_entropy_forward_risk=forecast_entropy_forward_risk,  # Phase 38
+            forecast_strength=forecast_strength,  # Phase 38
+            forecast_band=forecast_band,  # Phase 38
+            forecast_tags=forecast_tags,  # Phase 38
         )
 
         # Store observation

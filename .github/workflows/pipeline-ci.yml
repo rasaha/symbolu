@@ -28,6 +28,7 @@ on:
       - "tests/test_phase35_predictive_persona_drift.py"
       - "tests/test_phase36_identity_resonance_memory.py"
       - "symbolu/formulas/tests/test_phase37_adaptive_continuity.py"
+      - "tests/test_phase38_temporal_coherence_forecasting.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -67,6 +68,7 @@ on:
       - "tests/test_phase35_predictive_persona_drift.py"
       - "tests/test_phase36_identity_resonance_memory.py"
       - "symbolu/formulas/tests/test_phase37_adaptive_continuity.py"
+      - "tests/test_phase38_temporal_coherence_forecasting.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -463,6 +465,21 @@ jobs:
         with:
           name: phase37-ace-log
           path: phase37-ace.log
+          if-no-files-found: ignore
+
+      - name: Run Phase 38 Temporal Coherence Forecasting Tests
+        run: |
+          pytest tests/test_phase38_temporal_coherence_forecasting.py \
+            --disable-warnings -q \
+            --maxfail=1 \
+            2>&1 | tee phase38-tcfm.log
+
+      - name: Upload Phase 38 Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase38-tcfm-log
+          path: phase38-tcfm.log
           if-no-files-found: ignore
 
       - name: Run Phase 20 Unified Dashboard Tests
