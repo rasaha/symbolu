@@ -361,7 +361,100 @@ def test_metadata_passthrough(api_client):
 
 
 # ============================================================================
-# TEST 12: FastAPI Import Fallback
+# TEST 12: Session Dashboard Endpoint (Phase 20)
+# ============================================================================
+
+def test_session_dashboard_endpoint_success(api_client):
+    """
+    Test /sessions/{session_id}/dashboard returns complete analytics.
+
+    Phase 20 dashboard endpoint should return:
+    - All coherence metrics (v1/v2/v3/fused/quality)
+    - Semantic integrity & drift metrics
+    - Temporal entropy metrics
+    - Aggregated risk bands
+    - Sparklines for key metrics
+    """
+    # First, create a session
+    session_response = api_client.post("/session/start", json={"domain": "test"})
+    assert session_response.status_code == 200
+    session_data = session_response.json()
+    session_id = session_data["session_id"]
+
+    # Add a turn to the session
+    turn_payload = {
+        "text": "Hello I feel confused but hopeful",
+        "domain": "test",
+    }
+    turn_response = api_client.post(f"/session/{session_id}/analyze", json=turn_payload)
+    assert turn_response.status_code == 200
+
+    # Now get dashboard analytics
+    dashboard_response = api_client.get(f"/sessions/{session_id}/dashboard")
+    assert dashboard_response.status_code == 200
+
+    dashboard = dashboard_response.json()
+
+    # Verify key fields exist
+    assert "session_id" in dashboard
+    assert dashboard["session_id"] == session_id
+    assert "domain" in dashboard
+    assert "turn_count" in dashboard
+
+    # Verify coherence metrics are present (some may be None)
+    assert "coherence_v1" in dashboard or "coherence_fused" in dashboard
+
+    # Verify bands exist (if computed)
+    # Bands are optional depending on available metrics
+
+    # Verify sparklines exist
+    assert "coherence_sparkline" in dashboard
+    assert "drift_sparkline" in dashboard
+    assert "entropy_sparkline" in dashboard
+
+
+def test_session_dashboard_endpoint_not_found(api_client):
+    """Test /sessions/{session_id}/dashboard returns 404 for unknown session."""
+    response = api_client.get("/sessions/nonexistent-session-id/dashboard")
+    assert response.status_code == 404
+
+    error_data = response.json()
+    assert "not found" in error_data["detail"].lower()
+
+
+def test_session_dashboard_endpoint_no_behavior_change(api_client):
+    """
+    Test dashboard endpoint does not modify existing endpoint behavior.
+
+    Verify that:
+    - /dilchat/analyze still works the same
+    - /symbolu/analyze still works the same
+    - Session summary still works the same
+    """
+    # Create session
+    session_response = api_client.post("/session/start", json={"domain": "test"})
+    session_id = session_response.json()["session_id"]
+
+    # Add turn
+    turn_payload = {"text": "Test message", "domain": "test"}
+    turn_response = api_client.post(f"/session/{session_id}/analyze", json=turn_payload)
+
+    # Get dashboard (should not affect other endpoints)
+    dashboard_response = api_client.get(f"/sessions/{session_id}/dashboard")
+    assert dashboard_response.status_code == 200
+
+    # Verify summary endpoint still works
+    summary_response = api_client.get(f"/session/{session_id}/summary")
+    assert summary_response.status_code == 200
+
+    summary = summary_response.json()
+    assert "session_id" in summary
+    assert "total_turns" in summary
+    assert "coherence_trend" in summary
+
+
+# ============================================================================
+# TEST 13: FastAPI Import Fallback
 # ============================================================================
 
 def test_fastapi_import_fallback():

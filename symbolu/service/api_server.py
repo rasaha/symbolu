@@ -505,6 +505,67 @@ def create_app() -> "FastAPI":
                 detail=f"Session summary failed: {str(e)}"
             )
 
+    @app.get("/sessions/{session_id}/dashboard")
+    def session_dashboard(session_id: str, request: Request) -> Dict[str, Any]:
+        """
+        Get unified dashboard analytics for a session (Phase 20).
+
+        This endpoint returns complete dashboard-ready analytics including:
+        - All coherence metrics (v1/v2/v3/fused/quality)
+        - Semantic integrity & cognitive drift
+        - Temporal entropy metrics
+        - Intent/Identity/Motivation profiles
+        - Formula & resonance indices
+        - Aggregated risk bands (stability/drift/semantic/motivation)
+        - Timeline sparklines for key metrics
+        - Session pattern tags and notes
+
+        This is a read-only analytics endpoint that does NOT modify
+        any pipeline behavior or state.
+
+        Args:
+            session_id: Session identifier
+            request: FastAPI Request object (for security checks)
+
+        Returns:
+            Dict with complete UnifiedSessionAnalytics
+
+        Raises:
+            HTTPException: If session not found or security checks fail
+        """
+        # Security layer (optional, non-invasive)
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
+        try:
+            # Import dashboard builder
+            from symbolu.tools.unified_dashboard import build_unified_session_analytics
+
+            # Build analytics
+            analytics = build_unified_session_analytics(
+                session_id=session_id,
+                session_store=session_store
+            )
+
+            if analytics is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Session {session_id} not found"
+                )
+
+            # Return JSON-serialized analytics
+            return analytics.to_dict()
+
+        except HTTPException:
+            # Re-raise HTTP exceptions
+            raise
+        except Exception as e:
+            logger.error(f"Error in /sessions/{session_id}/dashboard: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Dashboard generation failed: {str(e)}"
+            )
+
     # ========================================================================
     # PREFERENCE ENDPOINTS (Phase 15B)
     # ========================================================================
