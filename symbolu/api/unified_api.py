@@ -87,6 +87,7 @@ class UnifiedOutput:
     adaptive_continuity: Optional[Dict[str, Any]] = None  # Phase 37: Adaptive continuity engine (observation-only, tone-level only)
     temporal_forecast: Optional[Dict[str, Any]] = None  # Phase 38: Temporal coherence forecasting model (observation-only, tone-level only)
     multi_horizon_forecast: Optional[Dict[str, Any]] = None  # Phase 39: Multi-horizon temporal forecasting engine (observation-only, tone-level only)
+    cross_horizon_resonance: Optional[Dict[str, Any]] = None  # Phase 40: Cross-Horizon Resonance Alignment Engine (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -1071,6 +1072,32 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "diagnostic_tags": getattr(mh_forecast_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 40: Extract cross-horizon resonance alignment engine data (observation-only)
+    chra_data = None
+    # Try to extract from persona response first (if available)
+    if hasattr(ctx, 'persona_response') and ctx.persona_response is not None:
+        chra_profile = getattr(ctx.persona_response, 'cross_horizon_resonance_profile', None)
+        if chra_profile is not None:
+            chra_data = chra_profile
+
+    # Also try to extract from coherence state for observability
+    if chra_data is None and hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        chra_snapshot = getattr(ctx.coherence_state, 'cross_horizon_resonance_snapshot', None)
+        if chra_snapshot is not None:
+            # Build dict from snapshot fields
+            chra_data = {
+                "has": {
+                    "H1": getattr(chra_snapshot, 'has_H1', None),
+                    "H2": getattr(chra_snapshot, 'has_H2', None),
+                    "H3": getattr(chra_snapshot, 'has_H3', None),
+                },
+                "rai": getattr(chra_snapshot, 'rai', None),
+                "ifa": getattr(chra_snapshot, 'ifa', None),
+                "dft": getattr(chra_snapshot, 'dft', None),
+                "alignment_band": getattr(chra_snapshot, 'alignment_band', None),
+                "diagnostic_tags": getattr(chra_snapshot, 'diagnostic_tags', []),
+            }
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -1100,6 +1127,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         adaptive_continuity=ace_data,  # Phase 37
         temporal_forecast=tcfm_data,  # Phase 38
         multi_horizon_forecast=mhtfe_data,  # Phase 39
+        cross_horizon_resonance=chra_data,  # Phase 40
     )
 
 

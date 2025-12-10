@@ -1143,6 +1143,66 @@ def _build_badges(
                 description="Identity continuity is reinforced. Identity patterns are persistent and echoing."
             ))
 
+    # ========================================================================
+    # Phase 40: Cross-Horizon Resonance Alignment Engine Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract cross-horizon resonance from unified_output if available
+    cross_horizon_resonance = None
+    if unified_output and "cross_horizon_resonance" in unified_output:
+        cross_horizon_resonance = unified_output.get("cross_horizon_resonance")
+
+    # Extract CHRA metrics
+    chra_alignment_band = None
+    chra_tags = []
+
+    if cross_horizon_resonance is not None and isinstance(cross_horizon_resonance, dict):
+        chra_alignment_band = cross_horizon_resonance.get("alignment_band")
+        chra_tags = cross_horizon_resonance.get("diagnostic_tags", [])
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode:
+        # Band-based badges (if band is available)
+        if chra_alignment_band == "HIGH_ALIGNMENT":
+            badges.append(DILchatBadge(
+                label="CH_RES_ALIGNMENT_HIGH",
+                level="info",
+                description="Multi-horizon forecast trends align well with resonance, identity, and symbolic signals."
+            ))
+        elif chra_alignment_band == "MIXED_ALIGNMENT":
+            badges.append(DILchatBadge(
+                label="CH_RES_ALIGNMENT_MIXED",
+                level="info",
+                description="Mixed alignment between forecast trends and resonance/identity signals."
+            ))
+        elif chra_alignment_band == "LOW_ALIGNMENT":
+            badges.append(DILchatBadge(
+                label="CH_RES_ALIGNMENT_LOW",
+                level="warning",
+                description="Forecast trends show low alignment with resonance, identity, and symbolic patterns."
+            ))
+
+        # Tag-based badges (diagnostic detail)
+        if "DRIFT_TENSION_HIGH" in chra_tags:
+            badges.append(DILchatBadge(
+                label="CH_RES_DRIFT_TENSION_HIGH",
+                level="warning",
+                description="High tension detected between predicted trends and drift risk."
+            ))
+
+        if "IDENTITY_SUPPORTS_TREND" in chra_tags:
+            badges.append(DILchatBadge(
+                label="CH_RES_IDENTITY_SUPPORTING_TREND",
+                level="info",
+                description="Identity harmonics and memory support the forecasted direction."
+            ))
+
+        if "LONG_TERM_ALIGNMENT_WEAK" in chra_tags:
+            badges.append(DILchatBadge(
+                label="CH_RES_LONG_TERM_UNCERTAIN",
+                level="warning",
+                description="Long-term forecast (H3) shows weak alignment with stability signals."
+            ))
+
     return badges
 
 
