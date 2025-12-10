@@ -156,6 +156,13 @@ class UnifiedSessionAnalytics:
     dominant_resonance_metrics: List[str] = field(default_factory=list)  # Top metrics by normalized weight
     resonance_notes: List[str] = field(default_factory=list)  # Diagnostic notes
 
+    # ========================================================================
+    # Phase 27: Symbolic Harmonization Formula
+    # ========================================================================
+    symbolic_harmonization_band: Optional[str] = None  # "high_harmony" | "medium_harmony" | "low_harmony"
+    symbolic_harmonization_sparkline: Optional[MetricSparkline] = None
+    symbolic_harmonization_notes: List[str] = field(default_factory=list)  # SHF diagnostic notes
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert to JSON-serializable dictionary.

@@ -140,6 +140,14 @@ class CoherenceObservation:
     ucf_entropy: Optional[float] = None  # UCF weight distribution entropy [0.0, 1.0]
     ucf_notes: List[str] = field(default_factory=list)  # UCF diagnostic notes
 
+    # Phase 27: Symbolic Harmonization Formula (observation only)
+    symbolic_harmonization: Optional[Any] = None  # SymbolicHarmonizationSnapshot
+    symbolic_harmonization_index: Optional[float] = None  # SHI [0.0, 1.0]
+    symbolic_alignment: Optional[float] = None  # Symbolic-Practical alignment [0.0, 1.0]
+    mirror_alignment_shf: Optional[float] = None  # Symbolic-Mirror alignment [0.0, 1.0]
+    harmonization_entropy: Optional[float] = None  # Component entropy [0.0, 1.0]
+    symbolic_harmonization_notes: List[str] = field(default_factory=list)  # SHF diagnostic notes
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -526,6 +534,29 @@ class CoherenceObserver:
                 if latest_snapshot is not None:
                     unified_consciousness = latest_snapshot
 
+        # Phase 27: Extract Symbolic Harmonization Formula from coherence_state
+        symbolic_harmonization = None
+        symbolic_harmonization_index = None
+        symbolic_alignment = None
+        mirror_alignment_shf = None
+        harmonization_entropy = None
+        symbolic_harmonization_notes = []
+
+        if coherence_state is not None:
+            # Extract current SHI
+            symbolic_harmonization_index = getattr(coherence_state, 'current_symbolic_harmonization_index', None)
+
+            # Extract harmonization entropy from snapshot
+            shf_snapshot = getattr(coherence_state, 'symbolic_harmonization_snapshot', None)
+            if shf_snapshot is not None:
+                symbolic_alignment = getattr(shf_snapshot, 'symbolic_alignment', None)
+                mirror_alignment_shf = getattr(shf_snapshot, 'mirror_alignment', None)
+                harmonization_entropy = getattr(shf_snapshot, 'harmonization_entropy', None)
+                notes = getattr(shf_snapshot, 'notes', None)
+                if notes:
+                    symbolic_harmonization_notes = list(notes)
+                symbolic_harmonization = shf_snapshot
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -613,6 +644,12 @@ class CoherenceObserver:
             consciousness_integration_potential=consciousness_integration_potential,
             ucf_entropy=ucf_entropy,
             ucf_notes=ucf_notes,
+            symbolic_harmonization=symbolic_harmonization,
+            symbolic_harmonization_index=symbolic_harmonization_index,
+            symbolic_alignment=symbolic_alignment,
+            mirror_alignment_shf=mirror_alignment_shf,
+            harmonization_entropy=harmonization_entropy,
+            symbolic_harmonization_notes=symbolic_harmonization_notes,
         )
 
         # Store observation
@@ -743,6 +780,11 @@ class CoherenceObserver:
         unified_consciousness = self._extract_unified_consciousness_from_observation(obs)
         if unified_consciousness:
             snapshot["unified_consciousness"] = unified_consciousness
+
+        # Phase 27: Add symbolic harmonization section if available
+        symbolic_harmonization = self._extract_symbolic_harmonization_from_observation(obs)
+        if symbolic_harmonization:
+            snapshot["symbolic_harmonization"] = symbolic_harmonization
 
         return snapshot
 
@@ -943,6 +985,56 @@ class CoherenceObserver:
                 unified_consciousness["snapshot"] = obs.unified_consciousness
 
         return unified_consciousness if unified_consciousness else None
+
+    def _extract_symbolic_harmonization_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Any]]:
+        """
+        Extract Phase 27 Symbolic Harmonization Formula metrics from observation.
+
+        Returns symbolic_harmonization dict if metrics are available, None otherwise.
+        """
+        # Build symbolic_harmonization dict from observation
+        symbolic_harmonization = {}
+
+        # Symbolic Harmonization Index (SHI)
+        if obs.symbolic_harmonization_index is not None:
+            symbolic_harmonization["index"] = obs.symbolic_harmonization_index
+            symbolic_harmonization["symbolic_harmonization_index"] = obs.symbolic_harmonization_index  # Explicit
+
+        # Component alignments
+        if obs.symbolic_alignment is not None:
+            symbolic_harmonization["symbolic_alignment"] = obs.symbolic_alignment
+
+        if obs.mirror_alignment_shf is not None:
+            symbolic_harmonization["mirror_alignment"] = obs.mirror_alignment_shf
+
+        # Harmonization entropy
+        if obs.harmonization_entropy is not None:
+            symbolic_harmonization["entropy"] = obs.harmonization_entropy
+
+        # SHF notes
+        if obs.symbolic_harmonization_notes:
+            symbolic_harmonization["notes"] = obs.symbolic_harmonization_notes
+
+        # Full snapshot if available
+        if obs.symbolic_harmonization is not None:
+            # Try to serialize the snapshot
+            if hasattr(obs.symbolic_harmonization, '__dict__'):
+                # Convert snapshot object to dict
+                snapshot_dict = {
+                    "symbolic_alignment": getattr(obs.symbolic_harmonization, 'symbolic_alignment', None),
+                    "mirror_alignment": getattr(obs.symbolic_harmonization, 'mirror_alignment', None),
+                    "guna_symbolic_resonance": getattr(obs.symbolic_harmonization, 'guna_symbolic_resonance', None),
+                    "kosha_symbolic_resonance": getattr(obs.symbolic_harmonization, 'kosha_symbolic_resonance', None),
+                    "semantic_integrity_weight": getattr(obs.symbolic_harmonization, 'semantic_integrity_weight', None),
+                    "symbolic_harmonization_index": getattr(obs.symbolic_harmonization, 'symbolic_harmonization_index', None),
+                    "harmonization_entropy": getattr(obs.symbolic_harmonization, 'harmonization_entropy', None),
+                    "notes": getattr(obs.symbolic_harmonization, 'notes', []),
+                }
+                symbolic_harmonization["snapshot"] = snapshot_dict
+            elif isinstance(obs.symbolic_harmonization, dict):
+                symbolic_harmonization["snapshot"] = obs.symbolic_harmonization
+
+        return symbolic_harmonization if symbolic_harmonization else None
 
     def _get_status_label(self, obs: CoherenceObservation) -> str:
         """Get human-readable status label."""

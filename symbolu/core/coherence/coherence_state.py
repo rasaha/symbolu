@@ -166,6 +166,12 @@ class CoherenceState:
     ucf_entropy: Optional[float] = None  # UCF weight distribution entropy [0.0, 1.0]
     ucf_notes: List[str] = field(default_factory=list)  # Current UCF diagnostic notes
 
+    # Phase 27: Symbolic Harmonization Formula (observation only - not used in scoring)
+    symbolic_harmonization_snapshot: Optional[Any] = None  # SymbolicHarmonizationSnapshot (latest)
+    symbolic_harmonization_history: List[Optional[Any]] = field(default_factory=list)  # List of SymbolicHarmonizationSnapshot
+    current_symbolic_harmonization_index: Optional[float] = None  # Symbolic Harmonization Index [0.0, 1.0]
+    harmonization_entropy_history: List[Optional[float]] = field(default_factory=list)  # Entropy history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -226,6 +232,10 @@ class CoherenceState:
 
         # Phase 26 unified consciousness formula history
         self.ucf_history = self.ucf_history[-window:]
+
+        # Phase 27 symbolic harmonization formula history
+        self.symbolic_harmonization_history = self.symbolic_harmonization_history[-window:]
+        self.harmonization_entropy_history = self.harmonization_entropy_history[-window:]
 
     def get_history_length(self) -> int:
         """

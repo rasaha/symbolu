@@ -100,6 +100,11 @@ class CoherenceEngine:
                 stability_band_history=prev_state.stability_band_history.copy(),
                 mirror_cycle_history=prev_state.mirror_cycle_history.copy(),
                 cause_effect_inversion_history=prev_state.cause_effect_inversion_history.copy(),
+                resonance_weighting_history=prev_state.resonance_weighting_history.copy(),
+                resonance_weighting_entropy_history=prev_state.resonance_weighting_entropy_history.copy(),
+                ucf_history=prev_state.ucf_history.copy(),
+                symbolic_harmonization_history=prev_state.symbolic_harmonization_history.copy(),
+                harmonization_entropy_history=prev_state.harmonization_entropy_history.copy(),
             )
 
         # Append new turn data to histories
@@ -187,6 +192,9 @@ class CoherenceEngine:
 
         # Update Phase 26 unified consciousness formula (observation only)
         self._update_unified_consciousness(state)
+
+        # Update Phase 27 symbolic harmonization formula (observation only)
+        self._update_symbolic_harmonization(state)
 
         return state
 
@@ -1746,3 +1754,170 @@ class CoherenceEngine:
             state.current_cip = None
             state.ucf_entropy = None
             state.ucf_notes = []
+
+    def _update_symbolic_harmonization(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 27 Symbolic Harmonization Formula (observation only).
+
+        This method computes the symbolic harmonization snapshot by measuring
+        alignment across symbolic, practical, and mirror layers, harmonized with
+        Guna/Kosha resonance and semantic integrity.
+
+        The SHF is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for dashboard visualization and analytics.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.symbolic_harmonization import compute_symbolic_harmonization
+
+        # ====================================================================
+        # STEP 1: CONSTRUCT SYMBOLIC LAYER VECTOR
+        # ====================================================================
+        # Symbolic layer represents meaning, archetypes, and authenticity
+        # Components: SMI, bhava states, resonance indices
+
+        symbolic_vector = []
+
+        # SMI (authenticity/tension) - take last 5 values
+        if state.smi_history:
+            symbolic_vector.extend(state.smi_history[-5:])
+
+        # Bhava states (normalized) - take last 5 values
+        if state.bhava_id_history:
+            # Normalize bhava IDs to [0, 1] (assuming max bhava ID is 8)
+            normalized_bhava = [bid / 8.0 for bid in state.bhava_id_history[-5:]]
+            symbolic_vector.extend(normalized_bhava)
+
+        # Guna/Kosha resonance (if available)
+        if state.guna_resonance_index is not None:
+            symbolic_vector.append(state.guna_resonance_index)
+        if state.kosha_resonance_index is not None:
+            symbolic_vector.append(state.kosha_resonance_index)
+
+        # Vritti momentum (Phase 14)
+        if state.vritti_momentum_history:
+            recent_vm = [vm for vm in state.vritti_momentum_history[-3:] if vm is not None]
+            symbolic_vector.extend(recent_vm)
+
+        # Use None if insufficient data
+        symbolic_layer_vector = symbolic_vector if len(symbolic_vector) >= 3 else None
+
+        # ====================================================================
+        # STEP 2: CONSTRUCT PRACTICAL LAYER VECTOR
+        # ====================================================================
+        # Practical layer represents factual grounding and structural coherence
+        # Components: coherence scores, semantic stability, mapper volatility
+
+        practical_vector = []
+
+        # Coherence scores
+        if state.coherence_score > 0.0:
+            practical_vector.append(state.coherence_score)
+        if state.coherence_score_v2 is not None:
+            practical_vector.append(state.coherence_score_v2)
+        if state.coherence_fused is not None:
+            practical_vector.append(state.coherence_fused)
+
+        # Semantic stability
+        if state.semantic_stability_score > 0.0:
+            practical_vector.append(state.semantic_stability_score)
+
+        # Semantic integrity (Phase 17)
+        if state.semantic_integrity_score is not None:
+            practical_vector.append(state.semantic_integrity_score)
+
+        # Mapper volatility (inverted - lower volatility = better practical grounding)
+        if state.mapper_volatility_score > 0.0:
+            practical_vector.append(1.0 - state.mapper_volatility_score)
+
+        # Temporal arc score
+        if state.temporal_arc_score > 0.0:
+            practical_vector.append(state.temporal_arc_score)
+
+        # Use None if insufficient data
+        practical_layer_vector = practical_vector if len(practical_vector) >= 3 else None
+
+        # ====================================================================
+        # STEP 3: CONSTRUCT MIRROR LAYER VECTOR
+        # ====================================================================
+        # Mirror layer represents contradictions, tensions, and reflective coherence
+        # Components: drift, tension, mirror-time metrics
+
+        mirror_vector = []
+
+        # Cognitive drift (Phase 17) - inverted for alignment (low drift = good)
+        if state.cognitive_drift_v3 is not None:
+            mirror_vector.append(1.0 - state.cognitive_drift_v3)
+
+        # Tension history - take recent values
+        if state.tension_history:
+            # Tension is a challenge metric, normalize and take recent values
+            recent_tension = state.tension_history[-3:]
+            mirror_vector.extend(recent_tension)
+
+        # Mirror-time loop metrics (Phase 21)
+        if state.avg_loop_alignment is not None:
+            mirror_vector.append(state.avg_loop_alignment)
+        if state.avg_loop_tension is not None:
+            # Tension is risk metric - invert it
+            mirror_vector.append(1.0 - state.avg_loop_tension)
+
+        # Mirror-time cycle metrics (Phase 22)
+        if state.avg_cycle_alignment is not None:
+            mirror_vector.append(state.avg_cycle_alignment)
+
+        # Temporal entropy (Phase 18)
+        if state.temporal_entropy_diff is not None:
+            # Low diff = stable, map to alignment quality
+            if state.temporal_entropy_diff <= 0.5:
+                quality = 0.5 + state.temporal_entropy_diff
+            else:
+                quality = 1.5 - state.temporal_entropy_diff
+            mirror_vector.append(quality)
+
+        # Use None if insufficient data
+        mirror_layer_vector = mirror_vector if len(mirror_vector) >= 3 else None
+
+        # ====================================================================
+        # STEP 4: GATHER RESONANCE & SEMANTIC METRICS
+        # ====================================================================
+
+        guna_resonance = state.guna_resonance_index
+        kosha_resonance = state.kosha_resonance_index
+        semantic_integrity = state.semantic_integrity_score
+
+        # ====================================================================
+        # STEP 5: COMPUTE SYMBOLIC HARMONIZATION
+        # ====================================================================
+
+        snapshot = compute_symbolic_harmonization(
+            symbolic_layer_vector=symbolic_layer_vector,
+            practical_layer_vector=practical_layer_vector,
+            mirror_layer_vector=mirror_layer_vector,
+            guna_resonance=guna_resonance,
+            kosha_resonance=kosha_resonance,
+            semantic_integrity=semantic_integrity,
+        )
+
+        # ====================================================================
+        # STEP 6: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Append to histories
+            state.symbolic_harmonization_history.append(snapshot)
+            state.harmonization_entropy_history.append(snapshot.harmonization_entropy)
+
+            # Update current metrics
+            state.symbolic_harmonization_snapshot = snapshot
+            state.current_symbolic_harmonization_index = snapshot.symbolic_harmonization_index
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.symbolic_harmonization_history.append(None)
+            state.harmonization_entropy_history.append(None)
+            state.symbolic_harmonization_snapshot = None
+            state.current_symbolic_harmonization_index = None

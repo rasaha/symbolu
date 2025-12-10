@@ -907,6 +907,60 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_ucf_notes:
             ucf_notes_list = sorted(set(all_ucf_notes))
 
+    # Phase 27: Extract Symbolic Harmonization Formula (SHF) metrics from coherence history
+    avg_symbolic_harmonization_val = None
+    dominant_symbolic_harmonization_pattern_val = None
+    symbolic_harmonization_notes_list = []
+
+    if state.coherence_history:
+        # Extract SHF metrics from CoherenceState
+        shi_values = []
+        all_shf_notes = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract current_symbolic_harmonization_index from CoherenceState
+                if "current_symbolic_harmonization_index" in coh and coh["current_symbolic_harmonization_index"] is not None:
+                    shi_values.append(coh["current_symbolic_harmonization_index"])
+
+                # Also extract from symbolic_harmonization_history for detailed analysis
+                if "symbolic_harmonization_history" in coh:
+                    shf_history = coh["symbolic_harmonization_history"]
+                    if isinstance(shf_history, list):
+                        for snapshot in shf_history:
+                            # Handle both dict and object snapshots
+                            if snapshot is not None:
+                                if isinstance(snapshot, dict):
+                                    if "notes" in snapshot and snapshot["notes"]:
+                                        all_shf_notes.extend(snapshot["notes"])
+                                elif hasattr(snapshot, "notes"):
+                                    if snapshot.notes:
+                                        all_shf_notes.extend(snapshot.notes)
+
+        # Compute aggregates
+        # Average Symbolic Harmonization Index
+        if shi_values:
+            avg_symbolic_harmonization_val = sum(shi_values) / len(shi_values)
+
+            # Determine dominant pattern using frequency-based band classification
+            # High harmony: >= 0.70, Medium harmony: 0.40-0.70, Low harmony: < 0.40
+            high_count = sum(1 for v in shi_values if v >= 0.70)
+            medium_count = sum(1 for v in shi_values if 0.40 <= v < 0.70)
+            low_count = sum(1 for v in shi_values if v < 0.40)
+
+            # Dominant pattern is the most frequent band
+            max_count = max(high_count, medium_count, low_count)
+            if max_count == high_count:
+                dominant_symbolic_harmonization_pattern_val = "high_harmony"
+            elif max_count == medium_count:
+                dominant_symbolic_harmonization_pattern_val = "medium_harmony"
+            else:
+                dominant_symbolic_harmonization_pattern_val = "low_harmony"
+
+        # Collect unique SHF notes (deduplicate and sort for determinism)
+        if all_shf_notes:
+            symbolic_harmonization_notes_list = sorted(set(all_shf_notes))
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -963,4 +1017,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         ucf_entropy_band=ucf_entropy_band_val,
         dominant_ucf_signals=dominant_ucf_signals_list,
         ucf_notes=ucf_notes_list,
+        avg_symbolic_harmonization=avg_symbolic_harmonization_val,
+        dominant_symbolic_harmonization_pattern=dominant_symbolic_harmonization_pattern_val,
+        symbolic_harmonization_notes=symbolic_harmonization_notes_list,
     )
