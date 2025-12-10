@@ -115,6 +115,9 @@ class CoherenceEngine:
         # Update Phase 8 Guna/Kosha resonance (observation only)
         self._update_guna_kosha_resonance(state, routing_plan, temporal_summary)
 
+        # Update Phase 10 coherence v3 (megafusion, observation only)
+        state.coherence_score_v3 = self._compute_coherence_score_v3(state, mapper_profile)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -498,3 +501,165 @@ class CoherenceEngine:
             state.guna_resonance_index = None
             state.kosha_resonance_index = None
             state.kosha_activation_vector = None
+
+    def _bias_synergy(self, guna_bias: float, kosha_bias: float) -> float:
+        """
+        Compute bias synergy from guna and kosha resonance biases.
+
+        Phase 10 support function for coherence v3 formula.
+        Combines guna_resonance_bias and kosha_resonance_bias into a normalized
+        synergy score.
+
+        Formula:
+            synergy = clamp((guna_bias + kosha_bias) / 2, -0.10, 0.10)
+            return 0.5 + synergy  # Normalize to [0, 1]
+
+        Args:
+            guna_bias: Guna resonance bias from mapper profile ([-0.10, +0.10])
+            kosha_bias: Kosha resonance bias from mapper profile ([-0.10, +0.10])
+
+        Returns:
+            float: Normalized synergy score [0.0, 1.0]
+        """
+        # Helper: clamp function
+        def clamp(value: float, min_val: float, max_val: float) -> float:
+            return max(min_val, min(max_val, value))
+
+        # Compute average bias
+        synergy = (guna_bias + kosha_bias) / 2.0
+
+        # Clamp to bias range
+        synergy = clamp(synergy, -0.10, 0.10)
+
+        # Normalize to [0, 1] range (0.5 = neutral)
+        return 0.5 + synergy
+
+    def _harmonics_coherence(self, expression_harmonics: Optional[list]) -> float:
+        """
+        Compute coherence from expression harmonics.
+
+        Phase 10 support function for coherence v3 formula.
+        Computes coherence as inverse of standard deviation of harmonics.
+        Lower variance = higher coherence.
+
+        Formula:
+            val = 1 - stddev(harmonics)
+            return clamp(val, 0.0, 1.0)
+
+        Args:
+            expression_harmonics: List of harmonic values from kosha activation
+
+        Returns:
+            float: Harmonics coherence score [0.0, 1.0]
+                   Returns 1.0 if harmonics is None or empty (neutral)
+        """
+        # Helper: clamp function
+        def clamp(value: float, min_val: float, max_val: float) -> float:
+            return max(min_val, min(max_val, value))
+
+        # If no harmonics, return neutral (1.0 = perfect coherence)
+        if expression_harmonics is None or len(expression_harmonics) == 0:
+            return 1.0
+
+        # If only one harmonic, no variance = perfect coherence
+        if len(expression_harmonics) == 1:
+            return 1.0
+
+        # Compute standard deviation
+        mean = sum(expression_harmonics) / len(expression_harmonics)
+        variance = sum((x - mean) ** 2 for x in expression_harmonics) / len(expression_harmonics)
+        stddev = variance ** 0.5
+
+        # Coherence = 1 - stddev (clamped to [0, 1])
+        coherence = 1.0 - stddev
+        return clamp(coherence, 0.0, 1.0)
+
+    def _compute_coherence_score_v3(
+        self,
+        state: CoherenceState,
+        mapper_profile: Dict,
+    ) -> Optional[float]:
+        """
+        Compute Phase 10 Coherence v3 megafusion score (experimental).
+
+        This is the first formula-layer megafusion that integrates:
+        - Phase 1 temporal formulas (smi, delta_smi, bhava_gap, tension_corridor)
+        - Phase 3 derived metrics (resonance_index, tension_index, arc_alignment_index)
+        - Phase 8 resonance metrics (guna_resonance_index, kosha_resonance_index)
+        - Phase 9 modulation biases (guna_resonance_bias, kosha_resonance_bias, expression_harmonics)
+
+        Formula (canonical v1.0 draft):
+            v3 = clamp(
+                0.35 * base
+              + 0.15 * resonance_index
+              + 0.10 * arc_alignment_index
+              + 0.10 * (1 - tension_index)
+              + 0.10 * guna_resonance_index
+              + 0.10 * kosha_resonance_index
+              + 0.05 * _bias_synergy(guna_bias, kosha_bias)
+              + 0.05 * _harmonics_coherence(expression_harmonics),
+              0.0, 1.0
+            )
+
+        Missing Data Rule:
+            If ANY required metric is missing → return None.
+
+        Args:
+            state: CoherenceState with all metrics
+            mapper_profile: MapperProfile dict with Phase 9 biases
+
+        Returns:
+            Optional[float]: v3 coherence score (0.0-1.0), or None if required
+                           metrics are not available
+
+        Note:
+            This score is EXPERIMENTAL and NOT used in existing pipeline behavior
+            unless explicitly enabled via domain profile feature flags (Phase 10+).
+            By default, use_coherence_v3=False for all domains.
+        """
+        # Helper: clamp function
+        def clamp(value: float, min_val: float, max_val: float) -> float:
+            return max(min_val, min(max_val, value))
+
+        # Extract required inputs from CoherenceState
+        base = state.coherence_score  # v1 canonical (always available)
+        resonance_index = state.resonance_index  # Phase 3
+        tension_index = state.tension_index  # Phase 3
+        arc_alignment_index = state.arc_alignment_index  # Phase 3
+        guna_resonance_index = state.guna_resonance_index  # Phase 8
+        kosha_resonance_index = state.kosha_resonance_index  # Phase 8
+
+        # Extract Phase 9 modulation biases from mapper_profile
+        guna_bias = mapper_profile.get("guna_resonance_bias", 0.0)
+        kosha_bias = mapper_profile.get("kosha_resonance_bias", 0.0)
+        expression_harmonics = mapper_profile.get("expression_harmonics", None)
+
+        # Missing data check: If ANY required metric is missing, return None
+        if (
+            resonance_index is None
+            or tension_index is None
+            or arc_alignment_index is None
+            or guna_resonance_index is None
+            or kosha_resonance_index is None
+        ):
+            return None
+
+        # Compute support metrics
+        bias_synergy = self._bias_synergy(guna_bias, kosha_bias)
+        harmonics_coherence = self._harmonics_coherence(expression_harmonics)
+
+        # Compute v3 score with canonical Phase 10 formula
+        coherence_score_v3 = clamp(
+            0.35 * base
+            + 0.15 * resonance_index
+            + 0.10 * arc_alignment_index
+            + 0.10 * (1.0 - tension_index)  # Tension penalty
+            + 0.10 * guna_resonance_index
+            + 0.10 * kosha_resonance_index
+            + 0.05 * bias_synergy
+            + 0.05 * harmonics_coherence,
+            0.0,
+            1.0,
+        )
+
+        return coherence_score_v3

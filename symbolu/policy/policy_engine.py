@@ -56,26 +56,36 @@ def _get_active_coherence_score(
     """
     Returns the coherence score that should be used for policy rules.
 
-    v1 is always available; v2 is optional and gated by profile.use_coherence_v2.
+    v1 is always available; v2 and v3 are optional and gated by profile flags.
 
-    This helper enables Phase 4 coherence v2 integration into policy layer while
-    maintaining complete backward compatibility. By default (use_coherence_v2=False),
-    this always returns v1 score, preserving existing behavior.
+    This helper enables Phase 4 coherence v2 and Phase 10 coherence v3 integration
+    into policy layer while maintaining complete backward compatibility. By default
+    (use_coherence_v2=False, use_coherence_v3=False), this always returns v1 score,
+    preserving existing behavior.
+
+    Priority cascade:
+        1. v3 (if use_coherence_v3=True AND v3 available)
+        2. v2 (if use_coherence_v2=True AND v2 available)
+        3. v1 (always fallback)
 
     Args:
         unified_output: Unified output dictionary from USU-API v1.0
         profile: Domain profile dictionary (from get_domain_profile)
 
     Returns:
-        float: Active coherence score (v2 if enabled and available, else v1)
+        float: Active coherence score (v3 > v2 > v1 cascade)
 
     Examples:
-        >>> unified = {"coherence": {"coherence_score": 0.6, "coherence_score_v2": 0.75}}
-        >>> profile = {"use_coherence_v2": True, ...}
+        >>> unified = {"coherence": {"coherence_score": 0.6, "coherence_score_v2": 0.75, "coherence_score_v3": 0.82}}
+        >>> profile = {"use_coherence_v3": True, ...}
         >>> _get_active_coherence_score(unified, profile)
+        0.82
+
+        >>> profile_v2 = {"use_coherence_v2": True, "use_coherence_v3": False, ...}
+        >>> _get_active_coherence_score(unified, profile_v2)
         0.75
 
-        >>> profile_v1_only = {"use_coherence_v2": False, ...}
+        >>> profile_v1_only = {"use_coherence_v2": False, "use_coherence_v3": False, ...}
         >>> _get_active_coherence_score(unified, profile_v1_only)
         0.6
     """
@@ -84,16 +94,25 @@ def _get_active_coherence_score(
     # v1 is always available (default to 1.0 if missing)
     coherence_score_v1 = coherence.get("coherence_score", 1.0)
 
-    # Check if profile enables v2
+    # Check if profile enables v3 (Phase 10 experimental megafusion)
+    use_v3 = profile.get("use_coherence_v3", False)
+
+    # If v3 is enabled AND v3 score is available, use it (highest priority)
+    if use_v3:
+        coherence_score_v3 = coherence.get("coherence_score_v3")
+        if coherence_score_v3 is not None:
+            return coherence_score_v3
+
+    # Check if profile enables v2 (Phase 4 formula-aware)
     use_v2 = profile.get("use_coherence_v2", False)
 
-    # If v2 is enabled AND v2 score is available, use it
+    # If v2 is enabled AND v2 score is available, use it (second priority)
     if use_v2:
         coherence_score_v2 = coherence.get("coherence_score_v2")
         if coherence_score_v2 is not None:
             return coherence_score_v2
 
-    # Default: return v1 (backward compatible)
+    # Default: return v1 (backward compatible, always fallback)
     return coherence_score_v1
 
 

@@ -70,6 +70,9 @@ class CoherenceState:
     # Phase 4: Formula-aware coherence v2 (optional, feature-flag gated)
     coherence_score_v2: Optional[float] = None  # v2 formula-aware (optional)
 
+    # Phase 10: Coherence v3 megafusion (experimental, disabled by default)
+    coherence_score_v3: Optional[float] = None  # v3 formula megafusion (optional)
+
     # Phase 8: Guna/Kosha resonance metrics (observation only - not used in scoring)
     guna_resonance_index: Optional[float] = None  # [0.0, 1.0] - Guna balance/distortion measure
     kosha_resonance_index: Optional[float] = None  # [0.0, 1.0] - Kosha coherence measure

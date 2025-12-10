@@ -27,7 +27,7 @@ on:
       - "symbolu/motivation/**"
       - "symbolu/core/motivation_drift_tests/**"
       - "symbolu/tools/coherence_dashboard/**"
-      - "docs/patent_formula_coverage_matrix.md"
+      - "docs/**"
       - ".github/workflows/pipeline-ci.yml"
   pull_request:
     branches: ["main", "master"]
@@ -55,7 +55,7 @@ on:
       - "symbolu/motivation/**"
       - "symbolu/core/motivation_drift_tests/**"
       - "symbolu/tools/coherence_dashboard/**"
-      - "docs/patent_formula_coverage_matrix.md"
+      - "docs/**"
       - ".github/workflows/pipeline-ci.yml"
   workflow_dispatch:
 
@@ -206,6 +206,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee phase9-mapper-modulation-pytest.log
 
+      - name: Run Phase 10 Coherence v3 Formula Fusion Tests
+        run: |
+          pytest symbolu/mechanical/pipeline/integration_tests/test_phase10_coherence_v3_formula_fusion.py \
+            --disable-warnings -q \
+            2>&1 | tee phase10-coherence-v3-pytest.log
+
       - name: Run Policy Engine Tests
         run: |
           pytest symbolu/policy/tests/test_policy_engine.py \
@@ -338,6 +344,7 @@ jobs:
             phase5-formula-ui-pytest.log
             phase8-resonance-integration-pytest.log
             phase9-mapper-modulation-pytest.log
+            phase10-coherence-v3-pytest.log
             policy-engine-pytest.log
             dilchat-adapter-pytest.log
             api-server-pytest.log
