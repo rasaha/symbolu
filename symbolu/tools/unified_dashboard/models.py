@@ -149,6 +149,13 @@ class UnifiedSessionAnalytics:
     inversion_sparkline: Optional[MetricSparkline] = None
     inversion_notes: List[str] = field(default_factory=list)
 
+    # ========================================================================
+    # Phase 24: Resonance Weighting Function
+    # ========================================================================
+    resonance_entropy_band: Optional[str] = None  # "focused" | "balanced" | "diffuse"
+    dominant_resonance_metrics: List[str] = field(default_factory=list)  # Top metrics by normalized weight
+    resonance_notes: List[str] = field(default_factory=list)  # Diagnostic notes
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert to JSON-serializable dictionary.

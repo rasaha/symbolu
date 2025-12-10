@@ -443,6 +443,46 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
 
             coherence_report['cause_effect_inversion'] = cause_effect_inversion_data
 
+        # Phase 24: Resonance Weighting Function (observation only - no behavior changes)
+        current_resonance_entropy = getattr(coherence_state, 'current_resonance_entropy', None)
+        dominant_resonance_metrics = getattr(coherence_state, 'dominant_resonance_metrics', None)
+        current_resonance_weights = getattr(coherence_state, 'current_resonance_weights', None)
+        current_normalized_resonance_weights = getattr(coherence_state, 'current_normalized_resonance_weights', None)
+
+        # Extract detailed snapshot from resonance weighting history
+        weighting_history = getattr(coherence_state, 'resonance_weighting_history', None)
+        latest_weighting_snapshot = None
+        if weighting_history and len(weighting_history) > 0:
+            latest_weighting_snapshot = weighting_history[-1]
+
+        # Add resonance weighting to coherence report if available
+        if current_resonance_entropy is not None or latest_weighting_snapshot is not None:
+            resonance_weighting_data = {}
+
+            if current_resonance_entropy is not None:
+                resonance_weighting_data['entropy'] = current_resonance_entropy
+
+            if dominant_resonance_metrics:
+                resonance_weighting_data['dominant_metrics'] = list(dominant_resonance_metrics) if isinstance(dominant_resonance_metrics, list) else []
+
+            if current_resonance_weights:
+                resonance_weighting_data['weights'] = current_resonance_weights
+
+            if current_normalized_resonance_weights:
+                resonance_weighting_data['normalized_weights'] = current_normalized_resonance_weights
+
+            # Add detailed breakdown if snapshot exists
+            if latest_weighting_snapshot is not None:
+                resonance_weighting_data['snapshot'] = {
+                    'weights': getattr(latest_weighting_snapshot, 'weights', None),
+                    'normalized_weights': getattr(latest_weighting_snapshot, 'normalized_weights', None),
+                    'entropy_of_weights': getattr(latest_weighting_snapshot, 'entropy_of_weights', None),
+                    'dominant_metrics': getattr(latest_weighting_snapshot, 'dominant_metrics', None),
+                    'notes': getattr(latest_weighting_snapshot, 'notes', None),
+                }
+
+            coherence_report['resonance_weighting'] = resonance_weighting_data
+
     # Build metadata
     metadata = {
         'timestamp': datetime.utcnow().isoformat() + 'Z',

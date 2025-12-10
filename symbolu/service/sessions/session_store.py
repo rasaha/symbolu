@@ -752,6 +752,62 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_inversion_notes:
             inversion_pattern_tags = list(set(all_inversion_notes))
 
+    # Phase 24: Extract Resonance Weighting metrics from coherence history
+    avg_resonance_entropy_val = None
+    dominant_resonance_metrics_list = []
+    resonance_weighting_notes_list = []
+
+    if state.coherence_history:
+        # Extract resonance weighting metrics from CoherenceState
+        resonance_entropy_values = []
+        all_dominant_metrics = []
+        all_resonance_notes = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract current_resonance_entropy from CoherenceState
+                if "current_resonance_entropy" in coh and coh["current_resonance_entropy"] is not None:
+                    resonance_entropy_values.append(coh["current_resonance_entropy"])
+
+                # Extract dominant_resonance_metrics from CoherenceState
+                if "dominant_resonance_metrics" in coh and coh["dominant_resonance_metrics"]:
+                    if isinstance(coh["dominant_resonance_metrics"], list):
+                        all_dominant_metrics.extend(coh["dominant_resonance_metrics"])
+
+                # Also extract from resonance_weighting_history for detailed analysis
+                if "resonance_weighting_history" in coh:
+                    weighting_history = coh["resonance_weighting_history"]
+                    if isinstance(weighting_history, list):
+                        for snapshot in weighting_history:
+                            # Handle both dict and object snapshots
+                            if snapshot is not None:
+                                if isinstance(snapshot, dict):
+                                    if "notes" in snapshot and snapshot["notes"]:
+                                        all_resonance_notes.extend(snapshot["notes"])
+                                    if "dominant_metrics" in snapshot and snapshot["dominant_metrics"]:
+                                        if isinstance(snapshot["dominant_metrics"], dict):
+                                            all_dominant_metrics.extend(snapshot["dominant_metrics"].keys())
+                                elif hasattr(snapshot, "notes") and snapshot.notes:
+                                    all_resonance_notes.extend(snapshot.notes)
+                                    if hasattr(snapshot, "dominant_metrics") and snapshot.dominant_metrics:
+                                        all_dominant_metrics.extend(snapshot.dominant_metrics.keys())
+
+        # Compute aggregates
+        # Average resonance entropy
+        if resonance_entropy_values:
+            avg_resonance_entropy_val = sum(resonance_entropy_values) / len(resonance_entropy_values)
+
+        # Dominant resonance metrics (most frequent, limited to top N)
+        if all_dominant_metrics:
+            from collections import Counter
+            metric_counts = Counter(all_dominant_metrics)
+            # Get top 5 most common metrics
+            dominant_resonance_metrics_list = [metric for metric, _ in metric_counts.most_common(5)]
+
+        # Collect unique resonance weighting notes (deduplicate and sort for determinism)
+        if all_resonance_notes:
+            resonance_weighting_notes_list = sorted(set(all_resonance_notes))
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -799,4 +855,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         dominant_inversion_band=dominant_inversion_band,
         cause_chain_stability_avg=cause_chain_stability_avg_val,
         inversion_pattern_tags=inversion_pattern_tags,
+        avg_resonance_entropy=avg_resonance_entropy_val,
+        dominant_resonance_metrics=dominant_resonance_metrics_list,
+        resonance_weighting_notes=resonance_weighting_notes_list,
     )
