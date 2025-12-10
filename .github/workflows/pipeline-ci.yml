@@ -342,6 +342,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee mirror_time-loop-pytest.log
 
+      - name: Run Phase 22 Mirror-Time Cycle Tests
+        run: |
+          pytest tests/test_phase22_mirror_time_cycle.py \
+            --disable-warnings -q \
+            2>&1 | tee phase22-mirror-time-cycle-pytest.log
+
       - name: Run Phase 20 Unified Dashboard Tests
         run: |
           pytest symbolu/tools/unified_dashboard/tests/test_unified_dashboard.py \

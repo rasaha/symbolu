@@ -51,7 +51,8 @@ class TemporalFormulaSnapshot:
 
     This dataclass holds the computed values from the four foundational
     temporal formulas introduced in Symbol-U v3.0 Phase 1, plus Phase 14
-    advanced temporal formulas, plus Phase 21 mirror-time loop.
+    advanced temporal formulas, plus Phase 21 mirror-time loop, plus Phase 22
+    mirror-time cycles.
 
     Attributes:
         smi: Symbolic Mental Index (0.0 to 1.0)
@@ -61,6 +62,7 @@ class TemporalFormulaSnapshot:
         vritti_momentum: Phase 14 Vritti Momentum Formula (-1.0 to 1.0) - observation only
         arc_tension_harmonizer: Phase 14 Arc-Tension Harmonizer (0.0 to 1.0) - observation only
         mirror_time_loop: Phase 21 Mirror-Time Loop snapshot - observation only
+        mirror_time_cycle_summary: Phase 22 Mirror-Time Cycle summary - observation only
     """
 
     smi: Optional[float] = None
@@ -70,9 +72,12 @@ class TemporalFormulaSnapshot:
     vritti_momentum: Optional[float] = None
     arc_tension_harmonizer: Optional[float] = None
     mirror_time_loop: Optional[Any] = None  # MirrorTimeLoopSnapshot
+    mirror_time_cycle_summary: Optional[Any] = None  # MirrorTimeCycleSummary
 
     def to_dict(self) -> Dict[str, Optional[float]]:
         """Convert snapshot to JSON-safe dictionary."""
+        from dataclasses import asdict
+
         result = {
             "smi": self.smi,
             "delta_smi": self.delta_smi,
@@ -84,8 +89,13 @@ class TemporalFormulaSnapshot:
 
         # Phase 21: Add mirror_time_loop if available
         if self.mirror_time_loop is not None:
-            from dataclasses import asdict
             result["mirror_time_loop"] = asdict(self.mirror_time_loop)
+
+        # Phase 22: Add mirror_time_cycle_summary if available
+        if self.mirror_time_cycle_summary is not None:
+            # Convert MirrorTimeCycleSummary to dict
+            cycle_summary_dict = asdict(self.mirror_time_cycle_summary)
+            result["mirror_time_cycle_summary"] = cycle_summary_dict
 
         return result
 
@@ -139,6 +149,11 @@ class TemporalState:
     def mirror_time_loop(self) -> Optional[Any]:
         """Get mirror_time_loop from formulas snapshot (Phase 21)."""
         return self.formulas.mirror_time_loop
+
+    @property
+    def mirror_time_cycle_summary(self) -> Optional[Any]:
+        """Get mirror_time_cycle_summary from formulas snapshot (Phase 22)."""
+        return self.formulas.mirror_time_cycle_summary
 
 
 class TemporalBhavaTracker:

@@ -157,3 +157,11 @@ class SessionSummary:
     avg_reversal_probability: Optional[float] = None  # Average reversal probability [0.0, 1.0]
     dominant_loop_stability_band: Optional[str] = None  # "stable" | "transitional" | "unstable"
     reversal_probability_trend: Optional[str] = None  # "increasing" | "decreasing" | "stable"
+
+    # Phase 22 Mirror-Time Cycles (observation only)
+    dominant_cycle_type: Optional[str] = None  # Most common cycle type: "converging" | "diverging" | "oscillating" | "stalled"
+    dominant_cycle_stability_band: Optional[str] = None  # Most common stability band: "stable" | "transitional" | "unstable"
+    avg_cycle_alignment: Optional[float] = None  # Average alignment across cycles [0.0, 1.0]
+    avg_cycle_tension: Optional[float] = None  # Average tension across cycles [0.0, 1.0]
+    avg_cycle_reversal_probability: Optional[float] = None  # Average reversal probability across cycles [0.0, 1.0]
+    cycle_count: int = 0  # Total number of cycles detected in session

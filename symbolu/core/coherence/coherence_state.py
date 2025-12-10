@@ -134,6 +134,14 @@ class CoherenceState:
     reversal_probability_history: List[Optional[float]] = field(default_factory=list)  # Reversal probability history
     stability_band_history: List[Optional[str]] = field(default_factory=list)  # Stability band history
 
+    # Phase 22: Mirror-Time Cycles (observation only - not used in scoring)
+    mirror_cycle_history: List[Any] = field(default_factory=list)  # List of MirrorTimeCycleSnapshot
+    dominant_cycle_type: Optional[str] = None  # Most common cycle type
+    dominant_cycle_stability_band: Optional[str] = None  # Most common stability band
+    avg_cycle_alignment: Optional[float] = None  # Average alignment across cycles [0.0, 1.0]
+    avg_cycle_tension: Optional[float] = None  # Average tension across cycles [0.0, 1.0]
+    avg_cycle_reversal_probability: Optional[float] = None  # Average reversal probability across cycles [0.0, 1.0]
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -181,6 +189,9 @@ class CoherenceState:
         self.loop_tension_history = self.loop_tension_history[-window:]
         self.reversal_probability_history = self.reversal_probability_history[-window:]
         self.stability_band_history = self.stability_band_history[-window:]
+
+        # Phase 22 cycle history
+        self.mirror_cycle_history = self.mirror_cycle_history[-window:]
 
     def get_history_length(self) -> int:
         """

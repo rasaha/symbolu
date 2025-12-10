@@ -110,6 +110,14 @@ class CoherenceObservation:
     avg_loop_tension: Optional[float] = None
     avg_reversal_probability: Optional[float] = None
 
+    # Phase 22: Mirror-Time Cycles (observation only)
+    mirror_cycle_dominant_type: Optional[str] = None
+    mirror_cycle_dominant_stability_band: Optional[str] = None
+    mirror_cycle_count: Optional[int] = None
+    mirror_cycle_avg_alignment: Optional[float] = None
+    mirror_cycle_avg_tension: Optional[float] = None
+    mirror_cycle_avg_reversal_probability: Optional[float] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -394,6 +402,27 @@ class CoherenceObserver:
                 mirror_vector = getattr(loop_snapshot, 'mirror_vector', None)
                 loop_delta = getattr(loop_snapshot, 'loop_delta', None)
 
+        # Phase 22: Extract Mirror-Time Cycles from coherence_state
+        mirror_cycle_dominant_type = None
+        mirror_cycle_dominant_stability_band = None
+        mirror_cycle_count = None
+        mirror_cycle_avg_alignment = None
+        mirror_cycle_avg_tension = None
+        mirror_cycle_avg_reversal_probability = None
+
+        if coherence_state is not None:
+            # Extract cycle aggregates
+            mirror_cycle_dominant_type = getattr(coherence_state, 'dominant_cycle_type', None)
+            mirror_cycle_dominant_stability_band = getattr(coherence_state, 'dominant_cycle_stability_band', None)
+            mirror_cycle_avg_alignment = getattr(coherence_state, 'avg_cycle_alignment', None)
+            mirror_cycle_avg_tension = getattr(coherence_state, 'avg_cycle_tension', None)
+            mirror_cycle_avg_reversal_probability = getattr(coherence_state, 'avg_cycle_reversal_probability', None)
+
+            # Count cycles from mirror_cycle_history
+            mirror_cycle_history = getattr(coherence_state, 'mirror_cycle_history', None)
+            if mirror_cycle_history is not None:
+                mirror_cycle_count = len(mirror_cycle_history)
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -459,6 +488,12 @@ class CoherenceObserver:
             avg_loop_alignment=avg_loop_alignment,
             avg_loop_tension=avg_loop_tension,
             avg_reversal_probability=avg_reversal_probability,
+            mirror_cycle_dominant_type=mirror_cycle_dominant_type,
+            mirror_cycle_dominant_stability_band=mirror_cycle_dominant_stability_band,
+            mirror_cycle_count=mirror_cycle_count,
+            mirror_cycle_avg_alignment=mirror_cycle_avg_alignment,
+            mirror_cycle_avg_tension=mirror_cycle_avg_tension,
+            mirror_cycle_avg_reversal_probability=mirror_cycle_avg_reversal_probability,
         )
 
         # Store observation
