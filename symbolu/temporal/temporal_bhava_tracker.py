@@ -51,7 +51,7 @@ class TemporalFormulaSnapshot:
 
     This dataclass holds the computed values from the four foundational
     temporal formulas introduced in Symbol-U v3.0 Phase 1, plus Phase 14
-    advanced temporal formulas.
+    advanced temporal formulas, plus Phase 21 mirror-time loop.
 
     Attributes:
         smi: Symbolic Mental Index (0.0 to 1.0)
@@ -60,6 +60,7 @@ class TemporalFormulaSnapshot:
         tension_corridor: Tension dynamics signal (0.0 to 1.0)
         vritti_momentum: Phase 14 Vritti Momentum Formula (-1.0 to 1.0) - observation only
         arc_tension_harmonizer: Phase 14 Arc-Tension Harmonizer (0.0 to 1.0) - observation only
+        mirror_time_loop: Phase 21 Mirror-Time Loop snapshot - observation only
     """
 
     smi: Optional[float] = None
@@ -68,10 +69,11 @@ class TemporalFormulaSnapshot:
     tension_corridor: Optional[float] = None
     vritti_momentum: Optional[float] = None
     arc_tension_harmonizer: Optional[float] = None
+    mirror_time_loop: Optional[Any] = None  # MirrorTimeLoopSnapshot
 
     def to_dict(self) -> Dict[str, Optional[float]]:
         """Convert snapshot to JSON-safe dictionary."""
-        return {
+        result = {
             "smi": self.smi,
             "delta_smi": self.delta_smi,
             "bhava_gap": self.bhava_gap,
@@ -79,6 +81,13 @@ class TemporalFormulaSnapshot:
             "vritti_momentum": self.vritti_momentum,
             "arc_tension_harmonizer": self.arc_tension_harmonizer,
         }
+
+        # Phase 21: Add mirror_time_loop if available
+        if self.mirror_time_loop is not None:
+            from dataclasses import asdict
+            result["mirror_time_loop"] = asdict(self.mirror_time_loop)
+
+        return result
 
 
 @dataclass
@@ -125,6 +134,11 @@ class TemporalState:
     def arc_tension_harmonizer(self) -> Optional[float]:
         """Get arc_tension_harmonizer from formulas snapshot (Phase 14)."""
         return self.formulas.arc_tension_harmonizer
+
+    @property
+    def mirror_time_loop(self) -> Optional[Any]:
+        """Get mirror_time_loop from formulas snapshot (Phase 21)."""
+        return self.formulas.mirror_time_loop
 
 
 class TemporalBhavaTracker:

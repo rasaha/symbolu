@@ -1167,6 +1167,45 @@ def _build_hints(
                     message="Temporal field volatile. Emotional/cognitive state is highly variable or unstable."
                 ))
 
+    # ========================================================================
+    # Phase 21: Mirror-Time Loop Hints (diagnostic only)
+    # ========================================================================
+    # Only show when interaction_mode in {smart_insight, deep_adaptive}
+    if interaction_mode in ["smart_insight", "deep_adaptive"] and coherence:
+        mirror_time_loop_data = coherence.get("mirror_time_loop", {})
+        reversal_probability = mirror_time_loop_data.get("reversal_probability")
+        stability_band = mirror_time_loop_data.get("details", {}).get("stability_band")
+
+        # If we have mirror-time loop data, add stability-based hints
+        if stability_band is not None:
+            # MIRROR_TIME_STABLE: stable band
+            if stability_band == "stable":
+                hints.append(DILchatHint(
+                    code="MIRROR_TIME_STABLE",
+                    message="Mirror-time loop stable. Forward and reflection are aligned, temporal flow is coherent."
+                ))
+
+            # MIRROR_TIME_TRANSITIONAL: transitional band
+            elif stability_band == "transitional":
+                hints.append(DILchatHint(
+                    code="MIRROR_TIME_TRANSITIONAL",
+                    message="Mirror-time loop transitional. Forward-reflection alignment is shifting, monitor for stabilization or reversal."
+                ))
+
+            # MIRROR_TIME_REVERSAL_RISK: unstable band OR high reversal probability
+            elif stability_band == "unstable":
+                hints.append(DILchatHint(
+                    code="MIRROR_TIME_REVERSAL_RISK",
+                    message="Mirror-time loop unstable. High reversal risk detected, reflection may overtake forward progression."
+                ))
+
+        # Add reversal risk hint if probability is high (even if band is not unstable)
+        elif reversal_probability is not None and reversal_probability > 0.65:
+            hints.append(DILchatHint(
+                code="MIRROR_TIME_REVERSAL_RISK",
+                message="Mirror-time loop reversal risk elevated. Monitor for temporal inversion or retrospective drift."
+            ))
+
     return hints
 
 

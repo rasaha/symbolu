@@ -542,6 +542,87 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
             else:
                 temporal_entropy_regime = "volatile"
 
+    # Phase 21: Extract Mirror-Time Loop from coherence history
+    avg_loop_alignment = None
+    avg_loop_tension = None
+    avg_reversal_probability = None
+    dominant_loop_stability_band = None
+    reversal_probability_trend = None
+
+    if state.coherence_history:
+        # Extract loop alignment, tension, reversal probability values
+        loop_alignment_values = []
+        loop_tension_values = []
+        reversal_probability_values = []
+        stability_band_values = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract avg_loop_alignment from CoherenceState
+                if "avg_loop_alignment" in coh and coh["avg_loop_alignment"] is not None:
+                    loop_alignment_values.append(coh["avg_loop_alignment"])
+
+                # Extract avg_loop_tension from CoherenceState
+                if "avg_loop_tension" in coh and coh["avg_loop_tension"] is not None:
+                    loop_tension_values.append(coh["avg_loop_tension"])
+
+                # Extract avg_reversal_probability from CoherenceState
+                if "avg_reversal_probability" in coh and coh["avg_reversal_probability"] is not None:
+                    reversal_probability_values.append(coh["avg_reversal_probability"])
+
+                # Also extract from histories for better coverage
+                if "loop_alignment_history" in coh:
+                    alignment_history = coh["loop_alignment_history"]
+                    if isinstance(alignment_history, list):
+                        loop_alignment_values.extend([a for a in alignment_history if a is not None])
+
+                if "loop_tension_history" in coh:
+                    tension_history = coh["loop_tension_history"]
+                    if isinstance(tension_history, list):
+                        loop_tension_values.extend([t for t in tension_history if t is not None])
+
+                if "reversal_probability_history" in coh:
+                    reversal_history = coh["reversal_probability_history"]
+                    if isinstance(reversal_history, list):
+                        reversal_probability_values.extend([r for r in reversal_history if r is not None])
+
+                # Extract stability band values
+                if "stability_band_history" in coh:
+                    band_history = coh["stability_band_history"]
+                    if isinstance(band_history, list):
+                        stability_band_values.extend([b for b in band_history if b is not None])
+
+        # Compute aggregates
+        if loop_alignment_values:
+            avg_loop_alignment = sum(loop_alignment_values) / len(loop_alignment_values)
+
+        if loop_tension_values:
+            avg_loop_tension = sum(loop_tension_values) / len(loop_tension_values)
+
+        if reversal_probability_values:
+            avg_reversal_probability = sum(reversal_probability_values) / len(reversal_probability_values)
+
+        # Determine dominant stability band (most frequent)
+        if stability_band_values:
+            from collections import Counter
+            band_counts = Counter(stability_band_values)
+            dominant_loop_stability_band = band_counts.most_common(1)[0][0]
+
+        # Determine reversal probability trend
+        if reversal_probability_values and len(reversal_probability_values) >= 3:
+            # Compare first third vs last third to detect trend
+            third = len(reversal_probability_values) // 3
+            first_third_avg = sum(reversal_probability_values[:third]) / third if third > 0 else 0.0
+            last_third_avg = sum(reversal_probability_values[-third:]) / third if third > 0 else 0.0
+
+            # Threshold for detecting trend
+            if last_third_avg - first_third_avg > 0.1:
+                reversal_probability_trend = "increasing"
+            elif first_third_avg - last_third_avg > 0.1:
+                reversal_probability_trend = "decreasing"
+            else:
+                reversal_probability_trend = "stable"
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -574,4 +655,9 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_temporal_entropy_diff=avg_temporal_entropy_diff,
         avg_temporal_entropy_volatility=avg_temporal_entropy_volatility,
         temporal_entropy_regime=temporal_entropy_regime,
+        avg_loop_alignment=avg_loop_alignment,
+        avg_loop_tension=avg_loop_tension,
+        avg_reversal_probability=avg_reversal_probability,
+        dominant_loop_stability_band=dominant_loop_stability_band,
+        reversal_probability_trend=reversal_probability_trend,
     )

@@ -150,3 +150,10 @@ class SessionSummary:
     avg_temporal_entropy_diff: Optional[float] = None  # Average normalized entropy diff [0.0, 1.0]
     avg_temporal_entropy_volatility: Optional[float] = None  # Average entropy volatility [0.0, 1.0]
     temporal_entropy_regime: Optional[str] = None  # "stable" | "transition" | "volatile"
+
+    # Phase 21 Mirror-Time Loop (observation only)
+    avg_loop_alignment: Optional[float] = None  # Average loop alignment [0.0, 1.0]
+    avg_loop_tension: Optional[float] = None  # Average loop tension [0.0, 1.0]
+    avg_reversal_probability: Optional[float] = None  # Average reversal probability [0.0, 1.0]
+    dominant_loop_stability_band: Optional[str] = None  # "stable" | "transitional" | "unstable"
+    reversal_probability_trend: Optional[str] = None  # "increasing" | "decreasing" | "stable"
