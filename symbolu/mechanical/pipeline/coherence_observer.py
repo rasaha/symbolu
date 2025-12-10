@@ -98,6 +98,18 @@ class CoherenceObservation:
     temporal_entropy_volatility: Optional[float] = None
     temporal_entropy_details: Optional[Dict[str, Any]] = None
 
+    # Phase 21: Mirror-Time Loop (observation only)
+    loop_alignment: Optional[float] = None
+    loop_tension: Optional[float] = None
+    reversal_probability: Optional[float] = None
+    stability_band: Optional[str] = None
+    forward_vector: Optional[float] = None
+    mirror_vector: Optional[float] = None
+    loop_delta: Optional[float] = None
+    avg_loop_alignment: Optional[float] = None
+    avg_loop_tension: Optional[float] = None
+    avg_reversal_probability: Optional[float] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -353,6 +365,35 @@ class CoherenceObserver:
                     'entropy_volatility': getattr(entropy_snapshot, 'entropy_volatility', None),
                 }
 
+        # Phase 21: Extract Mirror-Time Loop from coherence_state
+        loop_alignment = None
+        loop_tension = None
+        reversal_probability = None
+        stability_band = None
+        forward_vector = None
+        mirror_vector = None
+        loop_delta = None
+        avg_loop_alignment = None
+        avg_loop_tension = None
+        avg_reversal_probability = None
+
+        if coherence_state is not None:
+            # Extract aggregates
+            avg_loop_alignment = getattr(coherence_state, 'avg_loop_alignment', None)
+            avg_loop_tension = getattr(coherence_state, 'avg_loop_tension', None)
+            avg_reversal_probability = getattr(coherence_state, 'avg_reversal_probability', None)
+
+            # Extract current values from snapshot
+            loop_snapshot = getattr(coherence_state, 'mirror_time_loop_snapshot', None)
+            if loop_snapshot is not None:
+                loop_alignment = getattr(loop_snapshot, 'loop_alignment', None)
+                loop_tension = getattr(loop_snapshot, 'loop_tension', None)
+                reversal_probability = getattr(loop_snapshot, 'reversal_probability', None)
+                stability_band = getattr(loop_snapshot, 'stability_band', None)
+                forward_vector = getattr(loop_snapshot, 'forward_vector', None)
+                mirror_vector = getattr(loop_snapshot, 'mirror_vector', None)
+                loop_delta = getattr(loop_snapshot, 'loop_delta', None)
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -408,6 +449,16 @@ class CoherenceObserver:
             temporal_entropy_diff=temporal_entropy_diff,
             temporal_entropy_volatility=temporal_entropy_volatility,
             temporal_entropy_details=temporal_entropy_details,
+            loop_alignment=loop_alignment,
+            loop_tension=loop_tension,
+            reversal_probability=reversal_probability,
+            stability_band=stability_band,
+            forward_vector=forward_vector,
+            mirror_vector=mirror_vector,
+            loop_delta=loop_delta,
+            avg_loop_alignment=avg_loop_alignment,
+            avg_loop_tension=avg_loop_tension,
+            avg_reversal_probability=avg_reversal_probability,
         )
 
         # Store observation

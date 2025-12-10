@@ -167,6 +167,9 @@ class CoherenceEngine:
         # Update Phase 18 temporal entropy differential (observation only)
         self._update_temporal_entropy_differential(state)
 
+        # Update Phase 21 mirror-time loop (observation only)
+        self._update_mirror_time_loop(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -1164,3 +1167,105 @@ class CoherenceEngine:
             state.temporal_entropy_volatility = None
             state.temporal_entropy_diff_history.append(None)
             state.temporal_entropy_volatility_history.append(None)
+
+    def _update_mirror_time_loop(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 21 Mirror-Time Loop (observation only).
+
+        This method computes the mirror-time loop snapshot by analyzing:
+        - Forward vector (from delta_smi + tension_corridor)
+        - Mirror vector (from coherence_fused + semantic_integrity)
+        - Loop delta (forward - mirror)
+        - Loop tension (|forward - mirror|)
+        - Loop alignment (cosine similarity-like)
+        - Reversal probability
+        - Stability band classification
+
+        The mirror-time loop metrics are stored in state.mirror_time_loop_* fields
+        and do NOT affect any existing pipeline behavior. They are purely for
+        observation and diagnostics.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.mirror_time_loop import compute_mirror_time_loop
+
+        # Extract required histories
+        delta_smi_history = state.delta_smi_history
+        tension_corridor_history = state.tension_corridor_history
+        coherence_fused_history = state.coherence_fused_history
+        semantic_integrity_history = state.semantic_integrity_history
+
+        # Use resonance_index as a proxy for resonance_index_history
+        # Build history from arc_alignment_index (closest proxy available)
+        resonance_index_history = []
+        if state.resonance_index is not None:
+            # For simplicity, use current resonance_index as the latest value
+            # In a full implementation, we would maintain a dedicated history
+            resonance_index_history = [state.resonance_index]
+
+        # Check if we have any data
+        if not delta_smi_history and not tension_corridor_history and not coherence_fused_history:
+            # No data available - set to None and return
+            state.mirror_time_loop_snapshot = None
+            state.avg_loop_alignment = None
+            state.avg_loop_tension = None
+            state.avg_reversal_probability = None
+            state.loop_alignment_history.append(None)
+            state.loop_tension_history.append(None)
+            state.reversal_probability_history.append(None)
+            state.stability_band_history.append(None)
+            return
+
+        # Compute mirror-time loop snapshot
+        snapshot = compute_mirror_time_loop(
+            delta_smi_history=delta_smi_history,
+            tension_corridor_history=tension_corridor_history,
+            coherence_fused_history=coherence_fused_history,
+            semantic_integrity_history=semantic_integrity_history,
+            resonance_index_history=resonance_index_history,
+            window=5,
+        )
+
+        # Store results in state
+        if snapshot is not None:
+            state.mirror_time_loop_snapshot = snapshot
+
+            # Append to histories
+            state.loop_alignment_history.append(snapshot.loop_alignment)
+            state.loop_tension_history.append(snapshot.loop_tension)
+            state.reversal_probability_history.append(snapshot.reversal_probability)
+            state.stability_band_history.append(snapshot.stability_band)
+
+            # Compute aggregates (averages)
+            valid_alignments = [a for a in state.loop_alignment_history if a is not None]
+            valid_tensions = [t for t in state.loop_tension_history if t is not None]
+            valid_reversals = [r for r in state.reversal_probability_history if r is not None]
+
+            if valid_alignments:
+                state.avg_loop_alignment = sum(valid_alignments) / len(valid_alignments)
+            else:
+                state.avg_loop_alignment = None
+
+            if valid_tensions:
+                state.avg_loop_tension = sum(valid_tensions) / len(valid_tensions)
+            else:
+                state.avg_loop_tension = None
+
+            if valid_reversals:
+                state.avg_reversal_probability = sum(valid_reversals) / len(valid_reversals)
+            else:
+                state.avg_reversal_probability = None
+        else:
+            # Snapshot computation failed
+            state.mirror_time_loop_snapshot = None
+            state.avg_loop_alignment = None
+            state.avg_loop_tension = None
+            state.avg_reversal_probability = None
+            state.loop_alignment_history.append(None)
+            state.loop_tension_history.append(None)
+            state.reversal_probability_history.append(None)
+            state.stability_band_history.append(None)

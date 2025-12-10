@@ -124,6 +124,16 @@ class CoherenceState:
     temporal_entropy_diff_history: List[Optional[float]] = field(default_factory=list)  # Diff history
     temporal_entropy_volatility_history: List[Optional[float]] = field(default_factory=list)  # Volatility history
 
+    # Phase 21: Mirror-Time Loop (observation only - not used in scoring)
+    mirror_time_loop_snapshot: Optional[Any] = None  # MirrorTimeLoopSnapshot
+    avg_loop_alignment: Optional[float] = None  # Average loop alignment [0.0, 1.0]
+    avg_loop_tension: Optional[float] = None  # Average loop tension [0.0, 1.0]
+    avg_reversal_probability: Optional[float] = None  # Average reversal probability [0.0, 1.0]
+    loop_alignment_history: List[Optional[float]] = field(default_factory=list)  # Loop alignment history
+    loop_tension_history: List[Optional[float]] = field(default_factory=list)  # Loop tension history
+    reversal_probability_history: List[Optional[float]] = field(default_factory=list)  # Reversal probability history
+    stability_band_history: List[Optional[str]] = field(default_factory=list)  # Stability band history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -165,6 +175,12 @@ class CoherenceState:
         # Phase 18 formula histories
         self.temporal_entropy_diff_history = self.temporal_entropy_diff_history[-window:]
         self.temporal_entropy_volatility_history = self.temporal_entropy_volatility_history[-window:]
+
+        # Phase 21 formula histories
+        self.loop_alignment_history = self.loop_alignment_history[-window:]
+        self.loop_tension_history = self.loop_tension_history[-window:]
+        self.reversal_probability_history = self.reversal_probability_history[-window:]
+        self.stability_band_history = self.stability_band_history[-window:]
 
     def get_history_length(self) -> int:
         """

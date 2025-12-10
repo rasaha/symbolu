@@ -330,6 +330,41 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
 
             coherence_report['temporal_entropy'] = temporal_entropy_data
 
+        # Phase 21: Add Mirror-Time Loop metrics
+        loop_alignment = getattr(coherence_state, 'avg_loop_alignment', None)
+        loop_tension = getattr(coherence_state, 'avg_loop_tension', None)
+        reversal_probability = getattr(coherence_state, 'avg_reversal_probability', None)
+
+        # Extract detailed component breakdowns from snapshot
+        loop_snapshot = getattr(coherence_state, 'mirror_time_loop_snapshot', None)
+
+        # Add mirror-time loop to coherence report if available
+        if loop_alignment is not None or loop_tension is not None or reversal_probability is not None:
+            mirror_time_loop_data = {}
+
+            if loop_alignment is not None:
+                mirror_time_loop_data['loop_alignment'] = loop_alignment
+
+            if loop_tension is not None:
+                mirror_time_loop_data['loop_tension'] = loop_tension
+
+            if reversal_probability is not None:
+                mirror_time_loop_data['reversal_probability'] = reversal_probability
+
+            # Add component diagnostics if snapshot exists
+            if loop_snapshot is not None:
+                mirror_time_loop_data['details'] = {
+                    'forward_vector': getattr(loop_snapshot, 'forward_vector', None),
+                    'mirror_vector': getattr(loop_snapshot, 'mirror_vector', None),
+                    'loop_delta': getattr(loop_snapshot, 'loop_delta', None),
+                    'loop_tension': getattr(loop_snapshot, 'loop_tension', None),
+                    'loop_alignment': getattr(loop_snapshot, 'loop_alignment', None),
+                    'reversal_probability': getattr(loop_snapshot, 'reversal_probability', None),
+                    'stability_band': getattr(loop_snapshot, 'stability_band', None),
+                }
+
+            coherence_report['mirror_time_loop'] = mirror_time_loop_data
+
     # Build metadata
     metadata = {
         'timestamp': datetime.utcnow().isoformat() + 'Z',
@@ -543,6 +578,34 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         min_arc_tension_harmonizer = getattr(coherence_state, 'min_arc_tension_harmonizer', None)
         if min_arc_tension_harmonizer is not None:
             formulas_data["min_arc_tension_harmonizer"] = min_arc_tension_harmonizer
+
+        # Phase 21: Extract Mirror-Time Loop metrics
+        # Get most recent values from snapshot
+        loop_snapshot = getattr(coherence_state, 'mirror_time_loop_snapshot', None)
+        if loop_snapshot is not None:
+            mirror_time_loop_dict = {
+                'forward_vector': getattr(loop_snapshot, 'forward_vector', None),
+                'mirror_vector': getattr(loop_snapshot, 'mirror_vector', None),
+                'loop_delta': getattr(loop_snapshot, 'loop_delta', None),
+                'loop_tension': getattr(loop_snapshot, 'loop_tension', None),
+                'loop_alignment': getattr(loop_snapshot, 'loop_alignment', None),
+                'reversal_probability': getattr(loop_snapshot, 'reversal_probability', None),
+                'stability_band': getattr(loop_snapshot, 'stability_band', None),
+            }
+            formulas_data["mirror_time_loop"] = mirror_time_loop_dict
+
+        # Get Phase 21 aggregates
+        avg_loop_alignment = getattr(coherence_state, 'avg_loop_alignment', None)
+        if avg_loop_alignment is not None:
+            formulas_data["avg_loop_alignment"] = avg_loop_alignment
+
+        avg_loop_tension = getattr(coherence_state, 'avg_loop_tension', None)
+        if avg_loop_tension is not None:
+            formulas_data["avg_loop_tension"] = avg_loop_tension
+
+        avg_reversal_probability = getattr(coherence_state, 'avg_reversal_probability', None)
+        if avg_reversal_probability is not None:
+            formulas_data["avg_reversal_probability"] = avg_reversal_probability
 
     # Phase 15: Extract interaction mode from policy flags or context
     interaction_mode_data = None
