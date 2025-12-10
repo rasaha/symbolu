@@ -910,6 +910,63 @@ def _build_badges(
             ))
 
     # ========================================================================
+    # Phase 34: Identity Harmonics Layer Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract identity_harmonics from unified_output
+    identity_harmonics = unified_output.get("identity_harmonics") if unified_output else None
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and identity_harmonics is not None:
+        # Extract identity harmonics metrics
+        cih = identity_harmonics.get("cih")
+        aih = identity_harmonics.get("aih")
+        rih = identity_harmonics.get("rih")
+        ihi = identity_harmonics.get("ihi")
+        identity_stability_score = identity_harmonics.get("identity_stability_score")
+        identity_flexibility_score = identity_harmonics.get("identity_flexibility_score")
+        identity_harmonics_tags = identity_harmonics.get("identity_harmonics_tags", [])
+
+        # IDENTITY_HARMONICS_HIGH: Overall IHI >= 0.75
+        if ihi is not None and ihi >= 0.75:
+            badges.append(DILchatBadge(
+                label="IDENTITY_HARMONICS_HIGH",
+                level="info",
+                description=f"High identity harmonics alignment (IHI: {ihi:.2f}). Strong identity coherence across semantic, adaptive, and relational dimensions."
+            ))
+
+        # IDENTITY_HARMONICS_MEDIUM: Overall IHI between 0.50 and 0.75
+        elif ihi is not None and 0.50 <= ihi < 0.75:
+            badges.append(DILchatBadge(
+                label="IDENTITY_HARMONICS_MEDIUM",
+                level="info",
+                description=f"Medium identity harmonics alignment (IHI: {ihi:.2f}). Moderate identity coherence."
+            ))
+
+        # IDENTITY_HARMONICS_LOW: Overall IHI < 0.50
+        elif ihi is not None and ihi < 0.50:
+            badges.append(DILchatBadge(
+                label="IDENTITY_HARMONICS_LOW",
+                level="warning",
+                description=f"Low identity harmonics alignment (IHI: {ihi:.2f}). Identity coherence may be fragmented."
+            ))
+
+        # IDENTITY_FLEXIBILITY_HIGH: AIH >= 0.70
+        if aih is not None and aih >= 0.70:
+            badges.append(DILchatBadge(
+                label="IDENTITY_FLEXIBILITY_HIGH",
+                level="info",
+                description=f"High adaptive identity harmonic (AIH: {aih:.2f}). Strong capacity for coherent identity shifts."
+            ))
+
+        # IDENTITY_STABILITY_STRONG: CIH >= 0.75
+        if cih is not None and cih >= 0.75:
+            badges.append(DILchatBadge(
+                label="IDENTITY_STABILITY_STRONG",
+                level="info",
+                description=f"Strong core identity stability (CIH: {cih:.2f}). Consistent identity signals across turns."
+            ))
+
+    # ========================================================================
     # BADGE 16: Trading Guardrail Badges (Phase 7: Formula-Aware Trading Guardrails v1.0)
     # ========================================================================
     if trading_guardrails:
