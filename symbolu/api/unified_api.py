@@ -80,6 +80,7 @@ class UnifiedOutput:
     persona_resonance: Optional[Dict[str, Any]] = None  # Phase 29: Persona resonance profile
     persona_resonance_map: Optional[Dict[str, Any]] = None  # Phase 30: Cross-layer resonance persona map
     insight_window: Optional[Dict[str, Any]] = None  # Phase 32: Insight window gating result
+    schema_adaptive_map: Optional[Dict[str, Any]] = None  # Phase 33: Persona schema adaptive routing (observation-only)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -883,6 +884,26 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 # Fallback to dict conversion
                 persona_resonance_map_data = dict(cl_resonance_map.__dict__)
 
+    # Phase 33: Extract persona schema adaptive routing map from persona response
+    schema_adaptive_map_data = None
+    if hasattr(ctx, 'persona_response') and ctx.persona_response is not None:
+        # Try to extract schema_adaptive_map from PersonaResponse
+        schema_adaptive_map = getattr(ctx.persona_response, 'schema_adaptive_map', None)
+        if schema_adaptive_map is not None:
+            # Serialize SchemaAdaptiveRoutingSnapshot to dict
+            if hasattr(schema_adaptive_map, 'to_dict'):
+                # Use custom to_dict method
+                schema_adaptive_map_data = schema_adaptive_map.to_dict()
+            elif hasattr(schema_adaptive_map, 'model_dump'):
+                # Pydantic v2 style (new method name)
+                schema_adaptive_map_data = schema_adaptive_map.model_dump()
+            elif hasattr(schema_adaptive_map, 'dict'):
+                # Pydantic v1 style (deprecated in v2)
+                schema_adaptive_map_data = schema_adaptive_map.dict()
+            elif hasattr(schema_adaptive_map, '__dict__'):
+                # Fallback to dict conversion
+                schema_adaptive_map_data = dict(schema_adaptive_map.__dict__)
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -905,6 +926,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         persona_resonance=persona_resonance_data,  # Phase 29
         persona_resonance_map=persona_resonance_map_data,  # Phase 30
         insight_window=insight_window_data,  # Phase 32
+        schema_adaptive_map=schema_adaptive_map_data,  # Phase 33
     )
 
 

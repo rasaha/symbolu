@@ -152,6 +152,13 @@ class CoherenceObservation:
     persona_resonance_bias: Optional[float] = None  # Symbolic harmony bias applied to persona tone [-0.05, +0.05]
     persona_resonance_tags: List[str] = field(default_factory=list)  # Persona resonance tags
 
+    # Phase 33: Persona Schema Adaptive Routing (observation only)
+    persona_schema_alignment: Optional[Dict[str, float]] = None  # Schema alignment scores by persona [0.0, 1.0]
+    persona_schema_confidence: Optional[float] = None  # Confidence in schema alignment [0.0, 1.0]
+    persona_schema_stability: Optional[float] = None  # Schema stability score [0.0, 1.0]
+    persona_schema_drift: Optional[float] = None  # Schema drift score [0.0, 1.0]
+    persona_schema_tags: List[str] = field(default_factory=list)  # Schema diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -573,6 +580,24 @@ class CoherenceObserver:
                 persona_resonance_bias = getattr(persona_resonance, 'symbolic_harmony_bias', None)
                 persona_resonance_tags = getattr(persona_resonance, 'symbolic_resonance_tags', [])
 
+        # Phase 33: Extract Persona Schema Adaptive Routing from pipeline context
+        persona_schema_alignment = None
+        persona_schema_confidence = None
+        persona_schema_stability = None
+        persona_schema_drift = None
+        persona_schema_tags = []
+
+        # Try to extract schema adaptive map from persona_response in context
+        if hasattr(pipeline_context, 'persona_response') and pipeline_context.persona_response is not None:
+            persona_response = pipeline_context.persona_response
+            schema_adaptive_map = getattr(persona_response, 'schema_adaptive_map', None)
+            if schema_adaptive_map is not None:
+                persona_schema_alignment = getattr(schema_adaptive_map, 'schema_alignment_scores', None)
+                persona_schema_confidence = getattr(schema_adaptive_map, 'schema_confidence', None)
+                persona_schema_stability = getattr(schema_adaptive_map, 'schema_stability', None)
+                persona_schema_drift = getattr(schema_adaptive_map, 'schema_drift', None)
+                persona_schema_tags = getattr(schema_adaptive_map, 'schema_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -668,6 +693,11 @@ class CoherenceObserver:
             symbolic_harmonization_notes=symbolic_harmonization_notes,
             persona_resonance_bias=persona_resonance_bias,  # Phase 29
             persona_resonance_tags=persona_resonance_tags,  # Phase 29
+            persona_schema_alignment=persona_schema_alignment,  # Phase 33
+            persona_schema_confidence=persona_schema_confidence,  # Phase 33
+            persona_schema_stability=persona_schema_stability,  # Phase 33
+            persona_schema_drift=persona_schema_drift,  # Phase 33
+            persona_schema_tags=persona_schema_tags,  # Phase 33
         )
 
         # Store observation

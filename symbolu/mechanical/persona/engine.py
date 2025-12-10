@@ -20,6 +20,7 @@ from .models import RendererOutputV3, DHAResult, PersonaResponse, PersonaMetadat
 from .registry import PersonaRegistry
 from .selector import PersonaSelector
 from .persona_resonance_mapping import CrossLayerResonanceMap, compute_cross_layer_persona_map
+from .schema_adaptive_routing import SchemaAdaptiveRoutingSnapshot, compute_schema_adaptive_map
 
 
 class PersonaEngine:
@@ -150,7 +151,18 @@ class PersonaEngine:
             # Attach cl_map to response for observability
             persona_response.cross_layer_resonance_map = cl_map
 
-        # Step 9: Return complete response
+        # Phase 33 Step 9: Compute persona schema adaptive routing (observation-only)
+        # Extract coherence observation from explain_log (same as Phase 30)
+        if coherence_observation is not None:
+            # Compute schema adaptive map (experimental, diagnostic-only)
+            schema_map = self._compute_schema_adaptive_snapshot(
+                coherence_observation,
+                explain_log
+            )
+            # Attach schema_map to response for observability (NEVER affects routing)
+            persona_response.schema_adaptive_map = schema_map
+
+        # Step 10: Return complete response
         return persona_response
     
     def _order_layers(
@@ -563,6 +575,64 @@ class PersonaEngine:
 
         # No-op for now: future versions will implement live tone modulation
         pass
+
+    def _compute_schema_adaptive_snapshot(
+        self,
+        coherence_observation: Any,
+        explain_log: Dict[str, Any]
+    ) -> Optional[SchemaAdaptiveRoutingSnapshot]:
+        """
+        Phase 33: Compute persona schema adaptive routing snapshot.
+
+        This method computes experimental schema alignment signals that map
+        the user's coherence patterns to different persona schemas.
+
+        CRITICAL: This is OBSERVATION-ONLY. The computed schema alignment
+        scores are NEVER used to change persona selection or routing.
+        They are purely for research and diagnostic purposes.
+
+        Args:
+            coherence_observation: CoherenceObservation with all signals
+            explain_log: MLCR explain log with metadata
+
+        Returns:
+            SchemaAdaptiveRoutingSnapshot or None if computation fails
+
+        Invariants:
+            • Zero-LLM: pure mathematical computation
+            • Deterministic: same inputs → same outputs
+            • Observation-only: NEVER affects routing
+            • Graceful degradation: missing signals → None
+        """
+        # Graceful degradation: if coherence observation missing, return None
+        if coherence_observation is None:
+            return None
+
+        try:
+            # Extract previous schema snapshot from explain_log if available
+            # (for drift computation across turns)
+            previous_snapshot = None
+            if explain_log:
+                coherence_state = explain_log.get('coherence_state')
+                if coherence_state is not None:
+                    previous_snapshot = getattr(
+                        coherence_state,
+                        'previous_schema_adaptive_snapshot',
+                        None
+                    )
+
+            # Compute schema adaptive map
+            schema_map = compute_schema_adaptive_map(
+                coherence_observation,
+                previous_snapshot=previous_snapshot
+            )
+
+            return schema_map
+
+        except Exception:
+            # Graceful degradation: any error → return None
+            # This ensures schema adaptive routing NEVER breaks the pipeline
+            return None
 
     def get_persona_summary(self) -> str:
         """
