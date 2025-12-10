@@ -29,6 +29,9 @@ from symbolu.formulas.vritti_momentum import (
 from symbolu.formulas.arc_tension_harmonizer import (
     compute_arc_tension_harmonizer as _compute_arc_tension_harmonizer_formula,
 )
+from symbolu.formulas.enhanced_smi import (
+    compute_enhanced_smi_snapshot,
+)
 
 
 @dataclass
@@ -73,12 +76,14 @@ class TemporalFormulaSnapshot:
     arc_tension_harmonizer: Optional[float] = None
     mirror_time_loop: Optional[Any] = None  # MirrorTimeLoopSnapshot
     mirror_time_cycle_summary: Optional[Any] = None  # MirrorTimeCycleSummary
+    enhanced_smi: Optional[float] = None  # Phase 13: Enhanced SMI
 
     def to_dict(self) -> Dict[str, Optional[float]]:
         """Convert snapshot to JSON-safe dictionary."""
         from dataclasses import asdict
 
         result = {
+            "enhanced_smi": self.enhanced_smi,
             "smi": self.smi,
             "delta_smi": self.delta_smi,
             "bhava_gap": self.bhava_gap,
