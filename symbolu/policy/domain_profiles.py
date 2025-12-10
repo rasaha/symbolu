@@ -39,6 +39,8 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "style": "precise",
         "use_coherence_v2": False,  # Phase 4: Stay ultra-conservative, use v1 only
         "use_coherence_v3": False,  # Phase 10: Experimental megafusion (disabled by default)
+        # Phase 12: v3 quality gating (disabled for trading, v3 not used)
+        "min_v3_quality_for_activation": None,
         # Phase 5: Formula UI modulation (disabled for trading)
         "formula_ui_mode": "none",
         "min_resonance_for_reflection": 0.60,
@@ -58,6 +60,8 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "style": "reflective",
         "use_coherence_v2": True,  # Phase 4: Enable formula-aware coherence
         "use_coherence_v3": True,  # Phase 11: Enable megafusion v3 for therapy domain
+        # Phase 12: v3 quality gating (soft, forgiving threshold for therapy)
+        "min_v3_quality_for_activation": 0.40,
         # Phase 5: Formula UI modulation (enabled for therapy)
         "formula_ui_mode": "light",
         "min_resonance_for_reflection": 0.50,
@@ -74,6 +78,8 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "style": "exploratory",
         "use_coherence_v2": True,  # Phase 4: Enable formula-aware coherence
         "use_coherence_v3": True,  # Phase 11: Enable megafusion v3 for identity domain
+        # Phase 12: v3 quality gating (slightly stricter than therapy)
+        "min_v3_quality_for_activation": 0.45,
         # Phase 5: Formula UI modulation (enabled for identity)
         "formula_ui_mode": "light",
         "min_resonance_for_reflection": 0.50,
@@ -90,6 +96,8 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "style": "neutral",
         "use_coherence_v2": False,  # Phase 4: Stay conservative, use v1 by default
         "use_coherence_v3": False,  # Phase 10: Experimental megafusion (disabled by default)
+        # Phase 12: v3 quality gating (disabled for generic, v3 not used)
+        "min_v3_quality_for_activation": None,
         # Phase 5: Formula UI modulation (disabled for generic)
         "formula_ui_mode": "none",
         "min_resonance_for_reflection": 0.55,

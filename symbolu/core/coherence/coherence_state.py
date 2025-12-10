@@ -73,6 +73,9 @@ class CoherenceState:
     # Phase 10: Coherence v3 megafusion (experimental, disabled by default)
     coherence_score_v3: Optional[float] = None  # v3 formula megafusion (optional)
 
+    # Phase 12: Coherence v3 quality metric (soft stability windows)
+    coherence_v3_quality: Optional[float] = None  # [0.0, 1.0] - soft quality metric for v3 gating
+
     # Phase 8: Guna/Kosha resonance metrics (observation only - not used in scoring)
     guna_resonance_index: Optional[float] = None  # [0.0, 1.0] - Guna balance/distortion measure
     kosha_resonance_index: Optional[float] = None  # [0.0, 1.0] - Kosha coherence measure

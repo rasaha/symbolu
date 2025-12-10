@@ -218,6 +218,18 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee phase11-v3-activation-pytest.log
 
+      - name: Run Phase 12 Coherence v3 Quality Tests
+        run: |
+          pytest symbolu/core/coherence/tests/test_coherence_v3_quality.py \
+            --disable-warnings -q \
+            2>&1 | tee phase12-v3-quality-pytest.log
+
+      - name: Run Phase 12 v3 Quality Integration Tests
+        run: |
+          pytest symbolu/mechanical/pipeline/integration_tests/test_phase12_v3_quality_integration.py \
+            --disable-warnings -q \
+            2>&1 | tee phase12-v3-quality-integration-pytest.log
+
       - name: Run Policy Engine Tests
         run: |
           pytest symbolu/policy/tests/test_policy_engine.py \
@@ -352,6 +364,8 @@ jobs:
             phase9-mapper-modulation-pytest.log
             phase10-coherence-v3-pytest.log
             phase11-v3-activation-pytest.log
+            phase12-v3-quality-pytest.log
+            phase12-v3-quality-integration-pytest.log
             policy-engine-pytest.log
             dilchat-adapter-pytest.log
             api-server-pytest.log

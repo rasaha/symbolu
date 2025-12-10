@@ -64,6 +64,9 @@ class CoherenceObservation:
     # Phase 10: Coherence v3 megafusion (experimental, observation only)
     coherence_score_v3: Optional[float] = None
 
+    # Phase 12: Coherence v3 quality metric (soft stability windows)
+    coherence_v3_quality: Optional[float] = None
+
     # Phase 8: Guna/Kosha resonance (observation only)
     guna_resonance_index: Optional[float] = None
     kosha_resonance_index: Optional[float] = None
@@ -218,6 +221,12 @@ class CoherenceObserver:
         if coherence_state is not None:
             coherence_score_v3 = getattr(coherence_state, 'coherence_score_v3', None)
 
+        # Phase 12: Extract coherence v3 quality from coherence_state
+        coherence_v3_quality = None
+
+        if coherence_state is not None:
+            coherence_v3_quality = getattr(coherence_state, 'coherence_v3_quality', None)
+
         # Phase 8: Extract Guna/Kosha resonance from coherence_state
         guna_resonance_index = None
         kosha_resonance_index = None
@@ -259,6 +268,7 @@ class CoherenceObserver:
             arc_alignment_index=arc_alignment_index,
             coherence_score_v2=coherence_score_v2,
             coherence_score_v3=coherence_score_v3,
+            coherence_v3_quality=coherence_v3_quality,
             guna_resonance_index=guna_resonance_index,
             kosha_resonance_index=kosha_resonance_index,
         )

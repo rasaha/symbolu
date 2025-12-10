@@ -58,13 +58,18 @@ def _get_active_coherence_score(
 
     v1 is always available; v2 and v3 are optional and gated by profile flags.
 
+    Phase 12 Update:
+    v3 is now QUALITY-GATED. Even if use_coherence_v3=True, v3 will only be used
+    if coherence_v3_quality >= profile.min_v3_quality_for_activation.
+    If quality is too low, cascade to v2 (if available), else v1.
+
     This helper enables Phase 4 coherence v2 and Phase 10 coherence v3 integration
     into policy layer while maintaining complete backward compatibility. By default
     (use_coherence_v2=False, use_coherence_v3=False), this always returns v1 score,
     preserving existing behavior.
 
-    Priority cascade:
-        1. v3 (if use_coherence_v3=True AND v3 available)
+    Priority cascade (Phase 12):
+        1. v3 (if use_coherence_v3=True AND v3 available AND quality >= threshold)
         2. v2 (if use_coherence_v2=True AND v2 available)
         3. v1 (always fallback)
 
@@ -73,13 +78,17 @@ def _get_active_coherence_score(
         profile: Domain profile dictionary (from get_domain_profile)
 
     Returns:
-        float: Active coherence score (v3 > v2 > v1 cascade)
+        float: Active coherence score (v3 > v2 > v1 cascade, quality-gated)
 
     Examples:
-        >>> unified = {"coherence": {"coherence_score": 0.6, "coherence_score_v2": 0.75, "coherence_score_v3": 0.82}}
-        >>> profile = {"use_coherence_v3": True, ...}
+        >>> unified = {"coherence": {"coherence_score": 0.6, "coherence_score_v2": 0.75, "coherence_score_v3": 0.82, "coherence_v3_quality": 0.65}}
+        >>> profile = {"use_coherence_v3": True, "min_v3_quality_for_activation": 0.40, ...}
         >>> _get_active_coherence_score(unified, profile)
         0.82
+
+        >>> unified_low_quality = {"coherence": {"coherence_score": 0.6, "coherence_score_v2": 0.75, "coherence_score_v3": 0.82, "coherence_v3_quality": 0.20}}
+        >>> _get_active_coherence_score(unified_low_quality, profile)
+        0.75  # Falls back to v2 due to low quality
 
         >>> profile_v2 = {"use_coherence_v2": True, "use_coherence_v3": False, ...}
         >>> _get_active_coherence_score(unified, profile_v2)
@@ -97,11 +106,21 @@ def _get_active_coherence_score(
     # Check if profile enables v3 (Phase 10 experimental megafusion)
     use_v3 = profile.get("use_coherence_v3", False)
 
-    # If v3 is enabled AND v3 score is available, use it (highest priority)
+    # Phase 12: Quality-gated v3 usage
     if use_v3:
         coherence_score_v3 = coherence.get("coherence_score_v3")
-        if coherence_score_v3 is not None:
-            return coherence_score_v3
+        coherence_v3_quality = coherence.get("coherence_v3_quality")
+        min_v3_quality = profile.get("min_v3_quality_for_activation")
+
+        # Only use v3 if:
+        # 1. v3 score is available
+        # 2. v3 quality is available
+        # 3. v3 quality meets or exceeds threshold (if threshold is set)
+        if coherence_score_v3 is not None and coherence_v3_quality is not None:
+            # If no threshold is set (None), allow v3 unconditionally
+            if min_v3_quality is None or coherence_v3_quality >= min_v3_quality:
+                return coherence_score_v3
+            # If quality is below threshold, fall through to v2/v1
 
     # Check if profile enables v2 (Phase 4 formula-aware)
     use_v2 = profile.get("use_coherence_v2", False)
