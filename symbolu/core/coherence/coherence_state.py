@@ -234,6 +234,41 @@ class CoherenceState:
     forecast_strength_history: List[Optional[float]] = field(default_factory=list)  # Forecast strength history
     drift_influence_history: List[Optional[float]] = field(default_factory=list)  # Drift influence history
 
+    # Phase 39: Multi-Horizon Temporal Forecasting Engine (observation only - not used in scoring)
+    multi_horizon_forecast_snapshot: Optional[Any] = None  # MultiHorizonForecastSnapshot (latest)
+    multi_horizon_forecast_history: List[Optional[Any]] = field(default_factory=list)  # List of MultiHorizonForecastSnapshot
+    # H1 (Short-Term: 1-3 turns)
+    horizon_slope_H1: Optional[float] = None  # H1 coherence slope [-1.0, 1.0]
+    horizon_continuity_slope_H1: Optional[float] = None  # H1 continuity slope [-1.0, 1.0]
+    horizon_drift_H1: Optional[float] = None  # H1 drift risk [0.0, 1.0]
+    horizon_entropy_H1: Optional[float] = None  # H1 entropy risk [0.0, 1.0]
+    horizon_strength_H1: Optional[float] = None  # H1 forecast strength [0.0, 1.0]
+    horizon_band_H1: Optional[str] = None  # H1 forecast band
+    # H2 (Mid-Term: 4-8 turns)
+    horizon_slope_H2: Optional[float] = None  # H2 coherence slope [-1.0, 1.0]
+    horizon_continuity_slope_H2: Optional[float] = None  # H2 continuity slope [-1.0, 1.0]
+    horizon_drift_H2: Optional[float] = None  # H2 drift risk [0.0, 1.0]
+    horizon_entropy_H2: Optional[float] = None  # H2 entropy risk [0.0, 1.0]
+    horizon_strength_H2: Optional[float] = None  # H2 forecast strength [0.0, 1.0]
+    horizon_band_H2: Optional[str] = None  # H2 forecast band
+    # H3 (Long-Term: 9-20 turns)
+    horizon_slope_H3: Optional[float] = None  # H3 coherence slope [-1.0, 1.0]
+    horizon_continuity_slope_H3: Optional[float] = None  # H3 continuity slope [-1.0, 1.0]
+    horizon_drift_H3: Optional[float] = None  # H3 drift risk [0.0, 1.0]
+    horizon_entropy_H3: Optional[float] = None  # H3 entropy risk [0.0, 1.0]
+    horizon_strength_H3: Optional[float] = None  # H3 forecast strength [0.0, 1.0]
+    horizon_band_H3: Optional[str] = None  # H3 forecast band
+    # Cross-Horizon Analytics
+    forecast_consensus_index: Optional[float] = None  # Forecast Consensus Index [0.0, 1.0]
+    future_stability_envelope: Optional[float] = None  # Future Stability Envelope [0.0, 1.0]
+    current_mh_forecast_tags: List[str] = field(default_factory=list)  # Current multi-horizon diagnostic tags
+    # Histories
+    forecast_consensus_history: List[Optional[float]] = field(default_factory=list)  # FCI history
+    future_stability_envelope_history: List[Optional[float]] = field(default_factory=list)  # FSE history
+    horizon_band_H1_history: List[Optional[str]] = field(default_factory=list)  # H1 band history
+    horizon_band_H2_history: List[Optional[str]] = field(default_factory=list)  # H2 band history
+    horizon_band_H3_history: List[Optional[str]] = field(default_factory=list)  # H3 band history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -330,6 +365,14 @@ class CoherenceState:
         self.forecast_band_history = self.forecast_band_history[-window:]
         self.forecast_strength_history = self.forecast_strength_history[-window:]
         self.drift_influence_history = self.drift_influence_history[-window:]
+
+        # Phase 39 multi-horizon temporal forecasting engine formula history
+        self.multi_horizon_forecast_history = self.multi_horizon_forecast_history[-window:]
+        self.forecast_consensus_history = self.forecast_consensus_history[-window:]
+        self.future_stability_envelope_history = self.future_stability_envelope_history[-window:]
+        self.horizon_band_H1_history = self.horizon_band_H1_history[-window:]
+        self.horizon_band_H2_history = self.horizon_band_H2_history[-window:]
+        self.horizon_band_H3_history = self.horizon_band_H3_history[-window:]
 
     def get_history_length(self) -> int:
         """
