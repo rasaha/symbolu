@@ -60,6 +60,11 @@ class CoherenceObservation:
 
     # Phase 4: Formula-aware coherence v2 (observation only)
     coherence_score_v2: Optional[float] = None
+
+    # Phase 8: Guna/Kosha resonance (observation only)
+    guna_resonance_index: Optional[float] = None
+    kosha_resonance_index: Optional[float] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -204,6 +209,14 @@ class CoherenceObserver:
         if coherence_state is not None:
             coherence_score_v2 = getattr(coherence_state, 'coherence_score_v2', None)
 
+        # Phase 8: Extract Guna/Kosha resonance from coherence_state
+        guna_resonance_index = None
+        kosha_resonance_index = None
+
+        if coherence_state is not None:
+            guna_resonance_index = getattr(coherence_state, 'guna_resonance_index', None)
+            kosha_resonance_index = getattr(coherence_state, 'kosha_resonance_index', None)
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -236,6 +249,8 @@ class CoherenceObserver:
             tension_index=tension_index,
             arc_alignment_index=arc_alignment_index,
             coherence_score_v2=coherence_score_v2,
+            guna_resonance_index=guna_resonance_index,
+            kosha_resonance_index=kosha_resonance_index,
         )
 
         # Store observation
@@ -382,6 +397,12 @@ class CoherenceObserver:
             formulas["tension_index"] = obs.tension_index
         if obs.arc_alignment_index is not None:
             formulas["arc_alignment_index"] = obs.arc_alignment_index
+
+        # Phase 8 Guna/Kosha resonance metrics
+        if obs.guna_resonance_index is not None:
+            formulas["guna_resonance_index"] = obs.guna_resonance_index
+        if obs.kosha_resonance_index is not None:
+            formulas["kosha_resonance_index"] = obs.kosha_resonance_index
 
         return formulas if formulas else None
 

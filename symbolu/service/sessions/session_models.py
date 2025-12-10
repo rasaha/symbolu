@@ -133,3 +133,7 @@ class SessionSummary:
     avg_resonance_index: Optional[float] = None  # Average resonance index across session
     avg_tension_index: Optional[float] = None  # Average tension index across session
     avg_arc_alignment_index: Optional[float] = None  # Average arc alignment index across session
+
+    # Phase 8 Guna/Kosha resonance metrics (observation only)
+    avg_guna_resonance: Optional[float] = None  # Average Guna resonance index across session
+    avg_kosha_resonance: Optional[float] = None  # Average Kosha resonance index across session
