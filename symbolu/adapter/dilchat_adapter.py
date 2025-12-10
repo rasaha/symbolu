@@ -802,6 +802,59 @@ def _build_badges(
             ))
 
     # ========================================================================
+    # Phase 32: Insight Window Gating Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract insight_window from policy_flags if available
+    insight_window = policy_flags.get("insight_window", {})
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and insight_window:
+        insight_window_open = insight_window.get("insight_window_open", False)
+        insight_mode = insight_window.get("insight_mode", "none")
+        insight_tags = insight_window.get("insight_tags", [])
+
+        # INSIGHT_WINDOW_OPEN: Window is open for deeper reflection
+        if insight_window_open and insight_mode != "none":
+            badges.append(DILchatBadge(
+                label="INSIGHT_WINDOW_OPEN",
+                level="info",
+                description=f"Insight window open ({insight_mode} mode). UCF signals indicate readiness for deeper reflection."
+            ))
+
+        # INSIGHT_WINDOW_DEEP: Deep insight mode active
+        if insight_mode == "deep":
+            badges.append(DILchatBadge(
+                label="INSIGHT_WINDOW_DEEP",
+                level="info",
+                description="Deep insight mode active. Meta-insight and symbolic interpretation enabled."
+            ))
+
+        # INSIGHT_WINDOW_CAUTION_ENTROPY: High entropy or transitional state
+        if "entropy_high" in insight_tags or "entropy_transitional" in insight_tags:
+            badges.append(DILchatBadge(
+                label="INSIGHT_WINDOW_CAUTION_ENTROPY",
+                level="warning",
+                description="Entropy caution: temporal field shows volatility or transition."
+            ))
+
+        # INSIGHT_WINDOW_CAUTION_DRIFT: Drift risk detected
+        if "drift_caution" in insight_tags:
+            badges.append(DILchatBadge(
+                label="INSIGHT_WINDOW_CAUTION_DRIFT",
+                level="warning",
+                description="Drift caution: cognitive drift elevated, monitor stability."
+            ))
+
+        # INSIGHT_WINDOW_CLOSED: Window is closed (only if domain/mode gates passed but window closed)
+        if not insight_window_open and insight_mode == "none":
+            # Only add if we're in the right domain/mode but window closed due to metrics
+            badges.append(DILchatBadge(
+                label="INSIGHT_WINDOW_CLOSED",
+                level="info",
+                description="Insight window closed. UCF signals indicate reflection not recommended at this time."
+            ))
+
+    # ========================================================================
     # BADGE 16: Trading Guardrail Badges (Phase 7: Formula-Aware Trading Guardrails v1.0)
     # ========================================================================
     if trading_guardrails:
