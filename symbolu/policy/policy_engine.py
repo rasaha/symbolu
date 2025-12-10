@@ -16,6 +16,7 @@ Policy Flags:
 - stability_status: Overall stability assessment
 - recommended_style: Suggested response style
 - recommended_mapper: Suggested mapper for next turn
+- interaction_mode: Active interaction mode (Phase 15)
 
 Design Principles:
 - Zero-LLM: Pure deterministic rule-based logic
@@ -23,6 +24,11 @@ Design Principles:
 - Additive: Provides advisory flags only
 - Deterministic: Same input always produces same output
 - CI-tested: Comprehensive test coverage
+
+Phase 15 Interaction Modes:
+- ANALYTICS_ONLY: Standard Phase 1-12 behavior, no formula influence
+- SMART_INSIGHT: Soft UI-layer refinement, v3 scoring if domain allows
+- DEEP_ADAPTIVE: Full adaptive mode with VMF/ATH hints
 
 Usage:
     from symbolu.policy import compute_policy_flags
@@ -37,10 +43,16 @@ Usage:
     if flags["coherence_warning"]:
         # UI can alert user or suggest session pause
         pass
+
+    # Phase 15: Check interaction mode
+    if flags["interaction_mode"] == "deep_adaptive":
+        # Use VMF/ATH-based adaptive hints
+        pass
 """
 
-from typing import Dict, Any, Literal
+from typing import Dict, Any, Literal, Optional
 from .domain_profiles import get_domain_profile
+from .interaction_modes import InteractionMode, resolve_interaction_mode
 
 
 # Type aliases for clarity
@@ -252,7 +264,12 @@ def _refine_policy_with_formulas(
     return refined_flags
 
 
-def compute_policy_flags(unified: Dict[str, Any], domain: str) -> Dict[str, Any]:
+def compute_policy_flags(
+    unified: Dict[str, Any],
+    domain: str,
+    user_mode_override: Optional[str] = None,
+    admin_mode_override: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Compute policy flags from unified output and domain profile.
 
@@ -260,9 +277,14 @@ def compute_policy_flags(unified: Dict[str, Any], domain: str) -> Dict[str, Any]
     from the unified output and applies domain-specific thresholds to
     generate behavioral policy flags.
 
+    Phase 15: Supports interaction mode overrides that control how much
+    influence advanced formulas have on the policy output.
+
     Args:
         unified: Unified output dictionary from USU-API v1.0
         domain: Domain identifier (e.g., "trading", "therapy", "identity")
+        user_mode_override: Optional user-specified interaction mode override
+        admin_mode_override: Optional admin-specified interaction mode override
 
     Returns:
         Dictionary with policy flags:
@@ -274,7 +296,8 @@ def compute_policy_flags(unified: Dict[str, Any], domain: str) -> Dict[str, Any]
             "coherence_warning": bool,
             "stability_status": "stable" | "recovering" | "fragmented",
             "recommended_style": str,
-            "recommended_mapper": "LCM" | "HRM" | "LAM"
+            "recommended_mapper": "LCM" | "HRM" | "LAM",
+            "interaction_mode": str  # Phase 15: Active interaction mode
         }
 
     Raises:
@@ -293,6 +316,8 @@ def compute_policy_flags(unified: Dict[str, Any], domain: str) -> Dict[str, Any]
         >>> flags = compute_policy_flags(unified, "trading")
         >>> flags["needs_grounding"]
         True
+        >>> flags["interaction_mode"]
+        'analytics_only'
     """
     # Validate input
     if unified is None or not isinstance(unified, dict):
@@ -300,6 +325,16 @@ def compute_policy_flags(unified: Dict[str, Any], domain: str) -> Dict[str, Any]
 
     # Get domain profile
     profile = get_domain_profile(domain)
+
+    # ========================================================================
+    # Phase 15: Resolve interaction mode
+    # Priority: admin_override > user_override > domain_default
+    # ========================================================================
+    active_mode = resolve_interaction_mode(
+        domain_profile=profile,
+        user_override=user_mode_override,
+        admin_override=admin_mode_override,
+    )
 
     # Extract coherence metrics with safe defaults
     coherence = unified.get("coherence", {})
@@ -396,15 +431,121 @@ def compute_policy_flags(unified: Dict[str, Any], domain: str) -> Dict[str, Any]
         "stability_status": stability_status,
         "recommended_style": recommended_style,
         "recommended_mapper": recommended_mapper,
+        # Phase 15: Include active interaction mode
+        "interaction_mode": active_mode.value,
     }
 
     # ========================================================================
-    # Phase 5: Apply formula-based refinement (UI-layer only, therapy/identity)
-    # This gently modulates UI-focused flags based on Phase 3/4 formula signals
+    # Phase 15: Apply mode-specific behavior
     # ========================================================================
-    flags = _refine_policy_with_formulas(flags, unified, profile)
+    # MODE 1: ANALYTICS_ONLY → Use existing Phase 1-12 behavior only
+    #         NO formula influence on policy (same as before)
+    # MODE 2: SMART_INSIGHT → Enable soft UI-layer refinement from Phase 5
+    #         Enable v3 scoring if domain allows (Phase 11)
+    #         DO NOT modify routing/mappers
+    # MODE 3: DEEP_ADAPTIVE → Enable Phase 5 UI refinement
+    #         Enable v3 scoring priority
+    #         Leverage VMF/ATH for emotional/arc-based hints
+    #         Still no routing or mapper activation changes
+    #         Influence ONLY presentation layer (hints/badges), NEVER behavior
+    # ========================================================================
+
+    if active_mode == InteractionMode.ANALYTICS_ONLY:
+        # ANALYTICS_ONLY: No formula refinement applied
+        # Return flags as computed by Phase 1-12 rules only
+        pass
+
+    elif active_mode == InteractionMode.SMART_INSIGHT:
+        # SMART_INSIGHT: Apply Phase 5 formula-based refinement (UI-layer only)
+        flags = _refine_policy_with_formulas(flags, unified, profile)
+
+    elif active_mode == InteractionMode.DEEP_ADAPTIVE:
+        # DEEP_ADAPTIVE: Apply Phase 5 refinement PLUS VMF/ATH adaptive hints
+        flags = _refine_policy_with_formulas(flags, unified, profile)
+
+        # Apply VMF/ATH-based adaptive hints (presentation layer only)
+        flags = _apply_deep_adaptive_hints(flags, unified)
 
     return flags
+
+
+def _apply_deep_adaptive_hints(
+    flags: Dict[str, Any],
+    unified_output: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Apply VMF/ATH-based adaptive hints for DEEP_ADAPTIVE mode.
+
+    Phase 15: This function adds emotional/arc-based hint flags based on
+    Vritti Momentum Formula (VMF) and Arc-Tension Harmonizer (ATH) signals.
+
+    IMPORTANT:
+    - Influence ONLY presentation layer (hints/badges), NEVER behavior
+    - Does NOT modify routing, mappers, DHA, or Fusion
+    - Does NOT change existing safety flags (needs_grounding, coherence_warning)
+    - Additive only: adds hint flags, does not remove or modify core flags
+
+    Hint Flags Added:
+    - vmf_emotional_momentum: "rising" | "falling" | "stable" | None
+    - ath_arc_tension_state: "harmonized" | "building" | "releasing" | None
+
+    Args:
+        flags: Policy flags dictionary from compute_policy_flags()
+        unified_output: Unified output dictionary with formula metrics
+
+    Returns:
+        Refined policy flags dictionary with VMF/ATH hints
+
+    Examples:
+        >>> flags = {"needs_grounding": False, ...}
+        >>> unified = {"formulas": {"vritti_momentum": 0.75, "arc_tension_harmonizer": 0.60}}
+        >>> refined = _apply_deep_adaptive_hints(flags, unified)
+        >>> refined["vmf_emotional_momentum"]
+        'rising'
+    """
+    # Create a copy to avoid mutating input
+    refined_flags = flags.copy()
+
+    # Extract formula metrics from unified output
+    formulas = unified_output.get("formulas", {})
+
+    if not formulas:
+        # No formula data available, return flags unchanged
+        refined_flags["vmf_emotional_momentum"] = None
+        refined_flags["ath_arc_tension_state"] = None
+        return refined_flags
+
+    # ========================================================================
+    # VMF-based emotional momentum hint
+    # ========================================================================
+    vritti_momentum = formulas.get("vritti_momentum")
+
+    if vritti_momentum is not None:
+        if vritti_momentum >= 0.65:
+            refined_flags["vmf_emotional_momentum"] = "rising"
+        elif vritti_momentum <= 0.35:
+            refined_flags["vmf_emotional_momentum"] = "falling"
+        else:
+            refined_flags["vmf_emotional_momentum"] = "stable"
+    else:
+        refined_flags["vmf_emotional_momentum"] = None
+
+    # ========================================================================
+    # ATH-based arc-tension state hint
+    # ========================================================================
+    arc_tension_harmonizer = formulas.get("arc_tension_harmonizer")
+
+    if arc_tension_harmonizer is not None:
+        if arc_tension_harmonizer >= 0.70:
+            refined_flags["ath_arc_tension_state"] = "harmonized"
+        elif arc_tension_harmonizer >= 0.40:
+            refined_flags["ath_arc_tension_state"] = "building"
+        else:
+            refined_flags["ath_arc_tension_state"] = "releasing"
+    else:
+        refined_flags["ath_arc_tension_state"] = None
+
+    return refined_flags
 
 
 def _compute_stability_status(

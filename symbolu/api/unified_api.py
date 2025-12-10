@@ -55,6 +55,7 @@ class UnifiedOutput:
         motivation_profile: Motivation Flow Engine v1.0 (motivational driver classification)
         formulas: Phase 2 temporal formulas (SMI, ΔSMI, Bhava Gap, Tension Corridor) - observation only
         trading_guardrails: Phase 7 trading formula guardrails (trading safety risk flags)
+        interaction_mode: Phase 15 interaction mode (controls formula influence level)
     """
 
     text: str
@@ -74,6 +75,7 @@ class UnifiedOutput:
     motivation_profile: Dict[str, Any] = field(default_factory=dict)
     formulas: Optional[Dict[str, Optional[float]]] = None
     trading_guardrails: Optional[Dict[str, bool]] = None
+    interaction_mode: Optional[str] = None  # Phase 15: Active interaction mode
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -393,6 +395,13 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         if min_arc_tension_harmonizer is not None:
             formulas_data["min_arc_tension_harmonizer"] = min_arc_tension_harmonizer
 
+    # Phase 15: Extract interaction mode from policy flags or context
+    interaction_mode_data = None
+    if hasattr(ctx, 'policy_flags') and ctx.policy_flags is not None:
+        interaction_mode_data = ctx.policy_flags.get('interaction_mode')
+    elif hasattr(ctx, 'interaction_mode') and ctx.interaction_mode is not None:
+        interaction_mode_data = ctx.interaction_mode
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -411,6 +420,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         motivation_profile=motivation_profile_data,
         formulas=formulas_data,
         trading_guardrails=trading_guardrails_data,
+        interaction_mode=interaction_mode_data,
     )
 
 
