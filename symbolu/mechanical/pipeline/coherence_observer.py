@@ -185,6 +185,14 @@ class CoherenceObservation:
     irm_memory_band: Optional[str] = None  # IRM Memory Band: "LOW", "MEDIUM", "HIGH"
     irm_memory_tags: List[str] = field(default_factory=list)  # IRM diagnostic tags
 
+    # Phase 37: Adaptive Continuity Engine (observation only)
+    adaptive_continuity_snapshot: Optional[Any] = None  # AdaptiveContinuitySnapshot
+    continuity_ncc: Optional[float] = None  # Narrative Continuity Coefficient [0.0, 1.0]
+    continuity_icc: Optional[float] = None  # Identity Continuity Coefficient [0.0, 1.0]
+    continuity_css: Optional[float] = None  # Continuity Stability Score [0.0, 1.0]
+    continuity_band: Optional[str] = None  # Continuity Band: "LOW", "MEDIUM", "HIGH"
+    continuity_tags: List[str] = field(default_factory=list)  # ACE continuity diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -679,6 +687,23 @@ class CoherenceObserver:
                 irm_memory_band = getattr(identity_resonance_memory_snapshot, 'memory_band', None)
                 irm_memory_tags = getattr(identity_resonance_memory_snapshot, 'diagnostic_tags', [])
 
+        # Phase 37: Extract Adaptive Continuity Engine from coherence state
+        adaptive_continuity_snapshot = None
+        continuity_ncc = None
+        continuity_icc = None
+        continuity_css = None
+        continuity_band = None
+        continuity_tags = []
+
+        if coherence_state is not None:
+            adaptive_continuity_snapshot = getattr(coherence_state, 'adaptive_continuity_snapshot', None)
+            if adaptive_continuity_snapshot is not None:
+                continuity_ncc = getattr(adaptive_continuity_snapshot, 'ncc', None)
+                continuity_icc = getattr(adaptive_continuity_snapshot, 'icc', None)
+                continuity_css = getattr(adaptive_continuity_snapshot, 'css', None)
+                continuity_band = getattr(adaptive_continuity_snapshot, 'continuity_band', None)
+                continuity_tags = getattr(adaptive_continuity_snapshot, 'continuity_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -799,6 +824,12 @@ class CoherenceObserver:
             ida=ida,  # Phase 36
             irm_memory_band=irm_memory_band,  # Phase 36
             irm_memory_tags=irm_memory_tags,  # Phase 36
+            adaptive_continuity_snapshot=adaptive_continuity_snapshot,  # Phase 37
+            continuity_ncc=continuity_ncc,  # Phase 37
+            continuity_icc=continuity_icc,  # Phase 37
+            continuity_css=continuity_css,  # Phase 37
+            continuity_band=continuity_band,  # Phase 37
+            continuity_tags=continuity_tags,  # Phase 37
         )
 
         # Store observation

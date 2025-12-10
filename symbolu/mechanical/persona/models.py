@@ -287,6 +287,12 @@ class PersonaResponse(BaseModel):
         description="Phase 36: Identity resonance memory (observation-only, tone-level only)"
     )
 
+    # Phase 37: Optional adaptive continuity profile
+    continuity_profile: Optional[Any] = Field(
+        None,
+        description="Phase 37: Adaptive continuity engine (observation-only, tone-level only)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {

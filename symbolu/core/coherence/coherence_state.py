@@ -207,6 +207,19 @@ class CoherenceState:
     ida_history: List[Optional[float]] = field(default_factory=list)  # Identity Drift Anchoring history
     irm_memory_band_history: List[Optional[str]] = field(default_factory=list)  # IRM Memory Band history
 
+    # Phase 37: Adaptive Continuity Engine (observation only - not used in scoring)
+    adaptive_continuity_snapshot: Optional[Any] = None  # AdaptiveContinuitySnapshot (latest)
+    adaptive_continuity_history: List[Optional[Any]] = field(default_factory=list)  # List of AdaptiveContinuitySnapshot
+    current_ncc: Optional[float] = None  # Narrative Continuity Coefficient [0.0, 1.0]
+    current_icc: Optional[float] = None  # Identity Continuity Coefficient [0.0, 1.0]
+    current_css: Optional[float] = None  # Continuity Stability Score [0.0, 1.0]
+    current_continuity_band: Optional[str] = None  # Continuity Band: "LOW", "MEDIUM", "HIGH"
+    current_continuity_tags: List[str] = field(default_factory=list)  # Current continuity diagnostic tags
+    ncc_history: List[Optional[float]] = field(default_factory=list)  # Narrative Continuity Coefficient history
+    icc_history: List[Optional[float]] = field(default_factory=list)  # Identity Continuity Coefficient history
+    css_history: List[Optional[float]] = field(default_factory=list)  # Continuity Stability Score history
+    continuity_band_history: List[Optional[str]] = field(default_factory=list)  # Continuity Band history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -290,6 +303,13 @@ class CoherenceState:
         self.iep_history = self.iep_history[-window:]
         self.ida_history = self.ida_history[-window:]
         self.irm_memory_band_history = self.irm_memory_band_history[-window:]
+
+        # Phase 37 adaptive continuity engine formula history
+        self.adaptive_continuity_history = self.adaptive_continuity_history[-window:]
+        self.ncc_history = self.ncc_history[-window:]
+        self.icc_history = self.icc_history[-window:]
+        self.css_history = self.css_history[-window:]
+        self.continuity_band_history = self.continuity_band_history[-window:]
 
     def get_history_length(self) -> int:
         """

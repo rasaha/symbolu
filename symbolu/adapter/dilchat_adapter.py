@@ -1081,6 +1081,68 @@ def _build_badges(
                 description="Trading guardrails recommend no action. Wait for stability before trading."
             ))
 
+    # ========================================================================
+    # Phase 37: Adaptive Continuity Engine Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract adaptive continuity from unified_output if available
+    adaptive_continuity = None
+    if unified_output and "adaptive_continuity" in unified_output:
+        adaptive_continuity = unified_output.get("adaptive_continuity")
+
+    # Extract continuity metrics
+    continuity_css = None
+    continuity_band = None
+    continuity_tags = []
+
+    if adaptive_continuity is not None and isinstance(adaptive_continuity, dict):
+        continuity_css = adaptive_continuity.get("css")
+        continuity_band = adaptive_continuity.get("band")
+        continuity_tags = adaptive_continuity.get("tags", [])
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode:
+        # Band-based badges (if band is available)
+        if continuity_band == "HIGH":
+            badges.append(DILchatBadge(
+                label="CONTINUITY_HIGH",
+                level="info",
+                description="Session continuity is high. Narrative and identity patterns are stable and coherent."
+            ))
+        elif continuity_band == "MEDIUM":
+            badges.append(DILchatBadge(
+                label="CONTINUITY_MEDIUM",
+                level="info",
+                description="Session continuity is moderate. Core narrative and identity patterns are present."
+            ))
+        elif continuity_band == "LOW":
+            badges.append(DILchatBadge(
+                label="CONTINUITY_LOW",
+                level="warning",
+                description="Session continuity is low. Narrative or identity patterns show fragmentation."
+            ))
+
+        # Tag-based badges (diagnostic detail)
+        if "CONTINUITY_FRAGMENTED" in continuity_tags:
+            badges.append(DILchatBadge(
+                label="CONTINUITY_FRAGMENTED",
+                level="warning",
+                description="Narrative continuity is fragmented. Themes and intents are unstable."
+            ))
+
+        if "CONTINUITY_STABLE" in continuity_tags:
+            badges.append(DILchatBadge(
+                label="CONTINUITY_STABLE",
+                level="info",
+                description="Continuity is stable. Session-wide resilience and alignment are strong."
+            ))
+
+        if "CONTINUITY_IDENTITY_REINFORCED" in continuity_tags:
+            badges.append(DILchatBadge(
+                label="CONTINUITY_IDENTITY_REINFORCED",
+                level="info",
+                description="Identity continuity is reinforced. Identity patterns are persistent and echoing."
+            ))
+
     return badges
 
 
