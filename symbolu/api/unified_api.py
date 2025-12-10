@@ -88,6 +88,7 @@ class UnifiedOutput:
     temporal_forecast: Optional[Dict[str, Any]] = None  # Phase 38: Temporal coherence forecasting model (observation-only, tone-level only)
     multi_horizon_forecast: Optional[Dict[str, Any]] = None  # Phase 39: Multi-horizon temporal forecasting engine (observation-only, tone-level only)
     cross_horizon_resonance: Optional[Dict[str, Any]] = None  # Phase 40: Cross-Horizon Resonance Alignment Engine (observation-only, tone-level only)
+    persona_echo_profile: Optional[Dict[str, Any]] = None  # Phase 31: Adaptive Persona Echo Layer (APEL) (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -1098,6 +1099,14 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "diagnostic_tags": getattr(chra_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 31: Extract Adaptive Persona Echo Layer (APEL) data (observation-only, tone-level only)
+    echo_profile_data = None
+    # Try to extract from persona response (if available)
+    if hasattr(ctx, 'persona_response') and ctx.persona_response is not None:
+        echo_profile = getattr(ctx.persona_response, 'echo_profile', None)
+        if echo_profile is not None:
+            echo_profile_data = echo_profile
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -1128,6 +1137,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         temporal_forecast=tcfm_data,  # Phase 38
         multi_horizon_forecast=mhtfe_data,  # Phase 39
         cross_horizon_resonance=chra_data,  # Phase 40
+        persona_echo_profile=echo_profile_data,  # Phase 31
     )
 
 

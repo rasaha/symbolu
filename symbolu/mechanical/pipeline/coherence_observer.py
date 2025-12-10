@@ -98,6 +98,11 @@ class CoherenceObservation:
     temporal_entropy_volatility: Optional[float] = None
     temporal_entropy_details: Optional[Dict[str, Any]] = None
 
+    # Phase 19: Semantic-Temporal Drift Fusion (observation only)
+    drift_fusion_index: Optional[float] = None
+    drift_risk_band: Optional[str] = None
+    drift_pattern_tags: List[str] = field(default_factory=list)
+
     # Phase 21: Mirror-Time Loop (observation only)
     loop_alignment: Optional[float] = None
     loop_tension: Optional[float] = None
@@ -492,6 +497,18 @@ class CoherenceObserver:
                     'normalized_entropy_diff': getattr(entropy_snapshot, 'normalized_entropy_diff', None),
                     'entropy_volatility': getattr(entropy_snapshot, 'entropy_volatility', None),
                 }
+
+        # Phase 19: Extract Semantic-Temporal Drift Fusion from coherence_state
+        drift_fusion_index = None
+        drift_risk_band = None
+        drift_pattern_tags = []
+
+        if coherence_state is not None:
+            drift_fusion_index = getattr(coherence_state, 'drift_fusion_index', None)
+            drift_risk_band = getattr(coherence_state, 'drift_risk_band', None)
+            drift_pattern_tags_list = getattr(coherence_state, 'drift_pattern_tags', None)
+            if drift_pattern_tags_list:
+                drift_pattern_tags = list(drift_pattern_tags_list)
 
         # Phase 21: Extract Mirror-Time Loop from coherence_state
         loop_alignment = None
@@ -910,6 +927,9 @@ class CoherenceObserver:
             temporal_entropy_diff=temporal_entropy_diff,
             temporal_entropy_volatility=temporal_entropy_volatility,
             temporal_entropy_details=temporal_entropy_details,
+            drift_fusion_index=drift_fusion_index,  # Phase 19
+            drift_risk_band=drift_risk_band,  # Phase 19
+            drift_pattern_tags=drift_pattern_tags,  # Phase 19
             loop_alignment=loop_alignment,
             loop_tension=loop_tension,
             reversal_probability=reversal_probability,
@@ -1141,6 +1161,11 @@ class CoherenceObserver:
         if temporal_entropy:
             snapshot["temporal_entropy"] = temporal_entropy
 
+        # Phase 19: Add drift fusion section if available
+        drift_fusion = self._extract_drift_fusion_from_observation(obs)
+        if drift_fusion:
+            snapshot["drift_fusion"] = drift_fusion
+
         # Phase 24: Add resonance weighting section if available
         resonance_weighting = self._extract_resonance_weighting_from_observation(obs)
         if resonance_weighting:
@@ -1271,6 +1296,29 @@ class CoherenceObserver:
             temporal_entropy["details"] = obs.temporal_entropy_details
 
         return temporal_entropy if temporal_entropy else None
+
+    def _extract_drift_fusion_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Any]]:
+        """
+        Extract Phase 19 Semantic-Temporal Drift Fusion metrics from observation.
+
+        Returns drift_fusion dict if metrics are available, None otherwise.
+        """
+        # Build drift_fusion dict from observation
+        drift_fusion = {}
+
+        # Core metrics
+        if obs.drift_fusion_index is not None:
+            drift_fusion["index"] = obs.drift_fusion_index
+            drift_fusion["drift_fusion_index"] = obs.drift_fusion_index  # Explicit
+
+        if obs.drift_risk_band is not None:
+            drift_fusion["risk_band"] = obs.drift_risk_band
+
+        # Pattern tags
+        if obs.drift_pattern_tags:
+            drift_fusion["pattern_tags"] = obs.drift_pattern_tags
+
+        return drift_fusion if drift_fusion else None
 
     def _extract_resonance_weighting_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Any]]:
         """
