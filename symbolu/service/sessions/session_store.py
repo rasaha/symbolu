@@ -450,6 +450,51 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if kosha_resonance_values:
             avg_kosha_resonance = sum(kosha_resonance_values) / len(kosha_resonance_values)
 
+    # Phase 14: Extract Vritti Momentum & Arc-Tension Harmonizer from coherence history
+    avg_vritti_momentum = None
+    max_vritti_momentum = None
+    min_vritti_momentum = None
+    avg_arc_tension_harmonizer = None
+    max_arc_tension_harmonizer = None
+    min_arc_tension_harmonizer = None
+
+    if state.coherence_history:
+        # Extract VMF and ATH values
+        vmf_values = []
+        ath_values = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract avg_vritti_momentum from CoherenceState aggregates
+                if "avg_vritti_momentum" in coh and coh["avg_vritti_momentum"] is not None:
+                    vmf_values.append(coh["avg_vritti_momentum"])
+
+                # Extract avg_arc_tension_harmonizer from CoherenceState aggregates
+                if "avg_arc_tension_harmonizer" in coh and coh["avg_arc_tension_harmonizer"] is not None:
+                    ath_values.append(coh["avg_arc_tension_harmonizer"])
+
+                # Also extract from histories for min/max calculation
+                if "vritti_momentum_history" in coh:
+                    vmf_history = coh["vritti_momentum_history"]
+                    if isinstance(vmf_history, list):
+                        vmf_values.extend([v for v in vmf_history if v is not None])
+
+                if "arc_tension_harmonizer_history" in coh:
+                    ath_history = coh["arc_tension_harmonizer_history"]
+                    if isinstance(ath_history, list):
+                        ath_values.extend([a for a in ath_history if a is not None])
+
+        # Compute aggregates
+        if vmf_values:
+            avg_vritti_momentum = sum(vmf_values) / len(vmf_values)
+            max_vritti_momentum = max(vmf_values)
+            min_vritti_momentum = min(vmf_values)
+
+        if ath_values:
+            avg_arc_tension_harmonizer = sum(ath_values) / len(ath_values)
+            max_arc_tension_harmonizer = max(ath_values)
+            min_arc_tension_harmonizer = min(ath_values)
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -473,4 +518,10 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_arc_alignment_index=avg_arc_alignment_index,
         avg_guna_resonance=avg_guna_resonance,
         avg_kosha_resonance=avg_kosha_resonance,
+        avg_vritti_momentum=avg_vritti_momentum,
+        max_vritti_momentum=max_vritti_momentum,
+        min_vritti_momentum=min_vritti_momentum,
+        avg_arc_tension_harmonizer=avg_arc_tension_harmonizer,
+        max_arc_tension_harmonizer=max_arc_tension_harmonizer,
+        min_arc_tension_harmonizer=min_arc_tension_harmonizer,
     )

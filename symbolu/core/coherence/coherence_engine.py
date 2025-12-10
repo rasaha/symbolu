@@ -76,6 +76,8 @@ class CoherenceEngine:
                 delta_smi_history=prev_state.delta_smi_history.copy(),
                 bhava_gap_history=prev_state.bhava_gap_history.copy(),
                 tension_corridor_history=prev_state.tension_corridor_history.copy(),
+                vritti_momentum_history=prev_state.vritti_momentum_history.copy(),
+                arc_tension_harmonizer_history=prev_state.arc_tension_harmonizer_history.copy(),
             )
 
         # Append new turn data to histories
@@ -93,6 +95,10 @@ class CoherenceEngine:
         state.bhava_gap_history.append(self._extract_bhava_gap(temporal_summary))
         state.tension_corridor_history.append(self._extract_tension_corridor(temporal_summary))
 
+        # Phase 14 formulas (observation only - not used in scoring)
+        state.vritti_momentum_history.append(self._extract_vritti_momentum(temporal_summary))
+        state.arc_tension_harmonizer_history.append(self._extract_arc_tension_harmonizer(temporal_summary))
+
         # Trim to sliding window
         state.window_trim(self.window)
 
@@ -105,6 +111,9 @@ class CoherenceEngine:
 
         # Update Phase 2 formula aggregates (observation only)
         self._update_formula_aggregates(state)
+
+        # Update Phase 14 formula aggregates (observation only)
+        self._update_phase14_formula_aggregates(state)
 
         # Update Phase 3 derived formula metrics (observation only)
         self._update_derived_formula_metrics(state)
@@ -201,6 +210,18 @@ class CoherenceEngine:
         """Extract tension_corridor from temporal summary (Phase 1 formula)."""
         if temporal_summary and "tension_corridor" in temporal_summary:
             return temporal_summary["tension_corridor"]
+        return None
+
+    def _extract_vritti_momentum(self, temporal_summary: Optional[Dict]) -> Optional[float]:
+        """Extract vritti_momentum from temporal summary (Phase 14 formula)."""
+        if temporal_summary and "vritti_momentum" in temporal_summary:
+            return temporal_summary["vritti_momentum"]
+        return None
+
+    def _extract_arc_tension_harmonizer(self, temporal_summary: Optional[Dict]) -> Optional[float]:
+        """Extract arc_tension_harmonizer from temporal summary (Phase 14 formula)."""
+        if temporal_summary and "arc_tension_harmonizer" in temporal_summary:
+            return temporal_summary["arc_tension_harmonizer"]
         return None
 
     def _compute_persona_drift(self, state: CoherenceState) -> float:
@@ -320,6 +341,42 @@ class CoherenceEngine:
         else:
             state.avg_tension_corridor = None
             state.max_tension_corridor = None
+
+    def _update_phase14_formula_aggregates(self, state: CoherenceState) -> None:
+        """
+        Update Phase 14 formula aggregates (observation only).
+
+        This method computes aggregate statistics from Phase 14 formula histories:
+        - avg_vritti_momentum, max_vritti_momentum, min_vritti_momentum from vritti_momentum_history
+        - avg_arc_tension_harmonizer, max_arc_tension_harmonizer, min_arc_tension_harmonizer
+          from arc_tension_harmonizer_history
+
+        These aggregates are for observability only and do NOT affect scoring.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        # Compute Vritti Momentum aggregates
+        valid_vmf = [v for v in state.vritti_momentum_history if v is not None]
+        if valid_vmf:
+            state.avg_vritti_momentum = sum(valid_vmf) / len(valid_vmf)
+            state.max_vritti_momentum = max(valid_vmf)
+            state.min_vritti_momentum = min(valid_vmf)
+        else:
+            state.avg_vritti_momentum = None
+            state.max_vritti_momentum = None
+            state.min_vritti_momentum = None
+
+        # Compute Arc-Tension Harmonizer aggregates
+        valid_ath = [a for a in state.arc_tension_harmonizer_history if a is not None]
+        if valid_ath:
+            state.avg_arc_tension_harmonizer = sum(valid_ath) / len(valid_ath)
+            state.max_arc_tension_harmonizer = max(valid_ath)
+            state.min_arc_tension_harmonizer = min(valid_ath)
+        else:
+            state.avg_arc_tension_harmonizer = None
+            state.max_arc_tension_harmonizer = None
+            state.min_arc_tension_harmonizer = None
 
     def _update_derived_formula_metrics(self, state: CoherenceState) -> None:
         """

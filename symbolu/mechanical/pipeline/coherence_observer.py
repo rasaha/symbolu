@@ -71,6 +71,16 @@ class CoherenceObservation:
     guna_resonance_index: Optional[float] = None
     kosha_resonance_index: Optional[float] = None
 
+    # Phase 14: Vritti Momentum & Arc-Tension Harmonizer (observation only)
+    vritti_momentum: Optional[float] = None
+    arc_tension_harmonizer: Optional[float] = None
+    avg_vritti_momentum: Optional[float] = None
+    max_vritti_momentum: Optional[float] = None
+    min_vritti_momentum: Optional[float] = None
+    avg_arc_tension_harmonizer: Optional[float] = None
+    max_arc_tension_harmonizer: Optional[float] = None
+    min_arc_tension_harmonizer: Optional[float] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -235,6 +245,34 @@ class CoherenceObserver:
             guna_resonance_index = getattr(coherence_state, 'guna_resonance_index', None)
             kosha_resonance_index = getattr(coherence_state, 'kosha_resonance_index', None)
 
+        # Phase 14: Extract Vritti Momentum & Arc-Tension Harmonizer from coherence_state
+        vritti_momentum = None
+        arc_tension_harmonizer = None
+        avg_vritti_momentum = None
+        max_vritti_momentum = None
+        min_vritti_momentum = None
+        avg_arc_tension_harmonizer = None
+        max_arc_tension_harmonizer = None
+        min_arc_tension_harmonizer = None
+
+        if coherence_state is not None:
+            # Extract current values from histories
+            vmf_hist = getattr(coherence_state, 'vritti_momentum_history', [])
+            if vmf_hist and vmf_hist[-1] is not None:
+                vritti_momentum = vmf_hist[-1]
+
+            ath_hist = getattr(coherence_state, 'arc_tension_harmonizer_history', [])
+            if ath_hist and ath_hist[-1] is not None:
+                arc_tension_harmonizer = ath_hist[-1]
+
+            # Extract aggregates
+            avg_vritti_momentum = getattr(coherence_state, 'avg_vritti_momentum', None)
+            max_vritti_momentum = getattr(coherence_state, 'max_vritti_momentum', None)
+            min_vritti_momentum = getattr(coherence_state, 'min_vritti_momentum', None)
+            avg_arc_tension_harmonizer = getattr(coherence_state, 'avg_arc_tension_harmonizer', None)
+            max_arc_tension_harmonizer = getattr(coherence_state, 'max_arc_tension_harmonizer', None)
+            min_arc_tension_harmonizer = getattr(coherence_state, 'min_arc_tension_harmonizer', None)
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -271,6 +309,14 @@ class CoherenceObserver:
             coherence_v3_quality=coherence_v3_quality,
             guna_resonance_index=guna_resonance_index,
             kosha_resonance_index=kosha_resonance_index,
+            vritti_momentum=vritti_momentum,
+            arc_tension_harmonizer=arc_tension_harmonizer,
+            avg_vritti_momentum=avg_vritti_momentum,
+            max_vritti_momentum=max_vritti_momentum,
+            min_vritti_momentum=min_vritti_momentum,
+            avg_arc_tension_harmonizer=avg_arc_tension_harmonizer,
+            max_arc_tension_harmonizer=max_arc_tension_harmonizer,
+            min_arc_tension_harmonizer=min_arc_tension_harmonizer,
         )
 
         # Store observation

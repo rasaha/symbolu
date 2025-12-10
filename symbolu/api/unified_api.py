@@ -358,6 +358,41 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
             if kosha_activation_vector is not None:
                 formulas_data["kosha_activation_vector"] = kosha_activation_vector
 
+        # Phase 14: Extract Vritti Momentum & Arc-Tension Harmonizer
+        # Get most recent values from histories
+        vmf_hist = getattr(coherence_state, 'vritti_momentum_history', [])
+        if vmf_hist and vmf_hist[-1] is not None:
+            formulas_data["vritti_momentum"] = vmf_hist[-1]
+
+        ath_hist = getattr(coherence_state, 'arc_tension_harmonizer_history', [])
+        if ath_hist and ath_hist[-1] is not None:
+            formulas_data["arc_tension_harmonizer"] = ath_hist[-1]
+
+        # Get Phase 14 aggregates
+        avg_vritti_momentum = getattr(coherence_state, 'avg_vritti_momentum', None)
+        if avg_vritti_momentum is not None:
+            formulas_data["avg_vritti_momentum"] = avg_vritti_momentum
+
+        max_vritti_momentum = getattr(coherence_state, 'max_vritti_momentum', None)
+        if max_vritti_momentum is not None:
+            formulas_data["max_vritti_momentum"] = max_vritti_momentum
+
+        min_vritti_momentum = getattr(coherence_state, 'min_vritti_momentum', None)
+        if min_vritti_momentum is not None:
+            formulas_data["min_vritti_momentum"] = min_vritti_momentum
+
+        avg_arc_tension_harmonizer = getattr(coherence_state, 'avg_arc_tension_harmonizer', None)
+        if avg_arc_tension_harmonizer is not None:
+            formulas_data["avg_arc_tension_harmonizer"] = avg_arc_tension_harmonizer
+
+        max_arc_tension_harmonizer = getattr(coherence_state, 'max_arc_tension_harmonizer', None)
+        if max_arc_tension_harmonizer is not None:
+            formulas_data["max_arc_tension_harmonizer"] = max_arc_tension_harmonizer
+
+        min_arc_tension_harmonizer = getattr(coherence_state, 'min_arc_tension_harmonizer', None)
+        if min_arc_tension_harmonizer is not None:
+            formulas_data["min_arc_tension_harmonizer"] = min_arc_tension_harmonizer
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
