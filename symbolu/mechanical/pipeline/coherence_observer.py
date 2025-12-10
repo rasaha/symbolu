@@ -93,6 +93,11 @@ class CoherenceObservation:
     semantic_integrity_details: Optional[Dict[str, Any]] = None
     cognitive_drift_details: Optional[Dict[str, Any]] = None
 
+    # Phase 18: Temporal Entropy Differential (observation only)
+    temporal_entropy_diff: Optional[float] = None
+    temporal_entropy_volatility: Optional[float] = None
+    temporal_entropy_details: Optional[Dict[str, Any]] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -327,6 +332,27 @@ class CoherenceObserver:
                     'intent_identity_drift': getattr(drift_snapshot, 'intent_identity_drift', None),
                 }
 
+        # Phase 18: Extract Temporal Entropy Differential from coherence_state
+        temporal_entropy_diff = None
+        temporal_entropy_volatility = None
+        temporal_entropy_details = None
+
+        if coherence_state is not None:
+            temporal_entropy_diff = getattr(coherence_state, 'temporal_entropy_diff', None)
+            temporal_entropy_volatility = getattr(coherence_state, 'temporal_entropy_volatility', None)
+
+            # Extract detailed component breakdowns from snapshot
+            entropy_snapshot = getattr(coherence_state, 'temporal_entropy_snapshot', None)
+            if entropy_snapshot is not None:
+                temporal_entropy_details = {
+                    'instantaneous_entropy': getattr(entropy_snapshot, 'instantaneous_entropy', None),
+                    'short_window_entropy': getattr(entropy_snapshot, 'short_window_entropy', None),
+                    'long_window_entropy': getattr(entropy_snapshot, 'long_window_entropy', None),
+                    'entropy_diff': getattr(entropy_snapshot, 'entropy_diff', None),
+                    'normalized_entropy_diff': getattr(entropy_snapshot, 'normalized_entropy_diff', None),
+                    'entropy_volatility': getattr(entropy_snapshot, 'entropy_volatility', None),
+                }
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -379,6 +405,9 @@ class CoherenceObserver:
             cognitive_drift_v3=cognitive_drift_v3,
             semantic_integrity_details=semantic_integrity_details,
             cognitive_drift_details=cognitive_drift_details,
+            temporal_entropy_diff=temporal_entropy_diff,
+            temporal_entropy_volatility=temporal_entropy_volatility,
+            temporal_entropy_details=temporal_entropy_details,
         )
 
         # Store observation
@@ -495,6 +524,11 @@ class CoherenceObserver:
         if semantic:
             snapshot["semantic"] = semantic
 
+        # Phase 18: Add temporal entropy section if available
+        temporal_entropy = self._extract_temporal_entropy_from_observation(obs)
+        if temporal_entropy:
+            snapshot["temporal_entropy"] = temporal_entropy
+
         return snapshot
 
     def _extract_formulas_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Optional[float]]]:
@@ -588,6 +622,28 @@ class CoherenceObserver:
             semantic["drift_components"] = obs.cognitive_drift_details
 
         return semantic if semantic else None
+
+    def _extract_temporal_entropy_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Any]]:
+        """
+        Extract Phase 18 Temporal Entropy Differential metrics from observation.
+
+        Returns temporal_entropy dict if metrics are available, None otherwise.
+        """
+        # Build temporal_entropy dict from observation
+        temporal_entropy = {}
+
+        # Core metrics
+        if obs.temporal_entropy_diff is not None:
+            temporal_entropy["diff"] = obs.temporal_entropy_diff
+
+        if obs.temporal_entropy_volatility is not None:
+            temporal_entropy["volatility"] = obs.temporal_entropy_volatility
+
+        # Detailed components
+        if obs.temporal_entropy_details is not None:
+            temporal_entropy["details"] = obs.temporal_entropy_details
+
+        return temporal_entropy if temporal_entropy else None
 
     def _get_status_label(self, obs: CoherenceObservation) -> str:
         """Get human-readable status label."""

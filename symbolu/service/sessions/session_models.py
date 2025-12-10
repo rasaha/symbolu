@@ -145,3 +145,8 @@ class SessionSummary:
     avg_arc_tension_harmonizer: Optional[float] = None  # Average Arc-Tension Harmonizer across session
     max_arc_tension_harmonizer: Optional[float] = None  # Maximum Arc-Tension Harmonizer observed
     min_arc_tension_harmonizer: Optional[float] = None  # Minimum Arc-Tension Harmonizer observed
+
+    # Phase 18 Temporal Entropy Differential (observation only)
+    avg_temporal_entropy_diff: Optional[float] = None  # Average normalized entropy diff [0.0, 1.0]
+    avg_temporal_entropy_volatility: Optional[float] = None  # Average entropy volatility [0.0, 1.0]
+    temporal_entropy_regime: Optional[str] = None  # "stable" | "transition" | "volatile"

@@ -117,6 +117,13 @@ class CoherenceState:
     last_semantic_integrity_snapshot: Optional[Any] = None  # SemanticIntegritySnapshot
     last_cognitive_drift_snapshot: Optional[Any] = None  # CognitiveDriftSnapshotV3
 
+    # Phase 18: Temporal Entropy Differential (observation only - not used in scoring)
+    temporal_entropy_snapshot: Optional[Any] = None  # TemporalEntropySnapshot
+    temporal_entropy_diff: Optional[float] = None  # Alias for normalized_entropy_diff [0.0, 1.0]
+    temporal_entropy_volatility: Optional[float] = None  # Entropy volatility [0.0, 1.0]
+    temporal_entropy_diff_history: List[Optional[float]] = field(default_factory=list)  # Diff history
+    temporal_entropy_volatility_history: List[Optional[float]] = field(default_factory=list)  # Volatility history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -154,6 +161,10 @@ class CoherenceState:
         self.semantic_skeleton_history = self.semantic_skeleton_history[-window:]
         self.intent_arc_history = self.intent_arc_history[-window:]
         self.identity_signature_history = self.identity_signature_history[-window:]
+
+        # Phase 18 formula histories
+        self.temporal_entropy_diff_history = self.temporal_entropy_diff_history[-window:]
+        self.temporal_entropy_volatility_history = self.temporal_entropy_volatility_history[-window:]
 
     def get_history_length(self) -> int:
         """

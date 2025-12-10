@@ -495,6 +495,53 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
             max_arc_tension_harmonizer = max(ath_values)
             min_arc_tension_harmonizer = min(ath_values)
 
+    # Phase 18: Extract Temporal Entropy Differential from coherence history
+    avg_temporal_entropy_diff = None
+    avg_temporal_entropy_volatility = None
+    temporal_entropy_regime = None
+
+    if state.coherence_history:
+        # Extract temporal entropy diff and volatility values
+        entropy_diff_values = []
+        entropy_volatility_values = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract temporal_entropy_diff from CoherenceState
+                if "temporal_entropy_diff" in coh and coh["temporal_entropy_diff"] is not None:
+                    entropy_diff_values.append(coh["temporal_entropy_diff"])
+
+                # Extract temporal_entropy_volatility from CoherenceState
+                if "temporal_entropy_volatility" in coh and coh["temporal_entropy_volatility"] is not None:
+                    entropy_volatility_values.append(coh["temporal_entropy_volatility"])
+
+                # Also extract from histories for better coverage
+                if "temporal_entropy_diff_history" in coh:
+                    diff_history = coh["temporal_entropy_diff_history"]
+                    if isinstance(diff_history, list):
+                        entropy_diff_values.extend([d for d in diff_history if d is not None])
+
+                if "temporal_entropy_volatility_history" in coh:
+                    volatility_history = coh["temporal_entropy_volatility_history"]
+                    if isinstance(volatility_history, list):
+                        entropy_volatility_values.extend([v for v in volatility_history if v is not None])
+
+        # Compute aggregates
+        if entropy_diff_values:
+            avg_temporal_entropy_diff = sum(entropy_diff_values) / len(entropy_diff_values)
+
+        if entropy_volatility_values:
+            avg_temporal_entropy_volatility = sum(entropy_volatility_values) / len(entropy_volatility_values)
+
+        # Classify temporal entropy regime based on average volatility
+        if avg_temporal_entropy_volatility is not None:
+            if avg_temporal_entropy_volatility < 0.25:
+                temporal_entropy_regime = "stable"
+            elif avg_temporal_entropy_volatility < 0.60:
+                temporal_entropy_regime = "transition"
+            else:
+                temporal_entropy_regime = "volatile"
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -524,4 +571,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_arc_tension_harmonizer=avg_arc_tension_harmonizer,
         max_arc_tension_harmonizer=max_arc_tension_harmonizer,
         min_arc_tension_harmonizer=min_arc_tension_harmonizer,
+        avg_temporal_entropy_diff=avg_temporal_entropy_diff,
+        avg_temporal_entropy_volatility=avg_temporal_entropy_volatility,
+        temporal_entropy_regime=temporal_entropy_regime,
     )
