@@ -233,6 +233,9 @@ class CoherenceEngine:
         # Update Phase 38 temporal coherence forecasting model (observation only)
         self._update_temporal_coherence_forecast(state)
 
+        # Update Phase 39 multi-horizon temporal forecasting engine (observation only)
+        self._update_multi_horizon_forecast(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -2959,3 +2962,235 @@ class CoherenceEngine:
             state.current_forecast_strength = None
             state.current_forecast_band = None
             state.current_forecast_tags = []
+
+    def _update_multi_horizon_forecast(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 39 Multi-Horizon Temporal Forecasting Engine (observation only).
+
+        This method computes the multi-horizon forecast snapshot by predicting how
+        coherence, continuity, identity, and drift metrics are expected to evolve across
+        three temporal horizons:
+          • H1 (Short-Term): 1-3 turns
+          • H2 (Mid-Term): 4-8 turns
+          • H3 (Long-Term): 9-20 turns
+
+        The MHTFE produces:
+          1. Per-Horizon Forecasts (H1, H2, H3): Each with slopes, risks, strength, band
+          2. Forecast Consensus Index (FCI): Agreement across horizons [0.0, 1.0]
+          3. Future Stability Envelope (FSE): Uncertainty-modulated stability [0.0, 1.0]
+          4. Diagnostic Tags: MULTI_HORIZON_AGREEMENT, SHORT_TERM_NOISE, etc.
+
+        The MHTFE is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for tone-only micro-adjustments (±0.015 max) and analytics.
+
+        This update runs AFTER Phase 38 TCFM to leverage forecast signals.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.multi_horizon_temporal_forecasting import compute_multi_horizon_forecast
+
+        # ====================================================================
+        # STEP 1: GATHER COHERENCE FUSION (Phase 16)
+        # ====================================================================
+
+        # Extract coherence_fused history
+        coherence_fused_history = None
+        if state.coherence_fused_history:
+            coherence_fused_history = [
+                cfh for cfh in state.coherence_fused_history if cfh is not None
+            ]
+
+        # ====================================================================
+        # STEP 2: GATHER ADAPTIVE CONTINUITY ENGINE (Phase 37)
+        # ====================================================================
+
+        # Extract continuity histories
+        ncc_history = None
+        icc_history = None
+        css_history = None
+
+        if state.ncc_history:
+            ncc_history = [
+                ncc_val for ncc_val in state.ncc_history if ncc_val is not None
+            ]
+
+        if state.icc_history:
+            icc_history = [
+                icc_val for icc_val in state.icc_history if icc_val is not None
+            ]
+
+        if state.css_history:
+            css_history = [
+                css_val for css_val in state.css_history if css_val is not None
+            ]
+
+        # ====================================================================
+        # STEP 3: GATHER PREDICTIVE DRIFT (Phase 35)
+        # ====================================================================
+
+        drift_magnitude_prediction = state.current_drift_magnitude_prediction
+        drift_stability_score = state.current_drift_stability_score
+
+        # ====================================================================
+        # STEP 4: GATHER IDENTITY RESONANCE MEMORY (Phase 36)
+        # ====================================================================
+
+        identity_memory_strength = state.current_ims
+        identity_drift_anchoring = state.current_ida
+
+        # ====================================================================
+        # STEP 5: GATHER IDENTITY HARMONICS (Phase 34)
+        # ====================================================================
+
+        identity_stability_score = None
+        if state.identity_harmonics_snapshot is not None:
+            identity_stability_score = state.identity_harmonics_snapshot.identity_stability_score
+
+        # ====================================================================
+        # STEP 6: GATHER SYMBOLIC HARMONIZATION (Phase 27)
+        # ====================================================================
+
+        symbolic_harmonization_index = state.current_symbolic_harmonization_index
+
+        # Extract symbolic harmonization history
+        symbolic_harmonization_history = None
+        if state.symbolic_harmonization_history:
+            symbolic_harmonization_history = [
+                snap.symbolic_harmonization_index
+                for snap in state.symbolic_harmonization_history
+                if snap is not None
+            ]
+
+        # ====================================================================
+        # STEP 7: GATHER UNIFIED CONSCIOUSNESS (Phase 26)
+        # ====================================================================
+
+        consciousness_order_index = state.current_coi
+        consciousness_stability_index = state.current_csi
+
+        # Extract consciousness order history
+        consciousness_order_history = None
+        if state.ucf_history:
+            consciousness_order_history = [
+                snap.consciousness_order_index
+                for snap in state.ucf_history
+                if snap is not None
+            ]
+
+        # ====================================================================
+        # STEP 8: GATHER TEMPORAL ENTROPY (Phase 18)
+        # ====================================================================
+
+        temporal_entropy_volatility = state.temporal_entropy_volatility
+        temporal_entropy_diff = state.temporal_entropy_diff
+
+        # ====================================================================
+        # STEP 9: COMPUTE MULTI-HORIZON FORECAST
+        # ====================================================================
+
+        snapshot = compute_multi_horizon_forecast(
+            # Phase 16: Formula Fusion Stabilizer
+            coherence_fused_history=coherence_fused_history,
+            # Phase 37: Adaptive Continuity Engine
+            ncc_history=ncc_history,
+            icc_history=icc_history,
+            css_history=css_history,
+            # Phase 35: Predictive Persona Drift
+            drift_magnitude_prediction=drift_magnitude_prediction,
+            drift_stability_score=drift_stability_score,
+            # Phase 36: Identity Resonance Memory
+            identity_memory_strength=identity_memory_strength,
+            identity_drift_anchoring=identity_drift_anchoring,
+            # Phase 34: Identity Harmonics
+            identity_stability_score=identity_stability_score,
+            # Phase 27: Symbolic Harmonization
+            symbolic_harmonization_index=symbolic_harmonization_index,
+            symbolic_harmonization_history=symbolic_harmonization_history,
+            # Phase 26: Unified Consciousness Formula
+            consciousness_order_index=consciousness_order_index,
+            consciousness_stability_index=consciousness_stability_index,
+            consciousness_order_history=consciousness_order_history,
+            # Phase 18: Temporal Entropy
+            temporal_entropy_volatility=temporal_entropy_volatility,
+            temporal_entropy_diff=temporal_entropy_diff,
+        )
+
+        # ====================================================================
+        # STEP 10: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Append to histories
+            state.multi_horizon_forecast_history.append(snapshot)
+            state.forecast_consensus_history.append(snapshot.forecast_consensus_index)
+            state.future_stability_envelope_history.append(snapshot.future_stability_envelope)
+            state.horizon_band_H1_history.append(snapshot.h1_forecast.forecast_band)
+            state.horizon_band_H2_history.append(snapshot.h2_forecast.forecast_band)
+            state.horizon_band_H3_history.append(snapshot.h3_forecast.forecast_band)
+
+            # Update current metrics
+            state.multi_horizon_forecast_snapshot = snapshot
+
+            # H1 metrics
+            state.horizon_slope_H1 = snapshot.h1_forecast.coherence_slope
+            state.horizon_continuity_slope_H1 = snapshot.h1_forecast.continuity_slope
+            state.horizon_drift_H1 = snapshot.h1_forecast.drift_risk
+            state.horizon_entropy_H1 = snapshot.h1_forecast.entropy_risk
+            state.horizon_strength_H1 = snapshot.h1_forecast.forecast_strength
+            state.horizon_band_H1 = snapshot.h1_forecast.forecast_band
+
+            # H2 metrics
+            state.horizon_slope_H2 = snapshot.h2_forecast.coherence_slope
+            state.horizon_continuity_slope_H2 = snapshot.h2_forecast.continuity_slope
+            state.horizon_drift_H2 = snapshot.h2_forecast.drift_risk
+            state.horizon_entropy_H2 = snapshot.h2_forecast.entropy_risk
+            state.horizon_strength_H2 = snapshot.h2_forecast.forecast_strength
+            state.horizon_band_H2 = snapshot.h2_forecast.forecast_band
+
+            # H3 metrics
+            state.horizon_slope_H3 = snapshot.h3_forecast.coherence_slope
+            state.horizon_continuity_slope_H3 = snapshot.h3_forecast.continuity_slope
+            state.horizon_drift_H3 = snapshot.h3_forecast.drift_risk
+            state.horizon_entropy_H3 = snapshot.h3_forecast.entropy_risk
+            state.horizon_strength_H3 = snapshot.h3_forecast.forecast_strength
+            state.horizon_band_H3 = snapshot.h3_forecast.forecast_band
+
+            # Cross-horizon analytics
+            state.forecast_consensus_index = snapshot.forecast_consensus_index
+            state.future_stability_envelope = snapshot.future_stability_envelope
+            state.current_mh_forecast_tags = snapshot.diagnostic_tags
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.multi_horizon_forecast_history.append(None)
+            state.forecast_consensus_history.append(None)
+            state.future_stability_envelope_history.append(None)
+            state.horizon_band_H1_history.append(None)
+            state.horizon_band_H2_history.append(None)
+            state.horizon_band_H3_history.append(None)
+
+            state.multi_horizon_forecast_snapshot = None
+            state.horizon_slope_H1 = None
+            state.horizon_continuity_slope_H1 = None
+            state.horizon_drift_H1 = None
+            state.horizon_entropy_H1 = None
+            state.horizon_strength_H1 = None
+            state.horizon_band_H1 = None
+            state.horizon_slope_H2 = None
+            state.horizon_continuity_slope_H2 = None
+            state.horizon_drift_H2 = None
+            state.horizon_entropy_H2 = None
+            state.horizon_strength_H2 = None
+            state.horizon_band_H2 = None
+            state.horizon_slope_H3 = None
+            state.horizon_continuity_slope_H3 = None
+            state.horizon_drift_H3 = None
+            state.horizon_entropy_H3 = None
+            state.horizon_strength_H3 = None
+            state.horizon_band_H3 = None
+            state.forecast_consensus_index = None
+            state.future_stability_envelope = None
+            state.current_mh_forecast_tags = []

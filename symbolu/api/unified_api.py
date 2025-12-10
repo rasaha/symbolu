@@ -86,6 +86,7 @@ class UnifiedOutput:
     identity_resonance_memory: Optional[Dict[str, Any]] = None  # Phase 36: Identity resonance memory (observation-only, tone-level only)
     adaptive_continuity: Optional[Dict[str, Any]] = None  # Phase 37: Adaptive continuity engine (observation-only, tone-level only)
     temporal_forecast: Optional[Dict[str, Any]] = None  # Phase 38: Temporal coherence forecasting model (observation-only, tone-level only)
+    multi_horizon_forecast: Optional[Dict[str, Any]] = None  # Phase 39: Multi-horizon temporal forecasting engine (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -1025,6 +1026,51 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "diagnostic_tags": getattr(forecast_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 39: Extract multi-horizon temporal forecasting engine data (observation-only)
+    mhtfe_data = None
+    # Try to extract from persona response first (if available)
+    if hasattr(ctx, 'persona_response') and ctx.persona_response is not None:
+        mh_forecast_profile = getattr(ctx.persona_response, 'multi_horizon_forecast_profile', None)
+        if mh_forecast_profile is not None:
+            mhtfe_data = mh_forecast_profile
+
+    # Also try to extract from coherence state for observability
+    if mhtfe_data is None and hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        mh_forecast_snapshot = getattr(ctx.coherence_state, 'multi_horizon_forecast_snapshot', None)
+        if mh_forecast_snapshot is not None:
+            # Build dict from snapshot fields
+            mhtfe_data = {
+                "horizons": {
+                    "h1": {
+                        "coherence_slope": getattr(mh_forecast_snapshot.h1_forecast, 'coherence_slope', None),
+                        "continuity_slope": getattr(mh_forecast_snapshot.h1_forecast, 'continuity_slope', None),
+                        "drift_risk": getattr(mh_forecast_snapshot.h1_forecast, 'drift_risk', None),
+                        "entropy_risk": getattr(mh_forecast_snapshot.h1_forecast, 'entropy_risk', None),
+                        "forecast_strength": getattr(mh_forecast_snapshot.h1_forecast, 'forecast_strength', None),
+                        "forecast_band": getattr(mh_forecast_snapshot.h1_forecast, 'forecast_band', None),
+                    },
+                    "h2": {
+                        "coherence_slope": getattr(mh_forecast_snapshot.h2_forecast, 'coherence_slope', None),
+                        "continuity_slope": getattr(mh_forecast_snapshot.h2_forecast, 'continuity_slope', None),
+                        "drift_risk": getattr(mh_forecast_snapshot.h2_forecast, 'drift_risk', None),
+                        "entropy_risk": getattr(mh_forecast_snapshot.h2_forecast, 'entropy_risk', None),
+                        "forecast_strength": getattr(mh_forecast_snapshot.h2_forecast, 'forecast_strength', None),
+                        "forecast_band": getattr(mh_forecast_snapshot.h2_forecast, 'forecast_band', None),
+                    },
+                    "h3": {
+                        "coherence_slope": getattr(mh_forecast_snapshot.h3_forecast, 'coherence_slope', None),
+                        "continuity_slope": getattr(mh_forecast_snapshot.h3_forecast, 'continuity_slope', None),
+                        "drift_risk": getattr(mh_forecast_snapshot.h3_forecast, 'drift_risk', None),
+                        "entropy_risk": getattr(mh_forecast_snapshot.h3_forecast, 'entropy_risk', None),
+                        "forecast_strength": getattr(mh_forecast_snapshot.h3_forecast, 'forecast_strength', None),
+                        "forecast_band": getattr(mh_forecast_snapshot.h3_forecast, 'forecast_band', None),
+                    },
+                },
+                "forecast_consensus_index": getattr(mh_forecast_snapshot, 'forecast_consensus_index', None),
+                "future_stability_envelope": getattr(mh_forecast_snapshot, 'future_stability_envelope', None),
+                "diagnostic_tags": getattr(mh_forecast_snapshot, 'diagnostic_tags', []),
+            }
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -1053,6 +1099,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         identity_resonance_memory=irm_data,  # Phase 36
         adaptive_continuity=ace_data,  # Phase 37
         temporal_forecast=tcfm_data,  # Phase 38
+        multi_horizon_forecast=mhtfe_data,  # Phase 39
     )
 
 

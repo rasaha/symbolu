@@ -121,6 +121,10 @@ jobs:
             --maxfail=1 \
             2>&1 | tee phase25-resonance-simulator-pytest.log
 
+      - name: Run Phase 39 Multi-Horizon Temporal Forecasting Tests
+        run: |
+          python test_phase39_validation.py 2>&1 | tee phase39-multi-horizon-forecast.log
+
       - name: Upload Formula Drift test logs and fixtures
         uses: actions/upload-artifact@v4
         if: always()
@@ -134,6 +138,7 @@ jobs:
             phase23-cause-effect-inversion-pytest.log
             phase24-resonance-weighting-pytest.log
             phase25-resonance-simulator-pytest.log
+            phase39-multi-horizon-forecast.log
             symbolu/core/formula_drift_tests/phase1_resonance_fixtures.json
 
       - name: Check for drift
@@ -145,3 +150,4 @@ jobs:
           echo "✅ Phase 23 Cause-Effect Inversion Analytics tests passed! All formulas remain stable."
           echo "✅ Phase 24 Resonance Weighting Function tests passed! All formulas remain stable."
           echo "✅ Phase 25 Resonance Simulator tests passed! All what-if scenarios remain deterministic."
+          echo "✅ Phase 39 Multi-Horizon Temporal Forecasting tests passed! MHTFE is operational and deterministic."

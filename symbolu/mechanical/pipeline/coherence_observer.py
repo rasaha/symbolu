@@ -203,6 +203,30 @@ class CoherenceObservation:
     forecast_band: Optional[str] = None  # Forecast Band: STRONG_UPTREND, MILD_UPTREND, NEUTRAL, etc.
     forecast_tags: List[str] = field(default_factory=list)  # TCFM forecast diagnostic tags
 
+    # Phase 39: Multi-Horizon Temporal Forecasting Engine (observation only)
+    multi_horizon_forecast_snapshot: Optional[Any] = None  # MultiHorizonForecastSnapshot
+    mh_slope_H1: Optional[float] = None  # H1 coherence slope [-1.0, 1.0]
+    mh_continuity_slope_H1: Optional[float] = None  # H1 continuity slope [-1.0, 1.0]
+    mh_drift_H1: Optional[float] = None  # H1 drift risk [0.0, 1.0]
+    mh_entropy_H1: Optional[float] = None  # H1 entropy risk [0.0, 1.0]
+    mh_strength_H1: Optional[float] = None  # H1 forecast strength [0.0, 1.0]
+    mh_band_H1: Optional[str] = None  # H1 forecast band
+    mh_slope_H2: Optional[float] = None  # H2 coherence slope [-1.0, 1.0]
+    mh_continuity_slope_H2: Optional[float] = None  # H2 continuity slope [-1.0, 1.0]
+    mh_drift_H2: Optional[float] = None  # H2 drift risk [0.0, 1.0]
+    mh_entropy_H2: Optional[float] = None  # H2 entropy risk [0.0, 1.0]
+    mh_strength_H2: Optional[float] = None  # H2 forecast strength [0.0, 1.0]
+    mh_band_H2: Optional[str] = None  # H2 forecast band
+    mh_slope_H3: Optional[float] = None  # H3 coherence slope [-1.0, 1.0]
+    mh_continuity_slope_H3: Optional[float] = None  # H3 continuity slope [-1.0, 1.0]
+    mh_drift_H3: Optional[float] = None  # H3 drift risk [0.0, 1.0]
+    mh_entropy_H3: Optional[float] = None  # H3 entropy risk [0.0, 1.0]
+    mh_strength_H3: Optional[float] = None  # H3 forecast strength [0.0, 1.0]
+    mh_band_H3: Optional[str] = None  # H3 forecast band
+    mh_consensus: Optional[float] = None  # Forecast Consensus Index [0.0, 1.0]
+    mh_stability_envelope: Optional[float] = None  # Future Stability Envelope [0.0, 1.0]
+    mh_tags: List[str] = field(default_factory=list)  # MHTFE diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -735,6 +759,68 @@ class CoherenceObserver:
                 forecast_band = getattr(temporal_forecast_snapshot, 'forecast_band', None)
                 forecast_tags = getattr(temporal_forecast_snapshot, 'diagnostic_tags', [])
 
+        # Phase 39: Extract Multi-Horizon Temporal Forecasting Engine from coherence state
+        multi_horizon_forecast_snapshot = None
+        mh_slope_H1 = None
+        mh_continuity_slope_H1 = None
+        mh_drift_H1 = None
+        mh_entropy_H1 = None
+        mh_strength_H1 = None
+        mh_band_H1 = None
+        mh_slope_H2 = None
+        mh_continuity_slope_H2 = None
+        mh_drift_H2 = None
+        mh_entropy_H2 = None
+        mh_strength_H2 = None
+        mh_band_H2 = None
+        mh_slope_H3 = None
+        mh_continuity_slope_H3 = None
+        mh_drift_H3 = None
+        mh_entropy_H3 = None
+        mh_strength_H3 = None
+        mh_band_H3 = None
+        mh_consensus = None
+        mh_stability_envelope = None
+        mh_tags = []
+
+        if coherence_state is not None:
+            multi_horizon_forecast_snapshot = getattr(coherence_state, 'multi_horizon_forecast_snapshot', None)
+            if multi_horizon_forecast_snapshot is not None:
+                # H1 metrics
+                h1_forecast = getattr(multi_horizon_forecast_snapshot, 'h1_forecast', None)
+                if h1_forecast is not None:
+                    mh_slope_H1 = getattr(h1_forecast, 'coherence_slope', None)
+                    mh_continuity_slope_H1 = getattr(h1_forecast, 'continuity_slope', None)
+                    mh_drift_H1 = getattr(h1_forecast, 'drift_risk', None)
+                    mh_entropy_H1 = getattr(h1_forecast, 'entropy_risk', None)
+                    mh_strength_H1 = getattr(h1_forecast, 'forecast_strength', None)
+                    mh_band_H1 = getattr(h1_forecast, 'forecast_band', None)
+
+                # H2 metrics
+                h2_forecast = getattr(multi_horizon_forecast_snapshot, 'h2_forecast', None)
+                if h2_forecast is not None:
+                    mh_slope_H2 = getattr(h2_forecast, 'coherence_slope', None)
+                    mh_continuity_slope_H2 = getattr(h2_forecast, 'continuity_slope', None)
+                    mh_drift_H2 = getattr(h2_forecast, 'drift_risk', None)
+                    mh_entropy_H2 = getattr(h2_forecast, 'entropy_risk', None)
+                    mh_strength_H2 = getattr(h2_forecast, 'forecast_strength', None)
+                    mh_band_H2 = getattr(h2_forecast, 'forecast_band', None)
+
+                # H3 metrics
+                h3_forecast = getattr(multi_horizon_forecast_snapshot, 'h3_forecast', None)
+                if h3_forecast is not None:
+                    mh_slope_H3 = getattr(h3_forecast, 'coherence_slope', None)
+                    mh_continuity_slope_H3 = getattr(h3_forecast, 'continuity_slope', None)
+                    mh_drift_H3 = getattr(h3_forecast, 'drift_risk', None)
+                    mh_entropy_H3 = getattr(h3_forecast, 'entropy_risk', None)
+                    mh_strength_H3 = getattr(h3_forecast, 'forecast_strength', None)
+                    mh_band_H3 = getattr(h3_forecast, 'forecast_band', None)
+
+                # Cross-horizon analytics
+                mh_consensus = getattr(multi_horizon_forecast_snapshot, 'forecast_consensus_index', None)
+                mh_stability_envelope = getattr(multi_horizon_forecast_snapshot, 'future_stability_envelope', None)
+                mh_tags = getattr(multi_horizon_forecast_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -869,6 +955,28 @@ class CoherenceObserver:
             forecast_strength=forecast_strength,  # Phase 38
             forecast_band=forecast_band,  # Phase 38
             forecast_tags=forecast_tags,  # Phase 38
+            multi_horizon_forecast_snapshot=multi_horizon_forecast_snapshot,  # Phase 39
+            mh_slope_H1=mh_slope_H1,  # Phase 39
+            mh_continuity_slope_H1=mh_continuity_slope_H1,  # Phase 39
+            mh_drift_H1=mh_drift_H1,  # Phase 39
+            mh_entropy_H1=mh_entropy_H1,  # Phase 39
+            mh_strength_H1=mh_strength_H1,  # Phase 39
+            mh_band_H1=mh_band_H1,  # Phase 39
+            mh_slope_H2=mh_slope_H2,  # Phase 39
+            mh_continuity_slope_H2=mh_continuity_slope_H2,  # Phase 39
+            mh_drift_H2=mh_drift_H2,  # Phase 39
+            mh_entropy_H2=mh_entropy_H2,  # Phase 39
+            mh_strength_H2=mh_strength_H2,  # Phase 39
+            mh_band_H2=mh_band_H2,  # Phase 39
+            mh_slope_H3=mh_slope_H3,  # Phase 39
+            mh_continuity_slope_H3=mh_continuity_slope_H3,  # Phase 39
+            mh_drift_H3=mh_drift_H3,  # Phase 39
+            mh_entropy_H3=mh_entropy_H3,  # Phase 39
+            mh_strength_H3=mh_strength_H3,  # Phase 39
+            mh_band_H3=mh_band_H3,  # Phase 39
+            mh_consensus=mh_consensus,  # Phase 39
+            mh_stability_envelope=mh_stability_envelope,  # Phase 39
+            mh_tags=mh_tags,  # Phase 39
         )
 
         # Store observation
