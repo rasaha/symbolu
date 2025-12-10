@@ -6,3 +6,6 @@ This module is deprecated. Use symbolu.mechanical.fusion.schemas.candidate inste
 The canonical implementation is in the fusion/schemas directory.
 """
 # All imports redirected to canonical module
+from symbolu.mechanical.fusion.schemas.candidate import Candidate, CandidateSource
+
+__all__ = ["Candidate", "CandidateSource"]
