@@ -5,7 +5,7 @@ Tracks multi-turn coherence across conversation history with sliding window.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 
 @dataclass
@@ -100,6 +100,23 @@ class CoherenceState:
     fusion_inertia_factor: Optional[float] = None  # [0.5, 1.0] - temporal inertia factor
     fusion_quality_factor: Optional[float] = None  # [0.0, 1.0] - quality gating factor
 
+    # Phase 17: Semantic Integrity & Cognitive Drift v3 (observation only - not used in scoring)
+    semantic_integrity_score: Optional[float] = None  # [0.0, 1.0] - semantic coherence/self-consistency
+    cognitive_drift_v3: Optional[float] = None  # [0.0, 1.0] - semantic center-of-gravity drift
+    semantic_integrity_history: List[Optional[float]] = field(default_factory=list)  # Integrity history
+    cognitive_drift_v3_history: List[Optional[float]] = field(default_factory=list)  # Drift history
+
+    # Phase 17: Semantic skeleton tracking for integrity computation
+    semantic_skeleton_history: List[Dict] = field(default_factory=list)  # Semantic skeleton per turn
+
+    # Phase 17: Intent/identity tracking for drift computation
+    intent_arc_history: List[Optional[str]] = field(default_factory=list)  # Intent arc per turn
+    identity_signature_history: List[Optional[str]] = field(default_factory=list)  # Identity signature per turn
+
+    # Phase 17: Detailed snapshot storage (optional, for observability)
+    last_semantic_integrity_snapshot: Optional[Any] = None  # SemanticIntegritySnapshot
+    last_cognitive_drift_snapshot: Optional[Any] = None  # CognitiveDriftSnapshotV3
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -130,6 +147,13 @@ class CoherenceState:
 
         # Phase 16 formula histories
         self.coherence_fused_history = self.coherence_fused_history[-window:]
+
+        # Phase 17 formula histories
+        self.semantic_integrity_history = self.semantic_integrity_history[-window:]
+        self.cognitive_drift_v3_history = self.cognitive_drift_v3_history[-window:]
+        self.semantic_skeleton_history = self.semantic_skeleton_history[-window:]
+        self.intent_arc_history = self.intent_arc_history[-window:]
+        self.identity_signature_history = self.identity_signature_history[-window:]
 
     def get_history_length(self) -> int:
         """

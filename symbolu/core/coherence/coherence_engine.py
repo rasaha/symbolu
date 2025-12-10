@@ -14,6 +14,10 @@ from symbolu.core.coherence.semantic_skeleton import compute_semantic_stability
 from symbolu.core.coherence.temporal_arc_tracer import compute_temporal_arc_score
 from symbolu.formulas.guna_kosha_resonance import compute_guna_kosha_resonance
 from symbolu.formulas.formula_fusion_stabilizer import compute_coherence_fused
+from symbolu.formulas.semantic_integrity import (
+    compute_semantic_integrity,
+    compute_cognitive_drift_v3,
+)
 
 
 class CoherenceEngine:
@@ -80,6 +84,11 @@ class CoherenceEngine:
                 vritti_momentum_history=prev_state.vritti_momentum_history.copy(),
                 arc_tension_harmonizer_history=prev_state.arc_tension_harmonizer_history.copy(),
                 coherence_fused_history=prev_state.coherence_fused_history.copy(),
+                semantic_integrity_history=prev_state.semantic_integrity_history.copy(),
+                cognitive_drift_v3_history=prev_state.cognitive_drift_v3_history.copy(),
+                semantic_skeleton_history=prev_state.semantic_skeleton_history.copy(),
+                intent_arc_history=prev_state.intent_arc_history.copy(),
+                identity_signature_history=prev_state.identity_signature_history.copy(),
             )
 
         # Append new turn data to histories
@@ -100,6 +109,11 @@ class CoherenceEngine:
         # Phase 14 formulas (observation only - not used in scoring)
         state.vritti_momentum_history.append(self._extract_vritti_momentum(temporal_summary))
         state.arc_tension_harmonizer_history.append(self._extract_arc_tension_harmonizer(temporal_summary))
+
+        # Phase 17: Semantic skeleton, intent arc, identity signature (observation only)
+        state.semantic_skeleton_history.append(semantic_signature.copy() if semantic_signature else {})
+        state.intent_arc_history.append(self._extract_intent_arc(temporal_summary))
+        state.identity_signature_history.append(self._extract_identity_signature(temporal_summary))
 
         # Trim to sliding window
         state.window_trim(self.window)
@@ -140,6 +154,10 @@ class CoherenceEngine:
 
         # Update Phase 16 formula fusion stabilizer (observation only)
         self._update_formula_fusion_stabilizer(state, mapper_profile)
+
+        # Update Phase 17 semantic integrity and cognitive drift v3 (observation only)
+        self._update_semantic_integrity(state, mapper_profile)
+        self._update_cognitive_drift_v3(state)
 
         return state
 
@@ -227,6 +245,18 @@ class CoherenceEngine:
         """Extract arc_tension_harmonizer from temporal summary (Phase 14 formula)."""
         if temporal_summary and "arc_tension_harmonizer" in temporal_summary:
             return temporal_summary["arc_tension_harmonizer"]
+        return None
+
+    def _extract_intent_arc(self, temporal_summary: Optional[Dict]) -> Optional[str]:
+        """Extract intent_arc from temporal summary (Phase 17)."""
+        if temporal_summary and "intent_arc" in temporal_summary:
+            return temporal_summary["intent_arc"]
+        return None
+
+    def _extract_identity_signature(self, temporal_summary: Optional[Dict]) -> Optional[str]:
+        """Extract identity_signature from temporal summary (Phase 17)."""
+        if temporal_summary and "identity_signature" in temporal_summary:
+            return temporal_summary["identity_signature"]
         return None
 
     def _compute_persona_drift(self, state: CoherenceState) -> float:
@@ -939,3 +969,125 @@ class CoherenceEngine:
 
         # Append to history
         state.coherence_fused_history.append(snapshot.coherence_fused)
+
+    def _update_semantic_integrity(
+        self,
+        state: CoherenceState,
+        mapper_profile: Dict,
+    ) -> None:
+        """
+        Update Phase 17 Semantic Integrity (observation only).
+
+        This method computes the semantic integrity score by analyzing:
+        - Structural consistency (current skeleton vs. previous skeletons)
+        - Layer agreement (consistency between symbolic/practical/mirror)
+        - Cross-turn consistency (similarity across recent turns)
+        - Mapper alignment (mapper profile alignment with structure)
+        - Intent-identity alignment (coherence of intent arc + identity signature)
+
+        The semantic integrity metric is stored in state.semantic_integrity_score
+        and does NOT affect any existing pipeline behavior. It is purely for
+        observation and diagnostics.
+
+        Args:
+            state: CoherenceState to update in place
+            mapper_profile: MapperProfile dict for alignment scoring
+        """
+        # Get current semantic skeleton (most recent)
+        if not state.semantic_skeleton_history:
+            # No skeleton yet - set to None and return
+            state.semantic_integrity_score = None
+            state.last_semantic_integrity_snapshot = None
+            state.semantic_integrity_history.append(None)
+            return
+
+        current_skeleton = state.semantic_skeleton_history[-1]
+
+        # Get previous skeletons (all but the last one)
+        previous_skeletons = state.semantic_skeleton_history[:-1] if len(state.semantic_skeleton_history) > 1 else []
+
+        # Get most recent intent arc and identity signature
+        intent_arc = state.intent_arc_history[-1] if state.intent_arc_history else None
+        identity_signature = state.identity_signature_history[-1] if state.identity_signature_history else None
+
+        # Call semantic integrity formula
+        snapshot = compute_semantic_integrity(
+            current_skeleton=current_skeleton,
+            previous_skeletons=previous_skeletons,
+            mapper_profile=mapper_profile,
+            intent_arc=intent_arc,
+            identity_signature=identity_signature,
+        )
+
+        # Store results in state
+        state.semantic_integrity_score = snapshot.semantic_integrity_score
+        state.last_semantic_integrity_snapshot = snapshot
+
+        # Append to history
+        state.semantic_integrity_history.append(snapshot.semantic_integrity_score)
+
+    def _update_cognitive_drift_v3(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 17 Cognitive Drift v3 (observation only).
+
+        This method computes the cognitive drift v3 score by analyzing:
+        - Structure drift (inconsistency in structural patterns)
+        - Topic drift (variation in layer agreement and cross-turn consistency)
+        - Mapper drift (changes in mapper activation patterns)
+        - Intent-identity drift (changes in intent arc + identity signature)
+
+        The cognitive drift v3 metric is stored in state.cognitive_drift_v3
+        and does NOT affect any existing pipeline behavior. It is purely for
+        observation and diagnostics.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        # Collect semantic integrity snapshots (last N)
+        # We need at least 2 snapshots to compute drift
+        if not state.semantic_integrity_history or len(state.semantic_integrity_history) < 2:
+            # Not enough history - set to None and return
+            state.cognitive_drift_v3 = None
+            state.last_cognitive_drift_snapshot = None
+            state.cognitive_drift_v3_history.append(None)
+            return
+
+        # Build list of integrity snapshots from last N turns
+        # We'll use last 5-10 turns for drift computation
+        integrity_snapshots_last_n = []
+
+        # Get last N semantic integrity snapshots
+        # We need to reconstruct snapshots from histories if last_semantic_integrity_snapshot is not stored
+        # For simplicity, we'll use the current snapshot and assume we have access to component histories
+        # In a full implementation, we would store all snapshots or reconstruct from component histories
+
+        # For now, use a simplified approach: only use the last snapshot if available
+        if state.last_semantic_integrity_snapshot is not None:
+            integrity_snapshots_last_n = [state.last_semantic_integrity_snapshot]
+
+        # Get mapper profile history (last N)
+        mapper_history = state.mapper_profile_history[-10:] if state.mapper_profile_history else []
+
+        # Get intent arc history (last N)
+        intent_arc_history = state.intent_arc_history[-10:] if state.intent_arc_history else []
+
+        # Get identity signature history (last N)
+        identity_signature_history = state.identity_signature_history[-10:] if state.identity_signature_history else []
+
+        # Call cognitive drift v3 formula
+        snapshot = compute_cognitive_drift_v3(
+            integrity_snapshots_last_n=integrity_snapshots_last_n,
+            mapper_history=mapper_history,
+            intent_arc_history=intent_arc_history,
+            identity_signature_history=identity_signature_history,
+        )
+
+        # Store results in state
+        state.cognitive_drift_v3 = snapshot.cognitive_drift_v3
+        state.last_cognitive_drift_snapshot = snapshot
+
+        # Append to history
+        state.cognitive_drift_v3_history.append(snapshot.cognitive_drift_v3)

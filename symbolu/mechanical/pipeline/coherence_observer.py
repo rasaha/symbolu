@@ -87,6 +87,12 @@ class CoherenceObservation:
     fusion_inertia_factor: Optional[float] = None
     fusion_quality_factor: Optional[float] = None
 
+    # Phase 17: Semantic Integrity & Cognitive Drift v3 (observation only)
+    semantic_integrity_score: Optional[float] = None
+    cognitive_drift_v3: Optional[float] = None
+    semantic_integrity_details: Optional[Dict[str, Any]] = None
+    cognitive_drift_details: Optional[Dict[str, Any]] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -291,6 +297,36 @@ class CoherenceObserver:
             fusion_inertia_factor = getattr(coherence_state, 'fusion_inertia_factor', None)
             fusion_quality_factor = getattr(coherence_state, 'fusion_quality_factor', None)
 
+        # Phase 17: Extract Semantic Integrity & Cognitive Drift v3 from coherence_state
+        semantic_integrity_score = None
+        cognitive_drift_v3 = None
+        semantic_integrity_details = None
+        cognitive_drift_details = None
+
+        if coherence_state is not None:
+            semantic_integrity_score = getattr(coherence_state, 'semantic_integrity_score', None)
+            cognitive_drift_v3 = getattr(coherence_state, 'cognitive_drift_v3', None)
+
+            # Extract detailed component breakdowns from snapshots
+            integrity_snapshot = getattr(coherence_state, 'last_semantic_integrity_snapshot', None)
+            if integrity_snapshot is not None:
+                semantic_integrity_details = {
+                    'structural_consistency': getattr(integrity_snapshot, 'structural_consistency', None),
+                    'layer_agreement_score': getattr(integrity_snapshot, 'layer_agreement_score', None),
+                    'cross_turn_consistency': getattr(integrity_snapshot, 'cross_turn_consistency', None),
+                    'mapper_alignment_score': getattr(integrity_snapshot, 'mapper_alignment_score', None),
+                    'intent_identity_alignment': getattr(integrity_snapshot, 'intent_identity_alignment', None),
+                }
+
+            drift_snapshot = getattr(coherence_state, 'last_cognitive_drift_snapshot', None)
+            if drift_snapshot is not None:
+                cognitive_drift_details = {
+                    'structure_drift': getattr(drift_snapshot, 'structure_drift', None),
+                    'topic_drift': getattr(drift_snapshot, 'topic_drift', None),
+                    'mapper_drift': getattr(drift_snapshot, 'mapper_drift', None),
+                    'intent_identity_drift': getattr(drift_snapshot, 'intent_identity_drift', None),
+                }
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -339,6 +375,10 @@ class CoherenceObserver:
             fusion_stability_weight=fusion_stability_weight,
             fusion_inertia_factor=fusion_inertia_factor,
             fusion_quality_factor=fusion_quality_factor,
+            semantic_integrity_score=semantic_integrity_score,
+            cognitive_drift_v3=cognitive_drift_v3,
+            semantic_integrity_details=semantic_integrity_details,
+            cognitive_drift_details=cognitive_drift_details,
         )
 
         # Store observation
@@ -450,6 +490,11 @@ class CoherenceObserver:
         if stabilizer:
             snapshot["stabilizer"] = stabilizer
 
+        # Phase 17: Add semantic integrity & cognitive drift section if available
+        semantic = self._extract_semantic_from_observation(obs)
+        if semantic:
+            snapshot["semantic"] = semantic
+
         return snapshot
 
     def _extract_formulas_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Optional[float]]]:
@@ -518,6 +563,31 @@ class CoherenceObserver:
             stabilizer["quality_factor"] = obs.fusion_quality_factor
 
         return stabilizer if stabilizer else None
+
+    def _extract_semantic_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Any]]:
+        """
+        Extract Phase 17 Semantic Integrity & Cognitive Drift metrics from observation.
+
+        Returns semantic dict if metrics are available, None otherwise.
+        """
+        # Build semantic dict from observation
+        semantic = {}
+
+        # Integrity score and details
+        if obs.semantic_integrity_score is not None:
+            semantic["integrity_score"] = obs.semantic_integrity_score
+
+        if obs.semantic_integrity_details is not None:
+            semantic["integrity_components"] = obs.semantic_integrity_details
+
+        # Drift score and details
+        if obs.cognitive_drift_v3 is not None:
+            semantic["cognitive_drift_v3"] = obs.cognitive_drift_v3
+
+        if obs.cognitive_drift_details is not None:
+            semantic["drift_components"] = obs.cognitive_drift_details
+
+        return semantic if semantic else None
 
     def _get_status_label(self, obs: CoherenceObservation) -> str:
         """Get human-readable status label."""

@@ -262,6 +262,44 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 stabilizer_diagnostics['quality_factor'] = fusion_quality_factor
             coherence_report['stabilizer'] = stabilizer_diagnostics
 
+        # Phase 17: Add Semantic Integrity & Cognitive Drift v3 metrics
+        semantic_integrity_score = getattr(coherence_state, 'semantic_integrity_score', None)
+        cognitive_drift_v3 = getattr(coherence_state, 'cognitive_drift_v3', None)
+
+        # Extract detailed component breakdowns from snapshots
+        integrity_snapshot = getattr(coherence_state, 'last_semantic_integrity_snapshot', None)
+        drift_snapshot = getattr(coherence_state, 'last_cognitive_drift_snapshot', None)
+
+        # Add semantic integrity & drift to coherence report if available
+        if semantic_integrity_score is not None or cognitive_drift_v3 is not None:
+            semantic_data = {}
+
+            if semantic_integrity_score is not None:
+                semantic_data['integrity_score'] = semantic_integrity_score
+
+            if cognitive_drift_v3 is not None:
+                semantic_data['cognitive_drift_v3'] = cognitive_drift_v3
+
+            # Add component diagnostics if snapshots exist
+            if integrity_snapshot is not None:
+                semantic_data['integrity_components'] = {
+                    'structural_consistency': getattr(integrity_snapshot, 'structural_consistency', None),
+                    'layer_agreement_score': getattr(integrity_snapshot, 'layer_agreement_score', None),
+                    'cross_turn_consistency': getattr(integrity_snapshot, 'cross_turn_consistency', None),
+                    'mapper_alignment_score': getattr(integrity_snapshot, 'mapper_alignment_score', None),
+                    'intent_identity_alignment': getattr(integrity_snapshot, 'intent_identity_alignment', None),
+                }
+
+            if drift_snapshot is not None:
+                semantic_data['drift_components'] = {
+                    'structure_drift': getattr(drift_snapshot, 'structure_drift', None),
+                    'topic_drift': getattr(drift_snapshot, 'topic_drift', None),
+                    'mapper_drift': getattr(drift_snapshot, 'mapper_drift', None),
+                    'intent_identity_drift': getattr(drift_snapshot, 'intent_identity_drift', None),
+                }
+
+            coherence_report['semantic'] = semantic_data
+
     # Build metadata
     metadata = {
         'timestamp': datetime.utcnow().isoformat() + 'Z',

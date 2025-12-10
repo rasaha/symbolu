@@ -1106,6 +1106,37 @@ def _build_hints(
                         message="Arc-tension releasing. Support the emotional resolution process."
                     ))
 
+    # ========================================================================
+    # Phase 17: Semantic Integrity & Cognitive Drift v3 Hints (diagnostic only)
+    # ========================================================================
+    if coherence:
+        semantic_data = coherence.get("semantic", {})
+        integrity_score = semantic_data.get("integrity_score")
+        drift_v3 = semantic_data.get("cognitive_drift_v3")
+
+        # Only add semantic hints if we have both metrics
+        if integrity_score is not None and drift_v3 is not None:
+            # SEMANTIC_INTEGRITY_STRONG: High integrity, low drift
+            if integrity_score >= 0.75 and drift_v3 <= 0.3:
+                hints.append(DILchatHint(
+                    code="SEMANTIC_INTEGRITY_STRONG",
+                    message="Semantic integrity strong. Conversation is coherent and stable across layers."
+                ))
+
+            # SEMANTIC_INTEGRITY_FRAGILE: Low integrity, high drift
+            elif integrity_score <= 0.45 and drift_v3 >= 0.5:
+                hints.append(DILchatHint(
+                    code="SEMANTIC_INTEGRITY_FRAGILE",
+                    message="Semantic integrity fragile. Consider grounding or summarization to stabilize."
+                ))
+
+            # SEMANTIC_INTEGRITY_MIXED: Mid-range integrity and/or drift
+            elif (0.45 < integrity_score < 0.75) or (0.3 < drift_v3 < 0.5):
+                hints.append(DILchatHint(
+                    code="SEMANTIC_INTEGRITY_MIXED",
+                    message="Semantic integrity mixed. Monitor for stabilization or drift trends."
+                ))
+
     return hints
 
 
