@@ -184,6 +184,9 @@ class MapperProfile:
         detail_bias: 0.0–1.0 - Preference for fine-grained detail
         practical_bias: 0.0–1.0 - Preference for concrete/task-focused delivery
         reflective_bias: 0.0–1.0 - Preference for introspective/philosophical framing
+        guna_resonance_bias: 0.0 - Phase 9 Guna resonance modulation [-0.10, +0.10]
+        kosha_resonance_bias: 0.0 - Phase 9 Kosha resonance modulation [-0.10, +0.10]
+        expression_harmonics: None - Phase 9 expression harmonics from kosha vector
     """
 
     resolution_level: str = "medium"  # "low" | "medium" | "high"
@@ -191,6 +194,11 @@ class MapperProfile:
     detail_bias: float = 0.5  # 0.0–1.0
     practical_bias: float = 0.5  # 0.0–1.0
     reflective_bias: float = 0.5  # 0.0–1.0
+
+    # Phase 9: Guna/Kosha resonance biases (observation-only modulation)
+    guna_resonance_bias: float = 0.0  # [-0.10, +0.10]
+    kosha_resonance_bias: float = 0.0  # [-0.10, +0.10]
+    expression_harmonics: Optional[List[float]] = None  # Derived from kosha_activation_vector
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -200,6 +208,9 @@ class MapperProfile:
             "detail_bias": self.detail_bias,
             "practical_bias": self.practical_bias,
             "reflective_bias": self.reflective_bias,
+            "guna_resonance_bias": self.guna_resonance_bias,
+            "kosha_resonance_bias": self.kosha_resonance_bias,
+            "expression_harmonics": self.expression_harmonics,
         }
 
 

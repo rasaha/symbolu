@@ -438,6 +438,10 @@ class DHAEngine:
             - Emphasize coherence across turns
             - If tension > 0.7 → add stabilization framing
 
+        Phase 9 Kosha Resonance Modulation:
+            - If kosha_resonance_bias > 0.05: Add one extra reflective insight
+            - If kosha_resonance_bias < -0.05: Suppress lowest-depth DHA line
+
         Args:
             insight: DHA insight dictionary (readiness, tone, etc.)
             mapper_profile: Mapper profile from MLCR/TTOR
@@ -449,6 +453,17 @@ class DHAEngine:
             return insight
 
         modulated = insight.copy()
+
+        # Phase 9: Apply Kosha resonance modulation FIRST
+        if hasattr(mapper_profile, 'kosha_resonance_bias'):
+            if mapper_profile.kosha_resonance_bias > 0.05:
+                # Add extra reflective insight marker
+                modulated["extra_reflective_insight"] = True
+                modulated["kosha_depth_boost"] = True
+            elif mapper_profile.kosha_resonance_bias < -0.05:
+                # Suppress depth
+                modulated["suppress_lowest_depth"] = True
+                modulated["kosha_depth_reduction"] = True
 
         # LCM: Shallow insight
         if mapper_profile.practical_bias > 0.6 and mapper_profile.resolution_level == "low":

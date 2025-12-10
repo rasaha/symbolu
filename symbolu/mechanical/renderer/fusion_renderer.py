@@ -790,6 +790,11 @@ class FusionRenderer:
         if layer is None:
             return None
 
+        # Phase 9: Apply Guna/Kosha resonance modulation FIRST
+        # This provides subtle expression shaping before mapper-specific modulation
+        if profile.guna_resonance_bias != 0.0 or profile.kosha_resonance_bias != 0.0:
+            layer = self._apply_resonance_to_symbolic(layer, profile)
+
         # LCM: Collapse symbolic layer
         if profile.practical_bias > 0.6 and profile.resolution_level == "low":
             # Minimize symbolic content for LCM
@@ -885,6 +890,10 @@ class FusionRenderer:
         if layer is None:
             return None
 
+        # Phase 9: Apply Kosha resonance modulation FIRST for reflective depth
+        if profile.kosha_resonance_bias != 0.0:
+            layer = self._apply_resonance_to_mirror(layer, profile)
+
         # LCM: Minimize mirror layer
         if profile.practical_bias > 0.6 and profile.resolution_level == "low":
             return MirrorTruthLayer(
@@ -958,6 +967,105 @@ class FusionRenderer:
             "deep_context": "Deep context patterns suggest trajectory alignment."
         }
         return reflections.get(arc_mode, "Long-arc patterns detected.")
+
+    def _apply_resonance_to_symbolic(
+        self,
+        layer: SymbolicLayer,
+        profile: "MapperProfile"
+    ) -> SymbolicLayer:
+        """
+        Apply Phase 9 Guna/Kosha resonance modulation to symbolic layer.
+
+        Rules:
+        - Positive guna_resonance_bias (> 0): Increase symbolic granularity markers
+        - Negative guna_resonance_bias (< 0): Reduce symbolic embellishment
+        - Positive kosha_resonance_bias (> 0): Increase mirror-truth reflective stitching
+        - Negative kosha_resonance_bias (< 0): Reduce mirror-truth depth
+
+        Args:
+            layer: Symbolic layer to modulate
+            profile: Mapper profile with resonance biases
+
+        Returns:
+            Modulated symbolic layer
+        """
+        theme = layer.theme
+        archetype = layer.archetype
+        causal_patterns = list(layer.causal_patterns)
+
+        # Apply Guna resonance modulation
+        if profile.guna_resonance_bias > 0:
+            # Positive bias → increase symbolic granularity
+            if "[symbolic nuance]" not in theme:
+                theme = f"{theme} [symbolic nuance]"
+        elif profile.guna_resonance_bias < 0:
+            # Negative bias → reduce symbolic embellishment
+            # Remove any bracketed embellishments
+            import re
+            theme = re.sub(r'\s*\[.*?\]', '', theme)
+
+        # Apply Kosha resonance modulation (affects reflective depth)
+        # This is subtle and only adds/removes pattern depth markers
+        if profile.kosha_resonance_bias > 0:
+            # Positive bias → add reflective pattern marker
+            if len(causal_patterns) < 5:  # Don't over-add
+                causal_patterns.append("Subtle reflective pattern detected")
+
+        elif profile.kosha_resonance_bias < 0:
+            # Negative bias → reduce pattern depth (remove last pattern if > 1)
+            if len(causal_patterns) > 1:
+                causal_patterns = causal_patterns[:-1]
+
+        return SymbolicLayer(
+            theme=theme,
+            archetype=archetype,
+            causal_patterns=causal_patterns,
+            meaning_vectors=layer.meaning_vectors,
+            dominant_channel=layer.dominant_channel,
+            reasoning_depth=layer.reasoning_depth
+        )
+
+    def _apply_resonance_to_mirror(
+        self,
+        layer: MirrorTruthLayer,
+        profile: "MapperProfile"
+    ) -> MirrorTruthLayer:
+        """
+        Apply Phase 9 Kosha resonance modulation to mirror-truth layer.
+
+        Rules:
+        - Positive kosha_resonance_bias (> 0): Increase reflective depth
+        - Negative kosha_resonance_bias (< 0): Reduce reflective depth
+
+        Args:
+            layer: Mirror-truth layer to modulate
+            profile: Mapper profile with resonance biases
+
+        Returns:
+            Modulated mirror-truth layer
+        """
+        reflection = layer.reflection
+        tensions = list(layer.tensions)
+
+        # Apply Kosha resonance modulation
+        if profile.kosha_resonance_bias > 0.05:
+            # Positive bias → increase mirror-truth depth
+            if "Reflective coherence" not in reflection:
+                reflection = f"{reflection} Reflective coherence deepened."
+
+        elif profile.kosha_resonance_bias < -0.05:
+            # Negative bias → suppress reflective depth
+            # Simplify reflection to first sentence only
+            reflection = reflection.split('.')[0] + '.'
+
+        return MirrorTruthLayer(
+            contradictions=layer.contradictions,
+            entropy_measures=layer.entropy_measures,
+            tensions=tensions,
+            alignment_score=layer.alignment_score,
+            stability_indicator=layer.stability_indicator,
+            reflection=reflection
+        )
 
 
 # ============================================================================
