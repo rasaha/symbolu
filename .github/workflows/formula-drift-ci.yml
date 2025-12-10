@@ -69,6 +69,16 @@ jobs:
             --maxfail=1 \
             2>&1 | tee patent-formula-tags-pytest.log
 
+      - name: Run Phase 8 Guna/Kosha Resonance Drift Tests
+        run: |
+          pytest \
+            symbolu/core/formula_drift_tests/test_phase8_guna_kosha_resonance_drift.py \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            --maxfail=1 \
+            2>&1 | tee phase8-guna-kosha-pytest.log
+
       - name: Upload Formula Drift test logs and fixtures
         uses: actions/upload-artifact@v4
         if: always()
@@ -77,9 +87,11 @@ jobs:
           path: |
             formula-drift-pytest.log
             patent-formula-tags-pytest.log
+            phase8-guna-kosha-pytest.log
             symbolu/core/formula_drift_tests/phase1_resonance_fixtures.json
 
       - name: Check for drift
         run: |
           echo "✅ Formula drift tests passed! All formulas remain deterministic and within expected ranges."
           echo "✅ Patent formula tag drift tests passed! All formula tags remain stable."
+          echo "✅ Phase 8 Guna/Kosha resonance drift tests passed! All formulas remain stable."

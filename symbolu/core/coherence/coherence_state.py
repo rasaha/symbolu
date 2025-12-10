@@ -70,6 +70,11 @@ class CoherenceState:
     # Phase 4: Formula-aware coherence v2 (optional, feature-flag gated)
     coherence_score_v2: Optional[float] = None  # v2 formula-aware (optional)
 
+    # Phase 8: Guna/Kosha resonance metrics (observation only - not used in scoring)
+    guna_resonance_index: Optional[float] = None  # [0.0, 1.0] - Guna balance/distortion measure
+    kosha_resonance_index: Optional[float] = None  # [0.0, 1.0] - Kosha coherence measure
+    kosha_activation_vector: Optional[List[float]] = None  # Ordered kosha activation values
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.

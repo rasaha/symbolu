@@ -424,6 +424,32 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if arc_alignment_values:
             avg_arc_alignment_index = sum(arc_alignment_values) / len(arc_alignment_values)
 
+    # Phase 8: Extract Guna/Kosha resonance metrics from coherence history
+    avg_guna_resonance = None
+    avg_kosha_resonance = None
+
+    if state.coherence_history:
+        # Extract Guna/Kosha resonance values for averaging
+        guna_resonance_values = []
+        kosha_resonance_values = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract guna_resonance_index
+                if "guna_resonance_index" in coh and coh["guna_resonance_index"] is not None:
+                    guna_resonance_values.append(coh["guna_resonance_index"])
+
+                # Extract kosha_resonance_index
+                if "kosha_resonance_index" in coh and coh["kosha_resonance_index"] is not None:
+                    kosha_resonance_values.append(coh["kosha_resonance_index"])
+
+        # Compute averages
+        if guna_resonance_values:
+            avg_guna_resonance = sum(guna_resonance_values) / len(guna_resonance_values)
+
+        if kosha_resonance_values:
+            avg_kosha_resonance = sum(kosha_resonance_values) / len(kosha_resonance_values)
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -445,4 +471,6 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_resonance_index=avg_resonance_index,
         avg_tension_index=avg_tension_index,
         avg_arc_alignment_index=avg_arc_alignment_index,
+        avg_guna_resonance=avg_guna_resonance,
+        avg_kosha_resonance=avg_kosha_resonance,
     )

@@ -12,6 +12,7 @@ from symbolu.core.coherence.coherence_state import CoherenceState
 from symbolu.core.coherence.persona_drift_monitor import compute_persona_drift
 from symbolu.core.coherence.semantic_skeleton import compute_semantic_stability
 from symbolu.core.coherence.temporal_arc_tracer import compute_temporal_arc_score
+from symbolu.formulas.guna_kosha_resonance import compute_guna_kosha_resonance
 
 
 class CoherenceEngine:
@@ -110,6 +111,9 @@ class CoherenceEngine:
 
         # Update Phase 4 coherence v2 (formula-aware, observation only)
         state.coherence_score_v2 = self._compute_coherence_score_v2(state)
+
+        # Update Phase 8 Guna/Kosha resonance (observation only)
+        self._update_guna_kosha_resonance(state, routing_plan, temporal_summary)
 
         return state
 
@@ -433,3 +437,64 @@ class CoherenceEngine:
         )
 
         return coherence_score_v2
+
+    def _update_guna_kosha_resonance(
+        self,
+        state: CoherenceState,
+        routing_plan: Any,
+        temporal_summary: Optional[Dict],
+    ) -> None:
+        """
+        Update Phase 8 Guna/Kosha resonance metrics (observation only).
+
+        This method extracts guna_probs and kosha_probs from available inputs
+        (routing_plan or temporal_summary) and computes resonance indices.
+
+        These metrics are for observability only and do NOT affect existing scoring
+        or routing behavior. They are purely passive observations.
+
+        Args:
+            state: CoherenceState to update in place
+            routing_plan: TTOR RoutingPlan (may contain guna/kosha data)
+            temporal_summary: TemporalBhavaTracker summary (may contain guna/kosha data)
+        """
+        # Extract guna_probs (try temporal_summary first, then routing_plan)
+        guna_probs = None
+        if temporal_summary and "guna_probs" in temporal_summary:
+            guna_probs = temporal_summary["guna_probs"]
+        elif hasattr(routing_plan, "guna_probs"):
+            guna_probs = routing_plan.guna_probs
+
+        # Extract kosha_probs (try temporal_summary first, then routing_plan)
+        kosha_probs = None
+        if temporal_summary and "kosha_probs" in temporal_summary:
+            kosha_probs = temporal_summary["kosha_probs"]
+        elif hasattr(routing_plan, "kosha_probs"):
+            kosha_probs = routing_plan.kosha_probs
+
+        # If no input data, reset to None and return
+        if not guna_probs and not kosha_probs:
+            state.guna_resonance_index = None
+            state.kosha_resonance_index = None
+            state.kosha_activation_vector = None
+            return
+
+        # Compute resonance metrics (gracefully handles None inputs)
+        try:
+            result = compute_guna_kosha_resonance(guna_probs, kosha_probs)
+
+            if result is not None:
+                state.guna_resonance_index = result.guna_resonance_index
+                state.kosha_resonance_index = result.kosha_resonance_index
+                state.kosha_activation_vector = result.kosha_activation_vector
+            else:
+                # Computation failed (invalid inputs)
+                state.guna_resonance_index = None
+                state.kosha_resonance_index = None
+                state.kosha_activation_vector = None
+
+        except Exception:
+            # Graceful degradation: catch any unexpected errors
+            state.guna_resonance_index = None
+            state.kosha_resonance_index = None
+            state.kosha_activation_vector = None

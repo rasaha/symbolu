@@ -188,6 +188,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee phase5-formula-ui-pytest.log
 
+      - name: Run Phase 8 Guna/Kosha Resonance Integration Tests
+        run: |
+          pytest symbolu/mechanical/pipeline/integration_tests/test_phase8_resonance_integration.py \
+            --disable-warnings -q \
+            2>&1 | tee phase8-resonance-integration-pytest.log
+
       - name: Run Policy Engine Tests
         run: |
           pytest symbolu/policy/tests/test_policy_engine.py \

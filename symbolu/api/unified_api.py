@@ -330,6 +330,20 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 derived["arc_alignment_index"] = arc_alignment_index
             formulas_data["derived"] = derived
 
+        # Phase 8: Extract Guna/Kosha resonance metrics
+        guna_resonance_index = getattr(coherence_state, 'guna_resonance_index', None)
+        kosha_resonance_index = getattr(coherence_state, 'kosha_resonance_index', None)
+        kosha_activation_vector = getattr(coherence_state, 'kosha_activation_vector', None)
+
+        # Add Guna/Kosha metrics to formulas dict if any exist
+        if guna_resonance_index is not None or kosha_resonance_index is not None:
+            if guna_resonance_index is not None:
+                formulas_data["guna_resonance_index"] = guna_resonance_index
+            if kosha_resonance_index is not None:
+                formulas_data["kosha_resonance_index"] = kosha_resonance_index
+            if kosha_activation_vector is not None:
+                formulas_data["kosha_activation_vector"] = kosha_activation_vector
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
