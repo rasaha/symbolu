@@ -240,9 +240,78 @@ def build_mapper_profile_with_resonance(
     return profile
 
 
+def apply_symbolic_harmony_bias(
+    profile: MapperProfile,
+    shi: Optional[float]
+) -> MapperProfile:
+    """
+    Apply Phase 28 Symbolic Harmonization bias to mapper profile.
+
+    Modulates symbolic expression richness ONLY. Does NOT affect routing or mappers.
+    All changes are deterministic and observation-only.
+
+    Rules (v1.0 canonical):
+    -----------------------
+    Symbolic harmony → symbolic richness balance:
+        - If SHI >= 0.70: symbolic_harmony_bias = +0.05 (more symbolic richness)
+        - If SHI <= 0.35: symbolic_harmony_bias = -0.05 (less symbolic nuance)
+        - Otherwise: symbolic_harmony_bias = 0.0 (neutral)
+
+    Symbolic resonance tags:
+        - If SHI >= 0.70: ["HIGH_HARMONY"]
+        - If 0.35 < SHI < 0.70: ["MEDIUM_HARMONY"]
+        - If SHI <= 0.35: ["LOW_HARMONY"]
+
+    Args:
+        profile: MapperProfile to modulate
+        shi: Symbolic Harmonization Index from CoherenceState [0.0, 1.0]
+
+    Returns:
+        Modulated MapperProfile (new instance)
+    """
+    # If no SHI available, return unchanged
+    if shi is None:
+        return profile
+
+    # Compute symbolic harmony bias based on SHI
+    symbolic_bias = 0.0
+    resonance_tags = []
+
+    if shi >= 0.70:
+        # High SHI → more symbolic richness
+        symbolic_bias = 0.05
+        resonance_tags = ["HIGH_HARMONY"]
+    elif shi <= 0.35:
+        # Low SHI → reduce symbolic nuance
+        symbolic_bias = -0.05
+        resonance_tags = ["LOW_HARMONY"]
+    else:
+        # Medium SHI → neutral
+        symbolic_bias = 0.0
+        resonance_tags = ["MEDIUM_HARMONY"]
+
+    # Clamp bias to [-0.05, +0.05]
+    symbolic_bias = max(-0.05, min(0.05, symbolic_bias))
+
+    # Return new profile with symbolic harmony bias applied
+    return MapperProfile(
+        resolution_level=profile.resolution_level,
+        arc_mode=profile.arc_mode,
+        detail_bias=profile.detail_bias,
+        practical_bias=profile.practical_bias,
+        reflective_bias=profile.reflective_bias,
+        guna_resonance_bias=profile.guna_resonance_bias,
+        kosha_resonance_bias=profile.kosha_resonance_bias,
+        expression_harmonics=profile.expression_harmonics,
+        symbolic_harmony_bias=symbolic_bias,
+        symbolic_resonance_tags=resonance_tags,
+    )
+
+
 # Public exports
 __all__ = [
     "compute_mapper_profile",
     "apply_resonance_biases",
-    "build_mapper_profile_with_resonance"
+    "build_mapper_profile_with_resonance",
+    "apply_symbolic_harmony_bias"
 ]

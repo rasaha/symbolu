@@ -246,6 +246,8 @@ def build_dilchat_response(
         identity_signature=identity_signature,
         motivation_profile=motivation_profile,
         trading_guardrails=trading_guardrails,
+        coherence=coherence,
+        domain=response_domain,
     )
 
     # ========================================================================
@@ -334,6 +336,8 @@ def _build_badges(
     identity_signature: Optional[Dict[str, Any]] = None,
     motivation_profile: Optional[Dict[str, Any]] = None,
     trading_guardrails: Optional[Dict[str, Any]] = None,
+    coherence: Optional[Dict[str, Any]] = None,
+    domain: Optional[str] = None,
 ) -> List[DILchatBadge]:
     """
     Build UI badges based on stability status and policy flags.
@@ -355,6 +359,7 @@ def _build_badges(
         14. Identity Signature Badges (self_stable, self_expanding, self_fragmented, etc.)
         15. Motivation Profile Badges (hope, fear, expansion, stabilization, avoidance, assertion)
         16. Trading Guardrail Badges (high_tension_risk, neg_momentum_risk, volatility_risk, no_action_recommended)
+        17. Symbolic Harmonization Badges (Phase 28) - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only
 
     Args:
         stability_status: Stability classification from policy engine
@@ -366,6 +371,8 @@ def _build_badges(
         identity_signature: Identity signature dictionary with signature classification
         motivation_profile: Motivation profile dictionary with motivational driver classification
         trading_guardrails: Trading guardrails dictionary with risk flags
+        coherence: Coherence dictionary with symbolic harmonization data
+        domain: Domain identifier (e.g., "therapy", "identity", "trading")
 
     Returns:
         List of DILchatBadge objects
@@ -661,6 +668,40 @@ def _build_badges(
                 description="Assertion-driven motivation. Strong self-expression with HRM dominance."
             ))
         # Note: overcorrection and ambiguous_motivation don't get badges (as specified)
+
+    # ========================================================================
+    # Phase 28: Symbolic Harmonization Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract symbolic harmonization from coherence if available
+    symbolic_harmonization = coherence.get("symbolic_harmonization", {}) if coherence else {}
+    symbolic_harmonization_index = symbolic_harmonization.get("index") or symbolic_harmonization.get("symbolic_harmonization_index")
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    therapy_or_identity_domain = domain in ["therapy", "identity"]
+    smart_or_deep_mode = policy_flags.get("interaction_mode") in ["smart_insight", "deep_adaptive"]
+
+    if therapy_or_identity_domain and smart_or_deep_mode and symbolic_harmonization_index is not None:
+        # SYMBOLIC_HARMONY_HIGH: >= 0.75
+        if symbolic_harmonization_index >= 0.75:
+            badges.append(DILchatBadge(
+                label="SYMBOLIC_HARMONY_HIGH",
+                level="info",
+                description="Symbolic harmonization is high. Meaning layers, practical grounding, and mirror tensions are well-aligned."
+            ))
+        # SYMBOLIC_HARMONY_MEDIUM: 0.50 - 0.75
+        elif symbolic_harmonization_index >= 0.50:
+            badges.append(DILchatBadge(
+                label="SYMBOLIC_HARMONY_MEDIUM",
+                level="info",
+                description="Symbolic harmonization is moderate. Core meaning structures are coherent."
+            ))
+        # SYMBOLIC_HARMONY_LOW: < 0.50
+        else:
+            badges.append(DILchatBadge(
+                label="SYMBOLIC_HARMONY_LOW",
+                level="warning",
+                description="Symbolic harmonization is low. Meaning layers show misalignment."
+            ))
 
     # ========================================================================
     # BADGE 16: Trading Guardrail Badges (Phase 7: Formula-Aware Trading Guardrails v1.0)
