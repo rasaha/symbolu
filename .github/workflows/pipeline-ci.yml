@@ -25,6 +25,7 @@ on:
       - "tests/test_phase32_insight_window.py"
       - "tests/test_phase33_schema_adaptive_routing.py"
       - "tests/test_phase34_identity_harmonics.py"
+      - "tests/test_phase35_predictive_persona_drift.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -61,6 +62,7 @@ on:
       - "tests/test_phase32_insight_window.py"
       - "tests/test_phase33_schema_adaptive_routing.py"
       - "tests/test_phase34_identity_harmonics.py"
+      - "tests/test_phase35_predictive_persona_drift.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -412,6 +414,21 @@ jobs:
         with:
           name: phase34-identity-harmonics-log
           path: phase34-identity-harmonics.log
+          if-no-files-found: ignore
+
+      - name: Run Phase 35 Predictive Persona Drift Model Tests
+        run: |
+          pytest tests/test_phase35_predictive_persona_drift.py \
+            --disable-warnings -q \
+            --maxfail=1 \
+            2>&1 | tee phase35-predictive-drift.log
+
+      - name: Upload Phase 35 Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase35-predictive-drift-log
+          path: phase35-predictive-drift.log
           if-no-files-found: ignore
 
       - name: Run Phase 20 Unified Dashboard Tests

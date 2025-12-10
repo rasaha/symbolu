@@ -109,6 +109,10 @@ class CoherenceEngine:
                 identity_entropy_history=prev_state.identity_entropy_history.copy(),
                 identity_stability_history=prev_state.identity_stability_history.copy(),
                 identity_flexibility_history=prev_state.identity_flexibility_history.copy(),
+                predictive_drift_history=prev_state.predictive_drift_history.copy(),
+                drift_magnitude_history=prev_state.drift_magnitude_history.copy(),
+                drift_stability_history=prev_state.drift_stability_history.copy(),
+                drift_likelihood_band_history=prev_state.drift_likelihood_band_history.copy(),
             )
 
         # Append new turn data to histories
@@ -202,6 +206,9 @@ class CoherenceEngine:
 
         # Update Phase 34 identity harmonics layer (observation only)
         self._update_identity_harmonics(state)
+
+        # Update Phase 35 predictive persona drift model (observation only)
+        self._update_predictive_persona_drift(state)
 
         return state
 
@@ -2051,3 +2058,193 @@ class CoherenceEngine:
             state.current_aih = None
             state.current_rih = None
             state.current_identity_harmonics_index = None
+
+    def _update_predictive_persona_drift(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 35 Predictive Persona Drift Model (observation only).
+
+        This method computes the predictive persona drift snapshot by forecasting
+        future drift direction and magnitude using the full Symbol-U v3.0 signal stack.
+
+        The PPDM produces:
+          1. Drift Magnitude Prediction (DMP): Estimated future drift intensity
+          2. Drift Direction Scores: Direction components (structure, warmth, grounding)
+          3. Drift Stability Score (DSS): Confidence in drift trajectory
+          4. Drift Likelihood Band: LOW / MEDIUM / HIGH classification
+          5. Diagnostic Tags: DRIFT_RISK_RISING, HARMONICS_INFLUENCE_HIGH, etc.
+
+        The PPDM is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for tone-only micro-adjustments (±0.02 max) and analytics.
+
+        This update runs AFTER Phase 34 Identity Harmonics to leverage identity signals.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.predictive_persona_drift import compute_predictive_persona_drift
+
+        # ====================================================================
+        # STEP 1: GATHER IDENTITY HARMONICS (Phase 34)
+        # ====================================================================
+
+        core_identity_harmonic = state.current_cih
+        adaptive_identity_harmonic = state.current_aih
+        relational_identity_harmonic = state.current_rih
+        identity_stability_score = None
+        identity_flexibility_score = None
+        identity_entropy = None
+
+        # Extract from latest snapshot if available
+        if state.identity_harmonics_snapshot is not None:
+            identity_stability_score = state.identity_harmonics_snapshot.identity_stability_score
+            identity_flexibility_score = state.identity_harmonics_snapshot.identity_flexibility_score
+            identity_entropy = state.identity_harmonics_snapshot.identity_entropy
+
+        # ====================================================================
+        # STEP 2: GATHER SEMANTIC + COGNITIVE SIGNALS (Phase 17)
+        # ====================================================================
+
+        semantic_integrity = state.semantic_integrity_score
+        cognitive_drift_v3 = state.cognitive_drift_v3
+
+        # ====================================================================
+        # STEP 3: GATHER TEMPORAL ENTROPY (Phase 18)
+        # ====================================================================
+
+        temporal_entropy_volatility = state.temporal_entropy_volatility
+
+        # ====================================================================
+        # STEP 4: GATHER DRIFT FUSION (Phase 19) - if available
+        # ====================================================================
+
+        # Drift Fusion Index (DFI) is not directly stored in CoherenceState
+        # We can compute an approximation or leave as None for graceful degradation
+        drift_fusion_index = None
+
+        # ====================================================================
+        # STEP 5: GATHER RESONANCE WEIGHTING ENTROPY (Phase 24)
+        # ====================================================================
+
+        resonance_weighting_entropy = state.current_resonance_entropy
+
+        # ====================================================================
+        # STEP 6: GATHER SYMBOLIC HARMONIZATION (Phase 27)
+        # ====================================================================
+
+        symbolic_harmonization_index = state.current_symbolic_harmonization_index
+
+        # ====================================================================
+        # STEP 7: GATHER COHERENCE + CONSCIOUSNESS SIGNALS
+        # ====================================================================
+
+        coherence_fused = state.coherence_fused
+        unified_consciousness_order = state.current_coi  # Consciousness Order Index
+
+        # ====================================================================
+        # STEP 8: GATHER PERSONA + RELATIONAL SIGNALS
+        # ====================================================================
+
+        persona_drift_score = state.persona_drift_score
+        guna_resonance_index = state.guna_resonance_index
+        kosha_resonance_index = state.kosha_resonance_index
+
+        # ====================================================================
+        # STEP 9: GATHER HISTORICAL CONTEXT (For Trend Analysis)
+        # ====================================================================
+
+        # Extract recent values for trend/variance computation
+        cognitive_drift_history = None
+        if state.cognitive_drift_v3_history:
+            cognitive_drift_history = [
+                cd for cd in state.cognitive_drift_v3_history if cd is not None
+            ]
+
+        persona_drift_history = None
+        if state.persona_drift_score and state.turn_index >= 1:
+            # Reconstruct persona drift history from turn indices
+            # For now, we'll use a simple approach: collect recent persona_drift_score values
+            # This assumes persona_drift_score is updated each turn
+            # In practice, we might need a dedicated persona_drift_history field
+            # For Phase 35 v1.0, we'll use cognitive_drift as a proxy if persona history unavailable
+            persona_drift_history = cognitive_drift_history  # Proxy
+
+        coherence_fused_history = None
+        if state.coherence_fused_history:
+            coherence_fused_history = [
+                cf for cf in state.coherence_fused_history if cf is not None
+            ]
+
+        identity_stability_history = None
+        if state.identity_stability_history:
+            identity_stability_history = [
+                ish for ish in state.identity_stability_history if ish is not None
+            ]
+
+        # ====================================================================
+        # STEP 10: COMPUTE PREDICTIVE PERSONA DRIFT
+        # ====================================================================
+
+        snapshot = compute_predictive_persona_drift(
+            # Identity Harmonics (Phase 34)
+            core_identity_harmonic=core_identity_harmonic,
+            adaptive_identity_harmonic=adaptive_identity_harmonic,
+            relational_identity_harmonic=relational_identity_harmonic,
+            identity_stability_score=identity_stability_score,
+            identity_flexibility_score=identity_flexibility_score,
+            identity_entropy=identity_entropy,
+            # Semantic + Cognitive (Phase 17)
+            semantic_integrity=semantic_integrity,
+            cognitive_drift_v3=cognitive_drift_v3,
+            # Temporal Entropy (Phase 18)
+            temporal_entropy_volatility=temporal_entropy_volatility,
+            # Drift Fusion (Phase 19)
+            drift_fusion_index=drift_fusion_index,
+            # Resonance Weighting (Phase 24)
+            resonance_weighting_entropy=resonance_weighting_entropy,
+            # Symbolic Harmonization (Phase 27)
+            symbolic_harmonization_index=symbolic_harmonization_index,
+            # Coherence + Consciousness
+            coherence_fused=coherence_fused,
+            unified_consciousness_order=unified_consciousness_order,
+            # Persona + Relational
+            persona_drift_score=persona_drift_score,
+            guna_resonance_index=guna_resonance_index,
+            kosha_resonance_index=kosha_resonance_index,
+            # Historical context
+            cognitive_drift_history=cognitive_drift_history,
+            persona_drift_history=persona_drift_history,
+            coherence_fused_history=coherence_fused_history,
+            identity_stability_history=identity_stability_history,
+        )
+
+        # ====================================================================
+        # STEP 11: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Append to histories
+            state.predictive_drift_history.append(snapshot)
+            state.drift_magnitude_history.append(snapshot.drift_magnitude_prediction)
+            state.drift_stability_history.append(snapshot.drift_stability_score)
+            state.drift_likelihood_band_history.append(snapshot.drift_likelihood_band)
+
+            # Update current metrics
+            state.predictive_drift_snapshot = snapshot
+            state.current_drift_magnitude_prediction = snapshot.drift_magnitude_prediction
+            state.current_drift_stability_score = snapshot.drift_stability_score
+            state.current_drift_likelihood_band = snapshot.drift_likelihood_band
+            state.current_drift_direction_scores = snapshot.drift_direction_scores
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.predictive_drift_history.append(None)
+            state.drift_magnitude_history.append(None)
+            state.drift_stability_history.append(None)
+            state.drift_likelihood_band_history.append(None)
+            state.predictive_drift_snapshot = None
+            state.current_drift_magnitude_prediction = None
+            state.current_drift_stability_score = None
+            state.current_drift_likelihood_band = None
+            state.current_drift_direction_scores = None

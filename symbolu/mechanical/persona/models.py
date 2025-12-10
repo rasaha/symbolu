@@ -275,6 +275,12 @@ class PersonaResponse(BaseModel):
         description="Phase 34: Identity harmonics layer (observation-only, tone-level only)"
     )
 
+    # Phase 35: Optional predictive persona drift profile
+    predictive_drift_profile: Optional[Any] = Field(
+        None,
+        description="Phase 35: Predictive persona drift model (observation-only, tone-level only)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {

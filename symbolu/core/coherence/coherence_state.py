@@ -183,6 +183,17 @@ class CoherenceState:
     identity_stability_history: List[Optional[float]] = field(default_factory=list)  # Identity stability history
     identity_flexibility_history: List[Optional[float]] = field(default_factory=list)  # Identity flexibility history
 
+    # Phase 35: Predictive Persona Drift Model (observation only - not used in scoring)
+    predictive_drift_snapshot: Optional[Any] = None  # PredictivePersonaDriftSnapshot (latest)
+    predictive_drift_history: List[Optional[Any]] = field(default_factory=list)  # List of PredictivePersonaDriftSnapshot
+    current_drift_magnitude_prediction: Optional[float] = None  # Drift Magnitude Prediction [0.0, 1.0]
+    current_drift_stability_score: Optional[float] = None  # Drift Stability Score [0.0, 1.0]
+    current_drift_likelihood_band: Optional[str] = None  # Drift Likelihood Band: "LOW", "MEDIUM", "HIGH"
+    current_drift_direction_scores: Optional[Dict[str, float]] = None  # Drift direction scores
+    drift_magnitude_history: List[Optional[float]] = field(default_factory=list)  # Drift magnitude history
+    drift_stability_history: List[Optional[float]] = field(default_factory=list)  # Drift stability history
+    drift_likelihood_band_history: List[Optional[str]] = field(default_factory=list)  # Drift band history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -253,6 +264,12 @@ class CoherenceState:
         self.identity_entropy_history = self.identity_entropy_history[-window:]
         self.identity_stability_history = self.identity_stability_history[-window:]
         self.identity_flexibility_history = self.identity_flexibility_history[-window:]
+
+        # Phase 35 predictive persona drift formula history
+        self.predictive_drift_history = self.predictive_drift_history[-window:]
+        self.drift_magnitude_history = self.drift_magnitude_history[-window:]
+        self.drift_stability_history = self.drift_stability_history[-window:]
+        self.drift_likelihood_band_history = self.drift_likelihood_band_history[-window:]
 
     def get_history_length(self) -> int:
         """

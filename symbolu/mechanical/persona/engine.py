@@ -174,7 +174,19 @@ class PersonaEngine:
             # Attach profile to response for observability (NEVER affects routing)
             persona_response.identity_harmonics_profile = identity_harmonics_profile
 
-        # Step 11: Return complete response
+        # Phase 35 Step 11: Extract predictive persona drift and apply tone adjustments
+        # Extract predictive drift snapshot from coherence state
+        ppdm_snapshot = self._extract_predictive_drift_from_coherence(explain_log)
+        if ppdm_snapshot is not None:
+            # Compute predictive drift profile (tone-level adjustments only, ±0.02 max)
+            predictive_drift_profile = self._apply_predictive_drift_to_tone(
+                persona,
+                ppdm_snapshot
+            )
+            # Attach profile to response for observability (NEVER affects routing)
+            persona_response.predictive_drift_profile = predictive_drift_profile
+
+        # Step 12: Return complete response
         return persona_response
     
     def _order_layers(
@@ -787,6 +799,176 @@ class PersonaEngine:
         }
 
         return identity_harmonics_profile
+
+    def _extract_predictive_drift_from_coherence(
+        self,
+        explain_log: Dict[str, Any]
+    ) -> Optional[Any]:
+        """
+        Phase 35: Extract predictive persona drift snapshot from coherence state.
+
+        This method safely extracts the predictive drift snapshot from the
+        coherence state if available.
+
+        Args:
+            explain_log: MLCR explain log with coherence state
+
+        Returns:
+            PredictivePersonaDriftSnapshot or None if not available
+
+        Graceful Degradation:
+            Returns None if predictive drift not available in coherence state.
+        """
+        # Try to extract from coherence_state or coherence_observation
+        if not explain_log:
+            return None
+
+        # Try coherence_state path
+        coherence_state = explain_log.get('coherence_state')
+        if coherence_state is not None:
+            ppdm_snapshot = getattr(coherence_state, 'predictive_drift_snapshot', None)
+            if ppdm_snapshot is not None:
+                return ppdm_snapshot
+
+        # Try coherence_observation path (if it has PPDM data)
+        coherence_observation = explain_log.get('coherence_observation')
+        if coherence_observation is not None:
+            ppdm_snapshot = getattr(coherence_observation, 'predictive_drift_snapshot', None)
+            if ppdm_snapshot is not None:
+                return ppdm_snapshot
+
+        return None
+
+    def _apply_predictive_drift_to_tone(
+        self,
+        persona: PersonaProfile,
+        ppdm_snapshot: Optional[Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Phase 35: Apply predictive persona drift to tone.
+
+        This method maps PPDM outputs into micro-adjustments of persona tone
+        parameters. It is tone-level only and never affects semantic content.
+
+        Mapping Rules (based on predicted drift):
+            • High drift magnitude (≥0.65) → stabilize tone (↑ structure, ↓ metaphor)
+            • Low drift magnitude (<0.35) → no stabilization
+            • Drift direction toward_structure → +structure
+            • Drift direction toward_warmth → +warmth
+            • Drift direction toward_grounding → +structure (grounding emphasis)
+
+        Tone Adjustments (all ≤ ±0.02, max total ±0.02):
+            • structure_adjustment: [-0.02, +0.02]
+            • warmth_adjustment: [-0.02, +0.02]
+            • clarity_adjustment: [-0.02, +0.02]
+
+        Args:
+            persona: Selected PersonaProfile
+            ppdm_snapshot: PredictivePersonaDriftSnapshot (or None)
+
+        Returns:
+            Dict with predictive drift profile or None if PPDM not available
+
+        Invariants:
+            • All adjustments are ≤ ±0.02 (2% max deviation)
+            • Total combined adjustment ≤ ±0.02
+            • Deterministic: same inputs → same outputs
+            • Safe default: if PPDM missing → no modulation (returns None)
+        """
+        # Graceful degradation: if PPDM not available, return None
+        if ppdm_snapshot is None:
+            return None
+
+        # Extract metrics from snapshot
+        drift_magnitude = getattr(ppdm_snapshot, 'drift_magnitude_prediction', None)
+        drift_stability = getattr(ppdm_snapshot, 'drift_stability_score', None)
+        drift_band = getattr(ppdm_snapshot, 'drift_likelihood_band', None)
+        drift_directions = getattr(ppdm_snapshot, 'drift_direction_scores', None)
+        notes = getattr(ppdm_snapshot, 'notes', [])
+
+        # If core metrics missing, return None
+        if drift_magnitude is None or drift_directions is None:
+            return None
+
+        # ========================================================================
+        # STEP 1: Initialize adjustments
+        # ========================================================================
+        structure_adjustment = 0.0
+        warmth_adjustment = 0.0
+        clarity_adjustment = 0.0
+
+        # ========================================================================
+        # STEP 2: Apply drift magnitude stabilization
+        # ========================================================================
+        # High predicted drift → stabilize tone (more structure, less metaphor)
+        if drift_magnitude >= 0.65:
+            # High drift risk → increase structure for stability
+            structure_adjustment += 0.01
+        elif drift_magnitude <= 0.35:
+            # Low drift risk → no stabilization needed
+            pass  # No adjustment
+
+        # ========================================================================
+        # STEP 3: Apply directional drift adjustments
+        # ========================================================================
+        # Extract direction scores
+        toward_structure = drift_directions.get('toward_structure', 0.5)
+        toward_warmth = drift_directions.get('toward_warmth', 0.5)
+        toward_grounding = drift_directions.get('toward_grounding', 0.5)
+
+        # Find dominant direction (highest score ≥ 0.60)
+        if toward_structure >= 0.60 and toward_structure >= toward_warmth and toward_structure >= toward_grounding:
+            # Drift toward structure → increase clarity
+            clarity_adjustment += 0.01
+        elif toward_warmth >= 0.60 and toward_warmth >= toward_structure and toward_warmth >= toward_grounding:
+            # Drift toward warmth → increase warmth
+            warmth_adjustment += 0.01
+        elif toward_grounding >= 0.60 and toward_grounding >= toward_structure and toward_grounding >= toward_warmth:
+            # Drift toward grounding → increase structure (grounding emphasis)
+            structure_adjustment += 0.01
+
+        # ========================================================================
+        # STEP 4: Apply stability dampening
+        # ========================================================================
+        # High stability → confidence in prediction → apply adjustments fully
+        # Low stability → less confidence → dampen adjustments
+        if drift_stability is not None:
+            if drift_stability < 0.40:
+                # Low stability → reduce adjustment magnitude by 50%
+                structure_adjustment *= 0.5
+                warmth_adjustment *= 0.5
+                clarity_adjustment *= 0.5
+
+        # ========================================================================
+        # STEP 5: Enforce total adjustment bound (±0.02 max total)
+        # ========================================================================
+        total_adjustment = abs(structure_adjustment) + abs(warmth_adjustment) + abs(clarity_adjustment)
+        if total_adjustment > 0.02:
+            # Scale down proportionally to enforce ±0.02 max total
+            scale_factor = 0.02 / total_adjustment
+            structure_adjustment *= scale_factor
+            warmth_adjustment *= scale_factor
+            clarity_adjustment *= scale_factor
+
+        # ========================================================================
+        # STEP 6: Build predictive drift profile
+        # ========================================================================
+        predictive_drift_profile = {
+            "drift_magnitude_prediction": round(drift_magnitude, 4),
+            "drift_stability_score": round(drift_stability, 4) if drift_stability is not None else None,
+            "drift_likelihood_band": drift_band,
+            "drift_direction_scores": {
+                "toward_structure": round(toward_structure, 4),
+                "toward_warmth": round(toward_warmth, 4),
+                "toward_grounding": round(toward_grounding, 4),
+            },
+            "structure_adjustment": round(structure_adjustment, 4),
+            "warmth_adjustment": round(warmth_adjustment, 4),
+            "clarity_adjustment": round(clarity_adjustment, 4),
+            "predictive_drift_tags": notes,
+        }
+
+        return predictive_drift_profile
 
     def get_persona_summary(self) -> str:
         """
