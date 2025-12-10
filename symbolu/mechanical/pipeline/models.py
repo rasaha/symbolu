@@ -187,6 +187,8 @@ class MapperProfile:
         guna_resonance_bias: 0.0 - Phase 9 Guna resonance modulation [-0.10, +0.10]
         kosha_resonance_bias: 0.0 - Phase 9 Kosha resonance modulation [-0.10, +0.10]
         expression_harmonics: None - Phase 9 expression harmonics from kosha vector
+        symbolic_harmony_bias: None - Phase 28 Symbolic harmony bias [-0.05, +0.05]
+        symbolic_resonance_tags: None - Phase 28 Symbolic resonance tags (HIGH_HARMONY/MEDIUM/LOW)
     """
 
     resolution_level: str = "medium"  # "low" | "medium" | "high"
@@ -200,6 +202,10 @@ class MapperProfile:
     kosha_resonance_bias: float = 0.0  # [-0.10, +0.10]
     expression_harmonics: Optional[List[float]] = None  # Derived from kosha_activation_vector
 
+    # Phase 28: Symbolic Harmonization biases (renderer-only modulation)
+    symbolic_harmony_bias: Optional[float] = None  # Symbolic richness bias [-0.05, +0.05]
+    symbolic_resonance_tags: Optional[List[str]] = None  # HIGH_HARMONY | MEDIUM_HARMONY | LOW_HARMONY
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -211,6 +217,8 @@ class MapperProfile:
             "guna_resonance_bias": self.guna_resonance_bias,
             "kosha_resonance_bias": self.kosha_resonance_bias,
             "expression_harmonics": self.expression_harmonics,
+            "symbolic_harmony_bias": self.symbolic_harmony_bias,
+            "symbolic_resonance_tags": self.symbolic_resonance_tags,
         }
 
 

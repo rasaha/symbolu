@@ -795,6 +795,11 @@ class FusionRenderer:
         if profile.guna_resonance_bias != 0.0 or profile.kosha_resonance_bias != 0.0:
             layer = self._apply_resonance_to_symbolic(layer, profile)
 
+        # Phase 28: Apply Symbolic Harmonization modulation SECOND
+        # This enriches or simplifies symbolic markers based on SHI
+        if profile.symbolic_harmony_bias is not None:
+            layer = self._apply_symbolic_harmonization_to_symbolic_layer(layer, profile)
+
         # LCM: Collapse symbolic layer
         if profile.practical_bias > 0.6 and profile.resolution_level == "low":
             # Minimize symbolic content for LCM
@@ -893,6 +898,11 @@ class FusionRenderer:
         # Phase 9: Apply Kosha resonance modulation FIRST for reflective depth
         if profile.kosha_resonance_bias != 0.0:
             layer = self._apply_resonance_to_mirror(layer, profile)
+
+        # Phase 28: Apply Symbolic Resonance tags SECOND
+        # This adds diagnostic harmony markers to mirror layer
+        if profile.symbolic_resonance_tags is not None:
+            layer = self._apply_symbolic_resonance_tags_to_mirror_layer(layer, profile)
 
         # LCM: Minimize mirror layer
         if profile.practical_bias > 0.6 and profile.resolution_level == "low":
@@ -1057,6 +1067,121 @@ class FusionRenderer:
             # Negative bias → suppress reflective depth
             # Simplify reflection to first sentence only
             reflection = reflection.split('.')[0] + '.'
+
+        return MirrorTruthLayer(
+            contradictions=layer.contradictions,
+            entropy_measures=layer.entropy_measures,
+            tensions=tensions,
+            alignment_score=layer.alignment_score,
+            stability_indicator=layer.stability_indicator,
+            reflection=reflection
+        )
+
+    def _apply_symbolic_harmonization_to_symbolic_layer(
+        self,
+        layer: SymbolicLayer,
+        profile: "MapperProfile"
+    ) -> SymbolicLayer:
+        """
+        Apply Phase 28 Symbolic Harmonization modulation to symbolic layer.
+
+        Rules:
+        - If symbolic_harmony_bias > 0: Enrich symbolic markers and metaphoric structures
+        - If symbolic_harmony_bias < 0: Reduce complexity, compress symbolic markers
+        - If symbolic_harmony_bias == 0 or None: No changes
+
+        This modulates EXPRESSION only, not semantic truth.
+
+        Args:
+            layer: Symbolic layer to modulate
+            profile: Mapper profile with symbolic harmony bias
+
+        Returns:
+            Modulated symbolic layer
+        """
+        if profile.symbolic_harmony_bias is None or profile.symbolic_harmony_bias == 0.0:
+            return layer
+
+        theme = layer.theme
+        archetype = layer.archetype
+        causal_patterns = list(layer.causal_patterns)
+        meaning_vectors = dict(layer.meaning_vectors)
+
+        # Apply symbolic harmonization modulation
+        if profile.symbolic_harmony_bias > 0:
+            # Positive bias → enrich symbolic markers
+            if "[symbolic richness]" not in theme:
+                theme = f"{theme} [symbolic richness]"
+
+            # Add metaphoric structure marker to archetype
+            if "symbolic resonance" not in archetype.lower():
+                archetype = f"{archetype} - symbolic resonance enriched"
+
+        elif profile.symbolic_harmony_bias < 0:
+            # Negative bias → reduce symbolic complexity
+            # Remove any bracketed symbolic embellishments
+            import re
+            theme = re.sub(r'\s*\[symbolic.*?\]', '', theme)
+            archetype = re.sub(r'\s*-\s*symbolic.*?enriched', '', archetype)
+
+            # Compress causal patterns to top 1 only
+            if len(causal_patterns) > 1:
+                causal_patterns = causal_patterns[:1]
+
+        return SymbolicLayer(
+            theme=theme,
+            archetype=archetype,
+            causal_patterns=causal_patterns,
+            meaning_vectors=meaning_vectors,
+            dominant_channel=layer.dominant_channel,
+            reasoning_depth=layer.reasoning_depth
+        )
+
+    def _apply_symbolic_resonance_tags_to_mirror_layer(
+        self,
+        layer: MirrorTruthLayer,
+        profile: "MapperProfile"
+    ) -> MirrorTruthLayer:
+        """
+        Apply Phase 28 Symbolic Resonance tags to mirror-truth layer.
+
+        Rules:
+        - Only add tags when mapper mode != minimal
+        - Tags are diagnostic only, no meaning changes
+        - Tags: [harmony↑], [harmony↓], [harmony~]
+
+        Args:
+            layer: Mirror-truth layer to modulate
+            profile: Mapper profile with symbolic resonance tags
+
+        Returns:
+            Modulated mirror-truth layer
+        """
+        # Only apply tags if resonance tags are available
+        if profile.symbolic_resonance_tags is None or len(profile.symbolic_resonance_tags) == 0:
+            return layer
+
+        # Skip if mode is minimal
+        if self.mode == RenderMode.MINIMAL:
+            return layer
+
+        tensions = list(layer.tensions)
+        reflection = layer.reflection
+
+        # Add resonance tag based on harmony level
+        resonance_tag = profile.symbolic_resonance_tags[0]  # Get first tag
+        if resonance_tag == "HIGH_HARMONY":
+            tag_marker = "[harmony↑]"
+            if tag_marker not in tensions:
+                tensions.append(tag_marker)
+        elif resonance_tag == "LOW_HARMONY":
+            tag_marker = "[harmony↓]"
+            if tag_marker not in tensions:
+                tensions.append(tag_marker)
+        elif resonance_tag == "MEDIUM_HARMONY":
+            tag_marker = "[harmony~]"
+            if tag_marker not in tensions:
+                tensions.append(tag_marker)
 
         return MirrorTruthLayer(
             contradictions=layer.contradictions,

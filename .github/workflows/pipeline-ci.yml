@@ -19,6 +19,7 @@ on:
       - "symbolu/api/**"
       - "symbolu/policy/**"
       - "symbolu/adapter/**"
+      - "tests/test_phase28_symbolic_harmonization_renderer.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -49,6 +50,7 @@ on:
       - "symbolu/api/**"
       - "symbolu/policy/**"
       - "symbolu/adapter/**"
+      - "tests/test_phase28_symbolic_harmonization_renderer.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -354,6 +356,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee phase27-symbolic-harmonization-pytest.log
 
+      - name: Run Phase 28 Symbolic Harmonization → Renderer Tests
+        run: |
+          pytest tests/test_phase28_symbolic_harmonization_renderer.py \
+            --disable-warnings -q \
+            2>&1 | tee phase28-symbolic-harmonization-renderer.log
+
       - name: Run Phase 20 Unified Dashboard Tests
         run: |
           pytest symbolu/tools/unified_dashboard/tests/test_unified_dashboard.py \
@@ -444,6 +452,7 @@ jobs:
             mirror_time-loop-pytest.log
             phase22-mirror-time-cycle-pytest.log
             phase27-symbolic-harmonization-pytest.log
+            phase28-symbolic-harmonization-renderer.log
             phase20-unified-dashboard-pytest.log
             motivation-drift-pytest.log
 
