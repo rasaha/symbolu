@@ -13,6 +13,7 @@ from symbolu.core.coherence.persona_drift_monitor import compute_persona_drift
 from symbolu.core.coherence.semantic_skeleton import compute_semantic_stability
 from symbolu.core.coherence.temporal_arc_tracer import compute_temporal_arc_score
 from symbolu.formulas.guna_kosha_resonance import compute_guna_kosha_resonance
+from symbolu.formulas.formula_fusion_stabilizer import compute_coherence_fused
 
 
 class CoherenceEngine:
@@ -78,6 +79,7 @@ class CoherenceEngine:
                 tension_corridor_history=prev_state.tension_corridor_history.copy(),
                 vritti_momentum_history=prev_state.vritti_momentum_history.copy(),
                 arc_tension_harmonizer_history=prev_state.arc_tension_harmonizer_history.copy(),
+                coherence_fused_history=prev_state.coherence_fused_history.copy(),
             )
 
         # Append new turn data to histories
@@ -135,6 +137,9 @@ class CoherenceEngine:
             arc_alignment_index=state.arc_alignment_index,
             tension_index=state.tension_index,
         )
+
+        # Update Phase 16 formula fusion stabilizer (observation only)
+        self._update_formula_fusion_stabilizer(state, mapper_profile)
 
         return state
 
@@ -849,3 +854,88 @@ class CoherenceEngine:
         coherence_v3_quality = clamp(raw_quality, 0.0, 1.0)
 
         return coherence_v3_quality
+
+    def _update_formula_fusion_stabilizer(
+        self,
+        state: CoherenceState,
+        mapper_profile: Dict,
+    ) -> None:
+        """
+        Update Phase 16 Formula Fusion Stabilizer (observation only).
+
+        This method computes the fused coherence score by blending:
+        - coherence_score_v1 (baseline)
+        - coherence_score_v2 (formula-aware)
+        - coherence_score_v3 (megafusion)
+        - coherence_v3_quality (Phase 12)
+        - enhanced_smi (from SMI history - Phase 13 placeholder)
+        - vritti_momentum (Phase 14)
+        - arc_tension_harmonizer (Phase 14)
+        - guna_resonance_index (Phase 8)
+        - kosha_resonance_index (Phase 8)
+        - temporal inertia (sliding window)
+
+        The fused metric is stored in state.coherence_fused and does NOT affect
+        any existing pipeline behavior. It is purely for observation and future use.
+
+        Args:
+            state: CoherenceState to update in place
+            mapper_profile: MapperProfile dict (for potential future use)
+        """
+        # Extract all required inputs from state
+        v1 = state.coherence_score  # v1 canonical (always available)
+        v2 = state.coherence_score_v2  # Phase 4
+        v3 = state.coherence_score_v3  # Phase 10
+        v3_quality = state.coherence_v3_quality  # Phase 12
+
+        # Phase 13: Enhanced SMI - use most recent SMI from history as placeholder
+        # (Phase 13 may define a more sophisticated enhanced_smi in the future)
+        enhanced_smi = None
+        if state.smi_history:
+            enhanced_smi = state.smi_history[-1]
+
+        # Phase 14: Vritti Momentum & Arc-Tension Harmonizer
+        vritti_momentum = None
+        if state.vritti_momentum_history:
+            vritti_momentum = state.vritti_momentum_history[-1]
+
+        arc_tension_harmonizer = None
+        if state.arc_tension_harmonizer_history:
+            arc_tension_harmonizer = state.arc_tension_harmonizer_history[-1]
+
+        # Phase 8: Guna/Kosha resonance
+        guna_resonance = state.guna_resonance_index
+        kosha_resonance = state.kosha_resonance_index
+
+        # Get last 5 v1 scores for temporal inertia baseline
+        # Use coherence_score from smi_history (or a dedicated coherence history if available)
+        # For now, use the last 5 entries from coherence_fused_history if available,
+        # otherwise build from current v1 score
+        history_last_5 = state.coherence_fused_history[-5:] if state.coherence_fused_history else []
+
+        # If coherence_fused_history is empty (first turn), use v1 as baseline
+        if not history_last_5:
+            history_last_5 = [v1] if v1 is not None else []
+
+        # Call formula fusion stabilizer
+        snapshot = compute_coherence_fused(
+            v1=v1,
+            v2=v2,
+            v3=v3,
+            v3_quality=v3_quality,
+            enhanced_smi=enhanced_smi,
+            vritti_momentum=vritti_momentum,
+            arc_tension_harmonizer=arc_tension_harmonizer,
+            guna_resonance=guna_resonance,
+            kosha_resonance=kosha_resonance,
+            history_last_5=history_last_5,
+        )
+
+        # Store results in state
+        state.coherence_fused = snapshot.coherence_fused
+        state.fusion_stability_weight = snapshot.stability_weight
+        state.fusion_inertia_factor = snapshot.inertia_factor
+        state.fusion_quality_factor = snapshot.quality_factor
+
+        # Append to history
+        state.coherence_fused_history.append(snapshot.coherence_fused)

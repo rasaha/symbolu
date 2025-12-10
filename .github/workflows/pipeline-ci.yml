@@ -316,6 +316,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee phase15b-preferences-pytest.log
 
+      - name: Run Phase 16 Formula Fusion Stabilizer Tests
+        run: |
+          pytest symbolu/core/formula_drift_tests/test_phase16_formula_fusion_stabilizer.py \
+            --disable-warnings -q \
+            2>&1 | tee phase16-fusion-stabilizer-pytest.log
+
       - name: Run Motivation Drift Tests
         run: |
           pytest symbolu/core/motivation_drift_tests \
@@ -394,6 +400,7 @@ jobs:
             trading-guardrails-pytest.log
             phase15-interaction-modes-pytest.log
             phase15b-preferences-pytest.log
+            phase16-fusion-stabilizer-pytest.log
             motivation-drift-pytest.log
 
       - name: Upload snapshot diffs

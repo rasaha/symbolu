@@ -81,6 +81,12 @@ class CoherenceObservation:
     max_arc_tension_harmonizer: Optional[float] = None
     min_arc_tension_harmonizer: Optional[float] = None
 
+    # Phase 16: Formula Fusion Stabilizer (observation only)
+    coherence_fused: Optional[float] = None
+    fusion_stability_weight: Optional[float] = None
+    fusion_inertia_factor: Optional[float] = None
+    fusion_quality_factor: Optional[float] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -273,6 +279,18 @@ class CoherenceObserver:
             max_arc_tension_harmonizer = getattr(coherence_state, 'max_arc_tension_harmonizer', None)
             min_arc_tension_harmonizer = getattr(coherence_state, 'min_arc_tension_harmonizer', None)
 
+        # Phase 16: Extract Formula Fusion Stabilizer from coherence_state
+        coherence_fused = None
+        fusion_stability_weight = None
+        fusion_inertia_factor = None
+        fusion_quality_factor = None
+
+        if coherence_state is not None:
+            coherence_fused = getattr(coherence_state, 'coherence_fused', None)
+            fusion_stability_weight = getattr(coherence_state, 'fusion_stability_weight', None)
+            fusion_inertia_factor = getattr(coherence_state, 'fusion_inertia_factor', None)
+            fusion_quality_factor = getattr(coherence_state, 'fusion_quality_factor', None)
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -317,6 +335,10 @@ class CoherenceObserver:
             avg_arc_tension_harmonizer=avg_arc_tension_harmonizer,
             max_arc_tension_harmonizer=max_arc_tension_harmonizer,
             min_arc_tension_harmonizer=min_arc_tension_harmonizer,
+            coherence_fused=coherence_fused,
+            fusion_stability_weight=fusion_stability_weight,
+            fusion_inertia_factor=fusion_inertia_factor,
+            fusion_quality_factor=fusion_quality_factor,
         )
 
         # Store observation
@@ -423,6 +445,11 @@ class CoherenceObserver:
         if formulas:
             snapshot["formulas"] = formulas
 
+        # Phase 16: Add formula fusion stabilizer section if available
+        stabilizer = self._extract_stabilizer_from_observation(obs)
+        if stabilizer:
+            snapshot["stabilizer"] = stabilizer
+
         return snapshot
 
     def _extract_formulas_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Optional[float]]]:
@@ -471,6 +498,26 @@ class CoherenceObserver:
             formulas["kosha_resonance_index"] = obs.kosha_resonance_index
 
         return formulas if formulas else None
+
+    def _extract_stabilizer_from_observation(self, obs: CoherenceObservation) -> Optional[Dict[str, Optional[float]]]:
+        """
+        Extract Phase 16 Formula Fusion Stabilizer metrics from observation.
+
+        Returns stabilizer dict if metrics are available, None otherwise.
+        """
+        # Build stabilizer dict from observation
+        stabilizer = {}
+
+        if obs.coherence_fused is not None:
+            stabilizer["coherence_fused"] = obs.coherence_fused
+        if obs.fusion_stability_weight is not None:
+            stabilizer["stability_weight"] = obs.fusion_stability_weight
+        if obs.fusion_inertia_factor is not None:
+            stabilizer["inertia_factor"] = obs.fusion_inertia_factor
+        if obs.fusion_quality_factor is not None:
+            stabilizer["quality_factor"] = obs.fusion_quality_factor
+
+        return stabilizer if stabilizer else None
 
     def _get_status_label(self, obs: CoherenceObservation) -> str:
         """Get human-readable status label."""
