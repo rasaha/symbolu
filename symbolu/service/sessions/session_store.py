@@ -808,6 +808,105 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_resonance_notes:
             resonance_weighting_notes_list = sorted(set(all_resonance_notes))
 
+    # Phase 26: Extract Unified Consciousness Formula (UCF) metrics from coherence history
+    avg_coi_val = None
+    avg_csi_val = None
+    avg_cip_val = None
+    ucf_entropy_band_val = None
+    dominant_ucf_signals_list = []
+    ucf_notes_list = []
+
+    if state.coherence_history:
+        # Extract UCF metrics from CoherenceState
+        coi_values = []
+        csi_values = []
+        cip_values = []
+        ucf_entropy_values = []
+        all_ucf_notes = []
+        all_dominant_signals = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract current_coi, current_csi, current_cip from CoherenceState
+                if "current_coi" in coh and coh["current_coi"] is not None:
+                    coi_values.append(coh["current_coi"])
+                if "current_csi" in coh and coh["current_csi"] is not None:
+                    csi_values.append(coh["current_csi"])
+                if "current_cip" in coh and coh["current_cip"] is not None:
+                    cip_values.append(coh["current_cip"])
+
+                # Extract ucf_entropy from CoherenceState
+                if "ucf_entropy" in coh and coh["ucf_entropy"] is not None:
+                    ucf_entropy_values.append(coh["ucf_entropy"])
+
+                # Extract ucf_notes from CoherenceState
+                if "ucf_notes" in coh and coh["ucf_notes"]:
+                    if isinstance(coh["ucf_notes"], list):
+                        all_ucf_notes.extend(coh["ucf_notes"])
+
+                # Also extract from ucf_history for detailed analysis
+                if "ucf_history" in coh:
+                    ucf_history = coh["ucf_history"]
+                    if isinstance(ucf_history, list):
+                        for snapshot in ucf_history:
+                            # Handle both dict and object snapshots
+                            if snapshot is not None:
+                                if isinstance(snapshot, dict):
+                                    if "diagnostic_notes" in snapshot and snapshot["diagnostic_notes"]:
+                                        all_ucf_notes.extend(snapshot["diagnostic_notes"])
+                                    # Extract top 3 components from normalized_weights
+                                    if "normalized_weights" in snapshot and snapshot["normalized_weights"]:
+                                        # Sort by value and get top 3 keys
+                                        sorted_weights = sorted(
+                                            snapshot["normalized_weights"].items(),
+                                            key=lambda x: x[1],
+                                            reverse=True
+                                        )
+                                        top_3 = [k for k, v in sorted_weights[:3]]
+                                        all_dominant_signals.extend(top_3)
+                                elif hasattr(snapshot, "diagnostic_notes"):
+                                    if snapshot.diagnostic_notes:
+                                        all_ucf_notes.extend(snapshot.diagnostic_notes)
+                                    # Extract from normalized_weights
+                                    if hasattr(snapshot, "normalized_weights") and snapshot.normalized_weights:
+                                        sorted_weights = sorted(
+                                            snapshot.normalized_weights.items(),
+                                            key=lambda x: x[1],
+                                            reverse=True
+                                        )
+                                        top_3 = [k for k, v in sorted_weights[:3]]
+                                        all_dominant_signals.extend(top_3)
+
+        # Compute aggregates
+        # Average COI, CSI, CIP
+        if coi_values:
+            avg_coi_val = sum(coi_values) / len(coi_values)
+        if csi_values:
+            avg_csi_val = sum(csi_values) / len(csi_values)
+        if cip_values:
+            avg_cip_val = sum(cip_values) / len(cip_values)
+
+        # UCF entropy band derivation (focused | balanced | diffuse)
+        if ucf_entropy_values:
+            avg_ucf_entropy = sum(ucf_entropy_values) / len(ucf_entropy_values)
+            if avg_ucf_entropy < 0.35:
+                ucf_entropy_band_val = "focused"
+            elif avg_ucf_entropy < 0.70:
+                ucf_entropy_band_val = "balanced"
+            else:
+                ucf_entropy_band_val = "diffuse"
+
+        # Dominant UCF signals (most frequent, limited to top 3)
+        if all_dominant_signals:
+            from collections import Counter
+            signal_counts = Counter(all_dominant_signals)
+            # Get top 3 most common signals
+            dominant_ucf_signals_list = [signal for signal, _ in signal_counts.most_common(3)]
+
+        # Collect unique UCF notes (deduplicate and sort for determinism)
+        if all_ucf_notes:
+            ucf_notes_list = sorted(set(all_ucf_notes))
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -858,4 +957,10 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_resonance_entropy=avg_resonance_entropy_val,
         dominant_resonance_metrics=dominant_resonance_metrics_list,
         resonance_weighting_notes=resonance_weighting_notes_list,
+        avg_coi=avg_coi_val,
+        avg_csi=avg_csi_val,
+        avg_cip=avg_cip_val,
+        ucf_entropy_band=ucf_entropy_band_val,
+        dominant_ucf_signals=dominant_ucf_signals_list,
+        ucf_notes=ucf_notes_list,
     )

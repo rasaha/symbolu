@@ -483,6 +483,58 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
 
             coherence_report['resonance_weighting'] = resonance_weighting_data
 
+        # Phase 26: Extract Unified Consciousness Formula (UCF) from coherence_state
+        current_coi = getattr(coherence_state, 'current_coi', None)
+        current_csi = getattr(coherence_state, 'current_csi', None)
+        current_cip = getattr(coherence_state, 'current_cip', None)
+        ucf_entropy = getattr(coherence_state, 'ucf_entropy', None)
+        ucf_notes = getattr(coherence_state, 'ucf_notes', None)
+
+        # Extract detailed snapshot from UCF history
+        ucf_history = getattr(coherence_state, 'ucf_history', None)
+        latest_ucf_snapshot = None
+        if ucf_history and len(ucf_history) > 0:
+            latest_ucf_snapshot = ucf_history[-1]
+
+        # Add unified consciousness to coherence report if available
+        if current_coi is not None or current_csi is not None or current_cip is not None or latest_ucf_snapshot is not None:
+            unified_consciousness_data = {}
+
+            # Core indices
+            if current_coi is not None:
+                unified_consciousness_data['consciousness_order_index'] = current_coi
+                unified_consciousness_data['coi'] = current_coi  # Alias
+
+            if current_csi is not None:
+                unified_consciousness_data['consciousness_stability_index'] = current_csi
+                unified_consciousness_data['csi'] = current_csi  # Alias
+
+            if current_cip is not None:
+                unified_consciousness_data['consciousness_integration_potential'] = current_cip
+                unified_consciousness_data['cip'] = current_cip  # Alias
+
+            # UCF entropy
+            if ucf_entropy is not None:
+                unified_consciousness_data['entropy'] = ucf_entropy
+
+            # UCF diagnostic notes
+            if ucf_notes:
+                unified_consciousness_data['notes'] = list(ucf_notes) if isinstance(ucf_notes, list) else []
+
+            # Add detailed breakdown if snapshot exists
+            if latest_ucf_snapshot is not None:
+                unified_consciousness_data['snapshot'] = {
+                    'consciousness_order_index': getattr(latest_ucf_snapshot, 'consciousness_order_index', None),
+                    'consciousness_stability_index': getattr(latest_ucf_snapshot, 'consciousness_stability_index', None),
+                    'consciousness_integration_potential': getattr(latest_ucf_snapshot, 'consciousness_integration_potential', None),
+                    'weighted_component_breakdown': getattr(latest_ucf_snapshot, 'weighted_component_breakdown', None),
+                    'normalized_weights': getattr(latest_ucf_snapshot, 'normalized_weights', None),
+                    'entropy_of_weights': getattr(latest_ucf_snapshot, 'entropy_of_weights', None),
+                    'diagnostic_notes': getattr(latest_ucf_snapshot, 'diagnostic_notes', None),
+                }
+
+            coherence_report['unified_consciousness'] = unified_consciousness_data
+
     # Build metadata
     metadata = {
         'timestamp': datetime.utcnow().isoformat() + 'Z',

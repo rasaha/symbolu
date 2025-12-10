@@ -185,6 +185,9 @@ class CoherenceEngine:
         # Update Phase 24 resonance weighting function (observation only)
         self._update_resonance_weighting(state)
 
+        # Update Phase 26 unified consciousness formula (observation only)
+        self._update_unified_consciousness(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -1620,3 +1623,126 @@ class CoherenceEngine:
             state.current_normalized_resonance_weights = None
             state.current_resonance_entropy = None
             state.dominant_resonance_metrics = []
+
+    def _update_unified_consciousness(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 26 Unified Consciousness Formula (observation only).
+
+        This method computes the unified consciousness snapshot by integrating ALL
+        Symbol-U v3.0 formula signals into three indices:
+          - COI (Consciousness Order Index): Structural coherence & organization
+          - CSI (Consciousness Stability Index): Temporal stability & resilience
+          - CIP (Consciousness Integration Potential): Cross-layer integration readiness
+
+        The UCF is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for dashboard visualization and future v4.0 integration.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.unified_consciousness import compute_unified_consciousness
+
+        # Gather all inputs from state
+
+        # Coherence variants (Phase 1-4, 10, 16)
+        coherence_v1 = state.coherence_score if state.coherence_score > 0.0 else None
+        coherence_v2 = state.coherence_score_v2
+        coherence_v3 = state.coherence_score_v3
+        coherence_fused = state.coherence_fused
+
+        # Enhanced SMI (Phase 13 placeholder - use most recent SMI from history)
+        enhanced_smi = state.smi_history[-1] if state.smi_history else None
+
+        # Semantic integrity & cognitive drift (Phase 17)
+        semantic_integrity_score = state.semantic_integrity_score
+        cognitive_drift_v3 = state.cognitive_drift_v3
+
+        # Drift fusion index (Phase 19 - if available, use cognitive_drift_v3 as proxy)
+        drift_fusion_index = cognitive_drift_v3
+
+        # Vritti momentum (Phase 14)
+        vritti_momentum = state.vritti_momentum_history[-1] if state.vritti_momentum_history else None
+
+        # Arc-tension harmonizer (Phase 14)
+        arc_tension_harmonizer = state.arc_tension_harmonizer_history[-1] if state.arc_tension_harmonizer_history else None
+
+        # Mirror-time loop metrics (Phase 21)
+        mirror_loop_alignment = state.avg_loop_alignment
+        mirror_loop_tension = state.avg_loop_tension
+        mirror_reversal_probability = state.avg_reversal_probability
+
+        # Mirror-time cycle metrics (Phase 22)
+        cycle_alignment = state.avg_cycle_alignment
+        cycle_tension = state.avg_cycle_tension
+        cycle_reversal_probability = state.avg_cycle_reversal_probability
+
+        # Temporal entropy differential (Phase 18)
+        temporal_entropy_diff = state.temporal_entropy_diff
+        temporal_entropy_volatility = state.temporal_entropy_volatility
+
+        # Guna/Kosha resonance (Phase 8)
+        guna_resonance_index = state.guna_resonance_index
+        kosha_resonance_index = state.kosha_resonance_index
+
+        # Resonance weighting (Phase 24)
+        resonance_weighting_entropy = state.current_resonance_entropy
+        dominant_resonance_metrics = state.dominant_resonance_metrics if state.dominant_resonance_metrics else None
+
+        # Quality metrics (Phase 12, 16)
+        coherence_v3_quality = state.coherence_v3_quality
+        fusion_stability_weight = state.fusion_stability_weight
+        fusion_inertia_factor = state.fusion_inertia_factor
+
+        # Compute unified consciousness snapshot
+        snapshot = compute_unified_consciousness(
+            coherence_v1=coherence_v1,
+            coherence_v2=coherence_v2,
+            coherence_v3=coherence_v3,
+            coherence_fused=coherence_fused,
+            enhanced_smi=enhanced_smi,
+            semantic_integrity_score=semantic_integrity_score,
+            cognitive_drift_v3=cognitive_drift_v3,
+            drift_fusion_index=drift_fusion_index,
+            vritti_momentum=vritti_momentum,
+            arc_tension_harmonizer=arc_tension_harmonizer,
+            mirror_loop_alignment=mirror_loop_alignment,
+            mirror_loop_tension=mirror_loop_tension,
+            mirror_reversal_probability=mirror_reversal_probability,
+            cycle_alignment=cycle_alignment,
+            cycle_tension=cycle_tension,
+            cycle_reversal_probability=cycle_reversal_probability,
+            temporal_entropy_diff=temporal_entropy_diff,
+            temporal_entropy_volatility=temporal_entropy_volatility,
+            guna_resonance_index=guna_resonance_index,
+            kosha_resonance_index=kosha_resonance_index,
+            resonance_weighting_entropy=resonance_weighting_entropy,
+            dominant_resonance_metrics=dominant_resonance_metrics,
+            coherence_v3_quality=coherence_v3_quality,
+            fusion_stability_weight=fusion_stability_weight,
+            fusion_inertia_factor=fusion_inertia_factor,
+        )
+
+        # Store results in state
+        if snapshot is not None:
+            # Append to history
+            state.ucf_history.append(snapshot)
+
+            # Update current metrics
+            state.unified_consciousness_snapshot = snapshot
+            state.current_coi = snapshot.consciousness_order_index
+            state.current_csi = snapshot.consciousness_stability_index
+            state.current_cip = snapshot.consciousness_integration_potential
+            state.ucf_entropy = snapshot.entropy_of_weights
+            state.ucf_notes = snapshot.diagnostic_notes
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.ucf_history.append(None)
+            state.unified_consciousness_snapshot = None
+            state.current_coi = None
+            state.current_csi = None
+            state.current_cip = None
+            state.ucf_entropy = None
+            state.ucf_notes = []
