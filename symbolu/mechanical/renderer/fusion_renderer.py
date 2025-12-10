@@ -29,7 +29,31 @@ Patent Protected: Core algorithms immutable
 
 import json
 import hashlib
-import numpy as np
+
+# Deterministic fallback for numpy (for environments without numpy)
+try:
+    import numpy as np
+except ImportError:
+    # Minimal numpy-compatible fallback for testing environments
+    class NumpyFallback:
+        """Minimal numpy fallback for testing without numpy."""
+        @staticmethod
+        def array(x):
+            return x
+        @staticmethod
+        def mean(x):
+            if isinstance(x, (list, tuple)):
+                return sum(x) / len(x) if x else 0
+            return x
+        @staticmethod
+        def std(x):
+            if isinstance(x, (list, tuple)) and len(x) > 1:
+                mean_val = sum(x) / len(x)
+                variance = sum((i - mean_val) ** 2 for i in x) / len(x)
+                return variance ** 0.5
+            return 0
+    np = NumpyFallback()
+
 from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING
 from dataclasses import dataclass, field
 from datetime import datetime
