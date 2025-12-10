@@ -22,6 +22,7 @@ on:
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
+      - "symbolu/service/preferences/**"
       - "symbolu/intent/**"
       - "symbolu/identity/**"
       - "symbolu/motivation/**"
@@ -50,6 +51,7 @@ on:
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
+      - "symbolu/service/preferences/**"
       - "symbolu/intent/**"
       - "symbolu/identity/**"
       - "symbolu/motivation/**"
@@ -308,6 +310,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee phase15-interaction-modes-pytest.log
 
+      - name: Run Phase 15B Preference Store Tests
+        run: |
+          pytest symbolu/service/tests/test_phase15b_preferences.py \
+            --disable-warnings -q \
+            2>&1 | tee phase15b-preferences-pytest.log
+
       - name: Run Motivation Drift Tests
         run: |
           pytest symbolu/core/motivation_drift_tests \
@@ -385,6 +393,7 @@ jobs:
             motivation-flow-pytest.log
             trading-guardrails-pytest.log
             phase15-interaction-modes-pytest.log
+            phase15b-preferences-pytest.log
             motivation-drift-pytest.log
 
       - name: Upload snapshot diffs

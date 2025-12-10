@@ -32,11 +32,21 @@ class AnalyzeRequest(BaseModel if PYDANTIC_AVAILABLE else object):
     Attributes:
         text: User input text to analyze
         domain: Domain context (e.g., "generic", "trading", "therapy")
+        user_id: Optional user identifier for preference lookup (Phase 15B)
+        org_id: Optional organization identifier for preference lookup (Phase 15B)
         metadata: Optional metadata dict (user_id, persona_override, etc.)
     """
     if PYDANTIC_AVAILABLE:
         text: str = Field(..., description="User input text to analyze")
         domain: str = Field(default="generic", description="Domain context")
+        user_id: Optional[str] = Field(
+            default=None,
+            description="Optional user identifier for preference lookup"
+        )
+        org_id: Optional[str] = Field(
+            default=None,
+            description="Optional organization identifier for preference lookup"
+        )
         metadata: Optional[Dict[str, Any]] = Field(
             default=None,
             description="Optional metadata (user_id, persona_override, etc.)"
@@ -128,3 +138,89 @@ class UnifiedAPIResponse(BaseModel if PYDANTIC_AVAILABLE else object):
 def check_pydantic_available() -> bool:
     """Check if Pydantic is available for use."""
     return PYDANTIC_AVAILABLE
+
+
+# ============================================================================
+# PREFERENCE MODELS (Phase 15B)
+# ============================================================================
+
+class UserPreferenceUpdate(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Request schema for updating user interaction mode preferences.
+
+    Attributes:
+        user_id: Unique user identifier
+        preferred_interaction_mode: User's preferred interaction mode
+            Valid values: "analytics_only", "smart_insight", "deep_adaptive", or None
+    """
+    if PYDANTIC_AVAILABLE:
+        user_id: str = Field(..., description="Unique user identifier")
+        preferred_interaction_mode: Optional[str] = Field(
+            default=None,
+            description="Preferred interaction mode (analytics_only, smart_insight, deep_adaptive, or null)"
+        )
+
+        def validate_mode(self) -> None:
+            """Validate interaction mode string."""
+            if self.preferred_interaction_mode is not None:
+                valid_modes = ["analytics_only", "smart_insight", "deep_adaptive"]
+                normalized = self.preferred_interaction_mode.lower().strip()
+                if normalized not in valid_modes:
+                    raise ValueError(
+                        f"Invalid interaction mode: {self.preferred_interaction_mode}. "
+                        f"Valid values: {', '.join(valid_modes)}, or null"
+                    )
+
+
+class AdminPreferenceUpdate(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Request schema for updating admin (organization) interaction mode preferences.
+
+    Attributes:
+        org_id: Unique organization identifier
+        forced_interaction_mode: Admin-forced interaction mode
+            Valid values: "analytics_only", "smart_insight", "deep_adaptive", or None
+    """
+    if PYDANTIC_AVAILABLE:
+        org_id: str = Field(..., description="Unique organization identifier")
+        forced_interaction_mode: Optional[str] = Field(
+            default=None,
+            description="Forced interaction mode (analytics_only, smart_insight, deep_adaptive, or null)"
+        )
+
+        def validate_mode(self) -> None:
+            """Validate interaction mode string."""
+            if self.forced_interaction_mode is not None:
+                valid_modes = ["analytics_only", "smart_insight", "deep_adaptive"]
+                normalized = self.forced_interaction_mode.lower().strip()
+                if normalized not in valid_modes:
+                    raise ValueError(
+                        f"Invalid interaction mode: {self.forced_interaction_mode}. "
+                        f"Valid values: {', '.join(valid_modes)}, or null"
+                    )
+
+
+class PreferenceResponse(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Response schema for preference endpoints.
+
+    Attributes:
+        status: Operation status ("ok" or "error")
+        mode: Resolved interaction mode name
+        user_id: User identifier (if applicable)
+        org_id: Organization identifier (if applicable)
+    """
+    if PYDANTIC_AVAILABLE:
+        status: str = Field(..., description="Operation status")
+        mode: Optional[str] = Field(
+            default=None,
+            description="Resolved interaction mode"
+        )
+        user_id: Optional[str] = Field(
+            default=None,
+            description="User identifier"
+        )
+        org_id: Optional[str] = Field(
+            default=None,
+            description="Organization identifier"
+        )
