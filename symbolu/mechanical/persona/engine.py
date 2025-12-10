@@ -19,6 +19,7 @@ from typing import Dict, Any, Optional, List, Tuple
 from .models import RendererOutputV3, DHAResult, PersonaResponse, PersonaMetadata, PersonaProfile, PersonaResonanceProfile
 from .registry import PersonaRegistry
 from .selector import PersonaSelector
+from .persona_resonance_mapping import CrossLayerResonanceMap, compute_cross_layer_persona_map
 
 
 class PersonaEngine:
@@ -125,8 +126,8 @@ class PersonaEngine:
         shf_snapshot = self._extract_symbolic_harmony(explain_log)
         persona_resonance = self._apply_resonance_to_persona_tone(persona, shf_snapshot)
 
-        # Step 7: Return complete response (with optional persona_resonance)
-        return PersonaResponse(
+        # Step 7: Build PersonaResponse (with optional persona_resonance from Phase 29)
+        persona_response = PersonaResponse(
             persona_id=persona.id,
             text=text,
             layers={
@@ -137,6 +138,20 @@ class PersonaEngine:
             metadata=metadata,
             persona_resonance=persona_resonance  # Phase 29: Optional resonance profile
         )
+
+        # Phase 30 Step 8: Apply cross-layer resonance modulation
+        # Extract coherence observation from explain_log
+        coherence_observation = self._extract_coherence_observation(explain_log)
+        if coherence_observation is not None:
+            # Compute cross-layer resonance map
+            cl_map = compute_cross_layer_persona_map(coherence_observation)
+            # Apply tone-only modulation (observation only in v1.0)
+            self._apply_cross_layer_resonance(persona_response, cl_map)
+            # Attach cl_map to response for observability
+            persona_response.cross_layer_resonance_map = cl_map
+
+        # Step 9: Return complete response
+        return persona_response
     
     def _order_layers(
         self,
@@ -363,6 +378,41 @@ class PersonaEngine:
 
         return shf_snapshot
 
+    def _extract_coherence_observation(
+        self,
+        explain_log: Dict[str, Any]
+    ) -> Optional[Any]:
+        """
+        Phase 30: Extract CoherenceObservation from pipeline context.
+
+        Args:
+            explain_log: MLCR explain log with metadata
+
+        Returns:
+            CoherenceObservation or None if not available
+
+        Graceful Degradation:
+            Returns None if coherence observation is not present in context.
+        """
+        # Try to extract coherence observation from explain_log
+        # Expected path: explain_log -> coherence_observation
+        if not explain_log:
+            return None
+
+        # Direct access to coherence_observation
+        coherence_observation = explain_log.get('coherence_observation')
+        if coherence_observation is not None:
+            return coherence_observation
+
+        # Alternative path: explain_log -> coherence_state (might be the observation itself)
+        coherence_state = explain_log.get('coherence_state')
+        if coherence_state is not None:
+            # Check if coherence_state has coherence observation attributes
+            if hasattr(coherence_state, 'coherence_score'):
+                return coherence_state
+
+        return None
+
     def _apply_resonance_to_persona_tone(
         self,
         persona: PersonaProfile,
@@ -467,6 +517,52 @@ class PersonaEngine:
             symbolic_resonance_tags=symbolic_resonance_tags,
             persona_resonance_tone=persona_resonance_tone,
         )
+
+    def _apply_cross_layer_resonance(
+        self,
+        persona_response: PersonaResponse,
+        cl_map: CrossLayerResonanceMap
+    ) -> None:
+        """
+        Phase 30: Apply cross-layer resonance modulation to persona tone.
+
+        This method performs tone-only modulation based on cross-layer
+        resonance signals. It does NOT change semantics.
+
+        Deterministic Adjustments:
+            • metaphor_weight: Affects metaphor expansion/richness
+            • warmth_weight: Affects softening tone/empathy
+            • structure_weight: Controls clarity/organization
+            • grounding_bias: Increases concreteness/practicality
+            • expressiveness_bias: Adds expressive nuance
+
+        Args:
+            persona_response: PersonaResponse to modulate (in-place)
+            cl_map: CrossLayerResonanceMap with tone parameters
+
+        Returns:
+            None (modulates persona_response in-place)
+
+        Invariants:
+            • All modulations are tone-only (no semantic changes)
+            • Deterministic: same inputs → same outputs
+            • Safe: no exceptions for missing signals
+            • Zero-LLM: pure rule-based transforms
+
+        NOTE: In Phase 30 v1.0, this method stores the cl_map for observability
+        but does NOT yet apply live tone transformations to the text.
+        Future versions may implement live text modulation based on weights.
+        """
+        # Phase 30 v1.0: Store cl_map for observability
+        # Future: Apply tone transformations based on weights
+        # (e.g., adjust metaphor richness, warmth phrasing, structure clarity)
+
+        # For now, we simply attach the resonance map to the response
+        # This allows downstream consumers (e.g., UI, analytics) to observe
+        # the computed tone parameters without modifying the text.
+
+        # No-op for now: future versions will implement live tone modulation
+        pass
 
     def get_persona_summary(self) -> str:
         """

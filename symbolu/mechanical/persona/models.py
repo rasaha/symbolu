@@ -257,6 +257,12 @@ class PersonaResponse(BaseModel):
         description="Phase 29: Symbolic harmony → persona tone resonance profile (optional)"
     )
 
+    # Phase 30: Optional cross-layer resonance map
+    cross_layer_resonance_map: Optional[Any] = Field(
+        None,
+        description="Phase 30: Cross-layer resonance persona mapping (optional)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {
