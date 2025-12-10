@@ -79,6 +79,16 @@ jobs:
             --maxfail=1 \
             2>&1 | tee phase8-guna-kosha-pytest.log
 
+      - name: Run Phase 13 Enhanced SMI Drift Tests
+        run: |
+          pytest \
+            symbolu/core/formula_drift_tests/test_phase13_enhanced_smi.py \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            --maxfail=1 \
+            2>&1 | tee phase13-enhanced-smi-pytest.log
+
       - name: Upload Formula Drift test logs and fixtures
         uses: actions/upload-artifact@v4
         if: always()
@@ -88,6 +98,7 @@ jobs:
             formula-drift-pytest.log
             patent-formula-tags-pytest.log
             phase8-guna-kosha-pytest.log
+            phase13-enhanced-smi-pytest.log
             symbolu/core/formula_drift_tests/phase1_resonance_fixtures.json
 
       - name: Check for drift
@@ -95,3 +106,4 @@ jobs:
           echo "✅ Formula drift tests passed! All formulas remain deterministic and within expected ranges."
           echo "✅ Patent formula tag drift tests passed! All formula tags remain stable."
           echo "✅ Phase 8 Guna/Kosha resonance drift tests passed! All formulas remain stable."
+          echo "✅ Phase 13 Enhanced SMI drift tests passed! Patent-level coefficients remain stable."

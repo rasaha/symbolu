@@ -71,6 +71,12 @@ class CoherenceObservation:
     guna_resonance_index: Optional[float] = None
     kosha_resonance_index: Optional[float] = None
 
+    # Phase 13: Enhanced SMI (observation only)
+    enhanced_smi: Optional[float] = None
+    avg_enhanced_smi: Optional[float] = None
+    max_enhanced_smi: Optional[float] = None
+    min_enhanced_smi: Optional[float] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -235,6 +241,27 @@ class CoherenceObserver:
             guna_resonance_index = getattr(coherence_state, 'guna_resonance_index', None)
             kosha_resonance_index = getattr(coherence_state, 'kosha_resonance_index', None)
 
+        # Phase 13: Extract enhanced SMI from coherence_state
+        enhanced_smi = None
+        avg_enhanced_smi = None
+        max_enhanced_smi = None
+        min_enhanced_smi = None
+
+        if coherence_state is not None:
+            # Extract current enhanced SMI
+            enhanced_smi = getattr(coherence_state, 'current_enhanced_smi', None)
+
+            # Extract enhanced SMI aggregates
+            avg_enhanced_smi = getattr(coherence_state, 'avg_enhanced_smi', None)
+            max_enhanced_smi = getattr(coherence_state, 'max_enhanced_smi', None)
+            min_enhanced_smi = getattr(coherence_state, 'min_enhanced_smi', None)
+
+            # Fallback: try to get most recent from history if current is not set
+            if enhanced_smi is None:
+                enhanced_smi_hist = getattr(coherence_state, 'enhanced_smi_history', [])
+                if enhanced_smi_hist and enhanced_smi_hist[-1] is not None:
+                    enhanced_smi = enhanced_smi_hist[-1]
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -271,6 +298,10 @@ class CoherenceObserver:
             coherence_v3_quality=coherence_v3_quality,
             guna_resonance_index=guna_resonance_index,
             kosha_resonance_index=kosha_resonance_index,
+            enhanced_smi=enhanced_smi,
+            avg_enhanced_smi=avg_enhanced_smi,
+            max_enhanced_smi=max_enhanced_smi,
+            min_enhanced_smi=min_enhanced_smi,
         )
 
         # Store observation
@@ -423,6 +454,16 @@ class CoherenceObserver:
             formulas["guna_resonance_index"] = obs.guna_resonance_index
         if obs.kosha_resonance_index is not None:
             formulas["kosha_resonance_index"] = obs.kosha_resonance_index
+
+        # Phase 13 Enhanced SMI
+        if obs.enhanced_smi is not None:
+            formulas["enhanced_smi"] = obs.enhanced_smi
+        if obs.avg_enhanced_smi is not None:
+            formulas["avg_enhanced_smi"] = obs.avg_enhanced_smi
+        if obs.max_enhanced_smi is not None:
+            formulas["max_enhanced_smi"] = obs.max_enhanced_smi
+        if obs.min_enhanced_smi is not None:
+            formulas["min_enhanced_smi"] = obs.min_enhanced_smi
 
         return formulas if formulas else None
 

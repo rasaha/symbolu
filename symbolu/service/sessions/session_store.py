@@ -450,6 +450,33 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if kosha_resonance_values:
             avg_kosha_resonance = sum(kosha_resonance_values) / len(kosha_resonance_values)
 
+    # Phase 13: Extract enhanced SMI aggregates from coherence history
+    avg_enhanced_smi = None
+    max_enhanced_smi = None
+    min_enhanced_smi = None
+
+    if state.coherence_history:
+        # Extract enhanced SMI values from coherence history
+        enhanced_smi_values = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract avg_enhanced_smi from CoherenceState aggregates
+                if "avg_enhanced_smi" in coh and coh["avg_enhanced_smi"] is not None:
+                    enhanced_smi_values.append(coh["avg_enhanced_smi"])
+
+                # Also extract from enhanced_smi_history if available
+                if "enhanced_smi_history" in coh:
+                    history = coh["enhanced_smi_history"]
+                    if isinstance(history, list):
+                        enhanced_smi_values.extend([v for v in history if v is not None])
+
+        # Compute aggregates (remove duplicates by using set of unique values)
+        if enhanced_smi_values:
+            avg_enhanced_smi = sum(enhanced_smi_values) / len(enhanced_smi_values)
+            max_enhanced_smi = max(enhanced_smi_values)
+            min_enhanced_smi = min(enhanced_smi_values)
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -473,4 +500,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_arc_alignment_index=avg_arc_alignment_index,
         avg_guna_resonance=avg_guna_resonance,
         avg_kosha_resonance=avg_kosha_resonance,
+        avg_enhanced_smi=avg_enhanced_smi,
+        max_enhanced_smi=max_enhanced_smi,
+        min_enhanced_smi=min_enhanced_smi,
     )

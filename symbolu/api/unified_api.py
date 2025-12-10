@@ -358,6 +358,22 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
             if kosha_activation_vector is not None:
                 formulas_data["kosha_activation_vector"] = kosha_activation_vector
 
+        # Phase 13: Extract enhanced SMI metrics
+        current_enhanced_smi = getattr(coherence_state, 'current_enhanced_smi', None)
+        avg_enhanced_smi = getattr(coherence_state, 'avg_enhanced_smi', None)
+        max_enhanced_smi = getattr(coherence_state, 'max_enhanced_smi', None)
+        min_enhanced_smi = getattr(coherence_state, 'min_enhanced_smi', None)
+
+        # Add enhanced SMI metrics to formulas dict if any exist
+        if current_enhanced_smi is not None:
+            formulas_data["enhanced_smi"] = current_enhanced_smi
+        if avg_enhanced_smi is not None:
+            formulas_data["avg_enhanced_smi"] = avg_enhanced_smi
+        if max_enhanced_smi is not None:
+            formulas_data["max_enhanced_smi"] = max_enhanced_smi
+        if min_enhanced_smi is not None:
+            formulas_data["min_enhanced_smi"] = min_enhanced_smi
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,

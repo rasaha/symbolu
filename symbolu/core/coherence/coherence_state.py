@@ -46,12 +46,21 @@ class CoherenceState:
     bhava_gap_history: List[Optional[float]] = field(default_factory=list)  # Bhava gap per turn
     tension_corridor_history: List[Optional[float]] = field(default_factory=list)  # Tension corridor per turn
 
+    # Phase 13 enhanced SMI history (observation only - not used in scoring)
+    enhanced_smi_history: List[Optional[float]] = field(default_factory=list)  # Enhanced SMI per turn
+
     # Phase 2 formula aggregates (observation only - not used in scoring)
     avg_smi: Optional[float] = None  # Average SMI across session
     max_smi: Optional[float] = None  # Maximum SMI observed
     min_smi: Optional[float] = None  # Minimum SMI observed
     avg_tension_corridor: Optional[float] = None  # Average tension corridor
     max_tension_corridor: Optional[float] = None  # Maximum tension corridor
+
+    # Phase 13 enhanced SMI aggregates (observation only - not used in scoring)
+    current_enhanced_smi: Optional[float] = None  # Current enhanced SMI value
+    avg_enhanced_smi: Optional[float] = None  # Average enhanced SMI across session
+    max_enhanced_smi: Optional[float] = None  # Maximum enhanced SMI observed
+    min_enhanced_smi: Optional[float] = None  # Minimum enhanced SMI observed
 
     # Phase 3 derived formula metrics (observation only - not used in scoring)
     resonance_index: Optional[float] = None  # [0.0, 1.0] - formula-weighted stabilizing signal
@@ -104,6 +113,9 @@ class CoherenceState:
         self.delta_smi_history = self.delta_smi_history[-window:]
         self.bhava_gap_history = self.bhava_gap_history[-window:]
         self.tension_corridor_history = self.tension_corridor_history[-window:]
+
+        # Phase 13 enhanced SMI history
+        self.enhanced_smi_history = self.enhanced_smi_history[-window:]
 
     def get_history_length(self) -> int:
         """

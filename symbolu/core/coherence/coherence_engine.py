@@ -76,6 +76,7 @@ class CoherenceEngine:
                 delta_smi_history=prev_state.delta_smi_history.copy(),
                 bhava_gap_history=prev_state.bhava_gap_history.copy(),
                 tension_corridor_history=prev_state.tension_corridor_history.copy(),
+                enhanced_smi_history=prev_state.enhanced_smi_history.copy(),
             )
 
         # Append new turn data to histories
@@ -93,6 +94,9 @@ class CoherenceEngine:
         state.bhava_gap_history.append(self._extract_bhava_gap(temporal_summary))
         state.tension_corridor_history.append(self._extract_tension_corridor(temporal_summary))
 
+        # Phase 13 enhanced SMI (passive observation - not used in scoring)
+        state.enhanced_smi_history.append(self._extract_enhanced_smi(temporal_summary))
+
         # Trim to sliding window
         state.window_trim(self.window)
 
@@ -105,6 +109,9 @@ class CoherenceEngine:
 
         # Update Phase 2 formula aggregates (observation only)
         self._update_formula_aggregates(state)
+
+        # Update Phase 13 enhanced SMI aggregates (observation only)
+        self._update_enhanced_smi_aggregates(state)
 
         # Update Phase 3 derived formula metrics (observation only)
         self._update_derived_formula_metrics(state)
@@ -201,6 +208,14 @@ class CoherenceEngine:
         """Extract tension_corridor from temporal summary (Phase 1 formula)."""
         if temporal_summary and "tension_corridor" in temporal_summary:
             return temporal_summary["tension_corridor"]
+        return None
+
+    def _extract_enhanced_smi(self, temporal_summary: Optional[Dict]) -> Optional[float]:
+        """Extract enhanced_smi from temporal summary (Phase 13 formula)."""
+        if temporal_summary and "formulas" in temporal_summary:
+            formulas = temporal_summary["formulas"]
+            if isinstance(formulas, dict) and "enhanced_smi" in formulas:
+                return formulas["enhanced_smi"]
         return None
 
     def _compute_persona_drift(self, state: CoherenceState) -> float:
@@ -320,6 +335,42 @@ class CoherenceEngine:
         else:
             state.avg_tension_corridor = None
             state.max_tension_corridor = None
+
+    def _update_enhanced_smi_aggregates(self, state: CoherenceState) -> None:
+        """
+        Update Phase 13 enhanced SMI aggregates (observation only).
+
+        This method computes aggregate statistics from enhanced_smi_history:
+        - current_enhanced_smi: Most recent enhanced SMI value
+        - avg_enhanced_smi: Average enhanced SMI across session
+        - max_enhanced_smi: Maximum enhanced SMI observed
+        - min_enhanced_smi: Minimum enhanced SMI observed
+
+        These aggregates are for observability only and do NOT affect scoring
+        or routing behavior. They are purely passive observations.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        # Get valid enhanced SMI values (filter out None)
+        valid_enhanced_smis = [s for s in state.enhanced_smi_history if s is not None]
+
+        if valid_enhanced_smis:
+            # Current enhanced SMI (most recent value)
+            state.current_enhanced_smi = valid_enhanced_smis[-1]
+
+            # Average enhanced SMI
+            state.avg_enhanced_smi = sum(valid_enhanced_smis) / len(valid_enhanced_smis)
+
+            # Max and min enhanced SMI
+            state.max_enhanced_smi = max(valid_enhanced_smis)
+            state.min_enhanced_smi = min(valid_enhanced_smis)
+        else:
+            # No valid enhanced SMI data - reset to None
+            state.current_enhanced_smi = None
+            state.avg_enhanced_smi = None
+            state.max_enhanced_smi = None
+            state.min_enhanced_smi = None
 
     def _update_derived_formula_metrics(self, state: CoherenceState) -> None:
         """

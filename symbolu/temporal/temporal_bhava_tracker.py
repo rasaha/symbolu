@@ -23,6 +23,7 @@ from symbolu.formulas.resonance_formulas import (
     compute_bhava_gap as _compute_bhava_gap_formula,
     compute_tension_corridor as _compute_tension_corridor_formula,
 )
+from symbolu.formulas.enhanced_smi import compute_enhanced_smi as _compute_enhanced_smi_formula
 
 
 @dataclass
@@ -44,19 +45,22 @@ class TemporalFormulaSnapshot:
     Per-turn snapshot of Phase 1 temporal formula values.
 
     This dataclass holds the computed values from the four foundational
-    temporal formulas introduced in Symbol-U v3.0 Phase 1.
+    temporal formulas introduced in Symbol-U v3.0 Phase 1, plus the
+    Phase 13 enhanced SMI (patent-level coefficients).
 
     Attributes:
         smi: Symbolic Mental Index (0.0 to 1.0)
         delta_smi: SMI momentum (-1.0 to 1.0)
         bhava_gap: Bhava circular distance (0.0 to 1.0)
         tension_corridor: Tension dynamics signal (0.0 to 1.0)
+        enhanced_smi: Enhanced SMI with patent-level coefficients (0.0 to 1.0)
     """
 
     smi: Optional[float] = None
     delta_smi: Optional[float] = None
     bhava_gap: Optional[float] = None
     tension_corridor: Optional[float] = None
+    enhanced_smi: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Optional[float]]:
         """Convert snapshot to JSON-safe dictionary."""
@@ -65,6 +69,7 @@ class TemporalFormulaSnapshot:
             "delta_smi": self.delta_smi,
             "bhava_gap": self.bhava_gap,
             "tension_corridor": self.tension_corridor,
+            "enhanced_smi": self.enhanced_smi,
         }
 
 
@@ -102,6 +107,11 @@ class TemporalState:
     def tension_corridor(self) -> Optional[float]:
         """Get tension_corridor from formulas snapshot."""
         return self.formulas.tension_corridor
+
+    @property
+    def enhanced_smi(self) -> Optional[float]:
+        """Get enhanced_smi from formulas snapshot."""
+        return self.formulas.enhanced_smi
 
 
 class TemporalBhavaTracker:
@@ -296,6 +306,7 @@ class TemporalBhavaTracker:
         - ΔSMI from current and previous SMI
         - Bhava Gap from current and previous bhava
         - Tension Corridor from ΔSMI and bhava_gap
+        - Enhanced SMI (Phase 13) from available inputs
 
         All computations are wrapped in try/except blocks for fail-safety.
 
@@ -358,6 +369,21 @@ class TemporalBhavaTracker:
             # Log error and set to None (fail-safe)
             snapshot.tension_corridor = None
 
+        # Compute Enhanced SMI (Phase 13) with fail-safe wrapper
+        # NOTE: This is observation-only and does NOT affect pipeline behavior
+        try:
+            snapshot.enhanced_smi = self._compute_enhanced_smi(
+                dimensional_resonance=dimensional_resonance,
+                vrtti_intensity=vrtti_intensity,
+                bhava_position=bhava_position,
+                bhava_gap=snapshot.bhava_gap,
+                delta_smi=snapshot.delta_smi,
+                tension_corridor=snapshot.tension_corridor,
+            )
+        except Exception as e:
+            # Log error and set to None (fail-safe)
+            snapshot.enhanced_smi = None
+
         # Create state with snapshot
         state = TemporalState(formulas=snapshot)
 
@@ -368,6 +394,92 @@ class TemporalBhavaTracker:
         self._temporal_state = state
 
         return state
+
+    def _compute_enhanced_smi(
+        self,
+        dimensional_resonance: float,
+        vrtti_intensity: float,
+        bhava_position: float,
+        bhava_gap: Optional[float],
+        delta_smi: Optional[float],
+        tension_corridor: Optional[float],
+    ) -> Optional[float]:
+        """
+        Compute Phase 13 enhanced SMI from available inputs.
+
+        This method derives the six enhanced SMI components from available
+        Phase 1 formula outputs and computes the patent-accurate enhanced SMI.
+
+        Component Derivation:
+        - dim_resonance: Use dimensional_resonance directly
+        - vrtti_balance: Invert vrtti_intensity (high intensity → low balance)
+        - bhava_alignment: Use bhava_position directly
+        - semantic_weighting: Derive from bhava_gap (close gap → high weighting)
+        - temporal_decay: Derive from tension_corridor (low tension → low decay)
+        - noise_suppression: Derive from delta_smi stability (low delta → high suppression)
+
+        Args:
+            dimensional_resonance: Dimensional resonance [0.0, 1.0]
+            vrtti_intensity: Vrtti intensity [0.0, 1.0]
+            bhava_position: Bhava position [0.0, 1.0]
+            bhava_gap: Bhava gap [0.0, 1.0] (optional)
+            delta_smi: Delta SMI [-1.0, 1.0] (optional)
+            tension_corridor: Tension corridor [0.0, 1.0] (optional)
+
+        Returns:
+            Enhanced SMI [0.0, 1.0], or None if required inputs are missing
+
+        Note:
+            This is OBSERVATION-ONLY. Enhanced SMI does NOT affect pipeline behavior.
+        """
+        # Derive component 1: dim_resonance (use directly)
+        dim_resonance = dimensional_resonance
+
+        # Derive component 2: vrtti_balance (invert vrtti_intensity)
+        # High vrtti intensity → low balance
+        vrtti_balance = 1.0 - vrtti_intensity
+
+        # Derive component 3: bhava_alignment (use bhava_position directly)
+        bhava_alignment = bhava_position
+
+        # Derive component 4: semantic_weighting (from bhava_gap)
+        # Close bhava gap → high semantic weighting
+        if bhava_gap is not None:
+            semantic_weighting = 1.0 - bhava_gap
+        else:
+            # Default to neutral if bhava_gap is unavailable
+            semantic_weighting = 0.5
+
+        # Derive component 5: temporal_decay (from tension_corridor)
+        # Low tension → low decay (stable state)
+        if tension_corridor is not None:
+            temporal_decay = tension_corridor
+        else:
+            # Default to neutral if tension_corridor is unavailable
+            temporal_decay = 0.5
+
+        # Derive component 6: noise_suppression (from delta_smi)
+        # Low delta_smi → high suppression (stable signal)
+        if delta_smi is not None:
+            noise_suppression = 1.0 - min(abs(delta_smi), 1.0)
+        else:
+            # Default to neutral if delta_smi is unavailable
+            noise_suppression = 0.5
+
+        # Compute enhanced SMI with patent-level coefficients
+        try:
+            enhanced_smi = _compute_enhanced_smi_formula(
+                dim_resonance=dim_resonance,
+                vrtti_balance=vrtti_balance,
+                bhava_alignment=bhava_alignment,
+                semantic_weighting=semantic_weighting,
+                temporal_decay=temporal_decay,
+                noise_suppression=noise_suppression,
+            )
+            return enhanced_smi
+        except Exception:
+            # Graceful degradation: return None on error
+            return None
 
     def _compute_stats(self) -> Dict[str, Any]:
         """Compute basic statistical measures."""

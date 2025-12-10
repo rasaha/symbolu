@@ -137,3 +137,8 @@ class SessionSummary:
     # Phase 8 Guna/Kosha resonance metrics (observation only)
     avg_guna_resonance: Optional[float] = None  # Average Guna resonance index across session
     avg_kosha_resonance: Optional[float] = None  # Average Kosha resonance index across session
+
+    # Phase 13 enhanced SMI aggregates (observation only)
+    avg_enhanced_smi: Optional[float] = None  # Average enhanced SMI across session
+    max_enhanced_smi: Optional[float] = None  # Maximum enhanced SMI observed
+    min_enhanced_smi: Optional[float] = None  # Minimum enhanced SMI observed
