@@ -180,6 +180,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee phase4-coherence-v2-pytest.log
 
+      - name: Run Phase 5 Formula UI Behavior Tests
+        run: |
+          pytest symbolu/mechanical/pipeline/integration_tests/test_phase5_formula_ui_behavior.py \
+            --disable-warnings -q \
+            2>&1 | tee phase5-formula-ui-pytest.log
+
       - name: Run Policy Engine Tests
         run: |
           pytest symbolu/policy/tests/test_policy_engine.py \
@@ -303,6 +309,7 @@ jobs:
             unified-api-pytest.log
             phase3-derived-metrics-pytest.log
             phase4-coherence-v2-pytest.log
+            phase5-formula-ui-pytest.log
             policy-engine-pytest.log
             dilchat-adapter-pytest.log
             api-server-pytest.log
