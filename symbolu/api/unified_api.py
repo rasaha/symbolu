@@ -402,6 +402,47 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
 
             coherence_report['mirror_time_cycles'] = mirror_time_cycles_data
 
+        # Phase 23: Add Cause-Effect Inversion Analytics metrics
+        current_inversion_score = getattr(coherence_state, 'current_inversion_score', None)
+        current_inversion_band = getattr(coherence_state, 'current_inversion_band', None)
+        avg_inversion_score = getattr(coherence_state, 'avg_inversion_score', None)
+        cause_chain_stability_avg = getattr(coherence_state, 'cause_chain_stability_avg', None)
+
+        # Extract detailed snapshot from inversion history
+        inversion_history = getattr(coherence_state, 'cause_effect_inversion_history', None)
+        latest_inversion_snapshot = None
+        if inversion_history and len(inversion_history) > 0:
+            latest_inversion_snapshot = inversion_history[-1]
+
+        # Add cause-effect inversion to coherence report if available
+        if current_inversion_score is not None or latest_inversion_snapshot is not None:
+            cause_effect_inversion_data = {}
+
+            if current_inversion_score is not None:
+                cause_effect_inversion_data['inversion_score'] = current_inversion_score
+
+            if current_inversion_band is not None:
+                cause_effect_inversion_data['inversion_band'] = current_inversion_band
+
+            if avg_inversion_score is not None:
+                cause_effect_inversion_data['avg_inversion_score'] = avg_inversion_score
+
+            if cause_chain_stability_avg is not None:
+                cause_effect_inversion_data['avg_cause_chain_stability'] = cause_chain_stability_avg
+
+            # Add detailed breakdown if snapshot exists
+            if latest_inversion_snapshot is not None:
+                cause_effect_inversion_data['details'] = {
+                    'forward_alignment': getattr(latest_inversion_snapshot, 'forward_alignment', None),
+                    'mirror_alignment': getattr(latest_inversion_snapshot, 'mirror_alignment', None),
+                    'inversion_score': getattr(latest_inversion_snapshot, 'inversion_score', None),
+                    'inversion_band': getattr(latest_inversion_snapshot, 'inversion_band', None),
+                    'cause_chain_stability': getattr(latest_inversion_snapshot, 'cause_chain_stability', None),
+                    'notes': getattr(latest_inversion_snapshot, 'notes', None),
+                }
+
+            coherence_report['cause_effect_inversion'] = cause_effect_inversion_data
+
     # Build metadata
     metadata = {
         'timestamp': datetime.utcnow().isoformat() + 'Z',

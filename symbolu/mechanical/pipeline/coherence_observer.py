@@ -118,6 +118,15 @@ class CoherenceObservation:
     mirror_cycle_avg_tension: Optional[float] = None
     mirror_cycle_avg_reversal_probability: Optional[float] = None
 
+    # Phase 23: Cause-Effect Inversion Analytics (observation only)
+    cause_effect_inversion: Optional[Any] = None  # CauseEffectInversionSnapshot
+    inversion_score: Optional[float] = None
+    inversion_band: Optional[str] = None
+    cause_chain_stability: Optional[float] = None
+    forward_alignment: Optional[float] = None
+    mirror_alignment: Optional[float] = None
+    inversion_notes: Optional[List[str]] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -423,6 +432,37 @@ class CoherenceObserver:
             if mirror_cycle_history is not None:
                 mirror_cycle_count = len(mirror_cycle_history)
 
+        # Phase 23: Extract Cause-Effect Inversion Analytics from coherence_state
+        cause_effect_inversion = None
+        inversion_score = None
+        inversion_band = None
+        cause_chain_stability = None
+        forward_alignment = None
+        mirror_alignment = None
+        inversion_notes = None
+
+        if coherence_state is not None:
+            # Extract current inversion metrics
+            inversion_score = getattr(coherence_state, 'current_inversion_score', None)
+            inversion_band = getattr(coherence_state, 'current_inversion_band', None)
+
+            # Extract averages
+            avg_inversion_score = getattr(coherence_state, 'avg_inversion_score', None)
+            cause_chain_stability_avg = getattr(coherence_state, 'cause_chain_stability_avg', None)
+
+            # Extract current snapshot
+            inversion_history = getattr(coherence_state, 'cause_effect_inversion_history', None)
+            if inversion_history and len(inversion_history) > 0:
+                latest_snapshot = inversion_history[-1]
+                if latest_snapshot is not None:
+                    cause_effect_inversion = latest_snapshot
+                    inversion_score = getattr(latest_snapshot, 'inversion_score', inversion_score)
+                    inversion_band = getattr(latest_snapshot, 'inversion_band', inversion_band)
+                    cause_chain_stability = getattr(latest_snapshot, 'cause_chain_stability', None)
+                    forward_alignment = getattr(latest_snapshot, 'forward_alignment', None)
+                    mirror_alignment = getattr(latest_snapshot, 'mirror_alignment', None)
+                    inversion_notes = getattr(latest_snapshot, 'notes', None)
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -494,6 +534,13 @@ class CoherenceObserver:
             mirror_cycle_avg_alignment=mirror_cycle_avg_alignment,
             mirror_cycle_avg_tension=mirror_cycle_avg_tension,
             mirror_cycle_avg_reversal_probability=mirror_cycle_avg_reversal_probability,
+            cause_effect_inversion=cause_effect_inversion,
+            inversion_score=inversion_score,
+            inversion_band=inversion_band,
+            cause_chain_stability=cause_chain_stability,
+            forward_alignment=forward_alignment,
+            mirror_alignment=mirror_alignment,
+            inversion_notes=inversion_notes,
         )
 
         # Store observation

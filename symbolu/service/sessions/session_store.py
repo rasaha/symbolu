@@ -692,6 +692,66 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if cycle_reversal_probability_values:
             avg_cycle_reversal_probability = sum(cycle_reversal_probability_values) / len(cycle_reversal_probability_values)
 
+    # Phase 23: Extract Cause-Effect Inversion Analytics from coherence history
+    avg_inversion_score_val = None
+    dominant_inversion_band = None
+    cause_chain_stability_avg_val = None
+    inversion_pattern_tags = []
+
+    if state.coherence_history:
+        # Extract inversion metrics from CoherenceState
+        inversion_score_values = []
+        inversion_band_values = []
+        cause_chain_stability_values = []
+        all_inversion_notes = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract avg_inversion_score from CoherenceState
+                if "avg_inversion_score" in coh and coh["avg_inversion_score"] is not None:
+                    inversion_score_values.append(coh["avg_inversion_score"])
+
+                # Extract current_inversion_band from CoherenceState
+                if "current_inversion_band" in coh and coh["current_inversion_band"] is not None:
+                    inversion_band_values.append(coh["current_inversion_band"])
+
+                # Extract cause_chain_stability_avg from CoherenceState
+                if "cause_chain_stability_avg" in coh and coh["cause_chain_stability_avg"] is not None:
+                    cause_chain_stability_values.append(coh["cause_chain_stability_avg"])
+
+                # Also extract from cause_effect_inversion_history for detailed analysis
+                if "cause_effect_inversion_history" in coh:
+                    inversion_history = coh["cause_effect_inversion_history"]
+                    if isinstance(inversion_history, list):
+                        for snapshot in inversion_history:
+                            if snapshot is not None and hasattr(snapshot, 'inversion_score'):
+                                inversion_score_values.append(snapshot.inversion_score)
+                            if snapshot is not None and hasattr(snapshot, 'inversion_band'):
+                                inversion_band_values.append(snapshot.inversion_band)
+                            if snapshot is not None and hasattr(snapshot, 'cause_chain_stability'):
+                                cause_chain_stability_values.append(snapshot.cause_chain_stability)
+                            if snapshot is not None and hasattr(snapshot, 'notes'):
+                                all_inversion_notes.extend(snapshot.notes)
+
+        # Compute aggregates
+        # Average inversion score
+        if inversion_score_values:
+            avg_inversion_score_val = sum(inversion_score_values) / len(inversion_score_values)
+
+        # Dominant inversion band (most frequent)
+        if inversion_band_values:
+            from collections import Counter
+            band_counts = Counter(inversion_band_values)
+            dominant_inversion_band = band_counts.most_common(1)[0][0]
+
+        # Average cause-chain stability
+        if cause_chain_stability_values:
+            cause_chain_stability_avg_val = sum(cause_chain_stability_values) / len(cause_chain_stability_values)
+
+        # Collect unique inversion pattern tags (deduplicate)
+        if all_inversion_notes:
+            inversion_pattern_tags = list(set(all_inversion_notes))
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -735,4 +795,8 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_cycle_tension=avg_cycle_tension,
         avg_cycle_reversal_probability=avg_cycle_reversal_probability,
         cycle_count=cycle_count,
+        avg_inversion_score=avg_inversion_score_val,
+        dominant_inversion_band=dominant_inversion_band,
+        cause_chain_stability_avg=cause_chain_stability_avg_val,
+        inversion_pattern_tags=inversion_pattern_tags,
     )

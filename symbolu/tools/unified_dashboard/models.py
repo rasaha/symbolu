@@ -142,6 +142,13 @@ class UnifiedSessionAnalytics:
     session_pattern_tags: List[str] = field(default_factory=list)
     note: Optional[str] = None
 
+    # ========================================================================
+    # Phase 23: Cause-Effect Inversion Analytics
+    # ========================================================================
+    inversion_band: Optional[str] = None  # "forward_dominant" | "ambiguous" | "inversion_plausible" | "inversion_dominant"
+    inversion_sparkline: Optional[MetricSparkline] = None
+    inversion_notes: List[str] = field(default_factory=list)
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert to JSON-serializable dictionary.

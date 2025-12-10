@@ -165,3 +165,9 @@ class SessionSummary:
     avg_cycle_tension: Optional[float] = None  # Average tension across cycles [0.0, 1.0]
     avg_cycle_reversal_probability: Optional[float] = None  # Average reversal probability across cycles [0.0, 1.0]
     cycle_count: int = 0  # Total number of cycles detected in session
+
+    # Phase 23 Cause-Effect Inversion Analytics (observation only)
+    avg_inversion_score: Optional[float] = None  # Average inversion score [0.0, 1.0]
+    dominant_inversion_band: Optional[str] = None  # Most common inversion band: "forward_dominant" | "ambiguous" | "inversion_plausible" | "inversion_dominant"
+    cause_chain_stability_avg: Optional[float] = None  # Average cause-chain stability [0.0, 1.0]
+    inversion_pattern_tags: List[str] = field(default_factory=list)  # Collected diagnostic tags

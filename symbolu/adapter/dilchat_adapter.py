@@ -1248,6 +1248,57 @@ def _build_hints(
                     message="Mirror-time cycles stalled. Self-reflection patterns are static, may indicate plateau or resistance to change."
                 ))
 
+    # ========================================================================
+    # Phase 23: Cause-Effect Inversion Analytics Hints (diagnostic only)
+    # ========================================================================
+    # Only add for therapy/identity domains and SMART_INSIGHT/DEEP_ADAPTIVE modes
+    therapy_or_identity_domain = domain in ["therapy", "identity"]
+    smart_or_deep_mode = interaction_mode in ["smart_insight", "deep_adaptive"]
+
+    if therapy_or_identity_domain and smart_or_deep_mode and coherence:
+        cause_effect_data = coherence.get("cause_effect_inversion", {})
+        inversion_band = cause_effect_data.get("inversion_band")
+        cause_chain_stability_avg = cause_effect_data.get("avg_cause_chain_stability")
+
+        # Add inversion band hints if available
+        if inversion_band is not None:
+            # CAUSE_PATH_FORWARD_DOMINANT: forward_dominant band
+            if inversion_band == "forward_dominant":
+                hints.append(DILchatHint(
+                    code="CAUSE_PATH_FORWARD_DOMINANT",
+                    message="Cause-effect path is forward-dominant. Standard linear temporal interpretation fits best."
+                ))
+
+            # CAUSE_PATH_INVERSION_PLAUSIBLE: inversion_plausible band
+            elif inversion_band == "inversion_plausible":
+                hints.append(DILchatHint(
+                    code="CAUSE_PATH_INVERSION_PLAUSIBLE",
+                    message="Cause-effect inversion is plausible. Mirror-time explanation may provide additional insight alongside forward-time reading."
+                ))
+
+            # CAUSE_PATH_INVERSION_DOMINANT: inversion_dominant band
+            elif inversion_band == "inversion_dominant":
+                hints.append(DILchatHint(
+                    code="CAUSE_PATH_INVERSION_DOMINANT",
+                    message="Cause-effect inversion is dominant. Mirror-time explanation fits better than forward-time cause→effect reading."
+                ))
+
+        # Add cause-chain stability hints if available
+        if cause_chain_stability_avg is not None:
+            # CAUSE_CHAIN_STABLE: high stability (>= 0.65)
+            if cause_chain_stability_avg >= 0.65:
+                hints.append(DILchatHint(
+                    code="CAUSE_CHAIN_STABLE",
+                    message="Cause-chain is stable. Temporal coherence is high, patterns are consistent and reliable."
+                ))
+
+            # CAUSE_CHAIN_UNSTABLE: low stability (<= 0.35)
+            elif cause_chain_stability_avg <= 0.35:
+                hints.append(DILchatHint(
+                    code="CAUSE_CHAIN_UNSTABLE",
+                    message="Cause-chain is unstable. Temporal coherence is low, patterns may be unclear or contradictory."
+                ))
+
     return hints
 
 
