@@ -142,6 +142,13 @@ class CoherenceState:
     avg_cycle_tension: Optional[float] = None  # Average tension across cycles [0.0, 1.0]
     avg_cycle_reversal_probability: Optional[float] = None  # Average reversal probability across cycles [0.0, 1.0]
 
+    # Phase 23: Cause-Effect Inversion Analytics (observation only - not used in scoring)
+    cause_effect_inversion_history: List[Optional[Any]] = field(default_factory=list)  # List of CauseEffectInversionSnapshot
+    current_inversion_score: Optional[float] = None  # Current inversion score [0.0, 1.0]
+    current_inversion_band: Optional[str] = None  # Current inversion band classification
+    avg_inversion_score: Optional[float] = None  # Average inversion score across session [0.0, 1.0]
+    cause_chain_stability_avg: Optional[float] = None  # Average cause-chain stability [0.0, 1.0]
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -192,6 +199,9 @@ class CoherenceState:
 
         # Phase 22 cycle history
         self.mirror_cycle_history = self.mirror_cycle_history[-window:]
+
+        # Phase 23 cause-effect inversion history
+        self.cause_effect_inversion_history = self.cause_effect_inversion_history[-window:]
 
     def get_history_length(self) -> int:
         """

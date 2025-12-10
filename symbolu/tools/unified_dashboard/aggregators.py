@@ -108,6 +108,10 @@ def build_unified_session_analytics(
     guna_resonance_index = summary.avg_guna_resonance
     kosha_resonance_index = summary.avg_kosha_resonance
 
+    # Phase 23: Cause-Effect Inversion Analytics
+    inversion_band = summary.dominant_inversion_band
+    inversion_pattern_tags = summary.inversion_pattern_tags
+
     # ========================================================================
     # Extract from Last Coherence State (Phase 11/12/16/17/18)
     # ========================================================================
@@ -315,6 +319,37 @@ def build_unified_session_analytics(
         labels=entropy_labels,
     )
 
+    # Inversion sparkline (Phase 23: inversion_score)
+    inversion_values = []
+    inversion_labels = []
+
+    for i, coh in enumerate(session_state.coherence_history[-max_sparkline_points:]):
+        if isinstance(coh, dict):
+            val = None
+            # Try to extract from cause_effect_inversion_history
+            if 'cause_effect_inversion_history' in coh:
+                inv_history = coh['cause_effect_inversion_history']
+                if isinstance(inv_history, list) and len(inv_history) > 0:
+                    latest_snapshot = inv_history[-1]
+                    if latest_snapshot is not None and hasattr(latest_snapshot, 'inversion_score'):
+                        val = latest_snapshot.inversion_score
+
+            # Fallback to avg_inversion_score if available
+            if val is None and 'avg_inversion_score' in coh:
+                val = coh['avg_inversion_score']
+
+            if val is not None:
+                # Clamp to [0, 1] for sparkline
+                val = max(0.0, min(1.0, val))
+                inversion_values.append(val)
+                inversion_labels.append(f"Turn {i+1}")
+
+    inversion_sparkline = MetricSparkline(
+        name="inversion",
+        values=inversion_values,
+        labels=inversion_labels,
+    ) if inversion_values else None
+
     # ========================================================================
     # Assemble Session Pattern Tags
     # ========================================================================
@@ -433,6 +468,10 @@ def build_unified_session_analytics(
         # Pattern Tags & Note
         session_pattern_tags=session_pattern_tags,
         note=note,
+        # Phase 23: Cause-Effect Inversion Analytics
+        inversion_band=inversion_band,
+        inversion_sparkline=inversion_sparkline,
+        inversion_notes=inversion_pattern_tags,
     )
 
 

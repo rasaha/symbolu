@@ -99,6 +99,7 @@ class CoherenceEngine:
                 reversal_probability_history=prev_state.reversal_probability_history.copy(),
                 stability_band_history=prev_state.stability_band_history.copy(),
                 mirror_cycle_history=prev_state.mirror_cycle_history.copy(),
+                cause_effect_inversion_history=prev_state.cause_effect_inversion_history.copy(),
             )
 
         # Append new turn data to histories
@@ -177,6 +178,9 @@ class CoherenceEngine:
 
         # Update Phase 22 mirror-time cycles (observation only)
         self._update_mirror_time_cycles(state)
+
+        # Update Phase 23 cause-effect inversion analytics (observation only)
+        self._update_cause_effect_inversion(state)
 
         return state
 
@@ -1401,3 +1405,113 @@ class CoherenceEngine:
             state.avg_cycle_alignment = None
             state.avg_cycle_tension = None
             state.avg_cycle_reversal_probability = None
+
+    def _update_cause_effect_inversion(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 23 Cause-Effect Inversion Analytics (observation only).
+
+        This method computes the cause-effect inversion snapshot by analyzing:
+        - Forward alignment (coherence trend + semantic integrity)
+        - Mirror alignment (mirror-time loop + cycle metrics)
+        - Inversion score (alignment difference + drift + entropy)
+        - Inversion band classification
+        - Cause-chain stability
+
+        The cause-effect inversion metrics are stored in state.cause_effect_inversion_*
+        fields and do NOT affect any existing pipeline behavior. They are purely for
+        observation and diagnostics.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.cause_effect_inversion import compute_cause_effect_inversion
+
+        # Extract required inputs
+        coherence_history = state.coherence_fused_history if state.coherence_fused_history else []
+
+        # Fallback to v1 coherence if fused is not available
+        if not coherence_history or all(c is None for c in coherence_history):
+            # Use v1 coherence score history (reconstruct from state)
+            # For now, we'll use whatever we have in coherence_fused_history
+            # In a real scenario, we might maintain a separate coherence_score_history
+            coherence_history = [c for c in state.coherence_fused_history if c is not None]
+
+        # Mirror-time loop metrics
+        mirror_loop_snapshot = state.mirror_time_loop_snapshot
+        if mirror_loop_snapshot is not None:
+            mirror_loop_stability = mirror_loop_snapshot.loop_alignment
+            mirror_loop_tension = mirror_loop_snapshot.loop_tension
+        else:
+            mirror_loop_stability = None
+            mirror_loop_tension = None
+
+        # Cycle types from mirror cycle history
+        cycle_types = []
+        if state.mirror_cycle_history:
+            # Get recent cycle types (last 5)
+            recent_cycles = state.mirror_cycle_history[-5:]
+            cycle_types = [c.cycle_type for c in recent_cycles if hasattr(c, 'cycle_type')]
+
+        # Drift fusion index (from Phase 19)
+        # Note: We need to extract this from state if available
+        # For now, we'll use cognitive_drift_v3 as a proxy
+        drift_fusion_index = state.cognitive_drift_v3
+
+        # Temporal entropy diff (from Phase 18)
+        temporal_entropy_diff = state.temporal_entropy_diff
+
+        # Semantic integrity (from Phase 17)
+        semantic_integrity = state.semantic_integrity_score
+
+        # Check if we have minimum data
+        if not coherence_history or len(coherence_history) < 2:
+            # Not enough data - set to None and return
+            state.cause_effect_inversion_history.append(None)
+            state.current_inversion_score = None
+            state.current_inversion_band = None
+            state.avg_inversion_score = None
+            state.cause_chain_stability_avg = None
+            return
+
+        # Compute cause-effect inversion snapshot
+        snapshot = compute_cause_effect_inversion(
+            coherence_history=coherence_history,
+            mirror_loop_stability=mirror_loop_stability,
+            mirror_loop_tension=mirror_loop_tension,
+            cycle_types=cycle_types,
+            drift_fusion_index=drift_fusion_index,
+            temporal_entropy_diff=temporal_entropy_diff,
+            semantic_integrity=semantic_integrity,
+        )
+
+        # Store results in state
+        if snapshot is not None:
+            # Append to history
+            state.cause_effect_inversion_history.append(snapshot)
+
+            # Update current metrics
+            state.current_inversion_score = snapshot.inversion_score
+            state.current_inversion_band = snapshot.inversion_band
+
+            # Compute aggregates (averages)
+            valid_snapshots = [s for s in state.cause_effect_inversion_history if s is not None]
+
+            if valid_snapshots:
+                inversion_scores = [s.inversion_score for s in valid_snapshots]
+                stability_scores = [s.cause_chain_stability for s in valid_snapshots]
+
+                state.avg_inversion_score = sum(inversion_scores) / len(inversion_scores)
+                state.cause_chain_stability_avg = sum(stability_scores) / len(stability_scores)
+            else:
+                state.avg_inversion_score = None
+                state.cause_chain_stability_avg = None
+        else:
+            # Snapshot computation failed
+            state.cause_effect_inversion_history.append(None)
+            state.current_inversion_score = None
+            state.current_inversion_band = None
+            state.avg_inversion_score = None
+            state.cause_chain_stability_avg = None

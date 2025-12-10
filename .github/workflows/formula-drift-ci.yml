@@ -89,6 +89,16 @@ jobs:
             --maxfail=1 \
             2>&1 | tee phase14-vritti-arc-harmonizer.log
 
+      - name: Run Phase 23 Cause-Effect Inversion Analytics Tests
+        run: |
+          pytest \
+            tests/test_phase23_cause_effect_inversion.py \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            --maxfail=1 \
+            2>&1 | tee phase23-cause-effect-inversion-pytest.log
+
       - name: Upload Formula Drift test logs and fixtures
         uses: actions/upload-artifact@v4
         if: always()
@@ -99,6 +109,7 @@ jobs:
             patent-formula-tags-pytest.log
             phase8-guna-kosha-pytest.log
             phase14-vritti-arc-harmonizer.log
+            phase23-cause-effect-inversion-pytest.log
             symbolu/core/formula_drift_tests/phase1_resonance_fixtures.json
 
       - name: Check for drift
@@ -107,3 +118,4 @@ jobs:
           echo "✅ Patent formula tag drift tests passed! All formula tags remain stable."
           echo "✅ Phase 8 Guna/Kosha resonance drift tests passed! All formulas remain stable."
           echo "✅ Phase 14 Vritti Momentum & Arc-Tension Harmonizer tests passed! All formulas remain stable."
+          echo "✅ Phase 23 Cause-Effect Inversion Analytics tests passed! All formulas remain stable."
