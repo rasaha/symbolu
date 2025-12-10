@@ -21,6 +21,9 @@ from symbolu.formulas.semantic_integrity import (
 from symbolu.formulas.temporal_entropy_differential import (
     compute_temporal_entropy_snapshot,
 )
+from symbolu.formulas.drift_fusion import (
+    compute_drift_fusion_snapshot,
+)
 
 
 class CoherenceEngine:
@@ -89,11 +92,15 @@ class CoherenceEngine:
                 coherence_fused_history=prev_state.coherence_fused_history.copy(),
                 semantic_integrity_history=prev_state.semantic_integrity_history.copy(),
                 cognitive_drift_v3_history=prev_state.cognitive_drift_v3_history.copy(),
+                enhanced_smi_history=prev_state.enhanced_smi_history.copy(),
                 semantic_skeleton_history=prev_state.semantic_skeleton_history.copy(),
                 intent_arc_history=prev_state.intent_arc_history.copy(),
                 identity_signature_history=prev_state.identity_signature_history.copy(),
                 temporal_entropy_diff_history=prev_state.temporal_entropy_diff_history.copy(),
                 temporal_entropy_volatility_history=prev_state.temporal_entropy_volatility_history.copy(),
+                drift_fusion_index_history=prev_state.drift_fusion_index_history.copy(),
+                drift_risk_band_history=prev_state.drift_risk_band_history.copy(),
+                drift_pattern_tags_history=prev_state.drift_pattern_tags_history.copy(),
                 loop_alignment_history=prev_state.loop_alignment_history.copy(),
                 loop_tension_history=prev_state.loop_tension_history.copy(),
                 reversal_probability_history=prev_state.reversal_probability_history.copy(),
@@ -148,6 +155,10 @@ class CoherenceEngine:
         state.vritti_momentum_history.append(self._extract_vritti_momentum(temporal_summary))
         state.arc_tension_harmonizer_history.append(self._extract_arc_tension_harmonizer(temporal_summary))
 
+        # Phase 13: Enhanced SMI (observation only - not used in scoring)
+        enhanced_smi_value = self._extract_enhanced_smi(temporal_summary)
+        state.enhanced_smi_history.append(enhanced_smi_value)
+
         # Phase 17: Semantic skeleton, intent arc, identity signature (observation only)
         state.semantic_skeleton_history.append(semantic_signature.copy() if semantic_signature else {})
         state.intent_arc_history.append(self._extract_intent_arc(temporal_summary))
@@ -168,6 +179,9 @@ class CoherenceEngine:
 
         # Update Phase 14 formula aggregates (observation only)
         self._update_phase14_formula_aggregates(state)
+
+        # Update Phase 13 formula aggregates (observation only)
+        self._update_enhanced_smi_aggregates(state)
 
         # Update Phase 3 derived formula metrics (observation only)
         self._update_derived_formula_metrics(state)
@@ -199,6 +213,9 @@ class CoherenceEngine:
 
         # Update Phase 18 temporal entropy differential (observation only)
         self._update_temporal_entropy_differential(state)
+
+        # Update Phase 19 drift fusion (observation only - must come after Phase 17 & 18)
+        self._update_drift_fusion(state, temporal_summary)
 
         # Update Phase 21 mirror-time loop (observation only)
         self._update_mirror_time_loop(state)
@@ -338,6 +355,63 @@ class CoherenceEngine:
         if temporal_summary and "identity_signature" in temporal_summary:
             return temporal_summary["identity_signature"]
         return None
+
+    def _extract_enhanced_smi(self, temporal_summary: Optional[Dict]) -> Optional[float]:
+        """Extract enhanced SMI from temporal summary (Phase 13)."""
+        if temporal_summary and "formulas" in temporal_summary:
+            return temporal_summary["formulas"].get("enhanced_smi")
+        return None
+
+    def _update_enhanced_smi_aggregates(self, state: CoherenceState) -> None:
+        """Update enhanced SMI aggregate metrics (Phase 13)."""
+        valid_values = [v for v in state.enhanced_smi_history if v is not None]
+        if valid_values:
+            state.current_enhanced_smi = valid_values[-1]
+            state.avg_enhanced_smi = sum(valid_values) / len(valid_values)
+            state.max_enhanced_smi = max(valid_values)
+            state.min_enhanced_smi = min(valid_values)
+        else:
+            state.current_enhanced_smi = None
+            state.avg_enhanced_smi = None
+            state.max_enhanced_smi = None
+            state.min_enhanced_smi = None
+
+    def _update_drift_fusion(
+        self,
+        state: CoherenceState,
+        temporal_summary: Optional[Dict]
+    ) -> None:
+        """Compute and update drift fusion snapshot (Phase 19)."""
+        # Extract required inputs from state (populated by Phase 17 & 18)
+        semantic_integrity = state.semantic_integrity_score
+        cognitive_drift = state.cognitive_drift_v3
+        temporal_entropy_diff = state.temporal_entropy_diff
+        temporal_entropy_volatility = state.temporal_entropy_volatility
+        coherence_fused = state.coherence_fused
+
+        # Compute drift fusion snapshot
+        snapshot = compute_drift_fusion_snapshot(
+            semantic_integrity_score=semantic_integrity,
+            cognitive_drift_v3=cognitive_drift,
+            temporal_entropy_diff=temporal_entropy_diff,
+            temporal_entropy_volatility=temporal_entropy_volatility,
+            coherence_fused=coherence_fused,
+        )
+
+        if snapshot is not None:
+            state.drift_fusion_index = snapshot.drift_fusion_index
+            state.drift_risk_band = snapshot.drift_risk_band
+            state.drift_pattern_tags = snapshot.drift_pattern_tags.copy()
+            state.drift_fusion_index_history.append(snapshot.drift_fusion_index)
+            state.drift_risk_band_history.append(snapshot.drift_risk_band)
+            state.drift_pattern_tags_history.append(snapshot.drift_pattern_tags.copy())
+        else:
+            state.drift_fusion_index = None
+            state.drift_risk_band = None
+            state.drift_pattern_tags = []
+            state.drift_fusion_index_history.append(None)
+            state.drift_risk_band_history.append("")
+            state.drift_pattern_tags_history.append([])
 
     def _compute_persona_drift(self, state: CoherenceState) -> float:
         """Compute persona drift score."""
