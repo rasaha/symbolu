@@ -57,7 +57,7 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "allow_lam": True,
         "style": "reflective",
         "use_coherence_v2": True,  # Phase 4: Enable formula-aware coherence
-        "use_coherence_v3": False,  # Phase 10: Experimental megafusion (disabled by default)
+        "use_coherence_v3": True,  # Phase 11: Enable megafusion v3 for therapy domain
         # Phase 5: Formula UI modulation (enabled for therapy)
         "formula_ui_mode": "light",
         "min_resonance_for_reflection": 0.50,
@@ -73,7 +73,7 @@ DOMAIN_PROFILES: Dict[str, Dict[str, Any]] = {
         "allow_lam": True,
         "style": "exploratory",
         "use_coherence_v2": True,  # Phase 4: Enable formula-aware coherence
-        "use_coherence_v3": False,  # Phase 10: Experimental megafusion (disabled by default)
+        "use_coherence_v3": True,  # Phase 11: Enable megafusion v3 for identity domain
         # Phase 5: Formula UI modulation (enabled for identity)
         "formula_ui_mode": "light",
         "min_resonance_for_reflection": 0.50,
