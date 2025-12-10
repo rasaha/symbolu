@@ -252,9 +252,12 @@ def build_dilchat_response(
     )
 
     # ========================================================================
-    # STEP 6: Build hints (includes session memory + session recap + intent arc + identity signature + motivation + trading guardrail + v3 confidence hints)
+    # STEP 6: Build hints (includes session memory + session recap + intent arc + identity signature + motivation + trading guardrail + v3 confidence hints + APEL)
     # ========================================================================
-    hints = _build_hints(combined_flags, session_memory, session_recap, intent_arc, identity_signature, motivation_profile, trading_guardrails, coherence, domain)
+    # Extract persona_echo_profile from unified_output (Phase 31)
+    persona_echo_profile = unified_output.get("persona_echo_profile")
+
+    hints = _build_hints(combined_flags, session_memory, session_recap, intent_arc, identity_signature, motivation_profile, trading_guardrails, coherence, domain, persona_echo_profile)
 
     # ========================================================================
     # STEP 7: Extract Phase 2 formulas (diagnostics only)
@@ -1221,6 +1224,7 @@ def _build_hints(
     trading_guardrails: Optional[Dict[str, Any]] = None,
     coherence: Optional[Dict[str, Any]] = None,
     domain: Optional[str] = None,
+    persona_echo_profile: Optional[Dict[str, Any]] = None,
 ) -> List[DILchatHint]:
     """
     Build UI hints based on policy flags.
@@ -1670,6 +1674,94 @@ def _build_hints(
                 hints.append(DILchatHint(
                     code="TEMPORAL_FIELD_VOLATILE",
                     message="Temporal field volatile. Emotional/cognitive state is highly variable or unstable."
+                ))
+
+    # ========================================================================
+    # Phase 19: Semantic-Temporal Drift Fusion Hints (diagnostic only)
+    # ========================================================================
+    # Gating: therapy/identity domain OR smart_insight/deep_adaptive mode
+    drift_fusion_enabled = (
+        domain in ["therapy", "identity"]
+        or interaction_mode in ["smart_insight", "deep_adaptive"]
+    )
+
+    if drift_fusion_enabled and coherence and "drift_fusion" in coherence:
+        drift_index = coherence["drift_fusion"].get("index")
+        drift_risk_band = coherence["drift_fusion"].get("risk_band", "")
+
+        if drift_index is not None:
+            # DRIFT_LOW_RISK: drift index < 0.30 OR risk_band == "low"
+            if drift_index < 0.30 or drift_risk_band == "low":
+                hints.append(DILchatHint(
+                    code="DRIFT_LOW_RISK",
+                    message="Semantic-temporal drift is low and stable."
+                ))
+            # DRIFT_MODERATE_RISK: drift index 0.30-0.65 OR risk_band == "moderate"
+            elif 0.30 <= drift_index < 0.65 or drift_risk_band == "moderate":
+                hints.append(DILchatHint(
+                    code="DRIFT_MODERATE_RISK",
+                    message="Moderate semantic-temporal drift present."
+                ))
+            # DRIFT_HIGH_RISK: drift index >= 0.65 OR risk_band == "high"
+            elif drift_index >= 0.65 or drift_risk_band == "high":
+                hints.append(DILchatHint(
+                    code="DRIFT_HIGH_RISK",
+                    message="High semantic-temporal drift detected. Consider grounding strategies or semantic stabilization."
+                ))
+
+    # ========================================================================
+    # Phase 31: Adaptive Persona Echo Layer (APEL) Hints (diagnostic only)
+    # ========================================================================
+    # Gating: therapy/identity domain OR smart_insight/deep_adaptive mode
+    apel_enabled = (
+        domain in ["therapy", "identity"]
+        or interaction_mode in ["smart_insight", "deep_adaptive"]
+    )
+
+    if apel_enabled and persona_echo_profile:
+        echo_enabled = persona_echo_profile.get("echo_enabled", False)
+        echo_mode = persona_echo_profile.get("echo_mode", "none")
+        echo_focus_tags = persona_echo_profile.get("echo_focus_tags", [])
+        echo_risk_tags = persona_echo_profile.get("echo_risk_tags", [])
+
+        # Primary mode hints
+        if echo_enabled:
+            if echo_mode == "light":
+                hints.append(DILchatHint(
+                    code="APEL_LIGHT_ACTIVE",
+                    message="Light persona echo active. Minimal tone echo for stability reinforcement."
+                ))
+            elif echo_mode == "reflective":
+                hints.append(DILchatHint(
+                    code="APEL_REFLECTIVE_ACTIVE",
+                    message="Reflective persona echo active. Moderate tone echo for identity coherence."
+                ))
+            elif echo_mode == "pattern":
+                hints.append(DILchatHint(
+                    code="APEL_PATTERN_ACTIVE",
+                    message="Pattern persona echo active. Full tone echo for multi-turn pattern reinforcement."
+                ))
+        else:
+            # Echo disabled
+            hints.append(DILchatHint(
+                code="APEL_ECHO_DISABLED",
+                message="Persona echo layer is disabled for this interaction."
+            ))
+
+        # Supplementary hints
+        if echo_enabled:
+            # APEL_DRIFT_SENSITIVE: when drift_caution in risk_tags
+            if "drift_caution" in echo_risk_tags:
+                hints.append(DILchatHint(
+                    code="APEL_DRIFT_SENSITIVE",
+                    message="Echo layer is drift-sensitive. Tone modulation adapts to semantic drift risk."
+                ))
+
+            # APEL_STABILITY_ANCHORED: when stability in focus_tags
+            if "stability" in echo_focus_tags:
+                hints.append(DILchatHint(
+                    code="APEL_STABILITY_ANCHORED",
+                    message="Echo layer is stability-anchored. Tone reinforces stable coherence patterns."
                 ))
 
     # ========================================================================

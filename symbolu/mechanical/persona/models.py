@@ -293,6 +293,12 @@ class PersonaResponse(BaseModel):
         description="Phase 37: Adaptive continuity engine (observation-only, tone-level only)"
     )
 
+    # Phase 31: Optional adaptive persona echo layer (APEL) profile
+    echo_profile: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Phase 31: Adaptive Persona Echo Layer (observation-only, tone-level only)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {
