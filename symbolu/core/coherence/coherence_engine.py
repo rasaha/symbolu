@@ -18,6 +18,9 @@ from symbolu.formulas.semantic_integrity import (
     compute_semantic_integrity,
     compute_cognitive_drift_v3,
 )
+from symbolu.formulas.temporal_entropy_differential import (
+    compute_temporal_entropy_snapshot,
+)
 
 
 class CoherenceEngine:
@@ -89,6 +92,8 @@ class CoherenceEngine:
                 semantic_skeleton_history=prev_state.semantic_skeleton_history.copy(),
                 intent_arc_history=prev_state.intent_arc_history.copy(),
                 identity_signature_history=prev_state.identity_signature_history.copy(),
+                temporal_entropy_diff_history=prev_state.temporal_entropy_diff_history.copy(),
+                temporal_entropy_volatility_history=prev_state.temporal_entropy_volatility_history.copy(),
             )
 
         # Append new turn data to histories
@@ -158,6 +163,9 @@ class CoherenceEngine:
         # Update Phase 17 semantic integrity and cognitive drift v3 (observation only)
         self._update_semantic_integrity(state, mapper_profile)
         self._update_cognitive_drift_v3(state)
+
+        # Update Phase 18 temporal entropy differential (observation only)
+        self._update_temporal_entropy_differential(state)
 
         return state
 
@@ -1091,3 +1099,68 @@ class CoherenceEngine:
 
         # Append to history
         state.cognitive_drift_v3_history.append(snapshot.cognitive_drift_v3)
+
+    def _update_temporal_entropy_differential(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 18 Temporal Entropy Differential (observation only).
+
+        This method computes the temporal entropy snapshot by analyzing:
+        - Normalized entropy history (from TTOR/MLCR routing plans)
+        - Coherence fused history (from Phase 16)
+        - Short-window and long-window entropy averages
+        - Entropy differential (short - long)
+        - Entropy volatility (variance over time)
+
+        The temporal entropy metrics are stored in state.temporal_entropy_* fields
+        and do NOT affect any existing pipeline behavior. They are purely for
+        observation and diagnostics.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        # Build normalized_entropy_history from smi_history as proxy
+        # (In production, we would extract normalized_entropy from routing_plan if available)
+        # For now, use smi_history as a reasonable proxy for normalized entropy
+        normalized_entropy_history = [
+            s for s in state.smi_history if s is not None
+        ]
+
+        # If no entropy history, set to None and return
+        if not normalized_entropy_history:
+            state.temporal_entropy_snapshot = None
+            state.temporal_entropy_diff = None
+            state.temporal_entropy_volatility = None
+            state.temporal_entropy_diff_history.append(None)
+            state.temporal_entropy_volatility_history.append(None)
+            return
+
+        # Get coherence_fused_history for optional blending
+        coherence_fused_history = state.coherence_fused_history
+
+        # Compute temporal entropy snapshot
+        snapshot = compute_temporal_entropy_snapshot(
+            normalized_entropy_history=normalized_entropy_history,
+            coherence_fused_history=coherence_fused_history,
+            short_window=3,
+            long_window=10,
+        )
+
+        # Store results in state
+        if snapshot is not None:
+            state.temporal_entropy_snapshot = snapshot
+            state.temporal_entropy_diff = snapshot.normalized_entropy_diff
+            state.temporal_entropy_volatility = snapshot.entropy_volatility
+
+            # Append to histories
+            state.temporal_entropy_diff_history.append(snapshot.normalized_entropy_diff)
+            state.temporal_entropy_volatility_history.append(snapshot.entropy_volatility)
+        else:
+            # Snapshot computation failed
+            state.temporal_entropy_snapshot = None
+            state.temporal_entropy_diff = None
+            state.temporal_entropy_volatility = None
+            state.temporal_entropy_diff_history.append(None)
+            state.temporal_entropy_volatility_history.append(None)

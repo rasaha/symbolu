@@ -1137,6 +1137,36 @@ def _build_hints(
                     message="Semantic integrity mixed. Monitor for stabilization or drift trends."
                 ))
 
+    # ========================================================================
+    # Phase 18: Temporal Entropy Differential Hints (diagnostic only)
+    # ========================================================================
+    if coherence:
+        temporal_entropy_data = coherence.get("temporal_entropy", {})
+        entropy_volatility = temporal_entropy_data.get("volatility")
+
+        # Only add temporal field hints if we have volatility metric
+        if entropy_volatility is not None:
+            # TEMPORAL_FIELD_STABLE: Low volatility (< 0.25)
+            if entropy_volatility < 0.25:
+                hints.append(DILchatHint(
+                    code="TEMPORAL_FIELD_STABLE",
+                    message="Temporal field stable. Emotional/cognitive state is consistent and predictable."
+                ))
+
+            # TEMPORAL_FIELD_TRANSITIONAL: Mid-range volatility (0.25 - 0.60)
+            elif 0.25 <= entropy_volatility < 0.60:
+                hints.append(DILchatHint(
+                    code="TEMPORAL_FIELD_TRANSITIONAL",
+                    message="Temporal field transitional. Emotional/cognitive state is shifting or adapting."
+                ))
+
+            # TEMPORAL_FIELD_VOLATILE: High volatility (>= 0.60)
+            else:
+                hints.append(DILchatHint(
+                    code="TEMPORAL_FIELD_VOLATILE",
+                    message="Temporal field volatile. Emotional/cognitive state is highly variable or unstable."
+                ))
+
     return hints
 
 

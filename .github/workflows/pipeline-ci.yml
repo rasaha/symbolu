@@ -328,6 +328,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee phase17-semantic-integrity-drift-pytest.log
 
+      - name: Run Phase 18 Temporal Entropy Differential Tests
+        run: |
+          pytest symbolu/core/formula_drift_tests/test_phase18_temporal_entropy_differential.py \
+            --disable-warnings -q \
+            2>&1 | tee phase18-temporal-entropy-differential-pytest.log
+
       - name: Run Motivation Drift Tests
         run: |
           pytest symbolu/core/motivation_drift_tests \
@@ -408,6 +414,7 @@ jobs:
             phase15b-preferences-pytest.log
             phase16-fusion-stabilizer-pytest.log
             phase17-semantic-integrity-drift-pytest.log
+            phase18-temporal-entropy-differential-pytest.log
             motivation-drift-pytest.log
 
       - name: Upload snapshot diffs

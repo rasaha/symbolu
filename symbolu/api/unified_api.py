@@ -300,6 +300,36 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
 
             coherence_report['semantic'] = semantic_data
 
+        # Phase 18: Add Temporal Entropy Differential metrics
+        temporal_entropy_diff = getattr(coherence_state, 'temporal_entropy_diff', None)
+        temporal_entropy_volatility = getattr(coherence_state, 'temporal_entropy_volatility', None)
+
+        # Extract detailed component breakdowns from snapshot
+        entropy_snapshot = getattr(coherence_state, 'temporal_entropy_snapshot', None)
+
+        # Add temporal entropy to coherence report if available
+        if temporal_entropy_diff is not None or temporal_entropy_volatility is not None:
+            temporal_entropy_data = {}
+
+            if temporal_entropy_diff is not None:
+                temporal_entropy_data['diff'] = temporal_entropy_diff
+
+            if temporal_entropy_volatility is not None:
+                temporal_entropy_data['volatility'] = temporal_entropy_volatility
+
+            # Add component diagnostics if snapshot exists
+            if entropy_snapshot is not None:
+                temporal_entropy_data['details'] = {
+                    'instantaneous_entropy': getattr(entropy_snapshot, 'instantaneous_entropy', None),
+                    'short_window_entropy': getattr(entropy_snapshot, 'short_window_entropy', None),
+                    'long_window_entropy': getattr(entropy_snapshot, 'long_window_entropy', None),
+                    'entropy_diff': getattr(entropy_snapshot, 'entropy_diff', None),
+                    'normalized_entropy_diff': getattr(entropy_snapshot, 'normalized_entropy_diff', None),
+                    'entropy_volatility': getattr(entropy_snapshot, 'entropy_volatility', None),
+                }
+
+            coherence_report['temporal_entropy'] = temporal_entropy_data
+
     # Build metadata
     metadata = {
         'timestamp': datetime.utcnow().isoformat() + 'Z',
