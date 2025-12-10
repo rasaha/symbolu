@@ -212,6 +212,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee phase10-coherence-v3-pytest.log
 
+      - name: Run Phase 11 Selective Domain Activation Tests
+        run: |
+          pytest symbolu/mechanical/pipeline/integration_tests/test_phase11_coherence_v3_activation.py \
+            --disable-warnings -q \
+            2>&1 | tee phase11-v3-activation-pytest.log
+
       - name: Run Policy Engine Tests
         run: |
           pytest symbolu/policy/tests/test_policy_engine.py \
@@ -345,6 +351,7 @@ jobs:
             phase8-resonance-integration-pytest.log
             phase9-mapper-modulation-pytest.log
             phase10-coherence-v3-pytest.log
+            phase11-v3-activation-pytest.log
             policy-engine-pytest.log
             dilchat-adapter-pytest.log
             api-server-pytest.log

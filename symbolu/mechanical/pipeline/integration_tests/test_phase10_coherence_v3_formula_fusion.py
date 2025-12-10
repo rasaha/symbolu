@@ -518,7 +518,7 @@ def test_v3_backward_compatibility():
 
 
 def test_v3_ignored_for_all_domains_by_default():
-    """Test that v3 is ignored when use_coherence_v3=False (default)."""
+    """Test Phase 11 selective v3 activation: therapy/identity enabled, trading/generic disabled."""
     unified = {
         "coherence": {
             "coherence_score": 0.60,
@@ -527,8 +527,8 @@ def test_v3_ignored_for_all_domains_by_default():
         }
     }
 
-    # All domains should have v3 disabled by default
-    for domain in ["trading", "therapy", "identity", "generic"]:
+    # Phase 11: trading and generic have v3 DISABLED
+    for domain in ["trading", "generic"]:
         profile = get_domain_profile(domain)
         assert profile.get("use_coherence_v3", False) is False
 
@@ -541,6 +541,16 @@ def test_v3_ignored_for_all_domains_by_default():
             assert active_score == 0.70  # v2
         else:
             assert active_score == 0.60  # v1
+
+    # Phase 11: therapy and identity have v3 ENABLED
+    for domain in ["therapy", "identity"]:
+        profile = get_domain_profile(domain)
+        assert profile.get("use_coherence_v3", False) is True
+
+        active_score = _get_active_coherence_score(unified, profile)
+
+        # Should use v3
+        assert active_score == 0.80
 
 
 def test_v3_enabled_uses_v3():
