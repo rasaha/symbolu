@@ -8,6 +8,7 @@ on:
       - "symbolu/temporal/**"
       - "symbolu/core/coherence/**"
       - "symbolu/core/formula_drift_tests/**"
+      - "symbolu/tools/resonance_simulator/**"
       - "docs/patent_formula_coverage_matrix.md"
       - ".github/workflows/formula-drift-ci.yml"
   pull_request:
@@ -17,6 +18,7 @@ on:
       - "symbolu/temporal/**"
       - "symbolu/core/coherence/**"
       - "symbolu/core/formula_drift_tests/**"
+      - "symbolu/tools/resonance_simulator/**"
       - "docs/patent_formula_coverage_matrix.md"
       - ".github/workflows/formula-drift-ci.yml"
   workflow_dispatch:
@@ -109,6 +111,16 @@ jobs:
             --maxfail=1 \
             2>&1 | tee phase24-resonance-weighting-pytest.log
 
+      - name: Run Phase 25 Resonance Simulator Tests
+        run: |
+          pytest \
+            symbolu/tools/resonance_simulator/tests/test_resonance_simulator.py \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            --maxfail=1 \
+            2>&1 | tee phase25-resonance-simulator-pytest.log
+
       - name: Upload Formula Drift test logs and fixtures
         uses: actions/upload-artifact@v4
         if: always()
@@ -121,6 +133,7 @@ jobs:
             phase14-vritti-arc-harmonizer.log
             phase23-cause-effect-inversion-pytest.log
             phase24-resonance-weighting-pytest.log
+            phase25-resonance-simulator-pytest.log
             symbolu/core/formula_drift_tests/phase1_resonance_fixtures.json
 
       - name: Check for drift
@@ -131,3 +144,4 @@ jobs:
           echo "✅ Phase 14 Vritti Momentum & Arc-Tension Harmonizer tests passed! All formulas remain stable."
           echo "✅ Phase 23 Cause-Effect Inversion Analytics tests passed! All formulas remain stable."
           echo "✅ Phase 24 Resonance Weighting Function tests passed! All formulas remain stable."
+          echo "✅ Phase 25 Resonance Simulator tests passed! All what-if scenarios remain deterministic."
