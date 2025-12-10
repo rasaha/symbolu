@@ -26,6 +26,7 @@ on:
       - "tests/test_phase33_schema_adaptive_routing.py"
       - "tests/test_phase34_identity_harmonics.py"
       - "tests/test_phase35_predictive_persona_drift.py"
+      - "tests/test_phase36_identity_resonance_memory.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -63,6 +64,7 @@ on:
       - "tests/test_phase33_schema_adaptive_routing.py"
       - "tests/test_phase34_identity_harmonics.py"
       - "tests/test_phase35_predictive_persona_drift.py"
+      - "tests/test_phase36_identity_resonance_memory.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -429,6 +431,21 @@ jobs:
         with:
           name: phase35-predictive-drift-log
           path: phase35-predictive-drift.log
+          if-no-files-found: ignore
+
+      - name: Run Phase 36 Identity Resonance Memory Tests
+        run: |
+          pytest tests/test_phase36_identity_resonance_memory.py \
+            --disable-warnings -q \
+            --maxfail=1 \
+            2>&1 | tee phase36-irm.log
+
+      - name: Upload Phase 36 Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase36-irm-log
+          path: phase36-irm.log
           if-no-files-found: ignore
 
       - name: Run Phase 20 Unified Dashboard Tests

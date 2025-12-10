@@ -177,6 +177,14 @@ class CoherenceObservation:
     predicted_drift_band: Optional[str] = None  # Drift likelihood band: "LOW", "MEDIUM", "HIGH"
     predicted_drift_tags: List[str] = field(default_factory=list)  # PPDM diagnostic tags
 
+    # Phase 36: Identity Resonance Memory (observation only)
+    identity_resonance_memory_snapshot: Optional[Any] = None  # IdentityResonanceMemorySnapshot
+    ims: Optional[float] = None  # Identity Memory Strength [0.0, 1.0]
+    iep: Optional[float] = None  # Identity Echo Persistence [0.0, 1.0]
+    ida: Optional[float] = None  # Identity Drift Anchoring [0.0, 1.0]
+    irm_memory_band: Optional[str] = None  # IRM Memory Band: "LOW", "MEDIUM", "HIGH"
+    irm_memory_tags: List[str] = field(default_factory=list)  # IRM diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -654,6 +662,23 @@ class CoherenceObserver:
                 predicted_drift_band = getattr(predictive_drift_snapshot, 'drift_likelihood_band', None)
                 predicted_drift_tags = getattr(predictive_drift_snapshot, 'notes', [])
 
+        # Phase 36: Extract Identity Resonance Memory from coherence state
+        identity_resonance_memory_snapshot = None
+        ims = None
+        iep = None
+        ida = None
+        irm_memory_band = None
+        irm_memory_tags = []
+
+        if coherence_state is not None:
+            identity_resonance_memory_snapshot = getattr(coherence_state, 'identity_resonance_memory_snapshot', None)
+            if identity_resonance_memory_snapshot is not None:
+                ims = getattr(identity_resonance_memory_snapshot, 'identity_memory_strength', None)
+                iep = getattr(identity_resonance_memory_snapshot, 'identity_echo_persistence', None)
+                ida = getattr(identity_resonance_memory_snapshot, 'identity_drift_anchoring', None)
+                irm_memory_band = getattr(identity_resonance_memory_snapshot, 'memory_band', None)
+                irm_memory_tags = getattr(identity_resonance_memory_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -768,6 +793,12 @@ class CoherenceObserver:
             predicted_drift_stability=predicted_drift_stability,  # Phase 35
             predicted_drift_band=predicted_drift_band,  # Phase 35
             predicted_drift_tags=predicted_drift_tags,  # Phase 35
+            identity_resonance_memory_snapshot=identity_resonance_memory_snapshot,  # Phase 36
+            ims=ims,  # Phase 36
+            iep=iep,  # Phase 36
+            ida=ida,  # Phase 36
+            irm_memory_band=irm_memory_band,  # Phase 36
+            irm_memory_tags=irm_memory_tags,  # Phase 36
         )
 
         # Store observation

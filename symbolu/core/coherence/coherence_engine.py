@@ -210,6 +210,9 @@ class CoherenceEngine:
         # Update Phase 35 predictive persona drift model (observation only)
         self._update_predictive_persona_drift(state)
 
+        # Update Phase 36 identity resonance memory (observation only)
+        self._update_identity_resonance_memory(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -2248,3 +2251,229 @@ class CoherenceEngine:
             state.current_drift_stability_score = None
             state.current_drift_likelihood_band = None
             state.current_drift_direction_scores = None
+
+    def _update_identity_resonance_memory(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 36 Identity Resonance Memory (observation only).
+
+        This method computes the identity resonance memory snapshot by modeling how
+        resonant identity patterns accumulate, persist, decay, and resurface across turns.
+
+        The IRM produces:
+          1. Identity Memory Strength (IMS): How strongly identity signals persist
+          2. Identity Echo Persistence (IEP): Whether identity themes keep resurfacing
+          3. Identity Drift Anchoring (IDA): Identity stabilization vs predictive drift
+          4. Memory Band: LOW / MEDIUM / HIGH classification
+          5. Diagnostic Tags: IDENTITY_ANCHORING_STRONG, IDENTITY_ECHO_PERSISTENT, etc.
+
+        The IRM is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for tone-only micro-adjustments (±0.02 max) and analytics.
+
+        This update runs AFTER Phase 35 Predictive Drift to leverage drift predictions.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.identity_resonance_memory import compute_identity_resonance_memory
+
+        # ====================================================================
+        # STEP 1: GATHER IDENTITY HARMONICS (Phase 34)
+        # ====================================================================
+
+        core_identity_harmonic = state.current_cih
+        adaptive_identity_harmonic = state.current_aih
+        relational_identity_harmonic = state.current_rih
+        identity_stability_score = None
+        identity_flexibility_score = None
+
+        # Extract from latest snapshot if available
+        if state.identity_harmonics_snapshot is not None:
+            identity_stability_score = state.identity_harmonics_snapshot.identity_stability_score
+            identity_flexibility_score = state.identity_harmonics_snapshot.identity_flexibility_score
+
+        # ====================================================================
+        # STEP 2: GATHER PREDICTIVE DRIFT (Phase 35)
+        # ====================================================================
+
+        drift_magnitude_prediction = state.current_drift_magnitude_prediction
+        drift_stability_score = state.current_drift_stability_score
+        drift_likelihood_band = state.current_drift_likelihood_band
+
+        # ====================================================================
+        # STEP 3: GATHER SEMANTIC INTEGRITY (Phase 17)
+        # ====================================================================
+
+        semantic_integrity = state.semantic_integrity_score
+
+        # ====================================================================
+        # STEP 4: GATHER SYMBOLIC HARMONIZATION (Phase 27)
+        # ====================================================================
+
+        symbolic_harmonization_index = state.current_symbolic_harmonization_index
+
+        # ====================================================================
+        # STEP 5: GATHER UNIFIED CONSCIOUSNESS (Phase 26)
+        # ====================================================================
+
+        consciousness_order_index = state.current_coi
+
+        # ====================================================================
+        # STEP 6: GATHER TEMPORAL ENTROPY (Phase 18)
+        # ====================================================================
+
+        temporal_entropy_volatility = state.temporal_entropy_volatility
+        temporal_entropy_diff = state.temporal_entropy_diff
+
+        # ====================================================================
+        # STEP 7: GATHER RESONANCE WEIGHTING (Phase 24)
+        # ====================================================================
+
+        resonance_weighting_entropy = state.current_resonance_entropy
+
+        # ====================================================================
+        # STEP 8: GATHER MIRROR-TIME CYCLE (Phase 22) - optional
+        # ====================================================================
+
+        cycle_alignment = state.avg_cycle_alignment
+        cycle_stability_band = state.dominant_cycle_stability_band
+
+        # ====================================================================
+        # STEP 9: GATHER HISTORICAL CONTEXT
+        # ====================================================================
+
+        # Identity harmonics histories
+        cih_history = None
+        aih_history = None
+        rih_history = None
+
+        if state.identity_harmonics_history:
+            cih_history = [
+                snap.core_identity_harmonic
+                for snap in state.identity_harmonics_history
+                if snap is not None
+            ]
+            aih_history = [
+                snap.adaptive_identity_harmonic
+                for snap in state.identity_harmonics_history
+                if snap is not None
+            ]
+            rih_history = [
+                snap.relational_identity_harmonic
+                for snap in state.identity_harmonics_history
+                if snap is not None
+            ]
+
+        # Identity stability history
+        identity_stability_history = None
+        if state.identity_stability_history:
+            identity_stability_history = [
+                ish for ish in state.identity_stability_history if ish is not None
+            ]
+
+        # Semantic integrity history
+        semantic_integrity_history = None
+        if state.semantic_integrity_history:
+            semantic_integrity_history = [
+                sih for sih in state.semantic_integrity_history if sih is not None
+            ]
+
+        # Symbolic harmonization history
+        symbolic_harmonization_history = None
+        if state.symbolic_harmonization_history:
+            symbolic_harmonization_history = [
+                snap.symbolic_harmonization_index
+                for snap in state.symbolic_harmonization_history
+                if snap is not None
+            ]
+
+        # Drift magnitude history
+        drift_magnitude_history = None
+        if state.drift_magnitude_history:
+            drift_magnitude_history = [
+                dmh for dmh in state.drift_magnitude_history if dmh is not None
+            ]
+
+        # Consciousness order history
+        consciousness_order_history = None
+        if state.ucf_history:
+            consciousness_order_history = [
+                snap.consciousness_order_index
+                for snap in state.ucf_history
+                if snap is not None
+            ]
+
+        # ====================================================================
+        # STEP 10: COMPUTE IDENTITY RESONANCE MEMORY
+        # ====================================================================
+
+        snapshot = compute_identity_resonance_memory(
+            # Phase 34: Identity Harmonics
+            core_identity_harmonic=core_identity_harmonic,
+            adaptive_identity_harmonic=adaptive_identity_harmonic,
+            relational_identity_harmonic=relational_identity_harmonic,
+            identity_stability_score=identity_stability_score,
+            identity_flexibility_score=identity_flexibility_score,
+            # Phase 35: Predictive Persona Drift
+            drift_magnitude_prediction=drift_magnitude_prediction,
+            drift_stability_score=drift_stability_score,
+            drift_likelihood_band=drift_likelihood_band,
+            # Phase 17: Semantic Integrity
+            semantic_integrity=semantic_integrity,
+            # Phase 27: Symbolic Harmonization
+            symbolic_harmonization_index=symbolic_harmonization_index,
+            # Phase 26: Unified Consciousness
+            consciousness_order_index=consciousness_order_index,
+            # Phase 18: Temporal Entropy
+            temporal_entropy_volatility=temporal_entropy_volatility,
+            temporal_entropy_diff=temporal_entropy_diff,
+            # Phase 24: Resonance Weighting
+            resonance_weighting_entropy=resonance_weighting_entropy,
+            # Phase 22: Mirror-Time Cycle (optional)
+            cycle_alignment=cycle_alignment,
+            cycle_stability_band=cycle_stability_band,
+            # Historical context
+            cih_history=cih_history,
+            aih_history=aih_history,
+            rih_history=rih_history,
+            identity_stability_history=identity_stability_history,
+            semantic_integrity_history=semantic_integrity_history,
+            symbolic_harmonization_history=symbolic_harmonization_history,
+            drift_magnitude_history=drift_magnitude_history,
+            consciousness_order_history=consciousness_order_history,
+        )
+
+        # ====================================================================
+        # STEP 11: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Append to histories
+            state.identity_resonance_memory_history.append(snapshot)
+            state.ims_history.append(snapshot.identity_memory_strength)
+            state.iep_history.append(snapshot.identity_echo_persistence)
+            state.ida_history.append(snapshot.identity_drift_anchoring)
+            state.irm_memory_band_history.append(snapshot.memory_band)
+
+            # Update current metrics
+            state.identity_resonance_memory_snapshot = snapshot
+            state.current_ims = snapshot.identity_memory_strength
+            state.current_iep = snapshot.identity_echo_persistence
+            state.current_ida = snapshot.identity_drift_anchoring
+            state.current_irm_memory_band = snapshot.memory_band
+            state.current_irm_tags = snapshot.diagnostic_tags
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.identity_resonance_memory_history.append(None)
+            state.ims_history.append(None)
+            state.iep_history.append(None)
+            state.ida_history.append(None)
+            state.irm_memory_band_history.append(None)
+            state.identity_resonance_memory_snapshot = None
+            state.current_ims = None
+            state.current_iep = None
+            state.current_ida = None
+            state.current_irm_memory_band = None
+            state.current_irm_tags = []

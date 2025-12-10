@@ -83,6 +83,7 @@ class UnifiedOutput:
     schema_adaptive_map: Optional[Dict[str, Any]] = None  # Phase 33: Persona schema adaptive routing (observation-only)
     identity_harmonics: Optional[Dict[str, Any]] = None  # Phase 34: Identity harmonics layer (observation-only, tone-level only)
     predictive_persona_drift: Optional[Dict[str, Any]] = None  # Phase 35: Predictive persona drift model (observation-only, tone-level only)
+    identity_resonance_memory: Optional[Dict[str, Any]] = None  # Phase 36: Identity resonance memory (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -955,6 +956,29 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "tags": getattr(ppdm_snapshot, 'notes', []),
             }
 
+    # Phase 36: Extract identity resonance memory profile from persona response
+    irm_data = None
+    if hasattr(ctx, 'persona_response') and ctx.persona_response is not None:
+        # Try to extract identity_resonance_memory_profile from PersonaResponse
+        irm_profile = getattr(ctx.persona_response, 'identity_resonance_memory_profile', None)
+        if irm_profile is not None:
+            # IRM profile is already a dict from persona engine
+            # Just pass it through (JSON-safe)
+            irm_data = irm_profile
+
+    # Also try to extract from coherence block for observability
+    if irm_data is None and hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        irm_snapshot = getattr(ctx.coherence_state, 'identity_resonance_memory_snapshot', None)
+        if irm_snapshot is not None:
+            # Build dict from snapshot fields
+            irm_data = {
+                "ims": getattr(irm_snapshot, 'identity_memory_strength', None),
+                "iep": getattr(irm_snapshot, 'identity_echo_persistence', None),
+                "ida": getattr(irm_snapshot, 'identity_drift_anchoring', None),
+                "band": getattr(irm_snapshot, 'memory_band', None),
+                "tags": getattr(irm_snapshot, 'diagnostic_tags', []),
+            }
+
     return UnifiedOutput(
         text=text,
         symbolic=symbolic_layer,
@@ -980,6 +1004,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         schema_adaptive_map=schema_adaptive_map_data,  # Phase 33
         identity_harmonics=identity_harmonics_data,  # Phase 34
         predictive_persona_drift=predictive_drift_data,  # Phase 35
+        identity_resonance_memory=irm_data,  # Phase 36
     )
 
 

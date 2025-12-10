@@ -186,7 +186,19 @@ class PersonaEngine:
             # Attach profile to response for observability (NEVER affects routing)
             persona_response.predictive_drift_profile = predictive_drift_profile
 
-        # Step 12: Return complete response
+        # Phase 36 Step 12: Extract identity resonance memory and apply tone adjustments
+        # Extract IRM snapshot from coherence state
+        irm_snapshot = self._extract_irm_from_coherence(explain_log)
+        if irm_snapshot is not None:
+            # Compute identity resonance memory profile (tone-level adjustments only, ±0.02 max)
+            irm_profile = self._apply_identity_resonance_memory(
+                persona,
+                irm_snapshot
+            )
+            # Attach profile to response for observability (NEVER affects routing)
+            persona_response.identity_resonance_memory_profile = irm_profile
+
+        # Step 13: Return complete response
         return persona_response
     
     def _order_layers(
@@ -969,6 +981,160 @@ class PersonaEngine:
         }
 
         return predictive_drift_profile
+
+    def _extract_irm_from_coherence(
+        self,
+        explain_log: Dict[str, Any]
+    ) -> Optional[Any]:
+        """
+        Phase 36: Extract identity resonance memory snapshot from coherence state.
+
+        This method safely extracts the IRM snapshot from the
+        coherence state if available.
+
+        Args:
+            explain_log: MLCR explain log with coherence state
+
+        Returns:
+            IdentityResonanceMemorySnapshot or None if not available
+
+        Behavior:
+            • Returns None if no coherence state present
+            • Returns None if IRM computation was not run
+            • Returns snapshot if successfully computed
+        """
+        # Try coherence_state path first (most common)
+        coherence_state = explain_log.get('coherence_state')
+        if coherence_state is not None:
+            irm_snapshot = getattr(coherence_state, 'identity_resonance_memory_snapshot', None)
+            if irm_snapshot is not None:
+                return irm_snapshot
+
+        # Try coherence_observation path (if it has IRM data)
+        coherence_observation = explain_log.get('coherence_observation')
+        if coherence_observation is not None:
+            irm_snapshot = getattr(coherence_observation, 'identity_resonance_memory_snapshot', None)
+            if irm_snapshot is not None:
+                return irm_snapshot
+
+        return None
+
+    def _apply_identity_resonance_memory(
+        self,
+        persona: PersonaProfile,
+        irm_snapshot: Optional[Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Phase 36: Apply identity resonance memory to persona tone.
+
+        This method maps IRM outputs into micro-adjustments of persona tone
+        parameters. It is tone-level only and never affects semantic content.
+
+        Mapping Rules:
+            • High IMS (≥0.70) → increase warmth + continuity tone (≤ +0.015)
+            • High IEP (≥0.70) → increase metaphor richness (≤ +0.01)
+            • Low IDA (<0.35) → increase structure, reduce expressiveness (≤ +0.02)
+
+        Tone Adjustments (all ≤ ±0.02):
+            • warmth_adjustment: Applied to warmth parameter [-0.02, +0.02]
+            • metaphor_adjustment: Applied to metaphor_level parameter [-0.02, +0.02]
+            • structure_adjustment: Applied to structure_level parameter [-0.02, +0.02]
+
+        Total adjustment limit: ±0.02 max (enforced by scaling)
+
+        Args:
+            persona: PersonaProfile being applied
+            irm_snapshot: IdentityResonanceMemorySnapshot from Phase 36
+
+        Returns:
+            Identity resonance memory profile dict or None if snapshot invalid
+
+        Invariants:
+            • Tone-level only (NEVER affects routing, mappers, or semantics)
+            • Bounded adjustments (≤ ±0.02 total)
+            • Deterministic (same inputs → same outputs)
+            • Non-invasive (observation-only)
+        """
+        if irm_snapshot is None:
+            return None
+
+        # ========================================================================
+        # STEP 1: Extract IRM metrics
+        # ========================================================================
+        ims = getattr(irm_snapshot, 'identity_memory_strength', None)
+        iep = getattr(irm_snapshot, 'identity_echo_persistence', None)
+        ida = getattr(irm_snapshot, 'identity_drift_anchoring', None)
+        memory_band = getattr(irm_snapshot, 'memory_band', None)
+        tags = getattr(irm_snapshot, 'diagnostic_tags', [])
+
+        # If any core metric is missing, return None
+        if ims is None or iep is None or ida is None:
+            return None
+
+        # ========================================================================
+        # STEP 2: Compute warmth adjustment based on IMS
+        # ========================================================================
+        # High IMS → increase warmth + continuity
+        if ims >= 0.70:
+            warmth_adjustment = +0.015  # Max +0.015
+        elif ims >= 0.50:
+            warmth_adjustment = +0.007  # Moderate warmth
+        else:
+            warmth_adjustment = 0.0  # No adjustment
+
+        # ========================================================================
+        # STEP 3: Compute metaphor adjustment based on IEP
+        # ========================================================================
+        # High IEP → increase metaphor richness
+        if iep >= 0.70:
+            metaphor_adjustment = +0.010  # Max +0.01
+        elif iep >= 0.50:
+            metaphor_adjustment = +0.005  # Moderate metaphor
+        else:
+            metaphor_adjustment = 0.0  # No adjustment
+
+        # ========================================================================
+        # STEP 4: Compute structure adjustment based on IDA
+        # ========================================================================
+        # Low IDA → increase structure, reduce expressiveness
+        # High IDA → maintain or slightly reduce structure
+        if ida <= 0.35:
+            structure_adjustment = +0.020  # Max +0.02 (need more grounding)
+        elif ida <= 0.50:
+            structure_adjustment = +0.010  # Moderate structure
+        elif ida >= 0.70:
+            structure_adjustment = -0.005  # Slightly reduce structure (allow flow)
+        else:
+            structure_adjustment = 0.0  # No adjustment
+
+        # ========================================================================
+        # STEP 5: Enforce total adjustment limit (±0.02 max)
+        # ========================================================================
+        # Compute total absolute adjustment
+        total_adjustment = abs(warmth_adjustment) + abs(metaphor_adjustment) + abs(structure_adjustment)
+
+        # If total exceeds 0.02, scale down proportionally
+        if total_adjustment > 0.02:
+            scale_factor = 0.02 / total_adjustment
+            warmth_adjustment *= scale_factor
+            metaphor_adjustment *= scale_factor
+            structure_adjustment *= scale_factor
+
+        # ========================================================================
+        # STEP 6: Build identity resonance memory profile
+        # ========================================================================
+        irm_profile = {
+            "ims": round(ims, 4),
+            "iep": round(iep, 4),
+            "ida": round(ida, 4),
+            "memory_band": memory_band,
+            "warmth_adjustment": round(warmth_adjustment, 4),
+            "metaphor_adjustment": round(metaphor_adjustment, 4),
+            "structure_adjustment": round(structure_adjustment, 4),
+            "irm_tags": tags,
+        }
+
+        return irm_profile
 
     def get_persona_summary(self) -> str:
         """
