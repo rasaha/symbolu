@@ -194,6 +194,19 @@ class CoherenceState:
     drift_stability_history: List[Optional[float]] = field(default_factory=list)  # Drift stability history
     drift_likelihood_band_history: List[Optional[str]] = field(default_factory=list)  # Drift band history
 
+    # Phase 36: Identity Resonance Memory (observation only - not used in scoring)
+    identity_resonance_memory_snapshot: Optional[Any] = None  # IdentityResonanceMemorySnapshot (latest)
+    identity_resonance_memory_history: List[Optional[Any]] = field(default_factory=list)  # List of IdentityResonanceMemorySnapshot
+    current_ims: Optional[float] = None  # Identity Memory Strength [0.0, 1.0]
+    current_iep: Optional[float] = None  # Identity Echo Persistence [0.0, 1.0]
+    current_ida: Optional[float] = None  # Identity Drift Anchoring [0.0, 1.0]
+    current_irm_memory_band: Optional[str] = None  # IRM Memory Band: "LOW", "MEDIUM", "HIGH"
+    current_irm_tags: List[str] = field(default_factory=list)  # Current IRM diagnostic tags
+    ims_history: List[Optional[float]] = field(default_factory=list)  # Identity Memory Strength history
+    iep_history: List[Optional[float]] = field(default_factory=list)  # Identity Echo Persistence history
+    ida_history: List[Optional[float]] = field(default_factory=list)  # Identity Drift Anchoring history
+    irm_memory_band_history: List[Optional[str]] = field(default_factory=list)  # IRM Memory Band history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -270,6 +283,13 @@ class CoherenceState:
         self.drift_magnitude_history = self.drift_magnitude_history[-window:]
         self.drift_stability_history = self.drift_stability_history[-window:]
         self.drift_likelihood_band_history = self.drift_likelihood_band_history[-window:]
+
+        # Phase 36 identity resonance memory formula history
+        self.identity_resonance_memory_history = self.identity_resonance_memory_history[-window:]
+        self.ims_history = self.ims_history[-window:]
+        self.iep_history = self.iep_history[-window:]
+        self.ida_history = self.ida_history[-window:]
+        self.irm_memory_band_history = self.irm_memory_band_history[-window:]
 
     def get_history_length(self) -> int:
         """

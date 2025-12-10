@@ -203,3 +203,10 @@ class SessionSummary:
     avg_predicted_drift_stability: Optional[float] = None  # Average drift stability score [0.0, 1.0]
     dominant_drift_band: Optional[str] = None  # Most common drift band: "LOW" | "MEDIUM" | "HIGH"
     drift_prediction_notes: List[str] = field(default_factory=list)  # Collected PPDM diagnostic notes
+
+    # Phase 36 Identity Resonance Memory (observation only)
+    avg_ims: Optional[float] = None  # Average Identity Memory Strength [0.0, 1.0]
+    avg_iep: Optional[float] = None  # Average Identity Echo Persistence [0.0, 1.0]
+    avg_ida: Optional[float] = None  # Average Identity Drift Anchoring [0.0, 1.0]
+    dominant_memory_band: Optional[str] = None  # Most common memory band: "LOW" | "MEDIUM" | "HIGH"
+    aggregated_memory_tags: List[str] = field(default_factory=list)  # Collected IRM diagnostic tags

@@ -281,6 +281,12 @@ class PersonaResponse(BaseModel):
         description="Phase 35: Predictive persona drift model (observation-only, tone-level only)"
     )
 
+    # Phase 36: Optional identity resonance memory profile
+    identity_resonance_memory_profile: Optional[Any] = Field(
+        None,
+        description="Phase 36: Identity resonance memory (observation-only, tone-level only)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {
