@@ -228,6 +228,12 @@ jobs:
             --disable-warnings -q \
             2>&1 | tee phase5-formula-ui-pytest.log
 
+      - name: Run Phase 7 Trading Formula Guardrails Tests
+        run: |
+          pytest symbolu/mechanical/pipeline/integration_tests/test_phase7_trading_formula_guardrails.py \
+            --disable-warnings -q \
+            2>&1 | tee phase7-trading-guardrails-pytest.log
+
       - name: Run Phase 8 Guna/Kosha Resonance Integration Tests
         run: |
           pytest symbolu/mechanical/pipeline/integration_tests/test_phase8_resonance_integration.py \
@@ -554,7 +560,8 @@ jobs:
 
       - name: Run Phase 20 Unified Dashboard Tests
         run: |
-          pytest symbolu/tools/unified_dashboard/tests/test_unified_dashboard.py \
+          pytest tests/test_phase20_unified_dashboard.py \
+            symbolu/tools/unified_dashboard/tests/test_unified_dashboard.py \
             --disable-warnings -q \
             2>&1 | tee phase20-unified-dashboard-pytest.log
 

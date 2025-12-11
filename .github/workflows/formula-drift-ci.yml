@@ -114,6 +114,7 @@ jobs:
       - name: Run Phase 25 Resonance Simulator Tests
         run: |
           pytest \
+            tests/test_phase25_resonance_simulator.py \
             symbolu/tools/resonance_simulator/tests/test_resonance_simulator.py \
             -v \
             --tb=short \
