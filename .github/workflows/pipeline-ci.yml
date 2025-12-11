@@ -2,7 +2,7 @@ name: SymbolU Pipeline CI
 
 on:
   push:
-    branches: ["main", "master"]
+    branches: ["main", "master", "dev", "claude/**"]
     paths:
       - "symbolu/mechanical/pipeline/**"
       - "symbolu/mechanical/persona/**"
@@ -15,6 +15,7 @@ on:
       - "symbolu/mechanical/dha/**"
       - "symbolu/temporal/**"
       - "symbolu/core/coherence/**"
+      - "symbolu/core/**"
       - "symbolu/formulas/**"
       - "symbolu/api/**"
       - "symbolu/policy/**"
@@ -37,6 +38,8 @@ on:
       - "tests/test_phase46_trajectory_field_convergence.py"
       - "symbolu/tools/scenario_simulator/**"
       - "tests/test_phase43_scenario_simulator.py"
+      - "tests/test_phase*_invariance_audit.py"
+      - "PHASE_*_MERGE_SAFETY_REPORT.md"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -50,7 +53,7 @@ on:
       - "docs/**"
       - ".github/workflows/pipeline-ci.yml"
   pull_request:
-    branches: ["main", "master"]
+    branches: ["main", "master", "dev", "claude/**"]
     paths:
       - "symbolu/mechanical/pipeline/**"
       - "symbolu/mechanical/persona/**"
@@ -63,6 +66,7 @@ on:
       - "symbolu/mechanical/dha/**"
       - "symbolu/temporal/**"
       - "symbolu/core/coherence/**"
+      - "symbolu/core/**"
       - "symbolu/formulas/**"
       - "symbolu/api/**"
       - "symbolu/policy/**"
@@ -85,6 +89,8 @@ on:
       - "tests/test_phase46_trajectory_field_convergence.py"
       - "symbolu/tools/scenario_simulator/**"
       - "tests/test_phase43_scenario_simulator.py"
+      - "tests/test_phase*_invariance_audit.py"
+      - "PHASE_*_MERGE_SAFETY_REPORT.md"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -744,3 +750,103 @@ jobs:
             symbolu/mechanical/pipeline/mlcr.log
             symbolu/mechanical/pipeline/dha.log
             symbolu/mechanical/pipeline/renderer.log
+
+  # ========================================================================
+  # INVARIANCE AUDIT CI JOB
+  # ========================================================================
+  # This job runs ALL invariance audit tests for phases 27-47.
+  # These tests ensure that core formulas and behaviors remain stable
+  # across changes to the codebase.
+  # CRITICAL: Any failure in this job indicates a potential regression
+  # in formula stability or system invariants.
+  # ========================================================================
+  invariance-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Load cached dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-invariance-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-invariance-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -e .
+          pip install pytest pytest-cov coverage pydantic 'fastapi[standard]' uvicorn httpx
+
+      - name: Run ALL Invariance Audit Tests (Phases 27-47)
+        run: |
+          pytest -vv \
+            tests/test_phase27_invariance_audit.py \
+            tests/test_phase31_apel_invariance_audit.py \
+            tests/test_phase32_invariance_audit.py \
+            tests/test_phase38_tcfm_invariance_audit.py \
+            tests/test_phase40_chrae_invariance_audit.py \
+            tests/test_phase45_mtsf_invariance_audit.py \
+            tests/test_phase46_trajectory_convergence_invariance_audit.py \
+            tests/test_phase47_utsse_invariance_audit.py \
+            --tb=short \
+            --disable-warnings \
+            2>&1 | tee invariance-audit-all-phases.log
+
+      - name: Upload Invariance Audit Test Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: invariance-audit-logs
+          path: |
+            invariance-audit-all-phases.log
+
+      - name: Invariance Audit Summary
+        if: success()
+        run: |
+          echo "✅ =========================================="
+          echo "✅ INVARIANCE AUDIT: ALL TESTS PASSED"
+          echo "✅ =========================================="
+          echo "✅ Phase 27: Symbolic Harmonization invariants verified"
+          echo "✅ Phase 31: APEL invariants verified"
+          echo "✅ Phase 32: Insight Window Gating invariants verified"
+          echo "✅ Phase 38: TCFM invariants verified"
+          echo "✅ Phase 40: CHRAE invariants verified"
+          echo "✅ Phase 45: MTSF invariants verified"
+          echo "✅ Phase 46: Trajectory Convergence invariants verified"
+          echo "✅ Phase 47: UTSSE invariants verified"
+          echo "✅ =========================================="
+          echo "✅ All formulas remain stable and deterministic!"
+          echo "✅ No regressions detected in system invariants."
+          echo "✅ =========================================="
+
+      - name: Invariance Audit Failure Report
+        if: failure()
+        run: |
+          echo "❌ =========================================="
+          echo "❌ INVARIANCE AUDIT: FAILURES DETECTED"
+          echo "❌ =========================================="
+          echo "❌ One or more invariance tests have failed."
+          echo "❌ This indicates a potential regression in:"
+          echo "❌   - Formula stability"
+          echo "❌   - System invariants"
+          echo "❌   - Core behavioral guarantees"
+          echo "❌ =========================================="
+          echo "❌ ACTION REQUIRED:"
+          echo "❌ 1. Review the test log artifact above"
+          echo "❌ 2. Identify which phase(s) failed"
+          echo "❌ 3. Check recent changes to core formulas"
+          echo "❌ 4. Consult PHASE_*_MERGE_SAFETY_REPORT.md"
+          echo "❌ 5. Do NOT merge until all tests pass"
+          echo "❌ =========================================="
+          exit 1
