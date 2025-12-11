@@ -659,6 +659,9 @@ class TestPhase49SessionSummary:
         summary = SessionSummary(
             session_id="test",
             total_turns=5,
+            coherence_trend="stable",
+            persona_drift_avg=0.0,
+            temporal_arc_avg=0.0,
             avg_temporal_stability=0.75,
             avg_predictive_entropy=0.30,
             avg_future_consistency=0.80,
@@ -799,7 +802,18 @@ class TestPhase49UnifiedAPIAndObserver:
         """D1: UnifiedOutput must have temporal_stability field."""
         from symbolu.api.unified_api import UnifiedOutput
 
-        output = UnifiedOutput()
+        output = UnifiedOutput(
+            text="test",
+            symbolic={},
+            practical={},
+            mirror={},
+            dha={},
+            routing={},
+            mappers={},
+            entropy={},
+            coherence={},
+            metadata={}
+        )
         assert hasattr(output, 'temporal_stability')
 
     def test_unified_output_temporal_stability_dict_type(self):
@@ -817,6 +831,16 @@ class TestPhase49UnifiedAPIAndObserver:
         from symbolu.api.unified_api import UnifiedOutput
 
         output = UnifiedOutput(
+            text="test",
+            symbolic={},
+            practical={},
+            mirror={},
+            dha={},
+            routing={},
+            mappers={},
+            entropy={},
+            coherence={},
+            metadata={},
             temporal_stability={
                 "temporal_stability_index": 0.75,
                 "drift_risk": 0.25,
@@ -835,7 +859,19 @@ class TestPhase49UnifiedAPIAndObserver:
         """D4: Unified API must be null-safe (None snapshot case)."""
         from symbolu.api.unified_api import UnifiedOutput
 
-        output = UnifiedOutput(temporal_stability=None)
+        output = UnifiedOutput(
+            text="test",
+            symbolic={},
+            practical={},
+            mirror={},
+            dha={},
+            routing={},
+            mappers={},
+            entropy={},
+            coherence={},
+            metadata={},
+            temporal_stability=None
+        )
         assert output.temporal_stability is None
 
     def test_unified_output_to_dict_includes_phase49(self):
@@ -843,6 +879,16 @@ class TestPhase49UnifiedAPIAndObserver:
         from symbolu.api.unified_api import UnifiedOutput
 
         output = UnifiedOutput(
+            text="test",
+            symbolic={},
+            practical={},
+            mirror={},
+            dha={},
+            routing={},
+            mappers={},
+            entropy={},
+            coherence={},
+            metadata={},
             temporal_stability={
                 "temporal_stability_index": 0.75,
                 "stability_band": "HIGH"
@@ -856,7 +902,17 @@ class TestPhase49UnifiedAPIAndObserver:
         """D6: CoherenceObservation must have Phase 49 fields."""
         from symbolu.mechanical.pipeline.coherence_observer import CoherenceObservation
 
-        obs = CoherenceObservation()
+        obs = CoherenceObservation(
+            coherence_score=0.8,
+            persona_drift_score=0.2,
+            semantic_stability_score=0.9,
+            temporal_arc_score=0.7,
+            mapper_volatility_score=0.3,
+            turn_number=1,
+            tier="tier1",
+            domain="therapy",
+            active_mappers=[]
+        )
         assert hasattr(obs, 'temporal_stability_index')
         assert hasattr(obs, 'predictive_entropy')
         assert hasattr(obs, 'future_consistency')
@@ -867,7 +923,17 @@ class TestPhase49UnifiedAPIAndObserver:
         """D7: CoherenceObservation Phase 49 fields must have correct defaults."""
         from symbolu.mechanical.pipeline.coherence_observer import CoherenceObservation
 
-        obs = CoherenceObservation()
+        obs = CoherenceObservation(
+            coherence_score=0.8,
+            persona_drift_score=0.2,
+            semantic_stability_score=0.9,
+            temporal_arc_score=0.7,
+            mapper_volatility_score=0.3,
+            turn_number=1,
+            tier="tier1",
+            domain="therapy",
+            active_mappers=[]
+        )
         assert obs.temporal_stability_index == 0.0
         assert obs.predictive_entropy == 0.0
         assert obs.future_consistency == 0.0
@@ -879,6 +945,15 @@ class TestPhase49UnifiedAPIAndObserver:
         from symbolu.mechanical.pipeline.coherence_observer import CoherenceObservation
 
         obs = CoherenceObservation(
+            coherence_score=0.8,
+            persona_drift_score=0.2,
+            semantic_stability_score=0.9,
+            temporal_arc_score=0.7,
+            mapper_volatility_score=0.3,
+            turn_number=1,
+            tier="tier1",
+            domain="therapy",
+            active_mappers=[],
             temporal_stability_index=0.75,
             predictive_entropy=0.30,
             future_consistency=0.80,
@@ -994,11 +1069,12 @@ class TestPhase49BehavioralInvariance:
     def test_invariance_8_persona_semantics_unchanged(self):
         """E8: Phase 49 must NOT change persona semantics."""
         # Persona integration is metadata-only
-        import symbolu.mechanical.persona.engine as module
+        from symbolu.mechanical.persona.engine import PersonaEngine
         import inspect
 
         # Check that Phase 49 methods don't modify text or tone
-        source = inspect.getsource(module._build_temporal_stability_metadata)
+        engine = PersonaEngine()
+        source = inspect.getsource(engine._build_temporal_stability_metadata)
         assert 'text' not in source or 'text =' not in source
         assert 'tone' not in source or 'tone =' not in source
 
@@ -1199,33 +1275,62 @@ class TestPhase49AdditionalCoverage:
 
     def test_diagnostic_tag_temporal_system_unstable(self):
         """Additional5: Test TEMPORAL_SYSTEM_UNSTABLE tag generation."""
+        # Create high drift_risk (>= 0.70), high predictive entropy (>= 0.60), and low future_consistency (<= 0.40)
+        drift = type('obj', (object,), {
+            'drift_magnitude_prediction': 0.95,  # Very high drift
+            'drift_stability_score': 0.05  # Very low stability
+        })()
+        single_horizon = type('obj', (object,), {
+            'forecast_strength': 0.95,  # Very high
+            'coherence_slope': -0.8  # Negative slope (declining)
+        })()
         macro_stability = type('obj', (object,), {
-            'macro_stability_index': 0.20,
-            'macro_divergence_index': 0.80,
-            'macro_predictive_confidence': 0.25,
-            'macro_identity_resilience': 0.22
+            'macro_stability_index': 0.15,  # Very low
+            'macro_divergence_index': 0.90,  # Very high divergence
+            'macro_predictive_confidence': 0.05,  # Very low
+            'macro_identity_resilience': 0.10  # Very low
         })()
         synthesis_integrity = type('obj', (object,), {
-            'synthesis_integrity_score': 0.18,
-            'future_state_alignment_score': 0.20,
-            'future_state_coherence_score': 0.19,
-            'convergence_signal_strength': 0.15
+            'synthesis_integrity_score': 0.10,  # Very low
+            'future_state_alignment_score': 0.08,  # Very low
+            'future_state_coherence_score': 0.12,
+            'convergence_signal_strength': 0.05  # Very low
         })()
         trajectory_convergence = type('obj', (object,), {
-            'convergence_index': 0.20,
-            'divergence_index': 0.80,
-            'stability_index': 0.22
+            'convergence_index': 0.10,  # Very low
+            'divergence_index': 0.90,  # Very high
+            'stability_index': 0.12
+        })()
+        continuity = type('obj', (object,), {
+            'ncc': 0.08,  # Very low
+            'icc': 0.10,  # Very low
+            'css': 0.05  # Very low stability
         })()
         multi_horizon = type('obj', (object,), {
-            'forecast_consensus_index': 0.18,
-            'future_stability_envelope': 0.20
+            'forecast_consensus_index': 0.90,  # High (conflict with others)
+            'future_stability_envelope': 0.08  # Very low
+        })()
+        scenario_alignment = type('obj', (object,), {
+            'alignment_score': 0.05,  # Very low
+            'conflict_index': 0.95,  # Very high conflict
+            'stability_agreement': 0.10
+        })()
+        scenario_fusion = type('obj', (object,), {
+            'scenario_alignment_score': 0.88,  # High (conflict)
+            'scenario_divergence_index': 0.12,
+            'multi_regime_consensus': 0.85
         })()
 
         snapshot = compute_unified_temporal_stability(
+            drift=drift,
+            continuity=continuity,
+            single_horizon=single_horizon,
             macro_stability=macro_stability,
             synthesis_integrity=synthesis_integrity,
             trajectory_convergence=trajectory_convergence,
             multi_horizon=multi_horizon,
+            scenario_alignment=scenario_alignment,
+            scenario_fusion=scenario_fusion,
         )
 
         assert snapshot is not None
