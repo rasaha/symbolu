@@ -1493,7 +1493,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         all_macro_stability_bands = []
         all_macro_stability_tags = []
 
-        for coh in all_coherence:
+        for coh in state.coherence_history:
             if coh is not None and isinstance(coh, dict):
                 # Extract from macro_stability_index_history
                 if "macro_stability_index_history" in coh:
