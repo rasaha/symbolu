@@ -357,6 +357,12 @@ class PersonaResponse(BaseModel):
         description="Phase 47: Unified Trajectory–Scenario Synthesis Engine (UTSSE) metadata (observation-only, metadata-only)"
     )
 
+    # Phase 48: Optional macro-stability regulator metadata (observation-only, metadata-only)
+    persona_macro_stability_profile: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Phase 48: Macro-Stability Regulator (MSR) metadata (observation-only, metadata-only)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {

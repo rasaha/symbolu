@@ -262,6 +262,14 @@ class PersonaEngine:
             utsse_metadata = self._build_unified_synthesis_metadata(utsse_snapshot)
             persona_response.persona_unified_synthesis_profile = utsse_metadata
 
+        # Phase 48 Step 19.5: Extract MSR metadata (metadata-only, no tone changes)
+        # Extract MSR snapshot from coherence state
+        msr_snapshot = self._extract_macro_stability_snapshot(explain_log)
+        if msr_snapshot is not None:
+            # Attach metadata to response for observability (METADATA-ONLY, NO tone changes)
+            msr_metadata = self._build_macro_stability_metadata(msr_snapshot)
+            persona_response.persona_macro_stability_profile = msr_metadata
+
         # Step 20: Return complete response
         return persona_response
     
@@ -1771,6 +1779,88 @@ class PersonaEngine:
                 "dominant_future_path": getattr(utsse_snapshot, 'dominant_future_path', None),
                 "synthesis_band": getattr(utsse_snapshot, 'synthesis_band', None),
                 "diagnostic_tags": getattr(utsse_snapshot, 'diagnostic_tags', []),
+            }
+
+    def _extract_macro_stability_snapshot(
+        self,
+        explain_log: Optional[Any]
+    ) -> Optional[Any]:
+        """
+        Phase 48: Extract Macro-Stability Regulator snapshot from coherence state.
+
+        This method extracts the MSR snapshot for metadata observation.
+        This is METADATA-ONLY and does NOT affect tone or any other behavior.
+
+        Args:
+            explain_log: Explain log dict (may contain coherence_state)
+
+        Returns:
+            MacroStabilitySnapshot or None
+
+        Behavior:
+            • Extracts macro_stability_snapshot from coherence state
+            • Returns None if not available
+            • NEVER modifies tone or persona behavior
+        """
+        if explain_log is None:
+            return None
+
+        # Try to get coherence state
+        coherence_state = explain_log.get('coherence_state')
+        if coherence_state is None:
+            return None
+
+        # Extract MSR snapshot from coherence state
+        if isinstance(coherence_state, dict):
+            msr_snapshot = coherence_state.get('macro_stability_snapshot')
+        else:
+            msr_snapshot = getattr(coherence_state, 'macro_stability_snapshot', None)
+
+        return msr_snapshot
+
+    def _build_macro_stability_metadata(
+        self,
+        msr_snapshot: Any
+    ) -> Dict[str, Any]:
+        """
+        Phase 48: Build MSR metadata from snapshot.
+
+        This method extracts metadata from the MSR snapshot for observability.
+        This is METADATA-ONLY and does NOT affect tone or any other behavior.
+
+        Args:
+            msr_snapshot: MacroStabilitySnapshot or dict
+
+        Returns:
+            dict: Metadata dictionary for observability
+
+        Behavior:
+            • Extracts macro_stability_index, macro_divergence_index, etc.
+            • Extracts stability_band and diagnostic_tags
+            • NEVER modifies tone or persona behavior
+        """
+        if msr_snapshot is None:
+            return {}
+
+        # Handle both snapshot objects and dicts
+        if isinstance(msr_snapshot, dict):
+            return {
+                "macro_stability_index": msr_snapshot.get('macro_stability_index', 0.0),
+                "macro_divergence_index": msr_snapshot.get('macro_divergence_index', 0.0),
+                "macro_predictive_confidence": msr_snapshot.get('macro_predictive_confidence', 0.0),
+                "macro_identity_resilience": msr_snapshot.get('macro_identity_resilience', 0.0),
+                "stability_band": msr_snapshot.get('stability_band'),
+                "diagnostic_tags": msr_snapshot.get('diagnostic_tags', []),
+            }
+        else:
+            # Snapshot object
+            return {
+                "macro_stability_index": getattr(msr_snapshot, 'macro_stability_index', 0.0),
+                "macro_divergence_index": getattr(msr_snapshot, 'macro_divergence_index', 0.0),
+                "macro_predictive_confidence": getattr(msr_snapshot, 'macro_predictive_confidence', 0.0),
+                "macro_identity_resilience": getattr(msr_snapshot, 'macro_identity_resilience', 0.0),
+                "stability_band": getattr(msr_snapshot, 'stability_band', None),
+                "diagnostic_tags": getattr(msr_snapshot, 'diagnostic_tags', []),
             }
 
     def _build_scenario_fusion_metadata(

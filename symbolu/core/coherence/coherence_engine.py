@@ -285,6 +285,9 @@ class CoherenceEngine:
         # Update Phase 47 unified trajectory scenario synthesis engine (observation only)
         self._update_unified_trajectory_scenario_synthesis(state)
 
+        # Update Phase 48 macro-stability regulator (observation only)
+        self._update_macro_stability_regulator(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -4143,3 +4146,118 @@ class CoherenceEngine:
             state.synthesis_divergence_history.append(0.0)
             state.synthesis_band_history.append("")
             state.synthesis_tags_history.append([])
+
+    def _update_macro_stability_regulator(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 48 Macro-Stability Regulator (observation only).
+
+        This method regulates and monitors macro-level stability across the entire
+        forecasting and scenario subsystem by synthesizing signals from Phases 35-47.
+
+        The MSR analyzes and regulates:
+          - Phase 35: Predictive Persona Drift (drift predictions)
+          - Phase 36: Identity Resonance Memory (identity memory)
+          - Phase 37: Adaptive Continuity Engine (continuity tracking)
+          - Phase 38: Temporal Coherence Forecasting (single-horizon forecasting)
+          - Phase 39: Multi-Horizon Temporal Forecasting (multi-horizon forecasting)
+          - Phase 42: Scenario Fusion Engine (scenario fusion)
+          - Phase 44: Coherence-Scenario Alignment (scenario alignment)
+          - Phase 46: Trajectory Field Convergence (trajectory convergence)
+          - Phase 47: Unified Trajectory-Scenario Synthesis (unified synthesis)
+
+        The MSR produces:
+          1. Macro-Stability Index [0.0, 1.0] - overall macro-level system stability
+          2. Macro-Divergence Index [0.0, 1.0] - macro-level fragmentation/divergence risk
+          3. Macro-Predictive Confidence [0.0, 1.0] - forecasting subsystem reliability
+          4. Macro-Identity Resilience [0.0, 1.0] - identity/continuity stability
+          5. Stability Band: high | medium | low | fragmented
+          6. Diagnostic Tags
+
+        The MSR is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for analytics, dashboards, and UI diagnostics only.
+
+        This update runs AFTER Phase 47 to leverage all upstream layers.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.macro_stability_regulator import (
+            compute_macro_stability_regulator
+        )
+
+        # ====================================================================
+        # STEP 1: GATHER INPUTS FROM PHASES 35-47
+        # ====================================================================
+
+        # Phase 35 - Predictive Persona Drift
+        drift = state.predictive_drift_snapshot
+
+        # Phase 36 - Identity Resonance Memory
+        identity = state.identity_resonance_memory_snapshot
+
+        # Phase 37 - Adaptive Continuity Engine
+        continuity = state.adaptive_continuity_snapshot
+
+        # Phase 38 - Temporal Coherence Forecasting
+        forecast = state.temporal_forecast_snapshot
+
+        # Phase 39 - Multi-Horizon Temporal Forecasting
+        multi_horizon = state.multi_horizon_forecast_snapshot
+
+        # Phase 42 - Scenario Fusion Engine
+        scenario_fusion = state.scenario_fusion_snapshot
+
+        # Phase 44 - Coherence-Scenario Alignment
+        scenario_alignment = state.scenario_alignment_snapshot
+
+        # Phase 46 - Trajectory Field Convergence
+        convergence = state.trajectory_convergence_snapshot
+
+        # Phase 47 - Unified Trajectory-Scenario Synthesis
+        synthesis = state.trajectory_scenario_synthesis_snapshot
+
+        # ====================================================================
+        # STEP 2: COMPUTE MACRO-STABILITY REGULATOR
+        # ====================================================================
+
+        snapshot = compute_macro_stability_regulator(
+            drift=drift,
+            identity=identity,
+            continuity=continuity,
+            forecast=forecast,
+            multi_horizon=multi_horizon,
+            scenario_fusion=scenario_fusion,
+            scenario_alignment=scenario_alignment,
+            convergence=convergence,
+            synthesis=synthesis,
+        )
+
+        # ====================================================================
+        # STEP 3: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Update current snapshot
+            state.macro_stability_snapshot = snapshot
+
+            # Append to histories
+            state.macro_stability_index_history.append(snapshot.macro_stability_index)
+            state.macro_divergence_history.append(snapshot.macro_divergence_index)
+            state.macro_predictive_confidence_history.append(snapshot.macro_predictive_confidence)
+            state.macro_identity_resilience_history.append(snapshot.macro_identity_resilience)
+            state.macro_stability_band_history.append(snapshot.stability_band)
+            state.macro_stability_tags_history.append(snapshot.diagnostic_tags.copy() if snapshot.diagnostic_tags else [])
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.macro_stability_snapshot = None
+
+            # Append None/default values to maintain history alignment
+            state.macro_stability_index_history.append(0.0)
+            state.macro_divergence_history.append(0.0)
+            state.macro_predictive_confidence_history.append(0.0)
+            state.macro_identity_resilience_history.append(0.0)
+            state.macro_stability_band_history.append("")
+            state.macro_stability_tags_history.append([])

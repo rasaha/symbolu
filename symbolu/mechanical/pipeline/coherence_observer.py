@@ -285,6 +285,14 @@ class CoherenceObservation:
     synthesis_band: Optional[str] = None  # Synthesis band: "HIGH" | "MEDIUM" | "LOW" | "FRAGMENTED"
     synthesis_tags: List[str] = field(default_factory=list)  # UTSSE diagnostic tags
 
+    # Phase 48: Macro-Stability Regulator (MSR) (observation only)
+    macro_stability_index: float = 0.0  # Macro-Stability Index [0.0, 1.0]
+    macro_divergence_index: float = 0.0  # Macro-Divergence Index [0.0, 1.0]
+    macro_predictive_confidence: float = 0.0  # Macro-Predictive Confidence [0.0, 1.0]
+    macro_identity_resilience: float = 0.0  # Macro-Identity Resilience [0.0, 1.0]
+    macro_stability_band: Optional[str] = None  # Macro-stability band: "high" | "medium" | "low" | "fragmented"
+    macro_stability_tags: List[str] = field(default_factory=list)  # MSR diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -1010,6 +1018,24 @@ class CoherenceObserver:
                 synthesis_band = getattr(utsse_snapshot, 'synthesis_band', None)
                 synthesis_tags = getattr(utsse_snapshot, 'diagnostic_tags', [])
 
+        # Phase 48: Extract Macro-Stability Regulator (MSR) from coherence state
+        macro_stability_index = 0.0
+        macro_divergence_index = 0.0
+        macro_predictive_confidence = 0.0
+        macro_identity_resilience = 0.0
+        macro_stability_band = None
+        macro_stability_tags = []
+
+        if coherence_state is not None:
+            msr_snapshot = getattr(coherence_state, 'macro_stability_snapshot', None)
+            if msr_snapshot is not None:
+                macro_stability_index = getattr(msr_snapshot, 'macro_stability_index', 0.0)
+                macro_divergence_index = getattr(msr_snapshot, 'macro_divergence_index', 0.0)
+                macro_predictive_confidence = getattr(msr_snapshot, 'macro_predictive_confidence', 0.0)
+                macro_identity_resilience = getattr(msr_snapshot, 'macro_identity_resilience', 0.0)
+                macro_stability_band = getattr(msr_snapshot, 'stability_band', None)
+                macro_stability_tags = getattr(msr_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -1208,6 +1234,12 @@ class CoherenceObserver:
             synthesis_divergence=synthesis_divergence,  # Phase 47
             synthesis_band=synthesis_band,  # Phase 47
             synthesis_tags=synthesis_tags,  # Phase 47
+            macro_stability_index=macro_stability_index,  # Phase 48
+            macro_divergence_index=macro_divergence_index,  # Phase 48
+            macro_predictive_confidence=macro_predictive_confidence,  # Phase 48
+            macro_identity_resilience=macro_identity_resilience,  # Phase 48
+            macro_stability_band=macro_stability_band,  # Phase 48
+            macro_stability_tags=macro_stability_tags,  # Phase 48
         )
 
         # Store observation

@@ -257,3 +257,11 @@ class SessionSummary:
     avg_future_divergence_risk: Optional[float] = None  # Average future divergence risk [0.0, 1.0]
     dominant_synthesis_band: Optional[str] = None  # Most frequent synthesis band: "HIGH" | "MEDIUM" | "LOW" | "FRAGMENTED"
     synthesis_tags: List[str] = field(default_factory=list)  # Collected UTSSE diagnostic tags (deduped, sorted)
+
+    # Phase 48 Macro-Stability Regulator (observation only)
+    avg_macro_stability: Optional[float] = None  # Average macro-stability index [0.0, 1.0]
+    avg_macro_divergence: Optional[float] = None  # Average macro-divergence index [0.0, 1.0]
+    avg_macro_predictive_confidence: Optional[float] = None  # Average macro-predictive confidence [0.0, 1.0]
+    avg_macro_identity_resilience: Optional[float] = None  # Average macro-identity resilience [0.0, 1.0]
+    dominant_macro_stability_band: Optional[str] = None  # Most frequent stability band: "high" | "medium" | "low" | "fragmented"
+    macro_stability_tags: List[str] = field(default_factory=list)  # Collected MSR diagnostic tags (deduped, sorted)
