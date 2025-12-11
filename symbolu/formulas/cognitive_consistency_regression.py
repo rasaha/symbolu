@@ -99,7 +99,11 @@ def _compute_mean(values: List[float]) -> float:
     """
     if not values:
         return 0.0
-    return sum(values) / len(values)
+    # Filter out None values
+    valid_values = [v for v in values if v is not None]
+    if not valid_values:
+        return 0.0
+    return sum(valid_values) / len(valid_values)
 
 
 def _compute_variance(values: List[float]) -> float:
@@ -112,11 +116,16 @@ def _compute_variance(values: List[float]) -> float:
     Returns:
         float: Variance [0.0, ∞)
     """
-    if not values or len(values) < 2:
+    if not values:
         return 0.0
 
-    mean = _compute_mean(values)
-    variance = sum((x - mean) ** 2 for x in values) / len(values)
+    # Filter out None values
+    valid_values = [v for v in values if v is not None]
+    if not valid_values or len(valid_values) < 2:
+        return 0.0
+
+    mean = _compute_mean(valid_values)
+    variance = sum((x - mean) ** 2 for x in valid_values) / len(valid_values)
 
     return variance
 
@@ -148,18 +157,24 @@ def _compute_linear_slope(values: List[float]) -> float:
     Returns:
         float: Slope value (can be positive, negative, or zero)
     """
-    if not values or len(values) < 2:
+    if not values:
         return 0.0
 
-    n = len(values)
-    x = list(range(n))
+    # Filter out None values while preserving indices
+    valid_pairs = [(i, v) for i, v in enumerate(values) if v is not None]
+    if not valid_pairs or len(valid_pairs) < 2:
+        return 0.0
+
+    n = len(valid_pairs)
+    x = [pair[0] for pair in valid_pairs]
+    y = [pair[1] for pair in valid_pairs]
 
     # Compute means
     x_mean = sum(x) / n
-    y_mean = sum(values) / n
+    y_mean = sum(y) / n
 
     # Compute covariance and variance
-    cov = sum((x[i] - x_mean) * (values[i] - y_mean) for i in range(n)) / n
+    cov = sum((x[i] - x_mean) * (y[i] - y_mean) for i in range(n)) / n
     var_x = sum((xi - x_mean) ** 2 for xi in x) / n
 
     if var_x == 0:
