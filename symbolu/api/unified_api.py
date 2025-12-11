@@ -90,6 +90,7 @@ class UnifiedOutput:
     cross_horizon_resonance: Optional[Dict[str, Any]] = None  # Phase 40: Cross-Horizon Resonance Alignment Engine (observation-only, tone-level only)
     coherence_regime: Optional[Dict[str, Any]] = None  # Phase 41: Coherence-Regime Scenario Mapper (observation-only, analytics/UI-only)
     scenario_fusion: Optional[Dict[str, Any]] = None  # Phase 42: Scenario Fusion Engine (observation-only, analytics/UI-only)
+    coherence_scenario_alignment: Optional[Dict[str, Any]] = None  # Phase 44: Coherence–Scenario Alignment Engine (observation-only, analytics/UI-only)
     persona_echo_profile: Optional[Dict[str, Any]] = None  # Phase 31: Adaptive Persona Echo Layer (APEL) (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1129,6 +1130,20 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "tags": getattr(scenario_fusion_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 44: Extract coherence-scenario alignment engine data (observation-only, analytics/UI-only)
+    csae_data = None
+    if hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        csae_snapshot = getattr(ctx.coherence_state, 'scenario_alignment_snapshot', None)
+        if csae_snapshot is not None:
+            # Build dict from snapshot fields
+            csae_data = {
+                "alignment_score": getattr(csae_snapshot, 'alignment_score', None),
+                "conflict_index": getattr(csae_snapshot, 'conflict_index', None),
+                "stability_agreement": getattr(csae_snapshot, 'stability_agreement', None),
+                "alignment_band": getattr(csae_snapshot, 'overall_alignment_band', None),
+                "diagnostic_tags": getattr(csae_snapshot, 'diagnostic_tags', []),
+            }
+
     # Phase 31: Extract Adaptive Persona Echo Layer (APEL) data (observation-only, tone-level only)
     echo_profile_data = None
     # Try to extract from persona response (if available)
@@ -1169,6 +1184,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         cross_horizon_resonance=chra_data,  # Phase 40
         coherence_regime=regime_data,  # Phase 41
         scenario_fusion=scenario_fusion_data,  # Phase 42
+        coherence_scenario_alignment=csae_data,  # Phase 44
         persona_echo_profile=echo_profile_data,  # Phase 31
     )
 

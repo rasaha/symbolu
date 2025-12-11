@@ -1138,6 +1138,90 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_pattern_tags:
             scenario_pattern_tags_list = sorted(set(all_pattern_tags))
 
+    # Phase 44: Extract Coherence–Scenario Alignment Engine metrics from coherence history
+    avg_csae_alignment_val = None
+    avg_csae_conflict_val = None
+    avg_csae_stability_val = None
+    csae_alignment_band_val = None
+    csae_alignment_tags_list = []
+
+    if state.coherence_history:
+        # Extract CSAE metrics from CoherenceState
+        all_csae_alignment_scores = []
+        all_csae_conflict_scores = []
+        all_csae_stability_scores = []
+        all_csae_alignment_bands = []
+        all_csae_tags = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract from scenario_alignment_score_history
+                if "scenario_alignment_score_history" in coh:
+                    alignment_history = coh["scenario_alignment_score_history"]
+                    if isinstance(alignment_history, list):
+                        for score in alignment_history:
+                            if score is not None and isinstance(score, (int, float)):
+                                all_csae_alignment_scores.append(score)
+
+                # Extract from scenario_conflict_history
+                if "scenario_conflict_history" in coh:
+                    conflict_history = coh["scenario_conflict_history"]
+                    if isinstance(conflict_history, list):
+                        for score in conflict_history:
+                            if score is not None and isinstance(score, (int, float)):
+                                all_csae_conflict_scores.append(score)
+
+                # Extract from scenario_stability_history
+                if "scenario_stability_history" in coh:
+                    stability_history = coh["scenario_stability_history"]
+                    if isinstance(stability_history, list):
+                        for score in stability_history:
+                            if score is not None and isinstance(score, (int, float)):
+                                all_csae_stability_scores.append(score)
+
+                # Extract from scenario_alignment_band_history
+                if "scenario_alignment_band_history" in coh:
+                    band_history = coh["scenario_alignment_band_history"]
+                    if isinstance(band_history, list):
+                        for band in band_history:
+                            if band is not None:
+                                all_csae_alignment_bands.append(band)
+
+                # Extract tags from scenario_tags_history
+                if "scenario_tags_history" in coh:
+                    tags_history = coh["scenario_tags_history"]
+                    if isinstance(tags_history, list):
+                        for tag_list in tags_history:
+                            if isinstance(tag_list, list):
+                                all_csae_tags.extend(tag_list)
+
+        # Compute aggregates
+        # Average CSAE alignment score
+        if all_csae_alignment_scores:
+            avg_csae_alignment_val = sum(all_csae_alignment_scores) / len(all_csae_alignment_scores)
+
+        # Average CSAE conflict index
+        if all_csae_conflict_scores:
+            avg_csae_conflict_val = sum(all_csae_conflict_scores) / len(all_csae_conflict_scores)
+
+        # Average CSAE stability agreement
+        if all_csae_stability_scores:
+            avg_csae_stability_val = sum(all_csae_stability_scores) / len(all_csae_stability_scores)
+
+        # CSAE alignment band (most frequent)
+        if all_csae_alignment_bands:
+            from collections import Counter
+            band_counts = Counter(all_csae_alignment_bands)
+            # Deterministic tie-breaking: most_common + sorted
+            top_bands = band_counts.most_common()
+            max_count = top_bands[0][1]
+            tied_bands = [band for band, count in top_bands if count == max_count]
+            csae_alignment_band_val = sorted(tied_bands)[0]  # Deterministic tie-break
+
+        # Collect unique CSAE alignment tags (deduplicate and sort for determinism)
+        if all_csae_tags:
+            csae_alignment_tags_list = sorted(set(all_csae_tags))
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -1209,4 +1293,9 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         scenario_uncertainty_band=scenario_uncertainty_band_val,
         dominant_fused_future_path=dominant_fused_future_path_val,
         scenario_pattern_tags=scenario_pattern_tags_list,
+        avg_csae_alignment=avg_csae_alignment_val,
+        avg_csae_conflict=avg_csae_conflict_val,
+        avg_csae_stability=avg_csae_stability_val,
+        csae_alignment_band=csae_alignment_band_val,
+        csae_alignment_tags=csae_alignment_tags_list,
     )

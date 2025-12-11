@@ -256,6 +256,13 @@ class CoherenceObservation:
     scenario_fusion_dominant_path: Optional[str] = None  # Dominant future path (regime)
     scenario_fusion_tags: List[str] = field(default_factory=list)  # Scenario pattern tags
 
+    # Phase 44: Coherence–Scenario Alignment Engine (observation only)
+    csae_alignment_score: Optional[float] = None  # Alignment score [0.0, 1.0]
+    csae_conflict_index: Optional[float] = None  # Conflict index [0.0, 1.0]
+    csae_stability_agreement: Optional[float] = None  # Stability agreement [0.0, 1.0]
+    csae_alignment_band: Optional[str] = None  # Alignment band: "high" | "medium" | "low" | "conflict"
+    csae_diagnostic_tags: List[str] = field(default_factory=list)  # CSAE diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -915,6 +922,22 @@ class CoherenceObserver:
                 scenario_fusion_dominant_path = getattr(scenario_fusion_snapshot, 'dominant_future_path', None)
                 scenario_fusion_tags = getattr(scenario_fusion_snapshot, 'diagnostic_tags', [])
 
+        # Phase 44: Extract Coherence–Scenario Alignment Engine from coherence state
+        csae_alignment_score = None
+        csae_conflict_index = None
+        csae_stability_agreement = None
+        csae_alignment_band = None
+        csae_diagnostic_tags = []
+
+        if coherence_state is not None:
+            csae_snapshot = getattr(coherence_state, 'scenario_alignment_snapshot', None)
+            if csae_snapshot is not None:
+                csae_alignment_score = getattr(csae_snapshot, 'alignment_score', None)
+                csae_conflict_index = getattr(csae_snapshot, 'conflict_index', None)
+                csae_stability_agreement = getattr(csae_snapshot, 'stability_agreement', None)
+                csae_alignment_band = getattr(csae_snapshot, 'overall_alignment_band', None)
+                csae_diagnostic_tags = getattr(csae_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -1092,6 +1115,11 @@ class CoherenceObserver:
             scenario_fusion_uncertainty_band=scenario_fusion_uncertainty_band,  # Phase 42
             scenario_fusion_dominant_path=scenario_fusion_dominant_path,  # Phase 42
             scenario_fusion_tags=scenario_fusion_tags,  # Phase 42
+            csae_alignment_score=csae_alignment_score,  # Phase 44
+            csae_conflict_index=csae_conflict_index,  # Phase 44
+            csae_stability_agreement=csae_stability_agreement,  # Phase 44
+            csae_alignment_band=csae_alignment_band,  # Phase 44
+            csae_diagnostic_tags=csae_diagnostic_tags,  # Phase 44
         )
 
         # Store observation

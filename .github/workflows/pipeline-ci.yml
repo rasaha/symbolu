@@ -32,6 +32,7 @@ on:
       - "tests/test_phase40_cross_horizon_resonance_alignment.py"
       - "tests/test_phase41_coherence_regime_scenario_mapper.py"
       - "tests/test_phase42_scenario_fusion_engine.py"
+      - "tests/test_phase44_coherence_scenario_alignment.py"
       - "symbolu/tools/scenario_simulator/**"
       - "tests/test_phase43_scenario_simulator.py"
       - "symbolu/service/**"
@@ -77,6 +78,7 @@ on:
       - "tests/test_phase40_cross_horizon_resonance_alignment.py"
       - "tests/test_phase41_coherence_regime_scenario_mapper.py"
       - "tests/test_phase42_scenario_fusion_engine.py"
+      - "tests/test_phase44_coherence_scenario_alignment.py"
       - "symbolu/tools/scenario_simulator/**"
       - "tests/test_phase43_scenario_simulator.py"
       - "symbolu/service/**"
@@ -541,6 +543,21 @@ jobs:
         with:
           name: phase42-scenario-fusion-log
           path: phase42-scenario-fusion.log
+          if-no-files-found: ignore
+
+      - name: Run Phase 44 Coherence-Scenario Alignment Engine Tests
+        run: |
+          pytest tests/test_phase44_coherence_scenario_alignment.py \
+            --disable-warnings -q \
+            --maxfail=1 \
+            2>&1 | tee phase44-alignment-engine.log
+
+      - name: Upload Phase 44 Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase44-alignment-engine-log
+          path: phase44-alignment-engine.log
           if-no-files-found: ignore
 
       - name: Run Phase 43 Scenario What-If Simulator Tests

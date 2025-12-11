@@ -318,6 +318,14 @@ class CoherenceState:
     scenario_uncertainty_band_history: List[Optional[str]] = field(default_factory=list)  # Future uncertainty band history
     dominant_future_path_history: List[Optional[str]] = field(default_factory=list)  # Dominant future path history
 
+    # Phase 44: Coherence–Scenario Alignment Engine (observation only - not used in scoring)
+    scenario_alignment_snapshot: Optional[Any] = None  # CoherenceScenarioAlignmentSnapshot (latest)
+    scenario_alignment_score_history: List[Optional[float]] = field(default_factory=list)  # Alignment score history
+    scenario_conflict_history: List[Optional[float]] = field(default_factory=list)  # Conflict index history
+    scenario_stability_history: List[Optional[float]] = field(default_factory=list)  # Stability agreement history
+    scenario_alignment_band_history: List[Optional[str]] = field(default_factory=list)  # Alignment band history
+    scenario_tags_history: List[List[str]] = field(default_factory=list)  # Diagnostic tags history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -449,6 +457,13 @@ class CoherenceState:
         self.scenario_divergence_history = self.scenario_divergence_history[-window:]
         self.scenario_uncertainty_band_history = self.scenario_uncertainty_band_history[-window:]
         self.dominant_future_path_history = self.dominant_future_path_history[-window:]
+
+        # Phase 44 coherence scenario alignment engine formula history
+        self.scenario_alignment_score_history = self.scenario_alignment_score_history[-window:]
+        self.scenario_conflict_history = self.scenario_conflict_history[-window:]
+        self.scenario_stability_history = self.scenario_stability_history[-window:]
+        self.scenario_alignment_band_history = self.scenario_alignment_band_history[-window:]
+        self.scenario_tags_history = self.scenario_tags_history[-window:]
 
     def get_history_length(self) -> int:
         """
