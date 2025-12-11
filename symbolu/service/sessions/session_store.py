@@ -1230,6 +1230,13 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
     mtsf_band_val = None
     mtsf_tags_list = []
 
+    # Phase 46: Extract Trajectory Field Convergence Engine (TFCE) metrics from coherence history
+    avg_trajectory_convergence_val = None
+    avg_trajectory_divergence_val = None
+    avg_trajectory_stability_val = None
+    dominant_convergence_band_val = None
+    tfce_tags_list = []
+
     if state.coherence_history:
         # Extract MTSF metrics from CoherenceState
         all_tsi = []
@@ -1320,6 +1327,82 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_mtsf_tags:
             mtsf_tags_list = sorted(set(all_mtsf_tags))
 
+        # Phase 46: Extract TFCE metrics from CoherenceState
+        all_tfce_convergence = []
+        all_tfce_divergence = []
+        all_tfce_stability = []
+        all_tfce_bands = []
+        all_tfce_tags = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract from tfce_convergence_index_history
+                if "tfce_convergence_index_history" in coh:
+                    convergence_history = coh["tfce_convergence_index_history"]
+                    if isinstance(convergence_history, list):
+                        for val in convergence_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_tfce_convergence.append(val)
+
+                # Extract from tfce_divergence_index_history
+                if "tfce_divergence_index_history" in coh:
+                    divergence_history = coh["tfce_divergence_index_history"]
+                    if isinstance(divergence_history, list):
+                        for val in divergence_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_tfce_divergence.append(val)
+
+                # Extract from tfce_stability_index_history
+                if "tfce_stability_index_history" in coh:
+                    stability_history = coh["tfce_stability_index_history"]
+                    if isinstance(stability_history, list):
+                        for val in stability_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_tfce_stability.append(val)
+
+                # Extract from tfce_convergence_band_history
+                if "tfce_convergence_band_history" in coh:
+                    band_history = coh["tfce_convergence_band_history"]
+                    if isinstance(band_history, list):
+                        for band in band_history:
+                            if band is not None and band != "":
+                                all_tfce_bands.append(band)
+
+                # Extract tags from tfce_tags_history
+                if "tfce_tags_history" in coh:
+                    tags_history = coh["tfce_tags_history"]
+                    if isinstance(tags_history, list):
+                        for tag_list in tags_history:
+                            if isinstance(tag_list, list):
+                                all_tfce_tags.extend(tag_list)
+
+        # Compute aggregates
+        # Average convergence index
+        if all_tfce_convergence:
+            avg_trajectory_convergence_val = sum(all_tfce_convergence) / len(all_tfce_convergence)
+
+        # Average divergence index
+        if all_tfce_divergence:
+            avg_trajectory_divergence_val = sum(all_tfce_divergence) / len(all_tfce_divergence)
+
+        # Average stability index
+        if all_tfce_stability:
+            avg_trajectory_stability_val = sum(all_tfce_stability) / len(all_tfce_stability)
+
+        # Dominant convergence band (most frequent)
+        if all_tfce_bands:
+            from collections import Counter
+            band_counts = Counter(all_tfce_bands)
+            # Deterministic tie-breaking: most_common + sorted
+            top_bands = band_counts.most_common()
+            max_count = top_bands[0][1]
+            tied_bands = [band for band, count in top_bands if count == max_count]
+            dominant_convergence_band_val = sorted(tied_bands)[0]  # Deterministic tie-break
+
+        # Collect unique TFCE tags (deduplicate and sort for determinism)
+        if all_tfce_tags:
+            tfce_tags_list = sorted(set(all_tfce_tags))
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -1402,4 +1485,9 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_scc=avg_scc_val,
         mtsf_band=mtsf_band_val,
         mtsf_tags=mtsf_tags_list,
+        avg_trajectory_convergence=avg_trajectory_convergence_val,
+        avg_trajectory_divergence=avg_trajectory_divergence_val,
+        avg_trajectory_stability=avg_trajectory_stability_val,
+        dominant_convergence_band=dominant_convergence_band_val,
+        dominant_convergence_tags=tfce_tags_list,
     )

@@ -246,7 +246,15 @@ class PersonaEngine:
             mtsf_metadata = self._build_mtsf_metadata(mtsf_snapshot)
             persona_response.persona_mtsf = mtsf_metadata
 
-        # Step 18: Return complete response
+        # Phase 46 Step 18: Extract TFCE metadata (metadata-only, no tone changes)
+        # Extract TFCE snapshot from coherence state
+        tfce_snapshot = self._extract_trajectory_convergence(explain_log)
+        if tfce_snapshot is not None:
+            # Attach metadata to response for observability (METADATA-ONLY, NO tone changes)
+            tfce_metadata = self._build_trajectory_convergence_metadata(tfce_snapshot)
+            persona_response.persona_trajectory_convergence = tfce_metadata
+
+        # Step 19: Return complete response
         return persona_response
     
     def _order_layers(
@@ -1599,6 +1607,81 @@ class PersonaEngine:
                 "scc": getattr(mtsf_snapshot, 'scc', 0.0),
                 "band": getattr(mtsf_snapshot, 'band', None),
                 "tags": getattr(mtsf_snapshot, 'tags', []),
+            }
+
+    def _extract_trajectory_convergence(
+        self,
+        explain_log: Dict[str, Any]
+    ) -> Optional[Any]:
+        """
+        Phase 46: Extract TFCE snapshot from coherence state.
+
+        This method safely extracts the TFCE snapshot from the coherence state if available.
+
+        Args:
+            explain_log: MLCR explain log with coherence state
+
+        Returns:
+            TrajectoryFieldConvergenceSnapshot or None if not available
+
+        Behavior:
+            • Returns None if no coherence state present
+            • Returns None if TFCE computation was not run
+            • Returns snapshot if successfully computed
+        """
+        # Try coherence_state path first (most common)
+        coherence_state = explain_log.get('coherence_state')
+        if coherence_state is not None:
+            tfce_snapshot = getattr(coherence_state, 'trajectory_convergence_snapshot', None)
+            if tfce_snapshot is not None:
+                return tfce_snapshot
+
+        return None
+
+    def _build_trajectory_convergence_metadata(
+        self,
+        tfce_snapshot: Any
+    ) -> Dict[str, Any]:
+        """
+        Phase 46: Build TFCE metadata from snapshot.
+
+        This method extracts metadata from the TFCE snapshot for observability.
+        This is METADATA-ONLY and does NOT affect tone or any other behavior.
+
+        Args:
+            tfce_snapshot: TrajectoryFieldConvergenceSnapshot or dict
+
+        Returns:
+            dict: Metadata dictionary for observability
+
+        Behavior:
+            • Extracts convergence_index, divergence_index, stability_index
+            • Extracts convergence_band and dominant_convergence_signal
+            • Extracts diagnostic_tags
+            • NEVER modifies tone or persona behavior
+        """
+        if tfce_snapshot is None:
+            return {}
+
+        # Handle both snapshot objects and dicts
+        if isinstance(tfce_snapshot, dict):
+            return {
+                "convergence_index": tfce_snapshot.get('convergence_index', 0.0),
+                "divergence_index": tfce_snapshot.get('divergence_index', 0.0),
+                "stability_index": tfce_snapshot.get('stability_index', 0.0),
+                "convergence_band": tfce_snapshot.get('convergence_band'),
+                "dominant_convergence_signal": tfce_snapshot.get('dominant_convergence_signal'),
+                "diagnostic_tags": tfce_snapshot.get('diagnostic_tags', []),
+            }
+        else:
+            # Snapshot object
+            return {
+                "convergence_index": getattr(tfce_snapshot, 'convergence_index', 0.0),
+                "divergence_index": getattr(tfce_snapshot, 'divergence_index', 0.0),
+                "stability_index": getattr(tfce_snapshot, 'stability_index', 0.0),
+                "convergence_band": getattr(tfce_snapshot, 'convergence_band', None),
+                "dominant_convergence_signal": getattr(tfce_snapshot, 'dominant_convergence_signal', None),
+                "diagnostic_tags": getattr(tfce_snapshot, 'diagnostic_tags', []),
             }
 
     def _build_scenario_fusion_metadata(

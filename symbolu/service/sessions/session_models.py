@@ -243,3 +243,10 @@ class SessionSummary:
     avg_scc: float = 0.0  # Average Scenario-Coherence Coupling [0.0, 1.0]
     mtsf_band: Optional[str] = None  # Most frequent stability band: "HIGH" | "MEDIUM" | "LOW" | "CHAOTIC"
     mtsf_tags: List[str] = field(default_factory=list)  # Collected MTSF diagnostic tags (deduped, sorted)
+
+    # Phase 46 Trajectory Field Convergence Engine (observation only)
+    avg_trajectory_convergence: Optional[float] = None  # Average convergence index [0.0, 1.0]
+    avg_trajectory_divergence: Optional[float] = None  # Average divergence index [0.0, 1.0]
+    avg_trajectory_stability: Optional[float] = None  # Average stability index [0.0, 1.0]
+    dominant_convergence_band: Optional[str] = None  # Most frequent convergence band: "high" | "medium" | "low" | "fragmented"
+    dominant_convergence_tags: List[str] = field(default_factory=list)  # Collected TFCE diagnostic tags (deduped, sorted)

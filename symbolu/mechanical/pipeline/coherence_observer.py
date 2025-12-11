@@ -271,6 +271,13 @@ class CoherenceObservation:
     mtsf_band: Optional[str] = None  # Stability band: "HIGH" | "MEDIUM" | "LOW" | "CHAOTIC"
     mtsf_tags: List[str] = field(default_factory=list)  # MTSF diagnostic tags
 
+    # Phase 46: Trajectory Field Convergence Engine (TFCE) (observation only)
+    tfce_convergence_index: float = 0.0  # Convergence Index [0.0, 1.0]
+    tfce_divergence_index: float = 0.0  # Divergence Index [0.0, 1.0]
+    tfce_stability_index: float = 0.0  # Stability Index [0.0, 1.0]
+    tfce_band: Optional[str] = None  # Convergence band: "high" | "medium" | "low" | "fragmented"
+    tfce_tags: List[str] = field(default_factory=list)  # TFCE diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -964,6 +971,22 @@ class CoherenceObserver:
                 mtsf_band = getattr(mtsf_snapshot, 'band', None)
                 mtsf_tags = getattr(mtsf_snapshot, 'tags', [])
 
+        # Phase 46: Extract Trajectory Field Convergence Engine (TFCE) from coherence state
+        tfce_convergence_index = 0.0
+        tfce_divergence_index = 0.0
+        tfce_stability_index = 0.0
+        tfce_band = None
+        tfce_tags = []
+
+        if coherence_state is not None:
+            tfce_snapshot = getattr(coherence_state, 'trajectory_convergence_snapshot', None)
+            if tfce_snapshot is not None:
+                tfce_convergence_index = getattr(tfce_snapshot, 'convergence_index', 0.0)
+                tfce_divergence_index = getattr(tfce_snapshot, 'divergence_index', 0.0)
+                tfce_stability_index = getattr(tfce_snapshot, 'stability_index', 0.0)
+                tfce_band = getattr(tfce_snapshot, 'convergence_band', None)
+                tfce_tags = getattr(tfce_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -1152,6 +1175,11 @@ class CoherenceObserver:
             mtsf_scc=mtsf_scc,  # Phase 45
             mtsf_band=mtsf_band,  # Phase 45
             mtsf_tags=mtsf_tags,  # Phase 45
+            tfce_convergence_index=tfce_convergence_index,  # Phase 46
+            tfce_divergence_index=tfce_divergence_index,  # Phase 46
+            tfce_stability_index=tfce_stability_index,  # Phase 46
+            tfce_band=tfce_band,  # Phase 46
+            tfce_tags=tfce_tags,  # Phase 46
         )
 
         # Store observation

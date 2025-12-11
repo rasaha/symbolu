@@ -1449,6 +1449,58 @@ def _build_badges(
                 description="Forecast trajectories are diverging across forecasting layers, indicating trajectory instability."
             ))
 
+    # Phase 46: Trajectory Field Convergence Engine (TFCE) - Diagnostic-only badges
+    # Extract TFCE data from unified output
+    tfce = unified_output.get("trajectory_field_convergence") if unified_output else None
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and tfce is not None:
+        band = tfce.get("convergence_band")
+        convergence_index = tfce.get("convergence_index", 0.0)
+        divergence_index = tfce.get("divergence_index", 0.0)
+        stability_index = tfce.get("stability_index", 0.0)
+        tfce_tags = tfce.get("diagnostic_tags", [])
+
+        # TRAJECTORY_CONVERGENCE_HIGH: high convergence band
+        if band == "high":
+            badges.append(DILchatBadge(
+                label="TRAJECTORY_CONVERGENCE_HIGH",
+                level="info",
+                description="High trajectory convergence detected. All predictive trajectories are aligning toward a coherent future."
+            ))
+
+        # TRAJECTORY_CONVERGENCE_MEDIUM: medium convergence band
+        if band == "medium":
+            badges.append(DILchatBadge(
+                label="TRAJECTORY_CONVERGENCE_MEDIUM",
+                level="info",
+                description="Moderate trajectory convergence detected. Most trajectories are moving toward alignment."
+            ))
+
+        # TRAJECTORY_CONVERGENCE_LOW: low convergence band
+        if band == "low":
+            badges.append(DILchatBadge(
+                label="TRAJECTORY_CONVERGENCE_LOW",
+                level="warning",
+                description="Low trajectory convergence detected. Predictive trajectories are showing limited alignment."
+            ))
+
+        # TRAJECTORY_FRAGMENTED: fragmented convergence band
+        if band == "fragmented":
+            badges.append(DILchatBadge(
+                label="TRAJECTORY_FRAGMENTED",
+                level="warning",
+                description="Fragmented trajectory field detected. Predictive paths are diverging across multiple dimensions."
+            ))
+
+        # TRAJECTORY_CONSENSUS: strong consensus across trajectories
+        if "TRAJECTORY_CONSENSUS" in tfce_tags:
+            badges.append(DILchatBadge(
+                label="TRAJECTORY_CONSENSUS",
+                level="info",
+                description="Strong trajectory consensus detected. High convergence with stable alignment across all predictive layers."
+            ))
+
     return badges
 
 
