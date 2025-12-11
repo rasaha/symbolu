@@ -238,7 +238,15 @@ class PersonaEngine:
             scenario_alignment_metadata = self._build_scenario_alignment_metadata(scenario_alignment_snapshot)
             persona_response.persona_scenario_alignment = scenario_alignment_metadata
 
-        # Step 17: Return complete response
+        # Phase 45 Step 17: Extract MTSF metadata (metadata-only, no tone changes)
+        # Extract MTSF snapshot from coherence state
+        mtsf_snapshot = self._extract_mtsf(explain_log)
+        if mtsf_snapshot is not None:
+            # Attach metadata to response for observability (METADATA-ONLY, NO tone changes)
+            mtsf_metadata = self._build_mtsf_metadata(mtsf_snapshot)
+            persona_response.persona_mtsf = mtsf_metadata
+
+        # Step 18: Return complete response
         return persona_response
     
     def _order_layers(
@@ -1517,6 +1525,80 @@ class PersonaEngine:
                 "stability_agreement": getattr(scenario_alignment_snapshot, 'stability_agreement', None),
                 "alignment_band": getattr(scenario_alignment_snapshot, 'overall_alignment_band', None),
                 "tags": getattr(scenario_alignment_snapshot, 'diagnostic_tags', []),
+            }
+
+    def _extract_mtsf(
+        self,
+        explain_log: Dict[str, Any]
+    ) -> Optional[Any]:
+        """
+        Phase 45: Extract MTSF snapshot from coherence state.
+
+        This method safely extracts the MTSF snapshot from the coherence state if available.
+
+        Args:
+            explain_log: MLCR explain log with coherence state
+
+        Returns:
+            MultiTrajectoryStabilityFieldSnapshot or None if not available
+
+        Behavior:
+            • Returns None if no coherence state present
+            • Returns None if MTSF computation was not run
+            • Returns snapshot if successfully computed
+        """
+        # Try coherence_state path first (most common)
+        coherence_state = explain_log.get('coherence_state')
+        if coherence_state is not None:
+            mtsf_snapshot = getattr(coherence_state, 'mtsf_snapshot', None)
+            if mtsf_snapshot is not None:
+                return mtsf_snapshot
+
+        return None
+
+    def _build_mtsf_metadata(
+        self,
+        mtsf_snapshot: Any
+    ) -> Dict[str, Any]:
+        """
+        Phase 45: Build MTSF metadata from snapshot.
+
+        This method extracts metadata from the MTSF snapshot for observability.
+        This is METADATA-ONLY and does NOT affect tone or any other behavior.
+
+        Args:
+            mtsf_snapshot: MultiTrajectoryStabilityFieldSnapshot or dict
+
+        Returns:
+            dict: Metadata dictionary for observability
+
+        Behavior:
+            • Extracts tsi, tvi, chf, scc
+            • Extracts band and tags
+            • NEVER modifies tone or persona behavior
+        """
+        if mtsf_snapshot is None:
+            return {}
+
+        # Handle both snapshot objects and dicts
+        if isinstance(mtsf_snapshot, dict):
+            return {
+                "tsi": mtsf_snapshot.get('tsi', 0.0),
+                "tvi": mtsf_snapshot.get('tvi', 0.0),
+                "chf": mtsf_snapshot.get('chf', 0.0),
+                "scc": mtsf_snapshot.get('scc', 0.0),
+                "band": mtsf_snapshot.get('band'),
+                "tags": mtsf_snapshot.get('tags', []),
+            }
+        else:
+            # Snapshot object
+            return {
+                "tsi": getattr(mtsf_snapshot, 'tsi', 0.0),
+                "tvi": getattr(mtsf_snapshot, 'tvi', 0.0),
+                "chf": getattr(mtsf_snapshot, 'chf', 0.0),
+                "scc": getattr(mtsf_snapshot, 'scc', 0.0),
+                "band": getattr(mtsf_snapshot, 'band', None),
+                "tags": getattr(mtsf_snapshot, 'tags', []),
             }
 
     def _build_scenario_fusion_metadata(

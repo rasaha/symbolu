@@ -326,6 +326,15 @@ class CoherenceState:
     scenario_alignment_band_history: List[Optional[str]] = field(default_factory=list)  # Alignment band history
     scenario_tags_history: List[List[str]] = field(default_factory=list)  # Diagnostic tags history
 
+    # Phase 45: Multi-Trajectory Stability Field (observation only - not used in scoring)
+    mtsf_snapshot: Optional[Any] = None  # MultiTrajectoryStabilityFieldSnapshot (latest)
+    mtsf_tsi_history: List[float] = field(default_factory=list)  # Trajectory Stability Index history
+    mtsf_tvi_history: List[float] = field(default_factory=list)  # Trajectory Volatility Index history
+    mtsf_chf_history: List[float] = field(default_factory=list)  # Cross-Horizon Flux history
+    mtsf_scc_history: List[float] = field(default_factory=list)  # Scenario-Coherence Coupling history
+    mtsf_band_history: List[str] = field(default_factory=list)  # Stability band history
+    mtsf_tags_history: List[List[str]] = field(default_factory=list)  # Diagnostic tags history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -464,6 +473,14 @@ class CoherenceState:
         self.scenario_stability_history = self.scenario_stability_history[-window:]
         self.scenario_alignment_band_history = self.scenario_alignment_band_history[-window:]
         self.scenario_tags_history = self.scenario_tags_history[-window:]
+
+        # Phase 45 multi-trajectory stability field formula history
+        self.mtsf_tsi_history = self.mtsf_tsi_history[-window:]
+        self.mtsf_tvi_history = self.mtsf_tvi_history[-window:]
+        self.mtsf_chf_history = self.mtsf_chf_history[-window:]
+        self.mtsf_scc_history = self.mtsf_scc_history[-window:]
+        self.mtsf_band_history = self.mtsf_band_history[-window:]
+        self.mtsf_tags_history = self.mtsf_tags_history[-window:]
 
     def get_history_length(self) -> int:
         """

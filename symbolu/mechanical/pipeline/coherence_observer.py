@@ -263,6 +263,14 @@ class CoherenceObservation:
     csae_alignment_band: Optional[str] = None  # Alignment band: "high" | "medium" | "low" | "conflict"
     csae_diagnostic_tags: List[str] = field(default_factory=list)  # CSAE diagnostic tags
 
+    # Phase 45: Multi-Trajectory Stability Field (MTSF) (observation only)
+    mtsf_tsi: float = 0.0  # Trajectory Stability Index [0.0, 1.0]
+    mtsf_tvi: float = 0.0  # Trajectory Volatility Index [0.0, 1.0]
+    mtsf_chf: float = 0.0  # Cross-Horizon Flux [0.0, 1.0]
+    mtsf_scc: float = 0.0  # Scenario-Coherence Coupling [0.0, 1.0]
+    mtsf_band: Optional[str] = None  # Stability band: "HIGH" | "MEDIUM" | "LOW" | "CHAOTIC"
+    mtsf_tags: List[str] = field(default_factory=list)  # MTSF diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -938,6 +946,24 @@ class CoherenceObserver:
                 csae_alignment_band = getattr(csae_snapshot, 'overall_alignment_band', None)
                 csae_diagnostic_tags = getattr(csae_snapshot, 'diagnostic_tags', [])
 
+        # Phase 45: Extract Multi-Trajectory Stability Field (MTSF) from coherence state
+        mtsf_tsi = 0.0
+        mtsf_tvi = 0.0
+        mtsf_chf = 0.0
+        mtsf_scc = 0.0
+        mtsf_band = None
+        mtsf_tags = []
+
+        if coherence_state is not None:
+            mtsf_snapshot = getattr(coherence_state, 'mtsf_snapshot', None)
+            if mtsf_snapshot is not None:
+                mtsf_tsi = getattr(mtsf_snapshot, 'tsi', 0.0)
+                mtsf_tvi = getattr(mtsf_snapshot, 'tvi', 0.0)
+                mtsf_chf = getattr(mtsf_snapshot, 'chf', 0.0)
+                mtsf_scc = getattr(mtsf_snapshot, 'scc', 0.0)
+                mtsf_band = getattr(mtsf_snapshot, 'band', None)
+                mtsf_tags = getattr(mtsf_snapshot, 'tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -1120,6 +1146,12 @@ class CoherenceObserver:
             csae_stability_agreement=csae_stability_agreement,  # Phase 44
             csae_alignment_band=csae_alignment_band,  # Phase 44
             csae_diagnostic_tags=csae_diagnostic_tags,  # Phase 44
+            mtsf_tsi=mtsf_tsi,  # Phase 45
+            mtsf_tvi=mtsf_tvi,  # Phase 45
+            mtsf_chf=mtsf_chf,  # Phase 45
+            mtsf_scc=mtsf_scc,  # Phase 45
+            mtsf_band=mtsf_band,  # Phase 45
+            mtsf_tags=mtsf_tags,  # Phase 45
         )
 
         # Store observation

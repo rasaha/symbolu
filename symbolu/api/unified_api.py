@@ -91,6 +91,7 @@ class UnifiedOutput:
     coherence_regime: Optional[Dict[str, Any]] = None  # Phase 41: Coherence-Regime Scenario Mapper (observation-only, analytics/UI-only)
     scenario_fusion: Optional[Dict[str, Any]] = None  # Phase 42: Scenario Fusion Engine (observation-only, analytics/UI-only)
     coherence_scenario_alignment: Optional[Dict[str, Any]] = None  # Phase 44: Coherence–Scenario Alignment Engine (observation-only, analytics/UI-only)
+    multi_trajectory_stability_field: Optional[Dict[str, Any]] = None  # Phase 45: Multi-Trajectory Stability Field (MTSF) (observation-only, analytics/UI-only)
     persona_echo_profile: Optional[Dict[str, Any]] = None  # Phase 31: Adaptive Persona Echo Layer (APEL) (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1144,6 +1145,21 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "diagnostic_tags": getattr(csae_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 45: Extract multi-trajectory stability field (MTSF) data (observation-only, analytics/UI-only)
+    mtsf_data = None
+    if hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        mtsf_snapshot = getattr(ctx.coherence_state, 'mtsf_snapshot', None)
+        if mtsf_snapshot is not None:
+            # Build dict from snapshot fields
+            mtsf_data = {
+                "tsi": getattr(mtsf_snapshot, 'tsi', 0.0),
+                "tvi": getattr(mtsf_snapshot, 'tvi', 0.0),
+                "chf": getattr(mtsf_snapshot, 'chf', 0.0),
+                "scc": getattr(mtsf_snapshot, 'scc', 0.0),
+                "band": getattr(mtsf_snapshot, 'band', None),
+                "tags": getattr(mtsf_snapshot, 'tags', []),
+            }
+
     # Phase 31: Extract Adaptive Persona Echo Layer (APEL) data (observation-only, tone-level only)
     echo_profile_data = None
     # Try to extract from persona response (if available)
@@ -1185,6 +1201,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         coherence_regime=regime_data,  # Phase 41
         scenario_fusion=scenario_fusion_data,  # Phase 42
         coherence_scenario_alignment=csae_data,  # Phase 44
+        multi_trajectory_stability_field=mtsf_data,  # Phase 45
         persona_echo_profile=echo_profile_data,  # Phase 31
     )
 

@@ -339,6 +339,12 @@ class PersonaResponse(BaseModel):
         description="Phase 44: Coherence-Scenario Alignment Engine metadata (observation-only, metadata-only)"
     )
 
+    # Phase 45: Optional multi-trajectory stability field metadata (observation-only, metadata-only)
+    persona_mtsf: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Phase 45: Multi-Trajectory Stability Field (MTSF) metadata (observation-only, metadata-only)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {

@@ -235,3 +235,11 @@ class SessionSummary:
     avg_csae_stability: Optional[float] = None  # Average stability agreement [0.0, 1.0]
     csae_alignment_band: Optional[str] = None  # Most frequent alignment band: "high" | "medium" | "low" | "conflict"
     csae_alignment_tags: List[str] = field(default_factory=list)  # Collected CSAE diagnostic tags (deduped, sorted)
+
+    # Phase 45 Multi-Trajectory Stability Field (observation only)
+    avg_tsi: float = 0.0  # Average Trajectory Stability Index [0.0, 1.0]
+    avg_tvi: float = 0.0  # Average Trajectory Volatility Index [0.0, 1.0]
+    avg_chf: float = 0.0  # Average Cross-Horizon Flux [0.0, 1.0]
+    avg_scc: float = 0.0  # Average Scenario-Coherence Coupling [0.0, 1.0]
+    mtsf_band: Optional[str] = None  # Most frequent stability band: "HIGH" | "MEDIUM" | "LOW" | "CHAOTIC"
+    mtsf_tags: List[str] = field(default_factory=list)  # Collected MTSF diagnostic tags (deduped, sorted)

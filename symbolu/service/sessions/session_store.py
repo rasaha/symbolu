@@ -1222,6 +1222,104 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_csae_tags:
             csae_alignment_tags_list = sorted(set(all_csae_tags))
 
+    # Phase 45: Extract Multi-Trajectory Stability Field (MTSF) metrics from coherence history
+    avg_tsi_val = 0.0
+    avg_tvi_val = 0.0
+    avg_chf_val = 0.0
+    avg_scc_val = 0.0
+    mtsf_band_val = None
+    mtsf_tags_list = []
+
+    if state.coherence_history:
+        # Extract MTSF metrics from CoherenceState
+        all_tsi = []
+        all_tvi = []
+        all_chf = []
+        all_scc = []
+        all_mtsf_bands = []
+        all_mtsf_tags = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract from mtsf_tsi_history
+                if "mtsf_tsi_history" in coh:
+                    tsi_history = coh["mtsf_tsi_history"]
+                    if isinstance(tsi_history, list):
+                        for val in tsi_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_tsi.append(val)
+
+                # Extract from mtsf_tvi_history
+                if "mtsf_tvi_history" in coh:
+                    tvi_history = coh["mtsf_tvi_history"]
+                    if isinstance(tvi_history, list):
+                        for val in tvi_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_tvi.append(val)
+
+                # Extract from mtsf_chf_history
+                if "mtsf_chf_history" in coh:
+                    chf_history = coh["mtsf_chf_history"]
+                    if isinstance(chf_history, list):
+                        for val in chf_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_chf.append(val)
+
+                # Extract from mtsf_scc_history
+                if "mtsf_scc_history" in coh:
+                    scc_history = coh["mtsf_scc_history"]
+                    if isinstance(scc_history, list):
+                        for val in scc_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_scc.append(val)
+
+                # Extract from mtsf_band_history
+                if "mtsf_band_history" in coh:
+                    band_history = coh["mtsf_band_history"]
+                    if isinstance(band_history, list):
+                        for band in band_history:
+                            if band is not None and band != "":
+                                all_mtsf_bands.append(band)
+
+                # Extract tags from mtsf_tags_history
+                if "mtsf_tags_history" in coh:
+                    tags_history = coh["mtsf_tags_history"]
+                    if isinstance(tags_history, list):
+                        for tag_list in tags_history:
+                            if isinstance(tag_list, list):
+                                all_mtsf_tags.extend(tag_list)
+
+        # Compute aggregates
+        # Average TSI
+        if all_tsi:
+            avg_tsi_val = sum(all_tsi) / len(all_tsi)
+
+        # Average TVI
+        if all_tvi:
+            avg_tvi_val = sum(all_tvi) / len(all_tvi)
+
+        # Average CHF
+        if all_chf:
+            avg_chf_val = sum(all_chf) / len(all_chf)
+
+        # Average SCC
+        if all_scc:
+            avg_scc_val = sum(all_scc) / len(all_scc)
+
+        # MTSF band (most frequent)
+        if all_mtsf_bands:
+            from collections import Counter
+            band_counts = Counter(all_mtsf_bands)
+            # Deterministic tie-breaking: most_common + sorted
+            top_bands = band_counts.most_common()
+            max_count = top_bands[0][1]
+            tied_bands = [band for band, count in top_bands if count == max_count]
+            mtsf_band_val = sorted(tied_bands)[0]  # Deterministic tie-break
+
+        # Collect unique MTSF tags (deduplicate and sort for determinism)
+        if all_mtsf_tags:
+            mtsf_tags_list = sorted(set(all_mtsf_tags))
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -1298,4 +1396,10 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_csae_stability=avg_csae_stability_val,
         csae_alignment_band=csae_alignment_band_val,
         csae_alignment_tags=csae_alignment_tags_list,
+        avg_tsi=avg_tsi_val,
+        avg_tvi=avg_tvi_val,
+        avg_chf=avg_chf_val,
+        avg_scc=avg_scc_val,
+        mtsf_band=mtsf_band_val,
+        mtsf_tags=mtsf_tags_list,
     )

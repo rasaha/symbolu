@@ -33,6 +33,7 @@ on:
       - "tests/test_phase41_coherence_regime_scenario_mapper.py"
       - "tests/test_phase42_scenario_fusion_engine.py"
       - "tests/test_phase44_coherence_scenario_alignment.py"
+      - "tests/test_phase45_multi_trajectory_stability_field.py"
       - "symbolu/tools/scenario_simulator/**"
       - "tests/test_phase43_scenario_simulator.py"
       - "symbolu/service/**"
@@ -79,6 +80,7 @@ on:
       - "tests/test_phase41_coherence_regime_scenario_mapper.py"
       - "tests/test_phase42_scenario_fusion_engine.py"
       - "tests/test_phase44_coherence_scenario_alignment.py"
+      - "tests/test_phase45_multi_trajectory_stability_field.py"
       - "symbolu/tools/scenario_simulator/**"
       - "tests/test_phase43_scenario_simulator.py"
       - "symbolu/service/**"
@@ -558,6 +560,21 @@ jobs:
         with:
           name: phase44-alignment-engine-log
           path: phase44-alignment-engine.log
+          if-no-files-found: ignore
+
+      - name: Run Phase 45 Multi-Trajectory Stability Field Tests
+        run: |
+          pytest tests/test_phase45_multi_trajectory_stability_field.py \
+            --disable-warnings -q \
+            --maxfail=1 \
+            2>&1 | tee phase45-mtsf.log
+
+      - name: Upload Phase 45 Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase45-mtsf-log
+          path: phase45-mtsf.log
           if-no-files-found: ignore
 
       - name: Run Phase 43 Scenario What-If Simulator Tests
