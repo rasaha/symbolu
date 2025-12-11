@@ -300,6 +300,15 @@ class CoherenceObservation:
     temporal_stability_band: Optional[str] = None  # Temporal stability band: "HIGH" | "MEDIUM" | "LOW" | "FRAGMENTED"
     temporal_stability_tags: List[str] = field(default_factory=list)  # UCTSE diagnostic tags
 
+    # Phase 50: Cognitive Consistency Regression Engine (CCRE) (observation only)
+    regression_rsi: float = 0.0  # Regression Stability Index (RSI) [0.0, 1.0]
+    regression_alignment: float = 0.0  # Regression Alignment Score (CLRA) [0.0, 1.0]
+    regression_drift: float = 0.0  # Regression Drift Score (CDR) [0.0, 1.0]
+    regression_prr: float = 0.0  # Prediction Reversal Risk (PRR) [0.0, 1.0]
+    regression_ics: float = 0.0  # Internal Consistency Strength (ICS) [0.0, 1.0]
+    regression_band: Optional[str] = None  # Cognitive consistency band: "high_consistency" | "medium_consistency" | "low_consistency" | "internal_conflict"
+    regression_tags: List[str] = field(default_factory=list)  # CCRE diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -1059,6 +1068,26 @@ class CoherenceObserver:
                 temporal_stability_band = getattr(uctse_snapshot, 'stability_band', None)
                 temporal_stability_tags = getattr(uctse_snapshot, 'diagnostic_tags', [])
 
+        # Phase 50: Extract Cognitive Consistency Regression Engine (CCRE) from coherence state
+        regression_rsi = 0.0
+        regression_alignment = 0.0
+        regression_drift = 0.0
+        regression_prr = 0.0
+        regression_ics = 0.0
+        regression_band = None
+        regression_tags = []
+
+        if coherence_state is not None:
+            ccre_snapshot = getattr(coherence_state, 'cognitive_consistency_regression_snapshot', None)
+            if ccre_snapshot is not None:
+                regression_rsi = getattr(ccre_snapshot, 'regression_stability_index', 0.0)
+                regression_alignment = getattr(ccre_snapshot, 'regression_alignment_score', 0.0)
+                regression_drift = getattr(ccre_snapshot, 'regression_drift_score', 0.0)
+                regression_prr = getattr(ccre_snapshot, 'prediction_reversal_risk', 0.0)
+                regression_ics = getattr(ccre_snapshot, 'internal_consistency_strength', 0.0)
+                regression_band = getattr(ccre_snapshot, 'band', None)
+                regression_tags = getattr(ccre_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -1268,6 +1297,13 @@ class CoherenceObserver:
             future_consistency=future_consistency,  # Phase 49
             temporal_stability_band=temporal_stability_band,  # Phase 49
             temporal_stability_tags=temporal_stability_tags,  # Phase 49
+            regression_rsi=regression_rsi,  # Phase 50
+            regression_alignment=regression_alignment,  # Phase 50
+            regression_drift=regression_drift,  # Phase 50
+            regression_prr=regression_prr,  # Phase 50
+            regression_ics=regression_ics,  # Phase 50
+            regression_band=regression_band,  # Phase 50
+            regression_tags=regression_tags,  # Phase 50
         )
 
         # Store observation

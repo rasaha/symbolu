@@ -36,6 +36,10 @@ on:
       - "tests/test_phase44_coherence_scenario_alignment.py"
       - "tests/test_phase45_multi_trajectory_stability_field.py"
       - "tests/test_phase46_trajectory_field_convergence.py"
+      - "tests/test_phase48_macro_stability_regulator.py"
+      - "tests/test_phase49_unified_temporal_stability.py"
+      - "tests/test_phase50_cognitive_consistency_regression.py"
+      - "symbolu/formulas/cognitive_consistency_regression.py"
       - "symbolu/tools/scenario_simulator/**"
       - "tests/test_phase43_scenario_simulator.py"
       - "tests/test_phase*_invariance_audit.py"
@@ -87,6 +91,10 @@ on:
       - "tests/test_phase44_coherence_scenario_alignment.py"
       - "tests/test_phase45_multi_trajectory_stability_field.py"
       - "tests/test_phase46_trajectory_field_convergence.py"
+      - "tests/test_phase48_macro_stability_regulator.py"
+      - "tests/test_phase49_unified_temporal_stability.py"
+      - "tests/test_phase50_cognitive_consistency_regression.py"
+      - "symbolu/formulas/cognitive_consistency_regression.py"
       - "symbolu/tools/scenario_simulator/**"
       - "tests/test_phase43_scenario_simulator.py"
       - "tests/test_phase*_invariance_audit.py"
@@ -816,7 +824,21 @@ jobs:
           name: phase49-temporal-stability-log
           path: phase49-temporal-stability.log
 
-      - name: Run ALL Invariance Audit Tests (Phases 27-49)
+      - name: Run Phase 50 Cognitive Consistency Regression Engine Tests
+        run: |
+          pytest tests/test_phase50_cognitive_consistency_regression.py \
+            --disable-warnings -q \
+            --maxfail=1 \
+            2>&1 | tee phase50-ccre.log
+
+      - name: Upload Phase 50 Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase50-ccre-log
+          path: phase50-ccre.log
+
+      - name: Run ALL Invariance Audit Tests (Phases 27-50)
         run: |
           pytest -vv \
             tests/test_phase27_invariance_audit.py \
@@ -857,6 +879,7 @@ jobs:
           echo "✅ Phase 47: UTSSE invariants verified"
           echo "✅ Phase 48: Macro-Stability Regulator invariants verified"
           echo "✅ Phase 49: Unified Temporal Stability Engine invariants verified"
+          echo "✅ Phase 50: Cognitive Consistency Regression Engine invariants verified"
           echo "✅ =========================================="
           echo "✅ All formulas remain stable and deterministic!"
           echo "✅ No regressions detected in system invariants."

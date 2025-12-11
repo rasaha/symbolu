@@ -96,6 +96,7 @@ class UnifiedOutput:
     unified_trajectory_scenario_synthesis: Optional[Dict[str, Any]] = None  # Phase 47: Unified Trajectory–Scenario Synthesis Engine (UTSSE) (observation-only, analytics/UI-only)
     macro_stability_regulator: Optional[Dict[str, Any]] = None  # Phase 48: Macro-Stability Regulator (MSR) (observation-only, analytics/UI-only)
     temporal_stability: Optional[Dict[str, Any]] = None  # Phase 49: Unified Cross-Phase Temporal Stability Engine (UCTSE) (observation-only, analytics/UI-only)
+    cognitive_consistency_regression: Optional[Dict[str, Any]] = None  # Phase 50: Cognitive Consistency Regression Engine (CCRE) (observation-only, analytics/UI-only)
     persona_echo_profile: Optional[Dict[str, Any]] = None  # Phase 31: Adaptive Persona Echo Layer (APEL) (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1234,6 +1235,22 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "diagnostic_tags": getattr(uctse_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 50: Extract Cognitive Consistency Regression Engine (CCRE) (observation-only, analytics/UI-only)
+    ccre_data = None
+    if ctx.coherence_state is not None:
+        ccre_snapshot = getattr(ctx.coherence_state, 'cognitive_consistency_regression_snapshot', None)
+        if ccre_snapshot is not None:
+            # Build dict from snapshot fields
+            ccre_data = {
+                "regression_stability_index": getattr(ccre_snapshot, 'regression_stability_index', 0.0),
+                "regression_drift_score": getattr(ccre_snapshot, 'regression_drift_score', 0.0),
+                "regression_alignment_score": getattr(ccre_snapshot, 'regression_alignment_score', 0.0),
+                "prediction_reversal_risk": getattr(ccre_snapshot, 'prediction_reversal_risk', 0.0),
+                "internal_consistency_strength": getattr(ccre_snapshot, 'internal_consistency_strength', 0.0),
+                "band": getattr(ccre_snapshot, 'band', None),
+                "diagnostic_tags": getattr(ccre_snapshot, 'diagnostic_tags', []),
+            }
+
     # Phase 31: Extract Adaptive Persona Echo Layer (APEL) data (observation-only, tone-level only)
     echo_profile_data = None
     # Try to extract from persona response (if available)
@@ -1280,6 +1297,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         unified_trajectory_scenario_synthesis=utsse_data,  # Phase 47
         macro_stability_regulator=msr_data,  # Phase 48
         temporal_stability=uctse_data,  # Phase 49
+        cognitive_consistency_regression=ccre_data,  # Phase 50
         persona_echo_profile=echo_profile_data,  # Phase 31
     )
 
