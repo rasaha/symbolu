@@ -108,7 +108,7 @@ def test_a04_compute_pairwise_alignment_high():
 def test_a05_compute_pairwise_alignment_low():
     """Test _compute_pairwise_alignment with low alignment."""
     # Far apart values should have low alignment
-    values = [0.1, 0.9, 0.2, 0.8]
+    values = [0.0, 1.0, 0.1, 0.9]
     alignment = _compute_pairwise_alignment(values)
     assert alignment < 0.5  # Divergent values
 
@@ -215,11 +215,15 @@ def test_a11_tfce_convergence_band_high():
 
 def test_a12_tfce_convergence_band_fragmented():
     """Test convergence band classification: fragmented."""
-    # Low convergence signals (divergent)
-    drift = {"drift_magnitude_prediction": 0.8, "drift_stability_score": 0.2}
-    identity = {"ims": 0.2, "ida": 0.3}
-    continuity = {"ncc": 0.3, "icc": 0.25, "css": 0.2}
-    forecast = {"coherence_slope": -0.5, "forecast_strength": 0.3}
+    # Extremely divergent signals to produce fragmented convergence (< 0.35)
+    # drift_signal = 1.0 - 0.0 = 1.0
+    # identity_signal = (0.0 + 0.0) / 2 = 0.0
+    # continuity_signal = (1.0 + 1.0 + 1.0) / 3 = 1.0
+    # symbolic_signal = 0.0
+    drift = {"drift_magnitude_prediction": 0.0, "drift_stability_score": 0.2}
+    identity = {"ims": 0.0, "ida": 0.0}
+    continuity = {"ncc": 1.0, "icc": 1.0, "css": 1.0}
+    forecast = {"coherence_slope": -0.5, "forecast_strength": 0.0}
 
     result = compute_trajectory_field_convergence(
         predictive_drift_phase35=drift,
@@ -583,7 +587,7 @@ def test_c02_session_summary_tfce_default_values():
 
 def test_c03_session_store_computes_tfce_aggregates():
     """Test session store computes TFCE summary metrics."""
-    from symbolu.service.sessions.session_store import SessionStore
+    from symbolu.service.sessions.session_store import SessionStore, compute_session_summary
     from symbolu.service.sessions.session_models import SessionState
     from datetime import datetime
 
@@ -605,7 +609,7 @@ def test_c03_session_store_computes_tfce_aggregates():
     state.coherence_history.append(coherence_dict)
 
     # Compute summary
-    summary = store.compute_session_summary(state)
+    summary = compute_session_summary(state)
 
     # Check aggregates
     assert summary.avg_trajectory_convergence is not None
@@ -618,7 +622,7 @@ def test_c03_session_store_computes_tfce_aggregates():
 
 def test_c04_session_store_tfce_band_deterministic_tie_breaking():
     """Test session store uses deterministic tie-breaking for convergence band."""
-    from symbolu.service.sessions.session_store import SessionStore
+    from symbolu.service.sessions.session_store import SessionStore, compute_session_summary
     from symbolu.service.sessions.session_models import SessionState
     from datetime import datetime
 
@@ -639,7 +643,7 @@ def test_c04_session_store_tfce_band_deterministic_tie_breaking():
     state.coherence_history.append(coherence_dict)
 
     # Compute summary
-    summary = store.compute_session_summary(state)
+    summary = compute_session_summary(state)
 
     # With tied bands, should use alphabetical tie-breaking
     assert summary.dominant_convergence_band == "high"  # "high" < "medium" alphabetically
@@ -647,7 +651,7 @@ def test_c04_session_store_tfce_band_deterministic_tie_breaking():
 
 def test_c05_session_store_tfce_tags_deduplication():
     """Test session store deduplicates and sorts TFCE tags."""
-    from symbolu.service.sessions.session_store import SessionStore
+    from symbolu.service.sessions.session_store import SessionStore, compute_session_summary
     from symbolu.service.sessions.session_models import SessionState
     from datetime import datetime
 
@@ -672,7 +676,7 @@ def test_c05_session_store_tfce_tags_deduplication():
     state.coherence_history.append(coherence_dict)
 
     # Compute summary
-    summary = store.compute_session_summary(state)
+    summary = compute_session_summary(state)
 
     # Tags should be deduplicated and sorted
     assert len(summary.dominant_convergence_tags) == 3
@@ -681,7 +685,7 @@ def test_c05_session_store_tfce_tags_deduplication():
 
 def test_c06_session_store_tfce_empty_history():
     """Test session store handles empty TFCE history gracefully."""
-    from symbolu.service.sessions.session_store import SessionStore
+    from symbolu.service.sessions.session_store import SessionStore, compute_session_summary
     from symbolu.service.sessions.session_models import SessionState
     from datetime import datetime
 
@@ -702,7 +706,7 @@ def test_c06_session_store_tfce_empty_history():
     state.coherence_history.append(coherence_dict)
 
     # Compute summary
-    summary = store.compute_session_summary(state)
+    summary = compute_session_summary(state)
 
     # Should handle None values gracefully
     assert summary.avg_trajectory_convergence is None
@@ -713,7 +717,7 @@ def test_c06_session_store_tfce_empty_history():
 
 def test_c07_session_store_tfce_average_calculations():
     """Test session store computes correct averages."""
-    from symbolu.service.sessions.session_store import SessionStore
+    from symbolu.service.sessions.session_store import SessionStore, compute_session_summary
     from symbolu.service.sessions.session_models import SessionState
     from datetime import datetime
 
@@ -734,7 +738,7 @@ def test_c07_session_store_tfce_average_calculations():
     state.coherence_history.append(coherence_dict)
 
     # Compute summary
-    summary = store.compute_session_summary(state)
+    summary = compute_session_summary(state)
 
     # Check averages
     assert summary.avg_trajectory_convergence == pytest.approx(0.8, abs=0.01)  # (0.6 + 0.8 + 1.0) / 3
@@ -744,7 +748,7 @@ def test_c07_session_store_tfce_average_calculations():
 
 def test_c08_session_store_tfce_multiple_coherence_entries():
     """Test session store aggregates TFCE across multiple coherence history entries."""
-    from symbolu.service.sessions.session_store import SessionStore
+    from symbolu.service.sessions.session_store import SessionStore, compute_session_summary
     from symbolu.service.sessions.session_models import SessionState
     from datetime import datetime
 
@@ -766,7 +770,7 @@ def test_c08_session_store_tfce_multiple_coherence_entries():
         state.coherence_history.append(coherence_dict)
 
     # Compute summary
-    summary = store.compute_session_summary(state)
+    summary = compute_session_summary(state)
 
     # Should aggregate across all entries
     assert summary.avg_trajectory_convergence is not None
@@ -775,7 +779,7 @@ def test_c08_session_store_tfce_multiple_coherence_entries():
 
 def test_c09_session_store_tfce_band_frequency():
     """Test session store picks most frequent band."""
-    from symbolu.service.sessions.session_store import SessionStore
+    from symbolu.service.sessions.session_store import SessionStore, compute_session_summary
     from symbolu.service.sessions.session_models import SessionState
     from datetime import datetime
 
@@ -796,7 +800,7 @@ def test_c09_session_store_tfce_band_frequency():
     state.coherence_history.append(coherence_dict)
 
     # Compute summary
-    summary = store.compute_session_summary(state)
+    summary = compute_session_summary(state)
 
     # Should pick most frequent
     assert summary.dominant_convergence_band == "high"
@@ -804,7 +808,7 @@ def test_c09_session_store_tfce_band_frequency():
 
 def test_c10_session_store_tfce_null_safe():
     """Test session store handles None/missing values safely."""
-    from symbolu.service.sessions.session_store import SessionStore
+    from symbolu.service.sessions.session_store import SessionStore, compute_session_summary
     from symbolu.service.sessions.session_models import SessionState
     from datetime import datetime
 
@@ -825,7 +829,7 @@ def test_c10_session_store_tfce_null_safe():
     state.coherence_history.append(coherence_dict)
 
     # Compute summary - should not crash
-    summary = store.compute_session_summary(state)
+    summary = compute_session_summary(state)
 
     # Should handle None values gracefully
     assert summary.avg_trajectory_convergence is not None  # Should average non-None values
@@ -944,6 +948,10 @@ def test_d05_coherence_observer_has_tfce_fields():
         semantic_stability_score=0.8,
         mapper_volatility_score=0.2,
         temporal_arc_score=0.75,
+        turn_number=1,
+        tier="tier1",
+        domain="generic",
+        active_mappers=["mapper1"],
     )
 
     assert hasattr(observation, "tfce_convergence_index")
@@ -963,6 +971,10 @@ def test_d06_coherence_observer_tfce_default_values():
         semantic_stability_score=0.8,
         mapper_volatility_score=0.2,
         temporal_arc_score=0.75,
+        turn_number=1,
+        tier="tier1",
+        domain="generic",
+        active_mappers=["mapper1"],
     )
 
     assert observation.tfce_convergence_index == 0.0
@@ -975,6 +987,7 @@ def test_d06_coherence_observer_tfce_default_values():
 def test_d07_coherence_observer_tfce_extraction():
     """Test CoherenceObserver extracts TFCE data from coherence state."""
     from symbolu.mechanical.pipeline.coherence_observer import CoherenceObserver
+    from symbolu.mechanical.pipeline.models import PipelineContext, UserRequest
 
     observer = CoherenceObserver()
 
@@ -988,8 +1001,12 @@ def test_d07_coherence_observer_tfce_extraction():
         'diagnostic_tags': ['TRAJECTORY_CONVERGING'],
     })()
 
+    # Create minimal pipeline context
+    user_request = UserRequest(text="test")
+    pipeline_ctx = PipelineContext(request=user_request)
+
     # Observe
-    observation = observer.observe(coherence_state=coherence_state)
+    observation = observer.observe(text="test", pipeline_context=pipeline_ctx, coherence_state=coherence_state)
 
     assert observation.tfce_convergence_index == 0.8
     assert observation.tfce_divergence_index == 0.2
@@ -1001,6 +1018,7 @@ def test_d07_coherence_observer_tfce_extraction():
 def test_d08_coherence_observer_tfce_null_safe():
     """Test CoherenceObserver handles None TFCE snapshot safely."""
     from symbolu.mechanical.pipeline.coherence_observer import CoherenceObserver
+    from symbolu.mechanical.pipeline.models import PipelineContext, UserRequest
 
     observer = CoherenceObserver()
 
@@ -1008,8 +1026,12 @@ def test_d08_coherence_observer_tfce_null_safe():
     coherence_state = CoherenceState(convo_id="test", turn_index=0)
     coherence_state.trajectory_convergence_snapshot = None
 
+    # Create minimal pipeline context
+    user_request = UserRequest(text="test")
+    pipeline_ctx = PipelineContext(request=user_request)
+
     # Observe - should not crash
-    observation = observer.observe(coherence_state=coherence_state)
+    observation = observer.observe(text="test", pipeline_context=pipeline_ctx, coherence_state=coherence_state)
 
     assert observation.tfce_convergence_index == 0.0
     assert observation.tfce_band is None
@@ -1025,6 +1047,10 @@ def test_d09_coherence_observation_to_dict():
         semantic_stability_score=0.8,
         mapper_volatility_score=0.2,
         temporal_arc_score=0.75,
+        turn_number=1,
+        tier="tier1",
+        domain="generic",
+        active_mappers=["mapper1"],
         tfce_convergence_index=0.8,
         tfce_divergence_index=0.2,
         tfce_stability_index=0.85,

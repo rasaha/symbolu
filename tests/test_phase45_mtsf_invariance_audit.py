@@ -546,12 +546,24 @@ class TestPersonaInvariance:
 
     def test_persona_response_has_mtsf_field(self):
         """Test that PersonaResponse has persona_mtsf field."""
-        from symbolu.mechanical.persona.models import PersonaResponse
+        from symbolu.mechanical.persona.models import PersonaResponse, PersonaMetadata
+
+        metadata = PersonaMetadata(
+            tier="tier1",
+            domain="generic",
+            intent="test",
+            persona_id="test",
+            persona_name="Test Persona",
+            persona_description="Test",
+            dha_tone="neutral",
+            dha_confidence=0.5
+        )
 
         response = PersonaResponse(
             persona_id="test",
             text="test",
-            metadata={}
+            layers={},
+            metadata=metadata
         )
 
         assert hasattr(response, 'persona_mtsf')
