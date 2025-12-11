@@ -210,6 +210,7 @@ jobs:
         run: |
           pytest -vv \
             tests/test_phase8_guna_kosha_invariance_audit.py \
+            tests/test_phase10_formula_fusion_invariance_audit.py \
             tests/test_phase13_enhanced_smi_invariance_audit.py \
             tests/test_phase14_vritti_ath_invariance_audit.py \
             tests/test_phase16_formula_fusion_stabilizer_invariance_audit.py \
@@ -245,6 +246,7 @@ jobs:
           echo "✅ =========================================="
           echo "✅ TIER 1 PHASES (Core Formula Engine):"
           echo "✅   Phase 8: Guna/Kosha Resonance invariants verified"
+          echo "✅   Phase 10: Coherence v3 Formula Fusion invariants verified"
           echo "✅   Phase 13: Enhanced SMI invariants verified"
           echo "✅   Phase 14: Vritti/ATH invariants verified"
           echo "✅   Phase 16: Formula Fusion Stabilizer invariants verified"
