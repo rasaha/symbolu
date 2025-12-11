@@ -170,11 +170,13 @@ jobs:
   # ========================================================================
   # INVARIANCE AUDIT CI JOB
   # ========================================================================
-  # This job runs ALL invariance audit tests for phases 27-47.
+  # This job runs ALL invariance audit tests for Tier 1 (phases 8,13,14,16,
+  # 17,18,19,26) and Advanced phases (27-47).
   # These tests ensure that core formulas and behaviors remain stable
   # across changes to the codebase.
   # CRITICAL: Any failure in this job indicates a potential regression
   # in formula stability or system invariants.
+  # Total: 16 phase audit files covering 1,600+ invariance tests
   # ========================================================================
   invariance-audit:
     runs-on: ubuntu-latest
@@ -204,9 +206,17 @@ jobs:
           pip install -e .
           pip install pytest pytest-cov coverage pydantic 'fastapi[standard]' uvicorn httpx
 
-      - name: Run ALL Invariance Audit Tests (Phases 27-47)
+      - name: Run ALL Invariance Audit Tests (Phases 8-47)
         run: |
           pytest -vv \
+            tests/test_phase8_guna_kosha_invariance_audit.py \
+            tests/test_phase13_enhanced_smi_invariance_audit.py \
+            tests/test_phase14_vritti_ath_invariance_audit.py \
+            tests/test_phase16_formula_fusion_stabilizer_invariance_audit.py \
+            tests/test_phase17_semantic_integrity_invariance_audit.py \
+            tests/test_phase18_temporal_entropy_invariance_audit.py \
+            tests/test_phase19_drift_fusion_invariance_audit.py \
+            tests/test_phase26_unified_consciousness_invariance_audit.py \
             tests/test_phase27_invariance_audit.py \
             tests/test_phase31_apel_invariance_audit.py \
             tests/test_phase32_invariance_audit.py \
@@ -233,14 +243,25 @@ jobs:
           echo "✅ =========================================="
           echo "✅ INVARIANCE AUDIT: ALL TESTS PASSED"
           echo "✅ =========================================="
-          echo "✅ Phase 27: Symbolic Harmonization invariants verified"
-          echo "✅ Phase 31: APEL invariants verified"
-          echo "✅ Phase 32: Insight Window Gating invariants verified"
-          echo "✅ Phase 38: TCFM invariants verified"
-          echo "✅ Phase 40: CHRAE invariants verified"
-          echo "✅ Phase 45: MTSF invariants verified"
-          echo "✅ Phase 46: Trajectory Convergence invariants verified"
-          echo "✅ Phase 47: UTSSE invariants verified"
+          echo "✅ TIER 1 PHASES (Core Formula Engine):"
+          echo "✅   Phase 8: Guna/Kosha Resonance invariants verified"
+          echo "✅   Phase 13: Enhanced SMI invariants verified"
+          echo "✅   Phase 14: Vritti/ATH invariants verified"
+          echo "✅   Phase 16: Formula Fusion Stabilizer invariants verified"
+          echo "✅   Phase 17: Semantic Integrity invariants verified"
+          echo "✅   Phase 18: Temporal Entropy invariants verified"
+          echo "✅   Phase 19: Drift Fusion invariants verified"
+          echo "✅   Phase 26: Unified Consciousness invariants verified"
+          echo "✅ "
+          echo "✅ ADVANCED PHASES:"
+          echo "✅   Phase 27: Symbolic Harmonization invariants verified"
+          echo "✅   Phase 31: APEL invariants verified"
+          echo "✅   Phase 32: Insight Window Gating invariants verified"
+          echo "✅   Phase 38: TCFM invariants verified"
+          echo "✅   Phase 40: CHRAE invariants verified"
+          echo "✅   Phase 45: MTSF invariants verified"
+          echo "✅   Phase 46: Trajectory Convergence invariants verified"
+          echo "✅   Phase 47: UTSSE invariants verified"
           echo "✅ =========================================="
           echo "✅ All formulas remain stable and deterministic!"
           echo "✅ No regressions detected in system invariants."
