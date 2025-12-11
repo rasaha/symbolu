@@ -1581,6 +1581,99 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_macro_stability_tags:
             macro_stability_tags_list = sorted(set(all_macro_stability_tags))
 
+        # Phase 49: Extract Unified Cross-Phase Temporal Stability Engine (UCTSE) metrics from CoherenceState
+        all_temporal_stability = []
+        all_predictive_entropy = []
+        all_future_consistency = []
+        all_temporal_stability_bands = []
+        all_temporal_regimes = []
+
+        for coh in state.coherence_history:
+            if coh is not None and isinstance(coh, dict):
+                # Extract from temporal_stability_index_history
+                if "temporal_stability_index_history" in coh:
+                    stability_history = coh["temporal_stability_index_history"]
+                    if isinstance(stability_history, list):
+                        for val in stability_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_temporal_stability.append(val)
+
+                # Extract from temporal_stability_entropy_history
+                if "temporal_stability_entropy_history" in coh:
+                    entropy_history = coh["temporal_stability_entropy_history"]
+                    if isinstance(entropy_history, list):
+                        for val in entropy_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_predictive_entropy.append(val)
+
+                # Extract from temporal_stability_consistency_history
+                if "temporal_stability_consistency_history" in coh:
+                    consistency_history = coh["temporal_stability_consistency_history"]
+                    if isinstance(consistency_history, list):
+                        for val in consistency_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_future_consistency.append(val)
+
+                # Extract from temporal_stability_band_history
+                if "temporal_stability_band_history" in coh:
+                    band_history = coh["temporal_stability_band_history"]
+                    if isinstance(band_history, list):
+                        for band in band_history:
+                            if band is not None and band != "":
+                                all_temporal_stability_bands.append(band)
+
+                # Extract dominant regime from temporal_stability_snapshot
+                if "temporal_stability_snapshot" in coh:
+                    snapshot = coh["temporal_stability_snapshot"]
+                    if snapshot is not None:
+                        if isinstance(snapshot, dict) and "dominant_regime" in snapshot:
+                            regime = snapshot["dominant_regime"]
+                            if regime is not None and regime != "unknown":
+                                all_temporal_regimes.append(regime)
+                        elif hasattr(snapshot, "dominant_regime"):
+                            regime = snapshot.dominant_regime
+                            if regime is not None and regime != "unknown":
+                                all_temporal_regimes.append(regime)
+
+        # Compute aggregates
+        avg_temporal_stability_val = None
+        avg_predictive_entropy_val = None
+        avg_future_consistency_val = None
+        temporal_stability_band_val = None
+        dominant_temporal_regime_val = None
+
+        # Average temporal stability index
+        if all_temporal_stability:
+            avg_temporal_stability_val = sum(all_temporal_stability) / len(all_temporal_stability)
+
+        # Average predictive entropy
+        if all_predictive_entropy:
+            avg_predictive_entropy_val = sum(all_predictive_entropy) / len(all_predictive_entropy)
+
+        # Average future consistency
+        if all_future_consistency:
+            avg_future_consistency_val = sum(all_future_consistency) / len(all_future_consistency)
+
+        # Temporal stability band (most frequent)
+        if all_temporal_stability_bands:
+            from collections import Counter
+            band_counts = Counter(all_temporal_stability_bands)
+            # Deterministic tie-breaking: most_common + sorted
+            top_bands = band_counts.most_common()
+            max_count = top_bands[0][1]
+            tied_bands = [band for band, count in top_bands if count == max_count]
+            temporal_stability_band_val = sorted(tied_bands)[0]  # Deterministic tie-break
+
+        # Dominant temporal regime (most frequent)
+        if all_temporal_regimes:
+            from collections import Counter
+            regime_counts = Counter(all_temporal_regimes)
+            # Deterministic tie-breaking: most_common + sorted
+            top_regimes = regime_counts.most_common()
+            max_count = top_regimes[0][1]
+            tied_regimes = [regime for regime, count in top_regimes if count == max_count]
+            dominant_temporal_regime_val = sorted(tied_regimes)[0]  # Deterministic tie-break
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -1679,4 +1772,9 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_macro_identity_resilience=avg_macro_identity_resilience_val,
         dominant_macro_stability_band=dominant_macro_stability_band_val,
         macro_stability_tags=macro_stability_tags_list,
+        avg_temporal_stability=avg_temporal_stability_val,
+        avg_predictive_entropy=avg_predictive_entropy_val,
+        avg_future_consistency=avg_future_consistency_val,
+        dominant_temporal_regime=dominant_temporal_regime_val,
+        temporal_stability_band=temporal_stability_band_val,
     )

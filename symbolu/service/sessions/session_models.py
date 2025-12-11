@@ -265,3 +265,10 @@ class SessionSummary:
     avg_macro_identity_resilience: Optional[float] = None  # Average macro-identity resilience [0.0, 1.0]
     dominant_macro_stability_band: Optional[str] = None  # Most frequent stability band: "high" | "medium" | "low" | "fragmented"
     macro_stability_tags: List[str] = field(default_factory=list)  # Collected MSR diagnostic tags (deduped, sorted)
+
+    # Phase 49 Unified Cross-Phase Temporal Stability Engine (observation only)
+    avg_temporal_stability: Optional[float] = None  # Average temporal stability index [0.0, 1.0]
+    avg_predictive_entropy: Optional[float] = None  # Average predictive entropy [0.0, 1.0]
+    avg_future_consistency: Optional[float] = None  # Average future consistency [0.0, 1.0]
+    dominant_temporal_regime: Optional[str] = None  # Most frequent dominant regime
+    temporal_stability_band: Optional[str] = None  # Most frequent stability band: "HIGH" | "MEDIUM" | "LOW" | "FRAGMENTED"

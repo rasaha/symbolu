@@ -270,6 +270,14 @@ class PersonaEngine:
             msr_metadata = self._build_macro_stability_metadata(msr_snapshot)
             persona_response.persona_macro_stability_profile = msr_metadata
 
+        # Phase 49 Step 19.6: Extract UCTSE metadata (metadata-only, no tone changes)
+        # Extract UCTSE snapshot from coherence state
+        uctse_snapshot = self._extract_temporal_stability_snapshot(explain_log)
+        if uctse_snapshot is not None:
+            # Attach metadata to response for observability (METADATA-ONLY, NO tone changes)
+            uctse_metadata = self._build_temporal_stability_metadata(uctse_snapshot)
+            persona_response.persona_temporal_stability_profile = uctse_metadata
+
         # Step 20: Return complete response
         return persona_response
     
@@ -1861,6 +1869,88 @@ class PersonaEngine:
                 "macro_identity_resilience": getattr(msr_snapshot, 'macro_identity_resilience', 0.0),
                 "stability_band": getattr(msr_snapshot, 'stability_band', None),
                 "diagnostic_tags": getattr(msr_snapshot, 'diagnostic_tags', []),
+            }
+
+    def _extract_temporal_stability_snapshot(
+        self,
+        explain_log: Optional[Any]
+    ) -> Optional[Any]:
+        """
+        Phase 49: Extract Unified Cross-Phase Temporal Stability Engine (UCTSE) snapshot.
+
+        This method extracts the UCTSE snapshot from coherence state for metadata extraction.
+        This is METADATA-ONLY and does NOT affect tone or any other behavior.
+
+        Args:
+            explain_log: ExplanationLog (contains coherence_state)
+
+        Returns:
+            UnifiedTemporalStabilitySnapshot or None
+
+        Behavior:
+            • Extracts temporal_stability_snapshot from coherence state
+            • NEVER modifies tone or persona behavior
+        """
+        if explain_log is None:
+            return None
+
+        coherence_state = getattr(explain_log, 'coherence_state', None)
+        if coherence_state is None:
+            return None
+
+        # Extract UCTSE snapshot from coherence state
+        if isinstance(coherence_state, dict):
+            uctse_snapshot = coherence_state.get('temporal_stability_snapshot')
+        else:
+            uctse_snapshot = getattr(coherence_state, 'temporal_stability_snapshot', None)
+
+        return uctse_snapshot
+
+    def _build_temporal_stability_metadata(
+        self,
+        uctse_snapshot: Any
+    ) -> Dict[str, Any]:
+        """
+        Phase 49: Build UCTSE metadata from snapshot.
+
+        This method extracts metadata from the UCTSE snapshot for observability.
+        This is METADATA-ONLY and does NOT affect tone or any other behavior.
+
+        Args:
+            uctse_snapshot: UnifiedTemporalStabilitySnapshot or dict
+
+        Returns:
+            dict: Metadata dictionary for observability
+
+        Behavior:
+            • Extracts temporal_stability_index, drift_risk, predictive_entropy, etc.
+            • Extracts stability_band, dominant_regime, and diagnostic_tags
+            • NEVER modifies tone or persona behavior
+        """
+        if uctse_snapshot is None:
+            return {}
+
+        # Handle both snapshot objects and dicts
+        if isinstance(uctse_snapshot, dict):
+            return {
+                "temporal_stability_index": uctse_snapshot.get('temporal_stability_index', 0.0),
+                "drift_risk": uctse_snapshot.get('drift_risk', 0.0),
+                "predictive_entropy": uctse_snapshot.get('predictive_entropy', 0.0),
+                "future_consistency": uctse_snapshot.get('future_consistency', 0.0),
+                "dominant_regime": uctse_snapshot.get('dominant_regime'),
+                "stability_band": uctse_snapshot.get('stability_band'),
+                "diagnostic_tags": uctse_snapshot.get('diagnostic_tags', []),
+            }
+        else:
+            # Snapshot object
+            return {
+                "temporal_stability_index": getattr(uctse_snapshot, 'temporal_stability_index', 0.0),
+                "drift_risk": getattr(uctse_snapshot, 'drift_risk', 0.0),
+                "predictive_entropy": getattr(uctse_snapshot, 'predictive_entropy', 0.0),
+                "future_consistency": getattr(uctse_snapshot, 'future_consistency', 0.0),
+                "dominant_regime": getattr(uctse_snapshot, 'dominant_regime', None),
+                "stability_band": getattr(uctse_snapshot, 'stability_band', None),
+                "diagnostic_tags": getattr(uctse_snapshot, 'diagnostic_tags', []),
             }
 
     def _build_scenario_fusion_metadata(

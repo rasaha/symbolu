@@ -95,6 +95,7 @@ class UnifiedOutput:
     trajectory_field_convergence: Optional[Dict[str, Any]] = None  # Phase 46: Trajectory Field Convergence Engine (TFCE) (observation-only, analytics/UI-only)
     unified_trajectory_scenario_synthesis: Optional[Dict[str, Any]] = None  # Phase 47: Unified Trajectory–Scenario Synthesis Engine (UTSSE) (observation-only, analytics/UI-only)
     macro_stability_regulator: Optional[Dict[str, Any]] = None  # Phase 48: Macro-Stability Regulator (MSR) (observation-only, analytics/UI-only)
+    temporal_stability: Optional[Dict[str, Any]] = None  # Phase 49: Unified Cross-Phase Temporal Stability Engine (UCTSE) (observation-only, analytics/UI-only)
     persona_echo_profile: Optional[Dict[str, Any]] = None  # Phase 31: Adaptive Persona Echo Layer (APEL) (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1217,6 +1218,22 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "diagnostic_tags": getattr(msr_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 49: Extract Unified Cross-Phase Temporal Stability Engine (UCTSE) data (observation-only, analytics/UI-only)
+    uctse_data = None
+    if hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        uctse_snapshot = getattr(ctx.coherence_state, 'temporal_stability_snapshot', None)
+        if uctse_snapshot is not None:
+            # Build dict from snapshot fields
+            uctse_data = {
+                "temporal_stability_index": getattr(uctse_snapshot, 'temporal_stability_index', 0.0),
+                "drift_risk": getattr(uctse_snapshot, 'drift_risk', 0.0),
+                "predictive_entropy": getattr(uctse_snapshot, 'predictive_entropy', 0.0),
+                "future_consistency": getattr(uctse_snapshot, 'future_consistency', 0.0),
+                "dominant_regime": getattr(uctse_snapshot, 'dominant_regime', None),
+                "stability_band": getattr(uctse_snapshot, 'stability_band', None),
+                "diagnostic_tags": getattr(uctse_snapshot, 'diagnostic_tags', []),
+            }
+
     # Phase 31: Extract Adaptive Persona Echo Layer (APEL) data (observation-only, tone-level only)
     echo_profile_data = None
     # Try to extract from persona response (if available)
@@ -1262,6 +1279,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         trajectory_field_convergence=tfce_data,  # Phase 46
         unified_trajectory_scenario_synthesis=utsse_data,  # Phase 47
         macro_stability_regulator=msr_data,  # Phase 48
+        temporal_stability=uctse_data,  # Phase 49
         persona_echo_profile=echo_profile_data,  # Phase 31
     )
 

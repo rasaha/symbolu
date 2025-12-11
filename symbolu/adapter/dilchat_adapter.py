@@ -1553,6 +1553,49 @@ def _build_badges(
                 description="Forecasting subsystems show low confidence and alignment."
             ))
 
+    # ========================================================================
+    # Phase 49: Unified Cross-Phase Temporal Stability Engine (UCTSE) Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract Phase 49 UCTSE data from unified_output
+    temporal_stability = unified_output.get("temporal_stability") if unified_output else None
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and temporal_stability:
+        temporal_stability_index = temporal_stability.get("temporal_stability_index", 0.0)
+        stability_band = temporal_stability.get("stability_band")
+
+        # TEMPORAL_STABILITY_HIGH badge
+        if stability_band == "HIGH" and temporal_stability_index >= 0.75:
+            badges.append(DILchatBadge(
+                label="Temporal Stability: High",
+                level="info",
+                description="Strong temporal stability across all forecasting phases. Low drift risk and high future consistency."
+            ))
+
+        # TEMPORAL_STABILITY_MEDIUM badge
+        elif stability_band == "MEDIUM":
+            badges.append(DILchatBadge(
+                label="Temporal Stability: Medium",
+                level="info",
+                description="Moderate temporal stability. Balanced stability with manageable drift risk."
+            ))
+
+        # TEMPORAL_STABILITY_LOW badge
+        elif stability_band == "LOW":
+            badges.append(DILchatBadge(
+                label="Temporal Stability: Low",
+                level="warning",
+                description="Limited temporal stability. Elevated drift risk detected across forecasting layers."
+            ))
+
+        # TEMPORAL_STABILITY_FRAGMENTED badge
+        elif stability_band == "FRAGMENTED":
+            badges.append(DILchatBadge(
+                label="Temporal Stability: Fragmented",
+                level="warning",
+                description="Fragmented temporal stability. High drift risk and low predictive consistency."
+            ))
+
     return badges
 
 
