@@ -254,7 +254,15 @@ class PersonaEngine:
             tfce_metadata = self._build_trajectory_convergence_metadata(tfce_snapshot)
             persona_response.persona_trajectory_convergence = tfce_metadata
 
-        # Step 19: Return complete response
+        # Phase 47 Step 19: Extract UTSSE metadata (metadata-only, no tone changes)
+        # Extract UTSSE snapshot from coherence state
+        utsse_snapshot = self._extract_unified_synthesis(explain_log)
+        if utsse_snapshot is not None:
+            # Attach metadata to response for observability (METADATA-ONLY, NO tone changes)
+            utsse_metadata = self._build_unified_synthesis_metadata(utsse_snapshot)
+            persona_response.persona_unified_synthesis_profile = utsse_metadata
+
+        # Step 20: Return complete response
         return persona_response
     
     def _order_layers(
@@ -1682,6 +1690,87 @@ class PersonaEngine:
                 "convergence_band": getattr(tfce_snapshot, 'convergence_band', None),
                 "dominant_convergence_signal": getattr(tfce_snapshot, 'dominant_convergence_signal', None),
                 "diagnostic_tags": getattr(tfce_snapshot, 'diagnostic_tags', []),
+            }
+
+    def _extract_unified_synthesis(
+        self,
+        explain_log: Dict[str, Any]
+    ) -> Optional[Any]:
+        """
+        Phase 47: Extract UTSSE snapshot from coherence state.
+
+        This method safely extracts the UTSSE snapshot from the coherence state if available.
+
+        Args:
+            explain_log: MLCR explain log with coherence state
+
+        Returns:
+            UnifiedTrajectoryScenarioSnapshot or None if not available
+
+        Behavior:
+            • Returns None if no coherence state present
+            • Returns None if UTSSE computation was not run
+            • Returns snapshot if successfully computed
+        """
+        # Try coherence_state path first (most common)
+        coherence_state = explain_log.get('coherence_state')
+        if coherence_state is not None:
+            utsse_snapshot = getattr(coherence_state, 'trajectory_scenario_synthesis_snapshot', None)
+            if utsse_snapshot is not None:
+                return utsse_snapshot
+
+        return None
+
+    def _build_unified_synthesis_metadata(
+        self,
+        utsse_snapshot: Any
+    ) -> Dict[str, Any]:
+        """
+        Phase 47: Build UTSSE metadata from snapshot.
+
+        This method extracts metadata from the UTSSE snapshot for observability.
+        This is METADATA-ONLY and does NOT affect tone or any other behavior.
+
+        Args:
+            utsse_snapshot: UnifiedTrajectoryScenarioSnapshot or dict
+
+        Returns:
+            dict: Metadata dictionary for observability
+
+        Behavior:
+            • Extracts synthesis_integrity_score, future_state_alignment_score, etc.
+            • Extracts synthesis_band and dominant_future_path
+            • Extracts diagnostic_tags
+            • NEVER modifies tone or persona behavior
+        """
+        if utsse_snapshot is None:
+            return {}
+
+        # Handle both snapshot objects and dicts
+        if isinstance(utsse_snapshot, dict):
+            return {
+                "synthesis_integrity_score": utsse_snapshot.get('synthesis_integrity_score', 0.0),
+                "future_state_alignment_score": utsse_snapshot.get('future_state_alignment_score', 0.0),
+                "future_state_coherence_score": utsse_snapshot.get('future_state_coherence_score', 0.0),
+                "cross_horizon_consistency_score": utsse_snapshot.get('cross_horizon_consistency_score', 0.0),
+                "future_divergence_risk": utsse_snapshot.get('future_divergence_risk', 0.0),
+                "convergence_signal_strength": utsse_snapshot.get('convergence_signal_strength', 0.0),
+                "dominant_future_path": utsse_snapshot.get('dominant_future_path'),
+                "synthesis_band": utsse_snapshot.get('synthesis_band'),
+                "diagnostic_tags": utsse_snapshot.get('diagnostic_tags', []),
+            }
+        else:
+            # Snapshot object
+            return {
+                "synthesis_integrity_score": getattr(utsse_snapshot, 'synthesis_integrity_score', 0.0),
+                "future_state_alignment_score": getattr(utsse_snapshot, 'future_state_alignment_score', 0.0),
+                "future_state_coherence_score": getattr(utsse_snapshot, 'future_state_coherence_score', 0.0),
+                "cross_horizon_consistency_score": getattr(utsse_snapshot, 'cross_horizon_consistency_score', 0.0),
+                "future_divergence_risk": getattr(utsse_snapshot, 'future_divergence_risk', 0.0),
+                "convergence_signal_strength": getattr(utsse_snapshot, 'convergence_signal_strength', 0.0),
+                "dominant_future_path": getattr(utsse_snapshot, 'dominant_future_path', None),
+                "synthesis_band": getattr(utsse_snapshot, 'synthesis_band', None),
+                "diagnostic_tags": getattr(utsse_snapshot, 'diagnostic_tags', []),
             }
 
     def _build_scenario_fusion_metadata(

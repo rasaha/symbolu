@@ -278,6 +278,13 @@ class CoherenceObservation:
     tfce_band: Optional[str] = None  # Convergence band: "high" | "medium" | "low" | "fragmented"
     tfce_tags: List[str] = field(default_factory=list)  # TFCE diagnostic tags
 
+    # Phase 47: Unified Trajectory–Scenario Synthesis Engine (UTSSE) (observation only)
+    synthesis_integrity: float = 0.0  # Synthesis Integrity Score [0.0, 1.0]
+    synthesis_alignment: float = 0.0  # Future State Alignment Score [0.0, 1.0]
+    synthesis_divergence: float = 0.0  # Future Divergence Risk [0.0, 1.0]
+    synthesis_band: Optional[str] = None  # Synthesis band: "HIGH" | "MEDIUM" | "LOW" | "FRAGMENTED"
+    synthesis_tags: List[str] = field(default_factory=list)  # UTSSE diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -987,6 +994,22 @@ class CoherenceObserver:
                 tfce_band = getattr(tfce_snapshot, 'convergence_band', None)
                 tfce_tags = getattr(tfce_snapshot, 'diagnostic_tags', [])
 
+        # Phase 47: Extract Unified Trajectory–Scenario Synthesis Engine (UTSSE) from coherence state
+        synthesis_integrity = 0.0
+        synthesis_alignment = 0.0
+        synthesis_divergence = 0.0
+        synthesis_band = None
+        synthesis_tags = []
+
+        if coherence_state is not None:
+            utsse_snapshot = getattr(coherence_state, 'trajectory_scenario_synthesis_snapshot', None)
+            if utsse_snapshot is not None:
+                synthesis_integrity = getattr(utsse_snapshot, 'synthesis_integrity_score', 0.0)
+                synthesis_alignment = getattr(utsse_snapshot, 'future_state_alignment_score', 0.0)
+                synthesis_divergence = getattr(utsse_snapshot, 'future_divergence_risk', 0.0)
+                synthesis_band = getattr(utsse_snapshot, 'synthesis_band', None)
+                synthesis_tags = getattr(utsse_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -1180,6 +1203,11 @@ class CoherenceObserver:
             tfce_stability_index=tfce_stability_index,  # Phase 46
             tfce_band=tfce_band,  # Phase 46
             tfce_tags=tfce_tags,  # Phase 46
+            synthesis_integrity=synthesis_integrity,  # Phase 47
+            synthesis_alignment=synthesis_alignment,  # Phase 47
+            synthesis_divergence=synthesis_divergence,  # Phase 47
+            synthesis_band=synthesis_band,  # Phase 47
+            synthesis_tags=synthesis_tags,  # Phase 47
         )
 
         # Store observation

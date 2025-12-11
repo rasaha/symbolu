@@ -344,6 +344,14 @@ class CoherenceState:
     tfce_dominant_signal_history: List[str] = field(default_factory=list)  # Dominant convergence signal history
     tfce_tags_history: List[List[str]] = field(default_factory=list)  # Diagnostic tags history
 
+    # Phase 47: Unified Trajectory–Scenario Synthesis Engine (observation only - not used in scoring)
+    trajectory_scenario_synthesis_snapshot: Optional[Any] = None  # UnifiedTrajectoryScenarioSnapshot (latest)
+    synthesis_integrity_history: List[float] = field(default_factory=list)  # Synthesis integrity score history
+    synthesis_alignment_history: List[float] = field(default_factory=list)  # Future state alignment history
+    synthesis_divergence_history: List[float] = field(default_factory=list)  # Future divergence risk history
+    synthesis_band_history: List[str] = field(default_factory=list)  # Synthesis band history
+    synthesis_tags_history: List[List[str]] = field(default_factory=list)  # Diagnostic tags history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -498,6 +506,13 @@ class CoherenceState:
         self.tfce_convergence_band_history = self.tfce_convergence_band_history[-window:]
         self.tfce_dominant_signal_history = self.tfce_dominant_signal_history[-window:]
         self.tfce_tags_history = self.tfce_tags_history[-window:]
+
+        # Phase 47 unified trajectory scenario synthesis engine formula history
+        self.synthesis_integrity_history = self.synthesis_integrity_history[-window:]
+        self.synthesis_alignment_history = self.synthesis_alignment_history[-window:]
+        self.synthesis_divergence_history = self.synthesis_divergence_history[-window:]
+        self.synthesis_band_history = self.synthesis_band_history[-window:]
+        self.synthesis_tags_history = self.synthesis_tags_history[-window:]
 
     def get_history_length(self) -> int:
         """
