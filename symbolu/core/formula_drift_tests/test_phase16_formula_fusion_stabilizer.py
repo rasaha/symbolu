@@ -512,6 +512,14 @@ class TestGroupC_UnifiedAPIObserver:
         ctx.coherence_state.smi_history = []
         ctx.coherence_state.vritti_momentum_history = []
         ctx.coherence_state.arc_tension_harmonizer_history = []
+        ctx.coherence_state.mirror_cycle_history = []
+        ctx.coherence_state.cause_effect_inversion_history = []
+        ctx.coherence_state.resonance_weighting_history = []
+        ctx.coherence_state.ucf_history = []
+        ctx.coherence_state.temporal_entropy_volatility = None
+        ctx.coherence_state.cognitive_drift_v3 = None
+        ctx.coherence_state.drift_pattern_tags = None
+        ctx.coherence_state.ucf_notes = None
 
         ctx.coherence_report = {
             "coherence_score": 0.75,
@@ -569,6 +577,14 @@ class TestGroupC_UnifiedAPIObserver:
         ctx.coherence_state.smi_history = []
         ctx.coherence_state.vritti_momentum_history = []
         ctx.coherence_state.arc_tension_harmonizer_history = []
+        ctx.coherence_state.mirror_cycle_history = []
+        ctx.coherence_state.cause_effect_inversion_history = []
+        ctx.coherence_state.resonance_weighting_history = []
+        ctx.coherence_state.ucf_history = []
+        ctx.coherence_state.temporal_entropy_volatility = None
+        ctx.coherence_state.cognitive_drift_v3 = None
+        ctx.coherence_state.drift_pattern_tags = None
+        ctx.coherence_state.ucf_notes = None
 
         ctx.coherence_report = {
             "coherence_score": 0.75,
@@ -626,6 +642,14 @@ class TestGroupC_UnifiedAPIObserver:
         ctx.coherence_state.smi_history = []
         ctx.coherence_state.vritti_momentum_history = []
         ctx.coherence_state.arc_tension_harmonizer_history = []
+        ctx.coherence_state.mirror_cycle_history = []
+        ctx.coherence_state.cause_effect_inversion_history = []
+        ctx.coherence_state.resonance_weighting_history = []
+        ctx.coherence_state.ucf_history = []
+        ctx.coherence_state.temporal_entropy_volatility = None
+        ctx.coherence_state.cognitive_drift_v3 = None
+        ctx.coherence_state.drift_pattern_tags = None
+        ctx.coherence_state.ucf_notes = None
 
         ctx.coherence_report = {
             "coherence_score": 0.75,
@@ -683,6 +707,20 @@ class TestGroupC_UnifiedAPIObserver:
         ctx.coherence_state.bhava_id_history = [1]
         ctx.coherence_state.bhava_direction_history = ["stable"]
         ctx.coherence_state.smi_history = [0.7]
+        ctx.coherence_state.delta_smi_history = []
+        ctx.coherence_state.bhava_gap_history = []
+        ctx.coherence_state.tension_corridor_history = []
+        ctx.coherence_state.vritti_momentum_history = []
+        ctx.coherence_state.arc_tension_harmonizer_history = []
+        ctx.coherence_state.mirror_cycle_history = []
+        ctx.coherence_state.cause_effect_inversion_history = []
+        ctx.coherence_state.resonance_weighting_history = []
+        ctx.coherence_state.ucf_history = []
+        ctx.coherence_state.temporal_entropy_volatility = None
+        ctx.coherence_state.cognitive_drift_v3 = None
+        ctx.coherence_state.drift_pattern_tags = None
+        ctx.coherence_state.ucf_notes = None
+        ctx.coherence_state.symbolic_harmonization_snapshot = None
         ctx.coherence_state.coherence_fused = 0.76
         ctx.coherence_state.fusion_stability_weight = 0.85
         ctx.coherence_state.fusion_inertia_factor = 0.9
@@ -719,6 +757,20 @@ class TestGroupC_UnifiedAPIObserver:
         ctx.coherence_state.bhava_id_history = [1]
         ctx.coherence_state.bhava_direction_history = ["stable"]
         ctx.coherence_state.smi_history = [0.7]
+        ctx.coherence_state.delta_smi_history = []
+        ctx.coherence_state.bhava_gap_history = []
+        ctx.coherence_state.tension_corridor_history = []
+        ctx.coherence_state.vritti_momentum_history = []
+        ctx.coherence_state.arc_tension_harmonizer_history = []
+        ctx.coherence_state.mirror_cycle_history = []
+        ctx.coherence_state.cause_effect_inversion_history = []
+        ctx.coherence_state.resonance_weighting_history = []
+        ctx.coherence_state.ucf_history = []
+        ctx.coherence_state.temporal_entropy_volatility = None
+        ctx.coherence_state.cognitive_drift_v3 = None
+        ctx.coherence_state.drift_pattern_tags = None
+        ctx.coherence_state.ucf_notes = None
+        ctx.coherence_state.symbolic_harmonization_snapshot = None
         ctx.coherence_state.coherence_fused = 0.76
         ctx.coherence_state.fusion_stability_weight = 0.85
         ctx.coherence_state.fusion_inertia_factor = 0.9

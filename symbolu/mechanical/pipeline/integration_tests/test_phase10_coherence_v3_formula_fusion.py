@@ -524,6 +524,7 @@ def test_v3_ignored_for_all_domains_by_default():
             "coherence_score": 0.60,
             "coherence_score_v2": 0.70,
             "coherence_score_v3": 0.80,
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
         }
     }
 
@@ -549,8 +550,10 @@ def test_v3_ignored_for_all_domains_by_default():
 
         active_score = _get_active_coherence_score(unified, profile)
 
-        # Should use v3
-        assert active_score == 0.80
+        # Should use v3 (check it's the v3 score, not exact value which may drift)
+        v3_score = unified["coherence"].get("coherence_score_v3")
+        if v3_score is not None:
+            assert active_score == v3_score
 
 
 def test_v3_enabled_uses_v3():
@@ -560,6 +563,7 @@ def test_v3_enabled_uses_v3():
             "coherence_score": 0.60,
             "coherence_score_v2": 0.70,
             "coherence_score_v3": 0.80,
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
         }
     }
 
@@ -570,7 +574,8 @@ def test_v3_enabled_uses_v3():
     }
 
     active_score = _get_active_coherence_score(unified, profile_v3)
-    assert active_score == 0.80  # Should use v3
+    # Should use v3 (check it equals v3 score, not hardcoded value)
+    assert active_score == unified["coherence"]["coherence_score_v3"]
 
 
 def test_v3_fallback_to_v2_or_v1():
@@ -609,11 +614,13 @@ def test_v3_fallback_to_v2_or_v1():
             "coherence_score": 0.60,
             "coherence_score_v2": 0.70,
             "coherence_score_v3": 0.80,
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
         }
     }
 
     score3 = _get_active_coherence_score(unified_all, profile_v3_v2)
-    assert score3 == 0.80  # Uses v3
+    # Uses v3 (check it equals v3 score)
+    assert score3 == unified_all["coherence"]["coherence_score_v3"]
 
 
 def test_v3_policy_determinism():
@@ -815,6 +822,7 @@ def test_policy_flags_unaffected_unless_enabled():
             "coherence_score": 0.58,
             "coherence_score_v2": 0.68,
             "coherence_score_v3": 0.78,
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": 0.42,
             "mapper_volatility_score": 0.38,
             "temporal_arc_score": 0.62,
@@ -837,7 +845,8 @@ def test_policy_flags_unaffected_unless_enabled():
     profile_v3_enabled["use_coherence_v3"] = True
 
     score_with_v3 = _get_active_coherence_score(unified, profile_v3_enabled)
-    assert score_with_v3 == 0.78  # Would use v3 if enabled
+    # Would use v3 if enabled (check it equals v3 score)
+    assert score_with_v3 == unified["coherence"]["coherence_score_v3"]
 
 
 # ============================================================================
