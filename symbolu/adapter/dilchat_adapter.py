@@ -1318,6 +1318,67 @@ def _build_badges(
                 description="Scenario paths are diverging with weak consensus across coherence regimes."
             ))
 
+    # ========================================================================
+    # Phase 44: Coherence-Scenario Alignment Engine Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract coherence_scenario_alignment from unified_output
+    csae = unified_output.get("coherence_scenario_alignment") if unified_output else None
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and csae is not None:
+        alignment_band = csae.get("alignment_band")
+        alignment_score = csae.get("alignment_score")
+        conflict_index = csae.get("conflict_index")
+        csae_tags = csae.get("diagnostic_tags", [])
+
+        # CSAE_ALIGNMENT_HIGH: high alignment band
+        if alignment_band == "high":
+            badges.append(DILchatBadge(
+                label="CSAE_ALIGNMENT_HIGH",
+                level="info",
+                description="High alignment between temporal forecasts, scenario paths, and identity continuity signals."
+            ))
+
+        # CSAE_ALIGNMENT_MEDIUM: medium alignment band
+        if alignment_band == "medium":
+            badges.append(DILchatBadge(
+                label="CSAE_ALIGNMENT_MEDIUM",
+                level="info",
+                description="Moderate alignment across forecast horizons and scenario fusion signals."
+            ))
+
+        # CSAE_ALIGNMENT_LOW: low alignment band
+        if alignment_band == "low":
+            badges.append(DILchatBadge(
+                label="CSAE_ALIGNMENT_LOW",
+                level="warning",
+                description="Low alignment between coherence forecasts and scenario paths. Weak signal consensus."
+            ))
+
+        # CSAE_ALIGNMENT_CONFLICT: conflict band
+        if alignment_band == "conflict":
+            badges.append(DILchatBadge(
+                label="CSAE_ALIGNMENT_CONFLICT",
+                level="warning",
+                description="Conflicting signals detected between temporal forecasts, scenario paths, and identity continuity."
+            ))
+
+        # CSAE_STRONG_CONSENSUS: strong alignment from tags
+        if "strong_alignment_multi_horizon" in csae_tags or "alignment_coherence_rising" in csae_tags:
+            badges.append(DILchatBadge(
+                label="CSAE_STRONG_CONSENSUS",
+                level="info",
+                description="Strong multi-horizon consensus with rising coherence alignment across all forecast windows."
+            ))
+
+        # CSAE_SCENARIO_CONTRADICTION: contradiction detected
+        if "scenario_contradiction_detected" in csae_tags or "drift_conflict" in csae_tags:
+            badges.append(DILchatBadge(
+                label="CSAE_SCENARIO_CONTRADICTION",
+                level="warning",
+                description="Contradiction detected between scenario paths and coherence forecasts. High conflict index."
+            ))
+
     return badges
 
 

@@ -230,7 +230,15 @@ class PersonaEngine:
             scenario_fusion_metadata = self._build_scenario_fusion_metadata(scenario_fusion_snapshot)
             persona_response.persona_scenario_fusion = scenario_fusion_metadata
 
-        # Step 16: Return complete response
+        # Phase 44 Step 16: Extract coherence-scenario alignment metadata (metadata-only, no tone changes)
+        # Extract coherence-scenario alignment snapshot from coherence state
+        scenario_alignment_snapshot = self._extract_scenario_alignment(explain_log)
+        if scenario_alignment_snapshot is not None:
+            # Attach metadata to response for observability (METADATA-ONLY, NO tone changes)
+            scenario_alignment_metadata = self._build_scenario_alignment_metadata(scenario_alignment_snapshot)
+            persona_response.persona_scenario_alignment = scenario_alignment_metadata
+
+        # Step 17: Return complete response
         return persona_response
     
     def _order_layers(
@@ -1414,6 +1422,102 @@ class PersonaEngine:
                     }
 
         return None
+
+    def _extract_scenario_alignment(
+        self,
+        explain_log: Dict[str, Any]
+    ) -> Optional[Any]:
+        """
+        Phase 44: Extract coherence-scenario alignment snapshot from coherence state.
+
+        This method safely extracts the coherence-scenario alignment snapshot from the
+        coherence state if available.
+
+        Args:
+            explain_log: MLCR explain log with coherence state
+
+        Returns:
+            CoherenceScenarioAlignmentSnapshot or None if not available
+
+        Behavior:
+            • Returns None if no coherence state present
+            • Returns None if coherence-scenario alignment computation was not run
+            • Returns snapshot if successfully computed
+        """
+        # Try coherence_state path first (most common)
+        coherence_state = explain_log.get('coherence_state')
+        if coherence_state is not None:
+            scenario_alignment_snapshot = getattr(coherence_state, 'scenario_alignment_snapshot', None)
+            if scenario_alignment_snapshot is not None:
+                return scenario_alignment_snapshot
+
+        # Try coherence_observation path (if it has CSAE data)
+        coherence_observation = explain_log.get('coherence_observation')
+        if coherence_observation is not None:
+            # Check if observation has CSAE fields
+            if hasattr(coherence_observation, 'csae_alignment_score'):
+                # Build a minimal snapshot from observation fields
+                csae_alignment_score = getattr(coherence_observation, 'csae_alignment_score', None)
+                csae_conflict_index = getattr(coherence_observation, 'csae_conflict_index', None)
+                csae_stability_agreement = getattr(coherence_observation, 'csae_stability_agreement', None)
+                csae_alignment_band = getattr(coherence_observation, 'csae_alignment_band', None)
+                csae_diagnostic_tags = getattr(coherence_observation, 'csae_diagnostic_tags', [])
+
+                # If we have meaningful data, create a minimal dict
+                if csae_alignment_score is not None or csae_conflict_index is not None:
+                    return {
+                        'alignment_score': csae_alignment_score,
+                        'conflict_index': csae_conflict_index,
+                        'stability_agreement': csae_stability_agreement,
+                        'overall_alignment_band': csae_alignment_band,
+                        'diagnostic_tags': csae_diagnostic_tags,
+                    }
+
+        return None
+
+    def _build_scenario_alignment_metadata(
+        self,
+        scenario_alignment_snapshot: Any
+    ) -> Dict[str, Any]:
+        """
+        Phase 44: Build coherence-scenario alignment metadata from snapshot.
+
+        This method extracts metadata from the CSAE snapshot for observability.
+        This is METADATA-ONLY and does NOT affect tone or any other behavior.
+
+        Args:
+            scenario_alignment_snapshot: CoherenceScenarioAlignmentSnapshot or dict
+
+        Returns:
+            dict: Metadata dictionary for observability
+
+        Behavior:
+            • Extracts alignment_score, conflict_index, stability_agreement
+            • Extracts overall_alignment_band
+            • Extracts diagnostic_tags
+            • NEVER modifies tone or persona behavior
+        """
+        if scenario_alignment_snapshot is None:
+            return {}
+
+        # Handle both snapshot objects and dicts
+        if isinstance(scenario_alignment_snapshot, dict):
+            return {
+                "alignment_score": scenario_alignment_snapshot.get('alignment_score'),
+                "conflict_index": scenario_alignment_snapshot.get('conflict_index'),
+                "stability_agreement": scenario_alignment_snapshot.get('stability_agreement'),
+                "alignment_band": scenario_alignment_snapshot.get('overall_alignment_band'),
+                "tags": scenario_alignment_snapshot.get('diagnostic_tags', []),
+            }
+        else:
+            # Snapshot object
+            return {
+                "alignment_score": getattr(scenario_alignment_snapshot, 'alignment_score', None),
+                "conflict_index": getattr(scenario_alignment_snapshot, 'conflict_index', None),
+                "stability_agreement": getattr(scenario_alignment_snapshot, 'stability_agreement', None),
+                "alignment_band": getattr(scenario_alignment_snapshot, 'overall_alignment_band', None),
+                "tags": getattr(scenario_alignment_snapshot, 'diagnostic_tags', []),
+            }
 
     def _build_scenario_fusion_metadata(
         self,

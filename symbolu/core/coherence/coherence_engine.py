@@ -262,6 +262,9 @@ class CoherenceEngine:
         # Update Phase 42 scenario fusion engine (observation only)
         self._update_scenario_fusion_engine(state)
 
+        # Update Phase 44 coherence scenario alignment engine (observation only)
+        self._update_coherence_scenario_alignment(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -3690,3 +3693,132 @@ class CoherenceEngine:
             state.scenario_divergence_history.append(None)
             state.scenario_uncertainty_band_history.append(None)
             state.dominant_future_path_history.append(None)
+
+    def _update_coherence_scenario_alignment(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 44 Coherence–Scenario Alignment Engine (observation only).
+
+        This method assesses alignment between:
+          - Phase 38/39 temporal coherence forecasts
+          - Phase 42 scenario fusion signals
+          - Phase 37 identity continuity signals (ACE)
+          - Phase 34/36 identity stability signals
+
+        The CSAE produces:
+          1. Alignment score [0.0, 1.0] - overall alignment across horizons
+          2. Conflict index [0.0, 1.0] - degree of contradiction between signals
+          3. Stability agreement [0.0, 1.0] - agreement between forecast stability and identity
+          4. Overall alignment band ("high" | "medium" | "low" | "conflict")
+          5. Diagnostic tags
+
+        The CSAE is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for analytics, dashboards, and UI diagnostics only.
+
+        This update runs AFTER Phase 42 to leverage scenario fusion outputs.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.coherence_scenario_alignment import compute_coherence_scenario_alignment
+
+        # ====================================================================
+        # STEP 1: GATHER INPUTS FROM PHASES 38, 39, 42, 37, 34, 26
+        # ====================================================================
+
+        # Phase 38 - Temporal Coherence Forecasting
+        forecast_coherence_slope = state.current_forecast_coherence_slope
+        forecast_continuity_slope = state.current_forecast_continuity_slope
+        forecast_drift_influence = state.current_forecast_drift_influence
+        forecast_entropy_forward_risk = state.current_forecast_entropy_forward_risk
+        forecast_strength = state.current_forecast_strength
+        forecast_band = state.current_forecast_band
+
+        # Phase 39 - Multi-Horizon Forecasting
+        horizon_slope_H1 = state.horizon_slope_H1
+        horizon_slope_H2 = state.horizon_slope_H2
+        horizon_slope_H3 = state.horizon_slope_H3
+        forecast_consensus_index = state.forecast_consensus_index
+        future_stability_envelope = state.future_stability_envelope
+
+        # Phase 42 - Scenario Fusion Engine
+        scenario_alignment_score = None
+        scenario_divergence_index = None
+        dominant_future_path = None
+        future_uncertainty_band = None
+
+        if state.scenario_fusion_snapshot is not None:
+            scenario_alignment_score = state.scenario_fusion_snapshot.scenario_alignment_score
+            scenario_divergence_index = state.scenario_fusion_snapshot.scenario_divergence_index
+            dominant_future_path = state.scenario_fusion_snapshot.dominant_future_path
+            future_uncertainty_band = state.scenario_fusion_snapshot.future_uncertainty_band
+
+        # Phase 37 - Adaptive Continuity Engine (ACE)
+        icc = state.current_icc  # Identity Continuity Coefficient
+        ncc = state.current_ncc  # Narrative Continuity Coefficient
+        css = state.current_css  # Continuity Stability Score
+
+        # Phase 34 - Identity Harmonics
+        cih = state.current_cih  # Core Identity Harmonic
+
+        # Phase 26 - Unified Consciousness Formula
+        csi = state.current_csi  # Consciousness Stability Index
+
+        # ====================================================================
+        # STEP 2: COMPUTE COHERENCE–SCENARIO ALIGNMENT
+        # ====================================================================
+
+        snapshot = compute_coherence_scenario_alignment(
+            # Phase 38
+            forecast_coherence_slope=forecast_coherence_slope,
+            forecast_continuity_slope=forecast_continuity_slope,
+            forecast_drift_influence=forecast_drift_influence,
+            forecast_entropy_forward_risk=forecast_entropy_forward_risk,
+            forecast_strength=forecast_strength,
+            forecast_band=forecast_band,
+            # Phase 39
+            horizon_slope_H1=horizon_slope_H1,
+            horizon_slope_H2=horizon_slope_H2,
+            horizon_slope_H3=horizon_slope_H3,
+            forecast_consensus_index=forecast_consensus_index,
+            future_stability_envelope=future_stability_envelope,
+            # Phase 42
+            scenario_alignment_score=scenario_alignment_score,
+            scenario_divergence_index=scenario_divergence_index,
+            dominant_future_path=dominant_future_path,
+            future_uncertainty_band=future_uncertainty_band,
+            # Phase 37
+            icc=icc,
+            ncc=ncc,
+            css=css,
+            # Phase 34
+            cih=cih,
+            # Phase 26
+            csi=csi,
+        )
+
+        # ====================================================================
+        # STEP 3: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Update current snapshot
+            state.scenario_alignment_snapshot = snapshot
+
+            # Append to histories
+            state.scenario_alignment_score_history.append(snapshot.alignment_score)
+            state.scenario_conflict_history.append(snapshot.conflict_index)
+            state.scenario_stability_history.append(snapshot.stability_agreement)
+            state.scenario_alignment_band_history.append(snapshot.overall_alignment_band)
+            state.scenario_tags_history.append(snapshot.diagnostic_tags.copy() if snapshot.diagnostic_tags else [])
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.scenario_alignment_snapshot = None
+
+            state.scenario_alignment_score_history.append(None)
+            state.scenario_conflict_history.append(None)
+            state.scenario_stability_history.append(None)
+            state.scenario_alignment_band_history.append(None)
+            state.scenario_tags_history.append([])

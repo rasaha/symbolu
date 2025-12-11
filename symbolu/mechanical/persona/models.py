@@ -333,6 +333,12 @@ class PersonaResponse(BaseModel):
         description="Phase 42: Scenario Fusion Engine metadata (observation-only, metadata-only)"
     )
 
+    # Phase 44: Optional coherence-scenario alignment metadata (observation-only, metadata-only)
+    persona_scenario_alignment: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Phase 44: Coherence-Scenario Alignment Engine metadata (observation-only, metadata-only)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {

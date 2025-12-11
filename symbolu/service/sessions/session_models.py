@@ -228,3 +228,10 @@ class SessionSummary:
     scenario_uncertainty_band: Optional[str] = None  # Most frequent uncertainty band: "low" | "medium" | "high"
     dominant_fused_future_path: Optional[str] = None  # Most frequent dominant future path (regime)
     scenario_pattern_tags: List[str] = field(default_factory=list)  # Collected scenario pattern tags (deduped, sorted)
+
+    # Phase 44 Coherence–Scenario Alignment Engine (observation only)
+    avg_csae_alignment: Optional[float] = None  # Average alignment score [0.0, 1.0]
+    avg_csae_conflict: Optional[float] = None  # Average conflict index [0.0, 1.0]
+    avg_csae_stability: Optional[float] = None  # Average stability agreement [0.0, 1.0]
+    csae_alignment_band: Optional[str] = None  # Most frequent alignment band: "high" | "medium" | "low" | "conflict"
+    csae_alignment_tags: List[str] = field(default_factory=list)  # Collected CSAE diagnostic tags (deduped, sorted)
