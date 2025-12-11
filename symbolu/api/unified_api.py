@@ -94,6 +94,7 @@ class UnifiedOutput:
     multi_trajectory_stability_field: Optional[Dict[str, Any]] = None  # Phase 45: Multi-Trajectory Stability Field (MTSF) (observation-only, analytics/UI-only)
     trajectory_field_convergence: Optional[Dict[str, Any]] = None  # Phase 46: Trajectory Field Convergence Engine (TFCE) (observation-only, analytics/UI-only)
     unified_trajectory_scenario_synthesis: Optional[Dict[str, Any]] = None  # Phase 47: Unified Trajectory–Scenario Synthesis Engine (UTSSE) (observation-only, analytics/UI-only)
+    macro_stability_regulator: Optional[Dict[str, Any]] = None  # Phase 48: Macro-Stability Regulator (MSR) (observation-only, analytics/UI-only)
     persona_echo_profile: Optional[Dict[str, Any]] = None  # Phase 31: Adaptive Persona Echo Layer (APEL) (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1201,6 +1202,21 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "diagnostic_tags": getattr(utsse_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 48: Extract Macro-Stability Regulator (MSR) data (observation-only, analytics/UI-only)
+    msr_data = None
+    if hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        msr_snapshot = getattr(ctx.coherence_state, 'macro_stability_snapshot', None)
+        if msr_snapshot is not None:
+            # Build dict from snapshot fields
+            msr_data = {
+                "macro_stability_index": getattr(msr_snapshot, 'macro_stability_index', 0.0),
+                "macro_divergence_index": getattr(msr_snapshot, 'macro_divergence_index', 0.0),
+                "macro_predictive_confidence": getattr(msr_snapshot, 'macro_predictive_confidence', 0.0),
+                "macro_identity_resilience": getattr(msr_snapshot, 'macro_identity_resilience', 0.0),
+                "stability_band": getattr(msr_snapshot, 'stability_band', None),
+                "diagnostic_tags": getattr(msr_snapshot, 'diagnostic_tags', []),
+            }
+
     # Phase 31: Extract Adaptive Persona Echo Layer (APEL) data (observation-only, tone-level only)
     echo_profile_data = None
     # Try to extract from persona response (if available)
@@ -1245,6 +1261,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         multi_trajectory_stability_field=mtsf_data,  # Phase 45
         trajectory_field_convergence=tfce_data,  # Phase 46
         unified_trajectory_scenario_synthesis=utsse_data,  # Phase 47
+        macro_stability_regulator=msr_data,  # Phase 48
         persona_echo_profile=echo_profile_data,  # Phase 31
     )
 

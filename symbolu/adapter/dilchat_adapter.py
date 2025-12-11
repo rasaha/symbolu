@@ -1501,6 +1501,58 @@ def _build_badges(
                 description="Strong trajectory consensus detected. High convergence with stable alignment across all predictive layers."
             ))
 
+    # ========================================================================
+    # Phase 48: Macro-Stability Regulator (MSR) Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract Phase 48 MSR data from unified_output
+    macro_stability_regulator = unified_output.get("macro_stability_regulator") if unified_output else None
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and macro_stability_regulator:
+        macro_stability_index = macro_stability_regulator.get("macro_stability_index", 0.0)
+        macro_predictive_confidence = macro_stability_regulator.get("macro_predictive_confidence", 0.0)
+        stability_band = macro_stability_regulator.get("stability_band")
+
+        # MACRO_STABILITY_HIGH badge
+        if stability_band == "high" and macro_stability_index >= 0.70:
+            badges.append(DILchatBadge(
+                label="Macro-Stability: High",
+                level="info",
+                description="Overall system stability is high across all forecasting subsystems."
+            ))
+
+        # MACRO_STABILITY_MEDIUM badge
+        elif stability_band == "medium":
+            badges.append(DILchatBadge(
+                label="Macro-Stability: Medium",
+                level="info",
+                description="Overall system stability is moderate. Some subsystems show divergence."
+            ))
+
+        # MACRO_STABILITY_LOW badge
+        elif stability_band == "low":
+            badges.append(DILchatBadge(
+                label="Macro-Stability: Low",
+                level="warning",
+                description="Overall system stability is low. Multiple subsystems showing instability."
+            ))
+
+        # MACRO_STABILITY_FRAGMENTED badge
+        elif stability_band == "fragmented":
+            badges.append(DILchatBadge(
+                label="Macro-Stability: Fragmented",
+                level="warning",
+                description="Overall system is fragmented. Significant divergence across forecasting subsystems."
+            ))
+
+        # MACRO_PREDICTIVE_UNCERTAINTY badge
+        if macro_predictive_confidence <= 0.40:
+            badges.append(DILchatBadge(
+                label="Predictive Uncertainty",
+                level="warning",
+                description="Forecasting subsystems show low confidence and alignment."
+            ))
+
     return badges
 
 

@@ -352,6 +352,15 @@ class CoherenceState:
     synthesis_band_history: List[str] = field(default_factory=list)  # Synthesis band history
     synthesis_tags_history: List[List[str]] = field(default_factory=list)  # Diagnostic tags history
 
+    # Phase 48: Macro-Stability Regulator (observation only - not used in scoring)
+    macro_stability_snapshot: Optional[Any] = None  # MacroStabilitySnapshot (latest)
+    macro_stability_index_history: List[float] = field(default_factory=list)  # Macro-stability index history
+    macro_divergence_history: List[float] = field(default_factory=list)  # Macro-divergence index history
+    macro_predictive_confidence_history: List[float] = field(default_factory=list)  # Macro-predictive confidence history
+    macro_identity_resilience_history: List[float] = field(default_factory=list)  # Macro-identity resilience history
+    macro_stability_band_history: List[str] = field(default_factory=list)  # Macro-stability band history
+    macro_stability_tags_history: List[List[str]] = field(default_factory=list)  # Macro-stability diagnostic tags history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -513,6 +522,14 @@ class CoherenceState:
         self.synthesis_divergence_history = self.synthesis_divergence_history[-window:]
         self.synthesis_band_history = self.synthesis_band_history[-window:]
         self.synthesis_tags_history = self.synthesis_tags_history[-window:]
+
+        # Phase 48 macro-stability regulator formula history
+        self.macro_stability_index_history = self.macro_stability_index_history[-window:]
+        self.macro_divergence_history = self.macro_divergence_history[-window:]
+        self.macro_predictive_confidence_history = self.macro_predictive_confidence_history[-window:]
+        self.macro_identity_resilience_history = self.macro_identity_resilience_history[-window:]
+        self.macro_stability_band_history = self.macro_stability_band_history[-window:]
+        self.macro_stability_tags_history = self.macro_stability_tags_history[-window:]
 
     def get_history_length(self) -> int:
         """

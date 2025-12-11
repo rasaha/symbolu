@@ -1485,6 +1485,102 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_synthesis_tags:
             synthesis_tags_list = sorted(set(all_synthesis_tags))
 
+        # Phase 48: Extract Macro-Stability Regulator (MSR) metrics from CoherenceState
+        all_macro_stability = []
+        all_macro_divergence = []
+        all_macro_predictive_confidence = []
+        all_macro_identity_resilience = []
+        all_macro_stability_bands = []
+        all_macro_stability_tags = []
+
+        for coh in all_coherence:
+            if coh is not None and isinstance(coh, dict):
+                # Extract from macro_stability_index_history
+                if "macro_stability_index_history" in coh:
+                    stability_history = coh["macro_stability_index_history"]
+                    if isinstance(stability_history, list):
+                        for val in stability_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_macro_stability.append(val)
+
+                # Extract from macro_divergence_history
+                if "macro_divergence_history" in coh:
+                    divergence_history = coh["macro_divergence_history"]
+                    if isinstance(divergence_history, list):
+                        for val in divergence_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_macro_divergence.append(val)
+
+                # Extract from macro_predictive_confidence_history
+                if "macro_predictive_confidence_history" in coh:
+                    confidence_history = coh["macro_predictive_confidence_history"]
+                    if isinstance(confidence_history, list):
+                        for val in confidence_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_macro_predictive_confidence.append(val)
+
+                # Extract from macro_identity_resilience_history
+                if "macro_identity_resilience_history" in coh:
+                    resilience_history = coh["macro_identity_resilience_history"]
+                    if isinstance(resilience_history, list):
+                        for val in resilience_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_macro_identity_resilience.append(val)
+
+                # Extract from macro_stability_band_history
+                if "macro_stability_band_history" in coh:
+                    band_history = coh["macro_stability_band_history"]
+                    if isinstance(band_history, list):
+                        for band in band_history:
+                            if band is not None and band != "":
+                                all_macro_stability_bands.append(band)
+
+                # Extract tags from macro_stability_tags_history
+                if "macro_stability_tags_history" in coh:
+                    tags_history = coh["macro_stability_tags_history"]
+                    if isinstance(tags_history, list):
+                        for tag_list in tags_history:
+                            if isinstance(tag_list, list):
+                                all_macro_stability_tags.extend(tag_list)
+
+        # Compute aggregates
+        avg_macro_stability_val = None
+        avg_macro_divergence_val = None
+        avg_macro_predictive_confidence_val = None
+        avg_macro_identity_resilience_val = None
+        dominant_macro_stability_band_val = None
+        macro_stability_tags_list = []
+
+        # Average macro-stability index
+        if all_macro_stability:
+            avg_macro_stability_val = sum(all_macro_stability) / len(all_macro_stability)
+
+        # Average macro-divergence index
+        if all_macro_divergence:
+            avg_macro_divergence_val = sum(all_macro_divergence) / len(all_macro_divergence)
+
+        # Average macro-predictive confidence
+        if all_macro_predictive_confidence:
+            avg_macro_predictive_confidence_val = sum(all_macro_predictive_confidence) / len(all_macro_predictive_confidence)
+
+        # Average macro-identity resilience
+        if all_macro_identity_resilience:
+            avg_macro_identity_resilience_val = sum(all_macro_identity_resilience) / len(all_macro_identity_resilience)
+
+        # Dominant macro-stability band (most frequent)
+        if all_macro_stability_bands:
+            from collections import Counter
+            band_counts = Counter(all_macro_stability_bands)
+            # Deterministic tie-breaking: most_common + sorted
+            top_bands = band_counts.most_common()
+            max_count = top_bands[0][1]
+            tied_bands = [band for band, count in top_bands if count == max_count]
+            dominant_macro_stability_band_val = sorted(tied_bands)[0]  # Deterministic tie-break
+
+        # Collect unique MSR tags (deduplicate and sort for determinism)
+        if all_macro_stability_tags:
+            macro_stability_tags_list = sorted(set(all_macro_stability_tags))
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -1577,4 +1673,10 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_future_divergence_risk=avg_synthesis_divergence_val,
         dominant_synthesis_band=dominant_synthesis_band_val,
         synthesis_tags=synthesis_tags_list,
+        avg_macro_stability=avg_macro_stability_val,
+        avg_macro_divergence=avg_macro_divergence_val,
+        avg_macro_predictive_confidence=avg_macro_predictive_confidence_val,
+        avg_macro_identity_resilience=avg_macro_identity_resilience_val,
+        dominant_macro_stability_band=dominant_macro_stability_band_val,
+        macro_stability_tags=macro_stability_tags_list,
     )
