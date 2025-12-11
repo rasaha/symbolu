@@ -361,6 +361,14 @@ class CoherenceState:
     macro_stability_band_history: List[str] = field(default_factory=list)  # Macro-stability band history
     macro_stability_tags_history: List[List[str]] = field(default_factory=list)  # Macro-stability diagnostic tags history
 
+    # Phase 49: Unified Cross-Phase Temporal Stability Engine (observation only - not used in scoring)
+    temporal_stability_snapshot: Optional[Any] = None  # UnifiedTemporalStabilitySnapshot (latest)
+    temporal_stability_history: List[Optional[Any]] = field(default_factory=list)  # List of UnifiedTemporalStabilitySnapshot
+    temporal_stability_band_history: List[str] = field(default_factory=list)  # Stability band history
+    temporal_stability_index_history: List[float] = field(default_factory=list)  # Temporal stability index history
+    temporal_stability_entropy_history: List[float] = field(default_factory=list)  # Predictive entropy history
+    temporal_stability_consistency_history: List[float] = field(default_factory=list)  # Future consistency history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -530,6 +538,13 @@ class CoherenceState:
         self.macro_identity_resilience_history = self.macro_identity_resilience_history[-window:]
         self.macro_stability_band_history = self.macro_stability_band_history[-window:]
         self.macro_stability_tags_history = self.macro_stability_tags_history[-window:]
+
+        # Phase 49 unified cross-phase temporal stability engine formula history
+        self.temporal_stability_history = self.temporal_stability_history[-window:]
+        self.temporal_stability_band_history = self.temporal_stability_band_history[-window:]
+        self.temporal_stability_index_history = self.temporal_stability_index_history[-window:]
+        self.temporal_stability_entropy_history = self.temporal_stability_entropy_history[-window:]
+        self.temporal_stability_consistency_history = self.temporal_stability_consistency_history[-window:]
 
     def get_history_length(self) -> int:
         """

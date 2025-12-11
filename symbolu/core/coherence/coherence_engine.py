@@ -288,6 +288,9 @@ class CoherenceEngine:
         # Update Phase 48 macro-stability regulator (observation only)
         self._update_macro_stability_regulator(state)
 
+        # Update Phase 49 unified cross-phase temporal stability engine (observation only)
+        self._update_unified_temporal_stability(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -4261,3 +4264,127 @@ class CoherenceEngine:
             state.macro_identity_resilience_history.append(0.0)
             state.macro_stability_band_history.append("")
             state.macro_stability_tags_history.append([])
+
+    def _update_unified_temporal_stability(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 49 Unified Cross-Phase Temporal Stability Engine (observation only).
+
+        This method synthesizes temporal stability signals across all upstream
+        forecasting, scenario, trajectory, synthesis, and macro-stability phases (35-48).
+
+        The UCTSE analyzes:
+          - Phase 35: Predictive Persona Drift (drift predictions)
+          - Phase 36: Identity Resonance Memory (identity memory)
+          - Phase 37: Adaptive Continuity Engine (continuity tracking)
+          - Phase 38: Temporal Coherence Forecasting (single-horizon forecasting)
+          - Phase 39: Multi-Horizon Temporal Forecasting (multi-horizon forecasting)
+          - Phase 41: Coherence-Regime Scenario Mapper (regime mapping)
+          - Phase 42: Scenario Fusion Engine (scenario fusion)
+          - Phase 44: Coherence-Scenario Alignment (scenario alignment)
+          - Phase 46: Trajectory Field Convergence (trajectory convergence)
+          - Phase 47: Unified Trajectory-Scenario Synthesis (unified synthesis)
+          - Phase 48: Macro-Stability Regulator (macro-stability)
+
+        The UCTSE produces:
+          1. Temporal Stability Index [0.0, 1.0] - overall temporal stability
+          2. Drift Risk [0.0, 1.0] - risk of temporal drift/instability
+          3. Predictive Entropy [0.0, 1.0] - disagreement across forecasting subsystems
+          4. Future Consistency [0.0, 1.0] - consistency of future-state predictions
+          5. Dominant Regime - primary temporal stability driver
+          6. Stability Band: HIGH | MEDIUM | LOW | FRAGMENTED
+          7. Diagnostic Tags
+
+        The UCTSE is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for analytics, dashboards, and UI diagnostics only.
+
+        This update runs AFTER Phase 48 to leverage all upstream layers.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.unified_temporal_stability import (
+            compute_unified_temporal_stability
+        )
+
+        # ====================================================================
+        # STEP 1: GATHER INPUTS FROM PHASES 35-48
+        # ====================================================================
+
+        # Phase 35 - Predictive Persona Drift
+        drift = state.predictive_drift_snapshot
+
+        # Phase 36 - Identity Resonance Memory
+        identity = state.identity_resonance_memory_snapshot
+
+        # Phase 37 - Adaptive Continuity Engine
+        continuity = state.adaptive_continuity_snapshot
+
+        # Phase 38 - Temporal Coherence Forecasting
+        single_horizon = state.temporal_forecast_snapshot
+
+        # Phase 39 - Multi-Horizon Temporal Forecasting
+        multi_horizon = state.multi_horizon_forecast_snapshot
+
+        # Phase 41 - Coherence-Regime Scenario Mapper
+        scenario_regime = state.coherence_regime_snapshot
+
+        # Phase 42 - Scenario Fusion Engine
+        scenario_fusion = state.scenario_fusion_snapshot
+
+        # Phase 44 - Coherence-Scenario Alignment
+        scenario_alignment = state.scenario_alignment_snapshot
+
+        # Phase 46 - Trajectory Field Convergence
+        trajectory_convergence = state.trajectory_convergence_snapshot
+
+        # Phase 47 - Unified Trajectory-Scenario Synthesis
+        synthesis_integrity = state.trajectory_scenario_synthesis_snapshot
+
+        # Phase 48 - Macro-Stability Regulator
+        macro_stability = state.macro_stability_snapshot
+
+        # ====================================================================
+        # STEP 2: COMPUTE UNIFIED TEMPORAL STABILITY
+        # ====================================================================
+
+        snapshot = compute_unified_temporal_stability(
+            drift=drift,
+            identity=identity,
+            continuity=continuity,
+            single_horizon=single_horizon,
+            multi_horizon=multi_horizon,
+            scenario_regime=scenario_regime,
+            scenario_fusion=scenario_fusion,
+            scenario_alignment=scenario_alignment,
+            trajectory_convergence=trajectory_convergence,
+            synthesis_integrity=synthesis_integrity,
+            macro_stability=macro_stability,
+        )
+
+        # ====================================================================
+        # STEP 3: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Update current snapshot
+            state.temporal_stability_snapshot = snapshot
+
+            # Append to histories
+            state.temporal_stability_history.append(snapshot)
+            state.temporal_stability_band_history.append(snapshot.stability_band)
+            state.temporal_stability_index_history.append(snapshot.temporal_stability_index)
+            state.temporal_stability_entropy_history.append(snapshot.predictive_entropy)
+            state.temporal_stability_consistency_history.append(snapshot.future_consistency)
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.temporal_stability_snapshot = None
+
+            # Append None/default values to maintain history alignment
+            state.temporal_stability_history.append(None)
+            state.temporal_stability_band_history.append("")
+            state.temporal_stability_index_history.append(0.0)
+            state.temporal_stability_entropy_history.append(0.0)
+            state.temporal_stability_consistency_history.append(0.0)

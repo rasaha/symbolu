@@ -363,6 +363,12 @@ class PersonaResponse(BaseModel):
         description="Phase 48: Macro-Stability Regulator (MSR) metadata (observation-only, metadata-only)"
     )
 
+    # Phase 49: Optional unified cross-phase temporal stability metadata (observation-only, metadata-only)
+    persona_temporal_stability_profile: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Phase 49: Unified Cross-Phase Temporal Stability Engine (UCTSE) metadata (observation-only, metadata-only)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {

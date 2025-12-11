@@ -293,6 +293,13 @@ class CoherenceObservation:
     macro_stability_band: Optional[str] = None  # Macro-stability band: "high" | "medium" | "low" | "fragmented"
     macro_stability_tags: List[str] = field(default_factory=list)  # MSR diagnostic tags
 
+    # Phase 49: Unified Cross-Phase Temporal Stability Engine (UCTSE) (observation only)
+    temporal_stability_index: float = 0.0  # Temporal Stability Index [0.0, 1.0]
+    predictive_entropy: float = 0.0  # Predictive Entropy [0.0, 1.0]
+    future_consistency: float = 0.0  # Future Consistency [0.0, 1.0]
+    temporal_stability_band: Optional[str] = None  # Temporal stability band: "HIGH" | "MEDIUM" | "LOW" | "FRAGMENTED"
+    temporal_stability_tags: List[str] = field(default_factory=list)  # UCTSE diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -1036,6 +1043,22 @@ class CoherenceObserver:
                 macro_stability_band = getattr(msr_snapshot, 'stability_band', None)
                 macro_stability_tags = getattr(msr_snapshot, 'diagnostic_tags', [])
 
+        # Phase 49: Extract Unified Cross-Phase Temporal Stability Engine (UCTSE) from coherence state
+        temporal_stability_index = 0.0
+        predictive_entropy = 0.0
+        future_consistency = 0.0
+        temporal_stability_band = None
+        temporal_stability_tags = []
+
+        if coherence_state is not None:
+            uctse_snapshot = getattr(coherence_state, 'temporal_stability_snapshot', None)
+            if uctse_snapshot is not None:
+                temporal_stability_index = getattr(uctse_snapshot, 'temporal_stability_index', 0.0)
+                predictive_entropy = getattr(uctse_snapshot, 'predictive_entropy', 0.0)
+                future_consistency = getattr(uctse_snapshot, 'future_consistency', 0.0)
+                temporal_stability_band = getattr(uctse_snapshot, 'stability_band', None)
+                temporal_stability_tags = getattr(uctse_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -1240,6 +1263,11 @@ class CoherenceObserver:
             macro_identity_resilience=macro_identity_resilience,  # Phase 48
             macro_stability_band=macro_stability_band,  # Phase 48
             macro_stability_tags=macro_stability_tags,  # Phase 48
+            temporal_stability_index=temporal_stability_index,  # Phase 49
+            predictive_entropy=predictive_entropy,  # Phase 49
+            future_consistency=future_consistency,  # Phase 49
+            temporal_stability_band=temporal_stability_band,  # Phase 49
+            temporal_stability_tags=temporal_stability_tags,  # Phase 49
         )
 
         # Store observation
