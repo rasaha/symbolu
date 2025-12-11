@@ -134,6 +134,12 @@ class CoherenceEngine:
                 forecast_band_history=prev_state.forecast_band_history.copy(),
                 forecast_strength_history=prev_state.forecast_strength_history.copy(),
                 drift_influence_history=prev_state.drift_influence_history.copy(),
+                mtsf_tsi_history=prev_state.mtsf_tsi_history.copy(),
+                mtsf_tvi_history=prev_state.mtsf_tvi_history.copy(),
+                mtsf_chf_history=prev_state.mtsf_chf_history.copy(),
+                mtsf_scc_history=prev_state.mtsf_scc_history.copy(),
+                mtsf_band_history=prev_state.mtsf_band_history.copy(),
+                mtsf_tags_history=prev_state.mtsf_tags_history.copy(),
             )
 
         # Append new turn data to histories
@@ -264,6 +270,9 @@ class CoherenceEngine:
 
         # Update Phase 44 coherence scenario alignment engine (observation only)
         self._update_coherence_scenario_alignment(state)
+
+        # Update Phase 45 multi-trajectory stability field (observation only)
+        self._update_multi_trajectory_stability_field(state)
 
         return state
 
@@ -3822,3 +3831,88 @@ class CoherenceEngine:
             state.scenario_stability_history.append(None)
             state.scenario_alignment_band_history.append(None)
             state.scenario_tags_history.append([])
+
+    def _update_multi_trajectory_stability_field(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 45 Multi-Trajectory Stability Field (observation only).
+
+        This method assesses trajectory stability and convergence across:
+          - Phase 38 Temporal Coherence Forecasting
+          - Phase 39 Multi-Horizon Temporal Forecasting
+          - Phase 42 Scenario Fusion Engine
+          - Phase 44 Coherence–Scenario Alignment Engine
+
+        The MTSF produces:
+          1. TSI (Trajectory Stability Index) [0.0, 1.0] - cross-phase convergence
+          2. TVI (Trajectory Volatility Index) [0.0, 1.0] - variance across forecast slopes
+          3. CHF (Cross-Horizon Flux) [0.0, 1.0] - disagreement between H1/H2/H3
+          4. SCC (Scenario-Coherence Coupling) [0.0, 1.0] - alignment with scenario fusion + CSAE
+          5. Stability Band: HIGH | MEDIUM | LOW | CHAOTIC
+          6. Diagnostic Tags
+
+        The MTSF is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for analytics, dashboards, and UI diagnostics only.
+
+        This update runs AFTER Phase 44 to leverage all upstream forecasting layers.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.multi_trajectory_stability_field import compute_multi_trajectory_stability_field
+
+        # ====================================================================
+        # STEP 1: GATHER INPUTS FROM PHASES 38, 39, 42, 44
+        # ====================================================================
+
+        # Phase 38 - Temporal Coherence Forecasting
+        forecast_phase38 = state.temporal_forecast_snapshot
+
+        # Phase 39 - Multi-Horizon Temporal Forecasting
+        multi_horizon_phase39 = state.multi_horizon_forecast_snapshot
+
+        # Phase 42 - Scenario Fusion Engine
+        scenario_fusion_phase42 = state.scenario_fusion_snapshot
+
+        # Phase 44 - Coherence–Scenario Alignment Engine
+        csae_phase44 = state.scenario_alignment_snapshot
+
+        # ====================================================================
+        # STEP 2: COMPUTE MULTI-TRAJECTORY STABILITY FIELD
+        # ====================================================================
+
+        snapshot = compute_multi_trajectory_stability_field(
+            forecast_phase38=forecast_phase38,
+            multi_horizon_phase39=multi_horizon_phase39,
+            scenario_fusion_phase42=scenario_fusion_phase42,
+            csae_phase44=csae_phase44,
+        )
+
+        # ====================================================================
+        # STEP 3: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Update current snapshot
+            state.mtsf_snapshot = snapshot
+
+            # Append to histories
+            state.mtsf_tsi_history.append(snapshot.tsi)
+            state.mtsf_tvi_history.append(snapshot.tvi)
+            state.mtsf_chf_history.append(snapshot.chf)
+            state.mtsf_scc_history.append(snapshot.scc)
+            state.mtsf_band_history.append(snapshot.band)
+            state.mtsf_tags_history.append(snapshot.tags.copy() if snapshot.tags else [])
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.mtsf_snapshot = None
+
+            # Append None/default values to maintain history alignment
+            state.mtsf_tsi_history.append(0.0)
+            state.mtsf_tvi_history.append(0.0)
+            state.mtsf_chf_history.append(0.0)
+            state.mtsf_scc_history.append(0.0)
+            state.mtsf_band_history.append("")
+            state.mtsf_tags_history.append([])

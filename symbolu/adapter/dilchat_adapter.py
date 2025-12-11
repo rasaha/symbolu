@@ -1379,6 +1379,76 @@ def _build_badges(
                 description="Contradiction detected between scenario paths and coherence forecasts. High conflict index."
             ))
 
+    # ========================================================================
+    # Phase 45: Multi-Trajectory Stability Field (MTSF) Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract MTSF from unified_output
+    mtsf = unified_output.get("multi_trajectory_stability_field") if unified_output else None
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and mtsf is not None:
+        band = mtsf.get("band")
+        tsi = mtsf.get("tsi", 0.0)
+        tvi = mtsf.get("tvi", 0.0)
+        chf = mtsf.get("chf", 0.0)
+        mtsf_tags = mtsf.get("tags", [])
+
+        # MTSF_STABILITY_HIGH: HIGH band
+        if band == "HIGH":
+            badges.append(DILchatBadge(
+                label="MTSF_STABILITY_HIGH",
+                level="info",
+                description="High trajectory stability with strong cross-phase convergence across all forecasting layers."
+            ))
+
+        # MTSF_STABILITY_MEDIUM: MEDIUM band
+        if band == "MEDIUM":
+            badges.append(DILchatBadge(
+                label="MTSF_STABILITY_MEDIUM",
+                level="info",
+                description="Moderate trajectory stability with acceptable convergence across forecast horizons."
+            ))
+
+        # MTSF_STABILITY_LOW: LOW band
+        if band == "LOW":
+            badges.append(DILchatBadge(
+                label="MTSF_STABILITY_LOW",
+                level="warning",
+                description="Low trajectory stability detected. Weak convergence across forecasting layers."
+            ))
+
+        # MTSF_STABILITY_CHAOTIC: CHAOTIC band
+        if band == "CHAOTIC":
+            badges.append(DILchatBadge(
+                label="MTSF_STABILITY_CHAOTIC",
+                level="warning",
+                description="Chaotic trajectory field detected. Very low stability with high volatility or cross-horizon conflict."
+            ))
+
+        # MTSF_CROSS_HORIZON_CONFLICT: high CHF
+        if "CROSS_HORIZON_CONFLICT" in mtsf_tags:
+            badges.append(DILchatBadge(
+                label="MTSF_CROSS_HORIZON_CONFLICT",
+                level="warning",
+                description="Strong disagreement detected between short-term, mid-term, and long-term forecast horizons."
+            ))
+
+        # MTSF_CONVERGENCE: trajectory converging
+        if "TRAJECTORY_CONVERGING" in mtsf_tags or "TRAJECTORY_STRONGLY_CONVERGING" in mtsf_tags:
+            badges.append(DILchatBadge(
+                label="MTSF_CONVERGENCE",
+                level="info",
+                description="Forecast trajectories are converging across all phases, indicating stable future outlook."
+            ))
+
+        # MTSF_DIVERGENCE: trajectory diverging
+        if "TRAJECTORY_DIVERGING" in mtsf_tags or "TRAJECTORY_STRONGLY_DIVERGING" in mtsf_tags:
+            badges.append(DILchatBadge(
+                label="MTSF_DIVERGENCE",
+                level="warning",
+                description="Forecast trajectories are diverging across forecasting layers, indicating trajectory instability."
+            ))
+
     return badges
 
 
