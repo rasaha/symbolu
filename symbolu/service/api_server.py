@@ -691,6 +691,144 @@ def create_app() -> "FastAPI":
                 detail=f"Resonance simulation failed: {str(e)}"
             )
 
+    @app.get("/sessions/{session_id}/scenario/what_if")
+    def scenario_what_if(
+        session_id: str,
+        preset: str,
+        request: Request,
+    ) -> Dict[str, Any]:
+        """
+        Run a what-if simulation on session scenario fusion (Phase 43).
+
+        This endpoint applies a scenario preset to the session's latest
+        scenario fusion snapshot and returns the simulated outcome.
+
+        This is a read-only analytics tool that does NOT modify any pipeline
+        behavior, routing, policy flags, or live state.
+
+        Args:
+            session_id: Session identifier
+            preset: Preset name to apply (e.g., "neutral_baseline", "conservative_bias")
+            request: FastAPI Request object (for security checks)
+
+        Returns:
+            Dict with simulation results:
+            {
+                "preset": "conservative_bias",
+                "original": {
+                    "alignment_score": 0.65,
+                    "divergence_index": 0.42,
+                    "consensus": 0.58,
+                    "uncertainty_band": "medium",
+                    "dominant_path": "stable"
+                },
+                "simulated": {
+                    "alignment_score": 0.49,
+                    "divergence_index": 0.55,
+                    "consensus": 0.46,
+                    "uncertainty_band": "high",
+                    "dominant_path": "volatile",
+                    "diagnostic_notes": [...]
+                }
+            }
+
+        Raises:
+            HTTPException:
+                - 404: Session not found or no scenario fusion snapshot available
+                - 400: Invalid preset name
+                - 500: Simulation error
+        """
+        # Security layer (optional, non-invasive)
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
+        try:
+            # Import scenario simulator components
+            from symbolu.tools.scenario_simulator import (
+                is_valid_preset,
+                get_preset,
+                get_preset_names,
+                simulate_scenario_with_preset,
+            )
+            from symbolu.tools.scenario_simulator.cli import (
+                _extract_scenario_snapshot,
+            )
+
+            # Validate preset
+            if not is_valid_preset(preset):
+                available = ", ".join(get_preset_names())
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid preset '{preset}'. Available: {available}"
+                )
+
+            # Retrieve session
+            session = session_store.get(session_id)
+            if session is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Session '{session_id}' not found"
+                )
+
+            # Extract scenario fusion snapshot
+            snapshot = _extract_scenario_snapshot(session_store, session_id)
+            if snapshot is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "No scenario fusion snapshot available for this session. "
+                        "Session may not have any turns with scenario fusion computed."
+                    )
+                )
+
+            # Run simulation
+            preset_obj = get_preset(preset)
+            result = simulate_scenario_with_preset(snapshot, preset_obj)
+
+            if result is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Simulation failed"
+                )
+
+            # Build response
+            orig = result.original_snapshot
+            sim = result.simulated_snapshot
+
+            return {
+                "preset": result.applied_preset,
+                "original": {
+                    "alignment_score": orig.scenario_alignment_score,
+                    "divergence_index": orig.scenario_divergence_index,
+                    "consensus": orig.multi_regime_consensus,
+                    "uncertainty_band": orig.future_uncertainty_band,
+                    "dominant_path": orig.dominant_future_path,
+                    "diagnostic_tags": orig.diagnostic_tags,
+                },
+                "simulated": {
+                    "alignment_score": sim.scenario_alignment_score,
+                    "divergence_index": sim.scenario_divergence_index,
+                    "consensus": sim.multi_regime_consensus,
+                    "uncertainty_band": sim.future_uncertainty_band,
+                    "dominant_path": sim.dominant_future_path,
+                    "diagnostic_tags": sim.diagnostic_tags,
+                    "diagnostic_notes": result.diagnostic_notes,
+                },
+            }
+
+        except HTTPException:
+            # Re-raise HTTP exceptions
+            raise
+        except Exception as e:
+            logger.error(
+                f"Error in /sessions/{session_id}/scenario/what_if: {e}",
+                exc_info=True
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Scenario simulation failed: {str(e)}"
+            )
+
     # ========================================================================
     # PREFERENCE ENDPOINTS (Phase 15B)
     # ========================================================================

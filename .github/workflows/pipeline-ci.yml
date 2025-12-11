@@ -32,6 +32,8 @@ on:
       - "tests/test_phase40_cross_horizon_resonance_alignment.py"
       - "tests/test_phase41_coherence_regime_scenario_mapper.py"
       - "tests/test_phase42_scenario_fusion_engine.py"
+      - "symbolu/tools/scenario_simulator/**"
+      - "tests/test_phase43_scenario_simulator.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -75,6 +77,8 @@ on:
       - "tests/test_phase40_cross_horizon_resonance_alignment.py"
       - "tests/test_phase41_coherence_regime_scenario_mapper.py"
       - "tests/test_phase42_scenario_fusion_engine.py"
+      - "symbolu/tools/scenario_simulator/**"
+      - "tests/test_phase43_scenario_simulator.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -531,6 +535,21 @@ jobs:
         with:
           name: phase42-scenario-fusion-log
           path: phase42-scenario-fusion.log
+          if-no-files-found: ignore
+
+      - name: Run Phase 43 Scenario What-If Simulator Tests
+        run: |
+          pytest tests/test_phase43_scenario_simulator.py \
+            --disable-warnings -q \
+            --maxfail=1 \
+            2>&1 | tee phase43-scenario-simulator.log
+
+      - name: Upload Phase 43 Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase43-scenario-simulator-log
+          path: phase43-scenario-simulator.log
           if-no-files-found: ignore
 
       - name: Run Phase 20 Unified Dashboard Tests
