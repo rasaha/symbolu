@@ -221,3 +221,10 @@ class SessionSummary:
     regime_band: Optional[str] = None  # Most frequent regime band: "stable" | "mixed" | "volatile"
     regime_frequency: Dict[str, int] = field(default_factory=dict)  # Regime name → occurrence count
     regime_notes: List[str] = field(default_factory=list)  # Collected regime notes (deduped)
+
+    # Phase 42 Scenario Fusion Engine (observation only)
+    avg_scenario_alignment: Optional[float] = None  # Average scenario alignment score [0.0, 1.0]
+    avg_scenario_divergence: Optional[float] = None  # Average scenario divergence index [0.0, 1.0]
+    scenario_uncertainty_band: Optional[str] = None  # Most frequent uncertainty band: "low" | "medium" | "high"
+    dominant_fused_future_path: Optional[str] = None  # Most frequent dominant future path (regime)
+    scenario_pattern_tags: List[str] = field(default_factory=list)  # Collected scenario pattern tags (deduped, sorted)

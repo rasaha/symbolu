@@ -327,6 +327,12 @@ class PersonaResponse(BaseModel):
         description="Phase 31: Adaptive Persona Echo Layer (observation-only, tone-level only)"
     )
 
+    # Phase 42: Optional scenario fusion metadata (observation-only, metadata-only)
+    persona_scenario_fusion: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Phase 42: Scenario Fusion Engine metadata (observation-only, metadata-only)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {

@@ -31,6 +31,7 @@ on:
       - "tests/test_phase38_temporal_coherence_forecasting.py"
       - "tests/test_phase40_cross_horizon_resonance_alignment.py"
       - "tests/test_phase41_coherence_regime_scenario_mapper.py"
+      - "tests/test_phase42_scenario_fusion_engine.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -72,6 +73,8 @@ on:
       - "symbolu/formulas/tests/test_phase37_adaptive_continuity.py"
       - "tests/test_phase38_temporal_coherence_forecasting.py"
       - "tests/test_phase40_cross_horizon_resonance_alignment.py"
+      - "tests/test_phase41_coherence_regime_scenario_mapper.py"
+      - "tests/test_phase42_scenario_fusion_engine.py"
       - "symbolu/service/**"
       - "symbolu/service/security/**"
       - "symbolu/service/sessions/**"
@@ -513,6 +516,21 @@ jobs:
         with:
           name: phase41-coherence-regime-log
           path: phase41-coherence-regime.log
+          if-no-files-found: ignore
+
+      - name: Run Phase 42 Scenario Fusion Engine Tests
+        run: |
+          pytest tests/test_phase42_scenario_fusion_engine.py \
+            --disable-warnings -q \
+            --maxfail=1 \
+            2>&1 | tee phase42-scenario-fusion.log
+
+      - name: Upload Phase 42 Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase42-scenario-fusion-log
+          path: phase42-scenario-fusion.log
           if-no-files-found: ignore
 
       - name: Run Phase 20 Unified Dashboard Tests
