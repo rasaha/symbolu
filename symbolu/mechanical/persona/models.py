@@ -345,6 +345,12 @@ class PersonaResponse(BaseModel):
         description="Phase 45: Multi-Trajectory Stability Field (MTSF) metadata (observation-only, metadata-only)"
     )
 
+    # Phase 46: Optional trajectory field convergence engine metadata (observation-only, metadata-only)
+    persona_trajectory_convergence: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Phase 46: Trajectory Field Convergence Engine (TFCE) metadata (observation-only, metadata-only)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {

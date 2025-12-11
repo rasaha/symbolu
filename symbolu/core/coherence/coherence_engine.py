@@ -274,6 +274,9 @@ class CoherenceEngine:
         # Update Phase 45 multi-trajectory stability field (observation only)
         self._update_multi_trajectory_stability_field(state)
 
+        # Update Phase 46 trajectory field convergence engine (observation only)
+        self._update_trajectory_field_convergence(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -3916,3 +3919,107 @@ class CoherenceEngine:
             state.mtsf_scc_history.append(0.0)
             state.mtsf_band_history.append("")
             state.mtsf_tags_history.append([])
+
+    def _update_trajectory_field_convergence(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 46 Trajectory Field Convergence Engine (observation only).
+
+        This method measures how multiple predictive trajectories (drift, identity,
+        symbolic, continuity, scenario, and multi-horizon temporal) are converging
+        vs. diverging over time.
+
+        The TFCE analyzes trajectory alignment across:
+          - Phase 35: Predictive Persona Drift (drift trajectory)
+          - Phase 36: Identity Resonance Memory (identity trajectory)
+          - Phase 37: Adaptive Continuity Engine (continuity trajectory)
+          - Phase 38: Temporal Coherence Forecasting (symbolic trajectory)
+          - Phase 39: Multi-Horizon Temporal Forecasting (scenario trajectory)
+          - Phase 42: Scenario Fusion Engine (multi-horizon temporal trajectory)
+          - Phase 45: Multi-Trajectory Stability Field
+
+        The TFCE produces:
+          1. Convergence Index [0.0, 1.0] - overall trajectory convergence
+          2. Divergence Index [0.0, 1.0] - overall trajectory divergence
+          3. Stability Index [0.0, 1.0] - trajectory stability measure
+          4. Convergence Band: high | medium | low | fragmented
+          5. Dominant Convergence Signal: primary trajectory descriptor
+          6. Diagnostic Tags
+
+        The TFCE is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for analytics, dashboards, and UI diagnostics only.
+
+        This update runs AFTER Phase 45 to leverage all upstream trajectory layers.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.trajectory_field_convergence import compute_trajectory_field_convergence
+
+        # ====================================================================
+        # STEP 1: GATHER INPUTS FROM PHASES 35, 36, 37, 38, 39, 42, 45
+        # ====================================================================
+
+        # Phase 35 - Predictive Persona Drift
+        predictive_drift_phase35 = state.predictive_drift_snapshot
+
+        # Phase 36 - Identity Resonance Memory
+        identity_resonance_phase36 = state.identity_resonance_memory_snapshot
+
+        # Phase 37 - Adaptive Continuity Engine
+        continuity_phase37 = state.adaptive_continuity_snapshot
+
+        # Phase 38 - Temporal Coherence Forecasting
+        forecast_phase38 = state.temporal_forecast_snapshot
+
+        # Phase 39 - Multi-Horizon Temporal Forecasting
+        multi_horizon_phase39 = state.multi_horizon_forecast_snapshot
+
+        # Phase 42 - Scenario Fusion Engine
+        scenario_fusion_phase42 = state.scenario_fusion_snapshot
+
+        # Phase 45 - Multi-Trajectory Stability Field
+        mtsf_phase45 = state.mtsf_snapshot
+
+        # ====================================================================
+        # STEP 2: COMPUTE TRAJECTORY FIELD CONVERGENCE
+        # ====================================================================
+
+        snapshot = compute_trajectory_field_convergence(
+            predictive_drift_phase35=predictive_drift_phase35,
+            identity_resonance_phase36=identity_resonance_phase36,
+            continuity_phase37=continuity_phase37,
+            forecast_phase38=forecast_phase38,
+            multi_horizon_phase39=multi_horizon_phase39,
+            scenario_fusion_phase42=scenario_fusion_phase42,
+            mtsf_phase45=mtsf_phase45,
+        )
+
+        # ====================================================================
+        # STEP 3: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Update current snapshot
+            state.trajectory_convergence_snapshot = snapshot
+
+            # Append to histories
+            state.tfce_convergence_index_history.append(snapshot.convergence_index)
+            state.tfce_divergence_index_history.append(snapshot.divergence_index)
+            state.tfce_stability_index_history.append(snapshot.stability_index)
+            state.tfce_convergence_band_history.append(snapshot.convergence_band)
+            state.tfce_dominant_signal_history.append(snapshot.dominant_convergence_signal)
+            state.tfce_tags_history.append(snapshot.diagnostic_tags.copy() if snapshot.diagnostic_tags else [])
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.trajectory_convergence_snapshot = None
+
+            # Append None/default values to maintain history alignment
+            state.tfce_convergence_index_history.append(0.0)
+            state.tfce_divergence_index_history.append(0.0)
+            state.tfce_stability_index_history.append(0.0)
+            state.tfce_convergence_band_history.append("")
+            state.tfce_dominant_signal_history.append("")
+            state.tfce_tags_history.append([])

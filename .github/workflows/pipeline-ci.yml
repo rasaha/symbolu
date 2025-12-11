@@ -34,6 +34,7 @@ on:
       - "tests/test_phase42_scenario_fusion_engine.py"
       - "tests/test_phase44_coherence_scenario_alignment.py"
       - "tests/test_phase45_multi_trajectory_stability_field.py"
+      - "tests/test_phase46_trajectory_field_convergence.py"
       - "symbolu/tools/scenario_simulator/**"
       - "tests/test_phase43_scenario_simulator.py"
       - "symbolu/service/**"
@@ -81,6 +82,7 @@ on:
       - "tests/test_phase42_scenario_fusion_engine.py"
       - "tests/test_phase44_coherence_scenario_alignment.py"
       - "tests/test_phase45_multi_trajectory_stability_field.py"
+      - "tests/test_phase46_trajectory_field_convergence.py"
       - "symbolu/tools/scenario_simulator/**"
       - "tests/test_phase43_scenario_simulator.py"
       - "symbolu/service/**"
@@ -577,6 +579,21 @@ jobs:
           path: phase45-mtsf.log
           if-no-files-found: ignore
 
+      - name: Run Phase 46 Trajectory Field Convergence Engine Tests
+        run: |
+          pytest tests/test_phase46_trajectory_field_convergence.py \
+            --disable-warnings -q \
+            --maxfail=1 \
+            2>&1 | tee phase46-tfce.log
+
+      - name: Upload Phase 46 Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase46-tfce-log
+          path: phase46-tfce.log
+          if-no-files-found: ignore
+
       - name: Run Phase 43 Scenario What-If Simulator Tests
         run: |
           pytest tests/test_phase43_scenario_simulator.py \
@@ -687,6 +704,7 @@ jobs:
             phase29-persona-resonance.log
             phase30-cross-layer-resonance.log
             phase32-insight-window.log
+            phase46-tfce.log
             phase20-unified-dashboard-pytest.log
             motivation-drift-pytest.log
 

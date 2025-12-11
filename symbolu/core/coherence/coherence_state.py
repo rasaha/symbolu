@@ -335,6 +335,15 @@ class CoherenceState:
     mtsf_band_history: List[str] = field(default_factory=list)  # Stability band history
     mtsf_tags_history: List[List[str]] = field(default_factory=list)  # Diagnostic tags history
 
+    # Phase 46: Trajectory Field Convergence Engine (observation only - not used in scoring)
+    trajectory_convergence_snapshot: Optional[Any] = None  # TrajectoryFieldConvergenceSnapshot (latest)
+    tfce_convergence_index_history: List[float] = field(default_factory=list)  # Convergence index history
+    tfce_divergence_index_history: List[float] = field(default_factory=list)  # Divergence index history
+    tfce_stability_index_history: List[float] = field(default_factory=list)  # Stability index history
+    tfce_convergence_band_history: List[str] = field(default_factory=list)  # Convergence band history
+    tfce_dominant_signal_history: List[str] = field(default_factory=list)  # Dominant convergence signal history
+    tfce_tags_history: List[List[str]] = field(default_factory=list)  # Diagnostic tags history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -481,6 +490,14 @@ class CoherenceState:
         self.mtsf_scc_history = self.mtsf_scc_history[-window:]
         self.mtsf_band_history = self.mtsf_band_history[-window:]
         self.mtsf_tags_history = self.mtsf_tags_history[-window:]
+
+        # Phase 46 trajectory field convergence engine formula history
+        self.tfce_convergence_index_history = self.tfce_convergence_index_history[-window:]
+        self.tfce_divergence_index_history = self.tfce_divergence_index_history[-window:]
+        self.tfce_stability_index_history = self.tfce_stability_index_history[-window:]
+        self.tfce_convergence_band_history = self.tfce_convergence_band_history[-window:]
+        self.tfce_dominant_signal_history = self.tfce_dominant_signal_history[-window:]
+        self.tfce_tags_history = self.tfce_tags_history[-window:]
 
     def get_history_length(self) -> int:
         """
