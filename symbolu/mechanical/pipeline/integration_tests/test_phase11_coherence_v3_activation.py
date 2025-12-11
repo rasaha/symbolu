@@ -96,12 +96,13 @@ def test_v3_priority_cascade_in_active_coherence_score():
             "coherence_score": 0.60,      # v1
             "coherence_score_v2": 0.72,   # v2
             "coherence_score_v3": 0.85,   # v3
+            "coherence_v3_quality": 0.75, # Quality gate
         }
     }
 
     profile_v3 = get_domain_profile("therapy")  # use_coherence_v3=True
     active_score = _get_active_coherence_score(unified_all, profile_v3)
-    assert active_score == 0.85, f"Expected v3 (0.85), got {active_score}"
+    assert active_score == unified_all["coherence"]["coherence_score_v3"], f"Expected v3, got {active_score}"
 
     # Test Case 2: v3 disabled, v2 enabled → use v2
     profile_v2_only = get_domain_profile("trading")
@@ -139,6 +140,7 @@ def test_therapy_policy_uses_v3_when_available():
             "coherence_score": 0.40,      # v1: below threshold
             "coherence_score_v2": 0.42,   # v2: below threshold
             "coherence_score_v3": 0.55,   # v3: ABOVE threshold
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": 0.30,
             "mapper_volatility_score": 0.25,
             "temporal_arc_score": 0.70,
@@ -168,6 +170,7 @@ def test_identity_policy_uses_v3_when_available():
             "coherence_score": 0.45,      # v1: below threshold
             "coherence_score_v2": 0.48,   # v2: below threshold
             "coherence_score_v3": 0.62,   # v3: ABOVE threshold
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": 0.35,
             "mapper_volatility_score": 0.30,
             "temporal_arc_score": 0.75,
@@ -196,6 +199,7 @@ def test_trading_policy_ignores_v3_uses_v1():
             "coherence_score": 0.52,      # v1: below trading threshold 0.55
             "coherence_score_v2": 0.68,   # v2: above threshold (should be ignored)
             "coherence_score_v3": 0.72,   # v3: above threshold (should be ignored)
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": 0.35,
             "mapper_volatility_score": 0.40,
             "temporal_arc_score": 0.65,
@@ -220,6 +224,7 @@ def test_generic_policy_ignores_v3_uses_v1():
             "coherence_score": 0.38,      # v1: below generic min 0.40
             "coherence_score_v2": 0.65,   # v2: should be ignored
             "coherence_score_v3": 0.75,   # v3: should be ignored
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": 0.50,
             "mapper_volatility_score": 0.45,
             "temporal_arc_score": 0.60,
@@ -244,6 +249,7 @@ def test_v3_policy_deterministic():
             "coherence_score": 0.42,
             "coherence_score_v2": 0.48,
             "coherence_score_v3": 0.58,
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": 0.35,
             "mapper_volatility_score": 0.30,
             "temporal_arc_score": 0.70,
@@ -275,6 +281,7 @@ def test_v3_does_not_change_mapper_recommendations_for_disabled_domains():
             "coherence_score": 0.48,      # Below trading threshold → LCM
             "coherence_score_v2": 0.65,
             "coherence_score_v3": 0.72,
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": 0.45,
             "mapper_volatility_score": 0.50,
             "temporal_arc_score": 0.55,
@@ -300,6 +307,7 @@ def test_v3_does_not_change_stability_status_for_disabled_domains():
             "coherence_score": 0.58,      # v1: moderate
             "coherence_score_v2": 0.75,   # v2: high
             "coherence_score_v3": 0.82,   # v3: very high
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": 0.38,
             "mapper_volatility_score": 0.35,
             "temporal_arc_score": 0.65,
@@ -325,6 +333,7 @@ def test_trading_domain_full_behavioral_invariance():
             "coherence_score": 0.56,
             "coherence_score_v2": 0.70,
             "coherence_score_v3": 0.78,
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": 0.38,
             "mapper_volatility_score": 0.42,
             "temporal_arc_score": 0.65,
@@ -367,6 +376,7 @@ def test_generic_domain_full_behavioral_invariance():
             "coherence_score": 0.45,
             "coherence_score_v2": 0.68,
             "coherence_score_v3": 0.75,
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": 0.50,
             "mapper_volatility_score": 0.45,
             "temporal_arc_score": 0.60,
@@ -404,6 +414,7 @@ def test_v3_does_not_change_allow_deep_reflection():
             "coherence_score": 0.42,      # v1: below therapy min 0.45
             "coherence_score_v2": 0.44,   # v2: still below
             "coherence_score_v3": 0.52,   # v3: above threshold
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": 0.50,  # acceptable drift
             "mapper_volatility_score": 0.35,
             "temporal_arc_score": 0.65,
@@ -429,6 +440,7 @@ def test_v3_stability_with_formula_ui_modulation():
             "coherence_score": 0.45,      # v1: moderate
             "coherence_score_v2": 0.50,   # v2: moderate
             "coherence_score_v3": 0.68,   # v3: good
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": 0.35,
             "mapper_volatility_score": 0.30,
             "temporal_arc_score": 0.70,
@@ -490,6 +502,7 @@ def test_unified_output_includes_v3_in_coherence_block():
             "coherence_score": 0.60,
             "coherence_score_v2": 0.70,
             "coherence_score_v3": 0.82,
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": 0.30,
             "semantic_stability_score": 0.75,
             "temporal_arc_score": 0.70,
@@ -594,6 +607,7 @@ def test_v3_graceful_degradation_when_missing():
             "coherence_score": 0.60,
             "coherence_score_v2": 0.70,
             "coherence_score_v3": None,  # v3 not available
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": 0.30,
             "mapper_volatility_score": 0.25,
             "temporal_arc_score": 0.70,
@@ -691,6 +705,7 @@ def test_phase11_ci_smoke_therapy():
             "coherence_score": state.coherence_score,
             "coherence_score_v2": state.coherence_score_v2,
             "coherence_score_v3": state.coherence_score_v3,
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": state.persona_drift_score,
             "mapper_volatility_score": state.mapper_volatility_score,
             "temporal_arc_score": state.temporal_arc_score,
@@ -749,6 +764,7 @@ def test_phase11_ci_smoke_trading_invariance():
             "coherence_score": state.coherence_score,
             "coherence_score_v2": state.coherence_score_v2,
             "coherence_score_v3": state.coherence_score_v3,
+            "coherence_v3_quality": 0.75,  # Quality gate for v3
             "persona_drift_score": state.persona_drift_score,
             "mapper_volatility_score": state.mapper_volatility_score,
             "temporal_arc_score": state.temporal_arc_score,
