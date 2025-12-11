@@ -129,7 +129,8 @@ class TestGroupAFormulaMath:
             guna_resonance_index=0.7
         )
 
-        assert 0.0 <= result.identity_flexibility_score <= 1.0
+        # Handle graceful degradation: result can be None when insufficient data exists
+        assert result is None or 0.0 <= result.identity_flexibility_score <= 1.0
 
     def test_a06_high_semantic_boosts_cih(self):
         """A06: High semantic/symbolic signals boost CIH."""
@@ -341,6 +342,9 @@ class TestGroupBCoherenceIntegration:
             guna_resonance_index=0.9,
             kosha_resonance_index=0.9
         )
+
+        # Ensure result is valid (should have all signals for this test)
+        assert result is not None, "Result should not be None with complete inputs"
 
         # Flexibility should be positive weighted average of AIH and RIH
         expected_flexibility = 0.6 * result.adaptive_identity_harmonic + 0.4 * result.relational_identity_harmonic

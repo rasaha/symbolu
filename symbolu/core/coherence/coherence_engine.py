@@ -3528,7 +3528,7 @@ class CoherenceEngine:
 
         # Calculate instant entropy from snapshot if available
         if state.temporal_entropy_snapshot is not None:
-            temporal_entropy_instant = state.temporal_entropy_snapshot.instant_entropy
+            temporal_entropy_instant = state.temporal_entropy_snapshot.instantaneous_entropy
 
         # Phase 37: Adaptive Continuity Engine (continued)
         ncc = state.current_ncc

@@ -480,7 +480,7 @@ class TestSessionDashboardIntegration:
         """Test that window_trim trims regime history."""
         from symbolu.core.coherence.coherence_state import CoherenceState
 
-        state = CoherenceState(session_id="test", domain="therapy")
+        state = CoherenceState(convo_id="test", turn_index=0)
 
         # Add some regime history
         for i in range(15):
@@ -551,6 +551,8 @@ class TestSessionDashboardIntegration:
             session_id="test",
             total_turns=5,
             coherence_trend=0.7,
+            persona_drift_avg=0.2,
+            temporal_arc_avg=0.65,
         )
 
         # Default values should be None or empty
@@ -777,23 +779,30 @@ class TestBehavioralInvariance:
 
     def test_no_mlcr_changes(self):
         """Test that CRSM does not modify MLCR activation."""
-        # CRSM should not contain any MLCR logic
+        # CRSM should not contain any MLCR activation logic (only check actual code, not docstrings)
         from symbolu.formulas import coherence_regime_scenario_mapper
+        import inspect
 
-        module_code = coherence_regime_scenario_mapper.__doc__ or ""
-        assert "MLCR" not in module_code, "CRSM should not reference MLCR"
+        # Get the actual module source code (excluding docstrings)
+        module_code = inspect.getsource(coherence_regime_scenario_mapper)
+
+        # Check for actual MLCR activation patterns (not documentation mentions)
+        mlcr_patterns = ["activate_mlcr", "deactivate_mlcr", "mlcr_enabled", "set_mlcr"]
+        for pattern in mlcr_patterns:
+            assert pattern.lower() not in module_code.lower(), f"Found MLCR activation pattern: {pattern}"
 
     def test_no_mapper_activation_changes(self):
         """Test that CRSM does not change mapper activation."""
         # CRSM should not modify HRM/LCM/LAM activation
         from symbolu.formulas import coherence_regime_scenario_mapper
+        import inspect
 
-        module_functions = [func for func in dir(coherence_regime_scenario_mapper) if callable(getattr(coherence_regime_scenario_mapper, func))]
+        module_code = inspect.getsource(coherence_regime_scenario_mapper)
 
-        mapper_keywords = ["HRM", "LCM", "LAM", "mapper_active"]
-        for func in module_functions:
-            for keyword in mapper_keywords:
-                assert keyword.lower() not in func.lower(), f"Found mapper-related function: {func}"
+        # Only detect actual mapper name patterns, not substrings in function names like "_clamp()"
+        mapper_patterns = ["LAM(", "LAM_", "select_lam", "HRM(", "HRM_", "select_hrm", "LCM(", "LCM_", "select_lcm"]
+        for pattern in mapper_patterns:
+            assert pattern not in module_code, f"Found mapper activation pattern: {pattern}"
 
     def test_coherence_scoring_unchanged(self):
         """Test that CRSM does not modify v1/v2/v3/UCF/fused scoring."""
@@ -857,7 +866,7 @@ class TestBehavioralInvariance:
         # CoherenceState should work fine with None regime snapshot
         from symbolu.core.coherence.coherence_state import CoherenceState
 
-        state = CoherenceState(session_id="test", domain="therapy")
+        state = CoherenceState(convo_id="test", turn_index=0)
 
         # Should handle None regime snapshot gracefully
         assert state.coherence_regime_snapshot is None
