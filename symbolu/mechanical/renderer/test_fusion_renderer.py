@@ -16,7 +16,7 @@ import pytest
 import json
 import numpy as np
 from datetime import datetime
-from fusion_renderer import (
+from .fusion_renderer import (
     FusionRenderer,
     FusionOutput,
     SymbolicLayer,
