@@ -2001,31 +2001,28 @@ class TestEndToEndPipelineInvariance(unittest.TestCase):
 
     def test_session_store_integration_complete(self):
         """Session store must integrate Phase 48 completely."""
-        # Mock to avoid production bug in session_store.py line 1496
-        with patch('symbolu.service.sessions.session_store.compute_session_summary') as mock_compute:
-            # Setup mock with Phase 48 data
-            mock_summary = SessionSummary(
-                session_id="test",
-                total_turns=5,
-                coherence_trend=0.75,
-                persona_drift_avg=0.2,
-                temporal_arc_avg=0.7,
-                avg_macro_stability=0.75,
-                avg_macro_divergence=0.25
-            )
-            mock_compute.return_value = mock_summary
+        # FIXED: Bug at session_store.py line 1496 - test now runs without mocking
+        store = SessionStore()
+        session = store.create_session(domain="test")
 
-            store = SessionStore()
-            session = store.create_session(domain="test")
+        # Add Phase 48 MSR data to coherence_history
+        session.coherence_history.append({
+            "macro_stability_index_history": [0.75, 0.76, 0.77],
+            "macro_divergence_history": [0.25, 0.24, 0.23],
+            "macro_predictive_confidence_history": [0.72, 0.73],
+            "macro_identity_resilience_history": [0.78, 0.79],
+            "macro_stability_band_history": ["high", "high", "high"],
+            "macro_stability_tags_history": [["STABILITY_CONSENSUS"], ["PREDICTIVE_CONSENSUS"]]
+        })
 
-            # Compute summary
-            summary = mock_compute(session)
+        # Compute summary - should NOT raise NameError: undefined variable 'all_coherence'
+        summary = compute_session_summary(session)
 
-            # Should extract Phase 48 data
-            self.assertIsNotNone(summary)
-            # Should have Phase 48 fields populated
-            self.assertEqual(summary.avg_macro_stability, 0.75)
-            self.assertEqual(summary.avg_macro_divergence, 0.25)
+        # Should extract Phase 48 data without errors
+        self.assertIsNotNone(summary)
+        # Should have Phase 48 fields computed from coherence_history
+        self.assertIsNotNone(summary.avg_macro_stability)
+        self.assertIsNotNone(summary.avg_macro_divergence)
 
     def test_unified_api_integration_complete(self):
         """Unified API must integrate Phase 48 completely."""
