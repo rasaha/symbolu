@@ -163,6 +163,7 @@ class TestCSAEFormulaMath:
             forecast_drift_influence=1.0,
             forecast_entropy_forward_risk=1.0,
             scenario_divergence_index=1.0,
+            scenario_alignment_score=0.2,
             forecast_strength=0.0,
             future_uncertainty_band="high",
         )
@@ -218,9 +219,10 @@ class TestCSAEFormulaMath:
 
         # CONFLICT band
         snapshot_conflict = compute_coherence_scenario_alignment(
-            forecast_drift_influence=0.90,
-            forecast_entropy_forward_risk=0.85,
-            scenario_divergence_index=0.80,
+            forecast_drift_influence=0.95,
+            forecast_entropy_forward_risk=0.90,
+            scenario_divergence_index=0.85,
+            icc=0.20,
         )
         assert snapshot_conflict is not None
         assert snapshot_conflict.alignment_score < 0.25
@@ -437,6 +439,7 @@ class TestCoherenceIntegration:
             horizon_slope_H1=0.3,
             horizon_slope_H2=0.4,
             horizon_slope_H3=0.5,
+            scenario_alignment_score=0.70,
         )
 
         assert snapshot is not None
@@ -448,6 +451,7 @@ class TestCoherenceIntegration:
             horizon_slope_H1=-0.3,
             horizon_slope_H2=-0.4,
             horizon_slope_H3=-0.5,
+            scenario_alignment_score=0.30,
         )
 
         assert snapshot is not None
@@ -458,6 +462,7 @@ class TestCoherenceIntegration:
         # High ICC
         snapshot_high = compute_coherence_scenario_alignment(
             icc=0.85,
+            scenario_alignment_score=0.75,
         )
         assert snapshot_high is not None
         assert "identity_continuity_robust" in snapshot_high.diagnostic_tags
@@ -465,6 +470,7 @@ class TestCoherenceIntegration:
         # Low ICC
         snapshot_low = compute_coherence_scenario_alignment(
             icc=0.25,
+            scenario_alignment_score=0.35,
         )
         assert snapshot_low is not None
         assert "identity_continuity_weak" in snapshot_low.diagnostic_tags
@@ -492,6 +498,7 @@ class TestCoherenceIntegration:
         # Converging
         snapshot_converge = compute_coherence_scenario_alignment(
             scenario_alignment_score=0.75,
+            icc=0.70,
         )
         assert snapshot_converge is not None
         assert "scenario_regimes_converging" in snapshot_converge.diagnostic_tags
@@ -499,6 +506,7 @@ class TestCoherenceIntegration:
         # Diverging
         snapshot_diverge = compute_coherence_scenario_alignment(
             scenario_divergence_index=0.75,
+            icc=0.40,
         )
         assert snapshot_diverge is not None
         assert "scenario_regimes_diverging" in snapshot_diverge.diagnostic_tags
@@ -539,6 +547,8 @@ class TestSessionSummary:
             session_id="test",
             total_turns=10,
             coherence_trend="stable",
+            persona_drift_avg=0.0,
+            temporal_arc_avg=0.0,
         )
 
         assert hasattr(summary, 'avg_csae_alignment')
@@ -703,7 +713,15 @@ class TestUnifiedAPIObserver:
 
         output = UnifiedOutput(
             text="test",
-            persona_id="analyst",
+            symbolic={},
+            practical={},
+            mirror={},
+            dha={},
+            routing={},
+            mappers={},
+            entropy={},
+            coherence={},
+            metadata={},
         )
 
         assert hasattr(output, 'coherence_scenario_alignment')
@@ -722,7 +740,15 @@ class TestUnifiedAPIObserver:
         from symbolu.api.unified_api import UnifiedOutput
         output = UnifiedOutput(
             text="test",
-            persona_id="analyst",
+            symbolic={},
+            practical={},
+            mirror={},
+            dha={},
+            routing={},
+            mappers={},
+            entropy={},
+            coherence={},
+            metadata={},
             coherence_scenario_alignment=alignment_data,
         )
 
@@ -747,7 +773,15 @@ class TestUnifiedAPIObserver:
 
         output = UnifiedOutput(
             text="test",
-            persona_id="analyst",
+            symbolic={},
+            practical={},
+            mirror={},
+            dha={},
+            routing={},
+            mappers={},
+            entropy={},
+            coherence={},
+            metadata={},
             coherence_scenario_alignment=alignment_data,
         )
 
