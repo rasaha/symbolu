@@ -140,6 +140,11 @@ class CoherenceEngine:
                 mtsf_scc_history=prev_state.mtsf_scc_history.copy(),
                 mtsf_band_history=prev_state.mtsf_band_history.copy(),
                 mtsf_tags_history=prev_state.mtsf_tags_history.copy(),
+                synthesis_integrity_history=prev_state.synthesis_integrity_history.copy(),
+                synthesis_alignment_history=prev_state.synthesis_alignment_history.copy(),
+                synthesis_divergence_history=prev_state.synthesis_divergence_history.copy(),
+                synthesis_band_history=prev_state.synthesis_band_history.copy(),
+                synthesis_tags_history=prev_state.synthesis_tags_history.copy(),
             )
 
         # Append new turn data to histories
@@ -276,6 +281,9 @@ class CoherenceEngine:
 
         # Update Phase 46 trajectory field convergence engine (observation only)
         self._update_trajectory_field_convergence(state)
+
+        # Update Phase 47 unified trajectory scenario synthesis engine (observation only)
+        self._update_unified_trajectory_scenario_synthesis(state)
 
         return state
 
@@ -4023,3 +4031,115 @@ class CoherenceEngine:
             state.tfce_convergence_band_history.append("")
             state.tfce_dominant_signal_history.append("")
             state.tfce_tags_history.append([])
+
+    def _update_unified_trajectory_scenario_synthesis(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 47 Unified Trajectory–Scenario Synthesis Engine (observation only).
+
+        This method synthesizes signals from Phases 35, 36, 37, 38, 39, 42, 44, and 46
+        into a unified prediction of future-state coherence.
+
+        The UTSSE analyzes and synthesizes:
+          - Phase 35: Predictive Persona Drift (drift predictions)
+          - Phase 36: Identity Resonance Memory (identity memory)
+          - Phase 37: Adaptive Continuity Engine (continuity tracking)
+          - Phase 38: Temporal Coherence Forecasting (single-horizon forecasting)
+          - Phase 39: Multi-Horizon Temporal Forecasting (multi-horizon forecasting)
+          - Phase 42: Scenario Fusion Engine (scenario fusion)
+          - Phase 44: Coherence-Scenario Alignment (scenario alignment)
+          - Phase 46: Trajectory Field Convergence (trajectory convergence)
+
+        The UTSSE produces:
+          1. Synthesis Integrity Score [0.0, 1.0] - overall synthesis reliability
+          2. Future State Alignment Score [0.0, 1.0] - how aligned future predictions are
+          3. Future State Coherence Score [0.0, 1.0] - predicted future coherence quality
+          4. Cross-Horizon Consistency Score [0.0, 1.0] - consistency across time horizons
+          5. Future Divergence Risk [0.0, 1.0] - risk of future fragmentation
+          6. Convergence Signal Strength [0.0, 1.0] - strength of convergence signals
+          7. Dominant Future Path: primary trajectory/scenario descriptor
+          8. Synthesis Band: HIGH | MEDIUM | LOW | FRAGMENTED
+          9. Diagnostic Tags
+
+        The UTSSE is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for analytics, dashboards, and UI diagnostics only.
+
+        This update runs AFTER Phase 46 to leverage all upstream trajectory and
+        scenario layers.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.unified_trajectory_scenario_synthesis import (
+            compute_unified_trajectory_scenario_synthesis
+        )
+
+        # ====================================================================
+        # STEP 1: GATHER INPUTS FROM PHASES 35, 36, 37, 38, 39, 42, 44, 46
+        # ====================================================================
+
+        # Phase 35 - Predictive Persona Drift
+        drift = state.predictive_drift_snapshot
+
+        # Phase 36 - Identity Resonance Memory
+        identity = state.identity_resonance_memory_snapshot
+
+        # Phase 37 - Adaptive Continuity Engine
+        continuity = state.adaptive_continuity_snapshot
+
+        # Phase 38 - Temporal Coherence Forecasting
+        forecast_single = state.temporal_forecast_snapshot
+
+        # Phase 39 - Multi-Horizon Temporal Forecasting
+        forecast_multi = state.multi_horizon_forecast_snapshot
+
+        # Phase 42 - Scenario Fusion Engine
+        scenario_fusion = state.scenario_fusion_snapshot
+
+        # Phase 44 - Coherence-Scenario Alignment
+        scenario_alignment = state.scenario_alignment_snapshot
+
+        # Phase 46 - Trajectory Field Convergence
+        trajectory_convergence = state.trajectory_convergence_snapshot
+
+        # ====================================================================
+        # STEP 2: COMPUTE UNIFIED TRAJECTORY–SCENARIO SYNTHESIS
+        # ====================================================================
+
+        snapshot = compute_unified_trajectory_scenario_synthesis(
+            drift=drift,
+            identity=identity,
+            continuity=continuity,
+            forecast_single=forecast_single,
+            forecast_multi=forecast_multi,
+            scenario_fusion=scenario_fusion,
+            scenario_alignment=scenario_alignment,
+            trajectory_convergence=trajectory_convergence,
+        )
+
+        # ====================================================================
+        # STEP 3: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Update current snapshot
+            state.trajectory_scenario_synthesis_snapshot = snapshot
+
+            # Append to histories
+            state.synthesis_integrity_history.append(snapshot.synthesis_integrity_score)
+            state.synthesis_alignment_history.append(snapshot.future_state_alignment_score)
+            state.synthesis_divergence_history.append(snapshot.future_divergence_risk)
+            state.synthesis_band_history.append(snapshot.synthesis_band)
+            state.synthesis_tags_history.append(snapshot.diagnostic_tags.copy() if snapshot.diagnostic_tags else [])
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.trajectory_scenario_synthesis_snapshot = None
+
+            # Append None/default values to maintain history alignment
+            state.synthesis_integrity_history.append(0.0)
+            state.synthesis_alignment_history.append(0.0)
+            state.synthesis_divergence_history.append(0.0)
+            state.synthesis_band_history.append("")
+            state.synthesis_tags_history.append([])

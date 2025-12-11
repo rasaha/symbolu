@@ -250,3 +250,10 @@ class SessionSummary:
     avg_trajectory_stability: Optional[float] = None  # Average stability index [0.0, 1.0]
     dominant_convergence_band: Optional[str] = None  # Most frequent convergence band: "high" | "medium" | "low" | "fragmented"
     dominant_convergence_tags: List[str] = field(default_factory=list)  # Collected TFCE diagnostic tags (deduped, sorted)
+
+    # Phase 47 Unified Trajectory–Scenario Synthesis Engine (observation only)
+    avg_synthesis_integrity: Optional[float] = None  # Average synthesis integrity score [0.0, 1.0]
+    avg_future_alignment: Optional[float] = None  # Average future state alignment score [0.0, 1.0]
+    avg_future_divergence_risk: Optional[float] = None  # Average future divergence risk [0.0, 1.0]
+    dominant_synthesis_band: Optional[str] = None  # Most frequent synthesis band: "HIGH" | "MEDIUM" | "LOW" | "FRAGMENTED"
+    synthesis_tags: List[str] = field(default_factory=list)  # Collected UTSSE diagnostic tags (deduped, sorted)

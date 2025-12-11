@@ -351,6 +351,12 @@ class PersonaResponse(BaseModel):
         description="Phase 46: Trajectory Field Convergence Engine (TFCE) metadata (observation-only, metadata-only)"
     )
 
+    # Phase 47: Optional unified trajectory–scenario synthesis engine metadata (observation-only, metadata-only)
+    persona_unified_synthesis_profile: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Phase 47: Unified Trajectory–Scenario Synthesis Engine (UTSSE) metadata (observation-only, metadata-only)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {

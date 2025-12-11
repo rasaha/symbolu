@@ -93,6 +93,7 @@ class UnifiedOutput:
     coherence_scenario_alignment: Optional[Dict[str, Any]] = None  # Phase 44: Coherence–Scenario Alignment Engine (observation-only, analytics/UI-only)
     multi_trajectory_stability_field: Optional[Dict[str, Any]] = None  # Phase 45: Multi-Trajectory Stability Field (MTSF) (observation-only, analytics/UI-only)
     trajectory_field_convergence: Optional[Dict[str, Any]] = None  # Phase 46: Trajectory Field Convergence Engine (TFCE) (observation-only, analytics/UI-only)
+    unified_trajectory_scenario_synthesis: Optional[Dict[str, Any]] = None  # Phase 47: Unified Trajectory–Scenario Synthesis Engine (UTSSE) (observation-only, analytics/UI-only)
     persona_echo_profile: Optional[Dict[str, Any]] = None  # Phase 31: Adaptive Persona Echo Layer (APEL) (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1182,6 +1183,24 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "diagnostic_tags": getattr(tfce_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 47: Extract unified trajectory–scenario synthesis engine (UTSSE) data (observation-only, analytics/UI-only)
+    utsse_data = None
+    if hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        utsse_snapshot = getattr(ctx.coherence_state, 'trajectory_scenario_synthesis_snapshot', None)
+        if utsse_snapshot is not None:
+            # Build dict from snapshot fields
+            utsse_data = {
+                "synthesis_integrity_score": getattr(utsse_snapshot, 'synthesis_integrity_score', 0.0),
+                "future_state_alignment_score": getattr(utsse_snapshot, 'future_state_alignment_score', 0.0),
+                "future_state_coherence_score": getattr(utsse_snapshot, 'future_state_coherence_score', 0.0),
+                "cross_horizon_consistency_score": getattr(utsse_snapshot, 'cross_horizon_consistency_score', 0.0),
+                "future_divergence_risk": getattr(utsse_snapshot, 'future_divergence_risk', 0.0),
+                "convergence_signal_strength": getattr(utsse_snapshot, 'convergence_signal_strength', 0.0),
+                "dominant_future_path": getattr(utsse_snapshot, 'dominant_future_path', None),
+                "synthesis_band": getattr(utsse_snapshot, 'synthesis_band', None),
+                "diagnostic_tags": getattr(utsse_snapshot, 'diagnostic_tags', []),
+            }
+
     # Phase 31: Extract Adaptive Persona Echo Layer (APEL) data (observation-only, tone-level only)
     echo_profile_data = None
     # Try to extract from persona response (if available)
@@ -1225,6 +1244,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         coherence_scenario_alignment=csae_data,  # Phase 44
         multi_trajectory_stability_field=mtsf_data,  # Phase 45
         trajectory_field_convergence=tfce_data,  # Phase 46
+        unified_trajectory_scenario_synthesis=utsse_data,  # Phase 47
         persona_echo_profile=echo_profile_data,  # Phase 31
     )
 

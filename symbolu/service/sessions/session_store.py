@@ -1403,6 +1403,88 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_tfce_tags:
             tfce_tags_list = sorted(set(all_tfce_tags))
 
+        # Phase 47: Extract Unified Trajectory–Scenario Synthesis Engine (UTSSE) metrics from CoherenceState
+        all_synthesis_integrity = []
+        all_synthesis_alignment = []
+        all_synthesis_divergence = []
+        all_synthesis_bands = []
+        all_synthesis_tags = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract from synthesis_integrity_history
+                if "synthesis_integrity_history" in coh:
+                    integrity_history = coh["synthesis_integrity_history"]
+                    if isinstance(integrity_history, list):
+                        for val in integrity_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_synthesis_integrity.append(val)
+
+                # Extract from synthesis_alignment_history
+                if "synthesis_alignment_history" in coh:
+                    alignment_history = coh["synthesis_alignment_history"]
+                    if isinstance(alignment_history, list):
+                        for val in alignment_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_synthesis_alignment.append(val)
+
+                # Extract from synthesis_divergence_history
+                if "synthesis_divergence_history" in coh:
+                    divergence_history = coh["synthesis_divergence_history"]
+                    if isinstance(divergence_history, list):
+                        for val in divergence_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_synthesis_divergence.append(val)
+
+                # Extract from synthesis_band_history
+                if "synthesis_band_history" in coh:
+                    band_history = coh["synthesis_band_history"]
+                    if isinstance(band_history, list):
+                        for band in band_history:
+                            if band is not None and band != "":
+                                all_synthesis_bands.append(band)
+
+                # Extract tags from synthesis_tags_history
+                if "synthesis_tags_history" in coh:
+                    tags_history = coh["synthesis_tags_history"]
+                    if isinstance(tags_history, list):
+                        for tag_list in tags_history:
+                            if isinstance(tag_list, list):
+                                all_synthesis_tags.extend(tag_list)
+
+        # Compute aggregates
+        avg_synthesis_integrity_val = None
+        avg_synthesis_alignment_val = None
+        avg_synthesis_divergence_val = None
+        dominant_synthesis_band_val = None
+        synthesis_tags_list = []
+
+        # Average synthesis integrity
+        if all_synthesis_integrity:
+            avg_synthesis_integrity_val = sum(all_synthesis_integrity) / len(all_synthesis_integrity)
+
+        # Average future state alignment
+        if all_synthesis_alignment:
+            avg_synthesis_alignment_val = sum(all_synthesis_alignment) / len(all_synthesis_alignment)
+
+        # Average future divergence risk
+        if all_synthesis_divergence:
+            avg_synthesis_divergence_val = sum(all_synthesis_divergence) / len(all_synthesis_divergence)
+
+        # Dominant synthesis band (most frequent)
+        if all_synthesis_bands:
+            from collections import Counter
+            band_counts = Counter(all_synthesis_bands)
+            # Deterministic tie-breaking: most_common + sorted
+            top_bands = band_counts.most_common()
+            max_count = top_bands[0][1]
+            tied_bands = [band for band, count in top_bands if count == max_count]
+            dominant_synthesis_band_val = sorted(tied_bands)[0]  # Deterministic tie-break
+
+        # Collect unique UTSSE tags (deduplicate and sort for determinism)
+        if all_synthesis_tags:
+            synthesis_tags_list = sorted(set(all_synthesis_tags))
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -1490,4 +1572,9 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_trajectory_stability=avg_trajectory_stability_val,
         dominant_convergence_band=dominant_convergence_band_val,
         dominant_convergence_tags=tfce_tags_list,
+        avg_synthesis_integrity=avg_synthesis_integrity_val,
+        avg_future_alignment=avg_synthesis_alignment_val,
+        avg_future_divergence_risk=avg_synthesis_divergence_val,
+        dominant_synthesis_band=dominant_synthesis_band_val,
+        synthesis_tags=synthesis_tags_list,
     )
