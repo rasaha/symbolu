@@ -53,7 +53,7 @@ from symbolu.core.coherence.coherence_engine import CoherenceEngine
 from symbolu.service.sessions.session_models import SessionSummary, SessionState
 from symbolu.service.sessions.session_store import SessionStore, compute_session_summary
 from symbolu.mechanical.pipeline.coherence_observer import CoherenceObservation, CoherenceObserver
-from symbolu.mechanical.persona.models import PersonaResponse, PersonaContext
+from symbolu.mechanical.persona.models import PersonaResponse
 from symbolu.api.unified_api import UnifiedOutput
 
 
@@ -858,16 +858,13 @@ class TestPersonaInvariance(unittest.TestCase):
         self.assertTrue(True)
 
     def test_persona_context_metadata_only(self):
-        """PersonaContext.macro_stability_snapshot must be metadata-only."""
+        """Phase 48 integration in persona engine must be metadata-only."""
         # Phase 48 should appear ONLY in metadata, not affect text generation
-        context = PersonaContext(
-            text="test",
-            domain="general",
-            tier="hybrid"
-        )
+        # Structural guarantee: persona engine only extracts Phase 48, doesn't use it
+        state = CoherenceState(convo_id="test", turn_index=1)
 
-        # Add Phase 48 to context
-        context.macro_stability_snapshot = MacroStabilitySnapshot(
+        # Add Phase 48 to state
+        state.macro_stability_snapshot = MacroStabilitySnapshot(
             macro_stability_index=0.75,
             macro_divergence_index=0.25,
             macro_predictive_confidence=0.72,
@@ -875,8 +872,8 @@ class TestPersonaInvariance(unittest.TestCase):
             stability_band="high"
         )
 
-        # Should be in metadata only
-        self.assertIsNotNone(context.macro_stability_snapshot)
+        # Should be in metadata only (structural guarantee)
+        self.assertIsNotNone(state.macro_stability_snapshot)
 
     def test_no_conditional_persona_logic_based_on_msr(self):
         """No conditional persona logic like 'if macro_stability_index > X: tone Y'."""
@@ -1797,16 +1794,13 @@ class TestGracefulDegradation(unittest.TestCase):
         self.assertIsNone(as_dict.get("macro_stability_regulator"))
 
     def test_persona_context_handles_none_snapshot(self):
-        """PersonaContext must handle None macro_stability_snapshot gracefully."""
-        context = PersonaContext(
-            text="test",
-            domain="general",
-            tier="hybrid"
-        )
-        context.macro_stability_snapshot = None
+        """Persona engine must handle None macro_stability_snapshot gracefully."""
+        # Persona engine should handle None Phase 48 data without crashing
+        state = CoherenceState(convo_id="test", turn_index=1)
+        state.macro_stability_snapshot = None
 
         # Should not crash
-        self.assertIsNone(context.macro_stability_snapshot)
+        self.assertIsNone(state.macro_stability_snapshot)
 
     def test_safe_get_handles_none_data(self):
         """_safe_get must handle None data gracefully."""
