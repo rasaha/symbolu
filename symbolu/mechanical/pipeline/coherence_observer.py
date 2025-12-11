@@ -249,6 +249,13 @@ class CoherenceObservation:
     regime_scores: Dict[str, float] = field(default_factory=dict)  # Regime name → score
     regime_tags: List[str] = field(default_factory=list)  # CRSM diagnostic tags
 
+    # Phase 42: Scenario Fusion Engine (observation only)
+    scenario_fusion_alignment: Optional[float] = None  # Scenario alignment score [0.0, 1.0]
+    scenario_fusion_divergence: Optional[float] = None  # Scenario divergence index [0.0, 1.0]
+    scenario_fusion_uncertainty_band: Optional[str] = None  # Future uncertainty band: "low" | "medium" | "high"
+    scenario_fusion_dominant_path: Optional[str] = None  # Dominant future path (regime)
+    scenario_fusion_tags: List[str] = field(default_factory=list)  # Scenario pattern tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -892,6 +899,22 @@ class CoherenceObserver:
                 regime_scores = getattr(coherence_regime_snapshot, 'regime_scores', {})
                 regime_tags = getattr(coherence_regime_snapshot, 'diagnostic_tags', [])
 
+        # Phase 42: Extract Scenario Fusion Engine from coherence state
+        scenario_fusion_alignment = None
+        scenario_fusion_divergence = None
+        scenario_fusion_uncertainty_band = None
+        scenario_fusion_dominant_path = None
+        scenario_fusion_tags = []
+
+        if coherence_state is not None:
+            scenario_fusion_snapshot = getattr(coherence_state, 'scenario_fusion_snapshot', None)
+            if scenario_fusion_snapshot is not None:
+                scenario_fusion_alignment = getattr(scenario_fusion_snapshot, 'scenario_alignment_score', None)
+                scenario_fusion_divergence = getattr(scenario_fusion_snapshot, 'scenario_divergence_index', None)
+                scenario_fusion_uncertainty_band = getattr(scenario_fusion_snapshot, 'future_uncertainty_band', None)
+                scenario_fusion_dominant_path = getattr(scenario_fusion_snapshot, 'dominant_future_path', None)
+                scenario_fusion_tags = getattr(scenario_fusion_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -1064,6 +1087,11 @@ class CoherenceObserver:
             regime_band=regime_band,  # Phase 41
             regime_scores=regime_scores,  # Phase 41
             regime_tags=regime_tags,  # Phase 41
+            scenario_fusion_alignment=scenario_fusion_alignment,  # Phase 42
+            scenario_fusion_divergence=scenario_fusion_divergence,  # Phase 42
+            scenario_fusion_uncertainty_band=scenario_fusion_uncertainty_band,  # Phase 42
+            scenario_fusion_dominant_path=scenario_fusion_dominant_path,  # Phase 42
+            scenario_fusion_tags=scenario_fusion_tags,  # Phase 42
         )
 
         # Store observation

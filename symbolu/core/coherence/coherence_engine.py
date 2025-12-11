@@ -259,6 +259,9 @@ class CoherenceEngine:
         # Update Phase 41 coherence regime scenario mapper (observation only)
         self._update_coherence_regime(state)
 
+        # Update Phase 42 scenario fusion engine (observation only)
+        self._update_scenario_fusion_engine(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -3599,3 +3602,91 @@ class CoherenceEngine:
             state.current_dominant_regime = None
             state.current_regime_band = None
             state.current_regime_scores = {}
+
+    def _update_scenario_fusion_engine(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 42 Scenario Fusion Engine (observation only).
+
+        This method fuses Phase 41 regime-level scenario outputs into a unified
+        scenario fusion snapshot that characterizes scenario alignment, divergence,
+        consensus, and future uncertainty.
+
+        The Scenario Fusion Engine answers the question: "How aligned/divergent are the
+        regime scenarios, and what is the future uncertainty?"
+
+        The SFE produces:
+          1. Fused scenario vector (normalized regime scores)
+          2. Scenario alignment score [0.0, 1.0]
+          3. Scenario divergence index [0.0, 1.0]
+          4. Multi-regime consensus [0.0, 1.0]
+          5. Dominant future path (dominant regime)
+          6. Future uncertainty band ("low" | "medium" | "high")
+          7. Diagnostic tags
+
+        The SFE is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for analytics, dashboards, and UI diagnostics only.
+
+        This update runs AFTER Phase 41 to leverage the regime scenario outputs.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.scenario_fusion_engine import compute_scenario_fusion
+
+        # ====================================================================
+        # STEP 1: GATHER PHASE 41 OUTPUTS
+        # ====================================================================
+
+        # Check if Phase 41 produced a snapshot
+        if state.coherence_regime_snapshot is None:
+            # No Phase 41 data available - cannot compute scenario fusion
+            state.scenario_alignment_history.append(None)
+            state.scenario_divergence_history.append(None)
+            state.scenario_uncertainty_band_history.append(None)
+            state.dominant_future_path_history.append(None)
+            state.scenario_fusion_snapshot = None
+            return
+
+        # Extract regime scenarios from Phase 41
+        regime_scenarios = state.current_regime_scores  # Dict[str, float]
+        regime_band = state.current_regime_band  # "stable" | "mixed" | "volatile"
+
+        # Extract secondary regimes from snapshot if available
+        secondary_regimes = None
+        if hasattr(state.coherence_regime_snapshot, 'secondary_regimes'):
+            secondary_regimes = state.coherence_regime_snapshot.secondary_regimes
+
+        # ====================================================================
+        # STEP 2: COMPUTE SCENARIO FUSION
+        # ====================================================================
+
+        snapshot = compute_scenario_fusion(
+            regime_scenarios=regime_scenarios,
+            regime_band=regime_band,
+            secondary_regimes=secondary_regimes,
+        )
+
+        # ====================================================================
+        # STEP 3: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Update current snapshot
+            state.scenario_fusion_snapshot = snapshot
+
+            # Append to histories
+            state.scenario_alignment_history.append(snapshot.scenario_alignment_score)
+            state.scenario_divergence_history.append(snapshot.scenario_divergence_index)
+            state.scenario_uncertainty_band_history.append(snapshot.future_uncertainty_band)
+            state.dominant_future_path_history.append(snapshot.dominant_future_path)
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.scenario_fusion_snapshot = None
+
+            state.scenario_alignment_history.append(None)
+            state.scenario_divergence_history.append(None)
+            state.scenario_uncertainty_band_history.append(None)
+            state.dominant_future_path_history.append(None)

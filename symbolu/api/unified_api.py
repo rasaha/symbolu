@@ -89,6 +89,7 @@ class UnifiedOutput:
     multi_horizon_forecast: Optional[Dict[str, Any]] = None  # Phase 39: Multi-horizon temporal forecasting engine (observation-only, tone-level only)
     cross_horizon_resonance: Optional[Dict[str, Any]] = None  # Phase 40: Cross-Horizon Resonance Alignment Engine (observation-only, tone-level only)
     coherence_regime: Optional[Dict[str, Any]] = None  # Phase 41: Coherence-Regime Scenario Mapper (observation-only, analytics/UI-only)
+    scenario_fusion: Optional[Dict[str, Any]] = None  # Phase 42: Scenario Fusion Engine (observation-only, analytics/UI-only)
     persona_echo_profile: Optional[Dict[str, Any]] = None  # Phase 31: Adaptive Persona Echo Layer (APEL) (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1113,6 +1114,21 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "tags": getattr(regime_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 42: Extract scenario fusion engine data (observation-only, analytics/UI-only)
+    scenario_fusion_data = None
+    if hasattr(ctx, 'coherence_state') and ctx.coherence_state is not None:
+        scenario_fusion_snapshot = getattr(ctx.coherence_state, 'scenario_fusion_snapshot', None)
+        if scenario_fusion_snapshot is not None:
+            # Build dict from snapshot fields
+            scenario_fusion_data = {
+                "alignment": getattr(scenario_fusion_snapshot, 'scenario_alignment_score', None),
+                "divergence": getattr(scenario_fusion_snapshot, 'scenario_divergence_index', None),
+                "consensus": getattr(scenario_fusion_snapshot, 'multi_regime_consensus', None),
+                "uncertainty_band": getattr(scenario_fusion_snapshot, 'future_uncertainty_band', None),
+                "dominant_future_path": getattr(scenario_fusion_snapshot, 'dominant_future_path', None),
+                "tags": getattr(scenario_fusion_snapshot, 'diagnostic_tags', []),
+            }
+
     # Phase 31: Extract Adaptive Persona Echo Layer (APEL) data (observation-only, tone-level only)
     echo_profile_data = None
     # Try to extract from persona response (if available)
@@ -1152,6 +1168,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         multi_horizon_forecast=mhtfe_data,  # Phase 39
         cross_horizon_resonance=chra_data,  # Phase 40
         coherence_regime=regime_data,  # Phase 41
+        scenario_fusion=scenario_fusion_data,  # Phase 42
         persona_echo_profile=echo_profile_data,  # Phase 31
     )
 

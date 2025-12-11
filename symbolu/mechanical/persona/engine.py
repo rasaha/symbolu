@@ -222,7 +222,15 @@ class PersonaEngine:
             # Attach profile to response for observability (NEVER affects routing)
             persona_response.cross_horizon_resonance_profile = chra_profile
 
-        # Step 15: Return complete response
+        # Phase 42 Step 15: Extract scenario fusion metadata (metadata-only, no tone changes)
+        # Extract scenario fusion snapshot from coherence state
+        scenario_fusion_snapshot = self._extract_scenario_fusion(explain_log)
+        if scenario_fusion_snapshot is not None:
+            # Attach metadata to response for observability (METADATA-ONLY, NO tone changes)
+            scenario_fusion_metadata = self._build_scenario_fusion_metadata(scenario_fusion_snapshot)
+            persona_response.persona_scenario_fusion = scenario_fusion_metadata
+
+        # Step 16: Return complete response
         return persona_response
     
     def _order_layers(
@@ -1354,6 +1362,102 @@ class PersonaEngine:
                 return chra_snapshot
 
         return None
+
+    def _extract_scenario_fusion(
+        self,
+        explain_log: Dict[str, Any]
+    ) -> Optional[Any]:
+        """
+        Phase 42: Extract scenario fusion snapshot from coherence state.
+
+        This method safely extracts the scenario fusion snapshot from the
+        coherence state if available.
+
+        Args:
+            explain_log: MLCR explain log with coherence state
+
+        Returns:
+            ScenarioFusionSnapshot or None if not available
+
+        Behavior:
+            • Returns None if no coherence state present
+            • Returns None if scenario fusion computation was not run
+            • Returns snapshot if successfully computed
+        """
+        # Try coherence_state path first (most common)
+        coherence_state = explain_log.get('coherence_state')
+        if coherence_state is not None:
+            scenario_fusion_snapshot = getattr(coherence_state, 'scenario_fusion_snapshot', None)
+            if scenario_fusion_snapshot is not None:
+                return scenario_fusion_snapshot
+
+        # Try coherence_observation path (if it has scenario fusion data)
+        coherence_observation = explain_log.get('coherence_observation')
+        if coherence_observation is not None:
+            # Check if observation has scenario fusion fields
+            if hasattr(coherence_observation, 'scenario_fusion_alignment'):
+                # Build a minimal snapshot from observation fields
+                scenario_fusion_alignment = getattr(coherence_observation, 'scenario_fusion_alignment', None)
+                scenario_fusion_divergence = getattr(coherence_observation, 'scenario_fusion_divergence', None)
+                scenario_fusion_uncertainty_band = getattr(coherence_observation, 'scenario_fusion_uncertainty_band', None)
+                scenario_fusion_dominant_path = getattr(coherence_observation, 'scenario_fusion_dominant_path', None)
+                scenario_fusion_tags = getattr(coherence_observation, 'scenario_fusion_tags', [])
+
+                # If we have meaningful data, create a minimal dict
+                if scenario_fusion_alignment is not None or scenario_fusion_divergence is not None:
+                    return {
+                        'scenario_alignment_score': scenario_fusion_alignment,
+                        'scenario_divergence_index': scenario_fusion_divergence,
+                        'future_uncertainty_band': scenario_fusion_uncertainty_band,
+                        'dominant_future_path': scenario_fusion_dominant_path,
+                        'diagnostic_tags': scenario_fusion_tags,
+                    }
+
+        return None
+
+    def _build_scenario_fusion_metadata(
+        self,
+        scenario_fusion_snapshot: Any
+    ) -> Dict[str, Any]:
+        """
+        Phase 42: Build scenario fusion metadata dict for persona response.
+
+        This method builds a JSON-safe metadata dict from the scenario fusion snapshot.
+        This is METADATA-ONLY and does NOT affect tone parameters.
+
+        Args:
+            scenario_fusion_snapshot: ScenarioFusionSnapshot or dict
+
+        Returns:
+            dict: JSON-safe metadata dict
+
+        Behavior:
+            • Extracts key metrics from snapshot
+            • Returns JSON-serializable dict
+            • Safe for null/missing fields
+        """
+        if scenario_fusion_snapshot is None:
+            return {}
+
+        # If it's a dict (from observation path), use directly
+        if isinstance(scenario_fusion_snapshot, dict):
+            return {
+                "alignment": scenario_fusion_snapshot.get('scenario_alignment_score'),
+                "divergence": scenario_fusion_snapshot.get('scenario_divergence_index'),
+                "uncertainty_band": scenario_fusion_snapshot.get('future_uncertainty_band'),
+                "dominant_future_path": scenario_fusion_snapshot.get('dominant_future_path'),
+                "tags": scenario_fusion_snapshot.get('diagnostic_tags', []),
+            }
+
+        # Otherwise, it's a dataclass snapshot
+        return {
+            "alignment": getattr(scenario_fusion_snapshot, 'scenario_alignment_score', None),
+            "divergence": getattr(scenario_fusion_snapshot, 'scenario_divergence_index', None),
+            "consensus": getattr(scenario_fusion_snapshot, 'multi_regime_consensus', None),
+            "uncertainty_band": getattr(scenario_fusion_snapshot, 'future_uncertainty_band', None),
+            "dominant_future_path": getattr(scenario_fusion_snapshot, 'dominant_future_path', None),
+            "tags": getattr(scenario_fusion_snapshot, 'diagnostic_tags', []),
+        }
 
     def _apply_cross_horizon_resonance_to_tone(
         self,

@@ -1054,6 +1054,90 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_regime_notes:
             regime_notes_list = sorted(set(all_regime_notes))
 
+    # Phase 42: Extract Scenario Fusion Engine metrics from coherence history
+    avg_scenario_alignment_val = None
+    avg_scenario_divergence_val = None
+    scenario_uncertainty_band_val = None
+    dominant_fused_future_path_val = None
+    scenario_pattern_tags_list = []
+
+    if state.coherence_history:
+        # Extract scenario fusion metrics from CoherenceState
+        all_alignment_scores = []
+        all_divergence_scores = []
+        all_uncertainty_bands = []
+        all_future_paths = []
+        all_pattern_tags = []
+
+        for coh in state.coherence_history:
+            if isinstance(coh, dict):
+                # Extract from scenario_alignment_history
+                if "scenario_alignment_history" in coh:
+                    alignment_history = coh["scenario_alignment_history"]
+                    if isinstance(alignment_history, list):
+                        for score in alignment_history:
+                            if score is not None and isinstance(score, (int, float)):
+                                all_alignment_scores.append(score)
+
+                # Extract from scenario_divergence_history
+                if "scenario_divergence_history" in coh:
+                    divergence_history = coh["scenario_divergence_history"]
+                    if isinstance(divergence_history, list):
+                        for score in divergence_history:
+                            if score is not None and isinstance(score, (int, float)):
+                                all_divergence_scores.append(score)
+
+                # Extract from scenario_uncertainty_band_history
+                if "scenario_uncertainty_band_history" in coh:
+                    band_history = coh["scenario_uncertainty_band_history"]
+                    if isinstance(band_history, list):
+                        for band in band_history:
+                            if band is not None:
+                                all_uncertainty_bands.append(band)
+
+                # Extract from dominant_future_path_history
+                if "dominant_future_path_history" in coh:
+                    path_history = coh["dominant_future_path_history"]
+                    if isinstance(path_history, list):
+                        for path in path_history:
+                            if path is not None:
+                                all_future_paths.append(path)
+
+                # Extract tags from scenario_fusion_snapshot
+                if "scenario_fusion_snapshot" in coh and coh["scenario_fusion_snapshot"] is not None:
+                    snapshot = coh["scenario_fusion_snapshot"]
+                    if hasattr(snapshot, 'diagnostic_tags') and isinstance(snapshot.diagnostic_tags, list):
+                        all_pattern_tags.extend(snapshot.diagnostic_tags)
+
+        # Compute aggregates
+        # Average scenario alignment
+        if all_alignment_scores:
+            avg_scenario_alignment_val = sum(all_alignment_scores) / len(all_alignment_scores)
+
+        # Average scenario divergence
+        if all_divergence_scores:
+            avg_scenario_divergence_val = sum(all_divergence_scores) / len(all_divergence_scores)
+
+        # Scenario uncertainty band (most frequent)
+        if all_uncertainty_bands:
+            from collections import Counter
+            band_counts = Counter(all_uncertainty_bands)
+            scenario_uncertainty_band_val = band_counts.most_common(1)[0][0]
+
+        # Dominant fused future path (most frequent)
+        if all_future_paths:
+            from collections import Counter
+            path_counts = Counter(all_future_paths)
+            # Deterministic tie-breaking: most_common + sorted
+            top_paths = path_counts.most_common()
+            max_count = top_paths[0][1]
+            tied_paths = [path for path, count in top_paths if count == max_count]
+            dominant_fused_future_path_val = sorted(tied_paths)[0]  # Deterministic tie-break
+
+        # Collect unique scenario pattern tags (deduplicate and sort for determinism)
+        if all_pattern_tags:
+            scenario_pattern_tags_list = sorted(set(all_pattern_tags))
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -1120,4 +1204,9 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         regime_band=regime_band_val,
         regime_frequency=regime_frequency_val,
         regime_notes=regime_notes_list,
+        avg_scenario_alignment=avg_scenario_alignment_val,
+        avg_scenario_divergence=avg_scenario_divergence_val,
+        scenario_uncertainty_band=scenario_uncertainty_band_val,
+        dominant_fused_future_path=dominant_fused_future_path_val,
+        scenario_pattern_tags=scenario_pattern_tags_list,
     )

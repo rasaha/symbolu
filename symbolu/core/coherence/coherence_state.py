@@ -311,6 +311,13 @@ class CoherenceState:
     current_regime_band: Optional[str] = None  # Regime band: "stable" | "mixed" | "volatile"
     current_regime_scores: Dict[str, float] = field(default_factory=dict)  # Regime scores {regime_name: score}
 
+    # Phase 42: Scenario Fusion Engine (observation only - not used in scoring)
+    scenario_fusion_snapshot: Optional[Any] = None  # ScenarioFusionSnapshot (latest)
+    scenario_alignment_history: List[Optional[float]] = field(default_factory=list)  # Scenario alignment score history
+    scenario_divergence_history: List[Optional[float]] = field(default_factory=list)  # Scenario divergence index history
+    scenario_uncertainty_band_history: List[Optional[str]] = field(default_factory=list)  # Future uncertainty band history
+    dominant_future_path_history: List[Optional[str]] = field(default_factory=list)  # Dominant future path history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -436,6 +443,12 @@ class CoherenceState:
 
         # Phase 41 coherence regime scenario mapper formula history
         self.coherence_regime_history = self.coherence_regime_history[-window:]
+
+        # Phase 42 scenario fusion engine formula history
+        self.scenario_alignment_history = self.scenario_alignment_history[-window:]
+        self.scenario_divergence_history = self.scenario_divergence_history[-window:]
+        self.scenario_uncertainty_band_history = self.scenario_uncertainty_band_history[-window:]
+        self.dominant_future_path_history = self.dominant_future_path_history[-window:]
 
     def get_history_length(self) -> int:
         """

@@ -1265,6 +1265,59 @@ def _build_badges(
                 description="Session exhibits surface-level interaction. Low depth and symbolic harmonization."
             ))
 
+    # ========================================================================
+    # Phase 42: Scenario Fusion Engine Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract scenario_fusion from unified_output
+    scenario_fusion = unified_output.get("scenario_fusion") if unified_output else None
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and scenario_fusion is not None:
+        uncertainty_band = scenario_fusion.get("uncertainty_band")
+        alignment = scenario_fusion.get("alignment")
+        divergence = scenario_fusion.get("divergence")
+        tags = scenario_fusion.get("tags", [])
+
+        # SCENARIO_FUTURE_STABLE: low uncertainty, high alignment, low divergence
+        if uncertainty_band == "low":
+            badges.append(DILchatBadge(
+                label="SCENARIO_FUTURE_STABLE",
+                level="info",
+                description="Future scenario outlook is stable with high regime alignment and low uncertainty."
+            ))
+
+        # SCENARIO_FUTURE_CAUTIOUS: medium uncertainty
+        if uncertainty_band == "medium":
+            badges.append(DILchatBadge(
+                label="SCENARIO_FUTURE_CAUTIOUS",
+                level="info",
+                description="Future scenario outlook is cautious with moderate uncertainty and mixed regime signals."
+            ))
+
+        # SCENARIO_FUTURE_UNCERTAIN: high uncertainty
+        if uncertainty_band == "high":
+            badges.append(DILchatBadge(
+                label="SCENARIO_FUTURE_UNCERTAIN",
+                level="warning",
+                description="Future scenario outlook is uncertain with high divergence and low regime consensus."
+            ))
+
+        # SCENARIO_PATH_CONVERGING: high alignment and consensus
+        if (alignment is not None and alignment >= 0.65) or "SCENARIO_PATH_CONVERGING" in tags:
+            badges.append(DILchatBadge(
+                label="SCENARIO_PATH_CONVERGING",
+                level="info",
+                description="Scenario paths are converging with strong alignment across coherence regimes."
+            ))
+
+        # SCENARIO_PATH_DIVERGING: high divergence, low consensus
+        if (divergence is not None and divergence >= 0.65) or "SCENARIO_PATH_DIVERGING" in tags:
+            badges.append(DILchatBadge(
+                label="SCENARIO_PATH_DIVERGING",
+                level="warning",
+                description="Scenario paths are diverging with weak consensus across coherence regimes."
+            ))
+
     return badges
 
 
