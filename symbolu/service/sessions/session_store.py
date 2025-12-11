@@ -1674,6 +1674,124 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
             tied_regimes = [regime for regime, count in top_regimes if count == max_count]
             dominant_temporal_regime_val = sorted(tied_regimes)[0]  # Deterministic tie-break
 
+        # Phase 50: Extract Cognitive Consistency Regression Engine (CCRE) metrics from CoherenceState
+        all_regression_stability = []
+        all_regression_alignment = []
+        all_regression_drift = []
+        all_prediction_reversal_risk = []
+        all_internal_consistency_strength = []
+        all_regression_consistency_bands = []
+        all_regression_consistency_tags = []
+
+        for coh in state.coherence_history:
+            if coh is not None and isinstance(coh, dict):
+                # Extract from regression_stability_history (RSI)
+                if "regression_stability_history" in coh:
+                    stability_history = coh["regression_stability_history"]
+                    if isinstance(stability_history, list):
+                        for val in stability_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_regression_stability.append(val)
+
+                # Extract from regression_alignment_history (CLRA)
+                if "regression_alignment_history" in coh:
+                    alignment_history = coh["regression_alignment_history"]
+                    if isinstance(alignment_history, list):
+                        for val in alignment_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_regression_alignment.append(val)
+
+                # Extract from regression_drift_history (CDR)
+                if "regression_drift_history" in coh:
+                    drift_history = coh["regression_drift_history"]
+                    if isinstance(drift_history, list):
+                        for val in drift_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_regression_drift.append(val)
+
+                # Extract from regression_prr_history (PRR)
+                if "regression_prr_history" in coh:
+                    prr_history = coh["regression_prr_history"]
+                    if isinstance(prr_history, list):
+                        for val in prr_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_prediction_reversal_risk.append(val)
+
+                # Extract from regression_ics_history (ICS)
+                if "regression_ics_history" in coh:
+                    ics_history = coh["regression_ics_history"]
+                    if isinstance(ics_history, list):
+                        for val in ics_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_internal_consistency_strength.append(val)
+
+                # Extract from regression_band_history
+                if "regression_band_history" in coh:
+                    band_history = coh["regression_band_history"]
+                    if isinstance(band_history, list):
+                        for band in band_history:
+                            if band is not None and band != "":
+                                all_regression_consistency_bands.append(band)
+
+                # Extract tags from regression_tags_history
+                if "regression_tags_history" in coh:
+                    tags_history = coh["regression_tags_history"]
+                    if isinstance(tags_history, list):
+                        for tag_list in tags_history:
+                            if isinstance(tag_list, list):
+                                all_regression_consistency_tags.extend(tag_list)
+
+        # Compute aggregates
+        avg_regression_stability_val = None
+        avg_regression_alignment_val = None
+        avg_regression_drift_val = None
+        avg_prediction_reversal_risk_val = None
+        avg_internal_consistency_strength_val = None
+        regression_consistency_band_val = None
+        regression_consistency_tags_list = []
+
+        # Average regression stability index (RSI)
+        if all_regression_stability:
+            avg_regression_stability_val = sum(all_regression_stability) / len(all_regression_stability)
+
+        # Average regression alignment score (CLRA)
+        if all_regression_alignment:
+            avg_regression_alignment_val = sum(all_regression_alignment) / len(all_regression_alignment)
+
+        # Average regression drift score (CDR)
+        if all_regression_drift:
+            avg_regression_drift_val = sum(all_regression_drift) / len(all_regression_drift)
+
+        # Average prediction reversal risk (PRR)
+        if all_prediction_reversal_risk:
+            avg_prediction_reversal_risk_val = sum(all_prediction_reversal_risk) / len(all_prediction_reversal_risk)
+
+        # Average internal consistency strength (ICS)
+        if all_internal_consistency_strength:
+            avg_internal_consistency_strength_val = sum(all_internal_consistency_strength) / len(all_internal_consistency_strength)
+
+        # Regression consistency band (most frequent)
+        if all_regression_consistency_bands:
+            from collections import Counter
+            band_counts = Counter(all_regression_consistency_bands)
+            # Deterministic tie-breaking: most_common + sorted
+            # Priority order for tie-breaking: high_consistency > medium_consistency > low_consistency > internal_conflict
+            top_bands = band_counts.most_common()
+            max_count = top_bands[0][1]
+            tied_bands = [band for band, count in top_bands if count == max_count]
+            # Use priority order for deterministic tie-breaking
+            priority_order = ["high_consistency", "medium_consistency", "low_consistency", "internal_conflict"]
+            for priority_band in priority_order:
+                if priority_band in tied_bands:
+                    regression_consistency_band_val = priority_band
+                    break
+            if regression_consistency_band_val is None:
+                regression_consistency_band_val = sorted(tied_bands)[0]  # Fallback to alphabetical
+
+        # Collect unique CCRE tags (deduplicate and sort for determinism)
+        if all_regression_consistency_tags:
+            regression_consistency_tags_list = sorted(set(all_regression_consistency_tags))
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -1777,4 +1895,11 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_future_consistency=avg_future_consistency_val,
         dominant_temporal_regime=dominant_temporal_regime_val,
         temporal_stability_band=temporal_stability_band_val,
+        avg_regression_stability=avg_regression_stability_val,
+        avg_regression_alignment=avg_regression_alignment_val,
+        avg_regression_drift=avg_regression_drift_val,
+        avg_prediction_reversal_risk=avg_prediction_reversal_risk_val,
+        avg_internal_consistency_strength=avg_internal_consistency_strength_val,
+        regression_consistency_band=regression_consistency_band_val,
+        regression_consistency_tags=regression_consistency_tags_list,
     )

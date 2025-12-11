@@ -272,3 +272,12 @@ class SessionSummary:
     avg_future_consistency: Optional[float] = None  # Average future consistency [0.0, 1.0]
     dominant_temporal_regime: Optional[str] = None  # Most frequent dominant regime
     temporal_stability_band: Optional[str] = None  # Most frequent stability band: "HIGH" | "MEDIUM" | "LOW" | "FRAGMENTED"
+
+    # Phase 50 Cognitive Consistency Regression Engine (observation only)
+    avg_regression_stability: Optional[float] = None  # Average Regression Stability Index (RSI) [0.0, 1.0]
+    avg_regression_alignment: Optional[float] = None  # Average Regression Alignment Score (CLRA) [0.0, 1.0]
+    avg_regression_drift: Optional[float] = None  # Average Regression Drift Score (CDR) [0.0, 1.0]
+    avg_prediction_reversal_risk: Optional[float] = None  # Average Prediction Reversal Risk (PRR) [0.0, 1.0]
+    avg_internal_consistency_strength: Optional[float] = None  # Average Internal Consistency Strength (ICS) [0.0, 1.0]
+    regression_consistency_band: Optional[str] = None  # Most frequent band: "high_consistency" | "medium_consistency" | "low_consistency" | "internal_conflict"
+    regression_consistency_tags: List[str] = field(default_factory=list)  # Collected CCRE diagnostic tags (deduped, sorted)

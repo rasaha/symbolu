@@ -369,6 +369,16 @@ class CoherenceState:
     temporal_stability_entropy_history: List[float] = field(default_factory=list)  # Predictive entropy history
     temporal_stability_consistency_history: List[float] = field(default_factory=list)  # Future consistency history
 
+    # Phase 50: Cognitive Consistency Regression Engine (observation only - not used in scoring)
+    cognitive_consistency_regression_snapshot: Optional[Any] = None  # CognitiveConsistencyRegressionSnapshot (latest)
+    regression_stability_history: List[float] = field(default_factory=list)  # Regression Stability Index (RSI) history
+    regression_alignment_history: List[float] = field(default_factory=list)  # Regression Alignment Score (CLRA) history
+    regression_drift_history: List[float] = field(default_factory=list)  # Regression Drift Score (CDR) history
+    regression_prr_history: List[float] = field(default_factory=list)  # Prediction Reversal Risk (PRR) history
+    regression_ics_history: List[float] = field(default_factory=list)  # Internal Consistency Strength (ICS) history
+    regression_band_history: List[str] = field(default_factory=list)  # Cognitive consistency band history
+    regression_tags_history: List[List[str]] = field(default_factory=list)  # Cognitive consistency tags history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -545,6 +555,15 @@ class CoherenceState:
         self.temporal_stability_index_history = self.temporal_stability_index_history[-window:]
         self.temporal_stability_entropy_history = self.temporal_stability_entropy_history[-window:]
         self.temporal_stability_consistency_history = self.temporal_stability_consistency_history[-window:]
+
+        # Phase 50 cognitive consistency regression engine formula history
+        self.regression_stability_history = self.regression_stability_history[-window:]
+        self.regression_alignment_history = self.regression_alignment_history[-window:]
+        self.regression_drift_history = self.regression_drift_history[-window:]
+        self.regression_prr_history = self.regression_prr_history[-window:]
+        self.regression_ics_history = self.regression_ics_history[-window:]
+        self.regression_band_history = self.regression_band_history[-window:]
+        self.regression_tags_history = self.regression_tags_history[-window:]
 
     def get_history_length(self) -> int:
         """

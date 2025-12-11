@@ -145,6 +145,13 @@ class CoherenceEngine:
                 synthesis_divergence_history=prev_state.synthesis_divergence_history.copy(),
                 synthesis_band_history=prev_state.synthesis_band_history.copy(),
                 synthesis_tags_history=prev_state.synthesis_tags_history.copy(),
+                regression_stability_history=prev_state.regression_stability_history.copy(),
+                regression_alignment_history=prev_state.regression_alignment_history.copy(),
+                regression_drift_history=prev_state.regression_drift_history.copy(),
+                regression_prr_history=prev_state.regression_prr_history.copy(),
+                regression_ics_history=prev_state.regression_ics_history.copy(),
+                regression_band_history=prev_state.regression_band_history.copy(),
+                regression_tags_history=prev_state.regression_tags_history.copy(),
             )
 
         # Append new turn data to histories
@@ -290,6 +297,9 @@ class CoherenceEngine:
 
         # Update Phase 49 unified cross-phase temporal stability engine (observation only)
         self._update_unified_temporal_stability(state)
+
+        # Update Phase 50 cognitive consistency regression engine (observation only)
+        self._update_cognitive_consistency_regression(state)
 
         return state
 
@@ -4388,3 +4398,131 @@ class CoherenceEngine:
             state.temporal_stability_index_history.append(0.0)
             state.temporal_stability_entropy_history.append(0.0)
             state.temporal_stability_consistency_history.append(0.0)
+
+    def _update_cognitive_consistency_regression(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 50 Cognitive Consistency Regression Engine (observation only).
+
+        This method performs multi-window regression analysis over Phase 35-49
+        predictive and stability metrics to measure cognitive consistency.
+
+        The CCRE analyzes regression patterns across:
+          - Phase 35: Predictive Persona Drift (drift magnitude)
+          - Phase 36: Identity Resonance Memory (identity drift anchoring)
+          - Phase 37: Adaptive Continuity Engine (continuity stability score)
+          - Phase 38: Temporal Coherence Forecasting (forecast strength)
+          - Phase 39: Multi-Horizon Temporal Forecasting (future stability envelope)
+          - Phase 42: Scenario Fusion Engine (scenario alignment)
+          - Phase 44: Coherence-Scenario Alignment (alignment score)
+          - Phase 46: Trajectory Field Convergence (convergence index)
+          - Phase 47: Unified Trajectory-Scenario Synthesis (synthesis integrity)
+          - Phase 48: Macro-Stability Regulator (macro-stability index)
+          - Phase 49: Unified Cross-Phase Temporal Stability (temporal stability index)
+
+        The CCRE produces:
+          1. Regression Stability Index (RSI) [0.0, 1.0] - how stable regression patterns are
+          2. Regression Drift Score (CDR) [0.0, 1.0] - how much signals are drifting
+          3. Regression Alignment Score (CLRA) [0.0, 1.0] - cross-signal agreement
+          4. Prediction Reversal Risk (PRR) [0.0, 1.0] - slope direction flips
+          5. Internal Consistency Strength (ICS) [0.0, 1.0] - composite consistency
+          6. Band: high_consistency | medium_consistency | low_consistency | internal_conflict
+          7. Diagnostic Tags
+
+        The CCRE is purely observational and does NOT affect any existing pipeline
+        behavior. It is designed for analytics, dashboards, and UI diagnostics only.
+
+        This update runs AFTER Phase 49 to leverage all upstream layers.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.cognitive_consistency_regression import (
+            compute_cognitive_consistency_regression
+        )
+
+        # ====================================================================
+        # STEP 1: GATHER SIGNAL HISTORIES FROM PHASES 35-49
+        # ====================================================================
+
+        # Phase 35 - Predictive Persona Drift (drift magnitude)
+        drift_history = state.drift_magnitude_history if state.drift_magnitude_history else None
+
+        # Phase 36 - Identity Resonance Memory (IDA - Identity Drift Anchoring)
+        identity_history = state.ida_history if state.ida_history else None
+
+        # Phase 37 - Adaptive Continuity Engine (CSS - Continuity Stability Score)
+        continuity_history = state.css_history if state.css_history else None
+
+        # Phase 38 - Temporal Coherence Forecasting (forecast strength)
+        single_horizon_history = state.forecast_strength_history if state.forecast_strength_history else None
+
+        # Phase 39 - Multi-Horizon Temporal Forecasting (FSE - Future Stability Envelope)
+        multi_horizon_history = state.future_stability_envelope_history if state.future_stability_envelope_history else None
+
+        # Phase 42 - Scenario Fusion Engine (scenario alignment)
+        scenario_fusion_history = state.scenario_alignment_history if state.scenario_alignment_history else None
+
+        # Phase 44 - Coherence-Scenario Alignment (alignment score)
+        scenario_alignment_history = state.scenario_alignment_score_history if state.scenario_alignment_score_history else None
+
+        # Phase 46 - Trajectory Field Convergence (convergence index)
+        trajectory_convergence_history = state.tfce_convergence_index_history if state.tfce_convergence_index_history else None
+
+        # Phase 47 - Unified Trajectory-Scenario Synthesis (synthesis integrity)
+        unified_synthesis_history = state.synthesis_integrity_history if state.synthesis_integrity_history else None
+
+        # Phase 48 - Macro-Stability Regulator (macro-stability index)
+        macro_stability_history = state.macro_stability_index_history if state.macro_stability_index_history else None
+
+        # Phase 49 - Unified Cross-Phase Temporal Stability (temporal stability index)
+        unified_temporal_stability_history = state.temporal_stability_index_history if state.temporal_stability_index_history else None
+
+        # ====================================================================
+        # STEP 2: COMPUTE COGNITIVE CONSISTENCY REGRESSION
+        # ====================================================================
+
+        snapshot = compute_cognitive_consistency_regression(
+            drift_history=drift_history,
+            identity_history=identity_history,
+            continuity_history=continuity_history,
+            single_horizon_history=single_horizon_history,
+            multi_horizon_history=multi_horizon_history,
+            scenario_fusion_history=scenario_fusion_history,
+            scenario_alignment_history=scenario_alignment_history,
+            trajectory_convergence_history=trajectory_convergence_history,
+            unified_synthesis_history=unified_synthesis_history,
+            macro_stability_history=macro_stability_history,
+            unified_temporal_stability_history=unified_temporal_stability_history,
+        )
+
+        # ====================================================================
+        # STEP 3: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Update current snapshot
+            state.cognitive_consistency_regression_snapshot = snapshot
+
+            # Append to histories
+            state.regression_stability_history.append(snapshot.regression_stability_index)
+            state.regression_alignment_history.append(snapshot.regression_alignment_score)
+            state.regression_drift_history.append(snapshot.regression_drift_score)
+            state.regression_prr_history.append(snapshot.prediction_reversal_risk)
+            state.regression_ics_history.append(snapshot.internal_consistency_strength)
+            state.regression_band_history.append(snapshot.band)
+            state.regression_tags_history.append(snapshot.diagnostic_tags.copy() if snapshot.diagnostic_tags else [])
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.cognitive_consistency_regression_snapshot = None
+
+            # Append None/default values to maintain history alignment
+            state.regression_stability_history.append(0.0)
+            state.regression_alignment_history.append(0.0)
+            state.regression_drift_history.append(0.0)
+            state.regression_prr_history.append(0.0)
+            state.regression_ics_history.append(0.0)
+            state.regression_band_history.append("")
+            state.regression_tags_history.append([])
