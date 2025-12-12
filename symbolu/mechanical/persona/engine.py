@@ -302,6 +302,14 @@ class PersonaEngine:
             cra_metadata = self._build_cra_metadata(cra_snapshot)
             persona_response.persona_cra_profile = cra_metadata
 
+        # Phase 52 Step 19.8: Extract IER-CVE metadata (metadata-only, no tone changes)
+        # Extract IER-CVE snapshot from coherence state
+        ier_cve_snapshot = self._extract_internal_external_reality_cve(explain_log)
+        if ier_cve_snapshot is not None:
+            # Attach metadata to response for observability (METADATA-ONLY, NO tone changes)
+            ier_cve_metadata = self._build_internal_external_reality_cve_metadata(ier_cve_snapshot)
+            persona_response.persona_internal_external_alignment_profile = ier_cve_metadata
+
         # Step 20: Return complete response
         return persona_response
     
@@ -2413,6 +2421,73 @@ class PersonaEngine:
                 "dominant_band": getattr(cra_snapshot, 'dominant_band', None),
                 "pattern_tags": getattr(cra_snapshot, 'pattern_tags', []),
             }
+
+    def _extract_internal_external_reality_cve(
+        self,
+        explain_log: Optional[Any]
+    ) -> Optional[Any]:
+        """
+        Phase 52: Extract Internal–External Reality Cross-Verification Engine (IER-CVE) snapshot.
+
+        This method extracts the IER-CVE snapshot from the coherence state
+        for observability. This is METADATA-ONLY and does NOT affect tone.
+
+        Args:
+            explain_log: Optional ExplainLog containing coherence state
+
+        Returns:
+            Optional IER-CVE snapshot or None if not available
+        """
+        if explain_log is None:
+            return None
+
+        # Extract coherence state from explain log
+        coherence_state = getattr(explain_log, 'coherence_state', None)
+        if coherence_state is None:
+            return None
+
+        # Extract IER-CVE snapshot from coherence state
+        ier_cve_snapshot = getattr(coherence_state, 'internal_external_reality_snapshot', None)
+
+        return ier_cve_snapshot
+
+    def _build_internal_external_reality_cve_metadata(
+        self,
+        ier_cve_snapshot: Any
+    ) -> Dict[str, Any]:
+        """
+        Phase 52: Build IER-CVE metadata from snapshot.
+
+        This method extracts metadata from the IER-CVE snapshot for observability.
+        This is METADATA-ONLY and does NOT affect tone or any other behavior.
+
+        Args:
+            ier_cve_snapshot: IER-CVE snapshot
+
+        Returns:
+            Dict with IER-CVE metadata fields
+        """
+        # Extract fields from snapshot
+        internal_consistency_index = getattr(ier_cve_snapshot, 'internal_consistency_index', 0.0)
+        external_evidence_consistency_index = getattr(ier_cve_snapshot, 'external_evidence_consistency_index', 0.0)
+        alignment_index = getattr(ier_cve_snapshot, 'alignment_index', 0.0)
+        divergence_index = getattr(ier_cve_snapshot, 'divergence_index', 0.0)
+        evidence_conflict_index = getattr(ier_cve_snapshot, 'evidence_conflict_index', 0.0)
+        stability_projection_index = getattr(ier_cve_snapshot, 'stability_projection_index', 0.0)
+        band = getattr(ier_cve_snapshot, 'band', None)
+        diagnostic_tags = getattr(ier_cve_snapshot, 'diagnostic_tags', [])
+
+        # Return metadata dict
+        return {
+            "internal_consistency_index": internal_consistency_index,
+            "external_evidence_consistency_index": external_evidence_consistency_index,
+            "alignment_index": alignment_index,
+            "divergence_index": divergence_index,
+            "evidence_conflict_index": evidence_conflict_index,
+            "stability_projection_index": stability_projection_index,
+            "band": band,
+            "diagnostic_tags": diagnostic_tags,
+        }
 
     def get_persona_summary(self) -> str:
         """

@@ -1286,6 +1286,13 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
     dominant_cra_band_val = None
     cra_pattern_tags_list = []
 
+    # Phase 52: Initialize Internal–External Reality Cross-Verification Engine (IER-CVE) variables
+    avg_internal_external_alignment_val = None
+    avg_internal_external_conflict_val = None
+    avg_internal_external_stability_val = None
+    dominant_ier_cve_band_val = None
+    ier_cve_tags_list = []
+
     if state.coherence_history:
         # Extract MTSF metrics from CoherenceState
         all_tsi = []
@@ -1924,6 +1931,90 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_rag_tags:
             rag_diagnostic_tags_list = sorted(set(all_rag_tags))
 
+        # Phase 52: Extract Internal–External Reality Cross-Verification Engine (IER-CVE) metrics from CoherenceState
+        all_ier_cve_alignment = []
+        all_ier_cve_conflict = []
+        all_ier_cve_stability = []
+        all_ier_cve_bands = []
+        all_ier_cve_tags = []
+
+        for coh in state.coherence_history:
+            if coh is not None and isinstance(coh, dict):
+                # Extract from ier_cve_alignment_history
+                if "ier_cve_alignment_history" in coh:
+                    alignment_history = coh["ier_cve_alignment_history"]
+                    if isinstance(alignment_history, list):
+                        for val in alignment_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_ier_cve_alignment.append(val)
+
+                # Extract from ier_cve_conflict_history
+                if "ier_cve_conflict_history" in coh:
+                    conflict_history = coh["ier_cve_conflict_history"]
+                    if isinstance(conflict_history, list):
+                        for val in conflict_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_ier_cve_conflict.append(val)
+
+                # Extract from ier_cve_stability_history
+                if "ier_cve_stability_history" in coh:
+                    stability_history = coh["ier_cve_stability_history"]
+                    if isinstance(stability_history, list):
+                        for val in stability_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_ier_cve_stability.append(val)
+
+                # Extract from ier_cve_band_history
+                if "ier_cve_band_history" in coh:
+                    band_history = coh["ier_cve_band_history"]
+                    if isinstance(band_history, list):
+                        for band in band_history:
+                            if band is not None and isinstance(band, str) and band:
+                                all_ier_cve_bands.append(band)
+
+                # Extract from ier_cve_tag_history
+                if "ier_cve_tag_history" in coh:
+                    tag_history = coh["ier_cve_tag_history"]
+                    if isinstance(tag_history, list):
+                        for tags in tag_history:
+                            if tags is not None and isinstance(tags, list):
+                                all_ier_cve_tags.extend(tags)
+
+        # Compute aggregates for Phase 52
+        # Average IER-CVE alignment
+        if all_ier_cve_alignment:
+            avg_internal_external_alignment_val = sum(all_ier_cve_alignment) / len(all_ier_cve_alignment)
+
+        # Average IER-CVE conflict
+        if all_ier_cve_conflict:
+            avg_internal_external_conflict_val = sum(all_ier_cve_conflict) / len(all_ier_cve_conflict)
+
+        # Average IER-CVE stability
+        if all_ier_cve_stability:
+            avg_internal_external_stability_val = sum(all_ier_cve_stability) / len(all_ier_cve_stability)
+
+        # Dominant IER-CVE band (most frequent)
+        if all_ier_cve_bands:
+            from collections import Counter
+            band_counts = Counter(all_ier_cve_bands)
+            # Deterministic tie-breaking: most_common + sorted
+            # Priority order for tie-breaking: high_alignment > medium_alignment > low_alignment > conflict
+            top_bands = band_counts.most_common()
+            max_count = top_bands[0][1]
+            tied_bands = [band for band, count in top_bands if count == max_count]
+            # Use priority order for deterministic tie-breaking
+            priority_order = ["high_alignment", "medium_alignment", "low_alignment", "conflict"]
+            for priority_band in priority_order:
+                if priority_band in tied_bands:
+                    dominant_ier_cve_band_val = priority_band
+                    break
+            if dominant_ier_cve_band_val is None:
+                dominant_ier_cve_band_val = sorted(tied_bands)[0]  # Fallback to alphabetical
+
+        # Collect unique IER-CVE tags (deduplicate and sort for determinism)
+        if all_ier_cve_tags:
+            ier_cve_tags_list = sorted(set(all_ier_cve_tags))
+
         # Phase 51: CRA (Cognitive Resonance Aggregator) - Pre-RAG internal cognition aggregation
         # CRA aggregates ONLY internal metrics from implemented phases (NO RAG data)
 
@@ -2167,4 +2258,9 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_cra_consistency=avg_cra_consistency_val,
         dominant_cra_band=dominant_cra_band_val,
         cra_pattern_tags=cra_pattern_tags_list,
+        avg_internal_external_alignment=avg_internal_external_alignment_val,
+        avg_internal_external_conflict=avg_internal_external_conflict_val,
+        avg_internal_external_stability=avg_internal_external_stability_val,
+        dominant_ier_cve_band=dominant_ier_cve_band_val,
+        ier_cve_tags=ier_cve_tags_list,
     )

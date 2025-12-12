@@ -389,6 +389,14 @@ class CoherenceState:
     rag_band_history: List[str] = field(default_factory=list)  # RAG alignment band history
     rag_tag_history: List[List[str]] = field(default_factory=list)  # RAG diagnostic tags history
 
+    # Phase 52: Internal–External Reality Cross-Verification Engine (observation only - not used in scoring)
+    internal_external_reality_snapshot: Optional[Any] = None  # InternalExternalRealityCVESnapshot (latest)
+    ier_cve_alignment_history: List[float] = field(default_factory=list)  # Internal-external alignment history
+    ier_cve_conflict_history: List[float] = field(default_factory=list)  # Internal-external conflict history
+    ier_cve_stability_history: List[float] = field(default_factory=list)  # Stability projection history
+    ier_cve_band_history: List[str] = field(default_factory=list)  # IER-CVE band history
+    ier_cve_tag_history: List[List[str]] = field(default_factory=list)  # IER-CVE diagnostic tags history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -583,6 +591,13 @@ class CoherenceState:
         self.rag_support_history = self.rag_support_history[-window:]
         self.rag_band_history = self.rag_band_history[-window:]
         self.rag_tag_history = self.rag_tag_history[-window:]
+
+        # Phase 52 internal-external reality cross-verification engine formula history
+        self.ier_cve_alignment_history = self.ier_cve_alignment_history[-window:]
+        self.ier_cve_conflict_history = self.ier_cve_conflict_history[-window:]
+        self.ier_cve_stability_history = self.ier_cve_stability_history[-window:]
+        self.ier_cve_band_history = self.ier_cve_band_history[-window:]
+        self.ier_cve_tag_history = self.ier_cve_tag_history[-window:]
 
     def get_history_length(self) -> int:
         """
