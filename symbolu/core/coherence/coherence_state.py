@@ -397,6 +397,16 @@ class CoherenceState:
     ier_cve_band_history: List[str] = field(default_factory=list)  # IER-CVE band history
     ier_cve_tag_history: List[List[str]] = field(default_factory=list)  # IER-CVE diagnostic tags history
 
+    # Phase 53: External Reality Trust Calibration Engine (observation only - not used in scoring)
+    external_reality_trust_snapshot: Optional[Any] = None  # ExternalRealityTrustSnapshot (latest)
+    ertce_trust_score_history: List[float] = field(default_factory=list)  # External trust score history
+    ertce_override_pressure_history: List[float] = field(default_factory=list)  # Internal override pressure history
+    ertce_fragility_history: List[float] = field(default_factory=list)  # External signal fragility history
+    ertce_resilience_history: List[float] = field(default_factory=list)  # Alignment resilience history
+    ertce_decay_risk_history: List[float] = field(default_factory=list)  # Trust decay risk history
+    ertce_band_history: List[str] = field(default_factory=list)  # ERTCE trust band history
+    ertce_tag_history: List[List[str]] = field(default_factory=list)  # ERTCE diagnostic tags history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -598,6 +608,15 @@ class CoherenceState:
         self.ier_cve_stability_history = self.ier_cve_stability_history[-window:]
         self.ier_cve_band_history = self.ier_cve_band_history[-window:]
         self.ier_cve_tag_history = self.ier_cve_tag_history[-window:]
+
+        # Phase 53 external reality trust calibration engine formula history
+        self.ertce_trust_score_history = self.ertce_trust_score_history[-window:]
+        self.ertce_override_pressure_history = self.ertce_override_pressure_history[-window:]
+        self.ertce_fragility_history = self.ertce_fragility_history[-window:]
+        self.ertce_resilience_history = self.ertce_resilience_history[-window:]
+        self.ertce_decay_risk_history = self.ertce_decay_risk_history[-window:]
+        self.ertce_band_history = self.ertce_band_history[-window:]
+        self.ertce_tag_history = self.ertce_tag_history[-window:]
 
     def get_history_length(self) -> int:
         """

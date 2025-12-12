@@ -325,6 +325,15 @@ class CoherenceObservation:
     internal_external_band: Optional[str] = None  # IER-CVE band: "high_alignment" | "medium_alignment" | "low_alignment" | "conflict"
     internal_external_tags: List[str] = field(default_factory=list)  # IER-CVE diagnostic tags
 
+    # Phase 53: External Reality Trust Calibration Engine (ERTCE) (observation only)
+    external_trust_score: float = 0.0  # External trust score (ETS) [0.0, 1.0]
+    internal_override_pressure: float = 0.0  # Internal override pressure (IOP) [0.0, 1.0]
+    external_signal_fragility: float = 0.0  # External signal fragility (ESF) [0.0, 1.0]
+    alignment_resilience: float = 0.0  # Alignment resilience (AR) [0.0, 1.0]
+    trust_decay_risk: float = 0.0  # Trust decay risk (TDR) [0.0, 1.0]
+    trust_band: Optional[str] = None  # ERTCE trust band: "HIGH_EXTERNAL_TRUST" | "CONDITIONAL_EXTERNAL_TRUST" | "LOW_EXTERNAL_TRUST" | "EXTERNAL_CONFLICT_ZONE"
+    ertce_tags: List[str] = field(default_factory=list)  # ERTCE diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -1140,6 +1149,26 @@ class CoherenceObserver:
                 internal_external_band = getattr(ier_cve_snapshot, 'band', None)
                 internal_external_tags = getattr(ier_cve_snapshot, 'diagnostic_tags', [])
 
+        # Phase 53: Extract External Reality Trust Calibration Engine (ERTCE) from coherence state
+        external_trust_score = 0.0
+        internal_override_pressure = 0.0
+        external_signal_fragility = 0.0
+        alignment_resilience = 0.0
+        trust_decay_risk = 0.0
+        trust_band = None
+        ertce_tags = []
+
+        if coherence_state is not None:
+            ertce_snapshot = getattr(coherence_state, 'external_reality_trust_snapshot', None)
+            if ertce_snapshot is not None:
+                external_trust_score = getattr(ertce_snapshot, 'external_trust_score', 0.0)
+                internal_override_pressure = getattr(ertce_snapshot, 'internal_override_pressure', 0.0)
+                external_signal_fragility = getattr(ertce_snapshot, 'external_signal_fragility', 0.0)
+                alignment_resilience = getattr(ertce_snapshot, 'alignment_resilience', 0.0)
+                trust_decay_risk = getattr(ertce_snapshot, 'trust_decay_risk', 0.0)
+                trust_band = getattr(ertce_snapshot, 'trust_band', None)
+                ertce_tags = getattr(ertce_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -1368,6 +1397,13 @@ class CoherenceObserver:
             internal_external_stability=internal_external_stability,  # Phase 52
             internal_external_band=internal_external_band,  # Phase 52
             internal_external_tags=internal_external_tags,  # Phase 52
+            external_trust_score=external_trust_score,  # Phase 53
+            internal_override_pressure=internal_override_pressure,  # Phase 53
+            external_signal_fragility=external_signal_fragility,  # Phase 53
+            alignment_resilience=alignment_resilience,  # Phase 53
+            trust_decay_risk=trust_decay_risk,  # Phase 53
+            trust_band=trust_band,  # Phase 53
+            ertce_tags=ertce_tags,  # Phase 53
         )
 
         # Store observation
