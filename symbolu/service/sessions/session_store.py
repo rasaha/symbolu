@@ -1237,6 +1237,37 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
     dominant_convergence_band_val = None
     tfce_tags_list = []
 
+    # Phase 47: Initialize Unified Trajectory–Scenario Synthesis Engine (UTSSE) variables
+    avg_synthesis_integrity_val = None
+    avg_synthesis_alignment_val = None
+    avg_synthesis_divergence_val = None
+    dominant_synthesis_band_val = None
+    synthesis_tags_list = []
+
+    # Phase 48: Initialize Macro-Stability Regulator (MSR) variables
+    avg_macro_stability_val = None
+    avg_macro_divergence_val = None
+    avg_macro_predictive_confidence_val = None
+    avg_macro_identity_resilience_val = None
+    dominant_macro_stability_band_val = None
+    macro_stability_tags_list = []
+
+    # Phase 49: Initialize Unified Cross-Phase Temporal Stability Engine (UCTSE) variables
+    avg_temporal_stability_val = None
+    avg_predictive_entropy_val = None
+    avg_future_consistency_val = None
+    temporal_stability_band_val = None
+    dominant_temporal_regime_val = None
+
+    # Phase 50: Initialize Cognitive Consistency Regression Engine (CCRE) variables
+    avg_regression_stability_val = None
+    avg_regression_alignment_val = None
+    avg_regression_drift_val = None
+    avg_prediction_reversal_risk_val = None
+    avg_internal_consistency_strength_val = None
+    regression_consistency_band_val = None
+    regression_consistency_tags_list = []
+
     if state.coherence_history:
         # Extract MTSF metrics from CoherenceState
         all_tsi = []
@@ -1452,13 +1483,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
                             if isinstance(tag_list, list):
                                 all_synthesis_tags.extend(tag_list)
 
-        # Compute aggregates
-        avg_synthesis_integrity_val = None
-        avg_synthesis_alignment_val = None
-        avg_synthesis_divergence_val = None
-        dominant_synthesis_band_val = None
-        synthesis_tags_list = []
-
+        # Compute aggregates for Phase 47
         # Average synthesis integrity
         if all_synthesis_integrity:
             avg_synthesis_integrity_val = sum(all_synthesis_integrity) / len(all_synthesis_integrity)
@@ -1543,14 +1568,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
                             if isinstance(tag_list, list):
                                 all_macro_stability_tags.extend(tag_list)
 
-        # Compute aggregates
-        avg_macro_stability_val = None
-        avg_macro_divergence_val = None
-        avg_macro_predictive_confidence_val = None
-        avg_macro_identity_resilience_val = None
-        dominant_macro_stability_band_val = None
-        macro_stability_tags_list = []
-
+        # Compute aggregates for Phase 48
         # Average macro-stability index
         if all_macro_stability:
             avg_macro_stability_val = sum(all_macro_stability) / len(all_macro_stability)
@@ -1635,13 +1653,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
                             if regime is not None and regime != "unknown":
                                 all_temporal_regimes.append(regime)
 
-        # Compute aggregates
-        avg_temporal_stability_val = None
-        avg_predictive_entropy_val = None
-        avg_future_consistency_val = None
-        temporal_stability_band_val = None
-        dominant_temporal_regime_val = None
-
+        # Compute aggregates for Phase 49
         # Average temporal stability index
         if all_temporal_stability:
             avg_temporal_stability_val = sum(all_temporal_stability) / len(all_temporal_stability)
@@ -1741,15 +1753,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
                             if isinstance(tag_list, list):
                                 all_regression_consistency_tags.extend(tag_list)
 
-        # Compute aggregates
-        avg_regression_stability_val = None
-        avg_regression_alignment_val = None
-        avg_regression_drift_val = None
-        avg_prediction_reversal_risk_val = None
-        avg_internal_consistency_strength_val = None
-        regression_consistency_band_val = None
-        regression_consistency_tags_list = []
-
+        # Compute aggregates for Phase 50
         # Average regression stability index (RSI)
         if all_regression_stability:
             avg_regression_stability_val = sum(all_regression_stability) / len(all_regression_stability)
