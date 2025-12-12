@@ -56,7 +56,6 @@ from symbolu.formulas.mirror_time_loop import (
 )
 from symbolu.core.coherence.coherence_state import CoherenceState
 from symbolu.core.coherence.coherence_engine import CoherenceEngine
-from symbolu.service.sessions.session_models import compute_session_summary
 
 
 class TestRoutingInvariance(unittest.TestCase):
