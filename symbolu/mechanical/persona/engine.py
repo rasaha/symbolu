@@ -278,6 +278,14 @@ class PersonaEngine:
             uctse_metadata = self._build_temporal_stability_metadata(uctse_snapshot)
             persona_response.persona_temporal_stability_profile = uctse_metadata
 
+        # Phase 50 Step 19.65: Extract CCRE metadata (metadata-only, no tone changes)
+        # Extract CCRE snapshot from coherence state
+        ccre_snapshot = self._extract_ccre(explain_log)
+        if ccre_snapshot is not None:
+            # Attach metadata to response for observability (METADATA-ONLY, NO tone changes)
+            ccre_metadata = self._build_ccre_metadata(ccre_snapshot)
+            persona_response.persona_ccre = ccre_metadata
+
         # Phase 51 Step 19.7: Extract RCVE metadata (metadata-only, no tone changes)
         # Extract RCVE snapshot from coherence state
         rcve_snapshot = self._extract_rag_validation(explain_log)
@@ -1959,6 +1967,93 @@ class PersonaEngine:
                 "dominant_regime": getattr(uctse_snapshot, 'dominant_regime', None),
                 "stability_band": getattr(uctse_snapshot, 'stability_band', None),
                 "diagnostic_tags": getattr(uctse_snapshot, 'diagnostic_tags', []),
+            }
+
+    def _extract_ccre(
+        self,
+        explain_log: Optional[Any]
+    ) -> Optional[Any]:
+        """
+        Phase 50: Extract Cognitive Consistency Regression Engine (CCRE) snapshot.
+
+        This method extracts the CCRE snapshot from coherence state for metadata extraction.
+        This is METADATA-ONLY and does NOT affect tone or any other behavior.
+
+        Args:
+            explain_log: ExplanationLog (contains coherence_state)
+
+        Returns:
+            CognitiveConsistencyRegressionSnapshot or None
+
+        Behavior:
+            • Extracts cognitive_consistency_regression_snapshot from coherence state
+            • NEVER modifies tone or persona behavior
+        """
+        if explain_log is None:
+            return None
+
+        # Handle both dict and object explain_log
+        if isinstance(explain_log, dict):
+            coherence_state = explain_log.get('coherence_state')
+        else:
+            coherence_state = getattr(explain_log, 'coherence_state', None)
+
+        if coherence_state is None:
+            return None
+
+        # Extract CCRE snapshot from coherence state
+        if isinstance(coherence_state, dict):
+            ccre_snapshot = coherence_state.get('cognitive_consistency_regression_snapshot')
+        else:
+            ccre_snapshot = getattr(coherence_state, 'cognitive_consistency_regression_snapshot', None)
+
+        return ccre_snapshot
+
+    def _build_ccre_metadata(
+        self,
+        ccre_snapshot: Any
+    ) -> Dict[str, Any]:
+        """
+        Phase 50: Build CCRE metadata from snapshot.
+
+        This method extracts metadata from the CCRE snapshot for observability.
+        This is METADATA-ONLY and does NOT affect tone or any other behavior.
+
+        Args:
+            ccre_snapshot: CognitiveConsistencyRegressionSnapshot or dict
+
+        Returns:
+            dict: Metadata dictionary for observability
+
+        Behavior:
+            • Extracts regression_stability_index, regression_drift_score, etc.
+            • Extracts band and diagnostic_tags
+            • NEVER modifies tone or persona behavior
+        """
+        if ccre_snapshot is None:
+            return {}
+
+        # Handle both snapshot objects and dicts
+        if isinstance(ccre_snapshot, dict):
+            return {
+                "regression_stability_index": ccre_snapshot.get('regression_stability_index', 0.0),
+                "regression_drift_score": ccre_snapshot.get('regression_drift_score', 0.0),
+                "regression_alignment_score": ccre_snapshot.get('regression_alignment_score', 0.0),
+                "prediction_reversal_risk": ccre_snapshot.get('prediction_reversal_risk', 0.0),
+                "internal_consistency_strength": ccre_snapshot.get('internal_consistency_strength', 0.0),
+                "band": ccre_snapshot.get('band'),
+                "diagnostic_tags": ccre_snapshot.get('diagnostic_tags', []),
+            }
+        else:
+            # Snapshot object
+            return {
+                "regression_stability_index": getattr(ccre_snapshot, 'regression_stability_index', 0.0),
+                "regression_drift_score": getattr(ccre_snapshot, 'regression_drift_score', 0.0),
+                "regression_alignment_score": getattr(ccre_snapshot, 'regression_alignment_score', 0.0),
+                "prediction_reversal_risk": getattr(ccre_snapshot, 'prediction_reversal_risk', 0.0),
+                "internal_consistency_strength": getattr(ccre_snapshot, 'internal_consistency_strength', 0.0),
+                "band": getattr(ccre_snapshot, 'band', None),
+                "diagnostic_tags": getattr(ccre_snapshot, 'diagnostic_tags', []),
             }
 
     def _build_scenario_fusion_metadata(

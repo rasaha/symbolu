@@ -365,7 +365,8 @@ def _build_badges(
         15. Motivation Profile Badges (hope, fear, expansion, stabilization, avoidance, assertion)
         16. Trading Guardrail Badges (high_tension_risk, neg_momentum_risk, volatility_risk, no_action_recommended)
         17. Symbolic Harmonization Badges (Phase 28) - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only
-        18. RAG Coherence Validation Badges (Phase 51) - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only
+        18. Cognitive Consistency Regression Badges (Phase 50) - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only
+        19. RAG Coherence Validation Badges (Phase 51) - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only
 
     Args:
         stability_status: Stability classification from policy engine
@@ -1595,6 +1596,51 @@ def _build_badges(
                 label="Temporal Stability: Fragmented",
                 level="warning",
                 description="Fragmented temporal stability. High drift risk and low predictive consistency."
+            ))
+
+    # ========================================================================
+    # Phase 50: Cognitive Consistency Regression Engine (CCRE) Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract cognitive_consistency_regression from unified_output if available
+    cognitive_consistency_regression = unified_output.get("cognitive_consistency_regression") if unified_output else None
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and cognitive_consistency_regression is not None:
+        consistency_band = cognitive_consistency_regression.get("band")
+        regression_stability_index = cognitive_consistency_regression.get("regression_stability_index")
+        prediction_reversal_risk = cognitive_consistency_regression.get("prediction_reversal_risk")
+        internal_consistency_strength = cognitive_consistency_regression.get("internal_consistency_strength")
+
+        # CCRE_HIGH_CONSISTENCY: high_consistency band
+        if consistency_band == "high_consistency":
+            badges.append(DILchatBadge(
+                label="CCRE_HIGH_CONSISTENCY",
+                level="info",
+                description="High cognitive consistency. Predictive signals are stable and aligned across all windows."
+            ))
+
+        # CCRE_MEDIUM_CONSISTENCY: medium_consistency band
+        elif consistency_band == "medium_consistency":
+            badges.append(DILchatBadge(
+                label="CCRE_MEDIUM_CONSISTENCY",
+                level="info",
+                description="Medium cognitive consistency. Predictive signals show moderate alignment and stability."
+            ))
+
+        # CCRE_LOW_CONSISTENCY: low_consistency band
+        elif consistency_band == "low_consistency":
+            badges.append(DILchatBadge(
+                label="CCRE_LOW_CONSISTENCY",
+                level="warning",
+                description="Low cognitive consistency. Predictive signals show weak alignment or higher drift."
+            ))
+
+        # CCRE_INTERNAL_CONFLICT: internal_conflict band
+        elif consistency_band == "internal_conflict":
+            badges.append(DILchatBadge(
+                label="CCRE_INTERNAL_CONFLICT",
+                level="warning",
+                description="Internal cognitive conflict detected. Predictive signals are contradictory across windows."
             ))
 
     # ========================================================================
