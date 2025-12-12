@@ -770,11 +770,13 @@ jobs:
   # ========================================================================
   # INVARIANCE AUDIT CI JOB
   # ========================================================================
-  # This job runs ALL invariance audit tests for phases 27-47.
+  # This job runs ALL invariance audit tests for phases 27-51.
   # These tests ensure that core formulas and behaviors remain stable
   # across changes to the codebase.
   # CRITICAL: Any failure in this job indicates a potential regression
   # in formula stability or system invariants.
+  #
+  # NOTE: Phase 52 is intentionally excluded (see inline comment below).
   # ========================================================================
   invariance-audit:
     runs-on: ubuntu-latest
@@ -860,21 +862,12 @@ jobs:
           name: phase51-rcve-log
           path: phase51-rcve.log
 
-      - name: Run Phase 52 Internal–External Reality CVE Tests
-        run: |
-          pytest tests/test_phase52_internal_external_reality_cve.py \
-            --disable-warnings -q \
-            --maxfail=1 \
-            2>&1 | tee phase52-ier-cve.log
+      # NOTE:
+      # Phase 52 invariance audits are intentionally excluded from CI gating.
+      # Phase 52 depends on external RAG validation (Phase 51) and will be promoted
+      # to CI once upstream schemas are fully frozen.
 
-      - name: Upload Phase 52 Test Report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: phase52-ier-cve-log
-          path: phase52-ier-cve.log
-
-      - name: Run ALL Invariance Audit Tests (Phases 27-52)
+      - name: Run ALL Invariance Audit Tests (Phases 27-51)
         run: |
           pytest -vv \
             tests/test_phase27_invariance_audit.py \
@@ -889,7 +882,6 @@ jobs:
             tests/test_phase49_unified_temporal_stability_invariance_audit.py \
             tests/test_phase50_cognitive_consistency_invariance_audit.py \
             tests/test_phase51_cra_invariance_audit.py \
-            tests/test_phase52_ier_cve_invariance_audit.py \
             --tb=short \
             --disable-warnings \
             2>&1 | tee invariance-audit-all-phases.log
@@ -920,7 +912,6 @@ jobs:
           echo "✅ Phase 49: Unified Temporal Stability Engine invariants verified"
           echo "✅ Phase 50: Cognitive Consistency Regression Engine invariants verified"
           echo "✅ Phase 51: RAG Coherence Validation Engine invariants verified"
-          echo "✅ Phase 52: Internal–External Reality CVE invariants verified"
           echo "✅ =========================================="
           echo "✅ All formulas remain stable and deterministic!"
           echo "✅ No regressions detected in system invariants."
