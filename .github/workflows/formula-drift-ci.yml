@@ -206,7 +206,7 @@ jobs:
           pip install -e .
           pip install pytest pytest-cov coverage pydantic 'fastapi[standard]' uvicorn httpx
 
-      - name: Run ALL Invariance Audit Tests (Phases 8-47, incl. 21, 22)
+      - name: Run ALL Invariance Audit Tests (Phases 8-47, incl. 21, 22, 23)
         run: |
           pytest -vv \
             tests/test_phase8_guna_kosha_invariance_audit.py \
@@ -219,6 +219,7 @@ jobs:
             tests/test_phase19_drift_fusion_invariance_audit.py \
             tests/test_phase21_mirror_time_loop_invariance_audit.py \
             tests/test_phase22_mirror_time_cycle_invariance_audit.py \
+            tests/test_phase23_cause_effect_invariance_audit.py \
             tests/test_phase26_unified_consciousness_invariance_audit.py \
             tests/test_phase27_invariance_audit.py \
             tests/test_phase31_apel_invariance_audit.py \
@@ -257,6 +258,7 @@ jobs:
           echo "✅   Phase 19: Drift Fusion invariants verified"
           echo "✅   Phase 21: Mirror-Time Loop Engine invariants verified"
           echo "✅   Phase 22: Mirror-Time Cycle Engine invariants verified"
+          echo "✅   Phase 23: Cause-Effect Inversion Analytics invariants verified"
           echo "✅   Phase 26: Unified Consciousness invariants verified"
           echo "✅ "
           echo "✅ ADVANCED PHASES:"
