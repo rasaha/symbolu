@@ -171,12 +171,12 @@ jobs:
   # INVARIANCE AUDIT CI JOB
   # ========================================================================
   # This job runs ALL invariance audit tests for Tier 1 (phases 8,13,14,16,
-  # 17,18,19,26) and Advanced phases (27-47).
+  # 17,18,19,21,22,26) and Advanced phases (27-47).
   # These tests ensure that core formulas and behaviors remain stable
   # across changes to the codebase.
   # CRITICAL: Any failure in this job indicates a potential regression
   # in formula stability or system invariants.
-  # Total: 16 phase audit files covering 1,600+ invariance tests
+  # Total: 18 phase audit files covering 1,700+ invariance tests
   # ========================================================================
   invariance-audit:
     runs-on: ubuntu-latest
@@ -206,7 +206,7 @@ jobs:
           pip install -e .
           pip install pytest pytest-cov coverage pydantic 'fastapi[standard]' uvicorn httpx
 
-      - name: Run ALL Invariance Audit Tests (Phases 8-47)
+      - name: Run ALL Invariance Audit Tests (Phases 8-47, incl. 21, 22)
         run: |
           pytest -vv \
             tests/test_phase8_guna_kosha_invariance_audit.py \
@@ -218,6 +218,7 @@ jobs:
             tests/test_phase18_temporal_entropy_invariance_audit.py \
             tests/test_phase19_drift_fusion_invariance_audit.py \
             tests/test_phase21_mirror_time_loop_invariance_audit.py \
+            tests/test_phase22_mirror_time_cycle_invariance_audit.py \
             tests/test_phase26_unified_consciousness_invariance_audit.py \
             tests/test_phase27_invariance_audit.py \
             tests/test_phase31_apel_invariance_audit.py \
@@ -255,6 +256,7 @@ jobs:
           echo "✅   Phase 18: Temporal Entropy invariants verified"
           echo "✅   Phase 19: Drift Fusion invariants verified"
           echo "✅   Phase 21: Mirror-Time Loop Engine invariants verified"
+          echo "✅   Phase 22: Mirror-Time Cycle Engine invariants verified"
           echo "✅   Phase 26: Unified Consciousness invariants verified"
           echo "✅ "
           echo "✅ ADVANCED PHASES:"
