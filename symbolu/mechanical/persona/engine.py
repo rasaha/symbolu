@@ -278,6 +278,14 @@ class PersonaEngine:
             uctse_metadata = self._build_temporal_stability_metadata(uctse_snapshot)
             persona_response.persona_temporal_stability_profile = uctse_metadata
 
+        # Phase 51 Step 19.7: Extract RCVE metadata (metadata-only, no tone changes)
+        # Extract RCVE snapshot from coherence state
+        rcve_snapshot = self._extract_rag_validation(explain_log)
+        if rcve_snapshot is not None:
+            # Attach metadata to response for observability (METADATA-ONLY, NO tone changes)
+            rcve_metadata = self._build_rag_validation_metadata(rcve_snapshot)
+            persona_response.persona_rag_validation_profile = rcve_metadata
+
         # Step 20: Return complete response
         return persona_response
     
@@ -2135,6 +2143,90 @@ class PersonaEngine:
         }
 
         return chra_profile
+
+    def _extract_rag_validation(
+        self,
+        explain_log: Optional[Any]
+    ) -> Optional[Any]:
+        """
+        Phase 51: Extract RAG Coherence Validation Engine (RCVE) snapshot.
+
+        This method extracts the RCVE snapshot from the coherence state
+        for observability. This is METADATA-ONLY and does NOT affect tone.
+
+        Args:
+            explain_log: MLCR explain log with coherence state
+
+        Returns:
+            RAGCoherenceValidationSnapshot or None if not available
+
+        Behavior:
+            • Extracts from coherence_state.rag_validation_snapshot
+            • Does NOT modify tone or any other behavior
+        """
+        if explain_log is None:
+            return None
+
+        # Extract coherence state from explain log
+        coherence_state = explain_log.get('coherence_state') if isinstance(explain_log, dict) else getattr(explain_log, 'coherence_state', None)
+
+        if coherence_state is None:
+            return None
+
+        # Extract RCVE snapshot from coherence state
+        if isinstance(coherence_state, dict):
+            rcve_snapshot = coherence_state.get('rag_validation_snapshot')
+        else:
+            rcve_snapshot = getattr(coherence_state, 'rag_validation_snapshot', None)
+
+        return rcve_snapshot
+
+    def _build_rag_validation_metadata(
+        self,
+        rcve_snapshot: Any
+    ) -> Dict[str, Any]:
+        """
+        Phase 51: Build RCVE metadata from snapshot.
+
+        This method extracts metadata from the RCVE snapshot for observability.
+        This is METADATA-ONLY and does NOT affect tone or any other behavior.
+
+        Args:
+            rcve_snapshot: RAGCoherenceValidationSnapshot or dict
+
+        Returns:
+            dict: Metadata dictionary for observability
+
+        Behavior:
+            • Extracts evidence_alignment, evidence_conflict_index, etc.
+            • Extracts alignment_band and diagnostic_tags
+            • NEVER modifies tone or persona behavior
+        """
+        if rcve_snapshot is None:
+            return {}
+
+        # Handle both snapshot objects and dicts
+        if isinstance(rcve_snapshot, dict):
+            return {
+                "evidence_alignment": rcve_snapshot.get('evidence_alignment', 0.0),
+                "evidence_conflict_index": rcve_snapshot.get('evidence_conflict_index', 0.0),
+                "evidence_stability": rcve_snapshot.get('evidence_stability', 0.0),
+                "context_relevance_score": rcve_snapshot.get('context_relevance_score', 0.0),
+                "external_support_density": rcve_snapshot.get('external_support_density', 0.0),
+                "alignment_band": rcve_snapshot.get('alignment_band'),
+                "diagnostic_tags": rcve_snapshot.get('diagnostic_tags', []),
+            }
+        else:
+            # Snapshot object
+            return {
+                "evidence_alignment": getattr(rcve_snapshot, 'evidence_alignment', 0.0),
+                "evidence_conflict_index": getattr(rcve_snapshot, 'evidence_conflict_index', 0.0),
+                "evidence_stability": getattr(rcve_snapshot, 'evidence_stability', 0.0),
+                "context_relevance_score": getattr(rcve_snapshot, 'context_relevance_score', 0.0),
+                "external_support_density": getattr(rcve_snapshot, 'external_support_density', 0.0),
+                "alignment_band": getattr(rcve_snapshot, 'alignment_band', None),
+                "diagnostic_tags": getattr(rcve_snapshot, 'diagnostic_tags', []),
+            }
 
     def get_persona_summary(self) -> str:
         """

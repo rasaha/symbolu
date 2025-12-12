@@ -281,3 +281,12 @@ class SessionSummary:
     avg_internal_consistency_strength: Optional[float] = None  # Average Internal Consistency Strength (ICS) [0.0, 1.0]
     regression_consistency_band: Optional[str] = None  # Most frequent band: "high_consistency" | "medium_consistency" | "low_consistency" | "internal_conflict"
     regression_consistency_tags: List[str] = field(default_factory=list)  # Collected CCRE diagnostic tags (deduped, sorted)
+
+    # Phase 51 RAG Coherence Validation Engine (observation only)
+    avg_rag_alignment: Optional[float] = None  # Average evidence alignment [0.0, 1.0]
+    avg_rag_conflict: Optional[float] = None  # Average evidence conflict index [0.0, 1.0]
+    avg_rag_stability: Optional[float] = None  # Average evidence stability [0.0, 1.0]
+    avg_rag_relevance: Optional[float] = None  # Average context relevance [0.0, 1.0]
+    avg_rag_support_density: Optional[float] = None  # Average external support density [0.0, 1.0]
+    dominant_rag_band: Optional[str] = None  # Most frequent band: "HIGH_ALIGNMENT" | "MEDIUM_ALIGNMENT" | "LOW_ALIGNMENT" | "CONTRADICTION"
+    rag_diagnostic_tags: List[str] = field(default_factory=list)  # Collected RAG diagnostic tags (deduped, sorted)

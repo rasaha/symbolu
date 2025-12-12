@@ -365,6 +365,7 @@ def _build_badges(
         15. Motivation Profile Badges (hope, fear, expansion, stabilization, avoidance, assertion)
         16. Trading Guardrail Badges (high_tension_risk, neg_momentum_risk, volatility_risk, no_action_recommended)
         17. Symbolic Harmonization Badges (Phase 28) - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only
+        18. RAG Coherence Validation Badges (Phase 51) - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only
 
     Args:
         stability_status: Stability classification from policy engine
@@ -1594,6 +1595,59 @@ def _build_badges(
                 label="Temporal Stability: Fragmented",
                 level="warning",
                 description="Fragmented temporal stability. High drift risk and low predictive consistency."
+            ))
+
+    # ========================================================================
+    # Phase 51: RAG Coherence Validation Engine (RCVE) Badges (diagnostic only - therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)
+    # ========================================================================
+    # Extract rag_coherence_validation from unified_output if available
+    rag_coherence_validation = unified_output.get("rag_coherence_validation") if unified_output else None
+
+    # Only add badges for therapy/identity domains AND SMART_INSIGHT/DEEP_ADAPTIVE modes
+    if therapy_or_identity_domain and smart_or_deep_mode and rag_coherence_validation is not None:
+        alignment_band = rag_coherence_validation.get("alignment_band")
+        evidence_alignment = rag_coherence_validation.get("evidence_alignment")
+        evidence_conflict_index = rag_coherence_validation.get("evidence_conflict_index")
+        external_support_density = rag_coherence_validation.get("external_support_density")
+
+        # RAG_ALIGNMENT_HIGH: HIGH_ALIGNMENT band
+        if alignment_band == "HIGH_ALIGNMENT":
+            badges.append(DILchatBadge(
+                label="RAG_ALIGNMENT_HIGH",
+                level="info",
+                description="Strong RAG alignment. Internal cognition highly consistent with external evidence."
+            ))
+
+        # RAG_ALIGNMENT_MEDIUM: MEDIUM_ALIGNMENT band
+        elif alignment_band == "MEDIUM_ALIGNMENT":
+            badges.append(DILchatBadge(
+                label="RAG_ALIGNMENT_MEDIUM",
+                level="info",
+                description="Moderate RAG alignment. Internal cognition reasonably supported by external evidence."
+            ))
+
+        # RAG_ALIGNMENT_LOW: LOW_ALIGNMENT band
+        elif alignment_band == "LOW_ALIGNMENT":
+            badges.append(DILchatBadge(
+                label="RAG_ALIGNMENT_LOW",
+                level="warning",
+                description="Low RAG alignment. Internal cognition shows weak correlation with external evidence."
+            ))
+
+        # RAG_CONTRADICTION: CONTRADICTION band
+        elif alignment_band == "CONTRADICTION":
+            badges.append(DILchatBadge(
+                label="RAG_CONTRADICTION",
+                level="warning",
+                description="RAG contradiction detected. Internal cognition conflicts with external evidence."
+            ))
+
+        # RAG_WEAK_EVIDENCE: Low support density (< 0.40)
+        if external_support_density is not None and external_support_density < 0.40:
+            badges.append(DILchatBadge(
+                label="RAG_WEAK_EVIDENCE",
+                level="info",
+                description="Weak external evidence support. Limited RAG data available for validation."
             ))
 
     return badges

@@ -1268,6 +1268,15 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
     regression_consistency_band_val = None
     regression_consistency_tags_list = []
 
+    # Phase 51: Initialize RAG Coherence Validation Engine (RCVE) variables
+    avg_rag_alignment_val = None
+    avg_rag_conflict_val = None
+    avg_rag_stability_val = None
+    avg_rag_relevance_val = None
+    avg_rag_support_density_val = None
+    dominant_rag_band_val = None
+    rag_diagnostic_tags_list = []
+
     if state.coherence_history:
         # Extract MTSF metrics from CoherenceState
         all_tsi = []
@@ -1796,6 +1805,116 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_regression_consistency_tags:
             regression_consistency_tags_list = sorted(set(all_regression_consistency_tags))
 
+        # Phase 51: Extract RAG Coherence Validation Engine (RCVE) metrics from CoherenceState
+        all_rag_alignment = []
+        all_rag_conflict = []
+        all_rag_stability = []
+        all_rag_relevance = []
+        all_rag_support_density = []
+        all_rag_bands = []
+        all_rag_tags = []
+
+        for coh in state.coherence_history:
+            if coh is not None and isinstance(coh, dict):
+                # Extract from rag_alignment_history
+                if "rag_alignment_history" in coh:
+                    alignment_history = coh["rag_alignment_history"]
+                    if isinstance(alignment_history, list):
+                        for val in alignment_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_rag_alignment.append(val)
+
+                # Extract from rag_conflict_history
+                if "rag_conflict_history" in coh:
+                    conflict_history = coh["rag_conflict_history"]
+                    if isinstance(conflict_history, list):
+                        for val in conflict_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_rag_conflict.append(val)
+
+                # Extract from rag_stability_history
+                if "rag_stability_history" in coh:
+                    stability_history = coh["rag_stability_history"]
+                    if isinstance(stability_history, list):
+                        for val in stability_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_rag_stability.append(val)
+
+                # Extract from rag_relevance_history
+                if "rag_relevance_history" in coh:
+                    relevance_history = coh["rag_relevance_history"]
+                    if isinstance(relevance_history, list):
+                        for val in relevance_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_rag_relevance.append(val)
+
+                # Extract from rag_support_history
+                if "rag_support_history" in coh:
+                    support_history = coh["rag_support_history"]
+                    if isinstance(support_history, list):
+                        for val in support_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_rag_support_density.append(val)
+
+                # Extract from rag_band_history
+                if "rag_band_history" in coh:
+                    band_history = coh["rag_band_history"]
+                    if isinstance(band_history, list):
+                        for band in band_history:
+                            if band is not None and band != "":
+                                all_rag_bands.append(band)
+
+                # Extract tags from rag_tag_history
+                if "rag_tag_history" in coh:
+                    tags_history = coh["rag_tag_history"]
+                    if isinstance(tags_history, list):
+                        for tag_list in tags_history:
+                            if isinstance(tag_list, list):
+                                all_rag_tags.extend(tag_list)
+
+        # Compute aggregates for Phase 51
+        # Average RAG alignment
+        if all_rag_alignment:
+            avg_rag_alignment_val = sum(all_rag_alignment) / len(all_rag_alignment)
+
+        # Average RAG conflict
+        if all_rag_conflict:
+            avg_rag_conflict_val = sum(all_rag_conflict) / len(all_rag_conflict)
+
+        # Average RAG stability
+        if all_rag_stability:
+            avg_rag_stability_val = sum(all_rag_stability) / len(all_rag_stability)
+
+        # Average RAG relevance
+        if all_rag_relevance:
+            avg_rag_relevance_val = sum(all_rag_relevance) / len(all_rag_relevance)
+
+        # Average RAG support density
+        if all_rag_support_density:
+            avg_rag_support_density_val = sum(all_rag_support_density) / len(all_rag_support_density)
+
+        # Dominant RAG band (most frequent)
+        if all_rag_bands:
+            from collections import Counter
+            band_counts = Counter(all_rag_bands)
+            # Deterministic tie-breaking: most_common + sorted
+            # Priority order for tie-breaking: HIGH_ALIGNMENT > MEDIUM_ALIGNMENT > LOW_ALIGNMENT > CONTRADICTION
+            top_bands = band_counts.most_common()
+            max_count = top_bands[0][1]
+            tied_bands = [band for band, count in top_bands if count == max_count]
+            # Use priority order for deterministic tie-breaking
+            priority_order = ["HIGH_ALIGNMENT", "MEDIUM_ALIGNMENT", "LOW_ALIGNMENT", "CONTRADICTION"]
+            for priority_band in priority_order:
+                if priority_band in tied_bands:
+                    dominant_rag_band_val = priority_band
+                    break
+            if dominant_rag_band_val is None:
+                dominant_rag_band_val = sorted(tied_bands)[0]  # Fallback to alphabetical
+
+        # Collect unique RAG tags (deduplicate and sort for determinism)
+        if all_rag_tags:
+            rag_diagnostic_tags_list = sorted(set(all_rag_tags))
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -1906,4 +2025,11 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_internal_consistency_strength=avg_internal_consistency_strength_val,
         regression_consistency_band=regression_consistency_band_val,
         regression_consistency_tags=regression_consistency_tags_list,
+        avg_rag_alignment=avg_rag_alignment_val,
+        avg_rag_conflict=avg_rag_conflict_val,
+        avg_rag_stability=avg_rag_stability_val,
+        avg_rag_relevance=avg_rag_relevance_val,
+        avg_rag_support_density=avg_rag_support_density_val,
+        dominant_rag_band=dominant_rag_band_val,
+        rag_diagnostic_tags=rag_diagnostic_tags_list,
     )

@@ -379,6 +379,16 @@ class CoherenceState:
     regression_band_history: List[str] = field(default_factory=list)  # Cognitive consistency band history
     regression_tags_history: List[List[str]] = field(default_factory=list)  # Cognitive consistency tags history
 
+    # Phase 51: RAG Coherence Validation Engine (observation only - not used in scoring)
+    rag_validation_snapshot: Optional[Any] = None  # RAGCoherenceValidationSnapshot (latest)
+    rag_alignment_history: List[float] = field(default_factory=list)  # Evidence alignment history
+    rag_conflict_history: List[float] = field(default_factory=list)  # Evidence conflict index history
+    rag_stability_history: List[float] = field(default_factory=list)  # Evidence stability history
+    rag_relevance_history: List[float] = field(default_factory=list)  # Context relevance history
+    rag_support_history: List[float] = field(default_factory=list)  # External support density history
+    rag_band_history: List[str] = field(default_factory=list)  # RAG alignment band history
+    rag_tag_history: List[List[str]] = field(default_factory=list)  # RAG diagnostic tags history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -564,6 +574,15 @@ class CoherenceState:
         self.regression_ics_history = self.regression_ics_history[-window:]
         self.regression_band_history = self.regression_band_history[-window:]
         self.regression_tags_history = self.regression_tags_history[-window:]
+
+        # Phase 51 RAG coherence validation engine formula history
+        self.rag_alignment_history = self.rag_alignment_history[-window:]
+        self.rag_conflict_history = self.rag_conflict_history[-window:]
+        self.rag_stability_history = self.rag_stability_history[-window:]
+        self.rag_relevance_history = self.rag_relevance_history[-window:]
+        self.rag_support_history = self.rag_support_history[-window:]
+        self.rag_band_history = self.rag_band_history[-window:]
+        self.rag_tag_history = self.rag_tag_history[-window:]
 
     def get_history_length(self) -> int:
         """

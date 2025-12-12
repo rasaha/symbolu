@@ -97,6 +97,7 @@ class UnifiedOutput:
     macro_stability_regulator: Optional[Dict[str, Any]] = None  # Phase 48: Macro-Stability Regulator (MSR) (observation-only, analytics/UI-only)
     temporal_stability: Optional[Dict[str, Any]] = None  # Phase 49: Unified Cross-Phase Temporal Stability Engine (UCTSE) (observation-only, analytics/UI-only)
     cognitive_consistency_regression: Optional[Dict[str, Any]] = None  # Phase 50: Cognitive Consistency Regression Engine (CCRE) (observation-only, analytics/UI-only)
+    rag_coherence_validation: Optional[Dict[str, Any]] = None  # Phase 51: RAG Coherence Validation Engine (RCVE) (observation-only, analytics/UI-only)
     persona_echo_profile: Optional[Dict[str, Any]] = None  # Phase 31: Adaptive Persona Echo Layer (APEL) (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1251,6 +1252,22 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "diagnostic_tags": getattr(ccre_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 51: Extract RAG Coherence Validation Engine (RCVE) (observation-only, analytics/UI-only)
+    rcve_data = None
+    if ctx.coherence_state is not None:
+        rcve_snapshot = getattr(ctx.coherence_state, 'rag_validation_snapshot', None)
+        if rcve_snapshot is not None:
+            # Build dict from snapshot fields
+            rcve_data = {
+                "evidence_alignment": getattr(rcve_snapshot, 'evidence_alignment', 0.0),
+                "evidence_conflict_index": getattr(rcve_snapshot, 'evidence_conflict_index', 0.0),
+                "evidence_stability": getattr(rcve_snapshot, 'evidence_stability', 0.0),
+                "context_relevance_score": getattr(rcve_snapshot, 'context_relevance_score', 0.0),
+                "external_support_density": getattr(rcve_snapshot, 'external_support_density', 0.0),
+                "alignment_band": getattr(rcve_snapshot, 'alignment_band', None),
+                "diagnostic_tags": getattr(rcve_snapshot, 'diagnostic_tags', []),
+            }
+
     # Phase 31: Extract Adaptive Persona Echo Layer (APEL) data (observation-only, tone-level only)
     echo_profile_data = None
     # Try to extract from persona response (if available)
@@ -1298,6 +1315,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         macro_stability_regulator=msr_data,  # Phase 48
         temporal_stability=uctse_data,  # Phase 49
         cognitive_consistency_regression=ccre_data,  # Phase 50
+        rag_coherence_validation=rcve_data,  # Phase 51
         persona_echo_profile=echo_profile_data,  # Phase 31
     )
 
