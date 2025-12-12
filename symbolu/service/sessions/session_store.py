@@ -1282,6 +1282,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
     avg_cra_alignment_val = None
     avg_cra_stability_val = None
     avg_cra_consistency_val = None
+    avg_cra_overall_val = None
     dominant_cra_band_val = None
     cra_pattern_tags_list = []
 
@@ -1979,12 +1980,10 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if cra_stability_values:
             avg_cra_stability_val = sum(cra_stability_values) / len(cra_stability_values)
 
-        # Extract CRA consistency from Phases 27, 49, 50 (internal consistency)
+        # Extract CRA consistency from Phases 27, 50 (internal consistency)
         cra_consistency_values = []
         if avg_symbolic_harmonization_val is not None:  # Phase 27
             cra_consistency_values.append(avg_symbolic_harmonization_val)
-        if avg_future_consistency_val is not None:  # Phase 49
-            cra_consistency_values.append(avg_future_consistency_val)
         if avg_internal_consistency_strength_val is not None:  # Phase 50
             cra_consistency_values.append(avg_internal_consistency_strength_val)
         if avg_regression_alignment_val is not None:  # Phase 50 - Cross-layer regression alignment
@@ -1993,7 +1992,8 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if cra_consistency_values:
             avg_cra_consistency_val = sum(cra_consistency_values) / len(cra_consistency_values)
 
-        # Determine dominant_cra_band based on overall CRA metrics
+        # Compute CRA overall score and determine dominant_cra_band
+        avg_cra_overall_val = None
         cra_overall_values = []
         if avg_cra_resonance_val is not None:
             cra_overall_values.append(avg_cra_resonance_val)
@@ -2005,15 +2005,15 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
             cra_overall_values.append(avg_cra_consistency_val)
 
         if cra_overall_values:
-            avg_cra_overall = sum(cra_overall_values) / len(cra_overall_values)
-            if avg_cra_overall >= 0.70:
+            avg_cra_overall_val = sum(cra_overall_values) / len(cra_overall_values)
+            if avg_cra_overall_val >= 0.70:
                 dominant_cra_band_val = "HIGH_ALIGNMENT"
-            elif avg_cra_overall >= 0.40:
+            elif avg_cra_overall_val >= 0.40:
                 dominant_cra_band_val = "MEDIUM_ALIGNMENT"
             else:
                 dominant_cra_band_val = "LOW_ALIGNMENT"
 
-        # Aggregate CRA pattern tags from implemented phases (diagnostic tags)
+        # Aggregate CRA pattern tags from Phases 23-50 (diagnostic tags)
         all_cra_tags = []
         if inversion_pattern_tags:  # Phase 23
             all_cra_tags.extend(inversion_pattern_tags)
