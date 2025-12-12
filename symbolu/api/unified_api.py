@@ -101,6 +101,7 @@ class UnifiedOutput:
     cognitive_resonance_aggregator: Optional[Dict[str, Any]] = None  # Phase 51: Cognitive Resonance Aggregator (CRA) (observation-only, analytics/UI-only)
     internal_external_reality_verification: Optional[Dict[str, Any]] = None  # Phase 52: Internal–External Reality Cross-Verification Engine (IER-CVE) (observation-only, analytics/UI-only)
     external_reality_trust: Optional[Dict[str, Any]] = None  # Phase 53: External Reality Trust Calibration Engine (ERTCE) (observation-only, analytics/UI-only)
+    action_eligibility: Optional[Dict[str, Any]] = None  # Phase 54: Action Eligibility & Commitment Boundary Engine (AECBE) (observation-only, analytics/UI-only)
     persona_echo_profile: Optional[Dict[str, Any]] = None  # Phase 31: Adaptive Persona Echo Layer (APEL) (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1304,6 +1305,23 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "diagnostic_tags": getattr(ertce_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 54: Extract Action Eligibility & Commitment Boundary Engine (AECBE) (observation-only, analytics/UI-only)
+    aecbe_data = None
+    if ctx.coherence_state is not None:
+        aecbe_snapshot = getattr(ctx.coherence_state, 'action_eligibility_snapshot', None)
+        if aecbe_snapshot is not None:
+            # Build dict from snapshot fields
+            aecbe_data = {
+                "action_eligibility_score": getattr(aecbe_snapshot, 'action_eligibility_score', 0.0),
+                "eligibility_band": getattr(aecbe_snapshot, 'eligibility_band', None),
+                "internal_stability_index": getattr(aecbe_snapshot, 'internal_stability_index', 0.0),
+                "external_alignment_index": getattr(aecbe_snapshot, 'external_alignment_index', 0.0),
+                "trust_confidence_index": getattr(aecbe_snapshot, 'trust_confidence_index', 0.0),
+                "conflict_suppression_index": getattr(aecbe_snapshot, 'conflict_suppression_index', 0.0),
+                "temporal_persistence_index": getattr(aecbe_snapshot, 'temporal_persistence_index', 0.0),
+                "eligibility_tags": getattr(aecbe_snapshot, 'eligibility_tags', []),
+            }
+
     # Phase 51: Extract Cognitive Resonance Aggregator (CRA) session aggregates (observation-only, analytics/UI-only)
     cra_data = None
     # CRA aggregates are computed from SessionSummary if session_state is available
@@ -1401,6 +1419,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         cognitive_resonance_aggregator=cra_data,  # Phase 51
         internal_external_reality_verification=ier_cve_data,  # Phase 52
         external_reality_trust=ertce_data,  # Phase 53
+        action_eligibility=aecbe_data,  # Phase 54
         persona_echo_profile=echo_profile_data,  # Phase 31
     )
 

@@ -317,6 +317,9 @@ class CoherenceEngine:
         # Update Phase 53 external reality trust calibration engine (observation only)
         self._update_external_reality_trust_calibration(state)
 
+        # Update Phase 54 action eligibility boundary engine (observation only)
+        self._update_action_eligibility_boundary(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -4966,3 +4969,158 @@ class CoherenceEngine:
             state.ertce_decay_risk_history.append(0.0)
             state.ertce_band_history.append("")
             state.ertce_tag_history.append([])
+
+    def _update_action_eligibility_boundary(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 54 Action Eligibility & Commitment Boundary Engine (observation only).
+
+        This method determines whether the system's current cognitive state is eligible
+        to transition toward action consideration (NOT execution).
+
+        The AECBE computes:
+          - Action eligibility score (overall eligibility verdict)
+          - Internal stability index (internal cognition stability)
+          - External alignment index (external reality alignment)
+          - Trust confidence index (external trust calibration confidence)
+          - Conflict suppression index (conflict/contradiction resolution quality)
+          - Temporal persistence index (temporal stability persistence)
+
+        The AECBE produces:
+          1. Action Eligibility Score (AES) [0.0, 1.0]
+          2. Eligibility Band: ELIGIBLE | CONDITIONALLY_ELIGIBLE | NOT_ELIGIBLE | BLOCKED
+          3. Internal Stability Index (ISI) [0.0, 1.0]
+          4. External Alignment Index (EAI) [0.0, 1.0]
+          5. Trust Confidence Index (TCI) [0.0, 1.0]
+          6. Conflict Suppression Index (CSI) [0.0, 1.0]
+          7. Temporal Persistence Index (TPI) [0.0, 1.0]
+          8. Diagnostic Tags
+
+        CRITICAL: This update runs AFTER Phase 53 to leverage all prerequisite signals.
+        CRITICAL: This is observation-only and does NOT perform actions, select actions,
+                  route actions, or trigger agents. It only computes an eligibility verdict.
+        CRITICAL: This does NOT modify routing, mappers, or policy.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.action_eligibility_boundary import (
+            compute_action_eligibility_boundary
+        )
+
+        # ====================================================================
+        # STEP 1: GATHER COGNITIVE CONSISTENCY SIGNALS FROM PHASE 50
+        # ====================================================================
+
+        # Build cognitive consistency signals dict from Phase 50 state
+        cognitive_consistency_signals = {}
+
+        if state.cognitive_consistency_regression_snapshot is not None:
+            cognitive_consistency_signals["regression_stability_index"] = state.cognitive_consistency_regression_snapshot.regression_stability_index
+            cognitive_consistency_signals["internal_consistency_strength"] = state.cognitive_consistency_regression_snapshot.internal_consistency_strength
+            cognitive_consistency_signals["prediction_reversal_risk"] = state.cognitive_consistency_regression_snapshot.prediction_reversal_risk
+            cognitive_consistency_signals["regression_drift_score"] = state.cognitive_consistency_regression_snapshot.regression_drift_score
+
+        # ====================================================================
+        # STEP 2: GATHER RAG COHERENCE SIGNALS FROM PHASE 51
+        # ====================================================================
+
+        # Build RAG coherence signals dict from Phase 51 state
+        rag_coherence_signals = {}
+
+        if state.rag_validation_snapshot is not None:
+            rag_coherence_signals["evidence_alignment"] = state.rag_validation_snapshot.evidence_alignment
+            rag_coherence_signals["evidence_conflict_index"] = state.rag_validation_snapshot.evidence_conflict_index
+            rag_coherence_signals["evidence_stability"] = state.rag_validation_snapshot.evidence_stability
+            rag_coherence_signals["context_relevance_score"] = state.rag_validation_snapshot.context_relevance_score
+
+        # ====================================================================
+        # STEP 3: GATHER INTERNAL-EXTERNAL ALIGNMENT FROM PHASE 52
+        # ====================================================================
+
+        # Build internal-external alignment signals dict from Phase 52 state
+        internal_external_alignment_signals = {}
+
+        if state.internal_external_reality_snapshot is not None:
+            internal_external_alignment_signals["alignment_index"] = state.internal_external_reality_snapshot.alignment_index
+            internal_external_alignment_signals["divergence_index"] = state.internal_external_reality_snapshot.divergence_index
+            internal_external_alignment_signals["evidence_conflict_index"] = state.internal_external_reality_snapshot.evidence_conflict_index
+            internal_external_alignment_signals["stability_projection_index"] = state.internal_external_reality_snapshot.stability_projection_index
+
+        # ====================================================================
+        # STEP 4: GATHER EXTERNAL TRUST SIGNALS FROM PHASE 53
+        # ====================================================================
+
+        # Build external trust signals dict from Phase 53 state
+        external_trust_signals = {}
+
+        if state.external_reality_trust_snapshot is not None:
+            external_trust_signals["external_trust_score"] = state.external_reality_trust_snapshot.external_trust_score
+            external_trust_signals["internal_override_pressure"] = state.external_reality_trust_snapshot.internal_override_pressure
+            external_trust_signals["external_signal_fragility"] = state.external_reality_trust_snapshot.external_signal_fragility
+            external_trust_signals["alignment_resilience"] = state.external_reality_trust_snapshot.alignment_resilience
+            external_trust_signals["trust_decay_risk"] = state.external_reality_trust_snapshot.trust_decay_risk
+
+        # ====================================================================
+        # STEP 5: GATHER STABILITY SIGNALS FROM PHASES 47-49
+        # ====================================================================
+
+        # Build stability signals dict from Phases 47-49 state
+        stability_signals = {}
+
+        # Phase 47: Unified Trajectory-Scenario Synthesis
+        if state.synthesis_integrity_history:
+            stability_signals["synthesis_integrity"] = state.synthesis_integrity_history[-1]
+
+        # Phase 48: Macro-Stability Regulator
+        if state.macro_stability_index_history:
+            stability_signals["macro_stability_index"] = state.macro_stability_index_history[-1]
+
+        # Phase 49: Unified Cross-Phase Temporal Stability
+        if state.temporal_stability_index_history:
+            stability_signals["temporal_stability_index"] = state.temporal_stability_index_history[-1]
+
+        # ====================================================================
+        # STEP 6: COMPUTE ACTION ELIGIBILITY BOUNDARY
+        # ====================================================================
+
+        snapshot = compute_action_eligibility_boundary(
+            cognitive_consistency_signals=cognitive_consistency_signals,
+            rag_coherence_signals=rag_coherence_signals,
+            internal_external_alignment_signals=internal_external_alignment_signals,
+            external_trust_signals=external_trust_signals,
+            stability_signals=stability_signals,
+        )
+
+        # ====================================================================
+        # STEP 7: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Update current snapshot
+            state.action_eligibility_snapshot = snapshot
+
+            # Append to histories
+            state.action_eligibility_score_history.append(snapshot.action_eligibility_score)
+            state.action_eligibility_band_history.append(snapshot.eligibility_band)
+            state.action_eligibility_tags_history.append(snapshot.eligibility_tags.copy() if snapshot.eligibility_tags else [])
+            state.internal_stability_index_history.append(snapshot.internal_stability_index)
+            state.external_alignment_index_history.append(snapshot.external_alignment_index)
+            state.trust_confidence_index_history.append(snapshot.trust_confidence_index)
+            state.conflict_suppression_index_history.append(snapshot.conflict_suppression_index)
+            state.temporal_persistence_index_history.append(snapshot.temporal_persistence_index)
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.action_eligibility_snapshot = None
+
+            # Append default values to maintain history alignment
+            state.action_eligibility_score_history.append(0.0)
+            state.action_eligibility_band_history.append("")
+            state.action_eligibility_tags_history.append([])
+            state.internal_stability_index_history.append(0.0)
+            state.external_alignment_index_history.append(0.0)
+            state.trust_confidence_index_history.append(0.0)
+            state.conflict_suppression_index_history.append(0.0)
+            state.temporal_persistence_index_history.append(0.0)

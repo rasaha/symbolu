@@ -314,3 +314,8 @@ class SessionSummary:
     avg_trust_decay_risk: Optional[float] = None  # Average trust decay risk (TDR) [0.0, 1.0]
     dominant_trust_band: Optional[str] = None  # Most frequent band: "HIGH_EXTERNAL_TRUST" | "CONDITIONAL_EXTERNAL_TRUST" | "LOW_EXTERNAL_TRUST" | "EXTERNAL_CONFLICT_ZONE"
     ertce_tags: List[str] = field(default_factory=list)  # Collected ERTCE diagnostic tags (deduped, sorted)
+
+    # Phase 54 Action Eligibility & Commitment Boundary Engine (observation only)
+    avg_action_eligibility_score: Optional[float] = None  # Average action eligibility score (AES) [0.0, 1.0]
+    dominant_action_eligibility_band: Optional[str] = None  # Most frequent band: "ELIGIBLE" | "CONDITIONALLY_ELIGIBLE" | "NOT_ELIGIBLE" | "BLOCKED"
+    action_eligibility_tags: List[str] = field(default_factory=list)  # Collected action eligibility diagnostic tags (deduped, sorted)

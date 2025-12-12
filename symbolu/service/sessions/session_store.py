@@ -1302,6 +1302,11 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
     dominant_trust_band_val = None
     ertce_tags_list = []
 
+    # Phase 54: Initialize Action Eligibility & Commitment Boundary Engine (AECBE) variables
+    avg_action_eligibility_score_val = None
+    dominant_action_eligibility_band_val = None
+    action_eligibility_tags_list = []
+
     if state.coherence_history:
         # Extract MTSF metrics from CoherenceState
         all_tsi = []
@@ -2134,6 +2139,66 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_ertce_tags:
             ertce_tags_list = sorted(set(all_ertce_tags))
 
+        # ====================================================================
+        # Phase 54: Action Eligibility & Commitment Boundary Engine (AECBE)
+        # ====================================================================
+
+        all_action_eligibility_scores = []
+        all_action_eligibility_bands = []
+        all_action_eligibility_tags = []
+
+        for coh in state.coherence_history:
+            if coh is not None and isinstance(coh, dict):
+                # Extract from action_eligibility_score_history
+                if "action_eligibility_score_history" in coh:
+                    score_history = coh["action_eligibility_score_history"]
+                    if isinstance(score_history, list):
+                        for val in score_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_action_eligibility_scores.append(val)
+
+                # Extract from action_eligibility_band_history
+                if "action_eligibility_band_history" in coh:
+                    band_history = coh["action_eligibility_band_history"]
+                    if isinstance(band_history, list):
+                        for band in band_history:
+                            if band is not None and isinstance(band, str) and band:
+                                all_action_eligibility_bands.append(band)
+
+                # Extract from action_eligibility_tags_history
+                if "action_eligibility_tags_history" in coh:
+                    tag_history = coh["action_eligibility_tags_history"]
+                    if isinstance(tag_history, list):
+                        for tags in tag_history:
+                            if tags is not None and isinstance(tags, list):
+                                all_action_eligibility_tags.extend(tags)
+
+        # Compute aggregates for Phase 54
+        # Average action eligibility score
+        if all_action_eligibility_scores:
+            avg_action_eligibility_score_val = sum(all_action_eligibility_scores) / len(all_action_eligibility_scores)
+
+        # Dominant eligibility band (most frequent with deterministic tie-breaking)
+        if all_action_eligibility_bands:
+            from collections import Counter
+            band_counts = Counter(all_action_eligibility_bands)
+            # Deterministic tie-breaking with priority order
+            top_bands = band_counts.most_common()
+            max_count = top_bands[0][1]
+            tied_bands = [band for band, count in top_bands if count == max_count]
+            # Priority order: ELIGIBLE > CONDITIONALLY_ELIGIBLE > NOT_ELIGIBLE > BLOCKED
+            priority_order = ["ELIGIBLE", "CONDITIONALLY_ELIGIBLE", "NOT_ELIGIBLE", "BLOCKED"]
+            for priority_band in priority_order:
+                if priority_band in tied_bands:
+                    dominant_action_eligibility_band_val = priority_band
+                    break
+            if dominant_action_eligibility_band_val is None:
+                dominant_action_eligibility_band_val = sorted(tied_bands)[0]  # Fallback to alphabetical
+
+        # Collect unique action eligibility tags (deduplicate and sort for determinism)
+        if all_action_eligibility_tags:
+            action_eligibility_tags_list = sorted(set(all_action_eligibility_tags))
+
         # Phase 51: CRA (Cognitive Resonance Aggregator) - Pre-RAG internal cognition aggregation
         # CRA aggregates ONLY internal metrics from implemented phases (NO RAG data)
 
@@ -2389,4 +2454,7 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_trust_decay_risk=avg_trust_decay_risk_val,
         dominant_trust_band=dominant_trust_band_val,
         ertce_tags=ertce_tags_list,
+        avg_action_eligibility_score=avg_action_eligibility_score_val,
+        dominant_action_eligibility_band=dominant_action_eligibility_band_val,
+        action_eligibility_tags=action_eligibility_tags_list,
     )

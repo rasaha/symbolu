@@ -334,6 +334,16 @@ class CoherenceObservation:
     trust_band: Optional[str] = None  # ERTCE trust band: "HIGH_EXTERNAL_TRUST" | "CONDITIONAL_EXTERNAL_TRUST" | "LOW_EXTERNAL_TRUST" | "EXTERNAL_CONFLICT_ZONE"
     ertce_tags: List[str] = field(default_factory=list)  # ERTCE diagnostic tags
 
+    # Phase 54: Action Eligibility & Commitment Boundary Engine (AECBE) (observation only)
+    action_eligibility_score: float = 0.0  # Action eligibility score (AES) [0.0, 1.0]
+    eligibility_band: Optional[str] = None  # Eligibility band: "ELIGIBLE" | "CONDITIONALLY_ELIGIBLE" | "NOT_ELIGIBLE" | "BLOCKED"
+    internal_stability_index: float = 0.0  # Internal stability index (ISI) [0.0, 1.0]
+    external_alignment_index: float = 0.0  # External alignment index (EAI) [0.0, 1.0]
+    trust_confidence_index: float = 0.0  # Trust confidence index (TCI) [0.0, 1.0]
+    conflict_suppression_index: float = 0.0  # Conflict suppression index (CSI) [0.0, 1.0]
+    temporal_persistence_index: float = 0.0  # Temporal persistence index (TPI) [0.0, 1.0]
+    eligibility_tags: List[str] = field(default_factory=list)  # Action eligibility diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -1169,6 +1179,28 @@ class CoherenceObserver:
                 trust_band = getattr(ertce_snapshot, 'trust_band', None)
                 ertce_tags = getattr(ertce_snapshot, 'diagnostic_tags', [])
 
+        # Phase 54: Extract Action Eligibility & Commitment Boundary Engine (AECBE) from coherence state
+        action_eligibility_score = 0.0
+        eligibility_band = None
+        internal_stability_index = 0.0
+        external_alignment_index = 0.0
+        trust_confidence_index = 0.0
+        conflict_suppression_index = 0.0
+        temporal_persistence_index = 0.0
+        eligibility_tags = []
+
+        if coherence_state is not None:
+            aecbe_snapshot = getattr(coherence_state, 'action_eligibility_snapshot', None)
+            if aecbe_snapshot is not None:
+                action_eligibility_score = getattr(aecbe_snapshot, 'action_eligibility_score', 0.0)
+                eligibility_band = getattr(aecbe_snapshot, 'eligibility_band', None)
+                internal_stability_index = getattr(aecbe_snapshot, 'internal_stability_index', 0.0)
+                external_alignment_index = getattr(aecbe_snapshot, 'external_alignment_index', 0.0)
+                trust_confidence_index = getattr(aecbe_snapshot, 'trust_confidence_index', 0.0)
+                conflict_suppression_index = getattr(aecbe_snapshot, 'conflict_suppression_index', 0.0)
+                temporal_persistence_index = getattr(aecbe_snapshot, 'temporal_persistence_index', 0.0)
+                eligibility_tags = getattr(aecbe_snapshot, 'eligibility_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -1404,6 +1436,14 @@ class CoherenceObserver:
             trust_decay_risk=trust_decay_risk,  # Phase 53
             trust_band=trust_band,  # Phase 53
             ertce_tags=ertce_tags,  # Phase 53
+            action_eligibility_score=action_eligibility_score,  # Phase 54
+            eligibility_band=eligibility_band,  # Phase 54
+            internal_stability_index=internal_stability_index,  # Phase 54
+            external_alignment_index=external_alignment_index,  # Phase 54
+            trust_confidence_index=trust_confidence_index,  # Phase 54
+            conflict_suppression_index=conflict_suppression_index,  # Phase 54
+            temporal_persistence_index=temporal_persistence_index,  # Phase 54
+            eligibility_tags=eligibility_tags,  # Phase 54
         )
 
         # Store observation
