@@ -369,6 +369,12 @@ class PersonaResponse(BaseModel):
         description="Phase 49: Unified Cross-Phase Temporal Stability Engine (UCTSE) metadata (observation-only, metadata-only)"
     )
 
+    # Phase 50: Optional cognitive consistency regression engine metadata (observation-only, metadata-only)
+    persona_ccre: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Phase 50: Cognitive Consistency Regression Engine (CCRE) metadata (observation-only, metadata-only)"
+    )
+
     # Phase 51: Optional RAG coherence validation profile metadata (observation-only, metadata-only)
     persona_rag_validation_profile: Optional[Dict[str, Any]] = Field(
         None,
