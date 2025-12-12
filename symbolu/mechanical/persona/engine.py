@@ -294,6 +294,14 @@ class PersonaEngine:
             rcve_metadata = self._build_rag_validation_metadata(rcve_snapshot)
             persona_response.persona_rag_validation_profile = rcve_metadata
 
+        # Phase 51 Step 19.75: Extract CRA metadata (metadata-only, no tone changes)
+        # Extract CRA snapshot from coherence state
+        cra_snapshot = self._extract_cra(explain_log)
+        if cra_snapshot is not None:
+            # Attach metadata to response for observability (METADATA-ONLY, NO tone changes)
+            cra_metadata = self._build_cra_metadata(cra_snapshot)
+            persona_response.persona_cra_profile = cra_metadata
+
         # Step 20: Return complete response
         return persona_response
     
@@ -2321,6 +2329,89 @@ class PersonaEngine:
                 "external_support_density": getattr(rcve_snapshot, 'external_support_density', 0.0),
                 "alignment_band": getattr(rcve_snapshot, 'alignment_band', None),
                 "diagnostic_tags": getattr(rcve_snapshot, 'diagnostic_tags', []),
+            }
+
+    def _extract_cra(
+        self,
+        explain_log: Optional[Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Phase 51: Extract Cognitive Resonance Aggregator (CRA) snapshot.
+
+        This method extracts the CRA snapshot from the explain_log state
+        for observability. This is METADATA-ONLY and does NOT affect tone.
+
+        Args:
+            explain_log: MLCR explain log with state data
+
+        Returns:
+            CRA snapshot dict or None if not available
+
+        Behavior:
+            • Extracts from explain_log state or coherence_state
+            • Does NOT modify tone or any other behavior
+            • Returns None if CRA data is not available
+        """
+        if explain_log is None:
+            return None
+
+        # Extract coherence state from explain log
+        coherence_state = explain_log.get('coherence_state') if isinstance(explain_log, dict) else getattr(explain_log, 'coherence_state', None)
+
+        if coherence_state is None:
+            return None
+
+        # Extract CRA snapshot from coherence state
+        if isinstance(coherence_state, dict):
+            cra_snapshot = coherence_state.get('cra_snapshot')
+        else:
+            cra_snapshot = getattr(coherence_state, 'cra_snapshot', None)
+
+        return cra_snapshot
+
+    def _build_cra_metadata(
+        self,
+        cra_snapshot: Any
+    ) -> Dict[str, Any]:
+        """
+        Phase 51: Build CRA metadata from snapshot.
+
+        This method extracts metadata from the CRA snapshot for observability.
+        This is METADATA-ONLY and does NOT affect tone or any other behavior.
+
+        Args:
+            cra_snapshot: CRA snapshot dict or object
+
+        Returns:
+            dict: Metadata dictionary for observability
+
+        Behavior:
+            • Extracts avg_resonance, avg_alignment, avg_stability, avg_consistency
+            • Extracts dominant_band and pattern_tags
+            • NEVER modifies tone or persona behavior
+        """
+        if cra_snapshot is None:
+            return {}
+
+        # Handle both snapshot objects and dicts
+        if isinstance(cra_snapshot, dict):
+            return {
+                "avg_resonance": cra_snapshot.get('avg_resonance', 0.0),
+                "avg_alignment": cra_snapshot.get('avg_alignment', 0.0),
+                "avg_stability": cra_snapshot.get('avg_stability', 0.0),
+                "avg_consistency": cra_snapshot.get('avg_consistency', 0.0),
+                "dominant_band": cra_snapshot.get('dominant_band'),
+                "pattern_tags": cra_snapshot.get('pattern_tags', []),
+            }
+        else:
+            # Snapshot object
+            return {
+                "avg_resonance": getattr(cra_snapshot, 'avg_resonance', 0.0),
+                "avg_alignment": getattr(cra_snapshot, 'avg_alignment', 0.0),
+                "avg_stability": getattr(cra_snapshot, 'avg_stability', 0.0),
+                "avg_consistency": getattr(cra_snapshot, 'avg_consistency', 0.0),
+                "dominant_band": getattr(cra_snapshot, 'dominant_band', None),
+                "pattern_tags": getattr(cra_snapshot, 'pattern_tags', []),
             }
 
     def get_persona_summary(self) -> str:

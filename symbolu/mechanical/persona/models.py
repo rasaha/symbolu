@@ -381,6 +381,12 @@ class PersonaResponse(BaseModel):
         description="Phase 51: RAG Coherence Validation Engine (RCVE) metadata (observation-only, metadata-only)"
     )
 
+    # Phase 51: Optional cognitive resonance aggregator profile metadata (observation-only, metadata-only)
+    persona_cra_profile: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Phase 51: Cognitive Resonance Aggregator (CRA) metadata (observation-only, metadata-only)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {
