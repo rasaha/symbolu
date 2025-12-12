@@ -98,6 +98,7 @@ class UnifiedOutput:
     temporal_stability: Optional[Dict[str, Any]] = None  # Phase 49: Unified Cross-Phase Temporal Stability Engine (UCTSE) (observation-only, analytics/UI-only)
     cognitive_consistency_regression: Optional[Dict[str, Any]] = None  # Phase 50: Cognitive Consistency Regression Engine (CCRE) (observation-only, analytics/UI-only)
     rag_coherence_validation: Optional[Dict[str, Any]] = None  # Phase 51: RAG Coherence Validation Engine (RCVE) (observation-only, analytics/UI-only)
+    cognitive_resonance_aggregator: Optional[Dict[str, Any]] = None  # Phase 51: Cognitive Resonance Aggregator (CRA) (observation-only, analytics/UI-only)
     persona_echo_profile: Optional[Dict[str, Any]] = None  # Phase 31: Adaptive Persona Echo Layer (APEL) (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1268,6 +1269,52 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "diagnostic_tags": getattr(rcve_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 51: Extract Cognitive Resonance Aggregator (CRA) session aggregates (observation-only, analytics/UI-only)
+    cra_data = None
+    # CRA aggregates are computed from SessionSummary if session_state is available
+    if hasattr(ctx, 'request') and ctx.request is not None:
+        try:
+            # Import session store and compute session summary
+            from symbolu.service.sessions import SessionStore, compute_session_summary
+
+            # Get session state from store
+            user_id = ctx.request.user_id
+            convo_id = ctx.request.convo_id
+            session_store = SessionStore.get_instance()
+            session_state = session_store.get_session(user_id, convo_id)
+
+            if session_state is not None:
+                # Compute session summary to get CRA aggregates
+                session_summary = compute_session_summary(session_state)
+
+                # Extract CRA fields from SessionSummary
+                cra_resonance = session_summary.avg_cra_resonance
+                cra_alignment = session_summary.avg_cra_alignment
+                cra_stability = session_summary.avg_cra_stability
+                cra_consistency = session_summary.avg_cra_consistency
+                cra_band = session_summary.dominant_cra_band
+                cra_tags = session_summary.cra_pattern_tags if hasattr(session_summary, 'cra_pattern_tags') else []
+
+                # Build CRA dict if any CRA fields are present
+                if any([cra_resonance is not None, cra_alignment is not None, cra_stability is not None,
+                        cra_consistency is not None, cra_band is not None, cra_tags]):
+                    cra_data = {}
+                    if cra_resonance is not None:
+                        cra_data['avg_resonance'] = cra_resonance
+                    if cra_alignment is not None:
+                        cra_data['avg_alignment'] = cra_alignment
+                    if cra_stability is not None:
+                        cra_data['avg_stability'] = cra_stability
+                    if cra_consistency is not None:
+                        cra_data['avg_consistency'] = cra_consistency
+                    if cra_band is not None:
+                        cra_data['dominant_band'] = cra_band
+                    if cra_tags:
+                        cra_data['pattern_tags'] = cra_tags
+        except Exception:
+            # If session store is not available or CRA computation fails, CRA data remains None
+            pass
+
     # Phase 31: Extract Adaptive Persona Echo Layer (APEL) data (observation-only, tone-level only)
     echo_profile_data = None
     # Try to extract from persona response (if available)
@@ -1316,6 +1363,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         temporal_stability=uctse_data,  # Phase 49
         cognitive_consistency_regression=ccre_data,  # Phase 50
         rag_coherence_validation=rcve_data,  # Phase 51
+        cognitive_resonance_aggregator=cra_data,  # Phase 51
         persona_echo_profile=echo_profile_data,  # Phase 31
     )
 
