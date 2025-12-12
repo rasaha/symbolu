@@ -1,0 +1,74 @@
+{
+  "baseline_stats": {
+    "mean_brokenness": 0.18594570260737683,
+    "min_brokenness": 0.014285714285714284,
+    "max_brokenness": 0.2904200404858299,
+    "high_brokenness_pct": 0.0,
+    "mean_trigram_rate": 0.0751378628060374,
+    "mean_fragment_score": 0.24789673913043475,
+    "sample_size": 200
+  },
+  "optimized_stats": {
+    "mean_brokenness": 0.10755752164691255,
+    "min_brokenness": 0.014285714285714284,
+    "max_brokenness": 0.17291763011258102,
+    "high_brokenness_pct": 0.0,
+    "mean_trigram_rate": 0.05607246695143951,
+    "mean_fragment_score": 0.049978260869565194,
+    "sample_size": 200
+  },
+  "baseline_correlations": [
+    {
+      "feature": "sibilant_density",
+      "correlation": -0.7350619596628282,
+      "effect_size": "large"
+    },
+    {
+      "feature": "stop_ending_ratio",
+      "correlation": 0.4124611474096217,
+      "effect_size": "medium"
+    },
+    {
+      "feature": "fricative_density",
+      "correlation": -0.40044509780695353,
+      "effect_size": "medium"
+    },
+    {
+      "feature": "stop_density",
+      "correlation": 0.3645641825092087,
+      "effect_size": "medium"
+    },
+    {
+      "feature": "nasal_density",
+      "correlation": 0.11472815785293787,
+      "effect_size": "small"
+    }
+  ],
+  "optimized_correlations": [
+    {
+      "feature": "sibilant_density",
+      "correlation": -0.6913095831273357,
+      "effect_size": "large"
+    },
+    {
+      "feature": "fricative_density",
+      "correlation": -0.3114206504474236,
+      "effect_size": "medium"
+    },
+    {
+      "feature": "stop_density",
+      "correlation": 0.29979725731160006,
+      "effect_size": "small"
+    },
+    {
+      "feature": "nasal_density",
+      "correlation": 0.2790648628392392,
+      "effect_size": "small"
+    },
+    {
+      "feature": "stop_ending_ratio",
+      "correlation": 0.25360170019507916,
+      "effect_size": "small"
+    }
+  ]
+}
