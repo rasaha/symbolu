@@ -885,8 +885,11 @@ jobs:
             tests/test_phase45_mtsf_invariance_audit.py \
             tests/test_phase46_trajectory_convergence_invariance_audit.py \
             tests/test_phase47_utsse_invariance_audit.py \
-            tests/test_phase48_macro_stability_regulator.py \
-            tests/test_phase49_unified_temporal_stability.py \
+            tests/test_phase48_macro_stability_invariance_audit.py \
+            tests/test_phase49_unified_temporal_stability_invariance_audit.py \
+            tests/test_phase50_cognitive_consistency_invariance_audit.py \
+            tests/test_phase51_cra_invariance_audit.py \
+            tests/test_phase52_ier_cve_invariance_audit.py \
             --tb=short \
             --disable-warnings \
             2>&1 | tee invariance-audit-all-phases.log
