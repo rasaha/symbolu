@@ -305,3 +305,12 @@ class SessionSummary:
     avg_internal_external_stability: Optional[float] = None  # Average stability projection index [0.0, 1.0]
     dominant_ier_cve_band: Optional[str] = None  # Most frequent band: "high_alignment" | "medium_alignment" | "low_alignment" | "conflict"
     ier_cve_tags: List[str] = field(default_factory=list)  # Collected IER-CVE diagnostic tags (deduped, sorted)
+
+    # Phase 53 External Reality Trust Calibration Engine (observation only)
+    avg_external_trust_score: Optional[float] = None  # Average external trust score (ETS) [0.0, 1.0]
+    avg_internal_override_pressure: Optional[float] = None  # Average internal override pressure (IOP) [0.0, 1.0]
+    avg_external_signal_fragility: Optional[float] = None  # Average external signal fragility (ESF) [0.0, 1.0]
+    avg_alignment_resilience: Optional[float] = None  # Average alignment resilience (AR) [0.0, 1.0]
+    avg_trust_decay_risk: Optional[float] = None  # Average trust decay risk (TDR) [0.0, 1.0]
+    dominant_trust_band: Optional[str] = None  # Most frequent band: "HIGH_EXTERNAL_TRUST" | "CONDITIONAL_EXTERNAL_TRUST" | "LOW_EXTERNAL_TRUST" | "EXTERNAL_CONFLICT_ZONE"
+    ertce_tags: List[str] = field(default_factory=list)  # Collected ERTCE diagnostic tags (deduped, sorted)

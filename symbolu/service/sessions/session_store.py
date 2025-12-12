@@ -1293,6 +1293,15 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
     dominant_ier_cve_band_val = None
     ier_cve_tags_list = []
 
+    # Phase 53: Initialize External Reality Trust Calibration Engine (ERTCE) variables
+    avg_external_trust_score_val = None
+    avg_internal_override_pressure_val = None
+    avg_external_signal_fragility_val = None
+    avg_alignment_resilience_val = None
+    avg_trust_decay_risk_val = None
+    dominant_trust_band_val = None
+    ertce_tags_list = []
+
     if state.coherence_history:
         # Extract MTSF metrics from CoherenceState
         all_tsi = []
@@ -2015,6 +2024,116 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_ier_cve_tags:
             ier_cve_tags_list = sorted(set(all_ier_cve_tags))
 
+        # Phase 53: Extract External Reality Trust Calibration Engine (ERTCE) metrics from CoherenceState
+        all_ertce_trust_score = []
+        all_ertce_override_pressure = []
+        all_ertce_fragility = []
+        all_ertce_resilience = []
+        all_ertce_decay_risk = []
+        all_ertce_bands = []
+        all_ertce_tags = []
+
+        for coh in state.coherence_history:
+            if coh is not None and isinstance(coh, dict):
+                # Extract from ertce_trust_score_history
+                if "ertce_trust_score_history" in coh:
+                    trust_score_history = coh["ertce_trust_score_history"]
+                    if isinstance(trust_score_history, list):
+                        for val in trust_score_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_ertce_trust_score.append(val)
+
+                # Extract from ertce_override_pressure_history
+                if "ertce_override_pressure_history" in coh:
+                    override_pressure_history = coh["ertce_override_pressure_history"]
+                    if isinstance(override_pressure_history, list):
+                        for val in override_pressure_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_ertce_override_pressure.append(val)
+
+                # Extract from ertce_fragility_history
+                if "ertce_fragility_history" in coh:
+                    fragility_history = coh["ertce_fragility_history"]
+                    if isinstance(fragility_history, list):
+                        for val in fragility_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_ertce_fragility.append(val)
+
+                # Extract from ertce_resilience_history
+                if "ertce_resilience_history" in coh:
+                    resilience_history = coh["ertce_resilience_history"]
+                    if isinstance(resilience_history, list):
+                        for val in resilience_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_ertce_resilience.append(val)
+
+                # Extract from ertce_decay_risk_history
+                if "ertce_decay_risk_history" in coh:
+                    decay_risk_history = coh["ertce_decay_risk_history"]
+                    if isinstance(decay_risk_history, list):
+                        for val in decay_risk_history:
+                            if val is not None and isinstance(val, (int, float)):
+                                all_ertce_decay_risk.append(val)
+
+                # Extract from ertce_band_history
+                if "ertce_band_history" in coh:
+                    band_history = coh["ertce_band_history"]
+                    if isinstance(band_history, list):
+                        for band in band_history:
+                            if band is not None and isinstance(band, str) and band:
+                                all_ertce_bands.append(band)
+
+                # Extract from ertce_tag_history
+                if "ertce_tag_history" in coh:
+                    tag_history = coh["ertce_tag_history"]
+                    if isinstance(tag_history, list):
+                        for tags in tag_history:
+                            if tags is not None and isinstance(tags, list):
+                                all_ertce_tags.extend(tags)
+
+        # Compute aggregates for Phase 53
+        # Average external trust score
+        if all_ertce_trust_score:
+            avg_external_trust_score_val = sum(all_ertce_trust_score) / len(all_ertce_trust_score)
+
+        # Average internal override pressure
+        if all_ertce_override_pressure:
+            avg_internal_override_pressure_val = sum(all_ertce_override_pressure) / len(all_ertce_override_pressure)
+
+        # Average external signal fragility
+        if all_ertce_fragility:
+            avg_external_signal_fragility_val = sum(all_ertce_fragility) / len(all_ertce_fragility)
+
+        # Average alignment resilience
+        if all_ertce_resilience:
+            avg_alignment_resilience_val = sum(all_ertce_resilience) / len(all_ertce_resilience)
+
+        # Average trust decay risk
+        if all_ertce_decay_risk:
+            avg_trust_decay_risk_val = sum(all_ertce_decay_risk) / len(all_ertce_decay_risk)
+
+        # Dominant trust band (most frequent)
+        if all_ertce_bands:
+            from collections import Counter
+            band_counts = Counter(all_ertce_bands)
+            # Deterministic tie-breaking: most_common + sorted
+            # Priority order for tie-breaking: HIGH_EXTERNAL_TRUST > CONDITIONAL_EXTERNAL_TRUST > LOW_EXTERNAL_TRUST > EXTERNAL_CONFLICT_ZONE
+            top_bands = band_counts.most_common()
+            max_count = top_bands[0][1]
+            tied_bands = [band for band, count in top_bands if count == max_count]
+            # Use priority order for deterministic tie-breaking
+            priority_order = ["HIGH_EXTERNAL_TRUST", "CONDITIONAL_EXTERNAL_TRUST", "LOW_EXTERNAL_TRUST", "EXTERNAL_CONFLICT_ZONE"]
+            for priority_band in priority_order:
+                if priority_band in tied_bands:
+                    dominant_trust_band_val = priority_band
+                    break
+            if dominant_trust_band_val is None:
+                dominant_trust_band_val = sorted(tied_bands)[0]  # Fallback to alphabetical
+
+        # Collect unique ERTCE tags (deduplicate and sort for determinism)
+        if all_ertce_tags:
+            ertce_tags_list = sorted(set(all_ertce_tags))
+
         # Phase 51: CRA (Cognitive Resonance Aggregator) - Pre-RAG internal cognition aggregation
         # CRA aggregates ONLY internal metrics from implemented phases (NO RAG data)
 
@@ -2263,4 +2382,11 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_internal_external_stability=avg_internal_external_stability_val,
         dominant_ier_cve_band=dominant_ier_cve_band_val,
         ier_cve_tags=ier_cve_tags_list,
+        avg_external_trust_score=avg_external_trust_score_val,
+        avg_internal_override_pressure=avg_internal_override_pressure_val,
+        avg_external_signal_fragility=avg_external_signal_fragility_val,
+        avg_alignment_resilience=avg_alignment_resilience_val,
+        avg_trust_decay_risk=avg_trust_decay_risk_val,
+        dominant_trust_band=dominant_trust_band_val,
+        ertce_tags=ertce_tags_list,
     )

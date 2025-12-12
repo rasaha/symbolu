@@ -314,6 +314,9 @@ class CoherenceEngine:
         # Update Phase 52 internal-external reality cross-verification engine (observation only)
         self._update_internal_external_reality_cve(state)
 
+        # Update Phase 53 external reality trust calibration engine (observation only)
+        self._update_external_reality_trust_calibration(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -4835,3 +4838,131 @@ class CoherenceEngine:
             state.ier_cve_stability_history.append(0.0)
             state.ier_cve_band_history.append("")
             state.ier_cve_tag_history.append([])
+
+    def _update_external_reality_trust_calibration(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 53 External Reality Trust Calibration Engine (observation only).
+
+        This method calibrates how much trust should be assigned to external
+        (RAG-derived) reality signals, relative to internal cognition.
+
+        The ERTCE calibrates:
+          - External trust score (overall confidence in external reality)
+          - Internal override pressure (degree internal cognition contradicts external signal)
+          - External signal fragility (sensitivity of external signal to perturbation)
+          - Alignment resilience (stability of internal–external agreement over time)
+          - Trust decay risk (likelihood trust degrades soon)
+
+        The ERTCE produces:
+          1. External Trust Score (ETS) [0.0, 1.0]
+          2. Internal Override Pressure (IOP) [0.0, 1.0]
+          3. External Signal Fragility (ESF) [0.0, 1.0]
+          4. Alignment Resilience (AR) [0.0, 1.0]
+          5. Trust Decay Risk (TDR) [0.0, 1.0]
+          6. Trust Band: HIGH_EXTERNAL_TRUST | CONDITIONAL_EXTERNAL_TRUST | LOW_EXTERNAL_TRUST | EXTERNAL_CONFLICT_ZONE
+          7. Diagnostic Tags
+
+        CRITICAL: This update runs AFTER Phase 52 to leverage both internal cognition
+                  and external RAG validation.
+        CRITICAL: This is observation-only and does NOT modify routing, mappers, or policy.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.external_reality_trust_calibration import (
+            compute_external_reality_trust_calibration
+        )
+
+        # ====================================================================
+        # STEP 1: GATHER EXTERNAL REALITY SIGNALS FROM PHASE 51
+        # ====================================================================
+
+        # Build external reality signals dict from Phase 51 state
+        external_reality_signals = {}
+
+        if state.rag_validation_snapshot is not None:
+            external_reality_signals["evidence_alignment"] = state.rag_validation_snapshot.evidence_alignment
+            external_reality_signals["evidence_conflict_index"] = state.rag_validation_snapshot.evidence_conflict_index
+            external_reality_signals["evidence_stability"] = state.rag_validation_snapshot.evidence_stability
+            external_reality_signals["context_relevance_score"] = state.rag_validation_snapshot.context_relevance_score
+            external_reality_signals["external_support_density"] = state.rag_validation_snapshot.external_support_density
+
+        # ====================================================================
+        # STEP 2: GATHER INTERNAL-EXTERNAL ALIGNMENT FROM PHASE 52
+        # ====================================================================
+
+        # Build internal-external alignment dict from Phase 52 state
+        internal_external_alignment = {}
+
+        if state.internal_external_reality_snapshot is not None:
+            internal_external_alignment["internal_consistency_index"] = state.internal_external_reality_snapshot.internal_consistency_index
+            internal_external_alignment["external_evidence_consistency_index"] = state.internal_external_reality_snapshot.external_evidence_consistency_index
+            internal_external_alignment["alignment_index"] = state.internal_external_reality_snapshot.alignment_index
+            internal_external_alignment["divergence_index"] = state.internal_external_reality_snapshot.divergence_index
+            internal_external_alignment["evidence_conflict_index"] = state.internal_external_reality_snapshot.evidence_conflict_index
+            internal_external_alignment["stability_projection_index"] = state.internal_external_reality_snapshot.stability_projection_index
+
+        # ====================================================================
+        # STEP 3: GATHER INTERNAL STABILITY SIGNALS FROM PHASES 47-50
+        # ====================================================================
+
+        # Build internal stability signals dict from Phases 47-50 state
+        internal_stability_signals = {}
+
+        # Phase 47: Unified Trajectory-Scenario Synthesis
+        if state.synthesis_integrity_history:
+            internal_stability_signals["synthesis_integrity"] = state.synthesis_integrity_history[-1]
+
+        # Phase 48: Macro-Stability Regulator
+        if state.macro_stability_index_history:
+            internal_stability_signals["macro_stability_index"] = state.macro_stability_index_history[-1]
+
+        # Phase 49: Unified Cross-Phase Temporal Stability
+        if state.temporal_stability_index_history:
+            internal_stability_signals["temporal_stability_index"] = state.temporal_stability_index_history[-1]
+
+        # Phase 50: Cognitive Consistency Regression Engine
+        if state.regression_ics_history:
+            internal_stability_signals["internal_consistency_strength"] = state.regression_ics_history[-1]
+
+        # ====================================================================
+        # STEP 4: COMPUTE EXTERNAL REALITY TRUST CALIBRATION
+        # ====================================================================
+
+        snapshot = compute_external_reality_trust_calibration(
+            external_reality_signals=external_reality_signals,
+            internal_external_alignment=internal_external_alignment,
+            internal_stability_signals=internal_stability_signals,
+        )
+
+        # ====================================================================
+        # STEP 5: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Update current snapshot
+            state.external_reality_trust_snapshot = snapshot
+
+            # Append to histories
+            state.ertce_trust_score_history.append(snapshot.external_trust_score)
+            state.ertce_override_pressure_history.append(snapshot.internal_override_pressure)
+            state.ertce_fragility_history.append(snapshot.external_signal_fragility)
+            state.ertce_resilience_history.append(snapshot.alignment_resilience)
+            state.ertce_decay_risk_history.append(snapshot.trust_decay_risk)
+            state.ertce_band_history.append(snapshot.trust_band)
+            state.ertce_tag_history.append(snapshot.diagnostic_tags.copy() if snapshot.diagnostic_tags else [])
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.external_reality_trust_snapshot = None
+
+            # Append None/default values to maintain history alignment
+            state.ertce_trust_score_history.append(0.0)
+            state.ertce_override_pressure_history.append(0.0)
+            state.ertce_fragility_history.append(0.0)
+            state.ertce_resilience_history.append(0.0)
+            state.ertce_decay_risk_history.append(0.0)
+            state.ertce_band_history.append("")
+            state.ertce_tag_history.append([])
