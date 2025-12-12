@@ -298,3 +298,10 @@ class SessionSummary:
     avg_cra_consistency: Optional[float] = None  # Average CRA consistency (external support) [0.0, 1.0]
     dominant_cra_band: Optional[str] = None  # Most frequent CRA band: "HIGH_ALIGNMENT" | "MEDIUM_ALIGNMENT" | "LOW_ALIGNMENT" | "CONTRADICTION"
     cra_pattern_tags: List[str] = field(default_factory=list)  # Collected CRA pattern tags (deduped, sorted)
+
+    # Phase 52 Internal–External Reality Cross-Verification Engine (observation only)
+    avg_internal_external_alignment: Optional[float] = None  # Average internal-external alignment index [0.0, 1.0]
+    avg_internal_external_conflict: Optional[float] = None  # Average internal-external conflict index [0.0, 1.0]
+    avg_internal_external_stability: Optional[float] = None  # Average stability projection index [0.0, 1.0]
+    dominant_ier_cve_band: Optional[str] = None  # Most frequent band: "high_alignment" | "medium_alignment" | "low_alignment" | "conflict"
+    ier_cve_tags: List[str] = field(default_factory=list)  # Collected IER-CVE diagnostic tags (deduped, sorted)

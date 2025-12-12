@@ -311,6 +311,9 @@ class CoherenceEngine:
         # Update Phase 51 RAG coherence validation engine (observation only)
         self._update_rag_coherence_validation(state)
 
+        # Update Phase 52 internal-external reality cross-verification engine (observation only)
+        self._update_internal_external_reality_cve(state)
+
         return state
 
     def _extract_tier(self, routing_plan: Any) -> str:
@@ -4685,3 +4688,150 @@ class CoherenceEngine:
             state.rag_support_history.append(0.0)
             state.rag_band_history.append("")
             state.rag_tag_history.append([])
+
+    def _update_internal_external_reality_cve(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 52 Internal–External Reality Cross-Verification Engine (observation only).
+
+        This method cross-verifies internal cognitive predictions (Phases 35-51) against
+        external RAG coherence validation (Phase 51) to produce a unified Internal–External
+        Reality Alignment Index (IERAI).
+
+        The IER-CVE validates:
+          - Internal consistency (agreement across internal cognition layers)
+          - External evidence consistency (RAG validation strength)
+          - Alignment index (agreement between internal and external reality)
+          - Divergence index (disagreement between internal and external)
+          - Evidence conflict (contradictions between internal and external)
+          - Stability projection (expected future stability of alignment)
+
+        The IER-CVE produces:
+          1. Internal Consistency Index [0.0, 1.0]
+          2. External Evidence Consistency Index [0.0, 1.0]
+          3. Alignment Index [0.0, 1.0]
+          4. Divergence Index [0.0, 1.0]
+          5. Evidence Conflict Index [0.0, 1.0]
+          6. Stability Projection Index [0.0, 1.0]
+          7. Band: high_alignment | medium_alignment | low_alignment | conflict
+          8. Diagnostic Tags
+
+        CRITICAL: This update runs AFTER Phase 51 to leverage both internal cognition
+                  and external RAG validation.
+        CRITICAL: This is observation-only and does NOT modify routing, mappers, or policy.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.internal_external_reality_cve import (
+            compute_internal_external_reality_cve
+        )
+
+        # ====================================================================
+        # STEP 1: GATHER INTERNAL COGNITION SIGNALS FROM PHASES 35-50
+        # ====================================================================
+
+        # Build internal signals dict from Phase 35-50 state
+        internal_signals = {}
+
+        # Phase 35: Predictive Persona Drift
+        if state.drift_magnitude_history:
+            internal_signals["drift_magnitude"] = state.drift_magnitude_history[-1]
+
+        # Phase 36: Identity Resonance Memory
+        if state.ida_history:
+            internal_signals["identity_drift_anchoring"] = state.ida_history[-1]
+
+        # Phase 37: Adaptive Continuity Engine
+        if state.css_history:
+            internal_signals["continuity_stability"] = state.css_history[-1]
+
+        # Phase 38: Temporal Coherence Forecasting
+        if state.forecast_strength_history:
+            internal_signals["forecast_strength"] = state.forecast_strength_history[-1]
+
+        # Phase 39: Multi-Horizon Temporal Forecasting
+        if state.future_stability_envelope_history:
+            internal_signals["future_stability_envelope"] = state.future_stability_envelope_history[-1]
+
+        # Phase 40: Cross-Horizon Resonance Alignment
+        if state.rai_history:
+            internal_signals["resonance_alignment_index"] = state.rai_history[-1]
+
+        # Phase 42: Scenario Fusion Engine
+        if state.scenario_alignment_history:
+            internal_signals["scenario_alignment"] = state.scenario_alignment_history[-1]
+
+        # Phase 44: Coherence-Scenario Alignment
+        if state.scenario_alignment_score_history:
+            internal_signals["alignment_score"] = state.scenario_alignment_score_history[-1]
+
+        # Phase 46: Trajectory Field Convergence
+        if state.tfce_convergence_index_history:
+            internal_signals["convergence_index"] = state.tfce_convergence_index_history[-1]
+
+        # Phase 47: Unified Trajectory-Scenario Synthesis
+        if state.synthesis_integrity_history:
+            internal_signals["synthesis_integrity"] = state.synthesis_integrity_history[-1]
+
+        # Phase 48: Macro-Stability Regulator
+        if state.macro_stability_index_history:
+            internal_signals["macro_stability_index"] = state.macro_stability_index_history[-1]
+
+        # Phase 49: Unified Cross-Phase Temporal Stability
+        if state.temporal_stability_index_history:
+            internal_signals["temporal_stability_index"] = state.temporal_stability_index_history[-1]
+
+        # Phase 50: Cognitive Consistency Regression Engine
+        if state.regression_ics_history:
+            internal_signals["internal_consistency_strength"] = state.regression_ics_history[-1]
+
+        # ====================================================================
+        # STEP 2: GATHER EXTERNAL RAG VALIDATION FROM PHASE 51
+        # ====================================================================
+
+        # Build external RAG validation dict from Phase 51 state
+        external_rag_validation = {}
+
+        if state.rag_validation_snapshot is not None:
+            external_rag_validation["evidence_alignment"] = state.rag_validation_snapshot.evidence_alignment
+            external_rag_validation["evidence_conflict_index"] = state.rag_validation_snapshot.evidence_conflict_index
+            external_rag_validation["evidence_stability"] = state.rag_validation_snapshot.evidence_stability
+            external_rag_validation["context_relevance_score"] = state.rag_validation_snapshot.context_relevance_score
+            external_rag_validation["external_support_density"] = state.rag_validation_snapshot.external_support_density
+
+        # ====================================================================
+        # STEP 3: COMPUTE INTERNAL–EXTERNAL REALITY CROSS-VERIFICATION
+        # ====================================================================
+
+        snapshot = compute_internal_external_reality_cve(
+            internal_signals=internal_signals,
+            external_rag_validation=external_rag_validation,
+        )
+
+        # ====================================================================
+        # STEP 4: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Update current snapshot
+            state.internal_external_reality_snapshot = snapshot
+
+            # Append to histories
+            state.ier_cve_alignment_history.append(snapshot.alignment_index)
+            state.ier_cve_conflict_history.append(snapshot.evidence_conflict_index)
+            state.ier_cve_stability_history.append(snapshot.stability_projection_index)
+            state.ier_cve_band_history.append(snapshot.band)
+            state.ier_cve_tag_history.append(snapshot.diagnostic_tags.copy() if snapshot.diagnostic_tags else [])
+        else:
+            # Snapshot computation failed (insufficient data)
+            state.internal_external_reality_snapshot = None
+
+            # Append None/default values to maintain history alignment
+            state.ier_cve_alignment_history.append(0.0)
+            state.ier_cve_conflict_history.append(0.0)
+            state.ier_cve_stability_history.append(0.0)
+            state.ier_cve_band_history.append("")
+            state.ier_cve_tag_history.append([])

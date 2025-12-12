@@ -387,6 +387,12 @@ class PersonaResponse(BaseModel):
         description="Phase 51: Cognitive Resonance Aggregator (CRA) metadata (observation-only, metadata-only)"
     )
 
+    # Phase 52: Optional internal-external reality alignment profile metadata (observation-only, metadata-only)
+    persona_internal_external_alignment_profile: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Phase 52: Internal–External Reality Cross-Verification Engine (IER-CVE) metadata (observation-only, metadata-only)"
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {

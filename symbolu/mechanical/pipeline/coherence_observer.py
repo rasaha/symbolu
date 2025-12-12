@@ -318,6 +318,13 @@ class CoherenceObservation:
     rag_band: Optional[str] = None  # RAG alignment band: "HIGH_ALIGNMENT" | "MEDIUM_ALIGNMENT" | "LOW_ALIGNMENT" | "CONTRADICTION"
     rag_tags: List[str] = field(default_factory=list)  # RCVE diagnostic tags
 
+    # Phase 52: Internal–External Reality Cross-Verification Engine (IER-CVE) (observation only)
+    internal_external_alignment: float = 0.0  # Internal-external alignment index [0.0, 1.0]
+    internal_external_conflict: float = 0.0  # Internal-external conflict index [0.0, 1.0]
+    internal_external_stability: float = 0.0  # Stability projection index [0.0, 1.0]
+    internal_external_band: Optional[str] = None  # IER-CVE band: "high_alignment" | "medium_alignment" | "low_alignment" | "conflict"
+    internal_external_tags: List[str] = field(default_factory=list)  # IER-CVE diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -1117,6 +1124,22 @@ class CoherenceObserver:
                 rag_band = getattr(rcve_snapshot, 'alignment_band', None)
                 rag_tags = getattr(rcve_snapshot, 'diagnostic_tags', [])
 
+        # Phase 52: Extract Internal–External Reality Cross-Verification Engine (IER-CVE) from coherence state
+        internal_external_alignment = 0.0
+        internal_external_conflict = 0.0
+        internal_external_stability = 0.0
+        internal_external_band = None
+        internal_external_tags = []
+
+        if coherence_state is not None:
+            ier_cve_snapshot = getattr(coherence_state, 'internal_external_reality_snapshot', None)
+            if ier_cve_snapshot is not None:
+                internal_external_alignment = getattr(ier_cve_snapshot, 'alignment_index', 0.0)
+                internal_external_conflict = getattr(ier_cve_snapshot, 'evidence_conflict_index', 0.0)
+                internal_external_stability = getattr(ier_cve_snapshot, 'stability_projection_index', 0.0)
+                internal_external_band = getattr(ier_cve_snapshot, 'band', None)
+                internal_external_tags = getattr(ier_cve_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -1340,6 +1363,11 @@ class CoherenceObserver:
             rag_support=rag_support,  # Phase 51
             rag_band=rag_band,  # Phase 51
             rag_tags=rag_tags,  # Phase 51
+            internal_external_alignment=internal_external_alignment,  # Phase 52
+            internal_external_conflict=internal_external_conflict,  # Phase 52
+            internal_external_stability=internal_external_stability,  # Phase 52
+            internal_external_band=internal_external_band,  # Phase 52
+            internal_external_tags=internal_external_tags,  # Phase 52
         )
 
         # Store observation

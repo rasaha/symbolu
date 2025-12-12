@@ -99,6 +99,7 @@ class UnifiedOutput:
     cognitive_consistency_regression: Optional[Dict[str, Any]] = None  # Phase 50: Cognitive Consistency Regression Engine (CCRE) (observation-only, analytics/UI-only)
     rag_coherence_validation: Optional[Dict[str, Any]] = None  # Phase 51: RAG Coherence Validation Engine (RCVE) (observation-only, analytics/UI-only)
     cognitive_resonance_aggregator: Optional[Dict[str, Any]] = None  # Phase 51: Cognitive Resonance Aggregator (CRA) (observation-only, analytics/UI-only)
+    internal_external_reality_verification: Optional[Dict[str, Any]] = None  # Phase 52: Internal–External Reality Cross-Verification Engine (IER-CVE) (observation-only, analytics/UI-only)
     persona_echo_profile: Optional[Dict[str, Any]] = None  # Phase 31: Adaptive Persona Echo Layer (APEL) (observation-only, tone-level only)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1269,6 +1270,23 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
                 "diagnostic_tags": getattr(rcve_snapshot, 'diagnostic_tags', []),
             }
 
+    # Phase 52: Extract Internal–External Reality Cross-Verification Engine (IER-CVE) (observation-only, analytics/UI-only)
+    ier_cve_data = None
+    if ctx.coherence_state is not None:
+        ier_cve_snapshot = getattr(ctx.coherence_state, 'internal_external_reality_snapshot', None)
+        if ier_cve_snapshot is not None:
+            # Build dict from snapshot fields
+            ier_cve_data = {
+                "internal_consistency_index": getattr(ier_cve_snapshot, 'internal_consistency_index', 0.0),
+                "external_evidence_consistency_index": getattr(ier_cve_snapshot, 'external_evidence_consistency_index', 0.0),
+                "alignment_index": getattr(ier_cve_snapshot, 'alignment_index', 0.0),
+                "divergence_index": getattr(ier_cve_snapshot, 'divergence_index', 0.0),
+                "evidence_conflict_index": getattr(ier_cve_snapshot, 'evidence_conflict_index', 0.0),
+                "stability_projection_index": getattr(ier_cve_snapshot, 'stability_projection_index', 0.0),
+                "band": getattr(ier_cve_snapshot, 'band', None),
+                "diagnostic_tags": getattr(ier_cve_snapshot, 'diagnostic_tags', []),
+            }
+
     # Phase 51: Extract Cognitive Resonance Aggregator (CRA) session aggregates (observation-only, analytics/UI-only)
     cra_data = None
     # CRA aggregates are computed from SessionSummary if session_state is available
@@ -1364,6 +1382,7 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
         cognitive_consistency_regression=ccre_data,  # Phase 50
         rag_coherence_validation=rcve_data,  # Phase 51
         cognitive_resonance_aggregator=cra_data,  # Phase 51
+        internal_external_reality_verification=ier_cve_data,  # Phase 52
         persona_echo_profile=echo_profile_data,  # Phase 31
     )
 
