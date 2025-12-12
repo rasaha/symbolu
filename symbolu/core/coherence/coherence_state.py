@@ -407,6 +407,17 @@ class CoherenceState:
     ertce_band_history: List[str] = field(default_factory=list)  # ERTCE trust band history
     ertce_tag_history: List[List[str]] = field(default_factory=list)  # ERTCE diagnostic tags history
 
+    # Phase 54: Action Eligibility & Commitment Boundary Engine (observation only - not used in scoring)
+    action_eligibility_snapshot: Optional[Any] = None  # ActionEligibilitySnapshot (latest)
+    action_eligibility_score_history: List[float] = field(default_factory=list)  # Action eligibility score history
+    action_eligibility_band_history: List[str] = field(default_factory=list)  # Eligibility band history
+    action_eligibility_tags_history: List[List[str]] = field(default_factory=list)  # Eligibility tags history
+    internal_stability_index_history: List[float] = field(default_factory=list)  # Internal stability index history
+    external_alignment_index_history: List[float] = field(default_factory=list)  # External alignment index history
+    trust_confidence_index_history: List[float] = field(default_factory=list)  # Trust confidence index history
+    conflict_suppression_index_history: List[float] = field(default_factory=list)  # Conflict suppression index history
+    temporal_persistence_index_history: List[float] = field(default_factory=list)  # Temporal persistence index history
+
     def window_trim(self, window: int) -> None:
         """
         Trim all histories to sliding window size.
@@ -617,6 +628,16 @@ class CoherenceState:
         self.ertce_decay_risk_history = self.ertce_decay_risk_history[-window:]
         self.ertce_band_history = self.ertce_band_history[-window:]
         self.ertce_tag_history = self.ertce_tag_history[-window:]
+
+        # Phase 54 action eligibility boundary engine formula history
+        self.action_eligibility_score_history = self.action_eligibility_score_history[-window:]
+        self.action_eligibility_band_history = self.action_eligibility_band_history[-window:]
+        self.action_eligibility_tags_history = self.action_eligibility_tags_history[-window:]
+        self.internal_stability_index_history = self.internal_stability_index_history[-window:]
+        self.external_alignment_index_history = self.external_alignment_index_history[-window:]
+        self.trust_confidence_index_history = self.trust_confidence_index_history[-window:]
+        self.conflict_suppression_index_history = self.conflict_suppression_index_history[-window:]
+        self.temporal_persistence_index_history = self.temporal_persistence_index_history[-window:]
 
     def get_history_length(self) -> int:
         """
