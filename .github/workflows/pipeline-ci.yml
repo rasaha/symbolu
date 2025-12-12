@@ -44,6 +44,7 @@ on:
       - "symbolu/formulas/rag_coherence_validation.py"
       - "tests/test_phase52_internal_external_reality_cve.py"
       - "symbolu/formulas/internal_external_reality_cve.py"
+      - "tests/test_phase52_internal_external_reality_invariance_audit.py"
       - "symbolu/tools/scenario_simulator/**"
       - "tests/test_phase43_scenario_simulator.py"
       - "tests/test_phase*_invariance_audit.py"
@@ -103,6 +104,7 @@ on:
       - "symbolu/formulas/rag_coherence_validation.py"
       - "tests/test_phase52_internal_external_reality_cve.py"
       - "symbolu/formulas/internal_external_reality_cve.py"
+      - "tests/test_phase52_internal_external_reality_invariance_audit.py"
       - "symbolu/tools/scenario_simulator/**"
       - "tests/test_phase43_scenario_simulator.py"
       - "tests/test_phase*_invariance_audit.py"
@@ -874,6 +876,20 @@ jobs:
           name: phase52-ier-cve-log
           path: phase52-ier-cve.log
 
+      - name: Run Phase 52 Invariance Audit Tests
+        run: |
+          pytest tests/test_phase52_internal_external_reality_invariance_audit.py \
+            --disable-warnings -v \
+            --maxfail=1 \
+            2>&1 | tee phase52-invariance-audit.log
+
+      - name: Upload Phase 52 Invariance Audit Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase52-invariance-audit-log
+          path: phase52-invariance-audit.log
+
       - name: Run ALL Invariance Audit Tests (Phases 27-52)
         run: |
           pytest -vv \
@@ -889,7 +905,7 @@ jobs:
             tests/test_phase49_unified_temporal_stability_invariance_audit.py \
             tests/test_phase50_cognitive_consistency_invariance_audit.py \
             tests/test_phase51_cra_invariance_audit.py \
-            tests/test_phase52_ier_cve_invariance_audit.py \
+            tests/test_phase52_internal_external_reality_invariance_audit.py \
             --tb=short \
             --disable-warnings \
             2>&1 | tee invariance-audit-all-phases.log
