@@ -186,8 +186,10 @@ class TestCCREBandClassification:
 
     def test_low_consistency_or_conflict_band(self):
         """Test low_consistency or internal_conflict band."""
-        # Highly volatile, reversing signals
-        volatile_hist = [0.0, 1.0] * 10
+        # Irregular, multi-slope pattern (not predictable like alternating values)
+        # This creates conflicting regression slopes across windows
+        volatile_hist = [0.1, 0.9, 0.3, 0.85, 0.2, 0.7, 0.15, 0.95, 0.25, 0.8,
+                         0.35, 0.75, 0.4, 0.65, 0.5, 0.6, 0.45, 0.55, 0.48, 0.52]
 
         snapshot = compute_cognitive_consistency_regression(
             drift_history=volatile_hist,
@@ -196,7 +198,7 @@ class TestCCREBandClassification:
         )
 
         assert snapshot is not None
-        # Should have lower consistency
+        # Should have lower consistency due to irregular multi-slope pattern
         assert snapshot.band in ["low_consistency", "internal_conflict", "medium_consistency"]
 
 
@@ -404,7 +406,18 @@ class TestUnifiedAPIIntegration:
         """Test that UnifiedOutput has cognitive_consistency_regression field."""
         from symbolu.api.unified_api import UnifiedOutput
 
-        output = UnifiedOutput(text="test")
+        output = UnifiedOutput(
+            text="test",
+            symbolic={},
+            practical={},
+            mirror={},
+            dha={},
+            routing={},
+            mappers={},
+            entropy={},
+            coherence={},
+            metadata={}
+        )
         assert hasattr(output, "cognitive_consistency_regression")
         assert output.cognitive_consistency_regression is None  # Default
 
@@ -422,7 +435,19 @@ class TestUnifiedAPIIntegration:
             "diagnostic_tags": ["regression_stable", "low_drift"],
         }
 
-        output = UnifiedOutput(text="test", cognitive_consistency_regression=ccre_data)
+        output = UnifiedOutput(
+            text="test",
+            symbolic={},
+            practical={},
+            mirror={},
+            dha={},
+            routing={},
+            mappers={},
+            entropy={},
+            coherence={},
+            metadata={},
+            cognitive_consistency_regression=ccre_data
+        )
         output_dict = output.to_dict()
 
         assert "cognitive_consistency_regression" in output_dict
@@ -436,7 +461,17 @@ class TestCoherenceObserverIntegration:
         """Test that CoherenceObservation has Phase 50 fields."""
         from symbolu.mechanical.pipeline.coherence_observer import CoherenceObservation
 
-        obs = CoherenceObservation()
+        obs = CoherenceObservation(
+            coherence_score=0.8,
+            persona_drift_score=0.1,
+            semantic_stability_score=0.9,
+            temporal_arc_score=0.7,
+            mapper_volatility_score=0.2,
+            turn_number=1,
+            tier="HYBRID",
+            domain="therapy",
+            active_mappers=["HRM"]
+        )
 
         assert hasattr(obs, "regression_rsi")
         assert hasattr(obs, "regression_alignment")
@@ -450,7 +485,17 @@ class TestCoherenceObserverIntegration:
         """Test that Phase 50 fields default to 0.0/None."""
         from symbolu.mechanical.pipeline.coherence_observer import CoherenceObservation
 
-        obs = CoherenceObservation()
+        obs = CoherenceObservation(
+            coherence_score=0.8,
+            persona_drift_score=0.1,
+            semantic_stability_score=0.9,
+            temporal_arc_score=0.7,
+            mapper_volatility_score=0.2,
+            turn_number=1,
+            tier="HYBRID",
+            domain="therapy",
+            active_mappers=["HRM"]
+        )
 
         assert obs.regression_rsi == 0.0
         assert obs.regression_alignment == 0.0
