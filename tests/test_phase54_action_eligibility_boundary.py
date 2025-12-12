@@ -18,7 +18,11 @@ CRITICAL INVARIANTS:
 - NO action selection
 """
 
-import pytest
+try:
+    import pytest
+except ImportError:
+    pytest = None
+
 from symbolu.formulas.action_eligibility_boundary import (
     compute_action_eligibility_boundary,
     ActionEligibilitySnapshot,
@@ -727,4 +731,7 @@ def test_edge_case_missing_optional_fields():
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    if pytest:
+        pytest.main([__file__, "-v"])
+    else:
+        print("pytest not available, tests can be run manually")
