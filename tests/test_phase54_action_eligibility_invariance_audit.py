@@ -512,10 +512,14 @@ class TestDILchatInvariance:
 
         source = inspect.getsource(aecbe_module)
 
-        # Phase 54 must not import DILchat modules
-        assert 'dilchat' not in source.lower() or '# dilchat' in source.lower()
-        assert 'generate_dil' not in source
-        assert 'modify_dil' not in source
+        # Remove comments and docstrings to avoid false positives
+        source_no_comments = re.sub(r'#.*', '', source)
+        source_no_docstrings = re.sub(r'""".*?"""', '', source_no_comments, flags=re.DOTALL)
+
+        # Phase 54 must not import DILchat modules (check only code, not comments)
+        assert 'dilchat' not in source_no_docstrings.lower()
+        assert 'generate_dil' not in source_no_docstrings
+        assert 'modify_dil' not in source_no_docstrings
 
     def test_aecbe_badges_are_additive_not_replacing(self):
         """AECBE badges (if any) must be additive, not replacing."""
@@ -626,8 +630,12 @@ class TestUnifiedAPIInvariance:
         state = CoherenceState(convo_id="test", turn_index=0)
         state.action_eligibility_snapshot = None
 
-        # Observe - should not crash
-        observation = observer.observe(coherence_state=state)
+        # Observe - should not crash (provide required arguments)
+        observation = observer.observe(
+            text="test text",
+            pipeline_context=Mock(),
+            coherence_state=state
+        )
 
         # Should handle None gracefully
         assert observation is not None
