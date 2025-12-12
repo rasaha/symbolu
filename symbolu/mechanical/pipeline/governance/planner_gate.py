@@ -244,6 +244,11 @@ class PlannerGate:
                 violations=[],
             )
 
+        # Safety hardening: block if any clause has no selected grounding
+        for clause in envelope.clauses:
+            if clause.selected is None:
+                return self._build_blocked_result(envelope)
+
         # Process each clause and determine allowed actions
         allowed_actions: List[ActionClass] = []
         rejected_actions: Dict[ActionClass, str] = {}
@@ -346,12 +351,15 @@ class PlannerGate:
                 "reason": "analysis_not_allowed",
             }
 
-        # Check if action is explicitly allowed
+        # Check if action is explicitly allowed (strict allow-list)
         if action in allowed_set:
             return {"allowed": True, "reason": None}
 
-        # Default: allow if not explicitly forbidden
-        return {"allowed": True, "reason": None}
+        # Strict allow-list: reject if not explicitly allowed
+        return {
+            "allowed": False,
+            "reason": f"not_allowed_for_{mode.value.lower()}_mode",
+        }
 
     def _build_blocked_result(
         self, envelope: PhaseMinusOneEnvelope

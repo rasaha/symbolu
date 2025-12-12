@@ -561,6 +561,108 @@ class TestPlannerGate:
                     "VALIDATE should be allowed: in both REFLEXIVE and RELATIONAL allowed sets"
                 )
 
+    def test_strict_allow_list_rejects_unlisted_actions(self):
+        """
+        Test: Strict allow-list - actions not in allowed set are rejected.
+
+        JUDGE is not in any allowed set (it's in REFLEXIVE_FORBIDDEN).
+        Under strict allow-list, it must be rejected.
+        """
+        envelope = self.pipeline.run("I am sad.")
+
+        assert envelope.clauses[0].selected is not None
+        assert envelope.clauses[0].selected.mode == ObservationMode.REFLEXIVE
+
+        # JUDGE is in REFLEXIVE_FORBIDDEN - should be rejected
+        result = self.gate.filter(envelope, [ActionClass.JUDGE])
+
+        assert ActionClass.JUDGE not in result.selected_action_classes
+        assert ActionClass.JUDGE in result.rejected_action_classes
+        assert "forbidden" in result.rejected_action_classes[ActionClass.JUDGE].lower()
+
+    def test_strict_allow_list_detached_rejects_care(self):
+        """
+        Test: CARE is not in DETACHED_ALLOWED, so it should be rejected.
+
+        Under strict allow-list, even non-forbidden actions are rejected
+        if they're not explicitly allowed.
+        """
+        envelope = self.pipeline.run("Sadness is a common emotion.")
+
+        if envelope.clauses[0].selected and envelope.clauses[0].selected.mode == ObservationMode.DETACHED:
+            # CARE is allowed for REFLEXIVE but NOT in DETACHED_ALLOWED
+            result = self.gate.filter(envelope, [ActionClass.CARE])
+
+            assert ActionClass.CARE not in result.selected_action_classes, (
+                "CARE should be rejected for DETACHED mode (not in allow-list)"
+            )
+            assert ActionClass.CARE in result.rejected_action_classes
+            assert "not_allowed_for_detached_mode" in result.rejected_action_classes[ActionClass.CARE]
+
+    def test_safety_hardening_blocks_on_none_selected(self):
+        """
+        Test: Safety hardening - block if any clause has selected=None.
+
+        If a clause couldn't be grounded, the gate should return BLOCKED
+        rather than risk unsafe actions.
+        """
+        # Create an envelope with a clause that has selected=None
+        envelope = PhaseMinusOneEnvelope(
+            overall_policy=OverallPolicy.SINGLE_CONTEXT,  # Not BLOCKED itself
+            clauses=[
+                ClauseGroundingResult(
+                    clause_text="Some text",
+                    candidates=[],
+                    selected=None,  # No grounding selected
+                    grounding_status=GroundingStatus.AMBIGUOUS,
+                    resolution_policy=ResolutionPolicy.ASK_CLARIFY,
+                )
+            ],
+            run_id="test-safety",
+        )
+
+        result = self.gate.filter(envelope, [ActionClass.CARE, ActionClass.ANALYZE])
+
+        # Should be blocked due to safety hardening
+        assert result.blocked is True
+        assert ActionClass.ASK_CLARIFY_REFERENCE in result.selected_action_classes
+        assert len(result.selected_action_classes) == 1
+
+    def test_strict_allow_list_reflexive_allows_only_listed(self):
+        """
+        Test: REFLEXIVE mode allows only actions in REFLEXIVE_ALLOWED.
+
+        Verify that CARE, REFLECT, VALIDATE, ASK are allowed,
+        but EXPLAIN, SUMMARIZE (DETACHED actions) are rejected.
+        """
+        envelope = self.pipeline.run("I feel anxious.")
+
+        if envelope.clauses[0].selected and envelope.clauses[0].selected.mode == ObservationMode.REFLEXIVE:
+            # Test allowed actions
+            allowed_result = self.gate.filter(envelope, [
+                ActionClass.CARE,
+                ActionClass.REFLECT,
+                ActionClass.ASK,
+            ])
+            assert ActionClass.CARE in allowed_result.selected_action_classes
+            assert ActionClass.REFLECT in allowed_result.selected_action_classes
+            assert ActionClass.ASK in allowed_result.selected_action_classes
+
+            # Test rejected actions (DETACHED-only actions)
+            rejected_result = self.gate.filter(envelope, [
+                ActionClass.SUMMARIZE,
+                ActionClass.COMPARE,
+                ActionClass.INSTRUCT_GENERAL,
+            ])
+            assert ActionClass.SUMMARIZE not in rejected_result.selected_action_classes
+            assert ActionClass.COMPARE not in rejected_result.selected_action_classes
+            assert ActionClass.INSTRUCT_GENERAL not in rejected_result.selected_action_classes
+
+            # Verify rejection reasons
+            for action in [ActionClass.SUMMARIZE, ActionClass.COMPARE, ActionClass.INSTRUCT_GENERAL]:
+                assert action in rejected_result.rejected_action_classes
+                assert "not_allowed_for_reflexive_mode" in rejected_result.rejected_action_classes[action]
+
 
 class TestClarifyRenderer:
     """Tests for clarification question rendering."""
