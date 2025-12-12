@@ -1277,6 +1277,14 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
     dominant_rag_band_val = None
     rag_diagnostic_tags_list = []
 
+    # Phase 51: Initialize CRA (Cognitive Resonance Aggregator) variables
+    avg_cra_resonance_val = None
+    avg_cra_alignment_val = None
+    avg_cra_stability_val = None
+    avg_cra_consistency_val = None
+    dominant_cra_band_val = None
+    cra_pattern_tags_list = []
+
     if state.coherence_history:
         # Extract MTSF metrics from CoherenceState
         all_tsi = []
@@ -1915,6 +1923,127 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         if all_rag_tags:
             rag_diagnostic_tags_list = sorted(set(all_rag_tags))
 
+        # Phase 51: CRA (Cognitive Resonance Aggregator) - Pre-RAG internal cognition aggregation
+        # CRA aggregates ONLY internal metrics from implemented phases (NO RAG data)
+
+        # Extract CRA resonance from Phases 3, 8, 24 (resonance metrics)
+        cra_resonance_values = []
+        if avg_resonance_index is not None:  # Phase 3
+            cra_resonance_values.append(avg_resonance_index)
+        if avg_guna_resonance is not None:  # Phase 8
+            cra_resonance_values.append(avg_guna_resonance)
+        if avg_kosha_resonance is not None:  # Phase 8
+            cra_resonance_values.append(avg_kosha_resonance)
+        if avg_resonance_entropy_val is not None:  # Phase 24
+            # Invert entropy: lower entropy = better resonance
+            cra_resonance_values.append(1.0 - avg_resonance_entropy_val)
+
+        if cra_resonance_values:
+            avg_cra_resonance_val = sum(cra_resonance_values) / len(cra_resonance_values)
+
+        # Extract CRA alignment from Phases 3, 21, 22, 42, 44, 47 (alignment metrics)
+        cra_alignment_values = []
+        if avg_arc_alignment_index is not None:  # Phase 3
+            cra_alignment_values.append(avg_arc_alignment_index)
+        if avg_loop_alignment is not None:  # Phase 21
+            cra_alignment_values.append(avg_loop_alignment)
+        if avg_cycle_alignment is not None:  # Phase 22
+            cra_alignment_values.append(avg_cycle_alignment)
+        if avg_scenario_alignment_val is not None:  # Phase 42
+            cra_alignment_values.append(avg_scenario_alignment_val)
+        if avg_csae_alignment_val is not None:  # Phase 44
+            cra_alignment_values.append(avg_csae_alignment_val)
+        if avg_synthesis_alignment_val is not None:  # Phase 47
+            cra_alignment_values.append(avg_synthesis_alignment_val)
+
+        if cra_alignment_values:
+            avg_cra_alignment_val = sum(cra_alignment_values) / len(cra_alignment_values)
+
+        # Extract CRA stability from Phases 23, 26, 45, 46, 47, 48, 49 (stability metrics)
+        cra_stability_values = []
+        if cause_chain_stability_avg_val is not None:  # Phase 23
+            cra_stability_values.append(cause_chain_stability_avg_val)
+        if avg_csi_val is not None:  # Phase 26 - Consciousness Stability Index
+            cra_stability_values.append(avg_csi_val)
+        if avg_tsi_val > 0.0:  # Phase 45 - Trajectory Stability Index
+            cra_stability_values.append(avg_tsi_val)
+        if avg_trajectory_stability_val is not None:  # Phase 46
+            cra_stability_values.append(avg_trajectory_stability_val)
+        if avg_synthesis_integrity_val is not None:  # Phase 47
+            cra_stability_values.append(avg_synthesis_integrity_val)
+        if avg_macro_stability_val is not None:  # Phase 48
+            cra_stability_values.append(avg_macro_stability_val)
+        if avg_temporal_stability_val is not None:  # Phase 49
+            cra_stability_values.append(avg_temporal_stability_val)
+
+        if cra_stability_values:
+            avg_cra_stability_val = sum(cra_stability_values) / len(cra_stability_values)
+
+        # Extract CRA consistency from Phases 27, 49, 50 (internal consistency)
+        cra_consistency_values = []
+        if avg_symbolic_harmonization_val is not None:  # Phase 27
+            cra_consistency_values.append(avg_symbolic_harmonization_val)
+        if avg_future_consistency_val is not None:  # Phase 49
+            cra_consistency_values.append(avg_future_consistency_val)
+        if avg_internal_consistency_strength_val is not None:  # Phase 50
+            cra_consistency_values.append(avg_internal_consistency_strength_val)
+        if avg_regression_alignment_val is not None:  # Phase 50 - Cross-layer regression alignment
+            cra_consistency_values.append(avg_regression_alignment_val)
+
+        if cra_consistency_values:
+            avg_cra_consistency_val = sum(cra_consistency_values) / len(cra_consistency_values)
+
+        # Determine dominant_cra_band based on overall CRA metrics
+        cra_overall_values = []
+        if avg_cra_resonance_val is not None:
+            cra_overall_values.append(avg_cra_resonance_val)
+        if avg_cra_alignment_val is not None:
+            cra_overall_values.append(avg_cra_alignment_val)
+        if avg_cra_stability_val is not None:
+            cra_overall_values.append(avg_cra_stability_val)
+        if avg_cra_consistency_val is not None:
+            cra_overall_values.append(avg_cra_consistency_val)
+
+        if cra_overall_values:
+            avg_cra_overall = sum(cra_overall_values) / len(cra_overall_values)
+            if avg_cra_overall >= 0.70:
+                dominant_cra_band_val = "HIGH_ALIGNMENT"
+            elif avg_cra_overall >= 0.40:
+                dominant_cra_band_val = "MEDIUM_ALIGNMENT"
+            else:
+                dominant_cra_band_val = "LOW_ALIGNMENT"
+
+        # Aggregate CRA pattern tags from implemented phases (diagnostic tags)
+        all_cra_tags = []
+        if inversion_pattern_tags:  # Phase 23
+            all_cra_tags.extend(inversion_pattern_tags)
+        if resonance_weighting_notes_list:  # Phase 24
+            all_cra_tags.extend(resonance_weighting_notes_list)
+        if ucf_notes_list:  # Phase 26
+            all_cra_tags.extend(ucf_notes_list)
+        if symbolic_harmonization_notes_list:  # Phase 27
+            all_cra_tags.extend(symbolic_harmonization_notes_list)
+        if regime_notes_list:  # Phase 41
+            all_cra_tags.extend(regime_notes_list)
+        if scenario_pattern_tags_list:  # Phase 42
+            all_cra_tags.extend(scenario_pattern_tags_list)
+        if csae_alignment_tags_list:  # Phase 44
+            all_cra_tags.extend(csae_alignment_tags_list)
+        if mtsf_tags_list:  # Phase 45
+            all_cra_tags.extend(mtsf_tags_list)
+        if tfce_tags_list:  # Phase 46
+            all_cra_tags.extend(tfce_tags_list)
+        if synthesis_tags_list:  # Phase 47
+            all_cra_tags.extend(synthesis_tags_list)
+        if macro_stability_tags_list:  # Phase 48
+            all_cra_tags.extend(macro_stability_tags_list)
+        if regression_consistency_tags_list:  # Phase 50
+            all_cra_tags.extend(regression_consistency_tags_list)
+
+        # Deduplicate and sort CRA tags for determinism
+        if all_cra_tags:
+            cra_pattern_tags_list = sorted(set(all_cra_tags))
+
     return SessionSummary(
         session_id=state.session_id,
         total_turns=total_turns,
@@ -2032,4 +2161,10 @@ def compute_session_summary(state: SessionState) -> SessionSummary:
         avg_rag_support_density=avg_rag_support_density_val,
         dominant_rag_band=dominant_rag_band_val,
         rag_diagnostic_tags=rag_diagnostic_tags_list,
+        avg_cra_resonance=avg_cra_resonance_val,
+        avg_cra_alignment=avg_cra_alignment_val,
+        avg_cra_stability=avg_cra_stability_val,
+        avg_cra_consistency=avg_cra_consistency_val,
+        dominant_cra_band=dominant_cra_band_val,
+        cra_pattern_tags=cra_pattern_tags_list,
     )

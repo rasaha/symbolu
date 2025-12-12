@@ -290,3 +290,11 @@ class SessionSummary:
     avg_rag_support_density: Optional[float] = None  # Average external support density [0.0, 1.0]
     dominant_rag_band: Optional[str] = None  # Most frequent band: "HIGH_ALIGNMENT" | "MEDIUM_ALIGNMENT" | "LOW_ALIGNMENT" | "CONTRADICTION"
     rag_diagnostic_tags: List[str] = field(default_factory=list)  # Collected RAG diagnostic tags (deduped, sorted)
+
+    # Phase 51 CRA (Cognitive Resonance Aggregator) - Aggregate RAG metrics (observation only)
+    avg_cra_resonance: Optional[float] = None  # Average CRA resonance (context relevance) [0.0, 1.0]
+    avg_cra_alignment: Optional[float] = None  # Average CRA alignment (evidence alignment) [0.0, 1.0]
+    avg_cra_stability: Optional[float] = None  # Average CRA stability (evidence stability) [0.0, 1.0]
+    avg_cra_consistency: Optional[float] = None  # Average CRA consistency (external support) [0.0, 1.0]
+    dominant_cra_band: Optional[str] = None  # Most frequent CRA band: "HIGH_ALIGNMENT" | "MEDIUM_ALIGNMENT" | "LOW_ALIGNMENT" | "CONTRADICTION"
+    cra_pattern_tags: List[str] = field(default_factory=list)  # Collected CRA pattern tags (deduped, sorted)
