@@ -473,6 +473,94 @@ class TestPlannerGate:
         assert ActionClass.ANALYZE not in result.selected_action_classes
         assert ActionClass.DIAGNOSE not in result.selected_action_classes
 
+    def test_intersection_safety_multi_context(self):
+        """
+        Test: Intersection safety - action must be safe for ALL clauses.
+
+        Input: "I'm worried because she seems sad."
+        Grounding:
+        - Clause 0 → REFLEXIVE (allows GROUND)
+        - Clause 1 → RELATIONAL (forbids GROUND - not in RELATIONAL_ALLOWED)
+
+        Expected:
+        - GROUND is REJECTED because it's not safe for clause 1 (RELATIONAL)
+        - ASK is ALLOWED (safe for both REFLEXIVE and RELATIONAL)
+
+        This test validates AND semantics (intersection safety).
+        Under old OR semantics, GROUND would incorrectly be allowed.
+        """
+        envelope = self.pipeline.run("I'm worried because she seems sad.")
+
+        # This sentence should split into REFLEXIVE + RELATIONAL
+        if envelope.was_split and len(envelope.clauses) == 2:
+            clause0 = envelope.clauses[0]
+            clause1 = envelope.clauses[1]
+
+            # Verify we have the expected grounding modes
+            assert clause0.selected is not None
+            assert clause1.selected is not None
+
+            # Check modes (order may vary based on splitting)
+            modes = {clause0.selected.mode, clause1.selected.mode}
+
+            if ObservationMode.REFLEXIVE in modes and ObservationMode.RELATIONAL in modes:
+                # Test GROUND action - allowed for REFLEXIVE, NOT in RELATIONAL_ALLOWED
+                result = self.gate.filter(envelope, [ActionClass.GROUND])
+
+                # GROUND must be REJECTED (intersection safety)
+                # REFLEXIVE allows GROUND, but RELATIONAL does not
+                assert ActionClass.GROUND not in result.selected_action_classes, (
+                    "GROUND should be rejected under intersection safety: "
+                    "not allowed for RELATIONAL mode"
+                )
+                assert ActionClass.GROUND in result.rejected_action_classes
+
+                # Test ASK action - allowed for BOTH modes
+                result_ask = self.gate.filter(envelope, [ActionClass.ASK])
+                assert ActionClass.ASK in result_ask.selected_action_classes, (
+                    "ASK should be allowed: safe for both REFLEXIVE and RELATIONAL"
+                )
+
+    def test_intersection_safety_rejects_mode_specific_action(self):
+        """
+        Test: Mode-specific actions are rejected if ANY clause forbids them.
+
+        CARE is allowed for REFLEXIVE but NOT in RELATIONAL_ALLOWED.
+        Under intersection safety, CARE must be rejected for MULTI_CONTEXT
+        with REFLEXIVE + RELATIONAL.
+        """
+        envelope = self.pipeline.run("I'm worried because she seems sad.")
+
+        if envelope.was_split and len(envelope.clauses) == 2:
+            modes = {c.selected.mode for c in envelope.clauses if c.selected}
+
+            if ObservationMode.REFLEXIVE in modes and ObservationMode.RELATIONAL in modes:
+                # CARE: in REFLEXIVE_ALLOWED, NOT in RELATIONAL_ALLOWED
+                result = self.gate.filter(envelope, [ActionClass.CARE])
+
+                assert ActionClass.CARE not in result.selected_action_classes, (
+                    "CARE should be rejected: not in RELATIONAL_ALLOWED"
+                )
+
+    def test_intersection_safety_allows_common_action(self):
+        """
+        Test: Actions safe for ALL modes pass through the gate.
+
+        VALIDATE is in both REFLEXIVE_ALLOWED and RELATIONAL_ALLOWED.
+        """
+        envelope = self.pipeline.run("I'm worried because she seems sad.")
+
+        if envelope.was_split and len(envelope.clauses) == 2:
+            modes = {c.selected.mode for c in envelope.clauses if c.selected}
+
+            if ObservationMode.REFLEXIVE in modes and ObservationMode.RELATIONAL in modes:
+                # VALIDATE: in both REFLEXIVE_ALLOWED and RELATIONAL_ALLOWED
+                result = self.gate.filter(envelope, [ActionClass.VALIDATE])
+
+                assert ActionClass.VALIDATE in result.selected_action_classes, (
+                    "VALIDATE should be allowed: in both REFLEXIVE and RELATIONAL allowed sets"
+                )
+
 
 class TestClarifyRenderer:
     """Tests for clarification question rendering."""

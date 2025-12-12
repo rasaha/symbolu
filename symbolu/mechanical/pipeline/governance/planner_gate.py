@@ -217,6 +217,11 @@ class PlannerGate:
         """
         Filter proposed actions based on Phase −1 grounding constraints.
 
+        Uses AND semantics (intersection safety):
+        An action is allowed ONLY if it is safe for ALL grounded clauses.
+
+        Authority flows downward; safety dominates permissiveness.
+
         Args:
             envelope: Phase −1 grounding envelope.
             proposed_actions: List of actions proposed by planner.
@@ -228,40 +233,57 @@ class PlannerGate:
         if envelope.is_blocked():
             return self._build_blocked_result(envelope)
 
+        # Handle empty clauses edge case
+        if not envelope.clauses:
+            return GatedPlanResult(
+                selected_action_classes=[],
+                rejected_action_classes={a: "no_clauses" for a in proposed_actions},
+                blocked=True,
+                blocked_reason="no_clauses_to_evaluate",
+                plan_steps=[],
+                violations=[],
+            )
+
         # Process each clause and determine allowed actions
         allowed_actions: List[ActionClass] = []
         rejected_actions: Dict[ActionClass, str] = {}
         plan_steps: List[GatedPlanStep] = []
         violations: List[Dict] = []
 
-        # For each proposed action, check against all clauses
+        # For each proposed action, check against ALL clauses (AND semantics)
         for action in proposed_actions:
-            action_allowed = False
-            rejection_reasons = []
+            # Start as allowed; any rejection makes it rejected
+            action_allowed = True
+            rejection_reasons: List[str] = []
+            rejecting_clause_indices: List[int] = []
 
+            # Check ALL clauses - action must be safe for every clause
             for clause in envelope.clauses:
                 clause_result = self._check_action_for_clause(
                     action, clause, envelope
                 )
-                if clause_result["allowed"]:
-                    action_allowed = True
-                    plan_steps.append(GatedPlanStep(
-                        action=action,
-                        target_clause_index=clause.clause_index,
-                        allowed=True,
-                    ))
-                    break
-                else:
-                    rejection_reasons.append(clause_result["reason"])
+                if not clause_result["allowed"]:
+                    action_allowed = False
+                    rejection_reasons.append(
+                        f"clause[{clause.clause_index}]:{clause_result['reason']}"
+                    )
+                    rejecting_clause_indices.append(clause.clause_index)
 
             if action_allowed:
+                # Action is safe for ALL clauses
                 allowed_actions.append(action)
+                plan_steps.append(GatedPlanStep(
+                    action=action,
+                    target_clause_index=0,  # Safe for all, target first
+                    allowed=True,
+                ))
             else:
-                reason = "; ".join(set(rejection_reasons))
+                # Action was rejected by at least one clause
+                reason = "; ".join(rejection_reasons)
                 rejected_actions[action] = reason
                 plan_steps.append(GatedPlanStep(
                     action=action,
-                    target_clause_index=0,
+                    target_clause_index=rejecting_clause_indices[0] if rejecting_clause_indices else 0,
                     allowed=False,
                     rejection_reason=reason,
                 ))
@@ -269,6 +291,7 @@ class PlannerGate:
                     "action": action.value,
                     "reason": reason,
                     "envelope_policy": envelope.overall_policy.value,
+                    "rejecting_clauses": rejecting_clause_indices,
                 })
                 self._violation_count += 1
 
