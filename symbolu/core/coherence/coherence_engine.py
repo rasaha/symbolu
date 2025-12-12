@@ -152,6 +152,13 @@ class CoherenceEngine:
                 regression_ics_history=prev_state.regression_ics_history.copy(),
                 regression_band_history=prev_state.regression_band_history.copy(),
                 regression_tags_history=prev_state.regression_tags_history.copy(),
+                rag_alignment_history=prev_state.rag_alignment_history.copy(),
+                rag_conflict_history=prev_state.rag_conflict_history.copy(),
+                rag_stability_history=prev_state.rag_stability_history.copy(),
+                rag_relevance_history=prev_state.rag_relevance_history.copy(),
+                rag_support_history=prev_state.rag_support_history.copy(),
+                rag_band_history=prev_state.rag_band_history.copy(),
+                rag_tag_history=prev_state.rag_tag_history.copy(),
             )
 
         # Append new turn data to histories
@@ -300,6 +307,9 @@ class CoherenceEngine:
 
         # Update Phase 50 cognitive consistency regression engine (observation only)
         self._update_cognitive_consistency_regression(state)
+
+        # Update Phase 51 RAG coherence validation engine (observation only)
+        self._update_rag_coherence_validation(state)
 
         return state
 
@@ -4526,3 +4536,152 @@ class CoherenceEngine:
             state.regression_ics_history.append(0.0)
             state.regression_band_history.append("")
             state.regression_tags_history.append([])
+
+    def _update_rag_coherence_validation(
+        self,
+        state: CoherenceState,
+    ) -> None:
+        """
+        Update Phase 51 RAG Coherence Validation Engine (observation only).
+
+        This method validates internal cognition (Phases 35-50) against
+        prefetched RAG evidence.
+
+        The RCVE validates:
+          - Evidence alignment (how well internal signals match RAG evidence)
+          - Evidence conflict (contradictions between cognition and RAG)
+          - Evidence stability (consistency of RAG evidence over time)
+          - Context relevance (how relevant RAG evidence is to context)
+          - External support density (how much RAG evidence supports conclusions)
+
+        The RCVE produces:
+          1. Evidence Alignment [0.0, 1.0]
+          2. Evidence Conflict Index [0.0, 1.0]
+          3. Evidence Stability [0.0, 1.0]
+          4. Context Relevance Score [0.0, 1.0]
+          5. External Support Density [0.0, 1.0]
+          6. Alignment Band: HIGH_ALIGNMENT | MEDIUM_ALIGNMENT | LOW_ALIGNMENT | CONTRADICTION
+          7. Diagnostic Tags
+
+        CRITICAL: This update runs AFTER Phase 50 to leverage all internal cognition layers.
+        CRITICAL: This is observation-only and does NOT trigger retrieval.
+
+        Args:
+            state: CoherenceState to update in place
+        """
+        from symbolu.formulas.rag_coherence_validation import (
+            compute_rag_coherence_validation
+        )
+
+        # ====================================================================
+        # STEP 1: CHECK RAG CACHE FOR PREFETCHED EVIDENCE
+        # ====================================================================
+
+        # TODO: In production, this would check a RAG cache for prefetched evidence
+        # For now, we return None (no RAG evidence available)
+        # This is a placeholder for future RAG integration
+        rag_prefetch_data = None
+
+        # In the future, this would look like:
+        # rag_prefetch_data = self._get_rag_cache(state.convo_id, state.turn_index)
+        # where _get_rag_cache returns:
+        # {
+        #     "evidence_scores": [...],
+        #     "evidence_timestamps": [...],
+        #     "evidence_context_matches": [...],
+        #     "evidence_conflicts": [...],
+        #     "evidence_support_signals": {...}
+        # }
+
+        # ====================================================================
+        # STEP 2: GATHER INTERNAL COGNITION SIGNALS FROM PHASES 35-50
+        # ====================================================================
+
+        # Build internal signals dict from Phase 35-50 state
+        internal_signals = {}
+
+        # Phase 35: Predictive Persona Drift
+        if state.drift_magnitude_history:
+            internal_signals["drift_magnitude"] = state.drift_magnitude_history[-1]
+
+        # Phase 36: Identity Resonance Memory
+        if state.ida_history:
+            internal_signals["identity_drift_anchoring"] = state.ida_history[-1]
+
+        # Phase 37: Adaptive Continuity Engine
+        if state.css_history:
+            internal_signals["continuity_stability"] = state.css_history[-1]
+
+        # Phase 38: Temporal Coherence Forecasting
+        if state.forecast_strength_history:
+            internal_signals["forecast_strength"] = state.forecast_strength_history[-1]
+
+        # Phase 39: Multi-Horizon Temporal Forecasting
+        if state.future_stability_envelope_history:
+            internal_signals["future_stability_envelope"] = state.future_stability_envelope_history[-1]
+
+        # Phase 42: Scenario Fusion Engine
+        if state.scenario_alignment_history:
+            internal_signals["scenario_alignment"] = state.scenario_alignment_history[-1]
+
+        # Phase 44: Coherence-Scenario Alignment
+        if state.scenario_alignment_score_history:
+            internal_signals["alignment_score"] = state.scenario_alignment_score_history[-1]
+
+        # Phase 46: Trajectory Field Convergence
+        if state.tfce_convergence_index_history:
+            internal_signals["convergence_index"] = state.tfce_convergence_index_history[-1]
+
+        # Phase 47: Unified Trajectory-Scenario Synthesis
+        if state.synthesis_integrity_history:
+            internal_signals["synthesis_integrity"] = state.synthesis_integrity_history[-1]
+
+        # Phase 48: Macro-Stability Regulator
+        if state.macro_stability_index_history:
+            internal_signals["macro_stability_index"] = state.macro_stability_index_history[-1]
+
+        # Phase 49: Unified Cross-Phase Temporal Stability
+        if state.temporal_stability_index_history:
+            internal_signals["temporal_stability_index"] = state.temporal_stability_index_history[-1]
+
+        # Phase 50: Cognitive Consistency Regression Engine
+        if state.regression_ics_history:
+            internal_signals["internal_consistency_strength"] = state.regression_ics_history[-1]
+
+        # ====================================================================
+        # STEP 3: COMPUTE RAG COHERENCE VALIDATION
+        # ====================================================================
+
+        snapshot = compute_rag_coherence_validation(
+            internal_signals=internal_signals,
+            rag_prefetch_data=rag_prefetch_data,
+        )
+
+        # ====================================================================
+        # STEP 4: STORE RESULTS IN STATE
+        # ====================================================================
+
+        if snapshot is not None:
+            # Update current snapshot
+            state.rag_validation_snapshot = snapshot
+
+            # Append to histories
+            state.rag_alignment_history.append(snapshot.evidence_alignment)
+            state.rag_conflict_history.append(snapshot.evidence_conflict_index)
+            state.rag_stability_history.append(snapshot.evidence_stability)
+            state.rag_relevance_history.append(snapshot.context_relevance_score)
+            state.rag_support_history.append(snapshot.external_support_density)
+            state.rag_band_history.append(snapshot.alignment_band)
+            state.rag_tag_history.append(snapshot.diagnostic_tags.copy() if snapshot.diagnostic_tags else [])
+        else:
+            # Snapshot computation failed (no RAG evidence available)
+            state.rag_validation_snapshot = None
+
+            # Append None/default values to maintain history alignment
+            state.rag_alignment_history.append(0.0)
+            state.rag_conflict_history.append(0.0)
+            state.rag_stability_history.append(0.0)
+            state.rag_relevance_history.append(0.0)
+            state.rag_support_history.append(0.0)
+            state.rag_band_history.append("")
+            state.rag_tag_history.append([])

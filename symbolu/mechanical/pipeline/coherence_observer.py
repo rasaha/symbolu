@@ -309,6 +309,15 @@ class CoherenceObservation:
     regression_band: Optional[str] = None  # Cognitive consistency band: "high_consistency" | "medium_consistency" | "low_consistency" | "internal_conflict"
     regression_tags: List[str] = field(default_factory=list)  # CCRE diagnostic tags
 
+    # Phase 51: RAG Coherence Validation Engine (RCVE) (observation only)
+    rag_alignment: float = 0.0  # Evidence alignment [0.0, 1.0]
+    rag_conflict: float = 0.0  # Evidence conflict index [0.0, 1.0]
+    rag_stability: float = 0.0  # Evidence stability [0.0, 1.0]
+    rag_relevance: float = 0.0  # Context relevance score [0.0, 1.0]
+    rag_support: float = 0.0  # External support density [0.0, 1.0]
+    rag_band: Optional[str] = None  # RAG alignment band: "HIGH_ALIGNMENT" | "MEDIUM_ALIGNMENT" | "LOW_ALIGNMENT" | "CONTRADICTION"
+    rag_tags: List[str] = field(default_factory=list)  # RCVE diagnostic tags
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return asdict(self)
@@ -1088,6 +1097,26 @@ class CoherenceObserver:
                 regression_band = getattr(ccre_snapshot, 'band', None)
                 regression_tags = getattr(ccre_snapshot, 'diagnostic_tags', [])
 
+        # Phase 51: Extract RAG Coherence Validation Engine (RCVE) from coherence state
+        rag_alignment = 0.0
+        rag_conflict = 0.0
+        rag_stability = 0.0
+        rag_relevance = 0.0
+        rag_support = 0.0
+        rag_band = None
+        rag_tags = []
+
+        if coherence_state is not None:
+            rcve_snapshot = getattr(coherence_state, 'rag_validation_snapshot', None)
+            if rcve_snapshot is not None:
+                rag_alignment = getattr(rcve_snapshot, 'evidence_alignment', 0.0)
+                rag_conflict = getattr(rcve_snapshot, 'evidence_conflict_index', 0.0)
+                rag_stability = getattr(rcve_snapshot, 'evidence_stability', 0.0)
+                rag_relevance = getattr(rcve_snapshot, 'context_relevance_score', 0.0)
+                rag_support = getattr(rcve_snapshot, 'external_support_density', 0.0)
+                rag_band = getattr(rcve_snapshot, 'alignment_band', None)
+                rag_tags = getattr(rcve_snapshot, 'diagnostic_tags', [])
+
         # Create observation
         observation = CoherenceObservation(
             coherence_score=coherence_score,
@@ -1304,6 +1333,13 @@ class CoherenceObserver:
             regression_ics=regression_ics,  # Phase 50
             regression_band=regression_band,  # Phase 50
             regression_tags=regression_tags,  # Phase 50
+            rag_alignment=rag_alignment,  # Phase 51
+            rag_conflict=rag_conflict,  # Phase 51
+            rag_stability=rag_stability,  # Phase 51
+            rag_relevance=rag_relevance,  # Phase 51
+            rag_support=rag_support,  # Phase 51
+            rag_band=rag_band,  # Phase 51
+            rag_tags=rag_tags,  # Phase 51
         )
 
         # Store observation

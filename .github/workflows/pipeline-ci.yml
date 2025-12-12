@@ -40,6 +40,8 @@ on:
       - "tests/test_phase49_unified_temporal_stability.py"
       - "tests/test_phase50_cognitive_consistency_regression.py"
       - "symbolu/formulas/cognitive_consistency_regression.py"
+      - "tests/test_phase51_rag_coherence_validation.py"
+      - "symbolu/formulas/rag_coherence_validation.py"
       - "symbolu/tools/scenario_simulator/**"
       - "tests/test_phase43_scenario_simulator.py"
       - "tests/test_phase*_invariance_audit.py"
@@ -95,6 +97,8 @@ on:
       - "tests/test_phase49_unified_temporal_stability.py"
       - "tests/test_phase50_cognitive_consistency_regression.py"
       - "symbolu/formulas/cognitive_consistency_regression.py"
+      - "tests/test_phase51_rag_coherence_validation.py"
+      - "symbolu/formulas/rag_coherence_validation.py"
       - "symbolu/tools/scenario_simulator/**"
       - "tests/test_phase43_scenario_simulator.py"
       - "tests/test_phase*_invariance_audit.py"
@@ -838,7 +842,21 @@ jobs:
           name: phase50-ccre-log
           path: phase50-ccre.log
 
-      - name: Run ALL Invariance Audit Tests (Phases 27-50)
+      - name: Run Phase 51 RAG Coherence Validation Engine Tests
+        run: |
+          pytest tests/test_phase51_rag_coherence_validation.py \
+            --disable-warnings -q \
+            --maxfail=1 \
+            2>&1 | tee phase51-rcve.log
+
+      - name: Upload Phase 51 Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase51-rcve-log
+          path: phase51-rcve.log
+
+      - name: Run ALL Invariance Audit Tests (Phases 27-51)
         run: |
           pytest -vv \
             tests/test_phase27_invariance_audit.py \
@@ -880,6 +898,7 @@ jobs:
           echo "✅ Phase 48: Macro-Stability Regulator invariants verified"
           echo "✅ Phase 49: Unified Temporal Stability Engine invariants verified"
           echo "✅ Phase 50: Cognitive Consistency Regression Engine invariants verified"
+          echo "✅ Phase 51: RAG Coherence Validation Engine invariants verified"
           echo "✅ =========================================="
           echo "✅ All formulas remain stable and deterministic!"
           echo "✅ No regressions detected in system invariants."
