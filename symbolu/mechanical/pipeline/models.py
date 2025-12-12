@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from symbolu.core.coherence import CoherenceState
     from symbolu.mechanical.pipeline.grounding.phase_minus_one_schema import PhaseMinusOneEnvelope
+    from symbolu.mechanical.pipeline.phase_zero.phase_zero_schema import IntentEnvelope
 
 
 @dataclass
@@ -237,6 +238,7 @@ class PipelineContext:
         persona: PersonaContext after persona resolution.
         mlcr: MlcrResult after MLCR routing.
         phase_minus_one: PhaseMinusOneEnvelope from Phase −1 grounding analysis.
+        phase_zero: IntentEnvelope from Phase 0 intent resolution.
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
         lam_map: Optional LongArcMap from LAM engine (when use_lam=True or long_arc_tension high).
@@ -253,6 +255,7 @@ class PipelineContext:
     persona: Optional[PersonaContext] = None
     mlcr: Optional[MlcrResult] = None
     phase_minus_one: Optional["PhaseMinusOneEnvelope"] = None  # Phase −1 grounding envelope
+    phase_zero: Optional["IntentEnvelope"] = None  # Phase 0 intent envelope
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -290,6 +293,12 @@ class PipelineContext:
                 "overall_policy": self.phase_minus_one.overall_policy.value if self.phase_minus_one else None,
                 "clause_count": len(self.phase_minus_one.clauses) if self.phase_minus_one else 0,
                 "is_blocked": self.phase_minus_one.is_blocked() if self.phase_minus_one else False,
+            },
+            "phase_zero": {
+                "has_envelope": self.phase_zero is not None,
+                "intent_type": self.phase_zero.intent_type.value if self.phase_zero else None,
+                "response_posture": self.phase_zero.response_posture.value if self.phase_zero else None,
+                "planning_allowed": self.phase_zero.planning_allowed if self.phase_zero else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
