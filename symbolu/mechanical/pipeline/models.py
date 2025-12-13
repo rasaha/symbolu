@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p15_interaction.p15_interaction_schema import InteractionDirective
     from symbolu.mechanical.pipeline.p17_semantic_integrity.p17_schema import P17IntegrityReport
     from symbolu.mechanical.pipeline.p18_temporal_entropy.p18_schema import P18TemporalEntropyReport
+    from symbolu.mechanical.pipeline.p20_snapshot.p20_unified_snapshot_schema import UnifiedCognitiveSnapshot
 
 
 @dataclass
@@ -300,6 +301,7 @@ class PipelineContext:
     p16_guard_result: Optional[Any] = None  # P16 regression guard result
     p17: Optional["P17IntegrityReport"] = None  # P17 semantic integrity report (observation-only)
     p18: Optional["P18TemporalEntropyReport"] = None  # P18 temporal entropy differential (observation-only)
+    phase_20_snapshot: Optional["UnifiedCognitiveSnapshot"] = None  # P20 unified cognitive snapshot (read-only observability)
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -502,6 +504,15 @@ class PipelineContext:
                 "delta_entropy": self.p18.delta_entropy if self.p18 else None,
                 "trend": self.p18.trend.value if self.p18 else None,
                 "volatility_band": self.p18.volatility_band.value if self.p18 else None,
+            },
+            "p20": {
+                "has_snapshot": self.phase_20_snapshot is not None,
+                "run_id": self.phase_20_snapshot.run_id if self.phase_20_snapshot else None,
+                "coherence_v3": self.phase_20_snapshot.coherence_v3 if self.phase_20_snapshot else None,
+                "drift_fusion_index": self.phase_20_snapshot.drift_fusion_index if self.phase_20_snapshot else None,
+                "drift_risk_band": self.phase_20_snapshot.drift_risk_band if self.phase_20_snapshot else None,
+                "semantic_integrity": self.phase_20_snapshot.semantic_integrity if self.phase_20_snapshot else None,
+                "phase_count": self.phase_20_snapshot.phase_count() if self.phase_20_snapshot else 0,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
