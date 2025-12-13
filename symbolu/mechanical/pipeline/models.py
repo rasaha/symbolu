@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from symbolu.core.coherence import CoherenceState
     from symbolu.mechanical.pipeline.grounding.phase_minus_one_schema import PhaseMinusOneEnvelope
     from symbolu.mechanical.pipeline.phase_zero.phase_zero_schema import IntentEnvelope
+    from symbolu.mechanical.pipeline.phase_one.phase_one_schema import AllowedActionSet
 
 
 @dataclass
@@ -239,6 +240,7 @@ class PipelineContext:
         mlcr: MlcrResult after MLCR routing.
         phase_minus_one: PhaseMinusOneEnvelope from Phase −1 grounding analysis.
         phase_zero: IntentEnvelope from Phase 0 intent resolution.
+        allowed_actions: AllowedActionSet from Phase 1 action binding.
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
         lam_map: Optional LongArcMap from LAM engine (when use_lam=True or long_arc_tension high).
@@ -256,6 +258,7 @@ class PipelineContext:
     mlcr: Optional[MlcrResult] = None
     phase_minus_one: Optional["PhaseMinusOneEnvelope"] = None  # Phase −1 grounding envelope
     phase_zero: Optional["IntentEnvelope"] = None  # Phase 0 intent envelope
+    allowed_actions: Optional["AllowedActionSet"] = None  # Phase 1 allowed action set
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -299,6 +302,13 @@ class PipelineContext:
                 "intent_type": self.phase_zero.intent_type.value if self.phase_zero else None,
                 "response_posture": self.phase_zero.response_posture.value if self.phase_zero else None,
                 "planning_allowed": self.phase_zero.planning_allowed if self.phase_zero else None,
+            },
+            "phase_one": {
+                "has_allowed_actions": self.allowed_actions is not None,
+                "intent_type": self.allowed_actions.intent_type.value if self.allowed_actions else None,
+                "action_count": self.allowed_actions.count() if self.allowed_actions else 0,
+                "is_empty": self.allowed_actions.is_empty() if self.allowed_actions else None,
+                "allowed_actions": sorted([a.value for a in self.allowed_actions.allowed_actions]) if self.allowed_actions else [],
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
