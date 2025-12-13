@@ -382,6 +382,21 @@ Final Response
 - CI-enforced behavioral locking
 - Fully reproducible outputs
 
+## **11.1 Authority Separation Invariant**
+
+PO phases and P6–P9 govern meaning and authority.
+Acoustic realization is strictly post-lexical and deferred.
+
+This means:
+- **PO1–PO3**: Pre-acoustic governance (grounding, intent, action binding)
+- **P6–P9**: Semantic and lexical decision layers (regime, discourse, slots, words)
+- **P10+**: Post-lexical acoustic realization (future, not yet implemented)
+
+Phonetic and acoustic processing will never influence meaning, intent, or word choice.
+All acoustic formulas are foundational and dormant until post-lexical integration.
+
+See: `docs/ACOUSTIC_TOKENIZATION_STATUS.md`
+
 ---
 
 # **12. Backward Compatibility**

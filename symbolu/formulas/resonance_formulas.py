@@ -13,6 +13,19 @@ This module implements the four foundational formulas:
 All formulas are deterministic with placeholder coefficients until
 final patent constants are inserted.
 
+ARCHITECTURAL NOTE:
+    This module contains foundational formulas for future acoustic realization
+    layers. It does NOT participate in live cognition. These formulas are:
+
+    - Dormant: Not connected to the live pipeline
+    - Foundational: Mathematical primitives for future P10+ layers
+    - Non-semantic: They do not influence intent, regime, or lexical decisions
+
+    PO phases and P6-P9 govern meaning and authority.
+    Acoustic realization is strictly post-lexical and deferred.
+
+    See: docs/ACOUSTIC_TOKENIZATION_STATUS.md
+
 Version: 1.0 (Phase 1)
 Date: 2025-12-09
 """
