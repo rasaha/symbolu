@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p9_lexical.p9_lexical_schema import LexicalFrame
     from symbolu.mechanical.pipeline.p10_acoustic.p10_acoustic_schema import AcousticParameterFrame
     from symbolu.mechanical.pipeline.p11_prosodic.p11_prosodic_schema import ProsodicEvidenceFrame
+    from symbolu.mechanical.pipeline.p12_consistency.p12_consistency_schema import P12ConsistencyReport
 
 
 @dataclass
@@ -257,6 +258,7 @@ class PipelineContext:
         lexical_frame: LexicalFrame from P9 lexical selection engine (gating-only).
         p10_acoustic: AcousticParameterFrame from P10 acoustic parameterization (gating-only).
         p11_prosodic_evidence: ProsodicEvidenceFrame from P11 prosodic evidence capture (witness-only).
+        p12_consistency: P12ConsistencyReport from P12 consistency validation (audit-only).
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
         lam_map: Optional LongArcMap from LAM engine (when use_lam=True or long_arc_tension high).
@@ -283,6 +285,7 @@ class PipelineContext:
     lexical_frame: Optional["LexicalFrame"] = None  # P9 lexical selection frame
     p10_acoustic: Optional["AcousticParameterFrame"] = None  # P10 acoustic parameterization frame
     p11_prosodic_evidence: Optional["ProsodicEvidenceFrame"] = None  # P11 prosodic evidence frame
+    p12_consistency: Optional["P12ConsistencyReport"] = None  # P12 consistency validation report
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -403,6 +406,18 @@ class PipelineContext:
                 "source_discourse_act": self.p11_prosodic_evidence.source_discourse_act if self.p11_prosodic_evidence else None,
                 "source_p10_version": self.p11_prosodic_evidence.source_p10_version if self.p11_prosodic_evidence else None,
                 "timestamp_utc": self.p11_prosodic_evidence.timestamp_utc if self.p11_prosodic_evidence else None,
+            },
+            "p12": {
+                "has_consistency_report": self.p12_consistency is not None,
+                "is_consistent": self.p12_consistency.is_consistent if self.p12_consistency else None,
+                "violation_count": self.p12_consistency.violation_count() if self.p12_consistency else 0,
+                "warning_count": self.p12_consistency.warning_count() if self.p12_consistency else 0,
+                "has_critical": self.p12_consistency.has_critical_violations() if self.p12_consistency else False,
+                "has_major": self.p12_consistency.has_major_violations() if self.p12_consistency else False,
+                "checked_invariants": len(self.p12_consistency.checked_invariants) if self.p12_consistency else 0,
+                "source_regime": self.p12_consistency.source_regime if self.p12_consistency else None,
+                "source_discourse_act": self.p12_consistency.source_discourse_act if self.p12_consistency else None,
+                "timestamp_utc": self.p12_consistency.timestamp_utc if self.p12_consistency else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
