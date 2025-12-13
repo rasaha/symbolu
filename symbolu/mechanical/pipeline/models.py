@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p11_prosodic.p11_prosodic_schema import ProsodicEvidenceFrame
     from symbolu.mechanical.pipeline.p12_consistency.p12_consistency_schema import P12ConsistencyReport
     from symbolu.mechanical.pipeline.p13_acoustic_safety.p13_acoustic_safety_schema import AcousticSafetyEnvelope
+    from symbolu.mechanical.pipeline.p14_surface.p14_surface_schema import SurfacePlan
 
 
 @dataclass
@@ -261,6 +262,7 @@ class PipelineContext:
         p11_prosodic_evidence: ProsodicEvidenceFrame from P11 prosodic evidence capture (witness-only).
         p12_consistency: P12ConsistencyReport from P12 consistency validation (audit-only).
         p13_safety_envelope: AcousticSafetyEnvelope from P13 acoustic safety (binding).
+        p14_surface: SurfacePlan from P14 expression surface realizer (surface-shaping).
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
         lam_map: Optional LongArcMap from LAM engine (when use_lam=True or long_arc_tension high).
@@ -289,6 +291,7 @@ class PipelineContext:
     p11_prosodic_evidence: Optional["ProsodicEvidenceFrame"] = None  # P11 prosodic evidence frame
     p12_consistency: Optional["P12ConsistencyReport"] = None  # P12 consistency validation report
     p13_safety_envelope: Optional["AcousticSafetyEnvelope"] = None  # P13 acoustic safety envelope (binding)
+    p14_surface: Optional["SurfacePlan"] = None  # P14 expression surface plan (surface-shaping)
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -435,6 +438,24 @@ class PipelineContext:
                 "source_regime": self.p13_safety_envelope.source_regime if self.p13_safety_envelope else None,
                 "source_discourse_act": self.p13_safety_envelope.source_discourse_act if self.p13_safety_envelope else None,
                 "timestamp_utc": self.p13_safety_envelope.timestamp_utc if self.p13_safety_envelope else None,
+            },
+            "p14": {
+                "has_surface_plan": self.p14_surface is not None,
+                "style": self.p14_surface.style.value if self.p14_surface else None,
+                "punctuation": self.p14_surface.punctuation.value if self.p14_surface else None,
+                "hedging": self.p14_surface.hedging.value if self.p14_surface else None,
+                "length": self.p14_surface.length.value if self.p14_surface else None,
+                "persona_signals": self.p14_surface.persona_signals.value if self.p14_surface else None,
+                "requires_question": self.p14_surface.requires_question if self.p14_surface else True,
+                "is_deferral": self.p14_surface.is_deferral() if self.p14_surface else True,
+                "allows_exclamation": self.p14_surface.allows_exclamation() if self.p14_surface else False,
+                "allows_bullets": self.p14_surface.allows_bullets() if self.p14_surface else False,
+                "max_sentences": self.p14_surface.get_max_sentences() if self.p14_surface else 1,
+                "connector_count": len(self.p14_surface.allowed_connectors) if self.p14_surface else 0,
+                "forbidden_count": len(self.p14_surface.forbidden_tokens) if self.p14_surface else 0,
+                "source_regime": self.p14_surface.source_regime if self.p14_surface else None,
+                "source_discourse_act": self.p14_surface.source_discourse_act if self.p14_surface else None,
+                "timestamp_utc": self.p14_surface.timestamp_utc if self.p14_surface else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
