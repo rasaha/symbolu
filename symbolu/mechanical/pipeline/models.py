@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p10_acoustic.p10_acoustic_schema import AcousticParameterFrame
     from symbolu.mechanical.pipeline.p11_prosodic.p11_prosodic_schema import ProsodicEvidenceFrame
     from symbolu.mechanical.pipeline.p12_consistency.p12_consistency_schema import P12ConsistencyReport
+    from symbolu.mechanical.pipeline.p13_acoustic_safety.p13_acoustic_safety_schema import AcousticSafetyEnvelope
 
 
 @dataclass
@@ -259,6 +260,7 @@ class PipelineContext:
         p10_acoustic: AcousticParameterFrame from P10 acoustic parameterization (gating-only).
         p11_prosodic_evidence: ProsodicEvidenceFrame from P11 prosodic evidence capture (witness-only).
         p12_consistency: P12ConsistencyReport from P12 consistency validation (audit-only).
+        p13_safety_envelope: AcousticSafetyEnvelope from P13 acoustic safety (binding).
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
         lam_map: Optional LongArcMap from LAM engine (when use_lam=True or long_arc_tension high).
@@ -286,6 +288,7 @@ class PipelineContext:
     p10_acoustic: Optional["AcousticParameterFrame"] = None  # P10 acoustic parameterization frame
     p11_prosodic_evidence: Optional["ProsodicEvidenceFrame"] = None  # P11 prosodic evidence frame
     p12_consistency: Optional["P12ConsistencyReport"] = None  # P12 consistency validation report
+    p13_safety_envelope: Optional["AcousticSafetyEnvelope"] = None  # P13 acoustic safety envelope (binding)
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -418,6 +421,20 @@ class PipelineContext:
                 "source_regime": self.p12_consistency.source_regime if self.p12_consistency else None,
                 "source_discourse_act": self.p12_consistency.source_discourse_act if self.p12_consistency else None,
                 "timestamp_utc": self.p12_consistency.timestamp_utc if self.p12_consistency else None,
+            },
+            "p13": {
+                "has_safety_envelope": self.p13_safety_envelope is not None,
+                "risk_level": self.p13_safety_envelope.risk_level.value if self.p13_safety_envelope else None,
+                "is_safe": self.p13_safety_envelope.is_safe() if self.p13_safety_envelope else False,
+                "is_blocked": self.p13_safety_envelope.is_blocked() if self.p13_safety_envelope else True,
+                "has_violations": self.p13_safety_envelope.has_violations() if self.p13_safety_envelope else False,
+                "violation_count": len(self.p13_safety_envelope.violations) if self.p13_safety_envelope else 0,
+                "allow_emphasis": self.p13_safety_envelope.allow_emphasis if self.p13_safety_envelope else False,
+                "allow_pitch_contours": self.p13_safety_envelope.allow_pitch_contours if self.p13_safety_envelope else False,
+                "is_fully_restricted": self.p13_safety_envelope.is_fully_restricted() if self.p13_safety_envelope else True,
+                "source_regime": self.p13_safety_envelope.source_regime if self.p13_safety_envelope else None,
+                "source_discourse_act": self.p13_safety_envelope.source_discourse_act if self.p13_safety_envelope else None,
+                "timestamp_utc": self.p13_safety_envelope.timestamp_utc if self.p13_safety_envelope else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
