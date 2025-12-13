@@ -28,6 +28,8 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.phase_po5.po5_schema import ExecutionEligibilityEnvelope
     from symbolu.mechanical.pipeline.phase_p6.p6_schema import RegimeEnvelope
     from symbolu.mechanical.pipeline.p7_discourse.p7_discourse_schema import DiscourseEnvelope
+    from symbolu.mechanical.pipeline.p8_semantics.p8_semantic_schema import SemanticFrame
+    from symbolu.mechanical.pipeline.p9_lexical.p9_lexical_schema import LexicalFrame
 
 
 @dataclass
@@ -249,6 +251,8 @@ class PipelineContext:
         po5_execution_eligibility: ExecutionEligibilityEnvelope from PO5 execution gate (non-actuating).
         p6_regime: RegimeEnvelope from P6 regime selection gate (gating-only).
         p7_discourse_envelope: DiscourseEnvelope from P7 discourse act resolver (gating-only).
+        semantic_frame: SemanticFrame from P8 semantic slot resolver (gating-only).
+        lexical_frame: LexicalFrame from P9 lexical selection engine (gating-only).
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
         lam_map: Optional LongArcMap from LAM engine (when use_lam=True or long_arc_tension high).
@@ -271,6 +275,8 @@ class PipelineContext:
     po5_execution_eligibility: Optional["ExecutionEligibilityEnvelope"] = None  # PO5 execution eligibility envelope
     p6_regime: Optional["RegimeEnvelope"] = None  # P6 regime selection envelope
     p7_discourse_envelope: Optional["DiscourseEnvelope"] = None  # P7 discourse act envelope
+    semantic_frame: Optional["SemanticFrame"] = None  # P8 semantic slot resolution frame
+    lexical_frame: Optional["LexicalFrame"] = None  # P9 lexical selection frame
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -353,6 +359,23 @@ class PipelineContext:
                 "intent": self.p7_discourse_envelope.intent.value if self.p7_discourse_envelope else None,
                 "regime": self.p7_discourse_envelope.regime.value if self.p7_discourse_envelope else None,
                 "reason": self.p7_discourse_envelope.reason if self.p7_discourse_envelope else None,
+            },
+            "p8": {
+                "has_semantic_frame": self.semantic_frame is not None,
+                "discourse_act": self.semantic_frame.discourse_act.value if self.semantic_frame else None,
+                "allowed": self.semantic_frame.allowed if self.semantic_frame else None,
+                "slot_count": len(self.semantic_frame.slots) if self.semantic_frame else 0,
+                "populated_count": len(self.semantic_frame.get_populated_slots()) if self.semantic_frame else 0,
+                "reason": self.semantic_frame.reason if self.semantic_frame else None,
+            },
+            "p9": {
+                "has_lexical_frame": self.lexical_frame is not None,
+                "allowed": self.lexical_frame.allowed if self.lexical_frame else None,
+                "selection_count": self.lexical_frame.count() if self.lexical_frame else 0,
+                "is_empty": self.lexical_frame.is_empty() if self.lexical_frame else True,
+                "source_discourse_act": self.lexical_frame.source_discourse_act if self.lexical_frame else None,
+                "source_regime": self.lexical_frame.source_regime if self.lexical_frame else None,
+                "reason": self.lexical_frame.reason if self.lexical_frame else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
