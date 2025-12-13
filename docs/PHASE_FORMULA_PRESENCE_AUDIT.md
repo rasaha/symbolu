@@ -284,3 +284,21 @@ These phases introduce new mathematical formulas that compute numeric scores aff
 **Phases NOT requiring formula-level invariance audits:**
 - Phase 2, 9, 11, 28, 29: Use existing formulas (may need integration/activation tests)
 - Phase 5, 6, 7, 15, 20, 30, 31: Structural/presentation phases (behavioral tests sufficient)
+
+---
+
+## Formula File Locations (Complete Paths)
+
+| Phase | Formula | File Path |
+|-------|---------|-----------|
+| 3 | `resonance_index`, `tension_index`, `arc_alignment_index` | `symbolu/core/coherence/coherence_engine.py` |
+| 4 | `coherence_score_v2` | `symbolu/core/coherence/coherence_engine.py` |
+| 10 | `coherence_score_v3` | `symbolu/core/coherence/coherence_engine.py` |
+| 12 | `coherence_v3_quality` | `symbolu/core/coherence/coherence_engine.py` |
+| 32 | `insight_depth` | `symbolu/policy/insight_window_gating.py` |
+| 33 | `schema_alignment_scores`, `schema_drift`, `schema_stability` | `symbolu/mechanical/persona/schema_adaptive_routing.py` |
+
+**Summary by location:**
+- `symbolu/core/coherence/coherence_engine.py` — Phases 3, 4, 10, 12 (core coherence formulas)
+- `symbolu/policy/insight_window_gating.py` — Phase 32 (gating formula)
+- `symbolu/mechanical/persona/schema_adaptive_routing.py` — Phase 33 (persona schema formulas)
