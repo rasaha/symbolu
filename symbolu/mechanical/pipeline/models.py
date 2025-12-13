@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p12_consistency.p12_consistency_schema import P12ConsistencyReport
     from symbolu.mechanical.pipeline.p13_acoustic_safety.p13_acoustic_safety_schema import AcousticSafetyEnvelope
     from symbolu.mechanical.pipeline.p14_surface.p14_surface_schema import SurfacePlan
+    from symbolu.mechanical.pipeline.p15_interaction.p15_interaction_schema import InteractionDirective
 
 
 @dataclass
@@ -263,6 +264,7 @@ class PipelineContext:
         p12_consistency: P12ConsistencyReport from P12 consistency validation (audit-only).
         p13_safety_envelope: AcousticSafetyEnvelope from P13 acoustic safety (binding).
         p14_surface: SurfacePlan from P14 expression surface realizer (surface-shaping).
+        interaction_directive: InteractionDirective from P15 interaction mode resolver (posture-only).
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
         lam_map: Optional LongArcMap from LAM engine (when use_lam=True or long_arc_tension high).
@@ -292,6 +294,7 @@ class PipelineContext:
     p12_consistency: Optional["P12ConsistencyReport"] = None  # P12 consistency validation report
     p13_safety_envelope: Optional["AcousticSafetyEnvelope"] = None  # P13 acoustic safety envelope (binding)
     p14_surface: Optional["SurfacePlan"] = None  # P14 expression surface plan (surface-shaping)
+    interaction_directive: Optional["InteractionDirective"] = None  # P15 interaction mode directive (posture-only)
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -456,6 +459,23 @@ class PipelineContext:
                 "source_regime": self.p14_surface.source_regime if self.p14_surface else None,
                 "source_discourse_act": self.p14_surface.source_discourse_act if self.p14_surface else None,
                 "timestamp_utc": self.p14_surface.timestamp_utc if self.p14_surface else None,
+            },
+            "p15": {
+                "has_interaction_directive": self.interaction_directive is not None,
+                "mode": self.interaction_directive.mode.value if self.interaction_directive else None,
+                "blocked": self.interaction_directive.blocked if self.interaction_directive else None,
+                "is_read_only": self.interaction_directive.is_read_only() if self.interaction_directive else True,
+                "is_ack_only": self.interaction_directive.is_ack_only() if self.interaction_directive else False,
+                "is_supportive": self.interaction_directive.is_supportive() if self.interaction_directive else False,
+                "is_clarifying": self.interaction_directive.is_clarifying() if self.interaction_directive else False,
+                "is_informative": self.interaction_directive.is_informative() if self.interaction_directive else False,
+                "allows_questions": self.interaction_directive.allows_questions() if self.interaction_directive else False,
+                "allows_information": self.interaction_directive.allows_information() if self.interaction_directive else False,
+                "allows_support": self.interaction_directive.allows_support() if self.interaction_directive else False,
+                "source_regime": self.interaction_directive.source_regime if self.interaction_directive else None,
+                "source_discourse_act": self.interaction_directive.source_discourse_act if self.interaction_directive else None,
+                "source_grounding_mode": self.interaction_directive.source_grounding_mode if self.interaction_directive else None,
+                "timestamp_utc": self.interaction_directive.timestamp_utc if self.interaction_directive else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
