@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p14_surface.p14_surface_schema import SurfacePlan
     from symbolu.mechanical.pipeline.p15_interaction.p15_interaction_schema import InteractionDirective
     from symbolu.mechanical.pipeline.p17_semantic_integrity.p17_schema import P17IntegrityReport
+    from symbolu.mechanical.pipeline.p18_temporal_entropy.p18_schema import P18TemporalEntropyReport
 
 
 @dataclass
@@ -298,6 +299,7 @@ class PipelineContext:
     interaction_directive: Optional["InteractionDirective"] = None  # P15 interaction mode directive (posture-only)
     p16_guard_result: Optional[Any] = None  # P16 regression guard result
     p17: Optional["P17IntegrityReport"] = None  # P17 semantic integrity report (observation-only)
+    p18: Optional["P18TemporalEntropyReport"] = None  # P18 temporal entropy differential (observation-only)
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -492,6 +494,14 @@ class PipelineContext:
                 "issue_count": self.p17.issue_count() if self.p17 else 0,
                 "high_count": self.p17.high_count() if self.p17 else 0,
                 "warn_count": self.p17.warn_count() if self.p17 else 0,
+            },
+            "p18": {
+                "has_entropy_report": self.p18 is not None,
+                "entropy_now": self.p18.entropy_now if self.p18 else None,
+                "entropy_prev": self.p18.entropy_prev if self.p18 else None,
+                "delta_entropy": self.p18.delta_entropy if self.p18 else None,
+                "trend": self.p18.trend.value if self.p18 else None,
+                "volatility_band": self.p18.volatility_band.value if self.p18 else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
