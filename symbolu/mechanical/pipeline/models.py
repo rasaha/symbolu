@@ -295,6 +295,7 @@ class PipelineContext:
     p13_safety_envelope: Optional["AcousticSafetyEnvelope"] = None  # P13 acoustic safety envelope (binding)
     p14_surface: Optional["SurfacePlan"] = None  # P14 expression surface plan (surface-shaping)
     interaction_directive: Optional["InteractionDirective"] = None  # P15 interaction mode directive (posture-only)
+    p16_guard_result: Optional[Any] = None  # P16 regression guard result
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -476,6 +477,11 @@ class PipelineContext:
                 "source_discourse_act": self.interaction_directive.source_discourse_act if self.interaction_directive else None,
                 "source_grounding_mode": self.interaction_directive.source_grounding_mode if self.interaction_directive else None,
                 "timestamp_utc": self.interaction_directive.timestamp_utc if self.interaction_directive else None,
+            },
+            "p16": {
+                "has_guard_result": self.p16_guard_result is not None,
+                "passed": self.p16_guard_result.passed if self.p16_guard_result else None,
+                "violation_count": self.p16_guard_result.violation_count() if self.p16_guard_result and hasattr(self.p16_guard_result, 'violation_count') else 0,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
