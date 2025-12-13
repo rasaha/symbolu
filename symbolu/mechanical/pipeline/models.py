@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.grounding.phase_minus_one_schema import PhaseMinusOneEnvelope
     from symbolu.mechanical.pipeline.phase_zero.phase_zero_schema import IntentEnvelope
     from symbolu.mechanical.pipeline.phase_one.phase_one_schema import AllowedActionSet
+    from symbolu.mechanical.pipeline.phase_po4.po4_schema import PlannerProposalEnvelope
 
 
 @dataclass
@@ -241,6 +242,7 @@ class PipelineContext:
         phase_minus_one: PhaseMinusOneEnvelope from Phase −1 grounding analysis.
         phase_zero: IntentEnvelope from Phase 0 intent resolution.
         allowed_actions: AllowedActionSet from Phase 1 action binding.
+        po4_proposal: PlannerProposalEnvelope from PO4 planner proposal validation.
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
         lam_map: Optional LongArcMap from LAM engine (when use_lam=True or long_arc_tension high).
@@ -259,6 +261,7 @@ class PipelineContext:
     phase_minus_one: Optional["PhaseMinusOneEnvelope"] = None  # Phase −1 grounding envelope
     phase_zero: Optional["IntentEnvelope"] = None  # Phase 0 intent envelope
     allowed_actions: Optional["AllowedActionSet"] = None  # Phase 1 allowed action set
+    po4_proposal: Optional["PlannerProposalEnvelope"] = None  # PO4 planner proposal envelope
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -309,6 +312,15 @@ class PipelineContext:
                 "action_count": self.allowed_actions.count() if self.allowed_actions else 0,
                 "is_empty": self.allowed_actions.is_empty() if self.allowed_actions else None,
                 "allowed_actions": sorted([a.value for a in self.allowed_actions.allowed_actions]) if self.allowed_actions else [],
+            },
+            "po4": {
+                "has_proposal": self.po4_proposal is not None,
+                "status": self.po4_proposal.status.value if self.po4_proposal else None,
+                "intent": self.po4_proposal.intent.value if self.po4_proposal else None,
+                "allowed_count": self.po4_proposal.allowed_count() if self.po4_proposal else 0,
+                "rejected_count": self.po4_proposal.rejected_count() if self.po4_proposal else 0,
+                "proposed_count": self.po4_proposal.proposed_count() if self.po4_proposal else 0,
+                "blocked_reason": self.po4_proposal.blocked_reason if self.po4_proposal else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
