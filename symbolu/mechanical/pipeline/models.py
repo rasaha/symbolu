@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.phase_zero.phase_zero_schema import IntentEnvelope
     from symbolu.mechanical.pipeline.phase_one.phase_one_schema import AllowedActionSet
     from symbolu.mechanical.pipeline.phase_po4.po4_schema import PlannerProposalEnvelope
+    from symbolu.mechanical.pipeline.phase_po5.po5_schema import ExecutionEligibilityEnvelope
 
 
 @dataclass
@@ -243,6 +244,7 @@ class PipelineContext:
         phase_zero: IntentEnvelope from Phase 0 intent resolution.
         allowed_actions: AllowedActionSet from Phase 1 action binding.
         po4_proposal: PlannerProposalEnvelope from PO4 planner proposal validation.
+        po5_execution_eligibility: ExecutionEligibilityEnvelope from PO5 execution gate (non-actuating).
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
         lam_map: Optional LongArcMap from LAM engine (when use_lam=True or long_arc_tension high).
@@ -262,6 +264,7 @@ class PipelineContext:
     phase_zero: Optional["IntentEnvelope"] = None  # Phase 0 intent envelope
     allowed_actions: Optional["AllowedActionSet"] = None  # Phase 1 allowed action set
     po4_proposal: Optional["PlannerProposalEnvelope"] = None  # PO4 planner proposal envelope
+    po5_execution_eligibility: Optional["ExecutionEligibilityEnvelope"] = None  # PO5 execution eligibility envelope
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -321,6 +324,13 @@ class PipelineContext:
                 "rejected_count": self.po4_proposal.rejected_count() if self.po4_proposal else 0,
                 "proposed_count": self.po4_proposal.proposed_count() if self.po4_proposal else 0,
                 "blocked_reason": self.po4_proposal.blocked_reason if self.po4_proposal else None,
+            },
+            "po5": {
+                "has_eligibility": self.po5_execution_eligibility is not None,
+                "eligibility": self.po5_execution_eligibility.eligibility.value if self.po5_execution_eligibility else None,
+                "intent": self.po5_execution_eligibility.intent.value if self.po5_execution_eligibility else None,
+                "proposal_status": self.po5_execution_eligibility.proposal_status.value if self.po5_execution_eligibility else None,
+                "reason": self.po5_execution_eligibility.reason if self.po5_execution_eligibility else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
