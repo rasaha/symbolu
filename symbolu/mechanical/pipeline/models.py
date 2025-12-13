@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p7_discourse.p7_discourse_schema import DiscourseEnvelope
     from symbolu.mechanical.pipeline.p8_semantics.p8_semantic_schema import SemanticFrame
     from symbolu.mechanical.pipeline.p9_lexical.p9_lexical_schema import LexicalFrame
+    from symbolu.mechanical.pipeline.p10_acoustic.p10_acoustic_schema import AcousticParameterFrame
 
 
 @dataclass
@@ -253,6 +254,7 @@ class PipelineContext:
         p7_discourse_envelope: DiscourseEnvelope from P7 discourse act resolver (gating-only).
         semantic_frame: SemanticFrame from P8 semantic slot resolver (gating-only).
         lexical_frame: LexicalFrame from P9 lexical selection engine (gating-only).
+        p10_acoustic: AcousticParameterFrame from P10 acoustic parameterization (gating-only).
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
         lam_map: Optional LongArcMap from LAM engine (when use_lam=True or long_arc_tension high).
@@ -277,6 +279,7 @@ class PipelineContext:
     p7_discourse_envelope: Optional["DiscourseEnvelope"] = None  # P7 discourse act envelope
     semantic_frame: Optional["SemanticFrame"] = None  # P8 semantic slot resolution frame
     lexical_frame: Optional["LexicalFrame"] = None  # P9 lexical selection frame
+    p10_acoustic: Optional["AcousticParameterFrame"] = None  # P10 acoustic parameterization frame
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -376,6 +379,17 @@ class PipelineContext:
                 "source_discourse_act": self.lexical_frame.source_discourse_act if self.lexical_frame else None,
                 "source_regime": self.lexical_frame.source_regime if self.lexical_frame else None,
                 "reason": self.lexical_frame.reason if self.lexical_frame else None,
+            },
+            "p10": {
+                "has_acoustic_frame": self.p10_acoustic is not None,
+                "regime": self.p10_acoustic.regime.value if self.p10_acoustic else None,
+                "speech_rate": self.p10_acoustic.speech_rate if self.p10_acoustic else None,
+                "energy_level": self.p10_acoustic.energy_level if self.p10_acoustic else None,
+                "is_flat": self.p10_acoustic.is_flat_regime() if self.p10_acoustic else True,
+                "is_suppressed": self.p10_acoustic.is_suppressed() if self.p10_acoustic else True,
+                "allows_emphasis": self.p10_acoustic.allows_emphasis() if self.p10_acoustic else False,
+                "source_regime": self.p10_acoustic.source_regime if self.p10_acoustic else None,
+                "source_discourse_act": self.p10_acoustic.source_discourse_act if self.p10_acoustic else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
