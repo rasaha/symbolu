@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p8_semantics.p8_semantic_schema import SemanticFrame
     from symbolu.mechanical.pipeline.p9_lexical.p9_lexical_schema import LexicalFrame
     from symbolu.mechanical.pipeline.p10_acoustic.p10_acoustic_schema import AcousticParameterFrame
+    from symbolu.mechanical.pipeline.p11_prosodic.p11_prosodic_schema import ProsodicEvidenceFrame
 
 
 @dataclass
@@ -255,6 +256,7 @@ class PipelineContext:
         semantic_frame: SemanticFrame from P8 semantic slot resolver (gating-only).
         lexical_frame: LexicalFrame from P9 lexical selection engine (gating-only).
         p10_acoustic: AcousticParameterFrame from P10 acoustic parameterization (gating-only).
+        p11_prosodic_evidence: ProsodicEvidenceFrame from P11 prosodic evidence capture (witness-only).
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
         lam_map: Optional LongArcMap from LAM engine (when use_lam=True or long_arc_tension high).
@@ -280,6 +282,7 @@ class PipelineContext:
     semantic_frame: Optional["SemanticFrame"] = None  # P8 semantic slot resolution frame
     lexical_frame: Optional["LexicalFrame"] = None  # P9 lexical selection frame
     p10_acoustic: Optional["AcousticParameterFrame"] = None  # P10 acoustic parameterization frame
+    p11_prosodic_evidence: Optional["ProsodicEvidenceFrame"] = None  # P11 prosodic evidence frame
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -390,6 +393,16 @@ class PipelineContext:
                 "allows_emphasis": self.p10_acoustic.allows_emphasis() if self.p10_acoustic else False,
                 "source_regime": self.p10_acoustic.source_regime if self.p10_acoustic else None,
                 "source_discourse_act": self.p10_acoustic.source_discourse_act if self.p10_acoustic else None,
+            },
+            "p11": {
+                "has_prosodic_evidence": self.p11_prosodic_evidence is not None,
+                "violations_detected": self.p11_prosodic_evidence.violations_detected if self.p11_prosodic_evidence else None,
+                "failed_invariants": self.p11_prosodic_evidence.get_failed_invariants() if self.p11_prosodic_evidence else [],
+                "is_fully_suppressed": self.p11_prosodic_evidence.is_fully_suppressed() if self.p11_prosodic_evidence else True,
+                "source_regime": self.p11_prosodic_evidence.source_regime if self.p11_prosodic_evidence else None,
+                "source_discourse_act": self.p11_prosodic_evidence.source_discourse_act if self.p11_prosodic_evidence else None,
+                "source_p10_version": self.p11_prosodic_evidence.source_p10_version if self.p11_prosodic_evidence else None,
+                "timestamp_utc": self.p11_prosodic_evidence.timestamp_utc if self.p11_prosodic_evidence else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
