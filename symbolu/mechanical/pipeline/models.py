@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p13_acoustic_safety.p13_acoustic_safety_schema import AcousticSafetyEnvelope
     from symbolu.mechanical.pipeline.p14_surface.p14_surface_schema import SurfacePlan
     from symbolu.mechanical.pipeline.p15_interaction.p15_interaction_schema import InteractionDirective
+    from symbolu.mechanical.pipeline.p17_semantic_integrity.p17_schema import P17IntegrityReport
 
 
 @dataclass
@@ -296,6 +297,7 @@ class PipelineContext:
     p14_surface: Optional["SurfacePlan"] = None  # P14 expression surface plan (surface-shaping)
     interaction_directive: Optional["InteractionDirective"] = None  # P15 interaction mode directive (posture-only)
     p16_guard_result: Optional[Any] = None  # P16 regression guard result
+    p17: Optional["P17IntegrityReport"] = None  # P17 semantic integrity report (observation-only)
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -482,6 +484,14 @@ class PipelineContext:
                 "has_guard_result": self.p16_guard_result is not None,
                 "passed": self.p16_guard_result.passed if self.p16_guard_result else None,
                 "violation_count": self.p16_guard_result.violation_count() if self.p16_guard_result and hasattr(self.p16_guard_result, 'violation_count') else 0,
+            },
+            "p17": {
+                "has_integrity_report": self.p17 is not None,
+                "is_clean": self.p17.is_clean if self.p17 else None,
+                "integrity_score": self.p17.integrity_score if self.p17 else None,
+                "issue_count": self.p17.issue_count() if self.p17 else 0,
+                "high_count": self.p17.high_count() if self.p17 else 0,
+                "warn_count": self.p17.warn_count() if self.p17 else 0,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
