@@ -1,8 +1,11 @@
-# Phase −1: Observer-Observed Grounding
+# PO1 — Observer–Observed Grounding
+*(Implemented as phase_minus_one for backward compatibility)*
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 ## Purpose
 
-Phase −1 establishes the foundational grounding context for all downstream pipeline processing. Before any semantic analysis, discourse planning, or response generation occurs, Phase −1 answers the fundamental question:
+PO1 establishes the foundational grounding context for all downstream pipeline processing. Before any semantic analysis, discourse planning, or response generation occurs, PO1 answers the fundamental question:
 
 **"WHO is being observed, and HOW is the observation framed?"**
 
@@ -18,16 +21,20 @@ This grounding is essential for:
 Authority flows DOWNWARD
 Information flows UPWARD
 
-Phase −1 (Grounding)
+PO1 (Grounding)
     ↓ [AUTHORITY: constraints are binding]
+PO2 (Intent Envelope)
+    ↓ [AUTHORITY: determines posture]
+PO3 (Action Contract)
+    ↓ [AUTHORITY: bounds eligible actions]
 PlannerGate (Governance)
     ↓ [AUTHORITY: filters actions]
 Downstream Stages
     ↑ [INFORMATION: violations reported]
-Phase −1
+PO1
 ```
 
-**Key Invariant:** Downstream stages cannot override Phase −1 constraints. They can report violations for metrics but must respect the grounding decisions.
+**Key Invariant:** Downstream stages cannot override PO1 constraints. They can report violations for metrics but must respect the grounding decisions.
 
 ## Schema
 
@@ -63,7 +70,7 @@ Phase −1
 
 ## Components
 
-### Phase −1.0: Observer-Observed Grounding (OOG)
+### PO1.0: Observer-Observed Grounding (OOG)
 
 Deterministic heuristic analysis to produce grounding candidates.
 
@@ -79,7 +86,7 @@ confidence = 0.50 + (0.10 × evidence_count)
 capped at 0.95
 ```
 
-### Phase −1.1: Ambiguity Resolver (ARL)
+### PO1.1: Ambiguity Resolver (ARL)
 
 Resolves multiple candidates using threshold-based rules.
 
@@ -94,7 +101,7 @@ Resolves multiple candidates using threshold-based rules.
 3. If confidence ≥ 0.55 and risk ≠ HIGH → SAFE_DEFAULT
 4. Otherwise → ASK_CLARIFY
 
-### Phase −1.2: Conservative Clause Splitter (CSL)
+### PO1.2: Conservative Clause Splitter (CSL)
 
 Splits compound sentences ONLY when it improves grounding.
 
@@ -169,7 +176,7 @@ If `analysis_allowed == false`, strip ANALYZE/EXPLAIN from allowed set regardles
 ```
 Input: "I am sad."
 
-Phase −1 Output:
+PO1 Output:
   overall_policy: SINGLE_CONTEXT
   clauses[0]:
     mode: REFLEXIVE
@@ -188,7 +195,7 @@ PlannerGate:
 ```
 Input: "You are sad."
 
-Phase −1 Output:
+PO1 Output:
   overall_policy: SINGLE_CONTEXT
   clauses[0]:
     mode: RELATIONAL
@@ -207,7 +214,7 @@ PlannerGate:
 ```
 Input: "Sadness is common."
 
-Phase −1 Output:
+PO1 Output:
   overall_policy: SINGLE_CONTEXT
   clauses[0]:
     mode: DETACHED
@@ -226,7 +233,7 @@ PlannerGate:
 ```
 Input: "I'm worried because she seems sad."
 
-Phase −1 Output:
+PO1 Output:
   overall_policy: MULTI_CONTEXT
   was_split: true
   clauses[0]:
@@ -244,7 +251,7 @@ Phase −1 Output:
 ```
 Input: "Feeling tired lately."
 
-Phase −1 Output:
+PO1 Output:
   overall_policy: BLOCKED
   clauses[0]:
     status: AMBIGUOUS
@@ -317,6 +324,6 @@ pytest symbolu/mechanical/pipeline/integration_tests/test_phase_minus_one_integr
 
 3. **Safety-first resolution**: When in doubt, ask for clarification rather than guessing. High projection risk forces ASK_CLARIFY.
 
-4. **Authority chain enforcement**: Downstream stages cannot override Phase −1 constraints. This is enforced by PlannerGate.
+4. **Authority chain enforcement**: Downstream stages cannot override PO1 constraints. This is enforced by PlannerGate.
 
-5. **Minimal invasive integration**: Phase −1 is added as a wrapper/pre-phase, not by refactoring existing modules.
+5. **Minimal invasive integration**: PO1 is added as a wrapper/pre-phase, not by refactoring existing modules.

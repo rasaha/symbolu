@@ -1,9 +1,11 @@
 """
 ClarifyRenderer: Deterministic Clarification Questions for BLOCKED State
 
-When Phase −1 grounding analysis results in a BLOCKED state (ambiguous
-grounding that cannot be safely resolved), this renderer produces
+When PO1 (Observer–Observed Grounding) analysis results in a BLOCKED state
+(ambiguous grounding that cannot be safely resolved), this renderer produces
 deterministic clarification questions to help establish proper grounding.
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 Design:
 - No LLM calls (fully deterministic)
@@ -121,7 +123,7 @@ class ClarifyRenderer:
         Generate a clarification question for a BLOCKED envelope.
 
         Args:
-            envelope: Phase −1 envelope with BLOCKED policy.
+            envelope: PO1 envelope with BLOCKED policy.
 
         Returns:
             ClarificationQuestion to present to user.
@@ -242,7 +244,7 @@ class ClarifyRenderer:
         Convenience method to render just the question text.
 
         Args:
-            envelope: Phase −1 envelope.
+            envelope: PO1 envelope.
 
         Returns:
             Question text string.

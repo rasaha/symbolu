@@ -1,15 +1,18 @@
 """
-Phase 1 Resolver: Intent → Allowed Action Binding
+PO3 — Intent → Allowed Action Contract Resolver
+(Implemented as phase_one for backward compatibility)
 
 Deterministic resolution from IntentEnvelope to AllowedActionSet.
 No planning, no sequencing, no optimization, no LLM calls.
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 This is an authority layer that strictly binds intent to eligible actions.
 The Planner may ONLY propose actions from the resulting AllowedActionSet.
 
 Authority Model:
-- Consumes Phase 0 IntentEnvelope (read-only)
-- Cannot override Phase 0 decisions
+- Consumes PO2 IntentEnvelope (read-only)
+- Cannot override PO2 decisions
 - Produces AllowedActionSet for Planner consumption
 - PlannerGate remains final authority on actual execution
 """
@@ -39,7 +42,7 @@ from symbolu.mechanical.pipeline.phase_one.phase_one_schema import AllowedAction
 #   - Planner may only propose actions from this set
 #   - PlannerGate remains final authority
 #
-# Note: When Phase 0 is extended with additional IntentTypes (e.g., ANALYZE,
+# Note: When PO2 is extended with additional IntentTypes (e.g., ANALYZE,
 # DEESCALATE), this mapping should be updated accordingly.
 # ============================================================================
 
@@ -87,7 +90,7 @@ class PhaseOneResolver:
     """
 
     def __init__(self) -> None:
-        """Initialize the Phase 1 resolver."""
+        """Initialize the PO3 resolver."""
         # Validate that all IntentTypes are mapped
         self._validate_mapping_coverage()
 
@@ -107,7 +110,7 @@ class PhaseOneResolver:
         The result strictly bounds what actions the Planner may propose.
 
         Args:
-            intent_envelope: The Phase 0 IntentEnvelope.
+            intent_envelope: The PO2 IntentEnvelope.
 
         Returns:
             AllowedActionSet with the eligible ActionClass values.

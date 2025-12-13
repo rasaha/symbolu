@@ -1,8 +1,11 @@
 """
-Phase 0 Resolver: Deterministic Intent & Act-Type Resolution
+PO2 — Intent Envelope & Response Posture Resolver
+(Implemented as phase_zero for backward compatibility)
 
 The PhaseZeroResolver consumes a PhaseMinusOneEnvelope and produces an IntentEnvelope.
 All resolution logic is deterministic, rule-based, with no LLM calls.
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 Resolution Rules (in order of precedence):
 1. BLOCKED → CLARIFY (no planning)
@@ -13,8 +16,8 @@ Resolution Rules (in order of precedence):
 6. Fallback → ABSTAIN
 
 Authority Model:
-- Phase 0 cannot override Phase −1 constraints
-- Phase 0 must respect BLOCKED status unconditionally
+- PO2 cannot override PO1 constraints
+- PO2 must respect BLOCKED status unconditionally
 - Conservative defaults protect against ungrounded analysis
 """
 
@@ -39,9 +42,9 @@ from .phase_zero_schema import (
 
 class PhaseZeroResolver:
     """
-    Deterministic resolver for Phase 0 intent classification.
+    Deterministic resolver for PO2 intent classification.
 
-    Takes Phase −1 grounding envelope and produces Phase 0 intent envelope.
+    Takes PO1 grounding envelope and produces PO2 intent envelope.
     All resolution is rule-based with no probabilistic logic.
 
     Usage:
@@ -51,10 +54,10 @@ class PhaseZeroResolver:
 
     def resolve(self, envelope: PhaseMinusOneEnvelope) -> IntentEnvelope:
         """
-        Resolve Phase −1 envelope to Phase 0 intent envelope.
+        Resolve PO1 envelope to PO2 intent envelope.
 
         Args:
-            envelope: PhaseMinusOneEnvelope from Phase −1 analysis.
+            envelope: PhaseMinusOneEnvelope from PO1 analysis.
 
         Returns:
             IntentEnvelope with determined intent type and response posture.
@@ -69,7 +72,7 @@ class PhaseZeroResolver:
                 planning_allowed=False,
                 phase_minus_one_policy=envelope.overall_policy,
                 mode_signals=mode_signals,
-                reason="Phase −1 BLOCKED: clarification required before proceeding",
+                reason="PO1 BLOCKED: clarification required before proceeding",
             )
 
         # Rule 2: Any clause with selected=None → CLARIFY
@@ -208,7 +211,7 @@ class PhaseZeroResolver:
         Args:
             intent_type: The resolved intent type.
             planning_allowed: Whether planning may proceed.
-            phase_minus_one_policy: The upstream Phase −1 policy.
+            phase_minus_one_policy: The upstream PO1 policy.
             mode_signals: Observation modes from input clauses.
             reason: Human-readable resolution explanation.
 

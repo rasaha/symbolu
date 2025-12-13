@@ -1,9 +1,12 @@
 """
-Phase −1 Pipeline Integration Module
+PO1 — Observer–Observed Grounding Pipeline Integration Module
+(Implemented as phase_minus_one for backward compatibility)
 
-Provides a thin shim for integrating Phase −1 (Observer-Observed Grounding)
+Provides a thin shim for integrating PO1 (Observer-Observed Grounding)
 into the Symbol-U pipeline. Called at the earliest safe entry point before
 any semantic processing.
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 Usage in orchestrator:
     from .phase_minus_one_integration import maybe_run_phase_minus_one
@@ -12,7 +15,7 @@ Usage in orchestrator:
     ctx.phase_minus_one = maybe_run_phase_minus_one(ctx)
 
 Authority Model:
-    - Phase −1 establishes grounding constraints
+    - PO1 establishes grounding constraints
     - Authority flows downward (constraints are binding on downstream stages)
     - Information flows upward (violations reported but not overridden)
 """
@@ -24,12 +27,12 @@ from symbolu.mechanical.pipeline.grounding import (
     PhaseMinusOneEnvelope,
 )
 
-# Singleton Phase −1 pipeline instance
+# Singleton PO1 pipeline instance
 _phase_minus_one_pipeline: Optional[PhaseMinusOnePipeline] = None
 
 
 def get_phase_minus_one_pipeline() -> PhaseMinusOnePipeline:
-    """Get or create the singleton Phase −1 pipeline instance."""
+    """Get or create the singleton PO1 pipeline instance."""
     global _phase_minus_one_pipeline
     if _phase_minus_one_pipeline is None:
         _phase_minus_one_pipeline = PhaseMinusOnePipeline()
@@ -38,10 +41,10 @@ def get_phase_minus_one_pipeline() -> PhaseMinusOnePipeline:
 
 def maybe_run_phase_minus_one(ctx: Any) -> Optional[PhaseMinusOneEnvelope]:
     """
-    Run Phase −1 grounding analysis on the request text.
+    Run PO1 grounding analysis on the request text.
 
     This is the main integration function to call from the pipeline orchestrator.
-    Phase −1 always runs as it provides essential grounding constraints.
+    PO1 always runs as it provides essential grounding constraints.
 
     Args:
         ctx: Pipeline context with request.
@@ -58,14 +61,14 @@ def maybe_run_phase_minus_one(ctx: Any) -> Optional[PhaseMinusOneEnvelope]:
     if not text or not text.strip():
         return None
 
-    # Run Phase −1 pipeline
+    # Run PO1 pipeline
     pipeline = get_phase_minus_one_pipeline()
     return pipeline.run(text)
 
 
 def run_phase_minus_one_directly(text: str) -> PhaseMinusOneEnvelope:
     """
-    Run Phase −1 directly with explicit text input.
+    Run PO1 directly with explicit text input.
 
     Useful for testing or standalone grounding analysis.
 
@@ -81,7 +84,7 @@ def run_phase_minus_one_directly(text: str) -> PhaseMinusOneEnvelope:
 
 def is_pipeline_blocked(ctx: Any) -> bool:
     """
-    Check if pipeline is blocked due to Phase −1 grounding.
+    Check if pipeline is blocked due to PO1 grounding.
 
     Args:
         ctx: Pipeline context.
@@ -96,7 +99,7 @@ def is_pipeline_blocked(ctx: Any) -> bool:
 
 def get_grounding_envelope(ctx: Any) -> Optional[PhaseMinusOneEnvelope]:
     """
-    Get the Phase −1 grounding envelope from context.
+    Get the PO1 grounding envelope from context.
 
     Args:
         ctx: Pipeline context.
