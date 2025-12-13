@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.phase_one.phase_one_schema import AllowedActionSet
     from symbolu.mechanical.pipeline.phase_po4.po4_schema import PlannerProposalEnvelope
     from symbolu.mechanical.pipeline.phase_po5.po5_schema import ExecutionEligibilityEnvelope
+    from symbolu.mechanical.pipeline.phase_p6.p6_schema import RegimeEnvelope
 
 
 @dataclass
@@ -245,6 +246,7 @@ class PipelineContext:
         allowed_actions: AllowedActionSet from Phase 1 action binding.
         po4_proposal: PlannerProposalEnvelope from PO4 planner proposal validation.
         po5_execution_eligibility: ExecutionEligibilityEnvelope from PO5 execution gate (non-actuating).
+        p6_regime: RegimeEnvelope from P6 regime selection gate (gating-only).
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
         lam_map: Optional LongArcMap from LAM engine (when use_lam=True or long_arc_tension high).
@@ -265,6 +267,7 @@ class PipelineContext:
     allowed_actions: Optional["AllowedActionSet"] = None  # Phase 1 allowed action set
     po4_proposal: Optional["PlannerProposalEnvelope"] = None  # PO4 planner proposal envelope
     po5_execution_eligibility: Optional["ExecutionEligibilityEnvelope"] = None  # PO5 execution eligibility envelope
+    p6_regime: Optional["RegimeEnvelope"] = None  # P6 regime selection envelope
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -331,6 +334,14 @@ class PipelineContext:
                 "intent": self.po5_execution_eligibility.intent.value if self.po5_execution_eligibility else None,
                 "proposal_status": self.po5_execution_eligibility.proposal_status.value if self.po5_execution_eligibility else None,
                 "reason": self.po5_execution_eligibility.reason if self.po5_execution_eligibility else None,
+            },
+            "p6": {
+                "has_regime": self.p6_regime is not None,
+                "regime": self.p6_regime.regime.value if self.p6_regime else None,
+                "intent": self.p6_regime.intent.value if self.p6_regime else None,
+                "execution_eligibility": self.p6_regime.execution_eligibility.value if self.p6_regime else None,
+                "coherence_regime": self.p6_regime.coherence_regime if self.p6_regime else None,
+                "reason": self.p6_regime.reason if self.p6_regime else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
