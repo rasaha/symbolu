@@ -17,7 +17,7 @@ class TestPipelineModelsSmoke:
 
     def test_user_request_creation(self) -> None:
         """Test UserRequest can be instantiated."""
-        from mechanical.pipeline.models import UserRequest
+        from symbolu.mechanical.pipeline.models import UserRequest
 
         request = UserRequest(text="Test query")
         assert request.text == "Test query"
@@ -27,7 +27,7 @@ class TestPipelineModelsSmoke:
 
     def test_user_request_with_all_fields(self) -> None:
         """Test UserRequest with all fields populated."""
-        from mechanical.pipeline.models import UserRequest
+        from symbolu.mechanical.pipeline.models import UserRequest
 
         request = UserRequest(
             text="Test query",
@@ -42,14 +42,14 @@ class TestPipelineModelsSmoke:
 
     def test_user_request_empty_text_raises(self) -> None:
         """Test UserRequest raises on empty text."""
-        from mechanical.pipeline.models import UserRequest
+        from symbolu.mechanical.pipeline.models import UserRequest
 
         with pytest.raises(ValueError):
             UserRequest(text="")
 
     def test_rendered_output_creation(self) -> None:
         """Test RenderedOutput can be instantiated."""
-        from mechanical.pipeline.models import RenderedOutput
+        from symbolu.mechanical.pipeline.models import RenderedOutput
 
         output = RenderedOutput(
             raw_text="Test output",
@@ -62,7 +62,7 @@ class TestPipelineModelsSmoke:
 
     def test_pipeline_context_creation(self) -> None:
         """Test PipelineContext can be instantiated."""
-        from mechanical.pipeline.models import UserRequest, PipelineContext
+        from symbolu.mechanical.pipeline.models import UserRequest, PipelineContext
 
         request = UserRequest(text="Test query")
         ctx = PipelineContext(request=request)
@@ -77,7 +77,7 @@ class TestPipelineModelsSmoke:
 
     def test_pipeline_context_to_dict(self) -> None:
         """Test PipelineContext serialization."""
-        from mechanical.pipeline.models import UserRequest, PipelineContext
+        from symbolu.mechanical.pipeline.models import UserRequest, PipelineContext
 
         request = UserRequest(text="Test query", user_id="user_001")
         ctx = PipelineContext(request=request)
@@ -93,15 +93,15 @@ class TestPipelineRouterSmoke:
 
     def test_router_creation(self) -> None:
         """Test PipelineRouter can be instantiated."""
-        from mechanical.pipeline.routing import PipelineRouter
+        from symbolu.mechanical.pipeline.routing import PipelineRouter
 
         router = PipelineRouter()
         assert router is not None
 
     def test_router_default_mode_is_linear(self) -> None:
         """Test router returns linear mode by default."""
-        from mechanical.pipeline.routing import PipelineRouter
-        from mechanical.pipeline.models import UserRequest, PipelineContext
+        from symbolu.mechanical.pipeline.routing import PipelineRouter
+        from symbolu.mechanical.pipeline.models import UserRequest, PipelineContext
 
         router = PipelineRouter()
         request = UserRequest(text="Test query")
@@ -112,14 +112,14 @@ class TestPipelineRouterSmoke:
 
     def test_get_default_router(self) -> None:
         """Test get_default_router factory function."""
-        from mechanical.pipeline.routing import get_default_router
+        from symbolu.mechanical.pipeline.routing import get_default_router
 
         router = get_default_router()
         assert router is not None
 
     def test_router_explain(self) -> None:
         """Test router explain method."""
-        from mechanical.pipeline.routing import PipelineRouter
+        from symbolu.mechanical.pipeline.routing import PipelineRouter
 
         router = PipelineRouter()
         explanation = router.explain("linear")
@@ -127,7 +127,7 @@ class TestPipelineRouterSmoke:
 
     def test_router_valid_modes(self) -> None:
         """Test router has expected valid modes."""
-        from mechanical.pipeline.routing import PipelineRouter
+        from symbolu.mechanical.pipeline.routing import PipelineRouter
 
         expected_modes = {"linear", "dha_first", "dual_branch", "resistance_loop", "entropy_priority"}
         assert PipelineRouter.VALID_MODES == expected_modes
@@ -138,8 +138,8 @@ class TestPipelineValidatorsSmoke:
 
     def test_validate_request_valid(self) -> None:
         """Test validate_request passes for valid request."""
-        from mechanical.pipeline.validators import validate_request
-        from mechanical.pipeline.models import UserRequest
+        from symbolu.mechanical.pipeline.validators import validate_request
+        from symbolu.mechanical.pipeline.models import UserRequest
 
         request = UserRequest(text="Test query")
         # Should not raise
@@ -147,15 +147,15 @@ class TestPipelineValidatorsSmoke:
 
     def test_validate_request_none_raises(self) -> None:
         """Test validate_request raises for None."""
-        from mechanical.pipeline.validators import validate_request
+        from symbolu.mechanical.pipeline.validators import validate_request
 
         with pytest.raises(ValueError):
             validate_request(None)
 
     def test_validate_request_invalid_render_mode(self) -> None:
         """Test validate_request raises for invalid render mode."""
-        from mechanical.pipeline.validators import validate_request
-        from mechanical.pipeline.models import UserRequest
+        from symbolu.mechanical.pipeline.validators import validate_request
+        from symbolu.mechanical.pipeline.models import UserRequest
 
         request = UserRequest(text="Test query", render_mode="invalid_mode")
         with pytest.raises(ValueError):
@@ -163,8 +163,8 @@ class TestPipelineValidatorsSmoke:
 
     def test_ensure_persona_missing(self) -> None:
         """Test ensure_persona raises when persona is None."""
-        from mechanical.pipeline.validators import ensure_persona
-        from mechanical.pipeline.models import UserRequest, PipelineContext
+        from symbolu.mechanical.pipeline.validators import ensure_persona
+        from symbolu.mechanical.pipeline.models import UserRequest, PipelineContext
 
         request = UserRequest(text="Test query")
         ctx = PipelineContext(request=request)
@@ -178,7 +178,7 @@ class TestSymbolUPipelineSmoke:
 
     def test_pipeline_instantiation(self) -> None:
         """Test SymbolUPipeline can be instantiated."""
-        from mechanical.pipeline.orchestrator import SymbolUPipeline
+        from symbolu.mechanical.pipeline.orchestrator import SymbolUPipeline
 
         pipeline = SymbolUPipeline()
         assert pipeline is not None
@@ -189,8 +189,8 @@ class TestSymbolUPipelineSmoke:
 
     def test_pipeline_with_custom_router(self) -> None:
         """Test SymbolUPipeline accepts custom router."""
-        from mechanical.pipeline.orchestrator import SymbolUPipeline
-        from mechanical.pipeline.routing import PipelineRouter
+        from symbolu.mechanical.pipeline.orchestrator import SymbolUPipeline
+        from symbolu.mechanical.pipeline.routing import PipelineRouter
 
         custom_router = PipelineRouter()
         pipeline = SymbolUPipeline(router=custom_router)
@@ -200,7 +200,7 @@ class TestSymbolUPipelineSmoke:
     # This requires mocking or having all engines available
     # def test_pipeline_run_basic(self) -> None:
     #     """Test full pipeline execution."""
-    #     from mechanical.pipeline import SymbolUPipeline, UserRequest
+    #     from symbolu.mechanical.pipeline import SymbolUPipeline, UserRequest
     #
     #     pipeline = SymbolUPipeline()
     #     request = UserRequest(text="Test query")
@@ -216,7 +216,7 @@ class TestPipelinePackageExports:
 
     def test_core_exports(self) -> None:
         """Test core classes are exported."""
-        from mechanical.pipeline import (
+        from symbolu.mechanical.pipeline import (
             SymbolUPipeline,
             UserRequest,
             RenderedOutput,
@@ -230,7 +230,7 @@ class TestPipelinePackageExports:
 
     def test_model_exports(self) -> None:
         """Test all model classes are exported."""
-        from mechanical.pipeline import (
+        from symbolu.mechanical.pipeline import (
             PersonaContext,
             MlcrResult,
             FusionResult,
@@ -244,7 +244,7 @@ class TestPipelinePackageExports:
 
     def test_router_exports(self) -> None:
         """Test router exports."""
-        from mechanical.pipeline import (
+        from symbolu.mechanical.pipeline import (
             PipelineRouter,
             get_default_router,
         )
@@ -254,7 +254,7 @@ class TestPipelinePackageExports:
 
     def test_validator_exports(self) -> None:
         """Test validator exports."""
-        from mechanical.pipeline import (
+        from symbolu.mechanical.pipeline import (
             validate_request,
             ensure_persona,
             ensure_mlcr,
@@ -272,7 +272,7 @@ class TestPipelinePackageExports:
 
     def test_run_pipeline_convenience_function(self) -> None:
         """Test run_pipeline convenience function is exported."""
-        from mechanical.pipeline import run_pipeline
+        from symbolu.mechanical.pipeline import run_pipeline
 
         assert run_pipeline is not None
 
