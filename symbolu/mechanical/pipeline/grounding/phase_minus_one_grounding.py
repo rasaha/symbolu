@@ -1,8 +1,11 @@
 """
-Phase −1.0: Observer-Observed Grounding (OOG)
+PO1.0 — Observer-Observed Grounding (OOG)
+(Implemented as phase_minus_one_grounding for backward compatibility)
 
 Deterministic heuristic-based analysis to establish WHO is being observed
 and HOW the observation is framed.
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 Design Principles:
 - Fully deterministic (no LLM calls, no probabilistic sampling)
@@ -33,7 +36,7 @@ from .phase_minus_one_schema import (
 
 class ObserverObservedGrounding:
     """
-    Phase −1.0: Observer-Observed Grounding Engine.
+    PO1.0: Observer-Observed Grounding Engine.
 
     Analyzes clause text to produce grounding candidates based on
     deterministic linguistic heuristics.

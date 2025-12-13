@@ -1,8 +1,11 @@
 """
-PlannerGate: Phase −1 Constraint Enforcement
+PlannerGate: PO1 Constraint Enforcement
+(PO1 = Observer–Observed Grounding, implemented as phase_minus_one)
 
 Filters and blocks planner actions based on grounding constraints
-established by Phase −1 analysis.
+established by PO1 analysis.
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 Gating Rules by Mode:
 - REFLEXIVE (SELF observed):
@@ -21,7 +24,7 @@ Global Constraints:
 - If analysis_allowed == False: Strip ANALYZE/EXPLAIN from allowed set
 
 Authority Model:
-- PlannerGate receives authority from Phase −1 envelope
+- PlannerGate receives authority from PO1 envelope
 - Cannot override grounding decisions
 - Reports violations for metrics but enforces constraints
 """
@@ -126,7 +129,7 @@ class GatedPlanResult:
 
 class PlannerGate:
     """
-    Enforces Phase −1 grounding constraints on planner actions.
+    Enforces PO1 grounding constraints on planner actions.
 
     Usage:
         gate = PlannerGate()
@@ -215,7 +218,7 @@ class PlannerGate:
         proposed_actions: List[ActionClass],
     ) -> GatedPlanResult:
         """
-        Filter proposed actions based on Phase −1 grounding constraints.
+        Filter proposed actions based on PO1 grounding constraints.
 
         Uses AND semantics (intersection safety):
         An action is allowed ONLY if it is safe for ALL grounded clauses.
@@ -223,7 +226,7 @@ class PlannerGate:
         Authority flows downward; safety dominates permissiveness.
 
         Args:
-            envelope: Phase −1 grounding envelope.
+            envelope: PO1 grounding envelope.
             proposed_actions: List of actions proposed by planner.
 
         Returns:

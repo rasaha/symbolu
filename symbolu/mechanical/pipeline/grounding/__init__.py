@@ -1,14 +1,17 @@
 """
-Symbol-U Phase −1 Grounding Module
+PO1 — Observer–Observed Grounding Module
+(Implemented as phase_minus_one for backward compatibility)
 
 Pre-pipeline grounding analysis to establish observer-observed relationships
 before any semantic or discourse processing occurs.
 
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
+
 Components:
-- Phase −1.0: Observer-Observed Grounding (OOG)
-- Phase −1.1: Ambiguity Resolver (ARL)
-- Phase −1.2: Conservative Clause Splitter (CSL)
-- PhaseMinusOnePipeline: Orchestrates all Phase −1 stages
+- PO1.0: Observer-Observed Grounding (OOG)
+- PO1.1: Ambiguity Resolver (ARL)
+- PO1.2: Conservative Clause Splitter (CSL)
+- PhaseMinusOnePipeline: Orchestrates all PO1 stages
 
 Authority flows downward, information flows upward.
 """

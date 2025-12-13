@@ -1,20 +1,23 @@
 """
-Phase 0 Schema Definitions: Intent Envelope & Act-Type Selection
+PO2 — Intent Envelope & Response Posture Schema Definitions
+(Implemented as phase_zero for backward compatibility)
 
-Phase 0 sits between Phase −1 (Observer-Observed Grounding) and the Planner.
-It consumes grounding constraints from Phase −1 and produces a single IntentEnvelope
+PO2 sits between PO1 (Observer-Observed Grounding) and the Planner.
+It consumes grounding constraints from PO1 and produces a single IntentEnvelope
 that determines the appropriate response posture.
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 Design Principles:
 - Deterministic: No LLM calls, no probabilistic sampling
 - Conservative: Defaults to safe postures when uncertain
-- Authority-Respecting: Cannot override Phase −1 constraints
+- Authority-Respecting: Cannot override PO1 constraints
 - Serializable: All types support logging/tracing
 
 Authority Model:
-- Phase −1 constraints flow INTO Phase 0 (read-only)
-- Phase 0 produces IntentEnvelope for downstream consumption
-- Phase 0 cannot override blocked/restricted states from Phase −1
+- PO1 constraints flow INTO PO2 (read-only)
+- PO2 produces IntentEnvelope for downstream consumption
+- PO2 cannot override blocked/restricted states from PO1
 """
 
 from __future__ import annotations
@@ -39,7 +42,7 @@ class IntentType(str, Enum):
     """
     Classification of the user's communicative intent.
 
-    Derived deterministically from Phase −1 grounding analysis.
+    Derived deterministically from PO1 grounding analysis.
     Each intent type maps to specific allowed response postures.
 
     CLARIFY: Grounding is blocked or ambiguous; clarification required
@@ -57,7 +60,7 @@ class IntentType(str, Enum):
 
 class ResponsePosture(str, Enum):
     """
-    System response posture determined by Phase 0.
+    System response posture determined by PO2.
 
     Constrains what kinds of responses the Planner may generate.
     Postures are ordered from most conservative to most analytical.
@@ -96,15 +99,15 @@ INTENT_TO_POSTURE: Dict[IntentType, ResponsePosture] = {
 @dataclass
 class IntentEnvelope:
     """
-    Phase 0 output envelope: Intent classification and response posture.
+    PO2 output envelope: Intent classification and response posture.
 
-    This envelope is attached to PipelineContext after Phase 0 resolution
+    This envelope is attached to PipelineContext after PO2 resolution
     and carries forward the determined intent type and response posture
     for the Planner and downstream stages.
 
     Invariants:
     - intent_type and response_posture are always set (never None)
-    - If Phase −1 was BLOCKED, intent_type MUST be CLARIFY
+    - If PO1 was BLOCKED, intent_type MUST be CLARIFY
     - If any clause has selected=None, intent_type MUST be CLARIFY
     - response_posture is deterministically derived from intent_type
 
@@ -112,7 +115,7 @@ class IntentEnvelope:
         intent_type: Classified communicative intent
         response_posture: Determined response posture for Planner
         planning_allowed: Whether Planner may proceed with action planning
-        phase_minus_one_policy: The upstream Phase −1 overall policy (preserved)
+        phase_minus_one_policy: The upstream PO1 overall policy (preserved)
         mode_signals: Observation modes detected in input (for diagnostics)
         resolution_reason: Human-readable explanation of resolution
         debug: Additional debug/trace information
@@ -124,6 +127,9 @@ class IntentEnvelope:
     mode_signals: List[ObservationMode] = field(default_factory=list)
     resolution_reason: str = ""
     debug: Dict[str, Any] = field(default_factory=dict)
+
+    # Architectural phase identifier (informational only, does not affect logic)
+    architectural_phase: str = "PO2"
 
     def __post_init__(self) -> None:
         """Validate envelope invariants."""

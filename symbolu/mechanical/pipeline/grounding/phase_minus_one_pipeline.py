@@ -1,8 +1,11 @@
 """
-Phase −1 Pipeline Orchestrator
+PO1 — Observer–Observed Grounding Pipeline Orchestrator
+(Implemented as phase_minus_one for backward compatibility)
 
-Coordinates all Phase −1 stages to produce a PhaseMinusOneEnvelope
+Coordinates all PO1 stages to produce a PhaseMinusOneEnvelope
 that downstream stages must respect.
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 Pipeline Flow:
 1. CSL (Conservative Clause Splitter) proposes split (if beneficial)
@@ -12,7 +15,7 @@ Pipeline Flow:
 5. Populate debug/metrics fields
 
 Authority Model:
-- Phase −1 establishes grounding constraints
+- PO1 establishes grounding constraints
 - Authority flows downward (constraints are binding)
 - Information flows upward (violations are reported, not overridden)
 """
@@ -39,7 +42,7 @@ from .phase_minus_one_clause_splitter import ConservativeClauseSplitter
 
 class PhaseMinusOnePipeline:
     """
-    Phase −1 Pipeline Orchestrator.
+    PO1 (Observer–Observed Grounding) Pipeline Orchestrator.
 
     Coordinates clause splitting, grounding analysis, and ambiguity resolution
     to produce a complete grounding envelope.
@@ -59,7 +62,7 @@ class PhaseMinusOnePipeline:
         splitter: ConservativeClauseSplitter | None = None,
     ) -> None:
         """
-        Initialize the Phase −1 pipeline.
+        Initialize the PO1 pipeline.
 
         Args:
             grounding_engine: OOG engine instance.
@@ -75,7 +78,7 @@ class PhaseMinusOnePipeline:
 
     def run(self, text: str) -> PhaseMinusOneEnvelope:
         """
-        Execute the Phase −1 pipeline on input text.
+        Execute the PO1 pipeline on input text.
 
         Args:
             text: The input text to analyze.

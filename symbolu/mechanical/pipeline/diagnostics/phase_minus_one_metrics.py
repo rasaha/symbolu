@@ -1,8 +1,11 @@
 """
-Phase −1 Metrics and Violation Logging
+PO1 — Observer–Observed Grounding Metrics and Violation Logging
+(Implemented as phase_minus_one for backward compatibility)
 
-Tracks metrics and violations from Phase −1 grounding analysis for
+Tracks metrics and violations from PO1 grounding analysis for
 diagnostics and observability.
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 Metrics Tracked:
 - Mode distribution (REFLEXIVE/RELATIONAL/DETACHED counts)
@@ -39,7 +42,7 @@ from symbolu.mechanical.pipeline.grounding.phase_minus_one_schema import (
 @dataclass
 class PhaseMinusOneMetricsSnapshot:
     """
-    Snapshot of Phase −1 metrics at a point in time.
+    Snapshot of PO1 metrics at a point in time.
 
     Attributes:
         run_id: Unique run identifier.
@@ -98,7 +101,7 @@ class PhaseMinusOneMetricsSnapshot:
 
 class PhaseMinusOneMetrics:
     """
-    Metrics collector for Phase −1 grounding analysis.
+    Metrics collector for PO1 grounding analysis.
 
     Usage:
         metrics = PhaseMinusOneMetrics()
@@ -127,7 +130,7 @@ class PhaseMinusOneMetrics:
 
     def record_envelope(self, envelope: PhaseMinusOneEnvelope) -> None:
         """
-        Record metrics from a Phase −1 envelope.
+        Record metrics from a PO1 envelope.
 
         Args:
             envelope: The envelope to record metrics from.

@@ -1,8 +1,11 @@
 """
-Phase −1.1: Ambiguity Resolver (ARL)
+PO1.1 — Ambiguity Resolver (ARL)
+(Implemented as phase_minus_one_ambiguity for backward compatibility)
 
 Resolves multiple grounding candidates into a single selection or
 determines that clarification is needed.
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 Resolution Rules:
 1. If top.confidence >= CONFIDENCE_THRESHOLD → CONFIDENT, select top
@@ -51,7 +54,7 @@ class AmbiguityResolution:
 
 class AmbiguityResolver:
     """
-    Phase −1.1: Ambiguity Resolution Engine.
+    PO1.1: Ambiguity Resolution Engine.
 
     Resolves multiple grounding candidates using deterministic
     threshold-based rules with safety constraints.

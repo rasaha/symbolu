@@ -1,7 +1,10 @@
 """
-Phase −1 Schema Definitions
+PO1 — Observer–Observed Grounding Schema Definitions
+(Implemented as phase_minus_one for backward compatibility)
 
 Stable envelope objects for Observer-Observed grounding analysis.
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 All schemas are designed to be:
 - Deterministic (no probabilistic sampling)
@@ -9,8 +12,8 @@ All schemas are designed to be:
 - Immutable-friendly (dataclasses with frozen=False for practicality)
 
 Authority Model:
-- Phase −1 establishes WHO is being observed (SELF/OTHER/PHENOMENON)
-- Phase −1 establishes HOW they are being observed (REFLEXIVE/RELATIONAL/DETACHED)
+- PO1 establishes WHO is being observed (SELF/OTHER/PHENOMENON)
+- PO1 establishes HOW they are being observed (REFLEXIVE/RELATIONAL/DETACHED)
 - Downstream stages MUST respect these constraints
 - Authority flows downward; information flows upward
 """
@@ -109,7 +112,7 @@ class LinkageHint(str, Enum):
 
 class OverallPolicy(str, Enum):
     """
-    Overall pipeline policy based on Phase −1 analysis.
+    Overall pipeline policy based on PO1 analysis.
 
     SINGLE_CONTEXT: Single coherent grounding context
     MULTI_CONTEXT: Multiple clause contexts (requires per-clause handling)
@@ -206,13 +209,13 @@ class ClauseGroundingResult:
 @dataclass
 class PhaseMinusOneEnvelope:
     """
-    Complete Phase −1 analysis result.
+    Complete PO1 (Observer–Observed Grounding) analysis result.
 
     This envelope is attached to PipelineContext and carries all grounding
     constraints that downstream stages must respect.
 
     Invariants:
-    - Authority flows downward: Phase −1 constraints are binding on all later phases
+    - Authority flows downward: PO1 constraints are binding on all later phases
     - Information flows upward: Later phases can report violations but cannot override
     - If overall_policy == BLOCKED, pipeline must request clarification
 
@@ -225,6 +228,7 @@ class PhaseMinusOneEnvelope:
         debug: Debug/trace information for diagnostics
         run_id: Unique identifier for this analysis run
     """
+
     overall_policy: OverallPolicy
     clauses: List[ClauseGroundingResult]
     selected_primary: Optional[GroundingCandidate] = None
@@ -232,6 +236,9 @@ class PhaseMinusOneEnvelope:
     was_split: bool = False
     debug: Dict[str, Any] = field(default_factory=dict)
     run_id: str = ""
+
+    # Architectural phase identifier (informational only, does not affect logic)
+    architectural_phase: str = "PO1"
 
     def is_blocked(self) -> bool:
         """Check if pipeline should block and request clarification."""

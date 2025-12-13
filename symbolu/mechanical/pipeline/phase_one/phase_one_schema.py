@@ -1,9 +1,12 @@
 """
-Phase 1 Schema Definitions: Intent → Allowed Action Binding
+PO3 — Intent → Allowed Action Contract Schema Definitions
+(Implemented as phase_one for backward compatibility)
 
-Phase 1 sits between Phase 0 (Intent Envelope) and the Planner.
+PO3 sits between PO2 (Intent Envelope & Response Posture) and the Planner.
 It consumes the IntentEnvelope and produces an AllowedActionSet that
 strictly bounds what action classes the Planner may propose.
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 Design Principles:
 - Deterministic: No LLM calls, no probabilistic sampling
@@ -12,10 +15,10 @@ Design Principles:
 - Finite: AllowedActionSet is always a finite, known set
 
 Authority Model:
-- Phase 1 receives authority from Phase 0 IntentEnvelope
-- Phase 1 constrains what actions the Planner may even consider
+- PO3 receives authority from PO2 IntentEnvelope
+- PO3 constrains what actions the Planner may even consider
 - PlannerGate remains final authority on actual action execution
-- Authority flows: Phase −1 → Phase 0 → Phase 1 → Planner → PlannerGate
+- Authority flows: PO1 → PO2 → PO3 → Planner → PlannerGate
 """
 
 from __future__ import annotations
@@ -30,7 +33,7 @@ from symbolu.mechanical.pipeline.governance.planner_gate import ActionClass
 @dataclass(frozen=True)
 class AllowedActionSet:
     """
-    Phase 1 output: The strict set of allowed action classes for the Planner.
+    PO3 output: The strict set of allowed action classes for the Planner.
 
     This is an authority constraint, not a suggestion. The Planner may ONLY
     propose actions from this set. Any action outside this set is not eligible
@@ -43,7 +46,7 @@ class AllowedActionSet:
     - The set is deterministically derived from intent_type
 
     Attributes:
-        intent_type: The source IntentType from Phase 0
+        intent_type: The source IntentType from PO2
         allowed_actions: Frozen set of eligible ActionClass values
         run_id: Unique identifier for tracing/debugging
         resolution_reason: Human-readable explanation of the binding
@@ -54,6 +57,9 @@ class AllowedActionSet:
     run_id: str = ""
     resolution_reason: str = ""
     debug: Dict[str, Any] = field(default_factory=dict)
+
+    # Architectural phase identifier (informational only, does not affect logic)
+    architectural_phase: str = "PO3"
 
     def __post_init__(self) -> None:
         """Validate AllowedActionSet invariants."""

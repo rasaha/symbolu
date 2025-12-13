@@ -1,8 +1,11 @@
 """
-Phase −1.2: Conservative Clause Splitter (CSL)
+PO1.2 — Conservative Clause Splitter (CSL)
+(Implemented as phase_minus_one_clause_splitter for backward compatibility)
 
 Splits compound sentences into clauses ONLY when doing so improves
 grounding confidence. Default policy is CONSERVATIVE.
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 Conservative Splitting Rule:
 - Try candidate split when clause markers appear
@@ -62,7 +65,7 @@ class SplitResult:
 
 class ConservativeClauseSplitter:
     """
-    Phase −1.2: Conservative Clause Splitter.
+    PO1.2: Conservative Clause Splitter.
 
     Splits sentences into clauses only when doing so demonstrably
     improves grounding confidence.

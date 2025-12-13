@@ -1,9 +1,12 @@
 """
-Phase 0: Intent Envelope & Act-Type Selection
+PO2 — Intent Envelope & Response Posture
+(Implemented as phase_zero for backward compatibility)
 
-Phase 0 sits between Phase −1 (Observer-Observed Grounding) and the Planner.
+PO2 sits between PO1 (Observer-Observed Grounding) and the Planner.
 It consumes the PhaseMinusOneEnvelope and produces an IntentEnvelope that
 determines the appropriate response posture.
+
+PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
 Components:
 - IntentType: Enum classifying communicative intent
