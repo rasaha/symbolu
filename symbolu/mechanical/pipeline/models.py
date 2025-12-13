@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.phase_po4.po4_schema import PlannerProposalEnvelope
     from symbolu.mechanical.pipeline.phase_po5.po5_schema import ExecutionEligibilityEnvelope
     from symbolu.mechanical.pipeline.phase_p6.p6_schema import RegimeEnvelope
+    from symbolu.mechanical.pipeline.p7_discourse.p7_discourse_schema import DiscourseEnvelope
 
 
 @dataclass
@@ -247,6 +248,7 @@ class PipelineContext:
         po4_proposal: PlannerProposalEnvelope from PO4 planner proposal validation.
         po5_execution_eligibility: ExecutionEligibilityEnvelope from PO5 execution gate (non-actuating).
         p6_regime: RegimeEnvelope from P6 regime selection gate (gating-only).
+        p7_discourse_envelope: DiscourseEnvelope from P7 discourse act resolver (gating-only).
         hrm_map: Optional HighResolutionMap from HRM engine (when use_hrm=True).
         lcm_map: Optional LowContextMap from LCM engine (when use_lcm=True).
         lam_map: Optional LongArcMap from LAM engine (when use_lam=True or long_arc_tension high).
@@ -268,6 +270,7 @@ class PipelineContext:
     po4_proposal: Optional["PlannerProposalEnvelope"] = None  # PO4 planner proposal envelope
     po5_execution_eligibility: Optional["ExecutionEligibilityEnvelope"] = None  # PO5 execution eligibility envelope
     p6_regime: Optional["RegimeEnvelope"] = None  # P6 regime selection envelope
+    p7_discourse_envelope: Optional["DiscourseEnvelope"] = None  # P7 discourse act envelope
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -342,6 +345,14 @@ class PipelineContext:
                 "execution_eligibility": self.p6_regime.execution_eligibility.value if self.p6_regime else None,
                 "coherence_regime": self.p6_regime.coherence_regime if self.p6_regime else None,
                 "reason": self.p6_regime.reason if self.p6_regime else None,
+            },
+            "p7": {
+                "has_discourse": self.p7_discourse_envelope is not None,
+                "act": self.p7_discourse_envelope.act.value if self.p7_discourse_envelope else None,
+                "allowed": self.p7_discourse_envelope.allowed if self.p7_discourse_envelope else None,
+                "intent": self.p7_discourse_envelope.intent.value if self.p7_discourse_envelope else None,
+                "regime": self.p7_discourse_envelope.regime.value if self.p7_discourse_envelope else None,
+                "reason": self.p7_discourse_envelope.reason if self.p7_discourse_envelope else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
