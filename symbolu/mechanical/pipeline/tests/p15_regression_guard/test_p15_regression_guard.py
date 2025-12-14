@@ -27,7 +27,7 @@ import copy
 
 import pytest
 
-from symbolu.mechanical.pipeline.phase15_regression_guard import (
+from symbolu.mechanical.pipeline.p15_authority_guard import (
     # Schema
     P15AuthoritySnapshot,
     P15RegressionViolation,
@@ -41,7 +41,7 @@ from symbolu.mechanical.pipeline.phase15_regression_guard import (
     get_p15_snapshot,
     has_p15_snapshot,
 )
-from symbolu.mechanical.pipeline.phase15_regression_guard.p15_integration import (
+from symbolu.mechanical.pipeline.p15_authority_guard.p15_integration import (
     capture_snapshot_directly,
     validate_directly,
     validate_p15_snapshot_without_raise,
