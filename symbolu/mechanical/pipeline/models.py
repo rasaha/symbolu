@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p18_temporal_entropy.p18_schema import P18TemporalEntropyReport
     from symbolu.mechanical.pipeline.p20_snapshot.p20_unified_snapshot_schema import UnifiedCognitiveSnapshot
     from symbolu.mechanical.pipeline.p24_projection.p24_projection_schema import P24ProjectionReport
+    from symbolu.core.counterfactual.cf_schema import CounterfactualSandboxReport
     from symbolu.mechanical.pipeline.p33_schema_adaptive.p33_schema_snapshot import SchemaAdaptiveRoutingSnapshot
 
 
@@ -308,6 +309,7 @@ class PipelineContext:
     p22_acoustic_witness: Optional[Any] = None  # P22 acoustic-vrtti witness (witness-only)
     p23_alignment_report: Optional[Any] = None  # P23 inner-outer alignment report (observer-only)
     p24_projection_report: Optional["P24ProjectionReport"] = None  # P24 acoustic-ontology projection (observer-only)
+    p25: Optional["CounterfactualSandboxReport"] = None  # P25 counterfactual sandbox report (observation-only)
     p33: Optional["SchemaAdaptiveRoutingSnapshot"] = None  # P33 schema adaptive routing snapshot (observation-only)
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
@@ -539,6 +541,16 @@ class PipelineContext:
                 "risk_band": self.p24_projection_report.projection_risk_band.value if self.p24_projection_report else None,
                 "mismatch_type": self.p24_projection_report.mismatch_type.value if self.p24_projection_report else None,
                 "confidence": self.p24_projection_report.confidence if self.p24_projection_report else None,
+            },
+            "p25": {
+                "has_report": self.p25 is not None,
+                "baseline_ucf": self.p25.baseline_ucf if self.p25 else None,
+                "baseline_stability_band": self.p25.baseline_stability_band if self.p25 else None,
+                "scenario_count": self.p25.scenario_count() if self.p25 else 0,
+                "max_negative_delta": self.p25.max_negative_delta if self.p25 else None,
+                "max_positive_delta": self.p25.max_positive_delta if self.p25 else None,
+                "has_any_flags": self.p25.has_any_flags() if self.p25 else False,
+                "has_any_band_changes": self.p25.has_any_band_changes() if self.p25 else False,
             },
             "p33": {
                 "has_snapshot": self.p33 is not None,
