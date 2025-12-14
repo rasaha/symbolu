@@ -1,15 +1,30 @@
 """
-Vritti Momentum Formula (VMF) - Phase 14 Temporal Formula
-==========================================================
+Vṛtti Momentum Formula (VMF) — Core/Substrate Utility
+=======================================================
 
-An advanced emotional-derivative formula extending ΔSMI with weighted components:
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                         CORE/SUBSTRATE LAYER                                   ║
+║                                                                                ║
+║  This module is part of the Core/Substrate layer.                              ║
+║  It is NOT a pipeline phase and has no authority over intent, regime,          ║
+║  semantics, or delivery.                                                       ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+An advanced momentum formula extending ΔSMI with weighted components:
 - Weighted ΔSMI
-- Emotional polarity (vṛtti direction)
+- Motion polarity (vṛtti direction)
 - Bhava direction
 - Patent-coefficients for smoothing & stabilization
 - Nonlinear amplification for large shifts
 
 This formula is OBSERVATION-ONLY and does not affect any pipeline behavior.
+
+This module:
+    - Computes momentum metrics from acoustic/temporal signals
+    - Measures motion trajectory patterns
+    - Does NOT interpret meaning
+    - Does NOT infer emotion or intent
+    - Does NOT affect delivery decisions
 
 Formula (canonical v1.0):
     vritti_momentum = clamp(
@@ -27,7 +42,10 @@ Where:
 
 Output range: [-1.0, +1.0]
 
-Version: 1.0 (Phase 14)
+HISTORICAL NOTE: Legacy docstrings may reference "Phase 14". This is a
+historical development label, NOT an authoritative pipeline phase.
+
+Version: 1.0 (Core/Substrate Utility)
 Date: 2025-12-10
 """
 

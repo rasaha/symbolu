@@ -111,7 +111,7 @@ def _compute_inertia_factor(stability_weight: float) -> float:
     """
     Compute temporal inertia factor based on stability.
 
-    Inertia factor determines how much weight to give to historical momentum
+    Inertia factor specifies how much weight to give to historical momentum
     vs. current blended score.
 
     Higher stability → higher inertia (more trust in historical continuity)

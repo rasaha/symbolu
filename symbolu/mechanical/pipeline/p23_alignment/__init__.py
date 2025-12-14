@@ -1,6 +1,13 @@
 """
 P23 - Inner-Outer Alignment Observer
 
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                    OBSERVER PHASE — WITNESS ONLY                               ║
+║                                                                                ║
+║  This phase may observe and summarize internal signals.                        ║
+║  It may NOT influence regime, discourse, semantics, lexicon, or policy.        ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
 This phase is observer-only and non-authoritative.
 
 P23 observes whether the internal acoustic pressure (from P22) is aligned with

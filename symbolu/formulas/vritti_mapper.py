@@ -1,14 +1,22 @@
 """
-Vṛtti Mapper - Phase 1 Primitive Motion Quality Assignment
-===========================================================
+Vṛtti Mapper — Core/Substrate Utility
+======================================
 
-PHASE 1 MODULE - Assigns primitive motion qualities (vṛtti) to acoustic units.
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                         CORE/SUBSTRATE LAYER                                   ║
+║                                                                                ║
+║  This module is part of the Core/Substrate layer.                              ║
+║  It is NOT a pipeline phase and has no authority over intent, regime,          ║
+║  semantics, or delivery.                                                       ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+CORE/SUBSTRATE MODULE — Assigns primitive motion qualities (vṛtti) to acoustic units.
 
 This module maps acoustic units to fundamental motion qualities based purely
 on articulatory/phonetic properties. These are NOT emotional or semantic
 qualities - they are primitive descriptors of acoustic motion patterns.
 
-ARCHITECTURAL CONSTRAINTS (PHASE 1 INVARIANTS):
+ARCHITECTURAL CONSTRAINTS (CORE/SUBSTRATE INVARIANTS):
     - NO semantics: Vṛtti are motion qualities, not meanings
     - NO intent: This module never infers user purpose
     - NO routing: This module does not direct control flow
@@ -17,6 +25,14 @@ ARCHITECTURAL CONSTRAINTS (PHASE 1 INVARIANTS):
     - NO ontology lookup: Rules are self-contained
     - DETERMINISTIC: Same input always produces same output
     - READ-ONLY: Pure transformation with no side effects
+    - NON-AUTHORITATIVE: Cannot influence governance or routing decisions
+
+This module:
+    - Computes motion quality assignments
+    - Measures acoustic/articulatory patterns
+    - Does NOT interpret meaning
+    - Does NOT infer emotion or intent
+    - Does NOT affect delivery decisions
 
 Vṛtti Types (Non-Semantic Motion Qualities):
     - INERTIA: Stable, sustained energy (nasals, long vowels)
@@ -30,7 +46,10 @@ Assignment is based on acoustic/articulatory properties only:
     - Vowel properties (height, backness)
     - Cluster structure (consonant count, vowel count)
 
-Version: 1.0 (Phase 1 Acoustic-Symbolic Tokenization)
+HISTORICAL NOTE: Legacy docstrings may reference "Phase 1". This is a
+historical development label, NOT an authoritative pipeline phase.
+
+Version: 1.0 (Core/Substrate Utility)
 Date: 2025-12-13
 """
 
@@ -49,9 +68,10 @@ from symbolu.formulas.acoustic_unit_mapper import (
 
 
 # ============================================================================
-# PHASE 1 INVARIANT DECLARATIONS
+# CORE/SUBSTRATE INVARIANT DECLARATIONS
 # ============================================================================
 
+# Core/Substrate invariants (historical "Phase 1" label)
 PHASE_1_INVARIANTS = {
     "NO_SEMANTICS": True,
     "NO_INTENT": True,
@@ -114,7 +134,7 @@ class AcousticVritti:
         weight: Confidence weight (0.0 to 1.0) based on rule match strength
         rule_trace: Which rule(s) determined this assignment (for debugging)
 
-    Phase 1 Invariants:
+    Core/Substrate Invariants:
         - No meaning field
         - No intent field
         - No emotion field
@@ -200,7 +220,7 @@ def assign_vritti(unit: AcousticUnit) -> AcousticVritti:
     This is a deterministic, rule-based assignment with NO semantic
     inference. The vṛtti is selected based purely on acoustic properties.
 
-    PHASE 1 INVARIANTS:
+    CORE/SUBSTRATE INVARIANTS:
         - Deterministic: Same unit always produces same vṛtti
         - No meaning inference: Rules are phonetic only
         - No ontology lookup: Self-contained rules

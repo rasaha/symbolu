@@ -1,13 +1,21 @@
 """
-Acoustic Unit Mapper - Phase 1 Acoustic-Symbolic Tokenization
-==============================================================
+Acoustic Unit Mapper — Core/Substrate Utility
+==============================================
 
-PHASE 1 MODULE - Transforms raw input text into acoustic units.
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                         CORE/SUBSTRATE LAYER                                   ║
+║                                                                                ║
+║  This module is part of the Core/Substrate layer.                              ║
+║  It is NOT a pipeline phase and has no authority over intent, regime,          ║
+║  semantics, or delivery.                                                       ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
 
-This module performs the foundational acoustic decomposition of input text
+CORE/SUBSTRATE MODULE — Transforms raw input text into acoustic units.
+
+This module computes the foundational acoustic decomposition of input text
 into ordered symbolic primitives based purely on sound/syllable structure.
 
-ARCHITECTURAL CONSTRAINTS (PHASE 1 INVARIANTS):
+ARCHITECTURAL CONSTRAINTS (CORE/SUBSTRATE INVARIANTS):
     - NO semantics: This module has no knowledge of meaning
     - NO intent: This module never infers user purpose
     - NO routing: This module does not direct control flow
@@ -16,9 +24,16 @@ ARCHITECTURAL CONSTRAINTS (PHASE 1 INVARIANTS):
     - DETERMINISTIC: Same input always produces same output
     - LANGUAGE-AGNOSTIC: Works on phonetic structure, not language rules
     - READ-ONLY: Pure transformation with no side effects
+    - NON-AUTHORITATIVE: Cannot influence governance or routing decisions
 
-This module operates BEFORE any semantic, intent, or lexical processing.
-Outputs are pure symbolic primitives consumed by downstream phases.
+This module:
+    - Computes acoustic tokenization
+    - Measures phonetic properties
+    - Does NOT interpret meaning
+    - Does NOT infer emotion or intent
+    - Does NOT affect delivery decisions
+
+Outputs are pure symbolic primitives that may be observed by downstream phases.
 
 Algorithm:
     1. Normalize input (lowercase, strip edges)
@@ -26,7 +41,10 @@ Algorithm:
     3. Extract acoustic properties from each cluster
     4. Return ordered list of AcousticUnit primitives
 
-Version: 1.0 (Phase 1 Acoustic-Symbolic Tokenization)
+HISTORICAL NOTE: Legacy docstrings may reference "Phase 1". This is a
+historical development label, NOT an authoritative pipeline phase.
+
+Version: 1.0 (Core/Substrate Utility)
 Date: 2025-12-13
 """
 
@@ -38,10 +56,10 @@ from typing import List, Tuple
 
 
 # ============================================================================
-# PHASE 1 INVARIANT DECLARATIONS
+# CORE/SUBSTRATE INVARIANT DECLARATIONS
 # ============================================================================
 
-# These constants enforce Phase 1 boundaries
+# These constants enforce Core/Substrate boundaries (historical "Phase 1" label)
 PHASE_1_INVARIANTS = {
     "NO_SEMANTICS": True,
     "NO_INTENT": True,
@@ -116,7 +134,7 @@ class AcousticUnit:
         length: Character length of the unit
         is_syllable_nucleus: Whether this unit contains a vowel nucleus
 
-    Phase 1 Invariants:
+    Core/Substrate Invariants:
         - No meaning field
         - No intent field
         - No semantic category
@@ -208,7 +226,7 @@ def map_acoustic_units(text: str) -> List[AcousticUnit]:
     into a sequence of AcousticUnit primitives based purely on
     acoustic/phonetic structure.
 
-    PHASE 1 INVARIANTS:
+    CORE/SUBSTRATE INVARIANTS:
         - Deterministic: Same input always produces same output
         - No semantics: Units have no meaning
         - No LLM calls: Pure rule-based processing

@@ -1,18 +1,38 @@
 """
-Guna / Kosha Resonance Formulas - Phase 8 Observability Metrics
-================================================================
+Guṇa / Koṣa Resonance Formulas — Core/Substrate Utility
+=========================================================
 
-Deterministic, zero-LLM formulas for Guna and Kosha resonance analysis.
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                         CORE/SUBSTRATE LAYER                                   ║
+║                                                                                ║
+║  This module is part of the Core/Substrate layer.                              ║
+║  It is NOT a pipeline phase and has no authority over intent, regime,          ║
+║  semantics, or delivery.                                                       ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
 
-This module implements observation-only metrics for tracking:
+Deterministic, zero-LLM formulas for Guṇa and Koṣa resonance analysis.
+
+This module computes observation-only metrics for tracking:
 - Guna Resonance Index: Balance vs distortion in Guna distribution (sattva/rajas/tamas)
 - Kosha Activation Vector: Ordered vector of kosha layer activations
 - Kosha Resonance Index: Coherence of kosha activation patterns
 
 All formulas are deterministic, bounded to [0.0, 1.0], and purely observational.
-They do NOT affect routing, mappers, policy, or any decision logic.
 
-Version: 1.0 (Phase 8)
+This module:
+    - Computes guṇa/koṣa resonance metrics
+    - Measures balance and coherence patterns
+    - Does NOT interpret meaning
+    - Does NOT infer emotion or intent
+    - Does NOT affect delivery decisions
+
+These metrics do NOT affect routing, mappers, policy, or any decision logic.
+They are observation-only signals for allowed sinks (dashboards, logs, observers).
+
+HISTORICAL NOTE: Legacy docstrings may reference "Phase 8". This is a
+historical development label, NOT an authoritative pipeline phase.
+
+Version: 1.0 (Core/Substrate Utility)
 Date: 2025-12-10
 """
 

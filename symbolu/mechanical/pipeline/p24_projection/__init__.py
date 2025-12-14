@@ -1,6 +1,13 @@
 """
 P24 - Acoustic-Ontology Projection Observer
 
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                    OBSERVER PHASE — WITNESS ONLY                               ║
+║                                                                                ║
+║  This phase may observe and summarize internal signals.                        ║
+║  It may NOT influence regime, discourse, semantics, lexicon, or policy.        ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
 This phase is observer-only and non-authoritative.
 
 P24 estimates outer human interpretation (10-layer ontology projection) from
