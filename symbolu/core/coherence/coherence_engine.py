@@ -15,6 +15,7 @@ for the full specification of invariants INV-P12-H1 through INV-P12-H4.
 from typing import Optional, Dict, Any, Tuple
 from symbolu.core.coherence.coherence_state import CoherenceState
 from symbolu.core.coherence.acoustic_alignment_schema import AcousticAlignmentReport
+from symbolu.core.coherence.observer_diagnostics_bundle import ObserverDiagnosticsBundle
 from symbolu.core.coherence.phase12_hardening import AcousticHardeningViolation
 from symbolu.core.coherence.persona_drift_monitor import compute_persona_drift
 from symbolu.core.coherence.semantic_skeleton import compute_semantic_stability
@@ -60,6 +61,7 @@ class CoherenceEngine:
         temporal_summary: Optional[Dict],
         semantic_signature: Dict,
         acoustic_alignment: Optional[AcousticAlignmentReport] = None,
+        observer_diagnostics: Optional[ObserverDiagnosticsBundle] = None,
     ) -> CoherenceState:
         """
         Update coherence state with new turn data.
@@ -75,18 +77,29 @@ class CoherenceEngine:
             acoustic_alignment: Optional acoustic alignment report from P22/P23/P24
                               (observer-only, used for diagnostic annotation and
                                optional confidence reduction in coherence_v3_quality)
+                              DEPRECATED: Prefer using observer_diagnostics bundle.
+            observer_diagnostics: Optional ObserverDiagnosticsBundle containing
+                                 diagnostic artifacts from P20/P24. Provides a clean
+                                 bridge for observer data without authority coupling.
+                                 If both acoustic_alignment and observer_diagnostics
+                                 are provided, observer_diagnostics takes precedence.
 
         Returns:
             Updated CoherenceState with recomputed metrics
 
-        IMPORTANT: The acoustic_alignment parameter is OPTIONAL and observer-only.
-        When None (default), behavior is IDENTICAL to previous implementation.
-        When present, it may ONLY be used to:
+        IMPORTANT: The acoustic_alignment/observer_diagnostics parameters are OPTIONAL
+        and observer-only. When None (default), behavior is IDENTICAL to previous
+        implementation. When present, they may ONLY be used to:
         - Annotate diagnostics
         - Slightly reduce coherence_v3_quality (max 5%)
         - Add acoustic_misalignment flag and related diagnostic fields
 
-        acoustic_alignment NEVER influences:
+        SAFETY INVARIANTS (NON-NEGOTIABLE):
+        - INV-CB1: Bundle can ONLY affect coherence_v3_quality downward, within bounds
+        - INV-CB2: Bundle MUST NOT affect: PO1–PO5, P6–P9, regime/discourse/semantic/lexical
+        - INV-CB3: No imports from observer modules into authoritative modules
+
+        acoustic_alignment/observer_diagnostics NEVER influence:
         - coherence_v3 score
         - regime, discourse, semantics, lexical decisions
         - DHA, Persona, or Renderer
@@ -243,24 +256,35 @@ class CoherenceEngine:
         # Update Phase 10 coherence v3 (megafusion, observation only)
         state.coherence_score_v3 = self._compute_coherence_score_v3(state, mapper_profile)
 
+        # Resolve effective acoustic_alignment from observer_diagnostics bundle or direct param
+        # PRECEDENCE: observer_diagnostics bundle takes precedence over direct acoustic_alignment
+        # INVARIANT: This resolution does NOT change the behavior - it only determines the source
+        effective_acoustic_alignment: Optional[AcousticAlignmentReport] = None
+        if observer_diagnostics is not None and observer_diagnostics.has_acoustic_alignment():
+            # Extract from bundle (preferred path)
+            effective_acoustic_alignment = observer_diagnostics.extract_acoustic_alignment()
+        elif acoustic_alignment is not None:
+            # Fall back to direct parameter (legacy/deprecated path)
+            effective_acoustic_alignment = acoustic_alignment
+
         # Update Phase 12 coherence v3 quality (soft stability windows)
         # Extended to optionally incorporate acoustic alignment diagnostics
-        quality_result, penalty_applied, penalty_amount = self._compute_coherence_v3_quality_with_acoustic(
+        quality_result, penalty_applied, penalty_amount, _ = self._compute_coherence_v3_quality_with_acoustic(
             base=state.coherence_score,
             v3=state.coherence_score_v3,
             resonance_index=state.resonance_index,
             arc_alignment_index=state.arc_alignment_index,
             tension_index=state.tension_index,
-            acoustic_alignment=acoustic_alignment,
+            acoustic_alignment=effective_acoustic_alignment,
         )
         state.coherence_v3_quality = quality_result
 
         # Update acoustic diagnostic fields (observer-only, NEVER influences authoritative decisions)
-        if acoustic_alignment is not None:
-            state.acoustic_misalignment = acoustic_alignment.alignment_score < 0.4
-            state.acoustic_alignment_score = acoustic_alignment.alignment_score
-            state.acoustic_pressure_band = acoustic_alignment.pressure_band
-            state.acoustic_mismatch_tags = acoustic_alignment.mismatch_tags
+        if effective_acoustic_alignment is not None:
+            state.acoustic_misalignment = effective_acoustic_alignment.alignment_score < 0.4
+            state.acoustic_alignment_score = effective_acoustic_alignment.alignment_score
+            state.acoustic_pressure_band = effective_acoustic_alignment.pressure_band
+            state.acoustic_mismatch_tags = effective_acoustic_alignment.mismatch_tags
             state.acoustic_quality_penalty_applied = penalty_applied
             state.acoustic_quality_penalty_amount = penalty_amount
         else:
