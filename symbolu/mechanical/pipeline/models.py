@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p24_projection.p24_projection_schema import P24ProjectionReport
     from symbolu.core.counterfactual.cf_schema import CounterfactualSandboxReport
     from symbolu.mechanical.pipeline.p33_schema_adaptive.p33_schema_snapshot import SchemaAdaptiveRoutingSnapshot
+    from symbolu.core.predictive.persona_drift.drift_report import PredictivePersonaDriftReport
     from symbolu.policy.insight_window.insight_envelope import InsightWindowEnvelope
 
 
@@ -313,6 +314,7 @@ class PipelineContext:
     p25: Optional["CounterfactualSandboxReport"] = None  # P25 counterfactual sandbox report (observation-only)
     p32: Optional["InsightWindowEnvelope"] = None  # P32 insight window gating envelope (observation-only)
     p33: Optional["SchemaAdaptiveRoutingSnapshot"] = None  # P33 schema adaptive routing snapshot (observation-only)
+    p35: Optional["PredictivePersonaDriftReport"] = None  # P35 predictive persona drift report (observation-only)
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -569,6 +571,14 @@ class PipelineContext:
                 "stability_band": self.p33.stability_band.value if self.p33 else None,
                 "confidence_band": self.p33.confidence_band.value if self.p33 else None,
                 "schema_count": self.p33.get_schema_count() if self.p33 else 0,
+            },
+            "p35": {
+                "has_report": self.p35 is not None,
+                "predicted_drift_score": self.p35.predicted_drift_score if self.p35 else None,
+                "drift_risk_band": self.p35.drift_risk_band if self.p35 else None,
+                "trend_direction": self.p35.trend_direction if self.p35 else None,
+                "confidence": self.p35.confidence if self.p35 else None,
+                "factor_count": self.p35.factor_count() if self.p35 else 0,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
