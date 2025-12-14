@@ -1,5 +1,12 @@
 """
-P22 - Acoustic-Vrtti Witness Extractor
+P22 - Acoustic-Vṛtti Witness Extractor
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                    OBSERVER PHASE — WITNESS ONLY                               ║
+║                                                                                ║
+║  This phase may observe and summarize internal signals.                        ║
+║  It may NOT influence regime, discourse, semantics, lexicon, or policy.        ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
 
 This phase is witness-only and has zero authority over cognition or delivery.
 

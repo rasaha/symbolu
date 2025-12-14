@@ -1,8 +1,20 @@
 """
-Action Eligibility & Commitment Boundary Engine (AECBE) v1.0 - Phase 54
+Action Eligibility & Commitment Boundary Engine (AECBE) — Core/Substrate Utility
+==================================================================================
 
-Deterministic, zero-LLM, observation-only boundary engine that determines whether
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                         CORE/SUBSTRATE LAYER                                   ║
+║                                                                                ║
+║  This module is part of the Core/Substrate layer.                              ║
+║  It is NOT a pipeline phase and has no authority over intent, regime,          ║
+║  semantics, or delivery.                                                       ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+Deterministic, zero-LLM, observation-only boundary engine that computes whether
 the system's current cognitive state is eligible to transition toward action consideration.
+
+HISTORICAL NOTE: Legacy docstrings may reference "Phase 54". This is a
+historical development label, NOT an authoritative pipeline phase.
 
 This engine does NOT perform actions, select actions, route actions, or trigger agents.
 It only computes a read-only eligibility verdict.
@@ -123,7 +135,7 @@ def compute_action_eligibility_boundary(
     """
     Compute Action Eligibility & Commitment Boundary Engine (AECBE) v1.0.
 
-    This function determines whether the system's current cognitive state is eligible
+    This function computes whether the system's current cognitive state is eligible
     to transition toward action consideration (NOT execution).
 
     Args:

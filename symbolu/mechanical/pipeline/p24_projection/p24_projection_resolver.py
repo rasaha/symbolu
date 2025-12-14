@@ -1,6 +1,13 @@
 """
 P24 - Acoustic-Ontology Projection Observer Resolver
 
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                    OBSERVER PHASE — WITNESS ONLY                               ║
+║                                                                                ║
+║  This phase may observe and summarize internal signals.                        ║
+║  It may NOT influence regime, discourse, semantics, lexicon, or policy.        ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
 This phase is observer-only and non-authoritative.
 
 Projects outer human interpretation (10-layer ontology) from pipeline artifacts
@@ -162,7 +169,7 @@ class P24ProjectionResolver:
             2. Extracts base layers from discourse act
             3. Applies slot-based refinement
             4. Computes projection risk score and band
-            5. Determines mismatch type from P23 alignment
+            5. Computes mismatch type from P23 alignment (observes without deciding)
             6. Computes confidence from evidence completeness
             7. Returns frozen projection report
 
