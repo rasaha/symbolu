@@ -7,8 +7,9 @@ Updates CoherenceState by:
 - Maintaining sliding window
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 from symbolu.core.coherence.coherence_state import CoherenceState
+from symbolu.core.coherence.acoustic_alignment_schema import AcousticAlignmentReport
 from symbolu.core.coherence.persona_drift_monitor import compute_persona_drift
 from symbolu.core.coherence.semantic_skeleton import compute_semantic_stability
 from symbolu.core.coherence.temporal_arc_tracer import compute_temporal_arc_score
@@ -52,6 +53,7 @@ class CoherenceEngine:
         mapper_profile: Dict,
         temporal_summary: Optional[Dict],
         semantic_signature: Dict,
+        acoustic_alignment: Optional[AcousticAlignmentReport] = None,
     ) -> CoherenceState:
         """
         Update coherence state with new turn data.
@@ -64,9 +66,24 @@ class CoherenceEngine:
             mapper_profile: MapperProfile dict for this turn
             temporal_summary: TemporalBhavaTracker summary (optional)
             semantic_signature: Semantic skeleton for this turn
+            acoustic_alignment: Optional acoustic alignment report from P22/P23/P24
+                              (observer-only, used for diagnostic annotation and
+                               optional confidence reduction in coherence_v3_quality)
 
         Returns:
             Updated CoherenceState with recomputed metrics
+
+        IMPORTANT: The acoustic_alignment parameter is OPTIONAL and observer-only.
+        When None (default), behavior is IDENTICAL to previous implementation.
+        When present, it may ONLY be used to:
+        - Annotate diagnostics
+        - Slightly reduce coherence_v3_quality (max 5%)
+        - Add acoustic_misalignment flag and related diagnostic fields
+
+        acoustic_alignment NEVER influences:
+        - coherence_v3 score
+        - regime, discourse, semantics, lexical decisions
+        - DHA, Persona, or Renderer
         """
         # Initialize or copy previous state
         if prev_state is None:
@@ -221,13 +238,33 @@ class CoherenceEngine:
         state.coherence_score_v3 = self._compute_coherence_score_v3(state, mapper_profile)
 
         # Update Phase 12 coherence v3 quality (soft stability windows)
-        state.coherence_v3_quality = self._compute_coherence_v3_quality(
+        # Extended to optionally incorporate acoustic alignment diagnostics
+        quality_result, penalty_applied, penalty_amount = self._compute_coherence_v3_quality_with_acoustic(
             base=state.coherence_score,
             v3=state.coherence_score_v3,
             resonance_index=state.resonance_index,
             arc_alignment_index=state.arc_alignment_index,
             tension_index=state.tension_index,
+            acoustic_alignment=acoustic_alignment,
         )
+        state.coherence_v3_quality = quality_result
+
+        # Update acoustic diagnostic fields (observer-only, NEVER influences authoritative decisions)
+        if acoustic_alignment is not None:
+            state.acoustic_misalignment = acoustic_alignment.alignment_score < 0.4
+            state.acoustic_alignment_score = acoustic_alignment.alignment_score
+            state.acoustic_pressure_band = acoustic_alignment.pressure_band
+            state.acoustic_mismatch_tags = acoustic_alignment.mismatch_tags
+            state.acoustic_quality_penalty_applied = penalty_applied
+            state.acoustic_quality_penalty_amount = penalty_amount
+        else:
+            # When acoustic_alignment is None, reset diagnostic fields to defaults
+            state.acoustic_misalignment = False
+            state.acoustic_alignment_score = None
+            state.acoustic_pressure_band = None
+            state.acoustic_mismatch_tags = ()
+            state.acoustic_quality_penalty_applied = False
+            state.acoustic_quality_penalty_amount = 0.0
 
         # Update Phase 16 formula fusion stabilizer (observation only)
         self._update_formula_fusion_stabilizer(state, mapper_profile)
@@ -1102,6 +1139,139 @@ class CoherenceEngine:
         coherence_v3_quality = clamp(raw_quality, 0.0, 1.0)
 
         return coherence_v3_quality
+
+    def _apply_acoustic_confidence_adjustment(
+        self,
+        quality_score: float,
+        acoustic_alignment: Optional[AcousticAlignmentReport],
+    ) -> Tuple[float, bool, float]:
+        """
+        Apply acoustic alignment confidence adjustment to quality score.
+
+        This is an OBSERVER-ONLY adjustment that can ONLY REDUCE confidence,
+        NEVER increase it. The adjustment is based on acoustic-semantic alignment
+        signals from P22/P23/P24.
+
+        CRITICAL CONSTRAINTS (NON-NEGOTIABLE):
+        - NEVER increases confidence (confidence-reducing only)
+        - Maximum penalty is 5% (0.05)
+        - If acoustic_alignment is None, returns unchanged quality
+        - No penalty when alignment_score >= 0.4
+        - Does NOT affect coherence_v3 score itself, ONLY quality metadata
+
+        Penalty Rules:
+        - alignment_score >= 0.4: No penalty
+        - alignment_score < 0.4: Mild penalty up to 5%
+        - alignment_score < 0.2: Maximum 5% penalty (severe misalignment)
+
+        The penalty is calculated as:
+            penalty = MAX_PENALTY * (0.4 - alignment_score) / 0.4
+            clamped to [0.0, MAX_PENALTY]
+
+        Args:
+            quality_score: Current quality score [0.0, 1.0]
+            acoustic_alignment: Optional acoustic alignment report from P22/P23/P24
+
+        Returns:
+            Tuple[float, bool, float]:
+                - Adjusted quality score [0.0, 1.0]
+                - Whether penalty was applied (bool)
+                - Amount of penalty applied [0.0, 0.05]
+
+        Note:
+            This is a ZERO-LLM, deterministic adjustment. It does NOT influence
+            any authoritative decisions (regime, discourse, semantics, lexical).
+        """
+        # Maximum penalty is 5% (absolute constraint)
+        MAX_PENALTY = 0.05
+        # Threshold below which penalty applies
+        PENALTY_THRESHOLD = 0.4
+
+        # If no acoustic alignment report, return unchanged
+        if acoustic_alignment is None:
+            return (quality_score, False, 0.0)
+
+        alignment_score = acoustic_alignment.alignment_score
+
+        # If alignment is good (>= threshold), no penalty
+        if alignment_score >= PENALTY_THRESHOLD:
+            return (quality_score, False, 0.0)
+
+        # Calculate penalty: linear scale from 0 at threshold to MAX_PENALTY at 0
+        # penalty = MAX_PENALTY * (threshold - alignment_score) / threshold
+        raw_penalty = MAX_PENALTY * (PENALTY_THRESHOLD - alignment_score) / PENALTY_THRESHOLD
+
+        # Clamp penalty to [0.0, MAX_PENALTY]
+        penalty = max(0.0, min(MAX_PENALTY, raw_penalty))
+
+        # Apply penalty (confidence-reducing only)
+        adjusted_quality = quality_score - penalty
+
+        # Clamp result to [0.0, 1.0]
+        adjusted_quality = max(0.0, min(1.0, adjusted_quality))
+
+        return (adjusted_quality, True, penalty)
+
+    def _compute_coherence_v3_quality_with_acoustic(
+        self,
+        base: Optional[float],
+        v3: Optional[float],
+        resonance_index: Optional[float],
+        arc_alignment_index: Optional[float],
+        tension_index: Optional[float],
+        acoustic_alignment: Optional[AcousticAlignmentReport] = None,
+    ) -> Tuple[Optional[float], bool, float]:
+        """
+        Compute Phase 12 Coherence v3 quality with optional acoustic adjustment.
+
+        This is an extended version of _compute_coherence_v3_quality that
+        optionally incorporates acoustic alignment diagnostics. The acoustic
+        adjustment can ONLY REDUCE quality, NEVER increase it.
+
+        BACKWARD COMPATIBILITY:
+        - When acoustic_alignment is None, output is IDENTICAL to original
+        - The base quality formula is UNCHANGED
+        - Only the final quality value may be reduced (max 5%)
+
+        CRITICAL CONSTRAINTS:
+        - Acoustic signals NEVER influence the core quality formula
+        - Maximum adjustment is 5% reduction
+        - When acoustic_alignment is None, behaves identically to original
+
+        Args:
+            base: Coherence score v1 (canonical)
+            v3: Coherence score v3 (megafusion)
+            resonance_index: Phase 3 resonance index [0.0, 1.0]
+            arc_alignment_index: Phase 3 arc alignment index [0.0, 1.0]
+            tension_index: Phase 3 tension index [0.0, 1.0]
+            acoustic_alignment: Optional acoustic alignment report (observer-only)
+
+        Returns:
+            Tuple[Optional[float], bool, float]:
+                - Quality score (None if required inputs missing)
+                - Whether acoustic penalty was applied
+                - Amount of acoustic penalty applied
+        """
+        # Compute base quality using original formula (UNCHANGED)
+        base_quality = self._compute_coherence_v3_quality(
+            base=base,
+            v3=v3,
+            resonance_index=resonance_index,
+            arc_alignment_index=arc_alignment_index,
+            tension_index=tension_index,
+        )
+
+        # If base quality is None, cannot apply acoustic adjustment
+        if base_quality is None:
+            return (None, False, 0.0)
+
+        # Apply acoustic adjustment (observer-only, confidence-reducing only)
+        adjusted_quality, penalty_applied, penalty_amount = self._apply_acoustic_confidence_adjustment(
+            quality_score=base_quality,
+            acoustic_alignment=acoustic_alignment,
+        )
+
+        return (adjusted_quality, penalty_applied, penalty_amount)
 
     def _update_formula_fusion_stabilizer(
         self,

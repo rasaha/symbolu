@@ -5,7 +5,7 @@ Tracks multi-turn coherence across conversation history with sliding window.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Tuple
 
 
 @dataclass
@@ -417,6 +417,16 @@ class CoherenceState:
     trust_confidence_index_history: List[float] = field(default_factory=list)  # Trust confidence index history
     conflict_suppression_index_history: List[float] = field(default_factory=list)  # Conflict suppression index history
     temporal_persistence_index_history: List[float] = field(default_factory=list)  # Temporal persistence index history
+
+    # Phase 10 Extension: Acoustic Alignment Diagnostics (observer-only - NEVER influences authoritative decisions)
+    # These fields store diagnostic observations from P22/P23/P24 for observability purposes only.
+    # CRITICAL: These fields MUST NOT influence regime, discourse, semantics, lexical, DHA, Persona, or Renderer.
+    acoustic_misalignment: bool = False  # True if acoustic-semantic misalignment detected
+    acoustic_alignment_score: Optional[float] = None  # Alignment score [0.0, 1.0] from P23 (observation only)
+    acoustic_pressure_band: Optional[str] = None  # Pressure band: "low" | "moderate" | "high" (observation only)
+    acoustic_mismatch_tags: Tuple[str, ...] = field(default_factory=tuple)  # Mismatch tags (observation only)
+    acoustic_quality_penalty_applied: bool = False  # True if quality penalty was applied (diagnostic tracking)
+    acoustic_quality_penalty_amount: float = 0.0  # Amount of penalty applied [0.0, 0.05] (max 5%)
 
     def window_trim(self, window: int) -> None:
         """
