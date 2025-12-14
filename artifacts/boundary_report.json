@@ -1,0 +1,14 @@
+{
+  "timestamp": "2025-12-14T17:55:12.063505Z",
+  "violations": [],
+  "import_graph": {
+    "authoritative_to_observer_edges": [],
+    "total_edges_scanned": 531
+  },
+  "counts": {
+    "authoritative_modules_scanned": 124,
+    "observer_modules_scanned": 0,
+    "total_files_scanned": 124,
+    "violations_found": 0
+  }
+}
