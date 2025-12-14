@@ -1,5 +1,9 @@
 # Symbol-U Pipeline v3.0
 
+> **Note:** This directory documents the execution pipeline and context orchestration.
+> It does not define phase logic, authority, or decision-making.
+> Phase behavior is documented under `/docs/phases`.
+
 Linear pipeline orchestrator with Option C router hooks for the Symbol-U AGI system.
 
 ## Overview
