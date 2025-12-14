@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p33_schema_adaptive.p33_schema_snapshot import SchemaAdaptiveRoutingSnapshot
     from symbolu.core.predictive.persona_drift.drift_report import PredictivePersonaDriftReport
     from symbolu.policy.insight_window.insight_envelope import InsightWindowEnvelope
+    from symbolu.mechanical.pipeline.p41_scenario_regime_mapper.p41_schema import ScenarioRegimeMap
 
 
 @dataclass
@@ -315,6 +316,7 @@ class PipelineContext:
     p32: Optional["InsightWindowEnvelope"] = None  # P32 insight window gating envelope (observation-only)
     p33: Optional["SchemaAdaptiveRoutingSnapshot"] = None  # P33 schema adaptive routing snapshot (observation-only)
     p35: Optional["PredictivePersonaDriftReport"] = None  # P35 predictive persona drift report (observation-only)
+    p41_scenario_regime_map: Optional["ScenarioRegimeMap"] = None  # P41 scenario regime map (observation-only)
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -579,6 +581,12 @@ class PipelineContext:
                 "trend_direction": self.p35.trend_direction if self.p35 else None,
                 "confidence": self.p35.confidence if self.p35 else None,
                 "factor_count": self.p35.factor_count() if self.p35 else 0,
+            },
+            "p41": {
+                "has_map": self.p41_scenario_regime_map is not None,
+                "scenario_regime": self.p41_scenario_regime_map.scenario_regime if self.p41_scenario_regime_map else None,
+                "confidence": self.p41_scenario_regime_map.confidence if self.p41_scenario_regime_map else None,
+                "signal_count": self.p41_scenario_regime_map.signal_count() if self.p41_scenario_regime_map else 0,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
