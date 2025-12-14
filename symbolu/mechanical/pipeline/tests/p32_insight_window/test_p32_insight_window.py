@@ -808,12 +808,24 @@ class TestGroupFRegressionLock:
 
     def test_f04_empty_context_does_not_break(self):
         """Test that empty context returns closed envelope."""
-        ctx = MockPipelineContext()  # No coherence_state
+        # FIX: Test corrected to align with documented P32 contract.
+        # NOTE: No production logic changed. Behavior unchanged.
+        # VERIFIED: Failure pre-existed P50 and is unrelated.
+        #
+        # The production code checks `hasattr(ctx, "coherence_state")` not value.
+        # Since MockPipelineContext is a dataclass with coherence_state field,
+        # hasattr() returns True even when value is None. Per INV-P32-5,
+        # P32 returns a closed envelope with MISSING_INPUTS rather than None.
+        ctx = MockPipelineContext()  # No coherence_state value, but attribute exists
 
         result = maybe_run_p32(ctx)
 
-        # Should return None when no inputs
-        assert result is None
+        # Should return closed envelope with MISSING_INPUTS indicator
+        assert result is not None
+        assert isinstance(result, InsightWindowEnvelope)
+        assert result.is_open is False
+        assert "MISSING_INPUTS" in result.gating_reason_codes
+        assert result.observer_only is True
 
     def test_f05_minimal_context_produces_envelope(self):
         """Test that minimal context produces valid envelope."""
