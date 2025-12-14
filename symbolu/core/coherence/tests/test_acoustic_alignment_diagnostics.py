@@ -106,7 +106,7 @@ class TestBackwardCompatibility:
         )
 
         # Compute quality WITH acoustic=None (should be identical)
-        quality_with_acoustic, penalty_applied, penalty_amount = engine._compute_coherence_v3_quality_with_acoustic(
+        quality_with_acoustic, penalty_applied, penalty_amount, _ = engine._compute_coherence_v3_quality_with_acoustic(
             base=base_state.coherence_score,
             v3=0.75,
             resonance_index=base_state.resonance_index,
@@ -146,7 +146,7 @@ class TestBackwardCompatibility:
         """Test that multiple calls with None produce bitwise-identical results."""
         results = []
         for _ in range(10):
-            quality, applied, amount = engine._compute_coherence_v3_quality_with_acoustic(
+            quality, applied, amount, _ = engine._compute_coherence_v3_quality_with_acoustic(
                 base=base_state.coherence_score,
                 v3=0.73,
                 resonance_index=base_state.resonance_index,
@@ -161,7 +161,7 @@ class TestBackwardCompatibility:
 
     def test_missing_base_returns_none(self, engine):
         """Test that missing base returns None (original behavior preserved)."""
-        quality, penalty_applied, penalty_amount = engine._compute_coherence_v3_quality_with_acoustic(
+        quality, penalty_applied, penalty_amount, _ = engine._compute_coherence_v3_quality_with_acoustic(
             base=None,
             v3=0.75,
             resonance_index=0.6,
@@ -176,7 +176,7 @@ class TestBackwardCompatibility:
 
     def test_missing_v3_returns_none(self, engine):
         """Test that missing v3 returns None (original behavior preserved)."""
-        quality, penalty_applied, penalty_amount = engine._compute_coherence_v3_quality_with_acoustic(
+        quality, penalty_applied, penalty_amount, _ = engine._compute_coherence_v3_quality_with_acoustic(
             base=0.70,
             v3=None,
             resonance_index=0.6,
@@ -191,7 +191,7 @@ class TestBackwardCompatibility:
 
     def test_optional_metrics_use_defaults(self, engine):
         """Test that missing optional metrics still work (original behavior preserved)."""
-        quality, penalty_applied, penalty_amount = engine._compute_coherence_v3_quality_with_acoustic(
+        quality, penalty_applied, penalty_amount, _ = engine._compute_coherence_v3_quality_with_acoustic(
             base=0.70,
             v3=0.72,
             resonance_index=None,  # Should default to 0.5
@@ -230,7 +230,7 @@ class TestNonAuthorityGuarantees:
     def test_only_quality_is_adjusted_not_v3(self, engine, base_state, misaligned_report):
         """Test that only quality is adjusted, never the v3 score itself."""
         # Compute quality without acoustic
-        quality_without, _, _ = engine._compute_coherence_v3_quality_with_acoustic(
+        quality_without, _, _, _ = engine._compute_coherence_v3_quality_with_acoustic(
             base=base_state.coherence_score,
             v3=0.75,
             resonance_index=base_state.resonance_index,
@@ -240,7 +240,7 @@ class TestNonAuthorityGuarantees:
         )
 
         # Compute quality with misaligned acoustic
-        quality_with, penalty_applied, penalty_amount = engine._compute_coherence_v3_quality_with_acoustic(
+        quality_with, penalty_applied, penalty_amount, _ = engine._compute_coherence_v3_quality_with_acoustic(
             base=base_state.coherence_score,
             v3=0.75,
             resonance_index=base_state.resonance_index,
@@ -260,7 +260,7 @@ class TestNonAuthorityGuarantees:
 
     def test_aligned_report_no_penalty(self, engine, base_state, aligned_report):
         """Test that aligned report (score >= 0.4) produces no penalty."""
-        quality_without, _, _ = engine._compute_coherence_v3_quality_with_acoustic(
+        quality_without, _, _, _ = engine._compute_coherence_v3_quality_with_acoustic(
             base=base_state.coherence_score,
             v3=0.75,
             resonance_index=base_state.resonance_index,
@@ -269,7 +269,7 @@ class TestNonAuthorityGuarantees:
             acoustic_alignment=None,
         )
 
-        quality_with, penalty_applied, penalty_amount = engine._compute_coherence_v3_quality_with_acoustic(
+        quality_with, penalty_applied, penalty_amount, _ = engine._compute_coherence_v3_quality_with_acoustic(
             base=base_state.coherence_score,
             v3=0.75,
             resonance_index=base_state.resonance_index,
@@ -284,7 +284,7 @@ class TestNonAuthorityGuarantees:
 
     def test_threshold_report_no_penalty(self, engine, base_state, threshold_report):
         """Test that report exactly at threshold (0.4) produces no penalty."""
-        quality_without, _, _ = engine._compute_coherence_v3_quality_with_acoustic(
+        quality_without, _, _, _ = engine._compute_coherence_v3_quality_with_acoustic(
             base=base_state.coherence_score,
             v3=0.75,
             resonance_index=base_state.resonance_index,
@@ -293,7 +293,7 @@ class TestNonAuthorityGuarantees:
             acoustic_alignment=None,
         )
 
-        quality_with, penalty_applied, penalty_amount = engine._compute_coherence_v3_quality_with_acoustic(
+        quality_with, penalty_applied, penalty_amount, _ = engine._compute_coherence_v3_quality_with_acoustic(
             base=base_state.coherence_score,
             v3=0.75,
             resonance_index=base_state.resonance_index,
@@ -315,7 +315,7 @@ class TestNonAuthorityGuarantees:
             mismatch_tags=(),
         )
 
-        quality_without, _, _ = engine._compute_coherence_v3_quality_with_acoustic(
+        quality_without, _, _, _ = engine._compute_coherence_v3_quality_with_acoustic(
             base=base_state.coherence_score,
             v3=0.75,
             resonance_index=base_state.resonance_index,
@@ -324,7 +324,7 @@ class TestNonAuthorityGuarantees:
             acoustic_alignment=None,
         )
 
-        quality_with, penalty_applied, penalty_amount = engine._compute_coherence_v3_quality_with_acoustic(
+        quality_with, penalty_applied, penalty_amount, _ = engine._compute_coherence_v3_quality_with_acoustic(
             base=base_state.coherence_score,
             v3=0.75,
             resonance_index=base_state.resonance_index,
@@ -539,7 +539,7 @@ class TestDeterminism:
         """Test that identical inputs produce identical outputs."""
         results = []
         for _ in range(10):
-            quality, applied, amount = engine._compute_coherence_v3_quality_with_acoustic(
+            quality, applied, amount, _ = engine._compute_coherence_v3_quality_with_acoustic(
                 base=base_state.coherence_score,
                 v3=0.75,
                 resonance_index=base_state.resonance_index,
