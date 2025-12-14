@@ -187,6 +187,18 @@ class CoherenceState:
     current_symbolic_harmonization_index: Optional[float] = None  # Symbolic Harmonization Index [0.0, 1.0]
     harmonization_entropy_history: List[Optional[float]] = field(default_factory=list)  # Entropy history
 
+    # Phase 33: Schema Adaptive Routing (observation only - not used in routing/scoring)
+    # P33 observes schema stability/alignment; it NEVER influences decisions.
+    persona_schema_alignment: Optional[Dict[str, float]] = None  # Per-schema alignment scores [0.0, 1.0]
+    persona_schema_stability: Optional[float] = None  # Average schema stability [0.0, 1.0]
+    persona_schema_drift: Optional[float] = None  # Average schema drift [0.0, 1.0]
+    persona_schema_confidence: Optional[float] = None  # Confidence in schema assessment [0.0, 1.0]
+    persona_schema_dominant: Optional[str] = None  # Dominant schema ID (if any)
+    persona_schema_alignment_history: List[Dict[str, float]] = field(default_factory=list)  # Alignment history
+    persona_schema_stability_history: List[Optional[float]] = field(default_factory=list)  # Stability history
+    persona_schema_drift_history: List[Optional[float]] = field(default_factory=list)  # Drift history
+    persona_schema_confidence_history: List[Optional[float]] = field(default_factory=list)  # Confidence history
+
     # Phase 34: Identity Harmonics Layer (observation only - not used in scoring)
     identity_harmonics_snapshot: Optional[Any] = None  # IdentityHarmonicsSnapshot (latest)
     identity_harmonics_history: List[Optional[Any]] = field(default_factory=list)  # List of IdentityHarmonicsSnapshot
@@ -500,6 +512,12 @@ class CoherenceState:
         # Phase 27 symbolic harmonization formula history
         self.symbolic_harmonization_history = self.symbolic_harmonization_history[-window:]
         self.harmonization_entropy_history = self.harmonization_entropy_history[-window:]
+
+        # Phase 33 schema adaptive routing history
+        self.persona_schema_alignment_history = self.persona_schema_alignment_history[-window:]
+        self.persona_schema_stability_history = self.persona_schema_stability_history[-window:]
+        self.persona_schema_drift_history = self.persona_schema_drift_history[-window:]
+        self.persona_schema_confidence_history = self.persona_schema_confidence_history[-window:]
 
         # Phase 34 identity harmonics formula history
         self.identity_harmonics_history = self.identity_harmonics_history[-window:]
