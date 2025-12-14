@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from symbolu.core.predictive.persona_drift.drift_report import PredictivePersonaDriftReport
     from symbolu.policy.insight_window.insight_envelope import InsightWindowEnvelope
     from symbolu.mechanical.pipeline.p41_scenario_regime_mapper.p41_schema import ScenarioRegimeMap
+    from symbolu.mechanical.pipeline.p52_governance_adapter.p52_schema import GovernanceRequest
 
 
 @dataclass
@@ -317,6 +318,8 @@ class PipelineContext:
     p33: Optional["SchemaAdaptiveRoutingSnapshot"] = None  # P33 schema adaptive routing snapshot (observation-only)
     p35: Optional["PredictivePersonaDriftReport"] = None  # P35 predictive persona drift report (observation-only)
     p41_scenario_regime_map: Optional["ScenarioRegimeMap"] = None  # P41 scenario regime map (observation-only)
+    p51_governance_readiness: Optional[Any] = None  # P51 governance readiness envelope (diagnostic-only)
+    p52_governance_request: Optional["GovernanceRequest"] = None  # P52 governance adapter request (contract-only)
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -587,6 +590,17 @@ class PipelineContext:
                 "scenario_regime": self.p41_scenario_regime_map.scenario_regime if self.p41_scenario_regime_map else None,
                 "confidence": self.p41_scenario_regime_map.confidence if self.p41_scenario_regime_map else None,
                 "signal_count": self.p41_scenario_regime_map.signal_count() if self.p41_scenario_regime_map else 0,
+            },
+            "p51": {
+                "has_envelope": self.p51_governance_readiness is not None,
+                "readiness_level": getattr(self.p51_governance_readiness, "readiness_level", None) if self.p51_governance_readiness else None,
+                "ready": getattr(self.p51_governance_readiness, "ready", None) if self.p51_governance_readiness else None,
+            },
+            "p52": {
+                "has_request": self.p52_governance_request is not None,
+                "snapshot_id": self.p52_governance_request.snapshot_id if self.p52_governance_request else None,
+                "readiness_level": self.p52_governance_request.readiness_level if self.p52_governance_request else None,
+                "trace_hash": self.p52_governance_request.trace_hash if self.p52_governance_request else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
