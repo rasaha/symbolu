@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p24_projection.p24_projection_schema import P24ProjectionReport
     from symbolu.core.counterfactual.cf_schema import CounterfactualSandboxReport
     from symbolu.mechanical.pipeline.p33_schema_adaptive.p33_schema_snapshot import SchemaAdaptiveRoutingSnapshot
+    from symbolu.policy.insight_window.insight_envelope import InsightWindowEnvelope
 
 
 @dataclass
@@ -310,6 +311,7 @@ class PipelineContext:
     p23_alignment_report: Optional[Any] = None  # P23 inner-outer alignment report (observer-only)
     p24_projection_report: Optional["P24ProjectionReport"] = None  # P24 acoustic-ontology projection (observer-only)
     p25: Optional["CounterfactualSandboxReport"] = None  # P25 counterfactual sandbox report (observation-only)
+    p32: Optional["InsightWindowEnvelope"] = None  # P32 insight window gating envelope (observation-only)
     p33: Optional["SchemaAdaptiveRoutingSnapshot"] = None  # P33 schema adaptive routing snapshot (observation-only)
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
@@ -551,6 +553,14 @@ class PipelineContext:
                 "max_positive_delta": self.p25.max_positive_delta if self.p25 else None,
                 "has_any_flags": self.p25.has_any_flags() if self.p25 else False,
                 "has_any_band_changes": self.p25.has_any_band_changes() if self.p25 else False,
+            },
+            "p32": {
+                "has_envelope": self.p32 is not None,
+                "is_open": self.p32.is_open if self.p32 else None,
+                "insight_depth": self.p32.insight_depth if self.p32 else None,
+                "confidence_band": self.p32.confidence_band.value if self.p32 else None,
+                "reason_code_count": len(self.p32.gating_reason_codes) if self.p32 else 0,
+                "has_acoustic_penalty": self.p32.has_acoustic_penalty() if self.p32 else False,
             },
             "p33": {
                 "has_snapshot": self.p33 is not None,
