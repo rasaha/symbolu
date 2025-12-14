@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p18_temporal_entropy.p18_schema import P18TemporalEntropyReport
     from symbolu.mechanical.pipeline.p20_snapshot.p20_unified_snapshot_schema import UnifiedCognitiveSnapshot
     from symbolu.mechanical.pipeline.p24_projection.p24_projection_schema import P24ProjectionReport
+    from symbolu.mechanical.pipeline.p33_schema_adaptive.p33_schema_snapshot import SchemaAdaptiveRoutingSnapshot
 
 
 @dataclass
@@ -307,6 +308,7 @@ class PipelineContext:
     p22_acoustic_witness: Optional[Any] = None  # P22 acoustic-vrtti witness (witness-only)
     p23_alignment_report: Optional[Any] = None  # P23 inner-outer alignment report (observer-only)
     p24_projection_report: Optional["P24ProjectionReport"] = None  # P24 acoustic-ontology projection (observer-only)
+    p33: Optional["SchemaAdaptiveRoutingSnapshot"] = None  # P33 schema adaptive routing snapshot (observation-only)
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -537,6 +539,14 @@ class PipelineContext:
                 "risk_band": self.p24_projection_report.projection_risk_band.value if self.p24_projection_report else None,
                 "mismatch_type": self.p24_projection_report.mismatch_type.value if self.p24_projection_report else None,
                 "confidence": self.p24_projection_report.confidence if self.p24_projection_report else None,
+            },
+            "p33": {
+                "has_snapshot": self.p33 is not None,
+                "dominant_schema": self.p33.dominant_schema if self.p33 else None,
+                "confidence": self.p33.confidence if self.p33 else None,
+                "stability_band": self.p33.stability_band.value if self.p33 else None,
+                "confidence_band": self.p33.confidence_band.value if self.p33 else None,
+                "schema_count": self.p33.get_schema_count() if self.p33 else 0,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
