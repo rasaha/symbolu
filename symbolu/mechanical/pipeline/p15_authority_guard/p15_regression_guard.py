@@ -32,7 +32,7 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
-from symbolu.mechanical.pipeline.phase15_regression_guard.p15_regression_schema import (
+from symbolu.mechanical.pipeline.p15_authority_guard.p15_regression_schema import (
     P15AuthoritySnapshot,
     P15RegressionViolation,
     ViolationType,

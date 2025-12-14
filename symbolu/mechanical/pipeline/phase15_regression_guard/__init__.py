@@ -1,44 +1,45 @@
 """
-P15 Regression Guard — Authority Preservation Layer
+DEPRECATED: phase15_regression_guard has been renamed to p15_authority_guard.
 
-This module enforces the architectural invariant that no phase ≥ 16 may
-modify, reinterpret, escalate, or override any decision produced by PO1–P15.
+This module is a backward-compatibility shim that re-exports all symbols
+from the new location. Please update your imports to use:
 
-P15 is the LAST authority-bearing phase. All subsequent phases are READ-ONLY
-with respect to:
-- Intent inference
-- Regime selection
-- Discourse act resolution
-- Response posture
-- Allowed action contracts
-- Blocked state
+    from symbolu.mechanical.pipeline.p15_authority_guard import (
+        P15AuthoritySnapshot,
+        P15RegressionViolation,
+        P15RegressionViolationError,
+        ViolationType,
+        P15RegressionGuard,
+        capture_p15_snapshot,
+        enforce_p15_regression_guard,
+        get_p15_snapshot,
+        has_p15_snapshot,
+    )
 
-This guard is:
-- Structural: enforced by code, not configuration
-- Deterministic: same input → same violations
-- Non-bypassable: violations raise exceptions, not warnings
-
-Design Principles:
-- Immutable snapshots capture P15 authority decisions
-- No hidden state
-- No LLM usage
-- No heuristics
-- No learning
-- No auto-correction
-
-The guard exists to STOP the system, not to FIX it.
+This shim will be maintained for backward compatibility but the canonical
+location is now symbolu.mechanical.pipeline.p15_authority_guard.
 """
 
-from symbolu.mechanical.pipeline.phase15_regression_guard.p15_regression_schema import (
+import warnings
+
+# Issue a deprecation warning on import
+warnings.warn(
+    "phase15_regression_guard is deprecated and has been renamed to p15_authority_guard. "
+    "Please update your imports to use 'from symbolu.mechanical.pipeline.p15_authority_guard import ...'",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+# Re-export everything from the new location
+from symbolu.mechanical.pipeline.p15_authority_guard import (
+    # Schema
     P15AuthoritySnapshot,
     P15RegressionViolation,
     P15RegressionViolationError,
     ViolationType,
-)
-from symbolu.mechanical.pipeline.phase15_regression_guard.p15_regression_guard import (
+    # Guard
     P15RegressionGuard,
-)
-from symbolu.mechanical.pipeline.phase15_regression_guard.p15_integration import (
+    # Integration
     capture_p15_snapshot,
     enforce_p15_regression_guard,
     get_p15_snapshot,
