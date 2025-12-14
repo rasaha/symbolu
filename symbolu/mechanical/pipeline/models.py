@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p17_semantic_integrity.p17_schema import P17IntegrityReport
     from symbolu.mechanical.pipeline.p18_temporal_entropy.p18_schema import P18TemporalEntropyReport
     from symbolu.mechanical.pipeline.p20_snapshot.p20_unified_snapshot_schema import UnifiedCognitiveSnapshot
+    from symbolu.mechanical.pipeline.p24_projection.p24_projection_schema import P24ProjectionReport
 
 
 @dataclass
@@ -302,6 +303,10 @@ class PipelineContext:
     p17: Optional["P17IntegrityReport"] = None  # P17 semantic integrity report (observation-only)
     p18: Optional["P18TemporalEntropyReport"] = None  # P18 temporal entropy differential (observation-only)
     phase_20_snapshot: Optional["UnifiedCognitiveSnapshot"] = None  # P20 unified cognitive snapshot (read-only observability)
+    p21_delivery_mode: Optional[Any] = None  # P21 delivery mode decision (governance)
+    p22_acoustic_witness: Optional[Any] = None  # P22 acoustic-vrtti witness (witness-only)
+    p23_alignment_report: Optional[Any] = None  # P23 inner-outer alignment report (observer-only)
+    p24_projection_report: Optional["P24ProjectionReport"] = None  # P24 acoustic-ontology projection (observer-only)
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -513,6 +518,25 @@ class PipelineContext:
                 "drift_risk_band": self.phase_20_snapshot.drift_risk_band if self.phase_20_snapshot else None,
                 "semantic_integrity": self.phase_20_snapshot.semantic_integrity if self.phase_20_snapshot else None,
                 "phase_count": self.phase_20_snapshot.phase_count() if self.phase_20_snapshot else 0,
+            },
+            "p21": {
+                "has_delivery_mode": self.p21_delivery_mode is not None,
+            },
+            "p22": {
+                "has_acoustic_witness": self.p22_acoustic_witness is not None,
+                "pressure_band": getattr(self.p22_acoustic_witness, "pressure_band", None) if self.p22_acoustic_witness else None,
+            },
+            "p23": {
+                "has_alignment_report": self.p23_alignment_report is not None,
+                "alignment_state": getattr(getattr(self.p23_alignment_report, "alignment_state", None), "value", None) if self.p23_alignment_report else None,
+                "tension_score": getattr(self.p23_alignment_report, "tension_score", None) if self.p23_alignment_report else None,
+            },
+            "p24": {
+                "has_projection_report": self.p24_projection_report is not None,
+                "layer_count": self.p24_projection_report.layer_count() if self.p24_projection_report else 0,
+                "risk_band": self.p24_projection_report.projection_risk_band.value if self.p24_projection_report else None,
+                "mismatch_type": self.p24_projection_report.mismatch_type.value if self.p24_projection_report else None,
+                "confidence": self.p24_projection_report.confidence if self.p24_projection_report else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,
