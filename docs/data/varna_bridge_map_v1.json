@@ -1,0 +1,252 @@
+{
+  "meta": {
+    "source": "Sanskrit Varna Mala",
+    "version": "1.0",
+    "purpose": "Phase-1b substrate bridge meanings (pre-semantic)",
+    "constraints": [
+      "No dictionary meaning",
+      "No vrtti polarity resolution",
+      "No observer/observed logic",
+      "No contextual semantics",
+      "No heuristic phonetics"
+    ]
+  },
+
+  "vowels": {
+    "a": {
+      "type": "vowel",
+      "bridge_meaning": "birth_of_cognition"
+    },
+    "e": {
+      "type": "vowel",
+      "bridge_meaning": "practical_cognition"
+    },
+    "i": {
+      "type": "vowel",
+      "bridge_meaning": "self_doing"
+    },
+    "o": {
+      "type": "vowel",
+      "bridge_meaning": "closure_completion"
+    },
+    "u": {
+      "type": "vowel",
+      "bridge_meaning": "contraction_focus"
+    }
+  },
+
+  "consonants": {
+    "ka": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "hope_pressure",
+      "varna_group": "ka_varga"
+    },
+    "kha": {
+      "type": "consonant",
+      "aspirated": true,
+      "bridge_meaning": "worry_pressure",
+      "varna_group": "ka_varga"
+    },
+    "ga": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "action_pressure",
+      "varna_group": "ka_varga"
+    },
+    "gha": {
+      "type": "consonant",
+      "aspirated": true,
+      "bridge_meaning": "attachment_pressure",
+      "varna_group": "ka_varga"
+    },
+    "nga": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "vanity_pressure",
+      "varna_group": "ka_varga"
+    },
+
+    "ca": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "scatter_pressure",
+      "varna_group": "ca_varga"
+    },
+    "cha": {
+      "type": "consonant",
+      "aspirated": true,
+      "bridge_meaning": "nervous_pressure",
+      "varna_group": "ca_varga"
+    },
+    "ja": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "vanity_pressure",
+      "varna_group": "ca_varga"
+    },
+    "jha": {
+      "type": "consonant",
+      "aspirated": true,
+      "bridge_meaning": "greed_pressure",
+      "varna_group": "ca_varga"
+    },
+    "nya": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "hypocrisy_pressure",
+      "varna_group": "ca_varga"
+    },
+
+    "tta": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "overstatement_pressure",
+      "varna_group": "tta_varga"
+    },
+    "ttha": {
+      "type": "consonant",
+      "aspirated": true,
+      "bridge_meaning": "repentance_pressure",
+      "varna_group": "tta_varga"
+    },
+    "dda": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "shyness_pressure",
+      "varna_group": "tta_varga"
+    },
+    "ddha": {
+      "type": "consonant",
+      "aspirated": true,
+      "bridge_meaning": "cruelty_pressure",
+      "varna_group": "tta_varga"
+    },
+    "nna": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "envy_pressure",
+      "varna_group": "tta_varga"
+    },
+
+    "ta": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "inertia_pressure",
+      "varna_group": "ta_varga"
+    },
+    "tha": {
+      "type": "consonant",
+      "aspirated": true,
+      "bridge_meaning": "melancholy_pressure",
+      "varna_group": "ta_varga"
+    },
+    "da": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "irritability_pressure",
+      "varna_group": "ta_varga"
+    },
+    "dha": {
+      "type": "consonant",
+      "aspirated": true,
+      "bridge_meaning": "craving_pressure",
+      "varna_group": "ta_varga"
+    },
+    "na": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "attachment_pressure",
+      "varna_group": "ta_varga"
+    },
+
+    "pa": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "revulsion_pressure",
+      "varna_group": "pa_varga"
+    },
+    "pha": {
+      "type": "consonant",
+      "aspirated": true,
+      "bridge_meaning": "fear_pressure",
+      "varna_group": "pa_varga"
+    },
+    "ba": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "indifference_pressure",
+      "varna_group": "pa_varga"
+    },
+    "bha": {
+      "type": "consonant",
+      "aspirated": true,
+      "bridge_meaning": "delusion_pressure",
+      "varna_group": "pa_varga"
+    },
+    "ma": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "indulgence_pressure",
+      "varna_group": "pa_varga"
+    },
+
+    "ya": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "distrust_pressure",
+      "varna_group": "semi_vowel"
+    },
+    "ra": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "destruction_pressure",
+      "varna_group": "semi_vowel"
+    },
+    "la": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "cruelty_pressure",
+      "varna_group": "semi_vowel"
+    },
+    "va": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "external_dharma_pressure",
+      "varna_group": "semi_vowel"
+    },
+
+    "sha": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "material_greed_pressure",
+      "varna_group": "sibilant"
+    },
+    "ssa": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "lust_confusion_pressure",
+      "varna_group": "sibilant"
+    },
+    "sa": {
+      "type": "consonant",
+      "aspirated": false,
+      "bridge_meaning": "escape_pressure",
+      "varna_group": "sibilant"
+    },
+
+    "ha": {
+      "type": "consonant",
+      "aspirated": true,
+      "bridge_meaning": "ignorance_pressure",
+      "varna_group": "aspirate"
+    },
+
+    "ksha": {
+      "type": "consonant",
+      "aspirated": true,
+      "bridge_meaning": "false_knowledge_pressure",
+      "varna_group": "conjunct"
+    }
+  }
+}
