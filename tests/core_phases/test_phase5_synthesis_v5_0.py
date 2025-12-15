@@ -41,19 +41,14 @@ ABSOLUTE RULES:
 """
 
 import pytest
-import sys
 import hashlib
 import time
-from pathlib import Path
 from typing import List, Tuple, Any
 from enum import Enum
 
 
-# Setup path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "docs" / "experiments"))
-
 # Phase-1b imports
-from acoustic_unit_mapper_expressive_delta_v3_1 import (
+from docs.experiments.acoustic_unit_mapper_expressive_delta_v3_1 import (
     map_acoustic_units,
     AcousticBridgeUnit,
     validate_invariants_v3_1,
@@ -61,7 +56,7 @@ from acoustic_unit_mapper_expressive_delta_v3_1 import (
 )
 
 # Phase-2 imports
-from phase2_modifier_engine_v3_2 import (
+from docs.experiments.phase2_modifier_engine_v3_2 import (
     apply_modifiers,
     Phase2ModifiedUnit,
     extract_phase1b_units,
@@ -71,8 +66,8 @@ from phase2_modifier_engine_v3_2 import (
     PHASE2_ENGINE_VERSION,
 )
 
-# Phase-3 imports
-from test_phase3_rule_engine_v3_0 import (
+# Phase-3 imports from engine module
+from docs.experiments.phase3_rule_engine_v3_0 import (
     evaluate_phase3_rules,
     Phase3RuleEvaluation,
     Phase3RuleResult,
@@ -84,8 +79,8 @@ from test_phase3_rule_engine_v3_0 import (
     get_phase2_hash,
 )
 
-# Phase-4 imports
-from test_phase4_transform_v4_0 import (
+# Phase-4 imports from engine module
+from docs.experiments.phase4_transform_engine_v4_0 import (
     transform_phase3_to_phase4,
     transform_phase3_to_phase4_all,
     Phase4TransformResult,
@@ -99,8 +94,8 @@ from test_phase4_transform_v4_0 import (
     _compute_phase3_sequence_hash,
 )
 
-# Phase-5 imports
-from phase5_synthesis_engine_v5_0 import (
+# Phase-5 imports from engine module
+from docs.experiments.phase5_synthesis_engine_v5_0 import (
     synthesize_phase4_to_phase5,
     recover_phase4_indices,
     recover_phase4_eligibility_masks,
