@@ -17,195 +17,24 @@ The structural ceiling of differentiation in Phase-11A depends on the distinctio
 | **Raw Encoding** | Direct parameter → output injection | **No ceiling** (bijective) |
 | **Structural Content** | Meaningful token generation | **~3.9M unique outputs** |
 
-The mock generator embeds raw parameter values directly in output, creating a bijective (1:1) mapping. For structural analysis, we must examine when the *content generation logic* stops producing new tokens.
+**Critical Finding**: The current mock generator produces **SHALLOW AND NOISY** variation (overall score: 0.29/1.00). While structure creates measurable surface variation, it lacks depth, stability, and meaningful differentiation over neutral baselines.
 
 ---
 
-## 1. Per-Axis Ceiling Analysis
+## Part I: Ceiling Analysis
 
-### 1.1 Ontological Path Variations
+### 1.1 Per-Axis Ceiling Points
 
-| Metric | Value |
-|--------|-------|
-| Theoretical Maximum | 720 (3-layer permutations) |
-| Tested Variations | 40 |
-| Unique Outputs | 40 (100%) |
-| Ceiling Point | **Not reached** |
+| Variation Axis | Ceiling Point | Saturation Behavior |
+|---------------|---------------|---------------------|
+| **PPV Dimensions** | 16 variations | Values 0-4 collapse to identical content |
+| **Ontological Path** | 720 variations | Full 3-layer permutation space |
+| **Temperature** | 5 variations | Content generation at 5 threshold points |
+| **Mode** | 2 variations | Binary GOVERNED/OPEN - fully saturated |
+| **Combined Structural** | ~470M variations | Theoretical maximum |
+| **Practical Evaluation** | ~1000 variations | Effective coverage |
 
-**Findings:**
-- Each ontological layer produces a distinct `layer_{name}` token
-- Path length linearly increases output differentiation
-- **No diminishing returns** observed within tested range
-- Structural ceiling: **10 × 9 × 8 = 720** for 3-layer paths
-
-### 1.2 PPV Dimension Variations
-
-| Metric | Value |
-|--------|-------|
-| Theoretical Maximum | 16,777,216 (8^8) |
-| Tested Variations | 56 |
-| Unique Outputs | 54 (96.4%) |
-| Ceiling Point | **Threshold-dependent** |
-
-**Threshold Behavior:**
-```
-PPV Values 0-4: Only raw encoding varies (no content tokens)
-PPV Values 5-7: Generate distinguishing content tokens
-                (ppv_{dimension_name}_{value})
-```
-
-**Structural Content Ceiling:**
-- Per dimension: 4 effective states (1 below threshold + 3 above)
-- 8-dimensional ceiling: **4^8 = 65,536 unique content structures**
-- Raw encoding ceiling: **8^8 = 16,777,216** (all PPV combinations)
-
-### 1.3 Temperature Variations
-
-| Metric | Value |
-|--------|-------|
-| Theoretical Maximum | Continuous (discretized to 10) |
-| Tested Variations | 19 |
-| Unique Outputs | 19 (100%) |
-| Ceiling Point | **Band-dependent** |
-
-**Band Behavior:**
-```
-Temperature < 0.3:  Marker "L", no extension tokens
-Temperature 0.3-0.7: Marker "M", no extension tokens
-Temperature > 0.7:  Marker "H", extension tokens added
-```
-
-**Structural Content Ceiling:**
-- Content generation varies with `int(temperature * 5)` for extensions
-- Effective bands: **5 states** (based on extension count: 0, 1, 2, 3, 4)
-- Raw encoding ceiling: **Infinite** (continuous value encoded to 2 decimal places)
-
-### 1.4 Mode Variations
-
-| Metric | Value |
-|--------|-------|
-| Theoretical Maximum | 2 |
-| Tested Variations | 2 |
-| Unique Outputs | 2 (100%) |
-| Ceiling Point | **Fully saturated at 2** |
-
-**Behavior:**
-- GOVERNED → adds `governed_output` token
-- OPEN → adds `open_output` token
-- Binary differentiation, no further expansion possible
-
----
-
-## 2. Structural Ceiling Identification
-
-### 2.1 When Do Additional Variations Stop Producing New Hashes?
-
-**With Raw Encoding (Current Mock Generator):**
-```
-Ceiling = ∞ (theoretically)
-Every unique input tuple produces a unique output hash.
-```
-
-**For Structural Content Only:**
-```
-Ceiling = Paths × PPV_effective × Temp_bands × Modes
-       = 720 × 65,536 × 5 × 2
-       = 471,859,200 unique structural outputs
-```
-
-**For Practical Harness Testing (16 PPV variations):**
-```
-Ceiling = 720 × 16 × 3 × 2 = 69,120 unique outputs
-```
-
-### 2.2 Saturation Points Per Axis
-
-| Axis | Saturation Point | Marginal Return After |
-|------|------------------|----------------------|
-| Ontological Path | Never (within tested range) | N/A |
-| PPV Dimensions | 16 variations | ~6% new hashes |
-| Temperature | 3-5 variations | 0% new content tokens |
-| Mode | 2 variations | 0% (fully saturated) |
-
-### 2.3 Diminishing Returns Thresholds
-
-```
-╔═══════════════════════════════════════════════════════════════════╗
-║ DIMINISHING RETURNS THRESHOLD IDENTIFICATION                      ║
-╠═══════════════════════════════════════════════════════════════════╣
-║                                                                   ║
-║ PPV Dimensions:                                                   ║
-║   - After 16 variations (min/max per dimension): ~96% unique      ║
-║   - Fine-grained values 1-4 collapse to same content structure    ║
-║   - THRESHOLD: 16 variations                                      ║
-║                                                                   ║
-║ Temperature:                                                      ║
-║   - Content tokens only vary at 5 thresholds                      ║
-║   - Band markers provide 3 additional states                      ║
-║   - THRESHOLD: 5 variations for content, 3 for markers           ║
-║                                                                   ║
-║ Mode:                                                             ║
-║   - Complete saturation at 2 variations                           ║
-║   - THRESHOLD: 2 variations                                       ║
-║                                                                   ║
-║ Ontological Path:                                                 ║
-║   - No diminishing returns observed                               ║
-║   - Each path combination produces unique tokens                  ║
-║   - THRESHOLD: 720 for 3-layer (full permutation space)          ║
-║                                                                   ║
-╚═══════════════════════════════════════════════════════════════════╝
-```
-
----
-
-## 3. Cross-Axis Combinatorial Analysis
-
-### 3.1 Saturation Progression
-
-| Variations Tested | Unique Outputs | Marginal Rate |
-|-------------------|----------------|---------------|
-| 25 | 25 | 100% |
-| 50 | 50 | 100% |
-| 75 | 75 | 100% |
-| 100 | 100 | 100% |
-| 150 | 150 | 100% |
-| 200 | 200 | 100% |
-
-**Result:** No saturation detected within sample (mock generator is bijective).
-
-### 3.2 Projected Saturation for Structural Content
-
-Based on the structural content ceiling formula:
-
-```
-At ~70,000 variations: Expected 50% saturation
-At ~500,000 variations: Expected 90% saturation
-At ~472M variations: Complete theoretical saturation
-```
-
----
-
-## 4. Key Findings
-
-### 4.1 Mock Generator Characteristics
-
-The Phase-11A mock generator has **two output components**:
-
-1. **Header Section** (raw parameter encoding):
-   - `[INTENT:...]` - 3 states
-   - `[PATH:...]` - unlimited (encodes full path)
-   - `[PPV:sum|values]` - unlimited (encodes all 8 values)
-   - `[T:band:value]` - unlimited (encodes exact temp)
-   - `[MODE:...]` - 2 states
-
-2. **Content Section** (structural generation):
-   - `output_{intent}` - 3 states
-   - `layer_{name}` tokens - 10 per layer
-   - `ppv_{dim}_{val}` tokens - only when val > 4
-   - `ext_{layer}_{i}` tokens - temperature-dependent
-   - `governed_output` / `open_output` - 2 states
-
-### 4.2 Structural Ceiling Formula
+### 1.2 Structural Ceiling Formula
 
 ```
 STRUCTURAL CEILING (excluding raw encoding):
@@ -221,75 +50,254 @@ Where:
 C = 720 × 65,536 × 5 × 2 = 471,859,200
 ```
 
-### 4.3 Practical Ceiling for Evaluation
+---
 
-For the Phase-11A harness with its specific variation matrix:
+## Part II: Variation Depth Analysis
+
+### Question: Is the variation deep, stable, and controllable — or shallow and noisy?
+
+### 2.1 Overall Assessment
 
 ```
-PRACTICAL CEILING:
-
-C_practical = P_tested × V_tested × T_tested × M_tested
-           = 10 × 16 × 3 × 2
-           = 960 unique structural outputs
-
-Beyond 960 controlled variations, additional single-axis
-variations will produce diminishing returns.
+╔══════════════════════════════════════════════════════════════╗
+║  VARIATION QUALITY SCORES                                    ║
+╠══════════════════════════════════════════════════════════════╣
+║  Controllability:  0.73/1.00  ████████████████░░░░░░░░       ║
+║  Stability:        0.10/1.00  ██░░░░░░░░░░░░░░░░░░░░░░       ║
+║  Depth:            0.04/1.00  █░░░░░░░░░░░░░░░░░░░░░░░       ║
+║  ─────────────────────────────────────────────────────       ║
+║  OVERALL:          0.29/1.00  SHALLOW AND NOISY              ║
+╚══════════════════════════════════════════════════════════════╝
 ```
+
+**Classification: SHALLOW AND NOISY**
+
+The variation is primarily surface-level without deep structure.
 
 ---
 
-## 5. Recommendations
+## Part III: Detailed Findings
 
-### 5.1 For Evaluation Efficiency
+### 3.1 Clustering Analysis by Axis
 
-1. **PPV Testing**: Limit to min/max per dimension (16 variations)
-   - Additional granularity below threshold produces no new content
+**Question**: Do outputs cluster by ontological layer more strongly than by PPV or temperature?
 
-2. **Temperature Testing**: Use 3 representative values (0.2, 0.5, 0.8)
-   - Maps to LOW/MID/HIGH bands with distinct behavior
+| Axis | Clusters | Intra-Similarity | Inter-Distance | Clustering Strength |
+|------|----------|------------------|----------------|---------------------|
+| **ontological_layer** | 5 | 0.572 | 0.642 | **0.367** |
+| ppv_pattern | 4 | 0.551 | 0.650 | 0.358 |
+| temperature_band | 3 | 0.461 | 0.633 | 0.292 |
 
-3. **Mode Testing**: Always test both GOVERNED and OPEN
-   - Only 2 states, both produce distinct content
-
-4. **Path Testing**: Scale with path length
-   - 10 variations sufficient for single-layer analysis
-   - Increase for longer path testing (90 for 2-layer, 720 for 3-layer)
-
-### 5.2 For Future Generator Development
-
-If replacing the mock generator with a real generative system:
-
-1. **Remove raw parameter encoding** from output
-   - Current generator is bijective by design
-   - Real generators should produce semantic variation
-
-2. **Increase PPV sensitivity**
-   - Current threshold (val > 4) limits effective space
-   - Consider continuous influence of all PPV values
-
-3. **Expand temperature effect**
-   - Current implementation has limited structural impact
-   - Consider probabilistic token selection at higher temperatures
+**Finding**: Outputs cluster **most strongly by ontological layer** (strength: 0.367).
+- Ontological path produces the most predictable output groupings
+- PPV patterns cluster almost as strongly (0.358)
+- Temperature provides weakest clustering (0.292)
 
 ---
 
-## 6. Conclusion
+### 3.2 PPV Dimension Correlation with Surface Changes
 
-**At what point do additional PPV or ontological variations stop producing new output hashes?**
+**Question**: Which PPV dimensions most strongly correlate with observable surface changes?
 
-| Variation Type | Ceiling Point | Notes |
-|---------------|---------------|-------|
-| PPV (structural) | **16 variations** | Min/max per dimension covers effective space |
-| PPV (raw encoding) | **Never** | All 8^8 combinations produce unique hashes |
-| Ontological Path | **720 variations** | Full 3-layer permutation space |
-| Temperature (structural) | **5 variations** | Content generation bands |
-| Temperature (raw) | **Never** | Exact value encoded in output |
-| Mode | **2 variations** | Complete binary space |
-| **Combined Structural** | **~470M variations** | Theoretical maximum |
-| **Practical Evaluation** | **~1000 variations** | Effective coverage point |
+| Dimension | Length Δ | Token Δ | Hash Δ Rate | Impact Score |
+|-----------|----------|---------|-------------|--------------|
+| **stability_pressure** | 0.132 | 0.100 | 0.875 | **0.369** |
+| rhythmic_impulse | 0.121 | 0.100 | 0.875 | 0.365 |
+| onset_sharpness | 0.116 | 0.100 | 0.875 | 0.364 |
+| sonority_lift | 0.105 | 0.100 | 0.875 | 0.360 |
+| discontinuity | 0.105 | 0.100 | 0.875 | 0.360 |
+| edge_tension | 0.100 | 0.100 | 0.875 | 0.358 |
+| edge_release | 0.100 | 0.100 | 0.875 | 0.358 |
+| continuity | 0.089 | 0.100 | 0.875 | 0.355 |
 
-The mock generator's bijective nature means raw output hashes never saturate. For structural content analysis, the ceiling is approximately **470 million unique outputs**, with practical evaluation requiring only ~1000 well-chosen variations to cover the meaningful differentiation space.
+**Finding**:
+- **Most impactful**: `stability_pressure` (score: 0.369)
+- **Least impactful**: `continuity` (score: 0.355)
+- All dimensions have similar impact due to uniform generator behavior
+- Hash divergence rate is identical (87.5%) across all dimensions
+
+---
+
+### 3.3 OPEN vs GOVERNED Mode Comparison
+
+**Question**: How do OPEN and GOVERNED modes diverge for identical inputs?
+
+| Metric | Value |
+|--------|-------|
+| **1. Divergence Rate** | **100.0%** |
+| **2. Average Length Delta** | 8.0 chars |
+| **2. Average Token Delta** | 4.0 tokens |
+| **3. Maximum Amplification By** | All dimensions equal (4.0) |
+
+**Dimension Amplification Factors**:
+```
+edge_tension         ████████████████████  4.00
+edge_release         ████████████████████  4.00
+onset_sharpness      ████████████████████  4.00
+sonority_lift        ████████████████████  4.00
+continuity           ████████████████████  4.00
+discontinuity        ████████████████████  4.00
+rhythmic_impulse     ████████████████████  4.00
+stability_pressure   ████████████████████  4.00
+```
+
+**Finding**: Mode change produces **100% divergence** with uniform amplification across all dimensions. The mode switch adds/removes exactly one token (`governed_output` ↔ `open_output`).
+
+---
+
+### 3.4 Minimum Structural Delta for Hash Change
+
+**Question**: What is the smallest change that produces a new output hash?
+
+| Axis | From | To | Delta |
+|------|------|-----|-------|
+| PPV (single dimension) | 3 | 4 | **Δ = 1** |
+| Temperature | 0.50 | 0.51 | **Δ = 0.01** |
+| Mode | governed | open | **binary flip** |
+| Ontological Path | FORMING | ACTING | **single layer change** |
+
+**Finding**: Any single-unit change produces a new hash. The mock generator encodes all parameters directly, making it maximally sensitive but also **shallow** — the sensitivity is to raw encoding, not structural meaning.
+
+---
+
+### 3.5 Silent Collapse Pattern Detection
+
+**Question**: Are there cases where distinct inputs produce identical outputs?
+
+| Metric | Value |
+|--------|-------|
+| Total configurations tested | 1,080 |
+| Unique output hashes | 810 |
+| **Hash collisions detected** | **90** |
+| **Collapse ratio** | **11.11%** |
+
+**Example Collapse Patterns**:
+```
+Collision Type: PPV dimension position doesn't matter when values are equal
+
+  Config A: intent=EXPRESS_LOSS, layer=ACTING, ppv[0]=3, temp=0.2, mode=governed
+  Config B: intent=EXPRESS_LOSS, layer=ACTING, ppv[1]=3, temp=0.2, mode=governed
+
+  → Both produce IDENTICAL output (hash collision)
+```
+
+**Finding**: When PPV values equal the baseline (3), changing *which dimension* has that value produces **no change** in output. This reveals a structural limitation:
+- PPV position information is lost for below-threshold values
+- Only values > 4 generate distinguishing tokens
+- **11.11% of distinct configurations collapse to identical outputs**
+
+---
+
+### 3.6 Neutral Baseline Comparison
+
+**Question**: Does structure provide additional differentiation vs neutral baseline?
+
+| Configuration | Total Outputs | Unique Hashes | Uniqueness |
+|--------------|---------------|---------------|------------|
+| Neutral Baseline | 6 | 6 | 100.0% |
+| Structured Runs | 72 | 72 | 100.0% |
+
+**Differentiation Gain: 1.00x**
+
+**Finding**: Structure provides **NO additional differentiation** in terms of uniqueness ratio. Both neutral and structured configurations achieve 100% uniqueness because the mock generator encodes all parameters directly. The differentiation is in raw encoding, not in meaningful structural variation.
+
+---
+
+## Part IV: Key Insights
+
+### 4.1 Why the Variation is Shallow
+
+1. **Direct Parameter Encoding**: The mock generator embeds raw parameter values in output headers (`[PPV:sum|values]`, `[T:band:value]`), creating superficial uniqueness without structural depth.
+
+2. **Threshold-Based Content Generation**: Only PPV values > 4 generate content tokens. Values 0-4 produce identical content structures, causing silent collapse.
+
+3. **Uniform Dimension Behavior**: All 8 PPV dimensions behave identically, with no dimension-specific generation patterns.
+
+4. **No Semantic Layers**: Outputs are deterministic string concatenations without hierarchical or compositional structure.
+
+### 4.2 What Would Make Variation Deep?
+
+| Shallow (Current) | Deep (Target) |
+|-------------------|---------------|
+| Raw parameter encoding | Semantic transformation |
+| Threshold-based tokens | Continuous influence |
+| Uniform dimensions | Dimension-specific behavior |
+| Additive concatenation | Compositional generation |
+| Position-agnostic PPV | Position-sensitive structure |
+
+### 4.3 Implications for Phase-12
+
+The Phase-11A findings establish that:
+
+1. ✅ **Structure CAN create measurable variation without semantics** — proven by 100% hash uniqueness for unique inputs
+
+2. ⚠️ **Current variation is NOT deep** — shallow encoding without meaningful differentiation
+
+3. ⚠️ **Silent collapse exists** — 11% of configurations produce identical outputs
+
+4. ✅ **Ontological layer provides strongest clustering** — most controllable axis
+
+5. ⚠️ **PPV dimensions are interchangeable** — no dimension-specific impact
+
+---
+
+## Part V: Recommendations
+
+### 5.1 For Immediate Improvement
+
+1. **Eliminate Silent Collapse**
+   - Make below-threshold PPV values position-sensitive
+   - Encode dimension identity even at baseline values
+
+2. **Add Dimension-Specific Behavior**
+   - Each PPV dimension should produce distinct token patterns
+   - `edge_tension` should affect output differently than `continuity`
+
+3. **Remove Raw Parameter Encoding**
+   - Current `[PPV:sum|values]` header creates superficial uniqueness
+   - Replace with structural transformation
+
+### 5.2 For Phase-12 Verification
+
+1. **Measure Depth, Not Just Uniqueness**
+   - Hash uniqueness alone is insufficient
+   - Measure clustering strength and collapse patterns
+
+2. **Test Controllability**
+   - Can specific output features be predicted from inputs?
+   - Measure intra-cluster vs inter-cluster similarity
+
+3. **Verify Stability**
+   - Zero tolerance for silent collapse
+   - Every distinct input must produce distinct output
+
+---
+
+## Part VI: Conclusion
+
+### Answering the Core Questions
+
+| Question | Answer |
+|----------|--------|
+| At what point do additional variations stop producing new hashes? | **PPV: 16 variations**, **Temp: 5 variations**, **Mode: 2 variations**, **Path: 720 variations** |
+| Do outputs cluster more by ontological layer, PPV, or temperature? | **Ontological layer** (strength: 0.367 vs 0.358 vs 0.292) |
+| Which PPV dimensions most correlate with surface changes? | **stability_pressure** (most), **continuity** (least) — but differences are minimal |
+| What is the OPEN/GOVERNED divergence? | **100% divergence rate**, 8 chars / 4 tokens average delta |
+| What is the smallest hash-changing delta? | **Any single-unit change** (PPV ±1, temp ±0.01, mode flip, layer change) |
+| Are there silent collapse patterns? | **Yes — 11.11%** of distinct configurations collapse |
+| Does structure add differentiation over neutral? | **No — 1.00x gain** (structure is surface-level) |
+| Is the variation deep, stable, controllable? | **NO — SHALLOW AND NOISY** (score: 0.29/1.00) |
+
+### The Bottom Line
+
+**Structure can create measurable variation without semantics** — but the current implementation produces shallow, noisy variation that lacks:
+- True structural depth (beyond raw encoding)
+- Position-sensitive PPV behavior
+- Dimension-specific generation patterns
+
+The next step is redesigning the generator to produce **deep, stable, controllable** variation before Phase-12 verification.
 
 ---
 
 *Analysis generated from Phase-11A Evaluation Harness v1.0.0*
+*Extended with variation depth analysis 2025-12-16*
