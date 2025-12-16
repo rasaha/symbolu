@@ -8,8 +8,14 @@ Ledger Recording Rules:
     - ALWAYS records (regardless of RenderMode)
     - Records: artifact_id, artifact_hash, candidate_output_hash,
                verifier_report_hash, render_mode, span_id
+    - PPV recording (v1.1): ppv_hash (if present)
     - span_id is timestamp-free (hash-only)
     - NO timestamps, NO randomness
+
+PPV Recording Rules (v1.1):
+    - ppv_hash recorded if PPV is attached (Optional[str])
+    - ppv_hash is truncated to 16-char hex for ledger compactness
+    - Span IDs remain hash-only, timestamp-free
 
 Hard Constraints:
     - MUST be deterministic (same input -> same output)
@@ -56,6 +62,7 @@ class Phase11LedgerEntry:
         verifier_passed: Whether verifier check passed
         output_released: Whether output was actually released
         span_id: Deterministic span ID (hash-only, no timestamp)
+        ppv_hash: Optional PPV hash (16-char hex, truncated from 64)
         phase_id: Always "PHASE_11_CONTROLLER"
         ledger_version: Version of the ledger format
     """
@@ -67,6 +74,7 @@ class Phase11LedgerEntry:
     verifier_passed: bool
     output_released: bool
     span_id: str
+    ppv_hash: Optional[str] = None
     phase_id: str = "PHASE_11_CONTROLLER"
     ledger_version: str = LEDGER_VERSION
 
@@ -151,6 +159,25 @@ class Phase11LedgerEntry:
                 f"got '{self.phase_id}'"
             )
 
+        # Validate ppv_hash (optional, 16 hex chars if present)
+        if self.ppv_hash is not None:
+            if not isinstance(self.ppv_hash, str):
+                raise ValueError(
+                    f"Phase11LedgerEntry.ppv_hash must be str or None, "
+                    f"got {type(self.ppv_hash).__name__}"
+                )
+            if len(self.ppv_hash) != 16:
+                raise ValueError(
+                    f"Phase11LedgerEntry.ppv_hash must be 16 hex chars, "
+                    f"got {len(self.ppv_hash)} chars"
+                )
+            try:
+                int(self.ppv_hash, 16)
+            except ValueError:
+                raise ValueError(
+                    "Phase11LedgerEntry.ppv_hash must contain only hex characters"
+                )
+
         # CRITICAL INVARIANT: In GOVERNED mode, output_released IFF verifier_passed
         if self.render_mode == RenderMode.GOVERNED:
             if self.output_released and not self.verifier_passed:
@@ -173,6 +200,7 @@ class Phase11LedgerEntry:
             "verifier_passed": self.verifier_passed,
             "output_released": self.output_released,
             "span_id": self.span_id,
+            "ppv_hash": self.ppv_hash,
             "phase_id": self.phase_id,
             "ledger_version": self.ledger_version,
         }
@@ -189,6 +217,7 @@ def compute_span_id(
     candidate_output_hash: str,
     verifier_report_hash: str,
     render_mode: RenderMode,
+    ppv_hash: Optional[str] = None,
 ) -> str:
     """
     Compute deterministic span ID for ledger recording.
@@ -201,6 +230,7 @@ def compute_span_id(
         candidate_output_hash: Hash of candidate output.
         verifier_report_hash: Hash of verifier report.
         render_mode: The render mode applied.
+        ppv_hash: Optional PPV hash (16-char hex).
 
     Returns:
         Deterministic 16-char hex span ID.
@@ -217,6 +247,7 @@ def compute_span_id(
         f"candidate_output_hash:{candidate_output_hash}",
         f"verifier_report_hash:{verifier_report_hash}",
         f"render_mode:{render_mode.value}",
+        f"ppv_hash:{ppv_hash or 'NONE'}",
         f"phase:PHASE_11_CONTROLLER",
         f"version:{LEDGER_VERSION}",
     ]
@@ -240,6 +271,7 @@ def create_ledger_entry(
     render_mode: RenderMode,
     verifier_passed: bool,
     output_released: bool,
+    ppv_hash: Optional[str] = None,
 ) -> Phase11LedgerEntry:
     """
     Create a Phase-11 ledger entry.
@@ -254,6 +286,7 @@ def create_ledger_entry(
         render_mode: The render mode applied.
         verifier_passed: Whether verifier check passed.
         output_released: Whether output was actually released.
+        ppv_hash: Optional PPV hash (16-char hex, truncated from 64).
 
     Returns:
         Phase11LedgerEntry with computed span_id.
@@ -264,6 +297,7 @@ def create_ledger_entry(
         candidate_output_hash=candidate_output_hash,
         verifier_report_hash=verifier_report_hash,
         render_mode=render_mode,
+        ppv_hash=ppv_hash,
     )
 
     return Phase11LedgerEntry(
@@ -275,6 +309,7 @@ def create_ledger_entry(
         verifier_passed=verifier_passed,
         output_released=output_released,
         span_id=span_id,
+        ppv_hash=ppv_hash,
     )
 
 
