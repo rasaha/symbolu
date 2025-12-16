@@ -93,12 +93,22 @@ from symbolu.mechanical.pipeline.p11_controller.p11_templates import (
     # Dataclasses
     VCExtraction,
     TemplateRenderResult,
+    PPVMetrics,
+    VCPPVExtraction,
+    # Constants
+    EMPTY_PPV_METRICS,
     # Functions
     extract_vc_facts,
     render_template,
     get_approved_template_count,
     is_approved_template_key,
     get_template_version,
+    # PPV Functions
+    extract_ppv_metrics,
+    extract_vc_ppv_facts,
+    render_template_with_ppv,
+    is_ppv_template_supported,
+    get_ppv_template_count,
 )
 
 from symbolu.mechanical.pipeline.p11_controller.p11_verifier import (
@@ -109,6 +119,7 @@ from symbolu.mechanical.pipeline.p11_controller.p11_verifier import (
     VerifierReport,
     # Functions
     verify_output,
+    verify_output_with_ppv,
     get_verifier_version,
     get_forbidden_vocabulary_count,
     get_max_line_length,
@@ -170,10 +181,21 @@ __all__ = [
     "is_approved_template_key",
     "get_template_version",
 
+    # === PPV Template System ===
+    "PPVMetrics",
+    "VCPPVExtraction",
+    "EMPTY_PPV_METRICS",
+    "extract_ppv_metrics",
+    "extract_vc_ppv_facts",
+    "render_template_with_ppv",
+    "is_ppv_template_supported",
+    "get_ppv_template_count",
+
     # === Verifier System ===
     "VerificationCheck",
     "VerifierReport",
     "verify_output",
+    "verify_output_with_ppv",
     "get_verifier_version",
     "get_forbidden_vocabulary_count",
     "get_max_line_length",

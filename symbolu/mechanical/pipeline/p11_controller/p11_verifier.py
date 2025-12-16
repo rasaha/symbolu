@@ -8,8 +8,15 @@ Verification Rules:
     - Line-by-line structural verification
     - Forbidden vocabulary scan
     - Template shape enforcement
+    - PPV field verification (numeric only, approved lines)
     - Produces verifier_passed: bool
     - Produces verifier_report_hash
+
+PPV Verification Rules (v1.1):
+    - If output includes PPV fields, they must appear only in approved lines
+    - PPV fields must contain numeric values only
+    - No new alphabetic tokens introduced by PPV rendering
+    - If PPV present but template does not support it -> verifier fails in GOVERNED
 
 Hard Constraints:
     - MUST be deterministic (same input -> same output)
@@ -25,7 +32,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from symbolu.mechanical.pipeline.p11_controller.p11_templates import TemplateRenderResult
 
@@ -82,6 +89,20 @@ MAX_OUTPUT_LENGTH = 10000
 _VALID_TEMPLATE_SHAPES: Tuple[re.Pattern, ...] = (
     re.compile(r"^\[REGIME:[a-z]+\].*$"),  # Standard regime prefix
 )
+
+
+# =============================================================================
+# PPV Verification Patterns
+# =============================================================================
+
+# Valid PPV field pattern: [PPV:N] where N is an integer
+_PPV_FIELD_PATTERN = re.compile(r"\[PPV:(\d+)\]")
+
+# Valid PPV dimension line pattern: [PPV_DIMS:N,N,N,...] where N are integers
+_PPV_DIMS_PATTERN = re.compile(r"^\[PPV_DIMS:([\d,]+)\]$")
+
+# Forbidden PPV content (non-numeric, alphabetic interpretation)
+_PPV_FORBIDDEN_PATTERN = re.compile(r"\[PPV:[^0-9\],\[]+\]")
 
 
 # =============================================================================
@@ -307,6 +328,172 @@ def _check_regime_prefix(output_text: str) -> Tuple[bool, str]:
 
 
 # =============================================================================
+# PPV-Specific Verification Checks
+# =============================================================================
+
+
+def _check_ppv_field_format(output_text: str) -> Tuple[bool, List[str]]:
+    """
+    Check that PPV fields contain only numeric values.
+
+    PPV fields must be in format [PPV:N] where N is an integer.
+    No alphabetic or interpretation content allowed.
+
+    Args:
+        output_text: The text to check.
+
+    Returns:
+        Tuple of (passed, list of violations).
+    """
+    violations: List[str] = []
+
+    # Check for forbidden PPV content (non-numeric)
+    forbidden_matches = _PPV_FORBIDDEN_PATTERN.findall(output_text)
+    if forbidden_matches:
+        for match in forbidden_matches:
+            violations.append(f"PPV field contains non-numeric content: {match}")
+
+    # Check that all PPV fields have valid numeric format
+    # Find all [PPV:...] patterns
+    ppv_pattern = re.compile(r"\[PPV:([^\]]*)\]")
+    all_ppv_fields = ppv_pattern.findall(output_text)
+
+    for field_content in all_ppv_fields:
+        # Verify content is numeric (integer)
+        if field_content and not field_content.isdigit():
+            violations.append(f"PPV field must be numeric: [PPV:{field_content}]")
+
+    return len(violations) == 0, violations
+
+
+def _check_ppv_dims_format(output_text: str) -> Tuple[bool, List[str]]:
+    """
+    Check that PPV_DIMS lines have valid format.
+
+    PPV_DIMS must be [PPV_DIMS:N,N,N,...] where N are integers.
+
+    Args:
+        output_text: The text to check.
+
+    Returns:
+        Tuple of (passed, list of violations).
+    """
+    violations: List[str] = []
+
+    lines = output_text.split("\n")
+    for i, line in enumerate(lines, start=1):
+        if "[PPV_DIMS:" in line:
+            # Full line should match the dims pattern
+            if not _PPV_DIMS_PATTERN.match(line.strip()):
+                # Check what's wrong
+                if not line.strip().startswith("[PPV_DIMS:"):
+                    violations.append(
+                        f"Line {i}: PPV_DIMS must be standalone line"
+                    )
+                elif not line.strip().endswith("]"):
+                    violations.append(
+                        f"Line {i}: PPV_DIMS missing closing bracket"
+                    )
+                else:
+                    violations.append(
+                        f"Line {i}: PPV_DIMS must contain only comma-separated integers"
+                    )
+
+    return len(violations) == 0, violations
+
+
+def _check_ppv_placement(output_text: str) -> Tuple[bool, List[str]]:
+    """
+    Check that PPV fields appear only in approved positions.
+
+    PPV fields must appear:
+        - At end of main content line (inline [PPV:N])
+        - As dedicated PPV_DIMS line at end
+
+    Args:
+        output_text: The text to check.
+
+    Returns:
+        Tuple of (passed, list of violations).
+    """
+    violations: List[str] = []
+
+    lines = output_text.split("\n")
+    for i, line in enumerate(lines, start=1):
+        # PPV_DIMS must be a standalone line (not mixed with other content)
+        if "[PPV_DIMS:" in line:
+            stripped = line.strip()
+            if not stripped.startswith("[PPV_DIMS:") or not stripped.endswith("]"):
+                violations.append(
+                    f"Line {i}: PPV_DIMS must be standalone line"
+                )
+            # PPV_DIMS should only appear at the end
+            if i < len(lines):
+                remaining_lines = [l for l in lines[i:] if l.strip()]
+                if remaining_lines:
+                    violations.append(
+                        f"Line {i}: PPV_DIMS must be the last line"
+                    )
+
+        # Regular PPV field must appear at end of line (after main content)
+        elif "[PPV:" in line:
+            # Must be at end of line
+            ppv_match = re.search(r"\[PPV:\d+\]$", line.strip())
+            if not ppv_match:
+                # Check if PPV appears but not at end
+                if re.search(r"\[PPV:\d+\]", line):
+                    # It's somewhere but not at end - that's ok if followed only by whitespace
+                    ppv_pos = re.search(r"\[PPV:\d+\]", line)
+                    if ppv_pos:
+                        after_ppv = line[ppv_pos.end():]
+                        if after_ppv.strip():
+                            violations.append(
+                                f"Line {i}: PPV field must appear at end of line"
+                            )
+
+    return len(violations) == 0, violations
+
+
+def _check_ppv_no_alphabetic_injection(output_text: str) -> Tuple[bool, List[str]]:
+    """
+    Check that PPV rendering has not introduced new alphabetic tokens.
+
+    PPV should only add numeric content, not new words.
+
+    Args:
+        output_text: The text to check.
+
+    Returns:
+        Tuple of (passed, list of violations).
+    """
+    violations: List[str] = []
+
+    # Extract content from PPV fields and check for alphabetic content
+    ppv_content_pattern = re.compile(r"\[PPV:([^\]]+)\]")
+    matches = ppv_content_pattern.findall(output_text)
+
+    for match in matches:
+        # Check for any alphabetic characters
+        if re.search(r"[a-zA-Z]", match):
+            violations.append(
+                f"PPV field contains alphabetic content: [PPV:{match}]"
+            )
+
+    # Check PPV_DIMS content
+    dims_content_pattern = re.compile(r"\[PPV_DIMS:([^\]]+)\]")
+    dims_matches = dims_content_pattern.findall(output_text)
+
+    for match in dims_matches:
+        # Should only be digits and commas
+        if re.search(r"[^0-9,]", match):
+            violations.append(
+                f"PPV_DIMS contains non-numeric content: [PPV_DIMS:{match}]"
+            )
+
+    return len(violations) == 0, violations
+
+
+# =============================================================================
 # Main Verification Function
 # =============================================================================
 
@@ -421,6 +608,191 @@ def verify_output(render_result: TemplateRenderResult) -> VerifierReport:
 
 
 # =============================================================================
+# PPV-Aware Verification Function
+# =============================================================================
+
+
+def verify_output_with_ppv(
+    render_result: TemplateRenderResult,
+    ppv_present: bool = False,
+    ppv_template_supported: bool = False,
+) -> VerifierReport:
+    """
+    Perform full structural verification including PPV checks.
+
+    This function extends verify_output with PPV-specific checks:
+        - PPV field format (numeric only)
+        - PPV_DIMS format
+        - PPV placement
+        - PPV alphabetic injection check
+        - PPV template support check (for GOVERNED)
+
+    Args:
+        render_result: The template render result to verify.
+        ppv_present: Whether PPV data was attached.
+        ppv_template_supported: Whether the template supports PPV.
+
+    Returns:
+        VerifierReport with full verification results including PPV checks.
+    """
+    output_text = render_result.output_text
+    checks: List[VerificationCheck] = []
+    all_forbidden_found: List[str] = []
+    all_structural_violations: List[str] = []
+
+    # ===== Standard checks (same as verify_output) =====
+
+    # Check 1: Forbidden vocabulary
+    vocab_passed, forbidden_found = _check_forbidden_vocabulary(output_text)
+    checks.append(VerificationCheck(
+        check_name="forbidden_vocabulary",
+        passed=vocab_passed,
+        details=f"Found: {forbidden_found}" if forbidden_found else "No forbidden words"
+    ))
+    all_forbidden_found.extend(forbidden_found)
+
+    # Check 2: Line length
+    line_passed, line_violations = _check_line_length(output_text)
+    checks.append(VerificationCheck(
+        check_name="line_length",
+        passed=line_passed,
+        details="; ".join(line_violations) if line_violations else "All lines within limit"
+    ))
+    all_structural_violations.extend(line_violations)
+
+    # Check 3: Total length
+    total_passed, total_details = _check_total_length(output_text)
+    checks.append(VerificationCheck(
+        check_name="total_length",
+        passed=total_passed,
+        details=total_details
+    ))
+    if not total_passed:
+        all_structural_violations.append(total_details)
+
+    # Check 4: Template shape
+    shape_passed, shape_details = _check_template_shape(output_text)
+    checks.append(VerificationCheck(
+        check_name="template_shape",
+        passed=shape_passed,
+        details=shape_details
+    ))
+    if not shape_passed:
+        all_structural_violations.append(shape_details)
+
+    # Check 5: No null bytes
+    null_passed, null_details = _check_no_null_bytes(output_text)
+    checks.append(VerificationCheck(
+        check_name="no_null_bytes",
+        passed=null_passed,
+        details=null_details
+    ))
+    if not null_passed:
+        all_structural_violations.append(null_details)
+
+    # Check 6: Balanced brackets
+    bracket_passed, bracket_details = _check_balanced_brackets(output_text)
+    checks.append(VerificationCheck(
+        check_name="balanced_brackets",
+        passed=bracket_passed,
+        details=bracket_details
+    ))
+    if not bracket_passed:
+        all_structural_violations.append(bracket_details)
+
+    # Check 7: Regime prefix
+    regime_passed, regime_details = _check_regime_prefix(output_text)
+    checks.append(VerificationCheck(
+        check_name="regime_prefix",
+        passed=regime_passed,
+        details=regime_details
+    ))
+    if not regime_passed:
+        all_structural_violations.append(regime_details)
+
+    # ===== PPV-specific checks =====
+
+    # Check 8: PPV field format (numeric only)
+    ppv_format_passed, ppv_format_violations = _check_ppv_field_format(output_text)
+    checks.append(VerificationCheck(
+        check_name="ppv_field_format",
+        passed=ppv_format_passed,
+        details="; ".join(ppv_format_violations) if ppv_format_violations else "PPV fields numeric only"
+    ))
+    all_structural_violations.extend(ppv_format_violations)
+
+    # Check 9: PPV_DIMS format
+    ppv_dims_passed, ppv_dims_violations = _check_ppv_dims_format(output_text)
+    checks.append(VerificationCheck(
+        check_name="ppv_dims_format",
+        passed=ppv_dims_passed,
+        details="; ".join(ppv_dims_violations) if ppv_dims_violations else "PPV_DIMS format valid"
+    ))
+    all_structural_violations.extend(ppv_dims_violations)
+
+    # Check 10: PPV placement
+    ppv_placement_passed, ppv_placement_violations = _check_ppv_placement(output_text)
+    checks.append(VerificationCheck(
+        check_name="ppv_placement",
+        passed=ppv_placement_passed,
+        details="; ".join(ppv_placement_violations) if ppv_placement_violations else "PPV placement valid"
+    ))
+    all_structural_violations.extend(ppv_placement_violations)
+
+    # Check 11: PPV alphabetic injection
+    ppv_alpha_passed, ppv_alpha_violations = _check_ppv_no_alphabetic_injection(output_text)
+    checks.append(VerificationCheck(
+        check_name="ppv_no_alphabetic_injection",
+        passed=ppv_alpha_passed,
+        details="; ".join(ppv_alpha_violations) if ppv_alpha_violations else "No PPV alphabetic injection"
+    ))
+    all_structural_violations.extend(ppv_alpha_violations)
+
+    # Check 12: PPV template support (GOVERNED mode critical)
+    # If PPV is present but template doesn't support it, fail in GOVERNED
+    has_ppv_in_output = "[PPV:" in output_text or "[PPV_DIMS:" in output_text
+    ppv_support_passed = True
+    ppv_support_details = "PPV template support check passed"
+
+    if ppv_present and has_ppv_in_output and not ppv_template_supported:
+        ppv_support_passed = False
+        ppv_support_details = "PPV present but template does not support PPV (GOVERNED fail)"
+    elif ppv_present and not has_ppv_in_output:
+        # PPV was present but not rendered - this is OK (template may not support)
+        ppv_support_details = "PPV present but not rendered (template fallback)"
+    elif not ppv_present and has_ppv_in_output:
+        # PPV in output but wasn't present - this is a bug
+        ppv_support_passed = False
+        ppv_support_details = "PPV in output but no PPV data present"
+
+    checks.append(VerificationCheck(
+        check_name="ppv_template_support",
+        passed=ppv_support_passed,
+        details=ppv_support_details
+    ))
+    if not ppv_support_passed:
+        all_structural_violations.append(ppv_support_details)
+
+    # Overall pass/fail
+    overall_passed = all(c.passed for c in checks)
+
+    # Compute deterministic report hash
+    hash_input = "|".join([
+        f"{c.check_name}:{c.passed}:{c.details}"
+        for c in checks
+    ])
+    report_hash = hashlib.sha256(hash_input.encode("utf-8")).hexdigest()[:16]
+
+    return VerifierReport(
+        checks=tuple(checks),
+        passed=overall_passed,
+        report_hash=report_hash,
+        forbidden_words_found=tuple(all_forbidden_found),
+        structural_violations=tuple(all_structural_violations),
+    )
+
+
+# =============================================================================
 # Verifier Metadata
 # =============================================================================
 
@@ -457,6 +829,7 @@ __all__ = [
     "VerifierReport",
     # Functions
     "verify_output",
+    "verify_output_with_ppv",
     "get_verifier_version",
     "get_forbidden_vocabulary_count",
     "get_max_line_length",
