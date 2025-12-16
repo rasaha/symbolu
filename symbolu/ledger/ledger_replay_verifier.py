@@ -33,7 +33,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Mapping, Optional, Tuple
+from typing import Iterator, Mapping, Optional, Sequence, Tuple
 
 from symbolu.ontology.router.ontological_router_r1 import (
     LedgerAdapter,
@@ -42,6 +42,13 @@ from symbolu.ontology.router.ontological_router_r1 import (
     OntologicalLayerRouter,
     ProjectionRequest,
 )
+
+
+# =============================================================================
+# Constants
+# =============================================================================
+
+MAPPING_VERSION = "M1.0"
 
 
 # =============================================================================
@@ -73,6 +80,8 @@ class ReplayError(Enum):
     MISSING_ENTRY = "MISSING_ENTRY"
     EXTRA_ENTRY = "EXTRA_ENTRY"
     ROUTER_VERSION_MISMATCH = "ROUTER_VERSION_MISMATCH"
+    HASH_CHAIN_MISMATCH = "HASH_CHAIN_MISMATCH"
+    SEQ_MISMATCH = "SEQ_MISMATCH"
 
 
 # =============================================================================
@@ -147,6 +156,72 @@ class LedgerProjectionEntry:
             raise ValueError("router_version must be a non-empty string")
         if not isinstance(self.entry_hash, str) or len(self.entry_hash) != 16:
             raise ValueError("entry_hash must be a 16-character hex string")
+
+
+# =============================================================================
+# LedgerEntry (New Spec-Compliant)
+# =============================================================================
+
+@dataclass(frozen=True)
+class LedgerEntry:
+    """
+    Append-only ledger entry with hash chain linkage.
+
+    Fields (per specification):
+        entry_id: str - SHA-256 derived from canonical JSON (16 hex chars)
+        prev_entry_id: Optional[str] - Hash chain link to previous entry
+        span_id: str - Deterministic span ID
+        artifact_id: str - Opaque artifact identifier
+        artifact_hash: str - Precomputed artifact hash
+        phase_id: str - Phase identifier
+        projected_layers: Tuple[OntologicalLayer, ...] - Projected layers
+        router_version: str - Router version string
+        mapping_version: str - Mapping version string
+        seq: int - Monotonic sequence number (NO timestamps)
+
+    Invariants:
+        - All fields are immutable after construction
+        - entry_id is derived from canonical JSON serialization
+        - prev_entry_id links to previous entry (None for first)
+        - Same input produces identical output (deterministic)
+        - No timestamps, no randomness
+    """
+    entry_id: str
+    prev_entry_id: Optional[str]
+    span_id: str
+    artifact_id: str
+    artifact_hash: str
+    phase_id: str
+    projected_layers: Tuple[OntologicalLayer, ...]
+    router_version: str
+    mapping_version: str
+    seq: int
+
+    def __post_init__(self) -> None:
+        """Validate invariants on construction (fail-closed)."""
+        if not isinstance(self.entry_id, str) or len(self.entry_id) != 16:
+            raise ValueError("entry_id must be a 16-character hex string")
+        if self.prev_entry_id is not None:
+            if not isinstance(self.prev_entry_id, str) or len(self.prev_entry_id) != 16:
+                raise ValueError("prev_entry_id must be None or a 16-character hex string")
+        if not isinstance(self.span_id, str) or len(self.span_id) == 0:
+            raise ValueError("span_id must be a non-empty string")
+        if not isinstance(self.artifact_id, str) or len(self.artifact_id) == 0:
+            raise ValueError("artifact_id must be a non-empty string")
+        if not isinstance(self.artifact_hash, str) or len(self.artifact_hash) == 0:
+            raise ValueError("artifact_hash must be a non-empty string")
+        if not isinstance(self.phase_id, str) or len(self.phase_id) == 0:
+            raise ValueError("phase_id must be a non-empty string")
+        if not isinstance(self.projected_layers, tuple):
+            raise ValueError("projected_layers must be a tuple")
+        if not all(isinstance(layer, OntologicalLayer) for layer in self.projected_layers):
+            raise ValueError("all projected_layers must be OntologicalLayer instances")
+        if not isinstance(self.router_version, str) or len(self.router_version) == 0:
+            raise ValueError("router_version must be a non-empty string")
+        if not isinstance(self.mapping_version, str) or len(self.mapping_version) == 0:
+            raise ValueError("mapping_version must be a non-empty string")
+        if not isinstance(self.seq, int) or self.seq < 0:
+            raise ValueError("seq must be a non-negative integer")
 
 
 # =============================================================================
@@ -284,6 +359,185 @@ def create_entry(
         span_id=span_id,
         router_version=router_version,
         entry_hash=entry_hash,
+    )
+
+
+# =============================================================================
+# LedgerEntry Canonical Serialization and Hashing
+# =============================================================================
+
+def compute_entry_id(
+    prev_entry_id: Optional[str],
+    span_id: str,
+    artifact_id: str,
+    artifact_hash: str,
+    phase_id: str,
+    projected_layers: Tuple[OntologicalLayer, ...],
+    router_version: str,
+    mapping_version: str,
+    seq: int,
+) -> str:
+    """
+    Compute the entry_id for a LedgerEntry using SHA-256.
+
+    The entry_id is derived from a canonical JSON representation.
+    Rules:
+        - Keys sorted alphabetically
+        - No timestamps
+        - No randomness
+        - Same entry -> same hash byte-for-byte
+
+    Args:
+        prev_entry_id: Hash chain link to previous entry (None for first).
+        span_id: Deterministic span ID.
+        artifact_id: Opaque artifact identifier.
+        artifact_hash: Precomputed artifact hash.
+        phase_id: Phase identifier.
+        projected_layers: Tuple of projected layers.
+        router_version: Router version string.
+        mapping_version: Mapping version string.
+        seq: Monotonic sequence number.
+
+    Returns:
+        First 16 hex characters of SHA-256 hash.
+    """
+    sorted_layers = sorted(projected_layers, key=lambda l: l.value)
+    layer_names = [layer.name for layer in sorted_layers]
+
+    canonical_dict = {
+        "artifact_hash": artifact_hash,
+        "artifact_id": artifact_id,
+        "mapping_version": mapping_version,
+        "phase_id": phase_id,
+        "prev_entry_id": prev_entry_id,
+        "projected_layers": layer_names,
+        "router_version": router_version,
+        "seq": seq,
+        "span_id": span_id,
+    }
+
+    canonical_json = json.dumps(
+        canonical_dict,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+
+    full_hash = hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+    return full_hash[:16]
+
+
+def create_ledger_entry(
+    prev_entry_id: Optional[str],
+    span_id: str,
+    artifact_id: str,
+    artifact_hash: str,
+    phase_id: str,
+    projected_layers: Tuple[OntologicalLayer, ...],
+    router_version: str,
+    mapping_version: str,
+    seq: int,
+) -> LedgerEntry:
+    """
+    Create a LedgerEntry with computed entry_id.
+
+    Args:
+        prev_entry_id: Hash chain link to previous entry (None for first).
+        span_id: Deterministic span ID.
+        artifact_id: Opaque artifact identifier.
+        artifact_hash: Precomputed artifact hash.
+        phase_id: Phase identifier.
+        projected_layers: Tuple of projected layers.
+        router_version: Router version string.
+        mapping_version: Mapping version string.
+        seq: Monotonic sequence number.
+
+    Returns:
+        A new LedgerEntry with computed entry_id.
+    """
+    entry_id = compute_entry_id(
+        prev_entry_id=prev_entry_id,
+        span_id=span_id,
+        artifact_id=artifact_id,
+        artifact_hash=artifact_hash,
+        phase_id=phase_id,
+        projected_layers=projected_layers,
+        router_version=router_version,
+        mapping_version=mapping_version,
+        seq=seq,
+    )
+
+    return LedgerEntry(
+        entry_id=entry_id,
+        prev_entry_id=prev_entry_id,
+        span_id=span_id,
+        artifact_id=artifact_id,
+        artifact_hash=artifact_hash,
+        phase_id=phase_id,
+        projected_layers=projected_layers,
+        router_version=router_version,
+        mapping_version=mapping_version,
+        seq=seq,
+    )
+
+
+def ledger_entry_to_dict(entry: LedgerEntry) -> Mapping[str, object]:
+    """
+    Convert a LedgerEntry to a JSON-serializable dict.
+
+    Args:
+        entry: The entry to convert.
+
+    Returns:
+        A dictionary suitable for JSON serialization.
+    """
+    return {
+        "entry_id": entry.entry_id,
+        "prev_entry_id": entry.prev_entry_id,
+        "span_id": entry.span_id,
+        "artifact_id": entry.artifact_id,
+        "artifact_hash": entry.artifact_hash,
+        "phase_id": entry.phase_id,
+        "projected_layers": [layer.name for layer in entry.projected_layers],
+        "router_version": entry.router_version,
+        "mapping_version": entry.mapping_version,
+        "seq": entry.seq,
+    }
+
+
+def dict_to_ledger_entry(data: Mapping[str, object]) -> LedgerEntry:
+    """
+    Convert a dictionary to a LedgerEntry.
+
+    Args:
+        data: The dictionary containing entry data.
+
+    Returns:
+        A LedgerEntry instance.
+    """
+    layer_names = data["projected_layers"]
+    if not isinstance(layer_names, list):
+        raise ValueError("projected_layers must be a list")
+
+    projected_layers = tuple(
+        OntologicalLayer[name] for name in layer_names
+    )
+
+    prev_entry_id = data.get("prev_entry_id")
+    if prev_entry_id is not None:
+        prev_entry_id = str(prev_entry_id)
+
+    return LedgerEntry(
+        entry_id=str(data["entry_id"]),
+        prev_entry_id=prev_entry_id,
+        span_id=str(data["span_id"]),
+        artifact_id=str(data["artifact_id"]),
+        artifact_hash=str(data["artifact_hash"]),
+        phase_id=str(data["phase_id"]),
+        projected_layers=projected_layers,
+        router_version=str(data["router_version"]),
+        mapping_version=str(data["mapping_version"]),
+        seq=int(data["seq"]),  # type: ignore[arg-type]
     )
 
 
@@ -440,6 +694,142 @@ class LedgerReplayVerifier:
             return projected_layers[0]
 
         return None
+
+
+# =============================================================================
+# Standalone verify_ledger_replay Function (Spec-Compliant)
+# =============================================================================
+
+def verify_ledger_replay(
+    entries: Sequence[LedgerEntry],
+    router: OntologicalLayerRouter,
+) -> VerificationResult:
+    """
+    Verify ledger entries with hash chain integrity.
+
+    Checks (ALL REQUIRED - FAIL-CLOSED on any mismatch):
+        1. Hash chain integrity (prev_entry_id)
+        2. Recomputed entry_id matches stored
+        3. Recomputed span_id matches stored
+        4. Recomputed router projection matches projected_layers
+        5. Sequence ordering is strict and monotonic
+
+    Args:
+        entries: Sequence of LedgerEntry to verify.
+        router: The OntologicalLayerRouter to use for recomputation.
+
+    Returns:
+        VerificationResult indicating PASS or FAIL.
+
+    Note:
+        No recovery. No warnings. Only PASS / FAIL.
+    """
+    from symbolu.ontology.router.ontological_router_r1 import (
+        PHASE_TO_LAYER_DEFAULT,
+    )
+
+    prev_entry_id: Optional[str] = None
+
+    for idx, entry in enumerate(entries):
+        # Check 5: Sequence ordering is strict and monotonic
+        if entry.seq != idx:
+            return VerificationResult(
+                success=False,
+                error=ReplayError.SEQ_MISMATCH,
+                failed_index=idx,
+            )
+
+        # Check 1: Hash chain integrity (prev_entry_id)
+        if entry.prev_entry_id != prev_entry_id:
+            return VerificationResult(
+                success=False,
+                error=ReplayError.HASH_CHAIN_MISMATCH,
+                failed_index=idx,
+            )
+
+        # Check router version
+        if entry.router_version != router.ROUTER_VERSION:
+            return VerificationResult(
+                success=False,
+                error=ReplayError.ROUTER_VERSION_MISMATCH,
+                failed_index=idx,
+            )
+
+        # Infer hint for router replay
+        default_layers = PHASE_TO_LAYER_DEFAULT.get(entry.phase_id)
+        declared_hint: Optional[OntologicalLayer] = None
+        if default_layers is not None and entry.projected_layers != default_layers:
+            if len(entry.projected_layers) == 1:
+                declared_hint = entry.projected_layers[0]
+
+        # Check 4: Recomputed router projection matches projected_layers
+        request = ProjectionRequest(
+            artifact_id=entry.artifact_id,
+            phase_id=entry.phase_id,
+            artifact_hash=entry.artifact_hash,
+            declared_projection_hint=declared_hint,
+        )
+
+        try:
+            response = router.project(request)
+        except Exception:
+            return VerificationResult(
+                success=False,
+                error=ReplayError.LAYER_MISMATCH,
+                failed_index=idx,
+            )
+
+        if response.projected_layers != entry.projected_layers:
+            return VerificationResult(
+                success=False,
+                error=ReplayError.LAYER_MISMATCH,
+                failed_index=idx,
+            )
+
+        # Check 3: Recomputed span_id matches stored
+        expected_span_id = LedgerAdapter.generate_span_id(
+            LedgerSpanInput(
+                artifact_hash=entry.artifact_hash,
+                phase_id=entry.phase_id,
+                projected_layers=entry.projected_layers,
+            )
+        )
+
+        if expected_span_id != entry.span_id:
+            return VerificationResult(
+                success=False,
+                error=ReplayError.SPAN_ID_MISMATCH,
+                failed_index=idx,
+            )
+
+        # Check 2: Recomputed entry_id matches stored
+        expected_entry_id = compute_entry_id(
+            prev_entry_id=entry.prev_entry_id,
+            span_id=entry.span_id,
+            artifact_id=entry.artifact_id,
+            artifact_hash=entry.artifact_hash,
+            phase_id=entry.phase_id,
+            projected_layers=entry.projected_layers,
+            router_version=entry.router_version,
+            mapping_version=entry.mapping_version,
+            seq=entry.seq,
+        )
+
+        if expected_entry_id != entry.entry_id:
+            return VerificationResult(
+                success=False,
+                error=ReplayError.ENTRY_ID_MISMATCH,
+                failed_index=idx,
+            )
+
+        # Update prev_entry_id for next iteration
+        prev_entry_id = entry.entry_id
+
+    return VerificationResult(
+        success=True,
+        error=None,
+        failed_index=None,
+    )
 
 
 # =============================================================================
