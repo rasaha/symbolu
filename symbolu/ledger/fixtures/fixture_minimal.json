@@ -1,0 +1,18 @@
+{
+  "entries": [
+    {
+      "artifact_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "artifact_id": "artifact_minimal_001",
+      "entry_hash": "eafcca58e10eca71",
+      "ledger_index": 0,
+      "phase_id": "1b",
+      "projected_layers": ["ACTING"],
+      "router_version": "R1.0",
+      "span_id": "83d18d0145881102"
+    }
+  ],
+  "metadata": {
+    "description": "Single artifact, single phase - minimal fixture",
+    "fixture_type": "minimal"
+  }
+}
