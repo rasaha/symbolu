@@ -1,0 +1,19 @@
+{
+  "entries": [
+    {
+      "artifact_hash": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+      "artifact_id": "artifact_hint_001",
+      "entry_hash": "d8472d4549493fa6",
+      "ledger_index": 0,
+      "phase_id": "4",
+      "projected_layers": ["THINKING"],
+      "router_version": "R1.0",
+      "span_id": "b5157c68cec82301"
+    }
+  ],
+  "metadata": {
+    "description": "Phase 4 using THINKING instead of FORMING via declared hint",
+    "fixture_type": "hint_override",
+    "notes": "Verifies correct replacement (not augmentation) when hint is applied"
+  }
+}
