@@ -16,15 +16,18 @@
 
 Phase-11 is a **creative wind tunnel for expression**.
 
-It is an isolated experimental space designed to explore whether:
+It is an isolated experimental space. The scaffolded documents explore whether
+ontological routing and PPV can produce generative behavior. But the scaffolding
+is optional. The real question is broader:
 
-- **Ontological routing** (layer selection, path traversal)
-- **PPV influence** (Phonemic Propensity Vectors as soft bias signals)
-- **Probabilistic choice** (random sampling, soft weights)
+> Can structure produce expression — or does expression require breaking structure?
 
-...can produce generative behavior that is expressive enough to matter—without committing to transformers, neural networks, or full probabilistic learning.
+This sandbox provides both:
+- **Scaffolded exploration** (axes, modes, protocols)
+- **Freeform exploration** (no frame, no metrics, just try things)
 
-This is not intelligence. This is not meaning. This is structural experimentation.
+Start wherever feels right. The scaffolding exists if you want handrails.
+`freeform.md` exists if you want to let go.
 
 ## What Phase-11 Is NOT
 
@@ -106,6 +109,7 @@ Phase-11 exists in a separate `/docs/experiments/` directory to:
 | `generative_axes.md` | Dimensions of experimental freedom |
 | `sandbox_modes.md` | Defined experimental configurations |
 | `integration_notes.md` | Future integration concepts (not commitments) |
+| `freeform.md` | Permission to ignore everything above |
 
 ## Ground Rules
 
@@ -117,10 +121,10 @@ Phase-11 exists in a separate `/docs/experiments/` directory to:
 
 ## How to Read This Documentation
 
-- **If you want to understand scope**: Read `phase11_scope.md`
-- **If you want to understand what we're varying**: Read `generative_axes.md`
-- **If you want to run experiments**: Read `sandbox_modes.md`
-- **If you want to think about the future**: Read `integration_notes.md`
+- **If you want structure**: Start with `phase11_scope.md` → `generative_axes.md` → `sandbox_modes.md`
+- **If you want freedom**: Start with `freeform.md`, ignore the rest
+- **If you want to think about later**: Read `integration_notes.md`
+- **If you don't know**: Pick one and see what happens
 
 ---
 
