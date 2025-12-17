@@ -321,11 +321,24 @@ from symbolu.formulas.varna_bridge_loader import is_consonant, get_bridge_meanin
 | Component | Status | Action Required |
 |-----------|--------|-----------------|
 | `varna_bridge_map_v1.json` | VALID | Ground-truth source |
-| `acoustic_unit_mapper.py` | INVALID | Replace with data-driven |
+| `symbolu/formulas/acoustic_unit_mapper.py` | **OBSOLETE** | Do NOT use - contains heuristics |
+| `docs/experiments/acoustic_unit_mapper_expressive_delta_v3_1.py` | **CORRECT** | Use this implementation |
 | `vritti_mapper.py` | INVALID | Needs new ground-truth mapping |
 | `ppv_builder_v1.py` | INVALID | PPV features need ground-truth |
-| v3.1 experimental mapper | VALID | Model for production |
 | `varna_bridge_loader.py` | NEW | Central data authority |
+
+### CRITICAL: Correct Acoustic Unit Mapper
+
+**DO NOT USE:** `symbolu/formulas/acoustic_unit_mapper.py`
+- Contains heuristic IPA-based mappings
+- `SoundClass`, `VowelHeight`, `VowelBackness` are NOT from ground-truth
+- This file is **OBSOLETE**
+
+**USE INSTEAD:** `docs/experiments/acoustic_unit_mapper_expressive_delta_v3_1.py`
+- Loads `varna_bridge_map_v1.json` as sole authority
+- Uses `VarnaBridgeMap` class for data-driven lookups
+- Emits unknown varnas without heuristic classification
+- Has explicit `NO_PHONETIC_HEURISTICS: True` invariant
 
 ### Success Condition
 
