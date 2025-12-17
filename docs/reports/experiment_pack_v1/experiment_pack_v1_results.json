@@ -1,0 +1,3387 @@
+{
+  "metadata": {
+    "timestamp": "2025-12-17T01:19:05.907085",
+    "seed": 1234,
+    "corpus_size": 55,
+    "corpus_hash": "291e8ce6150a"
+  },
+  "baseline_results": {
+    "truth": {
+      "word": "truth",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "u",
+          "varna_type": "vowel",
+          "bridge_meaning": "contraction_focus",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "u"
+        },
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "UNKNOWN_h",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "h"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "contraction_focus",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O2_FORMING": 1.0
+      },
+      "unknown_count": 4,
+      "total_varnas": 5,
+      "final_layer": "O2_FORMING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "03b35a0ca088"
+    },
+    "becoming": {
+      "word": "becoming",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_b",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "b"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "UNKNOWN_c",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "c"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_m",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "m"
+        },
+        {
+          "varna_key": "i",
+          "varna_type": "vowel",
+          "bridge_meaning": "self_doing",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "i"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        },
+        {
+          "varna_key": "UNKNOWN_g",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "g"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "practical_cognition",
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN",
+        "self_doing",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 1.0,
+        "O10_ABSOLVING": 1.0,
+        "O3_ACTING": 1.0
+      },
+      "unknown_count": 5,
+      "total_varnas": 8,
+      "final_layer": "O1_THINKING",
+      "confidence": 0.3333333333333333,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "27174335b718"
+    },
+    "loss": {
+      "word": "loss",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_l",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "l"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 4,
+      "final_layer": "O10_ABSOLVING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "e1e2329c6c77"
+    },
+    "meaning": {
+      "word": "meaning",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_m",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "m"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "a",
+          "varna_type": "vowel",
+          "bridge_meaning": "birth_of_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "a"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        },
+        {
+          "varna_key": "i",
+          "varna_type": "vowel",
+          "bridge_meaning": "self_doing",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "i"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        },
+        {
+          "varna_key": "UNKNOWN_g",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "g"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "practical_cognition",
+        "birth_of_cognition",
+        "UNKNOWN",
+        "self_doing",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 2.0,
+        "O3_ACTING": 1.0
+      },
+      "unknown_count": 4,
+      "total_varnas": 7,
+      "final_layer": "O1_THINKING",
+      "confidence": 0.6666666666666666,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "b562f93a868b"
+    },
+    "essence": {
+      "word": "essence",
+      "varna_matches": [
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        },
+        {
+          "varna_key": "UNKNOWN_c",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "c"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        }
+      ],
+      "bridge_meanings": [
+        "practical_cognition",
+        "UNKNOWN",
+        "UNKNOWN",
+        "practical_cognition",
+        "UNKNOWN",
+        "UNKNOWN",
+        "practical_cognition"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 3.0
+      },
+      "unknown_count": 4,
+      "total_varnas": 7,
+      "final_layer": "O1_THINKING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "3e98965b5e0f"
+    },
+    "freedom": {
+      "word": "freedom",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_f",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "f"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "UNKNOWN_d",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "d"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_m",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "m"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "practical_cognition",
+        "practical_cognition",
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 2.0,
+        "O10_ABSOLVING": 1.0
+      },
+      "unknown_count": 4,
+      "total_varnas": 7,
+      "final_layer": "O1_THINKING",
+      "confidence": 0.6666666666666666,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "33d46f4bd60f"
+    },
+    "justice": {
+      "word": "justice",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_j",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "j"
+        },
+        {
+          "varna_key": "u",
+          "varna_type": "vowel",
+          "bridge_meaning": "contraction_focus",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "u"
+        },
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "i",
+          "varna_type": "vowel",
+          "bridge_meaning": "self_doing",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "i"
+        },
+        {
+          "varna_key": "UNKNOWN_c",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "c"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "contraction_focus",
+        "UNKNOWN",
+        "UNKNOWN",
+        "self_doing",
+        "UNKNOWN",
+        "practical_cognition"
+      ],
+      "layer_votes": {
+        "O2_FORMING": 1.0,
+        "O3_ACTING": 1.0,
+        "O1_THINKING": 1.0
+      },
+      "unknown_count": 4,
+      "total_varnas": 7,
+      "final_layer": "O2_FORMING",
+      "confidence": 0.3333333333333333,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "15fb2b488098"
+    },
+    "wisdom": {
+      "word": "wisdom",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_w",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "w"
+        },
+        {
+          "varna_key": "i",
+          "varna_type": "vowel",
+          "bridge_meaning": "self_doing",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "i"
+        },
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "UNKNOWN_d",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "d"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_m",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "m"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "self_doing",
+        "UNKNOWN",
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O3_ACTING": 1.0,
+        "O10_ABSOLVING": 1.0
+      },
+      "unknown_count": 4,
+      "total_varnas": 6,
+      "final_layer": "O3_ACTING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "b5a92f0c5df1"
+    },
+    "beauty": {
+      "word": "beauty",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_b",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "b"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "a",
+          "varna_type": "vowel",
+          "bridge_meaning": "birth_of_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "a"
+        },
+        {
+          "varna_key": "u",
+          "varna_type": "vowel",
+          "bridge_meaning": "contraction_focus",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "u"
+        },
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "UNKNOWN_y",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "y"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "practical_cognition",
+        "birth_of_cognition",
+        "contraction_focus",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 2.0,
+        "O2_FORMING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 6,
+      "final_layer": "O1_THINKING",
+      "confidence": 0.6666666666666666,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "4bd1035b7b78"
+    },
+    "power": {
+      "word": "power",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_p",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "p"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_w",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "w"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN",
+        "practical_cognition",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 1.0,
+        "O1_THINKING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 5,
+      "final_layer": "O10_ABSOLVING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "ef7ec65a41a6"
+    },
+    "build": {
+      "word": "build",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_b",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "b"
+        },
+        {
+          "varna_key": "u",
+          "varna_type": "vowel",
+          "bridge_meaning": "contraction_focus",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "u"
+        },
+        {
+          "varna_key": "i",
+          "varna_type": "vowel",
+          "bridge_meaning": "self_doing",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "i"
+        },
+        {
+          "varna_key": "UNKNOWN_l",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "l"
+        },
+        {
+          "varna_key": "UNKNOWN_d",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "d"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "contraction_focus",
+        "self_doing",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O2_FORMING": 1.0,
+        "O3_ACTING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 5,
+      "final_layer": "O2_FORMING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "1cbfccdd8987"
+    },
+    "break": {
+      "word": "break",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_b",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "b"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "a",
+          "varna_type": "vowel",
+          "bridge_meaning": "birth_of_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "a"
+        },
+        {
+          "varna_key": "UNKNOWN_k",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "k"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "practical_cognition",
+        "birth_of_cognition",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 2.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 5,
+      "final_layer": "O1_THINKING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "f0ac6c730c81"
+    },
+    "flow": {
+      "word": "flow",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_f",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "f"
+        },
+        {
+          "varna_key": "UNKNOWN_l",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "l"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_w",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "w"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 4,
+      "final_layer": "O10_ABSOLVING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "a9e2d70f0724"
+    },
+    "strike": {
+      "word": "strike",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "i",
+          "varna_type": "vowel",
+          "bridge_meaning": "self_doing",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "i"
+        },
+        {
+          "varna_key": "UNKNOWN_k",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "k"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "UNKNOWN",
+        "self_doing",
+        "UNKNOWN",
+        "practical_cognition"
+      ],
+      "layer_votes": {
+        "O3_ACTING": 1.0,
+        "O1_THINKING": 1.0
+      },
+      "unknown_count": 4,
+      "total_varnas": 6,
+      "final_layer": "O3_ACTING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "cf87add87847"
+    },
+    "gather": {
+      "word": "gather",
+      "varna_matches": [
+        {
+          "varna_key": "ga",
+          "varna_type": "consonant",
+          "bridge_meaning": "action_pressure",
+          "varna_group": "ka_varga",
+          "is_unknown": false,
+          "source_chars": "ga"
+        },
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "UNKNOWN_h",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "h"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        }
+      ],
+      "bridge_meanings": [
+        "action_pressure",
+        "UNKNOWN",
+        "UNKNOWN",
+        "practical_cognition",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O3_ACTING": 1.0,
+        "O1_THINKING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 5,
+      "final_layer": "O3_ACTING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "039caec7a159"
+    },
+    "push": {
+      "word": "push",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_p",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "p"
+        },
+        {
+          "varna_key": "u",
+          "varna_type": "vowel",
+          "bridge_meaning": "contraction_focus",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "u"
+        },
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "UNKNOWN_h",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "h"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "contraction_focus",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O2_FORMING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 4,
+      "final_layer": "O2_FORMING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "39205862dfd2"
+    },
+    "pull": {
+      "word": "pull",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_p",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "p"
+        },
+        {
+          "varna_key": "u",
+          "varna_type": "vowel",
+          "bridge_meaning": "contraction_focus",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "u"
+        },
+        {
+          "varna_key": "UNKNOWN_l",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "l"
+        },
+        {
+          "varna_key": "UNKNOWN_l",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "l"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "contraction_focus",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O2_FORMING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 4,
+      "final_layer": "O2_FORMING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "7285109eef52"
+    },
+    "throw": {
+      "word": "throw",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "UNKNOWN_h",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "h"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_w",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "w"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 1.0
+      },
+      "unknown_count": 4,
+      "total_varnas": 5,
+      "final_layer": "O10_ABSOLVING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "b87a6eb09dfb"
+    },
+    "catch": {
+      "word": "catch",
+      "varna_matches": [
+        {
+          "varna_key": "ca",
+          "varna_type": "consonant",
+          "bridge_meaning": "scatter_pressure",
+          "varna_group": "ca_varga",
+          "is_unknown": false,
+          "source_chars": "ca"
+        },
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "UNKNOWN_c",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "c"
+        },
+        {
+          "varna_key": "UNKNOWN_h",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "h"
+        }
+      ],
+      "bridge_meanings": [
+        "scatter_pressure",
+        "UNKNOWN",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O6_REASONING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 4,
+      "final_layer": "O6_REASONING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "ce401e2b036b"
+    },
+    "run": {
+      "word": "run",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "u",
+          "varna_type": "vowel",
+          "bridge_meaning": "contraction_focus",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "u"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "contraction_focus",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O2_FORMING": 1.0
+      },
+      "unknown_count": 2,
+      "total_varnas": 3,
+      "final_layer": "O2_FORMING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "d5dc99a24c13"
+    },
+    "fear": {
+      "word": "fear",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_f",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "f"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "a",
+          "varna_type": "vowel",
+          "bridge_meaning": "birth_of_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "a"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "practical_cognition",
+        "birth_of_cognition",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 2.0
+      },
+      "unknown_count": 2,
+      "total_varnas": 4,
+      "final_layer": "O1_THINKING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "a197fc66fa4e"
+    },
+    "calm": {
+      "word": "calm",
+      "varna_matches": [
+        {
+          "varna_key": "ca",
+          "varna_type": "consonant",
+          "bridge_meaning": "scatter_pressure",
+          "varna_group": "ca_varga",
+          "is_unknown": false,
+          "source_chars": "ca"
+        },
+        {
+          "varna_key": "UNKNOWN_l",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "l"
+        },
+        {
+          "varna_key": "UNKNOWN_m",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "m"
+        }
+      ],
+      "bridge_meanings": [
+        "scatter_pressure",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O6_REASONING": 1.0
+      },
+      "unknown_count": 2,
+      "total_varnas": 3,
+      "final_layer": "O6_REASONING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "5753f7df1dd9"
+    },
+    "longing": {
+      "word": "longing",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_l",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "l"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        },
+        {
+          "varna_key": "UNKNOWN_g",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "g"
+        },
+        {
+          "varna_key": "i",
+          "varna_type": "vowel",
+          "bridge_meaning": "self_doing",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "i"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        },
+        {
+          "varna_key": "UNKNOWN_g",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "g"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN",
+        "UNKNOWN",
+        "self_doing",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 1.0,
+        "O3_ACTING": 1.0
+      },
+      "unknown_count": 5,
+      "total_varnas": 7,
+      "final_layer": "O10_ABSOLVING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "90014789195f"
+    },
+    "joy": {
+      "word": "joy",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_j",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "j"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_y",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "y"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 1.0
+      },
+      "unknown_count": 2,
+      "total_varnas": 3,
+      "final_layer": "O10_ABSOLVING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "24f632beb43b"
+    },
+    "grief": {
+      "word": "grief",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_g",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "g"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "i",
+          "varna_type": "vowel",
+          "bridge_meaning": "self_doing",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "i"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "UNKNOWN_f",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "f"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "self_doing",
+        "practical_cognition",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O3_ACTING": 1.0,
+        "O1_THINKING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 5,
+      "final_layer": "O3_ACTING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "409fac7a31c9"
+    },
+    "hope": {
+      "word": "hope",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_h",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "h"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_p",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "p"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN",
+        "practical_cognition"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 1.0,
+        "O1_THINKING": 1.0
+      },
+      "unknown_count": 2,
+      "total_varnas": 4,
+      "final_layer": "O10_ABSOLVING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "08788cbcb1d5"
+    },
+    "despair": {
+      "word": "despair",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_d",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "d"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "pa",
+          "varna_type": "consonant",
+          "bridge_meaning": "revulsion_pressure",
+          "varna_group": "pa_varga",
+          "is_unknown": false,
+          "source_chars": "pa"
+        },
+        {
+          "varna_key": "i",
+          "varna_type": "vowel",
+          "bridge_meaning": "self_doing",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "i"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "practical_cognition",
+        "UNKNOWN",
+        "revulsion_pressure",
+        "self_doing",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 1.0,
+        "O8_META_OBSERVING": 1.0,
+        "O3_ACTING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 6,
+      "final_layer": "O1_THINKING",
+      "confidence": 0.3333333333333333,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "aab442f0d14d"
+    },
+    "anger": {
+      "word": "anger",
+      "varna_matches": [
+        {
+          "varna_key": "a",
+          "varna_type": "vowel",
+          "bridge_meaning": "birth_of_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "a"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        },
+        {
+          "varna_key": "UNKNOWN_g",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "g"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        }
+      ],
+      "bridge_meanings": [
+        "birth_of_cognition",
+        "UNKNOWN",
+        "UNKNOWN",
+        "practical_cognition",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 2.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 5,
+      "final_layer": "O1_THINKING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "f031d74235d0"
+    },
+    "peace": {
+      "word": "peace",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_p",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "p"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "a",
+          "varna_type": "vowel",
+          "bridge_meaning": "birth_of_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "a"
+        },
+        {
+          "varna_key": "UNKNOWN_c",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "c"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "practical_cognition",
+        "birth_of_cognition",
+        "UNKNOWN",
+        "practical_cognition"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 3.0
+      },
+      "unknown_count": 2,
+      "total_varnas": 5,
+      "final_layer": "O1_THINKING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "b3447d1e95bf"
+    },
+    "love": {
+      "word": "love",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_l",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "l"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_v",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "v"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN",
+        "practical_cognition"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 1.0,
+        "O1_THINKING": 1.0
+      },
+      "unknown_count": 2,
+      "total_varnas": 4,
+      "final_layer": "O10_ABSOLVING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "932a1ba4ea4f"
+    },
+    "stone": {
+      "word": "stone",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN",
+        "practical_cognition"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 1.0,
+        "O1_THINKING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 5,
+      "final_layer": "O10_ABSOLVING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "aa5829075b7f"
+    },
+    "water": {
+      "word": "water",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_w",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "w"
+        },
+        {
+          "varna_key": "a",
+          "varna_type": "vowel",
+          "bridge_meaning": "birth_of_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "a"
+        },
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "birth_of_cognition",
+        "UNKNOWN",
+        "practical_cognition",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 2.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 5,
+      "final_layer": "O1_THINKING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "de9089837156"
+    },
+    "light": {
+      "word": "light",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_l",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "l"
+        },
+        {
+          "varna_key": "i",
+          "varna_type": "vowel",
+          "bridge_meaning": "self_doing",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "i"
+        },
+        {
+          "varna_key": "UNKNOWN_g",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "g"
+        },
+        {
+          "varna_key": "UNKNOWN_h",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "h"
+        },
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "self_doing",
+        "UNKNOWN",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O3_ACTING": 1.0
+      },
+      "unknown_count": 4,
+      "total_varnas": 5,
+      "final_layer": "O3_ACTING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "8d2c85811a25"
+    },
+    "fire": {
+      "word": "fire",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_f",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "f"
+        },
+        {
+          "varna_key": "i",
+          "varna_type": "vowel",
+          "bridge_meaning": "self_doing",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "i"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "self_doing",
+        "UNKNOWN",
+        "practical_cognition"
+      ],
+      "layer_votes": {
+        "O3_ACTING": 1.0,
+        "O1_THINKING": 1.0
+      },
+      "unknown_count": 2,
+      "total_varnas": 4,
+      "final_layer": "O3_ACTING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "8d349fe847ac"
+    },
+    "wind": {
+      "word": "wind",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_w",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "w"
+        },
+        {
+          "varna_key": "i",
+          "varna_type": "vowel",
+          "bridge_meaning": "self_doing",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "i"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        },
+        {
+          "varna_key": "UNKNOWN_d",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "d"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "self_doing",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O3_ACTING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 4,
+      "final_layer": "O3_ACTING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "c218cae47a1b"
+    },
+    "tree": {
+      "word": "tree",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "practical_cognition",
+        "practical_cognition"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 2.0
+      },
+      "unknown_count": 2,
+      "total_varnas": 4,
+      "final_layer": "O1_THINKING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "702c66d27fed"
+    },
+    "cloud": {
+      "word": "cloud",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_c",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "c"
+        },
+        {
+          "varna_key": "UNKNOWN_l",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "l"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "u",
+          "varna_type": "vowel",
+          "bridge_meaning": "contraction_focus",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "u"
+        },
+        {
+          "varna_key": "UNKNOWN_d",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "d"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "closure_completion",
+        "contraction_focus",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 1.0,
+        "O2_FORMING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 5,
+      "final_layer": "O10_ABSOLVING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "8e70e00820c6"
+    },
+    "earth": {
+      "word": "earth",
+      "varna_matches": [
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "a",
+          "varna_type": "vowel",
+          "bridge_meaning": "birth_of_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "a"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "UNKNOWN_h",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "h"
+        }
+      ],
+      "bridge_meanings": [
+        "practical_cognition",
+        "birth_of_cognition",
+        "UNKNOWN",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 2.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 5,
+      "final_layer": "O1_THINKING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "36bf89e85085"
+    },
+    "star": {
+      "word": "star",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "ta",
+          "varna_type": "consonant",
+          "bridge_meaning": "inertia_pressure",
+          "varna_group": "ta_varga",
+          "is_unknown": false,
+          "source_chars": "ta"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "inertia_pressure",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O6_REASONING": 1.0
+      },
+      "unknown_count": 2,
+      "total_varnas": 3,
+      "final_layer": "O6_REASONING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "7e30f62c61b1"
+    },
+    "moon": {
+      "word": "moon",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_m",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "m"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "closure_completion",
+        "closure_completion",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 2.0
+      },
+      "unknown_count": 2,
+      "total_varnas": 4,
+      "final_layer": "O10_ABSOLVING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "f319efbc6270"
+    },
+    "change": {
+      "word": "change",
+      "varna_matches": [
+        {
+          "varna_key": "cha",
+          "varna_type": "consonant",
+          "bridge_meaning": "nervous_pressure",
+          "varna_group": "ca_varga",
+          "is_unknown": false,
+          "source_chars": "cha"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        },
+        {
+          "varna_key": "UNKNOWN_g",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "g"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        }
+      ],
+      "bridge_meanings": [
+        "nervous_pressure",
+        "UNKNOWN",
+        "UNKNOWN",
+        "practical_cognition"
+      ],
+      "layer_votes": {
+        "O8_META_OBSERVING": 1.0,
+        "O1_THINKING": 1.0
+      },
+      "unknown_count": 2,
+      "total_varnas": 4,
+      "final_layer": "O8_META_OBSERVING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "d5d83c96fccf"
+    },
+    "process": {
+      "word": "process",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_p",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "p"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_c",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "c"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN",
+        "practical_cognition",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 1.0,
+        "O1_THINKING": 1.0
+      },
+      "unknown_count": 5,
+      "total_varnas": 7,
+      "final_layer": "O10_ABSOLVING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "282fbf3ae341"
+    },
+    "form": {
+      "word": "form",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_f",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "f"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "UNKNOWN_m",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "m"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 4,
+      "final_layer": "O10_ABSOLVING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "116e8ffd3825"
+    },
+    "reason": {
+      "word": "reason",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "a",
+          "varna_type": "vowel",
+          "bridge_meaning": "birth_of_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "a"
+        },
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "practical_cognition",
+        "birth_of_cognition",
+        "UNKNOWN",
+        "closure_completion",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 2.0,
+        "O10_ABSOLVING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 6,
+      "final_layer": "O1_THINKING",
+      "confidence": 0.6666666666666666,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "12d26c0a28cf"
+    },
+    "cause": {
+      "word": "cause",
+      "varna_matches": [
+        {
+          "varna_key": "ca",
+          "varna_type": "consonant",
+          "bridge_meaning": "scatter_pressure",
+          "varna_group": "ca_varga",
+          "is_unknown": false,
+          "source_chars": "ca"
+        },
+        {
+          "varna_key": "u",
+          "varna_type": "vowel",
+          "bridge_meaning": "contraction_focus",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "u"
+        },
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        }
+      ],
+      "bridge_meanings": [
+        "scatter_pressure",
+        "contraction_focus",
+        "UNKNOWN",
+        "practical_cognition"
+      ],
+      "layer_votes": {
+        "O6_REASONING": 1.0,
+        "O2_FORMING": 1.0,
+        "O1_THINKING": 1.0
+      },
+      "unknown_count": 1,
+      "total_varnas": 4,
+      "final_layer": "O6_REASONING",
+      "confidence": 0.3333333333333333,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "21caf86c6eb0"
+    },
+    "karma": {
+      "word": "karma",
+      "varna_matches": [
+        {
+          "varna_key": "ka",
+          "varna_type": "consonant",
+          "bridge_meaning": "hope_pressure",
+          "varna_group": "ka_varga",
+          "is_unknown": false,
+          "source_chars": "ka"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "ma",
+          "varna_type": "consonant",
+          "bridge_meaning": "indulgence_pressure",
+          "varna_group": "pa_varga",
+          "is_unknown": false,
+          "source_chars": "ma"
+        }
+      ],
+      "bridge_meanings": [
+        "hope_pressure",
+        "UNKNOWN",
+        "indulgence_pressure"
+      ],
+      "layer_votes": {
+        "O7_PURPOSING": 2.0
+      },
+      "unknown_count": 1,
+      "total_varnas": 3,
+      "final_layer": "O7_PURPOSING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "ce2751963309"
+    },
+    "dharma": {
+      "word": "dharma",
+      "varna_matches": [
+        {
+          "varna_key": "dha",
+          "varna_type": "consonant",
+          "bridge_meaning": "craving_pressure",
+          "varna_group": "ta_varga",
+          "is_unknown": false,
+          "source_chars": "dha"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "ma",
+          "varna_type": "consonant",
+          "bridge_meaning": "indulgence_pressure",
+          "varna_group": "pa_varga",
+          "is_unknown": false,
+          "source_chars": "ma"
+        }
+      ],
+      "bridge_meanings": [
+        "craving_pressure",
+        "UNKNOWN",
+        "indulgence_pressure"
+      ],
+      "layer_votes": {
+        "O7_PURPOSING": 2.0
+      },
+      "unknown_count": 1,
+      "total_varnas": 3,
+      "final_layer": "O7_PURPOSING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "b175fb642f66"
+    },
+    "yoga": {
+      "word": "yoga",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_y",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "y"
+        },
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "ga",
+          "varna_type": "consonant",
+          "bridge_meaning": "action_pressure",
+          "varna_group": "ka_varga",
+          "is_unknown": false,
+          "source_chars": "ga"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "closure_completion",
+        "action_pressure"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 1.0,
+        "O3_ACTING": 1.0
+      },
+      "unknown_count": 1,
+      "total_varnas": 3,
+      "final_layer": "O10_ABSOLVING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "4fe893fba5da"
+    },
+    "mantra": {
+      "word": "mantra",
+      "varna_matches": [
+        {
+          "varna_key": "ma",
+          "varna_type": "consonant",
+          "bridge_meaning": "indulgence_pressure",
+          "varna_group": "pa_varga",
+          "is_unknown": false,
+          "source_chars": "ma"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        },
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "ra",
+          "varna_type": "consonant",
+          "bridge_meaning": "destruction_pressure",
+          "varna_group": "semi_vowel",
+          "is_unknown": false,
+          "source_chars": "ra"
+        }
+      ],
+      "bridge_meanings": [
+        "indulgence_pressure",
+        "UNKNOWN",
+        "UNKNOWN",
+        "destruction_pressure"
+      ],
+      "layer_votes": {
+        "O7_PURPOSING": 1.0,
+        "O3_ACTING": 1.0
+      },
+      "unknown_count": 2,
+      "total_varnas": 4,
+      "final_layer": "O7_PURPOSING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "189556473f80"
+    },
+    "chakra": {
+      "word": "chakra",
+      "varna_matches": [
+        {
+          "varna_key": "cha",
+          "varna_type": "consonant",
+          "bridge_meaning": "nervous_pressure",
+          "varna_group": "ca_varga",
+          "is_unknown": false,
+          "source_chars": "cha"
+        },
+        {
+          "varna_key": "UNKNOWN_k",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "k"
+        },
+        {
+          "varna_key": "ra",
+          "varna_type": "consonant",
+          "bridge_meaning": "destruction_pressure",
+          "varna_group": "semi_vowel",
+          "is_unknown": false,
+          "source_chars": "ra"
+        }
+      ],
+      "bridge_meanings": [
+        "nervous_pressure",
+        "UNKNOWN",
+        "destruction_pressure"
+      ],
+      "layer_votes": {
+        "O8_META_OBSERVING": 1.0,
+        "O3_ACTING": 1.0
+      },
+      "unknown_count": 1,
+      "total_varnas": 3,
+      "final_layer": "O8_META_OBSERVING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "a7d911c5f0ba"
+    },
+    "think": {
+      "word": "think",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "UNKNOWN_h",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "h"
+        },
+        {
+          "varna_key": "i",
+          "varna_type": "vowel",
+          "bridge_meaning": "self_doing",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "i"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        },
+        {
+          "varna_key": "UNKNOWN_k",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "k"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "self_doing",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O3_ACTING": 1.0
+      },
+      "unknown_count": 4,
+      "total_varnas": 5,
+      "final_layer": "O3_ACTING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "41e936dc1893"
+    },
+    "create": {
+      "word": "create",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_c",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "c"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "a",
+          "varna_type": "vowel",
+          "bridge_meaning": "birth_of_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "a"
+        },
+        {
+          "varna_key": "UNKNOWN_t",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "t"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "practical_cognition",
+        "birth_of_cognition",
+        "UNKNOWN",
+        "practical_cognition"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 3.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 6,
+      "final_layer": "O1_THINKING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "abe599d44884"
+    },
+    "observe": {
+      "word": "observe",
+      "varna_matches": [
+        {
+          "varna_key": "o",
+          "varna_type": "vowel",
+          "bridge_meaning": "closure_completion",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "o"
+        },
+        {
+          "varna_key": "UNKNOWN_b",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "b"
+        },
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "UNKNOWN_v",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "v"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        }
+      ],
+      "bridge_meanings": [
+        "closure_completion",
+        "UNKNOWN",
+        "UNKNOWN",
+        "practical_cognition",
+        "UNKNOWN",
+        "UNKNOWN",
+        "practical_cognition"
+      ],
+      "layer_votes": {
+        "O10_ABSOLVING": 1.0,
+        "O1_THINKING": 2.0
+      },
+      "unknown_count": 4,
+      "total_varnas": 7,
+      "final_layer": "O1_THINKING",
+      "confidence": 0.6666666666666666,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "edf19eae8aa7"
+    },
+    "unify": {
+      "word": "unify",
+      "varna_matches": [
+        {
+          "varna_key": "u",
+          "varna_type": "vowel",
+          "bridge_meaning": "contraction_focus",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "u"
+        },
+        {
+          "varna_key": "UNKNOWN_n",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "n"
+        },
+        {
+          "varna_key": "i",
+          "varna_type": "vowel",
+          "bridge_meaning": "self_doing",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "i"
+        },
+        {
+          "varna_key": "UNKNOWN_f",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "f"
+        },
+        {
+          "varna_key": "UNKNOWN_y",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "y"
+        }
+      ],
+      "bridge_meanings": [
+        "contraction_focus",
+        "UNKNOWN",
+        "self_doing",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "layer_votes": {
+        "O2_FORMING": 1.0,
+        "O3_ACTING": 1.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 5,
+      "final_layer": "O2_FORMING",
+      "confidence": 0.5,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "43514104abb0"
+    },
+    "release": {
+      "word": "release",
+      "varna_matches": [
+        {
+          "varna_key": "UNKNOWN_r",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "r"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "UNKNOWN_l",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "l"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        },
+        {
+          "varna_key": "a",
+          "varna_type": "vowel",
+          "bridge_meaning": "birth_of_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "a"
+        },
+        {
+          "varna_key": "UNKNOWN_s",
+          "varna_type": "unknown",
+          "bridge_meaning": "UNKNOWN",
+          "varna_group": null,
+          "is_unknown": true,
+          "source_chars": "s"
+        },
+        {
+          "varna_key": "e",
+          "varna_type": "vowel",
+          "bridge_meaning": "practical_cognition",
+          "varna_group": null,
+          "is_unknown": false,
+          "source_chars": "e"
+        }
+      ],
+      "bridge_meanings": [
+        "UNKNOWN",
+        "practical_cognition",
+        "UNKNOWN",
+        "practical_cognition",
+        "birth_of_cognition",
+        "UNKNOWN",
+        "practical_cognition"
+      ],
+      "layer_votes": {
+        "O1_THINKING": 4.0
+      },
+      "unknown_count": 3,
+      "total_varnas": 7,
+      "final_layer": "O1_THINKING",
+      "confidence": 1.0,
+      "status": "PARTIAL_UNKNOWN",
+      "routing_hash": "fb1b248beae8"
+    }
+  },
+  "layer_distribution": {
+    "O2_FORMING": 7,
+    "O1_THINKING": 17,
+    "O10_ABSOLVING": 14,
+    "O3_ACTING": 8,
+    "O6_REASONING": 4,
+    "O8_META_OBSERVING": 2,
+    "O7_PURPOSING": 3
+  },
+  "test_retest": {
+    "split_agreement_rate": 0.7605820105820106,
+    "top1_match_rate": 0.0,
+    "cohens_kappa": -0.11917098445595853
+  },
+  "permutation": {
+    "n_shuffles": 10,
+    "overall_stability": 1.0
+  },
+  "negative_controls": [
+    {
+      "control_type": "phoneme_scramble",
+      "control_agreement": 0.6545454545454545,
+      "passed": true
+    },
+    {
+      "control_type": "word_phoneme_swap",
+      "control_agreement": 0.16363636363636364,
+      "passed": true
+    },
+    {
+      "control_type": "uniform_dummy",
+      "control_agreement": 0.7,
+      "passed": false
+    }
+  ],
+  "ablations": {
+    "full": {
+      "agreement_vs_baseline": 1.0,
+      "stability_rate": 0.509090909090909
+    },
+    "no_meaning": {
+      "agreement_vs_baseline": 0.0,
+      "stability_rate": 0.0
+    },
+    "randomized": {
+      "agreement_vs_baseline": 0.2727272727272727,
+      "stability_rate": 0.36363636363636365
+    }
+  },
+  "summary": {
+    "overall_stability_rate": 0.509090909090909,
+    "determinism_verified": true,
+    "grounding_compliant": true
+  }
+}
