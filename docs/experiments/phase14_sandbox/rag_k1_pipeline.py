@@ -53,11 +53,21 @@ from layer_assigner import (
     ContextHint,
     create_assigner,
 )
-from character_deriver import (
-    CharacterDeriver,
-    CharacterProfile,
-    create_deriver,
-)
+# Character derivation - prefer Varna-based over heuristic
+try:
+    from character_deriver_varna import (
+        VarnaCharacterDeriver as CharacterDeriver,
+        CharacterProfile,
+        create_varna_deriver as create_deriver,
+    )
+    USING_VARNA_DERIVER = True
+except ImportError:
+    from character_deriver import (
+        CharacterDeriver,
+        CharacterProfile,
+        create_deriver,
+    )
+    USING_VARNA_DERIVER = False
 from accumulator import (
     Accumulator,
     LedgeredAccumulator,
