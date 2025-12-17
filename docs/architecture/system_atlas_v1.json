@@ -1,0 +1,742 @@
+{
+  "meta": {
+    "type": "archival_documentation",
+    "version": "1.0",
+    "date": "2025-12-17",
+    "repository": "rasaha/symbolu",
+    "status": "freeze_frame_snapshot"
+  },
+  "phase_inventory": {
+    "governance_phases": {
+      "authority": "HIGH",
+      "phases": [
+        {
+          "id": "PO1",
+          "name": "Observer-Observed Grounding",
+          "folder": "symbolu/mechanical/pipeline/grounding/",
+          "status": "SAFE",
+          "tests": true,
+          "deterministic": true,
+          "components": [
+            "ObserverObservedGrounding",
+            "AmbiguityResolver",
+            "ConservativeClauseSplitter",
+            "PhaseMinusOnePipeline"
+          ],
+          "invariants": ["no_llm_calls", "conservative_resolution", "fail_closed"]
+        },
+        {
+          "id": "PO2",
+          "name": "Intent Envelope & Response Posture",
+          "folder": "symbolu/mechanical/pipeline/phase_zero/",
+          "status": "SAFE",
+          "tests": true,
+          "deterministic": true,
+          "components": ["PhaseZeroResolver", "IntentEnvelope"],
+          "invariants": ["canonical_mapping", "defaults_to_abstain"]
+        },
+        {
+          "id": "PO3",
+          "name": "Intent to Allowed Action Contract",
+          "folder": "symbolu/mechanical/pipeline/phase_one/",
+          "status": "SAFE",
+          "tests": true,
+          "deterministic": true,
+          "components": ["PhaseOneResolver", "AllowedActionSet"],
+          "invariants": ["bounded_action_classes"]
+        },
+        {
+          "id": "PO4",
+          "name": "Planner Proposal Envelope",
+          "folder": "symbolu/mechanical/pipeline/phase_po4/",
+          "status": "SAFE",
+          "tests": true,
+          "deterministic": true,
+          "components": ["PO4Resolver", "PlannerProposalEnvelope"],
+          "invariants": ["read_only_governance", "no_execution"]
+        },
+        {
+          "id": "PO5",
+          "name": "Planner Execution Gate",
+          "folder": "symbolu/mechanical/pipeline/phase_po5/",
+          "status": "SAFE",
+          "tests": true,
+          "deterministic": true,
+          "components": ["PO5ExecutionGate", "ExecutionEligibilityEnvelope"],
+          "invariants": ["eligible_is_informational_only", "no_executor_exists"]
+        }
+      ]
+    },
+    "regime_language_phases": {
+      "authority": "HIGH",
+      "phases": [
+        {
+          "id": "P6",
+          "name": "Regime Selection",
+          "folder": "symbolu/mechanical/pipeline/phase_p6/",
+          "status": "SAFE",
+          "tests": true,
+          "deterministic": true,
+          "invariants": ["hold_always_safe", "regime_restricts_only"]
+        },
+        {
+          "id": "P7",
+          "name": "Discourse Act Resolver",
+          "folder": "symbolu/mechanical/pipeline/p7_discourse/",
+          "status": "SAFE",
+          "tests": true,
+          "deterministic": true,
+          "invariants": ["deferral_always_safe", "no_semantic_interpretation"]
+        },
+        {
+          "id": "P8",
+          "name": "Semantic Slot Resolution",
+          "folder": "symbolu/mechanical/pipeline/p8_semantics/",
+          "status": "SAFE",
+          "tests": true,
+          "deterministic": true
+        },
+        {
+          "id": "P9",
+          "name": "Lexical Selection",
+          "folder": "symbolu/mechanical/pipeline/p9_lexical/",
+          "status": "SAFE",
+          "tests": true,
+          "deterministic": true
+        }
+      ]
+    },
+    "acoustic_phases": {
+      "authority": "MEDIUM",
+      "critical_invariant": "Sound must obey meaning. Meaning must NEVER obey sound.",
+      "phases": [
+        {
+          "id": "P10",
+          "name": "Acoustic Parameterization",
+          "folder": "symbolu/mechanical/pipeline/p10_acoustic/",
+          "status": "SAFE",
+          "tests": true,
+          "deterministic": true
+        },
+        {
+          "id": "P11",
+          "name": "Prosodic Evidence",
+          "folder": "symbolu/mechanical/pipeline/p11_prosodic/",
+          "status": "SAFE",
+          "tests": true,
+          "deterministic": true
+        },
+        {
+          "id": "P12",
+          "name": "Consistency Check",
+          "folder": "symbolu/mechanical/pipeline/p12_consistency/",
+          "status": "SAFE",
+          "tests": true,
+          "deterministic": true
+        },
+        {
+          "id": "P13",
+          "name": "Acoustic Safety Envelope",
+          "folder": "symbolu/mechanical/pipeline/p13_acoustic_safety/",
+          "status": "SAFE",
+          "authority": "HIGH_CAPPING",
+          "tests": true,
+          "deterministic": true,
+          "invariants": ["binding_on_renderers"]
+        }
+      ]
+    },
+    "surface_delivery_phases": {
+      "authority": "MEDIUM",
+      "phases": [
+        {"id": "P14", "name": "Surface Realization", "folder": "symbolu/mechanical/pipeline/p14_surface/", "status": "SAFE"},
+        {"id": "P15", "name": "Interaction Directive", "folder": "symbolu/mechanical/pipeline/p15_interaction/", "status": "SAFE"},
+        {"id": "P16", "name": "Regression Guard", "folder": "symbolu/mechanical/pipeline/p16_regression_guard/", "status": "SAFE"},
+        {"id": "P17", "name": "Semantic Integrity", "folder": "symbolu/mechanical/pipeline/p17_semantic_integrity/", "status": "SAFE", "authority": "ZERO_OBSERVER"},
+        {"id": "P18", "name": "Temporal Entropy", "folder": "symbolu/mechanical/pipeline/p18_temporal_entropy/", "status": "SAFE", "authority": "ZERO_OBSERVER"},
+        {"id": "P19", "name": "Drift Fusion", "folder": "symbolu/mechanical/pipeline/p19_drift_fusion/", "status": "SAFE", "authority": "ZERO_OBSERVER"},
+        {"id": "P20", "name": "Unified Snapshot", "folder": "symbolu/mechanical/pipeline/p20_snapshot/", "status": "SAFE", "authority": "ZERO_OBSERVER"},
+        {"id": "P21", "name": "Delivery Mode", "folder": "symbolu/mechanical/pipeline/p21_delivery/", "status": "SAFE", "authority": "HIGH"}
+      ]
+    },
+    "observer_phases": {
+      "authority": "ZERO",
+      "invariant": "Cannot influence behavior, semantics, routing, or delivery",
+      "phases": [
+        {"id": "P22", "name": "Acoustic Witness", "folder": "symbolu/mechanical/pipeline/p22_acoustic_witness/", "status": "SAFE"},
+        {"id": "P23", "name": "Alignment Observer", "folder": "symbolu/mechanical/pipeline/p23_alignment/", "status": "SAFE"},
+        {"id": "P24", "name": "Projection Observer", "folder": "symbolu/mechanical/pipeline/p24_projection/", "status": "SAFE"},
+        {"id": "P25", "name": "Counterfactual Sandbox", "folder": "symbolu/mechanical/pipeline/p25_counterfactual/", "status": "SAFE"},
+        {"id": "P26", "name": "Unified Consciousness Formula", "folder": "symbolu/mechanical/pipeline/p26_ucf/", "status": "SAFE"}
+      ]
+    },
+    "predictive_scenario_phases": {
+      "authority": "ZERO",
+      "phases": [
+        {"id": "P32", "name": "Insight Window", "folder": "symbolu/mechanical/pipeline/p32_insight_window/", "status": "SAFE"},
+        {"id": "P33", "name": "Schema Adaptive Routing", "folder": "symbolu/mechanical/pipeline/p33_schema_adaptive/", "status": "SAFE"},
+        {"id": "P35", "name": "Predictive Persona Drift", "folder": "symbolu/mechanical/pipeline/p35_predictive_persona_drift/", "status": "SAFE"},
+        {"id": "P36", "name": "Identity Resonance Memory", "folder": "symbolu/mechanical/pipeline/p36_identity_resonance_memory/", "status": "SAFE"},
+        {"id": "P38", "name": "Temporal Forecast", "folder": "symbolu/mechanical/pipeline/p38_temporal_forecast/", "status": "SAFE"},
+        {"id": "P39", "name": "Multi-Horizon", "folder": "symbolu/mechanical/pipeline/p39_multi_horizon/", "status": "SAFE"},
+        {"id": "P40", "name": "Cross-Horizon Alignment", "folder": "symbolu/mechanical/pipeline/p40_cross_horizon_alignment/", "status": "SAFE"},
+        {"id": "P41", "name": "Scenario Regime Mapper", "folder": "symbolu/mechanical/pipeline/p41_scenario_regime_mapper/", "status": "SAFE"},
+        {"id": "P42", "name": "Scenario Fusion", "folder": "symbolu/mechanical/pipeline/p42_scenario_fusion/", "status": "SAFE"},
+        {"id": "P43", "name": "Scenario What-If", "folder": "symbolu/mechanical/pipeline/p43_scenario_what_if/", "status": "SAFE"},
+        {"id": "P44", "name": "Coherence Scenario Alignment", "folder": "symbolu/mechanical/pipeline/p44_coherence_scenario_alignment/", "status": "SAFE"},
+        {"id": "P45", "name": "Multi-Trajectory Stability", "folder": "symbolu/mechanical/pipeline/p45_multi_trajectory_stability/", "status": "SAFE"},
+        {"id": "P46", "name": "Trajectory Convergence", "folder": "symbolu/mechanical/pipeline/p46_trajectory_convergence/", "status": "SAFE"},
+        {"id": "P47", "name": "Unified Trajectory Scenario", "folder": "symbolu/mechanical/pipeline/p47_unified_trajectory_scenario/", "status": "SAFE"},
+        {"id": "P48", "name": "Macro Stability", "folder": "symbolu/mechanical/pipeline/p48_macro_stability/", "status": "SAFE"},
+        {"id": "P49", "name": "Temporal Stability Index", "folder": "symbolu/mechanical/pipeline/p49_temporal_stability/", "status": "SAFE"}
+      ]
+    },
+    "final_governance_phases": {
+      "authority": "ZERO_OBSERVER",
+      "phases": [
+        {
+          "id": "P50",
+          "name": "Cognitive Consistency Regression",
+          "folder": "symbolu/mechanical/pipeline/p50_cognitive_consistency/",
+          "status": "SAFE",
+          "invariants": [
+            "INV-P50-A1: Cannot modify upstream phase output",
+            "INV-P50-A2: Cannot gate any action or delivery",
+            "INV-P50-A3: Cannot be read by P6-P21",
+            "INV-P50-A4: Output is observer-only",
+            "INV-P50-D1: Same history + same input -> same report (bitwise)",
+            "INV-P50-D2: No randomness"
+          ]
+        },
+        {"id": "P51", "name": "Governance Readiness", "folder": "symbolu/mechanical/pipeline/p51_governance_readiness/", "status": "SAFE"},
+        {"id": "P52", "name": "Governance Adapter", "folder": "symbolu/mechanical/pipeline/p52_governance_adapter/", "status": "SAFE"},
+        {"id": "P53", "name": "Policy Binding", "folder": "symbolu/mechanical/pipeline/p53_policy_binding/", "status": "SAFE"},
+        {"id": "P54", "name": "Audit Trace", "folder": "symbolu/mechanical/pipeline/p54_audit_trace/", "status": "SAFE"}
+      ]
+    },
+    "experimental_sandboxes": {
+      "status": "EXPERIMENTAL",
+      "phases": [
+        {
+          "id": "Phase11",
+          "name": "Generative Surface Sandbox",
+          "folder": "docs/experiments/phase11_sandbox/",
+          "mode": "OPEN_ONLY",
+          "determinism": "explicitly_disabled",
+          "safety_claims": "none",
+          "subphases": [
+            {"id": "11B.1", "name": "Ontological Routing", "file": "phase11b1_routing.py"},
+            {"id": "11B.2", "name": "PPV Canonicalization", "file": "phase11b2_canonicalization.py"},
+            {"id": "11B.3", "name": "Template Registry", "file": "phase11b3_canonicalization.py"}
+          ]
+        },
+        {
+          "id": "Phase12",
+          "name": "Governed Generative Pipeline",
+          "folder": "docs/experiments/phase12_sandbox/",
+          "test_count": 100,
+          "components": [
+            {"name": "Phase12Schema", "file": "phase12_schema.py", "tests": 0},
+            {"name": "PPVConditioningEncoder", "file": "phase12_ppv_encoder.py", "tests": 31},
+            {"name": "Phase12Verifier", "file": "phase12_verifier.py", "tests": 32},
+            {"name": "TemplateRetriever", "file": "phase12_retriever.py", "tests": 23},
+            {"name": "LLM Integration PoC", "file": "phase12_poc.py", "tests": 14}
+          ],
+          "key_principle": "Probabilistic generation sandwiched between deterministic layers"
+        },
+        {
+          "id": "Phase13",
+          "name": "K1 Knowledge Layer",
+          "folder": "docs/experiments/phase13_sandbox/",
+          "test_count": 55,
+          "components": [
+            {"name": "K1Atom", "file": "k1_schema.py", "tests": 27},
+            {"name": "K1Store", "file": "k1_store.py", "tests": 28}
+          ],
+          "invariants": [
+            "deterministic_retrieval",
+            "ledger_recording",
+            "replay_provable",
+            "index_rebuildable",
+            "no_free_text"
+          ]
+        },
+        {
+          "id": "Phase14",
+          "name": "Phonemic-Ontological Accumulator",
+          "folder": "docs/experiments/phase14_sandbox/",
+          "test_count": 104,
+          "components": [
+            {"name": "Phoneme Extractor", "file": "phoneme_extractor.py", "tests": 28},
+            {"name": "Layer Assigner", "file": "layer_assigner.py", "tests": 25},
+            {"name": "Accumulator", "file": "accumulator.py", "tests": 27},
+            {"name": "RAG-K1 Pipeline", "file": "rag_k1_pipeline.py", "tests": 24}
+          ],
+          "stability_states": [
+            {"status": "UNSTABLE", "observations": "<10", "meaning": "Too little data"},
+            {"status": "EMERGING", "observations": "10-50", "confidence": "<0.7", "meaning": "Pattern forming"},
+            {"status": "STABLE", "observations": "50+", "confidence": ">0.8", "meaning": "Reliable mapping"},
+            {"status": "CONFLICTED", "observations": "50+", "confidence": "<0.5", "meaning": "Needs review"}
+          ]
+        }
+      ]
+    },
+    "pre_ontological_experiments": {
+      "status": "HISTORICAL",
+      "note": "Phase labels are development milestones, not pipeline phases",
+      "phases": [
+        {"id": "Phase1b", "name": "Substrate Bridge Validation", "location": "docs/data/phase1b_*"},
+        {"id": "Phase2", "name": "Modifier Engine", "file": "docs/experiments/phase2_modifier_engine_v3_2.py"},
+        {"id": "Phase3", "name": "Rule Engine", "file": "docs/experiments/phase3_rule_engine_v3_0.py"},
+        {"id": "Phase4", "name": "Transform Engine", "file": "docs/experiments/phase4_transform_engine_v4_0.py"},
+        {"id": "Phase5", "name": "Synthesis Engine", "file": "docs/experiments/phase5_synthesis_engine_v5_0.py"},
+        {"id": "Phase6", "name": "Generative Boundary", "file": "docs/experiments/phase6_generative_boundary_engine_v6_0.py"},
+        {"id": "Phase7", "name": "Structural Folding", "file": "docs/experiments/phase7_structural_folding_engine_v7_0.py"},
+        {"id": "Phase9", "name": "Rewrite Engine", "file": "docs/experiments/phase9_rewrite_engine_v0.py"}
+      ]
+    }
+  },
+  "subsystem_map": {
+    "mechanical_pipeline": {
+      "name": "SymbolUPipeline",
+      "folder": "symbolu/mechanical/pipeline/",
+      "version": "3.0",
+      "sequence": ["Persona", "MLCR", "Fusion", "DHA", "Renderer"]
+    },
+    "mlcr_engine": {
+      "name": "Multi-Layer Consciousness RAG",
+      "folder": "symbolu/mechanical/mlcr/",
+      "version": "3.1",
+      "status": "Production",
+      "components": [
+        "OntologyMassComputer",
+        "IntentClassifier",
+        "EntropyAdapter",
+        "TierSelector",
+        "ExpertRouter",
+        "RendererContextBuilder",
+        "ExplainabilityLogger"
+      ],
+      "inputs": ["user_query", "po_phase_constraints"],
+      "outputs": ["ActivationPlan"]
+    },
+    "ttor_router": {
+      "name": "Two-Tier Ontology Router",
+      "folder": "symbolu/mechanical/pipeline/ttor/",
+      "version": "1.4",
+      "canonical_mapper_rules": {
+        "HRM": "(tier != LOWER) AND (entropy_mix > 0.40)",
+        "LCM": "(tier == LOWER) AND (entropy_mix > 0.50)",
+        "LAM": "(long_arc_tension > 0.50) OR temporal_patterns_detected OR (domain in ['therapy', 'identity', 'spiritual'] AND entropy_mix > 0.60)"
+      },
+      "inputs": ["aspect_probs", "entropy_measures", "anchor_scores", "domain", "risk_level"],
+      "outputs": ["tier", "flow_mode", "hrm_lcm_lam_activation"]
+    },
+    "fusion_engine": {
+      "name": "Fusion Engine",
+      "folder": "symbolu/mechanical/fusion/",
+      "version": "3.1",
+      "channel_weights": {
+        "HRM": 0.4,
+        "LCM": 0.3,
+        "MoE": 0.3
+      }
+    },
+    "dha_engine": {
+      "name": "Delivery Harmonization & Adaptation",
+      "folder": "symbolu/mechanical/dha/",
+      "version": "3.0",
+      "delivery_profiles": ["SWEET_RESONANCE", "INVERSE_JOLT", "SYMBOLIC_METAPHOR"],
+      "components": [
+        "ToneSelector",
+        "DeliveryModulator",
+        "ReadinessAnalyzer",
+        "ResistanceDetector",
+        "SafetyFilters"
+      ]
+    },
+    "persona_engine": {
+      "name": "Persona Engine",
+      "folder": "symbolu/mechanical/persona/",
+      "version": "2.8.2",
+      "default_personas": ["sage", "analyst", "coach", "friendly", "regulator", "neutral"],
+      "critical_constraint": "PersonaEngine NEVER modifies layer contents"
+    },
+    "rag_subsystem": {
+      "name": "Symbol-U RAG",
+      "folder": "symbolu/rag/",
+      "version": "3.0",
+      "features": [
+        "pure_python_no_external_deps",
+        "deterministic_hash_embeddings",
+        "in_memory_vector_store",
+        "cosine_similarity"
+      ]
+    },
+    "ledger_system": {
+      "folder": "symbolu/ledger/",
+      "components": ["LedgerEntry", "LedgerEntryStore", "verify_ledger_replay"],
+      "invariants": ["hash_chain_integrity", "append_only", "replay_deterministic"]
+    },
+    "core_formulas": {
+      "folder": "symbolu/formulas/",
+      "authority": "ZERO",
+      "module_count": "40+",
+      "key_modules": [
+        "resonance_formulas.py",
+        "acoustic_unit_mapper.py",
+        "vritti_mapper.py",
+        "enhanced_smi.py",
+        "drift_fusion.py",
+        "semantic_integrity.py"
+      ],
+      "constraints": [
+        "zero_governance_authority",
+        "no_llm_calls",
+        "no_randomness",
+        "stateless",
+        "deterministic"
+      ]
+    },
+    "coherence_observer": {
+      "folder": "symbolu/core/coherence/",
+      "components": [
+        "CoherenceEngine",
+        "CoherenceState",
+        "PersonaDriftMonitor",
+        "TemporalArcTracer"
+      ],
+      "metrics_tracked": "50+"
+    }
+  },
+  "data_authority_registry": {
+    "ground_truth_files": [
+      {
+        "file": "varna_bridge_map_v1.json",
+        "location": "docs/data/",
+        "source": "Sanskrit Varna Mala",
+        "version": "1.0",
+        "purpose": "Phase-1b substrate bridge meanings (pre-semantic)",
+        "constraints": [
+          "no_dictionary_meaning",
+          "no_vrtti_polarity_resolution",
+          "no_observer_observed_logic",
+          "no_contextual_semantics",
+          "no_heuristic_phonetics"
+        ],
+        "used_by": [
+          "docs/experiments/experiment_pack_v1/phoneme_only_router.py",
+          "symbolu/formulas/varna_bridge_loader.py"
+        ]
+      },
+      {
+        "file": "constants.py",
+        "location": "symbolu/core/",
+        "version": "2.7.1",
+        "status": "CANONICAL",
+        "defines": [
+          "CANONICAL_KOSHA_LAYERS",
+          "KOSHA_DESCRIPTIONS",
+          "CANONICAL_CONSONANT_TO_KOSHA",
+          "CONSONANT_TO_KOSHA_MAP",
+          "ONTOLOGICAL_LAYERS",
+          "V26_STITCHING_WEIGHTS",
+          "DHA_TONES",
+          "VOWEL_ASPECT_BRIDGES",
+          "SMI_THRESHOLDS"
+        ]
+      }
+    ],
+    "fixture_files": [
+      {"file": "fixture_chain.json", "location": "symbolu/ledger/fixtures/"},
+      {"file": "fixture_absolving_block.json", "location": "symbolu/ledger/fixtures/"},
+      {"file": "fixture_hint_override.json", "location": "symbolu/ledger/fixtures/"},
+      {"file": "fixture_minimal.json", "location": "symbolu/ledger/fixtures/"}
+    ],
+    "snapshot_files": [
+      {"file": "delta_baseline.json", "location": "symbolu/mechanical/pipeline/snapshots/"},
+      {"file": "persona_temporal_baseline.json", "location": "symbolu/mechanical/pipeline/snapshots/"},
+      {"file": "mapper_switching_baseline.json", "location": "symbolu/mechanical/pipeline/ttor/snapshots/"},
+      {"file": "mapper_switching_baseline_v2.json", "location": "symbolu/mechanical/pipeline/ttor/snapshots/"}
+    ]
+  },
+  "governance_layers": {
+    "G1": {
+      "name": "Pre-Acoustic Governance",
+      "phases": ["PO1", "PO2", "PO3", "PO4", "PO5"],
+      "authority": "HIGH",
+      "characteristics": [
+        "establishes_intent_grounding_actions",
+        "authority_flows_downward_only",
+        "cannot_be_overridden_downstream"
+      ],
+      "fail_closed_behavior": {
+        "PO1": "conservative_clause_splitting",
+        "PO2": "defaults_to_abstain",
+        "PO3": "empty_action_set_if_unclear",
+        "PO4": "blocked_if_not_in_allow_list",
+        "PO5": "prohibited_if_uncertain"
+      }
+    },
+    "G2": {
+      "name": "Regime & Discourse Governance",
+      "phases": ["P6", "P7", "P8", "P9"],
+      "authority": "HIGH",
+      "characteristics": [
+        "constrains_language_generation",
+        "regime_restricts_only",
+        "hold_deferral_always_safe"
+      ]
+    },
+    "G3": {
+      "name": "Acoustic Constraint Governance",
+      "phases": ["P10", "P11", "P12", "P13"],
+      "authority": "MEDIUM_WITH_P13_HIGH_CAPPING",
+      "characteristics": [
+        "sound_obeys_meaning",
+        "p13_binding",
+        "acoustic_cannot_influence_semantic"
+      ]
+    },
+    "G4": {
+      "name": "Delivery Governance",
+      "phases": ["P14", "P15", "P16", "P17", "P18", "P19", "P20", "P21"],
+      "authority": "MEDIUM_WITH_P21_HIGH"
+    },
+    "G5": {
+      "name": "Observer Layer",
+      "phases": ["P22-P26", "P32-P49"],
+      "authority": "ZERO",
+      "characteristics": [
+        "cannot_influence_behavior",
+        "cannot_gate_or_block",
+        "read_only_observation"
+      ]
+    },
+    "G6": {
+      "name": "Final Governance Band",
+      "phases": ["P50", "P51", "P52", "P53", "P54"],
+      "authority": "ZERO_OBSERVER",
+      "characteristics": [
+        "cognitive_consistency_observation",
+        "governance_readiness_assessment",
+        "audit_trace_generation",
+        "non_actuating"
+      ]
+    }
+  },
+  "invariants_vs_assumptions": {
+    "enforced_invariants": [
+      {
+        "invariant": "Determinism (same inputs -> same outputs)",
+        "enforced_by": "determinism_verification.py",
+        "evidence": "50-iteration hash tests"
+      },
+      {
+        "invariant": "Sound obeys meaning",
+        "enforced_by": "P10 schema, P22 tests",
+        "evidence": "Import restrictions"
+      },
+      {
+        "invariant": "Observer phases cannot influence authority",
+        "enforced_by": "P41/P50 schemas",
+        "evidence": "observer_only: Literal[True]"
+      },
+      {
+        "invariant": "Regime monotonicity",
+        "enforced_by": "P6 schema",
+        "evidence": "Restrict-only logic"
+      },
+      {
+        "invariant": "P13 binding on renderers",
+        "enforced_by": "P13 schema, renderer compliance",
+        "evidence": "Explicit checks"
+      },
+      {
+        "invariant": "No LLM in governance phases",
+        "enforced_by": "All PO/P6-P9 code",
+        "evidence": "No LLM imports"
+      },
+      {
+        "invariant": "Ledger hash chain",
+        "enforced_by": "Ledger tests",
+        "evidence": "Chain verification"
+      },
+      {
+        "invariant": "TTOR canonical mapper rules",
+        "enforced_by": "TTOR tests",
+        "evidence": "Rule enforcement"
+      }
+    ],
+    "assumptions_in_docs_only": [
+      {
+        "assumption": "PPV vectors serve as generative seeds",
+        "stated_in": "Phase 11 README",
+        "status": "HYPOTHESIS"
+      },
+      {
+        "assumption": "Phoneme -> layer affinity mappings",
+        "stated_in": "Phase 14 README",
+        "status": "HYPOTHESIS_NEEDS_VALIDATION"
+      },
+      {
+        "assumption": "Cross-layer character usefulness",
+        "stated_in": "Phase 14 README",
+        "status": "UNVALIDATED"
+      },
+      {
+        "assumption": "Accumulation convergence",
+        "stated_in": "Phase 14 README",
+        "status": "UNVERIFIED"
+      },
+      {
+        "assumption": "Executor absence",
+        "stated_in": "PO5 docstring",
+        "status": "ARCHITECTURAL_CHOICE"
+      },
+      {
+        "assumption": "Phase numbering gaps",
+        "stated_in": "Architecture doc",
+        "status": "UNSPECIFIED"
+      }
+    ],
+    "explicitly_marked_hypotheses": [
+      {
+        "hypothesis": "Phonemes do not carry semantics, but acquire word character through deterministic ontological routing",
+        "location": "Experiment Pack v1",
+        "status": "UNDER_TEST"
+      },
+      {
+        "hypothesis": "Ontological routing can influence generative output",
+        "location": "Phase 11 README",
+        "status": "EXPERIMENTAL"
+      },
+      {
+        "hypothesis": "Probabilistic generation can be governed by deterministic layers",
+        "location": "Phase 12 README",
+        "status": "PARTIALLY_VALIDATED",
+        "evidence": "100 tests"
+      }
+    ]
+  },
+  "risk_status_labels": {
+    "SAFE": {
+      "description": "Mergeable to main",
+      "components": [
+        "All PO phases (PO1-PO5)",
+        "All P6-P21 phases",
+        "All P22-P26 phases",
+        "All P32-P49 phases",
+        "All P50-P54 phases",
+        "MLCR Engine",
+        "TTOR Router",
+        "Fusion Engine",
+        "DHA Engine",
+        "Persona Engine",
+        "RAG Subsystem",
+        "Ledger System",
+        "Core/Formulas"
+      ]
+    },
+    "EXPERIMENTAL": {
+      "description": "Hypothesis-based",
+      "components": [
+        "Phase 11 Sandbox",
+        "Phase 11B.1/B.2/B.3",
+        "Phase 12 Sandbox",
+        "Phase 13 Sandbox",
+        "Phase 14 Sandbox",
+        "Experiment Pack v1",
+        "Acoustic Unit Mapper Expressive Delta variants"
+      ]
+    },
+    "OBSOLETE": {
+      "description": "Historical only",
+      "components": [
+        "Phase 1b-10 experiments",
+        "Legacy ledger entries"
+      ]
+    },
+    "REQUIRES_GROUND_TRUTH": {
+      "description": "Depends on authoritative data",
+      "components": [
+        {
+          "component": "Phoneme-only routing",
+          "required_data": "varna_bridge_map_v1.json",
+          "status": "AVAILABLE"
+        },
+        {
+          "component": "Kosha/consonant mappings",
+          "required_data": "constants.py",
+          "status": "CANONICAL"
+        },
+        {
+          "component": "Phase 14 layer assignment",
+          "required_data": "POS tagging + override lexicon",
+          "status": "HEURISTIC"
+        },
+        {
+          "component": "Phase 14 phoneme->layer affinity",
+          "required_data": "Accumulation data",
+          "status": "NOT_VALIDATED"
+        }
+      ]
+    }
+  },
+  "mode_handling": {
+    "OPEN": {
+      "used_in": "Phase 11 sandbox only",
+      "characteristics": [
+        "no_governance_logic",
+        "no_verification",
+        "no_ledger_enforcement",
+        "no_safety_claims"
+      ]
+    },
+    "GOVERNED": {
+      "used_in": "Production pipeline (P6-P55)",
+      "characteristics": [
+        "full_governance_logic",
+        "verification_mandatory",
+        "ledger_enforcement",
+        "safety_claims_made"
+      ]
+    }
+  },
+  "ledger_audit_mechanisms": {
+    "ledger_entry_fields": [
+      {"field": "entry_id", "type": "str", "purpose": "hash_chain_id"},
+      {"field": "operation", "type": "str", "purpose": "operation_type"},
+      {"field": "inputs_hash", "type": "str", "purpose": "canonical_input_hash"},
+      {"field": "outputs_hash", "type": "str", "purpose": "canonical_output_hash"},
+      {"field": "timestamp", "type": "str", "purpose": "iso_timestamp"},
+      {"field": "previous_entry_id", "type": "str", "purpose": "chain_link"}
+    ],
+    "replay_guarantees": [
+      "same_inputs_same_results",
+      "every_operation_logged",
+      "step_by_step_proof",
+      "indices_rebuildable"
+    ]
+  },
+  "test_coverage": {
+    "total_test_files": 285,
+    "determinism_verification": {
+      "file": "determinism_verification.py",
+      "tests": [
+        {"phase": "Phase 13", "test": "Enhanced SMI", "status": "PASS"},
+        {"phase": "Phase 19", "test": "Drift Fusion", "status": "PASS"},
+        {"phase": "Phase 31", "test": "APEL", "status": "PASS"}
+      ]
+    }
+  },
+  "open_questions": {
+    "phase_numbering_gaps": ["P27-P31", "P34", "P37", "P55+"],
+    "renderer_llm_integration": {
+      "when_invoked": "UNSPECIFIED",
+      "constraints": "UNSPECIFIED",
+      "p13_compliance": "UNSPECIFIED"
+    },
+    "executor_absence": "No executor exists per PO5 - extension mechanism UNSPECIFIED"
+  }
+}
