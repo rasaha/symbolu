@@ -34,6 +34,8 @@ FROZEN_ONTOLOGY_FILES = frozenset({
     "docs/data/varna_bridge_map_v1.json",
     "docs/data/ontological_layers_v1.json",
     "docs/data/varna_layer_interaction_v1.json",
+    "docs/data/varna_polarity_map_v1.json",
+    "docs/data/varna_distortion_map_v1.json",
 })
 
 # Frozen ontology filenames (for string literal detection)
@@ -41,6 +43,8 @@ FROZEN_ONTOLOGY_FILENAMES = frozenset({
     "varna_bridge_map_v1.json",
     "ontological_layers_v1.json",
     "varna_layer_interaction_v1.json",
+    "varna_polarity_map_v1.json",
+    "varna_distortion_map_v1.json",
 })
 
 # Authorized modules (may read ontology files)

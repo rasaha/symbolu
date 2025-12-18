@@ -4,9 +4,11 @@ on:
   push:
     branches: ["main", "master", "dev", "claude/**"]
     paths:
-      - "docs/data/varna_bridge_map_v1.json"
-      - "docs/data/ontological_layers_v1.json"
-      - "docs/data/varna_layer_interaction_v1.json"
+      - "docs/data/varna_bridge_map_v*.json"
+      - "docs/data/ontological_layers_v*.json"
+      - "docs/data/varna_layer_interaction_v*.json"
+      - "docs/data/varna_polarity_map_v*.json"
+      - "docs/data/varna_distortion_map_v*.json"
       - "symbolu/ontology/**"
       - "symbolu/core/**"
       - "symbolu/mechanical/**"
@@ -14,13 +16,18 @@ on:
       - "symbolu/temporal/**"
       - "tests/test_ontology_freeze_contract.py"
       - "ONTOLOGY_FREEZE_CONTRACT.md"
+      - "docs/ontology/CHANGELOG.md"
+      - "docs/governance/PROTECTED_BRANCHES.md"
+      - ".github/CODEOWNERS"
       - ".github/workflows/ontology-freeze-ci.yml"
   pull_request:
     branches: ["main", "master", "dev", "claude/**"]
     paths:
-      - "docs/data/varna_bridge_map_v1.json"
-      - "docs/data/ontological_layers_v1.json"
-      - "docs/data/varna_layer_interaction_v1.json"
+      - "docs/data/varna_bridge_map_v*.json"
+      - "docs/data/ontological_layers_v*.json"
+      - "docs/data/varna_layer_interaction_v*.json"
+      - "docs/data/varna_polarity_map_v*.json"
+      - "docs/data/varna_distortion_map_v*.json"
       - "symbolu/ontology/**"
       - "symbolu/core/**"
       - "symbolu/mechanical/**"
@@ -28,6 +35,9 @@ on:
       - "symbolu/temporal/**"
       - "tests/test_ontology_freeze_contract.py"
       - "ONTOLOGY_FREEZE_CONTRACT.md"
+      - "docs/ontology/CHANGELOG.md"
+      - "docs/governance/PROTECTED_BRANCHES.md"
+      - ".github/CODEOWNERS"
       - ".github/workflows/ontology-freeze-ci.yml"
   workflow_dispatch:
 
@@ -73,6 +83,8 @@ jobs:
           echo "  - docs/data/varna_bridge_map_v1.json"
           echo "  - docs/data/ontological_layers_v1.json"
           echo "  - docs/data/varna_layer_interaction_v1.json"
+          echo "  - docs/data/varna_polarity_map_v1.json"
+          echo "  - docs/data/varna_distortion_map_v1.json"
           echo ""
           echo "Authorized Access:"
           echo "  - symbolu/ontology/phase4a/ ONLY"
@@ -81,6 +93,12 @@ jobs:
           echo "  - symbolu/ontology/phase4b/"
           echo "  - symbolu/ontology/phase4c/"
           echo "  - All other pipeline code"
+          echo ""
+          echo "Governance Requirements (for any change):"
+          echo "  1. Version bump in meta.version"
+          echo "  2. Entry in docs/ontology/CHANGELOG.md"
+          echo "  3. Migration notes"
+          echo "  4. Approval from @rasaha/ontology-stewards"
           echo ""
           echo "See ONTOLOGY_FREEZE_CONTRACT.md for details."
           echo "=========================================="
@@ -93,6 +111,8 @@ jobs:
             "docs/data/varna_bridge_map_v1.json"
             "docs/data/ontological_layers_v1.json"
             "docs/data/varna_layer_interaction_v1.json"
+            "docs/data/varna_polarity_map_v1.json"
+            "docs/data/varna_distortion_map_v1.json"
           )
 
           # Check if any frozen files were modified in this commit
@@ -179,3 +199,193 @@ jobs:
           name: ontology-freeze-logs
           path: ontology-freeze-pytest.log
           if-no-files-found: ignore
+
+  # ===========================================================================
+  # Ontology Changelog & Version Bump Enforcement
+  # ===========================================================================
+  ontology-changelog-check:
+    runs-on: ubuntu-latest
+    name: Ontology Changelog & Version Check
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for comparing versions
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check for ontology file modifications
+        id: check-mods
+        run: |
+          echo "Checking for ontology file modifications..."
+
+          # Define all frozen ontology files
+          FROZEN_FILES=(
+            "docs/data/varna_bridge_map_v1.json"
+            "docs/data/ontological_layers_v1.json"
+            "docs/data/varna_layer_interaction_v1.json"
+            "docs/data/varna_polarity_map_v1.json"
+            "docs/data/varna_distortion_map_v1.json"
+          )
+
+          # Get modified files (PR vs push)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            MODIFIED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "")
+          else
+            MODIFIED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          fi
+
+          # Check which frozen files were modified
+          MODIFIED_FROZEN=""
+          for file in "${FROZEN_FILES[@]}"; do
+            if echo "$MODIFIED" | grep -q "^${file}$"; then
+              MODIFIED_FROZEN="${MODIFIED_FROZEN}${file}\n"
+            fi
+          done
+
+          if [ -n "$MODIFIED_FROZEN" ]; then
+            echo "ontology_modified=true" >> $GITHUB_OUTPUT
+            echo -e "Modified frozen files:\n$MODIFIED_FROZEN"
+          else
+            echo "ontology_modified=false" >> $GITHUB_OUTPUT
+            echo "No frozen ontology files modified."
+          fi
+
+          # Also check if CHANGELOG was modified
+          if echo "$MODIFIED" | grep -q "^docs/ontology/CHANGELOG.md$"; then
+            echo "changelog_modified=true" >> $GITHUB_OUTPUT
+          else
+            echo "changelog_modified=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate version bump
+        if: steps.check-mods.outputs.ontology_modified == 'true'
+        run: |
+          echo "=========================================="
+          echo "ONTOLOGY VERSION BUMP CHECK"
+          echo "=========================================="
+
+          python3 << 'SCRIPT'
+          import json
+          import sys
+          from pathlib import Path
+
+          FROZEN_FILES = [
+              "docs/data/varna_bridge_map_v1.json",
+              "docs/data/ontological_layers_v1.json",
+              "docs/data/varna_layer_interaction_v1.json",
+              "docs/data/varna_polarity_map_v1.json",
+              "docs/data/varna_distortion_map_v1.json",
+          ]
+
+          errors = []
+
+          for filepath in FROZEN_FILES:
+              path = Path(filepath)
+              if path.exists():
+                  try:
+                      with open(path, "r") as f:
+                          data = json.load(f)
+
+                      # Check for meta.version field
+                      if "meta" not in data:
+                          errors.append(f"{filepath}: Missing 'meta' section")
+                      elif "version" not in data.get("meta", {}):
+                          errors.append(f"{filepath}: Missing 'meta.version' field")
+                      else:
+                          version = data["meta"]["version"]
+                          print(f"  {filepath}: version={version}")
+                  except json.JSONDecodeError as e:
+                      errors.append(f"{filepath}: Invalid JSON - {e}")
+                  except Exception as e:
+                      errors.append(f"{filepath}: Error reading - {e}")
+
+          if errors:
+              print("\nERRORS:")
+              for err in errors:
+                  print(f"  - {err}")
+              print("\nAll frozen ontology files must have meta.version field.")
+              sys.exit(1)
+          else:
+              print("\nAll frozen files have valid version metadata.")
+          SCRIPT
+
+      - name: Validate changelog entry
+        if: steps.check-mods.outputs.ontology_modified == 'true'
+        run: |
+          echo "=========================================="
+          echo "ONTOLOGY CHANGELOG CHECK"
+          echo "=========================================="
+
+          CHANGELOG_PATH="docs/ontology/CHANGELOG.md"
+
+          if [ ! -f "$CHANGELOG_PATH" ]; then
+            echo "ERROR: Changelog file not found at $CHANGELOG_PATH"
+            echo ""
+            echo "When modifying frozen ontology files, you MUST:"
+            echo "  1. Create/update docs/ontology/CHANGELOG.md"
+            echo "  2. Add an entry with the new version"
+            echo "  3. Include migration notes"
+            echo ""
+            exit 1
+          fi
+
+          if [ "${{ steps.check-mods.outputs.changelog_modified }}" != "true" ]; then
+            echo "WARNING: Frozen ontology files were modified but"
+            echo "docs/ontology/CHANGELOG.md was NOT updated!"
+            echo ""
+            echo "Per ontology governance rules, you MUST:"
+            echo "  1. Bump meta.version in the modified JSON file"
+            echo "  2. Add a changelog entry in docs/ontology/CHANGELOG.md"
+            echo "  3. Include migration notes if applicable"
+            echo ""
+            echo "See docs/ontology/CHANGELOG.md for the required format."
+            echo ""
+            exit 1
+          fi
+
+          echo "Changelog was updated. Verifying structure..."
+
+          # Check for required sections
+          if ! grep -q "## \[" "$CHANGELOG_PATH"; then
+            echo "WARNING: No version entries found in changelog."
+            echo "Ensure you added an entry like: ## [X.Y] - YYYY-MM-DD"
+          else
+            echo "Changelog contains version entries."
+          fi
+
+          echo ""
+          echo "CHANGELOG CHECK: PASSED"
+
+      - name: No ontology changes detected
+        if: steps.check-mods.outputs.ontology_modified != 'true'
+        run: |
+          echo "=========================================="
+          echo "ONTOLOGY CHANGELOG CHECK: SKIPPED"
+          echo "=========================================="
+          echo ""
+          echo "No frozen ontology files were modified."
+          echo "Changelog and version checks not required."
+
+      - name: Changelog check summary
+        if: always()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "ONTOLOGY GOVERNANCE SUMMARY"
+          echo "=========================================="
+          echo ""
+          echo "For any frozen ontology file modification:"
+          echo "  1. Bump meta.version in the JSON file"
+          echo "  2. Add entry to docs/ontology/CHANGELOG.md"
+          echo "  3. Include migration notes"
+          echo "  4. Request review from @rasaha/ontology-stewards"
+          echo ""
+          echo "See ONTOLOGY_FREEZE_CONTRACT.md for full rules."
+          echo "=========================================="
