@@ -1,0 +1,324 @@
+{
+  "meta": {
+    "version": "1.0",
+    "depends_on": ["varna_bridge_map_v1.json", "ontological_layers_v1.json"],
+    "scope": "Varna × Layer interaction only",
+    "rules": [
+      "Never let a higher file compensate for uncertainty in a lower file",
+      "No substrate edits",
+      "Contextual polarity only here"
+    ]
+  },
+  "interaction_map": {
+    "ka": {
+      "O1_ACTING": {
+        "manifestation_positive": "body readies with energized anticipation toward possibility",
+        "manifestation_negative": "body freezes awaiting outcome that never arrives",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking incoming signals as potential openings",
+        "manifestation_negative": "over-marking neutral signals as critical opportunities",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping energetic impulse toward emergent possibility",
+        "manifestation_negative": "forcing premature form onto unripe potential",
+        "distortion_vector": "upward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns orient toward what could emerge",
+        "manifestation_negative": "thought loops on idealized futures detached from present",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention toward genuine potential states",
+        "manifestation_negative": "misdirecting toward fantasy outcomes",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing steps toward realizable futures",
+        "manifestation_negative": "reasoning chains built on wishful premises",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose aligns with authentic forward possibility",
+        "manifestation_negative": "purpose fixates on impossible ideals",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing projection patterns without attachment",
+        "manifestation_negative": "observer collapses into projection identification",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating collective anticipation into coherent field",
+        "manifestation_negative": "fragmenting into competing hope-vectors",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "releasing attachment to projected outcomes",
+        "manifestation_negative": "collapse into hopelessness rather than dissolution",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "kha": {
+      "O1_ACTING": {
+        "manifestation_positive": "body activates appropriate vigilance response",
+        "manifestation_negative": "body locks in chronic tension scanning for threat",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking genuine impediments for attention",
+        "manifestation_negative": "over-classifying neutral stimuli as threats",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping protective readiness proportional to risk",
+        "manifestation_negative": "constricting all energy into defensive posture",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns scan for actual obstacles",
+        "manifestation_negative": "thought loops generating imagined catastrophes",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention to genuine risk vectors",
+        "manifestation_negative": "hypervigilant scanning in all directions",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing contingency plans for realistic scenarios",
+        "manifestation_negative": "infinite regress of worst-case planning",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purposeful prevention oriented to actual threats",
+        "manifestation_negative": "purpose contracts to pure threat-avoidance",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing vigilance patterns without merger",
+        "manifestation_negative": "observer consumed by impediment tracking",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating distributed vigilance into coordinated awareness",
+        "manifestation_negative": "fragmenting into paranoid dispersion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "releasing vigilance into restful dissolution",
+        "manifestation_negative": "vigilance terminates through exhaustion not resolution",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "ga": {
+      "O1_ACTING": {
+        "manifestation_positive": "body initiates kinetic movement toward task",
+        "manifestation_negative": "body activates without direction or completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking actions as relevant to current engagement",
+        "manifestation_negative": "classifying all stimuli as requiring immediate action",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping momentum toward coherent execution",
+        "manifestation_negative": "chaotic force dispersing in multiple directions",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns support efficient action-sequencing",
+        "manifestation_negative": "thought compulsively generates action without reflection",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing kinetic energy toward meaningful execution",
+        "manifestation_negative": "action-vectors scatter without convergence",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing execution steps in optimal order",
+        "manifestation_negative": "reasoning bypassed by compulsive doing",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purposeful action aligned with completion-goal",
+        "manifestation_negative": "action becomes its own purpose detached from outcome",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing momentum patterns without interference",
+        "manifestation_negative": "observer swept into action-identification",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating coordinated kinetic flow across field",
+        "manifestation_negative": "kinetic fragmentation into competing movements",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "action completes and momentum naturally dissolves",
+        "manifestation_negative": "momentum terminates without completion",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "gha": {
+      "O1_ACTING": {
+        "manifestation_positive": "body engages healthy adhesion to present task",
+        "manifestation_negative": "body grips with chronic holding tension",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking what genuinely belongs to current concern",
+        "manifestation_negative": "over-classifying everything as requiring possession",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping cohesive bonds appropriate to context",
+        "manifestation_negative": "forcing rigid cohesion that resists natural flow",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns support appropriate retention",
+        "manifestation_negative": "thought fixates on possession and loss-prevention",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention toward maintaining valuable bonds",
+        "manifestation_negative": "attention locked on preventing any release",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing retention strategies for genuine value",
+        "manifestation_negative": "reasoning loops justify clinging to exhausted bonds",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose oriented toward preserving what matters",
+        "manifestation_negative": "purpose collapses into pure preservation-reflex",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing adhesion patterns without fusing",
+        "manifestation_negative": "observer identifies with attachment-object",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating cohesive bonds into relational field",
+        "manifestation_negative": "fragmenting into possessive sub-fields",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "releasing bonds into natural dissolution",
+        "manifestation_negative": "forced unbinding leaving residue of loss",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "nga": {
+      "O1_ACTING": {
+        "manifestation_positive": "body resonates with appropriate marking signal",
+        "manifestation_negative": "body produces hollow resonance without content",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking signals that carry forward contextual echo",
+        "manifestation_negative": "redundant marking that obscures primary signal",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping resonant echo that reinforces form",
+        "manifestation_negative": "echo-force distorts original shape",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns carry appropriate resonance",
+        "manifestation_negative": "thought echoes without original content",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention to marked significance",
+        "manifestation_negative": "attention follows markers disconnected from source",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing with markers that support coherence",
+        "manifestation_negative": "reasoning cluttered with excessive indicators",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes appropriate indication function",
+        "manifestation_negative": "indicating becomes substitute for acting",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing marking patterns in clear awareness",
+        "manifestation_negative": "observer confused by marker proliferation",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating marker signals into coherent field",
+        "manifestation_negative": "marker noise fragmenting unified awareness",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "markers attenuate as primary signal completes",
+        "manifestation_negative": "markers persist after content has dissolved",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "terminating"
+      }
+    }
+  }
+}
