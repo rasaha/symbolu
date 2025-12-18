@@ -319,6 +319,626 @@
         "distortion_vector": "lateral",
         "sublimate_vector": "terminating"
       }
+    },
+    "ca": {
+      "O1_ACTING": {
+        "manifestation_positive": "body checks boundary before proceeding with action",
+        "manifestation_negative": "body halts repeatedly unable to cross any threshold",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking limits that require genuine respect",
+        "manifestation_negative": "over-classifying neutral zones as forbidden",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping constraint that enables coherent action",
+        "manifestation_negative": "constraint force rigidifies all emerging form",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns recognize appropriate boundaries",
+        "manifestation_negative": "thought loops on rule-checking without resolution",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention to maintain healthy limits",
+        "manifestation_negative": "attention fixates on boundary at expense of content",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing steps that honor necessary constraints",
+        "manifestation_negative": "reasoning chains paralyzed by constraint multiplication",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose aligns with authentic boundary wisdom",
+        "manifestation_negative": "purpose contracts to pure prohibition",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing boundary patterns without rigidity",
+        "manifestation_negative": "observer merges with constraint identification",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating distributed constraints into coherent ethics",
+        "manifestation_negative": "fragmenting into competing prohibition fields",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "boundary dissolves into unbounded awareness",
+        "manifestation_negative": "collapse into boundary-less confusion",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "cha": {
+      "O1_ACTING": {
+        "manifestation_positive": "body releases accumulated pressure through threshold breach",
+        "manifestation_negative": "body shatters from uncontained overload",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking genuine saturation requiring discharge",
+        "manifestation_negative": "classifying normal load as catastrophic overload",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping discharge into transformative release",
+        "manifestation_negative": "fragmentation force destroys coherent structure",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns recognize threshold for renewal",
+        "manifestation_negative": "thought cascades into panic fragmentation",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing overflow toward constructive channel",
+        "manifestation_negative": "collapse vector pulls all systems toward breakdown",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing discharge in managed intervals",
+        "manifestation_negative": "reasoning collapses under saturation cascade",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose oriented toward system renewal through release",
+        "manifestation_negative": "purpose fragments into survival-only mode",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing saturation without being overwhelmed",
+        "manifestation_negative": "observer consumed by cascading fragmentation",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating breakdown as part of larger renewal cycle",
+        "manifestation_negative": "cascading fragmentation across entire field",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "system resets into fresh ground state",
+        "manifestation_negative": "termination without reset leaves residual damage",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "ja": {
+      "O1_ACTING": {
+        "manifestation_positive": "body establishes clear self-boundary for action",
+        "manifestation_negative": "body rigidifies around defended self-position",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking self-other distinction for appropriate response",
+        "manifestation_negative": "over-differentiating until isolated from context",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping individuation that supports unique contribution",
+        "manifestation_negative": "individuation force hardens into rigid separation",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns support healthy self-recognition",
+        "manifestation_negative": "thought loops on self-reference blocking other content",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention to maintain appropriate self-boundary",
+        "manifestation_negative": "attention collapses into self-preoccupation",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing that includes self as valid reference point",
+        "manifestation_negative": "reasoning warped by self-serving bias",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes authentic self-expression",
+        "manifestation_negative": "purpose contracts to self-aggrandizement only",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing self-pattern without identification",
+        "manifestation_negative": "observer collapses into ego-identification",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating differentiated self into larger field",
+        "manifestation_negative": "self-boundary blocks field integration",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "self-reference dissolves into undifferentiated awareness",
+        "manifestation_negative": "ego death experienced as annihilation",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "jha": {
+      "O1_ACTING": {
+        "manifestation_positive": "body mobilizes to acquire genuinely needed resource",
+        "manifestation_negative": "body driven by insatiable acquisition impulse",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking actual deficit requiring attention",
+        "manifestation_negative": "classifying sufficiency as deficit",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping aggregation toward genuine fulfillment",
+        "manifestation_negative": "aggregation force consumes without satisfaction",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns recognize true need versus want",
+        "manifestation_negative": "thought fixates on more regardless of enough",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing acquisition toward real completion",
+        "manifestation_negative": "acquisition vector never reaches satisfaction point",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing acquisition steps toward genuine sufficiency",
+        "manifestation_negative": "reasoning justifies endless accumulation",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose oriented toward meaningful gathering",
+        "manifestation_negative": "purpose reduced to accumulation for its own sake",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing acquisition patterns without compulsion",
+        "manifestation_negative": "observer identified with deficit-state",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating pooled resources into shared field",
+        "manifestation_negative": "accumulation creates fragmented hoarding zones",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "deficit exhausts into natural sufficiency",
+        "manifestation_negative": "accumulation terminates leaving emptiness",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "nya": {
+      "O1_ACTING": {
+        "manifestation_positive": "body maintains appropriate surface presentation",
+        "manifestation_negative": "body performs surface disconnected from depth",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking difference between inner state and outer expression",
+        "manifestation_negative": "classifying all expression as requiring mask",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping presentation appropriate to context",
+        "manifestation_negative": "discrepancy force widens gap between layers",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns navigate inner-outer appropriately",
+        "manifestation_negative": "thought maintains parallel tracks that never meet",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention to manage genuine interface",
+        "manifestation_negative": "attention splits between competing presentations",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing that bridges inner and outer coherently",
+        "manifestation_negative": "reasoning maintains divergent tracks simultaneously",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose integrates authentic and presented self",
+        "manifestation_negative": "purpose serves surface at cost of depth",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing divergence patterns with clarity",
+        "manifestation_negative": "observer cannot locate authentic position",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating split layers into coherent field",
+        "manifestation_negative": "split-field persists blocking integration",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "surface and depth converge into single truth",
+        "manifestation_negative": "layers collapse without reconciliation",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "ta": {
+      "O1_ACTING": {
+        "manifestation_positive": "body maintains stable ground for action",
+        "manifestation_negative": "body resists all movement into stagnation",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking what requires stability versus change",
+        "manifestation_negative": "classifying all change as threat to stasis",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping stability that supports sustained form",
+        "manifestation_negative": "stability force prevents necessary transformation",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns provide stable reference frame",
+        "manifestation_negative": "thought resists new patterns through conservation bias",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention toward maintaining what works",
+        "manifestation_negative": "attention locked on preventing any shift",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing that preserves valuable continuity",
+        "manifestation_negative": "reasoning loops justify resistance to necessary change",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes appropriate preservation function",
+        "manifestation_negative": "purpose collapses into pure status-quo maintenance",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing stasis patterns without attachment",
+        "manifestation_negative": "observer identified with resistance to change",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating steady state into dynamic coherence",
+        "manifestation_negative": "rigid stability blocks field evolution",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "resistance releases into natural stillness",
+        "manifestation_negative": "stasis terminates through entropy not completion",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "tha": {
+      "O1_ACTING": {
+        "manifestation_positive": "body allows natural depletion cycle to complete",
+        "manifestation_negative": "body sinks into chronic diminishment",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking genuine depletion requiring rest",
+        "manifestation_negative": "classifying all states as diminished",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping recession into restorative withdrawal",
+        "manifestation_negative": "recession force drains all forming capacity",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns recognize need for withdrawal",
+        "manifestation_negative": "thought saturated with diminishment perception",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention toward necessary retreat",
+        "manifestation_negative": "withdrawal vector pulls away from all engagement",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing reduction in service of renewal",
+        "manifestation_negative": "reasoning validates progressive withdrawal from life",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes honoring depletion cycles",
+        "manifestation_negative": "purpose recedes into purposelessness",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing depletion without identification",
+        "manifestation_negative": "observer submerged in diminishment",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating diminished state into larger cycle",
+        "manifestation_negative": "diminishment spreads across entire field",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "depletion absorbed into restful stillness",
+        "manifestation_negative": "melancholy terminates in emptiness without peace",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "da": {
+      "O1_ACTING": {
+        "manifestation_positive": "body discharges friction through appropriate action",
+        "manifestation_negative": "body vibrates with undischarged irritation",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking genuine disturbance requiring attention",
+        "manifestation_negative": "classifying all stimuli as irritants",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping friction into useful energetic edge",
+        "manifestation_negative": "friction force erodes coherent form",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns channel irritation productively",
+        "manifestation_negative": "thought grates against every input",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing friction toward constructive discharge",
+        "manifestation_negative": "discharge vector scatters in reactive bursts",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing that addresses friction sources",
+        "manifestation_negative": "reasoning interrupted by constant irritation",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose uses friction as signal for adjustment",
+        "manifestation_negative": "purpose obscured by pervasive reactivity",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing friction patterns without reactivity",
+        "manifestation_negative": "observer irritated by observation itself",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating friction signals into field awareness",
+        "manifestation_negative": "friction fragments field coherence",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "friction dissipates into smooth stillness",
+        "manifestation_negative": "irritation terminates leaving residual rawness",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "dha": {
+      "O1_ACTING": {
+        "manifestation_positive": "body moves toward genuinely needed attractor",
+        "manifestation_negative": "body pulled by compulsive craving force",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking genuine attractor worthy of pursuit",
+        "manifestation_negative": "classifying all attractors as urgent needs",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping attraction toward fulfilling connection",
+        "manifestation_negative": "attraction force overrides discernment",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns evaluate attractor authentically",
+        "manifestation_negative": "thought consumed by craving-object",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing movement toward genuine satisfaction",
+        "manifestation_negative": "acquisition vector locked on impossible satiation",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing approach toward real fulfillment",
+        "manifestation_negative": "reasoning serves craving justification only",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes healthy attraction function",
+        "manifestation_negative": "purpose collapses into craving-satisfaction loop",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing attraction patterns without compulsion",
+        "manifestation_negative": "observer merged with craving-identification",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating attraction into relational field",
+        "manifestation_negative": "craving fragments field into competing pulls",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "pull exhausts into contentment without object",
+        "manifestation_negative": "craving terminates leaving void",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "na": {
+      "O1_ACTING": {
+        "manifestation_positive": "body forms healthy bond appropriate to situation",
+        "manifestation_negative": "body binds compulsively to any available anchor",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking connections worthy of sustained bond",
+        "manifestation_negative": "classifying all contacts as requiring attachment",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping linkage that supports mutual flourishing",
+        "manifestation_negative": "linkage force creates dependent binding",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns support meaningful connection",
+        "manifestation_negative": "thought fixates on connection-object",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention toward nurturing genuine bonds",
+        "manifestation_negative": "bonding vector attaches indiscriminately",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing that deepens authentic relationship",
+        "manifestation_negative": "reasoning serves attachment maintenance only",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes healthy relational function",
+        "manifestation_negative": "purpose collapses into attachment-preservation",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing linkage patterns without fusion",
+        "manifestation_negative": "observer cannot separate from bonded object",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating bonds into coherent relational field",
+        "manifestation_negative": "attachment bonds fragment unified awareness",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "linkage dissolves into unbounded connection",
+        "manifestation_negative": "attachment terminates as abandonment",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
     }
   }
 }
