@@ -1,7 +1,8 @@
 PHASE-7 TARGET CONTRACT
-Version: 1.0
+Version: 1.1
 Status: FROZEN
 Date: 2025-12-18
+Revision: Adversarial reinforcements applied
 
 ================================================================================
 POSITIONING
@@ -69,6 +70,33 @@ COMPOUND CONSTRAINTS
 All constraint values must be numeric literals or boolean literals.
 No variables, no expressions referencing external state, no computed values
 from outside the TrajectoryResult being evaluated.
+
+NUMERIC LITERAL DEFINITION
+  Numeric literals must be finite real numbers.
+  The following are explicitly rejected:
+    - Infinity, -Infinity
+    - NaN (Not a Number)
+    - Undefined or null values
+  Integer indices must be within bounds:
+    - Positive indices: 0 <= i < len(steps)
+    - Negative indices: -len(steps) <= i < 0
+  Index validity is enforced at scoring time against actual sequence length.
+
+WHITELIST EXCLUSIVITY
+  Constraint patterns not explicitly listed above are invalid.
+  Structural variations are rejected unless explicitly enumerated.
+  Examples of rejected variations:
+    - steps[i].magnitude - steps[i-2].magnitude (only i-1 allowed)
+    - sum(steps[].magnitude) (sum not in allowed operations)
+    - steps[i].velocity (velocity not a TrajectoryStep field)
+  Unknown constraint patterns trigger error type INVALID_CONSTRAINT_PATTERN.
+
+EMPTY TARGET PROHIBITION
+  Empty target specifications (zero constraints) are rejected.
+  At least one constraint is required.
+  Rationale: Vacuous targets match all sequences without discrimination,
+  defeating the purpose of targeted generation.
+  Empty targets trigger error type VACUOUS_TARGET.
 
 ================================================================================
 3. INVALID TARGET DIMENSIONS
@@ -183,6 +211,17 @@ Phase-7 accepts the following inputs:
     type: TargetSpec
     contents: conjunction/disjunction of valid constraints per Section 2
     required: yes
+    unknown_fields: rejected (error type UNKNOWN_TARGET_FIELD)
+
+  UNKNOWN FIELD REJECTION
+    Target specifications containing fields not defined in Section 2
+    are rejected with error type UNKNOWN_TARGET_FIELD.
+    No unknown fields are silently ignored.
+    Examples of rejected fields:
+      - "comment", "name", "description" (metadata smuggling)
+      - "harmony_score", "balance" (semantic camouflage)
+      - "ontology_layer", "varga" (Phase-4A leakage)
+    All field names must match exactly the constraint patterns in Section 2.
 
   generation_config:
     type: GenerationConfig
@@ -256,6 +295,27 @@ CONTRADICTORY CONSTRAINTS
   Report: error with type CONTRADICTORY_TARGET
   Output: no generation attempted, immediate error return
 
+  PHASE-6 INVARIANT IMPORT
+    Static analysis imports Phase-6 grammar constraints as axioms:
+      - First token must be consonant: steps[0].event == "reset" always
+      - Vowels require preceding consonant: no "modulate" without prior "reset"
+      - Only valid varnas from Phase-4A are allowed in sequences
+      - Magnitude baseline is 1.0; vowels only add positive deltas
+    Targets contradicting these invariants are CONTRADICTORY.
+    Examples:
+      - steps[0].event == "modulate" (impossible: first is always reset)
+      - final_magnitude < 1.0 (impossible: minimum is baseline 1.0)
+      - final_magnitude < 0 (impossible: magnitude never negative)
+
+  INDEX BOUND VALIDATION
+    Targets specifying steps[i] where i is statically provable to exceed
+    len(steps) constraints are CONTRADICTORY.
+    Examples:
+      - steps[5].magnitude > 1.0 AND len(steps) <= 3 (index 5 unreachable)
+      - steps[10].event == "reset" AND len(steps) == 5 (index 10 unreachable)
+    Detection requires cross-constraint analysis of index references
+    against length bounds.
+
 GENERATION BOUNDS EXCEEDED
   Definition: Candidate space exceeds max_candidates before completion
   Detection: candidate count reaches limit during enumeration
@@ -277,6 +337,30 @@ INVALID TARGET SPECIFICATION
   Detection: target validation before generation
   Report: error with type INVALID_TARGET_DIMENSION
   Output: no generation attempted, immediate error return
+
+UNKNOWN TARGET FIELD
+  Definition: Target contains field names not in Section 2 whitelist
+  Detection: field name validation before generation
+  Report: error with type UNKNOWN_TARGET_FIELD
+  Output: no generation attempted, field name included in error
+
+INVALID CONSTRAINT PATTERN
+  Definition: Target uses constraint syntax not in Section 2 whitelist
+  Detection: pattern matching against allowed constraint forms
+  Report: error with type INVALID_CONSTRAINT_PATTERN
+  Output: no generation attempted, pattern included in error
+
+VACUOUS TARGET
+  Definition: Target specification contains zero constraints
+  Detection: constraint count check before generation
+  Report: error with type VACUOUS_TARGET
+  Output: no generation attempted, immediate error return
+
+INVALID NUMERIC LITERAL
+  Definition: Target uses Infinity, NaN, or undefined as constraint value
+  Detection: numeric literal validation before generation
+  Report: error with type INVALID_NUMERIC_LITERAL
+  Output: no generation attempted, value included in error
 
 All failure modes produce deterministic, reproducible error reports.
 No failure is silent. No failure produces partial results without indication.
