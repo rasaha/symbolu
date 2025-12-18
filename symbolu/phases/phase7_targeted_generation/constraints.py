@@ -239,7 +239,14 @@ def parse_constraint(field_name: str, value: Any) -> Constraint:
     elif isinstance(value, (list, tuple, set, frozenset)):
         # Sequence constraints or range
         operator = ConstraintOperator.EQ
-        if isinstance(value, (set, frozenset)):
+        # IMPORTANT: Preserve set/frozenset for SEQUENCE_NOT_IN exclusion
+        if isinstance(value, (set, frozenset)) and field_enum == ConstraintField.SEQUENCE_NOT_IN:
+            # Keep as frozenset for exclusion constraint
+            actual_value = frozenset(
+                tuple(s) if isinstance(s, list) else s
+                for s in value
+            )
+        elif isinstance(value, (set, frozenset)):
             actual_value = tuple(sorted(value))
         else:
             actual_value = tuple(value)

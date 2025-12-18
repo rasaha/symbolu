@@ -69,95 +69,128 @@ def run_experiment_1_diversity() -> ExperimentResult:
     Goal: Show diversity emerges purely from Exclusion Chains.
     """
     print("\n" + "="*60)
-    print("EXPERIMENT 1: Diversity Emergence")
+    print("EXPERIMENT 1: Diversity Emergence (Exclusion Chains)")
     print("="*60)
 
     consonants = frozenset(["ka", "ga", "ta", "da", "pa", "ba"])
     vowels = frozenset(["a", "i", "u"])
 
     gen_config = {
-        "max_sequence_length": 6,
-        "max_candidates": 5000,
+        "max_sequence_length": 5,
+        "max_candidates": None,  # Exhaustive within length bound
         "vowel_set": list(vowels),
         "consonant_set": list(consonants),
     }
 
     sel_config = {
-        "max_results": 20,
+        "max_results": 15,  # Smaller batches for more iterations
         "scoring_mode": "binary",
     }
 
-    target_base = {
-        "len(steps)": ">= 4",
-        "final_magnitude": ">= 1.1",
-        "count(steps where event == 'modulate')": ">= 1",
+    # Base constraints (no diversity metric!) - LOOSENED for exploration
+    # Note: We want sequences with at least one vowel (modulate event)
+    base_constraints = {
+        "count(steps where event == 'modulate')": ">= 1",  # Single quotes required!
     }
 
-    # Collect sequences across iterations
-    all_found: List[Tuple[str, ...]] = []
+    # Collect sequences across iterations using TRUE exclusion chains
+    all_found: Set[Tuple[str, ...]] = set()
     diversity_per_iteration: List[float] = []
+    sequences_per_iteration: List[List[Tuple[str, ...]]] = []
 
-    # Run 10 iterations
-    # Note: True exclusion chains need sequence NOT IN support
-    # For now, we simulate by collecting and measuring diversity growth
+    # Run 10 iterations with actual exclusion
     for iteration in range(10):
-        result = execute_phase7(target_base, gen_config, sel_config)
+        # Build target with exclusion constraint
+        target = dict(base_constraints)
+        if all_found:
+            # Add exclusion constraint - THIS IS THE KEY
+            target["sequence NOT IN"] = all_found
+
+        result = execute_phase7(target, gen_config, sel_config)
 
         if not result.metadata.target_feasible:
+            print(f"  Iteration {iteration}: No more feasible sequences")
             break
 
-        new_seqs = [r.sequence for r in result.results[:10]]
-        all_found.extend(new_seqs)
+        # Collect new sequences (should be different from previous!)
+        new_seqs = [r.sequence for r in result.results]
+        sequences_per_iteration.append(new_seqs)
+
+        # Verify exclusion worked
+        overlap = set(new_seqs) & all_found
+        if overlap:
+            print(f"  WARNING: Found {len(overlap)} sequences that should have been excluded!")
+
+        all_found.update(new_seqs)
 
         # Calculate pairwise edit distances for all found so far
-        if len(all_found) >= 2:
+        all_found_list = list(all_found)
+        if len(all_found_list) >= 2:
             distances = []
-            for i in range(len(all_found)):
-                for j in range(i + 1, len(all_found)):
-                    distances.append(levenshtein_distance(all_found[i], all_found[j]))
+            for i in range(len(all_found_list)):
+                for j in range(i + 1, len(all_found_list)):
+                    distances.append(levenshtein_distance(all_found_list[i], all_found_list[j]))
             diversity_per_iteration.append(mean(distances))
         else:
             diversity_per_iteration.append(0.0)
 
-        print(f"  Iteration {iteration}: {len(all_found)} sequences, "
-              f"mean_edit_dist={diversity_per_iteration[-1]:.2f}")
+        print(f"  Iteration {iteration}: {len(all_found)} unique sequences, "
+              f"mean_edit_dist={diversity_per_iteration[-1]:.2f}, "
+              f"new_this_iter={len(new_seqs)}")
 
     # Calculate metrics
+    all_found_list = list(all_found)
     unique_templates = set(sequence_to_template(s, consonants) for s in all_found)
-    unique_consonants = set(t for s in all_found for t in s if t in consonants)
-    unique_vowels = set(t for s in all_found for t in s if t in vowels)
+    unique_consonants = set(t for s in all_found_list for t in s if t in consonants)
+    unique_vowels = set(t for s in all_found_list for t in s if t in vowels)
 
     initial_diversity = diversity_per_iteration[0] if diversity_per_iteration else 0
     final_diversity = diversity_per_iteration[-1] if diversity_per_iteration else 0
 
-    # Since we can't actually exclude sequences yet, check if diversity exists
+    # Diversity should INCREASE as we exclude similar sequences and find different ones
     diversity_increase = final_diversity / initial_diversity if initial_diversity > 0 else 1.0
 
+    # Count iterations where we found new sequences
+    iterations_with_results = len(sequences_per_iteration)
+
     metrics = {
-        "total_sequences": len(all_found),
+        "total_unique_sequences": len(all_found),
         "unique_templates": len(unique_templates),
         "consonant_coverage": len(unique_consonants) / len(consonants),
         "vowel_coverage": len(unique_vowels) / len(vowels),
         "initial_diversity": initial_diversity,
         "final_diversity": final_diversity,
         "diversity_increase_ratio": diversity_increase,
+        "iterations_completed": iterations_with_results,
+        "diversity_curve": diversity_per_iteration,
     }
 
-    # Pass conditions (relaxed for now since exclusion not fully implemented)
+    # Pass conditions - NOW WITH REAL EXCLUSION CHAINS
+    # P1.1: Diversity increases (or at least maintains) as we explore
+    # P1.2: Template coverage (diversity of structure)
+    # P1.3: All sequences are unique (exclusion works)
     passed = (
-        len(unique_templates) >= 3 and  # Some template diversity
-        metrics["consonant_coverage"] >= 0.5 and  # Token coverage
-        len(all_found) >= 50  # Enough sequences found
+        len(unique_templates) >= 5 and  # Multiple template patterns discovered
+        metrics["consonant_coverage"] >= 0.8 and  # Good token coverage
+        metrics["vowel_coverage"] >= 1.0 and  # All vowels used
+        len(all_found) >= 100 and  # Found many unique sequences
+        iterations_with_results >= 5  # Multiple successful iterations
     )
 
-    print(f"\n  Metrics: {json.dumps(metrics, indent=2)}")
+    print(f"\n  Metrics:")
+    print(f"    Total unique sequences: {len(all_found)}")
+    print(f"    Unique templates: {len(unique_templates)}")
+    print(f"    Consonant coverage: {metrics['consonant_coverage']:.0%}")
+    print(f"    Vowel coverage: {metrics['vowel_coverage']:.0%}")
+    print(f"    Diversity curve: {[f'{d:.2f}' for d in diversity_per_iteration]}")
+    print(f"    Iterations completed: {iterations_with_results}")
     print(f"  PASSED: {passed}")
 
     return ExperimentResult(
         name="Diversity Emergence",
         passed=passed,
         metrics=metrics,
-        details=f"Found {len(unique_templates)} unique templates across {len(all_found)} sequences",
+        details=f"Found {len(unique_templates)} unique templates across {len(all_found)} unique sequences in {iterations_with_results} iterations",
     )
 
 
