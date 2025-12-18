@@ -16,23 +16,26 @@
 #   1. Version bump in meta.version
 #   2. Entry in docs/ontology/CHANGELOG.md
 #   3. Migration notes
-#   4. Approval from ontology-stewards team
+#   4. Approval from @ontology-core team
 #
 # See docs/governance/PROTECTED_BRANCHES.md for protected branch configuration.
 
-# Frozen ontology JSON files - strict governance
-docs/data/varna_bridge_map_v1.json           @rasaha/ontology-stewards
-docs/data/ontological_layers_v1.json         @rasaha/ontology-stewards
-docs/data/varna_layer_interaction_v1.json    @rasaha/ontology-stewards
-docs/data/varna_polarity_map_v1.json         @rasaha/ontology-stewards
-docs/data/varna_distortion_map_v1.json       @rasaha/ontology-stewards
+# Frozen ontology JSON files - strict governance (@ontology-core required)
+docs/data/varna_bridge_map_v1.json           @ontology-core @rasaha/ontology-stewards
+docs/data/ontological_layers_v1.json         @ontology-core @rasaha/ontology-stewards
+docs/data/varna_layer_interaction_v1.json    @ontology-core @rasaha/ontology-stewards
+docs/data/varna_polarity_map_v1.json         @ontology-core @rasaha/ontology-stewards
+docs/data/varna_distortion_map_v1.json       @ontology-core @rasaha/ontology-stewards
+
+# All files in docs/data require @ontology-core approval
+docs/data/*                                  @ontology-core
 
 # Future versioned ontology files (pattern match for v2, v3, etc.)
-docs/data/varna_bridge_map_v*.json           @rasaha/ontology-stewards
-docs/data/ontological_layers_v*.json         @rasaha/ontology-stewards
-docs/data/varna_layer_interaction_v*.json    @rasaha/ontology-stewards
-docs/data/varna_polarity_map_v*.json         @rasaha/ontology-stewards
-docs/data/varna_distortion_map_v*.json       @rasaha/ontology-stewards
+docs/data/varna_bridge_map_v*.json           @ontology-core @rasaha/ontology-stewards
+docs/data/ontological_layers_v*.json         @ontology-core @rasaha/ontology-stewards
+docs/data/varna_layer_interaction_v*.json    @ontology-core @rasaha/ontology-stewards
+docs/data/varna_polarity_map_v*.json         @ontology-core @rasaha/ontology-stewards
+docs/data/varna_distortion_map_v*.json       @ontology-core @rasaha/ontology-stewards
 
 # =============================================================================
 # ONTOLOGY PHASE-4A MODULE
@@ -41,7 +44,8 @@ docs/data/varna_distortion_map_v*.json       @rasaha/ontology-stewards
 # Phase-4A is the ONLY authorized reader of frozen ontology files.
 # Changes here affect ontology access patterns across the entire pipeline.
 
-symbolu/ontology/phase4a/**                  @rasaha/ontology-stewards
+symbolu/ontology/phase4a/**                  @ontology-core @rasaha/ontology-stewards
+symbolu/ontology/phase4a/*                   @ontology-core @rasaha/ontology-stewards
 
 # =============================================================================
 # ONTOLOGY FREEZE CONTRACT & CI GUARDS
@@ -50,9 +54,12 @@ symbolu/ontology/phase4a/**                  @rasaha/ontology-stewards
 # These files define and enforce the ontology governance rules.
 # Changes require careful review to ensure freeze contract integrity.
 
-ONTOLOGY_FREEZE_CONTRACT.md                  @rasaha/ontology-stewards
-tests/test_ontology_freeze_contract.py       @rasaha/ontology-stewards
-.github/workflows/ontology-freeze-ci.yml     @rasaha/ontology-stewards
+docs/ontology/ONTOLOGY_FREEZE_CONTRACT.md    @ontology-core @rasaha/ontology-stewards
+ONTOLOGY_FREEZE_CONTRACT.md                  @ontology-core @rasaha/ontology-stewards
+tests/test_ontology_freeze_contract.py       @ontology-core @rasaha/ontology-stewards
+tests/ontology/test_ontology_immutability.py @ontology-core @rasaha/ontology-stewards
+.github/workflows/ontology-freeze-ci.yml     @ontology-core @rasaha/ontology-stewards
+.github/workflows/ontology_guard.yml         @ontology-core @rasaha/ontology-stewards
 
 # =============================================================================
 # ONTOLOGY GOVERNANCE DOCUMENTATION
@@ -60,8 +67,8 @@ tests/test_ontology_freeze_contract.py       @rasaha/ontology-stewards
 #
 # Documentation related to ontology governance and change management.
 
-docs/ontology/**                             @rasaha/ontology-stewards
-docs/governance/PROTECTED_BRANCHES.md        @rasaha/ontology-stewards
+docs/ontology/**                             @ontology-core @rasaha/ontology-stewards
+docs/governance/PROTECTED_BRANCHES.md        @ontology-core @rasaha/ontology-stewards
 
 # =============================================================================
 # CODEOWNERS FILE ITSELF
@@ -69,7 +76,7 @@ docs/governance/PROTECTED_BRANCHES.md        @rasaha/ontology-stewards
 #
 # Changes to CODEOWNERS require review to prevent bypass of governance rules.
 
-.github/CODEOWNERS                           @rasaha/ontology-stewards
+.github/CODEOWNERS                           @ontology-core @rasaha/ontology-stewards
 
 # =============================================================================
 # NOTES
