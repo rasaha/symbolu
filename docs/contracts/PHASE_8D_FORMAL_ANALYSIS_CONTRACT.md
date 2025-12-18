@@ -359,10 +359,23 @@ ANALYSIS RESULT STRUCTURE
       query_type: QueryType              # Echo of input query type
       query_hash: str                    # Deterministic hash of query
       verdict: Verdict                   # Primary answer
+      classification: ResultClassification  # EXACT, BOUNDED, or ESTIMATED
+      proof_obligation: ProofObligation  # Required explanation for verdict
       evidence: Optional[Evidence]       # Supporting evidence
       bounds: Optional[ResultBounds]     # Numeric bounds if applicable
       metadata: AnalysisMetadata         # Execution metadata
       error: Optional[AnalysisError]     # Error if analysis failed
+
+  ResultClassification (enum):
+    EXACT                        # Result is provably precise
+    BOUNDED                      # Result is within proven bounds
+    ESTIMATED                    # Result is approximation with stated confidence
+
+  CLASSIFICATION REQUIREMENTS:
+    - ALL results MUST have a classification (T6.1)
+    - EXACT requires proof or exhaustive verification (T6.2)
+    - BOUNDED requires bounds to contain true value (T6.3)
+    - ESTIMATED requires confidence and method metadata (T6.4)
 
   Verdict (enum):
     # For reachability/satisfiability
@@ -384,6 +397,67 @@ ANALYSIS RESULT STRUCTURE
     # Uncertainty
     UNKNOWN                      # Could not determine
     TIMEOUT                      # Analysis exceeded limits
+
+PROOF OBLIGATION STRUCTURE
+
+  ProofObligation:
+    type: frozen dataclass
+    fields:
+      obligation_type: ObligationType
+      blocking_constraint: Optional[BlockingConstraint]  # For UNSATISFIABLE
+      limiting_factor: Optional[LimitingFactor]          # For bounds
+      witness_commitment: Optional[WitnessCommitment]    # For SATISFIABLE
+      derivation_chain: Tuple[str, ...]                  # Axioms/rules applied
+
+  ObligationType (enum):
+    UNREACHABILITY_PROOF         # Must explain WHY unreachable
+    BOUND_DERIVATION             # Must explain WHY bounded
+    EXISTENCE_WITNESS            # Must provide or cite witness
+    EQUIVALENCE_PROOF            # Must show bidirectional implication
+    NONE                         # For UNKNOWN/TIMEOUT (no obligation)
+
+  BlockingConstraint:
+    type: frozen dataclass
+    fields:
+      constraint_id: str                 # Which constraint blocks
+      axiom_violated: str                # Which Phase-6 axiom is contradicted
+      explanation: str                   # Human-readable explanation
+      minimal: bool                      # True if removing this unblocks
+
+    REQUIREMENT (T5.1): Every UNSATISFIABLE verdict MUST include a
+    blocking_constraint identifying what makes the target impossible.
+
+  LimitingFactor:
+    type: frozen dataclass
+    fields:
+      factor_type: LimitingFactorType    # What kind of limit
+      constraint_source: str             # Which constraint or axiom
+      bound_value: float                 # The limiting value
+      achievable: bool                   # Can the bound be achieved?
+
+    REQUIREMENT (T5.2): Every bound result MUST include a limiting_factor
+    explaining what determines the bound.
+
+  LimitingFactorType (enum):
+    AXIOM_LIMIT                  # Phase-6 axiom imposes limit (e.g., M3: mag >= 1.0)
+    CONSTRAINT_LIMIT             # User constraint imposes limit
+    COMBINATORIAL_LIMIT          # Structural limit (e.g., max vowels in length)
+    DERIVED_LIMIT                # Limit derived from constraint interaction
+
+  WitnessCommitment:
+    type: frozen dataclass
+    fields:
+      witness_available: bool            # Can provide concrete witness
+      witness_constructible: bool        # Can construct witness on demand
+      witness_description: str           # How to find/construct witness
+
+    REQUIREMENT (T4.2): Every SATISFIABLE verdict MUST either provide
+    a witness or commit to witness availability.
+
+  PROOF OBLIGATION VALIDITY (T5.3):
+    - blocking_constraint.constraint_id must reference a real constraint
+    - blocking_constraint.axiom_violated must be a valid Phase-6 axiom
+    - limiting_factor.constraint_source must exist in input or axioms
 
 EVIDENCE STRUCTURE
 
@@ -752,8 +826,21 @@ EXAMPLE 1: MAGNITUDE REACHABILITY
 
   Result:
     verdict: SATISFIABLE
+    classification: EXACT
+    proof_obligation: ProofObligation(
+      obligation_type: EXISTENCE_WITNESS,
+      blocking_constraint: None,
+      limiting_factor: None,
+      witness_commitment: WitnessCommitment(
+        witness_available: True,
+        witness_constructible: True,
+        witness_description: "Pattern [C, i, i, a] achieves 1.5 in 4 steps"
+      ),
+      derivation_chain: ("M5", "delta_sum", "witness_construction")
+    )
     evidence: WitnessEvidence(sequence=("ka", "i", "i", "a"), ...)
     metadata.method_used: CLOSED_FORM_DERIVATION
+    metadata.confidence: 1.0
 
 EXAMPLE 2: CONTRADICTION DETECTION
 
@@ -767,6 +854,19 @@ EXAMPLE 2: CONTRADICTION DETECTION
 
   Result:
     verdict: UNSATISFIABLE
+    classification: EXACT
+    proof_obligation: ProofObligation(
+      obligation_type: UNREACHABILITY_PROOF,
+      blocking_constraint: BlockingConstraint(
+        constraint_id: "final_magnitude < 1.0",
+        axiom_violated: "M3",
+        explanation: "Axiom M3 guarantees magnitude >= 1.0; constraint requires < 1.0",
+        minimal: True
+      ),
+      limiting_factor: None,
+      witness_commitment: None,
+      derivation_chain: ("M3", "constraint_contradiction")
+    )
     evidence: ProofTrace(
       steps=[
         ProofStep(1, "By axiom M3, final_magnitude >= 1.0", "M3"),
@@ -776,6 +876,7 @@ EXAMPLE 2: CONTRADICTION DETECTION
       axioms_used={"M3"}
     )
     metadata.method_used: AXIOMATIC_DEDUCTION
+    metadata.confidence: 1.0
 
 EXAMPLE 3: CARDINALITY BOUNDS
 
@@ -803,7 +904,24 @@ EXAMPLE 3: CARDINALITY BOUNDS
 
   Result:
     verdict: EXISTS (satisfying sequences exist)
-    bounds: ResultBounds(lower=48, upper=126, exact=False)
+    classification: BOUNDED
+    proof_obligation: ProofObligation(
+      obligation_type: BOUND_DERIVATION,
+      blocking_constraint: None,
+      limiting_factor: LimitingFactor(
+        factor_type: CONSTRAINT_LIMIT,
+        constraint_source: "final_magnitude >= 1.2",
+        bound_value: 1.2,
+        achievable: True
+      ),
+      witness_commitment: WitnessCommitment(
+        witness_available: True,
+        witness_constructible: True,
+        witness_description: "Pattern [C, i, *] achieves >= 1.2"
+      ),
+      derivation_chain: ("M5", "combinatorial_count", "constraint_filter")
+    )
+    bounds: ResultBounds(lower=48, upper=126, exact=False, count=None)
     metadata.method_used: COMBINATORIAL_COUNTING
     metadata.confidence: 0.95
 
@@ -904,7 +1022,187 @@ STANDALONE ANALYSIS
   Benefit: Understanding before action.
 
 ================================================================================
-12. FREEZE CONDITIONS
+12. TEST TRACEABILITY
+================================================================================
+
+This section maps acceptance test requirements to contract guarantees.
+
+T1: SOUNDNESS TESTS (Critical) → Contract Guarantees
+
+  T1.1: Unreachability soundness
+    Requirement: UNSATISFIABLE → Phase-7 finds zero results
+    Contract: S1 (NO-FALSE-UNSATISFIABLE), INV-S1
+    Verification: verdict == UNSATISFIABLE ↔ ∀s, ¬satisfies(s, constraints)
+
+  T1.2: Upper bound soundness
+    Requirement: "max ≤ X" → no result exceeds X
+    Contract: S5 (BOUNDS-VALIDITY)
+    Verification: result.bounds.upper >= max(actual_values)
+
+  T1.3: Lower bound soundness
+    Requirement: "min ≥ X" → no result below X
+    Contract: S5 (BOUNDS-VALIDITY)
+    Verification: result.bounds.lower <= min(actual_values)
+
+  T1.4: Cardinality upper bound
+    Requirement: "≤ N sequences" → actual count ≤ N
+    Contract: S7 (COUNT-ACCURACY) for EXACT, S5 for BOUNDED
+    Verification: result.bounds.count >= actual_count (upper bound)
+
+T2: INDEPENDENCE TESTS (Critical) → Contract Guarantees
+
+  T2.1: No Phase-7 invocation
+    Requirement: Zero Phase-7 calls during analysis
+    Contract: INV-I1 (No Phase-7 dependency), F-D1
+    Verification: Mock Phase-7, assert zero calls
+
+  T2.2: No trajectory simulation
+    Requirement: Zero Phase-6 simulate() calls
+    Contract: INV-I2 (No Phase-6 simulation), F-D2
+    Verification: Instrument Phase-6, assert zero calls
+    Exception: Single-call witness verification permitted
+
+  T2.3: Analysis-only execution
+    Requirement: No sequence generation in call stack
+    Contract: INV-A1 (Enumeration never primary), INV-A3 (Enumeration bounded)
+    Verification: Profile execution, verify analytical methods used
+
+T3: DETERMINISM TESTS (Critical) → Contract Guarantees
+
+  T3.1: Repeated analysis
+    Requirement: 10 identical runs produce byte-identical results
+    Contract: INV-D1 (Same query → same result)
+    Verification: Hash comparison of results
+
+  T3.2: Order independence
+    Requirement: Analyze [A,B] then [B,A] produces same results
+    Contract: INV-D3 (No randomness), D1 (Pure function)
+    Verification: Permutation testing
+
+  T3.3: Session independence
+    Requirement: Fresh interpreter produces same result
+    Contract: F-D3 (No external state access)
+    Verification: Cross-process comparison
+
+T4: COMPLETENESS TESTS (High) → Contract Guarantees
+
+  T4.1: Known-reachable detection
+    Requirement: Phase-7 proven results → SATISFIABLE
+    Contract: Section 7 completeness boundaries
+    Verification: No false UNKNOWN for decidable cases
+
+  T4.2: Witness availability
+    Requirement: SATISFIABLE → witness available
+    Contract: WitnessCommitment in ProofObligation
+    Verification: proof_obligation.witness_commitment.witness_available == True
+
+  T4.3: No false negatives (bounded)
+    Requirement: Zero incorrect UNSATISFIABLE claims
+    Contract: S1 (NO-FALSE-UNSATISFIABLE)
+    Verification: Sample-based validation
+
+T5: PROOF OBLIGATION TESTS (High) → Contract Guarantees
+
+  T5.1: Unreachable has blocker
+    Requirement: UNSATISFIABLE → includes blocking_constraint
+    Contract: BlockingConstraint structure, REQUIREMENT (T5.1)
+    Verification: assert result.proof_obligation.blocking_constraint is not None
+
+  T5.2: Bound has dominator
+    Requirement: Bound result → includes limiting_factor
+    Contract: LimitingFactor structure, REQUIREMENT (T5.2)
+    Verification: assert result.proof_obligation.limiting_factor is not None
+
+  T5.3: Blocker is valid
+    Requirement: blocking_constraint references real constraint/axiom
+    Contract: PROOF OBLIGATION VALIDITY section
+    Verification: Validate constraint_id ∈ input_constraints ∪ axiom_ids
+
+T6: OUTPUT CLASSIFICATION TESTS (High) → Contract Guarantees
+
+  T6.1: All outputs classified
+    Requirement: Every result has classification ∈ {EXACT, BOUNDED, ESTIMATED}
+    Contract: ResultClassification enum, AnalysisResult.classification required
+    Verification: assert result.classification is not None
+
+  T6.2: EXACT is exact
+    Requirement: classification == EXACT → matches exhaustive verification
+    Contract: CLASSIFICATION REQUIREMENTS
+    Verification: Cross-check with exhaustive enumeration
+
+  T6.3: BOUNDED contains truth
+    Requirement: classification == BOUNDED → true value within bounds
+    Contract: S5 (BOUNDS-VALIDITY)
+    Verification: actual_value ∈ [lower, upper]
+
+  T6.4: ESTIMATED has metadata
+    Requirement: classification == ESTIMATED → includes confidence/method
+    Contract: CLASSIFICATION REQUIREMENTS, AnalysisMetadata
+    Verification: assert metadata.confidence < 1.0, method_used present
+
+T7: ACCURACY TESTS (Medium) → Contract Guarantees
+
+  T7.1: Bound tightness
+    Requirement: Gap < 5% of range
+    Contract: S6 (EXACT-BOUNDS-TIGHTNESS) when exact == True
+    Verification: (upper - actual_max) / (upper - lower) < 0.05
+
+  T7.2: Cardinality accuracy
+    Requirement: Small space count matches Phase-8D
+    Contract: S7 (COUNT-ACCURACY)
+    Verification: Exhaustive enumeration comparison
+
+  T7.3: Cross-validation
+    Requirement: Consistent with Phase-7 boundary experiment (≈1.594)
+    Contract: Axiom encoding (M1-M5)
+    Verification: Phase-8D max_magnitude query returns consistent bound
+
+T8: EDGE CASE TESTS (Medium) → Contract Guarantees
+
+  T8.1: Empty constraints
+    Requirement: Defined behavior for {}
+    Contract: Section 7 completeness, full space analysis
+    Verification: Returns full validity space bounds
+
+  T8.2: Contradictory constraints
+    Requirement: {mag >= 5, mag <= 1} → UNSATISFIABLE with proof
+    Contract: S1, BlockingConstraint
+    Verification: verdict == UNSATISFIABLE, blocker present
+
+  T8.3: Tautological constraints
+    Requirement: {mag >= 0} → full space analysis
+    Contract: Axiom M3 (mag >= 1.0) subsumes tautology
+    Verification: Equivalent to unconstrained analysis
+
+  T8.4: Single-point target
+    Requirement: Very tight constraints → cardinality 0 or 1
+    Contract: C1 (EXACT_COUNT)
+    Verification: Exact count returned
+
+  T8.5: Maximum complexity
+    Requirement: 20+ constraints completes without error
+    Contract: AnalysisBounds.max_computation_steps
+    Verification: Returns result or TIMEOUT (not crash)
+
+T9: CONSISTENCY TESTS (Medium) → Contract Guarantees
+
+  T9.1: Equivalence symmetry
+    Requirement: equivalent(A, B) == equivalent(B, A)
+    Contract: E1 (CONSTRAINT_EQUIVALENCE) - bidirectional
+    Verification: Symmetry assertion
+
+  T9.2: Equivalence transitivity
+    Requirement: A≡B ∧ B≡C → A≡C
+    Contract: Logical soundness of equivalence
+    Verification: Transitivity assertion
+
+  T9.3: Subset consistency
+    Requirement: A ⊂ B → cardinality(A) ≤ cardinality(B)
+    Contract: E2 (CONSTRAINT_SUBSUMPTION), cardinality bounds
+    Verification: Cross-query consistency check
+
+================================================================================
+13. FREEZE CONDITIONS
 ================================================================================
 
 Phase-8D Formal Analysis Contract is considered complete and frozen when:
@@ -919,25 +1217,45 @@ COMPLETENESS CRITERIA
   [ ] All forbidden behaviors enumerated (Section 9)
   [ ] Example queries sketched (Section 10)
   [ ] Phase composition defined (Section 11)
+  [ ] Test traceability complete (Section 12)
 
 SOUNDNESS CRITERIA
-  [ ] No false UNSATISFIABLE possible
+  [ ] No false UNSATISFIABLE possible (T1.1)
   [ ] No false HOLDS possible
   [ ] No false NOT_EXISTS possible
   [ ] All evidence types validated
-  [ ] Bounds always contain actuals
+  [ ] Bounds always contain actuals (T1.2, T1.3)
+  [ ] Cardinality bounds are valid (T1.4)
 
 INDEPENDENCE CRITERIA
-  [ ] No Phase-7 invocation in analysis
-  [ ] No Phase-6 simulation in analysis (except witness verification)
+  [ ] No Phase-7 invocation in analysis (T2.1)
+  [ ] No Phase-6 simulation in analysis (T2.2, except witness verification)
   [ ] No Phase-8A dependency
-  [ ] Analysis-primary invariant enforceable
+  [ ] Analysis-primary invariant enforceable (T2.3)
+
+DETERMINISM CRITERIA
+  [ ] Repeated analysis produces identical results (T3.1)
+  [ ] Order-independent analysis (T3.2)
+  [ ] Session-independent analysis (T3.3)
+
+PROOF OBLIGATION CRITERIA
+  [ ] UNSATISFIABLE includes blocking_constraint (T5.1)
+  [ ] Bound results include limiting_factor (T5.2)
+  [ ] Blockers reference valid constraints/axioms (T5.3)
+
+CLASSIFICATION CRITERIA
+  [ ] All results have classification (T6.1)
+  [ ] EXACT results are provably exact (T6.2)
+  [ ] BOUNDED results contain true values (T6.3)
+  [ ] ESTIMATED results have confidence metadata (T6.4)
 
 CONSISTENCY CRITERIA
   [ ] Axiom encoding matches Phase-6 implementation
   [ ] Query types cover all structural questions
   [ ] Output schema handles all verdict types
   [ ] Error handling complete
+  [ ] Equivalence is symmetric and transitive (T9.1, T9.2)
+  [ ] Subset cardinality is monotonic (T9.3)
 
 Once all criteria are satisfied, this contract is FROZEN.
 Modifications require a new version number and explicit justification.
