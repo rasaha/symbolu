@@ -632,124 +632,124 @@
     },
     "aṁ": {
       "O1_ACTING": {
-        "manifestation_positive": "body expels what genuinely obstructs vital function",
-        "manifestation_negative": "body rejects indiscriminately in purgative reflex",
+        "manifestation_positive": "body attenuates what genuinely completes primary signal",
+        "manifestation_negative": "body trails residual imprint indiscriminately",
         "distortion_vector": "lateral",
         "sublimate_vector": "upward"
       },
       "O2_TAGGING": {
-        "manifestation_positive": "marking what genuinely requires expulsion",
-        "manifestation_negative": "classifying neutral content as requiring purging",
+        "manifestation_positive": "marking what genuinely completes as trailing resonance",
+        "manifestation_negative": "classifying neutral content as requiring attenuation",
         "distortion_vector": "lateral",
         "sublimate_vector": "upward"
       },
       "O3_FORMING": {
-        "manifestation_positive": "shaping purgation into cleansing release",
-        "manifestation_negative": "purgative force expels valuable content",
+        "manifestation_positive": "shaping signal completion into reverberant closure",
+        "manifestation_negative": "trailing force attenuates valuable signal prematurely",
         "distortion_vector": "downward",
         "sublimate_vector": "upward"
       },
       "O4_THINKING": {
-        "manifestation_positive": "thought patterns identify what genuinely needs clearing",
-        "manifestation_negative": "thought repulses without discrimination",
+        "manifestation_positive": "thought patterns identify what completes as residual imprint",
+        "manifestation_negative": "thought attenuates without discrimination",
         "distortion_vector": "lateral",
         "sublimate_vector": "upward"
       },
       "O5_DIRECTING": {
-        "manifestation_positive": "directing expulsion toward genuine obstruction",
-        "manifestation_negative": "repulsion vector pushes away all contact",
+        "manifestation_positive": "directing attenuation toward genuine signal completion",
+        "manifestation_negative": "trailing vector attenuates all contact prematurely",
         "distortion_vector": "lateral",
         "sublimate_vector": "upward"
       },
       "O6_REASONING": {
-        "manifestation_positive": "sequencing purification in appropriate order",
-        "manifestation_negative": "reasoning serves indiscriminate rejection",
+        "manifestation_positive": "sequencing signal completion in appropriate order",
+        "manifestation_negative": "reasoning serves indiscriminate attenuation",
         "distortion_vector": "lateral",
         "sublimate_vector": "upward"
       },
       "O7_PURPOSING": {
-        "manifestation_positive": "purpose includes healthy cleansing function",
-        "manifestation_negative": "purpose collapses into pure repulsion",
+        "manifestation_positive": "purpose includes healthy closure function",
+        "manifestation_negative": "purpose collapses into premature trailing",
         "distortion_vector": "downward",
         "sublimate_vector": "upward"
       },
       "O8_META_OBSERVING": {
-        "manifestation_positive": "witnessing purgative patterns without reactivity",
-        "manifestation_negative": "observer repulsed by its own content",
+        "manifestation_positive": "witnessing residual patterns without reactivity",
+        "manifestation_negative": "observer attenuated by its own trailing imprint",
         "distortion_vector": "lateral",
         "sublimate_vector": "upward"
       },
       "O9_UNIFYING": {
-        "manifestation_positive": "integrating cleared space into renewed field",
-        "manifestation_negative": "purgation fragments field into rejected zones",
+        "manifestation_positive": "integrating residual echo into renewed field",
+        "manifestation_negative": "trailing resonance fragments field into attenuated zones",
         "distortion_vector": "lateral",
         "sublimate_vector": "upward"
       },
       "O10_ABSOLVING": {
-        "manifestation_positive": "purgation completes into purified stillness",
-        "manifestation_negative": "repulsion terminates leaving emptied residue",
+        "manifestation_positive": "signal completion settles into reverberant stillness",
+        "manifestation_negative": "trailing terminates leaving residual echo",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
       }
     },
     "aha": {
       "O1_ACTING": {
-        "manifestation_positive": "body opens to dissolve rigid boundaries",
+        "manifestation_positive": "body opens to cessation beyond rigid boundaries",
         "manifestation_negative": "body loses coherent boundary prematurely",
         "distortion_vector": "downward",
         "sublimate_vector": "upward"
       },
       "O2_TAGGING": {
-        "manifestation_positive": "marking what is ready for dissolving absorption",
-        "manifestation_negative": "classifying all structure as requiring dissolution",
+        "manifestation_positive": "marking what is ready for cessation beyond processing",
+        "manifestation_negative": "classifying all structure as requiring cessation",
         "distortion_vector": "lateral",
         "sublimate_vector": "upward"
       },
       "O3_FORMING": {
-        "manifestation_positive": "shaping dissolution into liberating release",
-        "manifestation_negative": "dissolutive force melts necessary structure",
+        "manifestation_positive": "shaping cessation into post-processing stillness",
+        "manifestation_negative": "cessation force subsides necessary structure prematurely",
         "distortion_vector": "downward",
         "sublimate_vector": "upward"
       },
       "O4_THINKING": {
-        "manifestation_positive": "thought patterns allow melting of rigid concepts",
-        "manifestation_negative": "thought dissolves before coherence forms",
+        "manifestation_positive": "thought patterns allow cessation of rigid concepts",
+        "manifestation_negative": "thought ceases before coherence forms",
         "distortion_vector": "lateral",
         "sublimate_vector": "upward"
       },
       "O5_DIRECTING": {
-        "manifestation_positive": "directing attention toward liberating dissolution",
-        "manifestation_negative": "dissolution vector attracts premature merging",
+        "manifestation_positive": "directing attention toward post-processing stillness",
+        "manifestation_negative": "cessation vector attracts premature non-registration",
         "distortion_vector": "downward",
         "sublimate_vector": "upward"
       },
       "O6_REASONING": {
-        "manifestation_positive": "sequencing toward natural dissolution timing",
-        "manifestation_negative": "reasoning dissolves before reaching conclusion",
+        "manifestation_positive": "sequencing toward natural cessation timing",
+        "manifestation_negative": "reasoning ceases before reaching conclusion",
         "distortion_vector": "lateral",
         "sublimate_vector": "upward"
       },
       "O7_PURPOSING": {
-        "manifestation_positive": "purpose includes healthy dissolution function",
-        "manifestation_negative": "purpose melts before manifesting",
+        "manifestation_positive": "purpose includes healthy cessation function",
+        "manifestation_negative": "purpose ceases before manifesting",
         "distortion_vector": "downward",
         "sublimate_vector": "upward"
       },
       "O8_META_OBSERVING": {
-        "manifestation_positive": "witnessing dissolution without losing witness",
-        "manifestation_negative": "observer dissolves into observed",
+        "manifestation_positive": "witnessing cessation without losing witness",
+        "manifestation_negative": "observer ceases into non-registration",
         "distortion_vector": "downward",
         "sublimate_vector": "upward"
       },
       "O9_UNIFYING": {
-        "manifestation_positive": "integrating dissolved elements into unified field",
-        "manifestation_negative": "dissolution erases field boundaries prematurely",
+        "manifestation_positive": "integrating ceased elements into unified field",
+        "manifestation_negative": "cessation erases field boundaries prematurely",
         "distortion_vector": "lateral",
         "sublimate_vector": "upward"
       },
       "O10_ABSOLVING": {
-        "manifestation_positive": "dissolution completes into boundless awareness",
-        "manifestation_negative": "attraction terminates in merged confusion",
+        "manifestation_positive": "cessation completes into stillness beyond processing",
+        "manifestation_negative": "cessation terminates in non-registration without remainder",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
       }
@@ -1227,13 +1227,13 @@
       },
       "O7_PURPOSING": {
         "manifestation_positive": "purpose includes authentic self-expression",
-        "manifestation_negative": "purpose contracts to self-aggrandizement only",
+        "manifestation_negative": "purpose contracts to self-amplifying loop only",
         "distortion_vector": "downward",
         "sublimate_vector": "upward"
       },
       "O8_META_OBSERVING": {
         "manifestation_positive": "witnessing self-pattern without identification",
-        "manifestation_negative": "observer collapses into ego-identification",
+        "manifestation_negative": "observer collapses into self-referential pattern",
         "distortion_vector": "downward",
         "sublimate_vector": "upward"
       },
@@ -1245,7 +1245,7 @@
       },
       "O10_ABSOLVING": {
         "manifestation_positive": "self-reference dissolves into undifferentiated awareness",
-        "manifestation_negative": "ego death experienced as annihilation",
+        "manifestation_negative": "self-pattern dissolution experienced as annihilation",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
       }
@@ -1295,7 +1295,7 @@
       },
       "O8_META_OBSERVING": {
         "manifestation_positive": "witnessing acquisition patterns without compulsion",
-        "manifestation_negative": "observer identified with deficit-state",
+        "manifestation_negative": "observer locked in deficit-pattern",
         "distortion_vector": "downward",
         "sublimate_vector": "upward"
       },
@@ -1350,7 +1350,7 @@
         "sublimate_vector": "upward"
       },
       "O7_PURPOSING": {
-        "manifestation_positive": "purpose integrates authentic and presented self",
+        "manifestation_positive": "purpose integrates inner state and presented expression",
         "manifestation_negative": "purpose serves surface at cost of depth",
         "distortion_vector": "downward",
         "sublimate_vector": "upward"
