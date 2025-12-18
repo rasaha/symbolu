@@ -97,7 +97,7 @@
         "O7_PURPOSING": "prevention orientation vector",
         "O8_META_OBSERVING": "impediment pattern tracking",
         "O9_UNIFYING": "distributed vigilance coherence",
-        "O10_ABSOLVING": "exhaustion of vigilance"
+        "O10_ABSOLVING": "vigilance termination"
       }
     },
     "ga": {
@@ -188,7 +188,7 @@
         "O7_PURPOSING": "discharge orientation vector",
         "O8_META_OBSERVING": "saturation pattern tracking",
         "O9_UNIFYING": "cascading fragmentation field",
-        "O10_ABSOLVING": "collapse into reset"
+        "O10_ABSOLVING": "system reset termination"
       }
     },
     "ja": {
@@ -258,7 +258,7 @@
         "O4_THINKING": "magnification pattern bias",
         "O5_DIRECTING": "toward emphasis",
         "O6_REASONING": "amplification-based sequencing",
-        "O7_PURPOSING": "impact maximization vector",
+        "O7_PURPOSING": "impact maximization orientation vector",
         "O8_META_OBSERVING": "amplification pattern tracking",
         "O9_UNIFYING": "amplified field coherence",
         "O10_ABSOLVING": "attenuation of amplification"
@@ -279,7 +279,7 @@
         "O7_PURPOSING": "reversal orientation vector",
         "O8_META_OBSERVING": "retraction pattern tracking",
         "O9_UNIFYING": "corrective field integration",
-        "O10_ABSOLVING": "nullification of prior trace"
+        "O10_ABSOLVING": "prior-trace termination"
       }
     },
     "dda": {
@@ -312,7 +312,7 @@
         "O4_THINKING": "intensity pattern bias",
         "O5_DIRECTING": "toward maximum impact",
         "O6_REASONING": "intensity-based sequencing",
-        "O7_PURPOSING": "force application vector",
+        "O7_PURPOSING": "force application orientation vector",
         "O8_META_OBSERVING": "impact pattern tracking",
         "O9_UNIFYING": "concentrated force integration",
         "O10_ABSOLVING": "collapse of intensification"
@@ -352,7 +352,7 @@
         "O7_PURPOSING": "preservation orientation vector",
         "O8_META_OBSERVING": "stasis pattern tracking",
         "O9_UNIFYING": "steady state coherence",
-        "O10_ABSOLVING": "collapse of resistance"
+        "O10_ABSOLVING": "resistance termination"
       }
     },
     "tha": {
@@ -494,10 +494,10 @@
         "O4_THINKING": "signal distortion bias",
         "O5_DIRECTING": "toward signal drift",
         "O6_REASONING": "distortion-based sequencing",
-        "O7_PURPOSING": "divergent signal vector",
+        "O7_PURPOSING": "divergent signal orientation vector",
         "O8_META_OBSERVING": "distortion pattern tracking",
         "O9_UNIFYING": "distorted field integration",
-        "O10_ABSOLVING": "collapse of distortion"
+        "O10_ABSOLVING": "distortion termination"
       }
     },
     "ma": {
@@ -552,7 +552,7 @@
         "O7_PURPOSING": "clearing orientation vector",
         "O8_META_OBSERVING": "dissolution pattern tracking",
         "O9_UNIFYING": "dissolution field integration",
-        "O10_ABSOLVING": "completion of dissolution"
+        "O10_ABSOLVING": "terminal dissolution"
       }
     },
     "la": {
@@ -622,7 +622,7 @@
         "O4_THINKING": "sensory-pull pattern bias",
         "O5_DIRECTING": "toward sensory attractor",
         "O6_REASONING": "sensory-attraction sequencing",
-        "O7_PURPOSING": "sensory-approach vector",
+        "O7_PURPOSING": "sensory-approach orientation vector",
         "O8_META_OBSERVING": "sensory-attraction tracking",
         "O9_UNIFYING": "sensory-attraction field integration",
         "O10_ABSOLVING": "dissolution of sensory pull"
@@ -643,7 +643,7 @@
         "O7_PURPOSING": "departure orientation vector",
         "O8_META_OBSERVING": "exit pattern tracking",
         "O9_UNIFYING": "flight field integration",
-        "O10_ABSOLVING": "transcendence through exit"
+        "O10_ABSOLVING": "terminal evacuation"
       }
     },
 
@@ -659,10 +659,10 @@
         "O4_THINKING": "occlusion pattern bias",
         "O5_DIRECTING": "toward non-registration",
         "O6_REASONING": "occlusion-based sequencing",
-        "O7_PURPOSING": "non-registration vector",
+        "O7_PURPOSING": "non-registration orientation vector",
         "O8_META_OBSERVING": "occlusion pattern tracking",
         "O9_UNIFYING": "occluded field integration",
-        "O10_ABSOLVING": "absorption into void"
+        "O10_ABSOLVING": "null-state transition"
       }
     },
 
