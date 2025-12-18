@@ -1,6 +1,15 @@
 """
-Phase-4.0 Transform Engine (v4.0) - Phase-4B
-=============================================
+Phase-4.0 Transform Engine (v4.0) - Phase-4B — EXPERIMENT SANDBOX
+=================================================================
+
+EXPERIMENT_ONLY = True
+
+WARNING: This file MUST NOT be used as ontology source of truth.
+This is Phase-4B (Transform Engine), NOT Phase-4A (Ontology Lookup).
+
+AUTHORITATIVE ONTOLOGY SOURCE:
+    - Ontology executor: symbolu.ontology.phase4a (Phase-4A)
+    - Frozen data: docs/data/*.json
 
 Phase-4.0 is **Phase-4B** within the composite Phase-4 of the Phase-1b → Phase-14
 experimental pipeline.
@@ -42,6 +51,8 @@ CRITICAL ONTOLOGY CONSTRAINT (Phase-4 Composite Rule):
 
 Version: 4.0
 """
+
+EXPERIMENT_ONLY = True
 
 import hashlib
 from dataclasses import dataclass

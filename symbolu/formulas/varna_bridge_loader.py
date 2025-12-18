@@ -1,10 +1,21 @@
 """
-Varna Bridge Loader - Ground-Truth Data Authority
-==================================================
+Varna Bridge Loader - LEGACY MODULE
+====================================
 
-This module is the SOLE authoritative source for all phoneme/varna mappings
-in the Symbol-U system. It loads data EXCLUSIVELY from:
+WARNING: EXPERIMENT_ONLY = True
 
+This file MUST NOT be used as ontology source of truth.
+
+DEPRECATION NOTICE:
+    This loader is a LEGACY module from before Phase-4A was established.
+    For production ontology access, use:
+        from symbolu.ontology.phase4a import lookup_interaction, get_varna_info
+
+AUTHORITATIVE SOURCE:
+    - Ontology executor: symbolu.ontology.phase4a (Phase-4A)
+    - Frozen data: docs/data/*.json
+
+This module loads data from:
     /docs/data/varna_bridge_map_v1.json
 
 HARD CONSTRAINTS (NON-NEGOTIABLE):
@@ -21,9 +32,12 @@ ERROR CODES:
     - VARNA_MAPPING_NOT_FOUND: Raised when a requested varna is not in the JSON
     - VARNA_DATA_NOT_LOADED: Raised when JSON file cannot be loaded
 
-Version: 1.0.0 (Ground-Truth Authority)
+Version: 1.0.0 (Legacy - prefer Phase-4A)
 Date: 2025-12-17
 """
+
+# EXPERIMENT_ONLY marker — this loader is NOT the authoritative ontology executor
+EXPERIMENT_ONLY = True
 
 from __future__ import annotations
 

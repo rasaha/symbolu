@@ -2,6 +2,8 @@
 Phase-4A Ontology Loader
 ========================
 
+FROZEN SUBSTRATE — NO INFERENCE, NO MODIFICATION, NO GAP-FILLING
+
 Phase-4A is the ontology lookup sub-module within the composite Phase-4
 of the Phase-1b → Phase-14 experimental pipeline.
 
@@ -14,10 +16,19 @@ Validation Rules:
     1. Every varna in interaction file MUST exist in bridge file
     2. Every layer in interaction file MUST exist in ontological layers
     3. Every interaction MUST have all required fields
+    4. Checksum/hash consistency is enforced (fail-fast on mismatch)
 
 The loader uses module-level caching. Files are loaded once per process.
+
+HARD INVARIANTS:
+    - READ-ONLY: Never modifies frozen ontology files
+    - DETERMINISTIC: Same input => identical output
+    - FAIL-FAST: Missing data triggers immediate error, never infers
+    - NO INFERENCE: No gap-filling, no polarity invention, no smoothing
+    - CHECKSUM VALIDATED: File integrity verified on load
 """
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -84,6 +95,101 @@ VALID_LAYER_IDS = frozenset({
 
 
 # =============================================================================
+# Checksum Registry — Frozen Substrate Integrity
+# =============================================================================
+
+# These checksums are computed from the frozen ontology files.
+# Any modification to the files will cause a checksum mismatch and fail-fast.
+_FROZEN_CHECKSUMS: Dict[str, Optional[str]] = {
+    "varna_bridge_map": None,  # Computed on first load, then locked
+    "ontological_layers": None,
+    "varna_layer_interaction": None,
+}
+
+_checksums_locked: bool = False
+
+
+def _compute_file_checksum(file_path: Path) -> str:
+    """
+    Compute SHA-256 checksum of a file.
+
+    Args:
+        file_path: Path to file
+
+    Returns:
+        Hex-encoded SHA-256 checksum
+    """
+    sha256 = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            sha256.update(chunk)
+    return sha256.hexdigest()
+
+
+def _verify_checksum(file_key: str, file_path: Path) -> None:
+    """
+    Verify file checksum matches frozen value.
+
+    On first load, records the checksum.
+    On subsequent loads, verifies checksum matches.
+
+    Args:
+        file_key: Key into ONTOLOGY_FILES
+        file_path: Path to file
+
+    Raises:
+        Phase4AValidationError: If checksum mismatch detected
+    """
+    global _checksums_locked
+
+    current_checksum = _compute_file_checksum(file_path)
+
+    if _FROZEN_CHECKSUMS[file_key] is None:
+        # First load — record checksum
+        _FROZEN_CHECKSUMS[file_key] = current_checksum
+    else:
+        # Subsequent load — verify checksum
+        if current_checksum != _FROZEN_CHECKSUMS[file_key]:
+            raise Phase4AValidationError(
+                message=f"CHECKSUM MISMATCH: {file_key} has been modified. "
+                        f"Expected {_FROZEN_CHECKSUMS[file_key][:16]}..., "
+                        f"got {current_checksum[:16]}...",
+                missing_varnas=(),
+                missing_layers=(),
+                orphan_interactions=(),
+            )
+
+
+def get_frozen_checksums() -> Dict[str, Optional[str]]:
+    """
+    Get the current frozen checksums for audit purposes.
+
+    Returns:
+        Dict mapping file_key → checksum (or None if not yet loaded)
+    """
+    return dict(_FROZEN_CHECKSUMS)
+
+
+def verify_all_checksums() -> bool:
+    """
+    Verify all frozen ontology files have consistent checksums.
+
+    This is a fail-fast integrity check.
+
+    Returns:
+        True if all checksums are valid
+
+    Raises:
+        Phase4AValidationError: If any checksum mismatch
+    """
+    for file_key in ONTOLOGY_FILES:
+        file_path = _get_data_dir() / ONTOLOGY_FILES[file_key]
+        if file_path.exists():
+            _verify_checksum(file_key, file_path)
+    return True
+
+
+# =============================================================================
 # Module-Level Cache
 # =============================================================================
 
@@ -96,6 +202,8 @@ def _load_json_file(file_key: str) -> Dict[str, Any]:
     """
     Load a single JSON file from the data directory.
 
+    FROZEN SUBSTRATE: Verifies checksum before loading.
+
     Args:
         file_key: Key into ONTOLOGY_FILES
 
@@ -105,12 +213,16 @@ def _load_json_file(file_key: str) -> Dict[str, Any]:
     Raises:
         Phase4AFileNotFoundError: If file doesn't exist
         Phase4AFileParseError: If file is invalid JSON
+        Phase4AValidationError: If checksum mismatch
     """
     file_name = ONTOLOGY_FILES[file_key]
     file_path = _get_data_dir() / file_name
 
     if not file_path.exists():
         raise Phase4AFileNotFoundError(file_name, str(file_path))
+
+    # Verify checksum before loading (fail-fast on modification)
+    _verify_checksum(file_key, file_path)
 
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -159,6 +271,21 @@ def _clear_cache() -> None:
     _cached_ontology = None
     _cached_varnas = None
     _cached_layers = None
+    # Note: Checksums are NOT cleared — once recorded, they are frozen
+    # To reset checksums in tests, use _reset_checksums_for_testing()
+
+
+def _reset_checksums_for_testing() -> None:
+    """
+    Reset checksum registry for testing purposes ONLY.
+
+    WARNING: This should only be used in test fixtures.
+    Production code should NEVER call this function.
+    """
+    global _FROZEN_CHECKSUMS
+    _FROZEN_CHECKSUMS["varna_bridge_map"] = None
+    _FROZEN_CHECKSUMS["ontological_layers"] = None
+    _FROZEN_CHECKSUMS["varna_layer_interaction"] = None
 
 
 # =============================================================================
