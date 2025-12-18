@@ -17,21 +17,49 @@
       "type": "vowel",
       "bridge_meaning": "birth_of_cognition"
     },
-    "e": {
+    "ā": {
       "type": "vowel",
-      "bridge_meaning": "practical_cognition"
+      "bridge_meaning": "expansion_continuity"
     },
     "i": {
       "type": "vowel",
       "bridge_meaning": "self_doing"
     },
-    "o": {
+    "ī": {
       "type": "vowel",
-      "bridge_meaning": "closure_completion"
+      "bridge_meaning": "specialized_identity"
     },
     "u": {
       "type": "vowel",
       "bridge_meaning": "contraction_focus"
+    },
+    "ū": {
+      "type": "vowel",
+      "bridge_meaning": "sustained_hold"
+    },
+    "e": {
+      "type": "vowel",
+      "bridge_meaning": "practical_cognition"
+    },
+    "ai": {
+      "type": "vowel",
+      "bridge_meaning": "integrative_understanding"
+    },
+    "o": {
+      "type": "vowel",
+      "bridge_meaning": "closure_completion"
+    },
+    "au": {
+      "type": "vowel",
+      "bridge_meaning": "surrender_transition"
+    },
+    "aṁ": {
+      "type": "vowel",
+      "bridge_meaning": "purgative_repulsion"
+    },
+    "aha": {
+      "type": "vowel",
+      "bridge_meaning": "dissolutive_attraction"
     }
   },
 
