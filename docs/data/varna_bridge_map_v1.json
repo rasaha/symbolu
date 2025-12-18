@@ -68,213 +68,621 @@
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "hope_pressure",
-      "varna_group": "ka_varga"
+      "varna_group": "ka_varga",
+      "layers": {
+        "O1_ACTING": "optimistic seeking behavior",
+        "O2_TAGGING": "possibility labeling",
+        "O3_FORMING": "aspiration shaping force",
+        "O4_THINKING": "expectation pattern bias",
+        "O5_DIRECTING": "toward anticipated outcome",
+        "O6_REASONING": "possibility-based logic",
+        "O7_PURPOSING": "future fulfillment vector",
+        "O8_META_OBSERVING": "expectation monitoring pattern",
+        "O9_UNIFYING": "shared aspiration integration",
+        "O10_ABSOLVING": "release of expectation"
+      }
     },
     "kha": {
       "type": "consonant",
       "aspirated": true,
       "bridge_meaning": "worry_pressure",
-      "varna_group": "ka_varga"
+      "varna_group": "ka_varga",
+      "layers": {
+        "O1_ACTING": "anxious vigilance behavior",
+        "O2_TAGGING": "threat labeling tendency",
+        "O3_FORMING": "anxiety shaping force",
+        "O4_THINKING": "risk anticipation bias",
+        "O5_DIRECTING": "toward threat avoidance",
+        "O6_REASONING": "worst-case logic style",
+        "O7_PURPOSING": "harm prevention vector",
+        "O8_META_OBSERVING": "worry monitoring pattern",
+        "O9_UNIFYING": "shared concern integration",
+        "O10_ABSOLVING": "release of anxiety"
+      }
     },
     "ga": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "action_pressure",
-      "varna_group": "ka_varga"
+      "varna_group": "ka_varga",
+      "layers": {
+        "O1_ACTING": "movement initiation behavior",
+        "O2_TAGGING": "activity labeling tendency",
+        "O3_FORMING": "momentum shaping force",
+        "O4_THINKING": "action-oriented bias",
+        "O5_DIRECTING": "toward execution",
+        "O6_REASONING": "doing-based logic style",
+        "O7_PURPOSING": "completion vector",
+        "O8_META_OBSERVING": "action monitoring pattern",
+        "O9_UNIFYING": "coordinated action integration",
+        "O10_ABSOLVING": "release of doing"
+      }
     },
     "gha": {
       "type": "consonant",
       "aspirated": true,
       "bridge_meaning": "attachment_pressure",
-      "varna_group": "ka_varga"
+      "varna_group": "ka_varga",
+      "layers": {
+        "O1_ACTING": "clinging behavior expression",
+        "O2_TAGGING": "possession labeling tendency",
+        "O3_FORMING": "bond shaping force",
+        "O4_THINKING": "holding pattern bias",
+        "O5_DIRECTING": "toward retention",
+        "O6_REASONING": "ownership logic style",
+        "O7_PURPOSING": "preservation vector",
+        "O8_META_OBSERVING": "attachment monitoring pattern",
+        "O9_UNIFYING": "bonded integration effect",
+        "O10_ABSOLVING": "release of holding"
+      }
     },
     "nga": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "nasal_marker_pressure",
-      "varna_group": "ka_varga"
+      "varna_group": "ka_varga",
+      "layers": {
+        "O1_ACTING": "resonance marking behavior",
+        "O2_TAGGING": "nasal categorization tendency",
+        "O3_FORMING": "echo shaping force",
+        "O4_THINKING": "resonance pattern bias",
+        "O5_DIRECTING": "toward marking",
+        "O6_REASONING": "marking logic style",
+        "O7_PURPOSING": "indication vector",
+        "O8_META_OBSERVING": "marking monitoring pattern",
+        "O9_UNIFYING": "marker integration effect",
+        "O10_ABSOLVING": "release of marking"
+      }
     },
 
     "ca": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "conscience_pressure",
-      "varna_group": "ca_varga"
+      "varna_group": "ca_varga",
+      "layers": {
+        "O1_ACTING": "moral checking behavior",
+        "O2_TAGGING": "right-wrong labeling tendency",
+        "O3_FORMING": "ethical shaping force",
+        "O4_THINKING": "moral judgment bias",
+        "O5_DIRECTING": "toward rightness",
+        "O6_REASONING": "ethical logic style",
+        "O7_PURPOSING": "moral alignment vector",
+        "O8_META_OBSERVING": "conscience monitoring pattern",
+        "O9_UNIFYING": "shared ethics integration",
+        "O10_ABSOLVING": "release of judgment"
+      }
     },
     "cha": {
       "type": "consonant",
       "aspirated": true,
       "bridge_meaning": "nervous_breakdown_pressure",
-      "varna_group": "ca_varga"
+      "varna_group": "ca_varga",
+      "layers": {
+        "O1_ACTING": "overwhelmed collapse behavior",
+        "O2_TAGGING": "crisis labeling tendency",
+        "O3_FORMING": "breakdown shaping force",
+        "O4_THINKING": "overload pattern bias",
+        "O5_DIRECTING": "toward collapse",
+        "O6_REASONING": "catastrophizing logic style",
+        "O7_PURPOSING": "escape vector",
+        "O8_META_OBSERVING": "breakdown monitoring pattern",
+        "O9_UNIFYING": "shared crisis integration",
+        "O10_ABSOLVING": "release of overwhelm"
+      }
     },
     "ja": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "ego_pressure",
-      "varna_group": "ca_varga"
+      "varna_group": "ca_varga",
+      "layers": {
+        "O1_ACTING": "self-assertion behavior",
+        "O2_TAGGING": "self-other labeling tendency",
+        "O3_FORMING": "ego shaping force",
+        "O4_THINKING": "self-centered bias",
+        "O5_DIRECTING": "toward self-interest",
+        "O6_REASONING": "self-serving logic style",
+        "O7_PURPOSING": "self-enhancement vector",
+        "O8_META_OBSERVING": "ego monitoring pattern",
+        "O9_UNIFYING": "self-other integration effect",
+        "O10_ABSOLVING": "release of self"
+      }
     },
     "jha": {
       "type": "consonant",
       "aspirated": true,
       "bridge_meaning": "greed_pressure",
-      "varna_group": "ca_varga"
+      "varna_group": "ca_varga",
+      "layers": {
+        "O1_ACTING": "grasping behavior expression",
+        "O2_TAGGING": "more-less labeling tendency",
+        "O3_FORMING": "acquisitive shaping force",
+        "O4_THINKING": "scarcity pattern bias",
+        "O5_DIRECTING": "toward accumulation",
+        "O6_REASONING": "acquisition logic style",
+        "O7_PURPOSING": "gain maximization vector",
+        "O8_META_OBSERVING": "greed monitoring pattern",
+        "O9_UNIFYING": "resource integration effect",
+        "O10_ABSOLVING": "release of grasping"
+      }
     },
     "nya": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "hypocrisy_pressure",
-      "varna_group": "ca_varga"
+      "varna_group": "ca_varga",
+      "layers": {
+        "O1_ACTING": "inconsistent display behavior",
+        "O2_TAGGING": "facade labeling tendency",
+        "O3_FORMING": "pretense shaping force",
+        "O4_THINKING": "dual standard bias",
+        "O5_DIRECTING": "toward appearance",
+        "O6_REASONING": "selective logic style",
+        "O7_PURPOSING": "image maintenance vector",
+        "O8_META_OBSERVING": "facade monitoring pattern",
+        "O9_UNIFYING": "split integration effect",
+        "O10_ABSOLVING": "release of pretense"
+      }
     },
 
     "tta": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "overstatement_pressure",
-      "varna_group": "tta_varga"
+      "varna_group": "tta_varga",
+      "layers": {
+        "O1_ACTING": "exaggeration behavior expression",
+        "O2_TAGGING": "inflation labeling tendency",
+        "O3_FORMING": "amplification shaping force",
+        "O4_THINKING": "magnification pattern bias",
+        "O5_DIRECTING": "toward emphasis",
+        "O6_REASONING": "amplifying logic style",
+        "O7_PURPOSING": "impact maximization vector",
+        "O8_META_OBSERVING": "exaggeration monitoring pattern",
+        "O9_UNIFYING": "shared emphasis integration",
+        "O10_ABSOLVING": "release of inflation"
+      }
     },
     "ttha": {
       "type": "consonant",
       "aspirated": true,
       "bridge_meaning": "repentance_pressure",
-      "varna_group": "tta_varga"
+      "varna_group": "tta_varga",
+      "layers": {
+        "O1_ACTING": "regret expression behavior",
+        "O2_TAGGING": "wrong-done labeling tendency",
+        "O3_FORMING": "guilt shaping force",
+        "O4_THINKING": "regret pattern bias",
+        "O5_DIRECTING": "toward atonement",
+        "O6_REASONING": "corrective logic style",
+        "O7_PURPOSING": "redemption vector",
+        "O8_META_OBSERVING": "guilt monitoring pattern",
+        "O9_UNIFYING": "reconciliation integration",
+        "O10_ABSOLVING": "release of guilt"
+      }
     },
     "dda": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "shyness_pressure",
-      "varna_group": "tta_varga"
+      "varna_group": "tta_varga",
+      "layers": {
+        "O1_ACTING": "withdrawal behavior expression",
+        "O2_TAGGING": "exposure labeling tendency",
+        "O3_FORMING": "reserve shaping force",
+        "O4_THINKING": "self-conscious bias",
+        "O5_DIRECTING": "toward concealment",
+        "O6_REASONING": "avoidance logic style",
+        "O7_PURPOSING": "protection vector",
+        "O8_META_OBSERVING": "exposure monitoring pattern",
+        "O9_UNIFYING": "guarded integration effect",
+        "O10_ABSOLVING": "release of hiding"
+      }
     },
     "ddha": {
       "type": "consonant",
       "aspirated": true,
       "bridge_meaning": "sadistic_cruelty_pressure",
-      "varna_group": "tta_varga"
+      "varna_group": "tta_varga",
+      "layers": {
+        "O1_ACTING": "harm-seeking behavior expression",
+        "O2_TAGGING": "victim labeling tendency",
+        "O3_FORMING": "cruelty shaping force",
+        "O4_THINKING": "dominance pattern bias",
+        "O5_DIRECTING": "toward infliction",
+        "O6_REASONING": "power logic style",
+        "O7_PURPOSING": "control vector",
+        "O8_META_OBSERVING": "cruelty monitoring pattern",
+        "O9_UNIFYING": "power integration effect",
+        "O10_ABSOLVING": "release of cruelty"
+      }
     },
     "nna": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "envy_pressure",
-      "varna_group": "tta_varga"
+      "varna_group": "tta_varga",
+      "layers": {
+        "O1_ACTING": "comparison behavior expression",
+        "O2_TAGGING": "have-lack labeling tendency",
+        "O3_FORMING": "rivalry shaping force",
+        "O4_THINKING": "comparison pattern bias",
+        "O5_DIRECTING": "toward parity",
+        "O6_REASONING": "comparative logic style",
+        "O7_PURPOSING": "equalization vector",
+        "O8_META_OBSERVING": "envy monitoring pattern",
+        "O9_UNIFYING": "competitive integration",
+        "O10_ABSOLVING": "release of comparison"
+      }
     },
 
     "ta": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "inertia_pressure",
-      "varna_group": "ta_varga"
+      "varna_group": "ta_varga",
+      "layers": {
+        "O1_ACTING": "resistance to change behavior",
+        "O2_TAGGING": "stasis labeling tendency",
+        "O3_FORMING": "stability shaping force",
+        "O4_THINKING": "status quo bias",
+        "O5_DIRECTING": "toward maintenance",
+        "O6_REASONING": "conservation logic style",
+        "O7_PURPOSING": "preservation vector",
+        "O8_META_OBSERVING": "stasis monitoring pattern",
+        "O9_UNIFYING": "steady state integration",
+        "O10_ABSOLVING": "release of resistance"
+      }
     },
     "tha": {
       "type": "consonant",
       "aspirated": true,
       "bridge_meaning": "melancholy_pressure",
-      "varna_group": "ta_varga"
+      "varna_group": "ta_varga",
+      "layers": {
+        "O1_ACTING": "sorrowful expression behavior",
+        "O2_TAGGING": "loss labeling tendency",
+        "O3_FORMING": "sadness shaping force",
+        "O4_THINKING": "pessimistic pattern bias",
+        "O5_DIRECTING": "toward withdrawal",
+        "O6_REASONING": "loss-focused logic style",
+        "O7_PURPOSING": "mourning vector",
+        "O8_META_OBSERVING": "sadness monitoring pattern",
+        "O9_UNIFYING": "shared grief integration",
+        "O10_ABSOLVING": "release of sorrow"
+      }
     },
     "da": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "irritability_pressure",
-      "varna_group": "ta_varga"
+      "varna_group": "ta_varga",
+      "layers": {
+        "O1_ACTING": "reactive agitation behavior",
+        "O2_TAGGING": "annoyance labeling tendency",
+        "O3_FORMING": "friction shaping force",
+        "O4_THINKING": "irritation pattern bias",
+        "O5_DIRECTING": "toward discharge",
+        "O6_REASONING": "blame logic style",
+        "O7_PURPOSING": "relief vector",
+        "O8_META_OBSERVING": "irritation monitoring pattern",
+        "O9_UNIFYING": "friction integration effect",
+        "O10_ABSOLVING": "release of agitation"
+      }
     },
     "dha": {
       "type": "consonant",
       "aspirated": true,
       "bridge_meaning": "craving_pressure",
-      "varna_group": "ta_varga"
+      "varna_group": "ta_varga",
+      "layers": {
+        "O1_ACTING": "seeking behavior expression",
+        "O2_TAGGING": "want labeling tendency",
+        "O3_FORMING": "desire shaping force",
+        "O4_THINKING": "longing pattern bias",
+        "O5_DIRECTING": "toward acquisition",
+        "O6_REASONING": "want-based logic style",
+        "O7_PURPOSING": "fulfillment vector",
+        "O8_META_OBSERVING": "craving monitoring pattern",
+        "O9_UNIFYING": "desire integration effect",
+        "O10_ABSOLVING": "release of wanting"
+      }
     },
     "na": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "attachment_pressure",
-      "varna_group": "ta_varga"
+      "varna_group": "ta_varga",
+      "layers": {
+        "O1_ACTING": "binding behavior expression",
+        "O2_TAGGING": "mine labeling tendency",
+        "O3_FORMING": "connection shaping force",
+        "O4_THINKING": "attachment pattern bias",
+        "O5_DIRECTING": "toward bonding",
+        "O6_REASONING": "relation logic style",
+        "O7_PURPOSING": "belonging vector",
+        "O8_META_OBSERVING": "bond monitoring pattern",
+        "O9_UNIFYING": "attachment integration effect",
+        "O10_ABSOLVING": "release of binding"
+      }
     },
 
     "pa": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "revulsion_pressure",
-      "varna_group": "pa_varga"
+      "varna_group": "pa_varga",
+      "layers": {
+        "O1_ACTING": "rejection behavior expression",
+        "O2_TAGGING": "repellent labeling tendency",
+        "O3_FORMING": "aversion shaping force",
+        "O4_THINKING": "disgust pattern bias",
+        "O5_DIRECTING": "toward separation",
+        "O6_REASONING": "rejection logic style",
+        "O7_PURPOSING": "avoidance vector",
+        "O8_META_OBSERVING": "disgust monitoring pattern",
+        "O9_UNIFYING": "repulsion integration effect",
+        "O10_ABSOLVING": "release of aversion"
+      }
     },
     "pha": {
       "type": "consonant",
       "aspirated": true,
       "bridge_meaning": "fear_pressure",
-      "varna_group": "pa_varga"
+      "varna_group": "pa_varga",
+      "layers": {
+        "O1_ACTING": "avoidance behavior expression",
+        "O2_TAGGING": "danger labeling tendency",
+        "O3_FORMING": "fear shaping force",
+        "O4_THINKING": "threat pattern bias",
+        "O5_DIRECTING": "toward safety",
+        "O6_REASONING": "protective logic style",
+        "O7_PURPOSING": "survival vector",
+        "O8_META_OBSERVING": "fear monitoring pattern",
+        "O9_UNIFYING": "shared fear integration",
+        "O10_ABSOLVING": "release of fear"
+      }
     },
     "ba": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "indifference_pressure",
-      "varna_group": "pa_varga"
+      "varna_group": "pa_varga",
+      "layers": {
+        "O1_ACTING": "disengagement behavior expression",
+        "O2_TAGGING": "irrelevant labeling tendency",
+        "O3_FORMING": "apathy shaping force",
+        "O4_THINKING": "disconnection pattern bias",
+        "O5_DIRECTING": "toward detachment",
+        "O6_REASONING": "dismissive logic style",
+        "O7_PURPOSING": "non-involvement vector",
+        "O8_META_OBSERVING": "apathy monitoring pattern",
+        "O9_UNIFYING": "distance integration effect",
+        "O10_ABSOLVING": "release of caring"
+      }
     },
     "bha": {
       "type": "consonant",
       "aspirated": true,
       "bridge_meaning": "delusion_pressure",
-      "varna_group": "pa_varga"
+      "varna_group": "pa_varga",
+      "layers": {
+        "O1_ACTING": "misperception behavior expression",
+        "O2_TAGGING": "false labeling tendency",
+        "O3_FORMING": "illusion shaping force",
+        "O4_THINKING": "distortion pattern bias",
+        "O5_DIRECTING": "toward fantasy",
+        "O6_REASONING": "deceptive logic style",
+        "O7_PURPOSING": "escape vector",
+        "O8_META_OBSERVING": "delusion monitoring pattern",
+        "O9_UNIFYING": "shared illusion integration",
+        "O10_ABSOLVING": "release of illusion"
+      }
     },
     "ma": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "indulgence_pressure",
-      "varna_group": "pa_varga"
+      "varna_group": "pa_varga",
+      "layers": {
+        "O1_ACTING": "excess behavior expression",
+        "O2_TAGGING": "pleasure labeling tendency",
+        "O3_FORMING": "gratification shaping force",
+        "O4_THINKING": "pleasure-seeking bias",
+        "O5_DIRECTING": "toward satisfaction",
+        "O6_REASONING": "gratification logic style",
+        "O7_PURPOSING": "enjoyment vector",
+        "O8_META_OBSERVING": "indulgence monitoring pattern",
+        "O9_UNIFYING": "shared pleasure integration",
+        "O10_ABSOLVING": "release of excess"
+      }
     },
 
     "ya": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "distrust_pressure",
-      "varna_group": "semi_vowel"
+      "varna_group": "semi_vowel",
+      "layers": {
+        "O1_ACTING": "suspicion behavior expression",
+        "O2_TAGGING": "untrust labeling tendency",
+        "O3_FORMING": "doubt shaping force",
+        "O4_THINKING": "skeptical pattern bias",
+        "O5_DIRECTING": "toward verification",
+        "O6_REASONING": "questioning logic style",
+        "O7_PURPOSING": "protection vector",
+        "O8_META_OBSERVING": "trust monitoring pattern",
+        "O9_UNIFYING": "guarded integration effect",
+        "O10_ABSOLVING": "release of doubt"
+      }
     },
     "ra": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "destruction_pressure",
-      "varna_group": "semi_vowel"
+      "varna_group": "semi_vowel",
+      "layers": {
+        "O1_ACTING": "breaking behavior expression",
+        "O2_TAGGING": "destructible labeling tendency",
+        "O3_FORMING": "dissolution shaping force",
+        "O4_THINKING": "entropy pattern bias",
+        "O5_DIRECTING": "toward dismantling",
+        "O6_REASONING": "elimination logic style",
+        "O7_PURPOSING": "clearing vector",
+        "O8_META_OBSERVING": "destruction monitoring pattern",
+        "O9_UNIFYING": "dissolution integration effect",
+        "O10_ABSOLVING": "release through breaking"
+      }
     },
     "la": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "cruelty_pressure",
-      "varna_group": "semi_vowel"
+      "varna_group": "semi_vowel",
+      "layers": {
+        "O1_ACTING": "harshness behavior expression",
+        "O2_TAGGING": "victim labeling tendency",
+        "O3_FORMING": "harshness shaping force",
+        "O4_THINKING": "callous pattern bias",
+        "O5_DIRECTING": "toward harm",
+        "O6_REASONING": "punitive logic style",
+        "O7_PURPOSING": "domination vector",
+        "O8_META_OBSERVING": "cruelty monitoring pattern",
+        "O9_UNIFYING": "harsh integration effect",
+        "O10_ABSOLVING": "release of harshness"
+      }
     },
     "va": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "external_dharma_pressure",
-      "varna_group": "semi_vowel"
+      "varna_group": "semi_vowel",
+      "layers": {
+        "O1_ACTING": "conformity behavior expression",
+        "O2_TAGGING": "duty labeling tendency",
+        "O3_FORMING": "obligation shaping force",
+        "O4_THINKING": "duty-bound pattern bias",
+        "O5_DIRECTING": "toward compliance",
+        "O6_REASONING": "rule-based logic style",
+        "O7_PURPOSING": "fulfillment vector",
+        "O8_META_OBSERVING": "duty monitoring pattern",
+        "O9_UNIFYING": "role integration effect",
+        "O10_ABSOLVING": "release of duty"
+      }
     },
 
     "sha": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "material_greed_pressure",
-      "varna_group": "sibilant"
+      "varna_group": "sibilant",
+      "layers": {
+        "O1_ACTING": "hoarding behavior expression",
+        "O2_TAGGING": "wealth labeling tendency",
+        "O3_FORMING": "acquisition shaping force",
+        "O4_THINKING": "accumulation pattern bias",
+        "O5_DIRECTING": "toward possession",
+        "O6_REASONING": "materialist logic style",
+        "O7_PURPOSING": "wealth vector",
+        "O8_META_OBSERVING": "greed monitoring pattern",
+        "O9_UNIFYING": "material integration effect",
+        "O10_ABSOLVING": "release of hoarding"
+      }
     },
     "ssa": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "lust_confusion_pressure",
-      "varna_group": "sibilant"
+      "varna_group": "sibilant",
+      "layers": {
+        "O1_ACTING": "desire-driven behavior expression",
+        "O2_TAGGING": "attraction labeling tendency",
+        "O3_FORMING": "desire shaping force",
+        "O4_THINKING": "lust pattern bias",
+        "O5_DIRECTING": "toward gratification",
+        "O6_REASONING": "desire logic style",
+        "O7_PURPOSING": "pleasure vector",
+        "O8_META_OBSERVING": "lust monitoring pattern",
+        "O9_UNIFYING": "desire integration effect",
+        "O10_ABSOLVING": "release of lust"
+      }
     },
     "sa": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "escape_pressure",
-      "varna_group": "sibilant"
+      "varna_group": "sibilant",
+      "layers": {
+        "O1_ACTING": "fleeing behavior expression",
+        "O2_TAGGING": "exit labeling tendency",
+        "O3_FORMING": "avoidance shaping force",
+        "O4_THINKING": "escape pattern bias",
+        "O5_DIRECTING": "toward exit",
+        "O6_REASONING": "evasion logic style",
+        "O7_PURPOSING": "freedom vector",
+        "O8_META_OBSERVING": "escape monitoring pattern",
+        "O9_UNIFYING": "flight integration effect",
+        "O10_ABSOLVING": "release through escape"
+      }
     },
 
     "ha": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "ignorance_pressure",
-      "varna_group": "aspirate"
+      "varna_group": "aspirate",
+      "layers": {
+        "O1_ACTING": "unknowing behavior expression",
+        "O2_TAGGING": "unknown labeling tendency",
+        "O3_FORMING": "darkness shaping force",
+        "O4_THINKING": "blind pattern bias",
+        "O5_DIRECTING": "toward unawareness",
+        "O6_REASONING": "blindspot logic style",
+        "O7_PURPOSING": "avoidance vector",
+        "O8_META_OBSERVING": "ignorance monitoring pattern",
+        "O9_UNIFYING": "blindness integration effect",
+        "O10_ABSOLVING": "release of unknowing"
+      }
     },
 
     "ksha": {
       "type": "consonant",
       "aspirated": true,
       "bridge_meaning": "false_knowledge_pressure",
-      "varna_group": "conjunct"
+      "varna_group": "conjunct",
+      "layers": {
+        "O1_ACTING": "misinformed behavior expression",
+        "O2_TAGGING": "false truth labeling tendency",
+        "O3_FORMING": "misconception shaping force",
+        "O4_THINKING": "false certainty bias",
+        "O5_DIRECTING": "toward wrong conclusion",
+        "O6_REASONING": "pseudo-logic style",
+        "O7_PURPOSING": "misguided vector",
+        "O8_META_OBSERVING": "false certainty monitoring",
+        "O9_UNIFYING": "shared error integration",
+        "O10_ABSOLVING": "release of false knowing"
+      }
     }
   }
 }
