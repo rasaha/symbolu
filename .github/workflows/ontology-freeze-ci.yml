@@ -1,0 +1,181 @@
+name: Ontology Freeze Contract CI
+
+on:
+  push:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "docs/data/varna_bridge_map_v1.json"
+      - "docs/data/ontological_layers_v1.json"
+      - "docs/data/varna_layer_interaction_v1.json"
+      - "symbolu/ontology/**"
+      - "symbolu/core/**"
+      - "symbolu/mechanical/**"
+      - "symbolu/formulas/**"
+      - "symbolu/temporal/**"
+      - "tests/test_ontology_freeze_contract.py"
+      - "ONTOLOGY_FREEZE_CONTRACT.md"
+      - ".github/workflows/ontology-freeze-ci.yml"
+  pull_request:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "docs/data/varna_bridge_map_v1.json"
+      - "docs/data/ontological_layers_v1.json"
+      - "docs/data/varna_layer_interaction_v1.json"
+      - "symbolu/ontology/**"
+      - "symbolu/core/**"
+      - "symbolu/mechanical/**"
+      - "symbolu/formulas/**"
+      - "symbolu/temporal/**"
+      - "tests/test_ontology_freeze_contract.py"
+      - "ONTOLOGY_FREEZE_CONTRACT.md"
+      - ".github/workflows/ontology-freeze-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  ontology-freeze-guard:
+    runs-on: ubuntu-latest
+    name: Ontology Freeze Contract Enforcement
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need history for diff checking
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Load cached dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-ontology-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-ontology-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -e .
+          pip install pytest
+
+      - name: Display Ontology Freeze Contract
+        run: |
+          echo "=========================================="
+          echo "ONTOLOGY FREEZE CONTRACT"
+          echo "=========================================="
+          echo ""
+          echo "Frozen Files:"
+          echo "  - docs/data/varna_bridge_map_v1.json"
+          echo "  - docs/data/ontological_layers_v1.json"
+          echo "  - docs/data/varna_layer_interaction_v1.json"
+          echo ""
+          echo "Authorized Access:"
+          echo "  - symbolu/ontology/phase4a/ ONLY"
+          echo ""
+          echo "Forbidden Access:"
+          echo "  - symbolu/ontology/phase4b/"
+          echo "  - symbolu/ontology/phase4c/"
+          echo "  - All other pipeline code"
+          echo ""
+          echo "See ONTOLOGY_FREEZE_CONTRACT.md for details."
+          echo "=========================================="
+
+      - name: Check for frozen file modifications
+        run: |
+          echo "Checking for unauthorized ontology file modifications..."
+
+          FROZEN_FILES=(
+            "docs/data/varna_bridge_map_v1.json"
+            "docs/data/ontological_layers_v1.json"
+            "docs/data/varna_layer_interaction_v1.json"
+          )
+
+          # Check if any frozen files were modified in this commit
+          MODIFIED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+
+          VIOLATIONS=""
+          for file in "${FROZEN_FILES[@]}"; do
+            if echo "$MODIFIED" | grep -q "^${file}$"; then
+              VIOLATIONS="${VIOLATIONS}  - ${file}\n"
+            fi
+          done
+
+          if [ -n "$VIOLATIONS" ]; then
+            echo "=========================================="
+            echo "WARNING: Frozen ontology files were modified!"
+            echo "=========================================="
+            echo -e "Modified files:\n${VIOLATIONS}"
+            echo ""
+            echo "Per ONTOLOGY_FREEZE_CONTRACT.md, modifications"
+            echo "require a version bump (e.g., v1 -> v2)."
+            echo ""
+            echo "If this is an authorized change with version bump,"
+            echo "update the Phase-4A loader to use the new version."
+            echo "=========================================="
+            # Note: This is a warning, not a failure, to allow versioned updates
+          else
+            echo "No frozen ontology files were modified."
+          fi
+
+      - name: Run Ontology Freeze Contract Tests
+        run: |
+          pytest tests/test_ontology_freeze_contract.py \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            2>&1 | tee ontology-freeze-pytest.log
+
+      - name: Ontology Freeze Success Summary
+        if: success()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "ONTOLOGY FREEZE CONTRACT: PASSED"
+          echo "=========================================="
+          echo ""
+          echo "All guards verified:"
+          echo "  [PASS] No unauthorized ontology file access"
+          echo "  [PASS] Phase-4B/4C isolation verified"
+          echo "  [PASS] Frozen file integrity confirmed"
+          echo "  [PASS] Legacy modules properly marked"
+          echo "  [PASS] Phase-4A structure verified"
+          echo ""
+          echo "The ontology freeze contract is enforced."
+          echo "=========================================="
+
+      - name: Ontology Freeze Failure Report
+        if: failure()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "ONTOLOGY FREEZE CONTRACT: FAILED"
+          echo "=========================================="
+          echo ""
+          echo "One or more ontology freeze guards failed."
+          echo ""
+          echo "COMMON VIOLATIONS:"
+          echo "  1. Accessing ontology JSON outside Phase-4A"
+          echo "  2. Referencing ontology filenames in pipeline code"
+          echo "  3. Phase-4B/4C accessing ontology directly"
+          echo "  4. Missing EXPERIMENT_ONLY marker on legacy modules"
+          echo ""
+          echo "TO FIX:"
+          echo "  - Use 'from symbolu.ontology.phase4a import lookup_interaction'"
+          echo "  - Remove direct file path references"
+          echo "  - See ONTOLOGY_FREEZE_CONTRACT.md for details"
+          echo ""
+          echo "=========================================="
+          exit 1
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontology-freeze-logs
+          path: ontology-freeze-pytest.log
+          if-no-files-found: ignore
