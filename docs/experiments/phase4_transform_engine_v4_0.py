@@ -1,8 +1,16 @@
 """
-Phase-4.0 Transform Engine (v4.0)
-=================================
+Phase-4.0 Transform Engine (v4.0) - Phase-4B
+=============================================
 
-Phase-4.0 implements non-textual transformation of Phase-3 output.
+Phase-4.0 is **Phase-4B** within the composite Phase-4 of the Phase-1b → Phase-14
+experimental pipeline.
+
+Phase-4 Composite Structure:
+    - Phase-4A: Ontology Lookup (frozen varna × layer interaction resolution)
+    - Phase-4B: Transform Engine (this module)
+    - Phase-4C: PO4 Planner Governance
+
+This module implements non-textual transformation of Phase-3 output.
 
 This module is:
     - TEST-ONLY
@@ -24,6 +32,13 @@ ABSOLUTE RULES:
     - DO NOT use probabilities
     - DO NOT use timestamps
     - DO NOT use randomness
+
+CRITICAL ONTOLOGY CONSTRAINT (Phase-4 Composite Rule):
+    - DO NOT load frozen ontology files directly
+    - DO NOT infer polarity or manifestation values
+    - DO NOT gap-fill missing ontology data
+    - DO NOT interpret or smooth ontology language
+    - If ontology data is needed, call Phase-4A's lookup functions
 
 Version: 4.0
 """
@@ -81,6 +96,9 @@ PHASE4_INVARIANTS = {
     "REVERSIBLE": True,
     "AUDITABLE": True,
     "DETERMINISTIC": True,
+    # Phase-4 Composite Rule: NO ontology inference in Phase-4B
+    "NO_ONTOLOGY_INFERENCE": True,
+    "NO_DIRECT_ONTOLOGY_FILE_ACCESS": True,
 }
 
 FORBIDDEN_TERMS = frozenset([
@@ -99,6 +117,11 @@ FORBIDDEN_INFERENCE_TYPES = frozenset([
     "sentiment_analysis",
     "meaning_extraction",
     "polarity_inference",
+    # Phase-4 Composite Rule: NO ontology inference in Phase-4B
+    "ontology_inference",
+    "manifestation_inference",
+    "varna_layer_inference",
+    "distortion_vector_inference",
 ])
 
 
