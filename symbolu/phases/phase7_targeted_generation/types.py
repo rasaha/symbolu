@@ -46,6 +46,15 @@ class ConstraintField(Enum):
     SEQUENCE_NOT_IN = "sequence NOT IN"
     SEQUENCE_STARTS_WITH = "sequence STARTS_WITH"
     SEQUENCE_ENDS_WITH = "sequence ENDS_WITH"
+    # M1: Template constraints (C = consonant, V = vowel)
+    TEMPLATE = "template"
+    TEMPLATE_MATCHES = "template matches"
+    TEMPLATE_STARTS_WITH = "template starts_with"
+    TEMPLATE_ENDS_WITH = "template ends_with"
+    # M2: Pattern exclusion
+    TEMPLATE_NOT_IN = "template NOT IN"
+    PREFIX_NOT_IN = "prefix NOT IN"
+    SUFFIX_NOT_IN = "suffix NOT IN"
 
 
 class ErrorType(Enum):
@@ -156,6 +165,12 @@ class ExecutionMetadata:
     candidates_satisfying: int
     execution_deterministic: bool  # Always True
     target_feasible: bool
+    # H1: Early termination optimization
+    early_terminated: bool = False
+    candidates_checked: int = 0
+    # H2: Prefix memoization optimization
+    cache_hits: int = 0
+    cache_misses: int = 0
 
 
 @dataclass(frozen=True)

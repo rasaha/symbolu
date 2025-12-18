@@ -155,6 +155,22 @@ def parse_field(field_name: str) -> Tuple[ConstraintField, Optional[int], Option
         return ConstraintField.SEQUENCE_STARTS_WITH, None, None
     if field_name == "sequence ENDS_WITH":
         return ConstraintField.SEQUENCE_ENDS_WITH, None, None
+    # M1: Template constraints
+    if field_name == "template":
+        return ConstraintField.TEMPLATE, None, None
+    if field_name == "template matches":
+        return ConstraintField.TEMPLATE_MATCHES, None, None
+    if field_name == "template starts_with":
+        return ConstraintField.TEMPLATE_STARTS_WITH, None, None
+    if field_name == "template ends_with":
+        return ConstraintField.TEMPLATE_ENDS_WITH, None, None
+    # M2: Pattern exclusions
+    if field_name == "template NOT IN":
+        return ConstraintField.TEMPLATE_NOT_IN, None, None
+    if field_name == "prefix NOT IN":
+        return ConstraintField.PREFIX_NOT_IN, None, None
+    if field_name == "suffix NOT IN":
+        return ConstraintField.SUFFIX_NOT_IN, None, None
 
     # Pattern matches with index extraction
     step_mag_match = re.match(r"steps\[(-?\d+)\]\.magnitude$", field_name)
@@ -239,9 +255,15 @@ def parse_constraint(field_name: str, value: Any) -> Constraint:
     elif isinstance(value, (list, tuple, set, frozenset)):
         # Sequence constraints or range
         operator = ConstraintOperator.EQ
-        # IMPORTANT: Preserve set/frozenset for SEQUENCE_NOT_IN exclusion
-        if isinstance(value, (set, frozenset)) and field_enum == ConstraintField.SEQUENCE_NOT_IN:
-            # Keep as frozenset for exclusion constraint
+        # IMPORTANT: Preserve set/frozenset for exclusion constraints (M2 optimization)
+        exclusion_fields = {
+            ConstraintField.SEQUENCE_NOT_IN,
+            ConstraintField.TEMPLATE_NOT_IN,
+            ConstraintField.PREFIX_NOT_IN,
+            ConstraintField.SUFFIX_NOT_IN,
+        }
+        if isinstance(value, (set, frozenset)) and field_enum in exclusion_fields:
+            # Keep as frozenset for exclusion constraints
             actual_value = frozenset(
                 tuple(s) if isinstance(s, list) else s
                 for s in value

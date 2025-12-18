@@ -4,7 +4,11 @@ Phase-7 Targeted Generation - Candidate Sequence Generator
 Generates valid varna sequences according to Phase-6 grammar:
 - Consonant-initial
 - Only valid varnas
-- Deterministic enumeration order (lexicographic)
+- Deterministic enumeration order
+
+Two enumeration modes:
+- Length-first: all length 1, then length 2, etc. (default)
+- Lexicographic: pure lexicographic order for early termination optimization
 """
 
 from typing import Iterator, Tuple, FrozenSet, Optional, List
@@ -163,11 +167,84 @@ def validate_sequence(
     return _is_valid_sequence(sequence, config.consonant_set, config.vowel_set)
 
 
+def generate_candidates_lexicographic(
+    config: GenerationConfig,
+) -> Iterator[Tuple[str, ...]]:
+    """
+    Generate candidate varna sequences in pure lexicographic order.
+
+    This generator produces sequences in lexicographic order (like dictionary order)
+    rather than length-first order. This is required for early termination (H1)
+    to produce the same results as exhaustive search when ranking ties by
+    lexicographic order.
+
+    Args:
+        config: Generation configuration
+
+    Yields:
+        Tuples of varna tokens in lexicographic order
+
+    Notes:
+        - Uses depth-first traversal of the sequence tree
+        - ('ba',) < ('ba', 'a') < ('ba', 'a', 'a') < ('ba', 'ba') < ('ka',)
+        - Required for H1 early termination to work correctly
+    """
+    consonants = sorted(config.consonant_set)
+    vowels = sorted(config.vowel_set)
+    all_tokens = sorted(set(consonants) | set(vowels))  # Lexicographically sorted
+    max_len = config.max_sequence_length
+    max_candidates = config.max_candidates
+
+    count = 0
+
+    def generate_from_prefix(
+        prefix: Tuple[str, ...],
+        has_active_consonant: bool,
+    ) -> Iterator[Tuple[str, ...]]:
+        """Recursively generate sequences with given prefix."""
+        nonlocal count
+
+        # Yield current prefix if it's valid (non-empty)
+        if prefix:
+            yield prefix
+            count += 1
+            if max_candidates is not None and count >= max_candidates:
+                return
+
+        # Don't extend if we've reached max length
+        if len(prefix) >= max_len:
+            return
+
+        # Extend with each valid token in lexicographic order
+        for token in all_tokens:
+            if token in config.consonant_set:
+                # Consonant can always follow
+                new_has_active = True
+                new_prefix = prefix + (token,)
+                yield from generate_from_prefix(new_prefix, new_has_active)
+                if max_candidates is not None and count >= max_candidates:
+                    return
+            elif token in config.vowel_set:
+                # Vowel can only follow consonant (has_active_consonant)
+                if has_active_consonant:
+                    new_prefix = prefix + (token,)
+                    yield from generate_from_prefix(new_prefix, has_active_consonant)
+                    if max_candidates is not None and count >= max_candidates:
+                        return
+
+    # Start with each consonant (first token must be consonant)
+    for first_consonant in consonants:
+        yield from generate_from_prefix((first_consonant,), True)
+        if max_candidates is not None and count >= max_candidates:
+            return
+
+
 def generate_candidates_filtered(
     config: GenerationConfig,
     exclude_sequences: Optional[FrozenSet[Tuple[str, ...]]] = None,
     prefix: Optional[Tuple[str, ...]] = None,
     suffix: Optional[Tuple[str, ...]] = None,
+    lexicographic: bool = False,
 ) -> Iterator[Tuple[str, ...]]:
     """
     Generate candidates with compositional filtering.
@@ -177,11 +254,18 @@ def generate_candidates_filtered(
         exclude_sequences: Sequences to exclude (for exclusion chains)
         prefix: Required prefix (for STARTS_WITH constraint)
         suffix: Required suffix (for ENDS_WITH constraint)
+        lexicographic: If True, use lexicographic order (for early termination)
 
     Yields:
         Filtered candidate sequences
     """
-    for seq in generate_candidates(config):
+    # Choose generator based on order preference
+    if lexicographic:
+        base_generator = generate_candidates_lexicographic(config)
+    else:
+        base_generator = generate_candidates(config)
+
+    for seq in base_generator:
         # Apply exclusion filter
         if exclude_sequences is not None and seq in exclude_sequences:
             continue
