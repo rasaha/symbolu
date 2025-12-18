@@ -1700,13 +1700,13 @@
       "O3_FORMING": {
         "manifestation_positive": "shaping emphasis that highlights essential form",
         "manifestation_negative": "amplification force distorts natural proportion",
-        "distortion_vector": "downward",
+        "distortion_vector": "lateral",
         "sublimate_vector": "upward"
       },
       "O4_THINKING": {
         "manifestation_positive": "thought patterns recognize what merits magnification",
         "manifestation_negative": "thought inflates significance of every input",
-        "distortion_vector": "lateral",
+        "distortion_vector": "upward",
         "sublimate_vector": "upward"
       },
       "O5_DIRECTING": {
@@ -2196,7 +2196,7 @@
       "O3_FORMING": {
         "manifestation_positive": "shaping perception toward accurate registration",
         "manifestation_negative": "distortion force warps all incoming form",
-        "distortion_vector": "downward",
+        "distortion_vector": "lateral",
         "sublimate_vector": "upward"
       },
       "O4_THINKING": {
@@ -2226,7 +2226,7 @@
       "O8_META_OBSERVING": {
         "manifestation_positive": "witnessing distortion patterns without belief",
         "manifestation_negative": "observer cannot distinguish its own distortion",
-        "distortion_vector": "lateral",
+        "distortion_vector": "downward",
         "sublimate_vector": "upward"
       },
       "O9_UNIFYING": {
