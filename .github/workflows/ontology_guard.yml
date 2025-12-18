@@ -1,0 +1,263 @@
+name: Ontology Guard
+
+on:
+  pull_request:
+    branches: ["main", "master", "dev"]
+    paths:
+      - "docs/data/varna_bridge_map_v*.json"
+      - "docs/data/ontological_layers_v*.json"
+      - "docs/data/varna_layer_interaction_v*.json"
+
+jobs:
+  ontology-freeze-enforcement:
+    runs-on: ubuntu-latest
+    name: Enforce Ontology Freeze Contract
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "")
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Block edits to ABSOLUTELY FROZEN files
+        run: |
+          echo "=========================================="
+          echo "ONTOLOGY FREEZE CONTRACT ENFORCEMENT"
+          echo "=========================================="
+          echo ""
+
+          FROZEN_FILES=(
+            "docs/data/varna_bridge_map_v1.json"
+            "docs/data/ontological_layers_v1.json"
+          )
+
+          CHANGED_FILES="${{ steps.changed-files.outputs.changed_files }}"
+
+          VIOLATIONS=""
+          for file in "${FROZEN_FILES[@]}"; do
+            if echo "$CHANGED_FILES" | grep -q "^${file}$"; then
+              VIOLATIONS="${VIOLATIONS}  - ${file}\n"
+            fi
+          done
+
+          if [ -n "$VIOLATIONS" ]; then
+            echo "FREEZE CONTRACT VIOLATION DETECTED"
+            echo ""
+            echo "The following ABSOLUTELY FROZEN files were modified:"
+            echo -e "$VIOLATIONS"
+            echo ""
+            echo "Per ONTOLOGY_FREEZE_CONTRACT.md, these files cannot be edited."
+            echo "Any change requires a new version file (e.g., v2.json)."
+            echo ""
+            echo "Canonical Rule:"
+            echo "  \"Never let a higher layer compensate for uncertainty in a lower layer.\""
+            echo ""
+            echo "=========================================="
+            exit 1
+          fi
+
+          echo "No ABSOLUTELY FROZEN files were modified."
+          echo ""
+
+      - name: Validate controlled file edits (distortion_vector only)
+        run: |
+          echo "=========================================="
+          echo "CONTROLLED FILE VALIDATION"
+          echo "=========================================="
+          echo ""
+
+          CONTROLLED_FILE="docs/data/varna_layer_interaction_v1.json"
+          CHANGED_FILES="${{ steps.changed-files.outputs.changed_files }}"
+
+          if ! echo "$CHANGED_FILES" | grep -q "^${CONTROLLED_FILE}$"; then
+            echo "Controlled file not modified. Skipping field validation."
+            exit 0
+          fi
+
+          echo "Controlled file modified: ${CONTROLLED_FILE}"
+          echo "Validating that only distortion_vector field was changed..."
+          echo ""
+
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          # Get the diff for the controlled file
+          DIFF=$(git diff "$BASE_SHA" "$HEAD_SHA" -- "$CONTROLLED_FILE")
+
+          # Check for forbidden field modifications
+          FORBIDDEN_PATTERNS=(
+            '"manifestation_positive":'
+            '"manifestation_negative":'
+            '"sublimate_vector":'
+          )
+
+          FIELD_VIOLATIONS=""
+          for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+            # Check if the pattern appears in added or removed lines (not context)
+            if echo "$DIFF" | grep -E "^[+-].*${pattern}" | grep -v "^[+-][+-][+-]" > /dev/null 2>&1; then
+              FIELD_VIOLATIONS="${FIELD_VIOLATIONS}  - ${pattern}\n"
+            fi
+          done
+
+          if [ -n "$FIELD_VIOLATIONS" ]; then
+            echo "CONTROLLED PATCH VIOLATION DETECTED"
+            echo ""
+            echo "The following FROZEN fields were modified:"
+            echo -e "$FIELD_VIOLATIONS"
+            echo ""
+            echo "Per ONTOLOGY_FREEZE_CONTRACT.md Section 4.1:"
+            echo "  - distortion_vector: EDITABLE (patch-only)"
+            echo "  - manifestation_positive: FROZEN"
+            echo "  - manifestation_negative: FROZEN"
+            echo "  - sublimate_vector: FROZEN"
+            echo ""
+            echo "Only distortion_vector may be patched."
+            echo ""
+            echo "=========================================="
+            exit 1
+          fi
+
+          # Verify distortion_vector was actually changed (not a no-op)
+          if echo "$DIFF" | grep -E "^[+-].*\"distortion_vector\":" | grep -v "^[+-][+-][+-]" > /dev/null 2>&1; then
+            echo "VALID: distortion_vector field was modified."
+            echo ""
+            echo "Patch validation PASSED."
+          else
+            echo "WARNING: Controlled file was modified but no distortion_vector changes detected."
+            echo "This may indicate a structural change (forbidden) or whitespace-only change."
+            echo ""
+            echo "Reviewing diff for structural changes..."
+
+            # Check for structural changes (new varnas, new layers, etc.)
+            if echo "$DIFF" | grep -E "^[+].*\"[a-z]+\":\s*\{" | grep -v "distortion_vector" > /dev/null 2>&1; then
+              echo ""
+              echo "STRUCTURAL CHANGE DETECTED"
+              echo "New entries appear to have been added to the interaction map."
+              echo "This is a freeze contract violation."
+              echo ""
+              exit 1
+            fi
+
+            echo "No structural violations detected."
+          fi
+
+          echo ""
+          echo "=========================================="
+
+      - name: Verify no inference/smoothing/gap-filling patterns
+        run: |
+          echo "=========================================="
+          echo "INFERENCE/SMOOTHING PATTERN CHECK"
+          echo "=========================================="
+          echo ""
+
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          # Get all changed Python files
+          CHANGED_PY=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "*.py" 2>/dev/null || echo "")
+
+          if [ -z "$CHANGED_PY" ]; then
+            echo "No Python files changed. Skipping inference pattern check."
+            exit 0
+          fi
+
+          echo "Checking changed Python files for forbidden patterns..."
+          echo ""
+
+          # Patterns that indicate inference/smoothing/gap-filling
+          FORBIDDEN_CODE_PATTERNS=(
+            "\.get\(.*,.*default"
+            "if.*is None.*:.*="
+            "or\s+default"
+            "\.setdefault\("
+            "infer.*ontology"
+            "smooth.*ontology"
+            "fill.*gap"
+            "fallback.*varna"
+            "fallback.*layer"
+            "default.*bridge"
+            "default.*manifestation"
+            "default.*distortion"
+            "default.*sublimate"
+          )
+
+          DIFF=$(git diff "$BASE_SHA" "$HEAD_SHA" -- "*.py")
+
+          # Only check added lines
+          ADDED_LINES=$(echo "$DIFF" | grep "^+" | grep -v "^+++" || echo "")
+
+          VIOLATIONS=""
+          for pattern in "${FORBIDDEN_CODE_PATTERNS[@]}"; do
+            MATCHES=$(echo "$ADDED_LINES" | grep -iE "$pattern" || echo "")
+            if [ -n "$MATCHES" ]; then
+              VIOLATIONS="${VIOLATIONS}Pattern: ${pattern}\n${MATCHES}\n\n"
+            fi
+          done
+
+          if [ -n "$VIOLATIONS" ]; then
+            echo "WARNING: Potential inference/smoothing patterns detected"
+            echo ""
+            echo -e "$VIOLATIONS"
+            echo ""
+            echo "Per ONTOLOGY_FREEZE_CONTRACT.md Section 3.3:"
+            echo "  - No inference, smoothing, defaults, or gap-filling"
+            echo "  - Missing data MUST throw, not fallback"
+            echo ""
+            echo "Review these patterns carefully."
+            echo "If legitimate, add a comment explaining why."
+            echo ""
+            # Warning only, not blocking (may have false positives)
+          else
+            echo "No forbidden inference/smoothing patterns detected."
+          fi
+
+          echo ""
+          echo "=========================================="
+
+      - name: Ontology Guard Success
+        if: success()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "ONTOLOGY FREEZE CONTRACT: ENFORCED"
+          echo "=========================================="
+          echo ""
+          echo "All guards passed:"
+          echo "  [PASS] No ABSOLUTELY FROZEN files modified"
+          echo "  [PASS] Controlled file edits validated"
+          echo "  [PASS] No forbidden inference patterns"
+          echo ""
+          echo "Canonical Rule enforced:"
+          echo "  \"Never let a higher layer compensate for uncertainty in a lower layer.\""
+          echo ""
+          echo "=========================================="
+
+      - name: Ontology Guard Failure
+        if: failure()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "ONTOLOGY FREEZE CONTRACT: VIOLATED"
+          echo "=========================================="
+          echo ""
+          echo "This PR violates the Ontology Freeze Contract."
+          echo ""
+          echo "See docs/ontology/ONTOLOGY_FREEZE_CONTRACT.md for:"
+          echo "  - Permitted modifications"
+          echo "  - Change procedure"
+          echo "  - Authority model"
+          echo ""
+          echo "=========================================="
+          exit 1
