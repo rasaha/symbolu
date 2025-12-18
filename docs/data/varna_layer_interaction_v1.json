@@ -939,6 +939,316 @@
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
       }
+    },
+    "pa": {
+      "O1_ACTING": {
+        "manifestation_positive": "body establishes clear separation from genuine threat",
+        "manifestation_negative": "body recoils indiscriminately from all contact",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking what genuinely requires distance",
+        "manifestation_negative": "classifying neutral stimuli as repellent",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping separation that protects integrity",
+        "manifestation_negative": "separation force fragments coherent engagement",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns discern what to avoid",
+        "manifestation_negative": "thought generates aversion toward everything",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing movement away from genuine harm",
+        "manifestation_negative": "separation vector scatters from all engagement",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing that maintains healthy boundaries",
+        "manifestation_negative": "reasoning justifies rejection of all contact",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes appropriate rejection function",
+        "manifestation_negative": "purpose contracts to pure avoidance",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing repulsion patterns without aversion",
+        "manifestation_negative": "observer repelled by observation itself",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating dispersive function into field clarity",
+        "manifestation_negative": "repulsion fragments field into isolated zones",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "repulsion neutralizes into equanimous release",
+        "manifestation_negative": "aversion terminates leaving residual disgust",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "pha": {
+      "O1_ACTING": {
+        "manifestation_positive": "body contracts appropriately to protect from danger",
+        "manifestation_negative": "body locks in chronic defensive contraction",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking genuine threats requiring protective response",
+        "manifestation_negative": "classifying safe stimuli as dangerous",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping defensive posture proportional to threat",
+        "manifestation_negative": "contraction force constricts all expression",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns recognize actual danger",
+        "manifestation_negative": "thought generates phantom threats continuously",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention toward genuine protective needs",
+        "manifestation_negative": "protective vector freezes all forward movement",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing protective actions in appropriate order",
+        "manifestation_negative": "reasoning loops on danger scenarios without resolution",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes healthy self-preservation function",
+        "manifestation_negative": "purpose collapses into survival-only mode",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing fear patterns without being consumed",
+        "manifestation_negative": "observer overwhelmed by aversive tracking",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating protective awareness into coherent field",
+        "manifestation_negative": "contraction isolates zones from field coherence",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "contraction exhausts into expansive release",
+        "manifestation_negative": "fear terminates through collapse not resolution",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "ba": {
+      "O1_ACTING": {
+        "manifestation_positive": "body disengages from what genuinely lacks relevance",
+        "manifestation_negative": "body withdraws engagement from all stimuli",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking what can be released without consequence",
+        "manifestation_negative": "classifying everything as non-relevant",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping detachment that frees attention for essentials",
+        "manifestation_negative": "detachment force dissolves capacity to engage",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns recognize what merits attention",
+        "manifestation_negative": "thought dismisses all content as unworthy",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention away from non-essentials",
+        "manifestation_negative": "detachment vector severs connection to everything",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing that filters out unnecessary concerns",
+        "manifestation_negative": "reasoning disconnects from all meaningful chains",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes healthy disengagement function",
+        "manifestation_negative": "purpose dissolves into purposelessness",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing detachment patterns with neutral clarity",
+        "manifestation_negative": "observer indifferent to its own observation",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating selective disengagement into field clarity",
+        "manifestation_negative": "indifference disperses field into disconnected zones",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "disengagement completes into serene neutrality",
+        "manifestation_negative": "indifference terminates as hollow emptiness",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "bha": {
+      "O1_ACTING": {
+        "manifestation_positive": "body responds to signal rather than distortion",
+        "manifestation_negative": "body activates based on misread signals",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking actual signal distinct from noise",
+        "manifestation_negative": "misclassifying noise as signal consistently",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping perception toward accurate registration",
+        "manifestation_negative": "distortion force warps all incoming form",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns distinguish reality from appearance",
+        "manifestation_negative": "thought builds elaborate structures on false input",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention toward accurate perception",
+        "manifestation_negative": "signal drift vector leads away from reality",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing based on verified rather than assumed data",
+        "manifestation_negative": "reasoning chains built on distorted premises",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose oriented toward clarity through confusion",
+        "manifestation_negative": "purpose serves maintenance of distorted view",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing distortion patterns without belief",
+        "manifestation_negative": "observer cannot distinguish its own distortion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating clarified perception into coherent field",
+        "manifestation_negative": "distortion propagates across entire field",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "distortion terminates revealing clear ground",
+        "manifestation_negative": "delusion ends leaving disorientation residue",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "ma": {
+      "O1_ACTING": {
+        "manifestation_positive": "body experiences healthy fullness and satisfaction",
+        "manifestation_negative": "body driven to consume beyond capacity",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking genuine surplus and completion signals",
+        "manifestation_negative": "classifying sufficiency as insufficiency",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping saturation toward natural completion",
+        "manifestation_negative": "saturation force overrides natural limits",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns recognize fullness and enough",
+        "manifestation_negative": "thought perpetuates more-seeking despite excess",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention toward appreciating abundance",
+        "manifestation_negative": "saturation vector seeks endless filling",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing that respects natural saturation points",
+        "manifestation_negative": "reasoning justifies excess beyond healthy bounds",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes healthy enjoyment function",
+        "manifestation_negative": "purpose collapses into consumption loop",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing saturation patterns without compulsion",
+        "manifestation_negative": "observer merged with indulgence-identification",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating satisfaction into shared field abundance",
+        "manifestation_negative": "saturation blocks flow to rest of field",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "saturation exhausts into contented stillness",
+        "manifestation_negative": "indulgence terminates leaving depleted hollowness",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
     }
   }
 }
