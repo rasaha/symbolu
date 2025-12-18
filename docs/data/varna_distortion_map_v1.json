@@ -1,0 +1,1635 @@
+{
+  "meta": {
+    "version": "1.0",
+    "depends_on": [
+      "varna_bridge_map_v1.json",
+      "varna_polarity_map_v1.json"
+    ],
+    "scope": "Phase-3 distortion vectors only",
+    "rules": [
+      "No semantic meaning",
+      "No polarity edits",
+      "Adjacent-layer flow only",
+      "Kośa-consistent propagation",
+      "Neutral polarity produces no entry"
+    ]
+  },
+  "distortion_map": {
+    "ka": {
+      "O1_ACTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O4_THINKING"]
+      },
+      "O4_THINKING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O3_FORMING", "O5_DIRECTING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O4_THINKING", "O6_REASONING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "kha": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O5_DIRECTING", "O7_PURPOSING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "ga": {
+      "O1_ACTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O4_THINKING"]
+      },
+      "O4_THINKING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O6_REASONING"]
+      },
+      "O6_REASONING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O7_PURPOSING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "gha": {
+      "O1_ACTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O4_THINKING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O6_REASONING", "O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "nga": {
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "ca": {
+      "O1_ACTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O4_THINKING"]
+      },
+      "O4_THINKING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O6_REASONING"]
+      },
+      "O6_REASONING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O7_PURPOSING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "cha": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O2_TAGGING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O1_ACTING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O6_REASONING", "O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "ja": {
+      "O1_ACTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O4_THINKING"]
+      },
+      "O4_THINKING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O3_FORMING", "O5_DIRECTING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O6_REASONING"]
+      },
+      "O6_REASONING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O5_DIRECTING", "O7_PURPOSING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O8_META_OBSERVING", "O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "jha": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "nya": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "moderate",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "tta": {
+      "O1_ACTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O4_THINKING"]
+      },
+      "O4_THINKING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O3_FORMING", "O5_DIRECTING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O6_REASONING"]
+      },
+      "O6_REASONING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O5_DIRECTING", "O7_PURPOSING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "ttha": {
+      "O1_ACTING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O2_TAGGING", "O4_THINKING"]
+      },
+      "O4_THINKING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O3_FORMING", "O5_DIRECTING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O4_THINKING", "O6_REASONING"]
+      },
+      "O6_REASONING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O5_DIRECTING", "O7_PURPOSING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O6_REASONING", "O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O8_META_OBSERVING", "O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "dda": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "ddha": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "nna": {
+      "O1_ACTING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O2_TAGGING", "O4_THINKING"]
+      },
+      "O4_THINKING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O3_FORMING", "O5_DIRECTING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O4_THINKING", "O6_REASONING"]
+      },
+      "O6_REASONING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O5_DIRECTING", "O7_PURPOSING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O6_REASONING", "O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O8_META_OBSERVING", "O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "ta": {
+      "O3_FORMING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O4_THINKING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "tha": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "da": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O4_THINKING", "O6_REASONING"]
+      },
+      "O6_REASONING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O5_DIRECTING", "O7_PURPOSING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O6_REASONING", "O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O8_META_OBSERVING", "O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "dha": {
+      "O1_ACTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O4_THINKING"]
+      },
+      "O4_THINKING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O3_FORMING", "O5_DIRECTING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O8_META_OBSERVING", "O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "na": {
+      "O1_ACTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O4_THINKING"]
+      },
+      "O4_THINKING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O3_FORMING", "O5_DIRECTING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O6_REASONING"]
+      },
+      "O6_REASONING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O5_DIRECTING", "O7_PURPOSING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O6_REASONING", "O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "pa": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "pha": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "ba": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "bha": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O2_TAGGING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O1_ACTING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "ma": {
+      "O1_ACTING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O2_TAGGING", "O4_THINKING"]
+      },
+      "O4_THINKING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O3_FORMING", "O5_DIRECTING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O4_THINKING", "O6_REASONING"]
+      },
+      "O6_REASONING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O5_DIRECTING", "O7_PURPOSING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O6_REASONING", "O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O8_META_OBSERVING", "O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "ya": {
+      "O7_PURPOSING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "ra": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O6_REASONING", "O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "la": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "va": {
+      "O1_ACTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O4_THINKING"]
+      },
+      "O4_THINKING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O3_FORMING", "O5_DIRECTING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O6_REASONING"]
+      },
+      "O6_REASONING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O7_PURPOSING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "upward",
+        "intensity": "moderate",
+        "flow_mode": "amplifying",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O8_META_OBSERVING", "O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "sha": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "ssa": {
+      "O1_ACTING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O2_TAGGING", "O4_THINKING"]
+      },
+      "O4_THINKING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O3_FORMING", "O5_DIRECTING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O4_THINKING", "O6_REASONING"]
+      },
+      "O6_REASONING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O5_DIRECTING", "O7_PURPOSING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O6_REASONING", "O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O8_META_OBSERVING", "O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "sa": {
+      "O1_ACTING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O2_TAGGING", "O4_THINKING"]
+      },
+      "O4_THINKING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O3_FORMING", "O5_DIRECTING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O4_THINKING", "O6_REASONING"]
+      },
+      "O6_REASONING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O5_DIRECTING", "O7_PURPOSING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O6_REASONING", "O8_META_OBSERVING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "lateral",
+        "intensity": "low",
+        "flow_mode": "neutralizing",
+        "targets": ["O8_META_OBSERVING", "O10_ABSOLVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "ha": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    },
+    "ksha": {
+      "O1_ACTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O2_TAGGING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O1_ACTING"]
+      },
+      "O3_FORMING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O2_TAGGING"]
+      },
+      "O4_THINKING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O3_FORMING"]
+      },
+      "O5_DIRECTING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O4_THINKING"]
+      },
+      "O6_REASONING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O5_DIRECTING"]
+      },
+      "O7_PURPOSING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O6_REASONING"]
+      },
+      "O9_UNIFYING": {
+        "direction": "downward",
+        "intensity": "high",
+        "flow_mode": "looping",
+        "targets": ["O8_META_OBSERVING"]
+      },
+      "O10_ABSOLVING": {
+        "direction": "terminating",
+        "intensity": "low",
+        "flow_mode": "resolving",
+        "targets": ["O9_UNIFYING"]
+      }
+    }
+  }
+}
