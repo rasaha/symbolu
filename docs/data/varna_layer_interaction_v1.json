@@ -940,6 +940,316 @@
         "sublimate_vector": "terminating"
       }
     },
+    "tta": {
+      "O1_ACTING": {
+        "manifestation_positive": "body expresses with appropriate emphasis",
+        "manifestation_negative": "body amplifies every response beyond proportion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking what genuinely warrants emphasis",
+        "manifestation_negative": "classifying all signals as requiring amplification",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping emphasis that highlights essential form",
+        "manifestation_negative": "amplification force distorts natural proportion",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns recognize what merits magnification",
+        "manifestation_negative": "thought inflates significance of every input",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention toward what deserves emphasis",
+        "manifestation_negative": "emphasis vector magnifies without discrimination",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing that builds appropriate impact",
+        "manifestation_negative": "reasoning inflates conclusions beyond evidence",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes impactful communication function",
+        "manifestation_negative": "purpose collapses into maximization for its own sake",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing amplification patterns with clarity",
+        "manifestation_negative": "observer swept into magnified perception",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating emphasis into coherent field expression",
+        "manifestation_negative": "amplification drowns out subtle field signals",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "amplification attenuates into natural scale",
+        "manifestation_negative": "overstatement collapses leaving hollow residue",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "ttha": {
+      "O1_ACTING": {
+        "manifestation_positive": "body initiates corrective reversal of prior action",
+        "manifestation_negative": "body trapped in endless undoing loops",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking prior actions that require correction",
+        "manifestation_negative": "classifying all past actions as requiring reversal",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping retraction into restorative correction",
+        "manifestation_negative": "retraction force prevents any forward movement",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns recognize what genuinely needs undoing",
+        "manifestation_negative": "thought loops on past errors without resolution",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing correction toward genuine repair",
+        "manifestation_negative": "reversal vector pulls backward indefinitely",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing correction in proper remedial order",
+        "manifestation_negative": "reasoning churns on what should have been different",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes genuine amendment function",
+        "manifestation_negative": "purpose contracts to pure self-correction",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing retraction patterns without self-blame",
+        "manifestation_negative": "observer identified with wrongdoing",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating corrective action into coherent renewal",
+        "manifestation_negative": "reversal fragments field into regret zones",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "prior trace releases into cleared ground",
+        "manifestation_negative": "repentance terminates without absolution",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "dda": {
+      "O1_ACTING": {
+        "manifestation_positive": "body withdraws appropriately from exposure",
+        "manifestation_negative": "body contracts chronically from all visibility",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking situations requiring protective concealment",
+        "manifestation_negative": "classifying all visibility as threatening exposure",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping withdrawal into appropriate restraint",
+        "manifestation_negative": "contraction force shrinks all self-expression",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns recognize safe disclosure levels",
+        "manifestation_negative": "thought generates exposure fears in neutral contexts",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention toward safe emergence timing",
+        "manifestation_negative": "concealment vector blocks all forward presence",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing self-revelation in appropriate stages",
+        "manifestation_negative": "reasoning justifies perpetual hiding",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes healthy modesty function",
+        "manifestation_negative": "purpose collapses into pure self-concealment",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing withdrawal patterns without shame",
+        "manifestation_negative": "observer shrinks from being witnessed",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating restraint into coherent field presence",
+        "manifestation_negative": "withdrawal isolates from field participation",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "withdrawal exhausts into relaxed presence",
+        "manifestation_negative": "concealment terminates in permanent hiding",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "ddha": {
+      "O1_ACTING": {
+        "manifestation_positive": "body applies concentrated force appropriately",
+        "manifestation_negative": "body intensifies impact beyond measure",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking what requires focused intensity",
+        "manifestation_negative": "classifying all targets as requiring maximum force",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping intensity into precise application",
+        "manifestation_negative": "concentrated force crushes without calibration",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns recognize appropriate intensity levels",
+        "manifestation_negative": "thought seeks maximum impact regardless of need",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing force toward necessary breakthrough",
+        "manifestation_negative": "impact vector seeks destruction for its own sake",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing intensity in measured application",
+        "manifestation_negative": "reasoning serves escalation without limit",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes penetrative clarity function",
+        "manifestation_negative": "purpose collapses into pure intensification",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing intensity patterns without amplification",
+        "manifestation_negative": "observer feeds on impact tracking",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating focused force into coherent field action",
+        "manifestation_negative": "intensity fractures field into damage zones",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "intensification collapses into released stillness",
+        "manifestation_negative": "force terminates leaving destruction residue",
+        "distortion_vector": "downward",
+        "sublimate_vector": "terminating"
+      }
+    },
+    "nna": {
+      "O1_ACTING": {
+        "manifestation_positive": "body senses disparity as information signal",
+        "manifestation_negative": "body tenses with comparison-driven agitation",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O2_TAGGING": {
+        "manifestation_positive": "marking genuine disparities requiring attention",
+        "manifestation_negative": "classifying all differences as personal deficits",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O3_FORMING": {
+        "manifestation_positive": "shaping comparison into useful calibration",
+        "manifestation_negative": "comparison force distorts self-perception",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O4_THINKING": {
+        "manifestation_positive": "thought patterns use difference for learning",
+        "manifestation_negative": "thought loops on unfavorable comparisons",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O5_DIRECTING": {
+        "manifestation_positive": "directing attention toward genuine equilibration",
+        "manifestation_negative": "equilibration vector demands elimination of other",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O6_REASONING": {
+        "manifestation_positive": "sequencing toward mutual elevation",
+        "manifestation_negative": "reasoning serves diminishment of compared other",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O7_PURPOSING": {
+        "manifestation_positive": "purpose includes healthy aspiration function",
+        "manifestation_negative": "purpose collapses into competitive negation",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O8_META_OBSERVING": {
+        "manifestation_positive": "witnessing comparison patterns without identification",
+        "manifestation_negative": "observer consumed by disparity tracking",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O9_UNIFYING": {
+        "manifestation_positive": "integrating diverse positions into coherent field",
+        "manifestation_negative": "comparison fragments field into rival zones",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O10_ABSOLVING": {
+        "manifestation_positive": "differential absorbs into equanimous wholeness",
+        "manifestation_negative": "comparison terminates leaving resentment residue",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "terminating"
+      }
+    },
     "pa": {
       "O1_ACTING": {
         "manifestation_positive": "body establishes clear separation from genuine threat",
