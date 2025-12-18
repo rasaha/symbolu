@@ -1,6 +1,15 @@
 """
-Phase-14: Layer Assigner
-========================
+Phase-14: Layer Assigner — EXPERIMENT SANDBOX
+=============================================
+
+EXPERIMENT_ONLY = True
+
+WARNING: This file MUST NOT be used as ontology source of truth.
+Phase-14 is an AUDIT/ENFORCEMENT layer, NOT an ontology consumer.
+
+AUTHORITATIVE SOURCE:
+    - Ontology executor: symbolu.ontology.phase4a
+    - Frozen data: docs/data/*.json
 
 Assigns words to ontological layers (O1-O10) using POS-based heuristics.
 
@@ -22,6 +31,8 @@ Ontological Layers:
     O9_UNIFYING   - Synthesis, integration words
     O10_ABSOLVING - Release, resolution words
 """
+
+EXPERIMENT_ONLY = True
 
 from __future__ import annotations
 
