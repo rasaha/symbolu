@@ -1,8 +1,11 @@
 """
-Phase-4 Data Models
-===================
+Phase-4A Data Models
+====================
 
-Immutable dataclasses for Phase-4 ontology execution outputs.
+Phase-4A is the ontology lookup sub-module within the composite Phase-4
+of the Phase-1b → Phase-14 experimental pipeline.
+
+Immutable dataclasses for Phase-4A ontology lookup outputs.
 
 All models are:
     - Frozen (immutable after construction)
@@ -17,9 +20,9 @@ from typing import Tuple, FrozenSet
 @dataclass(frozen=True)
 class VarnaLayerInteraction:
     """
-    The output of a Phase-4 (varna, layer) lookup.
+    The output of a Phase-4A (varna, layer) lookup.
 
-    All fields are required. Phase-4 fails if any field is missing
+    All fields are required. Phase-4A fails if any field is missing
     from the frozen ontology files.
 
     Attributes:
@@ -76,7 +79,7 @@ class VarnaLayerInteraction:
 @dataclass(frozen=True)
 class OntologyValidationReport:
     """
-    Report from Phase-4 ontology validation.
+    Report from Phase-4A ontology validation.
 
     Attributes:
         valid: True if all three frozen files are consistent

@@ -1,22 +1,25 @@
 """
-Phase-4 Error Types
+Phase-4A Error Types
 ====================
 
-Explicit error types for Phase-4 ontology execution failures.
+Explicit error types for Phase-4A ontology lookup failures.
+
+Phase-4A is the ontology lookup sub-module within the composite Phase-4
+of the Phase-1b → Phase-14 experimental pipeline.
 
 All errors are fail-fast: they indicate irrecoverable data inconsistencies
-that require upstream ontology file fixes. Phase-4 never infers, smooths,
+that require upstream ontology file fixes. Phase-4A never infers, smooths,
 or compensates for missing data.
 """
 
 from typing import Optional, Tuple
 
 
-class Phase4Error(Exception):
+class Phase4AError(Exception):
     """
-    Base exception for all Phase-4 failures.
+    Base exception for all Phase-4A failures.
 
-    Phase-4 errors are always fatal and indicate ontology
+    Phase-4A errors are always fatal and indicate ontology
     inconsistencies that require file-level fixes.
     """
 
@@ -27,12 +30,12 @@ class Phase4Error(Exception):
 
     def _format_message(self) -> str:
         if not self.context:
-            return f"[Phase-4 Error] {self.message}"
+            return f"[Phase-4A Error] {self.message}"
         ctx_str = ", ".join(f"{k}={v!r}" for k, v in self.context.items())
-        return f"[Phase-4 Error] {self.message} | Context: {ctx_str}"
+        return f"[Phase-4A Error] {self.message} | Context: {ctx_str}"
 
 
-class Phase4ValidationError(Phase4Error):
+class Phase4AValidationError(Phase4AError):
     """
     Raised when ontology file validation fails.
 
@@ -62,11 +65,11 @@ class Phase4ValidationError(Phase4Error):
         self.orphan_interactions = orphan_interactions
 
 
-class Phase4VarnaMissingError(Phase4Error):
+class Phase4AVarnaMissingError(Phase4AError):
     """
     Raised when a requested varna does not exist in varna_bridge_map_v1.json.
 
-    Phase-4 does NOT infer or substitute. If the varna is missing, fail.
+    Phase-4A does NOT infer or substitute. If the varna is missing, fail.
     """
 
     def __init__(self, varna: str):
@@ -77,7 +80,7 @@ class Phase4VarnaMissingError(Phase4Error):
         self.varna = varna
 
 
-class Phase4LayerMissingError(Phase4Error):
+class Phase4ALayerMissingError(Phase4AError):
     """
     Raised when a requested layer does not exist in ontological_layers_v1.json.
 
@@ -96,7 +99,7 @@ class Phase4LayerMissingError(Phase4Error):
         self.valid_layers = valid_layers
 
 
-class Phase4InteractionMissingError(Phase4Error):
+class Phase4AInteractionMissingError(Phase4AError):
     """
     Raised when a (varna, layer) pair has no entry in varna_layer_interaction_v1.json.
 
@@ -112,7 +115,7 @@ class Phase4InteractionMissingError(Phase4Error):
         self.layer = layer
 
 
-class Phase4FieldMissingError(Phase4Error):
+class Phase4AFieldMissingError(Phase4AError):
     """
     Raised when a required field is missing from an interaction entry.
 
@@ -145,7 +148,7 @@ class Phase4FieldMissingError(Phase4Error):
         self.missing_field = missing_field
 
 
-class Phase4FileNotFoundError(Phase4Error):
+class Phase4AFileNotFoundError(Phase4AError):
     """
     Raised when a frozen ontology file cannot be located.
     """
@@ -159,7 +162,7 @@ class Phase4FileNotFoundError(Phase4Error):
         self.expected_path = expected_path
 
 
-class Phase4FileParseError(Phase4Error):
+class Phase4AFileParseError(Phase4AError):
     """
     Raised when a frozen ontology file cannot be parsed as JSON.
     """

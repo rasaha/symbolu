@@ -1,8 +1,11 @@
 """
-Phase-4 Ontology Lookup Test Suite
-===================================
+Phase-4A Ontology Lookup Test Suite
+====================================
 
-Comprehensive tests for the Phase-4 ontology execution layer.
+Phase-4A is the ontology lookup sub-module within the composite Phase-4
+of the Phase-1b → Phase-14 experimental pipeline.
+
+Comprehensive tests for the Phase-4A ontology lookup layer.
 
 Test Categories:
     1. Formula Determinism - Same input produces identical output
@@ -12,21 +15,21 @@ Test Categories:
     5. Lookup Correctness - Returns exact frozen file values
     6. Edge Cases - Boundary conditions and error handling
 
-Total: ~40 tests
+Total: ~50 tests
 """
 
 import pytest
 import inspect
 from typing import FrozenSet
 
-from symbolu.ontology.phase4 import (
+from symbolu.ontology.phase4a import (
     # Errors
-    Phase4Error,
-    Phase4ValidationError,
-    Phase4VarnaMissingError,
-    Phase4LayerMissingError,
-    Phase4InteractionMissingError,
-    Phase4FieldMissingError,
+    Phase4AError,
+    Phase4AValidationError,
+    Phase4AVarnaMissingError,
+    Phase4ALayerMissingError,
+    Phase4AInteractionMissingError,
+    Phase4AFieldMissingError,
     # Models
     VarnaLayerInteraction,
     OntologyValidationReport,
@@ -39,14 +42,14 @@ from symbolu.ontology.phase4 import (
     lookup_interaction,
     lookup_interaction_raw,
 )
-from symbolu.ontology.phase4.lookup import (
+from symbolu.ontology.phase4a.lookup import (
     lookup_varna_all_layers,
     lookup_layer_all_varnas,
     has_interaction,
     is_valid_varna,
     is_valid_layer,
 )
-from symbolu.ontology.phase4.loader import (
+from symbolu.ontology.phase4a.loader import (
     _clear_cache,
     VALID_LAYER_IDS,
     REQUIRED_INTERACTION_FIELDS,
@@ -57,8 +60,8 @@ from symbolu.ontology.phase4.loader import (
 # Test Class 1: Formula Determinism (7 tests)
 # =============================================================================
 
-class TestPhase4FormulaDeterminism:
-    """Verify Phase-4 lookup is deterministic."""
+class TestPhase4AFormulaDeterminism:
+    """Verify Phase-4A lookup is deterministic."""
 
     def test_lookup_same_input_same_output(self):
         """Test same (varna, layer) produces identical result every time."""
@@ -105,45 +108,45 @@ class TestPhase4FormulaDeterminism:
 # Test Class 2: Zero-LLM Guarantee (6 tests)
 # =============================================================================
 
-class TestPhase4ZeroLLMGuarantee:
-    """Verify Phase-4 makes NO LLM or ML calls."""
+class TestPhase4AZeroLLMGuarantee:
+    """Verify Phase-4A makes NO LLM or ML calls."""
 
     def test_no_anthropic_imports(self):
-        """Test no Anthropic imports in Phase-4 modules."""
-        import symbolu.ontology.phase4.lookup as module
+        """Test no Anthropic imports in Phase-4A modules."""
+        import symbolu.ontology.phase4a.lookup as module
         source = inspect.getsource(module)
         assert 'anthropic' not in source.lower()
 
     def test_no_openai_imports(self):
-        """Test no OpenAI imports in Phase-4 modules."""
-        import symbolu.ontology.phase4.lookup as module
+        """Test no OpenAI imports in Phase-4A modules."""
+        import symbolu.ontology.phase4a.lookup as module
         source = inspect.getsource(module)
         assert 'openai' not in source.lower()
 
     def test_no_ml_imports_loader(self):
         """Test no ML imports in loader."""
-        import symbolu.ontology.phase4.loader as module
+        import symbolu.ontology.phase4a.loader as module
         source = inspect.getsource(module)
         for ml_lib in ['sklearn', 'tensorflow', 'torch', 'numpy', 'scipy']:
             assert ml_lib not in source.lower()
 
     def test_no_network_calls(self):
-        """Test no network calls in Phase-4."""
-        import symbolu.ontology.phase4.lookup as module
+        """Test no network calls in Phase-4A."""
+        import symbolu.ontology.phase4a.lookup as module
         source = inspect.getsource(module)
         assert 'requests' not in source.lower()
         assert 'urllib' not in source.lower()
         assert 'httpx' not in source.lower()
 
     def test_no_randomness(self):
-        """Test no randomness in Phase-4."""
-        import symbolu.ontology.phase4.lookup as module
+        """Test no randomness in Phase-4A."""
+        import symbolu.ontology.phase4a.lookup as module
         source = inspect.getsource(module)
         assert 'random' not in source.lower()
 
     def test_runs_offline(self):
-        """Test Phase-4 runs completely offline."""
-        # If this runs, Phase-4 works offline
+        """Test Phase-4A runs completely offline."""
+        # If this runs, Phase-4A works offline
         result = lookup_interaction("ga", "O5_DIRECTING")
         assert result is not None
         assert isinstance(result, VarnaLayerInteraction)
@@ -153,51 +156,51 @@ class TestPhase4ZeroLLMGuarantee:
 # Test Class 3: Fail-Fast Behavior (8 tests)
 # =============================================================================
 
-class TestPhase4FailFast:
-    """Verify Phase-4 fails immediately on missing data, never infers."""
+class TestPhase4AFailFast:
+    """Verify Phase-4A fails immediately on missing data, never infers."""
 
     def test_missing_varna_raises_error(self):
-        """Test missing varna raises Phase4VarnaMissingError."""
-        with pytest.raises(Phase4VarnaMissingError) as exc:
+        """Test missing varna raises Phase4AVarnaMissingError."""
+        with pytest.raises(Phase4AVarnaMissingError) as exc:
             lookup_interaction("nonexistent_varna", "O1_ACTING")
         assert "nonexistent_varna" in str(exc.value)
 
     def test_missing_layer_raises_error(self):
-        """Test missing layer raises Phase4LayerMissingError."""
-        with pytest.raises(Phase4LayerMissingError) as exc:
+        """Test missing layer raises Phase4ALayerMissingError."""
+        with pytest.raises(Phase4ALayerMissingError) as exc:
             lookup_interaction("ka", "O99_INVALID")
         assert "O99_INVALID" in str(exc.value)
 
     def test_invalid_layer_format_raises_error(self):
         """Test invalid layer format raises error."""
-        with pytest.raises(Phase4LayerMissingError):
+        with pytest.raises(Phase4ALayerMissingError):
             lookup_interaction("ka", "ACTING")  # Missing O1_ prefix
 
     def test_empty_varna_raises_error(self):
         """Test empty varna raises error."""
-        with pytest.raises(Phase4VarnaMissingError):
+        with pytest.raises(Phase4AVarnaMissingError):
             lookup_interaction("", "O1_ACTING")
 
     def test_empty_layer_raises_error(self):
         """Test empty layer raises error."""
-        with pytest.raises(Phase4LayerMissingError):
+        with pytest.raises(Phase4ALayerMissingError):
             lookup_interaction("ka", "")
 
     def test_whitespace_varna_raises_error(self):
         """Test whitespace-only varna raises error."""
-        with pytest.raises(Phase4VarnaMissingError):
+        with pytest.raises(Phase4AVarnaMissingError):
             lookup_interaction("   ", "O1_ACTING")
 
     def test_error_includes_context(self):
         """Test errors include helpful context."""
-        with pytest.raises(Phase4VarnaMissingError) as exc:
+        with pytest.raises(Phase4AVarnaMissingError) as exc:
             lookup_interaction("xyz", "O1_ACTING")
         assert exc.value.varna == "xyz"
         assert "varna" in str(exc.value).lower()
 
     def test_layer_error_includes_valid_layers(self):
         """Test layer error includes list of valid layers."""
-        with pytest.raises(Phase4LayerMissingError) as exc:
+        with pytest.raises(Phase4ALayerMissingError) as exc:
             lookup_interaction("ka", "O0_FAKE")
         assert len(exc.value.valid_layers) == 10
 
@@ -206,8 +209,8 @@ class TestPhase4FailFast:
 # Test Class 4: Validation Strictness (6 tests)
 # =============================================================================
 
-class TestPhase4ValidationStrictness:
-    """Verify Phase-4 validates all required fields."""
+class TestPhase4AValidationStrictness:
+    """Verify Phase-4A validates all required fields."""
 
     def test_validation_report_returns_valid(self):
         """Test validation report indicates valid ontology."""
@@ -254,8 +257,8 @@ class TestPhase4ValidationStrictness:
 # Test Class 5: Lookup Correctness (8 tests)
 # =============================================================================
 
-class TestPhase4LookupCorrectness:
-    """Verify Phase-4 returns exact values from frozen files."""
+class TestPhase4ALookupCorrectness:
+    """Verify Phase-4A returns exact values from frozen files."""
 
     def test_lookup_returns_dataclass(self):
         """Test lookup returns VarnaLayerInteraction dataclass."""
@@ -306,8 +309,8 @@ class TestPhase4LookupCorrectness:
 # Test Class 6: Edge Cases (5 tests)
 # =============================================================================
 
-class TestPhase4EdgeCases:
-    """Verify Phase-4 handles edge cases correctly."""
+class TestPhase4AEdgeCases:
+    """Verify Phase-4A handles edge cases correctly."""
 
     def test_vowel_lookup_works(self):
         """Test vowel varnas work."""
@@ -341,8 +344,8 @@ class TestPhase4EdgeCases:
 # Test Class 7: Dataclass Immutability (4 tests)
 # =============================================================================
 
-class TestPhase4Immutability:
-    """Verify Phase-4 outputs are immutable."""
+class TestPhase4AImmutability:
+    """Verify Phase-4A outputs are immutable."""
 
     def test_varnaLayerInteraction_is_frozen(self):
         """Test VarnaLayerInteraction cannot be modified."""
@@ -374,7 +377,7 @@ class TestPhase4Immutability:
 # Test Class 8: Existence Checks (4 tests)
 # =============================================================================
 
-class TestPhase4ExistenceChecks:
+class TestPhase4AExistenceChecks:
     """Verify non-throwing existence check functions."""
 
     def test_has_interaction_true(self):
@@ -400,7 +403,7 @@ class TestPhase4ExistenceChecks:
 # Test Class 9: All Layers Coverage (2 tests)
 # =============================================================================
 
-class TestPhase4AllLayersCoverage:
+class TestPhase4AAllLayersCoverage:
     """Verify all 10 layers work for varnas."""
 
     def test_all_layers_for_ka(self):

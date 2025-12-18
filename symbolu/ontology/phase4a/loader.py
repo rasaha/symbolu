@@ -1,6 +1,9 @@
 """
-Phase-4 Ontology Loader
-=======================
+Phase-4A Ontology Loader
+========================
+
+Phase-4A is the ontology lookup sub-module within the composite Phase-4
+of the Phase-1b → Phase-14 experimental pipeline.
 
 Loads and validates the three frozen ontology files:
     - varna_bridge_map_v1.json
@@ -20,12 +23,12 @@ import os
 from pathlib import Path
 from typing import Dict, Set, Tuple, Optional, Any, FrozenSet
 
-from symbolu.ontology.phase4.errors import (
-    Phase4ValidationError,
-    Phase4FileNotFoundError,
-    Phase4FileParseError,
+from symbolu.ontology.phase4a.errors import (
+    Phase4AValidationError,
+    Phase4AFileNotFoundError,
+    Phase4AFileParseError,
 )
-from symbolu.ontology.phase4.models import (
+from symbolu.ontology.phase4a.models import (
     OntologyValidationReport,
     VarnaInfo,
     LayerInfo,
@@ -44,7 +47,7 @@ def _get_data_dir() -> Path:
         Path to the data directory
     """
     # Navigate from this file to docs/data
-    # This file: symbolu/ontology/phase4/loader.py
+    # This file: symbolu/ontology/phase4a/loader.py
     # Data dir: docs/data/
     current_file = Path(__file__).resolve()
     project_root = current_file.parent.parent.parent.parent  # symbolu repo root
@@ -100,20 +103,20 @@ def _load_json_file(file_key: str) -> Dict[str, Any]:
         Parsed JSON as dict
 
     Raises:
-        Phase4FileNotFoundError: If file doesn't exist
-        Phase4FileParseError: If file is invalid JSON
+        Phase4AFileNotFoundError: If file doesn't exist
+        Phase4AFileParseError: If file is invalid JSON
     """
     file_name = ONTOLOGY_FILES[file_key]
     file_path = _get_data_dir() / file_name
 
     if not file_path.exists():
-        raise Phase4FileNotFoundError(file_name, str(file_path))
+        raise Phase4AFileNotFoundError(file_name, str(file_path))
 
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except json.JSONDecodeError as e:
-        raise Phase4FileParseError(file_name, str(e))
+        raise Phase4AFileParseError(file_name, str(e))
 
 
 def load_ontology_files(*, force_reload: bool = False) -> Dict[str, Any]:
@@ -132,8 +135,8 @@ def load_ontology_files(*, force_reload: bool = False) -> Dict[str, Any]:
             - "varna_layer_interaction": The interaction map
 
     Raises:
-        Phase4FileNotFoundError: If any file is missing
-        Phase4FileParseError: If any file is invalid JSON
+        Phase4AFileNotFoundError: If any file is missing
+        Phase4AFileParseError: If any file is invalid JSON
     """
     global _cached_ontology
 
@@ -264,9 +267,6 @@ def validate_ontology(*, force_reload: bool = False) -> OntologyValidationReport
 
     Returns:
         OntologyValidationReport (check .valid to see if passed)
-
-    Raises:
-        Phase4ValidationError: If validation fails (optional, based on raise_on_failure)
     """
     ontology = load_ontology_files(force_reload=force_reload)
 
@@ -373,18 +373,18 @@ def validate_ontology_strict(*, force_reload: bool = False) -> None:
     """
     Validate ontology and raise on any inconsistency.
 
-    This is the recommended startup check for Phase-4.
+    This is the recommended startup check for Phase-4A.
 
     Args:
         force_reload: If True, reload files before validation
 
     Raises:
-        Phase4ValidationError: If any validation check fails
+        Phase4AValidationError: If any validation check fails
     """
     report = validate_ontology(force_reload=force_reload)
 
     if not report.valid:
-        raise Phase4ValidationError(
+        raise Phase4AValidationError(
             message="Ontology validation failed",
             missing_varnas=report.missing_varnas_in_interactions,
             missing_layers=report.missing_layers_in_interactions,

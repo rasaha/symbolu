@@ -1,5 +1,14 @@
 """
-PO4 — Planner Proposal Envelope
+PO4 — Planner Proposal Envelope (Phase-4C)
+==========================================
+
+PO4 is **Phase-4C** within the composite Phase-4 of the Phase-1b → Phase-14
+experimental pipeline.
+
+Phase-4 Composite Structure:
+    - Phase-4A: Ontology Lookup (frozen varna × layer interaction resolution)
+    - Phase-4B: Transform Engine (non-textual transformation)
+    - Phase-4C: PO4 Planner Governance (this module)
 
 PO4 sits after PO3 (Intent → Allowed Action Contract) and before any
 planner execution or symbolic reasoning.
@@ -16,6 +25,13 @@ PO4 does NOT:
 - Modify grounding
 - Perform reasoning
 - Call LLMs
+
+CRITICAL ONTOLOGY CONSTRAINT (Phase-4 Composite Rule):
+- PO4 MUST NOT load frozen ontology files directly
+- PO4 MUST NOT infer polarity or manifestation values
+- PO4 MUST NOT gap-fill missing ontology data
+- PO4 MUST NOT interpret or smooth ontology language
+- If ontology data is needed, PO4 MUST call Phase-4A's lookup functions
 
 PO phases are pre-acoustic governance layers and precede symbolic processing (P1+).
 
