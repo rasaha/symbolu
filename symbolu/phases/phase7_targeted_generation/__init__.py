@@ -19,7 +19,7 @@ Usage:
 """
 
 # Primary entry point
-from .executor import execute_phase7
+from .executor import execute_phase7, derive_template, PrefixCache
 
 # Type exports
 from .types import (
@@ -62,6 +62,7 @@ from .completeness import (
 from .generator import (
     generate_candidates,
     generate_candidates_filtered,
+    generate_candidates_lexicographic,
     count_candidate_space,
     validate_sequence,
 )
@@ -110,6 +111,7 @@ __all__ = [
     # Generator
     "generate_candidates",
     "generate_candidates_filtered",
+    "generate_candidates_lexicographic",
     "count_candidate_space",
     "validate_sequence",
 
@@ -117,4 +119,8 @@ __all__ = [
     "score_trajectory",
     "evaluate_constraint",
     "extract_field_value",
+
+    # Optimization utilities
+    "derive_template",
+    "PrefixCache",
 ]

@@ -17,6 +17,19 @@ from .types import (
 )
 
 
+# Constraints that are pre-filtered during generation (M1/M2 optimizations)
+# These are skipped during scoring since candidates already satisfy them
+PRE_FILTERED_CONSTRAINTS = frozenset([
+    ConstraintField.TEMPLATE,
+    ConstraintField.TEMPLATE_MATCHES,
+    ConstraintField.TEMPLATE_STARTS_WITH,
+    ConstraintField.TEMPLATE_ENDS_WITH,
+    ConstraintField.TEMPLATE_NOT_IN,
+    ConstraintField.PREFIX_NOT_IN,
+    ConstraintField.SUFFIX_NOT_IN,
+])
+
+
 def score_trajectory(
     trajectory: TrajectoryResult,
     spec: TargetSpec,
@@ -34,11 +47,19 @@ def score_trajectory(
         Score value:
         - Binary mode: 1.0 = satisfies all, 0.0 = fails any
         - Distance mode: 0.0 = perfect, >0 = sum of violations
+
+    Note:
+        Template and pattern constraints (M1/M2) are pre-filtered during
+        generation, so they are skipped here.
     """
     total_distance = 0.0
     all_satisfied = True
 
     for constraint in spec.constraints:
+        # Skip pre-filtered constraints (M1/M2 optimizations)
+        if constraint.field in PRE_FILTERED_CONSTRAINTS:
+            continue
+
         satisfied, distance = evaluate_constraint(trajectory, constraint)
         if not satisfied:
             all_satisfied = False
@@ -185,6 +206,30 @@ def extract_field_value(
         return trajectory.sequence
 
     elif field == ConstraintField.SEQUENCE_ENDS_WITH:
+        return trajectory.sequence
+
+    # Template constraints (M1) - these are pre-filtered during generation
+    # Return the sequence for any post-hoc validation
+    elif field == ConstraintField.TEMPLATE:
+        return trajectory.sequence
+
+    elif field == ConstraintField.TEMPLATE_MATCHES:
+        return trajectory.sequence
+
+    elif field == ConstraintField.TEMPLATE_STARTS_WITH:
+        return trajectory.sequence
+
+    elif field == ConstraintField.TEMPLATE_ENDS_WITH:
+        return trajectory.sequence
+
+    # Pattern exclusions (M2) - these are also pre-filtered
+    elif field == ConstraintField.TEMPLATE_NOT_IN:
+        return trajectory.sequence
+
+    elif field == ConstraintField.PREFIX_NOT_IN:
+        return trajectory.sequence
+
+    elif field == ConstraintField.SUFFIX_NOT_IN:
         return trajectory.sequence
 
     else:
