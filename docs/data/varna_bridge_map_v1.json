@@ -91,26 +91,26 @@
     "nga": {
       "type": "consonant",
       "aspirated": false,
-      "bridge_meaning": "vanity_pressure",
+      "bridge_meaning": "nasal_marker_pressure",
       "varna_group": "ka_varga"
     },
 
     "ca": {
       "type": "consonant",
       "aspirated": false,
-      "bridge_meaning": "scatter_pressure",
+      "bridge_meaning": "conscience_pressure",
       "varna_group": "ca_varga"
     },
     "cha": {
       "type": "consonant",
       "aspirated": true,
-      "bridge_meaning": "nervous_pressure",
+      "bridge_meaning": "nervous_breakdown_pressure",
       "varna_group": "ca_varga"
     },
     "ja": {
       "type": "consonant",
       "aspirated": false,
-      "bridge_meaning": "vanity_pressure",
+      "bridge_meaning": "ego_pressure",
       "varna_group": "ca_varga"
     },
     "jha": {
@@ -147,7 +147,7 @@
     "ddha": {
       "type": "consonant",
       "aspirated": true,
-      "bridge_meaning": "cruelty_pressure",
+      "bridge_meaning": "sadistic_cruelty_pressure",
       "varna_group": "tta_varga"
     },
     "nna": {
@@ -265,7 +265,7 @@
 
     "ha": {
       "type": "consonant",
-      "aspirated": true,
+      "aspirated": false,
       "bridge_meaning": "ignorance_pressure",
       "varna_group": "aspirate"
     },
