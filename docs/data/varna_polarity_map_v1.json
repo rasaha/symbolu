@@ -55,7 +55,7 @@
       "O4_THINKING": "degenerative",
       "O5_DIRECTING": "degenerative",
       "O6_REASONING": "degenerative",
-      "O7_PURPOSING": "degenerative",
+      "O7_PURPOSING": "transitional",
       "O8_META_OBSERVING": "neutral",
       "O9_UNIFYING": "constructive",
       "O10_ABSOLVING": "transitional"
@@ -247,7 +247,7 @@
       "O4_THINKING": "transitional",
       "O5_DIRECTING": "constructive",
       "O6_REASONING": "transitional",
-      "O7_PURPOSING": "constructive",
+      "O7_PURPOSING": "transitional",
       "O8_META_OBSERVING": "neutral",
       "O9_UNIFYING": "constructive",
       "O10_ABSOLVING": "transitional"
@@ -271,7 +271,7 @@
       "O4_THINKING": "degenerative",
       "O5_DIRECTING": "degenerative",
       "O6_REASONING": "degenerative",
-      "O7_PURPOSING": "constructive",
+      "O7_PURPOSING": "degenerative",
       "O8_META_OBSERVING": "neutral",
       "O9_UNIFYING": "degenerative",
       "O10_ABSOLVING": "transitional"
@@ -334,7 +334,7 @@
       "O7_PURPOSING": "transitional",
       "O8_META_OBSERVING": "neutral",
       "O9_UNIFYING": "degenerative",
-      "O10_ABSOLVING": "degenerative"
+      "O10_ABSOLVING": "transitional"
     },
     "la": {
       "O1_ACTING": "degenerative",
@@ -357,7 +357,7 @@
       "O6_REASONING": "constructive",
       "O7_PURPOSING": "constructive",
       "O8_META_OBSERVING": "neutral",
-      "O9_UNIFYING": "constructive",
+      "O9_UNIFYING": "transitional",
       "O10_ABSOLVING": "transitional"
     },
     "sha": {
@@ -394,7 +394,7 @@
       "O7_PURPOSING": "transitional",
       "O8_META_OBSERVING": "neutral",
       "O9_UNIFYING": "transitional",
-      "O10_ABSOLVING": "degenerative"
+      "O10_ABSOLVING": "transitional"
     },
     "ha": {
       "O1_ACTING": "degenerative",
