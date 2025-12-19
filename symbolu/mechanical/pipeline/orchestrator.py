@@ -93,6 +93,9 @@ from .lam_integration import maybe_run_lam
 # Mapper-Fusion Adapter (HRM/LAM/LCM → Fusion Candidates)
 from .mapper_fusion_adapter import create_candidates_from_mappers, get_mapper_summary
 
+# Integrated Renderer (FusionRenderer + VarnaHybridRenderer)
+from .renderer_integration import run_integrated_renderer, IntegratedRenderedOutput
+
 # Coherence Observer (Observability Layer)
 from .coherence_observer import CoherenceObserver
 
@@ -808,8 +811,9 @@ class SymbolUPipeline:
         """
         Run final rendering stage.
 
-        Combines DHA output with persona styling for final presentation.
-        Uses FusionRenderer for structured output when available.
+        v3.1: Uses integrated renderer that combines:
+        - FusionRenderer for structured layers (Symbolic/Practical/Mirror-Truth)
+        - VarnaHybridRenderer for phoneme analysis and optimization
 
         Args:
             ctx: Pipeline context with DHA result.
@@ -817,38 +821,51 @@ class SymbolUPipeline:
         Returns:
             Updated context with ctx.rendered populated.
         """
-        # Determine render mode from request
-        render_mode_str = ctx.request.render_mode or "standard"
-        render_mode_map = {
-            "minimal": RenderMode.MINIMAL,
-            "standard": RenderMode.STANDARD,
-            "enhanced": RenderMode.SYMBOLIC,
-            "regulated": RenderMode.REGULATED,
-        }
-        render_mode = render_mode_map.get(render_mode_str, RenderMode.STANDARD)
+        try:
+            # Use integrated renderer (FusionRenderer + VarnaHybridRenderer)
+            integrated_output = run_integrated_renderer(ctx)
 
-        # Get final text from DHA
-        final_text = ctx.dha.guarded_text if ctx.dha else ""
+            # Store the full integrated output
+            ctx.integrated_rendered = integrated_output
 
-        # Build output metadata
-        output_meta = {
-            "persona_id": ctx.persona.active_persona_id if ctx.persona else None,
-            "tone_profile": ctx.dha.tone_profile if ctx.dha else None,
-            "readiness_level": ctx.dha.readiness_level if ctx.dha else None,
-            "router_mode": ctx.router_mode,
-            "pipeline_version": "3.0",
-        }
+            # Create compatible RenderedOutput for backward compatibility
+            ctx.rendered = RenderedOutput(
+                raw_text=integrated_output.raw_text,
+                mode=integrated_output.mode,
+                meta=integrated_output.meta,
+            )
 
-        # Add MLCR trace if available
-        if ctx.mlcr:
-            output_meta["mlcr_tier"] = ctx.mlcr.explain_log.get("meta", {}).get("tier")
-            output_meta["mlcr_intent"] = ctx.mlcr.explain_log.get("meta", {}).get("intent")
+            # Store structured layers in context for downstream access
+            ctx.symbolic_layer = integrated_output.symbolic_layer
+            ctx.practical_layer = integrated_output.practical_layer
+            ctx.mirror_truth_layer = integrated_output.mirror_truth_layer
+            ctx.varna_analysis = integrated_output.varna_analysis
+            ctx.phoneme_routing = integrated_output.phoneme_routing
 
-        ctx.rendered = RenderedOutput(
-            raw_text=final_text,
-            mode=render_mode_str,
-            meta=output_meta,
-        )
+        except Exception as e:
+            # Fallback to basic rendering if integrated renderer fails
+            render_mode_str = ctx.request.render_mode or "standard"
+            final_text = ctx.dha.guarded_text if ctx.dha else ""
+
+            output_meta = {
+                "persona_id": ctx.persona.active_persona_id if ctx.persona else None,
+                "tone_profile": ctx.dha.tone_profile if ctx.dha else None,
+                "readiness_level": ctx.dha.readiness_level if ctx.dha else None,
+                "router_mode": ctx.router_mode,
+                "pipeline_version": "3.1",
+                "renderer_fallback": True,
+                "renderer_error": str(e),
+            }
+
+            if ctx.mlcr:
+                output_meta["mlcr_tier"] = ctx.mlcr.explain_log.get("meta", {}).get("tier")
+                output_meta["mlcr_intent"] = ctx.mlcr.explain_log.get("meta", {}).get("intent")
+
+            ctx.rendered = RenderedOutput(
+                raw_text=final_text,
+                mode=render_mode_str,
+                meta=output_meta,
+            )
 
         return ctx
 
