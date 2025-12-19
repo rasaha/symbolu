@@ -525,3 +525,123 @@ def phrase_harmony_report(phrase: str) -> str:
             )
 
     return "\n".join(lines)
+
+
+# =============================================================================
+# Varṇa-Based Analysis (Enhanced Sanskrit Phoneme System)
+# =============================================================================
+
+def analyze_word_varna(word: str) -> WordVector:
+    """
+    Analyze a word using Varṇa-based affinities (Sanskrit phoneme system).
+
+    This uses the enhanced Varṇa mappings that include:
+    - Bridge meanings (semantic associations per phoneme)
+    - Layer descriptions (ontological layer activation)
+    - Polarity information (positive/negative manifestations)
+
+    Args:
+        word: The word to analyze
+
+    Returns:
+        WordVector with 10D projection based on Varṇa affinities
+
+    Example:
+        >>> vec = analyze_word_varna("truth")
+        >>> print(vec.dominant_layer)
+    """
+    from symbolu.resonance.varna_bridge import varna_word_to_vector
+    phonemes = get_phonemes(word)
+    return varna_word_to_vector(word, phonemes)
+
+
+def analyze_phrase_varna(phrase: str) -> PhraseAnalysis:
+    """
+    Analyze phonetic harmony using Varṇa-based affinities.
+
+    Args:
+        phrase: The phrase to analyze
+
+    Returns:
+        PhraseAnalysis with harmony/dissonance using Varṇa system
+    """
+    content_words = extract_content_words(phrase)
+
+    if not content_words:
+        return PhraseAnalysis(
+            phrase=phrase,
+            words=(),
+            pairwise_resonance=(),
+            overall_harmony=0.0,
+            overall_dissonance=0.0,
+            prediction="NEUTRAL",
+            key_resonances=(),
+        )
+
+    # Analyze each content word using Varṇa
+    word_vectors = tuple(analyze_word_varna(w) for w in content_words)
+
+    # Compute phrase-level metrics
+    analysis = analyze_phrase_vectors(word_vectors)
+
+    return PhraseAnalysis(
+        phrase=phrase,
+        words=analysis.words,
+        pairwise_resonance=analysis.pairwise_resonance,
+        overall_harmony=analysis.overall_harmony,
+        overall_dissonance=analysis.overall_dissonance,
+        prediction=analysis.prediction,
+        key_resonances=analysis.key_resonances,
+    )
+
+
+def compare_arpabet_vs_varna(word: str) -> str:
+    """
+    Compare ARPABET vs Varṇa analysis for a word.
+
+    Args:
+        word: The word to analyze
+
+    Returns:
+        Formatted comparison string
+
+    Example:
+        >>> print(compare_arpabet_vs_varna("truth"))
+    """
+    from symbolu.resonance.varna_bridge import phonemes_to_varnas
+
+    arpabet_vec = analyze_word(word)
+    varna_vec = analyze_word_varna(word)
+
+    # Get phonemes and varnas
+    phonemes = get_phonemes(word)
+    varnas = phonemes_to_varnas(phonemes)
+
+    lines = [
+        f"Word: {word}",
+        "",
+        "=== ARPABET Analysis ===",
+        f"Phonemes: {' '.join(phonemes)}",
+        f"Dominant Layer: {arpabet_vec.dominant_layer} ({arpabet_vec.dominant_score:.3f})",
+        "",
+        "=== Varṇa Analysis ===",
+        f"Varṇas: {' '.join(varnas)}",
+        f"Dominant Layer: {varna_vec.dominant_layer} ({varna_vec.dominant_score:.3f})",
+        "",
+        "=== Layer Comparison ===",
+    ]
+
+    # Compare each layer
+    layer_names = [
+        "O1_ACTING", "O2_TAGGING", "O3_FORMING", "O4_THINKING", "O5_DIRECTING",
+        "O6_REASONING", "O7_PURPOSING", "O8_META_OBSERVING", "O9_UNIFYING", "O10_ABSOLVING"
+    ]
+
+    for i, layer in enumerate(layer_names):
+        arp_val = arpabet_vec.vector[i]
+        var_val = varna_vec.vector[i]
+        diff = var_val - arp_val
+        diff_str = f"+{diff:.3f}" if diff >= 0 else f"{diff:.3f}"
+        lines.append(f"  {layer:20s}: ARPABET={arp_val:.3f}  Varṇa={var_val:.3f}  Δ={diff_str}")
+
+    return "\n".join(lines)
