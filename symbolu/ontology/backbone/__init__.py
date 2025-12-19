@@ -87,6 +87,15 @@ from .persona_tracker import (
     track_query,
     get_persona_insights,
 )
+from .phoneme_validator import (
+    ValidationResult,
+    PhonemeAlignment,
+    ValidationReport,
+    validate_event,
+    validate_experiential_before_store,
+    validate_batch,
+    filter_universal,
+)
 
 __all__ = [
     # Core types
@@ -138,4 +147,12 @@ __all__ = [
     "get_persona_store",
     "track_query",
     "get_persona_insights",
+    # Phoneme Validation (Ground Truth)
+    "ValidationResult",
+    "PhonemeAlignment",
+    "ValidationReport",
+    "validate_event",
+    "validate_experiential_before_store",
+    "validate_batch",
+    "filter_universal",
 ]

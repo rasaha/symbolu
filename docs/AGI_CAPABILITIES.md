@@ -2,7 +2,9 @@
 
 ## Executive Summary
 
-Symbol-U implements a **10-dimensional ontological backbone** structured as **5 mirror pairs** that enables cross-domain reasoning without domain-specific training. By encoding all knowledge into a universal cognitive-mathematical structure with **event tagging** and **persona-based pattern discovery**, the system can transfer insights across history, science, literature, finance, biology, and any other domain—a foundational capability for Artificial General Intelligence.
+Symbol-U implements a **10-dimensional ontological backbone** structured as **5 mirror pairs** that enables cross-domain reasoning without domain-specific training. By encoding all knowledge into a universal cognitive-mathematical structure with **event tagging**, **persona-based pattern discovery**, and **phoneme ground truth validation**, the system can transfer insights across history, science, literature, finance, biology, and any other domain—a foundational capability for Artificial General Intelligence.
+
+**The key innovation:** The phoneme model validates that words describing an event encode the same meaning as the experience itself. Only universal patterns survive to storage. The system is self-validating.
 
 ---
 
@@ -17,6 +19,8 @@ Symbol-U implements a **10-dimensional ontological backbone** structured as **5 
 | No knowledge transfer | Cross-domain by design |
 | User-agnostic | Persona query tracking |
 | Extract patterns from content | Discover patterns from usage |
+| No ground truth | Phoneme validation (sound = meaning) |
+| Manual curation | Self-cleaning (anomalies auto-filter) |
 
 ---
 
@@ -185,7 +189,74 @@ Knowledge is stored not as raw content, but as **transferable reasoning patterns
 }
 ```
 
-### 7. Reasoning Synthesis
+### 7. Phoneme Ground Truth Validation
+
+**The Problem:** How do you know a stored insight is universally valid and not just user-specific or metaphorical?
+
+**The Solution:** Use the phoneme model as the ground truth validator.
+
+```
+Event → Words describing event → Phoneme analysis → Match experience?
+                                                          ↓
+                                        YES: Universal pattern (store it)
+                                        NO:  Anomaly (discard or flag)
+```
+
+**How It Works:**
+
+1. User describes an event: "The empire was shattered by internal conflict"
+2. Extract key words: ["shattered", "conflict"]
+3. Get phoneme 10D vectors for each word (from resonance engine)
+4. Get event 10D vector (from backbone encoder)
+5. Compare: Do the phonemes encode the same meaning as the event?
+
+```python
+validation = validate_event(
+    event_text="The empire was shattered by internal conflict",
+    event_words=["shattered", "conflict"],
+)
+
+if validation.is_universal:
+    # Phonemes match experience → Safe to store and transfer
+    experiential_store.add(experiential)
+else:
+    # Phonemes don't match → Anomaly, user-specific, or metaphorical
+    log.warning(f"Non-universal: {validation.anomaly_reason}")
+```
+
+**Validation Results:**
+
+| Result | Meaning | Action |
+|--------|---------|--------|
+| `UNIVERSAL` | Phonemes align with experience | Store and transfer |
+| `ANOMALY` | Phonemes don't match | Discard or flag |
+| `METAPHORICAL` | Partial alignment | Store with caution |
+| `INSUFFICIENT` | Can't validate | Skip validation |
+
+**Why This Works:**
+
+The phoneme model encodes meaning at the sound level—this is pre-cultural, pre-semantic. If the word "shattered" phonemically encodes "destruction" and the event also encodes "destruction", the usage is universal. If not, it's idiosyncratic.
+
+```
+UNIVERSAL:
+  "shattered" phonemes → destruction (0.8)
+  Event encoding → destruction (0.75)
+  Alignment: 0.92 ✓
+
+ANOMALY:
+  "interesting" phonemes → thinking, forming
+  Event encoding → destruction, conflict
+  Alignment: 0.31 ✗ (metaphorical/ironic usage)
+```
+
+**Self-Cleaning System:**
+
+- Only universal patterns survive to storage
+- Anomalies naturally filter out
+- No external oracle needed
+- Phoneme truth is the ground truth
+
+### 8. Reasoning Synthesis
 
 Multiple experientials combine into unified, actionable output:
 
@@ -298,6 +369,23 @@ ground or split—unclear division is worst outcome.
                                      │
                                      ▼
                          ┌─────────────────────────┐
+                         │   PHONEME VALIDATION    │
+                         │                         │
+                         │  Words → Phoneme 10D    │
+                         │  Event → Event 10D      │
+                         │  Match? → Universal     │
+                         └───────────┬─────────────┘
+                                     │
+                        ┌────────────┴────────────┐
+                        │                         │
+                        ▼                         ▼
+              ┌─────────────────┐      ┌─────────────────┐
+              │    UNIVERSAL    │      │    ANOMALY      │
+              │  Store & Use    │      │  Discard/Flag   │
+              └────────┬────────┘      └─────────────────┘
+                       │
+                       ▼
+                         ┌─────────────────────────┐
                          │      FEEDBACK LOOP      │
                          │                         │
                          │  Updates persona        │
@@ -322,6 +410,8 @@ ground or split—unclear division is worst outcome.
 | Explainability | Mirror balance visible |
 | Zero-shot domain transfer | No retraining needed |
 | Insight quality metric | Balance score |
+| **Ground truth validation** | **Phoneme alignment check** |
+| **Self-cleaning data** | **Anomalies filtered automatically** |
 
 ### ○ Future Extensions
 
@@ -421,27 +511,49 @@ symbolu/ontology/backbone/
 ├── reasoning_extractor.py   # Pattern extraction (legacy)
 ├── user_inclination.py      # User profiles
 ├── reasoning_synthesizer.py # Multi-source synthesis
-├── mirror_pairs.py          # Mirror pair architecture ← NEW
-└── persona_tracker.py       # Query-based pattern discovery ← NEW
+├── mirror_pairs.py          # Mirror pair architecture
+├── persona_tracker.py       # Query-based pattern discovery
+└── phoneme_validator.py     # Ground truth validation ← NEW
+
+symbolu/resonance/
+├── phoneme_map.py           # Phoneme → 10D affinities
+├── engine.py                # word_to_vector, compute_resonance
+├── analyzer.py              # High-level analysis functions
+└── varna_bridge.py          # Sanskrit phoneme mappings
 ```
 
 ---
 
 ## Conclusion
 
-Symbol-U's architecture represents a **structural approach to AGI** built on three key insights:
+Symbol-U's architecture represents a **structural approach to AGI** built on four key insights:
 
 1. **Mirror Pairs**: 10D reduces to 5 balanced pairs—balance determines insight quality
 2. **Event Tagging**: Tag what happened, not what it's called—solves clustering
 3. **Persona Tracking**: Discover patterns from usage, not extraction—simplifies everything
+4. **Phoneme Ground Truth**: Validate universality by checking if words match experience
 
-The system doesn't extract patterns from content (too much data). It discovers patterns from how users query across domains. The cross-domain bridges emerge naturally.
+The system is now **self-validating**:
+- Extract events from content
+- Encode to 10D with mirror balance
+- Validate via phoneme alignment
+- Only universal patterns survive
+- Cross-domain bridges emerge from user queries
+
+```
+Content → Events → 10D → Balance → Phoneme Validation → Universal?
+                                                              ↓
+                                              YES → Store & Transfer
+                                              NO  → Anomaly (discard)
+```
+
+**The phoneme model is the oracle.** If the sounds encode the same meaning as the experience, it's universal truth. If not, it's idiosyncratic usage.
 
 **This is pattern matching, not philosophy.**
 
 ---
 
-*Document Version: 2.0*
+*Document Version: 3.0*
 *Symbol-U Ontological Backbone*
-*Mirror Pair Architecture*
-*Cross-Domain Reasoning via Balance + Events + Personas*
+*Mirror Pair Architecture + Phoneme Ground Truth*
+*Cross-Domain Reasoning via Balance + Events + Personas + Validation*
