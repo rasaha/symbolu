@@ -367,11 +367,18 @@ class VarnaHybridRenderer:
         elif mode == HybridRenderMode.HYBRID_FULL:
             # Full hybrid with attention optimization
             tokens = tuple(text.split())
-            attention_scores, flops = self.compute_attention(tokens)
+            if tokens:
+                attention_scores, flops = self.compute_attention(tokens)
 
-            # Compare to traditional
-            comparison = self.attention.compare_to_traditional(len(tokens))
-            flops_saved = (1 - comparison['phoneme_flops'] / comparison['traditional_flops']) * 100
+                # Compare to traditional (guard against division by zero)
+                comparison = self.attention.compare_to_traditional(len(tokens))
+                if comparison['traditional_flops'] > 0:
+                    flops_saved = (1 - comparison['phoneme_flops'] / comparison['traditional_flops']) * 100
+                else:
+                    flops_saved = 100.0  # No traditional FLOPs = 100% savings
+            else:
+                # Empty input
+                flops_saved = 100.0
 
             # Pre-filter if candidates provided
             if candidates is not None and target_word is not None:
