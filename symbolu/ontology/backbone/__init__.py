@@ -44,6 +44,29 @@ from .similarity import (
 from .extractors import (
     DimensionExtractor,
     get_extractor,
+    ProjectionDirection,
+)
+from .experiential import (
+    ExperientialObject,
+    ExperientialStore,
+    PatternType,
+    create_experiential,
+    get_experiential_store,
+)
+from .reasoning_extractor import (
+    extract_reasoning,
+    extract_and_create_experiential,
+)
+from .user_inclination import (
+    UserInclinationProfile,
+    UserInclinationStore,
+    ReasoningStyle,
+    get_user_store,
+)
+from .reasoning_synthesizer import (
+    ReasoningSynthesizer,
+    SynthesisResult,
+    synthesize_for_problem,
 )
 
 __all__ = [
@@ -60,4 +83,23 @@ __all__ = [
     # Extractors
     "DimensionExtractor",
     "get_extractor",
+    "ProjectionDirection",
+    # Experiential Objects
+    "ExperientialObject",
+    "ExperientialStore",
+    "PatternType",
+    "create_experiential",
+    "get_experiential_store",
+    # Reasoning Extraction
+    "extract_reasoning",
+    "extract_and_create_experiential",
+    # User Inclination
+    "UserInclinationProfile",
+    "UserInclinationStore",
+    "ReasoningStyle",
+    "get_user_store",
+    # Synthesis
+    "ReasoningSynthesizer",
+    "SynthesisResult",
+    "synthesize_for_problem",
 ]
