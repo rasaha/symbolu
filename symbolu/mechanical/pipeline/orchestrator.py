@@ -96,6 +96,12 @@ from .mapper_fusion_adapter import create_candidates_from_mappers, get_mapper_su
 # Integrated Renderer (FusionRenderer + VarnaHybridRenderer)
 from .renderer_integration import run_integrated_renderer, IntegratedRenderedOutput
 
+# P27 Persona Selection Phase (Delivery Adaptation Band)
+from .p27_persona import maybe_run_p27, P27Output
+
+# P28 DHA Phase (Delivery Adaptation Band)
+from .p28_dha import maybe_run_p28, P28Output
+
 # Coherence Observer (Observability Layer)
 from .coherence_observer import CoherenceObserver
 
@@ -670,6 +676,23 @@ class SymbolUPipeline:
             persona_config=persona_config,
         )
 
+        # =======================================================================
+        # P27 Persona Selection Phase (Delivery Adaptation Band)
+        # Runs alongside existing persona logic to provide formal phase tracing
+        # =======================================================================
+        try:
+            p27_output = maybe_run_p27(ctx)
+            if p27_output:
+                ctx.p27_persona = p27_output
+                # Optionally update persona_id if P27 suggests different selection
+                if p27_output.persona_id != persona_id:
+                    # P27 provides additional signal but doesn't override existing logic
+                    ctx.persona.persona_config["p27_suggestion"] = p27_output.persona_id
+                    ctx.persona.persona_config["p27_confidence"] = p27_output.selection_confidence
+        except Exception:
+            # P27 phase is optional - continue if it fails
+            pass
+
         return ctx
 
     def _run_fusion(self, ctx: PipelineContext) -> PipelineContext:
@@ -804,6 +827,25 @@ class SymbolUPipeline:
                 "modulation": diagnostics.get("modulation", {}),
             },
         )
+
+        # =======================================================================
+        # P28 DHA Phase (Delivery Adaptation Band)
+        # Runs alongside existing DHA logic to provide formal phase tracing
+        # =======================================================================
+        try:
+            # Get P27 output if available for persona context
+            p27_output = getattr(ctx, 'p27_persona', None)
+            p28_output = maybe_run_p28(ctx, p27_output=p27_output)
+            if p28_output:
+                ctx.p28_dha = p28_output
+                # Enrich DHA decision with P28 phase data
+                ctx.dha.adaptation_notes["p28_profile"] = p28_output.tone_profile.profile_type.value
+                ctx.dha.adaptation_notes["p28_readiness"] = p28_output.readiness_level.value
+                ctx.dha.adaptation_notes["p28_resistance"] = p28_output.resistance_level.value
+                ctx.dha.adaptation_notes["p28_safety_status"] = p28_output.safety_result.status.value
+        except Exception:
+            # P28 phase is optional - continue if it fails
+            pass
 
         return ctx
 
