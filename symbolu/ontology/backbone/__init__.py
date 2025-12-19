@@ -68,6 +68,25 @@ from .reasoning_synthesizer import (
     SynthesisResult,
     synthesize_for_problem,
 )
+from .mirror_pairs import (
+    MirrorPair,
+    MIRROR_MAP,
+    compute_balance,
+    propagate_to_mirror,
+    encode_with_events,
+    tag_events,
+    EventType,
+    BalanceReport,
+    is_transferable_insight,
+    explain_balance,
+)
+from .persona_tracker import (
+    PersonaProfile,
+    PersonaStore,
+    get_persona_store,
+    track_query,
+    get_persona_insights,
+)
 
 __all__ = [
     # Core types
@@ -102,4 +121,21 @@ __all__ = [
     "ReasoningSynthesizer",
     "SynthesisResult",
     "synthesize_for_problem",
+    # Mirror Pairs
+    "MirrorPair",
+    "MIRROR_MAP",
+    "compute_balance",
+    "propagate_to_mirror",
+    "encode_with_events",
+    "tag_events",
+    "EventType",
+    "BalanceReport",
+    "is_transferable_insight",
+    "explain_balance",
+    # Persona Tracking
+    "PersonaProfile",
+    "PersonaStore",
+    "get_persona_store",
+    "track_query",
+    "get_persona_insights",
 ]
