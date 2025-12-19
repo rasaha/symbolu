@@ -90,6 +90,9 @@ from .lcm_integration import maybe_run_lcm
 # LAM Integration (Long-Arc Mapper)
 from .lam_integration import maybe_run_lam
 
+# Mapper-Fusion Adapter (HRM/LAM/LCM → Fusion Candidates)
+from .mapper_fusion_adapter import create_candidates_from_mappers, get_mapper_summary
+
 # Coherence Observer (Observability Layer)
 from .coherence_observer import CoherenceObserver
 
@@ -862,8 +865,9 @@ class SymbolUPipeline:
         """
         Generate candidates for fusion.
 
-        v3.0: Creates synthetic candidates from MLCR output.
-        Future: Will integrate RAG-retrieved candidates.
+        v3.1: Uses mapper outputs (HRM/LAM/LCM) to create candidates with
+        properly derived channel scores based on actual mapper analysis.
+        Falls back to synthetic candidates when mappers weren't run.
 
         Args:
             ctx: Pipeline context.
@@ -873,47 +877,26 @@ class SymbolUPipeline:
         Returns:
             List of Candidate objects for fusion.
         """
-        candidates = []
-
-        # Create a primary candidate from the query itself
-        # This ensures fusion always has something to work with
         query_text = ctx.request.text
+        domain = explain_log.get("meta", {}).get("domain", "general")
 
-        # HRM candidate (symbolic/reasoning)
-        hrm_candidate = Candidate(
-            id=f"hrm_{uuid.uuid4().hex[:8]}",
-            text=f"From a deeper perspective: {query_text}",
-            source=CandidateSource.HRM,
-            channel_scores={"hrm": 0.8, "lcm": 0.4, "moe": 0.3},
-            domain=explain_log.get("meta", {}).get("domain", "general"),
-            relevance_score=0.7,
-            confidence=0.8,
-        )
-        candidates.append(hrm_candidate)
+        # Get mapper outputs from context (populated in stages 1.5-1.7)
+        hrm_map = getattr(ctx, 'hrm_map', None)
+        lam_map = getattr(ctx, 'lam_map', None)
+        lcm_map = getattr(ctx, 'lcm_map', None)
 
-        # LCM candidate (linguistic clarity)
-        lcm_candidate = Candidate(
-            id=f"lcm_{uuid.uuid4().hex[:8]}",
-            text=f"To clarify: {query_text}",
-            source=CandidateSource.LCM,
-            channel_scores={"hrm": 0.3, "lcm": 0.9, "moe": 0.4},
-            domain=explain_log.get("meta", {}).get("domain", "general"),
-            relevance_score=0.75,
-            confidence=0.85,
+        # Use mapper-fusion adapter to create candidates from actual mapper outputs
+        # This bridges the gap between mapper analysis and fusion engine
+        candidates = create_candidates_from_mappers(
+            text=query_text,
+            domain=domain,
+            hrm_map=hrm_map,
+            lam_map=lam_map,
+            lcm_map=lcm_map,
         )
-        candidates.append(lcm_candidate)
 
-        # MoE candidate (domain expertise)
-        moe_candidate = Candidate(
-            id=f"moe_{uuid.uuid4().hex[:8]}",
-            text=f"Based on domain knowledge: {query_text}",
-            source=CandidateSource.MOE,
-            channel_scores={"hrm": 0.4, "lcm": 0.5, "moe": 0.85},
-            domain=explain_log.get("meta", {}).get("domain", "general"),
-            relevance_score=0.7,
-            confidence=0.75,
-        )
-        candidates.append(moe_candidate)
+        # Store mapper summary in context for observability
+        ctx.mapper_summary = get_mapper_summary(hrm_map, lam_map, lcm_map)
 
         return candidates
 
