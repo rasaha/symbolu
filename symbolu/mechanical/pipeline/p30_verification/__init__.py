@@ -59,6 +59,33 @@ from .p30_integration import (
     HAS_COHERENCE_ENGINE,
 )
 
+# New modules (Phase 1 & 2 implementation)
+from .semantic_drift_monitor import (
+    DriftAnalysis,
+    SemanticDriftMonitor,
+    get_semantic_drift_monitor,
+    analyze_drift,
+)
+
+from .persona_consistency_checker import (
+    PersonaConsistencyResult,
+    PersonaConsistencyChecker,
+    get_persona_consistency_checker,
+    check_persona_consistency,
+)
+
+from .authority_cascade_validator import (
+    AuthorityLevel,
+    ViolationType,
+    PhaseAuthority,
+    PHASE_AUTHORITIES,
+    AuthorityViolation,
+    CascadeValidation,
+    AuthorityCascadeValidator,
+    get_authority_cascade_validator,
+    validate_authority_cascade,
+)
+
 PHASE_STATUS = "implemented"
 
 __version__ = VERSION
@@ -83,6 +110,26 @@ __all__ = [
     "get_p30_output",
     "get_p30_verified_text",
     "is_p30_passed",
+    # Semantic Drift Monitor
+    "DriftAnalysis",
+    "SemanticDriftMonitor",
+    "get_semantic_drift_monitor",
+    "analyze_drift",
+    # Persona Consistency Checker
+    "PersonaConsistencyResult",
+    "PersonaConsistencyChecker",
+    "get_persona_consistency_checker",
+    "check_persona_consistency",
+    # Authority Cascade Validator
+    "AuthorityLevel",
+    "ViolationType",
+    "PhaseAuthority",
+    "PHASE_AUTHORITIES",
+    "AuthorityViolation",
+    "CascadeValidation",
+    "AuthorityCascadeValidator",
+    "get_authority_cascade_validator",
+    "validate_authority_cascade",
     # Feature flags
     "HAS_COMPLIANCE_CHECKER",
     "HAS_P12_VALIDATOR",

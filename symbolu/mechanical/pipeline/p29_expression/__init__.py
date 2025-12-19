@@ -56,6 +56,19 @@ from .p29_integration import (
     HAS_RESONANCE,
 )
 
+# New modules (Phase 1 & 2 implementation)
+from .phoneme_harmony_engine import (
+    TransitionQuality,
+    PhonemeClass,
+    WordPhonemes,
+    WordTransition,
+    HarmonyAnalysis,
+    PhonemeHarmonyEngine,
+    get_phoneme_harmony_engine,
+    analyze_harmony,
+    HAS_RESONANCE as HARMONY_HAS_RESONANCE,
+)
+
 PHASE_STATUS = "implemented"
 
 __version__ = VERSION
@@ -79,6 +92,16 @@ __all__ = [
     "maybe_run_p29",
     "get_p29_output",
     "get_p29_final_text",
+    # Phoneme Harmony Engine
+    "TransitionQuality",
+    "PhonemeClass",
+    "WordPhonemes",
+    "WordTransition",
+    "HarmonyAnalysis",
+    "PhonemeHarmonyEngine",
+    "get_phoneme_harmony_engine",
+    "analyze_harmony",
+    "HARMONY_HAS_RESONANCE",
     # Feature flags
     "HAS_VARNA",
     "HAS_STYLE",

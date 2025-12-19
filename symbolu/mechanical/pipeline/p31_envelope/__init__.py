@@ -57,6 +57,27 @@ from .p31_integration import (
     HAS_SAFETY_FILTERS,
 )
 
+# New modules (Phase 1 & 2 implementation)
+from .multi_channel_adapter import (
+    ChannelType,
+    VoiceStyle,
+    ChannelConfig,
+    ChannelOutput,
+    MultiChannelAdapter,
+    get_multi_channel_adapter,
+    adapt_for_channel,
+)
+
+from .progressive_disclosure import (
+    DisclosureLevel,
+    ContentType,
+    DisclosureLayer,
+    ProgressiveResponse,
+    ProgressiveDisclosureEngine,
+    get_progressive_disclosure_engine,
+    create_progressive_response,
+)
+
 PHASE_STATUS = "implemented"
 
 __version__ = VERSION
@@ -80,6 +101,22 @@ __all__ = [
     "maybe_run_p31",
     "get_p31_output",
     "get_final_output",
+    # Multi-Channel Adapter
+    "ChannelType",
+    "VoiceStyle",
+    "ChannelConfig",
+    "ChannelOutput",
+    "MultiChannelAdapter",
+    "get_multi_channel_adapter",
+    "adapt_for_channel",
+    # Progressive Disclosure
+    "DisclosureLevel",
+    "ContentType",
+    "DisclosureLayer",
+    "ProgressiveResponse",
+    "ProgressiveDisclosureEngine",
+    "get_progressive_disclosure_engine",
+    "create_progressive_response",
     # Feature flags
     "HAS_DELIVERY_MODULATOR",
     "HAS_FUSION_RENDERER",
