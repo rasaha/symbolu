@@ -1,84 +1,88 @@
 """
-P31 Output Envelope Phase (STUB)
-=================================
+P31 Output Envelope Phase
+============================
 
-Placeholder for future P31 Output Envelope phase within the
-Delivery Adaptation Band (P27-P31).
+Wrap final output in appropriate envelope format for delivery.
+Integrates existing modules:
+
+- DeliveryModulator: Profile-based message wrapping
+- SafetyFilters: Final safety gating
+- FusionRenderer: 3-layer structure formatting
 
 Phase Authority: LOW
 Band Position: P31 (Final in Delivery Adaptation Band)
 
 Purpose:
-    Wrap final output in appropriate envelope format for delivery.
-    Handles:
-    - Output structure formatting
-    - Metadata attachment
-    - Delivery channel adaptation
+    - Output structure formatting (plain/markdown/JSON/HTML/SSML)
+    - Metadata attachment with pipeline trace
+    - Delivery channel adaptation (chat/API/voice/email)
+    - Final safety filtering
 
-Status: STUB - Not yet implemented
-Version: 0.1.0
-"""
-
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
-
-VERSION = "0.1.0"
-PHASE_STATUS = "stub"
-
-
-@dataclass
-class P31Output:
-    """Stub output for P31 phase."""
-    envelope_text: str
-    envelope_format: str = "plain"
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "phase": "P31",
-            "version": VERSION,
-            "status": PHASE_STATUS,
-            "envelope_text": self.envelope_text,
-            "envelope_format": self.envelope_format,
-            "metadata": self.metadata,
-        }
-
-
-def maybe_run_p31(ctx: Any) -> Optional[P31Output]:
-    """
-    Stub implementation - passes through text unchanged.
-
-    Args:
-        ctx: Pipeline context.
-
-    Returns:
-        P31Output with unmodified text.
-    """
-    text = ""
-    if hasattr(ctx, 'p30_verification') and ctx.p30_verification:
-        text = ctx.p30_verification.verified_text
-    elif hasattr(ctx, 'p29_expression') and ctx.p29_expression:
-        text = ctx.p29_expression.final_text
-    elif hasattr(ctx, 'p28_dha') and ctx.p28_dha:
-        text = ctx.p28_dha.guarded_text
-    elif hasattr(ctx, 'dha') and ctx.dha:
-        text = getattr(ctx.dha, 'guarded_text', "")
-
-    return P31Output(
-        envelope_text=text,
-        envelope_format="plain",
-        metadata={
-            "delivery_band": "P27-P31",
-            "phase_status": PHASE_STATUS,
-        },
+Usage:
+    from symbolu.mechanical.pipeline.p31_envelope import (
+        maybe_run_p31,
+        get_p31_output,
+        get_final_output,
     )
 
+    # In orchestrator (after P30)
+    p31_result = maybe_run_p31(ctx)
+    if p31_result:
+        ctx.p31_envelope = p31_result
+"""
 
-def get_p31_output(ctx: Any) -> Optional[P31Output]:
-    """Get P31 output from context if available."""
-    if hasattr(ctx, 'p31_envelope'):
-        return ctx.p31_envelope
-    return None
+from .p31_envelope_schema import (
+    VERSION,
+    P31Authority,
+    EnvelopeFormat,
+    DeliveryChannel,
+    P31Metadata,
+    P31Output,
+)
 
+from .p31_integration import (
+    get_delivery_modulator,
+    get_safety_filters,
+    extract_metadata,
+    detect_format,
+    detect_channel,
+    format_envelope,
+    apply_final_safety,
+    run_p31_envelope,
+    maybe_run_p31,
+    get_p31_output,
+    get_final_output,
+    HAS_DELIVERY_MODULATOR,
+    HAS_FUSION_RENDERER,
+    HAS_SAFETY_FILTERS,
+)
 
-__all__ = ["VERSION", "PHASE_STATUS", "P31Output", "maybe_run_p31", "get_p31_output"]
+PHASE_STATUS = "implemented"
+
+__version__ = VERSION
+__all__ = [
+    # Schema
+    "VERSION",
+    "P31Authority",
+    "EnvelopeFormat",
+    "DeliveryChannel",
+    "P31Metadata",
+    "P31Output",
+    # Integration
+    "get_delivery_modulator",
+    "get_safety_filters",
+    "extract_metadata",
+    "detect_format",
+    "detect_channel",
+    "format_envelope",
+    "apply_final_safety",
+    "run_p31_envelope",
+    "maybe_run_p31",
+    "get_p31_output",
+    "get_final_output",
+    # Feature flags
+    "HAS_DELIVERY_MODULATOR",
+    "HAS_FUSION_RENDERER",
+    "HAS_SAFETY_FILTERS",
+    "PHASE_STATUS",
+]

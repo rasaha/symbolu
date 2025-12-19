@@ -1,79 +1,91 @@
 """
-P30 Output Verification Phase (STUB)
-=====================================
+P30 Output Verification Phase
+================================
 
-Placeholder for future P30 Output Verification phase within the
-Delivery Adaptation Band (P27-P31).
+Output quality and constraint verification before delivery.
+Integrates existing modules:
 
-Phase Authority: MEDIUM
+- RendererComplianceChecker: P13 safety envelope validation
+- P12ConsistencyValidator: Acoustic-prosodic consistency
+- CoherenceEngine: Multi-turn coherence verification
+
+Phase Authority: MEDIUM (HIGH when violations block output)
 Band Position: P30 (Fourth in Delivery Adaptation Band)
 
 Purpose:
-    Verify output quality and constraint compliance before delivery.
-    Checks include:
-    - Coherence verification
-    - Constraint satisfaction check
+    - P13 safety envelope compliance checking
+    - P12 acoustic-prosodic consistency validation
+    - Multi-turn coherence verification
     - Phase authority chain validation
 
-Status: STUB - Not yet implemented
-Version: 0.1.0
-"""
-
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
-
-VERSION = "0.1.0"
-PHASE_STATUS = "stub"
-
-
-@dataclass
-class P30Output:
-    """Stub output for P30 phase."""
-    verified_text: str
-    verification_passed: bool = True
-    checks_performed: List[str] = field(default_factory=list)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "phase": "P30",
-            "version": VERSION,
-            "status": PHASE_STATUS,
-            "verified_text": self.verified_text,
-            "verification_passed": self.verification_passed,
-            "checks_performed": self.checks_performed,
-        }
-
-
-def maybe_run_p30(ctx: Any) -> Optional[P30Output]:
-    """
-    Stub implementation - passes through text unchanged.
-
-    Args:
-        ctx: Pipeline context.
-
-    Returns:
-        P30Output with unmodified text.
-    """
-    text = ""
-    if hasattr(ctx, 'p29_expression') and ctx.p29_expression:
-        text = ctx.p29_expression.final_text
-    elif hasattr(ctx, 'p28_dha') and ctx.p28_dha:
-        text = ctx.p28_dha.guarded_text
-    elif hasattr(ctx, 'dha') and ctx.dha:
-        text = getattr(ctx.dha, 'guarded_text', "")
-
-    return P30Output(
-        verified_text=text,
-        verification_passed=True,
-        checks_performed=["stub_passthrough"],
+Usage:
+    from symbolu.mechanical.pipeline.p30_verification import (
+        maybe_run_p30,
+        get_p30_output,
+        get_p30_verified_text,
+        is_p30_passed,
     )
 
+    # In orchestrator (after P29)
+    p30_result = maybe_run_p30(ctx)
+    if p30_result:
+        ctx.p30_verification = p30_result
+"""
 
-def get_p30_output(ctx: Any) -> Optional[P30Output]:
-    """Get P30 output from context if available."""
-    if hasattr(ctx, 'p30_verification'):
-        return ctx.p30_verification
-    return None
+from .p30_verification_schema import (
+    VERSION,
+    P30Authority,
+    VerificationStatus,
+    ViolationSeverity,
+    P30Violation,
+    P30ComplianceResult,
+    P30CoherenceResult,
+    P30Output,
+)
 
+from .p30_integration import (
+    get_compliance_checker,
+    get_p12_validator,
+    get_coherence_engine,
+    run_compliance_check,
+    run_coherence_check,
+    run_p30_verification,
+    maybe_run_p30,
+    get_p30_output,
+    get_p30_verified_text,
+    is_p30_passed,
+    HAS_COMPLIANCE_CHECKER,
+    HAS_P12_VALIDATOR,
+    HAS_COHERENCE_ENGINE,
+)
 
-__all__ = ["VERSION", "PHASE_STATUS", "P30Output", "maybe_run_p30", "get_p30_output"]
+PHASE_STATUS = "implemented"
+
+__version__ = VERSION
+__all__ = [
+    # Schema
+    "VERSION",
+    "P30Authority",
+    "VerificationStatus",
+    "ViolationSeverity",
+    "P30Violation",
+    "P30ComplianceResult",
+    "P30CoherenceResult",
+    "P30Output",
+    # Integration
+    "get_compliance_checker",
+    "get_p12_validator",
+    "get_coherence_engine",
+    "run_compliance_check",
+    "run_coherence_check",
+    "run_p30_verification",
+    "maybe_run_p30",
+    "get_p30_output",
+    "get_p30_verified_text",
+    "is_p30_passed",
+    # Feature flags
+    "HAS_COMPLIANCE_CHECKER",
+    "HAS_P12_VALIDATOR",
+    "HAS_COHERENCE_ENGINE",
+    "PHASE_STATUS",
+]

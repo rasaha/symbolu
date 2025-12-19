@@ -480,47 +480,113 @@ class TestP27P28Flow:
 # =============================================================================
 
 
-class TestP29P31Stubs:
-    """Tests for P29-P31 stub phases."""
+class TestP29P31Integration:
+    """Tests for P29-P31 integrated phases."""
 
-    def test_p29_stub_passthrough(self):
-        """Test P29 stub passes through text."""
+    def test_p29_expression_with_p28_input(self):
+        """Test P29 expression finalization with P28 input."""
         from symbolu.mechanical.pipeline.p29_expression import maybe_run_p29
+        from symbolu.mechanical.pipeline.p28_dha import (
+            P28Output, P28ToneProfile, DeliveryProfileType,
+            ReadinessLevel, ResistanceLevel, P28SafetyResult, SafetyStatus
+        )
 
         ctx = MockPipelineContext()
-        ctx.p28_dha = type('P28', (), {'guarded_text': 'Test message'})()
+        ctx.p28_dha = P28Output(
+            adapted_text='Test message for polish',
+            guarded_text='Test message for polish',
+            tone_profile=P28ToneProfile(profile_type=DeliveryProfileType.BALANCED),
+            readiness_level=ReadinessLevel.MEDIUM,
+            resistance_level=ResistanceLevel.LOW,
+            safety_result=P28SafetyResult(status=SafetyStatus.PASSED),
+        )
 
         output = maybe_run_p29(ctx)
 
         assert output is not None
-        assert output.final_text == 'Test message'
-        assert output.polish_applied is False
+        assert 'Test message' in output.final_text
 
-    def test_p30_stub_passthrough(self):
-        """Test P30 stub passes through text."""
-        from symbolu.mechanical.pipeline.p30_verification import maybe_run_p30
+    def test_p30_verification_basic(self):
+        """Test P30 verification with basic input."""
+        from symbolu.mechanical.pipeline.p30_verification import (
+            maybe_run_p30, VerificationStatus
+        )
+        from symbolu.mechanical.pipeline.p29_expression import P29Output, PolishMode
 
         ctx = MockPipelineContext()
-        ctx.p28_dha = type('P28', (), {'guarded_text': 'Test message'})()
+        ctx.p29_expression = P29Output(
+            final_text='Verified test message',
+            polish_applied=True,
+            polish_mode=PolishMode.PASSTHROUGH,
+        )
 
         output = maybe_run_p30(ctx)
 
         assert output is not None
-        assert output.verified_text == 'Test message'
-        assert output.verification_passed is True
+        assert output.verified_text == 'Verified test message'
+        assert output.verification_status in (
+            VerificationStatus.PASSED,
+            VerificationStatus.PASSED_WITH_WARNINGS,
+        )
 
-    def test_p31_stub_passthrough(self):
-        """Test P31 stub passes through text."""
-        from symbolu.mechanical.pipeline.p31_envelope import maybe_run_p31
+    def test_p31_envelope_basic(self):
+        """Test P31 envelope with basic input."""
+        from symbolu.mechanical.pipeline.p31_envelope import (
+            maybe_run_p31, EnvelopeFormat
+        )
+        from symbolu.mechanical.pipeline.p30_verification import (
+            P30Output, VerificationStatus
+        )
 
         ctx = MockPipelineContext()
-        ctx.p28_dha = type('P28', (), {'guarded_text': 'Test message'})()
+        ctx.p30_verification = P30Output(
+            verified_text='Enveloped test message',
+            verification_status=VerificationStatus.PASSED,
+        )
 
         output = maybe_run_p31(ctx)
 
         assert output is not None
-        assert output.envelope_text == 'Test message'
-        assert output.envelope_format == "plain"
+        assert output.envelope_text == 'Enveloped test message'
+        assert output.envelope_format == EnvelopeFormat.PLAIN
+
+    def test_p29_p30_p31_chain(self):
+        """Test full P29 → P30 → P31 chain."""
+        from symbolu.mechanical.pipeline.p29_expression import maybe_run_p29
+        from symbolu.mechanical.pipeline.p30_verification import maybe_run_p30
+        from symbolu.mechanical.pipeline.p31_envelope import maybe_run_p31
+        from symbolu.mechanical.pipeline.p28_dha import (
+            P28Output, P28ToneProfile, DeliveryProfileType,
+            ReadinessLevel, ResistanceLevel, P28SafetyResult, SafetyStatus
+        )
+
+        ctx = MockPipelineContext()
+        ctx.p28_dha = P28Output(
+            adapted_text='Chain test message',
+            guarded_text='Chain test message',
+            tone_profile=P28ToneProfile(profile_type=DeliveryProfileType.SWEET_RESONANCE),
+            readiness_level=ReadinessLevel.HIGH,
+            resistance_level=ResistanceLevel.NONE,
+            safety_result=P28SafetyResult(status=SafetyStatus.PASSED),
+        )
+
+        # Run P29
+        p29_output = maybe_run_p29(ctx)
+        ctx.p29_expression = p29_output
+
+        # Run P30
+        p30_output = maybe_run_p30(ctx)
+        ctx.p30_verification = p30_output
+
+        # Run P31
+        p31_output = maybe_run_p31(ctx)
+        ctx.p31_envelope = p31_output
+
+        # Verify chain
+        assert p29_output is not None
+        assert p30_output is not None
+        assert p31_output is not None
+        assert 'Chain test' in p31_output.envelope_text
 
 
 # =============================================================================
@@ -537,7 +603,7 @@ def run_tests():
         TestP28Schema,
         TestP28Integration,
         TestP27P28Flow,
-        TestP29P31Stubs,
+        TestP29P31Integration,
     ]
 
     passed = 0

@@ -1,71 +1,87 @@
 """
-P29 Expression Finalization Phase (STUB)
-=========================================
+P29 Expression Finalization Phase
+===================================
 
-Placeholder for future P29 Expression Finalization phase within the
-Delivery Adaptation Band (P27-P31).
+Final linguistic polish and expression optimization after DHA.
+Integrates existing modules:
+
+- VarnaHybridRenderer: Phoneme-based rhythm optimization
+- StyleModifiers: Tone-based style application
+- Resonance analysis: Bridge meanings and harmony
 
 Phase Authority: LOW
 Band Position: P29 (Third in Delivery Adaptation Band)
 
 Purpose:
-    Final linguistic polish and expression optimization after DHA.
-    Handles micro-level text adjustments like:
-    - Sentence rhythm optimization
-    - Word choice refinement
-    - Punctuation styling
+    - Sentence rhythm optimization via Varṇa phoneme analysis
+    - Word choice refinement using bridge meanings
+    - Style modifications based on persona/delivery profile
 
-Status: STUB - Not yet implemented
-Version: 0.1.0
+Usage:
+    from symbolu.mechanical.pipeline.p29_expression import (
+        maybe_run_p29,
+        get_p29_output,
+        get_p29_final_text,
+    )
+
+    # In orchestrator (after P28)
+    p29_result = maybe_run_p29(ctx)
+    if p29_result:
+        ctx.p29_expression = p29_result
 """
 
-from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from .p29_expression_schema import (
+    VERSION,
+    P29Authority,
+    PolishMode,
+    RhythmQuality,
+    P29InputSignals,
+    P29PhonemeAnalysis,
+    P29StyleModifications,
+    P29Output,
+)
 
-VERSION = "0.1.0"
-PHASE_STATUS = "stub"
+from .p29_integration import (
+    get_varna_renderer,
+    get_style_modifiers,
+    extract_p29_signals,
+    run_phoneme_analysis,
+    apply_style_modifications,
+    run_p29_finalization,
+    maybe_run_p29,
+    get_p29_output,
+    get_p29_final_text,
+    HAS_VARNA,
+    HAS_STYLE,
+    HAS_RESONANCE,
+)
 
+PHASE_STATUS = "implemented"
 
-@dataclass
-class P29Output:
-    """Stub output for P29 phase."""
-    final_text: str
-    polish_applied: bool = False
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "phase": "P29",
-            "version": VERSION,
-            "status": PHASE_STATUS,
-            "final_text": self.final_text,
-            "polish_applied": self.polish_applied,
-        }
-
-
-def maybe_run_p29(ctx: Any) -> Optional[P29Output]:
-    """
-    Stub implementation - passes through text unchanged.
-
-    Args:
-        ctx: Pipeline context.
-
-    Returns:
-        P29Output with unmodified text.
-    """
-    text = ""
-    if hasattr(ctx, 'p28_dha') and ctx.p28_dha:
-        text = ctx.p28_dha.guarded_text
-    elif hasattr(ctx, 'dha') and ctx.dha:
-        text = getattr(ctx.dha, 'guarded_text', "")
-
-    return P29Output(final_text=text, polish_applied=False)
-
-
-def get_p29_output(ctx: Any) -> Optional[P29Output]:
-    """Get P29 output from context if available."""
-    if hasattr(ctx, 'p29_expression'):
-        return ctx.p29_expression
-    return None
-
-
-__all__ = ["VERSION", "PHASE_STATUS", "P29Output", "maybe_run_p29", "get_p29_output"]
+__version__ = VERSION
+__all__ = [
+    # Schema
+    "VERSION",
+    "P29Authority",
+    "PolishMode",
+    "RhythmQuality",
+    "P29InputSignals",
+    "P29PhonemeAnalysis",
+    "P29StyleModifications",
+    "P29Output",
+    # Integration
+    "get_varna_renderer",
+    "get_style_modifiers",
+    "extract_p29_signals",
+    "run_phoneme_analysis",
+    "apply_style_modifications",
+    "run_p29_finalization",
+    "maybe_run_p29",
+    "get_p29_output",
+    "get_p29_final_text",
+    # Feature flags
+    "HAS_VARNA",
+    "HAS_STYLE",
+    "HAS_RESONANCE",
+    "PHASE_STATUS",
+]

@@ -102,6 +102,15 @@ from .p27_persona import maybe_run_p27, P27Output
 # P28 DHA Phase (Delivery Adaptation Band)
 from .p28_dha import maybe_run_p28, P28Output
 
+# P29 Expression Finalization Phase (Delivery Adaptation Band)
+from .p29_expression import maybe_run_p29, P29Output
+
+# P30 Output Verification Phase (Delivery Adaptation Band)
+from .p30_verification import maybe_run_p30, P30Output
+
+# P31 Output Envelope Phase (Delivery Adaptation Band)
+from .p31_envelope import maybe_run_p31, P31Output
+
 # Coherence Observer (Observability Layer)
 from .coherence_observer import CoherenceObserver
 
@@ -908,6 +917,41 @@ class SymbolUPipeline:
                 mode=render_mode_str,
                 meta=output_meta,
             )
+
+        # =======================================================================
+        # P29-P31 DELIVERY ADAPTATION BAND (Expression → Verification → Envelope)
+        # =======================================================================
+
+        # P29 Expression Finalization
+        try:
+            p29_output = maybe_run_p29(ctx)
+            if p29_output:
+                ctx.p29_expression = p29_output
+        except Exception:
+            pass
+
+        # P30 Output Verification
+        try:
+            p30_output = maybe_run_p30(ctx)
+            if p30_output:
+                ctx.p30_verification = p30_output
+        except Exception:
+            pass
+
+        # P31 Output Envelope
+        try:
+            p31_output = maybe_run_p31(ctx)
+            if p31_output:
+                ctx.p31_envelope = p31_output
+                # Update rendered output with final envelope text
+                if p31_output.envelope_text:
+                    ctx.rendered = RenderedOutput(
+                        raw_text=p31_output.envelope_text,
+                        mode=ctx.rendered.mode if ctx.rendered else "standard",
+                        meta=ctx.rendered.meta if ctx.rendered else {},
+                    )
+        except Exception:
+            pass
 
         return ctx
 
