@@ -90,6 +90,41 @@ from .lcm_integration import maybe_run_lcm
 # LAM Integration (Long-Arc Mapper)
 from .lam_integration import maybe_run_lam
 
+# Mapper-Fusion Adapter (HRM/LAM/LCM → Fusion Candidates)
+from .mapper_fusion_adapter import create_candidates_from_mappers, get_mapper_summary
+
+# RAG-Hybrid Integration (RAG + Semantic Routing + Phoneme Optimization)
+try:
+    from .rag_hybrid_integration import (
+        HybridRAGEngine,
+        get_hybrid_rag_engine,
+        get_fusion_candidates,
+        RetrievalMode,
+        HAS_RAG,
+    )
+    RAG_AVAILABLE = HAS_RAG
+except ImportError:
+    RAG_AVAILABLE = False
+    get_fusion_candidates = None
+
+# Integrated Renderer (FusionRenderer + VarnaHybridRenderer)
+from .renderer_integration import run_integrated_renderer, IntegratedRenderedOutput
+
+# P27 Persona Selection Phase (Delivery Adaptation Band)
+from .p27_persona import maybe_run_p27, P27Output
+
+# P28 DHA Phase (Delivery Adaptation Band)
+from .p28_dha import maybe_run_p28, P28Output
+
+# P29 Expression Finalization Phase (Delivery Adaptation Band)
+from .p29_expression import maybe_run_p29, P29Output
+
+# P30 Output Verification Phase (Delivery Adaptation Band)
+from .p30_verification import maybe_run_p30, P30Output
+
+# P31 Output Envelope Phase (Delivery Adaptation Band)
+from .p31_envelope import maybe_run_p31, P31Output
+
 # Coherence Observer (Observability Layer)
 from .coherence_observer import CoherenceObserver
 
@@ -664,6 +699,23 @@ class SymbolUPipeline:
             persona_config=persona_config,
         )
 
+        # =======================================================================
+        # P27 Persona Selection Phase (Delivery Adaptation Band)
+        # Runs alongside existing persona logic to provide formal phase tracing
+        # =======================================================================
+        try:
+            p27_output = maybe_run_p27(ctx)
+            if p27_output:
+                ctx.p27_persona = p27_output
+                # Optionally update persona_id if P27 suggests different selection
+                if p27_output.persona_id != persona_id:
+                    # P27 provides additional signal but doesn't override existing logic
+                    ctx.persona.persona_config["p27_suggestion"] = p27_output.persona_id
+                    ctx.persona.persona_config["p27_confidence"] = p27_output.selection_confidence
+        except Exception:
+            # P27 phase is optional - continue if it fails
+            pass
+
         return ctx
 
     def _run_fusion(self, ctx: PipelineContext) -> PipelineContext:
@@ -799,14 +851,34 @@ class SymbolUPipeline:
             },
         )
 
+        # =======================================================================
+        # P28 DHA Phase (Delivery Adaptation Band)
+        # Runs alongside existing DHA logic to provide formal phase tracing
+        # =======================================================================
+        try:
+            # Get P27 output if available for persona context
+            p27_output = getattr(ctx, 'p27_persona', None)
+            p28_output = maybe_run_p28(ctx, p27_output=p27_output)
+            if p28_output:
+                ctx.p28_dha = p28_output
+                # Enrich DHA decision with P28 phase data
+                ctx.dha.adaptation_notes["p28_profile"] = p28_output.tone_profile.profile_type.value
+                ctx.dha.adaptation_notes["p28_readiness"] = p28_output.readiness_level.value
+                ctx.dha.adaptation_notes["p28_resistance"] = p28_output.resistance_level.value
+                ctx.dha.adaptation_notes["p28_safety_status"] = p28_output.safety_result.status.value
+        except Exception:
+            # P28 phase is optional - continue if it fails
+            pass
+
         return ctx
 
     def _run_renderer(self, ctx: PipelineContext) -> PipelineContext:
         """
         Run final rendering stage.
 
-        Combines DHA output with persona styling for final presentation.
-        Uses FusionRenderer for structured output when available.
+        v3.1: Uses integrated renderer that combines:
+        - FusionRenderer for structured layers (Symbolic/Practical/Mirror-Truth)
+        - VarnaHybridRenderer for phoneme analysis and optimization
 
         Args:
             ctx: Pipeline context with DHA result.
@@ -814,38 +886,86 @@ class SymbolUPipeline:
         Returns:
             Updated context with ctx.rendered populated.
         """
-        # Determine render mode from request
-        render_mode_str = ctx.request.render_mode or "standard"
-        render_mode_map = {
-            "minimal": RenderMode.MINIMAL,
-            "standard": RenderMode.STANDARD,
-            "enhanced": RenderMode.SYMBOLIC,
-            "regulated": RenderMode.REGULATED,
-        }
-        render_mode = render_mode_map.get(render_mode_str, RenderMode.STANDARD)
+        try:
+            # Use integrated renderer (FusionRenderer + VarnaHybridRenderer)
+            integrated_output = run_integrated_renderer(ctx)
 
-        # Get final text from DHA
-        final_text = ctx.dha.guarded_text if ctx.dha else ""
+            # Store the full integrated output
+            ctx.integrated_rendered = integrated_output
 
-        # Build output metadata
-        output_meta = {
-            "persona_id": ctx.persona.active_persona_id if ctx.persona else None,
-            "tone_profile": ctx.dha.tone_profile if ctx.dha else None,
-            "readiness_level": ctx.dha.readiness_level if ctx.dha else None,
-            "router_mode": ctx.router_mode,
-            "pipeline_version": "3.0",
-        }
+            # Create compatible RenderedOutput for backward compatibility
+            ctx.rendered = RenderedOutput(
+                raw_text=integrated_output.raw_text,
+                mode=integrated_output.mode,
+                meta=integrated_output.meta,
+            )
 
-        # Add MLCR trace if available
-        if ctx.mlcr:
-            output_meta["mlcr_tier"] = ctx.mlcr.explain_log.get("meta", {}).get("tier")
-            output_meta["mlcr_intent"] = ctx.mlcr.explain_log.get("meta", {}).get("intent")
+            # Store structured layers in context for downstream access
+            ctx.symbolic_layer = integrated_output.symbolic_layer
+            ctx.practical_layer = integrated_output.practical_layer
+            ctx.mirror_truth_layer = integrated_output.mirror_truth_layer
+            ctx.varna_analysis = integrated_output.varna_analysis
+            ctx.phoneme_routing = integrated_output.phoneme_routing
 
-        ctx.rendered = RenderedOutput(
-            raw_text=final_text,
-            mode=render_mode_str,
-            meta=output_meta,
-        )
+        except Exception as e:
+            # Fallback to basic rendering if integrated renderer fails
+            render_mode_str = ctx.request.render_mode or "standard"
+            final_text = ctx.dha.guarded_text if ctx.dha else ""
+
+            output_meta = {
+                "persona_id": ctx.persona.active_persona_id if ctx.persona else None,
+                "tone_profile": ctx.dha.tone_profile if ctx.dha else None,
+                "readiness_level": ctx.dha.readiness_level if ctx.dha else None,
+                "router_mode": ctx.router_mode,
+                "pipeline_version": "3.1",
+                "renderer_fallback": True,
+                "renderer_error": str(e),
+            }
+
+            if ctx.mlcr:
+                output_meta["mlcr_tier"] = ctx.mlcr.explain_log.get("meta", {}).get("tier")
+                output_meta["mlcr_intent"] = ctx.mlcr.explain_log.get("meta", {}).get("intent")
+
+            ctx.rendered = RenderedOutput(
+                raw_text=final_text,
+                mode=render_mode_str,
+                meta=output_meta,
+            )
+
+        # =======================================================================
+        # P29-P31 DELIVERY ADAPTATION BAND (Expression → Verification → Envelope)
+        # =======================================================================
+
+        # P29 Expression Finalization
+        try:
+            p29_output = maybe_run_p29(ctx)
+            if p29_output:
+                ctx.p29_expression = p29_output
+        except Exception:
+            pass
+
+        # P30 Output Verification
+        try:
+            p30_output = maybe_run_p30(ctx)
+            if p30_output:
+                ctx.p30_verification = p30_output
+        except Exception:
+            pass
+
+        # P31 Output Envelope
+        try:
+            p31_output = maybe_run_p31(ctx)
+            if p31_output:
+                ctx.p31_envelope = p31_output
+                # Update rendered output with final envelope text
+                if p31_output.envelope_text:
+                    ctx.rendered = RenderedOutput(
+                        raw_text=p31_output.envelope_text,
+                        mode=ctx.rendered.mode if ctx.rendered else "standard",
+                        meta=ctx.rendered.meta if ctx.rendered else {},
+                    )
+        except Exception:
+            pass
 
         return ctx
 
@@ -862,8 +982,15 @@ class SymbolUPipeline:
         """
         Generate candidates for fusion.
 
-        v3.0: Creates synthetic candidates from MLCR output.
-        Future: Will integrate RAG-retrieved candidates.
+        v3.2: Integrates RAG retrieval with mapper outputs (HRM/LAM/LCM) to create
+        candidates with properly derived channel scores based on actual analysis.
+        Falls back to synthetic candidates when mappers weren't run.
+
+        RAG Integration (v3.2):
+            - Retrieves relevant context from indexed corpora
+            - Applies hybrid optimization (semantic routing, phoneme pre-filter)
+            - Converts RAG results to Fusion candidates with channel scores
+            - Blends RAG candidates with mapper candidates
 
         Args:
             ctx: Pipeline context.
@@ -873,49 +1000,88 @@ class SymbolUPipeline:
         Returns:
             List of Candidate objects for fusion.
         """
-        candidates = []
-
-        # Create a primary candidate from the query itself
-        # This ensures fusion always has something to work with
         query_text = ctx.request.text
+        domain = explain_log.get("meta", {}).get("domain", "general")
 
-        # HRM candidate (symbolic/reasoning)
-        hrm_candidate = Candidate(
-            id=f"hrm_{uuid.uuid4().hex[:8]}",
-            text=f"From a deeper perspective: {query_text}",
-            source=CandidateSource.HRM,
-            channel_scores={"hrm": 0.8, "lcm": 0.4, "moe": 0.3},
-            domain=explain_log.get("meta", {}).get("domain", "general"),
-            relevance_score=0.7,
-            confidence=0.8,
-        )
-        candidates.append(hrm_candidate)
+        # Get mapper outputs from context (populated in stages 1.5-1.7)
+        hrm_map = getattr(ctx, 'hrm_map', None)
+        lam_map = getattr(ctx, 'lam_map', None)
+        lcm_map = getattr(ctx, 'lcm_map', None)
 
-        # LCM candidate (linguistic clarity)
-        lcm_candidate = Candidate(
-            id=f"lcm_{uuid.uuid4().hex[:8]}",
-            text=f"To clarify: {query_text}",
-            source=CandidateSource.LCM,
-            channel_scores={"hrm": 0.3, "lcm": 0.9, "moe": 0.4},
-            domain=explain_log.get("meta", {}).get("domain", "general"),
-            relevance_score=0.75,
-            confidence=0.85,
+        # Use mapper-fusion adapter to create candidates from actual mapper outputs
+        # This bridges the gap between mapper analysis and fusion engine
+        candidates = create_candidates_from_mappers(
+            text=query_text,
+            domain=domain,
+            hrm_map=hrm_map,
+            lam_map=lam_map,
+            lcm_map=lcm_map,
         )
-        candidates.append(lcm_candidate)
 
-        # MoE candidate (domain expertise)
-        moe_candidate = Candidate(
-            id=f"moe_{uuid.uuid4().hex[:8]}",
-            text=f"Based on domain knowledge: {query_text}",
-            source=CandidateSource.MOE,
-            channel_scores={"hrm": 0.4, "lcm": 0.5, "moe": 0.85},
-            domain=explain_log.get("meta", {}).get("domain", "general"),
-            relevance_score=0.7,
-            confidence=0.75,
-        )
-        candidates.append(moe_candidate)
+        # v3.2: Integrate RAG candidates if available
+        # This adds retrieved context from indexed corpora
+        rag_candidates = self._get_rag_candidates(ctx, query_text, domain)
+        if rag_candidates:
+            candidates.extend(rag_candidates)
+            # Store RAG stats in context for observability
+            ctx.rag_stats = {
+                "enabled": True,
+                "candidate_count": len(rag_candidates),
+            }
+        else:
+            ctx.rag_stats = {"enabled": False, "candidate_count": 0}
+
+        # Store mapper summary in context for observability
+        ctx.mapper_summary = get_mapper_summary(hrm_map, lam_map, lcm_map)
 
         return candidates
+
+    def _get_rag_candidates(
+        self,
+        ctx: PipelineContext,
+        query_text: str,
+        domain: str,
+    ) -> List[Candidate]:
+        """
+        Get candidates from RAG retrieval with hybrid optimization.
+
+        Uses the hybrid RAG engine which applies:
+        - Semantic routing for corpus selection
+        - Phoneme pre-filtering for candidate reduction
+        - Channel score computation for fusion
+
+        Args:
+            ctx: Pipeline context.
+            query_text: Query text.
+            domain: Domain classification.
+
+        Returns:
+            List of Candidate objects from RAG, or empty list.
+        """
+        if not RAG_AVAILABLE or get_fusion_candidates is None:
+            return []
+
+        # Check if RAG is enabled in request metadata
+        request_metadata = getattr(ctx.request, 'metadata', {}) or {}
+        rag_enabled = request_metadata.get('use_rag', True)  # Default enabled
+        corpus_ids = request_metadata.get('corpus_ids', None)
+
+        if not rag_enabled:
+            return []
+
+        try:
+            # Use hybrid RAG integration
+            rag_candidates = get_fusion_candidates(
+                query=query_text,
+                corpus_ids=corpus_ids,
+                domain=domain,
+                top_k=5,  # Limit RAG candidates to blend with mapper candidates
+            )
+            return list(rag_candidates)
+        except Exception as e:
+            # Graceful degradation - log but don't fail pipeline
+            ctx.rag_stats = {"enabled": True, "error": str(e)}
+            return []
 
     def _create_fallback_fusion(self, ctx: PipelineContext) -> Any:
         """
