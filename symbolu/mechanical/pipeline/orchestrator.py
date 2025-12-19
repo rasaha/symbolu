@@ -93,6 +93,20 @@ from .lam_integration import maybe_run_lam
 # Mapper-Fusion Adapter (HRM/LAM/LCM → Fusion Candidates)
 from .mapper_fusion_adapter import create_candidates_from_mappers, get_mapper_summary
 
+# RAG-Hybrid Integration (RAG + Semantic Routing + Phoneme Optimization)
+try:
+    from .rag_hybrid_integration import (
+        HybridRAGEngine,
+        get_hybrid_rag_engine,
+        get_fusion_candidates,
+        RetrievalMode,
+        HAS_RAG,
+    )
+    RAG_AVAILABLE = HAS_RAG
+except ImportError:
+    RAG_AVAILABLE = False
+    get_fusion_candidates = None
+
 # Integrated Renderer (FusionRenderer + VarnaHybridRenderer)
 from .renderer_integration import run_integrated_renderer, IntegratedRenderedOutput
 
@@ -968,9 +982,15 @@ class SymbolUPipeline:
         """
         Generate candidates for fusion.
 
-        v3.1: Uses mapper outputs (HRM/LAM/LCM) to create candidates with
-        properly derived channel scores based on actual mapper analysis.
+        v3.2: Integrates RAG retrieval with mapper outputs (HRM/LAM/LCM) to create
+        candidates with properly derived channel scores based on actual analysis.
         Falls back to synthetic candidates when mappers weren't run.
+
+        RAG Integration (v3.2):
+            - Retrieves relevant context from indexed corpora
+            - Applies hybrid optimization (semantic routing, phoneme pre-filter)
+            - Converts RAG results to Fusion candidates with channel scores
+            - Blends RAG candidates with mapper candidates
 
         Args:
             ctx: Pipeline context.
@@ -998,10 +1018,70 @@ class SymbolUPipeline:
             lcm_map=lcm_map,
         )
 
+        # v3.2: Integrate RAG candidates if available
+        # This adds retrieved context from indexed corpora
+        rag_candidates = self._get_rag_candidates(ctx, query_text, domain)
+        if rag_candidates:
+            candidates.extend(rag_candidates)
+            # Store RAG stats in context for observability
+            ctx.rag_stats = {
+                "enabled": True,
+                "candidate_count": len(rag_candidates),
+            }
+        else:
+            ctx.rag_stats = {"enabled": False, "candidate_count": 0}
+
         # Store mapper summary in context for observability
         ctx.mapper_summary = get_mapper_summary(hrm_map, lam_map, lcm_map)
 
         return candidates
+
+    def _get_rag_candidates(
+        self,
+        ctx: PipelineContext,
+        query_text: str,
+        domain: str,
+    ) -> List[Candidate]:
+        """
+        Get candidates from RAG retrieval with hybrid optimization.
+
+        Uses the hybrid RAG engine which applies:
+        - Semantic routing for corpus selection
+        - Phoneme pre-filtering for candidate reduction
+        - Channel score computation for fusion
+
+        Args:
+            ctx: Pipeline context.
+            query_text: Query text.
+            domain: Domain classification.
+
+        Returns:
+            List of Candidate objects from RAG, or empty list.
+        """
+        if not RAG_AVAILABLE or get_fusion_candidates is None:
+            return []
+
+        # Check if RAG is enabled in request metadata
+        request_metadata = getattr(ctx.request, 'metadata', {}) or {}
+        rag_enabled = request_metadata.get('use_rag', True)  # Default enabled
+        corpus_ids = request_metadata.get('corpus_ids', None)
+
+        if not rag_enabled:
+            return []
+
+        try:
+            # Use hybrid RAG integration
+            rag_candidates = get_fusion_candidates(
+                query=query_text,
+                corpus_ids=corpus_ids,
+                domain=domain,
+                top_k=5,  # Limit RAG candidates to blend with mapper candidates
+            )
+            return list(rag_candidates)
+        except Exception as e:
+            # Graceful degradation - log but don't fail pipeline
+            ctx.rag_stats = {"enabled": True, "error": str(e)}
+            return []
 
     def _create_fallback_fusion(self, ctx: PipelineContext) -> Any:
         """
