@@ -63,6 +63,21 @@ from symbolu.resonance.analyzer import (
     phrase_harmony_report,
     get_phonemes,
     extract_content_words,
+    # Varṇa-based analyzer functions
+    analyze_word_varna,
+    analyze_phrase_varna,
+    compare_arpabet_vs_varna,
+)
+
+from symbolu.resonance.varna_bridge import (
+    varna_to_10d_vector,
+    varna_word_to_vector,
+    english_phoneme_to_varna,
+    phonemes_to_varnas,
+    get_varna_affinities,
+    get_bridge_meaning,
+    list_varnas,
+    ENGLISH_TO_VARNA,
 )
 
 __all__ = [
@@ -100,4 +115,17 @@ __all__ = [
     "phrase_harmony_report",
     "get_phonemes",
     "extract_content_words",
+    # Varṇa-based analyzer functions
+    "analyze_word_varna",
+    "analyze_phrase_varna",
+    "compare_arpabet_vs_varna",
+    # Varṇa bridge functions
+    "varna_to_10d_vector",
+    "varna_word_to_vector",
+    "english_phoneme_to_varna",
+    "phonemes_to_varnas",
+    "get_varna_affinities",
+    "get_bridge_meaning",
+    "list_varnas",
+    "ENGLISH_TO_VARNA",
 ]
