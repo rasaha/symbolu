@@ -2,12 +2,12 @@ name: TTOR CI/CD Pipeline
 
 on:
   push:
-    branches: ["main", "master"]
+    branches: ["main", "master", "dev", "claude/**"]
     paths:
       - "symbolu/mechanical/pipeline/ttor/**"
       - ".github/workflows/ttor-ci.yml"
   pull_request:
-    branches: ["main", "master"]
+    branches: ["main", "master", "dev", "claude/**"]
     paths:
       - "symbolu/mechanical/pipeline/ttor/**"
       - ".github/workflows/ttor-ci.yml"
