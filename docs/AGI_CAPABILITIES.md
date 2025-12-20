@@ -6,6 +6,8 @@ Symbol-U implements a **10-dimensional ontological backbone** structured as **5 
 
 **The key innovation:** The phoneme model provides an orthogonal consistency check—correlating articulation patterns with encoded event structure. Only structurally consistent patterns survive to storage. The system is self-consistent, self-filtering, and self-auditing.
 
+**The AGI Vision:** This architecture represents a deliberate step toward Artificial General Intelligence. While individual claims are conservatively framed (probabilistic validation, consistency checking rather than truth claims), the **end goal is AGI**. The combination of universal representation, cross-domain transfer, and self-filtering validation addresses core AGI requirements that current approaches cannot solve.
+
 ---
 
 ## The Generalization Gap: Why Current AI Falls Short
@@ -818,7 +820,7 @@ for insight in insights:
 
 ## Conclusion
 
-Symbol-U's architecture represents a **structural approach to generalizable reasoning** built on key insights:
+Symbol-U's architecture represents a **structural approach to generalizable reasoning**—and a deliberate step toward AGI. Built on key insights:
 
 1. **Mirror Pairs**: 10D reduces to 5 balanced pairs—balance determines insight quality
 2. **Event Tagging**: Tag what happened, not what it's called—solves clustering
@@ -905,11 +907,26 @@ Content → Events → 10D → Balance → Orthogonal Validation → Consistent?
 Neither layer claims absolute truth. Together they provide orthogonal consistency validation.
 The design principle is embedded in the architecture: **show, don't tell.**
 
+### The Path to AGI
+
+This is not a final destination—it is infrastructure for the journey. The architecture provides:
+
+| AGI Requirement | Symbol-U Solution | Status |
+|-----------------|-------------------|--------|
+| Universal knowledge representation | 10D mirror pairs | ✓ Implemented |
+| Cross-domain reasoning | Balance-based transfer | ✓ Implemented |
+| Self-improvement capability | Feedback refines weights | ○ Architected |
+| Validation without external oracle | Orthogonal consistency | ✓ Implemented |
+| Explainable reasoning | Transparent layer reports | ✓ Implemented |
+| Novel insight generation | Combine balanced experientials | ○ Architected |
+
+**The claims are conservative. The ambition is not.**
+
 ---
 
-*Document Version: 3.7*
-*Symbol-U Generalizable Cognitive Architecture*
+*Document Version: 3.8*
+*Symbol-U Generalizable Cognitive Architecture — A Step Toward AGI*
 *Event Learning + Orthogonal Consistency Validation + Learning Hierarchy + Admin Config*
 *Learning Layer: Causal Chains + 10D Structure + Consistency Gates + Admin-Controlled Pairs*
 *Presentation Layer: User-Controlled Modes + Structural Validation (No Advertising)*
-*Framing: Conservative claims, probabilistic validation, transparent consistency checking*
+*Framing: Conservative mechanism claims, ambitious AGI vision*
