@@ -95,6 +95,10 @@ from .phoneme_validator import (
     validate_experiential_before_store,
     validate_batch,
     filter_universal,
+    # Word-pair entropy validation
+    WordPairHarmony,
+    validate_word_pair,
+    validate_phrase_harmony,
 )
 
 __all__ = [
@@ -155,4 +159,8 @@ __all__ = [
     "validate_experiential_before_store",
     "validate_batch",
     "filter_universal",
+    # Word-Pair Entropy Validation
+    "WordPairHarmony",
+    "validate_word_pair",
+    "validate_phrase_harmony",
 ]

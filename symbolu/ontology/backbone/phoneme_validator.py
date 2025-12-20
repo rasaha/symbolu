@@ -421,6 +421,159 @@ def filter_universal(
 
 
 # =============================================================================
+# Word-Pair Entropy Validation
+# =============================================================================
+
+@dataclass(frozen=True)
+class WordPairHarmony:
+    """
+    Harmony analysis between two words based on phoneme vectors.
+
+    High harmony = words naturally go together (sky + blue)
+    High entropy = words clash experientially (sky + red)
+    """
+    word1: str
+    word2: str
+    vector1: Optional[Tuple[float, ...]]
+    vector2: Optional[Tuple[float, ...]]
+    harmony_score: float          # 0.0 to 1.0 (higher = more natural pairing)
+    entropy_flag: bool            # True if high entropy (unnatural pairing)
+    dominant_layer1: str
+    dominant_layer2: str
+    shared_layers: List[str]      # Layers where both words are strong
+    conflicting_layers: List[str] # Layers where one is strong, other is weak
+
+
+def validate_word_pair(
+    word1: str,
+    word2: str,
+    harmony_threshold: float = 0.6,
+    conflict_threshold: float = 0.3,
+) -> WordPairHarmony:
+    """
+    Validate if two words naturally go together based on phoneme harmony.
+
+    Args:
+        word1: First word (e.g., "sky")
+        word2: Second word (e.g., "blue" or "red")
+        harmony_threshold: Minimum harmony for natural pairing
+        conflict_threshold: Below this = high entropy
+
+    Returns:
+        WordPairHarmony with entropy_flag = True if unnatural pairing
+
+    Example:
+        >>> validate_word_pair("sky", "blue")
+        WordPairHarmony(harmony_score=0.85, entropy_flag=False, ...)
+
+        >>> validate_word_pair("sky", "red")
+        WordPairHarmony(harmony_score=0.42, entropy_flag=True, ...)
+    """
+    vec1 = _get_phoneme_vector(word1)
+    vec2 = _get_phoneme_vector(word2)
+
+    if vec1 is None or vec2 is None:
+        return WordPairHarmony(
+            word1=word1,
+            word2=word2,
+            vector1=vec1,
+            vector2=vec2,
+            harmony_score=0.0,
+            entropy_flag=True,
+            dominant_layer1="UNKNOWN",
+            dominant_layer2="UNKNOWN",
+            shared_layers=[],
+            conflicting_layers=[],
+        )
+
+    # Get dominant layers
+    dom1 = _get_dominant_layer(vec1)
+    dom2 = _get_dominant_layer(vec2)
+
+    # Find shared and conflicting layers
+    shared = []
+    conflicting = []
+    HIGH_THRESHOLD = 0.35
+    LOW_THRESHOLD = 0.20
+
+    for i in range(min(len(vec1), len(vec2), len(RESONANCE_LAYER_NAMES))):
+        v1, v2 = vec1[i], vec2[i]
+        layer = RESONANCE_LAYER_NAMES[i]
+
+        if v1 >= HIGH_THRESHOLD and v2 >= HIGH_THRESHOLD:
+            shared.append(layer)
+        elif (v1 >= HIGH_THRESHOLD and v2 < LOW_THRESHOLD) or \
+             (v2 >= HIGH_THRESHOLD and v1 < LOW_THRESHOLD):
+            conflicting.append(layer)
+
+    # Compute harmony based on:
+    # 1. Vector similarity (cosine)
+    # 2. Shared layers (bonus)
+    # 3. Conflicting layers (penalty)
+
+    cosine_sim = _cosine_similarity(vec1, vec2)
+
+    # Adjust for semantic compatibility using layer analysis
+    shared_bonus = len(shared) * 0.05
+    conflict_penalty = len(conflicting) * 0.08
+
+    # Key insight: words should share PURPOSE-related layers to be natural pairs
+    # Acting, Forming, Purposing layers matter more for semantic pairing
+    purpose_layers = {"O3_ACTING", "O2_FORMING", "O7_PURPOSING", "O9_UNIFYING"}
+    purpose_shared = len([l for l in shared if l in purpose_layers])
+    purpose_conflict = len([l for l in conflicting if l in purpose_layers])
+
+    purpose_adjustment = (purpose_shared * 0.1) - (purpose_conflict * 0.15)
+
+    harmony_score = cosine_sim + shared_bonus - conflict_penalty + purpose_adjustment
+    harmony_score = max(0.0, min(1.0, harmony_score))
+
+    # Determine entropy flag
+    entropy_flag = harmony_score < harmony_threshold or len(conflicting) > 2
+
+    return WordPairHarmony(
+        word1=word1,
+        word2=word2,
+        vector1=vec1,
+        vector2=vec2,
+        harmony_score=harmony_score,
+        entropy_flag=entropy_flag,
+        dominant_layer1=dom1,
+        dominant_layer2=dom2,
+        shared_layers=shared,
+        conflicting_layers=conflicting,
+    )
+
+
+def validate_phrase_harmony(
+    words: List[str],
+    harmony_threshold: float = 0.6,
+) -> Tuple[float, List[Tuple[str, str, bool]]]:
+    """
+    Validate harmony across all word pairs in a phrase.
+
+    Returns:
+        Tuple of (overall_harmony, list of (word1, word2, is_harmonic))
+    """
+    if len(words) < 2:
+        return 1.0, []
+
+    pairs = []
+    total_harmony = 0.0
+    count = 0
+
+    for i in range(len(words)):
+        for j in range(i + 1, len(words)):
+            result = validate_word_pair(words[i], words[j], harmony_threshold)
+            pairs.append((words[i], words[j], not result.entropy_flag))
+            total_harmony += result.harmony_score
+            count += 1
+
+    overall = total_harmony / count if count > 0 else 0.0
+    return overall, pairs
+
+
+# =============================================================================
 # Exports
 # =============================================================================
 
@@ -432,4 +585,8 @@ __all__ = [
     "validate_experiential_before_store",
     "validate_batch",
     "filter_universal",
+    # Word-pair entropy validation
+    "WordPairHarmony",
+    "validate_word_pair",
+    "validate_phrase_harmony",
 ]
