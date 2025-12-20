@@ -54,8 +54,12 @@ from .phase_minus_one_session import (
     DECAY_HALF_LIFE,
     CONTRADICTION_THRESHOLD,
     MAX_RESOLUTION_BIAS,
+    BASE_SIGNAL_OVERRIDE_THRESHOLD,
+    ALL_OBSERVATION_MODES,
     # Enums
     SessionNonPermission,
+    SuppressionCause,
+    ConstraintType,
     DomainCategory,
     EventType,
     ResolutionSource,
@@ -67,6 +71,7 @@ from .phase_minus_one_session import (
     PriorGroundingProjection,
     # Constraint narrowing
     SessionConstraintEffect,
+    ConstraintResolution,
     # Projection layer
     SessionProjection,
     # Audit
@@ -91,6 +96,8 @@ __all__ = [
     "DomainCategory",
     "ResolutionSource",
     "SessionNonPermission",
+    "SuppressionCause",
+    "ConstraintType",
     # Dataclasses
     "GroundingCandidate",
     "ClauseGroundingResult",
@@ -104,6 +111,7 @@ __all__ = [
     "PriorGroundingProjection",
     "SessionAwareFuzzySignals",
     "SessionConstraintEffect",
+    "ConstraintResolution",
     "SessionProjection",
     "SessionAuditEntry",
     "SessionSummary",
@@ -118,4 +126,6 @@ __all__ = [
     "DECAY_HALF_LIFE",
     "CONTRADICTION_THRESHOLD",
     "MAX_RESOLUTION_BIAS",
+    "BASE_SIGNAL_OVERRIDE_THRESHOLD",
+    "ALL_OBSERVATION_MODES",
 ]
