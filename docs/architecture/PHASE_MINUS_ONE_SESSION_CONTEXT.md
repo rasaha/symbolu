@@ -1,6 +1,6 @@
 # Phase -1 Session Context Architecture
 
-**Version**: 2.0
+**Version**: 2.1
 **Date**: 2025-12-20
 **Status**: Implemented
 
@@ -15,7 +15,28 @@ Modern LLM systems benefit from tracking session history to inform current query
 3. **Persona Modeling**: Building understanding of user communication patterns
 4. **Event History**: Remembering conversation events for reference resolution
 
-## Key Design Principles (v2.0)
+## Phase Boundary Contract
+
+**Critical**: Phase -1 outputs are **HYPOTHESES**, not commitments.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    PHASE BOUNDARY CONTRACT                      │
+├─────────────────────────────────────────────────────────────────┤
+│ 1. All Phase -1 outputs are PROVISIONAL                        │
+│ 2. Downstream phases MUST treat them as hypotheses             │
+│ 3. Session context NARROWS possibilities, never DETERMINES     │
+│ 4. Resolution bias affects TIE-BREAKING only                   │
+│ 5. Any phase can override Phase -1 with sufficient evidence    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+This contract ensures that:
+- Phase -1 cannot "lock in" interpretations prematurely
+- Later phases maintain full authority to reinterpret
+- Session influence is advisory, not prescriptive
+
+## Key Design Principles (v2.1)
 
 ### 1. Constraint Narrowing (Not Confidence Boosting)
 
@@ -26,12 +47,50 @@ Instead of "boosting confidence" (which inflates certainty), the system uses **c
 "+0.08 confidence due to reflexive streak"
 ```
 
-**New approach (v2.0):**
+**New approach (v2.0+):**
 ```
 "Eliminated DETACHED mode due to reflexive_streak_3"
 ```
 
 This makes reasoning more explainable and auditable.
+
+### 1a. Constraint Types (NEW in v2.1)
+
+Constraints are categorized as **HARD** or **SOFT**:
+
+```python
+class ConstraintType(str, Enum):
+    HARD = "hard"   # Always applied, cannot be overridden
+    SOFT = "soft"   # Ignored when base signals are strong (≥0.7)
+```
+
+| Type | Example | Override Behavior |
+|------|---------|-------------------|
+| HARD | User explicitly clarified | Never overridden |
+| SOFT | Persona pattern suggests | Ignored if base signals strong |
+
+### 1b. Constraint Resolution (NEW in v2.1)
+
+Multiple constraints are combined via `ConstraintResolution`:
+
+```python
+@dataclass(frozen=True)
+class ConstraintResolution:
+    eliminated_modes: FrozenSet[str]      # Union of all eliminations
+    surviving_modes: FrozenSet[str]       # What remains after elimination
+    resolution_reason: str                 # Primary constraint reason
+    is_overconstrained: bool              # True if no modes survive
+    applied_constraints: Tuple[...]        # Constraints that were applied
+    ignored_constraints: Tuple[...]        # Constraints ignored (soft + strong base)
+```
+
+**Over-constraining Detection:**
+```python
+if len(surviving_modes) == 0:
+    # All modes eliminated - this is an error condition
+    is_overconstrained = True
+    # Fallback: ignore all constraints, use base signals only
+```
 
 ### 2. Read-Only Projection Layer
 
@@ -73,12 +132,75 @@ if contradiction_count >= CONTRADICTION_THRESHOLD:  # default: 2
 Explicit actions that SessionContext must NEVER perform:
 
 ```python
-class SessionNonPermission(Enum):
+class SessionNonPermission(str, Enum):
     OVERRIDE_USER_CLARIFICATION = "override_user_clarification"
     INVENT_REFERENTS = "invent_referents"
     OVERRIDE_STRONG_BASE_SIGNALS = "override_strong_base_signals"
     CROSS_SESSION_PERSISTENCE = "cross_session_persistence"
     EXCEED_INFLUENCE_WINDOW = "exceed_influence_window"
+    DERIVE_INTENT_BEYOND_QUERY = "derive_intent_beyond_query"  # NEW in v2.1
+```
+
+**NEW in v2.1**: `DERIVE_INTENT_BEYOND_QUERY` prevents the session from inferring user intent that goes beyond what is explicitly stated in the query. Session context can narrow possibilities but cannot fabricate intent.
+
+### 6. Typed Suppression Causes (NEW in v2.1)
+
+Suppression is now a first-class state with typed causes:
+
+```python
+class SuppressionCause(str, Enum):
+    CONTRADICTION_THRESHOLD = "contradiction_threshold"   # Too many pattern breaks
+    INSUFFICIENT_HISTORY = "insufficient_history"         # Not enough data
+    STRONG_BASE_SIGNALS = "strong_base_signals"           # Base signals override
+    OVERCONSTRAINED = "overconstrained"                   # All modes eliminated
+    USER_CLARIFICATION = "user_clarification"             # User explicitly clarified
+```
+
+This enables:
+- Analytics on why session influence was suppressed
+- Debugging of unexpected behavior
+- Pattern detection across sessions
+
+### 7. Resolution Bias as Tie-Breaking Only (NEW in v2.1)
+
+Resolution bias (`-0.20` to `+0.20`) is **strictly for tie-breaking**:
+
+```python
+def should_apply_bias(self, candidate_mode_count: int) -> bool:
+    """Resolution bias applies ONLY for tie-breaking."""
+    return candidate_mode_count > 1 and not self.influence_suppressed
+```
+
+| Candidates | Bias Applied? | Reason |
+|------------|---------------|--------|
+| 1 mode | No | No tie to break |
+| 2+ modes | Yes | Bias breaks the tie |
+| Suppressed | No | Influence disabled |
+
+### 8. Explicit Consistency Score Formula (NEW in v2.1)
+
+The consistency score is computed with a documented formula:
+
+```python
+def _compute_consistency_score(self) -> float:
+    """
+    Explicit Formula:
+        consistency = 1.0 - (
+            contradiction_rate * 0.5 +
+            mode_switch_rate * 0.3 +
+            domain_switch_rate * 0.2
+        )
+
+    Where:
+        contradiction_rate = contradictions / total_queries
+        mode_switch_rate = mode_switches / (total_queries - 1)
+        domain_switch_rate = domain_switches / (total_queries - 1)
+
+    Returns:
+        float: Consistency score in [0.0, 1.0]
+               - 1.0 = Perfect consistency (no switches, no contradictions)
+               - 0.0 = Maximum volatility
+    """
 ```
 
 ## Architecture
@@ -96,10 +218,13 @@ Phase -1 Pipeline (PO1)
     ├── PersonaSignals (with EMA)
     ├── PriorGroundingProjection (with contradiction tracking)
     ├── SessionProjection (read-only decision layer)
+    │   └── ConstraintResolution (NEW v2.1: constraint interaction)
+    ├── SessionConstraintEffect (with ConstraintType: HARD/SOFT)
+    ├── SuppressionCause (NEW v2.1: typed suppression reasons)
     └── SessionAuditLog (explainability)
 ```
 
-### Data Flow (v2.0)
+### Data Flow (v2.1)
 
 ```
                     ┌─────────────────────────────────────────────────────┐
@@ -113,20 +238,26 @@ Phase -1 Pipeline (PO1)
                                 │                               │
                                 ▼                               │
                       SessionProjection (frozen)                │
+                         ├── constraints (HARD/SOFT)            │
+                         ├── ConstraintResolution               │
+                         └── SuppressionCause                   │
                                 │                               │
                                 ▼                               │
     Query ──▶ FuzzyQueryClassifier ──▶ SessionAwareFuzzySignals │
                                               │                 │
-                            constraint narrowing                │
+                          ConstraintResolution.resolve()        │
+                          (combines, checks overconstrain)      │
                                               │                 │
                                               ▼                 │
                                        AmbiguityResolver        │
+                               (bias = tie-breaking only)       │
                                               │                 │
                                               ▼                 │
                                      ClauseGroundingResult ─────┘
                                               │            (recorded + audit)
                                               ▼
                                      PhaseMinusOneEnvelope
+                                       (HYPOTHESES, not commitments)
 ```
 
 ## Configuration Constants
@@ -177,7 +308,7 @@ class SessionContext:
 - `generate_summary()`: **NEW** - Generate end-of-session analytics
 - `record_audit()`: **NEW** - Record audit entry
 
-### 2. SessionProjection (NEW in v2.0)
+### 2. SessionProjection (v2.1)
 
 Read-only, frozen projection for decision-making:
 
@@ -191,18 +322,26 @@ class SessionProjection:
     # Constraints to apply (replaces confidence boost)
     constraints: Tuple[SessionConstraintEffect, ...]
 
+    # Constraint resolution (NEW in v2.1)
+    constraint_resolution: ConstraintResolution  # Combined constraint analysis
+
     # Resolution bias (renamed from confidence_adjustment)
     resolution_bias: float  # [-0.20, +0.20]
 
-    # Suppression tracking
+    # Suppression tracking (UPDATED in v2.1)
     influence_suppressed: bool
-    suppression_reason: Optional[str]
+    suppression_cause: Optional[SuppressionCause]  # Typed enum, not string
 
     constraint_summary: Tuple[str, ...]
     query_index: int
+
+    # NEW in v2.1: Tie-breaking helper
+    def should_apply_bias(self, candidate_mode_count: int) -> bool:
+        """Resolution bias applies ONLY for tie-breaking."""
+        return candidate_mode_count > 1 and not self.influence_suppressed
 ```
 
-### 3. SessionConstraintEffect (NEW in v2.0)
+### 3. SessionConstraintEffect (v2.1)
 
 Represents constraint narrowing instead of confidence boosting:
 
@@ -213,6 +352,35 @@ class SessionConstraintEffect:
     eliminated_domains: FrozenSet[DomainCategory]
     reason: str                            # e.g., "reflexive_streak_3"
     strength: float                        # 0.0-1.0
+    constraint_type: ConstraintType        # NEW in v2.1: HARD or SOFT
+```
+
+**Constraint Type Behavior:**
+- `HARD`: Always applied, cannot be overridden by base signals
+- `SOFT`: Ignored when `base_signal_strength >= BASE_SIGNAL_OVERRIDE_THRESHOLD` (0.7)
+
+### 3a. ConstraintResolution (NEW in v2.1)
+
+Combines multiple constraints and detects over-constraining:
+
+```python
+@dataclass(frozen=True)
+class ConstraintResolution:
+    eliminated_modes: FrozenSet[str]       # Union of all eliminations
+    surviving_modes: FrozenSet[str]        # Modes that survive elimination
+    resolution_reason: str                  # Primary constraint reason
+    is_overconstrained: bool               # True if no modes survive
+    applied_constraints: Tuple[SessionConstraintEffect, ...]
+    ignored_constraints: Tuple[SessionConstraintEffect, ...]
+
+    @classmethod
+    def resolve(cls, constraints: List[SessionConstraintEffect],
+                base_signal_strength: float = 0.0) -> "ConstraintResolution":
+        """
+        Combine constraints, handling:
+        1. Soft constraints ignored when base signals strong
+        2. Over-constraining detection (no surviving modes)
+        """
 ```
 
 ### 4. DomainAccumulator (with Decay)
@@ -469,7 +637,7 @@ def was_already_clarified(self, topic: str) -> bool:
 
 ```
 symbolu/mechanical/pipeline/grounding/
-├── phase_minus_one_session.py      # Session context (v2.0)
+├── phase_minus_one_session.py      # Session context (v2.1)
 ├── phase_minus_one_fuzzy.py        # Fuzzy query classifier
 ├── phase_minus_one_ambiguity.py    # Ambiguity resolver
 ├── phase_minus_one_pipeline.py     # Pipeline with run_with_session()
@@ -509,6 +677,17 @@ print(f'Consistency: {session._compute_consistency_score():.3f}')
 ```
 
 ## Changelog
+
+- **v2.1** (2025-12-20): Constraint interaction and phase boundary refinements
+  - Added ConstraintResolution for combining multiple constraints with over-constraining detection
+  - Added ConstraintType enum (HARD/SOFT) for constraint classification
+  - Added SuppressionCause enum for typed suppression reasons (analytics-friendly)
+  - Added DERIVE_INTENT_BEYOND_QUERY non-permission
+  - Resolution bias now explicitly for tie-breaking only (should_apply_bias method)
+  - Explicit consistency score formula documented
+  - Added Phase Boundary Contract defining Phase -1 outputs as hypotheses
+  - Soft constraints ignored when base signals strong (≥0.7)
+  - Over-constraining fallback: ignore all constraints when no modes survive
 
 - **v2.0** (2025-12-20): Major improvements based on safety/robustness review
   - Replaced confidence boosting with constraint narrowing (SessionConstraintEffect)

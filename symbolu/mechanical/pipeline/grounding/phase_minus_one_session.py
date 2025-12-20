@@ -22,6 +22,13 @@ Safety Model (Non-Permissions):
 - Must NOT change grounding mode when base signals strongly disagree
 - Must NOT persist across sessions without explicit user opt-in
 - Must NOT apply influence beyond the session window
+- Must NOT derive intent beyond what query explicitly states
+
+Phase Boundary Contract:
+- Phase -1 outputs are HYPOTHESES, not commitments
+- All downstream phases MUST treat them as provisional
+- Session context NARROWS possibilities, never DETERMINES outcomes
+- Resolution bias affects TIE-BREAKING only, never mode selection
 
 Integration:
 - SessionContext feeds into FuzzyQueryClassifier as additional signals
@@ -84,6 +91,38 @@ class SessionNonPermission(str, Enum):
     OVERRIDE_STRONG_BASE_SIGNALS = "override_strong_base_signals"
     CROSS_SESSION_PERSISTENCE = "cross_session_persistence"
     EXCEED_INFLUENCE_WINDOW = "exceed_influence_window"
+    DERIVE_INTENT_BEYOND_QUERY = "derive_intent_beyond_query"  # NEW: Cannot infer new intent
+
+
+class SuppressionCause(str, Enum):
+    """
+    First-class enumeration of why session influence was suppressed.
+
+    Making suppression a typed state (not just a flag) enables:
+    - Analytics
+    - Debugging
+    - Governance reporting
+    - Future learning (without authority)
+    """
+    CONTRADICTION_THRESHOLD = "contradiction_threshold"
+    INSUFFICIENT_HISTORY = "insufficient_history"
+    STRONG_BASE_SIGNALS = "strong_base_signals"
+    OVERCONSTRAINED = "overconstrained"  # All modes would be eliminated
+    USER_CLARIFICATION = "user_clarification"  # User explicitly clarified
+
+
+class ConstraintType(str, Enum):
+    """
+    Distinguishes hard vs soft constraints.
+
+    HARD: Never violate unless user explicitly clarifies
+    SOFT: May be ignored if base signals dominate (above threshold)
+
+    This prevents weak session signals from eliminating valid interpretations,
+    especially in noisy early sessions.
+    """
+    HARD = "hard"
+    SOFT = "soft"
 
 
 # =============================================================================
@@ -135,11 +174,16 @@ class SessionConstraintEffect:
 
     Instead of boosting confidence, we ELIMINATE unlikely interpretations.
     This makes the system's reasoning more explainable and auditable.
+
+    Constraint Types:
+    - HARD: Never violate unless user clarifies explicitly
+    - SOFT: May be ignored if base signals are strong (>= threshold)
     """
     eliminated_modes: FrozenSet[str]
     eliminated_domains: FrozenSet[DomainCategory]
     reason: str
     strength: float  # 0.0-1.0, how strongly we believe this constraint
+    constraint_type: ConstraintType = ConstraintType.SOFT  # Default: soft
 
     @classmethod
     def create(
@@ -148,12 +192,14 @@ class SessionConstraintEffect:
         eliminated_domains: List[DomainCategory] = None,
         reason: str = "",
         strength: float = 0.5,
+        constraint_type: ConstraintType = ConstraintType.SOFT,
     ) -> "SessionConstraintEffect":
         return cls(
             eliminated_modes=frozenset(eliminated_modes or []),
             eliminated_domains=frozenset(eliminated_domains or []),
             reason=reason,
             strength=max(0.0, min(1.0, strength)),
+            constraint_type=constraint_type,
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -162,6 +208,106 @@ class SessionConstraintEffect:
             "eliminated_domains": [d.value for d in self.eliminated_domains],
             "reason": self.reason,
             "strength": self.strength,
+            "constraint_type": self.constraint_type.value,
+        }
+
+
+# All known observation modes for constraint resolution
+ALL_OBSERVATION_MODES: FrozenSet[str] = frozenset({"REFLEXIVE", "RELATIONAL", "DETACHED"})
+
+
+@dataclass(frozen=True)
+class ConstraintResolution:
+    """
+    Result of combining and resolving multiple constraints.
+
+    Handles constraint interaction to prevent:
+    - Over-constraining (eliminating all modes)
+    - Conflicting constraints
+    - Accidental determinism
+
+    Rule: If all modes would be eliminated → suppress session influence entirely
+    """
+    eliminated_modes: FrozenSet[str]
+    surviving_modes: FrozenSet[str]
+    resolution_reason: str
+    is_overconstrained: bool  # All modes would be eliminated
+    applied_constraints: tuple  # Constraints that were applied
+    ignored_constraints: tuple  # Constraints ignored due to conflicts
+
+    @classmethod
+    def resolve(
+        cls,
+        constraints: List[SessionConstraintEffect],
+        base_signal_strength: float = 0.0,
+    ) -> "ConstraintResolution":
+        """
+        Combine multiple constraints with conflict detection.
+
+        If constraints would eliminate all modes, returns overconstrained state.
+        Soft constraints are ignored if base signals are strong.
+        """
+        if not constraints:
+            return cls(
+                eliminated_modes=frozenset(),
+                surviving_modes=ALL_OBSERVATION_MODES,
+                resolution_reason="no_constraints",
+                is_overconstrained=False,
+                applied_constraints=(),
+                ignored_constraints=(),
+            )
+
+        applied: List[SessionConstraintEffect] = []
+        ignored: List[SessionConstraintEffect] = []
+
+        # Filter constraints based on type and base signal strength
+        for constraint in constraints:
+            if constraint.constraint_type == ConstraintType.SOFT:
+                if base_signal_strength >= BASE_SIGNAL_OVERRIDE_THRESHOLD:
+                    # Strong base signals override soft constraints
+                    ignored.append(constraint)
+                    continue
+            applied.append(constraint)
+
+        # Combine eliminated modes from applied constraints
+        eliminated: Set[str] = set()
+        for constraint in applied:
+            eliminated.update(constraint.eliminated_modes)
+
+        surviving = ALL_OBSERVATION_MODES - eliminated
+
+        # Check for over-constraining
+        if not surviving:
+            return cls(
+                eliminated_modes=frozenset(eliminated),
+                surviving_modes=frozenset(),
+                resolution_reason="overconstrained_all_modes_eliminated",
+                is_overconstrained=True,
+                applied_constraints=tuple(applied),
+                ignored_constraints=tuple(ignored),
+            )
+
+        # Build resolution reason
+        reasons = [c.reason for c in applied]
+        resolution_reason = "+".join(reasons) if reasons else "no_constraints_applied"
+
+        return cls(
+            eliminated_modes=frozenset(eliminated),
+            surviving_modes=frozenset(surviving),
+            resolution_reason=resolution_reason,
+            is_overconstrained=False,
+            applied_constraints=tuple(applied),
+            ignored_constraints=tuple(ignored),
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "eliminated_modes": list(self.eliminated_modes),
+            "surviving_modes": list(self.surviving_modes),
+            "resolution_reason": self.resolution_reason,
+            "is_overconstrained": self.is_overconstrained,
+            "applied_count": len(self.applied_constraints),
+            "ignored_count": len(self.ignored_constraints),
         }
 
 
@@ -642,21 +788,29 @@ class SessionProjection:
 
     Separates evidence accumulation from decision influence.
     Ensures no mutation during decision and provides clear audit boundary.
+
+    Phase Boundary Contract:
+    - This projection is a HYPOTHESIS, not a commitment
+    - Downstream phases MUST treat this as provisional
+    - Resolution bias affects TIE-BREAKING only, never mode selection
     """
     # Derived state (immutable per query)
     dominant_domain: Optional[DomainCategory]
     dominant_mode: Optional[str]
     consistency_score: float  # 0.0-1.0, how consistent the session has been
 
-    # Constraints to apply
+    # Constraint resolution result
+    constraint_resolution: ConstraintResolution
+
+    # Constraints to apply (raw, before resolution)
     constraints: tuple  # Tuple[SessionConstraintEffect, ...]
 
-    # Resolution bias (replaces confidence_adjustment)
+    # Resolution bias - affects TIE-BREAKING ONLY, never mode selection
     resolution_bias: float  # [-0.20, +0.20]
 
     # Whether session influence is suppressed
     influence_suppressed: bool
-    suppression_reason: Optional[str]
+    suppression_cause: Optional[SuppressionCause]  # Typed enum, not string
 
     # Summary for downstream
     constraint_summary: tuple  # Tuple[str, ...]
@@ -664,17 +818,34 @@ class SessionProjection:
     # Query index this projection is for
     query_index: int
 
+    def get_surviving_modes(self) -> FrozenSet[str]:
+        """Get modes that survived constraint narrowing."""
+        if self.influence_suppressed:
+            return ALL_OBSERVATION_MODES
+        return self.constraint_resolution.surviving_modes
+
+    def should_apply_bias(self, candidate_mode_count: int) -> bool:
+        """
+        Resolution bias applies ONLY for tie-breaking.
+
+        If only one mode survives constraints, bias is not applied.
+        This keeps Phase -1 non-authoritative and non-optimizing.
+        """
+        return candidate_mode_count > 1 and not self.influence_suppressed
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "dominant_domain": self.dominant_domain.value if self.dominant_domain else None,
             "dominant_mode": self.dominant_mode,
             "consistency_score": round(self.consistency_score, 3),
+            "constraint_resolution": self.constraint_resolution.to_dict(),
             "constraints": [c.to_dict() for c in self.constraints],
             "resolution_bias": round(self.resolution_bias, 3),
             "influence_suppressed": self.influence_suppressed,
-            "suppression_reason": self.suppression_reason,
+            "suppression_cause": self.suppression_cause.value if self.suppression_cause else None,
             "constraint_summary": list(self.constraint_summary),
             "query_index": self.query_index,
+            "surviving_modes": list(self.get_surviving_modes()),
         }
 
 
@@ -907,33 +1078,52 @@ class SessionContext:
                 query_text=clause_result.clause_text,
             ))
 
-    def create_projection(self, query_index: Optional[int] = None) -> SessionProjection:
+    def create_projection(
+        self,
+        query_index: Optional[int] = None,
+        base_signal_strength: float = 0.0,
+    ) -> SessionProjection:
         """
         Create a read-only projection of session state for decision-making.
 
         This is the ONLY way session context should influence decisions.
+
+        Phase Boundary Contract:
+        - This projection is a HYPOTHESIS, not a commitment
+        - Downstream phases MUST treat it as provisional
+        - Resolution bias affects TIE-BREAKING only
+
+        Args:
+            query_index: Query index for this projection
+            base_signal_strength: Strength of base fuzzy signals (0.0-1.0)
+                                 Strong base signals can override soft constraints
         """
         if query_index is None:
             query_index = self.query_count + 1
 
-        # Check if influence should be suppressed
+        # Check if influence should be suppressed (with typed cause)
         influence_suppressed = False
-        suppression_reason = None
+        suppression_cause: Optional[SuppressionCause] = None
 
         if self.prior_projections.is_influence_suppressed(query_index):
             influence_suppressed = True
-            suppression_reason = f"contradictions_exceeded_threshold_{CONTRADICTION_THRESHOLD}"
+            suppression_cause = SuppressionCause.CONTRADICTION_THRESHOLD
 
         # Only use queries within the influence window
-        if query_index > SESSION_INFLUENCE_WINDOW:
-            # Check if recent history is too sparse
+        if not influence_suppressed and query_index > SESSION_INFLUENCE_WINDOW:
             recent_groundings = sum(
                 1 for g in self.prior_projections.grounding_history
                 if g.get("query_index", 0) > query_index - SESSION_INFLUENCE_WINDOW
             )
             if recent_groundings < 2:
                 influence_suppressed = True
-                suppression_reason = "insufficient_recent_history"
+                suppression_cause = SuppressionCause.INSUFFICIENT_HISTORY
+
+        # Check if base signals are strong enough to override
+        if not influence_suppressed and base_signal_strength >= BASE_SIGNAL_OVERRIDE_THRESHOLD:
+            # Don't suppress entirely, but soft constraints will be ignored
+            # This is handled in ConstraintResolution.resolve()
+            pass
 
         # Collect constraints
         constraints: List[SessionConstraintEffect] = []
@@ -952,24 +1142,37 @@ class SessionContext:
                 constraints.append(grounding_constraint)
                 constraint_summary.append(grounding_constraint.reason)
 
-        # Compute resolution bias from constraints
+        # Resolve constraints with interaction handling
+        constraint_resolution = ConstraintResolution.resolve(
+            constraints, base_signal_strength
+        )
+
+        # Check for over-constraining (all modes eliminated)
+        if constraint_resolution.is_overconstrained:
+            influence_suppressed = True
+            suppression_cause = SuppressionCause.OVERCONSTRAINED
+            # Reset resolution to no constraints
+            constraint_resolution = ConstraintResolution.resolve([])
+
+        # Compute resolution bias from applied constraints
+        # NOTE: Bias affects TIE-BREAKING only, not mode selection
         resolution_bias = 0.0
-        if constraints:
-            # Average constraint strength as bias
-            total_strength = sum(c.strength for c in constraints)
+        if constraint_resolution.applied_constraints:
+            total_strength = sum(c.strength for c in constraint_resolution.applied_constraints)
             resolution_bias = min(MAX_RESOLUTION_BIAS, total_strength * 0.15)
 
-        # Compute consistency score
+        # Compute consistency score with explicit formula
         consistency_score = self._compute_consistency_score()
 
         return SessionProjection(
             dominant_domain=self.domain_accumulator.primary_domain,
             dominant_mode=self.prior_projections.get_mode_prior(),
             consistency_score=consistency_score,
+            constraint_resolution=constraint_resolution,
             constraints=tuple(constraints),
             resolution_bias=resolution_bias,
             influence_suppressed=influence_suppressed,
-            suppression_reason=suppression_reason,
+            suppression_cause=suppression_cause,
             constraint_summary=tuple(constraint_summary),
             query_index=query_index,
         )
@@ -979,32 +1182,49 @@ class SessionContext:
         self.audit_log.append(entry)
 
     def _compute_consistency_score(self) -> float:
-        """Compute how consistent session patterns have been."""
+        """
+        Compute how consistent session patterns have been.
+
+        Explicit Formula:
+            consistency = 1.0 - (
+                contradiction_rate * 0.5 +
+                mode_switch_rate * 0.3 +
+                domain_switch_rate * 0.2
+            )
+
+        Where:
+        - contradiction_rate = contradictions / query_count
+        - mode_switch_rate = mode_switches / query_count (approximated by contradiction)
+        - domain_switch_rate = unique_domains / domain_sequence_length
+
+        Returns: Float in range [0.0, 1.0]
+        """
         if self.query_count < 3:
-            return 0.5  # Not enough data
+            return 0.5  # Not enough data for meaningful score
 
-        # Factors that reduce consistency:
-        # - High contradiction rate
-        # - High emotional variance
-        # - Frequent domain switches
+        # Calculate component rates
+        contradiction_rate = (
+            self.prior_projections.contradiction_count / self.query_count
+            if self.query_count > 0 else 0.0
+        )
 
-        score = 1.0
+        # Mode switch rate (use contradiction as proxy)
+        mode_switch_rate = contradiction_rate  # Same as contradiction for now
 
-        # Contradiction penalty
-        if self.query_count > 0:
-            contradiction_rate = self.prior_projections.contradiction_count / self.query_count
-            score -= contradiction_rate * 0.3
-
-        # Emotional variance penalty
-        score -= self.persona_signals.emotional_variance * 0.2
-
-        # Domain switch penalty (based on sequence diversity)
+        # Domain switch rate
+        domain_switch_rate = 0.0
         if len(self.domain_accumulator.domain_sequence) >= 3:
             unique_domains = len(set(self.domain_accumulator.domain_sequence))
-            domain_diversity = unique_domains / len(self.domain_accumulator.domain_sequence)
-            score -= domain_diversity * 0.2
+            domain_switch_rate = unique_domains / len(self.domain_accumulator.domain_sequence)
 
-        return max(0.0, min(1.0, score))
+        # Apply the explicit formula
+        consistency = 1.0 - (
+            contradiction_rate * 0.5 +
+            mode_switch_rate * 0.3 +
+            domain_switch_rate * 0.2
+        )
+
+        return max(0.0, min(1.0, consistency))
 
     def get_likely_mode_from_context(self) -> Optional[str]:
         """
