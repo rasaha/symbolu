@@ -104,6 +104,18 @@ from .phoneme_validator import (
     validate_word_pair,
     validate_phrase_harmony,
 )
+from .learning_pipeline import (
+    # Learning outcomes
+    LearningOutcome,
+    LearningResult,
+    RetrievalResult,
+    BatchLearningResult,
+    # Learning functions
+    learn_from_event,
+    learn_batch,
+    # Retrieval functions
+    retrieve_similar,
+)
 
 __all__ = [
     # Core types
@@ -171,4 +183,12 @@ __all__ = [
     "WordPairHarmony",
     "validate_word_pair",
     "validate_phrase_harmony",
+    # Event Learning Pipeline
+    "LearningOutcome",
+    "LearningResult",
+    "RetrievalResult",
+    "BatchLearningResult",
+    "learn_from_event",
+    "learn_batch",
+    "retrieve_similar",
 ]
