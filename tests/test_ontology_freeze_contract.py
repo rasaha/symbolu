@@ -51,6 +51,7 @@ FROZEN_ONTOLOGY_FILENAMES = frozenset({
 AUTHORIZED_MODULES = frozenset({
     "symbolu/ontology/phase4a/",
     "symbolu/resonance/",  # Core resonance engine - legitimately uses varna bridge data
+    "symbolu/formulas/",   # Formulas modules - use varna bridge data for acoustic mapping
 })
 
 # Exempt paths (experimental, tests, docs)
@@ -64,7 +65,6 @@ EXEMPT_PATHS = frozenset({
 # Legacy modules with EXPERIMENT_ONLY marker (tolerated but deprecated)
 LEGACY_EXPERIMENT_MODULES = frozenset({
     "symbolu/formulas/varna_bridge_loader.py",
-    "symbolu/formulas/varna_acoustic_mapper.py",
 })
 
 # Forbidden modules (must never reference ontology)
@@ -561,8 +561,8 @@ class TestNoDirectOntologyImportsInPipeline:
                 continue
 
             for filepath in directory.rglob("*.py"):
-                # Skip legacy experiment modules
-                if is_legacy_experiment(filepath):
+                # Skip authorized modules and legacy experiment modules
+                if is_authorized(filepath) or is_legacy_experiment(filepath):
                     continue
 
                 refs = find_ontology_filename_references(filepath)

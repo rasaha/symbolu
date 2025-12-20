@@ -231,10 +231,10 @@ Added `restoration/experiments/` to exempt paths in test configuration.
 
 Added `symbolu/resonance/` to `AUTHORIZED_MODULES` as it legitimately uses varna bridge data for resonance computation.
 
-### 4. Legacy Module Registration (Priority 4)
+### 4. Authorized Formulas Module (Priority 4)
 **File**: `tests/test_ontology_freeze_contract.py`
 
-Added `symbolu/formulas/varna_acoustic_mapper.py` to `LEGACY_EXPERIMENT_MODULES` since it requires different data (varna properties) than what Phase-4A provides (layer interactions).
+Added `symbolu/formulas/` to `AUTHORIZED_MODULES` since formulas modules legitimately use varna bridge data for acoustic mapping. Also updated `test_core_modules_no_ontology_filenames` to skip authorized modules.
 
 ---
 
