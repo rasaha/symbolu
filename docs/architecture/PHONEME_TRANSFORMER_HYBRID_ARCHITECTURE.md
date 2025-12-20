@@ -2,7 +2,132 @@
 
 ## Executive Summary
 
-This document describes the **Phoneme-Transformer Hybrid System** - an optimization layer that uses deterministic 10-dimensional phoneme vectors to reduce transformer computation by 80%+ for specific operations.
+This document describes the **Symbolic Transformer Engine (STE)** - a deterministic computational system that uses 10-dimensional phoneme vectors for ontological processing.
+
+**Core Claim**:
+
+> Symbolu implements a transformer-class computation (contextual sequence processing with selective focus and state propagation), but replaces learned continuous operators with explicit, deterministic symbolic operators.
+
+**Symbolu is not a language model and not a neural transformer.**
+
+---
+
+## Symbolic Transformer Foundations
+
+### What "Transformer-Class" Means in Symbolu
+
+This refers to **abstract computational roles**, not neural implementation:
+
+| Computational Role | Description |
+|-------------------|-------------|
+| Tokenized sequence processing | Input broken into discrete units |
+| Context accumulation | Prior state informs current processing |
+| Selective focus ("attention") | Some elements weighted over others |
+| State preservation across steps | Information persists through layers |
+
+**Explicit Non-Claim**:
+
+Symbolu does not implement neural attention, embeddings, gradients, or probability distributions.
+
+### Tokens in Symbolu
+
+Tokens are **varnas / phonemes** - discrete symbolic units with explicit features.
+
+| Property | Neural Tokens | Symbolu Tokens |
+|----------|---------------|----------------|
+| Representation | Learned embeddings (768D+) | Defined features (10D) |
+| Origin | Statistical subword splitting | Phonetic structure |
+| Meaning | Emergent from training | Structural, not semantic |
+| Modifiability | Frozen after training | Explicitly auditable |
+
+> Tokens in Symbolu play the same structural role as tokens in transformers, but their representations are defined, finite, and auditable rather than learned and continuous.
+
+### Attention as Constraint Focus
+
+Neural attention and Symbolu "attention" serve the same abstract role but differ fundamentally:
+
+| Aspect | Neural Attention | Symbolu Attention |
+|--------|------------------|-------------------|
+| Mechanism | Graded weighting (QK dot products) | Categorical elimination |
+| Output | Probability distribution | Constraint-resolved candidates |
+| Computation | Softmax over similarities | Validity pruning |
+| Gradients | Required for learning | None |
+
+> In Symbolu, "attention" is implemented as constraint-based focus and exclusion, not as weighted aggregation.
+
+Symbolu's attention mechanisms include:
+- **Constraint narrowing**: Eliminate impossible interpretations
+- **Validity pruning**: Remove phonetically incompatible candidates
+- **Mode elimination**: Exclude observation modes based on session history
+- **Target feasibility checks**: Verify ontological routing targets
+
+**Symbolu does not approximate neural attention; it replaces it with a stricter, deterministic operator.**
+
+### Context Accumulation
+
+Both transformers and Symbolu maintain context windows, but through different mechanisms:
+
+| Mechanism | Neural Transformers | Symbolu |
+|-----------|---------------------|---------|
+| Position encoding | Learned positional embeddings | `SESSION_INFLUENCE_WINDOW` (explicit N queries) |
+| Decay | Implicit in attention weights | Deterministic decay functions (`exp(-λ × age)`) |
+| Recency | Causal masking | Explicit recency weighting |
+| Boundaries | Fixed context length | Auditable window bounds |
+
+> This is functionally equivalent to context accumulation, but transparent, bounded, and auditable.
+
+### State Preservation
+
+Residual connections in neural transformers preserve base signal across layers. Symbolu achieves the same effect symbolically:
+
+> Base signals persist unless explicitly overridden by constraints.
+
+| Neural Residuals | Symbolu State Preservation |
+|------------------|---------------------------|
+| Skip connections add input to output | Base signals retained by default |
+| Learned layer normalization | Deterministic decay normalization |
+| Gradient flow preservation | N/A (no gradients) |
+
+This is **residual-equivalent behavior**, not residual connections.
+
+### What Symbolu Does NOT Do
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    EXPLICIT NON-CAPABILITIES                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ✗ No learning                                                  │
+│  ✗ No gradient descent                                          │
+│  ✗ No probability distributions                                 │
+│  ✗ No interpolation between unseen states                       │
+│  ✗ No semantic generalization                                   │
+│  ✗ No emergent behavior from statistical patterns               │
+│                                                                 │
+│  Symbolu converges via enumeration, exclusion, and constraint   │
+│  tightening, not statistical optimization.                      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Canonical Comparison Table
+
+| Abstract Role | Transformer (Neural) | Symbolu (Symbolic) |
+|---------------|----------------------|--------------------|
+| Token | Discrete → embedding | Discrete → symbolic features |
+| Context | Positional embeddings | Session influence window |
+| Attention | QK dot products | Constraint focus & exclusion |
+| Weighting | Softmax probabilities | Deterministic mode elimination |
+| State preservation | Residual connections | Base signal retention |
+| Normalization | Learned layer norms | Deterministic decay |
+| Output | Distribution over tokens | Constraint-resolved candidates |
+| Learning | Gradient descent | None (explicit rules) |
+
+---
+
+## Optimization Layer Overview
+
+This document also describes the **Phoneme-Transformer Hybrid System** - an optimization layer that uses deterministic 10-dimensional phoneme vectors to reduce transformer computation by 80%+ for specific operations.
 
 **Core Innovation**: Derive semantic meaning from phonetic STRUCTURE (how sounds are produced) rather than statistical USAGE (word co-occurrence in corpora). This enables:
 - **Zero-parameter attention** using phoneme similarity
@@ -13,6 +138,18 @@ This document describes the **Phoneme-Transformer Hybrid System** - an optimizat
 
 ## Table of Contents
 
+**Part I: Symbolic Transformer Foundations**
+- [Executive Summary](#executive-summary)
+- [Symbolic Transformer Foundations](#symbolic-transformer-foundations)
+  - [What "Transformer-Class" Means in Symbolu](#what-transformer-class-means-in-symbolu)
+  - [Tokens in Symbolu](#tokens-in-symbolu)
+  - [Attention as Constraint Focus](#attention-as-constraint-focus)
+  - [Context Accumulation](#context-accumulation)
+  - [State Preservation](#state-preservation)
+  - [What Symbolu Does NOT Do](#what-symbolu-does-not-do)
+  - [Canonical Comparison Table](#canonical-comparison-table)
+
+**Part II: Optimization Layer**
 1. [Problem Statement](#1-problem-statement)
 2. [Solution Architecture](#2-solution-architecture)
 3. [Core Components](#3-core-components)
@@ -748,6 +885,20 @@ Dominant layers: ('O9_UNIFYING', 'O9_UNIFYING', 'O3_ACTING')
 
 ---
 
-*Document Version: 1.0*
-*Last Updated: 2025-12-18*
+## Terminology
+
+This document uses **Symbolic Transformer Engine (STE)** as the canonical name for Symbolu's computational architecture. Alternative acceptable terms:
+- Ontological Transformer
+- Phoneme-Transformer Hybrid (for the optimization layer only)
+
+**Do not use**: "neural transformer", "language model", "AI model"
+
+---
+
+*Document Version: 2.0*
+*Last Updated: 2025-12-20*
 *Authors: Symbol-U Development Team*
+
+**Changelog**:
+- v2.0 (2025-12-20): Added Symbolic Transformer Foundations section with explicit transformer-class framing, non-capabilities, and canonical comparison table
+- v1.0 (2025-12-18): Initial optimization layer documentation
