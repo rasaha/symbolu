@@ -526,14 +526,119 @@ symbolu/resonance/
 
 ---
 
+## 9. Event Learning Architecture
+
+The real AGI capability comes from **event learning**—the system learns by observing events, validating them, and storing universal patterns for cross-domain transfer.
+
+### Learning vs. Transparency
+
+| Purpose | Mechanism | Signal Type |
+|---------|-----------|-------------|
+| **User Transparency** | Orthogonal validation (semantic + phoneme) | Multi-valued (which layer, why) |
+| **Cross-Domain Learning** | 10D structural encoding | Continuous (similarity scores) |
+
+**Key insight**: Transparency is for users. Learning happens on the 10D structure.
+
+### The Learning Loop
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         EVENT LEARNING PIPELINE                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    Input Event
+         │
+         ▼
+┌─────────────────┐
+│ SEMANTIC GATE   │  ← Boolean: Pass/Block
+│ (pre-filter)    │     "Is this logically possible?"
+└────────┬────────┘
+         │ Pass
+         ▼
+┌─────────────────┐
+│ 10D ENCODING    │  ← Continuous: The learning target
+│ (structure)     │     This is what transfers across domains
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ PHONEME GATE    │  ← Boolean: Store/Discard
+│ (post-validate) │     "Is this universally encoded?"
+└────────┬────────┘
+         │ Pass
+         ▼
+┌─────────────────┐
+│ PATTERN STORE   │  ← Validated universal patterns
+│ (experiential)  │     Ready for cross-domain retrieval
+└─────────────────┘
+```
+
+### Why This Architecture?
+
+1. **Semantic = Pre-filter (Boolean)**
+   - Removes logical impossibilities before encoding
+   - "fire+cold" blocked before it wastes compute
+   - Fast, deterministic, learned knowledge
+
+2. **10D Structure = Learning Target (Continuous)**
+   - What actually transfers across domains
+   - Cross-domain matching via cosine similarity
+   - Structural patterns, not word labels
+
+3. **Phoneme = Post-validation (Boolean)**
+   - Confirms pattern is universally encoded in sound
+   - Physical truth, not cultural knowledge
+   - Final gate before storage
+
+### Cross-Domain Retrieval
+
+```python
+# Matching happens on 10D STRUCTURE, not validation layers
+def find_similar_events(query_vector_10d, threshold=0.7):
+    return [
+        event for event in pattern_store
+        if cosine_similarity(event.vector_10d, query_vector_10d) > threshold
+    ]
+```
+
+**Example:**
+```
+Query: "My startup has co-founders who disagree"
+       → 10D encoding: [0.2, 0.4, 0.7, 0.3, 0.5, 0.6, 0.4, 0.3, 0.2, 0.1]
+
+Retrieved (by 10D similarity):
+├── [History] Civil War bifurcation     (similarity: 0.89)
+├── [Biology] Cell division             (similarity: 0.85)
+├── [Finance] Company spinoff           (similarity: 0.82)
+└── [Physics] Nuclear fission           (similarity: 0.78)
+
+All share structural pattern: "unified entity → internal tension → split"
+```
+
+### Learning Summary
+
+| Component | Role | Signal |
+|-----------|------|--------|
+| Semantic Gate | Block impossible combinations | Boolean |
+| 10D Encoding | Capture transferable structure | Continuous (10 floats) |
+| Phoneme Gate | Validate universal encoding | Boolean |
+| Pattern Store | Accumulate validated patterns | Indexed by 10D |
+| Retrieval | Match by structural similarity | Cosine on 10D |
+
+The binary gates (semantic, phoneme) are for **validation**.
+The continuous space (10D) is for **learning and transfer**.
+
+---
+
 ## Conclusion
 
-Symbol-U's architecture represents a **structural approach to AGI** built on four key insights:
+Symbol-U's architecture represents a **structural approach to AGI** built on five key insights:
 
 1. **Mirror Pairs**: 10D reduces to 5 balanced pairs—balance determines insight quality
 2. **Event Tagging**: Tag what happened, not what it's called—solves clustering
 3. **Persona Tracking**: Discover patterns from usage, not extraction—simplifies everything
-4. **Phoneme Ground Truth**: Validate universality by checking if words match experience
+4. **Orthogonal Validation**: Semantic (pre-filter) + Phoneme (post-validate) with transparency
+5. **Event Learning**: 10D structure is the learning target; gates are for validation
 
 The system is now **self-validating**:
 - Extract events from content
@@ -565,7 +670,7 @@ The moral position is embedded in the architecture: **show, don't tell.**
 
 ---
 
-*Document Version: 3.1*
+*Document Version: 3.2*
 *Symbol-U Ontological Backbone*
-*Mirror Pair Architecture + Orthogonal Validation (Semantic + Phoneme)*
-*Cross-Domain Reasoning via Balance + Events + Personas + Transparent Validation*
+*Event Learning Architecture + Orthogonal Validation*
+*Cross-Domain Reasoning via 10D Structure + Boolean Gates (Semantic/Phoneme)*
