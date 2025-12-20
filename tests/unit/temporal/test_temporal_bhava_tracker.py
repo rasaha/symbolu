@@ -290,10 +290,10 @@ class TestWindowBehavior:
         entries = tracker.entries
         assert len(entries) == 3
 
-        # Verify these are the last 3 entries
-        assert entries[0].smi == 0.3
-        assert entries[1].smi == 0.4
-        assert entries[2].smi == 0.5
+        # Verify these are the last 3 entries (use approx for float comparison)
+        assert entries[0].smi == pytest.approx(0.3)
+        assert entries[1].smi == pytest.approx(0.4)
+        assert entries[2].smi == pytest.approx(0.5)
 
     def test_window_stats_only_use_window(self):
         """Test that stats are computed only from window entries."""

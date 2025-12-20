@@ -169,8 +169,8 @@ def test_embedding_determinism():
     print("=" * 60)
     print("TEST: test_embedding_determinism")
     print("=" * 60)
-    
-    from rag.embeddings.encoder import embed
+
+    from symbolu.rag.embeddings.encoder import embed
     
     text = "Hello world this is a test"
     
@@ -194,8 +194,8 @@ def test_chunking():
     print("=" * 60)
     print("TEST: test_chunking")
     print("=" * 60)
-    
-    from rag.indexing.indexer import chunk_text
+
+    from symbolu.rag.indexing.indexer import chunk_text
     
     # Long text
     text = "This is sentence one. " * 50  # ~1100 chars

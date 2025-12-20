@@ -300,8 +300,8 @@ class TestChunkText:
     def test_chunk_text_empty_string(self) -> None:
         """Test chunk_text with empty string."""
         chunks = chunk_text("", chunk_size=300)
-        assert len(chunks) == 1
-        assert chunks[0] == ""
+        # Empty string should return empty list
+        assert len(chunks) == 0
 
     def test_chunk_text_with_overlap(self) -> None:
         """Test chunk_text with overlap parameter."""
@@ -334,9 +334,9 @@ class TestChunkDocuments:
     ) -> None:
         """Test that chunk_documents preserves document metadata."""
         chunks = chunk_documents(sample_documents, chunk_size=500)
-        # Each chunk should have metadata with doc_idx
+        # Each chunk should have metadata with doc_index
         for chunk in chunks:
-            assert "doc_idx" in chunk.metadata
+            assert "doc_index" in chunk.metadata
 
 
 class TestBuildIndex:

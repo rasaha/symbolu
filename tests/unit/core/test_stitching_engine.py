@@ -331,27 +331,27 @@ class TestModuleImports:
 
     def test_stitching_engine_module_import(self) -> None:
         """Test that stitching_engine module can be imported."""
-        from core.stitching import stitching_engine
+        from symbolu.core.stitching import stitching_engine
         assert stitching_engine is not None
 
     def test_objective_module_import(self) -> None:
         """Test that objective module can be imported."""
-        from core.stitching import objective
+        from symbolu.core.stitching import objective
         assert objective is not None
 
     def test_penalties_module_import(self) -> None:
         """Test that penalties module can be imported."""
-        from core.stitching import penalties
+        from symbolu.core.stitching import penalties
         assert penalties is not None
 
     def test_stitching_package_import(self) -> None:
         """Test that stitching package can be imported."""
-        from core import stitching
+        from symbolu.core import stitching
         assert stitching is not None
 
     def test_models_import(self) -> None:
         """Test that models module can be imported."""
-        from core import models
+        from symbolu.core import models
         assert models is not None
         assert hasattr(models, 'CandidateResponse')
         assert hasattr(models, 'SMIResult')

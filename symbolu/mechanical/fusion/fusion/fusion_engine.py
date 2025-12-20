@@ -175,32 +175,44 @@ class FusionEngine:
     ) -> Tuple[Optional[Candidate], str]:
         """
         Select candidate using conflict resolution if needed
-        
+
         Returns: (selected_candidate, resolution_reason)
         """
         if not ranked_candidates:
             return None, "no_candidates"
-        
-        # If only one candidate, select it
+
+        # Apply safety filters first for regulated mode (even for single candidates)
+        if context.is_regulated():
+            safe_candidates = self.conflict_resolver.apply_safety_filters(
+                ranked_candidates, context
+            )
+            if not safe_candidates:
+                return None, "all_filtered_by_safety"
+            ranked_candidates = [c for c in ranked_candidates if c in safe_candidates]
+            if not ranked_candidates:
+                return None, "all_filtered_by_safety"
+
+        # If only one candidate remains, select it
         if len(ranked_candidates) == 1:
             return ranked_candidates[0], "only_candidate"
-        
+
         # Check if top candidate is clear winner
         top_score = scores[ranked_candidates[0].id]
         second_score = scores[ranked_candidates[1].id]
-        
-        # Clear winner threshold
-        if top_score - second_score > 0.2:
+
+        # Winner threshold: respect the ranking from scorer which includes SMI penalty
+        # Use conflict resolver for close scores (< 0.02 difference)
+        if top_score - second_score > 0.02:
             return ranked_candidates[0], "clear_winner"
-        
-        # Close competition: use conflict resolver
-        logger.debug("Close competition detected, using conflict resolver")
-        
+
+        # True tie: use conflict resolver
+        logger.debug("True tie detected, using conflict resolver")
+
         selected, reason = self.conflict_resolver.resolve_conflict(
             ranked_candidates[:5],  # Consider top 5 for conflict resolution
             context
         )
-        
+
         return selected, f"conflict_resolved_{reason}"
     
     def fuse_with_fallback(

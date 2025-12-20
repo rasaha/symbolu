@@ -475,24 +475,24 @@ class TestCoreModuleImports:
 
     def test_core_package_import(self) -> None:
         """Test that core package can be imported."""
-        import core
+        from symbolu import core
         assert core is not None
 
     def test_core_interface_import(self) -> None:
         """Test that core.interface can be imported."""
-        from core import interface
+        from symbolu.core import interface
         assert interface is not None
         assert hasattr(interface, 'CoreInterface')
 
     def test_core_pipeline_import(self) -> None:
         """Test that core.pipeline can be imported."""
-        from core import pipeline
+        from symbolu.core import pipeline
         assert pipeline is not None
         assert hasattr(pipeline, 'CorePipeline')
 
     def test_core_models_import(self) -> None:
         """Test that core.models can be imported."""
-        from core import models
+        from symbolu.core import models
         assert models is not None
         assert hasattr(models, 'SMIResult')
         assert hasattr(models, 'BhavaState')
@@ -502,5 +502,5 @@ class TestCoreModuleImports:
 
     def test_core_stitching_import(self) -> None:
         """Test that core.stitching package can be imported."""
-        from core import stitching
+        from symbolu.core import stitching
         assert stitching is not None
