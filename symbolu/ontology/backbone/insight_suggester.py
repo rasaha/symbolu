@@ -13,10 +13,15 @@ Architecture:
 Key Distinction:
     - Universal patterns transfer across domains for ALL users
     - Personal insights are generated FOR this user based on THEIR history
+
+Critical Design:
+    - Insights require STRUCTURAL VALIDATION, not just domain co-occurrence
+    - User controls insight mode (recent memory, domain-relative, new possibilities)
+    - Without structural match, cross-domain suggestions are advertising, not insight
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any, Tuple, Set
 from datetime import datetime, timedelta
 from enum import Enum
 
@@ -28,14 +33,54 @@ from .persona_tracker import (
     CrossDomainBridge,
 )
 from .mirror_pairs import encode_with_events, TaggedEvent
+from .encoder import DimensionalVector
+from .similarity import cosine_similarity
+
+
+class InsightMode(Enum):
+    """
+    User-controlled insight presentation modes.
+
+    The user decides HOW they want insights presented, not the system.
+    """
+    RECENT_MEMORY = "recent_memory"
+    """Prioritize connections to what user was just working on.
+    User explicitly wants this context, recency over structural match."""
+
+    DOMAIN_RELATIVE = "domain_relative"
+    """Stay focused on current domain only. No cross-domain suggestions.
+    Deep dive mode - user wants focus, not distraction."""
+
+    NEW_POSSIBILITIES = "new_possibilities"
+    """Show novel cross-domain connections ONLY if structural match exists.
+    Requires causal chain or 10D similarity validation.
+    This is discovery mode, but grounded in real patterns."""
 
 
 class InsightType(Enum):
     """Types of personal insights."""
-    BRIDGE_OPPORTUNITY = "bridge_opportunity"   # Current context bridges to recent activity
-    PATTERN_CONTINUATION = "pattern_continuation"  # Continuing a pattern the user follows
-    DOMAIN_SWITCH = "domain_switch"             # User's interest may have shifted
-    ACTION_SUGGESTION = "action_suggestion"     # Specific action based on context
+    BRIDGE_OPPORTUNITY = "bridge_opportunity"      # Cross-domain connection (validated)
+    PATTERN_CONTINUATION = "pattern_continuation"  # Continuing a pattern user follows
+    DOMAIN_DEPTH = "domain_depth"                  # Deeper insight within same domain
+    STRUCTURAL_MATCH = "structural_match"          # Novel connection via structure
+
+
+@dataclass
+class StructuralMatch:
+    """Evidence that a cross-domain bridge is structurally valid."""
+    similarity_10d: float           # Cosine similarity in 10D space
+    shared_events: List[str]        # Common event types
+    causal_overlap: float           # Causal chain overlap (0-1)
+    is_valid: bool                  # Passes threshold for suggestion
+
+    @property
+    def combined_score(self) -> float:
+        """Weighted score matching learning hierarchy."""
+        return (
+            self.causal_overlap * 0.6 +
+            self.similarity_10d * 0.3 +
+            (0.1 if self.shared_events else 0.0)
+        )
 
 
 @dataclass
@@ -57,8 +102,12 @@ class PersonalInsight:
     recent_activity: List[str] = field(default_factory=list)
     shared_events: List[str] = field(default_factory=list)
 
+    # Structural validation (NEW - prevents advertising)
+    structural_match: Optional[StructuralMatch] = None
+
     # For transparency
     reasoning: str = ""
+    mode_used: Optional[InsightMode] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -69,7 +118,13 @@ class PersonalInsight:
             "bridge_domain": self.bridge_domain,
             "recent_activity": self.recent_activity,
             "shared_events": self.shared_events,
+            "structural_match": {
+                "similarity_10d": self.structural_match.similarity_10d,
+                "causal_overlap": self.structural_match.causal_overlap,
+                "is_valid": self.structural_match.is_valid,
+            } if self.structural_match else None,
             "reasoning": self.reasoning,
+            "mode": self.mode_used.value if self.mode_used else None,
         }
 
 
@@ -79,30 +134,108 @@ class InsightContext:
     text: str
     domain: str
     events: List[TaggedEvent] = field(default_factory=list)
+    vector_10d: Optional[DimensionalVector] = None
 
 
 # =============================================================================
-# Domain Bridge Templates
+# Structural Validation (The key to avoiding "advertising")
 # =============================================================================
 
-# Maps domain pairs to insight templates
+# Minimum thresholds for structural validity
+STRUCTURAL_THRESHOLD_10D = 0.5      # Minimum 10D cosine similarity
+STRUCTURAL_THRESHOLD_CAUSAL = 0.3   # Minimum causal chain overlap
+STRUCTURAL_THRESHOLD_COMBINED = 0.4 # Minimum combined score
+
+
+def _compute_structural_match(
+    current_vector: DimensionalVector,
+    current_events: Set[str],
+    target_vector: Optional[DimensionalVector],
+    target_events: Set[str],
+    target_causal_chain: Optional[List[str]] = None,
+    current_causal_chain: Optional[List[str]] = None,
+) -> StructuralMatch:
+    """
+    Compute structural match between current context and a target domain pattern.
+
+    This is the key function that prevents "advertising" - it validates that
+    a cross-domain connection is structurally grounded, not just co-occurrence.
+    """
+    # 10D similarity
+    similarity_10d = 0.0
+    if current_vector and target_vector:
+        similarity_10d = cosine_similarity(current_vector, target_vector)
+
+    # Event overlap
+    shared_events = list(current_events & target_events)
+
+    # Causal chain overlap (LCS-based)
+    causal_overlap = 0.0
+    if current_causal_chain and target_causal_chain:
+        causal_overlap = _compute_lcs_ratio(current_causal_chain, target_causal_chain)
+
+    # Determine validity
+    is_valid = (
+        similarity_10d >= STRUCTURAL_THRESHOLD_10D or
+        causal_overlap >= STRUCTURAL_THRESHOLD_CAUSAL or
+        len(shared_events) >= 2
+    )
+
+    match = StructuralMatch(
+        similarity_10d=similarity_10d,
+        shared_events=shared_events,
+        causal_overlap=causal_overlap,
+        is_valid=is_valid,
+    )
+
+    # Also check combined score
+    if match.combined_score >= STRUCTURAL_THRESHOLD_COMBINED:
+        match.is_valid = True
+
+    return match
+
+
+def _compute_lcs_ratio(chain1: List[str], chain2: List[str]) -> float:
+    """Compute longest common subsequence ratio between two chains."""
+    if not chain1 or not chain2:
+        return 0.0
+
+    m, n = len(chain1), len(chain2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if chain1[i-1].lower() == chain2[j-1].lower():
+                dp[i][j] = dp[i-1][j-1] + 1
+            else:
+                dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+
+    lcs_length = dp[m][n]
+    max_length = max(m, n)
+    return lcs_length / max_length if max_length > 0 else 0.0
+
+
+# =============================================================================
+# Domain Bridge Templates (only used after structural validation)
+# =============================================================================
+
 BRIDGE_TEMPLATES: Dict[Tuple[str, str], str] = {
     # Biology/Biotech + Finance
-    ("biology", "finance"): "Are you considering the investment angle?",
-    ("biotech", "finance"): "This breakthrough could have market implications.",
-    ("medicine", "finance"): "Healthcare stocks might be affected by this.",
+    ("biology", "finance"): "Structural pattern matches your finance interest.",
+    ("biotech", "finance"): "This pattern structurally connects to market dynamics.",
+    ("medicine", "finance"): "Healthcare pattern matches your financial analysis style.",
 
     # Tech + Finance
-    ("technology", "finance"): "Tech sector implications worth considering?",
-    ("ai", "finance"): "AI companies in this space might interest you.",
+    ("technology", "finance"): "Tech pattern structurally similar to your market analysis.",
+    ("ai", "finance"): "AI development pattern matches investment cycles you track.",
 
     # History + Current Events
-    ("history", "politics"): "Historical patterns suggest...",
-    ("history", "economics"): "Economic cycles show similar patterns.",
+    ("history", "politics"): "Historical pattern structurally matches current dynamics.",
+    ("history", "economics"): "Economic cycle pattern detected from your history queries.",
 
     # Science + Practical
-    ("physics", "engineering"): "Engineering applications could follow.",
-    ("chemistry", "manufacturing"): "Manufacturing implications here.",
+    ("physics", "engineering"): "Physics principle matches engineering patterns you explore.",
+    ("chemistry", "manufacturing"): "Chemical process maps to manufacturing patterns.",
 }
 
 
@@ -114,7 +247,7 @@ def _get_bridge_template(domain_a: str, domain_b: str) -> Optional[str]:
 
 
 # =============================================================================
-# Core Insight Generation
+# Recent Activity Helpers
 # =============================================================================
 
 def _get_recent_domains(
@@ -162,10 +295,40 @@ def _get_recent_events(
     return recent_events
 
 
+def _get_recent_vectors(
+    persona: PersonaProfile,
+    domain: str,
+    hours: int = 24,
+    limit: int = 5
+) -> List[DimensionalVector]:
+    """Get 10D vectors from recent queries in a specific domain."""
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    vectors = []
+
+    for query in reversed(persona.queries):
+        if len(vectors) >= limit:
+            break
+        try:
+            query_time = datetime.fromisoformat(query.timestamp)
+            if query_time < cutoff:
+                break
+            if query.domain and query.domain.lower() == domain.lower():
+                vectors.append(query.vector)
+        except (ValueError, TypeError):
+            continue
+
+    return vectors
+
+
+# =============================================================================
+# Core Insight Generation (Mode-Aware)
+# =============================================================================
+
 def generate_insights(
     persona_id: str,
     current_context: str,
     current_domain: str,
+    mode: InsightMode = InsightMode.NEW_POSSIBILITIES,
     max_insights: int = 3,
     recency_hours: int = 24,
     store: Optional[PersonaStore] = None,
@@ -173,12 +336,13 @@ def generate_insights(
     """
     Generate personalized insights based on persona history and current context.
 
-    This is the main entry point for the insight suggestion system.
+    USER CONTROLS THE MODE - this is not decided by the system.
 
     Args:
         persona_id: The user's persona identifier
         current_context: What the user is currently reading/viewing
         current_domain: Domain of the current context
+        mode: User-selected insight mode (controls what gets shown)
         max_insights: Maximum number of insights to return
         recency_hours: How far back to look in persona history
         store: Optional PersonaStore (uses global if not provided)
@@ -186,15 +350,10 @@ def generate_insights(
     Returns:
         List of PersonalInsight objects, sorted by confidence
 
-    Example:
-        >>> insights = generate_insights(
-        ...     persona_id="user_123",
-        ...     current_context="New CRISPR breakthrough enables gene editing...",
-        ...     current_domain="biology"
-        ... )
-        >>> for insight in insights:
-        ...     print(insight.message)
-        "Are you considering the investment angle?"
+    Modes:
+        RECENT_MEMORY: Show connections to recent activity (recency priority)
+        DOMAIN_RELATIVE: Stay in current domain (no cross-domain)
+        NEW_POSSIBILITIES: Only show cross-domain if STRUCTURALLY validated
     """
     if store is None:
         store = get_persona_store()
@@ -208,85 +367,161 @@ def generate_insights(
     insights: List[PersonalInsight] = []
 
     # Encode current context
-    _, current_events, _ = encode_with_events(current_context)
+    current_vector, current_events, _ = encode_with_events(current_context)
     current_event_types = {e.event_type.value for e in current_events}
 
     # Get recent activity
     recent_domains = _get_recent_domains(persona, hours=recency_hours)
     recent_events = _get_recent_events(persona, hours=recency_hours)
 
-    # 1. Bridge Opportunity: Current domain differs from recent activity
+    # ==========================================================================
+    # MODE: DOMAIN_RELATIVE - Stay within current domain
+    # ==========================================================================
+    if mode == InsightMode.DOMAIN_RELATIVE:
+        # Only show pattern continuations within the domain
+        top_events = sorted(recent_events.items(), key=lambda x: -x[1])[:5]
+        for event_type, count in top_events:
+            if event_type in current_event_types:
+                insights.append(PersonalInsight(
+                    insight_type=InsightType.PATTERN_CONTINUATION,
+                    message=f"This deepens your {event_type} exploration in {current_domain}.",
+                    confidence=min(0.85, 0.5 + (count * 0.05)),
+                    current_domain=current_domain,
+                    recent_activity=[f"{event_type}: {count} occurrences"],
+                    shared_events=[event_type],
+                    reasoning=f"Continuing {event_type} pattern within {current_domain}",
+                    mode_used=mode,
+                ))
+
+        insights.sort(key=lambda x: -x.confidence)
+        return insights[:max_insights]
+
+    # ==========================================================================
+    # MODE: RECENT_MEMORY - Prioritize recency (user explicitly wants this)
+    # ==========================================================================
+    if mode == InsightMode.RECENT_MEMORY:
+        for recent_domain, query_count in recent_domains:
+            if recent_domain.lower() == current_domain.lower():
+                continue
+
+            # Get vectors from recent domain for comparison
+            recent_vectors = _get_recent_vectors(persona, recent_domain, recency_hours)
+
+            # Check for existing bridge
+            bridge_key = "_".join(sorted([current_domain.lower(), recent_domain.lower()]))
+            existing_bridge = persona.bridges.get(bridge_key)
+
+            # Structural validation (still compute, but with lower threshold for recent memory)
+            target_events = set()
+            if existing_bridge:
+                target_events = existing_bridge.shared_events
+
+            structural_match = None
+            if recent_vectors:
+                structural_match = _compute_structural_match(
+                    current_vector=current_vector,
+                    current_events=current_event_types,
+                    target_vector=recent_vectors[0] if recent_vectors else None,
+                    target_events=target_events,
+                )
+
+            # For RECENT_MEMORY, recency matters more than structure
+            confidence = min(0.9, 0.4 + (query_count * 0.1))
+            if structural_match and structural_match.is_valid:
+                confidence = min(0.95, confidence + 0.1)
+
+            message = f"Your recent {recent_domain} work ({query_count} queries) connects here."
+            if structural_match and structural_match.is_valid:
+                message += f" (structural match: {structural_match.combined_score:.0%})"
+
+            insights.append(PersonalInsight(
+                insight_type=InsightType.BRIDGE_OPPORTUNITY,
+                message=message,
+                confidence=confidence,
+                current_domain=current_domain,
+                bridge_domain=recent_domain,
+                recent_activity=[f"{recent_domain}: {query_count} queries in {recency_hours}h"],
+                shared_events=list(current_event_types & target_events),
+                structural_match=structural_match,
+                reasoning=f"Recent memory mode: prioritizing recency of {recent_domain} activity",
+                mode_used=mode,
+            ))
+
+        insights.sort(key=lambda x: -x.confidence)
+        return insights[:max_insights]
+
+    # ==========================================================================
+    # MODE: NEW_POSSIBILITIES - Only if STRUCTURAL match exists
+    # ==========================================================================
+    # This is the default and most rigorous mode
+
     for recent_domain, query_count in recent_domains:
         if recent_domain.lower() == current_domain.lower():
             continue
 
-        # Check if there's a template for this bridge
-        template = _get_bridge_template(current_domain, recent_domain)
+        # Get vectors from recent domain
+        recent_vectors = _get_recent_vectors(persona, recent_domain, recency_hours)
 
-        # Check for existing bridge in persona
+        # Get bridge info
         bridge_key = "_".join(sorted([current_domain.lower(), recent_domain.lower()]))
         existing_bridge = persona.bridges.get(bridge_key)
 
-        # Calculate confidence based on query count and bridge history
-        confidence = min(0.9, 0.3 + (query_count * 0.1))
+        target_events = set()
         if existing_bridge:
-            confidence = min(0.95, confidence + (existing_bridge.bridge_count * 0.05))
+            target_events = existing_bridge.shared_events
 
-        # Find shared events between current context and recent domain
-        shared = []
-        if existing_bridge:
-            shared = list(current_event_types & existing_bridge.shared_events)
+        # STRUCTURAL VALIDATION - the key to avoiding advertising
+        structural_match = _compute_structural_match(
+            current_vector=current_vector,
+            current_events=current_event_types,
+            target_vector=recent_vectors[0] if recent_vectors else None,
+            target_events=target_events,
+        )
 
-        # Generate message
+        # ONLY suggest if structurally valid
+        if not structural_match.is_valid:
+            continue  # Skip this domain - no real connection
+
+        # Get template or generate message
+        template = _get_bridge_template(current_domain, recent_domain)
         if template:
             message = template
         else:
-            message = f"Your recent {recent_domain} activity might connect here."
+            message = f"Structural pattern match with your {recent_domain} analysis."
+
+        # Add match score to message for transparency
+        message += f" (match: {structural_match.combined_score:.0%})"
+
+        # Confidence based on structural match, not just recency
+        confidence = min(0.95, 0.5 + structural_match.combined_score * 0.4)
 
         insights.append(PersonalInsight(
-            insight_type=InsightType.BRIDGE_OPPORTUNITY,
+            insight_type=InsightType.STRUCTURAL_MATCH,
             message=message,
             confidence=confidence,
             current_domain=current_domain,
             bridge_domain=recent_domain,
             recent_activity=[f"{recent_domain}: {query_count} queries"],
-            shared_events=shared,
-            reasoning=f"User has been active in {recent_domain} ({query_count} queries in {recency_hours}h)",
+            shared_events=structural_match.shared_events,
+            structural_match=structural_match,
+            reasoning=f"Structural validation passed: 10D={structural_match.similarity_10d:.2f}, causal={structural_match.causal_overlap:.2f}",
+            mode_used=mode,
         ))
 
-    # 2. Pattern Continuation: User follows certain event patterns
+    # Also add pattern continuations (these don't need cross-domain validation)
     top_events = sorted(recent_events.items(), key=lambda x: -x[1])[:3]
     for event_type, count in top_events:
         if event_type in current_event_types:
             insights.append(PersonalInsight(
                 insight_type=InsightType.PATTERN_CONTINUATION,
-                message=f"This follows your interest in {event_type} patterns.",
-                confidence=min(0.8, 0.4 + (count * 0.05)),
+                message=f"This continues your {event_type} pattern exploration.",
+                confidence=min(0.75, 0.4 + (count * 0.05)),
                 current_domain=current_domain,
                 recent_activity=[f"{event_type}: {count} occurrences"],
                 shared_events=[event_type],
-                reasoning=f"User frequently explores {event_type} patterns",
+                reasoning=f"Pattern continuation within {current_domain}",
+                mode_used=mode,
             ))
-
-    # 3. Action Suggestion: Specific suggestions based on domain combination
-    for recent_domain, _ in recent_domains[:2]:
-        if recent_domain.lower() == current_domain.lower():
-            continue
-
-        # Finance-related action suggestions
-        if recent_domain.lower() == "finance" and current_domain.lower() in [
-            "biology", "biotech", "technology", "ai", "medicine"
-        ]:
-            insights.append(PersonalInsight(
-                insight_type=InsightType.ACTION_SUGGESTION,
-                message="Consider researching related stocks or investment opportunities.",
-                confidence=0.7,
-                current_domain=current_domain,
-                bridge_domain="finance",
-                recent_activity=["Recent trading/finance activity detected"],
-                reasoning="User has recent finance activity and is viewing investment-relevant content",
-            ))
-            break
 
     # Sort by confidence and limit
     insights.sort(key=lambda x: -x.confidence)
@@ -297,6 +532,7 @@ def generate_insight_for_display(
     persona_id: str,
     current_context: str,
     current_domain: str,
+    mode: InsightMode = InsightMode.NEW_POSSIBILITIES,
     store: Optional[PersonaStore] = None,
 ) -> Optional[str]:
     """
@@ -304,29 +540,12 @@ def generate_insight_for_display(
 
     Convenience function that returns just the top insight message,
     or None if no insights are available.
-
-    Args:
-        persona_id: The user's persona identifier
-        current_context: What the user is currently reading/viewing
-        current_domain: Domain of the current context
-        store: Optional PersonaStore
-
-    Returns:
-        The top insight message as a string, or None
-
-    Example:
-        >>> message = generate_insight_for_display(
-        ...     "user_123",
-        ...     "CRISPR gene editing breakthrough...",
-        ...     "biology"
-        ... )
-        >>> print(message)
-        "Are you considering the investment angle?"
     """
     insights = generate_insights(
         persona_id=persona_id,
         current_context=current_context,
         current_domain=current_domain,
+        mode=mode,
         max_insights=1,
         store=store,
     )
@@ -345,18 +564,22 @@ def explain_insight(insight: PersonalInsight) -> str:
     Generate a transparent explanation of why this insight was suggested.
 
     Supports the system's transparency principle: show, don't tell.
-
-    Args:
-        insight: The PersonalInsight to explain
-
-    Returns:
-        Human-readable explanation string
     """
     parts = [f"Insight Type: {insight.insight_type.value}"]
     parts.append(f"Confidence: {insight.confidence:.0%}")
 
+    if insight.mode_used:
+        parts.append(f"Mode: {insight.mode_used.value}")
+
     if insight.bridge_domain:
         parts.append(f"Bridge: {insight.current_domain} ↔ {insight.bridge_domain}")
+
+    if insight.structural_match:
+        parts.append(
+            f"Structural: 10D={insight.structural_match.similarity_10d:.2f}, "
+            f"causal={insight.structural_match.causal_overlap:.2f}, "
+            f"valid={insight.structural_match.is_valid}"
+        )
 
     if insight.recent_activity:
         parts.append(f"Based on: {', '.join(insight.recent_activity)}")
@@ -371,12 +594,19 @@ def explain_insight(insight: PersonalInsight) -> str:
 
 
 __all__ = [
+    # Modes (user control)
+    "InsightMode",
     # Types
     "InsightType",
     "PersonalInsight",
     "InsightContext",
+    "StructuralMatch",
     # Core functions
     "generate_insights",
     "generate_insight_for_display",
     "explain_insight",
+    # Thresholds (for transparency)
+    "STRUCTURAL_THRESHOLD_10D",
+    "STRUCTURAL_THRESHOLD_CAUSAL",
+    "STRUCTURAL_THRESHOLD_COMBINED",
 ]
