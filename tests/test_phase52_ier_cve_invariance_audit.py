@@ -540,12 +540,23 @@ class TestPersonaInvariance:
 
     def test_persona_metadata_is_optional(self):
         """Test that persona IER-CVE metadata field is optional."""
-        from symbolu.mechanical.persona.models import PersonaResponse
+        from symbolu.mechanical.persona.models import PersonaResponse, PersonaMetadata
 
         # Should be able to create PersonaResponse without IER-CVE metadata
         response = PersonaResponse(
             persona_id="test",
             text="Test response",
+            layers={"symbolic": {}, "practical": {}, "mirror": {}},
+            metadata=PersonaMetadata(
+                tier="HYBRID",
+                domain="test",
+                intent="how",
+                persona_id="test",
+                persona_name="Test",
+                persona_description="Test persona",
+                dha_tone="neutral",
+                dha_confidence=0.8,
+            ),
         )
 
         assert hasattr(response, 'persona_internal_external_alignment_profile')
@@ -576,12 +587,23 @@ class TestPersonaInvariance:
 
     def test_persona_response_backward_compatible(self):
         """Test that PersonaResponse is backward-compatible with IER-CVE field."""
-        from symbolu.mechanical.persona.models import PersonaResponse
+        from symbolu.mechanical.persona.models import PersonaResponse, PersonaMetadata
 
         # Old code should work without IER-CVE field
         response = PersonaResponse(
             persona_id="test",
             text="Test",
+            layers={"symbolic": {}, "practical": {}, "mirror": {}},
+            metadata=PersonaMetadata(
+                tier="HYBRID",
+                domain="test",
+                intent="how",
+                persona_id="test",
+                persona_name="Test",
+                persona_description="Test persona",
+                dha_tone="neutral",
+                dha_confidence=0.8,
+            ),
         )
 
         # New field should be None by default
@@ -596,12 +618,23 @@ class TestPersonaInvariance:
 
     def test_persona_ier_cve_metadata_json_serializable(self):
         """Test that persona IER-CVE metadata is JSON-serializable."""
-        from symbolu.mechanical.persona.models import PersonaResponse
+        from symbolu.mechanical.persona.models import PersonaResponse, PersonaMetadata
         import json
 
         response = PersonaResponse(
             persona_id="test",
             text="Test",
+            layers={"symbolic": {}, "practical": {}, "mirror": {}},
+            metadata=PersonaMetadata(
+                tier="HYBRID",
+                domain="test",
+                intent="how",
+                persona_id="test",
+                persona_name="Test",
+                persona_description="Test persona",
+                dha_tone="neutral",
+                dha_confidence=0.8,
+            ),
             persona_internal_external_alignment_profile={
                 "alignment_index": 0.75,
                 "band": "high_alignment",
@@ -609,7 +642,7 @@ class TestPersonaInvariance:
         )
 
         # Should be JSON-serializable
-        json_str = json.dumps(response.dict())
+        json_str = json.dumps(response.model_dump())
         assert isinstance(json_str, str)
 
     def test_persona_engine_ier_cve_extraction_graceful(self):

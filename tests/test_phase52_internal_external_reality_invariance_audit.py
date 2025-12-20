@@ -545,11 +545,22 @@ class TestPersonaInvariance:
 
     def test_persona_response_has_ier_cve_field(self):
         """Test that PersonaResponse has persona_internal_external_alignment_profile field."""
-        from symbolu.mechanical.persona.models import PersonaResponse
+        from symbolu.mechanical.persona.models import PersonaResponse, PersonaMetadata
 
         response = PersonaResponse(
             persona_id="test",
             text="test",
+            layers={"symbolic": {}, "practical": {}, "mirror": {}},
+            metadata=PersonaMetadata(
+                tier="HYBRID",
+                domain="test",
+                intent="how",
+                persona_id="test",
+                persona_name="Test",
+                persona_description="Test persona",
+                dha_tone="neutral",
+                dha_confidence=0.8,
+            ),
         )
 
         assert hasattr(response, 'persona_internal_external_alignment_profile')
