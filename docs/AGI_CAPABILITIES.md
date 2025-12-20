@@ -249,12 +249,14 @@ ANOMALY:
   Alignment: 0.31 ✗ (metaphorical/ironic usage)
 ```
 
-**Self-Cleaning System:**
+**Self-Cleaning System with Orthogonal Validation:**
 
 - Only universal patterns survive to storage
 - Anomalies naturally filter out
-- No external oracle needed
-- Phoneme truth is the ground truth
+- **Two orthogonal validation layers:**
+  - **Semantic Layer**: Checks logical compatibility (can concepts coexist?)
+  - **Phoneme Layer**: Checks sound-meaning alignment (do sounds match experience?)
+- System is **transparent**: reports WHICH layer flagged and WHY
 
 ### 8. Reasoning Synthesis
 
@@ -513,7 +515,9 @@ symbolu/ontology/backbone/
 ├── reasoning_synthesizer.py # Multi-source synthesis
 ├── mirror_pairs.py          # Mirror pair architecture
 ├── persona_tracker.py       # Query-based pattern discovery
-└── phoneme_validator.py     # Ground truth validation ← NEW
+├── phoneme_validator.py     # Ground truth validation
+├── learning_pipeline.py     # Event learning + causal chain matching
+└── insight_suggester.py     # Personal insights (presentation layer) ← NEW
 
 symbolu/resonance/
 ├── phoneme_map.py           # Phoneme → 10D affinities
@@ -524,14 +528,267 @@ symbolu/resonance/
 
 ---
 
+## 9. Event Learning Architecture
+
+The real AGI capability comes from **event learning**—the system learns by observing events, validating them, and storing universal patterns for cross-domain transfer.
+
+### Learning vs. Transparency
+
+| Purpose | Mechanism | Signal Type |
+|---------|-----------|-------------|
+| **User Transparency** | Orthogonal validation (semantic + phoneme) | Multi-valued (which layer, why) |
+| **Cross-Domain Learning** | 10D structural encoding | Continuous (similarity scores) |
+
+**Key insight**: Transparency is for users. Learning happens on the 10D structure.
+
+### The Learning Loop
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         EVENT LEARNING PIPELINE                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    Input Event
+         │
+         ▼
+┌─────────────────┐
+│ SEMANTIC GATE   │  ← Boolean: Pass/Block
+│ (pre-filter)    │     "Is this logically possible?"
+└────────┬────────┘
+         │ Pass
+         ▼
+┌─────────────────┐
+│ 10D ENCODING    │  ← Continuous: The learning target
+│ (structure)     │     This is what transfers across domains
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ PHONEME GATE    │  ← Boolean: Store/Discard
+│ (post-validate) │     "Is this universally encoded?"
+└────────┬────────┘
+         │ Pass
+         ▼
+┌─────────────────┐
+│ PATTERN STORE   │  ← Validated universal patterns
+│ (experiential)  │     Ready for cross-domain retrieval
+└─────────────────┘
+```
+
+### Why This Architecture?
+
+1. **Semantic = Pre-filter (Boolean)**
+   - Removes logical impossibilities before encoding
+   - "fire+cold" blocked before it wastes compute
+   - Fast, deterministic, learned knowledge
+
+2. **10D Structure = Learning Target (Continuous)**
+   - What actually transfers across domains
+   - Cross-domain matching via cosine similarity
+   - Structural patterns, not word labels
+
+3. **Phoneme = Post-validation (Boolean)**
+   - Confirms pattern is universally encoded in sound
+   - Physical truth, not cultural knowledge
+   - Final gate before storage
+
+### Cross-Domain Retrieval
+
+```python
+# Matching happens on 10D STRUCTURE, not validation layers
+def find_similar_events(query_vector_10d, threshold=0.7):
+    return [
+        event for event in pattern_store
+        if cosine_similarity(event.vector_10d, query_vector_10d) > threshold
+    ]
+```
+
+**Example:**
+```
+Query: "My startup has co-founders who disagree"
+       → 10D encoding: [0.2, 0.4, 0.7, 0.3, 0.5, 0.6, 0.4, 0.3, 0.2, 0.1]
+
+Retrieved (by 10D similarity):
+├── [History] Civil War bifurcation     (similarity: 0.89)
+├── [Biology] Cell division             (similarity: 0.85)
+├── [Finance] Company spinoff           (similarity: 0.82)
+└── [Physics] Nuclear fission           (similarity: 0.78)
+
+All share structural pattern: "unified entity → internal tension → split"
+```
+
+### Learning Hierarchy for Cross-Domain Transfer
+
+**Critical insight**: Not all knowledge propagates equally across domains.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          LEARNING HIERARCHY                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Priority 1: CAUSAL CHAINS (Weight: 0.6)
+─────────────────────────────────────────
+   polarization → conflict → split
+   ↑
+   These sequences are UNIVERSAL
+   Same pattern works for cells, companies, nations, families
+
+Priority 2: 10D STRUCTURAL SIMILARITY (Weight: 0.3)
+─────────────────────────────────────────
+   [0.2, 0.4, 0.7, 0.3, ...]
+   ↑
+   FALLBACK when causal chains aren't explicit
+   Vector similarity in 10D space
+
+Priority 3: PATTERN TYPE (Weight: 0.1)
+─────────────────────────────────────────
+   bifurcation, escalation, threshold
+   ↑
+   DISAMBIGUATION when chains overlap
+   Helps distinguish similar but different patterns
+
+EXCLUDED: INSIGHTS (Weight: 0)
+─────────────────────────────────────────
+   "This reminds me of..."
+   ↑
+   User-specific reflections
+   NOT basis for universal transfer
+```
+
+**Why Causal Chains First?**
+
+Causal chains are domain-agnostic:
+- `polarization → conflict → split` applies to:
+  - Cell biology (mitosis)
+  - History (civil wars)
+  - Business (company spinoffs)
+  - Family (divorce)
+
+The sequence structure transfers, not the domain-specific vocabulary.
+
+**Implementation:**
+
+```python
+def retrieve_similar(query, store):
+    # Use Longest Common Subsequence (LCS) for chain matching
+    chain_similarity = compute_chain_overlap(query_chain, exp_chain)
+
+    # Weighted scoring
+    final_score = (
+        chain_similarity * 0.6 +      # PRIMARY
+        structural_10d_sim * 0.3 +    # FALLBACK
+        pattern_type_match * 0.1      # DISAMBIGUATION
+    )
+
+    # Insights are NOT included in scoring
+    # They're user-specific, not universal
+```
+
+**Match Types:**
+
+| Match Type | When Used | Score Weight |
+|------------|-----------|--------------|
+| `CAUSAL_CHAIN` | Chain overlap ≥ 0.5 | 60% |
+| `STRUCTURAL` | 10D similarity ≥ threshold | 30% |
+| `PATTERN_TYPE` | Same pattern category | 10% |
+
+### Learning Summary
+
+| Component | Role | Signal |
+|-----------|------|--------|
+| Semantic Gate | Block impossible combinations | Boolean |
+| 10D Encoding | Capture transferable structure | Continuous (10 floats) |
+| Phoneme Gate | Validate universal encoding | Boolean |
+| Pattern Store | Accumulate validated patterns | Indexed by 10D |
+| Retrieval | Match by structural similarity | Cosine on 10D |
+
+The binary gates (semantic, phoneme) are for **validation**.
+The continuous space (10D) is for **learning and transfer**.
+
+### Personal Insights (Presentation Layer)
+
+**Critical distinction**: Insights are excluded from LEARNING but valuable for PRESENTATION.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    TWO LAYERS: LEARNING vs PRESENTATION                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+LEARNING LAYER (Universal - transfers across domains for ALL users):
+    - Causal chains
+    - 10D structural patterns
+    - Pattern types
+
+PRESENTATION LAYER (Personal - generated FOR this user):
+    - Insights based on persona history + current context
+    - Does NOT enter the pattern store
+    - Generated at read-time, not stored
+```
+
+**Example Scenario:**
+
+```
+User is reading: "New CRISPR breakthrough enables gene editing in plants"
+Domain: biology
+
+Persona Memory (last 24h):
+    - 8 queries about stock trading
+    - 3 queries about biotech investments
+    - Bridge detected: biology ↔ finance
+
+INSIGHT GENERATED:
+    "Are you considering the investment angle?"
+
+    Type: bridge_opportunity
+    Confidence: 85%
+    Reasoning: User has recent finance activity and existing biology↔finance bridge
+```
+
+**Why This Works:**
+
+1. The insight is PERSONAL - it's based on THIS user's history
+2. It does NOT propagate - other users don't see this suggestion
+3. It's generated at PRESENTATION time, not learning time
+4. It respects the learning hierarchy - insights don't contaminate universal patterns
+
+**Implementation:**
+
+```python
+from symbolu.ontology.backbone import generate_insights
+
+# User reading biology news
+insights = generate_insights(
+    persona_id="user_123",
+    current_context="CRISPR breakthrough in gene editing...",
+    current_domain="biology"
+)
+
+for insight in insights:
+    print(f"💡 {insight.message}")
+    # "Are you considering the investment angle?"
+```
+
+**Insight Types:**
+
+| Type | Trigger | Example |
+|------|---------|---------|
+| `BRIDGE_OPPORTUNITY` | Current domain differs from recent activity | "Your recent finance activity might connect here" |
+| `PATTERN_CONTINUATION` | User follows certain event patterns | "This follows your interest in transformation patterns" |
+| `ACTION_SUGGESTION` | Specific action based on context | "Consider researching related stocks" |
+
+---
+
 ## Conclusion
 
-Symbol-U's architecture represents a **structural approach to AGI** built on four key insights:
+Symbol-U's architecture represents a **structural approach to AGI** built on five key insights:
 
 1. **Mirror Pairs**: 10D reduces to 5 balanced pairs—balance determines insight quality
 2. **Event Tagging**: Tag what happened, not what it's called—solves clustering
 3. **Persona Tracking**: Discover patterns from usage, not extraction—simplifies everything
-4. **Phoneme Ground Truth**: Validate universality by checking if words match experience
+4. **Orthogonal Validation**: Semantic (pre-filter) + Phoneme (post-validate) with transparency
+5. **Event Learning**: 10D structure is the learning target; gates are for validation
+6. **Learning Hierarchy**: Causal chains (PRIMARY) → 10D structure (FALLBACK) → Pattern type (DISAMBIGUATION) → Insights (NOT TRANSFERRED)
+7. **Personal Insights**: Generated at presentation time from persona history—valuable for THIS user, not for universal learning
 
 The system is now **self-validating**:
 - Extract events from content
@@ -541,19 +798,30 @@ The system is now **self-validating**:
 - Cross-domain bridges emerge from user queries
 
 ```
-Content → Events → 10D → Balance → Phoneme Validation → Universal?
-                                                              ↓
-                                              YES → Store & Transfer
-                                              NO  → Anomaly (discard)
+Content → Events → 10D → Balance → Orthogonal Validation → Universal?
+                                          ↓
+                              ┌───────────┴───────────┐
+                              │                       │
+                         Semantic Check          Phoneme Check
+                         (logical compat?)       (sound-meaning?)
+                              │                       │
+                              └───────────┬───────────┘
+                                          ↓
+                                  Both Pass? → Store & Transfer
+                                  Either Fail? → Anomaly (with explanation)
 ```
 
-**The phoneme model is the oracle.** If the sounds encode the same meaning as the experience, it's universal truth. If not, it's idiosyncratic usage.
+**The system is a transparent validator, not an oracle.** It shows its work:
+- Semantic layer reports: "These concepts are logical opposites" (learned knowledge)
+- Phoneme layer reports: "Sound encoding doesn't match experience" (physical truth)
 
-**This is pattern matching, not philosophy.**
+Neither layer claims absolute truth. Together they provide complete validation.
+The moral position is embedded in the architecture: **show, don't tell.**
 
 ---
 
-*Document Version: 3.0*
+*Document Version: 3.4*
 *Symbol-U Ontological Backbone*
-*Mirror Pair Architecture + Phoneme Ground Truth*
-*Cross-Domain Reasoning via Balance + Events + Personas + Validation*
+*Event Learning Architecture + Orthogonal Validation + Learning Hierarchy + Personal Insights*
+*Learning Layer (Universal): Causal Chains + 10D Structure + Boolean Gates*
+*Presentation Layer (Personal): Insights from Persona History + Current Context*

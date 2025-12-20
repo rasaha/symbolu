@@ -95,6 +95,36 @@ from .phoneme_validator import (
     validate_experiential_before_store,
     validate_batch,
     filter_universal,
+    # Semantic contradiction check
+    SemanticCheck,
+    check_semantic_contradiction,
+    SEMANTIC_OPPOSITES,
+    # Word-pair entropy validation
+    WordPairHarmony,
+    validate_word_pair,
+    validate_phrase_harmony,
+)
+from .learning_pipeline import (
+    # Learning outcomes
+    LearningOutcome,
+    LearningResult,
+    MatchType,
+    RetrievalResult,
+    BatchLearningResult,
+    # Learning functions
+    learn_from_event,
+    learn_batch,
+    # Retrieval functions
+    retrieve_similar,
+)
+from .insight_suggester import (
+    # Types
+    InsightType,
+    PersonalInsight,
+    # Core functions
+    generate_insights,
+    generate_insight_for_display,
+    explain_insight,
 )
 
 __all__ = [
@@ -155,4 +185,27 @@ __all__ = [
     "validate_experiential_before_store",
     "validate_batch",
     "filter_universal",
+    # Semantic Contradiction Check
+    "SemanticCheck",
+    "check_semantic_contradiction",
+    "SEMANTIC_OPPOSITES",
+    # Word-Pair Entropy Validation
+    "WordPairHarmony",
+    "validate_word_pair",
+    "validate_phrase_harmony",
+    # Event Learning Pipeline
+    "LearningOutcome",
+    "LearningResult",
+    "MatchType",
+    "RetrievalResult",
+    "BatchLearningResult",
+    "learn_from_event",
+    "learn_batch",
+    "retrieve_similar",
+    # Personal Insight Suggester
+    "InsightType",
+    "PersonalInsight",
+    "generate_insights",
+    "generate_insight_for_display",
+    "explain_insight",
 ]
