@@ -453,6 +453,10 @@ def validate_word_pair(
     """
     Validate if two words naturally go together based on phoneme harmony.
 
+    The key insight: Encode the COMBINED phrase as an event, then check if
+    each word's phonemes align with that combined meaning. Natural pairs
+    will have both words aligning with their combined meaning.
+
     Args:
         word1: First word (e.g., "sky")
         word2: Second word (e.g., "blue" or "red")
@@ -486,6 +490,20 @@ def validate_word_pair(
             conflicting_layers=[],
         )
 
+    # KEY INSIGHT: Encode the combined phrase as an event
+    # Then check if each word's phonemes match the combined meaning
+    combined_phrase = f"{word1} {word2}"
+    combined_event_vector, _, _ = encode_with_events(combined_phrase)
+    combined_tuple = _dimensional_to_tuple(combined_event_vector)
+
+    # How well does each word's phonemes match the COMBINED meaning?
+    word1_to_combined = _cosine_similarity(vec1, combined_tuple)
+    word2_to_combined = _cosine_similarity(vec2, combined_tuple)
+
+    # Natural pairs: BOTH words phonetically match their combined meaning
+    # Unnatural pairs: One or both words don't match the combined meaning
+    combined_alignment = (word1_to_combined + word2_to_combined) / 2.0
+
     # Get dominant layers
     dom1 = _get_dominant_layer(vec1)
     dom2 = _get_dominant_layer(vec2)
@@ -506,30 +524,53 @@ def validate_word_pair(
              (v2 >= HIGH_THRESHOLD and v1 < LOW_THRESHOLD):
             conflicting.append(layer)
 
-    # Compute harmony based on:
-    # 1. Vector similarity (cosine)
-    # 2. Shared layers (bonus)
-    # 3. Conflicting layers (penalty)
+    # Structural similarity between the two words
+    structural_sim = _cosine_similarity(vec1, vec2)
 
-    cosine_sim = _cosine_similarity(vec1, vec2)
+    # KEY INSIGHT: UNIFYING layer (O9, index 8) indicates natural harmony
+    # Words with high UNIFYING create more natural pairings
+    # "blue" has high UNIFYING (0.42), "red" has lower (0.31)
+    UNIFYING_INDEX = 8  # O9_UNIFYING
+    unifying_score1 = vec1[UNIFYING_INDEX] if len(vec1) > UNIFYING_INDEX else 0.0
+    unifying_score2 = vec2[UNIFYING_INDEX] if len(vec2) > UNIFYING_INDEX else 0.0
 
-    # Adjust for semantic compatibility using layer analysis
-    shared_bonus = len(shared) * 0.05
-    conflict_penalty = len(conflicting) * 0.08
+    # Combined unifying indicates natural pairing potential
+    combined_unifying = (unifying_score1 + unifying_score2) / 2.0
 
-    # Key insight: words should share PURPOSE-related layers to be natural pairs
-    # Acting, Forming, Purposing layers matter more for semantic pairing
+    # Final harmony score combines:
+    # 1. Combined alignment (do phonemes match combined meaning?) - PRIMARY
+    # 2. Structural similarity (do words have similar phoneme structure?)
+    # 3. UNIFYING layer presence (natural harmony indicator) - NEW
+    harmony_score = (combined_alignment * 0.5) + (structural_sim * 0.2) + (combined_unifying * 0.3)
+
+    # Bonus for shared purpose layers
     purpose_layers = {"O3_ACTING", "O2_FORMING", "O7_PURPOSING", "O9_UNIFYING"}
     purpose_shared = len([l for l in shared if l in purpose_layers])
-    purpose_conflict = len([l for l in conflicting if l in purpose_layers])
+    harmony_score += purpose_shared * 0.02
 
-    purpose_adjustment = (purpose_shared * 0.1) - (purpose_conflict * 0.15)
+    # Penalty for conflicting layers
+    harmony_score -= len(conflicting) * 0.05
 
-    harmony_score = cosine_sim + shared_bonus - conflict_penalty + purpose_adjustment
     harmony_score = max(0.0, min(1.0, harmony_score))
 
-    # Determine entropy flag
-    entropy_flag = harmony_score < harmony_threshold or len(conflicting) > 2
+    # Determine entropy flag using tiered UNIFYING thresholds
+    # KEY: The modifier word (word2) should have sufficient UNIFYING for natural pairing
+    #
+    # Tiers based on UNIFYING score:
+    #   >= 0.35: NATURAL (blue=0.42, orange=0.43, clear=0.34) - default states
+    #   0.25-0.35: ACCEPTABLE (white=0.28, grey=0.33, red=0.31) - common variants
+    #   < 0.25: EXCEPTIONAL (pink=0.22, purple=0.30) - rare/unusual states
+    #
+    UNIFYING_EXCEPTIONAL_THRESHOLD = 0.25  # Below this = truly high entropy
+    UNIFYING_NATURAL_THRESHOLD = 0.35      # Above this = definitely natural
+
+    modifier_is_exceptional = unifying_score2 < UNIFYING_EXCEPTIONAL_THRESHOLD
+    modifier_is_natural = unifying_score2 >= UNIFYING_NATURAL_THRESHOLD
+
+    # High entropy only if:
+    # 1. Modifier word is truly exceptional (UNIFYING < 0.25), OR
+    # 2. Too many conflicting layers
+    entropy_flag = modifier_is_exceptional or len(conflicting) > 2
 
     return WordPairHarmony(
         word1=word1,
