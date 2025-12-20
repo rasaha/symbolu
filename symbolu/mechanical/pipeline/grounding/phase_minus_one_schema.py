@@ -22,7 +22,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .phase_minus_one_fuzzy import FuzzyQuerySignals
 
 
 # ============================================================================
@@ -184,6 +187,9 @@ class ClauseGroundingResult:
         resolution_policy: How to handle ambiguity (NONE/ASK_CLARIFY/SAFE_DEFAULT)
         linkage_hint: Semantic relationship to previous clause
         clause_index: Position in the original utterance (0-indexed)
+        fuzzy_signals: Optional fuzzy classifier signals for disambiguation
+        fuzzy_adjustment: Confidence adjustment applied from fuzzy signals
+        fuzzy_hints: Hints from fuzzy classifier for downstream processing
     """
     clause_text: str
     candidates: List[GroundingCandidate] = field(default_factory=list)
@@ -192,10 +198,13 @@ class ClauseGroundingResult:
     resolution_policy: ResolutionPolicy = ResolutionPolicy.ASK_CLARIFY
     linkage_hint: LinkageHint = LinkageHint.NONE
     clause_index: int = 0
+    fuzzy_signals: Optional["FuzzyQuerySignals"] = None
+    fuzzy_adjustment: float = 0.0
+    fuzzy_hints: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary for logging/tracing."""
-        return {
+        result = {
             "clause_text": self.clause_text,
             "candidates": [c.to_dict() for c in self.candidates],
             "selected": self.selected.to_dict() if self.selected else None,
@@ -203,7 +212,17 @@ class ClauseGroundingResult:
             "resolution_policy": self.resolution_policy.value,
             "linkage_hint": self.linkage_hint.value,
             "clause_index": self.clause_index,
+            "fuzzy_adjustment": self.fuzzy_adjustment,
+            "fuzzy_hints": self.fuzzy_hints,
         }
+        if self.fuzzy_signals:
+            result["fuzzy_signals"] = {
+                "primary_intent": self.fuzzy_signals.primary_intent.value,
+                "subject_clarity": self.fuzzy_signals.subject_clarity,
+                "pronoun_ambiguity": self.fuzzy_signals.pronoun_ambiguity,
+                "confidence_adjustment": self.fuzzy_signals.confidence_adjustment,
+            }
+        return result
 
 
 @dataclass

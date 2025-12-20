@@ -38,6 +38,7 @@ from .phase_minus_one_schema import (
 from .phase_minus_one_grounding import ObserverObservedGrounding
 from .phase_minus_one_ambiguity import AmbiguityResolver
 from .phase_minus_one_clause_splitter import ConservativeClauseSplitter
+from .phase_minus_one_fuzzy import FuzzyQueryClassifier, FuzzyQuerySignals
 
 
 class PhaseMinusOnePipeline:
@@ -60,6 +61,7 @@ class PhaseMinusOnePipeline:
         grounding_engine: ObserverObservedGrounding | None = None,
         resolver: AmbiguityResolver | None = None,
         splitter: ConservativeClauseSplitter | None = None,
+        fuzzy_classifier: FuzzyQueryClassifier | None = None,
     ) -> None:
         """
         Initialize the PO1 pipeline.
@@ -68,6 +70,7 @@ class PhaseMinusOnePipeline:
             grounding_engine: OOG engine instance.
             resolver: ARL resolver instance.
             splitter: CSL splitter instance.
+            fuzzy_classifier: FQC classifier instance for fuzzy disambiguation.
         """
         self.grounding_engine = grounding_engine or ObserverObservedGrounding()
         self.resolver = resolver or AmbiguityResolver()
@@ -75,6 +78,7 @@ class PhaseMinusOnePipeline:
             grounding_engine=self.grounding_engine,
             resolver=self.resolver,
         )
+        self.fuzzy_classifier = fuzzy_classifier or FuzzyQueryClassifier()
 
     def run(self, text: str) -> PhaseMinusOneEnvelope:
         """
@@ -142,7 +146,7 @@ class PhaseMinusOnePipeline:
         index: int,
     ) -> ClauseGroundingResult:
         """
-        Analyze a single clause.
+        Analyze a single clause with fuzzy logic support.
 
         Args:
             clause_text: The clause text.
@@ -150,13 +154,16 @@ class PhaseMinusOnePipeline:
             index: Clause index (0-based).
 
         Returns:
-            ClauseGroundingResult with grounding analysis.
+            ClauseGroundingResult with grounding analysis and fuzzy signals.
         """
+        # Run fuzzy classifier to extract signals
+        fuzzy_signals = self.fuzzy_classifier.classify(clause_text)
+
         # Generate candidates
         candidates = self.grounding_engine.analyze(clause_text)
 
-        # Resolve ambiguity
-        resolution = self.resolver.resolve(candidates)
+        # Resolve ambiguity with fuzzy signals for disambiguation
+        resolution = self.resolver.resolve(candidates, fuzzy_signals=fuzzy_signals)
 
         return ClauseGroundingResult(
             clause_text=clause_text,
@@ -166,6 +173,9 @@ class PhaseMinusOnePipeline:
             resolution_policy=resolution.policy,
             linkage_hint=linkage,
             clause_index=index,
+            fuzzy_signals=fuzzy_signals,
+            fuzzy_adjustment=resolution.fuzzy_adjustment_applied,
+            fuzzy_hints=resolution.fuzzy_hints,
         )
 
     def _determine_overall_policy(
@@ -243,7 +253,7 @@ class PhaseMinusOnePipeline:
         overall_policy: OverallPolicy,
         selected_primary: Optional[GroundingCandidate],
     ) -> dict:
-        """Build debug/metrics information."""
+        """Build debug/metrics information including fuzzy logic stats."""
         # Mode distribution
         mode_dist = {}
         risk_dist = {}
@@ -263,6 +273,16 @@ class PhaseMinusOnePipeline:
         confidences = [
             c.selected.confidence for c in clauses if c.selected
         ]
+
+        # Fuzzy logic stats
+        fuzzy_adjustments = [c.fuzzy_adjustment for c in clauses]
+        all_fuzzy_hints = []
+        intent_distribution = {}
+        for clause in clauses:
+            all_fuzzy_hints.extend(clause.fuzzy_hints)
+            if clause.fuzzy_signals:
+                intent = clause.fuzzy_signals.primary_intent.value
+                intent_distribution[intent] = intent_distribution.get(intent, 0) + 1
 
         return {
             "split_reason": split_result.reason,
@@ -290,6 +310,19 @@ class PhaseMinusOnePipeline:
                 1 for c in clauses
                 if c.resolution_policy == ResolutionPolicy.SAFE_DEFAULT
             ) / len(clauses) if clauses else 0.0,
+            # Fuzzy logic metrics
+            "fuzzy_stats": {
+                "adjustments_applied": sum(1 for a in fuzzy_adjustments if a != 0.0),
+                "mean_adjustment": sum(fuzzy_adjustments) / len(fuzzy_adjustments) if fuzzy_adjustments else 0.0,
+                "max_adjustment": max(fuzzy_adjustments) if fuzzy_adjustments else 0.0,
+                "min_adjustment": min(fuzzy_adjustments) if fuzzy_adjustments else 0.0,
+                "hints_generated": all_fuzzy_hints,
+                "intent_distribution": intent_distribution,
+                "disambiguation_assists": sum(
+                    1 for hints in [c.fuzzy_hints for c in clauses]
+                    if "fuzzy_disambiguation_applied" in hints
+                ),
+            },
         }
 
 
