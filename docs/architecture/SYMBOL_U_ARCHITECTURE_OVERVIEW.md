@@ -11,7 +11,7 @@ Symbol-U is a **deterministic cognitive constraint system** that governs how res
 
 1. Establishes authority through governance phases (PO1–PO5, P6)
 2. Routes queries through consciousness-aware layers (MLCR, TTOR)
-3. Fuses reasoning channels (HRM, LCM, LAM, MoE)
+3. Fuses reasoning channels (OLM, LCM, LAM, MoE) via 5+5 ontological layers
 4. Adapts delivery (DHA) and persona styling
 5. Enforces acoustic isolation (sound cannot influence meaning)
 6. Maintains determinism (same inputs → same outputs, no LLM calls)
@@ -55,7 +55,7 @@ symbolu/
 │   │   ├── p16–p49/        # Extended phases
 │   │   └── ttor/           # Two-Tier Ontology Router
 │   ├── mlcr/               # Multi-Layer Consciousness RAG
-│   ├── fusion/             # Fusion Engine (HRM/LCM/MoE)
+│   ├── fusion/             # Fusion Engine (OLM/LCM/LAM/MoE)
 │   ├── dha/                # Delivery Harmonization & Adaptation
 │   ├── persona/            # Persona Engine
 │   └── renderer/           # Output renderers
@@ -201,11 +201,12 @@ These phases **observe only** and cannot influence behavior, semantics, routing,
 - Computes aspect base scores
 - Applies entropy boosts and domain modulation
 - Determines FlowMode (OUTER_ONLY/OUTER_PLUS_INNER/INNER_PRIORITY)
-- Sets HRM/LCM/LAM activation flags using canonical rules
+- Sets OLM/LCM/LAM activation flags using canonical rules
 
-**Canonical Mapper Rules v2.0:**
+**Canonical Mapper Rules v2.0 (5+5 Ontological Model):**
 ```
-HRM: (tier != LOWER) AND (entropy_mix > 0.40)
+OLM: (tier != LOWER) AND (entropy_mix > 0.40)
+     Maps to 5+5 ontological layers: O1-O5 (Execution), O6-O10 (Governance)
 LCM: (tier == LOWER) AND (entropy_mix > 0.50)
 LAM: (long_arc_tension > 0.50) OR temporal_patterns_detected
      OR (domain in ["therapy", "identity", "spiritual"] AND entropy_mix > 0.60)
@@ -221,14 +222,14 @@ LAM: (long_arc_tension > 0.50) OR temporal_patterns_detected
 **Purpose:** Blends reasoning channels and selects optimal candidate response.
 
 **Capabilities:**
-- Score candidates across HRM (symbolic WHY), LCM (semantic WHAT), MoE (domain HOW)
+- Score candidates across OLM (ontological WHY), LCM (semantic WHAT), MoE (domain HOW)
 - Conflict resolution (deterministic)
 - Routing decisions
 - Explanation generation
 
 **Channel Weights (Default):**
 ```
-HRM: 0.4 (α - High-Reasoning)
+OLM: 0.4 (α - Ontological Layer Mapper via 5+5 model)
 LCM: 0.3 (β - Linguistic Coherence)
 MoE: 0.3 (γ - Mixture of Experts)
 ```
@@ -368,7 +369,7 @@ It only controls ordering, framing, and presentation style.
 │  │ Engine  │    │ Router  │    │ Engine  │                             │
 │  └─────────┘    └─────────┘    └─────────┘                             │
 │       │              │              │                                    │
-│       │         HRM/LCM/LAM        │                                    │
+│       │         OLM/LCM/LAM        │                                    │
 │       │         activation         │                                    │
 │                                                                          │
 └──────────────────────────────────┬──────────────────────────────────────┘
