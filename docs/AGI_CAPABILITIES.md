@@ -249,12 +249,14 @@ ANOMALY:
   Alignment: 0.31 ✗ (metaphorical/ironic usage)
 ```
 
-**Self-Cleaning System:**
+**Self-Cleaning System with Orthogonal Validation:**
 
 - Only universal patterns survive to storage
 - Anomalies naturally filter out
-- No external oracle needed
-- Phoneme truth is the ground truth
+- **Two orthogonal validation layers:**
+  - **Semantic Layer**: Checks logical compatibility (can concepts coexist?)
+  - **Phoneme Layer**: Checks sound-meaning alignment (do sounds match experience?)
+- System is **transparent**: reports WHICH layer flagged and WHY
 
 ### 8. Reasoning Synthesis
 
@@ -541,19 +543,29 @@ The system is now **self-validating**:
 - Cross-domain bridges emerge from user queries
 
 ```
-Content → Events → 10D → Balance → Phoneme Validation → Universal?
-                                                              ↓
-                                              YES → Store & Transfer
-                                              NO  → Anomaly (discard)
+Content → Events → 10D → Balance → Orthogonal Validation → Universal?
+                                          ↓
+                              ┌───────────┴───────────┐
+                              │                       │
+                         Semantic Check          Phoneme Check
+                         (logical compat?)       (sound-meaning?)
+                              │                       │
+                              └───────────┬───────────┘
+                                          ↓
+                                  Both Pass? → Store & Transfer
+                                  Either Fail? → Anomaly (with explanation)
 ```
 
-**The phoneme model is the oracle.** If the sounds encode the same meaning as the experience, it's universal truth. If not, it's idiosyncratic usage.
+**The system is a transparent validator, not an oracle.** It shows its work:
+- Semantic layer reports: "These concepts are logical opposites" (learned knowledge)
+- Phoneme layer reports: "Sound encoding doesn't match experience" (physical truth)
 
-**This is pattern matching, not philosophy.**
+Neither layer claims absolute truth. Together they provide complete validation.
+The moral position is embedded in the architecture: **show, don't tell.**
 
 ---
 
-*Document Version: 3.0*
+*Document Version: 3.1*
 *Symbol-U Ontological Backbone*
-*Mirror Pair Architecture + Phoneme Ground Truth*
-*Cross-Domain Reasoning via Balance + Events + Personas + Validation*
+*Mirror Pair Architecture + Orthogonal Validation (Semantic + Phoneme)*
+*Cross-Domain Reasoning via Balance + Events + Personas + Transparent Validation*

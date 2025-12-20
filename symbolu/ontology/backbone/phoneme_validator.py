@@ -66,6 +66,12 @@ class ValidationReport:
 
     The key output is `is_universal` - if True, this pattern
     can be safely stored and transferred across domains.
+
+    Orthogonal Validation:
+    - Semantic layer: checks logical compatibility between words
+    - Phoneme layer: checks sound-meaning alignment
+
+    The system is transparent: reports WHICH layer flagged and WHY.
     """
     # Core result
     is_universal: bool
@@ -77,13 +83,18 @@ class ValidationReport:
     tagged_events: List[TaggedEvent]
     event_vector: DimensionalVector
 
-    # Word-by-word analysis
+    # Word-by-word analysis (Phoneme layer)
     word_alignments: List[PhonemeAlignment]
     aligned_words: List[str]
     anomalous_words: List[str]
 
-    # Explanation
+    # Semantic contradiction analysis (Semantic layer)
+    semantic_contradictions: List[Tuple[str, str, str]] = field(default_factory=list)
+    # List of (word1, word2, explanation) tuples
+
+    # Explanation - transparent about which layer flagged
     anomaly_reason: Optional[str] = None
+    flagged_by: str = "none"  # 'semantic', 'phoneme', 'both', 'none'
     confidence: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
@@ -98,7 +109,12 @@ class ValidationReport:
             ],
             "aligned_words": self.aligned_words,
             "anomalous_words": self.anomalous_words,
+            "semantic_contradictions": [
+                {"word1": w1, "word2": w2, "explanation": exp}
+                for w1, w2, exp in self.semantic_contradictions
+            ],
             "anomaly_reason": self.anomaly_reason,
+            "flagged_by": self.flagged_by,
             "confidence": self.confidence,
         }
 
@@ -251,8 +267,11 @@ def validate_event(
     """
     Validate that words describing an event match its experiential meaning.
 
-    This is the ground truth check: do the phonemes encode the same
-    meaning as the event itself?
+    Orthogonal Validation Pipeline:
+    1. SEMANTIC LAYER: Check for logical contradictions between word pairs
+    2. PHONEME LAYER: Check if word sounds match event meaning
+
+    The system is transparent: reports WHICH layer flagged and WHY.
 
     Args:
         event_text: The full text describing the event
@@ -261,7 +280,7 @@ def validate_event(
         min_aligned_ratio: Minimum ratio of aligned words for universal
 
     Returns:
-        ValidationReport with is_universal flag and details
+        ValidationReport with is_universal flag, flagged_by, and details
     """
     # Step 1: Encode the event using the 10D backbone
     event_vector, tagged_events, balance = encode_with_events(event_text)
@@ -283,10 +302,28 @@ def validate_event(
             aligned_words=[],
             anomalous_words=[],
             anomaly_reason="No key words found to validate",
+            flagged_by="none",
             confidence=0.0,
         )
 
-    # Step 3: Get phoneme vectors for each word and compare
+    # ==========================================================================
+    # SEMANTIC LAYER: Check for logical contradictions between word pairs
+    # ==========================================================================
+    semantic_contradictions: List[Tuple[str, str, str]] = []
+
+    for i in range(len(event_words)):
+        for j in range(i + 1, len(event_words)):
+            check = check_semantic_contradiction(event_words[i], event_words[j])
+            if check.is_contradiction:
+                semantic_contradictions.append(
+                    (event_words[i], event_words[j], check.explanation)
+                )
+
+    has_semantic_issues = len(semantic_contradictions) > 0
+
+    # ==========================================================================
+    # PHONEME LAYER: Check sound-meaning alignment
+    # ==========================================================================
     alignments: List[PhonemeAlignment] = []
     aligned_words: List[str] = []
     anomalous_words: List[str] = []
@@ -329,7 +366,9 @@ def validate_event(
             word_alignments=[],
             aligned_words=[],
             anomalous_words=event_words,
+            semantic_contradictions=semantic_contradictions,
             anomaly_reason="Could not analyze phonemes for any words",
+            flagged_by="semantic" if has_semantic_issues else "none",
             confidence=0.0,
         )
 
@@ -337,19 +376,51 @@ def validate_event(
     overall_alignment = sum(a.alignment_score for a in alignments) / len(alignments)
     aligned_ratio = len(aligned_words) / len(alignments)
 
-    # Determine if universal
-    is_universal = aligned_ratio >= min_aligned_ratio and overall_alignment >= alignment_threshold
+    # Determine phoneme layer result
+    has_phoneme_issues = aligned_ratio < min_aligned_ratio or overall_alignment < alignment_threshold
 
-    # Determine result type
+    # ==========================================================================
+    # TRANSPARENT REPORTING: Which layer flagged?
+    # ==========================================================================
+    if has_semantic_issues and has_phoneme_issues:
+        flagged_by = "both"
+    elif has_semantic_issues:
+        flagged_by = "semantic"
+    elif has_phoneme_issues:
+        flagged_by = "phoneme"
+    else:
+        flagged_by = "none"
+
+    # Determine if universal (must pass BOTH layers)
+    is_universal = not has_semantic_issues and not has_phoneme_issues
+
+    # Determine result type and build explanation
     if is_universal:
         result_type = ValidationResult.UNIVERSAL
         anomaly_reason = None
-    elif aligned_ratio > 0.3:
-        result_type = ValidationResult.METAPHORICAL
-        anomaly_reason = f"Partial alignment ({aligned_ratio:.0%}) suggests metaphorical usage"
-    else:
+    elif has_semantic_issues and not has_phoneme_issues:
         result_type = ValidationResult.ANOMALY
-        anomaly_reason = f"Low alignment ({overall_alignment:.2f}) - phonemes don't match experience"
+        contradictions_str = "; ".join(
+            f"'{w1}' vs '{w2}'" for w1, w2, _ in semantic_contradictions
+        )
+        anomaly_reason = f"[SEMANTIC] Logical contradictions: {contradictions_str}"
+    elif has_phoneme_issues and not has_semantic_issues:
+        if aligned_ratio > 0.3:
+            result_type = ValidationResult.METAPHORICAL
+            anomaly_reason = f"[PHONEME] Partial alignment ({aligned_ratio:.0%}) suggests metaphorical usage"
+        else:
+            result_type = ValidationResult.ANOMALY
+            anomaly_reason = f"[PHONEME] Low alignment ({overall_alignment:.2f}) - sounds don't match experience"
+    else:
+        # Both layers flagged
+        result_type = ValidationResult.ANOMALY
+        contradictions_str = "; ".join(
+            f"'{w1}' vs '{w2}'" for w1, w2, _ in semantic_contradictions
+        )
+        anomaly_reason = (
+            f"[SEMANTIC] Contradictions: {contradictions_str}; "
+            f"[PHONEME] Low alignment ({overall_alignment:.2f})"
+        )
 
     # Confidence based on sample size and alignment variance
     alignment_scores = [a.alignment_score for a in alignments]
@@ -366,7 +437,9 @@ def validate_event(
         word_alignments=alignments,
         aligned_words=aligned_words,
         anomalous_words=anomalous_words,
+        semantic_contradictions=semantic_contradictions,
         anomaly_reason=anomaly_reason,
+        flagged_by=flagged_by,
         confidence=confidence,
     )
 
