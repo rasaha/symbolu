@@ -314,7 +314,7 @@ With a small band of 21 men, including five African Americans, Brown captured th
 
 Brown was captured, tried for treason against Virginia, and hanged on December 2, 1859. He became a martyr to abolitionists; Ralph Waldo Emerson called him a "new saint." Southern whites saw the raid as proof of Northern intentions and accelerated preparations for secession.
 
-"John Brown's Body" became a Union marching song, later inspiring "The Battle Hymn of the Republic."""",
+"John Brown's Body" became a Union marching song, later inspiring "The Battle Hymn of the Republic." """,
             metadata={"domain": "slavery", "tags": ["john-brown", "harpers-ferry", "abolition"], "difficulty": "intermediate", "era": "antebellum"}
         ))
 
