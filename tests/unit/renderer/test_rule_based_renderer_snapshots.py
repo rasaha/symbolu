@@ -40,7 +40,7 @@ from symbolu.mechanical.renderer.fusion_renderer import (
     Domain
 )
 
-from symbolu.renderer.tests.snapshot_utils import assert_snapshot
+from tests.unit.renderer.snapshot_utils import assert_snapshot
 
 
 # ============================================================================

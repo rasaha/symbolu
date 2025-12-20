@@ -8,12 +8,6 @@ Full test suite would include comprehensive tests for all components.
 Run with: pytest test_example_ontology_mass.py -v
 """
 
-import sys
-import os
-
-# Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
 from symbolu.mechanical.mlcr import get_ontology_computer
 
 

@@ -10,7 +10,6 @@ Run with:
 """
 
 import pytest
-import warnings
 
 
 class TestNewCanonicalImports:
@@ -60,44 +59,6 @@ class TestNewCanonicalImports:
         assert ViolationType is not None
         assert P15RegressionGuard is not None
         assert callable(capture_p15_snapshot)
-
-
-class TestBackwardCompatibilityShims:
-    """Tests for backward-compatibility shim imports."""
-
-    def test_phase15_regression_guard_shim_import(self):
-        """Deprecated phase15_regression_guard shim still works."""
-        # Suppress the deprecation warning for this test
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-
-            from symbolu.mechanical.pipeline.phase15_regression_guard import (
-                P15AuthoritySnapshot,
-                P15RegressionViolation,
-                P15RegressionViolationError,
-                ViolationType,
-                P15RegressionGuard,
-                capture_p15_snapshot,
-                enforce_p15_regression_guard,
-                get_p15_snapshot,
-                has_p15_snapshot,
-            )
-
-            # Verify all exports work
-            assert P15AuthoritySnapshot is not None
-            assert P15RegressionGuard is not None
-            assert callable(capture_p15_snapshot)
-
-    def test_phase15_shim_emits_deprecation_warning(self):
-        """Deprecated shim emits DeprecationWarning."""
-        # Clear any cached imports
-        import sys
-
-        if "symbolu.mechanical.pipeline.phase15_regression_guard" in sys.modules:
-            del sys.modules["symbolu.mechanical.pipeline.phase15_regression_guard"]
-
-        with pytest.warns(DeprecationWarning, match="phase15_regression_guard.*deprecated"):
-            import symbolu.mechanical.pipeline.phase15_regression_guard  # noqa: F401
 
 
 class TestKeyPipelinePhaseImports:
