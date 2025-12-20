@@ -35,7 +35,7 @@ from symbolu.mechanical.renderer.llm_renderer import LLMRenderer
 from symbolu.mechanical.renderer.rules_renderer import RulesRenderer
 from symbolu.mechanical.renderer.safety_guardrails import SafetyGuardrails
 
-from symbolu.renderer.tests.snapshot_utils import assert_snapshot
+from tests.unit.renderer.snapshot_utils import assert_snapshot
 
 
 # ============================================================================
