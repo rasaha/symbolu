@@ -1,6 +1,11 @@
 """
 Acoustic Unit Mapper — Expressive Delta v3.1 (Phase-1b)
 
+EXPERIMENT_ONLY = True
+
+WARNING: This module is EXPERIMENTAL and reads varna_bridge_map directly.
+For production layer interactions, use symbolu.ontology.phase4a APIs.
+
 • Removes heuristic phonetic classification
 • Uses Sanskrit Varṇa symbols as acoustic substrate
 • Attaches bridge meanings (pre-semantic, non-interpreted)
@@ -25,6 +30,7 @@ from typing import List, Literal, Dict, Any, Optional
 
 ACOUSTIC_MAPPER_VERSION = 3.1
 
+EXPERIMENT_ONLY = True  # Required by ONTOLOGY_FREEZE_CONTRACT
 EXPERIMENTAL_MODULE_V3_1 = True
 EXPERIMENTAL_WARNING_V3_1 = (
     "This module is EXPERIMENTAL (Delta v3.1 — Phase-1b). Do not use in production "

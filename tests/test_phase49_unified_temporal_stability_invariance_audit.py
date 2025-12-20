@@ -1580,7 +1580,7 @@ class TestGracefulDegradation:
 
     def test_coherence_engine_handles_none_snapshot(self):
         """10.5: CoherenceEngine must handle None snapshot gracefully."""
-        state = CoherenceState()
+        state = CoherenceState(convo_id="test-convo", turn_index=0)
 
         # Simulate Phase 49 update with insufficient data (will return None)
         engine = CoherenceEngine()

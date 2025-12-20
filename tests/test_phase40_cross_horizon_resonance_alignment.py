@@ -478,7 +478,7 @@ def test_persona_engine_chra_tone_bounded():
 def test_persona_engine_chra_returns_none_without_snapshot():
     """Test Phase 40 tone application returns None without snapshot."""
     from symbolu.mechanical.persona.engine import PersonaEngine
-    from symbolu.mechanical.persona.persona_profile import PersonaProfile
+    from symbolu.mechanical.persona.models import PersonaProfile
 
     engine = PersonaEngine()
     persona = PersonaProfile(name="test", traits={}, tone_params={})

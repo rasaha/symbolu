@@ -3,6 +3,11 @@
 Experiment Pack v1: CLI Runner
 ==============================
 
+EXPERIMENT_ONLY = True
+
+WARNING: This file MUST NOT be used as ontology source of truth.
+This is experimental validation code, NOT production infrastructure.
+
 Validates the hypothesis:
 "Phonemes do not carry semantics, but acquire word character through
 deterministic ontological routing."
@@ -29,6 +34,8 @@ Usage:
         --report_dir <path>       Output directory for reports
         --seed 1234               Random seed for reproducibility
 """
+
+EXPERIMENT_ONLY = True
 
 from __future__ import annotations
 

@@ -1158,16 +1158,10 @@ class TestGracefulDegradation:
         assert result is None or isinstance(result, CognitiveConsistencyRegressionSnapshot)
 
     def test_no_crashes_on_none_snapshots(self):
-        """Test that CCRE doesn't crash on None snapshots."""
-        state = CoherenceState(convo_id="test", turn_index=5)
-
-        # Explicitly set to None
-        state.temporal_stability_snapshot = None
-        state.utsse_snapshot = None
-        state.tccr_snapshot = None
-
-        # Should not crash
-        result = compute_cognitive_consistency_regression(state)
+        """Test that CCRE doesn't crash on None/missing history data."""
+        # Call with no data - tests graceful degradation
+        # (Function now takes keyword-only args, not state object)
+        result = compute_cognitive_consistency_regression()
         assert result is None
 
     def test_safe_defaults_in_api_response(self):
