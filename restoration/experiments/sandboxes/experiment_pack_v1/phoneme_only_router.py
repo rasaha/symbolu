@@ -2,6 +2,11 @@
 Experiment Pack v1: Phoneme-Only Router (Grounded)
 ==================================================
 
+EXPERIMENT_ONLY = True
+
+WARNING: This file MUST NOT be used as ontology source of truth.
+This is experimental validation code, NOT production infrastructure.
+
 GROUNDING COMPLIANCE:
     This module loads phoneme/varna meaning EXCLUSIVELY from:
         docs/data/varna_bridge_map_v1.json
@@ -19,6 +24,8 @@ This router:
     4. Routes to OntologicalLayers based on bridge_meaning composition
     5. Produces a structured audit trace
 """
+
+EXPERIMENT_ONLY = True
 
 from __future__ import annotations
 

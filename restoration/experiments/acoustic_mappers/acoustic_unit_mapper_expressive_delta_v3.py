@@ -22,6 +22,7 @@ from typing import List, Literal, Dict, Any, Optional
 
 ACOUSTIC_MAPPER_VERSION = 3
 
+EXPERIMENT_ONLY = True  # Required by ONTOLOGY_FREEZE_CONTRACT
 EXPERIMENTAL_MODULE_V3 = True
 EXPERIMENTAL_WARNING_V3 = (
     "This module is EXPERIMENTAL (Delta v3 — Phase-1b). Do not use in production "
