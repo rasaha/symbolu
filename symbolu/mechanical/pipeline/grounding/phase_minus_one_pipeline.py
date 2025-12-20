@@ -39,6 +39,10 @@ from .phase_minus_one_grounding import ObserverObservedGrounding
 from .phase_minus_one_ambiguity import AmbiguityResolver
 from .phase_minus_one_clause_splitter import ConservativeClauseSplitter
 from .phase_minus_one_fuzzy import FuzzyQueryClassifier, FuzzyQuerySignals
+from .phase_minus_one_session import (
+    SessionContext,
+    SessionAwareFuzzySignals,
+)
 
 
 class PhaseMinusOnePipeline:
@@ -54,6 +58,18 @@ class PhaseMinusOnePipeline:
         # envelope.overall_policy == MULTI_CONTEXT
         # envelope.clauses[0].selected.mode == REFLEXIVE
         # envelope.clauses[1].selected.mode == RELATIONAL
+
+    Session-Aware Usage:
+        session = SessionContext.create()
+        pipeline = PhaseMinusOnePipeline()
+
+        # First query
+        envelope1 = pipeline.run_with_session("I feel anxious", session)
+        # Session learns: emotional content, reflexive grounding
+
+        # Second query - session context helps disambiguation
+        envelope2 = pipeline.run_with_session("What about that feeling?", session)
+        # Session provides: prior grounding context, domain continuity
     """
 
     def __init__(
@@ -137,6 +153,122 @@ class PhaseMinusOnePipeline:
             was_split=split_result.was_split,
             debug=debug,
             run_id=run_id,
+        )
+
+    def run_with_session(
+        self,
+        text: str,
+        session: SessionContext,
+    ) -> PhaseMinusOneEnvelope:
+        """
+        Execute the PO1 pipeline with session context awareness.
+
+        Uses accumulated session context (prior queries, domains, persona)
+        to enhance disambiguation for the current query.
+
+        Args:
+            text: The input text to analyze.
+            session: SessionContext with accumulated session state.
+
+        Returns:
+            PhaseMinusOneEnvelope with session-enhanced grounding analysis.
+        """
+        run_id = str(uuid.uuid4())[:8]
+
+        # Handle empty input
+        if not text or not text.strip():
+            return PhaseMinusOneEnvelope(
+                overall_policy=OverallPolicy.BLOCKED,
+                clauses=[],
+                selected_primary=None,
+                original_text=text or "",
+                was_split=False,
+                debug={"reason": "empty_input"},
+                run_id=run_id,
+            )
+
+        text = text.strip()
+
+        # Step 1: Run clause splitter
+        split_result = self.splitter.split(text)
+
+        # Step 2: Analyze each clause with session context
+        clause_results: List[ClauseGroundingResult] = []
+
+        for i, (clause_text, linkage) in enumerate(
+            zip(split_result.clauses, split_result.linkage_hints)
+        ):
+            result = self._analyze_clause_with_session(
+                clause_text, linkage, i, session
+            )
+            clause_results.append(result)
+
+            # Record result in session for future queries
+            session.record_grounding_result(result)
+
+        # Step 3: Determine overall policy
+        overall_policy = self._determine_overall_policy(clause_results)
+
+        # Step 4: Select primary grounding
+        selected_primary = self._select_primary(clause_results, overall_policy)
+
+        # Step 5: Build debug info with session context
+        debug = self._build_debug_info(
+            split_result, clause_results, overall_policy, selected_primary
+        )
+        debug["session_context"] = session.to_dict()
+
+        return PhaseMinusOneEnvelope(
+            overall_policy=overall_policy,
+            clauses=clause_results,
+            selected_primary=selected_primary,
+            original_text=text,
+            was_split=split_result.was_split,
+            debug=debug,
+            run_id=run_id,
+        )
+
+    def _analyze_clause_with_session(
+        self,
+        clause_text: str,
+        linkage: LinkageHint,
+        index: int,
+        session: SessionContext,
+    ) -> ClauseGroundingResult:
+        """
+        Analyze a single clause with session context enhancement.
+
+        Combines per-query fuzzy signals with session-level context
+        for improved disambiguation.
+        """
+        # Run base fuzzy classifier
+        base_signals = self.fuzzy_classifier.classify(clause_text)
+
+        # Record query in session (before grounding, for context)
+        session.record_query(clause_text, base_signals)
+
+        # Create session-aware signals
+        session_signals = SessionAwareFuzzySignals.from_context(
+            base_signals, session, clause_text
+        )
+
+        # Generate candidates
+        candidates = self.grounding_engine.analyze(clause_text)
+
+        # Resolve ambiguity with session-enhanced signals
+        resolution = self.resolver.resolve(candidates, fuzzy_signals=session_signals)
+
+        return ClauseGroundingResult(
+            clause_text=clause_text,
+            candidates=candidates,
+            selected=resolution.selected,
+            grounding_status=resolution.status,
+            resolution_policy=resolution.policy,
+            linkage_hint=linkage,
+            clause_index=index,
+            fuzzy_signals=base_signals,  # Store base signals
+            fuzzy_adjustment=resolution.fuzzy_adjustment_applied,
+            fuzzy_hints=resolution.fuzzy_hints + session_signals.context_hints,
         )
 
     def _analyze_clause(

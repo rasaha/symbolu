@@ -12,7 +12,14 @@ Components:
 - PO1.1: Ambiguity Resolver (ARL)
 - PO1.2: Conservative Clause Splitter (CSL)
 - PO1.F: Fuzzy Query Classifier (FQC) - fuzzy logic for disambiguation
+- PO1.S: Session Context Tracker (SCT) - session-level context accumulation
 - PhaseMinusOnePipeline: Orchestrates all PO1 stages
+
+Session Context (PO1.S) enables:
+- Domain accumulation: Tracks topics/domains explored in session
+- Event history: Conversation events and emotional arcs
+- User persona signals: Communication patterns observed
+- Prior query projections: Previous grounding decisions for inference
 
 Authority flows downward, information flows upward.
 """
@@ -41,6 +48,16 @@ from .phase_minus_one_fuzzy import (
     QueryIntentHint,
     TemporalOrientation,
 )
+from .phase_minus_one_session import (
+    SessionContext,
+    SessionEvent,
+    EventType,
+    DomainCategory,
+    DomainAccumulator,
+    PersonaSignals,
+    PriorGroundingProjection,
+    SessionAwareFuzzySignals,
+)
 
 __all__ = [
     # Enums
@@ -53,12 +70,20 @@ __all__ = [
     "OverallPolicy",
     "QueryIntentHint",
     "TemporalOrientation",
+    "EventType",
+    "DomainCategory",
     # Dataclasses
     "GroundingCandidate",
     "ClauseGroundingResult",
     "PhaseMinusOneEnvelope",
     "AmbiguityResolution",
     "FuzzyQuerySignals",
+    "SessionContext",
+    "SessionEvent",
+    "DomainAccumulator",
+    "PersonaSignals",
+    "PriorGroundingProjection",
+    "SessionAwareFuzzySignals",
     # Components
     "ObserverObservedGrounding",
     "AmbiguityResolver",
