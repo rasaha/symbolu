@@ -126,8 +126,30 @@ def test_fusion_with_empty_candidates_raises_error(basic_context):
 
 # Channel Scoring Tests
 
-def test_hrm_channel_boost_for_why_intent(sample_candidates):
+def test_hrm_channel_boost_for_why_intent():
     """Test HRM channel gets boost for WHY intent"""
+    # Use candidates with equal confidence and SMI to isolate channel boost effect
+    candidates = [
+        Candidate(
+            id="hrm_candidate",
+            text="Philosophical exploration",
+            source=CandidateSource.HRM,
+            channel_scores={"hrm": 0.9, "lcm": 0.5, "moe": 0.4},
+            relevance_score=0.8,
+            confidence=0.85,
+            smi=0.2
+        ),
+        Candidate(
+            id="other_candidate",
+            text="Other response",
+            source=CandidateSource.LCM,
+            channel_scores={"hrm": 0.4, "lcm": 0.8, "moe": 0.6},
+            relevance_score=0.8,
+            confidence=0.85,
+            smi=0.2
+        ),
+    ]
+
     context = FusionContext(
         tier="UPPER",
         intent="WHY",
@@ -135,16 +157,38 @@ def test_hrm_channel_boost_for_why_intent(sample_candidates):
         entropy={"total_entropy": 0.4},
         ontology_mass={"lower_mass": 0.3, "upper_mass": 0.7}
     )
-    
+
     engine = FusionEngine()
-    result = engine.fuse(sample_candidates, context)
-    
-    # HRM candidate should be favored
+    result = engine.fuse(candidates, context)
+
+    # HRM candidate should be favored due to WHY intent boost
     assert result.selected_candidate.id == "hrm_candidate"
 
 
-def test_moe_channel_boost_for_how_intent(sample_candidates):
+def test_moe_channel_boost_for_how_intent():
     """Test MoE channel gets boost for HOW intent"""
+    # Use candidates with equal confidence and SMI to isolate channel boost effect
+    candidates = [
+        Candidate(
+            id="moe_candidate",
+            text="Domain-specific factual response",
+            source=CandidateSource.MOE,
+            channel_scores={"hrm": 0.4, "lcm": 0.5, "moe": 0.9},
+            relevance_score=0.8,
+            confidence=0.85,
+            smi=0.2
+        ),
+        Candidate(
+            id="other_candidate",
+            text="Other response",
+            source=CandidateSource.LCM,
+            channel_scores={"hrm": 0.6, "lcm": 0.8, "moe": 0.4},
+            relevance_score=0.8,
+            confidence=0.85,
+            smi=0.2
+        ),
+    ]
+
     context = FusionContext(
         tier="LOWER",
         intent="HOW",
@@ -152,16 +196,38 @@ def test_moe_channel_boost_for_how_intent(sample_candidates):
         entropy={"total_entropy": 0.3},
         ontology_mass={"lower_mass": 0.7, "upper_mass": 0.3}
     )
-    
+
     engine = FusionEngine()
-    result = engine.fuse(sample_candidates, context)
-    
-    # MoE candidate should be favored
+    result = engine.fuse(candidates, context)
+
+    # MoE candidate should be favored due to HOW intent boost
     assert result.selected_candidate.id == "moe_candidate"
 
 
-def test_lcm_channel_boost_for_what_intent(sample_candidates):
+def test_lcm_channel_boost_for_what_intent():
     """Test LCM channel gets boost for WHAT intent"""
+    # Use candidates with equal confidence and SMI to isolate channel boost effect
+    candidates = [
+        Candidate(
+            id="lcm_candidate",
+            text="Clear semantic explanation",
+            source=CandidateSource.LCM,
+            channel_scores={"hrm": 0.4, "lcm": 0.9, "moe": 0.5},
+            relevance_score=0.8,
+            confidence=0.85,
+            smi=0.2
+        ),
+        Candidate(
+            id="other_candidate",
+            text="Other response",
+            source=CandidateSource.HRM,
+            channel_scores={"hrm": 0.8, "lcm": 0.4, "moe": 0.6},
+            relevance_score=0.8,
+            confidence=0.85,
+            smi=0.2
+        ),
+    ]
+
     context = FusionContext(
         tier="HYBRID",
         intent="WHAT",
@@ -169,11 +235,11 @@ def test_lcm_channel_boost_for_what_intent(sample_candidates):
         entropy={"total_entropy": 0.4},
         ontology_mass={"lower_mass": 0.5, "upper_mass": 0.5}
     )
-    
+
     engine = FusionEngine()
-    result = engine.fuse(sample_candidates, context)
-    
-    # LCM candidate should be favored
+    result = engine.fuse(candidates, context)
+
+    # LCM candidate should be favored due to WHAT intent boost
     assert result.selected_candidate.id == "lcm_candidate"
 
 

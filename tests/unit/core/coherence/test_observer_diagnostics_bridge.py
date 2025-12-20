@@ -441,8 +441,9 @@ class TestINVCB4StaticImportSafety:
         (P20, P22, P23, P24). This ensures the architectural boundary is maintained.
         """
         # Get the path to coherence_engine.py
-        coherence_dir = Path(__file__).parent.parent
-        coherence_engine_path = coherence_dir / "coherence_engine.py"
+        # Navigate from tests/unit/core/coherence/ to symbolu/core/coherence/
+        project_root = Path(__file__).parent.parent.parent.parent.parent
+        coherence_engine_path = project_root / "symbolu" / "core" / "coherence" / "coherence_engine.py"
 
         assert coherence_engine_path.exists(), \
             f"coherence_engine.py not found at {coherence_engine_path}"

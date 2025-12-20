@@ -586,6 +586,7 @@ def test_unified_output_contains_session_memory():
             self.fusion = None
             self.mlcr = None
             self.coherence_report = None
+            self.coherence_state = None
             self.request = type('obj', (object,), {'user_id': 'test-user'})()
             self.session_memory = SessionMemory()
             self.session_memory.add_event(MemoryEntry(
@@ -623,6 +624,7 @@ def test_public_response_trims_memory_safely():
             self.fusion = None
             self.mlcr = None
             self.coherence_report = {'coherence_score': 0.8}
+            self.coherence_state = None
             self.request = type('obj', (object,), {'user_id': 'test'})()
             self.session_memory = SessionMemory()
             # Add various events
@@ -728,6 +730,7 @@ def test_sessionless_requests_do_not_break():
             self.fusion = None
             self.mlcr = None
             self.coherence_report = None
+            self.coherence_state = None
             self.request = type('obj', (object,), {'user_id': 'test'})()
             # No session_memory attribute
 

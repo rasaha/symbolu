@@ -255,7 +255,7 @@ class TestMapperVolatilityPenalty:
         # Scenario A: Stable mapper configuration
         state_stable = None
         for i in range(6):
-            from symbolu.core.coherence.tests.test_coherence_state import MockRoutingPlan
+            from tests.unit.core.coherence.test_coherence_state import MockRoutingPlan
             routing_plan = MockRoutingPlan(tier="hybrid", domain="task", tension=0.5)
             mapper_profile = {
                 "resolution_level": "medium",
@@ -285,7 +285,7 @@ class TestMapperVolatilityPenalty:
         # Scenario B: Volatile mapper configuration
         state_volatile = None
         for i in range(6):
-            from symbolu.core.coherence.tests.test_coherence_state import MockRoutingPlan
+            from tests.unit.core.coherence.test_coherence_state import MockRoutingPlan
             routing_plan = MockRoutingPlan(tier="hybrid", domain="task", tension=0.5)
             mapper_profile = {
                 "resolution_level": ["low", "high", "medium"][i % 3],
@@ -329,7 +329,7 @@ class TestOverallCoherence:
         # Scenario A: High coherence (stable, recovery, low drift)
         state_high = None
         for i in range(6):
-            from symbolu.core.coherence.tests.test_coherence_state import MockRoutingPlan
+            from tests.unit.core.coherence.test_coherence_state import MockRoutingPlan
             routing_plan = MockRoutingPlan(tier="hybrid", domain="task", tension=0.4)
             mapper_profile = {
                 "resolution_level": "medium",
@@ -372,7 +372,7 @@ class TestOverallCoherence:
         state_low = None
         domains = ["task", "therapy", "finance", "identity", "spiritual", "task"]
         for i in range(6):
-            from symbolu.core.coherence.tests.test_coherence_state import MockRoutingPlan
+            from tests.unit.core.coherence.test_coherence_state import MockRoutingPlan
             routing_plan = MockRoutingPlan(tier="hybrid", domain=domains[i], tension=0.8)
             mapper_profile = {
                 "resolution_level": ["low", "high", "medium"][i % 3],
