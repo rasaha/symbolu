@@ -39,7 +39,7 @@ Usage:
 
 from __future__ import annotations
 
-import hashlib
+from collections import OrderedDict
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -78,141 +78,129 @@ from .lam_integration import maybe_run_lam
 # Renderer integration
 from .renderer_integration import run_integrated_renderer, IntegratedRenderedOutput
 
-# Delivery adaptation phases (P27-P31) - lazy loaded
-_p27_module = None
-_p28_module = None
-_p29_module = None
-_p30_module = None
-_p31_module = None
-
-
+# Delivery adaptation phases (P27-P31) - lazy loaded via @lru_cache
+@lru_cache(maxsize=1)
 def _get_p27():
-    global _p27_module
-    if _p27_module is None:
-        from .p27_persona import maybe_run_p27
-        _p27_module = maybe_run_p27
-    return _p27_module
+    from .p27_persona import maybe_run_p27
+    return maybe_run_p27
 
 
+@lru_cache(maxsize=1)
 def _get_p28():
-    global _p28_module
-    if _p28_module is None:
-        from .p28_dha import maybe_run_p28
-        _p28_module = maybe_run_p28
-    return _p28_module
+    from .p28_dha import maybe_run_p28
+    return maybe_run_p28
 
 
+@lru_cache(maxsize=1)
 def _get_p29():
-    global _p29_module
-    if _p29_module is None:
-        from .p29_expression import maybe_run_p29
-        _p29_module = maybe_run_p29
-    return _p29_module
+    from .p29_expression import maybe_run_p29
+    return maybe_run_p29
 
 
+@lru_cache(maxsize=1)
 def _get_p30():
-    global _p30_module
-    if _p30_module is None:
-        from .p30_verification import maybe_run_p30
-        _p30_module = maybe_run_p30
-    return _p30_module
+    from .p30_verification import maybe_run_p30
+    return maybe_run_p30
 
 
+@lru_cache(maxsize=1)
 def _get_p31():
-    global _p31_module
-    if _p31_module is None:
-        from .p31_envelope import maybe_run_p31
-        _p31_module = maybe_run_p31
-    return _p31_module
+    from .p31_envelope import maybe_run_p31
+    return maybe_run_p31
 
 
-# Processing modules - lazy loaded
-_coherence_observer_class = None
-_session_processing_fn = None
-_output_processing_fn = None
-_candidate_helpers = None
-
-
+# Processing modules - lazy loaded via @lru_cache
+@lru_cache(maxsize=1)
 def _get_coherence_observer():
-    global _coherence_observer_class
-    if _coherence_observer_class is None:
-        from .coherence_observer import CoherenceObserver
-        _coherence_observer_class = CoherenceObserver
-    return _coherence_observer_class
+    from .coherence_observer import CoherenceObserver
+    return CoherenceObserver
 
 
+@lru_cache(maxsize=1)
 def _get_session_processing():
-    global _session_processing_fn
-    if _session_processing_fn is None:
-        from .session_processing import process_session_context
-        _session_processing_fn = process_session_context
-    return _session_processing_fn
+    from .session_processing import process_session_context
+    return process_session_context
 
 
+@lru_cache(maxsize=1)
 def _get_output_processing():
-    global _output_processing_fn
-    if _output_processing_fn is None:
-        from .output_processing import process_output_layers
-        _output_processing_fn = process_output_layers
-    return _output_processing_fn
+    from .output_processing import process_output_layers
+    return process_output_layers
 
 
+@lru_cache(maxsize=1)
 def _get_candidate_helpers():
-    global _candidate_helpers
-    if _candidate_helpers is None:
-        from .candidate_helpers import (
-            generate_candidates,
-            create_fallback_fusion,
-            extract_text_for_dha,
-        )
-        _candidate_helpers = {
-            "generate_candidates": generate_candidates,
-            "create_fallback_fusion": create_fallback_fusion,
-            "extract_text_for_dha": extract_text_for_dha,
-        }
-    return _candidate_helpers
+    from .candidate_helpers import (
+        generate_candidates,
+        create_fallback_fusion,
+        extract_text_for_dha,
+    )
+    return {
+        "generate_candidates": generate_candidates,
+        "create_fallback_fusion": create_fallback_fusion,
+        "extract_text_for_dha": extract_text_for_dha,
+    }
 
 
 # ============================================================================
-# MLCR RESULT CACHE
+# MLCR RESULT CACHE (True LRU using OrderedDict)
 # ============================================================================
 
 # Global MLCR cache (shared across pipeline instances for efficiency)
-_mlcr_cache: Dict[str, Any] = {}
+# Using OrderedDict for true LRU eviction based on access order
+_mlcr_cache: OrderedDict[Tuple[str, Optional[str], Optional[str]], Any] = OrderedDict()
 _MLCR_CACHE_MAX_SIZE = 1000
 
 
-def _make_mlcr_cache_key(text: str, context: Dict[str, Any]) -> str:
-    """Generate cache key from query text and context."""
-    # Include relevant context fields that affect MLCR routing
-    key_parts = [
+def _make_mlcr_cache_key(
+    text: str, context: Dict[str, Any]
+) -> Tuple[str, Optional[str], Optional[str]]:
+    """Generate cache key from query text and context.
+
+    Uses tuple instead of hash for:
+    - Better performance (no hashing overhead)
+    - Debuggability (can inspect cache keys)
+    - Hashability (tuples are hashable)
+    """
+    return (
         text,
-        str(context.get("domain", "")),
-        str(context.get("user_id", "")),
-    ]
-    key_str = "|".join(key_parts)
-    return hashlib.md5(key_str.encode()).hexdigest()
+        context.get("domain"),
+        context.get("user_id"),
+    )
 
 
-def _get_cached_mlcr(cache_key: str) -> Optional[Any]:
-    """Get cached MLCR result if available."""
-    return _mlcr_cache.get(cache_key)
+def _get_cached_mlcr(
+    cache_key: Tuple[str, Optional[str], Optional[str]]
+) -> Optional[Any]:
+    """Get cached MLCR result if available.
+
+    Moves accessed key to end (marks as recently used).
+    """
+    if cache_key in _mlcr_cache:
+        _mlcr_cache.move_to_end(cache_key)  # Mark as recently used
+        return _mlcr_cache[cache_key]
+    return None
 
 
-def _set_cached_mlcr(cache_key: str, result: Any) -> None:
-    """Cache MLCR result with LRU eviction."""
-    global _mlcr_cache
-    # Simple LRU: if at max size, remove oldest entry
+def _set_cached_mlcr(
+    cache_key: Tuple[str, Optional[str], Optional[str]], result: Any
+) -> None:
+    """Cache MLCR result with true LRU eviction."""
+    # If key exists, move to end and update
+    if cache_key in _mlcr_cache:
+        _mlcr_cache.move_to_end(cache_key)
+        _mlcr_cache[cache_key] = result
+        return
+
+    # Evict least recently used if at capacity
     if len(_mlcr_cache) >= _MLCR_CACHE_MAX_SIZE:
-        # Remove first (oldest) entry
-        oldest_key = next(iter(_mlcr_cache))
-        del _mlcr_cache[oldest_key]
+        _mlcr_cache.popitem(last=False)  # Remove oldest (first) entry
+
     _mlcr_cache[cache_key] = result
 
 
 def clear_mlcr_cache() -> int:
     """Clear the MLCR cache. Returns number of entries cleared."""
-    global _mlcr_cache
     count = len(_mlcr_cache)
     _mlcr_cache.clear()
     return count
