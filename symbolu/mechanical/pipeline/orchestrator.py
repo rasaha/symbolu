@@ -39,7 +39,6 @@ Usage:
 
 from __future__ import annotations
 
-import uuid
 from typing import Any, Dict, List, Optional
 
 # Pipeline models and utilities
@@ -61,85 +60,37 @@ from .validators import (
     validate_request,
 )
 
-# ============================================================================
-# EXTERNAL ENGINE IMPORTS
-# Import existing engines - we adapt to them, don't modify them
-# ============================================================================
-
-# MLCR Engine
+# External engine imports
 from symbolu.mechanical.mlcr.mlcr_engine import MLCR
-
-# Persona Engine Components
 from symbolu.mechanical.persona.registry import PersonaRegistry, get_default_registry
 from symbolu.mechanical.persona.selector import PersonaSelector
-
-# Fusion Engine
 from symbolu.mechanical.fusion.fusion.fusion_engine import FusionEngine
-from symbolu.mechanical.fusion.schemas.candidate import Candidate, CandidateSource
 from symbolu.mechanical.fusion.schemas.fusion_result import FusionContext
-
-# DHA Engine
 from symbolu.mechanical.dha.dha_engine import DHAEngine
 
-# HRM Integration (High-Resolution Mapper)
+# Mapper integrations
 from .hrm_integration import maybe_run_hrm
-
-# LCM Integration (Low-Context Mapper)
 from .lcm_integration import maybe_run_lcm
-
-# LAM Integration (Long-Arc Mapper)
 from .lam_integration import maybe_run_lam
 
-# Mapper-Fusion Adapter (HRM/LAM/LCM → Fusion Candidates)
-from .mapper_fusion_adapter import create_candidates_from_mappers, get_mapper_summary
-
-# RAG-Hybrid Integration (RAG + Semantic Routing + Phoneme Optimization)
-try:
-    from .rag_hybrid_integration import (
-        HybridRAGEngine,
-        get_hybrid_rag_engine,
-        get_fusion_candidates,
-        RetrievalMode,
-        HAS_RAG,
-    )
-    RAG_AVAILABLE = HAS_RAG
-except ImportError:
-    RAG_AVAILABLE = False
-    get_fusion_candidates = None
-
-# Integrated Renderer (FusionRenderer + VarnaHybridRenderer)
+# Renderer integration
 from .renderer_integration import run_integrated_renderer, IntegratedRenderedOutput
 
-# P27 Persona Selection Phase (Delivery Adaptation Band)
-from .p27_persona import maybe_run_p27, P27Output
+# Delivery adaptation phases (P27-P31)
+from .p27_persona import maybe_run_p27
+from .p28_dha import maybe_run_p28
+from .p29_expression import maybe_run_p29
+from .p30_verification import maybe_run_p30
+from .p31_envelope import maybe_run_p31
 
-# P28 DHA Phase (Delivery Adaptation Band)
-from .p28_dha import maybe_run_p28, P28Output
-
-# P29 Expression Finalization Phase (Delivery Adaptation Band)
-from .p29_expression import maybe_run_p29, P29Output
-
-# P30 Output Verification Phase (Delivery Adaptation Band)
-from .p30_verification import maybe_run_p30, P30Output
-
-# P31 Output Envelope Phase (Delivery Adaptation Band)
-from .p31_envelope import maybe_run_p31, P31Output
-
-# Coherence Observer (Observability Layer)
+# Processing modules (extracted for clarity)
 from .coherence_observer import CoherenceObserver
-
-# Session Processing (extracted for clarity)
 from .session_processing import process_session_context
-
-# Output Processing (extracted for clarity)
 from .output_processing import process_output_layers
-
-# Renderer Components
-from symbolu.mechanical.renderer.fusion_renderer import (
-    FusionOutput,
-    FusionRenderer,
-    RenderMode,
-    Domain,
+from .candidate_helpers import (
+    generate_candidates,
+    create_fallback_fusion,
+    extract_text_for_dha,
 )
 
 
@@ -483,17 +434,14 @@ class SymbolUPipeline:
             regulated_mode=meta.get("domain", "") in {"medical", "legal", "financial"},
         )
 
-        # Generate candidates
-        # In v3.0, we create synthetic candidates from MLCR output
-        # Future versions will integrate real RAG candidates
-        candidates = self._generate_candidates(ctx, explain_log, activation_plan)
+        # Generate candidates from mappers and RAG
+        candidates = generate_candidates(ctx, explain_log, self.fusion_engine)
 
         # Run fusion
         if candidates:
             fusion_result = self.fusion_engine.fuse(candidates, fusion_ctx)
         else:
-            # Fallback: create minimal fusion result
-            fusion_result = self._create_fallback_fusion(ctx)
+            fusion_result = create_fallback_fusion(ctx, self.fusion_engine)
 
         ctx.fusion = FusionResult(
             fused_candidates=fusion_result,
@@ -522,8 +470,7 @@ class SymbolUPipeline:
             Updated context with ctx.dha populated.
         """
         # Build renderer output for DHA
-        # DHA expects a dict with "text" key
-        text_to_adapt = self._extract_text_for_dha(ctx)
+        text_to_adapt = extract_text_for_dha(ctx)
         renderer_output = {"text": text_to_adapt}
 
         # Build metadata for readiness/resistance analysis
@@ -698,170 +645,6 @@ class SymbolUPipeline:
             pass
 
         return ctx
-
-    # ========================================================================
-    # HELPER METHODS
-    # ========================================================================
-
-    def _generate_candidates(
-        self,
-        ctx: PipelineContext,
-        explain_log: Dict[str, Any],
-        activation_plan: Dict[str, Any],
-    ) -> List[Candidate]:
-        """
-        Generate candidates for fusion.
-
-        v3.2: Integrates RAG retrieval with mapper outputs (HRM/LAM/LCM) to create
-        candidates with properly derived channel scores based on actual analysis.
-        Falls back to synthetic candidates when mappers weren't run.
-
-        RAG Integration (v3.2):
-            - Retrieves relevant context from indexed corpora
-            - Applies hybrid optimization (semantic routing, phoneme pre-filter)
-            - Converts RAG results to Fusion candidates with channel scores
-            - Blends RAG candidates with mapper candidates
-
-        Args:
-            ctx: Pipeline context.
-            explain_log: MLCR explain log.
-            activation_plan: MLCR activation plan.
-
-        Returns:
-            List of Candidate objects for fusion.
-        """
-        query_text = ctx.request.text
-        domain = explain_log.get("meta", {}).get("domain", "general")
-
-        # Get mapper outputs from context (populated in stages 1.5-1.7)
-        hrm_map = getattr(ctx, 'hrm_map', None)
-        lam_map = getattr(ctx, 'lam_map', None)
-        lcm_map = getattr(ctx, 'lcm_map', None)
-
-        # Use mapper-fusion adapter to create candidates from actual mapper outputs
-        # This bridges the gap between mapper analysis and fusion engine
-        candidates = create_candidates_from_mappers(
-            text=query_text,
-            domain=domain,
-            hrm_map=hrm_map,
-            lam_map=lam_map,
-            lcm_map=lcm_map,
-        )
-
-        # v3.2: Integrate RAG candidates if available
-        # This adds retrieved context from indexed corpora
-        rag_candidates = self._get_rag_candidates(ctx, query_text, domain)
-        if rag_candidates:
-            candidates.extend(rag_candidates)
-            # Store RAG stats in context for observability
-            ctx.rag_stats = {
-                "enabled": True,
-                "candidate_count": len(rag_candidates),
-            }
-        else:
-            ctx.rag_stats = {"enabled": False, "candidate_count": 0}
-
-        # Store mapper summary in context for observability
-        ctx.mapper_summary = get_mapper_summary(hrm_map, lam_map, lcm_map)
-
-        return candidates
-
-    def _get_rag_candidates(
-        self,
-        ctx: PipelineContext,
-        query_text: str,
-        domain: str,
-    ) -> List[Candidate]:
-        """
-        Get candidates from RAG retrieval with hybrid optimization.
-
-        Uses the hybrid RAG engine which applies:
-        - Semantic routing for corpus selection
-        - Phoneme pre-filtering for candidate reduction
-        - Channel score computation for fusion
-
-        Args:
-            ctx: Pipeline context.
-            query_text: Query text.
-            domain: Domain classification.
-
-        Returns:
-            List of Candidate objects from RAG, or empty list.
-        """
-        if not RAG_AVAILABLE or get_fusion_candidates is None:
-            return []
-
-        # Check if RAG is enabled in request metadata
-        request_metadata = getattr(ctx.request, 'metadata', {}) or {}
-        rag_enabled = request_metadata.get('use_rag', True)  # Default enabled
-        corpus_ids = request_metadata.get('corpus_ids', None)
-
-        if not rag_enabled:
-            return []
-
-        try:
-            # Use hybrid RAG integration
-            rag_candidates = get_fusion_candidates(
-                query=query_text,
-                corpus_ids=corpus_ids,
-                domain=domain,
-                top_k=5,  # Limit RAG candidates to blend with mapper candidates
-            )
-            return list(rag_candidates)
-        except Exception as e:
-            # Graceful degradation - log but don't fail pipeline
-            ctx.rag_stats = {"enabled": True, "error": str(e)}
-            return []
-
-    def _create_fallback_fusion(self, ctx: PipelineContext) -> Any:
-        """
-        Create a minimal fusion result when no candidates available.
-
-        Args:
-            ctx: Pipeline context.
-
-        Returns:
-            Minimal fusion result object.
-        """
-        # Create a single template candidate
-        fallback_candidate = Candidate(
-            id="fallback_001",
-            text=ctx.request.text,
-            source=CandidateSource.TEMPLATE,
-            channel_scores={"hrm": 0.33, "lcm": 0.34, "moe": 0.33},
-        )
-
-        # Create minimal fusion context
-        fallback_ctx = FusionContext(
-            tier="HYBRID",
-            intent="WHAT",
-            domain="general",
-            entropy={"H_D": 0.5, "H_G": 0.5, "H_K": 0.5},
-            ontology_mass={"lower": 0.5, "upper": 0.5},
-        )
-
-        return self.fusion_engine.fuse([fallback_candidate], fallback_ctx)
-
-    def _extract_text_for_dha(self, ctx: PipelineContext) -> str:
-        """
-        Extract the text to be adapted by DHA.
-
-        Priority:
-        1. Fusion selected candidate text
-        2. Request text as fallback
-
-        Args:
-            ctx: Pipeline context with fusion result.
-
-        Returns:
-            Text string for DHA adaptation.
-        """
-        # Try to get text from fusion result
-        if ctx.fusion and ctx.fusion.selected_text:
-            return ctx.fusion.selected_text
-
-        # Fallback to request text
-        return ctx.request.text
 
     def get_stats(self) -> Dict[str, Any]:
         """Get pipeline execution statistics."""
