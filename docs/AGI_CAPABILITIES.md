@@ -515,7 +515,9 @@ symbolu/ontology/backbone/
 ├── reasoning_synthesizer.py # Multi-source synthesis
 ├── mirror_pairs.py          # Mirror pair architecture
 ├── persona_tracker.py       # Query-based pattern discovery
-└── phoneme_validator.py     # Ground truth validation ← NEW
+├── phoneme_validator.py     # Ground truth validation
+├── learning_pipeline.py     # Event learning + causal chain matching
+└── insight_suggester.py     # Personal insights (presentation layer) ← NEW
 
 symbolu/resonance/
 ├── phoneme_map.py           # Phoneme → 10D affinities
@@ -703,6 +705,77 @@ def retrieve_similar(query, store):
 The binary gates (semantic, phoneme) are for **validation**.
 The continuous space (10D) is for **learning and transfer**.
 
+### Personal Insights (Presentation Layer)
+
+**Critical distinction**: Insights are excluded from LEARNING but valuable for PRESENTATION.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    TWO LAYERS: LEARNING vs PRESENTATION                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+LEARNING LAYER (Universal - transfers across domains for ALL users):
+    - Causal chains
+    - 10D structural patterns
+    - Pattern types
+
+PRESENTATION LAYER (Personal - generated FOR this user):
+    - Insights based on persona history + current context
+    - Does NOT enter the pattern store
+    - Generated at read-time, not stored
+```
+
+**Example Scenario:**
+
+```
+User is reading: "New CRISPR breakthrough enables gene editing in plants"
+Domain: biology
+
+Persona Memory (last 24h):
+    - 8 queries about stock trading
+    - 3 queries about biotech investments
+    - Bridge detected: biology ↔ finance
+
+INSIGHT GENERATED:
+    "Are you considering the investment angle?"
+
+    Type: bridge_opportunity
+    Confidence: 85%
+    Reasoning: User has recent finance activity and existing biology↔finance bridge
+```
+
+**Why This Works:**
+
+1. The insight is PERSONAL - it's based on THIS user's history
+2. It does NOT propagate - other users don't see this suggestion
+3. It's generated at PRESENTATION time, not learning time
+4. It respects the learning hierarchy - insights don't contaminate universal patterns
+
+**Implementation:**
+
+```python
+from symbolu.ontology.backbone import generate_insights
+
+# User reading biology news
+insights = generate_insights(
+    persona_id="user_123",
+    current_context="CRISPR breakthrough in gene editing...",
+    current_domain="biology"
+)
+
+for insight in insights:
+    print(f"💡 {insight.message}")
+    # "Are you considering the investment angle?"
+```
+
+**Insight Types:**
+
+| Type | Trigger | Example |
+|------|---------|---------|
+| `BRIDGE_OPPORTUNITY` | Current domain differs from recent activity | "Your recent finance activity might connect here" |
+| `PATTERN_CONTINUATION` | User follows certain event patterns | "This follows your interest in transformation patterns" |
+| `ACTION_SUGGESTION` | Specific action based on context | "Consider researching related stocks" |
+
 ---
 
 ## Conclusion
@@ -715,6 +788,7 @@ Symbol-U's architecture represents a **structural approach to AGI** built on fiv
 4. **Orthogonal Validation**: Semantic (pre-filter) + Phoneme (post-validate) with transparency
 5. **Event Learning**: 10D structure is the learning target; gates are for validation
 6. **Learning Hierarchy**: Causal chains (PRIMARY) → 10D structure (FALLBACK) → Pattern type (DISAMBIGUATION) → Insights (NOT TRANSFERRED)
+7. **Personal Insights**: Generated at presentation time from persona history—valuable for THIS user, not for universal learning
 
 The system is now **self-validating**:
 - Extract events from content
@@ -746,7 +820,8 @@ The moral position is embedded in the architecture: **show, don't tell.**
 
 ---
 
-*Document Version: 3.3*
+*Document Version: 3.4*
 *Symbol-U Ontological Backbone*
-*Event Learning Architecture + Orthogonal Validation + Learning Hierarchy*
-*Cross-Domain Reasoning via Causal Chains (PRIMARY) + 10D Structure (FALLBACK) + Boolean Gates (Semantic/Phoneme)*
+*Event Learning Architecture + Orthogonal Validation + Learning Hierarchy + Personal Insights*
+*Learning Layer (Universal): Causal Chains + 10D Structure + Boolean Gates*
+*Presentation Layer (Personal): Insights from Persona History + Current Context*

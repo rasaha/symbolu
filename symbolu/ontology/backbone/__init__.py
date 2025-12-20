@@ -117,6 +117,15 @@ from .learning_pipeline import (
     # Retrieval functions
     retrieve_similar,
 )
+from .insight_suggester import (
+    # Types
+    InsightType,
+    PersonalInsight,
+    # Core functions
+    generate_insights,
+    generate_insight_for_display,
+    explain_insight,
+)
 
 __all__ = [
     # Core types
@@ -193,4 +202,10 @@ __all__ = [
     "learn_from_event",
     "learn_batch",
     "retrieve_similar",
+    # Personal Insight Suggester
+    "InsightType",
+    "PersonalInsight",
+    "generate_insights",
+    "generate_insight_for_display",
+    "explain_insight",
 ]
