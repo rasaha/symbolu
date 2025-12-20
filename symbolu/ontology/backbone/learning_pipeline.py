@@ -42,6 +42,10 @@ from dataclasses import dataclass
 from typing import Optional, List, Tuple, Any, Dict
 from enum import Enum
 
+from .cross_domain_config import (
+    get_cross_domain_config,
+    CrossDomainConfig,
+)
 from .phoneme_validator import (
     validate_event,
     ValidationReport,
@@ -301,6 +305,7 @@ def retrieve_similar(
     cross_domain_only: bool = False,
     store: Optional[ExperientialStore] = None,
     query_chain: Optional[List[str]] = None,
+    config: Optional[CrossDomainConfig] = None,
 ) -> List[RetrievalResult]:
     """
     Retrieve similar experientials using learning hierarchy:
@@ -314,6 +319,11 @@ def retrieve_similar(
     - Same chain applies to cells, companies, nations
     - 10D provides fallback when chains aren't explicit
 
+    ADMIN CONTROL:
+    - Cross-domain config (JSON) controls which pairs are allowed
+    - Blocked pairs are excluded from results
+    - Counters track where learning is blocked/succeeds
+
     Args:
         query: Query text to find similar patterns for
         current_domain: Current domain (for cross-domain filtering)
@@ -322,6 +332,7 @@ def retrieve_similar(
         cross_domain_only: If True, exclude results from current_domain
         store: ExperientialStore to search (defaults to global)
         query_chain: Optional explicit causal chain for query
+        config: Optional CrossDomainConfig (uses global if not provided)
 
     Returns:
         List of RetrievalResult sorted by match quality
@@ -337,6 +348,10 @@ def retrieve_similar(
     """
     if store is None:
         store = get_experiential_store()
+
+    # Get admin-level cross-domain config
+    if config is None:
+        config = get_cross_domain_config()
 
     # ==========================================================================
     # STEP 1: Extract query's causal chain (if not provided)
@@ -381,6 +396,28 @@ def retrieve_similar(
         if exp.causal_chain:
             exp_chain = exp.causal_chain.steps
 
+        # =======================================================================
+        # ADMIN CHECK: Is this domain pair allowed?
+        # =======================================================================
+        is_cross = current_domain is not None and exp.source_domain != current_domain
+
+        if is_cross and current_domain:
+            # Check admin config for this domain pair
+            if not config.is_pair_allowed(current_domain, exp.source_domain):
+                # Blocked by admin - skip this result (counter already recorded)
+                continue
+
+            # Get thresholds for this pair (may be custom)
+            thresholds = config.get_thresholds(current_domain, exp.source_domain)
+            pair_min_structural = thresholds["structural"]
+            pair_min_causal = thresholds["causal"]
+            pair_min_combined = thresholds["combined"]
+        else:
+            # Same domain or no domain specified - use defaults
+            pair_min_structural = min_similarity
+            pair_min_causal = 0.3
+            pair_min_combined = min_similarity
+
         # Compute chain similarity (PRIMARY)
         chain_sim = _compute_chain_similarity(query_chain, exp_chain)
 
@@ -403,11 +440,33 @@ def retrieve_similar(
             pattern_bonus * PATTERN_WEIGHT
         )
 
-        # Skip if below threshold
-        if final_score < min_similarity * 0.5:
-            continue
-
-        is_cross = current_domain is not None and exp.source_domain != current_domain
+        # =======================================================================
+        # THRESHOLD CHECK: Does this meet the pair-specific thresholds?
+        # =======================================================================
+        if is_cross and current_domain:
+            # For cross-domain, check against pair-specific thresholds
+            threshold_met = (
+                chain_sim >= pair_min_causal or
+                structural_score >= pair_min_structural or
+                final_score >= pair_min_combined
+            )
+            if not threshold_met:
+                # Record threshold failure for admin visibility
+                config.record_transfer_result(
+                    current_domain, exp.source_domain,
+                    success=False, threshold_met=False
+                )
+                continue
+            else:
+                # Record success
+                config.record_transfer_result(
+                    current_domain, exp.source_domain,
+                    success=True, threshold_met=True
+                )
+        else:
+            # Skip if below default threshold
+            if final_score < min_similarity * 0.5:
+                continue
 
         scored_results.append(RetrievalResult(
             experiential=exp,

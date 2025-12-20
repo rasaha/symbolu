@@ -517,7 +517,9 @@ symbolu/ontology/backbone/
 ├── persona_tracker.py       # Query-based pattern discovery
 ├── phoneme_validator.py     # Ground truth validation
 ├── learning_pipeline.py     # Event learning + causal chain matching
-└── insight_suggester.py     # Personal insights (presentation layer) ← NEW
+├── insight_suggester.py     # Personal insights (presentation layer)
+├── cross_domain_config.py   # Admin-level cross-domain policies ← NEW
+└── cross_domain_config.json # JSON config for domain pairs ← NEW
 
 symbolu/resonance/
 ├── phoneme_map.py           # Phoneme → 10D affinities
@@ -827,6 +829,53 @@ Symbol-U's architecture represents a **structural approach to AGI** built on fiv
 7. **Personal Insights**: Generated at presentation time from persona history—valuable for THIS user, not for universal learning
 8. **User-Controlled Modes**: User decides insight mode (recent memory, domain-relative, new possibilities)—system doesn't assume
 9. **Structural Validation**: Cross-domain insights require structural match (10D, causal, events)—without validation it's advertising
+10. **Admin-Level Config**: JSON file controls which domain pairs can learn from each other—counters track blocked/successful transfers
+
+### Admin-Level Cross-Domain Config
+
+**System-wide control over cross-domain learning (not per-persona).**
+
+```json
+{
+  "enabled": true,
+  "default_policy": "allow",
+  "domain_pairs": {
+    "fiction_medicine": {
+      "policy": "block",
+      "reason": "Fictional medical patterns could be dangerous"
+    },
+    "finance_politics": {
+      "policy": "require_high",
+      "min_structural_threshold": 0.75,
+      "reason": "Political-financial transfers need high confidence"
+    }
+  },
+  "counters": {
+    "blocked_attempts": {"fiction_medicine": 23},
+    "successful_transfers": {"biology_finance": 156},
+    "threshold_failures": {"ai_philosophy": 12}
+  }
+}
+```
+
+**Policies:**
+
+| Policy | Behavior |
+|--------|----------|
+| `allow` | Cross-domain learning enabled with default thresholds |
+| `block` | Cross-domain learning completely blocked |
+| `require_high` | Allowed but requires 1.5× higher thresholds |
+| `monitor` | Allowed but closely tracked in counters |
+
+**Counters (Admin Visibility):**
+
+```python
+from symbolu.ontology.backbone import get_counters_report
+
+report = get_counters_report()
+print(f"Success rate: {report['summary']['success_rate']:.1%}")
+print(f"Problem pairs: {report['problem_pairs']}")
+```
 
 The system is now **self-validating**:
 - Extract events from content
@@ -858,8 +907,8 @@ The moral position is embedded in the architecture: **show, don't tell.**
 
 ---
 
-*Document Version: 3.5*
+*Document Version: 3.6*
 *Symbol-U Ontological Backbone*
-*Event Learning Architecture + Orthogonal Validation + Learning Hierarchy + User-Controlled Insights*
-*Learning Layer (Universal): Causal Chains + 10D Structure + Boolean Gates*
+*Event Learning Architecture + Orthogonal Validation + Learning Hierarchy + Admin Config*
+*Learning Layer (Universal): Causal Chains + 10D Structure + Boolean Gates + Admin-Controlled Pairs*
 *Presentation Layer (Personal): User-Controlled Modes + Structural Validation (No Advertising)*

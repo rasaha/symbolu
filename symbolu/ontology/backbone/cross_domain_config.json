@@ -1,0 +1,113 @@
+{
+  "enabled": true,
+  "default_policy": "allow",
+  "default_structural_threshold": 0.5,
+  "default_causal_threshold": 0.3,
+  "default_combined_threshold": 0.4,
+  "domain_pairs": {
+    "entertainment_medicine": {
+      "domain_a": "entertainment",
+      "domain_b": "medicine",
+      "policy": "block",
+      "min_structural_threshold": null,
+      "min_causal_threshold": null,
+      "min_combined_threshold": null,
+      "reason": "Entertainment patterns unreliable for medical context",
+      "created_at": "2024-01-01T00:00:00",
+      "updated_at": "2024-01-01T00:00:00"
+    },
+    "fiction_finance": {
+      "domain_a": "fiction",
+      "domain_b": "finance",
+      "policy": "block",
+      "min_structural_threshold": null,
+      "min_causal_threshold": null,
+      "min_combined_threshold": null,
+      "reason": "Fictional financial patterns unreliable for real decisions",
+      "created_at": "2024-01-01T00:00:00",
+      "updated_at": "2024-01-01T00:00:00"
+    },
+    "fiction_medicine": {
+      "domain_a": "fiction",
+      "domain_b": "medicine",
+      "policy": "block",
+      "min_structural_threshold": null,
+      "min_causal_threshold": null,
+      "min_combined_threshold": null,
+      "reason": "Fictional medical patterns could be dangerous if transferred",
+      "created_at": "2024-01-01T00:00:00",
+      "updated_at": "2024-01-01T00:00:00"
+    },
+    "finance_politics": {
+      "domain_a": "finance",
+      "domain_b": "politics",
+      "policy": "require_high",
+      "min_structural_threshold": 0.75,
+      "min_causal_threshold": 0.5,
+      "min_combined_threshold": 0.6,
+      "reason": "Political-financial transfers need high confidence",
+      "created_at": "2024-01-01T00:00:00",
+      "updated_at": "2024-01-01T00:00:00"
+    },
+    "medicine_religion": {
+      "domain_a": "medicine",
+      "domain_b": "religion",
+      "policy": "require_high",
+      "min_structural_threshold": 0.75,
+      "min_causal_threshold": 0.5,
+      "min_combined_threshold": 0.6,
+      "reason": "Medical-religious transfers need high confidence",
+      "created_at": "2024-01-01T00:00:00",
+      "updated_at": "2024-01-01T00:00:00"
+    },
+    "biology_finance": {
+      "domain_a": "biology",
+      "domain_b": "finance",
+      "policy": "allow",
+      "min_structural_threshold": 0.5,
+      "min_causal_threshold": 0.3,
+      "min_combined_threshold": 0.4,
+      "reason": "Growth, decay, and cycle patterns transfer well",
+      "created_at": "2024-01-01T00:00:00",
+      "updated_at": "2024-01-01T00:00:00"
+    },
+    "history_politics": {
+      "domain_a": "history",
+      "domain_b": "politics",
+      "policy": "allow",
+      "min_structural_threshold": 0.4,
+      "min_causal_threshold": 0.3,
+      "min_combined_threshold": 0.35,
+      "reason": "Historical patterns inform political understanding",
+      "created_at": "2024-01-01T00:00:00",
+      "updated_at": "2024-01-01T00:00:00"
+    },
+    "physics_engineering": {
+      "domain_a": "physics",
+      "domain_b": "engineering",
+      "policy": "allow",
+      "min_structural_threshold": 0.4,
+      "min_causal_threshold": 0.25,
+      "min_combined_threshold": 0.35,
+      "reason": "Physics principles directly apply to engineering",
+      "created_at": "2024-01-01T00:00:00",
+      "updated_at": "2024-01-01T00:00:00"
+    }
+  },
+  "blocked_pairs": [
+    "entertainment_medicine",
+    "fiction_finance",
+    "fiction_medicine"
+  ],
+  "counters": {
+    "blocked_attempts": {},
+    "successful_transfers": {},
+    "threshold_failures": {},
+    "total_blocked": 0,
+    "total_successful": 0,
+    "total_threshold_failures": 0,
+    "last_reset": ""
+  },
+  "version": "1.0",
+  "last_updated": "2024-01-01T00:00:00"
+}
