@@ -76,22 +76,99 @@ from .lam_integration import maybe_run_lam
 # Renderer integration
 from .renderer_integration import run_integrated_renderer, IntegratedRenderedOutput
 
-# Delivery adaptation phases (P27-P31)
-from .p27_persona import maybe_run_p27
-from .p28_dha import maybe_run_p28
-from .p29_expression import maybe_run_p29
-from .p30_verification import maybe_run_p30
-from .p31_envelope import maybe_run_p31
+# Delivery adaptation phases (P27-P31) - lazy loaded
+_p27_module = None
+_p28_module = None
+_p29_module = None
+_p30_module = None
+_p31_module = None
 
-# Processing modules (extracted for clarity)
-from .coherence_observer import CoherenceObserver
-from .session_processing import process_session_context
-from .output_processing import process_output_layers
-from .candidate_helpers import (
-    generate_candidates,
-    create_fallback_fusion,
-    extract_text_for_dha,
-)
+
+def _get_p27():
+    global _p27_module
+    if _p27_module is None:
+        from .p27_persona import maybe_run_p27
+        _p27_module = maybe_run_p27
+    return _p27_module
+
+
+def _get_p28():
+    global _p28_module
+    if _p28_module is None:
+        from .p28_dha import maybe_run_p28
+        _p28_module = maybe_run_p28
+    return _p28_module
+
+
+def _get_p29():
+    global _p29_module
+    if _p29_module is None:
+        from .p29_expression import maybe_run_p29
+        _p29_module = maybe_run_p29
+    return _p29_module
+
+
+def _get_p30():
+    global _p30_module
+    if _p30_module is None:
+        from .p30_verification import maybe_run_p30
+        _p30_module = maybe_run_p30
+    return _p30_module
+
+
+def _get_p31():
+    global _p31_module
+    if _p31_module is None:
+        from .p31_envelope import maybe_run_p31
+        _p31_module = maybe_run_p31
+    return _p31_module
+
+
+# Processing modules - lazy loaded
+_coherence_observer_class = None
+_session_processing_fn = None
+_output_processing_fn = None
+_candidate_helpers = None
+
+
+def _get_coherence_observer():
+    global _coherence_observer_class
+    if _coherence_observer_class is None:
+        from .coherence_observer import CoherenceObserver
+        _coherence_observer_class = CoherenceObserver
+    return _coherence_observer_class
+
+
+def _get_session_processing():
+    global _session_processing_fn
+    if _session_processing_fn is None:
+        from .session_processing import process_session_context
+        _session_processing_fn = process_session_context
+    return _session_processing_fn
+
+
+def _get_output_processing():
+    global _output_processing_fn
+    if _output_processing_fn is None:
+        from .output_processing import process_output_layers
+        _output_processing_fn = process_output_layers
+    return _output_processing_fn
+
+
+def _get_candidate_helpers():
+    global _candidate_helpers
+    if _candidate_helpers is None:
+        from .candidate_helpers import (
+            generate_candidates,
+            create_fallback_fusion,
+            extract_text_for_dha,
+        )
+        _candidate_helpers = {
+            "generate_candidates": generate_candidates,
+            "create_fallback_fusion": create_fallback_fusion,
+            "extract_text_for_dha": extract_text_for_dha,
+        }
+    return _candidate_helpers
 
 
 # ============================================================================
@@ -164,11 +241,18 @@ class SymbolUPipeline:
         self.fusion_engine = fusion_engine or FusionEngine()
         self.dha_engine = dha_engine or DHAEngine()
 
-        # Observability layer (non-invasive)
-        self.coherence_observer = CoherenceObserver()
+        # Observability layer (lazy-initialized)
+        self._coherence_observer = None
 
         # Statistics
         self._run_count = 0
+
+    @property
+    def coherence_observer(self):
+        """Lazy-load coherence observer on first access."""
+        if self._coherence_observer is None:
+            self._coherence_observer = _get_coherence_observer()()
+        return self._coherence_observer
 
     def run(self, request: UserRequest) -> RenderedOutput:
         """
@@ -274,14 +358,18 @@ class SymbolUPipeline:
         # ================================================================
         # SESSION PROCESSING: Compute session-level context enrichments
         # (policy flags, memory, recap, intent arc, identity, motivation, guardrails)
+        # Skip if skip_session_processing=True in metadata (performance optimization)
         # ================================================================
-        process_session_context(ctx)
+        if not ctx.request.metadata.get("skip_session_processing", False):
+            _get_session_processing()(ctx)
 
         # ================================================================
         # OUTPUT PROCESSING: Generate API outputs and presentation layers
         # (unified API, policy flags, DILchat payload)
+        # Skip if skip_output_processing=True in metadata (performance optimization)
         # ================================================================
-        process_output_layers(ctx)
+        if not ctx.request.metadata.get("skip_output_processing", False):
+            _get_output_processing()(ctx)
 
         self._run_count += 1
 
@@ -385,6 +473,7 @@ class SymbolUPipeline:
         # Runs alongside existing persona logic to provide formal phase tracing
         # =======================================================================
         try:
+            maybe_run_p27 = _get_p27()
             p27_output = maybe_run_p27(ctx)
             if p27_output:
                 ctx.p27_persona = p27_output
@@ -435,13 +524,14 @@ class SymbolUPipeline:
         )
 
         # Generate candidates from mappers and RAG
-        candidates = generate_candidates(ctx, explain_log, self.fusion_engine)
+        helpers = _get_candidate_helpers()
+        candidates = helpers["generate_candidates"](ctx, explain_log, self.fusion_engine)
 
         # Run fusion
         if candidates:
             fusion_result = self.fusion_engine.fuse(candidates, fusion_ctx)
         else:
-            fusion_result = create_fallback_fusion(ctx, self.fusion_engine)
+            fusion_result = helpers["create_fallback_fusion"](ctx, self.fusion_engine)
 
         ctx.fusion = FusionResult(
             fused_candidates=fusion_result,
@@ -470,7 +560,8 @@ class SymbolUPipeline:
             Updated context with ctx.dha populated.
         """
         # Build renderer output for DHA
-        text_to_adapt = extract_text_for_dha(ctx)
+        helpers = _get_candidate_helpers()
+        text_to_adapt = helpers["extract_text_for_dha"](ctx)
         renderer_output = {"text": text_to_adapt}
 
         # Build metadata for readiness/resistance analysis
@@ -535,6 +626,7 @@ class SymbolUPipeline:
         try:
             # Get P27 output if available for persona context
             p27_output = getattr(ctx, 'p27_persona', None)
+            maybe_run_p28 = _get_p28()
             p28_output = maybe_run_p28(ctx, p27_output=p27_output)
             if p28_output:
                 ctx.p28_dha = p28_output
@@ -615,6 +707,7 @@ class SymbolUPipeline:
 
         # P29 Expression Finalization
         try:
+            maybe_run_p29 = _get_p29()
             p29_output = maybe_run_p29(ctx)
             if p29_output:
                 ctx.p29_expression = p29_output
@@ -623,6 +716,7 @@ class SymbolUPipeline:
 
         # P30 Output Verification
         try:
+            maybe_run_p30 = _get_p30()
             p30_output = maybe_run_p30(ctx)
             if p30_output:
                 ctx.p30_verification = p30_output
@@ -631,6 +725,7 @@ class SymbolUPipeline:
 
         # P31 Output Envelope
         try:
+            maybe_run_p31 = _get_p31()
             p31_output = maybe_run_p31(ctx)
             if p31_output:
                 ctx.p31_envelope = p31_output
