@@ -39,7 +39,9 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+import hashlib
+from functools import lru_cache
+from typing import Any, Dict, List, Optional, Tuple
 
 # Pipeline models and utilities
 from .models import (
@@ -172,6 +174,51 @@ def _get_candidate_helpers():
 
 
 # ============================================================================
+# MLCR RESULT CACHE
+# ============================================================================
+
+# Global MLCR cache (shared across pipeline instances for efficiency)
+_mlcr_cache: Dict[str, Any] = {}
+_MLCR_CACHE_MAX_SIZE = 1000
+
+
+def _make_mlcr_cache_key(text: str, context: Dict[str, Any]) -> str:
+    """Generate cache key from query text and context."""
+    # Include relevant context fields that affect MLCR routing
+    key_parts = [
+        text,
+        str(context.get("domain", "")),
+        str(context.get("user_id", "")),
+    ]
+    key_str = "|".join(key_parts)
+    return hashlib.md5(key_str.encode()).hexdigest()
+
+
+def _get_cached_mlcr(cache_key: str) -> Optional[Any]:
+    """Get cached MLCR result if available."""
+    return _mlcr_cache.get(cache_key)
+
+
+def _set_cached_mlcr(cache_key: str, result: Any) -> None:
+    """Cache MLCR result with LRU eviction."""
+    global _mlcr_cache
+    # Simple LRU: if at max size, remove oldest entry
+    if len(_mlcr_cache) >= _MLCR_CACHE_MAX_SIZE:
+        # Remove first (oldest) entry
+        oldest_key = next(iter(_mlcr_cache))
+        del _mlcr_cache[oldest_key]
+    _mlcr_cache[cache_key] = result
+
+
+def clear_mlcr_cache() -> int:
+    """Clear the MLCR cache. Returns number of entries cleared."""
+    global _mlcr_cache
+    count = len(_mlcr_cache)
+    _mlcr_cache.clear()
+    return count
+
+
+# ============================================================================
 # PIPELINE ORCHESTRATOR
 # ============================================================================
 
@@ -222,6 +269,7 @@ class SymbolUPipeline:
         persona_registry: Optional[PersonaRegistry] = None,
         fusion_engine: Optional[FusionEngine] = None,
         dha_engine: Optional[DHAEngine] = None,
+        enable_mlcr_cache: bool = True,
     ) -> None:
         """
         Initialize the pipeline orchestrator.
@@ -233,6 +281,7 @@ class SymbolUPipeline:
             persona_registry: Persona registry (default: global registry).
             fusion_engine: Fusion engine (default: new FusionEngine()).
             dha_engine: DHA engine (default: new DHAEngine()).
+            enable_mlcr_cache: Enable MLCR result caching (default: True).
         """
         self.router = router or get_default_router()
         self.mlcr = mlcr or MLCR()
@@ -240,6 +289,11 @@ class SymbolUPipeline:
         self.persona_registry = persona_registry or get_default_registry()
         self.fusion_engine = fusion_engine or FusionEngine()
         self.dha_engine = dha_engine or DHAEngine()
+
+        # Caching configuration
+        self.enable_mlcr_cache = enable_mlcr_cache
+        self._mlcr_cache_hits = 0
+        self._mlcr_cache_misses = 0
 
         # Observability layer (lazy-initialized)
         self._coherence_observer = None
@@ -408,8 +462,26 @@ class SymbolUPipeline:
             "session_id": ctx.request.metadata.get("session_id"),
         }
 
-        # Run MLCR routing
-        mlcr_result = self.mlcr.route(ctx.request.text, mlcr_context)
+        # Check cache first (if enabled and not disabled via request metadata)
+        use_cache = (
+            self.enable_mlcr_cache
+            and not ctx.request.metadata.get("skip_mlcr_cache", False)
+        )
+        cache_key = None
+        mlcr_result = None
+
+        if use_cache:
+            cache_key = _make_mlcr_cache_key(ctx.request.text, mlcr_context)
+            mlcr_result = _get_cached_mlcr(cache_key)
+            if mlcr_result is not None:
+                self._mlcr_cache_hits += 1
+
+        # Run MLCR routing if not cached
+        if mlcr_result is None:
+            mlcr_result = self.mlcr.route(ctx.request.text, mlcr_context)
+            if use_cache and cache_key:
+                _set_cached_mlcr(cache_key, mlcr_result)
+            self._mlcr_cache_misses += 1
 
         # Wrap in MlcrResult
         ctx.mlcr = MlcrResult(
@@ -417,6 +489,7 @@ class SymbolUPipeline:
             meta={
                 "query_length": len(ctx.request.text),
                 "has_explain_log": "explain_log" in mlcr_result,
+                "cache_hit": use_cache and mlcr_result is not None,
             },
         )
 
@@ -743,8 +816,19 @@ class SymbolUPipeline:
 
     def get_stats(self) -> Dict[str, Any]:
         """Get pipeline execution statistics."""
+        total_mlcr_calls = self._mlcr_cache_hits + self._mlcr_cache_misses
+        cache_hit_rate = (
+            self._mlcr_cache_hits / total_mlcr_calls if total_mlcr_calls > 0 else 0.0
+        )
         return {
             "run_count": self._run_count,
+            "mlcr_cache": {
+                "enabled": self.enable_mlcr_cache,
+                "hits": self._mlcr_cache_hits,
+                "misses": self._mlcr_cache_misses,
+                "hit_rate": round(cache_hit_rate, 3),
+                "size": len(_mlcr_cache),
+            },
             "fusion_stats": self.fusion_engine.get_statistics() if hasattr(self.fusion_engine, 'get_statistics') else {},
             "dha_stats": self.dha_engine.get_stats() if hasattr(self.dha_engine, 'get_stats') else {},
         }
@@ -775,4 +859,5 @@ def run_pipeline(text: str, **kwargs: Any) -> RenderedOutput:
 __all__ = [
     "SymbolUPipeline",
     "run_pipeline",
+    "clear_mlcr_cache",
 ]
