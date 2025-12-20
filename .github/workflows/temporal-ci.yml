@@ -2,14 +2,14 @@ name: Temporal CI
 
 on:
   push:
-    branches: ["main", "master"]
+    branches: ["main", "master", "dev", "claude/**"]
     paths:
       - "symbolu/temporal/**"
       - "examples/temporal_analysis.py"
       - "symbolu/mechanical/pipeline/integration_tests/test_temporal_integration.py"
       - ".github/workflows/temporal-ci.yml"
   pull_request:
-    branches: ["main", "master"]
+    branches: ["main", "master", "dev", "claude/**"]
     paths:
       - "symbolu/temporal/**"
       - "examples/temporal_analysis.py"
