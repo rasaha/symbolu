@@ -374,7 +374,7 @@ def test_coherence_engine_update_mtsf_with_valid_data():
 def test_coherence_engine_mtsf_snapshot_stored():
     """Test that MTSF snapshot is stored in coherence state."""
     engine = CoherenceEngine()
-    state = CoherenceState()
+    state = CoherenceState(convo_id="test-convo", turn_index=0)
 
     # Populate upstream snapshots
     state.temporal_forecast_snapshot = type('obj', (object,), {
