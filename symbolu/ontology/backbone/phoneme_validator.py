@@ -421,6 +421,103 @@ def filter_universal(
 
 
 # =============================================================================
+# Semantic Contradiction Check (runs BEFORE phoneme validation)
+# =============================================================================
+
+# Known semantic opposites - words that logically contradict
+SEMANTIC_OPPOSITES = {
+    # Temperature
+    'hot': {'cold', 'frozen', 'icy', 'freezing', 'cool', 'chilly'},
+    'cold': {'hot', 'warm', 'burning', 'heated', 'fiery'},
+    'warm': {'cold', 'frozen', 'icy', 'freezing', 'cool'},
+    'cool': {'hot', 'warm', 'burning', 'heated'},
+    # Light/Dark
+    'light': {'dark', 'dim', 'shadowy', 'black'},
+    'dark': {'light', 'bright', 'luminous', 'radiant'},
+    'bright': {'dark', 'dim', 'dull', 'shadowy'},
+    # State
+    'alive': {'dead', 'lifeless', 'deceased'},
+    'dead': {'alive', 'living', 'vital'},
+    # Size
+    'big': {'small', 'tiny', 'little', 'miniature'},
+    'small': {'big', 'large', 'huge', 'giant', 'massive'},
+    # Speed
+    'fast': {'slow', 'sluggish', 'crawling'},
+    'slow': {'fast', 'quick', 'rapid', 'swift'},
+    # Emotion
+    'love': {'hate', 'loathe', 'despise'},
+    'hate': {'love', 'adore', 'cherish'},
+    'happy': {'sad', 'unhappy', 'miserable', 'depressed'},
+    'sad': {'happy', 'joyful', 'elated', 'cheerful'},
+    # State of being
+    'peace': {'war', 'conflict', 'battle', 'fighting'},
+    'war': {'peace', 'harmony', 'tranquility'},
+    # Elements
+    'fire': {'water', 'ice', 'cold', 'frozen'},
+    'water': {'fire', 'flame', 'burning'},
+    'ice': {'fire', 'hot', 'burning', 'warm'},
+}
+
+
+@dataclass(frozen=True)
+class SemanticCheck:
+    """Result of semantic contradiction check."""
+    word1: str
+    word2: str
+    is_contradiction: bool
+    contradiction_type: str  # 'opposite', 'incompatible', 'none'
+    explanation: str
+
+
+def check_semantic_contradiction(word1: str, word2: str) -> SemanticCheck:
+    """
+    Check if two words are semantic contradictions.
+
+    This runs BEFORE phoneme validation to catch logical impossibilities
+    like "fire cold" or "dead alive".
+
+    Args:
+        word1: First word
+        word2: Second word
+
+    Returns:
+        SemanticCheck with is_contradiction flag
+    """
+    w1_lower = word1.lower()
+    w2_lower = word2.lower()
+
+    # Check if word2 is in word1's opposite set
+    if w1_lower in SEMANTIC_OPPOSITES:
+        if w2_lower in SEMANTIC_OPPOSITES[w1_lower]:
+            return SemanticCheck(
+                word1=word1,
+                word2=word2,
+                is_contradiction=True,
+                contradiction_type='opposite',
+                explanation=f"'{word1}' and '{word2}' are semantic opposites"
+            )
+
+    # Check reverse direction
+    if w2_lower in SEMANTIC_OPPOSITES:
+        if w1_lower in SEMANTIC_OPPOSITES[w2_lower]:
+            return SemanticCheck(
+                word1=word1,
+                word2=word2,
+                is_contradiction=True,
+                contradiction_type='opposite',
+                explanation=f"'{word2}' and '{word1}' are semantic opposites"
+            )
+
+    return SemanticCheck(
+        word1=word1,
+        word2=word2,
+        is_contradiction=False,
+        contradiction_type='none',
+        explanation='No semantic contradiction detected'
+    )
+
+
+# =============================================================================
 # Word-Pair Entropy Validation
 # =============================================================================
 
@@ -453,6 +550,10 @@ def validate_word_pair(
     """
     Validate if two words naturally go together based on phoneme harmony.
 
+    The validation pipeline:
+    1. FIRST: Check for semantic contradictions (fire+cold = immediate fail)
+    2. THEN: Check phoneme harmony (do sounds match combined meaning?)
+
     The key insight: Encode the COMBINED phrase as an event, then check if
     each word's phonemes align with that combined meaning. Natural pairs
     will have both words aligning with their combined meaning.
@@ -472,7 +573,31 @@ def validate_word_pair(
 
         >>> validate_word_pair("sky", "red")
         WordPairHarmony(harmony_score=0.42, entropy_flag=True, ...)
+
+        >>> validate_word_pair("fire", "cold")
+        WordPairHarmony(entropy_flag=True, ...)  # Semantic contradiction!
     """
+    # STEP 1: Check semantic contradiction FIRST
+    # This catches logical impossibilities before phoneme analysis
+    semantic_check = check_semantic_contradiction(word1, word2)
+    if semantic_check.is_contradiction:
+        # Immediate failure - logical contradiction detected
+        vec1 = _get_phoneme_vector(word1)
+        vec2 = _get_phoneme_vector(word2)
+        return WordPairHarmony(
+            word1=word1,
+            word2=word2,
+            vector1=vec1,
+            vector2=vec2,
+            harmony_score=0.0,  # Semantic contradiction = zero harmony
+            entropy_flag=True,  # Always high entropy for contradictions
+            dominant_layer1=_get_dominant_layer(vec1) if vec1 else "UNKNOWN",
+            dominant_layer2=_get_dominant_layer(vec2) if vec2 else "UNKNOWN",
+            shared_layers=[],
+            conflicting_layers=["SEMANTIC_CONTRADICTION"],
+        )
+
+    # STEP 2: Proceed with phoneme analysis
     vec1 = _get_phoneme_vector(word1)
     vec2 = _get_phoneme_vector(word2)
 
@@ -626,6 +751,10 @@ __all__ = [
     "validate_experiential_before_store",
     "validate_batch",
     "filter_universal",
+    # Semantic contradiction check
+    "SemanticCheck",
+    "check_semantic_contradiction",
+    "SEMANTIC_OPPOSITES",
     # Word-pair entropy validation
     "WordPairHarmony",
     "validate_word_pair",

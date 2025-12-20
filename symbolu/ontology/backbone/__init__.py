@@ -95,6 +95,10 @@ from .phoneme_validator import (
     validate_experiential_before_store,
     validate_batch,
     filter_universal,
+    # Semantic contradiction check
+    SemanticCheck,
+    check_semantic_contradiction,
+    SEMANTIC_OPPOSITES,
     # Word-pair entropy validation
     WordPairHarmony,
     validate_word_pair,
@@ -159,6 +163,10 @@ __all__ = [
     "validate_experiential_before_store",
     "validate_batch",
     "filter_universal",
+    # Semantic Contradiction Check
+    "SemanticCheck",
+    "check_semantic_contradiction",
+    "SEMANTIC_OPPOSITES",
     # Word-Pair Entropy Validation
     "WordPairHarmony",
     "validate_word_pair",
