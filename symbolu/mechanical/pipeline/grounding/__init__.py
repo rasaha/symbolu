@@ -11,7 +11,15 @@ Components:
 - PO1.0: Observer-Observed Grounding (OOG)
 - PO1.1: Ambiguity Resolver (ARL)
 - PO1.2: Conservative Clause Splitter (CSL)
+- PO1.F: Fuzzy Query Classifier (FQC) - fuzzy logic for disambiguation
+- PO1.S: Session Context Tracker (SCT) - session-level context accumulation
 - PhaseMinusOnePipeline: Orchestrates all PO1 stages
+
+Session Context (PO1.S) enables:
+- Domain accumulation: Tracks topics/domains explored in session
+- Event history: Conversation events and emotional arcs
+- User persona signals: Communication patterns observed
+- Prior query projections: Previous grounding decisions for inference
 
 Authority flows downward, information flows upward.
 """
@@ -31,9 +39,25 @@ from .phase_minus_one_schema import (
     PhaseMinusOneEnvelope,
 )
 from .phase_minus_one_grounding import ObserverObservedGrounding
-from .phase_minus_one_ambiguity import AmbiguityResolver
+from .phase_minus_one_ambiguity import AmbiguityResolver, AmbiguityResolution
 from .phase_minus_one_clause_splitter import ConservativeClauseSplitter
 from .phase_minus_one_pipeline import PhaseMinusOnePipeline
+from .phase_minus_one_fuzzy import (
+    FuzzyQueryClassifier,
+    FuzzyQuerySignals,
+    QueryIntentHint,
+    TemporalOrientation,
+)
+from .phase_minus_one_session import (
+    SessionContext,
+    SessionEvent,
+    EventType,
+    DomainCategory,
+    DomainAccumulator,
+    PersonaSignals,
+    PriorGroundingProjection,
+    SessionAwareFuzzySignals,
+)
 
 __all__ = [
     # Enums
@@ -44,13 +68,26 @@ __all__ = [
     "ResolutionPolicy",
     "LinkageHint",
     "OverallPolicy",
+    "QueryIntentHint",
+    "TemporalOrientation",
+    "EventType",
+    "DomainCategory",
     # Dataclasses
     "GroundingCandidate",
     "ClauseGroundingResult",
     "PhaseMinusOneEnvelope",
+    "AmbiguityResolution",
+    "FuzzyQuerySignals",
+    "SessionContext",
+    "SessionEvent",
+    "DomainAccumulator",
+    "PersonaSignals",
+    "PriorGroundingProjection",
+    "SessionAwareFuzzySignals",
     # Components
     "ObserverObservedGrounding",
     "AmbiguityResolver",
     "ConservativeClauseSplitter",
     "PhaseMinusOnePipeline",
+    "FuzzyQueryClassifier",
 ]
