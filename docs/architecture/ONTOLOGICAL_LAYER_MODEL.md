@@ -13,6 +13,18 @@ Symbol-U uses a **10-layer ontological architecture** divided into two groups:
 
 This is a **STRUCTURAL ONTOLOGY**, not a behavioral model.
 
+### 1.1 STE Alignment
+
+The 5+5 Ontological Layer Model operates as a core component within the **Symbolic Transformer Engine (STE)**. The STE is Symbol-U's deterministic processing pipeline that transforms symbolic inputs through constraint-based phases.
+
+Within the STE context:
+- **OLM** (Ontological Layer Mapper) computes layer distributions for the STE's constraint satisfaction
+- Layer balance (O1-O5 vs O6-O10) informs STE phase routing
+- Tension zones trigger STE resolution constraints
+- All ontological processing is **deterministic** — same inputs produce bitwise-identical outputs
+
+The 5+5 model provides structural placement information; the STE uses this placement to guide symbol transformation through its phases.
+
 ---
 
 ## 2. Key Architectural Principles (MANDATORY)
@@ -151,9 +163,22 @@ Tension zones are detected when ontological placement creates structural contrad
 
 ---
 
-## 7. OLM (Ontological Layer Mapper) Engine
+## 7. Orthogonal Analyzers (OLM, LCM, LAM)
 
-The OLM engine replaces the deprecated HRM (High-Resolution Mapper):
+Symbol-U uses three **orthogonal analyzers** that operate simultaneously and independently:
+
+| Analyzer | Purpose | Operates On |
+|----------|---------|-------------|
+| **OLM** (Ontological Layer Mapper) | Maps ontological layer distribution (O1-O10) | Structural placement |
+| **LCM** (Low-Context Mapper) | Evaluates contextual complexity and routing sufficiency | Query complexity signals |
+| **LAM** (Long-Arc Mapper) | Tracks temporal trajectory across conversation turns | Multi-turn patterns |
+
+**Critical distinction:** These are **analyzers**, not modes, agents, or parallel reasoning systems. They:
+- Do NOT make decisions
+- Do NOT generate content
+- Do NOT operate as independent reasoning units
+
+Each analyzer produces a structured map that downstream engines (Fusion, DHA) consume for constraint-informed processing.
 
 ### 7.1 Activation Rules
 
@@ -161,8 +186,13 @@ The OLM engine replaces the deprecated HRM (High-Resolution Mapper):
 # OLM activation (formerly HRM)
 use_olm = (tier != LOWER) AND (entropy_mix > 0.40)
 
-# LCM activation (unchanged)
+# LCM activation — evaluates contextual complexity and routing sufficiency
+# NOTE: LCM does NOT evaluate semantic structure; it measures query complexity
+# signals (length, token density, contextual markers) for routing decisions
 use_lcm = (tier == LOWER) AND (entropy_mix > 0.50)
+
+# LAM activation — temporal trajectory tracking
+use_lam = (long_arc_tension > 0.40) OR explicit_flag
 ```
 
 ### 7.2 OLM Output Structure
