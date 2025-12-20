@@ -1,14 +1,16 @@
-# Symbol-U: AGI Capabilities Architecture
+# Symbol-U: Generalizable Cognitive Architecture
 
 ## Executive Summary
 
-Symbol-U implements a **10-dimensional ontological backbone** structured as **5 mirror pairs** that enables cross-domain reasoning without domain-specific training. By encoding all knowledge into a universal cognitive-mathematical structure with **event tagging**, **persona-based pattern discovery**, and **phoneme ground truth validation**, the system can transfer insights across history, science, literature, finance, biology, and any other domain—a foundational capability for Artificial General Intelligence.
+Symbol-U implements a **10-dimensional ontological backbone** structured as **5 mirror pairs** that enables cross-domain reasoning without domain-specific training. By encoding all knowledge into a universal cognitive-mathematical structure with **event tagging**, **persona-based pattern discovery**, and **phoneme-based consistency validation**, the system can transfer insights across history, science, literature, finance, biology, and any other domain—a foundational capability for domain-agnostic reasoning.
 
-**The key innovation:** The phoneme model validates that words describing an event encode the same meaning as the experience itself. Only universal patterns survive to storage. The system is self-validating.
+**The key innovation:** The phoneme model provides an orthogonal consistency check—correlating articulation patterns with encoded event structure. Only structurally consistent patterns survive to storage. The system is self-consistent, self-filtering, and self-auditing.
+
+**The AGI Vision:** This architecture represents a deliberate step toward Artificial General Intelligence. While individual claims are conservatively framed (probabilistic validation, consistency checking rather than truth claims), the **end goal is AGI**. The combination of universal representation, cross-domain transfer, and self-filtering validation addresses core AGI requirements that current approaches cannot solve.
 
 ---
 
-## The AGI Gap: Why Current AI Falls Short
+## The Generalization Gap: Why Current AI Falls Short
 
 | Traditional AI | Symbol-U Approach |
 |----------------|-------------------|
@@ -19,12 +21,12 @@ Symbol-U implements a **10-dimensional ontological backbone** structured as **5 
 | No knowledge transfer | Cross-domain by design |
 | User-agnostic | Persona query tracking |
 | Extract patterns from content | Discover patterns from usage |
-| No ground truth | Phoneme validation (sound = meaning) |
-| Manual curation | Self-cleaning (anomalies auto-filter) |
+| Single validation layer | Orthogonal validation (semantic + phoneme) |
+| Manual curation | Self-filtering (anomalies auto-detected) |
 
 ---
 
-## Core AGI Capabilities
+## Core Capabilities
 
 ### 1. Mirror Pair Architecture (The Simplification)
 
@@ -189,17 +191,17 @@ Knowledge is stored not as raw content, but as **transferable reasoning patterns
 }
 ```
 
-### 7. Phoneme Ground Truth Validation
+### 7. Phoneme-Based Consistency Validation
 
-**The Problem:** How do you know a stored insight is universally valid and not just user-specific or metaphorical?
+**The Problem:** How do you detect when a stored insight may be user-specific, metaphorical, or idiosyncratic rather than structurally consistent?
 
-**The Solution:** Use the phoneme model as the ground truth validator.
+**The Solution:** Use phonemic patterns as an orthogonal consistency check—detecting mismatches between linguistic form and encoded event structure.
 
 ```
-Event → Words describing event → Phoneme analysis → Match experience?
+Event → Words describing event → Phoneme analysis → Consistent encoding?
                                                           ↓
-                                        YES: Universal pattern (store it)
-                                        NO:  Anomaly (discard or flag)
+                                        YES: Structurally consistent (store it)
+                                        NO:  Potential anomaly (flag for review)
 ```
 
 **How It Works:**
@@ -208,7 +210,7 @@ Event → Words describing event → Phoneme analysis → Match experience?
 2. Extract key words: ["shattered", "conflict"]
 3. Get phoneme 10D vectors for each word (from resonance engine)
 4. Get event 10D vector (from backbone encoder)
-5. Compare: Do the phonemes encode the same meaning as the event?
+5. Compare: Do the articulation patterns correlate with the event encoding?
 
 ```python
 validation = validate_event(
@@ -216,46 +218,46 @@ validation = validate_event(
     event_words=["shattered", "conflict"],
 )
 
-if validation.is_universal:
-    # Phonemes match experience → Safe to store and transfer
+if validation.is_consistent:
+    # Phoneme patterns correlate with event encoding → Store and transfer
     experiential_store.add(experiential)
 else:
-    # Phonemes don't match → Anomaly, user-specific, or metaphorical
-    log.warning(f"Non-universal: {validation.anomaly_reason}")
+    # Mismatch detected → Flag for review (may be metaphorical or idiosyncratic)
+    log.info(f"Consistency check: {validation.mismatch_reason}")
 ```
 
 **Validation Results:**
 
 | Result | Meaning | Action |
 |--------|---------|--------|
-| `UNIVERSAL` | Phonemes align with experience | Store and transfer |
-| `ANOMALY` | Phonemes don't match | Discard or flag |
-| `METAPHORICAL` | Partial alignment | Store with caution |
-| `INSUFFICIENT` | Can't validate | Skip validation |
+| `CONSISTENT` | Phoneme patterns correlate with event encoding | Store and transfer |
+| `MISMATCH` | Patterns don't correlate | Flag for review |
+| `METAPHORICAL` | Partial correlation | Store with lower confidence |
+| `INSUFFICIENT` | Not enough data to validate | Skip validation |
 
-**Why This Works:**
+**Why This Works (Probabilistically):**
 
-The phoneme model encodes meaning at the sound level—this is pre-cultural, pre-semantic. If the word "shattered" phonemically encodes "destruction" and the event also encodes "destruction", the usage is universal. If not, it's idiosyncratic.
+The phoneme model provides a statistical correlation between articulation patterns and semantic encoding. If the word "shattered" has phonemic characteristics associated with "destruction" patterns, and the event also encodes "destruction", there's high correlation. Low correlation may indicate metaphorical, ironic, or idiosyncratic usage.
 
 ```
-UNIVERSAL:
-  "shattered" phonemes → destruction (0.8)
+HIGH CORRELATION:
+  "shattered" phoneme profile → destruction-associated (0.8)
   Event encoding → destruction (0.75)
-  Alignment: 0.92 ✓
+  Correlation: 0.92 ✓
 
-ANOMALY:
-  "interesting" phonemes → thinking, forming
+LOW CORRELATION:
+  "interesting" phoneme profile → thinking, forming
   Event encoding → destruction, conflict
-  Alignment: 0.31 ✗ (metaphorical/ironic usage)
+  Correlation: 0.31 ✗ (likely metaphorical/ironic usage)
 ```
 
-**Self-Cleaning System with Orthogonal Validation:**
+**Self-Filtering System with Orthogonal Validation:**
 
-- Only universal patterns survive to storage
-- Anomalies naturally filter out
+- Structurally consistent patterns are prioritized for storage
+- Mismatches are flagged for review (not automatically discarded)
 - **Two orthogonal validation layers:**
   - **Semantic Layer**: Checks logical compatibility (can concepts coexist?)
-  - **Phoneme Layer**: Checks sound-meaning alignment (do sounds match experience?)
+  - **Phoneme Layer**: Checks articulation-encoding correlation (do patterns align?)
 - System is **transparent**: reports WHICH layer flagged and WHY
 
 ### 8. Reasoning Synthesis
@@ -371,19 +373,19 @@ ground or split—unclear division is worst outcome.
                                      │
                                      ▼
                          ┌─────────────────────────┐
-                         │   PHONEME VALIDATION    │
+                         │ PHONEME CONSISTENCY     │
                          │                         │
                          │  Words → Phoneme 10D    │
                          │  Event → Event 10D      │
-                         │  Match? → Universal     │
+                         │  Correlate? → Consistent│
                          └───────────┬─────────────┘
                                      │
                         ┌────────────┴────────────┐
                         │                         │
                         ▼                         ▼
               ┌─────────────────┐      ┌─────────────────┐
-              │    UNIVERSAL    │      │    ANOMALY      │
-              │  Store & Use    │      │  Discard/Flag   │
+              │   CONSISTENT    │      │   MISMATCH      │
+              │  Store & Use    │      │  Flag/Review    │
               └────────┬────────┘      └─────────────────┘
                        │
                        ▼
@@ -398,7 +400,7 @@ ground or split—unclear division is worst outcome.
 
 ---
 
-## What Makes This AGI-Adjacent
+## What Makes This Architecture Generalizable
 
 ### ✓ Achieved
 
@@ -412,8 +414,8 @@ ground or split—unclear division is worst outcome.
 | Explainability | Mirror balance visible |
 | Zero-shot domain transfer | No retraining needed |
 | Insight quality metric | Balance score |
-| **Ground truth validation** | **Phoneme alignment check** |
-| **Self-cleaning data** | **Anomalies filtered automatically** |
+| **Orthogonal consistency check** | **Phoneme-encoding correlation** |
+| **Self-filtering data** | **Mismatches flagged for review** |
 
 ### ○ Future Extensions
 
@@ -532,7 +534,7 @@ symbolu/resonance/
 
 ## 9. Event Learning Architecture
 
-The real AGI capability comes from **event learning**—the system learns by observing events, validating them, and storing universal patterns for cross-domain transfer.
+The core generalization capability comes from **event learning**—the system learns by observing events, checking consistency, and storing structurally validated patterns for cross-domain transfer.
 
 ### Learning vs. Transparency
 
@@ -590,8 +592,8 @@ The real AGI capability comes from **event learning**—the system learns by obs
    - Structural patterns, not word labels
 
 3. **Phoneme = Post-validation (Boolean)**
-   - Confirms pattern is universally encoded in sound
-   - Physical truth, not cultural knowledge
+   - Checks if articulation patterns correlate with event encoding
+   - Probabilistic consistency check, not absolute truth
    - Final gate before storage
 
 ### Cross-Domain Retrieval
@@ -818,7 +820,7 @@ for insight in insights:
 
 ## Conclusion
 
-Symbol-U's architecture represents a **structural approach to AGI** built on five key insights:
+Symbol-U's architecture represents a **structural approach to generalizable reasoning**—and a deliberate step toward AGI. Built on key insights:
 
 1. **Mirror Pairs**: 10D reduces to 5 balanced pairs—balance determines insight quality
 2. **Event Tagging**: Tag what happened, not what it's called—solves clustering
@@ -877,38 +879,54 @@ print(f"Success rate: {report['summary']['success_rate']:.1%}")
 print(f"Problem pairs: {report['problem_pairs']}")
 ```
 
-The system is now **self-validating**:
+The system is **self-consistent and self-filtering**:
 - Extract events from content
 - Encode to 10D with mirror balance
-- Validate via phoneme alignment
-- Only universal patterns survive
+- Check consistency via phoneme-encoding correlation
+- Structurally consistent patterns are prioritized
 - Cross-domain bridges emerge from user queries
 
 ```
-Content → Events → 10D → Balance → Orthogonal Validation → Universal?
+Content → Events → 10D → Balance → Orthogonal Validation → Consistent?
                                           ↓
                               ┌───────────┴───────────┐
                               │                       │
                          Semantic Check          Phoneme Check
-                         (logical compat?)       (sound-meaning?)
+                         (logical compat?)       (encoding correlation?)
                               │                       │
                               └───────────┬───────────┘
                                           ↓
                                   Both Pass? → Store & Transfer
-                                  Either Fail? → Anomaly (with explanation)
+                                  Either Fail? → Flag for Review (with explanation)
 ```
 
-**The system is a transparent validator, not an oracle.** It shows its work:
-- Semantic layer reports: "These concepts are logical opposites" (learned knowledge)
-- Phoneme layer reports: "Sound encoding doesn't match experience" (physical truth)
+**The system is a transparent consistency checker, not an oracle.** It shows its work:
+- Semantic layer reports: "These concepts are logical opposites" (structural incompatibility)
+- Phoneme layer reports: "Articulation patterns don't correlate with event encoding" (probabilistic mismatch)
 
-Neither layer claims absolute truth. Together they provide complete validation.
-The moral position is embedded in the architecture: **show, don't tell.**
+Neither layer claims absolute truth. Together they provide orthogonal consistency validation.
+The design principle is embedded in the architecture: **show, don't tell.**
+
+### The Path to AGI
+
+This is not a final destination—it is infrastructure for the journey. The architecture provides:
+
+| AGI Requirement | Symbol-U Solution | Status |
+|-----------------|-------------------|--------|
+| Universal knowledge representation | 10D mirror pairs | ✓ Implemented |
+| Cross-domain reasoning | Balance-based transfer | ✓ Implemented |
+| Self-improvement capability | Feedback refines weights | ○ Architected |
+| Validation without external oracle | Orthogonal consistency | ✓ Implemented |
+| Explainable reasoning | Transparent layer reports | ✓ Implemented |
+| Novel insight generation | Combine balanced experientials | ○ Architected |
+
+**The claims are conservative. The ambition is not.**
 
 ---
 
-*Document Version: 3.6*
-*Symbol-U Ontological Backbone*
-*Event Learning Architecture + Orthogonal Validation + Learning Hierarchy + Admin Config*
-*Learning Layer (Universal): Causal Chains + 10D Structure + Boolean Gates + Admin-Controlled Pairs*
-*Presentation Layer (Personal): User-Controlled Modes + Structural Validation (No Advertising)*
+*Document Version: 3.8*
+*Symbol-U Generalizable Cognitive Architecture — A Step Toward AGI*
+*Event Learning + Orthogonal Consistency Validation + Learning Hierarchy + Admin Config*
+*Learning Layer: Causal Chains + 10D Structure + Consistency Gates + Admin-Controlled Pairs*
+*Presentation Layer: User-Controlled Modes + Structural Validation (No Advertising)*
+*Framing: Conservative mechanism claims, ambitious AGI vision*
