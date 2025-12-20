@@ -615,6 +615,81 @@ Retrieved (by 10D similarity):
 All share structural pattern: "unified entity → internal tension → split"
 ```
 
+### Learning Hierarchy for Cross-Domain Transfer
+
+**Critical insight**: Not all knowledge propagates equally across domains.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          LEARNING HIERARCHY                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Priority 1: CAUSAL CHAINS (Weight: 0.6)
+─────────────────────────────────────────
+   polarization → conflict → split
+   ↑
+   These sequences are UNIVERSAL
+   Same pattern works for cells, companies, nations, families
+
+Priority 2: 10D STRUCTURAL SIMILARITY (Weight: 0.3)
+─────────────────────────────────────────
+   [0.2, 0.4, 0.7, 0.3, ...]
+   ↑
+   FALLBACK when causal chains aren't explicit
+   Vector similarity in 10D space
+
+Priority 3: PATTERN TYPE (Weight: 0.1)
+─────────────────────────────────────────
+   bifurcation, escalation, threshold
+   ↑
+   DISAMBIGUATION when chains overlap
+   Helps distinguish similar but different patterns
+
+EXCLUDED: INSIGHTS (Weight: 0)
+─────────────────────────────────────────
+   "This reminds me of..."
+   ↑
+   User-specific reflections
+   NOT basis for universal transfer
+```
+
+**Why Causal Chains First?**
+
+Causal chains are domain-agnostic:
+- `polarization → conflict → split` applies to:
+  - Cell biology (mitosis)
+  - History (civil wars)
+  - Business (company spinoffs)
+  - Family (divorce)
+
+The sequence structure transfers, not the domain-specific vocabulary.
+
+**Implementation:**
+
+```python
+def retrieve_similar(query, store):
+    # Use Longest Common Subsequence (LCS) for chain matching
+    chain_similarity = compute_chain_overlap(query_chain, exp_chain)
+
+    # Weighted scoring
+    final_score = (
+        chain_similarity * 0.6 +      # PRIMARY
+        structural_10d_sim * 0.3 +    # FALLBACK
+        pattern_type_match * 0.1      # DISAMBIGUATION
+    )
+
+    # Insights are NOT included in scoring
+    # They're user-specific, not universal
+```
+
+**Match Types:**
+
+| Match Type | When Used | Score Weight |
+|------------|-----------|--------------|
+| `CAUSAL_CHAIN` | Chain overlap ≥ 0.5 | 60% |
+| `STRUCTURAL` | 10D similarity ≥ threshold | 30% |
+| `PATTERN_TYPE` | Same pattern category | 10% |
+
 ### Learning Summary
 
 | Component | Role | Signal |
@@ -639,6 +714,7 @@ Symbol-U's architecture represents a **structural approach to AGI** built on fiv
 3. **Persona Tracking**: Discover patterns from usage, not extraction—simplifies everything
 4. **Orthogonal Validation**: Semantic (pre-filter) + Phoneme (post-validate) with transparency
 5. **Event Learning**: 10D structure is the learning target; gates are for validation
+6. **Learning Hierarchy**: Causal chains (PRIMARY) → 10D structure (FALLBACK) → Pattern type (DISAMBIGUATION) → Insights (NOT TRANSFERRED)
 
 The system is now **self-validating**:
 - Extract events from content
@@ -670,7 +746,7 @@ The moral position is embedded in the architecture: **show, don't tell.**
 
 ---
 
-*Document Version: 3.2*
+*Document Version: 3.3*
 *Symbol-U Ontological Backbone*
-*Event Learning Architecture + Orthogonal Validation*
-*Cross-Domain Reasoning via 10D Structure + Boolean Gates (Semantic/Phoneme)*
+*Event Learning Architecture + Orthogonal Validation + Learning Hierarchy*
+*Cross-Domain Reasoning via Causal Chains (PRIMARY) + 10D Structure (FALLBACK) + Boolean Gates (Semantic/Phoneme)*

@@ -232,6 +232,13 @@ def _infer_insight(validation: ValidationReport) -> str:
 # Cross-Domain Retrieval
 # =============================================================================
 
+class MatchType(Enum):
+    """How the match was determined."""
+    CAUSAL_CHAIN = "causal_chain"      # Matched on causal sequence (PRIMARY)
+    STRUCTURAL = "structural"           # Matched on 10D similarity (FALLBACK)
+    PATTERN_TYPE = "pattern_type"       # Matched on pattern type (DISAMBIGUATION)
+
+
 @dataclass
 class RetrievalResult:
     """Result of cross-domain retrieval."""
@@ -239,6 +246,51 @@ class RetrievalResult:
     similarity: float
     source_domain: str
     is_cross_domain: bool
+    match_type: MatchType = MatchType.STRUCTURAL
+    chain_overlap: float = 0.0  # How much causal chain overlaps (0-1)
+
+
+def _compute_chain_similarity(chain1: Optional[List[str]], chain2: Optional[List[str]]) -> float:
+    """
+    Compute similarity between two causal chains.
+
+    Uses longest common subsequence to find structural overlap.
+    Returns 0-1 score where 1 = identical sequence.
+    """
+    if not chain1 or not chain2:
+        return 0.0
+
+    # Normalize to lowercase
+    c1 = [s.lower() for s in chain1]
+    c2 = [s.lower() for s in chain2]
+
+    # Find longest common subsequence
+    m, n = len(c1), len(c2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if c1[i-1] == c2[j-1]:
+                dp[i][j] = dp[i-1][j-1] + 1
+            else:
+                dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+
+    lcs_length = dp[m][n]
+    max_length = max(m, n)
+
+    return lcs_length / max_length if max_length > 0 else 0.0
+
+
+def _extract_causal_chain_from_text(text: str) -> List[str]:
+    """
+    Extract implicit causal chain from text using event tags.
+
+    Returns list of event types in order of occurrence.
+    """
+    from .mirror_pairs import tag_events
+
+    events = tag_events(text)
+    return [e.event_type.value for e in events]
 
 
 def retrieve_similar(
@@ -248,25 +300,31 @@ def retrieve_similar(
     min_similarity: float = 0.5,
     cross_domain_only: bool = False,
     store: Optional[ExperientialStore] = None,
+    query_chain: Optional[List[str]] = None,
 ) -> List[RetrievalResult]:
     """
-    Retrieve similar experientials by 10D structural similarity.
+    Retrieve similar experientials using learning hierarchy:
+
+    1. CAUSAL CHAINS (PRIMARY): Match on sequence structure
+    2. 10D SIMILARITY (FALLBACK): Match on structural encoding
+    3. PATTERN TYPE (DISAMBIGUATION): Resolve overlapping chains
 
     This is where cross-domain learning happens:
-    - Query is encoded to 10D
-    - Store is searched by 10D similarity
-    - Results ranked by structural match, not domain
+    - Causal chains are domain-agnostic (polarization → conflict → split)
+    - Same chain applies to cells, companies, nations
+    - 10D provides fallback when chains aren't explicit
 
     Args:
         query: Query text to find similar patterns for
         current_domain: Current domain (for cross-domain filtering)
         top_k: Number of results to return
-        min_similarity: Minimum 10D similarity threshold
+        min_similarity: Minimum similarity threshold
         cross_domain_only: If True, exclude results from current_domain
         store: ExperientialStore to search (defaults to global)
+        query_chain: Optional explicit causal chain for query
 
     Returns:
-        List of RetrievalResult sorted by similarity
+        List of RetrievalResult sorted by match quality
 
     Example:
         >>> results = retrieve_similar(
@@ -275,40 +333,97 @@ def retrieve_similar(
         ...     cross_domain_only=True
         ... )
         >>> for r in results:
-        ...     print(f"[{r.source_domain}] {r.similarity:.2f}: {r.experiential.insight}")
+        ...     print(f"[{r.match_type.value}] {r.source_domain}: {r.similarity:.2f}")
     """
     if store is None:
         store = get_experiential_store()
 
-    # Encode query to 10D
+    # ==========================================================================
+    # STEP 1: Extract query's causal chain (if not provided)
+    # ==========================================================================
+    if query_chain is None:
+        query_chain = _extract_causal_chain_from_text(query)
+
+    # Encode query to 10D (for fallback matching)
     query_vector = encode_10d(query)
 
-    # Search by 10D similarity
+    # ==========================================================================
+    # STEP 2: Get candidates from store
+    # ==========================================================================
     if cross_domain_only and current_domain:
         raw_results = store.get_cross_domain(
             problem_vector=query_vector,
             exclude_domain=current_domain,
-            top_k=top_k,
+            top_k=top_k * 3,  # Get more candidates for chain filtering
         )
     else:
         raw_results = store.search(
             problem_vector=query_vector,
-            min_similarity=min_similarity,
-            top_k=top_k,
+            min_similarity=min_similarity * 0.5,  # Lower threshold, will re-rank
+            top_k=top_k * 3,
         )
 
-    # Convert to RetrievalResult
-    results = []
-    for exp, score in raw_results:
+    # ==========================================================================
+    # STEP 3: Score using LEARNING HIERARCHY
+    #         1. Causal Chain (PRIMARY) - weight 0.6
+    #         2. 10D Similarity (FALLBACK) - weight 0.3
+    #         3. Pattern Type (DISAMBIGUATION) - weight 0.1
+    # ==========================================================================
+    CHAIN_WEIGHT = 0.6
+    STRUCTURAL_WEIGHT = 0.3
+    PATTERN_WEIGHT = 0.1
+
+    scored_results = []
+
+    for exp, structural_score in raw_results:
+        # Get experiential's causal chain
+        exp_chain = None
+        if exp.causal_chain:
+            exp_chain = exp.causal_chain.steps
+
+        # Compute chain similarity (PRIMARY)
+        chain_sim = _compute_chain_similarity(query_chain, exp_chain)
+
+        # Determine match type
+        if chain_sim >= 0.5:
+            match_type = MatchType.CAUSAL_CHAIN
+        elif structural_score >= min_similarity:
+            match_type = MatchType.STRUCTURAL
+        else:
+            match_type = MatchType.PATTERN_TYPE
+
+        # Pattern type bonus (for disambiguation)
+        pattern_bonus = 0.0
+        # Could add pattern type matching here if query has expected pattern
+
+        # Compute final score using hierarchy weights
+        final_score = (
+            chain_sim * CHAIN_WEIGHT +
+            structural_score * STRUCTURAL_WEIGHT +
+            pattern_bonus * PATTERN_WEIGHT
+        )
+
+        # Skip if below threshold
+        if final_score < min_similarity * 0.5:
+            continue
+
         is_cross = current_domain is not None and exp.source_domain != current_domain
-        results.append(RetrievalResult(
+
+        scored_results.append(RetrievalResult(
             experiential=exp,
-            similarity=score,
+            similarity=final_score,
             source_domain=exp.source_domain,
             is_cross_domain=is_cross,
+            match_type=match_type,
+            chain_overlap=chain_sim,
         ))
 
-    return results
+    # ==========================================================================
+    # STEP 4: Sort by score and return top_k
+    # ==========================================================================
+    scored_results.sort(key=lambda r: r.similarity, reverse=True)
+
+    return scored_results[:top_k]
 
 
 # =============================================================================
@@ -392,6 +507,7 @@ __all__ = [
     # Outcomes
     "LearningOutcome",
     "LearningResult",
+    "MatchType",
     "RetrievalResult",
     "BatchLearningResult",
     # Learning functions

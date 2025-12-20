@@ -108,6 +108,7 @@ from .learning_pipeline import (
     # Learning outcomes
     LearningOutcome,
     LearningResult,
+    MatchType,
     RetrievalResult,
     BatchLearningResult,
     # Learning functions
@@ -186,6 +187,7 @@ __all__ = [
     # Event Learning Pipeline
     "LearningOutcome",
     "LearningResult",
+    "MatchType",
     "RetrievalResult",
     "BatchLearningResult",
     "learn_from_event",
