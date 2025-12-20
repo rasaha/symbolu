@@ -117,10 +117,24 @@ from .learning_pipeline import (
     # Retrieval functions
     retrieve_similar,
 )
+from .cross_domain_config import (
+    # Admin-level config
+    DomainPairPolicy,
+    DomainPairConfig,
+    CrossDomainCounters,
+    CrossDomainConfig,
+    # Config functions
+    get_cross_domain_config,
+    reload_config,
+    get_counters_report,
+)
 from .insight_suggester import (
+    # User control
+    InsightMode,
     # Types
     InsightType,
     PersonalInsight,
+    StructuralMatch,
     # Core functions
     generate_insights,
     generate_insight_for_display,
@@ -202,9 +216,19 @@ __all__ = [
     "learn_from_event",
     "learn_batch",
     "retrieve_similar",
-    # Personal Insight Suggester
+    # Cross-Domain Config (Admin-Level)
+    "DomainPairPolicy",
+    "DomainPairConfig",
+    "CrossDomainCounters",
+    "CrossDomainConfig",
+    "get_cross_domain_config",
+    "reload_config",
+    "get_counters_report",
+    # Personal Insight Suggester (User-Controlled)
+    "InsightMode",
     "InsightType",
     "PersonalInsight",
+    "StructuralMatch",
     "generate_insights",
     "generate_insight_for_display",
     "explain_insight",

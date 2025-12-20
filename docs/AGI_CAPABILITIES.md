@@ -517,7 +517,9 @@ symbolu/ontology/backbone/
 ├── persona_tracker.py       # Query-based pattern discovery
 ├── phoneme_validator.py     # Ground truth validation
 ├── learning_pipeline.py     # Event learning + causal chain matching
-└── insight_suggester.py     # Personal insights (presentation layer) ← NEW
+├── insight_suggester.py     # Personal insights (presentation layer)
+├── cross_domain_config.py   # Admin-level cross-domain policies ← NEW
+└── cross_domain_config.json # JSON config for domain pairs ← NEW
 
 symbolu/resonance/
 ├── phoneme_map.py           # Phoneme → 10D affinities
@@ -709,72 +711,108 @@ The continuous space (10D) is for **learning and transfer**.
 
 **Critical distinction**: Insights are excluded from LEARNING but valuable for PRESENTATION.
 
+**Critical design**: Without structural validation, cross-domain suggestions become **advertising**.
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    TWO LAYERS: LEARNING vs PRESENTATION                      │
+│                    ADVERTISING vs GENUINE INSIGHT                            │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-LEARNING LAYER (Universal - transfers across domains for ALL users):
-    - Causal chains
-    - 10D structural patterns
-    - Pattern types
+ADVERTISING (Wrong):
+    "You looked at finance recently + you're reading biology = BUY STOCKS!"
+    ↑ No structural validation, just domain co-occurrence
 
-PRESENTATION LAYER (Personal - generated FOR this user):
-    - Insights based on persona history + current context
-    - Does NOT enter the pattern store
-    - Generated at read-time, not stored
+GENUINE INSIGHT (Right):
+    "This biology pattern STRUCTURALLY matches a finance pattern you explored"
+    ↑ Validated via 10D similarity, causal chain overlap, or shared events
 ```
 
-**Example Scenario:**
+### User-Controlled Insight Modes
+
+**The user decides HOW insights are presented, not the system.**
 
 ```
-User is reading: "New CRISPR breakthrough enables gene editing in plants"
-Domain: biology
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    USER-CONTROLLED INSIGHT MODES                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-Persona Memory (last 24h):
-    - 8 queries about stock trading
-    - 3 queries about biotech investments
-    - Bridge detected: biology ↔ finance
+Mode 1: RECENT_MEMORY
+─────────────────────────
+    "Show me connections to what I was just working on"
+    → Prioritizes recency over structural match
+    → User explicitly wants this context
+    → Lower structural threshold
 
-INSIGHT GENERATED:
-    "Are you considering the investment angle?"
+Mode 2: DOMAIN_RELATIVE
+─────────────────────────
+    "Stay focused on this domain"
+    → No cross-domain suggestions at all
+    → Deep dive mode - focus, not distraction
+    → Only pattern continuations within domain
 
-    Type: bridge_opportunity
-    Confidence: 85%
-    Reasoning: User has recent finance activity and existing biology↔finance bridge
+Mode 3: NEW_POSSIBILITIES (Default)
+─────────────────────────
+    "Show me novel connections I haven't explored"
+    → ONLY if STRUCTURAL match exists
+    → Requires: 10D similarity ≥ 0.5 OR causal overlap ≥ 0.3
+    → This is discovery, but grounded in real patterns
 ```
 
-**Why This Works:**
+### Structural Validation
 
-1. The insight is PERSONAL - it's based on THIS user's history
-2. It does NOT propagate - other users don't see this suggestion
-3. It's generated at PRESENTATION time, not learning time
-4. It respects the learning hierarchy - insights don't contaminate universal patterns
-
-**Implementation:**
+Before ANY cross-domain insight is shown, the system validates:
 
 ```python
-from symbolu.ontology.backbone import generate_insights
+structural_match = compute_structural_match(
+    current_vector_10d,
+    current_events,
+    target_vector_10d,
+    target_events,
+)
 
-# User reading biology news
+# NOT: user.recent_domains contains "finance"
+# BUT: structural_match.is_valid == True
+
+if not structural_match.is_valid:
+    skip_this_insight()  # Don't show advertising
+```
+
+**Validation Thresholds:**
+
+| Metric | Threshold | What It Measures |
+|--------|-----------|------------------|
+| 10D Similarity | ≥ 0.5 | Vector cosine in 10D space |
+| Causal Overlap | ≥ 0.3 | LCS ratio of causal chains |
+| Shared Events | ≥ 2 | Common event types |
+| Combined Score | ≥ 0.4 | Weighted (0.6×causal + 0.3×10D + 0.1×events) |
+
+### Implementation
+
+```python
+from symbolu.ontology.backbone import generate_insights, InsightMode
+
+# User controls the mode
 insights = generate_insights(
     persona_id="user_123",
     current_context="CRISPR breakthrough in gene editing...",
-    current_domain="biology"
+    current_domain="biology",
+    mode=InsightMode.NEW_POSSIBILITIES  # User choice
 )
 
 for insight in insights:
+    if insight.structural_match:
+        print(f"Match: {insight.structural_match.combined_score:.0%}")
     print(f"💡 {insight.message}")
-    # "Are you considering the investment angle?"
 ```
 
 **Insight Types:**
 
-| Type | Trigger | Example |
-|------|---------|---------|
-| `BRIDGE_OPPORTUNITY` | Current domain differs from recent activity | "Your recent finance activity might connect here" |
-| `PATTERN_CONTINUATION` | User follows certain event patterns | "This follows your interest in transformation patterns" |
-| `ACTION_SUGGESTION` | Specific action based on context | "Consider researching related stocks" |
+| Type | When | Requires Structural Validation |
+|------|------|--------------------------------|
+| `STRUCTURAL_MATCH` | Cross-domain with validated structure | YES |
+| `BRIDGE_OPPORTUNITY` | Cross-domain in RECENT_MEMORY mode | Computed but lower threshold |
+| `PATTERN_CONTINUATION` | Same event type continues | NO (within domain) |
+| `DOMAIN_DEPTH` | Deeper in same domain | NO (no cross-domain) |
 
 ---
 
@@ -789,6 +827,55 @@ Symbol-U's architecture represents a **structural approach to AGI** built on fiv
 5. **Event Learning**: 10D structure is the learning target; gates are for validation
 6. **Learning Hierarchy**: Causal chains (PRIMARY) → 10D structure (FALLBACK) → Pattern type (DISAMBIGUATION) → Insights (NOT TRANSFERRED)
 7. **Personal Insights**: Generated at presentation time from persona history—valuable for THIS user, not for universal learning
+8. **User-Controlled Modes**: User decides insight mode (recent memory, domain-relative, new possibilities)—system doesn't assume
+9. **Structural Validation**: Cross-domain insights require structural match (10D, causal, events)—without validation it's advertising
+10. **Admin-Level Config**: JSON file controls which domain pairs can learn from each other—counters track blocked/successful transfers
+
+### Admin-Level Cross-Domain Config
+
+**System-wide control over cross-domain learning (not per-persona).**
+
+```json
+{
+  "enabled": true,
+  "default_policy": "allow",
+  "domain_pairs": {
+    "fiction_medicine": {
+      "policy": "block",
+      "reason": "Fictional medical patterns could be dangerous"
+    },
+    "finance_politics": {
+      "policy": "require_high",
+      "min_structural_threshold": 0.75,
+      "reason": "Political-financial transfers need high confidence"
+    }
+  },
+  "counters": {
+    "blocked_attempts": {"fiction_medicine": 23},
+    "successful_transfers": {"biology_finance": 156},
+    "threshold_failures": {"ai_philosophy": 12}
+  }
+}
+```
+
+**Policies:**
+
+| Policy | Behavior |
+|--------|----------|
+| `allow` | Cross-domain learning enabled with default thresholds |
+| `block` | Cross-domain learning completely blocked |
+| `require_high` | Allowed but requires 1.5× higher thresholds |
+| `monitor` | Allowed but closely tracked in counters |
+
+**Counters (Admin Visibility):**
+
+```python
+from symbolu.ontology.backbone import get_counters_report
+
+report = get_counters_report()
+print(f"Success rate: {report['summary']['success_rate']:.1%}")
+print(f"Problem pairs: {report['problem_pairs']}")
+```
 
 The system is now **self-validating**:
 - Extract events from content
@@ -820,8 +907,8 @@ The moral position is embedded in the architecture: **show, don't tell.**
 
 ---
 
-*Document Version: 3.4*
+*Document Version: 3.6*
 *Symbol-U Ontological Backbone*
-*Event Learning Architecture + Orthogonal Validation + Learning Hierarchy + Personal Insights*
-*Learning Layer (Universal): Causal Chains + 10D Structure + Boolean Gates*
-*Presentation Layer (Personal): Insights from Persona History + Current Context*
+*Event Learning Architecture + Orthogonal Validation + Learning Hierarchy + Admin Config*
+*Learning Layer (Universal): Causal Chains + 10D Structure + Boolean Gates + Admin-Controlled Pairs*
+*Presentation Layer (Personal): User-Controlled Modes + Structural Validation (No Advertising)*
