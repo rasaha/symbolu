@@ -1,6 +1,6 @@
 # Phase -1 Session Context Architecture
 
-**Version**: 1.0
+**Version**: 2.0
 **Date**: 2025-12-20
 **Status**: Implemented
 
@@ -15,6 +15,72 @@ Modern LLM systems benefit from tracking session history to inform current query
 3. **Persona Modeling**: Building understanding of user communication patterns
 4. **Event History**: Remembering conversation events for reference resolution
 
+## Key Design Principles (v2.0)
+
+### 1. Constraint Narrowing (Not Confidence Boosting)
+
+Instead of "boosting confidence" (which inflates certainty), the system uses **constraint narrowing** to eliminate unlikely interpretations.
+
+**Old approach (v1.0):**
+```
+"+0.08 confidence due to reflexive streak"
+```
+
+**New approach (v2.0):**
+```
+"Eliminated DETACHED mode due to reflexive_streak_3"
+```
+
+This makes reasoning more explainable and auditable.
+
+### 2. Read-Only Projection Layer
+
+Evidence accumulation is separated from decision influence via `SessionProjection`:
+
+```
+SessionContext (mutable, accumulates evidence)
+      ↓
+SessionProjection (frozen, read-only for decisions)
+      ↓
+AmbiguityResolver
+```
+
+This ensures:
+- No mutation during decision-making
+- Clear audit boundary
+- Reproducible decisions
+
+### 3. Exponential Decay on All Accumulators
+
+All accumulators use exponential decay to prevent early queries from overweighting later ones:
+
+```python
+effective_weight = raw_weight * exp(-λ * age_in_queries)
+# λ = ln(2) / DECAY_HALF_LIFE (default: 4 queries)
+```
+
+### 4. Contradiction Tracking
+
+The system tracks when patterns break unexpectedly and suppresses session influence accordingly:
+
+```python
+if contradiction_count >= CONTRADICTION_THRESHOLD:  # default: 2
+    session_influence = 0  # Suppressed
+```
+
+### 5. Hard Safety Constraints (Non-Permissions)
+
+Explicit actions that SessionContext must NEVER perform:
+
+```python
+class SessionNonPermission(Enum):
+    OVERRIDE_USER_CLARIFICATION = "override_user_clarification"
+    INVENT_REFERENTS = "invent_referents"
+    OVERRIDE_STRONG_BASE_SIGNALS = "override_strong_base_signals"
+    CROSS_SESSION_PERSISTENCE = "cross_session_persistence"
+    EXCEED_INFLUENCE_WINDOW = "exceed_influence_window"
+```
+
 ## Architecture
 
 ### Component Hierarchy
@@ -26,9 +92,14 @@ Phase -1 Pipeline (PO1)
 ├── PO1.2: Conservative Clause Splitter (CSL)
 ├── PO1.F: Fuzzy Query Classifier (FQC)  ← Per-query fuzzy signals
 └── PO1.S: Session Context Tracker (SCT) ← Session-level accumulation
+    ├── DomainAccumulator (with decay)
+    ├── PersonaSignals (with EMA)
+    ├── PriorGroundingProjection (with contradiction tracking)
+    ├── SessionProjection (read-only decision layer)
+    └── SessionAuditLog (explainability)
 ```
 
-### Data Flow
+### Data Flow (v2.0)
 
 ```
                     ┌─────────────────────────────────────────────────────┐
@@ -36,27 +107,52 @@ Phase -1 Pipeline (PO1)
                     │  ┌─────────────┐ ┌──────────────┐ ┌──────────────┐  │
                     │  │   Domain    │ │   Persona    │ │    Prior     │  │
                     │  │ Accumulator │ │   Signals    │ │ Projections  │  │
+                    │  │ (w/ decay)  │ │  (w/ EMA)    │ │(w/ contradict)│  │
                     │  └─────────────┘ └──────────────┘ └──────────────┘  │
                     └───────────┬───────────────────────────────┬─────────┘
                                 │                               │
                                 ▼                               │
+                      SessionProjection (frozen)                │
+                                │                               │
+                                ▼                               │
     Query ──▶ FuzzyQueryClassifier ──▶ SessionAwareFuzzySignals │
+                                              │                 │
+                            constraint narrowing                │
                                               │                 │
                                               ▼                 │
                                        AmbiguityResolver        │
                                               │                 │
                                               ▼                 │
                                      ClauseGroundingResult ─────┘
-                                              │            (recorded)
+                                              │            (recorded + audit)
                                               ▼
                                      PhaseMinusOneEnvelope
+```
+
+## Configuration Constants
+
+```python
+# Session influence window - only last N queries affect decisions
+SESSION_INFLUENCE_WINDOW: int = 5
+
+# Decay half-life for accumulator weights (in query count)
+DECAY_HALF_LIFE: int = 4
+
+# Contradiction threshold - suppress session influence after N contradictions
+CONTRADICTION_THRESHOLD: int = 2
+
+# Maximum resolution bias magnitude
+MAX_RESOLUTION_BIAS: float = 0.20
+
+# Base signal disagreement threshold - when to ignore session influence
+BASE_SIGNAL_OVERRIDE_THRESHOLD: float = 0.7
 ```
 
 ## Components
 
 ### 1. SessionContext
 
-Main container for session state. Thread-safe, stateful across queries.
+Main container for session state. Stateful across queries.
 
 ```python
 @dataclass
@@ -67,6 +163,7 @@ class SessionContext:
     persona_signals: PersonaSignals
     prior_projections: PriorGroundingProjection
     events: Deque[SessionEvent]
+    audit_log: Deque[SessionAuditEntry]  # NEW in v2.0
     query_count: int
     clarification_count: int
     ambiguity_count: int
@@ -75,127 +172,165 @@ class SessionContext:
 **Key Methods:**
 - `create()`: Factory method to create new session
 - `record_query()`: Record incoming query with fuzzy signals
-- `record_grounding_result()`: Record grounding decision
-- `get_context_confidence_adjustment()`: Get session-based confidence modifier
-- `get_likely_mode_from_context()`: Infer likely mode from history
+- `record_grounding_result()`: Record grounding decision with resolution source
+- `create_projection()`: **NEW** - Create read-only projection for decisions
+- `generate_summary()`: **NEW** - Generate end-of-session analytics
+- `record_audit()`: **NEW** - Record audit entry
 
-### 2. DomainAccumulator
+### 2. SessionProjection (NEW in v2.0)
 
-Tracks domain exploration within session.
+Read-only, frozen projection for decision-making:
+
+```python
+@dataclass(frozen=True)
+class SessionProjection:
+    dominant_domain: Optional[DomainCategory]
+    dominant_mode: Optional[str]
+    consistency_score: float  # 0.0-1.0
+
+    # Constraints to apply (replaces confidence boost)
+    constraints: Tuple[SessionConstraintEffect, ...]
+
+    # Resolution bias (renamed from confidence_adjustment)
+    resolution_bias: float  # [-0.20, +0.20]
+
+    # Suppression tracking
+    influence_suppressed: bool
+    suppression_reason: Optional[str]
+
+    constraint_summary: Tuple[str, ...]
+    query_index: int
+```
+
+### 3. SessionConstraintEffect (NEW in v2.0)
+
+Represents constraint narrowing instead of confidence boosting:
+
+```python
+@dataclass(frozen=True)
+class SessionConstraintEffect:
+    eliminated_modes: FrozenSet[str]       # e.g., {"DETACHED"}
+    eliminated_domains: FrozenSet[DomainCategory]
+    reason: str                            # e.g., "reflexive_streak_3"
+    strength: float                        # 0.0-1.0
+```
+
+### 4. DomainAccumulator (with Decay)
+
+Tracks domain exploration with exponential decay:
 
 ```python
 @dataclass
 class DomainAccumulator:
     domain_counts: Dict[DomainCategory, int]
-    domain_sequence: Deque[DomainCategory]  # Recent domains
+    domain_timestamps: Dict[DomainCategory, List[float]]  # NEW
+    domain_sequence: Deque[DomainCategory]
     domain_keywords: Dict[DomainCategory, Set[str]]
     primary_domain: Optional[DomainCategory]
-    domain_affinity: Dict[DomainCategory, float]
+    domain_affinity: Dict[DomainCategory, float]  # Decayed
+    current_query_index: int  # NEW
 ```
 
-**Domain Categories:**
-- `EMOTIONAL`: Feelings, mood, mental state
-- `RELATIONAL`: Relationships, social dynamics
-- `PROFESSIONAL`: Work, career, colleagues
-- `HEALTH`: Physical/mental health
-- `FINANCIAL`: Money, finances
-- `PHILOSOPHICAL`: Meaning, purpose, values
-- `PRACTICAL`: Tasks, logistics, planning
+### 5. PriorGroundingProjection (with Contradiction Tracking)
 
-**Use Case:** When query contains "the issue" or "that problem", domain accumulator helps infer which domain is being referenced based on session history.
-
-### 3. PersonaSignals
-
-Accumulated communication patterns.
-
-```python
-@dataclass
-class PersonaSignals:
-    uses_first_person: float      # Frequency of "I" statements
-    uses_emotional_language: float # Emotional word density
-    question_ratio: float          # Questions vs statements
-    avg_query_length: float        # Words per query
-    emotional_baseline: float      # Session emotional level
-    query_count: int
-```
-
-**Use Case:** User who consistently uses first-person emotional language is more likely to be in REFLEXIVE mode for ambiguous queries.
-
-### 4. PriorGroundingProjection
-
-Stores grounding decisions for projection.
+Stores grounding decisions with pattern break detection:
 
 ```python
 @dataclass
 class PriorGroundingProjection:
-    grounding_history: Deque[Dict[str, Any]]  # Last 20 groundings
-    mode_counts: Dict[str, int]               # REFLEXIVE/RELATIONAL/DETACHED counts
-    last_confident_grounding: Optional[Dict]  # Most recent confident result
-    reflexive_streak: int                     # Consecutive reflexive groundings
-    relational_streak: int                    # Consecutive relational groundings
+    grounding_history: Deque[Dict[str, Any]]
+    mode_counts: Dict[str, int]
+    last_confident_grounding: Optional[Dict]
+    reflexive_streak: int
+    relational_streak: int
+
+    # Contradiction tracking (NEW)
+    contradiction_count: int
+    last_mode_switch_at: int
+    recent_contradictions: Deque[int]
 ```
 
-**Use Case:** After 3 consecutive REFLEXIVE groundings, confidence is boosted (+0.08) for subsequent queries that appear reflexive.
+### 6. ResolutionSource (NEW in v2.0)
 
-### 5. SessionAwareFuzzySignals
+Tracks how ambiguity was resolved for traceability:
 
-Wrapper that combines per-query fuzzy signals with session context.
+```python
+class ResolutionSource(Enum):
+    LEXICAL = "lexical"                     # Word-level features
+    FUZZY_SIGNALS = "fuzzy_signals"         # Fuzzy classifier
+    SESSION_PROJECTION = "session_projection"  # Session context
+    EXPLICIT_CLARIFICATION = "explicit"     # User clarification
+    SAFE_DEFAULT = "safe_default"           # Conservative fallback
+```
+
+### 7. SessionAuditEntry (NEW in v2.0)
+
+Audit log for explainability:
 
 ```python
 @dataclass
-class SessionAwareFuzzySignals:
-    base_signals: FuzzyQuerySignals    # From FuzzyQueryClassifier
-    session_adjustment: float          # Session-based adjustment
-    session_mode_prior: Optional[str]  # Mode from history
-    session_domain: Optional[DomainCategory]
-    combined_adjustment: float         # Base + session (capped ±0.20)
-    context_hints: List[str]           # Session-derived hints
+class SessionAuditEntry:
+    decision_id: str
+    timestamp: float
+    query_index: int
+    factors_used: List[str]
+    factors_ignored: List[str]          # Silence is dangerous
+    ignored_reasons: Dict[str, str]
+    constraints_applied: List[SessionConstraintEffect]
+    resolution_source: ResolutionSource
+    resolution_bias_applied: float
+    reason: str
 ```
 
-## Confidence Adjustment Model
+### 8. SessionSummary (NEW in v2.0)
 
-### Per-Query (FuzzyQueryClassifier)
+End-of-session analytics (not used for decisions):
 
-| Factor | Adjustment Range |
-|--------|-----------------|
-| High intent score (≥0.7) | +0.10 |
-| Moderate intent (≥0.5) | +0.05 |
-| Low intent (<0.3) | -0.05 |
-| High subject clarity (≥0.8) | +0.05 |
-| Low subject clarity (≤0.3) | -0.08 |
-| High pronoun ambiguity (≥0.6) | -0.07 |
-| Low pronoun ambiguity (≤0.2) | +0.03 |
-| High complexity (≥0.7) | -0.05 |
+```python
+@dataclass
+class SessionSummary:
+    session_id: str
+    duration_seconds: float
+    query_count: int
+    dominant_domain: Optional[DomainCategory]
+    dominant_mode: Optional[str]
+    ambiguity_rate: float
+    clarification_rate: float
+    volatility_score: float
+    contradiction_rate: float
+    consistency_score: float
+```
 
-**Per-query range: [-0.15, +0.15]**
+## Constraint Narrowing Model (v2.0)
 
-### Session Context
+Instead of confidence adjustment, we use constraint elimination:
 
-| Factor | Adjustment Range |
-|--------|-----------------|
-| First-person + emotional pattern | +0.05 |
-| Consistent patterns (3+ queries) | +0.03 |
-| Mode streak (≥3 consistent) | +0.08 |
-| Mode streak (≥2 consistent) | +0.04 |
-| High ambiguity rate (>50%) | -0.05 |
+### Persona-Based Constraints
 
-**Session range: [-0.10, +0.10]**
+| Pattern | Constraint | Strength |
+|---------|-----------|----------|
+| High first-person + emotional | Eliminate DETACHED | 0.6 |
+| Low emotional + high questions | Eliminate REFLEXIVE | 0.5 |
 
-### Combined
+### Grounding History Constraints
 
-Combined adjustment is capped at **±0.20** to prevent over-amplification.
+| Pattern | Constraint | Strength |
+|---------|-----------|----------|
+| Reflexive streak ≥3 | Eliminate DETACHED | 0.7 |
+| Reflexive streak ≥2 | Eliminate DETACHED | 0.5 |
+| Relational streak ≥3 | Eliminate DETACHED | 0.7 |
+| Relational streak ≥2 | Eliminate DETACHED | 0.5 |
+
+### Suppression Rules
+
+Session influence is **suppressed** when:
+1. `contradiction_count >= CONTRADICTION_THRESHOLD` (default: 2)
+2. Insufficient recent history in influence window
+3. Query index exceeds window without enough data
 
 ## API Usage
 
-### Stateless Mode (Original)
-
-```python
-pipeline = PhaseMinusOnePipeline()
-envelope = pipeline.run("I feel anxious")
-# No session context, per-query fuzzy only
-```
-
-### Session-Aware Mode
+### Session-Aware Mode (v2.0)
 
 ```python
 session = SessionContext.create()
@@ -203,36 +338,86 @@ pipeline = PhaseMinusOnePipeline()
 
 # First query - establishes context
 env1 = pipeline.run_with_session("I feel anxious about my future", session)
-# Session learns: emotional domain, reflexive mode, first-person pattern
+# Session learns: emotional domain, reflexive mode
 
-# Second query - session informs disambiguation
-env2 = pipeline.run_with_session("What should I do about that?", session)
-# "that" can be resolved using prior context
-# Session provides: +0.08 confidence boost from reflexive streak
+# Second query - constraints applied
+env2 = pipeline.run_with_session("I keep worrying about everything", session)
+# Constraint: Eliminated DETACHED due to reflexive_streak_2
 
-# Third query - pattern reinforced
-env3 = pipeline.run_with_session("I keep worrying about it", session)
-# Context hints: ["session_queries_3", "reflexive_pattern", "domain_emotional"]
+# Third query - stronger constraints
+env3 = pipeline.run_with_session("What should I do about that?", session)
+# Constraint: Eliminated DETACHED due to reflexive_streak_3 (strength: 0.7)
+
+# Get read-only projection
+projection = session.create_projection()
+print(f"Constraints: {[c.reason for c in projection.constraints]}")
+print(f"Suppressed: {projection.influence_suppressed}")
+
+# Generate end-of-session summary
+summary = session.generate_summary()
+print(f"Consistency: {summary.consistency_score}")
 ```
 
-### Debug Output
-
-Session context is included in envelope debug info:
+### Debug Output (v2.0)
 
 ```python
 envelope.debug["session_context"] = {
     "session_id": "abc123",
     "query_count": 3,
-    "domain_accumulator": {
-        "primary_domain": "emotional",
-        "domain_affinity": {"emotional": 0.8, "relational": 0.2}
-    },
-    "prior_projections": {
-        "mode_prior": "REFLEXIVE",
-        "reflexive_streak": 3,
-    },
-    "context_adjustment": +0.11
+    "consistency_score": 0.782,
+    "current_projection": {
+        "dominant_mode": "REFLEXIVE",
+        "constraints": [
+            {
+                "eliminated_modes": ["DETACHED"],
+                "reason": "reflexive_streak_3",
+                "strength": 0.7
+            }
+        ],
+        "resolution_bias": 0.105,
+        "influence_suppressed": False
+    }
 }
+```
+
+## Safety Model
+
+### Non-Permissions (Hard Constraints)
+
+The system must NEVER:
+
+1. **Override user clarification**: If user explicitly clarifies, session cannot contradict
+2. **Invent referents**: Cannot create references not present in session history
+3. **Override strong base signals**: If base fuzzy signals are strong (≥0.7), session cannot flip
+4. **Persist across sessions**: No cross-session state without explicit opt-in
+5. **Exceed influence window**: Only last N queries (default: 5) can influence
+
+### Influence Suppression
+
+Session influence is automatically suppressed when:
+
+```python
+# Too many contradictions in recent window
+if sum(1 for c in recent_contradictions if within_window(c)) >= 2:
+    influence_suppressed = True
+    suppression_reason = "contradictions_exceeded_threshold"
+```
+
+### Audit Trail
+
+Every session-influenced decision is logged:
+
+```python
+session.record_audit(SessionAuditEntry(
+    decision_id="...",
+    factors_used=["reflexive_streak", "emotional_pattern"],
+    factors_ignored=["domain_affinity"],
+    ignored_reasons={"domain_affinity": "below_threshold"},
+    constraints_applied=[...],
+    resolution_source=ResolutionSource.SESSION_PROJECTION,
+    resolution_bias_applied=0.105,
+    reason="reflexive_streak_3 eliminated DETACHED mode"
+))
 ```
 
 ## Privacy Considerations
@@ -241,86 +426,50 @@ envelope.debug["session_context"] = {
 2. **User Controls**: Application layer can clear/reset sessions
 3. **Minimal Storage**: Only grounding-relevant patterns stored
 4. **No Content Storage**: Query text in events is optional
+5. **Audit for Compliance**: All decisions logged for review
 
 ## Future Enhancements
 
 ### 1. Persona Files
 
-Persistent persona profiles across sessions:
-
-```
-PersonaFile
-├── communication_style: Dict[str, float]
-├── domain_preferences: Dict[DomainCategory, float]
-├── typical_grounding_mode: str
-└── last_session_summary: Dict
-```
-
-### 2. Reference Resolution
-
-Explicit anaphora resolution using session context:
+Persistent persona profiles (requires explicit opt-in):
 
 ```python
-def resolve_reference(self, pronoun: str) -> Optional[str]:
-    """Resolve 'that', 'this issue', etc. to prior query content."""
-    if pronoun in ["that", "this", "it"]:
-        return self.prior_projections.last_confident_grounding["clause_text"]
+@dataclass
+class PersonaFile:
+    communication_style: Dict[str, float]
+    domain_preferences: Dict[DomainCategory, float]
+    typical_grounding_mode: str
+    last_session_summary: SessionSummary
 ```
 
-### 3. Emotional Arc Tracking
-
-Track emotional trajectory across session:
+### 2. Emotional Arc Tracking
 
 ```python
 @dataclass
 class EmotionalArc:
-    baseline: float           # Session start emotional level
-    current: float            # Current emotional level
-    trajectory: str           # "escalating", "stable", "de-escalating"
+    baseline: float
+    current: float
+    trajectory: Literal["escalating", "stable", "de-escalating"]
     peak_moment: Optional[SessionEvent]
 ```
 
-### 4. Multi-Turn Disambiguation
-
-Use prior clarifications to avoid repeating questions:
+### 3. Multi-Turn Clarification Memory
 
 ```python
 def was_already_clarified(self, topic: str) -> bool:
-    """Check if we've already asked about this topic."""
-    for event in self.events:
-        if event.event_type == EventType.CLARIFICATION:
-            if topic in event.query_text:
-                return True
-    return False
-```
-
-## Integration Points
-
-### With Phase 0 (P0)
-
-Session context can inform P0 routing decisions:
-
-```python
-# P0 can access session to inform mode selection
-if session.prior_projections.reflexive_streak >= 3:
-    # Bias toward reflexive processing path
-    pass
-```
-
-### With Phase 1+ (P1+)
-
-Session domain can inform topic modeling:
-
-```python
-# P1 topic model can use session domain as prior
-prior_topic = session.domain_accumulator.primary_domain
+    """Avoid repeating clarification questions."""
+    return any(
+        e.event_type == EventType.CLARIFICATION and topic in e.query_text
+        for e in self.events
+    )
 ```
 
 ## File Locations
 
 ```
 symbolu/mechanical/pipeline/grounding/
-├── phase_minus_one_session.py      # Session context implementation
+├── phase_minus_one_session.py      # Session context (v2.0)
 ├── phase_minus_one_fuzzy.py        # Fuzzy query classifier
 ├── phase_minus_one_ambiguity.py    # Ambiguity resolver
 ├── phase_minus_one_pipeline.py     # Pipeline with run_with_session()
@@ -329,34 +478,49 @@ symbolu/mechanical/pipeline/grounding/
 
 ## Testing
 
-Test session-aware pipeline:
-
 ```bash
 python -c "
 from symbolu.mechanical.pipeline.grounding import (
     PhaseMinusOnePipeline,
     SessionContext,
+    SessionProjection,
+    SESSION_INFLUENCE_WINDOW,
 )
 
 session = SessionContext.create()
 pipeline = PhaseMinusOnePipeline()
 
-# Simulate multi-turn conversation
+# Test constraint narrowing
 queries = [
-    'I feel anxious about my relationship',
-    'She doesn\'t understand me',
+    'I feel anxious about my future',
+    'I keep worrying about everything',
     'What should I do about that?',
 ]
 
 for q in queries:
     env = pipeline.run_with_session(q, session)
-    print(f'{q} -> {env.clauses[0].grounding_status}')
+    print(f'{q}')
+    print(f'  Mode: {env.clauses[0].selected.mode}')
 
-print(f'Session context: {session.to_dict()}')
+projection = session.create_projection()
+print(f'Constraints: {[c.reason for c in projection.constraints]}')
+print(f'Consistency: {session._compute_consistency_score():.3f}')
 "
 ```
 
 ## Changelog
+
+- **v2.0** (2025-12-20): Major improvements based on safety/robustness review
+  - Replaced confidence boosting with constraint narrowing (SessionConstraintEffect)
+  - Added SessionProjection read-only decision layer
+  - Added exponential decay to all accumulators
+  - Added contradiction tracking and influence suppression
+  - Added ResolutionSource for traceability
+  - Added SessionNonPermission hard safety constraints
+  - Added SessionAuditEntry for explainability
+  - Added SessionSummary for end-of-session analytics
+  - Renamed confidence_adjustment to resolution_bias
+  - Added session influence window (SESSION_INFLUENCE_WINDOW)
 
 - **v1.0** (2025-12-20): Initial implementation
   - SessionContext, DomainAccumulator, PersonaSignals, PriorGroundingProjection

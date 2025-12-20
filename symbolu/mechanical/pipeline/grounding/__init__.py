@@ -49,13 +49,30 @@ from .phase_minus_one_fuzzy import (
     TemporalOrientation,
 )
 from .phase_minus_one_session import (
+    # Configuration
+    SESSION_INFLUENCE_WINDOW,
+    DECAY_HALF_LIFE,
+    CONTRADICTION_THRESHOLD,
+    MAX_RESOLUTION_BIAS,
+    # Enums
+    SessionNonPermission,
+    DomainCategory,
+    EventType,
+    ResolutionSource,
+    # Core classes
     SessionContext,
     SessionEvent,
-    EventType,
-    DomainCategory,
     DomainAccumulator,
     PersonaSignals,
     PriorGroundingProjection,
+    # Constraint narrowing
+    SessionConstraintEffect,
+    # Projection layer
+    SessionProjection,
+    # Audit
+    SessionAuditEntry,
+    SessionSummary,
+    # Session-aware signals
     SessionAwareFuzzySignals,
 )
 
@@ -72,6 +89,8 @@ __all__ = [
     "TemporalOrientation",
     "EventType",
     "DomainCategory",
+    "ResolutionSource",
+    "SessionNonPermission",
     # Dataclasses
     "GroundingCandidate",
     "ClauseGroundingResult",
@@ -84,10 +103,19 @@ __all__ = [
     "PersonaSignals",
     "PriorGroundingProjection",
     "SessionAwareFuzzySignals",
+    "SessionConstraintEffect",
+    "SessionProjection",
+    "SessionAuditEntry",
+    "SessionSummary",
     # Components
     "ObserverObservedGrounding",
     "AmbiguityResolver",
     "ConservativeClauseSplitter",
     "PhaseMinusOnePipeline",
     "FuzzyQueryClassifier",
+    # Configuration
+    "SESSION_INFLUENCE_WINDOW",
+    "DECAY_HALF_LIFE",
+    "CONTRADICTION_THRESHOLD",
+    "MAX_RESOLUTION_BIAS",
 ]
