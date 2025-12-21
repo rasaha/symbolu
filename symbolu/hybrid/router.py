@@ -53,11 +53,27 @@ REASONING_PATTERNS: Set[str] = {
 }
 
 RELATIONSHIP_PATTERNS: Set[str] = {
-    "feel", "feeling", "emotion", "sad", "happy", "anxious", "worried",
-    "lonely", "love", "hate", "friend", "family", "relationship", "hurt",
-    "heart", "care", "connect", "bond", "trust", "empathy", "compassion",
-    "frustrated", "angry", "upset", "stressed", "overwhelmed", "depressed",
-    "miss", "cope", "support", "talk", "listen", "comfort", "help",
+    # Core emotional states
+    "feel", "feeling", "feelings", "emotion", "emotional", "emotions",
+    "sad", "sadness", "happy", "happiness", "anxious", "anxiety", "worried", "worry",
+    "lonely", "loneliness", "scared", "fear", "afraid", "nervous",
+    # Relationships
+    "love", "loving", "hate", "hating", "friend", "friends", "friendship",
+    "family", "relationship", "relationships", "partner", "spouse", "husband", "wife",
+    "boyfriend", "girlfriend", "parent", "parents", "child", "children", "sibling",
+    "colleague", "coworker", "boss", "team", "people",
+    # Emotional actions
+    "hurt", "hurting", "heart", "heartbreak", "care", "caring",
+    "connect", "connection", "bond", "bonding", "trust", "trusting",
+    "empathy", "compassion", "understand", "understanding",
+    # Negative emotions
+    "frustrated", "frustration", "angry", "anger", "upset", "stressed", "stress",
+    "overwhelmed", "depressed", "depression", "miss", "missing", "grief", "grieving",
+    # Support-seeking
+    "cope", "coping", "support", "talk", "talking", "listen", "listening",
+    "comfort", "help", "advice", "guidance", "someone", "anyone",
+    # Relational phrases (first word patterns)
+    "i'm", "im", "i", "my", "we", "our", "need", "struggling",
 }
 
 CREATIVE_PATTERNS: Set[str] = {

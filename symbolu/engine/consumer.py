@@ -9,12 +9,14 @@ Architecture:
       ↓
     STL (10D) ──────────────┐
       ↓                     │
-    AGI Context             │ (Event tagging, 10D encoding, balance check)
+    Query Type Check        │ (PROBLEM vs INFORMATION)
+      ↓                     │
+    AGI Context (if PROBLEM)│ (Event tagging, 10D encoding, balance check)
       ↓                     │
     Confidence Check        │
       ↓                     ↓
     ┌─────────────┐    ┌─────────────┐
-    │ HIGH (≥80%) │    │ LOW (<80%)  │
+    │ HIGH (≥60%) │    │ LOW (<60%)  │
     └─────────────┘    └─────────────┘
           ↓                   ↓
     Skip 768D            768D Embedding
@@ -31,18 +33,17 @@ Architecture:
                    ↓                   ↓
                Response            Response
                              ↓
-                   Cross-Domain Retrieval (AGI)
+                   Cross-Domain Retrieval (AGI, PROBLEM only)
                              ↓
                    Persona Tracking (AGI)
                              ↓
                    Insights Available (AGI)
 
-Benefits:
-    - 85% of queries skip 768D computation
-    - Most queries use cost-effective 7B
-    - Edge cases get full 175B capability
-    - STL provides audit trail for all queries
-    - AGI provides cross-domain reasoning and persona tracking
+Cost Optimization Levers:
+    - stl_confidence_threshold: Lower to skip 768D more (default: 0.6)
+    - cascade_threshold: Lower to use 7B more (default: 0.6)
+    - agi_for_problems_only: Only run AGI for PROBLEM queries (default: True)
+    - vocabulary: Add custom terms to boost confidence
 """
 
 import time
@@ -51,6 +52,7 @@ from dataclasses import dataclass, asdict
 
 from symbolu.engine.base import BaseEngine, EngineResult, EngineCapability
 from symbolu.engine.agi_context import AGIContext, AGILevel, AGISignal
+from symbolu.engine.query_type import classify_query_type, QueryType
 from symbolu.hybrid.router import SemanticRouter, ModelType, RoutingDecision
 from symbolu.hybrid.vocabulary import CustomVocabulary
 from symbolu.resonance import analyze_phrase
@@ -146,40 +148,61 @@ class ConsumerEngine(BaseEngine):
         insights = engine.get_insights()
     """
 
+    # Default thresholds optimized for cost savings (based on benchmarks)
+    DEFAULT_STL_CONFIDENCE_THRESHOLD = 0.6  # Skip 768D if STL confidence >= this
+    DEFAULT_CASCADE_THRESHOLD = 0.6         # Use 7B if combined confidence >= this
+
     def __init__(
         self,
         vocabulary: Optional[CustomVocabulary] = None,
-        stl_confidence_threshold: float = 0.8,
-        cascade_threshold: float = 0.8,
+        stl_confidence_threshold: Optional[float] = None,
+        cascade_threshold: Optional[float] = None,
         embedder: Optional[SemanticEmbedder] = None,
         persona_id: Optional[str] = None,
         enable_agi: bool = True,
+        agi_for_problems_only: bool = True,
     ):
         """
         Initialize Consumer Engine.
 
         Args:
-            vocabulary: Optional custom vocabulary
-            stl_confidence_threshold: STL confidence to skip 768D
-            cascade_threshold: Combined confidence to use 7B vs 175B
+            vocabulary: Optional custom vocabulary for confidence boosting
+            stl_confidence_threshold: STL confidence to skip 768D (default: 0.6)
+                - Lower = more 768D skipping = more cost savings
+                - Higher = more accuracy but more 768D compute
+            cascade_threshold: Combined confidence to use 7B vs 175B (default: 0.6)
+                - Lower = more 7B usage = more cost savings
+                - Higher = more 175B fallback = better quality
             embedder: 768D embedder (stub if not provided)
             persona_id: User/session ID for AGI persona tracking
             enable_agi: Whether to enable AGI capabilities (default: True)
+            agi_for_problems_only: Only run AGI for PROBLEM queries (default: True)
+                - True = AGI skipped for INFORMATION queries = faster + cheaper
+                - False = AGI always runs when enabled
         """
         self.router = SemanticRouter(
             vocabulary=vocabulary,
             confidence_threshold=0.3,  # Low threshold - we use our own cascading
         )
         self.vocabulary = vocabulary
-        self.stl_confidence_threshold = stl_confidence_threshold
-        self.cascade_threshold = cascade_threshold
+        self.stl_confidence_threshold = (
+            stl_confidence_threshold
+            if stl_confidence_threshold is not None
+            else self.DEFAULT_STL_CONFIDENCE_THRESHOLD
+        )
+        self.cascade_threshold = (
+            cascade_threshold
+            if cascade_threshold is not None
+            else self.DEFAULT_CASCADE_THRESHOLD
+        )
 
         # 768D embedder
         self.embedder = embedder or SemanticEmbedder()
 
-        # AGI context
+        # AGI configuration
         self.persona_id = persona_id
         self.enable_agi = enable_agi
+        self.agi_for_problems_only = agi_for_problems_only
         self.agi_context: Optional[AGIContext] = None
         if enable_agi:
             self.agi_context = AGIContext(
@@ -290,9 +313,18 @@ class ConsumerEngine(BaseEngine):
             "time_ms": stl_time * 1000,
         }
 
-        # Step 2: AGI processing (if enabled)
+        # Step 1.5: Query type classification (for AGI gating)
+        query_type_result = classify_query_type(query)
+        is_problem_query = query_type_result.query_type == QueryType.PROBLEM
+
+        # Step 2: AGI processing (if enabled AND appropriate for query type)
         agi_signal = None
-        if self.agi_context:
+        should_run_agi = (
+            self.agi_context is not None
+            and (not self.agi_for_problems_only or is_problem_query)
+        )
+
+        if should_run_agi:
             agi_start = time.perf_counter()
             query_ctx = self.agi_context.process_query(
                 query=query,
@@ -314,6 +346,14 @@ class ConsumerEngine(BaseEngine):
                 "top_match_similarity": signal.top_match_similarity,
                 "insights_available": signal.insights_available,
                 "time_ms": agi_time * 1000,
+                "query_type": query_type_result.query_type.value,
+            }
+        elif self.agi_context and self.agi_for_problems_only and not is_problem_query:
+            # AGI skipped due to INFORMATION query
+            agi_signal = {
+                "skipped": True,
+                "reason": "INFORMATION query - AGI disabled for cost savings",
+                "query_type": query_type_result.query_type.value,
             }
 
         semantic_signal = None

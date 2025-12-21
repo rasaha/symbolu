@@ -252,9 +252,9 @@ def run_demo():
    - Track which domains and events each user explores
    - Bridges emerge from usage, not extraction
 
-5. STRUCTURAL VALIDATION: Cross-domain insights are now permissive
-   - 10D similarity >= 0.1 (lowered from 0.5)
-   - Enables more cross-domain pattern discovery for PROBLEM queries
+5. STRUCTURAL VALIDATION: Cross-domain insights use quality filtering
+   - 10D similarity >= 0.5 for quality matches
+   - Filters low-confidence cross-domain connections for cleaner results
 
 6. CANONICAL MATCHING (C × R × S): Source-independent semantic validation
    - C and R derive from phonemic analysis (same source)
