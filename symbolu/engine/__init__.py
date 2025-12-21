@@ -52,6 +52,12 @@ from symbolu.engine.enterprise_search import EnterpriseSearchEngine
 from symbolu.engine.enterprise_chat import EnterpriseChatEngine
 from symbolu.engine.consumer import ConsumerEngine
 from symbolu.engine.agi_context import AGIContext, AGILevel, AGISignal
+from symbolu.engine.query_type import (
+    QueryType,
+    QueryTypeResult,
+    classify_query_type,
+    is_problem_query,
+)
 
 __all__ = [
     # Factory
@@ -69,4 +75,9 @@ __all__ = [
     "AGIContext",
     "AGILevel",
     "AGISignal",
+    # Query type classification
+    "QueryType",
+    "QueryTypeResult",
+    "classify_query_type",
+    "is_problem_query",
 ]
