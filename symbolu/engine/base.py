@@ -33,6 +33,7 @@ class EngineResult:
         tier_used: Which tier processed the request
         stl_signal: STL analysis details
         semantic_signal: 768D embedding details (if used)
+        agi_signal: AGI capabilities signal (events, balance, cross-domain)
         latency_ms: Processing time in milliseconds
         metadata: Additional operation-specific data
     """
@@ -44,6 +45,7 @@ class EngineResult:
     tier_used: Optional[str] = None
     stl_signal: Optional[Dict[str, Any]] = None
     semantic_signal: Optional[Dict[str, Any]] = None
+    agi_signal: Optional[Dict[str, Any]] = None
     latency_ms: float = 0.0
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -58,6 +60,7 @@ class EngineResult:
             "tier_used": self.tier_used,
             "stl_signal": self.stl_signal,
             "semantic_signal": self.semantic_signal,
+            "agi_signal": self.agi_signal,
             "latency_ms": self.latency_ms,
             "metadata": self.metadata,
         }

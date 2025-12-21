@@ -2,12 +2,14 @@
 Consumer Engine
 ===============
 
-Full capability engine combining STL + 768D embeddings + cascading LLM.
+Full capability engine combining STL + 768D embeddings + cascading LLM + AGI.
 
 Architecture:
     Query
       ↓
     STL (10D) ──────────────┐
+      ↓                     │
+    AGI Context             │ (Event tagging, 10D encoding, balance check)
       ↓                     │
     Confidence Check        │
       ↓                     ↓
@@ -28,22 +30,31 @@ Architecture:
                7B Model            175B Fallback
                    ↓                   ↓
                Response            Response
+                             ↓
+                   Cross-Domain Retrieval (AGI)
+                             ↓
+                   Persona Tracking (AGI)
+                             ↓
+                   Insights Available (AGI)
 
 Benefits:
     - 85% of queries skip 768D computation
     - Most queries use cost-effective 7B
     - Edge cases get full 175B capability
     - STL provides audit trail for all queries
+    - AGI provides cross-domain reasoning and persona tracking
 """
 
 import time
 from typing import Optional, Tuple, Dict, Any, List
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 from symbolu.engine.base import BaseEngine, EngineResult, EngineCapability
+from symbolu.engine.agi_context import AGIContext, AGILevel, AGISignal
 from symbolu.hybrid.router import SemanticRouter, ModelType, RoutingDecision
 from symbolu.hybrid.vocabulary import CustomVocabulary
 from symbolu.resonance import analyze_phrase
+from symbolu.ontology.backbone import InsightMode
 
 
 @dataclass
@@ -113,10 +124,10 @@ class LLMHandler:
 
 class ConsumerEngine(BaseEngine):
     """
-    Consumer Engine: STL + 768D + Cascading LLM.
+    Consumer Engine: STL + 768D + Cascading LLM + AGI.
 
     Example:
-        engine = ConsumerEngine()
+        engine = ConsumerEngine(persona_id="user_123")
 
         # Simple query - uses STL → 7B (skips 768D)
         result = engine.generate("Write a poem")
@@ -129,6 +140,10 @@ class ConsumerEngine(BaseEngine):
         # Check what was used
         print(result.stl_signal)       # STL routing details
         print(result.semantic_signal)  # 768D usage (if any)
+        print(result.agi_signal)       # AGI capabilities (events, balance, cross-domain)
+
+        # Get cross-domain insights
+        insights = engine.get_insights()
     """
 
     def __init__(
@@ -137,6 +152,8 @@ class ConsumerEngine(BaseEngine):
         stl_confidence_threshold: float = 0.8,
         cascade_threshold: float = 0.8,
         embedder: Optional[SemanticEmbedder] = None,
+        persona_id: Optional[str] = None,
+        enable_agi: bool = True,
     ):
         """
         Initialize Consumer Engine.
@@ -146,6 +163,8 @@ class ConsumerEngine(BaseEngine):
             stl_confidence_threshold: STL confidence to skip 768D
             cascade_threshold: Combined confidence to use 7B vs 175B
             embedder: 768D embedder (stub if not provided)
+            persona_id: User/session ID for AGI persona tracking
+            enable_agi: Whether to enable AGI capabilities (default: True)
         """
         self.router = SemanticRouter(
             vocabulary=vocabulary,
@@ -157,6 +176,17 @@ class ConsumerEngine(BaseEngine):
 
         # 768D embedder
         self.embedder = embedder or SemanticEmbedder()
+
+        # AGI context
+        self.persona_id = persona_id
+        self.enable_agi = enable_agi
+        self.agi_context: Optional[AGIContext] = None
+        if enable_agi:
+            self.agi_context = AGIContext(
+                persona_id=persona_id,
+                level=AGILevel.FULL,
+                auto_learn=True,
+            )
 
         # Model handlers
         self.specialist_handlers: Dict[ModelType, LLMHandler] = {
@@ -225,23 +255,27 @@ class ConsumerEngine(BaseEngine):
         self,
         query: str,
         context: Optional[Dict[str, Any]] = None,
+        domain: Optional[str] = None,
     ) -> EngineResult:
         """
-        Generate response using cascading STL → 768D → LLM.
+        Generate response using cascading STL → 768D → LLM + AGI.
 
         Flow:
             1. STL analysis (always, ~100μs)
-            2. If high confidence: skip to 7B
-            3. If low confidence: compute 768D, combine signals
-            4. If combined high: use 7B
-            5. If combined low: use 175B fallback
+            2. AGI processing (event tagging, 10D encoding, balance check)
+            3. If high confidence: skip to 7B
+            4. If low confidence: compute 768D, combine signals
+            5. If combined high: use 7B
+            6. If combined low: use 175B fallback
+            7. Cross-domain retrieval and persona tracking (AGI)
 
         Args:
             query: Input query/prompt
             context: Optional generation context
+            domain: Optional domain hint for AGI
 
         Returns:
-            EngineResult with response and full audit trail
+            EngineResult with response and full audit trail including AGI signal
         """
         start = time.perf_counter()
 
@@ -256,11 +290,37 @@ class ConsumerEngine(BaseEngine):
             "time_ms": stl_time * 1000,
         }
 
+        # Step 2: AGI processing (if enabled)
+        agi_signal = None
+        if self.agi_context:
+            agi_start = time.perf_counter()
+            query_ctx = self.agi_context.process_query(
+                query=query,
+                domain=domain,
+                synthesize=False,  # Don't synthesize for basic generation
+                max_matches=3,
+            )
+            agi_time = time.perf_counter() - agi_start
+
+            signal = self.agi_context.to_signal()
+            agi_signal = {
+                "level": signal.level.value,
+                "persona_id": signal.persona_id,
+                "events_detected": signal.events_detected,
+                "balance_score": signal.balance_score,
+                "is_transferable": signal.is_transferable,
+                "cross_domain_matches": signal.cross_domain_matches,
+                "top_match_domain": signal.top_match_domain,
+                "top_match_similarity": signal.top_match_similarity,
+                "insights_available": signal.insights_available,
+                "time_ms": agi_time * 1000,
+            }
+
         semantic_signal = None
         used_768d = False
         final_confidence = decision.confidence
 
-        # Step 2: Check if we need 768D augmentation
+        # Step 3: Check if we need 768D augmentation
         if decision.confidence >= self.stl_confidence_threshold:
             # HIGH STL confidence - skip 768D
             semantic_signal = {
@@ -288,7 +348,7 @@ class ConsumerEngine(BaseEngine):
                 "time_ms": embed_time * 1000,
             }
 
-        # Step 3: Select model based on final confidence
+        # Step 4: Select model based on final confidence
         if final_confidence >= self.cascade_threshold:
             # Use specialized 7B
             handler = self.specialist_handlers.get(
@@ -301,7 +361,7 @@ class ConsumerEngine(BaseEngine):
             handler = self.fallback_handler
             model_used = "general-175b"
 
-        # Step 4: Generate response
+        # Step 5: Generate response
         gen_start = time.perf_counter()
 
         generation_context = {
@@ -310,6 +370,14 @@ class ConsumerEngine(BaseEngine):
             "used_768d": used_768d,
             **(context or {}),
         }
+
+        # Add AGI context for cross-domain reasoning
+        if self.agi_context and agi_signal:
+            generation_context["agi"] = {
+                "events": agi_signal.get("events_detected", []),
+                "cross_domain_matches": agi_signal.get("cross_domain_matches", 0),
+                "top_match": agi_signal.get("top_match_domain"),
+            }
 
         response = handler.generate(query, generation_context)
 
@@ -325,6 +393,7 @@ class ConsumerEngine(BaseEngine):
             model_used=model_used,
             stl_signal=stl_signal,
             semantic_signal=semantic_signal,
+            agi_signal=agi_signal,
             latency_ms=total_time,
             metadata={
                 "used_768d": used_768d,
@@ -411,3 +480,130 @@ class ConsumerEngine(BaseEngine):
             "7b_usage_rate": stats["used_7b"] / total * 100,
             "175b_usage_rate": stats["used_175b"] / total * 100,
         }
+
+    # =========================================================================
+    # AGI Capabilities
+    # =========================================================================
+
+    def get_insights(
+        self,
+        mode: InsightMode = InsightMode.NEW_POSSIBILITIES,
+        current_domain: Optional[str] = None,
+        max_insights: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get personalized cross-domain insights.
+
+        Based on persona query history, finds structurally similar
+        patterns across domains the user has explored.
+
+        Args:
+            mode: Insight mode (RECENT_MEMORY, DOMAIN_RELATIVE, NEW_POSSIBILITIES)
+            current_domain: Current domain context
+            max_insights: Maximum insights to return
+
+        Returns:
+            List of insight dictionaries with:
+                - type: Insight type (STRUCTURAL_MATCH, BRIDGE_OPPORTUNITY, etc.)
+                - message: Human-readable insight
+                - source_domain: Domain the insight came from
+                - similarity: Structural similarity score
+        """
+        if not self.agi_context:
+            return []
+
+        insights = self.agi_context.get_insights(
+            mode=mode,
+            current_domain=current_domain,
+            max_insights=max_insights,
+        )
+
+        return [
+            {
+                "type": insight.insight_type.value if hasattr(insight.insight_type, 'value') else str(insight.insight_type),
+                "message": insight.message,
+                "current_domain": insight.current_domain,
+                "bridge_domain": insight.bridge_domain,
+                "similarity": insight.structural_match.combined_score if insight.structural_match else 0.0,
+            }
+            for insight in insights
+        ]
+
+    def get_cross_domain_bridges(self) -> Dict[str, int]:
+        """
+        Get discovered cross-domain bridges for this persona.
+
+        Bridges emerge from user query patterns - when a user
+        explores similar structural patterns across different domains.
+
+        Returns:
+            Dict mapping "domain_a:domain_b" to bridge count
+        """
+        if not self.agi_context:
+            return {}
+
+        bridges = self.agi_context.get_cross_domain_bridges()
+        return {
+            f"{a}:{b}": count
+            for (a, b), count in bridges.items()
+        }
+
+    def synthesize_reasoning(
+        self,
+        problem: str,
+        domain: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Synthesize cross-domain reasoning for a problem.
+
+        Retrieves structurally similar experientials from multiple
+        domains and synthesizes a unified reasoning approach.
+
+        Args:
+            problem: Problem description
+            domain: Optional domain hint
+
+        Returns:
+            Dictionary with:
+                - synthesis: Combined reasoning output
+                - sources: List of source domains used
+                - pattern: Detected structural pattern
+                - recommendations: Action recommendations
+        """
+        if not self.agi_context:
+            return {"error": "AGI not enabled"}
+
+        query_ctx = self.agi_context.process_query(
+            query=problem,
+            domain=domain,
+            synthesize=True,
+            max_matches=5,
+        )
+
+        if not query_ctx.synthesis:
+            return {
+                "synthesis": None,
+                "sources": [],
+                "pattern": None,
+                "recommendations": [],
+            }
+
+        return {
+            "synthesis": query_ctx.synthesis.unified_insight,
+            "sources": [r.source_domain for r in query_ctx.similar_experientials],
+            "pattern": query_ctx.synthesis.detected_pattern,
+            "recommendations": query_ctx.synthesis.recommendations,
+            "balance_score": query_ctx.balance_score,
+            "is_transferable": query_ctx.is_transferable,
+        }
+
+    def explain_last_query(self) -> str:
+        """
+        Get human-readable explanation of last query's balance.
+
+        Returns explanation of how the query's 10D encoding
+        maps to mirror pairs and whether insights are transferable.
+        """
+        if not self.agi_context:
+            return "AGI not enabled"
+        return self.agi_context.explain_query_balance()

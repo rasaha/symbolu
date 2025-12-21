@@ -20,7 +20,8 @@ Symbolu is a three-tier semantic processing engine that combines **Symbolic Tran
 │                                                                                     │
 │   ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────────────┐ │
 │   │  ENTERPRISE TIER 1  │  │  ENTERPRISE TIER 2  │  │         CONSUMER            │ │
-│   │     (Pure STL)      │  │    (STL + 7B)       │  │   (STL + 768D + LLM)        │ │
+│   │     (Pure STL)      │  │  (STL + 7B + AGI)   │  │ (STL + 768D + LLM + AGI)    │ │
+│   │     [No AGI]        │  │    [Light AGI]      │  │      [Full AGI]             │ │
 │   └─────────────────────┘  └─────────────────────┘  └─────────────────────────────┘ │
 │                                                                                     │
 │         Query                      Query                      Query                 │
@@ -529,18 +530,174 @@ Scenario: Customer Support Bot (100K queries/day)
 
 ---
 
-## Conclusion
+## AGI Capabilities Integration
 
-Symbolu's three-tier architecture provides a flexible cost-performance tradeoff:
+The engine architecture now integrates the 10D AGI backbone from `/docs/AGI_CAPABILITIES.md`.
 
-1. **Enterprise Search**: Free, fast, auditable classification
-2. **Enterprise Chat**: 97% cost reduction with specialized 7B models
-3. **Consumer**: Smart cascading for quality with 83% cost savings
+### AGI Levels by Tier
 
-The key insight is that **STL handles 85%+ of queries** at near-zero cost, with neural components only invoked when necessary.
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          AGI CAPABILITIES BY TIER                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   Tier                  AGI Level       Capabilities                        │
+│   ─────────────────────────────────────────────────────────────────────     │
+│                                                                             │
+│   Enterprise Search     NONE            • Pure STL only                     │
+│                                         • No event tagging                  │
+│                                         • No persona tracking               │
+│                                                                             │
+│   Enterprise Chat       LIGHT           • Event tagging                     │
+│                                         • Persona query tracking            │
+│                                         • Cross-domain retrieval            │
+│                                         • No insight generation             │
+│                                                                             │
+│   Consumer              FULL            • Event tagging                     │
+│                                         • 10D mirror pair balance           │
+│                                         • Persona query tracking            │
+│                                         • Cross-domain retrieval            │
+│                                         • Insight generation                │
+│                                         • Reasoning synthesis               │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### AGI Signal in Results
+
+Every query now returns an `agi_signal` with:
+
+```python
+result = engine.generate("My startup co-founders disagree", domain="business")
+
+print(result.agi_signal)
+# {
+#     "level": "full",
+#     "persona_id": "user_123",
+#     "events_detected": ["conflict", "division"],
+#     "balance_score": 0.77,
+#     "is_transferable": True,
+#     "cross_domain_matches": 3,
+#     "top_match_domain": "history",
+#     "top_match_similarity": 0.89,
+#     "insights_available": 2,
+#     "time_ms": 0.12
+# }
+```
+
+### Key AGI Concepts
+
+1. **Event Tagging**: Tag EVENTS (conflict, destruction, formation), not entities
+   ```
+   "My startup failed" → Events: [destruction, collapse]
+   "The empire fell"   → Events: [destruction, collapse]
+   → Same structural pattern, different domains
+   ```
+
+2. **Mirror Pair Balance**: 10D encodes as 5 mirror pairs
+   ```
+   Acting (1D)    ↔ Absolving (10D)    = Event ↔ Meaning
+   Tagging (2D)   ↔ Unifying (9D)      = Naming ↔ Connecting
+   Forming (3D)   ↔ Observing (8D)     = Structure ↔ Perspective
+   Thinking (4D)  ↔ Purposing (7D)     = Process ↔ Purpose
+   Directing (5D) ↔ Reasoning (6D)     = Choice ↔ Justification
+
+   Balance Score = 1.0 - (Σ |lower[i] - higher[i]| / 5.0)
+   Balanced (≥0.6) = Transferable insight
+   Imbalanced     = Just facts OR just theory
+   ```
+
+3. **Persona Tracking**: Discover patterns from user behavior
+   ```
+   User queries: [history, finance, history, biology]
+   Discovered bridge: history ↔ finance (shared events: collapse)
+   Future suggestions: Cross-domain insights based on structural match
+   ```
+
+4. **Structural Validation**: Insights require validated structural match
+   ```
+   NOT: "You looked at finance + history = suggest stocks"  (advertising)
+   BUT: "This biology pattern structurally matches your finance query"
+
+   Thresholds:
+   • 10D similarity ≥ 0.5
+   • Causal chain overlap ≥ 0.3
+   • Shared events ≥ 2
+   ```
+
+### Usage Examples
+
+```python
+from symbolu.engine import create_engine, EngineTier
+from symbolu.ontology.backbone import InsightMode
+
+# Consumer engine with full AGI
+engine = create_engine(
+    tier=EngineTier.CONSUMER,
+    persona_id="user_123"
+)
+
+# Process query
+result = engine.generate(
+    "My startup co-founders disagree on direction",
+    domain="business"
+)
+
+# Check AGI signal
+print(f"Events: {result.agi_signal['events_detected']}")
+print(f"Balance: {result.agi_signal['balance_score']:.2f}")
+print(f"Matches: {result.agi_signal['cross_domain_matches']}")
+
+# Get cross-domain insights
+insights = engine.get_insights(mode=InsightMode.NEW_POSSIBILITIES)
+for insight in insights:
+    print(f"[{insight['type']}] {insight['message']}")
+
+# Synthesize reasoning from multiple domains
+synthesis = engine.synthesize_reasoning(
+    problem="My company is splitting into two factions"
+)
+print(f"Pattern: {synthesis['pattern']}")
+print(f"Sources: {synthesis['sources']}")
+
+# Check discovered bridges
+bridges = engine.get_cross_domain_bridges()
+print(f"Bridges: {bridges}")  # {"history:finance": 3, "biology:business": 2}
+```
+
+### Running the AGI Demo
+
+```bash
+python -m symbolu.engine.agi_demo
+```
+
+This demonstrates:
+1. Building persona patterns across domains
+2. Cross-domain reasoning synthesis
+3. Discovered bridges
+4. Personalized insights (structurally validated)
+5. Balance explanations
 
 ---
 
-*Document Version: 1.0*
+## Conclusion
+
+Symbolu's three-tier architecture provides a flexible cost-performance tradeoff with integrated AGI capabilities:
+
+1. **Enterprise Search**: Free, fast, auditable classification (no AGI)
+2. **Enterprise Chat**: 97% cost reduction with light AGI (tracking + retrieval)
+3. **Consumer**: Smart cascading with full AGI (cross-domain reasoning)
+
+The key insight is that **STL handles 85%+ of queries** at near-zero cost, with neural and AGI components only invoked when necessary. The AGI backbone provides:
+
+- **Event-based generalization** across domains
+- **Mirror pair balance** for insight transferability
+- **Persona tracking** for pattern discovery
+- **Structural validation** to prevent advertising-like suggestions
+
+---
+
+*Document Version: 2.0*
 *Date: 2025-12-21*
 *Branch: claude/pluggable-provider-architecture-A2ZuW*
+*Update: Added AGI integration (10D backbone, event tagging, cross-domain reasoning)*
