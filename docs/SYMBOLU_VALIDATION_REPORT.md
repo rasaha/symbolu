@@ -1,7 +1,7 @@
 # Symbolu Engine
 ## Technical Validation Report
 
-**Version:** 1.1
+**Version:** 1.3
 **Date:** 2025-12-21
 **Status:** Technical Diligence Ready
 
@@ -20,6 +20,8 @@
 
 **Bottom Line:** 25x cost reduction. <1ms routing latency. 90% accuracy. AGI features add 0.5ms when enabled—and can be turned off entirely.
 
+**Why Now:** Large models are powerful but expensive, and most workloads do not require their full capability. Symbolu makes this mismatch actionable.
+
 ---
 
 ## 1. Key Numbers at a Glance
@@ -28,10 +30,10 @@
 |--------|-------|-------------|----------|
 | Routing Accuracy | 90% | 100 labeled queries, 6 categories | ±0% (deterministic) |
 | Routing Latency | 0.13ms (p50) | 1,000 queries, Enterprise Search | ±0% |
-| Routing Latency (AGI ON) | 0.60ms (p50) | 1,000 queries, Consumer + AGI | ±0% |
-| 768D Skip Rate | 85% | Consumer tier, mixed workload | ±3% |
-| 7B Model Usage | 90% | Consumer tier cascade | ±2% |
-| 175B Fallback Rate | 10% | Consumer tier cascade | ±2% |
+| Routing Latency (AGI ON) | 0.60ms (p50) | 1,000 queries, Cascade + AGI | ±0% |
+| 768D Skip Rate | 85% | Cascade tier, mixed workload | ±3% |
+| 7B Model Usage | 90% | Cascade tier cascade | ±2% |
+| 175B Fallback Rate | 10% | Cascade tier cascade | ±2% |
 | Cost Reduction | 25x | vs GPT-4 API baseline | — |
 | AGI Overhead | +0.5ms | Event tagging + balance computation | ±0.1ms |
 
@@ -87,6 +89,15 @@
 - **Optional:** Core routing works without AGI
 - **Local:** AGI runs on local CPU, not API calls
 
+### What Symbolu Is Not
+
+| ❌ Not This | ✅ Instead |
+|------------|-----------|
+| A replacement for LLMs | A routing layer that optimizes LLM usage |
+| An autonomous decision-maker | A deterministic classifier with human-set thresholds |
+| A black-box learning system | Fully auditable, no hidden training |
+| Dependent on stochastic routing | 100% deterministic—same input, same output |
+
 ---
 
 ## 4. How It Works: Three Tiers, One Codebase
@@ -104,17 +115,22 @@
            ┌───────────────┼───────────────┐
            ▼               ▼               ▼
     ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-    │ ENTERPRISE  │ │ ENTERPRISE  │ │  CONSUMER   │
-    │   SEARCH    │ │    CHAT     │ │             │
+    │ ENTERPRISE  │ │ ENTERPRISE  │ │             │
+    │   SEARCH    │ │    CHAT     │ │   CASCADE   │
     │             │ │             │ │             │
     │  Pure STL   │ │  STL + 7B   │ │ STL + 768D  │
-    │  No LLM     │ │  Models     │ │ + Cascade   │
+    │  No LLM     │ │  Models     │ │ + 7B/175B   │
     └─────────────┘ └─────────────┘ └─────────────┘
           │               │               │
           ▼               ▼               ▼
-    Classification   Specialized      Smart routing
-    & Search         Generation       7B → 175B
+    Classification   Specialized     Smart routing
+                      generation     with fallback
 ```
+
+**Legend:**
+- **STL (10D):** Deterministic symbolic routing layer (phoneme-based intent detection)
+- **768D:** Semantic embedding vectors (used selectively, skipped 85% of the time)
+- **7B / 175B:** Language models of increasing capability and cost
 
 ### The Key Insight
 
@@ -133,11 +149,11 @@
 
 ## 5. Pick Your Tier
 
-| Tier | Components | Best For | Latency | LLM Cost |
-|------|------------|----------|---------|----------|
-| **Enterprise Search** | STL only | Classification, filtering, search | 0.1ms | $0 |
-| **Enterprise Chat** | STL + 7B | Specialized chat, domain expertise | ~500ms | Low |
-| **Consumer** | STL + 768D + 7B/175B | Full capability with cost optimization | 100ms-1s | Medium |
+| Tier | Purpose | Components | Latency | LLM Cost |
+|------|---------|------------|---------|----------|
+| **Enterprise Search** | Classification | STL only | 0.1ms | $0 |
+| **Enterprise Chat** | Specialized generation | STL + 7B | ~500ms | Low |
+| **Cascade** | Smart routing with fallback | STL + 768D + 7B/175B | 100ms-1s | Medium |
 
 ### Decision Matrix
 
@@ -146,9 +162,24 @@
 | Intent classification only | Enterprise Search |
 | High-volume chat (>100K/day) | Enterprise Chat |
 | Audit/compliance requirements | Enterprise Search or Chat |
-| Quality-critical applications | Consumer |
-| Unpredictable query complexity | Consumer |
+| Quality-critical applications | Cascade |
+| Unpredictable query complexity | Cascade |
 | Offline/edge deployment | Enterprise Search |
+
+### Example: Support Ticket System
+
+A support system receives **1M monthly tickets**:
+
+| Volume | Query Type | Tier | Cost |
+|--------|-----------|------|------|
+| 700K (70%) | Classification and routing | Enterprise Search | $0 |
+| 200K (20%) | Templated responses | Enterprise Chat (7B) | $200 |
+| 100K (10%) | Complex reasoning | Cascade (175B) | $3,000 |
+| **Total** | | | **$3,200/month** |
+
+Traditional approach (all 175B): **$30,000/month**
+
+Result: 90% cost reduction, predictable spend, auditable routing, no quality loss on complex queries.
 
 ---
 
@@ -190,8 +221,8 @@
 |------|-----|-----|-----|-----|
 | Enterprise Search | 0.13ms | 0.21ms | 0.37ms | 0.45ms |
 | Enterprise Chat | 0.15ms | 0.25ms | 0.41ms | 0.52ms |
-| Consumer (STL only) | 0.18ms | 0.29ms | 0.48ms | 0.60ms |
-| Consumer (+ AGI) | 0.60ms | 0.85ms | 1.1ms | 1.4ms |
+| Cascade (STL only) | 0.18ms | 0.29ms | 0.48ms | 0.60ms |
+| Cascade (+ AGI) | 0.60ms | 0.85ms | 1.1ms | 1.4ms |
 
 **Note:** AGI features add ~0.5ms overhead. This is optional and can be disabled.
 
@@ -237,7 +268,7 @@
 - One-off queries with no session context
 - High-throughput, low-latency requirements
 
-### 6.6 Cascade Efficiency (Consumer Tier)
+### 6.6 Cascade Efficiency
 
 **Methodology:** 500 queries representing realistic workload distribution.
 
@@ -278,7 +309,7 @@
 |------|--------------|---------------|-----------------|
 | Enterprise Search | $0 | $0 | **$0** |
 | Enterprise Chat | $0 | ~$0.001 (7B) | **~$0.001** |
-| Consumer | ~$0.0001 (15% of queries) | ~$0.005 (blended) | **~$0.005** |
+| Cascade | ~$0.0001 (15% of queries) | ~$0.005 (blended) | **~$0.005** |
 | Traditional (175B all) | $0.0001 | $0.03 | **$0.03** |
 
 ### Monthly Projection (1 Million Queries)
@@ -287,7 +318,7 @@
 |----------|--------------|----------------|
 | Enterprise Search | $0 | 100% savings |
 | Enterprise Chat | $1,000 | 97% savings |
-| Consumer | $5,000 | 83% savings |
+| Cascade | $5,000 | 83% savings |
 | Traditional 175B | $30,000 | baseline |
 
 ### Cost Stability
@@ -370,7 +401,7 @@ engine = create_engine(tier=EngineTier.ENTERPRISE_SEARCH)
 result = engine.classify("Deploy the K8s cluster")
 print(f"Intent: {result.intent}, Confidence: {result.confidence:.0%}")
 
-# Consumer: Full capability
+# Cascade tier
 engine = create_engine(tier=EngineTier.CONSUMER)
 result = engine.generate("Explain quantum entanglement")
 print(f"Model used: {result.model_used}")
@@ -421,7 +452,7 @@ The following benchmarks are recommended for full production validation:
 ### A.5 LLM-Always-On Baseline Comparison
 
 - Run identical 1,000 query workload through:
-  - Symbolu Consumer tier
+  - Symbolu Cascade tier
   - Direct GPT-4 API
 - Calculate actual API costs, latency, token consumption
 - Report savings ratio with confidence interval
@@ -464,6 +495,8 @@ See `/docs/benchmarks/ENGINE_BENCHMARK_RESULTS.md` for:
 |---------|------|---------|
 | 1.0 | 2025-12-21 | Initial validation report |
 | 1.1 | 2025-12-21 | Added AGI ON/OFF comparison, failure isolation, contribution analysis |
+| 1.2 | 2025-12-21 | Added "Why Now", visual legend, "What Symbolu Is Not", use case example |
+| 1.3 | 2025-12-21 | Renamed tier: Consumer → Full Capability → **Cascade** |
 
 ---
 
