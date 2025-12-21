@@ -6,9 +6,9 @@
       "total_queries": 8,
       "correct": 5,
       "accuracy": 62.5,
-      "avg_latency_ms": 0.1591556250133408,
-      "min_latency_ms": 0.08183199997802149,
-      "max_latency_ms": 0.470125999981974,
+      "avg_latency_ms": 0.14251637502127323,
+      "min_latency_ms": 0.0880190000316361,
+      "max_latency_ms": 0.36814000009144365,
       "by_intent": {
         "action": {
           "correct": 1,
@@ -30,9 +30,9 @@
       "total_queries": 8,
       "correct": 6,
       "accuracy": 75.0,
-      "avg_latency_ms": 0.15777049999599058,
-      "min_latency_ms": 0.1163719999794921,
-      "max_latency_ms": 0.23993499996777246,
+      "avg_latency_ms": 0.1546962500214022,
+      "min_latency_ms": 0.11391300006380334,
+      "max_latency_ms": 0.23215800001707976,
       "by_intent": {
         "action": {
           "correct": 3,
@@ -54,9 +54,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.17735800000195923,
-      "min_latency_ms": 0.1326110000263725,
-      "max_latency_ms": 0.2373370000441355,
+      "avg_latency_ms": 0.17046524999386747,
+      "min_latency_ms": 0.13122900008966099,
+      "max_latency_ms": 0.2352029999883598,
       "by_intent": {
         "creative": {
           "correct": 8,
@@ -70,9 +70,9 @@
       "total_queries": 8,
       "correct": 7,
       "accuracy": 87.5,
-      "avg_latency_ms": 0.14124212502508726,
-      "min_latency_ms": 0.07921400003851886,
-      "max_latency_ms": 0.24213599999711732,
+      "avg_latency_ms": 0.13333337497556386,
+      "min_latency_ms": 0.07521500003804249,
+      "max_latency_ms": 0.2282699999796023,
       "by_intent": {
         "relationship": {
           "correct": 7,
@@ -86,9 +86,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.12342124999520365,
-      "min_latency_ms": 0.045814000031896285,
-      "max_latency_ms": 0.42286699999749544,
+      "avg_latency_ms": 0.10557950001555128,
+      "min_latency_ms": 0.035987000046588946,
+      "max_latency_ms": 0.3642369999852235,
       "by_intent": {
         "reflective": {
           "correct": 8,
@@ -102,9 +102,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.12411824999958299,
-      "min_latency_ms": 0.07851999998820247,
-      "max_latency_ms": 0.15887500001099397,
+      "avg_latency_ms": 0.11776124999585136,
+      "min_latency_ms": 0.07602999994560378,
+      "max_latency_ms": 0.1514729999598785,
       "by_intent": {
         "reasoning": {
           "correct": 8,
@@ -120,9 +120,9 @@
       "total_queries": 8,
       "correct": 5,
       "accuracy": 62.5,
-      "avg_latency_ms": 0.11653187500826334,
-      "min_latency_ms": 0.08114399997793953,
-      "max_latency_ms": 0.20176300006369274,
+      "avg_latency_ms": 0.11195137500408237,
+      "min_latency_ms": 0.07797400007802935,
+      "max_latency_ms": 0.1896960000067338,
       "by_intent": {
         "action": {
           "correct": 1,
@@ -144,9 +144,9 @@
       "total_queries": 8,
       "correct": 6,
       "accuracy": 75.0,
-      "avg_latency_ms": 0.15945700000941088,
-      "min_latency_ms": 0.11215500001071632,
-      "max_latency_ms": 0.2570689999856768,
+      "avg_latency_ms": 0.15205699999398803,
+      "min_latency_ms": 0.12173200002507656,
+      "max_latency_ms": 0.23366400000668364,
       "by_intent": {
         "action": {
           "correct": 3,
@@ -168,9 +168,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.17604287501171711,
-      "min_latency_ms": 0.1305000000684231,
-      "max_latency_ms": 0.23740200003885548,
+      "avg_latency_ms": 0.1692447499692662,
+      "min_latency_ms": 0.12712699992789567,
+      "max_latency_ms": 0.2307729999984076,
       "by_intent": {
         "creative": {
           "correct": 8,
@@ -184,9 +184,9 @@
       "total_queries": 8,
       "correct": 7,
       "accuracy": 87.5,
-      "avg_latency_ms": 0.15339612500042676,
-      "min_latency_ms": 0.07878300004904304,
-      "max_latency_ms": 0.26115900004697323,
+      "avg_latency_ms": 0.13057175000597,
+      "min_latency_ms": 0.07453000000623433,
+      "max_latency_ms": 0.22532000002684072,
       "by_intent": {
         "relationship": {
           "correct": 7,
@@ -200,9 +200,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.09578899998530233,
-      "min_latency_ms": 0.040799999965202005,
-      "max_latency_ms": 0.2349540000068373,
+      "avg_latency_ms": 0.08872387498115586,
+      "min_latency_ms": 0.03543999991961755,
+      "max_latency_ms": 0.2364329999409165,
       "by_intent": {
         "reflective": {
           "correct": 8,
@@ -216,9 +216,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.12200149998875531,
-      "min_latency_ms": 0.07776899997224973,
-      "max_latency_ms": 0.1409120000062103,
+      "avg_latency_ms": 0.11586387500983619,
+      "min_latency_ms": 0.07636800000909716,
+      "max_latency_ms": 0.14016299996910675,
       "by_intent": {
         "reasoning": {
           "correct": 8,
@@ -234,9 +234,9 @@
       "total_queries": 8,
       "correct": 5,
       "accuracy": 62.5,
-      "avg_latency_ms": 0.13681624999151154,
-      "min_latency_ms": 0.07947500000682339,
-      "max_latency_ms": 0.18046499997126375,
+      "avg_latency_ms": 0.1291088749866276,
+      "min_latency_ms": 0.08295599991470226,
+      "max_latency_ms": 0.17047399990133272,
       "by_intent": {
         "action": {
           "correct": 1,
@@ -258,9 +258,9 @@
       "total_queries": 8,
       "correct": 6,
       "accuracy": 75.0,
-      "avg_latency_ms": 0.18883062500663073,
-      "min_latency_ms": 0.1157359999979235,
-      "max_latency_ms": 0.28824499997881503,
+      "avg_latency_ms": 0.17603187502857054,
+      "min_latency_ms": 0.11233999998694344,
+      "max_latency_ms": 0.2705960000639607,
       "by_intent": {
         "action": {
           "correct": 3,
@@ -282,9 +282,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.18158762497932912,
-      "min_latency_ms": 0.13328599993656098,
-      "max_latency_ms": 0.2629509999678703,
+      "avg_latency_ms": 0.17337974998099526,
+      "min_latency_ms": 0.13087399997857574,
+      "max_latency_ms": 0.2339699999538425,
       "by_intent": {
         "creative": {
           "correct": 8,
@@ -298,9 +298,9 @@
       "total_queries": 8,
       "correct": 7,
       "accuracy": 87.5,
-      "avg_latency_ms": 0.14198487497196766,
-      "min_latency_ms": 0.07938999999623775,
-      "max_latency_ms": 0.23399099995913275,
+      "avg_latency_ms": 0.1366393749862027,
+      "min_latency_ms": 0.07460100005118875,
+      "max_latency_ms": 0.2252559999078585,
       "by_intent": {
         "relationship": {
           "correct": 7,
@@ -314,9 +314,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.11070737501484018,
-      "min_latency_ms": 0.0441990000581427,
-      "max_latency_ms": 0.25149300006432895,
+      "avg_latency_ms": 0.10226187499995376,
+      "min_latency_ms": 0.04233000004205678,
+      "max_latency_ms": 0.2348090000623415,
       "by_intent": {
         "reflective": {
           "correct": 8,
@@ -330,9 +330,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.1282589999789252,
-      "min_latency_ms": 0.08076899996467546,
-      "max_latency_ms": 0.18319599996630131,
+      "avg_latency_ms": 0.12192762501683774,
+      "min_latency_ms": 0.07621999998264073,
+      "max_latency_ms": 0.16341499997452047,
       "by_intent": {
         "reasoning": {
           "correct": 8,
@@ -414,21 +414,21 @@
       "top_result": "Neural Network Fundamentals",
       "expected": "Statistical Machine Learning",
       "correct": false,
-      "latency_ms": "2.55"
+      "latency_ms": "2.50"
     },
     {
       "query": "emotional well-being",
       "top_result": "Mental Health Awareness",
       "expected": "Mental Health Awareness",
       "correct": true,
-      "latency_ms": "1.65"
+      "latency_ms": "1.56"
     },
     {
       "query": "software deployment",
       "top_result": "Kubernetes Deployment",
       "expected": "Kubernetes Deployment",
       "correct": true,
-      "latency_ms": "1.67"
+      "latency_ms": "1.66"
     }
   ]
 }
