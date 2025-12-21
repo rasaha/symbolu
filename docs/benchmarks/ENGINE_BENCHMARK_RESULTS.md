@@ -55,13 +55,26 @@ This document presents benchmark results for the three-tier Symbolu engine archi
 
 ### 2. Homonym Disambiguation
 
+**Current Status: Marginal, Not Solved**
+
 | Homonym  | Accuracy | Notes |
 |----------|----------|-------|
 | "light"  | 75%      | Physics vs art contexts distinguishable |
 | "run"    | 50%      | Tech vs physical contexts |
 | "spring" | 50%      | Season vs mechanism |
-| "bank"   | 20%      | Financial vs nature (hardest case) |
-| **Overall** | **47%** | Cross-matching provides marginal improvement |
+| "bank"   | 20%      | Financial vs nature (expected - hardest case) |
+| **Overall** | **47%** | Cross-matching provides marginal improvement only |
+
+**Why 47% is honest:**
+- Phonemes alone cannot encode semantic domain
+- "bank" (river) and "bank" (financial) share identical phoneme signatures
+- Cross-matching helps only when context words have distinct phoneme patterns
+- The 20% accuracy on "bank" is expected, not a bug
+
+**Future Improvements (Not Yet Implemented):**
+- **SessionContext accumulation**: Prior queries build disambiguation context
+- **Phase-1 constraint narrowing**: Semantic constraints reduce candidate space
+- **768D augmentation**: Consumer mode uses embeddings for ambiguous cases
 
 ### 3. Latency Comparison
 
@@ -199,7 +212,8 @@ When organizations provide domain-specific vocabulary:
 
 2. **Keyword patterns boost to 90%** - explicit intent patterns handle most cases effectively
 
-3. **Cross-matching adds marginal value** - 47% homonym accuracy, helps in specific contexts
+3. **Cross-matching is marginal, not solved** - 47% homonym accuracy; "bank" at 20% is expected
+   - Future: SessionContext and Phase-1 constraint narrowing will materially improve this
 
 4. **Custom vocabulary critical for domain terms** - 20-30% confidence boost for acronyms/jargon
 
