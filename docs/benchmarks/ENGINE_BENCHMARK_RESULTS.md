@@ -44,14 +44,14 @@ This document presents benchmark results for the three-tier Symbolu engine archi
 
 ### 1. Intent Classification Accuracy
 
-| Category     | Pure Phoneme | + Keyword Patterns | + Cross-Matching | + Vocabulary |
-|--------------|--------------|-------------------|------------------|--------------|
-| Reasoning    | 0%           | 100%              | 100%             | 100%         |
-| Creative     | 75%          | 100%              | 100%             | 100%         |
-| Action       | 25%          | 100%              | 100%             | 100%         |
-| Reflective   | 38%          | 100%              | 100%             | 100%         |
-| Relationship | 25%          | 50%               | 50%              | 50%          |
-| **Overall**  | **32%**      | **90%**           | **90%**          | **90%+**     |
+| Category     | Accuracy | Notes |
+|--------------|----------|-------|
+| Reasoning    | 100%     | 8/8 queries correctly routed |
+| Creative     | 100%     | 8/8 queries correctly routed |
+| Action       | 100%     | 8/8 queries correctly routed |
+| Reflective   | 100%     | 8/8 queries (includes reasoning overlap) |
+| Relationship | 62%      | 5/8 queries - known limitation |
+| **Overall**  | **92%**  | 37/40 total queries |
 
 ### 2. Homonym Disambiguation
 
@@ -80,10 +80,9 @@ This document presents benchmark results for the three-tier Symbolu engine archi
 
 | Tier | Routing | Generation | Total | Notes |
 |------|---------|------------|-------|-------|
-| Enterprise Search | ~100μs | N/A | **~100μs** | No LLM |
-| Enterprise Chat | ~100μs | ~500ms | **~500ms** | 7B model |
-| Cascade (skip 768D) | ~100μs | ~500ms | **~500ms** | High confidence |
-| Cascade (use 768D) | ~100μs + ~10ms | ~500ms-1s | **~600ms-1s** | Low confidence |
+| Enterprise Search | ~120μs | N/A | **~120μs** | No LLM |
+| Enterprise Chat | ~130μs | ~500ms | **~500ms** | 7B model |
+| Cascade | ~200μs | ~500ms-1s | **~600ms-1s** | With 768D boost |
 
 ### 4. Cost Comparison
 
@@ -91,17 +90,17 @@ This document presents benchmark results for the three-tier Symbolu engine archi
 |------|--------------|----------|---------------|
 | Enterprise Search | None | None | **Free** |
 | Enterprise Chat | None | 7B only | **Low** |
-| Cascade | ~15% of queries | 7B + 175B fallback | **Medium** |
-| Traditional (175B all) | N/A | 175B always | **High (25x)** |
+| Cascade | All queries | 60% 7B + 40% 175B | **Medium** |
+| Traditional (175B all) | N/A | 175B always | **High (10x)** |
 
-### 5. 768D Skip Rate (Cascade Tier)
+### 5. Cascade Tier Model Distribution
 
-| Query Type | STL Confidence | 768D Skipped | Model Used |
-|------------|----------------|--------------|------------|
-| Clear intent ("Write a poem") | ≥80% | Yes | 7B |
-| Moderate ("Explain physics") | 60-80% | No | 7B |
-| Complex/ambiguous | <60% | No | 175B |
-| **Expected distribution** | | **~85% skip** | **~90% use 7B** |
+| Query Type | STL Confidence | 768D Used | Model Used |
+|------------|----------------|-----------|------------|
+| Clear intent ("Write a poem") | ≥65% | Yes (boost) | 7B |
+| Moderate ("Explain physics") | 50-65% | Yes | 7B |
+| Complex/ambiguous | <50% | Yes | 175B |
+| **Observed distribution** | | **100% used** | **60% 7B / 40% 175B** |
 
 ---
 
@@ -390,12 +389,13 @@ print(f'Intent: {result.model_type.value}, Confidence: {result.confidence:.0%}')
 
 - **Date**: 2025-12-21
 - **Last benchmark run**: 2025-12-21
-- **Branch**: claude/pluggable-provider-architecture-A2ZuW
+- **Branch**: claude/update-symbol-validation-docs-vPBWG
 - **Commits**:
-  - feat: Add keyword pattern boosting (32% → 90%)
+  - feat: Add keyword pattern boosting (32% → 92%)
   - feat: Add semantic cross-matching for homonyms
   - feat: Add custom vocabulary support
   - feat: Add three-tier engine architecture
   - feat: Integrate AGI capabilities from 10D backbone
   - feat: Relax cross-domain thresholds (0.5 → 0.1) for better pattern discovery
   - feat: Gate cross-domain reasoning by query type (problem vs information)
+  - docs: Update validation report with actual benchmark metrics
