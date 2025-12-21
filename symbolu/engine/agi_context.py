@@ -241,24 +241,21 @@ class AGIContext:
                 events=(),
                 balance_score=0.0,
                 balance_report=BalanceReport(
-                    pair_balances={},
-                    overall_balance=0.0,
-                    imbalanced_pairs=[],
+                    pairs=[],
+                    total_imbalance=0.0,
+                    balance_score=0.0,
+                    dominant_state="none",
+                    propagation_needed=[],
                 ),
                 is_transferable=False,
             )
 
-        # Step 1: Tag events
-        events = tag_events(query)
-
-        # Step 2: Encode with events
-        encoding = encode_with_events(query, events)
-        vector_10d = tuple(encoding.vector.values)
-
-        # Step 3: Check mirror balance
-        balance_report = compute_balance(encoding.vector)
-        balance_score = balance_report.overall_balance
-        is_transferable = is_transferable_insight(balance_score)
+        # Step 1-3: Encode with events (includes tagging and balance)
+        balanced_vector, tagged_events, balance_report = encode_with_events(query)
+        vector_10d = tuple(balanced_vector.values)
+        events = tuple(e.event_type for e in tagged_events)
+        balance_score = balance_report.balance_score
+        is_transferable = is_transferable_insight(balanced_vector)
 
         # Step 4: Semantic validation
         semantic_check = None
@@ -272,19 +269,17 @@ class AGIContext:
         if self.persona_id and self.level in (AGILevel.LIGHT, AGILevel.FULL):
             track_query(
                 persona_id=self.persona_id,
-                query=query,
+                query_text=query,
                 domain=domain or "general",
-                events=events,
-                vector_10d=encoding.vector,
             )
 
         # Step 6: Retrieve similar experientials
         similar = []
         if self.level in (AGILevel.LIGHT, AGILevel.FULL):
             similar = retrieve_similar(
-                query_vector=encoding.vector,
-                query_events=events,
-                max_results=max_matches,
+                query=query,
+                current_domain=domain,
+                top_k=max_matches,
                 config=self.cross_domain_config,
             )
 
@@ -327,7 +322,7 @@ class AGIContext:
         query_context: Optional[QueryContext] = None,
         insight: Optional[str] = None,
         causal_chain: Optional[List[str]] = None,
-        pattern_type: PatternType = PatternType.OBSERVATION,
+        pattern_type: PatternType = PatternType.CAUSAL,
     ) -> LearningResult:
         """
         Learn from a processed query, storing as experiential.
@@ -397,7 +392,7 @@ class AGIContext:
         """Get the current persona's profile."""
         if not self.persona_id:
             return None
-        return self.persona_store.get(self.persona_id)
+        return self.persona_store.get_or_create(self.persona_id)
 
     def get_cross_domain_bridges(self) -> Dict[Tuple[str, str], int]:
         """

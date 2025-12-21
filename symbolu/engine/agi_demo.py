@@ -117,7 +117,8 @@ def run_demo():
         print("Available insights (structurally validated):")
         for insight in insights:
             print(f"  [{insight['type']}] {insight['message']}")
-            print(f"    Source: {insight['source_domain']}, "
+            bridge = insight.get('bridge_domain', 'N/A')
+            print(f"    Domain: {insight['current_domain']} -> {bridge}, "
                   f"Similarity: {insight['similarity']:.2f}")
     else:
         print("(Insights require populated experiential store)")

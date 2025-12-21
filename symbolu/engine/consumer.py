@@ -522,7 +522,8 @@ class ConsumerEngine(BaseEngine):
             {
                 "type": insight.insight_type.value if hasattr(insight.insight_type, 'value') else str(insight.insight_type),
                 "message": insight.message,
-                "source_domain": insight.source_domain,
+                "current_domain": insight.current_domain,
+                "bridge_domain": insight.bridge_domain,
                 "similarity": insight.structural_match.combined_score if insight.structural_match else 0.0,
             }
             for insight in insights
