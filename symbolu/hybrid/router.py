@@ -120,6 +120,11 @@ class SemanticRouter:
         elif decision.model_type == ModelType.REASONING:
             result = reasoning_model(query)
         ...
+
+        # With custom vocabulary for domain terms:
+        from symbolu.hybrid.vocabulary import VocabularyLoader
+        vocab = VocabularyLoader.from_file("company_terms.json")
+        router = SemanticRouter(vocabulary=vocab)
     """
 
     # Pattern sets mapped to model types
@@ -131,11 +136,24 @@ class SemanticRouter:
         ModelType.REFLECTIVE: REFLECTIVE_PATTERNS,
     }
 
+    # Intent string → ModelType mapping
+    INTENT_TO_MODEL: Dict[str, ModelType] = {
+        "action": ModelType.ACTION,
+        "reasoning": ModelType.REASONING,
+        "relationship": ModelType.RELATIONSHIP,
+        "creative": ModelType.CREATIVE,
+        "reflective": ModelType.REFLECTIVE,
+        "directive": ModelType.DIRECTIVE,
+        "transcendent": ModelType.TRANSCENDENT,
+        "general": ModelType.GENERAL,
+    }
+
     def __init__(
         self,
         confidence_threshold: float = 0.3,
         fallback_model: ModelType = ModelType.GENERAL,
         pattern_boost: float = 0.3,
+        vocabulary: Optional[Any] = None,
     ):
         """
         Initialize router.
@@ -144,10 +162,52 @@ class SemanticRouter:
             confidence_threshold: Minimum dominant layer score to route
             fallback_model: Model to use when confidence is low
             pattern_boost: Amount to boost confidence when keyword patterns match
+            vocabulary: Optional CustomVocabulary for domain-specific terms
         """
         self.confidence_threshold = confidence_threshold
         self.fallback_model = fallback_model
         self.pattern_boost = pattern_boost
+        self.vocabulary = vocabulary
+
+    def _check_vocabulary(self, query: str) -> Optional[Tuple[ModelType, float]]:
+        """
+        Check if any words in the query have vocabulary overrides.
+
+        Args:
+            query: The input query
+
+        Returns:
+            Tuple of (ModelType, confidence) if vocabulary match found, None otherwise
+        """
+        if not self.vocabulary:
+            return None
+
+        # Tokenize query
+        words = re.findall(r'\b[a-zA-Z0-9/&]+\b', query)
+
+        vocab_matches = []
+
+        for word in words:
+            intent = self.vocabulary.get_intent_override(word)
+            if intent:
+                model_type = self.INTENT_TO_MODEL.get(intent.lower())
+                if model_type:
+                    # Get layer vector for confidence boost
+                    layer_vec = self.vocabulary.get_layer_vector(word)
+                    if layer_vec:
+                        # Use max layer affinity as confidence
+                        confidence = max(layer_vec)
+                    else:
+                        confidence = 0.7  # Default confidence for vocab match
+
+                    vocab_matches.append((model_type, confidence, word))
+
+        if vocab_matches:
+            # Return highest confidence match
+            best = max(vocab_matches, key=lambda x: x[1])
+            return (best[0], best[1])
+
+        return None
 
     def _detect_intent_patterns(self, query: str) -> Dict[ModelType, float]:
         """
@@ -361,6 +421,18 @@ class SemanticRouter:
         indexed = [(LAYER_NAMES[i], normalized[i]) for i in range(10)]
         sorted_layers = sorted(indexed, key=lambda x: x[1], reverse=True)
         top_layers = tuple(sorted_layers[:3])
+
+        # Check vocabulary for domain-specific term overrides (highest priority)
+        vocab_result = self._check_vocabulary(query)
+        if vocab_result:
+            vocab_model, vocab_confidence = vocab_result
+            return RoutingDecision(
+                model_type=vocab_model,
+                confidence=vocab_confidence,
+                dominant_layer=dominant_layer,
+                layer_scores=top_layers,
+                query_analysis=analysis,
+            )
 
         # Detect intent patterns from keywords
         pattern_scores = self._detect_intent_patterns(query)
