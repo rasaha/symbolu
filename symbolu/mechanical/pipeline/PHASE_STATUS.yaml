@@ -1,0 +1,122 @@
+# Symbol-U Pipeline Phase Status Configuration
+# Version: 1.1
+# Environment: production
+# Last Updated: 2025-12-21
+
+version: "1.1"
+environment: production
+
+# Directory to Phase ID Mapping
+# Note: Directory names do not always match phase IDs
+naming_convention:
+  grounding: "PO1"           # phase_minus_one files -> PO1 (P-1)
+  phase_zero: "PO2"          # phase_zero files -> PO2 (P0)
+  phase_one: "PO3"           # phase_one files -> PO3 (P1)
+  phase_po4: "PO4"
+  phase_po5: "PO5"
+  phase_p6: "P6"
+  p7_discourse: "P7"
+  p8_semantics: "P8"
+  p9_lexical: "P9"
+  # P10+ directories follow pXX_name pattern
+
+phases:
+  # Active phases - called from orchestrator.py
+  active:
+    - PO1   # grounding/phase_minus_one - Observer-Observed grounding
+    - PO2   # phase_zero - Intent envelope
+    - PO3   # phase_one - Allowed action set
+    - PO4   # phase_po4 - Planner proposal validation
+    - PO5   # phase_po5 - Execution eligibility gate
+    - P27   # p27_persona - Persona selection (Delivery Adaptation Band)
+    - P28   # p28_dha - DHA modulation (Delivery Adaptation Band)
+    - P29   # p29_expression - Expression finalization
+    - P30   # p30_verification - Output verification
+    - P31   # p31_envelope - Output envelope
+
+  # Dormant phases - implemented but not called from orchestrator
+  dormant:
+    # Core Governance (deferred)
+    - P6    # phase_p6 - Regime selection
+    - P7    # p7_discourse - Discourse act resolution
+    - P8    # p8_semantics - Semantic slot resolution
+    - P9    # p9_lexical - Lexical selection
+    # Extended Governance
+    - P10   # p10_acoustic - Acoustic parameterization
+    - P11   # p11b_controller - PPV banding controller (canonical)
+    - P12   # p12_consistency - Consistency validation
+    - P13   # p13_acoustic_safety - Acoustic safety envelope
+    - P14   # p14_surface - Surface realization
+    - P15   # p15_authority_guard - Authority guard
+    - P16   # p16_regression_guard - Regression guard
+    - P17   # p17_semantic_integrity - Semantic integrity monitor
+    - P18   # p18_temporal_entropy - Temporal entropy differential
+    - P19   # p19_drift_fusion - Drift fusion
+    - P20   # p20_snapshot - Unified cognitive snapshot
+    - P21   # p21_delivery - Delivery mode resolver
+    # Observer phases
+    - P22   # p22_acoustic_witness - Acoustic-Vrtti witness
+    - P23   # p23_alignment - Alignment observer
+    - P24   # p24_projection - Projection observer
+    # Formula/Consciousness
+    - P25   # p25_counterfactual - Counterfactual sandbox
+    - P26   # p26_ucf - Unified consciousness formula
+    - P32   # p32_insight_window - Insight window gating
+    - P33   # p33_schema_adaptive - Schema adaptive routing
+    - P35   # p35_predictive_persona_drift - Predictive persona drift
+    # Advanced Pipeline
+    - P36   # p36_identity_resonance_memory
+    - P38   # p38_temporal_forecast
+    - P39   # p39_multi_horizon
+    - P40   # p40_cross_horizon_alignment
+    - P41   # p41_scenario_regime_mapper
+    - P42   # p42_scenario_fusion
+    - P43   # p43_scenario_what_if
+    - P44   # p44_coherence_scenario_alignment
+    - P45   # p45_multi_trajectory_stability
+    - P46   # p46_trajectory_convergence
+    - P47   # p47_unified_trajectory_scenario
+    - P48   # p48_macro_stability
+    - P49   # p49_temporal_stability
+    - P50   # p50_cognitive_consistency
+    - P51   # p51_governance_readiness
+    - P52   # p52_governance_adapter
+    - P53   # p53_policy_binding
+    - P54   # p54_audit_trace
+
+  # Missing phases - referenced in code but not implemented
+  missing:
+    - P34   # Referenced by P35, P36 - Identity Harmonics
+    - P37   # Referenced by formulas - Narrative Continuity
+
+  # Archived phases - moved to restoration/experiments/deprecated_phases/
+  archived:
+    - P11_controller   # ARCHIVED 2025-12-21 - 2,987 LOC dead code
+    - P11_prosodic     # ARCHIVED 2025-12-21 - Witness-only but never runs
+    - P15_interaction  # ARCHIVED 2025-12-21 - Redundant with P15_authority_guard
+
+  # Canonical implementations after consolidation
+  canonical:
+    P11: p11b_controller  # PPV banding controller is canonical P11
+    P15: p15_authority_guard  # Authority guard is canonical P15
+
+# Phase counts summary
+summary:
+  total_implemented: 52
+  active: 10
+  dormant: 39  # Reduced by 3 archived
+  missing: 2
+  archived: 3
+
+# Archive locations
+archive_info:
+  location: "restoration/experiments/deprecated_phases/"
+  archived_date: "2025-12-21"
+  recovery_instructions: "See restoration/experiments/deprecated_phases/README.md"
+  phases_archived:
+    - directory: p11_controller
+      reason: "Redundant with p11b_controller, never called from orchestrator"
+    - directory: p11_prosodic
+      reason: "Witness-only observer, never executed in pipeline"
+    - directory: p15_interaction
+      reason: "Redundant with p15_authority_guard"
