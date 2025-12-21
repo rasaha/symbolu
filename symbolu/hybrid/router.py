@@ -19,9 +19,10 @@ Computational Savings:
 """
 
 from dataclasses import dataclass
-from typing import Tuple, Optional, Dict, Callable, Any, Set
+from typing import Tuple, Optional, Dict, Callable, Any, Set, List
 from enum import Enum
 import re
+import math
 
 from symbolu.resonance import (
     analyze_phrase,
@@ -179,12 +180,125 @@ class SemanticRouter:
 
         return scores
 
+    def _cosine_similarity(self, vec_a: Tuple[float, ...], vec_b: Tuple[float, ...]) -> float:
+        """
+        Compute cosine similarity between two vectors.
+
+        Args:
+            vec_a: First vector
+            vec_b: Second vector
+
+        Returns:
+            Cosine similarity (0.0 to 1.0)
+        """
+        dot_product = sum(a * b for a, b in zip(vec_a, vec_b))
+        norm_a = math.sqrt(sum(a * a for a in vec_a))
+        norm_b = math.sqrt(sum(b * b for b in vec_b))
+
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+
+        return dot_product / (norm_a * norm_b)
+
+    def _compute_cross_resonance(
+        self, word_vectors: List[WordVector]
+    ) -> Dict[str, float]:
+        """
+        Compute semantic cross-resonance between words in a sentence.
+
+        Words that resonate on the same layers create a "semantic field"
+        that can help disambiguate homonyms.
+
+        Args:
+            word_vectors: List of WordVector from phrase analysis
+
+        Returns:
+            Dict mapping layer names to cluster strength scores
+        """
+        if len(word_vectors) < 2:
+            return {}
+
+        # Compute pairwise resonance and accumulate by shared dominant layers
+        layer_cluster_scores: Dict[str, float] = {layer: 0.0 for layer in LAYER_NAMES}
+
+        for i, vec_a in enumerate(word_vectors):
+            for j, vec_b in enumerate(word_vectors):
+                if i >= j:
+                    continue
+
+                # Compute similarity between word vectors
+                similarity = self._cosine_similarity(vec_a.vector, vec_b.vector)
+
+                if similarity > 0.5:  # Only consider resonant pairs
+                    # Find shared high-scoring layers
+                    for k, layer in enumerate(LAYER_NAMES):
+                        # Both words have significant score in this layer
+                        if vec_a.vector[k] > 0.1 and vec_b.vector[k] > 0.1:
+                            # Weight by both the similarity and the layer scores
+                            layer_cluster_scores[layer] += (
+                                similarity * (vec_a.vector[k] + vec_b.vector[k]) / 2
+                            )
+
+        return layer_cluster_scores
+
+    def _get_disambiguated_layer(
+        self,
+        word_vectors: List[WordVector],
+        initial_dominant: str,
+        layer_totals: List[float],
+    ) -> Tuple[str, float]:
+        """
+        Use cross-resonance to potentially adjust the dominant layer.
+
+        If the sentence has a strong semantic cluster in a different layer
+        than the simple aggregation suggests, prefer the cluster.
+
+        Args:
+            word_vectors: Word vectors from phrase analysis
+            initial_dominant: Initially computed dominant layer
+            layer_totals: Raw layer totals from aggregation
+
+        Returns:
+            Tuple of (adjusted_dominant_layer, cluster_confidence_boost)
+        """
+        cluster_scores = self._compute_cross_resonance(word_vectors)
+
+        if not cluster_scores:
+            return initial_dominant, 0.0
+
+        # Find the strongest cluster
+        max_cluster_layer = max(cluster_scores, key=cluster_scores.get)
+        max_cluster_score = cluster_scores[max_cluster_layer]
+
+        # Normalize cluster score relative to total
+        total_cluster = sum(cluster_scores.values())
+        if total_cluster > 0:
+            cluster_dominance = max_cluster_score / total_cluster
+        else:
+            cluster_dominance = 0.0
+
+        # If cluster strongly disagrees with initial dominant, consider switching
+        if max_cluster_layer != initial_dominant and cluster_dominance > 0.25:
+            # Check if the cluster layer has reasonable support in raw totals
+            cluster_layer_idx = LAYER_NAMES.index(max_cluster_layer)
+            initial_layer_idx = LAYER_NAMES.index(initial_dominant)
+
+            # Only switch if cluster layer is not too far behind in raw scores
+            if layer_totals[cluster_layer_idx] > layer_totals[initial_layer_idx] * 0.7:
+                return max_cluster_layer, cluster_dominance * 0.2
+
+        # Cluster confirms initial - boost confidence
+        if max_cluster_layer == initial_dominant:
+            return initial_dominant, cluster_dominance * 0.15
+
+        return initial_dominant, 0.0
+
     def route(self, query: str) -> RoutingDecision:
         """
         Route a query to the appropriate model.
 
         Combines phoneme layer analysis with keyword pattern detection
-        for improved accuracy.
+        and semantic cross-matching for improved accuracy.
 
         Args:
             query: The input query/prompt
@@ -211,7 +325,7 @@ class SemanticRouter:
             for i, score in enumerate(word_vec.vector):
                 layer_totals[i] += score
 
-        # Find dominant layer using raw totals (not normalized)
+        # Find initial dominant layer using raw totals
         max_idx = 0
         max_total = layer_totals[0]
         for i in range(1, 10):
@@ -219,13 +333,22 @@ class SemanticRouter:
                 max_total = layer_totals[i]
                 max_idx = i
 
-        dominant_layer = LAYER_NAMES[max_idx]
+        initial_dominant = LAYER_NAMES[max_idx]
+
+        # Apply cross-resonance disambiguation for homonyms
+        # This uses pairwise word similarity to find semantic clusters
+        dominant_layer, cluster_boost = self._get_disambiguated_layer(
+            list(analysis.words), initial_dominant, layer_totals
+        )
 
         # Calculate confidence using the best word-level dominant score
         max_word_score = 0.0
         for word_vec in analysis.words:
             if word_vec.dominant_score > max_word_score:
                 max_word_score = word_vec.dominant_score
+
+        # Add cluster boost to confidence
+        max_word_score = min(max_word_score + cluster_boost, 1.0)
 
         # Normalize for layer_scores display
         total = sum(layer_totals)
