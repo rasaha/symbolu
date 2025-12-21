@@ -46,7 +46,15 @@ Usage:
     insights = engine.get_insights()  # Cross-domain insights
 """
 
-from symbolu.engine.factory import create_engine, EngineTier
+from symbolu.engine.factory import (
+    create_engine,
+    EngineTier,
+    SmartRouter,
+    BatchProcessor,
+    BatchResult,
+    COST_PRESETS,
+    CostPreset,
+)
 from symbolu.engine.base import BaseEngine, EngineResult, EngineCapability
 from symbolu.engine.enterprise_search import EnterpriseSearchEngine
 from symbolu.engine.enterprise_chat import EnterpriseChatEngine
@@ -63,6 +71,12 @@ __all__ = [
     # Factory
     "create_engine",
     "EngineTier",
+    # Cost optimization
+    "SmartRouter",
+    "BatchProcessor",
+    "BatchResult",
+    "COST_PRESETS",
+    "CostPreset",
     # Base classes
     "BaseEngine",
     "EngineResult",
