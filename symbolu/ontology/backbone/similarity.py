@@ -400,6 +400,7 @@ class CrossDomainMatch:
         domain2: Domain of second content
         similarity: Similarity result
         shared_structure: Description of shared structure
+        referent_coherence: Optional C × R × S referent coherence score
     """
     content1: str
     content2: str
@@ -407,9 +408,10 @@ class CrossDomainMatch:
     domain2: str
     similarity: SimilarityResult
     shared_structure: str
+    referent_coherence: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        result = {
             "content1": self.content1[:100] + "..." if len(self.content1) > 100 else self.content1,
             "content2": self.content2[:100] + "..." if len(self.content2) > 100 else self.content2,
             "domain1": self.domain1,
@@ -417,13 +419,28 @@ class CrossDomainMatch:
             "similarity_score": self.similarity.score,
             "shared_structure": self.shared_structure,
         }
+        if self.referent_coherence is not None:
+            result["referent_coherence"] = self.referent_coherence
+        return result
+
+    @property
+    def combined_score(self) -> float:
+        """Combined score including referent coherence if available."""
+        base = self.similarity.score
+        if self.referent_coherence is not None:
+            # Weight: 80% structural, 20% referent coherence
+            return base * 0.8 + self.referent_coherence * 0.2
+        return base
 
 
 def analyze_cross_domain(
     content1: str,
     content2: str,
     domain1: str = "unknown",
-    domain2: str = "unknown"
+    domain2: str = "unknown",
+    compute_referent_coherence: bool = False,
+    terms1: Optional[List[str]] = None,
+    terms2: Optional[List[str]] = None,
 ) -> CrossDomainMatch:
     """
     Analyze structural relationship between content from different domains.
@@ -433,6 +450,9 @@ def analyze_cross_domain(
         content2: Second content text
         domain1: Domain label for first content
         domain2: Domain label for second content
+        compute_referent_coherence: If True, compute C × R × S referent coherence
+        terms1: Optional key terms from content1 for referent matching
+        terms2: Optional key terms from content2 for referent matching
 
     Returns:
         CrossDomainMatch with detailed analysis
@@ -451,6 +471,13 @@ def analyze_cross_domain(
     else:
         shared_structure = "No strongly shared dimensional structure"
 
+    # Compute referent coherence using canonical matching (C × R × S)
+    referent_coherence = None
+    if compute_referent_coherence and terms1 and terms2:
+        referent_coherence = _compute_cross_domain_referent_coherence(terms1, terms2)
+        if referent_coherence is not None:
+            shared_structure += f" | Referent coherence: {referent_coherence:.2f}"
+
     return CrossDomainMatch(
         content1=content1,
         content2=content2,
@@ -458,7 +485,43 @@ def analyze_cross_domain(
         domain2=domain2,
         similarity=similarity,
         shared_structure=shared_structure,
+        referent_coherence=referent_coherence,
     )
+
+
+def _compute_cross_domain_referent_coherence(
+    terms1: List[str],
+    terms2: List[str],
+) -> Optional[float]:
+    """
+    Compute referent coherence between term sets using canonical matching.
+
+    Uses the S term from C × R × S to provide NON-phonemic validation.
+
+    Args:
+        terms1: Key terms from first content
+        terms2: Key terms from second content
+
+    Returns:
+        Average S term (referent coherence) or None if not available
+    """
+    try:
+        from symbolu.providers import get_match_provider
+        match_provider = get_match_provider("enterprise")
+
+        s_scores = []
+        for t1 in terms1[:5]:
+            for t2 in terms2[:5]:
+                if t1.lower() != t2.lower():
+                    result = match_provider.match(t1, t2)
+                    s_scores.append(result.referent)
+
+        if s_scores:
+            return sum(s_scores) / len(s_scores)
+        return None
+
+    except ImportError:
+        return None
 
 
 def find_cross_domain_connections(
