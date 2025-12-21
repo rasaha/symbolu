@@ -1,0 +1,8 @@
+# Training data files (generated, not committed)
+raw/*.jsonl
+raw/*.json
+processed/*.jsonl
+processed/*.json
+
+# Keep directory structure
+!.gitkeep
