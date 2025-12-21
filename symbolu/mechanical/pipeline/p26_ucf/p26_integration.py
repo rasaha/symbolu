@@ -81,11 +81,11 @@ def maybe_run_p26(ctx: Any) -> Optional[UnifiedConsciousnessState]:
         return None
 
     # P26 can run with minimal inputs (will use neutral defaults)
-    # Only skip if ctx has no relevant attributes at all
-    has_any_input = hasattr(ctx, "coherence_state")
+    # Skip if ctx has no coherence_state or coherence_state is None
+    coherence_state = getattr(ctx, "coherence_state", None)
 
-    if not has_any_input:
-        # Context has none of the expected attributes, skip P26
+    if coherence_state is None:
+        # Context has no coherence_state, skip P26
         return None
 
     try:
