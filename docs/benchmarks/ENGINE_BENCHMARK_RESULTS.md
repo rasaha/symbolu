@@ -4,9 +4,9 @@
 
 This document presents benchmark results for the three-tier Symbolu engine architecture:
 
-1. **Enterprise Search (Tier 1)**: Pure STL for classification/retrieval
-2. **Enterprise Chat (Tier 2)**: STL + 7B specialized models
-3. **Consumer**: STL + 768D + cascading LLM
+1. **Enterprise Search**: Pure STL for classification/retrieval
+2. **Enterprise Chat**: STL + 7B specialized models
+3. **Cascade**: STL + 768D + cascading LLM (smart routing with fallback)
 
 ---
 
@@ -17,24 +17,24 @@ This document presents benchmark results for the three-tier Symbolu engine archi
 │                        SYMBOLU ENGINE ARCHITECTURE                          │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  ENTERPRISE TIER 1         ENTERPRISE TIER 2         CONSUMER              │
-│  (Pure STL)                (STL + 7B)                (STL + 768D + LLM)     │
+│  ENTERPRISE SEARCH       ENTERPRISE CHAT           CASCADE                  │
+│  (Pure STL)              (STL + 7B)               (STL + 768D + LLM)        │
 │                                                                             │
-│  Query                     Query                     Query                  │
-│    ↓                         ↓                         ↓                    │
-│  STL (10D)                 STL (10D)                 STL (10D)              │
-│    ↓                         ↓                         ↓                    │
-│  Classification            Route                    Confidence?            │
-│    ↓                         ↓                     ↙     ↘                 │
-│  DONE                      7B Model              HIGH    LOW               │
-│                              ↓                     ↓       ↓                │
-│                            Response            Skip    768D                │
-│                                                  768D     ↓                 │
-│                                                   ↓    Combined            │
-│                                                   ↓       ↓                 │
-│                                                  7B    7B/175B             │
-│                                                   ↓       ↓                 │
-│                                                Response Response           │
+│  Query                   Query                     Query                    │
+│    ↓                       ↓                         ↓                      │
+│  STL (10D)               STL (10D)                 STL (10D)                │
+│    ↓                       ↓                         ↓                      │
+│  Classification          Route                    Confidence?              │
+│    ↓                       ↓                     ↙     ↘                   │
+│  DONE                    7B Model              HIGH    LOW                 │
+│                            ↓                     ↓       ↓                  │
+│                          Response            Skip    768D                  │
+│                                                768D     ↓                   │
+│                                                 ↓    Combined              │
+│                                                 ↓       ↓                   │
+│                                                7B    7B/175B               │
+│                                                 ↓       ↓                   │
+│                                              Response Response             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -74,7 +74,7 @@ This document presents benchmark results for the three-tier Symbolu engine archi
 **Future Improvements (Not Yet Implemented):**
 - **SessionContext accumulation**: Prior queries build disambiguation context
 - **Phase-1 constraint narrowing**: Semantic constraints reduce candidate space
-- **768D augmentation**: Consumer mode uses embeddings for ambiguous cases
+- **768D augmentation**: Cascade tier uses embeddings for ambiguous cases
 
 ### 3. Latency Comparison
 
@@ -82,8 +82,8 @@ This document presents benchmark results for the three-tier Symbolu engine archi
 |------|---------|------------|-------|-------|
 | Enterprise Search | ~100μs | N/A | **~100μs** | No LLM |
 | Enterprise Chat | ~100μs | ~500ms | **~500ms** | 7B model |
-| Consumer (skip 768D) | ~100μs | ~500ms | **~500ms** | High confidence |
-| Consumer (use 768D) | ~100μs + ~10ms | ~500ms-1s | **~600ms-1s** | Low confidence |
+| Cascade (skip 768D) | ~100μs | ~500ms | **~500ms** | High confidence |
+| Cascade (use 768D) | ~100μs + ~10ms | ~500ms-1s | **~600ms-1s** | Low confidence |
 
 ### 4. Cost Comparison
 
@@ -91,10 +91,10 @@ This document presents benchmark results for the three-tier Symbolu engine archi
 |------|--------------|----------|---------------|
 | Enterprise Search | None | None | **Free** |
 | Enterprise Chat | None | 7B only | **Low** |
-| Consumer | ~15% of queries | 7B + 175B fallback | **Medium** |
+| Cascade | ~15% of queries | 7B + 175B fallback | **Medium** |
 | Traditional (175B all) | N/A | 175B always | **High (25x)** |
 
-### 5. 768D Skip Rate (Consumer Mode)
+### 5. 768D Skip Rate (Cascade Tier)
 
 | Query Type | STL Confidence | 768D Skipped | Model Used |
 |------------|----------------|--------------|------------|
@@ -153,7 +153,7 @@ Query: "Deploy the application to production"
   Latency: 0.15ms
 ```
 
-### Consumer: Cascading with 768D
+### Cascade: Smart Routing with Fallback
 
 ```
 Query: "Write a poem about love"
@@ -208,7 +208,7 @@ When organizations provide domain-specific vocabulary:
 
 ## AGI Integration Benchmarks
 
-The engine now integrates AGI capabilities from the 10D backbone. Here are the performance results:
+The engine integrates AGI capabilities from the 10D backbone. Results from `python -m symbolu.engine.agi_demo`:
 
 ### AGI Latency by Tier
 
@@ -216,38 +216,75 @@ The engine now integrates AGI capabilities from the 10D backbone. Here are the p
 |------|---------------|--------------|-------|
 | Enterprise Search | 0.23ms | N/A | No AGI |
 | Enterprise Chat | 0.74ms | 0.54ms | Light AGI (tracking only) |
-| Consumer | 0.60ms | 0.31ms | Full AGI |
-| Consumer (no AGI) | 0.18ms | N/A | Baseline for comparison |
+| Cascade | 0.60ms | 0.31ms | Full AGI |
+| Cascade (no AGI) | 0.18ms | N/A | Baseline for comparison |
 
 ### AGI Overhead Analysis
 
 ```
-Consumer with AGI enabled:
+Cascade with AGI enabled:
   Total latency:  0.75ms avg
   AGI overhead:   0.48ms avg
   Events found:   0.5 per query avg
 
-Consumer without AGI:
+Cascade without AGI:
   Total latency:  0.18ms avg
 
 AGI overhead impact: ~300% increase
 But: Still <1ms total latency for routing
 ```
 
-### Event Detection
+### Event Detection (Live Demo Output)
 
-| Query Type | Events Detected | Balance Score |
-|------------|-----------------|---------------|
-| History ("Roman Empire fall") | destruction | 0.88 |
-| Business ("co-founders disagree") | creation, leadership | 0.73 |
-| Biology ("cells divide") | division | 0.88 |
-| Finance ("market crashes") | (none) | 0.82 |
-| Family ("handle conflict") | conflict | 0.88 |
+| Domain | Query | Events Detected | Balance Score | Transferable |
+|--------|-------|-----------------|---------------|--------------|
+| History | "Why did the Roman Empire fall?" | destruction | 0.88 | Yes |
+| Business | "My startup co-founders disagree on direction" | creation, leadership | 0.73 | Yes |
+| Biology | "How do cells divide?" | division | 0.88 | Yes |
+| Finance | "What causes market crashes?" | (none) | 0.82 | Yes |
+| Family | "How to handle family conflict during holidays?" | conflict | 0.88 | Yes |
+
+### Cross-Domain Insights (Live Demo Output)
+
+```
+Available insights (structurally validated):
+  [structural_match] Structural pattern match with finance analysis. (match: 30%)
+    Domain: business -> finance, Similarity: 0.30
+  [structural_match] Structural pattern match with biology analysis. (match: 26%)
+    Domain: business -> biology, Similarity: 0.26
+  [structural_match] Structural pattern match with history analysis. (match: 26%)
+    Domain: business -> history, Similarity: 0.26
+```
+
+### Tier Comparison (Live Demo Output)
+
+```
+Enterprise Search (No AGI)
+  Intent:     directive
+  Confidence: 0.52
+  AGI Signal: None (AGI not enabled for this tier)
+
+Enterprise Chat (Light AGI)
+  Intent:     directive
+  Confidence: 0.52
+  AGI Level:  light
+  Events:     ['creation', 'leadership']
+  Balance:    N/A
+  Matches:    0
+
+Cascade (Full AGI)
+  Intent:     directive
+  Confidence: 0.62
+  AGI Level:  full
+  Events:     ['creation', 'leadership']
+  Balance:    0.73
+  Matches:    0
+```
 
 ### AGI Capabilities by Tier
 
-| Capability | Enterprise Search | Enterprise Chat | Consumer |
-|------------|-------------------|-----------------|----------|
+| Capability | Enterprise Search | Enterprise Chat | Cascade |
+|------------|-------------------|-----------------|---------|
 | Event tagging | No | Yes | Yes |
 | Persona tracking | No | Yes | Yes |
 | Balance checking | No | No | Yes |
@@ -255,12 +292,21 @@ But: Still <1ms total latency for routing
 | Insight generation | No | No | Yes |
 | Reasoning synthesis | No | No | Yes |
 
-### Cross-Domain Insights
+### Balance Explanation (Live Demo Output)
 
-When insights are available (populated experiential store):
-- Average structural match: 26-30%
-- Insights are structurally validated to prevent advertising
-- Bridge discovery emerges from user behavior patterns
+```
+Balance Score: 0.82
+Dominant State: both_low
+
+Mirror Pairs:
+  ACTION (0.12) ← ABSOLUTE (0.12) [both_low]
+  IDENTIFICATION (1.00) → SINGULARITY (0.12) [grounded_only]
+  BODY (0.12) ← WITNESS (0.12) [both_low]
+  MIND (0.12) ← SOUL (0.12) [both_low]
+  EGO (0.12) ← INTELLECT (0.12) [both_low]
+
+Propagation needed: ['IDENTIFICATION_SINGULARITY']
+```
 
 ---
 
@@ -291,8 +337,8 @@ When insights are available (populated experiential store):
 | Document filtering | Enterprise Search |
 | Specialized chat | Enterprise Chat |
 | Cost-sensitive generation | Enterprise Chat |
-| Full capability needed | Consumer |
-| Edge case handling | Consumer |
+| Full capability needed | Cascade |
+| Edge case handling | Cascade |
 
 ---
 
