@@ -29,7 +29,7 @@ def run_demo():
     print("=" * 70)
     print()
 
-    # Create Consumer Engine with full AGI
+    # Create Cascade Engine with full AGI
     engine = create_engine(
         tier=EngineTier.CONSUMER,
         persona_id="demo_user",
@@ -224,7 +224,7 @@ def run_demo():
 6. THREE TIERS:
    - Enterprise Search: Pure STL (no AGI)
    - Enterprise Chat: STL + 7B + Light AGI (tracking + retrieval)
-   - Consumer: STL + 768D + LLM + Full AGI (all capabilities)
+   - Cascade: STL + 768D + LLM + Full AGI (all capabilities)
 """)
 
 
@@ -241,7 +241,7 @@ def compare_tiers():
     for tier, name in [
         (EngineTier.ENTERPRISE_SEARCH, "Enterprise Search (No AGI)"),
         (EngineTier.ENTERPRISE_CHAT, "Enterprise Chat (Light AGI)"),
-        (EngineTier.CONSUMER, "Consumer (Full AGI)"),
+        (EngineTier.CONSUMER, "Cascade (Full AGI)"),
     ]:
         print(f"{name}")
         print("-" * 50)

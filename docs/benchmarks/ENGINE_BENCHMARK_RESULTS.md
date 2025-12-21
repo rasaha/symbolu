@@ -371,6 +371,7 @@ print(f'Intent: {result.model_type.value}, Confidence: {result.confidence:.0%}')
 ## Version
 
 - **Date**: 2025-12-21
+- **Last benchmark run**: 2025-12-21
 - **Branch**: claude/pluggable-provider-architecture-A2ZuW
 - **Commits**:
   - feat: Add keyword pattern boosting (32% → 90%)

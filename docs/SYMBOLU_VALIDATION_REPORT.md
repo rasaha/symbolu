@@ -401,7 +401,7 @@ engine = create_engine(tier=EngineTier.ENTERPRISE_SEARCH)
 result = engine.classify("Deploy the K8s cluster")
 print(f"Intent: {result.intent}, Confidence: {result.confidence:.0%}")
 
-# Cascade tier
+# Cascade tier (EngineTier.CONSUMER is the enum name)
 engine = create_engine(tier=EngineTier.CONSUMER)
 result = engine.generate("Explain quantum entanglement")
 print(f"Model used: {result.model_used}")
