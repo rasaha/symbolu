@@ -1,9 +1,9 @@
 # Symbol-U Pipeline Phase Status Configuration
-# Version: 1.0
+# Version: 1.1
 # Environment: production
 # Last Updated: 2025-12-21
 
-version: "1.0"
+version: "1.1"
 environment: production
 
 # Directory to Phase ID Mapping
@@ -43,7 +43,7 @@ phases:
     - P9    # p9_lexical - Lexical selection
     # Extended Governance
     - P10   # p10_acoustic - Acoustic parameterization
-    - P11   # p11_prosodic - Prosodic evidence (witness-only)
+    - P11   # p11b_controller - PPV banding controller (canonical)
     - P12   # p12_consistency - Consistency validation
     - P13   # p13_acoustic_safety - Acoustic safety envelope
     - P14   # p14_surface - Surface realization
@@ -89,32 +89,34 @@ phases:
     - P34   # Referenced by P35, P36 - Identity Harmonics
     - P37   # Referenced by formulas - Narrative Continuity
 
-  # Deprecated phases - marked for removal
-  deprecated:
-    - P11_controller   # p11_controller/ - 2,987 LOC dead code
-    - P11_prosodic     # p11_prosodic/ - Witness-only but never runs
-    - P15_interaction  # p15_interaction/ - Redundant with P15_authority_guard
-    # Note: p11b_controller is kept as potential canonical P11 replacement
+  # Archived phases - moved to restoration/experiments/deprecated_phases/
+  archived:
+    - P11_controller   # ARCHIVED 2025-12-21 - 2,987 LOC dead code
+    - P11_prosodic     # ARCHIVED 2025-12-21 - Witness-only but never runs
+    - P15_interaction  # ARCHIVED 2025-12-21 - Redundant with P15_authority_guard
+
+  # Canonical implementations after consolidation
+  canonical:
+    P11: p11b_controller  # PPV banding controller is canonical P11
+    P15: p15_authority_guard  # Authority guard is canonical P15
 
 # Phase counts summary
 summary:
   total_implemented: 52
   active: 10
-  dormant: 42
+  dormant: 39  # Reduced by 3 archived
   missing: 2
-  deprecated: 3
+  archived: 3
 
-# Deprecation migration paths
-deprecation_plan:
-  P11_controller:
-    action: REMOVE
-    target_date: null
-    migration: "Archive to restoration/experiments/, use P11b if P11 needed"
-  P11_prosodic:
-    action: REMOVE
-    target_date: null
-    migration: "Archive to restoration/experiments/"
-  P15_interaction:
-    action: MERGE
-    target_date: null
-    migration: "Merge functionality into p15_authority_guard"
+# Archive locations
+archive_info:
+  location: "restoration/experiments/deprecated_phases/"
+  archived_date: "2025-12-21"
+  recovery_instructions: "See restoration/experiments/deprecated_phases/README.md"
+  phases_archived:
+    - directory: p11_controller
+      reason: "Redundant with p11b_controller, never called from orchestrator"
+    - directory: p11_prosodic
+      reason: "Witness-only observer, never executed in pipeline"
+    - directory: p15_interaction
+      reason: "Redundant with p15_authority_guard"
