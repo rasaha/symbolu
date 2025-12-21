@@ -11,12 +11,12 @@
 | `test_phase11_light_invariance.py` | `tests/tier3_invariance/` | Tier3 tests for deprecated controller |
 | `test_phase11_coherence_v3_activation.py` | `symbolu/mechanical/pipeline/integration_tests/` | Integration tests for deprecated controller |
 | `p11_prosodic/` | `tests/unit/mechanical/pipeline/` | Tests for deprecated p11_prosodic (witness-only, never executed) |
+| `p10_p11/` | `tests/unit/mechanical/pipeline/` | P10-P11 invariant tests (imports deprecated p11_prosodic) |
 
 ## Canonical Tests (NOT Archived)
 
 The following tests remain active for the canonical p11b_controller:
 - `tests/phase11/test_p11b_controller.py` - Unit tests for canonical P11
-- `tests/unit/mechanical/pipeline/p10_p11/test_p10_p11_invariants.py` - P10-P11 integration invariants
 
 ## Recovery Instructions
 
