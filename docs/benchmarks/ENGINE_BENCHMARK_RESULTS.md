@@ -246,6 +246,8 @@ But: Still <1ms total latency for routing
 
 ### Cross-Domain Insights (Live Demo Output)
 
+**Note**: Thresholds relaxed from 0.5 to 0.1 - all pattern matches now surfaced.
+
 ```
 Available insights (structurally validated):
   [structural_match] Structural pattern match with finance analysis. (match: 30%)
@@ -285,12 +287,17 @@ Cascade (Full AGI)
 
 | Capability | Enterprise Search | Enterprise Chat | Cascade |
 |------------|-------------------|-----------------|---------|
+| Query type classification | Yes | Yes | Yes |
 | Event tagging | No | Yes | Yes |
 | Persona tracking | No | Yes | Yes |
 | Balance checking | No | No | Yes |
-| Cross-domain retrieval | No | Yes | Yes |
+| Cross-domain retrieval | No | Yes (gated) | Yes (gated) |
 | Insight generation | No | No | Yes |
 | Reasoning synthesis | No | No | Yes |
+
+**Note**: Cross-domain retrieval is now gated by query type. Only PROBLEM queries
+("My X is failing", "How do I handle Y?") trigger cross-domain reasoning.
+INFORMATION queries ("What is X?", "How does Y work?") skip cross-domain to reduce noise.
 
 ### Balance Explanation (Live Demo Output)
 
@@ -326,6 +333,17 @@ Propagation needed: ['IDENTIFICATION_SINGULARITY']
 6. **7B usage ~90%** - only edge cases need 175B fallback
 
 7. **AGI adds ~0.5ms overhead** - event tagging, balance checking, persona tracking all included in <1ms
+
+8. **Cross-domain thresholds relaxed** - lowered from 0.5/0.3/0.4 to 0.1/0.1/0.1
+   - Previously: Cross-domain insights with 26-30% similarity were filtered out
+   - Now: All structural pattern matches are surfaced for discovery
+   - Enables more cross-domain connections while keeping safety blocks for sensitive pairs
+
+9. **Query type gating for cross-domain** - cross-domain reasoning now gated by query type
+   - PROBLEM queries ("My X is failing"): Cross-domain ENABLED
+   - INFORMATION queries ("What is X?"): Cross-domain DISABLED
+   - Reduces noise for knowledge-seeking queries
+   - Cross-domain patterns only add value when solving problems, not gathering facts
 
 ---
 
@@ -371,6 +389,7 @@ print(f'Intent: {result.model_type.value}, Confidence: {result.confidence:.0%}')
 ## Version
 
 - **Date**: 2025-12-21
+- **Last benchmark run**: 2025-12-21
 - **Branch**: claude/pluggable-provider-architecture-A2ZuW
 - **Commits**:
   - feat: Add keyword pattern boosting (32% → 90%)
@@ -378,3 +397,5 @@ print(f'Intent: {result.model_type.value}, Confidence: {result.confidence:.0%}')
   - feat: Add custom vocabulary support
   - feat: Add three-tier engine architecture
   - feat: Integrate AGI capabilities from 10D backbone
+  - feat: Relax cross-domain thresholds (0.5 → 0.1) for better pattern discovery
+  - feat: Gate cross-domain reasoning by query type (problem vs information)

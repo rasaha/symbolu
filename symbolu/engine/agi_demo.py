@@ -5,18 +5,23 @@ AGI Demo
 Demonstrates cross-domain reasoning capabilities of the Symbol-U engine.
 
 This demo shows how:
-    1. Events are tagged from natural language
-    2. Queries are encoded to 10D with mirror pair balance
-    3. Cross-domain experientials are retrieved
-    4. Persona patterns are tracked across domains
-    5. Insights are generated (structurally validated, not advertising)
-    6. Canonical matching (C × R × S) validates semantic coherence
+    1. Query type is classified (PROBLEM vs INFORMATION)
+    2. Cross-domain reasoning ONLY activates for PROBLEM queries
+    3. Events are tagged from natural language
+    4. Queries are encoded to 10D with mirror pair balance
+    5. Cross-domain experientials are retrieved (only for problems)
+    6. Persona patterns are tracked across domains
+    7. Insights are generated (structurally validated, not advertising)
+    8. Canonical matching (C × R × S) validates semantic coherence
+
+Key insight: Cross-domain reasoning adds value for problem-solving
+but adds noise for information-gathering queries.
 
 Usage:
     python -m symbolu.engine.agi_demo
 """
 
-from symbolu.engine import create_engine, EngineTier, AGILevel
+from symbolu.engine import create_engine, EngineTier, AGILevel, classify_query_type
 from symbolu.ontology.backbone import InsightMode
 from symbolu.providers import get_match_provider, get_filter_provider
 
@@ -29,12 +34,43 @@ def run_demo():
     print("=" * 70)
     print()
 
-    # Create Consumer Engine with full AGI
+    # Create Cascade Engine with full AGI
     engine = create_engine(
         tier=EngineTier.CONSUMER,
         persona_id="demo_user",
         enable_agi=True,
     )
+
+    # PART 0: Query Type Classification Demo
+    print("PART 0: Query Type Classification (Problem vs Information)")
+    print("-" * 70)
+    print()
+    print("Cross-domain reasoning is gated by query type:")
+    print("  - PROBLEM queries: Cross-domain enabled (patterns help solve problems)")
+    print("  - INFORMATION queries: Cross-domain disabled (adds noise to facts)")
+    print()
+
+    classification_examples = [
+        # Problems (cross-domain enabled)
+        "My startup co-founders disagree on direction",
+        "How do I handle family conflict?",
+        "What should I do about team communication issues?",
+        # Information (cross-domain disabled)
+        "What is quantum entanglement?",
+        "How do cells divide?",
+        "Explain the theory of relativity",
+    ]
+
+    for query in classification_examples:
+        result = classify_query_type(query)
+        cross_domain = "ENABLED" if result.query_type.value == "problem" else "disabled"
+        print(f"Query: \"{query}\"")
+        print(f"  Type: {result.query_type.value.upper()}")
+        print(f"  Confidence: {result.confidence:.0%}")
+        print(f"  Cross-domain: {cross_domain}")
+        print()
+
+    print()
 
     # Demo queries across different domains
     demo_queries = [
@@ -199,32 +235,37 @@ def run_demo():
     print("KEY ARCHITECTURE POINTS:")
     print("=" * 70)
     print("""
-1. MIRROR PAIRS: 10D encodes as 5 mirror pairs (Acting-Absolving, etc.)
+1. QUERY TYPE GATING: Cross-domain only for PROBLEM queries
+   - PROBLEM ("My X is failing"): Cross-domain reasoning ENABLED
+   - INFORMATION ("What is X?"): Cross-domain reasoning DISABLED
+   - Reduces noise for knowledge-seeking; enables patterns for problem-solving
+
+2. MIRROR PAIRS: 10D encodes as 5 mirror pairs (Acting-Absolving, etc.)
    - Balance between lower (concrete) and higher (abstract) = transferable insight
    - Imbalanced = just facts or just theory
 
-2. EVENT TAGGING: Tag EVENTS (conflict, division, collapse), not entities
+3. EVENT TAGGING: Tag EVENTS (conflict, division, collapse), not entities
    - Events are domain-agnostic
    - Same event patterns appear across history, biology, business, etc.
 
-3. PERSONA TRACKING: Discover patterns from USER BEHAVIOR, not content
+4. PERSONA TRACKING: Discover patterns from USER BEHAVIOR, not content
    - Track which domains and events each user explores
    - Bridges emerge from usage, not extraction
 
-4. STRUCTURAL VALIDATION: Insights require validated structural match
-   - 10D similarity >= 0.5 OR causal chain overlap >= 0.3
-   - Without validation, cross-domain suggestions = advertising
+5. STRUCTURAL VALIDATION: Cross-domain insights are now permissive
+   - 10D similarity >= 0.1 (lowered from 0.5)
+   - Enables more cross-domain pattern discovery for PROBLEM queries
 
-5. CANONICAL MATCHING (C × R × S): Source-independent semantic validation
+6. CANONICAL MATCHING (C × R × S): Source-independent semantic validation
    - C and R derive from phonemic analysis (same source)
    - S derives from referent classes (NON-phonemic, orthogonal)
    - S gates the match: low S → REFERENT_MISMATCH regardless of C×R
    - Fixes ChatGPT failure modes (king↔banana now correctly rejected)
 
-6. THREE TIERS:
+7. THREE TIERS:
    - Enterprise Search: Pure STL (no AGI)
    - Enterprise Chat: STL + 7B + Light AGI (tracking + retrieval)
-   - Consumer: STL + 768D + LLM + Full AGI (all capabilities)
+   - Cascade: STL + 768D + LLM + Full AGI (all capabilities)
 """)
 
 
@@ -241,7 +282,7 @@ def compare_tiers():
     for tier, name in [
         (EngineTier.ENTERPRISE_SEARCH, "Enterprise Search (No AGI)"),
         (EngineTier.ENTERPRISE_CHAT, "Enterprise Chat (Light AGI)"),
-        (EngineTier.CONSUMER, "Consumer (Full AGI)"),
+        (EngineTier.CONSUMER, "Cascade (Full AGI)"),
     ]:
         print(f"{name}")
         print("-" * 50)

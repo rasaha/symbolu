@@ -35,6 +35,12 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple
 from enum import Enum
 
+from symbolu.engine.query_type import (
+    classify_query_type,
+    QueryType,
+    QueryTypeResult,
+    is_problem_query,
+)
 from symbolu.ontology.backbone import (
     # Core encoding
     encode_10d,
@@ -107,6 +113,10 @@ class QueryContext:
     query: str
     domain: Optional[str]
 
+    # Query type classification (problem vs information)
+    query_type: QueryType
+    query_type_confidence: float
+
     # 10D encoding
     vector_10d: Tuple[float, ...]
     events: Tuple[EventType, ...]
@@ -120,8 +130,9 @@ class QueryContext:
     semantic_check: Optional[SemanticCheck] = None
     phoneme_validation: Optional[ValidationReport] = None
 
-    # Cross-domain retrieval
+    # Cross-domain retrieval (only populated for PROBLEM queries)
     similar_experientials: List[RetrievalResult] = field(default_factory=list)
+    cross_domain_skipped: bool = False  # True if skipped due to INFORMATION query
 
     # Synthesis (if requested)
     synthesis: Optional[SynthesisResult] = None
@@ -133,12 +144,17 @@ class AGISignal:
     level: AGILevel
     persona_id: Optional[str]
 
+    # Query type (problem vs information)
+    query_type: str  # "problem" or "information"
+    query_type_confidence: float
+    cross_domain_enabled: bool  # Whether cross-domain was enabled for this query
+
     # What was computed
     events_detected: List[str]
     balance_score: float
     is_transferable: bool
 
-    # Cross-domain matches (if any)
+    # Cross-domain matches (if any - only for PROBLEM queries)
     cross_domain_matches: int
     top_match_domain: Optional[str]
     top_match_similarity: float
@@ -231,12 +247,19 @@ class AGIContext:
         Returns:
             QueryContext with full AGI analysis
         """
+        # Step 0: Classify query type (problem vs information)
+        # Cross-domain reasoning only activates for PROBLEM queries
+        query_type_result = classify_query_type(query)
+        is_problem = query_type_result.query_type == QueryType.PROBLEM
+
         if self.level == AGILevel.NONE:
             # Minimal processing for Enterprise Search
             vector = encode_10d(query)
             return QueryContext(
                 query=query,
                 domain=domain,
+                query_type=query_type_result.query_type,
+                query_type_confidence=query_type_result.confidence,
                 vector_10d=tuple(vector.values),
                 events=(),
                 balance_score=0.0,
@@ -248,6 +271,7 @@ class AGIContext:
                     propagation_needed=[],
                 ),
                 is_transferable=False,
+                cross_domain_skipped=True,  # Always skip for Enterprise Search
             )
 
         # Step 1-3: Encode with events (includes tagging and balance)
@@ -273,15 +297,22 @@ class AGIContext:
                 domain=domain or "general",
             )
 
-        # Step 6: Retrieve similar experientials
+        # Step 6: Retrieve similar experientials (ONLY for PROBLEM queries)
+        # Cross-domain reasoning adds noise for information-gathering queries
         similar = []
+        cross_domain_skipped = False
         if self.level in (AGILevel.LIGHT, AGILevel.FULL):
-            similar = retrieve_similar(
-                query=query,
-                current_domain=domain,
-                top_k=max_matches,
-                config=self.cross_domain_config,
-            )
+            if is_problem:
+                # Problem query - enable cross-domain reasoning
+                similar = retrieve_similar(
+                    query=query,
+                    current_domain=domain,
+                    top_k=max_matches,
+                    config=self.cross_domain_config,
+                )
+            else:
+                # Information query - skip cross-domain (reduces noise)
+                cross_domain_skipped = True
 
         # Step 7: Synthesize if requested
         synthesis = None
@@ -303,6 +334,8 @@ class AGIContext:
         ctx = QueryContext(
             query=query,
             domain=domain,
+            query_type=query_type_result.query_type,
+            query_type_confidence=query_type_result.confidence,
             vector_10d=vector_10d,
             events=events,
             balance_score=balance_score,
@@ -311,6 +344,7 @@ class AGIContext:
             semantic_check=semantic_check,
             phoneme_validation=phoneme_validation,
             similar_experientials=similar,
+            cross_domain_skipped=cross_domain_skipped,
             synthesis=synthesis,
         )
 
@@ -419,6 +453,9 @@ class AGIContext:
             return AGISignal(
                 level=self.level,
                 persona_id=self.persona_id,
+                query_type="information",
+                query_type_confidence=0.0,
+                cross_domain_enabled=False,
                 events_detected=[],
                 balance_score=0.0,
                 is_transferable=False,
@@ -441,6 +478,9 @@ class AGIContext:
         return AGISignal(
             level=self.level,
             persona_id=self.persona_id,
+            query_type=ctx.query_type.value,
+            query_type_confidence=ctx.query_type_confidence,
+            cross_domain_enabled=not ctx.cross_domain_skipped,
             events_detected=[e.value for e in ctx.events],
             balance_score=ctx.balance_score,
             is_transferable=ctx.is_transferable,
