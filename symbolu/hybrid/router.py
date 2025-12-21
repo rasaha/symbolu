@@ -19,8 +19,9 @@ Computational Savings:
 """
 
 from dataclasses import dataclass
-from typing import Tuple, Optional, Dict, Callable, Any
+from typing import Tuple, Optional, Dict, Callable, Any, Set
 from enum import Enum
+import re
 
 from symbolu.resonance import (
     analyze_phrase,
@@ -29,6 +30,40 @@ from symbolu.resonance import (
     WordVector,
     LAYER_NAMES,
 )
+
+
+# Intent keyword patterns for boosting
+# These augment phoneme analysis with common linguistic patterns
+
+ACTION_PATTERNS: Set[str] = {
+    "run", "execute", "start", "stop", "deploy", "install", "send", "book",
+    "schedule", "create", "delete", "build", "test", "compile", "launch",
+    "restart", "shutdown", "upload", "download", "push", "pull", "commit",
+}
+
+REASONING_PATTERNS: Set[str] = {
+    "how", "why", "what", "explain", "analyze", "calculate", "compute",
+    "derive", "prove", "solve", "understand", "theory", "logic", "reason",
+    "cause", "effect", "because", "therefore", "hypothesis", "theorem",
+}
+
+RELATIONSHIP_PATTERNS: Set[str] = {
+    "feel", "feeling", "emotion", "sad", "happy", "anxious", "worried",
+    "lonely", "love", "hate", "friend", "family", "relationship", "hurt",
+    "heart", "care", "connect", "bond", "trust", "empathy", "compassion",
+}
+
+CREATIVE_PATTERNS: Set[str] = {
+    "write", "compose", "design", "create", "imagine", "paint", "draw",
+    "poem", "story", "song", "art", "music", "illustration", "sketch",
+    "novel", "lyrics", "melody", "artistic", "creative", "invent",
+}
+
+REFLECTIVE_PATTERNS: Set[str] = {
+    "meaning", "life", "exist", "existence", "consciousness", "free",
+    "will", "death", "truth", "reality", "nature", "being", "soul",
+    "spirit", "philosophy", "metaphysics", "purpose", "destiny", "fate",
+}
 
 
 class ModelType(Enum):
@@ -86,10 +121,20 @@ class SemanticRouter:
         ...
     """
 
+    # Pattern sets mapped to model types
+    PATTERN_TO_MODEL: Dict[ModelType, Set[str]] = {
+        ModelType.ACTION: ACTION_PATTERNS,
+        ModelType.REASONING: REASONING_PATTERNS,
+        ModelType.RELATIONSHIP: RELATIONSHIP_PATTERNS,
+        ModelType.CREATIVE: CREATIVE_PATTERNS,
+        ModelType.REFLECTIVE: REFLECTIVE_PATTERNS,
+    }
+
     def __init__(
         self,
         confidence_threshold: float = 0.3,
         fallback_model: ModelType = ModelType.GENERAL,
+        pattern_boost: float = 0.3,
     ):
         """
         Initialize router.
@@ -97,13 +142,49 @@ class SemanticRouter:
         Args:
             confidence_threshold: Minimum dominant layer score to route
             fallback_model: Model to use when confidence is low
+            pattern_boost: Amount to boost confidence when keyword patterns match
         """
         self.confidence_threshold = confidence_threshold
         self.fallback_model = fallback_model
+        self.pattern_boost = pattern_boost
+
+    def _detect_intent_patterns(self, query: str) -> Dict[ModelType, float]:
+        """
+        Detect intent patterns in the query using keyword matching.
+
+        Args:
+            query: The input query
+
+        Returns:
+            Dict mapping ModelType to match score (0.0 to 1.0)
+        """
+        # Tokenize query into lowercase words
+        words = set(re.findall(r'\b[a-z]+\b', query.lower()))
+
+        scores: Dict[ModelType, float] = {}
+
+        for model_type, patterns in self.PATTERN_TO_MODEL.items():
+            matches = words & patterns
+            if matches:
+                # Score based on number of matches and their position
+                # First word matching gets extra weight (imperative detection)
+                first_word = query.lower().split()[0] if query.strip() else ""
+                first_word_match = first_word in patterns
+
+                base_score = len(matches) / max(len(words), 1)
+                if first_word_match:
+                    base_score += 0.3  # Boost for imperative commands
+
+                scores[model_type] = min(base_score, 1.0)
+
+        return scores
 
     def route(self, query: str) -> RoutingDecision:
         """
         Route a query to the appropriate model.
+
+        Combines phoneme layer analysis with keyword pattern detection
+        for improved accuracy.
 
         Args:
             query: The input query/prompt
@@ -111,7 +192,7 @@ class SemanticRouter:
         Returns:
             RoutingDecision with model type and confidence
         """
-        # Analyze the query
+        # Analyze the query using phoneme analysis
         analysis = analyze_phrase(query)
 
         if not analysis.words:
@@ -141,13 +222,12 @@ class SemanticRouter:
         dominant_layer = LAYER_NAMES[max_idx]
 
         # Calculate confidence using the best word-level dominant score
-        # This preserves the differentiation seen at word level
         max_word_score = 0.0
         for word_vec in analysis.words:
             if word_vec.dominant_score > max_word_score:
                 max_word_score = word_vec.dominant_score
 
-        # Normalize for layer_scores display (but not for routing decision)
+        # Normalize for layer_scores display
         total = sum(layer_totals)
         if total > 0:
             normalized = [s / total for s in layer_totals]
@@ -159,13 +239,50 @@ class SemanticRouter:
         sorted_layers = sorted(indexed, key=lambda x: x[1], reverse=True)
         top_layers = tuple(sorted_layers[:3])
 
-        # Determine model using word-level confidence
-        if max_word_score < self.confidence_threshold:
-            model_type = self.fallback_model
-            confidence = max_word_score
+        # Detect intent patterns from keywords
+        pattern_scores = self._detect_intent_patterns(query)
+
+        # Determine model type by combining phoneme analysis with pattern matching
+        phoneme_model = LAYER_TO_MODEL.get(dominant_layer, self.fallback_model)
+
+        # If pattern detection has a strong signal, use it to override or confirm
+        if pattern_scores:
+            # Get the best pattern match
+            best_pattern_model = max(pattern_scores, key=pattern_scores.get)
+            best_pattern_score = pattern_scores[best_pattern_model]
+
+            # Strong pattern match overrides phoneme if phoneme confidence is weak
+            if best_pattern_score >= 0.2:
+                # Pattern is strong enough to consider
+                if max_word_score < self.confidence_threshold:
+                    # Low phoneme confidence - trust pattern
+                    model_type = best_pattern_model
+                    confidence = min(max_word_score + best_pattern_score * self.pattern_boost, 1.0)
+                elif best_pattern_model == phoneme_model:
+                    # Pattern confirms phoneme - boost confidence
+                    model_type = phoneme_model
+                    confidence = min(max_word_score + best_pattern_score * self.pattern_boost, 1.0)
+                else:
+                    # Pattern and phoneme disagree - use pattern if score is high
+                    if best_pattern_score >= 0.4:
+                        model_type = best_pattern_model
+                        confidence = min(max_word_score + best_pattern_score * self.pattern_boost, 1.0)
+                    else:
+                        # Stick with phoneme but note conflict
+                        model_type = phoneme_model
+                        confidence = max_word_score
+            else:
+                # Pattern too weak - use phoneme
+                model_type = phoneme_model if max_word_score >= self.confidence_threshold else self.fallback_model
+                confidence = max_word_score
         else:
-            model_type = LAYER_TO_MODEL.get(dominant_layer, self.fallback_model)
-            confidence = max_word_score
+            # No pattern matches - use pure phoneme analysis
+            if max_word_score < self.confidence_threshold:
+                model_type = self.fallback_model
+                confidence = max_word_score
+            else:
+                model_type = phoneme_model
+                confidence = max_word_score
 
         return RoutingDecision(
             model_type=model_type,
