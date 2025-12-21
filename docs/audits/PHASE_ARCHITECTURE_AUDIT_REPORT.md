@@ -13,25 +13,41 @@
 |--------|-------|
 | **Total Phases Implemented** | 52 |
 | **Missing Phases** | P34, P37 (intentional gaps) |
-| **Active Phases (in orchestrator)** | 5-10 (P27-P31 + mappers) |
-| **Dormant Phases** | ~40 (implemented but not called) |
-| **Obsolete/Redundant Phases** | 5 (P11 variants, P15 variants) |
+| **Active Phases (in orchestrator)** | 10 (PO1-PO5, P27-P31) |
+| **Dormant Phases** | 42 (implemented but not called) |
+| **Deprecated Phases** | 3 (P11_controller, P11_prosodic, P15_interaction) |
 | **Test Coverage - Good** | 23 phases (42.6%) |
 | **Test Coverage - None** | 12 phases (22.2%) |
 | **Boundary Violations** | 1 (P22 imports formulas - minor) |
 | **Overall Health Score** | **72/100** |
 
+### Phase Status Configuration
+
+See `symbolu/mechanical/pipeline/PHASE_STATUS.yaml` for the authoritative phase status configuration.
+
 ### Key Findings
 
 1. **Architecture is sound** - Clean three-tier separation (Core/Substrate → Observer → Governance)
 2. **Significant dead code** - ~40 phases implemented but never called from orchestrator
-3. **Redundant implementations** - P11 has 3 versions, P15 has 2 versions
+3. **Deprecated phases** - P11_controller, P11_prosodic, P15_interaction marked for removal
 4. **Missing phases** - P34 (Identity Harmonics) and P37 (Narrative Continuity) are referenced but not implemented
 5. **Test coverage gaps** - 12 phases have zero tests, 14 have skeleton tests only
 
 ---
 
 ## Phase Catalog
+
+### Directory to Phase ID Naming Convention
+
+| Directory | Phase ID | Notes |
+|-----------|----------|-------|
+| `grounding/` (phase_minus_one_*) | PO1 (P-1) | Observer-Observed grounding |
+| `phase_zero/` | PO2 (P0) | Intent envelope |
+| `phase_one/` | PO3 (P1) | Allowed action set |
+| `phase_po4/` | PO4 | Planner proposal |
+| `phase_po5/` | PO5 | Execution gate |
+| `phase_p6/` | P6 | Regime selection |
+| `pN_*` | PN | Pattern for P7+ |
 
 ### Phase Classification
 
