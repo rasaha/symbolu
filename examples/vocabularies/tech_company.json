@@ -1,0 +1,135 @@
+{
+  "version": "1.0",
+  "organization": "Example Tech Company",
+  "description": "Custom vocabulary for tech company domain terms, acronyms, and jargon",
+  "terms": [
+    {
+      "term": "JIRA",
+      "expansion": "issue tracking system",
+      "intent": "action",
+      "layer_affinities": {
+        "O3_ACTING": 0.8,
+        "O6_REASONING": 0.4
+      },
+      "synonyms": ["ticket", "issue"],
+      "category": "tools"
+    },
+    {
+      "term": "K8s",
+      "expansion": "Kubernetes container orchestration",
+      "intent": "action",
+      "layer_affinities": {
+        "O3_ACTING": 0.9,
+        "O5_DIRECTING": 0.5
+      },
+      "synonyms": ["kubernetes", "kube", "cluster"],
+      "category": "infrastructure"
+    },
+    {
+      "term": "CI/CD",
+      "expansion": "continuous integration and continuous deployment",
+      "intent": "action",
+      "layer_affinities": {
+        "O3_ACTING": 0.9,
+        "O5_DIRECTING": 0.4
+      },
+      "synonyms": ["pipeline", "cicd", "build pipeline"],
+      "category": "devops"
+    },
+    {
+      "term": "PR",
+      "expansion": "pull request for code review",
+      "intent": "action",
+      "layer_affinities": {
+        "O3_ACTING": 0.6,
+        "O6_REASONING": 0.7
+      },
+      "synonyms": ["pull request", "merge request", "MR"],
+      "category": "development"
+    },
+    {
+      "term": "SLA",
+      "expansion": "service level agreement",
+      "intent": "reasoning",
+      "layer_affinities": {
+        "O6_REASONING": 0.8,
+        "O5_DIRECTING": 0.5
+      },
+      "category": "operations"
+    },
+    {
+      "term": "OKR",
+      "expansion": "objectives and key results",
+      "intent": "reasoning",
+      "layer_affinities": {
+        "O6_REASONING": 0.7,
+        "O7_PURPOSING": 0.8
+      },
+      "synonyms": ["objectives", "key results"],
+      "category": "management"
+    },
+    {
+      "term": "retro",
+      "expansion": "retrospective meeting",
+      "intent": "reflective",
+      "layer_affinities": {
+        "O1_THINKING": 0.7,
+        "O8_META_OBSERVING": 0.6
+      },
+      "synonyms": ["retrospective", "postmortem"],
+      "category": "agile"
+    },
+    {
+      "term": "standup",
+      "expansion": "daily standup meeting",
+      "intent": "action",
+      "layer_affinities": {
+        "O3_ACTING": 0.6,
+        "O5_DIRECTING": 0.5
+      },
+      "synonyms": ["daily", "scrum"],
+      "category": "agile"
+    },
+    {
+      "term": "MVP",
+      "expansion": "minimum viable product",
+      "intent": "creative",
+      "layer_affinities": {
+        "O2_FORMING": 0.8,
+        "O7_PURPOSING": 0.6
+      },
+      "category": "product"
+    },
+    {
+      "term": "POC",
+      "expansion": "proof of concept",
+      "intent": "reasoning",
+      "layer_affinities": {
+        "O6_REASONING": 0.7,
+        "O2_FORMING": 0.5
+      },
+      "synonyms": ["prototype", "spike"],
+      "category": "development"
+    },
+    {
+      "term": "EOD",
+      "expansion": "end of day",
+      "intent": "action",
+      "layer_affinities": {
+        "O3_ACTING": 0.5,
+        "O5_DIRECTING": 0.6
+      },
+      "category": "time"
+    },
+    {
+      "term": "WFH",
+      "expansion": "work from home",
+      "intent": "action",
+      "layer_affinities": {
+        "O3_ACTING": 0.6
+      },
+      "synonyms": ["remote", "remote work"],
+      "category": "workplace"
+    }
+  ]
+}

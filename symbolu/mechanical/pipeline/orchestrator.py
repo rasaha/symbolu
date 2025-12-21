@@ -43,6 +43,17 @@ from collections import OrderedDict
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 
+# Provider architecture imports
+from symbolu.config import SymboluConfig
+from symbolu.providers import (
+    get_embedding_provider,
+    get_router_provider,
+    get_filter_provider,
+    EmbeddingProvider,
+    RouterProvider,
+    FilterProvider,
+)
+
 # Pipeline models and utilities
 from .models import (
     DhaDecision,
@@ -264,6 +275,7 @@ class SymbolUPipeline:
 
     def __init__(
         self,
+        config: Optional[SymboluConfig] = None,
         router: Optional[PipelineRouter] = None,
         mlcr: Optional[MLCR] = None,
         persona_selector: Optional[PersonaSelector] = None,
@@ -271,11 +283,17 @@ class SymbolUPipeline:
         fusion_engine: Optional[FusionEngine] = None,
         dha_engine: Optional[DHAEngine] = None,
         enable_mlcr_cache: bool = True,
+        # Provider overrides (optional, for testing)
+        embedding_provider: Optional[EmbeddingProvider] = None,
+        router_provider: Optional[RouterProvider] = None,
+        filter_provider: Optional[FilterProvider] = None,
     ) -> None:
         """
         Initialize the pipeline orchestrator.
 
         Args:
+            config: Symbol-U configuration (default: enterprise mode).
+                    Controls provider selection and mode-specific behavior.
             router: Pipeline router for execution path decisions (default: linear-only).
             mlcr: MLCR engine instance (default: new MLCR()).
             persona_selector: Persona selector (default: new PersonaSelector()).
@@ -283,7 +301,32 @@ class SymbolUPipeline:
             fusion_engine: Fusion engine (default: new FusionEngine()).
             dha_engine: DHA engine (default: new DHAEngine()).
             enable_mlcr_cache: Enable MLCR result caching (default: True).
+            embedding_provider: Override embedding provider (for testing).
+            router_provider: Override router provider (for testing).
+            filter_provider: Override filter provider (for testing).
+
+        Example:
+            # Enterprise mode (symbolic, auditable)
+            pipeline = SymbolUPipeline(config=SymboluConfig(mode="enterprise"))
+
+            # Consumer mode (pre-trained, semantic)
+            pipeline = SymbolUPipeline(config=SymboluConfig(mode="consumer"))
         """
+        # Configuration (default to enterprise mode for backward compatibility)
+        self.config = config or SymboluConfig(mode="enterprise")
+
+        # Initialize pluggable providers based on config
+        self.embedding_provider = embedding_provider or get_embedding_provider(
+            self.config.mode, self.config.embedding_config
+        )
+        self.router_provider = router_provider or get_router_provider(
+            self.config.mode, self.config.router_config
+        )
+        self.filter_provider = filter_provider or get_filter_provider(
+            self.config.mode, self.config.filter_config
+        )
+
+        # Existing engine initialization
         self.router = router or get_default_router()
         self.mlcr = mlcr or MLCR()
         self.persona_selector = persona_selector or PersonaSelector()
@@ -450,17 +493,40 @@ class SymbolUPipeline:
         - Ontology mass (lower/upper)
         - Expert routing hints
 
+        Provider Integration:
+        - Uses RouterProvider to get standardized RoutingDecision
+        - RoutingDecision is stored in ctx for downstream governance use
+        - Enterprise mode: phoneme-based routing with full audit trace
+        - Consumer mode: trained classifier routing
+
         Args:
             ctx: Pipeline context with request.
 
         Returns:
-            Updated context with ctx.mlcr populated.
+            Updated context with ctx.mlcr and ctx.routing_decision populated.
         """
+        # ================================================================
+        # PROVIDER-BASED ROUTING
+        # Get standardized RoutingDecision from configured provider
+        # ================================================================
+        routing_decision = self.router_provider.route(ctx.request.text)
+        ctx.routing_decision = routing_decision
+
+        # Store routing info for audit (enterprise mode has full trace)
+        if self.config.audit_enabled:
+            ctx.routing_trace = routing_decision.trace
+
         # Build context for MLCR
         mlcr_context = {
             "user_id": ctx.request.user_id,
             "domain": ctx.request.metadata.get("domain"),
             "session_id": ctx.request.metadata.get("session_id"),
+            # Pass provider routing decision to MLCR for enrichment
+            "provider_routing": {
+                "model_type": routing_decision.model_type.value,
+                "confidence": routing_decision.confidence,
+                "dominant_layer": routing_decision.dominant_layer,
+            },
         }
 
         # Check cache first (if enabled and not disabled via request metadata)
@@ -491,6 +557,9 @@ class SymbolUPipeline:
                 "query_length": len(ctx.request.text),
                 "has_explain_log": "explain_log" in mlcr_result,
                 "cache_hit": use_cache and mlcr_result is not None,
+                "provider_mode": self.config.mode,
+                "provider_model_type": routing_decision.model_type.value,
+                "provider_confidence": routing_decision.confidence,
             },
         )
 
@@ -858,6 +927,16 @@ class SymbolUPipeline:
         )
         return {
             "run_count": self._run_count,
+            "config": {
+                "mode": self.config.mode,
+                "audit_enabled": self.config.audit_enabled,
+            },
+            "providers": {
+                "embedding_dim": self.embedding_provider.get_dimension(),
+                "embedding_type": type(self.embedding_provider).__name__,
+                "router_type": type(self.router_provider).__name__,
+                "filter_type": type(self.filter_provider).__name__,
+            },
             "mlcr_cache": {
                 "enabled": self.enable_mlcr_cache,
                 "hits": self._mlcr_cache_hits,
@@ -875,18 +954,31 @@ class SymbolUPipeline:
 # ============================================================================
 
 
-def run_pipeline(text: str, **kwargs: Any) -> RenderedOutput:
+def run_pipeline(
+    text: str,
+    mode: str = "enterprise",
+    **kwargs: Any,
+) -> RenderedOutput:
     """
     Convenience function to run the pipeline with minimal setup.
 
     Args:
         text: Query text.
+        mode: Provider mode - "enterprise" (symbolic) or "consumer" (pre-trained).
         **kwargs: Additional UserRequest parameters (user_id, metadata, render_mode).
 
     Returns:
         RenderedOutput from the pipeline.
+
+    Example:
+        # Enterprise mode (default)
+        result = run_pipeline("Why do I feel stuck?")
+
+        # Consumer mode
+        result = run_pipeline("Why do I feel stuck?", mode="consumer")
     """
-    pipeline = SymbolUPipeline()
+    config = SymboluConfig(mode=mode)
+    pipeline = SymbolUPipeline(config=config)
     request = UserRequest(text=text, **kwargs)
     return pipeline.run(request)
 
@@ -894,6 +986,7 @@ def run_pipeline(text: str, **kwargs: Any) -> RenderedOutput:
 # Public exports
 __all__ = [
     "SymbolUPipeline",
+    "SymboluConfig",
     "run_pipeline",
     "clear_mlcr_cache",
 ]
