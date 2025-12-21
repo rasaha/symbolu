@@ -145,6 +145,7 @@ class InsightContext:
 STRUCTURAL_THRESHOLD_10D = 0.5      # Minimum 10D cosine similarity
 STRUCTURAL_THRESHOLD_CAUSAL = 0.3   # Minimum causal chain overlap
 STRUCTURAL_THRESHOLD_COMBINED = 0.4 # Minimum combined score
+STRUCTURAL_THRESHOLD_REFERENT = 0.3 # Minimum referent coherence (S term)
 
 
 def _compute_structural_match(
@@ -154,12 +155,24 @@ def _compute_structural_match(
     target_events: Set[str],
     target_causal_chain: Optional[List[str]] = None,
     current_causal_chain: Optional[List[str]] = None,
+    current_terms: Optional[List[str]] = None,
+    target_terms: Optional[List[str]] = None,
 ) -> StructuralMatch:
     """
     Compute structural match between current context and a target domain pattern.
 
     This is the key function that prevents "advertising" - it validates that
     a cross-domain connection is structurally grounded, not just co-occurrence.
+
+    Validation axes:
+    1. 10D cosine similarity (phonemic-derived)
+    2. Causal chain overlap (structural)
+    3. Shared events (semantic)
+    4. Referent coherence via C × R × S (NON-phonemic, source-independent)
+
+    The referent coherence (S term) provides an orthogonal validation axis
+    that is NOT derived from phonemic data, addressing the source correlation
+    issue identified in the canonical matching design.
     """
     # 10D similarity
     similarity_10d = 0.0
@@ -174,11 +187,15 @@ def _compute_structural_match(
     if current_causal_chain and target_causal_chain:
         causal_overlap = _compute_lcs_ratio(current_causal_chain, target_causal_chain)
 
-    # Determine validity
+    # Referent coherence via canonical matching (S term - NON-phonemic)
+    referent_coherence = _compute_referent_coherence(current_terms, target_terms)
+
+    # Determine validity using all axes
     is_valid = (
         similarity_10d >= STRUCTURAL_THRESHOLD_10D or
         causal_overlap >= STRUCTURAL_THRESHOLD_CAUSAL or
-        len(shared_events) >= 2
+        len(shared_events) >= 2 or
+        referent_coherence >= STRUCTURAL_THRESHOLD_REFERENT
     )
 
     match = StructuralMatch(
@@ -188,11 +205,56 @@ def _compute_structural_match(
         is_valid=is_valid,
     )
 
-    # Also check combined score
-    if match.combined_score >= STRUCTURAL_THRESHOLD_COMBINED:
+    # Also check combined score (now includes referent coherence)
+    combined = match.combined_score
+    if referent_coherence > 0:
+        # Boost combined score with referent coherence
+        combined = combined * 0.8 + referent_coherence * 0.2
+    if combined >= STRUCTURAL_THRESHOLD_COMBINED:
         match.is_valid = True
 
     return match
+
+
+def _compute_referent_coherence(
+    current_terms: Optional[List[str]],
+    target_terms: Optional[List[str]],
+) -> float:
+    """
+    Compute referent coherence between term sets using canonical matching.
+
+    This provides a NON-phonemic validation axis via the S term from
+    the C × R × S canonical matching framework.
+
+    Args:
+        current_terms: Key terms from current context
+        target_terms: Key terms from target domain
+
+    Returns:
+        Average S term (referent coherence) across term pairs
+    """
+    if not current_terms or not target_terms:
+        return 0.0
+
+    try:
+        from symbolu.providers import get_match_provider
+        match_provider = get_match_provider("enterprise")
+
+        # Compute pairwise referent coherence (S term only)
+        s_scores = []
+        for current_term in current_terms[:5]:  # Limit to top 5 terms
+            for target_term in target_terms[:5]:
+                if current_term.lower() != target_term.lower():
+                    result = match_provider.match(current_term, target_term)
+                    s_scores.append(result.referent)
+
+        if s_scores:
+            return sum(s_scores) / len(s_scores)
+        return 0.0
+
+    except ImportError:
+        # Canonical matching not available - return neutral
+        return 0.0
 
 
 def _compute_lcs_ratio(chain1: List[str], chain2: List[str]) -> float:
