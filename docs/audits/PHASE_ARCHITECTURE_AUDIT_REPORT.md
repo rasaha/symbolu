@@ -1,7 +1,7 @@
 # Symbol-U Phase Architecture Comprehensive Audit Report
 
 **Audit Date:** 2025-12-21
-**Audit Version:** 1.1
+**Audit Version:** 1.2
 **Auditor:** Claude Code Architecture Analysis
 **Status:** COMPLETE
 
@@ -590,6 +590,303 @@ symbolu/mechanical/pipeline/p15_interaction/
 | Formula/Consciousness | 3 | 2 | 3 | 3 |
 | Advanced Pipeline | 0 | 2 | 9 | 9 |
 | **Total** | **23** | **6** | **14** | **12** |
+
+---
+
+## Appendix C: LLM Integration Proposal Analysis
+
+### Overview
+
+This section analyzes external recommendations for LLM integration contracts and provides Symbol-U-aligned counter-recommendations.
+
+---
+
+### Proposal 1: LLM Adapter Contract
+
+#### External Recommendation Summary
+
+An `PHASE_LLM_ADAPTER_CONTRACT.md` that:
+- Translates SurfacePlan (P14) + minimal context into LLM requests
+- Returns candidate text + trace for P12 validation
+- Enforces determinism, non-selection, no semantics injection
+- Produces `LLMRequestEnvelope` + `LLMAdapterTrace`
+
+#### Analysis
+
+| Aspect | Assessment | Notes |
+|--------|------------|-------|
+| **Determinism requirement** | ✓ Aligned | Matches Symbol-U zero-LLM guarantee philosophy |
+| **Trace completeness** | ✓ Good | Enables P12 post-validation |
+| **"No Selection" invariant** | ⚠️ Imprecise | References "Phase-7 scores/ranks" but P7 is discourse act selection, not ranking |
+| **Authority model** | ❌ Missing | No mention of Symbol-U's three-tier authority (FULL/AUTHORITATIVE/ZERO) |
+| **Boundary semantics** | ❌ Missing | Should enforce witness_only/observer_only at adapter level |
+| **Failure modes** | ✓ Good | Covers key failure cases |
+
+#### Claude Recommendation
+
+```
+PHASE_LLM_ADAPTER_CONTRACT.md should be restructured to:
+
+1. AUTHORITY ALIGNMENT
+   - Adapter operates at ZERO authority (non-actuating)
+   - Cannot mutate upstream context
+   - Cannot block, redirect, or alter governance decisions
+   - Produces LLMAdapterTrace (read-only, witness semantics)
+
+2. INPUT BOUNDARY ENFORCEMENT
+   - Explicit allowlist of consumed context attributes
+   - Type-level enforcement: adapter receives ImmutableSurfacePlan
+   - Hash upstream inputs for audit trail
+
+3. OUTPUT BOUNDARY ENFORCEMENT
+   - CandidateText is UNTRUSTED until P12 validation
+   - Adapter must NOT post-process LLM output
+   - All outputs flow to P12 for gating decision
+
+4. INVARIANTS (Symbol-U aligned)
+   - INV-ADAPTER-1: Adapter is deterministic (same inputs → same request)
+   - INV-ADAPTER-2: Adapter is non-actuating (cannot modify pipeline state)
+   - INV-ADAPTER-3: Adapter preserves authority bounds (respects upstream decisions)
+   - INV-ADAPTER-4: Adapter traces are immutable and hashable
+   - INV-ADAPTER-5: No forbidden token leakage (adapter cannot bypass P14 constraints)
+
+5. MISSING FROM EXTERNAL PROPOSAL
+   - Integration with P13 (Safety Envelope) - adapter should validate
+     request stays within safety bounds BEFORE sending to LLM
+   - Regime-aware request shaping (P6 regime affects prompt framing)
+   - Discourse-act alignment (P7 discourse constrains response type)
+```
+
+---
+
+### Proposal 2: SurfacePlan → System Prompt Compiler
+
+#### External Recommendation Summary
+
+A `surfaceplan_prompt_compiler.py` that:
+- Deterministically compiles SurfacePlan into system prompts
+- Maps style/punctuation/hedging/length/forbidden_tokens
+- Uses canonical template with `[CONSTRAINT_UNSATISFIABLE]` fallback
+
+#### Analysis
+
+| Aspect | Assessment | Notes |
+|--------|------------|-------|
+| **Deterministic compilation** | ✓ Good | Essential for reproducibility |
+| **Policy mappings** | ⚠️ Incomplete | Missing PersonaSignalPolicy from P14 |
+| **Template approach** | ✓ Good | Structured, auditable |
+| **CONSTRAINT_UNSATISFIABLE output** | ❌ Problematic | Leaks internal state to LLM output; should be handled pre-generation |
+| **Hash-based trace** | ✓ Good | Enables P12 validation |
+| **Test cases** | ✓ Good | Covers key determinism tests |
+
+#### Claude Recommendation
+
+```
+SURFACEPLAN_PROMPT_COMPILER_SPEC.md should be enhanced:
+
+1. COMPLETE POLICY MAPPINGS
+   Add missing PersonaSignalPolicy:
+   - NONE → "Do not signal persona traits."
+   - SUBTLE → "Persona may be implied but not stated."
+   - STANDARD → "Persona traits may be expressed naturally."
+
+2. PRE-GENERATION CONSTRAINT VALIDATION
+   Replace [CONSTRAINT_UNSATISFIABLE] with:
+   - Compiler validates constraints are satisfiable BEFORE generating prompt
+   - If unsatisfiable → return CompilerError, do NOT proceed to LLM
+   - Example: ONE_SENTENCE + requires_question + HEDGING_REQUIRED may conflict
+
+3. P13 SAFETY INTEGRATION
+   Compiler should consume P13SafetyEnvelope and embed:
+   - Maximum acoustic intensity bounds
+   - Forbidden emotional amplification flags
+   - Certainty suppression requirements
+   These become additional system prompt constraints.
+
+4. REGIME-AWARE FRAMING
+   If P6 regime is available, compiler should adjust framing:
+   - HOLD → "Respond minimally. Avoid new commitments."
+   - CLARIFY → "Ask clarifying questions. Do not assume."
+   - INFORM → "Provide factual information only."
+   - REFLECT → "Mirror user's concern. Do not advise."
+
+5. CANONICAL TEMPLATE (revised)
+   ```
+   You are a constrained surface realizer operating under Symbol-U governance.
+
+   REGIME: <regime_label>
+   DISCOURSE: <discourse_act>
+
+   HARD CONSTRAINTS (violation = rejection):
+   - STYLE: <style_rule>
+   - LENGTH: <length_rule>
+   - PUNCTUATION: <punct_rule>
+   - HEDGING: <hedge_rule>
+   - QUESTION_REQUIRED: <true/false>
+   - PERSONA_SIGNAL: <persona_rule>
+
+   FORBIDDEN TOKENS (case-insensitive):
+   <sorted_token_list>
+
+   SAFETY BOUNDS (from P13):
+   - Max emotional intensity: <bound>
+   - Certainty allowed: <true/false>
+   - Emphasis allowed: <true/false>
+
+   OUTPUT RULES:
+   - Comply with ALL constraints above.
+   - Do not explain or reference constraints.
+   - Do not add content beyond user request.
+   ```
+
+6. COMPILER INVARIANTS
+   - INV-COMPILER-1: Deterministic (same SurfacePlan → identical prompt bytes)
+   - INV-COMPILER-2: Stable ordering (forbidden tokens sorted alphabetically)
+   - INV-COMPILER-3: Complete (all SurfacePlan fields mapped to prompt lines)
+   - INV-COMPILER-4: Bounded (prompt length < MAX_PROMPT_TOKENS)
+   - INV-COMPILER-5: Traceable (compiler emits hash of all inputs + output)
+```
+
+---
+
+### Proposal 3: P6-P7 Minimal Activation Plan
+
+#### External Recommendation Summary
+
+Activate P6 (Regime) + P7 (Discourse) first:
+- Keep P8 (Semantics) + P9 (Lexical) dormant initially
+- Feature flags: ENABLE_P6, ENABLE_P7, ENABLE_P14, ENABLE_P12
+- Fail-safe defaults: P6 errors → HOLD, P7 errors → DEFERRAL
+
+#### Analysis
+
+| Aspect | Assessment | Notes |
+|--------|------------|-------|
+| **P6+P7 first** | ✓ Sound | Minimal upstream governance for P14 meaningfulness |
+| **P8+P9 dormant** | ✓ Reasonable | Avoids semantic slot complexity initially |
+| **Feature flags** | ✓ Good | Gradual rollout capability |
+| **Fail-safe defaults** | ⚠️ Incomplete | Should specify authority preservation |
+| **P10 consideration** | ❌ Missing | P10 (Acoustic) bridges governance to P11b/P12/P13 |
+| **P11b integration** | ❌ Missing | Canonical P11b should be part of activation path |
+| **Test requirements** | ✓ Good | Covers key scenarios |
+
+#### Claude Recommendation
+
+```
+P6_P7_MINIMAL_ACTIVATION_PLAN.md should be revised:
+
+1. ACTIVATION SEQUENCE (recommended)
+
+   Phase 1 (Core Governance):
+   ├── P6 (Regime Selection) - ACTIVATE
+   └── P7 (Discourse Act) - ACTIVATE
+
+   Phase 2 (Acoustic Bridge):
+   ├── P10 (Acoustic Parameterization) - ACTIVATE
+   └── P11b (PPV Banding Controller) - ACTIVATE (canonical)
+
+   Phase 3 (Validation Layer):
+   ├── P12 (Consistency Validator) - ACTIVATE
+   ├── P13 (Acoustic Safety) - ACTIVATE
+   └── P14 (Surface Realizer) - ACTIVATE
+
+   Phase 4 (Semantic Depth - deferred):
+   ├── P8 (Semantic Slots) - KEEP DORMANT
+   └── P9 (Lexical Selection) - KEEP DORMANT
+
+   Rationale: P10/P11b provide acoustic context that P12/P13/P14 need
+   to produce meaningful constraints. Without P10, SurfacePlan lacks
+   acoustic grounding.
+
+2. AUTHORITY PRESERVATION INVARIANTS
+   - If P6 fails → regime = HOLD (minimum authority, maximum safety)
+   - If P7 fails → discourse_act = DEFERRAL (no commitment)
+   - If P10 fails → acoustic = SUPPRESSED_ALL (no intensity)
+   - If P11b fails → prosodic = NEUTRAL (no prosodic features)
+   - If P14 fails → surface_plan = DEFERRAL_MINIMAL (one clarifying question)
+
+   Key: Failures always reduce authority, never increase it.
+
+3. FEATURE FLAGS (expanded)
+   ```yaml
+   phase_activation:
+     # Phase 1
+     ENABLE_P6: true
+     ENABLE_P7: true
+     # Phase 2
+     ENABLE_P10: true
+     ENABLE_P11B: true
+     # Phase 3
+     ENABLE_P12: true
+     ENABLE_P13: true
+     ENABLE_P14: true
+     # Phase 4 (deferred)
+     ENABLE_P8: false
+     ENABLE_P9: false
+     # LLM Integration
+     ENABLE_LLM_ADAPTER: false  # Requires P12+P14 stable first
+   ```
+
+4. ORCHESTRATOR WIRING (revised)
+   ```
+   PO1 → PO2 → PO3 → PO4 → PO5 (existing, active)
+        ↓
+   maybe_run_p6(ctx)  → ctx.regime
+        ↓
+   maybe_run_p7(ctx)  → ctx.discourse_act
+        ↓
+   maybe_run_p10(ctx) → ctx.p10_acoustic
+        ↓
+   maybe_run_p11b(ctx) → ctx.p11_prosodic (canonical)
+        ↓
+   maybe_run_p13(ctx) → ctx.p13_safety_envelope
+        ↓
+   maybe_run_p14(ctx) → ctx.p14_surface_plan
+        ↓
+   [LLM ADAPTER - future] → candidate_text
+        ↓
+   maybe_run_p12(ctx) → ctx.p12_consistency_report
+        ↓
+   gating_decision(ctx) → ACCEPT / REJECT / FALLBACK
+   ```
+
+5. INTEGRATION TESTS (minimum set)
+   - test_p6_hold_propagates_to_p14_minimal_style
+   - test_p7_deferral_forces_question_required
+   - test_p10_suppression_bounds_p13_safety
+   - test_p11b_neutral_preserves_acoustic_bounds
+   - test_p12_violation_triggers_gating_reject
+   - test_p14_surfaceplan_deterministic
+   - test_end_to_end_governance_chain
+   - test_failure_cascade_reduces_authority
+   - test_existing_p27_p31_unaffected
+
+6. ROLLBACK PLAN
+   - Each phase has independent feature flag
+   - Rollback order: P14 → P13 → P12 → P11b → P10 → P7 → P6
+   - Rollback trigger: >1% of requests hitting unexpected failure mode
+   - Monitoring: P12 violation rate, gating rejection rate, latency P95
+```
+
+---
+
+### Summary: Claude vs External Recommendations
+
+| Deliverable | External Approach | Claude Recommendation |
+|-------------|-------------------|----------------------|
+| **LLM Adapter** | Deterministic, trace-complete | Add authority model, boundary enforcement, P13 integration |
+| **Prompt Compiler** | Template-based, hash-traced | Add PersonaSignalPolicy, pre-validation, regime framing, P13 bounds |
+| **Activation Plan** | P6+P7 first, flags | Add P10/P11b to initial slice, explicit authority preservation, expanded test matrix |
+
+### Key Divergences
+
+1. **Authority Model**: External proposals don't address Symbol-U's three-tier authority system. All contracts should explicitly state their authority level (FULL/AUTHORITATIVE/ZERO).
+
+2. **P10/P11b Inclusion**: Activating P6+P7 without P10/P11b leaves P12/P13/P14 without acoustic context. The "minimal slice" should include the acoustic bridge.
+
+3. **Pre-Validation vs Post-Fallback**: External proposals use `[CONSTRAINT_UNSATISFIABLE]` as LLM output. Symbol-U principle: validate BEFORE generation, not after.
+
+4. **Boundary Semantics**: Symbol-U's `witness_only`/`observer_only` patterns should extend to the LLM adapter layer.
 
 ---
 
