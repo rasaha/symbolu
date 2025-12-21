@@ -33,6 +33,8 @@ phases:
     - P29   # p29_expression - Expression finalization
     - P30   # p30_verification - Output verification
     - P31   # p31_envelope - Output envelope
+    - P34   # p34_identity_harmonics - Identity Harmonics (Observer Band)
+    - P37   # p37_continuity - Adaptive Continuity Engine (Predictive Band)
 
   # Dormant phases - implemented but not called from orchestrator
   dormant:
@@ -85,9 +87,7 @@ phases:
     - P54   # p54_audit_trace
 
   # Missing phases - referenced in code but not implemented
-  missing:
-    - P34   # Referenced by P35, P36 - Identity Harmonics
-    - P37   # Referenced by formulas - Narrative Continuity
+  missing: []  # All previously missing phases (P34, P37) now implemented
 
   # Archived phases - moved to restoration/experiments/deprecated_phases/
   archived:
@@ -102,10 +102,10 @@ phases:
 
 # Phase counts summary
 summary:
-  total_implemented: 52
-  active: 10
+  total_implemented: 54  # Added P34, P37
+  active: 12  # Added P34, P37
   dormant: 39  # Reduced by 3 archived
-  missing: 2
+  missing: 0  # P34, P37 now implemented
   archived: 3
 
 # Archive locations

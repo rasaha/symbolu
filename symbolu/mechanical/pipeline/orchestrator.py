@@ -109,6 +109,19 @@ def _get_p31():
     return maybe_run_p31
 
 
+# Advanced pipeline phases (P34, P37) - lazy loaded via @lru_cache
+@lru_cache(maxsize=1)
+def _get_p34():
+    from .p34_identity_harmonics import maybe_run_p34
+    return maybe_run_p34
+
+
+@lru_cache(maxsize=1)
+def _get_p37():
+    from .p37_continuity import maybe_run_p37
+    return maybe_run_p37
+
+
 # Processing modules - lazy loaded via @lru_cache
 @lru_cache(maxsize=1)
 def _get_coherence_observer():
@@ -547,6 +560,23 @@ class SymbolUPipeline:
             # P27 phase is optional - continue if it fails
             pass
 
+        # =======================================================================
+        # P34 Identity Harmonics Layer (Observer Band)
+        # Computes identity coherence metrics from persona + consciousness signals
+        # Authority: OBSERVER (read-only analytics, non-actuating)
+        # =======================================================================
+        try:
+            maybe_run_p34 = _get_p34()
+            p34_output = maybe_run_p34(ctx)
+            if p34_output:
+                ctx.p34_identity_harmonics = p34_output
+                # Store identity stability score for downstream phases
+                ctx.persona.persona_config["identity_harmonics_index"] = p34_output.identity_harmonics_index
+                ctx.persona.persona_config["identity_stable"] = p34_output.is_identity_stable()
+        except Exception:
+            # P34 phase is optional - continue if it fails
+            pass
+
         return ctx
 
     def _run_fusion(self, ctx: PipelineContext) -> PipelineContext:
@@ -698,6 +728,24 @@ class SymbolUPipeline:
                 ctx.dha.adaptation_notes["p28_safety_status"] = p28_output.safety_result.status.value
         except Exception:
             # P28 phase is optional - continue if it fails
+            pass
+
+        # =======================================================================
+        # P37 Adaptive Continuity Engine (Predictive Band)
+        # Computes narrative + identity continuity from P34 + upstream signals
+        # Authority: PREDICTIVE (analytics only, non-actuating)
+        # =======================================================================
+        try:
+            maybe_run_p37 = _get_p37()
+            p37_output = maybe_run_p37(ctx)
+            if p37_output:
+                ctx.p37_continuity = p37_output
+                # Store continuity metrics for downstream phases
+                ctx.dha.adaptation_notes["continuity_band"] = p37_output.continuity_band.value
+                ctx.dha.adaptation_notes["narrative_continuity"] = p37_output.ncc
+                ctx.dha.adaptation_notes["identity_continuity"] = p37_output.icc
+        except Exception:
+            # P37 phase is optional - continue if it fails
             pass
 
         return ctx

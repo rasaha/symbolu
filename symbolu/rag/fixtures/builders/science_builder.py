@@ -266,7 +266,7 @@ Heisenberg's Uncertainty Principle states that certain pairs of properties, like
 
 The Schrödinger equation describes how the quantum state (wave function) of a system evolves over time. The wave function gives probability amplitudes; its square gives the probability of finding a particle in a particular state or location.
 
-Quantum superposition allows particles to exist in multiple states simultaneously until measured. The famous thought experiment of Schrödinger's cat illustrates the strange implications. Entanglement links particles such that measuring one instantly affects the other, regardless of distance—what Einstein called "spooky action at a distance."""",
+Quantum superposition allows particles to exist in multiple states simultaneously until measured. The famous thought experiment of Schrödinger's cat illustrates the strange implications. Entanglement links particles such that measuring one instantly affects the other, regardless of distance—what Einstein called 'spooky action at a distance.'""",
             metadata={"domain": "physics", "tags": ["quantum-mechanics", "wave-particle", "uncertainty", "superposition"], "difficulty": "advanced", "focus": "modern-physics"}
         ))
 
@@ -750,7 +750,7 @@ Three main observations support the Big Bang. First, Edwin Hubble's 1929 discove
 
 Dark matter and dark energy shape cosmic evolution. Dark matter's gravity helps galaxies form and hold together. Dark energy, discovered in 1998 through supernova observations, drives accelerating expansion. Together, they comprise about 95% of the universe's content.
 
-The universe's fate depends on its total density. Current evidence suggests it will expand forever, with galaxies eventually receding beyond our observable horizon. In the distant future, stars will burn out, black holes will evaporate, and the universe may approach a cold, diffuse "heat death."""",
+The universe's fate depends on its total density. Current evidence suggests it will expand forever, with galaxies eventually receding beyond our observable horizon. In the distant future, stars will burn out, black holes will evaporate, and the universe may approach a cold, diffuse 'heat death.'""",
             metadata={"domain": "astronomy", "tags": ["big-bang", "cosmology", "universe", "cmb"], "difficulty": "intermediate", "focus": "astronomy"}
         ))
 
