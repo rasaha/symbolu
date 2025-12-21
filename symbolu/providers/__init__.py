@@ -60,6 +60,8 @@ def get_embedding_provider(
     Args:
         mode: Provider mode - "enterprise" or "consumer"
         config: Optional provider-specific configuration
+            For consumer mode:
+                - model_path: Path to trained embedding model
 
     Returns:
         EmbeddingProvider instance for the mode
@@ -74,6 +76,10 @@ def get_embedding_provider(
         >>> vec = provider.embed("hello world")
         >>> len(vec)
         768
+
+        >>> provider = get_embedding_provider("consumer", {"model_path": "model.json"})
+        >>> provider.is_model_loaded()
+        True
     """
     config = config or {}
 
@@ -84,7 +90,8 @@ def get_embedding_provider(
         from symbolu.providers.consumer.learned_embedding import (
             LearnedEmbeddingProvider,
         )
-        return LearnedEmbeddingProvider()
+        model_path = config.get("model_path")
+        return LearnedEmbeddingProvider(model_path=model_path)
     else:
         raise ValueError(f"Invalid mode: {mode}. Must be 'enterprise' or 'consumer'")
 
@@ -92,6 +99,7 @@ def get_embedding_provider(
 def get_router_provider(
     mode: Literal["enterprise", "consumer"],
     config: Optional[Dict[str, Any]] = None,
+    embedding_provider: Optional[EmbeddingProvider] = None,
 ) -> RouterProvider:
     """
     Get a router provider for the specified mode.
@@ -99,6 +107,11 @@ def get_router_provider(
     Args:
         mode: Provider mode - "enterprise" or "consumer"
         config: Optional provider-specific configuration
+            For enterprise mode:
+                - confidence_threshold: Routing confidence threshold
+            For consumer mode:
+                - model_path: Path to trained router model
+        embedding_provider: Optional embedding provider (for consumer mode)
 
     Returns:
         RouterProvider instance for the mode
@@ -107,12 +120,16 @@ def get_router_provider(
         >>> provider = get_router_provider("enterprise")
         >>> decision = provider.route("How do atoms bond?")
         >>> decision.model_type
-        ModelType.REASONING
+        ModelType.LOGIC
 
         >>> provider = get_router_provider("consumer")
         >>> decision = provider.route("How do atoms bond?")
         >>> decision.model_type
-        ModelType.GENERAL  # Stub returns GENERAL
+        ModelType.GENERAL  # Fallback when no model loaded
+
+        >>> provider = get_router_provider("consumer", {"model_path": "router.json"})
+        >>> provider.is_model_loaded()
+        True
     """
     config = config or {}
 
@@ -123,7 +140,11 @@ def get_router_provider(
         )
     elif mode == "consumer":
         from symbolu.providers.consumer.trained_router import TrainedRouterProvider
-        return TrainedRouterProvider()
+        from symbolu.providers.consumer.learned_embedding import LearnedEmbeddingProvider
+        model_path = config.get("model_path")
+        # Use provided embedder or create default
+        embedder = embedding_provider if isinstance(embedding_provider, LearnedEmbeddingProvider) else None
+        return TrainedRouterProvider(model_path=model_path, embedder=embedder)
     else:
         raise ValueError(f"Invalid mode: {mode}. Must be 'enterprise' or 'consumer'")
 

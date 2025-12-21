@@ -1,20 +1,22 @@
 """
-Learned Embedding Provider (Consumer) - STUB
-=============================================
+Learned Embedding Provider (Consumer)
+=====================================
 
-Placeholder for pre-trained embedding provider.
-Currently returns deterministic pseudo-random 768D vectors.
-Will be replaced with actual trained model in Phase 4-5.
+Consumer embedding provider using trained models.
+Supports loading trained embedding models from Phase 4.
+Falls back to hash-based embeddings if no model is loaded.
 
-Future Implementation:
-- Sentence-BERT (distilbert-base) or similar
-- 768D embeddings
-- Trained on contrastive loss with paraphrase data
+Trained Model:
+- Uses contrastive learning on paraphrase pairs
+- 768D embeddings (configurable)
+- Can be trained using symbolu.training.trainers.EmbeddingTrainer
 """
 
 import hashlib
+import json
 import math
-from typing import List
+from pathlib import Path
+from typing import List, Optional
 
 from symbolu.providers.interfaces.embedding_provider import EmbeddingProvider
 
@@ -25,45 +27,92 @@ CONSUMER_EMBEDDING_DIM = 768
 
 class LearnedEmbeddingProvider(EmbeddingProvider):
     """
-    Consumer embedding provider using pre-trained embeddings.
+    Consumer embedding provider using trained embeddings.
 
-    STUB IMPLEMENTATION:
-    Currently produces deterministic pseudo-random 768D vectors
-    based on text hashing. This ensures reproducibility for testing.
-
-    Future implementation will use a trained sentence transformer.
+    Can operate in two modes:
+    1. Trained mode: Uses a loaded model for embeddings
+    2. Fallback mode: Uses hash-based embeddings (for testing)
 
     Attributes:
-        dimension: The embedding dimension (768)
+        dimension: The embedding dimension (768 by default)
+        model_path: Path to loaded model (if any)
     """
 
-    def __init__(self):
-        """Initialize the learned embedding provider."""
+    def __init__(self, model_path: Optional[str] = None):
+        """
+        Initialize the learned embedding provider.
+
+        Args:
+            model_path: Optional path to trained model checkpoint
+        """
         self._dimension = CONSUMER_EMBEDDING_DIM
+        self._model_path: Optional[str] = None
+        self._weights: Optional[List[List[float]]] = None
+        self._bias: Optional[List[float]] = None
+        self._vocab_cache: dict = {}
+
+        if model_path:
+            self.load_model(model_path)
+
+    def load_model(self, model_path: str) -> None:
+        """
+        Load a trained embedding model.
+
+        Args:
+            model_path: Path to the model checkpoint (JSON format)
+
+        Raises:
+            FileNotFoundError: If model file doesn't exist
+            ValueError: If model format is invalid
+        """
+        path = Path(model_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Model not found: {model_path}")
+
+        with open(path, "r") as f:
+            data = json.load(f)
+
+        # Validate model format
+        if "weights" not in data or "bias" not in data:
+            raise ValueError("Invalid model format: missing weights or bias")
+
+        self._weights = data["weights"]
+        self._bias = data["bias"]
+        self._dimension = data.get("config", {}).get("dimension", len(self._bias))
+        self._model_path = model_path
+        self._vocab_cache.clear()
+
+    def is_model_loaded(self) -> bool:
+        """Check if a trained model is loaded."""
+        return self._weights is not None and self._bias is not None
 
     def embed(self, text: str) -> List[float]:
         """
-        Convert text to a 768D embedding vector.
+        Convert text to an embedding vector.
 
-        STUB: Uses deterministic hash-based pseudo-random generation.
-        Future: Will use pre-trained sentence transformer.
+        If a trained model is loaded, uses the learned transformation.
+        Otherwise, falls back to hash-based embeddings.
 
         Args:
             text: Input text string
 
         Returns:
-            List of floats (normalized 768D embedding vector)
+            List of floats (normalized embedding vector)
         """
         if not text or not text.strip():
             return [0.0] * self._dimension
 
-        # Generate deterministic pseudo-random embedding based on text hash
-        embedding = self._hash_to_vector(text)
+        # Get base embedding
+        base = self._get_base_embedding(text)
+
+        # Apply learned transformation if model is loaded
+        if self.is_model_loaded():
+            transformed = self._apply_transformation(base)
+        else:
+            transformed = base
 
         # Normalize to unit vector
-        embedding = self._normalize(embedding)
-
-        return embedding
+        return self._normalize(transformed)
 
     def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """
@@ -73,7 +122,7 @@ class LearnedEmbeddingProvider(EmbeddingProvider):
             texts: List of text strings
 
         Returns:
-            List of 768D embedding vectors (one per text)
+            List of embedding vectors (one per text)
         """
         return [self.embed(text) for text in texts]
 
@@ -82,16 +131,16 @@ class LearnedEmbeddingProvider(EmbeddingProvider):
         Return the embedding dimension.
 
         Returns:
-            768 (pre-trained embedding dimension)
+            Embedding dimension (768 by default)
         """
         return self._dimension
 
-    def _hash_to_vector(self, text: str) -> List[float]:
+    def _get_base_embedding(self, text: str) -> List[float]:
         """
-        Generate a deterministic pseudo-random vector from text.
+        Generate base embedding using hash function.
 
-        Uses SHA-256 to generate enough bytes for 768 dimensions.
-        This is a placeholder until we have a trained model.
+        This is the input to the learned transformation.
+        Uses caching for efficiency.
 
         Args:
             text: Input text
@@ -99,26 +148,47 @@ class LearnedEmbeddingProvider(EmbeddingProvider):
         Returns:
             List of floats (un-normalized)
         """
-        # We need 768 floats
-        # Each SHA-256 hash gives 32 bytes = 8 floats (4 bytes each)
-        # So we need 768/8 = 96 hashes
+        cache_key = text.lower().strip()
+        if cache_key in self._vocab_cache:
+            return self._vocab_cache[cache_key]
+
         vectors = []
-        num_hashes_needed = (self._dimension + 7) // 8  # Ceiling division
+        num_hashes_needed = (self._dimension + 7) // 8
 
         for i in range(num_hashes_needed):
-            seed = f"{text}_{i}"
+            seed = f"{cache_key}_{i}"
             hash_bytes = hashlib.sha256(seed.encode("utf-8")).digest()
-            # Convert each 4 bytes to a float between -1 and 1
             for j in range(0, len(hash_bytes), 4):
-                chunk = hash_bytes[j : j + 4]
+                chunk = hash_bytes[j:j + 4]
                 value = int.from_bytes(chunk, byteorder="big", signed=True)
-                # Normalize to [-1, 1]
                 normalized = value / (2**31)
                 vectors.append(normalized)
                 if len(vectors) >= self._dimension:
-                    return vectors[:self._dimension]
+                    break
+            if len(vectors) >= self._dimension:
+                break
 
-        return vectors[:self._dimension]
+        result = vectors[:self._dimension]
+        self._vocab_cache[cache_key] = result
+        return result
+
+    def _apply_transformation(self, base: List[float]) -> List[float]:
+        """
+        Apply learned transformation matrix to base embedding.
+
+        Args:
+            base: Base embedding vector
+
+        Returns:
+            Transformed embedding vector
+        """
+        result = []
+        for i in range(self._dimension):
+            val = self._bias[i]
+            for j in range(self._dimension):
+                val += self._weights[i][j] * base[j]
+            result.append(val)
+        return result
 
     def _normalize(self, vector: List[float]) -> List[float]:
         """
@@ -131,6 +201,6 @@ class LearnedEmbeddingProvider(EmbeddingProvider):
             Normalized vector (unit length)
         """
         norm = math.sqrt(sum(x * x for x in vector))
-        if norm == 0:
+        if norm < 1e-10:
             return vector
         return [x / norm for x in vector]
