@@ -1,0 +1,434 @@
+{
+  "enterprise_search": [
+    {
+      "tier": "enterprise_search",
+      "use_case": "customer_support",
+      "total_queries": 8,
+      "correct": 4,
+      "accuracy": 50.0,
+      "avg_latency_ms": 0.13868712499842673,
+      "min_latency_ms": 0.0796219999870118,
+      "max_latency_ms": 0.3664369999967221,
+      "by_intent": {
+        "action": {
+          "correct": 1,
+          "total": 3
+        },
+        "reasoning": {
+          "correct": 2,
+          "total": 3
+        },
+        "relationship": {
+          "correct": 1,
+          "total": 2
+        }
+      }
+    },
+    {
+      "tier": "enterprise_search",
+      "use_case": "developer_assistant",
+      "total_queries": 8,
+      "correct": 6,
+      "accuracy": 75.0,
+      "avg_latency_ms": 0.15284600000242676,
+      "min_latency_ms": 0.11333200001217847,
+      "max_latency_ms": 0.23802000001182932,
+      "by_intent": {
+        "action": {
+          "correct": 3,
+          "total": 3
+        },
+        "reasoning": {
+          "correct": 2,
+          "total": 3
+        },
+        "creative": {
+          "correct": 1,
+          "total": 2
+        }
+      }
+    },
+    {
+      "tier": "enterprise_search",
+      "use_case": "creative_writing",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.1760663749941216,
+      "min_latency_ms": 0.1289909999968586,
+      "max_latency_ms": 0.24146999999175023,
+      "by_intent": {
+        "creative": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "enterprise_search",
+      "use_case": "emotional_support",
+      "total_queries": 8,
+      "correct": 6,
+      "accuracy": 75.0,
+      "avg_latency_ms": 0.13013450000443072,
+      "min_latency_ms": 0.0730419999968035,
+      "max_latency_ms": 0.23338100001524253,
+      "by_intent": {
+        "relationship": {
+          "correct": 6,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "enterprise_search",
+      "use_case": "philosophical_inquiry",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.0878751250041887,
+      "min_latency_ms": 0.035066999998889514,
+      "max_latency_ms": 0.2257360000044173,
+      "by_intent": {
+        "reflective": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "enterprise_search",
+      "use_case": "technical_analysis",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.11506737499544784,
+      "min_latency_ms": 0.07547399999907611,
+      "max_latency_ms": 0.1328259999979764,
+      "by_intent": {
+        "reasoning": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    }
+  ],
+  "enterprise_chat": [
+    {
+      "tier": "enterprise_chat",
+      "use_case": "customer_support",
+      "total_queries": 8,
+      "correct": 4,
+      "accuracy": 50.0,
+      "avg_latency_ms": 0.10149487500044074,
+      "min_latency_ms": 0.0758919999839236,
+      "max_latency_ms": 0.1362710000023526,
+      "by_intent": {
+        "action": {
+          "correct": 1,
+          "total": 3
+        },
+        "reasoning": {
+          "correct": 2,
+          "total": 3
+        },
+        "relationship": {
+          "correct": 1,
+          "total": 2
+        }
+      }
+    },
+    {
+      "tier": "enterprise_chat",
+      "use_case": "developer_assistant",
+      "total_queries": 8,
+      "correct": 6,
+      "accuracy": 75.0,
+      "avg_latency_ms": 0.14825074999791354,
+      "min_latency_ms": 0.1098999999840089,
+      "max_latency_ms": 0.2254249999964486,
+      "by_intent": {
+        "action": {
+          "correct": 3,
+          "total": 3
+        },
+        "reasoning": {
+          "correct": 2,
+          "total": 3
+        },
+        "creative": {
+          "correct": 1,
+          "total": 2
+        }
+      }
+    },
+    {
+      "tier": "enterprise_chat",
+      "use_case": "creative_writing",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.16704737499750877,
+      "min_latency_ms": 0.1300110000101995,
+      "max_latency_ms": 0.2311559999839119,
+      "by_intent": {
+        "creative": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "enterprise_chat",
+      "use_case": "emotional_support",
+      "total_queries": 8,
+      "correct": 6,
+      "accuracy": 75.0,
+      "avg_latency_ms": 0.12857250000308795,
+      "min_latency_ms": 0.07106600000383878,
+      "max_latency_ms": 0.22124599999528982,
+      "by_intent": {
+        "relationship": {
+          "correct": 6,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "enterprise_chat",
+      "use_case": "philosophical_inquiry",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.08692862499515286,
+      "min_latency_ms": 0.03516199998898628,
+      "max_latency_ms": 0.22398799998768482,
+      "by_intent": {
+        "reflective": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "enterprise_chat",
+      "use_case": "technical_analysis",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.11522187499934944,
+      "min_latency_ms": 0.07542200000898447,
+      "max_latency_ms": 0.13999499998362808,
+      "by_intent": {
+        "reasoning": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    }
+  ],
+  "consumer": [
+    {
+      "tier": "consumer",
+      "use_case": "customer_support",
+      "total_queries": 8,
+      "correct": 4,
+      "accuracy": 50.0,
+      "avg_latency_ms": 0.6922847499986062,
+      "min_latency_ms": 0.11999700001297242,
+      "max_latency_ms": 4.528841999984934,
+      "by_intent": {
+        "action": {
+          "correct": 1,
+          "total": 3
+        },
+        "reasoning": {
+          "correct": 2,
+          "total": 3
+        },
+        "relationship": {
+          "correct": 1,
+          "total": 2
+        }
+      }
+    },
+    {
+      "tier": "consumer",
+      "use_case": "developer_assistant",
+      "total_queries": 8,
+      "correct": 6,
+      "accuracy": 75.0,
+      "avg_latency_ms": 0.18913362499972663,
+      "min_latency_ms": 0.15576699999542143,
+      "max_latency_ms": 0.2720159999967109,
+      "by_intent": {
+        "action": {
+          "correct": 3,
+          "total": 3
+        },
+        "reasoning": {
+          "correct": 2,
+          "total": 3
+        },
+        "creative": {
+          "correct": 1,
+          "total": 2
+        }
+      }
+    },
+    {
+      "tier": "consumer",
+      "use_case": "creative_writing",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.20704087500433843,
+      "min_latency_ms": 0.16580299998736336,
+      "max_latency_ms": 0.27523600002155035,
+      "by_intent": {
+        "creative": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "consumer",
+      "use_case": "emotional_support",
+      "total_queries": 8,
+      "correct": 6,
+      "accuracy": 75.0,
+      "avg_latency_ms": 0.16897287499517688,
+      "min_latency_ms": 0.11035299999662129,
+      "max_latency_ms": 0.2685799999824212,
+      "by_intent": {
+        "relationship": {
+          "correct": 6,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "consumer",
+      "use_case": "philosophical_inquiry",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.12631787499728375,
+      "min_latency_ms": 0.0715989999946487,
+      "max_latency_ms": 0.2689599999996517,
+      "by_intent": {
+        "reflective": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "consumer",
+      "use_case": "technical_analysis",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.15319950000503013,
+      "min_latency_ms": 0.1132000000154676,
+      "max_latency_ms": 0.17722299998013114,
+      "by_intent": {
+        "reasoning": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    }
+  ],
+  "cascade_test": {
+    "total": 8,
+    "skipped_768d": 0,
+    "used_768d": 8,
+    "used_7b": 3,
+    "used_175b": 5,
+    "queries": [
+      {
+        "query": "Write a simple poem",
+        "intent": "creative",
+        "confidence": "75%",
+        "used_768d": true,
+        "model": "general-175b"
+      },
+      {
+        "query": "Deploy the app",
+        "intent": "action",
+        "confidence": "87%",
+        "used_768d": true,
+        "model": "action-7b"
+      },
+      {
+        "query": "Explain quantum mechanics in detail",
+        "intent": "reasoning",
+        "confidence": "70%",
+        "used_768d": true,
+        "model": "general-175b"
+      },
+      {
+        "query": "I'm feeling sad",
+        "intent": "relationship",
+        "confidence": "89%",
+        "used_768d": true,
+        "model": "relationship-7b"
+      },
+      {
+        "query": "What is consciousness?",
+        "intent": "reasoning",
+        "confidence": "71%",
+        "used_768d": true,
+        "model": "general-175b"
+      },
+      {
+        "query": "Run the tests",
+        "intent": "action",
+        "confidence": "75%",
+        "used_768d": true,
+        "model": "general-175b"
+      },
+      {
+        "query": "Analyze the socioeconomic implications of AI on la",
+        "intent": "reasoning",
+        "confidence": "65%",
+        "used_768d": true,
+        "model": "general-175b"
+      },
+      {
+        "query": "Create a logo",
+        "intent": "creative",
+        "confidence": "85%",
+        "used_768d": true,
+        "model": "creative-7b"
+      }
+    ],
+    "768d_skip_rate": "0%",
+    "7b_usage_rate": "38%"
+  },
+  "search_test": [
+    {
+      "query": "machine learning algorithms",
+      "top_result": "Neural Network Fundamentals",
+      "expected": "Statistical Machine Learning",
+      "correct": false,
+      "latency_ms": "2.48"
+    },
+    {
+      "query": "emotional well-being",
+      "top_result": "Mental Health Awareness",
+      "expected": "Mental Health Awareness",
+      "correct": true,
+      "latency_ms": "1.55"
+    },
+    {
+      "query": "software deployment",
+      "top_result": "Kubernetes Deployment",
+      "expected": "Kubernetes Deployment",
+      "correct": true,
+      "latency_ms": "1.64"
+    }
+  ]
+}

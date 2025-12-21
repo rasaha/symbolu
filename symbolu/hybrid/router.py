@@ -40,30 +40,39 @@ ACTION_PATTERNS: Set[str] = {
     "run", "execute", "start", "stop", "deploy", "install", "send", "book",
     "schedule", "create", "delete", "build", "test", "compile", "launch",
     "restart", "shutdown", "upload", "download", "push", "pull", "commit",
+    "cancel", "reset", "update", "configure", "setup", "migrate", "backup",
+    "restore", "subscribe", "unsubscribe", "register", "login", "logout",
 }
 
 REASONING_PATTERNS: Set[str] = {
     "how", "why", "what", "explain", "analyze", "calculate", "compute",
     "derive", "prove", "solve", "understand", "theory", "logic", "reason",
     "cause", "effect", "because", "therefore", "hypothesis", "theorem",
+    "work", "works", "difference", "compare", "evaluate", "assess",
+    "determine", "figure", "clarify", "describe", "define", "means",
 }
 
 RELATIONSHIP_PATTERNS: Set[str] = {
     "feel", "feeling", "emotion", "sad", "happy", "anxious", "worried",
     "lonely", "love", "hate", "friend", "family", "relationship", "hurt",
     "heart", "care", "connect", "bond", "trust", "empathy", "compassion",
+    "frustrated", "angry", "upset", "stressed", "overwhelmed", "depressed",
+    "miss", "cope", "support", "talk", "listen", "comfort", "help",
 }
 
 CREATIVE_PATTERNS: Set[str] = {
     "write", "compose", "design", "create", "imagine", "paint", "draw",
     "poem", "story", "song", "art", "music", "illustration", "sketch",
     "novel", "lyrics", "melody", "artistic", "creative", "invent",
+    "haiku", "logo", "concept", "character", "backstory", "fiction",
+    "describe", "picture", "scene", "narrative", "plot", "draft",
 }
 
 REFLECTIVE_PATTERNS: Set[str] = {
     "meaning", "life", "exist", "existence", "consciousness", "free",
     "will", "death", "truth", "reality", "nature", "being", "soul",
     "spirit", "philosophy", "metaphysics", "purpose", "destiny", "fate",
+    "why", "nothing", "everything", "universe", "god", "afterlife",
 }
 
 
