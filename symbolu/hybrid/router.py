@@ -130,33 +130,42 @@ class SemanticRouter:
             for i, score in enumerate(word_vec.vector):
                 layer_totals[i] += score
 
-        # Normalize
-        total = sum(layer_totals)
-        if total > 0:
-            layer_totals = [s / total for s in layer_totals]
-
-        # Find dominant layer
+        # Find dominant layer using raw totals (not normalized)
         max_idx = 0
-        max_score = layer_totals[0]
+        max_total = layer_totals[0]
         for i in range(1, 10):
-            if layer_totals[i] > max_score:
-                max_score = layer_totals[i]
+            if layer_totals[i] > max_total:
+                max_total = layer_totals[i]
                 max_idx = i
 
         dominant_layer = LAYER_NAMES[max_idx]
 
+        # Calculate confidence using the best word-level dominant score
+        # This preserves the differentiation seen at word level
+        max_word_score = 0.0
+        for word_vec in analysis.words:
+            if word_vec.dominant_score > max_word_score:
+                max_word_score = word_vec.dominant_score
+
+        # Normalize for layer_scores display (but not for routing decision)
+        total = sum(layer_totals)
+        if total > 0:
+            normalized = [s / total for s in layer_totals]
+        else:
+            normalized = layer_totals
+
         # Get top 3 layers for context
-        indexed = [(LAYER_NAMES[i], layer_totals[i]) for i in range(10)]
+        indexed = [(LAYER_NAMES[i], normalized[i]) for i in range(10)]
         sorted_layers = sorted(indexed, key=lambda x: x[1], reverse=True)
         top_layers = tuple(sorted_layers[:3])
 
-        # Determine model
-        if max_score < self.confidence_threshold:
+        # Determine model using word-level confidence
+        if max_word_score < self.confidence_threshold:
             model_type = self.fallback_model
-            confidence = max_score
+            confidence = max_word_score
         else:
             model_type = LAYER_TO_MODEL.get(dominant_layer, self.fallback_model)
-            confidence = max_score
+            confidence = max_word_score
 
         return RoutingDecision(
             model_type=model_type,
