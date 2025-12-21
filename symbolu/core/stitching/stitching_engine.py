@@ -49,6 +49,35 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
+# Stitching Result (Output Format per Specification)
+# =============================================================================
+
+@dataclass
+class StitchingResult:
+    """
+    Output of the Stitching Encoder (per prompt specification).
+
+    Includes:
+    - selected_candidates: List of selected CandidateEntry objects
+    - scores: Dict mapping candidate_id to final score
+    - diagnostics: Breakdown of relevance, redundancy, domain_jump
+    """
+    selected_candidates: List[Any]
+    scores: Dict[str, float]
+    diagnostics: Dict[str, Any]
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "selected_candidates": [
+                getattr(c, "id", str(i)) for i, c in enumerate(self.selected_candidates)
+            ],
+            "scores": self.scores,
+            "diagnostics": self.diagnostics,
+        }
+
+
+# =============================================================================
 # Query Context
 # =============================================================================
 
@@ -255,6 +284,56 @@ class StitchingEngine:
         scored = self.score_candidates(candidates, context)
         return [sc.candidate for sc in scored[:beam]]
 
+    def stitch(
+        self,
+        candidates: List[Any],
+        context: QueryContext,
+    ) -> StitchingResult:
+        """
+        Execute stitching and return StitchingResult (per prompt specification).
+
+        This is the main entry point that returns the output format:
+        - selected_candidates: List[CandidateEntry]
+        - scores: Dict[candidate_id, float]
+        - diagnostics: { "relevance": float, "redundancy": float, "domain_jump": float }
+
+        Args:
+            candidates: List of candidates to select from
+            context: Query context
+
+        Returns:
+            StitchingResult with selected candidates, scores, and diagnostics
+        """
+        scored = self.score_candidates(candidates, context)
+
+        # Build output per specification
+        selected_candidates = [sc.candidate for sc in scored]
+
+        scores = {
+            getattr(sc.candidate, "id", f"c_{i}"): sc.final_score
+            for i, sc in enumerate(scored)
+        }
+
+        # Aggregate diagnostics
+        total_relevance = sum(sc.relevance for sc in scored)
+        total_redundancy = sum(sc.redundancy_penalty for sc in scored)
+        total_domain_jump = sum(sc.domain_jump_penalty for sc in scored)
+
+        diagnostics = {
+            "relevance": total_relevance,
+            "redundancy": total_redundancy,
+            "domain_jump": total_domain_jump,
+            "selected_count": len(scored),
+            "cross_domain_count": sum(1 for sc in scored if sc.is_cross_domain),
+            "per_candidate": [sc.to_dict() for sc in scored],
+        }
+
+        return StitchingResult(
+            selected_candidates=selected_candidates,
+            scores=scores,
+            diagnostics=diagnostics,
+        )
+
     def apply_penalties(
         self,
         candidates: List[Any],
@@ -337,8 +416,10 @@ class StitchingEngine:
         - AGENCY (actor capability)
         - BALANCE (equilibrium)
 
-        Formula:
-            AspectScore = Σ_k query_aspect[k] × candidate_aspect[k] / ||q|| × ||c||
+        Formula (from prompt specification):
+            relevance = Σ (aspect_weight[k] * min(query.aspect[k], candidate.aspect[k]))
+
+        This uses min-based overlap, NOT cosine similarity.
         """
         query_aspects = context.aspect_vector
         candidate_aspects = getattr(candidate, "aspect_vector", {})
@@ -347,8 +428,21 @@ class StitchingEngine:
             # Fall back to ontology/kosha signature if available
             return self._compute_signature_relevance(candidate)
 
-        # Compute normalized dot product (cosine similarity)
-        return get_aspect_overlap(query_aspects, candidate_aspects)
+        # Compute min-based aspect overlap (per prompt specification)
+        # relevance = Σ (aspect_weight[k] * min(query.aspect[k], candidate.aspect[k]))
+        overlap_sum = 0.0
+        for aspect_key in query_aspects:
+            if aspect_key in candidate_aspects:
+                q_val = query_aspects[aspect_key]
+                c_val = candidate_aspects[aspect_key]
+                # aspect_weight defaults to 1.0 if not specified
+                overlap_sum += min(q_val, c_val)
+
+        # Normalize to [0, 1] range
+        if query_aspects:
+            max_possible = sum(query_aspects.values())
+            return overlap_sum / max_possible if max_possible > 0 else 0.0
+        return 0.0
 
     def _compute_signature_relevance(
         self,
@@ -547,6 +641,7 @@ def create_query_context(
 __all__ = [
     "StitchingEngine",
     "StitchingConfig",
+    "StitchingResult",
     "QueryContext",
     "create_stitching_engine",
     "create_query_context",

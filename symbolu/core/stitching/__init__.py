@@ -17,6 +17,7 @@ Patent Reference:
 from symbolu.core.stitching.stitching_engine import (
     StitchingEngine,
     StitchingConfig,
+    StitchingResult,
     QueryContext,
     create_stitching_engine,
     create_query_context,
@@ -40,6 +41,7 @@ __all__ = [
     # Engine
     "StitchingEngine",
     "StitchingConfig",
+    "StitchingResult",
     "QueryContext",
     "create_stitching_engine",
     "create_query_context",
