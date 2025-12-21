@@ -32,6 +32,8 @@ def create_engine(
     tier: EngineTier = EngineTier.ENTERPRISE_SEARCH,
     vocabulary: Optional[CustomVocabulary] = None,
     vocabulary_file: Optional[str] = None,
+    persona_id: Optional[str] = None,
+    enable_agi: bool = True,
     **kwargs: Any,
 ) -> BaseEngine:
     """
@@ -41,23 +43,32 @@ def create_engine(
         tier: Which engine tier to create
         vocabulary: Pre-loaded CustomVocabulary
         vocabulary_file: Path to vocabulary JSON file
+        persona_id: User/session ID for AGI persona tracking
+        enable_agi: Whether to enable AGI capabilities
         **kwargs: Tier-specific configuration
 
     Returns:
         Configured engine instance
 
     Examples:
-        # Enterprise Tier 1: Pure STL
+        # Enterprise Tier 1: Pure STL (no AGI)
         engine = create_engine(tier=EngineTier.ENTERPRISE_SEARCH)
         result = engine.classify("Deploy the cluster")
 
-        # Enterprise Tier 2: STL + 7B
-        engine = create_engine(tier=EngineTier.ENTERPRISE_CHAT)
+        # Enterprise Tier 2: STL + 7B + Light AGI
+        engine = create_engine(
+            tier=EngineTier.ENTERPRISE_CHAT,
+            persona_id="user_123"
+        )
         result = engine.generate("Explain quantum physics")
 
-        # Consumer: Full capability
-        engine = create_engine(tier=EngineTier.CONSUMER)
-        result = engine.generate("Complex query here")
+        # Consumer: Full capability with Full AGI
+        engine = create_engine(
+            tier=EngineTier.CONSUMER,
+            persona_id="user_123"
+        )
+        result = engine.generate("My startup co-founders disagree")
+        print(result.agi_signal)  # Cross-domain insights
 
         # With custom vocabulary
         engine = create_engine(
@@ -71,25 +82,32 @@ def create_engine(
 
     # Create appropriate engine
     if tier == EngineTier.ENTERPRISE_SEARCH:
+        # No AGI for Enterprise Search
         return EnterpriseSearchEngine(
             vocabulary=vocabulary,
             confidence_threshold=kwargs.get("confidence_threshold", 0.3),
         )
 
     elif tier == EngineTier.ENTERPRISE_CHAT:
+        # Light AGI for Enterprise Chat
         return EnterpriseChatEngine(
             vocabulary=vocabulary,
             confidence_threshold=kwargs.get("confidence_threshold", 0.3),
             model_handlers=kwargs.get("model_handlers"),
             model_names=kwargs.get("model_names"),
+            persona_id=persona_id,
+            enable_agi=enable_agi,
         )
 
     elif tier == EngineTier.CONSUMER:
+        # Full AGI for Consumer
         return ConsumerEngine(
             vocabulary=vocabulary,
             stl_confidence_threshold=kwargs.get("stl_confidence_threshold", 0.8),
             cascade_threshold=kwargs.get("cascade_threshold", 0.8),
             embedder=kwargs.get("embedder"),
+            persona_id=persona_id,
+            enable_agi=enable_agi,
         )
 
     else:

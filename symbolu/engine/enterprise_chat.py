@@ -4,27 +4,36 @@ Enterprise Chat Engine (Tier 2)
 
 STL routes to specialized 7B models for generation.
 25x parameter savings compared to using 175B for everything.
+Light AGI: Persona tracking and cross-domain retrieval (no insight generation).
 
 Use cases:
     - Specialized chat with domain expertise
     - Cost-optimized text generation
     - Explainable routing decisions
+    - Cross-domain pattern matching (light AGI)
 
 Architecture:
-    Query → STL (10D) → Route Decision → 7B Specialist → Response
+    Query → STL (10D) → Light AGI → Route Decision → 7B Specialist → Response
+
+Light AGI capabilities:
+    - Persona query tracking
+    - Cross-domain experiential retrieval
+    - Event tagging (no balance checking)
 
 Performance:
     - Routing: ~100μs
+    - Light AGI: ~50μs additional
     - Generation: ~500ms (depends on 7B model)
     - Cost: 25x lower than 175B
     - Accuracy: 90% routing accuracy
 """
 
 import time
-from typing import Optional, Tuple, Dict, Any, Callable, Protocol
+from typing import Optional, Tuple, Dict, Any, Callable, Protocol, List
 from abc import abstractmethod
 
 from symbolu.engine.base import BaseEngine, EngineResult, EngineCapability
+from symbolu.engine.agi_context import AGIContext, AGILevel
 from symbolu.hybrid.router import SemanticRouter, ModelType, RoutingDecision
 from symbolu.hybrid.vocabulary import CustomVocabulary
 
@@ -55,14 +64,15 @@ class StubModelHandler:
 
 class EnterpriseChatEngine(BaseEngine):
     """
-    Enterprise Tier 2: STL routes to specialized 7B models.
+    Enterprise Tier 2: STL routes to specialized 7B models + Light AGI.
 
     Example:
         # With stub handlers (for testing)
         engine = EnterpriseChatEngine()
 
-        # With real model handlers
+        # With real model handlers and AGI
         engine = EnterpriseChatEngine(
+            persona_id="user_123",
             model_handlers={
                 ModelType.REASONING: ReasoningModel(),
                 ModelType.CREATIVE: CreativeModel(),
@@ -74,6 +84,7 @@ class EnterpriseChatEngine(BaseEngine):
         print(result.response)     # Generated text
         print(result.model_used)   # "reasoning-7b"
         print(result.stl_signal)   # Routing details
+        print(result.agi_signal)   # Light AGI: events, cross-domain matches
     """
 
     # Default model names for each type
@@ -94,6 +105,8 @@ class EnterpriseChatEngine(BaseEngine):
         confidence_threshold: float = 0.3,
         model_handlers: Optional[Dict[ModelType, ModelHandler]] = None,
         model_names: Optional[Dict[ModelType, str]] = None,
+        persona_id: Optional[str] = None,
+        enable_agi: bool = True,
     ):
         """
         Initialize Enterprise Chat Engine.
@@ -103,6 +116,8 @@ class EnterpriseChatEngine(BaseEngine):
             confidence_threshold: Minimum confidence for routing
             model_handlers: Map of ModelType to handler implementations
             model_names: Custom model names (for logging/tracking)
+            persona_id: User/session ID for light AGI persona tracking
+            enable_agi: Whether to enable light AGI capabilities
         """
         self.router = SemanticRouter(
             vocabulary=vocabulary,
@@ -122,6 +137,17 @@ class EnterpriseChatEngine(BaseEngine):
                 model_type: StubModelHandler(name)
                 for model_type, name in self.model_names.items()
             }
+
+        # Light AGI context (persona tracking + retrieval only)
+        self.persona_id = persona_id
+        self.enable_agi = enable_agi
+        self.agi_context: Optional[AGIContext] = None
+        if enable_agi:
+            self.agi_context = AGIContext(
+                persona_id=persona_id,
+                level=AGILevel.LIGHT,  # Light AGI only
+                auto_learn=False,  # No auto-learning in enterprise
+            )
 
     @property
     def tier_name(self) -> str:
@@ -161,16 +187,22 @@ class EnterpriseChatEngine(BaseEngine):
             latency_ms=elapsed_ms,
         )
 
-    def generate(self, query: str, context: Optional[Dict[str, Any]] = None) -> EngineResult:
+    def generate(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None,
+        domain: Optional[str] = None,
+    ) -> EngineResult:
         """
-        Generate response using STL-routed 7B model.
+        Generate response using STL-routed 7B model + Light AGI.
 
         Args:
             query: Input query/prompt
             context: Optional context for generation
+            domain: Optional domain hint for AGI
 
         Returns:
-            EngineResult with generated response
+            EngineResult with generated response and AGI signal
         """
         start = time.perf_counter()
 
@@ -178,7 +210,30 @@ class EnterpriseChatEngine(BaseEngine):
         decision = self.router.route(query)
         routing_time = time.perf_counter() - start
 
-        # Step 2: Get appropriate model handler
+        # Step 2: Light AGI processing (if enabled)
+        agi_signal = None
+        if self.agi_context:
+            agi_start = time.perf_counter()
+            query_ctx = self.agi_context.process_query(
+                query=query,
+                domain=domain,
+                synthesize=False,
+                max_matches=3,
+            )
+            agi_time = time.perf_counter() - agi_start
+
+            signal = self.agi_context.to_signal()
+            agi_signal = {
+                "level": signal.level.value,
+                "persona_id": signal.persona_id,
+                "events_detected": signal.events_detected,
+                "cross_domain_matches": signal.cross_domain_matches,
+                "top_match_domain": signal.top_match_domain,
+                "top_match_similarity": signal.top_match_similarity,
+                "time_ms": agi_time * 1000,
+            }
+
+        # Step 3: Get appropriate model handler
         handler = self.model_handlers.get(decision.model_type)
         if handler is None:
             # Fall back to general
@@ -191,7 +246,7 @@ class EnterpriseChatEngine(BaseEngine):
                 metadata={"error": f"No handler for {decision.model_type.value}"},
             )
 
-        # Step 3: Generate response
+        # Step 4: Generate response
         gen_start = time.perf_counter()
 
         generation_context = {
@@ -200,6 +255,13 @@ class EnterpriseChatEngine(BaseEngine):
             "dominant_layer": decision.dominant_layer,
             **(context or {}),
         }
+
+        # Add light AGI context
+        if agi_signal:
+            generation_context["agi"] = {
+                "events": agi_signal.get("events_detected", []),
+                "cross_domain_matches": agi_signal.get("cross_domain_matches", 0),
+            }
 
         response = handler.generate(query, generation_context)
 
@@ -219,6 +281,7 @@ class EnterpriseChatEngine(BaseEngine):
                 "harmony": decision.query_analysis.overall_harmony,
                 "routing_time_ms": routing_time * 1000,
             },
+            agi_signal=agi_signal,
             latency_ms=total_time,
             metadata={
                 "generation_time_ms": gen_time * 1000,
