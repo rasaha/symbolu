@@ -589,6 +589,21 @@ def test_unified_api_extraction_from_policy_flags():
             }
             self.rendered = None
             self.dha = None
+            # Required attributes for build_unified_output
+            self.fusion = None
+            self.mlcr = None
+            self.mapper_profile = None
+            self.coherence_report = None
+            self.coherence_state = None
+            self.session_memory = None
+            self.session_recap = None
+            self.intent_arc = None
+            self.identity_signature = None
+            self.motivation_profile = None
+            self.trading_guardrails = None
+            self.interaction_mode = None
+            self.persona_response = None
+            self.request = None
 
     from symbolu.api.unified_api import build_unified_output
 
