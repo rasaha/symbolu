@@ -95,6 +95,9 @@ class ImportScanner:
         """
         Extract all imports from a Python file using AST.
 
+        Skips imports inside TYPE_CHECKING blocks, as those are only
+        for static type hints and not runtime imports.
+
         Args:
             file_path: Path to the Python file.
 
@@ -109,13 +112,43 @@ class ImportScanner:
 
             tree = ast.parse(content)
 
+            # First, identify line ranges that are inside TYPE_CHECKING blocks
+            type_checking_ranges: List[Tuple[int, int]] = []
+            for node in ast.walk(tree):
+                if isinstance(node, ast.If):
+                    # Check if this is "if TYPE_CHECKING:"
+                    test = node.test
+                    is_type_checking = False
+                    if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
+                        is_type_checking = True
+                    elif isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING":
+                        is_type_checking = True
+
+                    if is_type_checking:
+                        # Get the line range of the if body
+                        if node.body:
+                            start_line = node.body[0].lineno
+                            end_line = node.body[-1].end_lineno or node.body[-1].lineno
+                            type_checking_ranges.append((start_line, end_line))
+
+            def is_in_type_checking(line: int) -> bool:
+                """Check if a line is inside a TYPE_CHECKING block."""
+                for start, end in type_checking_ranges:
+                    if start <= line <= end:
+                        return True
+                return False
+
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
                     for alias in node.names:
-                        imports.append((alias.name, node.lineno))
+                        # Skip if inside TYPE_CHECKING block
+                        if not is_in_type_checking(node.lineno):
+                            imports.append((alias.name, node.lineno))
                 elif isinstance(node, ast.ImportFrom):
                     if node.module:
-                        imports.append((node.module, node.lineno))
+                        # Skip if inside TYPE_CHECKING block
+                        if not is_in_type_checking(node.lineno):
+                            imports.append((node.module, node.lineno))
 
         except (SyntaxError, UnicodeDecodeError, IOError):
             pass

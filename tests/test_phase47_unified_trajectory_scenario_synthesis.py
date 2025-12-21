@@ -524,7 +524,18 @@ def test_session_store_handles_empty_synthesis_history():
 def test_unified_output_has_synthesis_field():
     """Test UnifiedOutput has Phase 47 field."""
     from symbolu.api.unified_api import UnifiedOutput
-    output = UnifiedOutput(text="test")
+    output = UnifiedOutput(
+        text="test",
+        symbolic={},
+        practical={},
+        mirror={},
+        dha={},
+        routing={},
+        mappers={},
+        entropy={},
+        coherence={},
+        metadata={},
+    )
     assert hasattr(output, 'unified_trajectory_scenario_synthesis')
 
 
@@ -606,8 +617,22 @@ def test_coherence_observer_handles_none_synthesis():
 
 def test_persona_response_has_synthesis_field():
     """Test PersonaResponse has Phase 47 metadata field."""
-    from symbolu.mechanical.persona.models import PersonaResponse
-    response = PersonaResponse(persona_id="test", text="test", layers={})
+    from symbolu.mechanical.persona.models import PersonaResponse, PersonaMetadata
+    response = PersonaResponse(
+        persona_id="test",
+        text="test",
+        layers={"symbolic": {}, "practical": {}, "mirror": {}},
+        metadata=PersonaMetadata(
+            tier="HYBRID",
+            domain="test",
+            intent="how",
+            persona_id="test",
+            persona_name="Test Persona",
+            persona_description="Test persona description",
+            dha_tone="neutral",
+            dha_confidence=0.8,
+        ),
+    )
     assert hasattr(response, 'persona_unified_synthesis_profile')
 
 

@@ -1,28 +1,14 @@
 {
-  "timestamp": "2025-12-20T18:53:29.855977Z",
-  "violations": [
-    {
-      "file": "/home/user/symbolu/symbolu/core/coherence/observer_diagnostics_bundle.py",
-      "line": 33,
-      "violation_type": "forbidden_import",
-      "source_module": "symbolu.core.coherence.observer_diagnostics_bundle",
-      "imported_module": "symbolu.mechanical.pipeline.p24_projection.p24_projection_schema",
-      "details": "Authoritative module imports observer: symbolu.mechanical.pipeline.p24_projection.p24_projection_schema"
-    }
-  ],
+  "timestamp": "2025-12-21T00:42:21.768413Z",
+  "violations": [],
   "import_graph": {
-    "authoritative_to_observer_edges": [
-      {
-        "source": "symbolu.core.coherence.observer_diagnostics_bundle",
-        "target": "symbolu.mechanical.pipeline.p24_projection.p24_projection_schema"
-      }
-    ],
-    "total_edges_scanned": 538
+    "authoritative_to_observer_edges": [],
+    "total_edges_scanned": 531
   },
   "counts": {
     "authoritative_modules_scanned": 120,
     "observer_modules_scanned": 0,
     "total_files_scanned": 120,
-    "violations_found": 1
+    "violations_found": 0
   }
 }

@@ -53,7 +53,7 @@ from symbolu.core.coherence.coherence_engine import CoherenceEngine
 from symbolu.service.sessions.session_models import SessionSummary, SessionState
 from symbolu.service.sessions.session_store import SessionStore, compute_session_summary
 from symbolu.mechanical.pipeline.coherence_observer import CoherenceObservation, CoherenceObserver
-from symbolu.mechanical.persona.models import PersonaResponse
+from symbolu.mechanical.persona.models import PersonaResponse, PersonaMetadata
 from symbolu.api.unified_api import UnifiedOutput
 
 
@@ -1035,16 +1035,27 @@ class TestPersonaInvariance(unittest.TestCase):
 
     def test_persona_response_metadata_only(self):
         """PersonaResponse must include Phase 48 ONLY in metadata field."""
-        # Phase 48 should not affect text, tone, or semantic fields
-        # Only metadata field should contain Phase 48 data
+        # Phase 48 should not affect text or semantic fields
+        # Only optional persona_macro_stability_profile field contains Phase 48 data
         response = PersonaResponse(
+            persona_id="test",
             text="Test response",
-            tone="neutral"
+            layers={"symbolic": {}, "practical": {}, "mirror": {}},
+            metadata=PersonaMetadata(
+                tier="HYBRID",
+                domain="test",
+                intent="how",
+                persona_id="test",
+                persona_name="Test Persona",
+                persona_description="Test persona description",
+                dha_tone="neutral",
+                dha_confidence=0.8,
+            ),
         )
 
-        # Metadata can include Phase 48, but text/tone cannot be influenced by it
+        # Phase 48 metadata should be in optional field, not affecting text
         self.assertEqual(response.text, "Test response")
-        self.assertEqual(response.tone, "neutral")
+        self.assertTrue(hasattr(response, 'persona_macro_stability_profile'))
 
 
 # ============================================================================

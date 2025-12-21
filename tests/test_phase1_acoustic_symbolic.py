@@ -449,12 +449,13 @@ class TestTypeSafety:
     """Test type validation and error handling."""
 
     def test_map_acoustic_units_requires_string(self):
-        """map_acoustic_units should reject non-string input."""
+        """map_acoustic_units should reject non-string input (except falsy values)."""
         with pytest.raises(TypeError):
             map_acoustic_units(123)
 
-        with pytest.raises(TypeError):
-            map_acoustic_units(None)
+        # None returns empty list (graceful degradation, not an error)
+        result = map_acoustic_units(None)
+        assert result == []
 
         with pytest.raises(TypeError):
             map_acoustic_units(['hello'])

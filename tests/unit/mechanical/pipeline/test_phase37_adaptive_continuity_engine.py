@@ -410,6 +410,7 @@ class TestGroupE_ImportSafety:
 
     def test_no_governance_imports(self):
         """Test that P37 modules don't import governance modules."""
+        import ast
         import symbolu.core.continuity.continuity_models as models_module
         import symbolu.core.continuity.adaptive_continuity_engine as engine_module
 
@@ -426,15 +427,23 @@ class TestGroupE_ImportSafety:
         for filepath in source_files:
             if filepath:
                 with open(filepath, 'r') as f:
-                    content = f.read().lower()
-                    for pattern in forbidden_patterns:
-                        # Check import lines only
-                        import_check = f"import {pattern}" in content or f"from {pattern}" in content
-                        assert not import_check, \
-                            f"Found forbidden pattern '{pattern}' in {filepath}"
+                    content = f.read()
+                    # Use AST to check actual imports, not docstrings
+                    tree = ast.parse(content)
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.ImportFrom) and node.module:
+                            for pattern in forbidden_patterns:
+                                assert pattern not in node.module.lower(), \
+                                    f"Found forbidden pattern '{pattern}' in {filepath}"
+                        if isinstance(node, ast.Import):
+                            for alias in node.names:
+                                for pattern in forbidden_patterns:
+                                    assert pattern not in alias.name.lower(), \
+                                        f"Found forbidden pattern '{pattern}' in {filepath}"
 
     def test_no_persona_imports(self):
         """Test that P37 modules don't import persona modules."""
+        import ast
         import symbolu.core.continuity.continuity_models as models_module
         import symbolu.core.continuity.adaptive_continuity_engine as engine_module
 
@@ -447,11 +456,16 @@ class TestGroupE_ImportSafety:
             if filepath:
                 with open(filepath, 'r') as f:
                     content = f.read()
-                    # Check for persona imports (not mentions in docstrings)
-                    import_lines = [l for l in content.split('\n')
-                                    if 'import' in l.lower() and 'persona' in l.lower()]
-                    assert not import_lines, \
-                        f"Found forbidden persona import in {filepath}"
+                    # Use AST to check actual imports, not docstrings
+                    tree = ast.parse(content)
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.ImportFrom) and node.module:
+                            assert "persona" not in node.module.lower(), \
+                                f"Found forbidden persona import in {filepath}"
+                        if isinstance(node, ast.Import):
+                            for alias in node.names:
+                                assert "persona" not in alias.name.lower(), \
+                                    f"Found forbidden persona import in {filepath}"
 
     def test_no_dha_imports(self):
         """Test that P37 modules don't import DHA modules."""
@@ -474,6 +488,7 @@ class TestGroupE_ImportSafety:
 
     def test_no_renderer_imports(self):
         """Test that P37 modules don't import renderer modules."""
+        import ast
         import symbolu.core.continuity.continuity_models as models_module
         import symbolu.core.continuity.adaptive_continuity_engine as engine_module
 
@@ -486,11 +501,16 @@ class TestGroupE_ImportSafety:
             if filepath:
                 with open(filepath, 'r') as f:
                     content = f.read()
-                    # Check for renderer imports (not mentions in docstrings)
-                    import_lines = [l for l in content.split('\n')
-                                    if 'import' in l.lower() and 'renderer' in l.lower()]
-                    assert not import_lines, \
-                        f"Found forbidden renderer import in {filepath}"
+                    # Use AST to check actual imports, not docstrings
+                    tree = ast.parse(content)
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.ImportFrom) and node.module:
+                            assert "renderer" not in node.module.lower(), \
+                                f"Found forbidden renderer import in {filepath}"
+                        if isinstance(node, ast.Import):
+                            for alias in node.names:
+                                assert "renderer" not in alias.name.lower(), \
+                                    f"Found forbidden renderer import in {filepath}"
 
     def test_no_random_imports(self):
         """Test that P37 modules don't import random/probabilistic modules."""
