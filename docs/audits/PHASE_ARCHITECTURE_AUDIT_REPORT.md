@@ -1,7 +1,7 @@
 # Symbol-U Phase Architecture Comprehensive Audit Report
 
 **Audit Date:** 2025-12-21
-**Audit Version:** 1.0
+**Audit Version:** 1.1
 **Auditor:** Claude Code Architecture Analysis
 **Status:** COMPLETE
 
@@ -227,6 +227,162 @@ See `symbolu/mechanical/pipeline/PHASE_STATUS.yaml` for the authoritative phase 
 |-------|---------------|--------|----------------|
 | P34 | P35, P36, formulas | Graceful degradation | **IMPLEMENT or DOCUMENT as deferred** |
 | P37 | macro_stability_regulator.py | Graceful degradation | **IMPLEMENT or DOCUMENT as deferred** |
+
+---
+
+## Deep Dive: P12 (Consistency Validator) & P14 (Surface Realizer)
+
+### P12 - Acoustic-Prosodic Consistency Validator
+
+**Status:** DORMANT (fully implemented, not called from orchestrator)
+**Location:** `symbolu/mechanical/pipeline/p12_consistency/`
+**Lines of Code:** ~1,163 LOC
+**Authority Level:** ZERO (audit-only, non-actuating)
+
+#### Architecture
+
+P12 is an **audit-only** phase that validates consistency between upstream phase outputs without modifying behavior. It operates as a truth-preserving audit layer.
+
+```
+Authority Model:
+- Consumes ALL upstream phase outputs (read-only)
+- Cannot mutate any upstream output
+- Cannot block, redirect, alter regime, or alter discourse
+- Produces P12ConsistencyReport (read-only, non-actuating)
+- Violations reported upward, never corrected
+```
+
+#### Invariant Checks (17 total)
+
+| Check Category | Description |
+|----------------|-------------|
+| Regime-Acoustic | Regime decisions match acoustic parameterization |
+| Discourse-Prosody | Discourse acts align with prosodic patterns |
+| Semantic-Lexical | Semantic slots consistent with lexical selection |
+| Safety-Surface | Safety constraints respected in surface realization |
+| Authority Flow | Downstream phases don't exceed upstream authority |
+
+#### Integration API
+
+```python
+from .p12_consistency.p12_integration import maybe_run_p12
+
+# After P11 stage
+maybe_run_p12(ctx)
+# ctx.p12_consistency now contains P12ConsistencyReport
+```
+
+#### LLM Governance Opportunity
+
+P12 is strategically positioned to validate LLM outputs against Symbol-U governance constraints:
+- Check if LLM-generated acoustic features respect regime bounds
+- Validate prosodic consistency with discourse act decisions
+- Report violations for upstream correction or rejection
+
+#### Work Needed
+
+| Item | Priority | Effort |
+|------|----------|--------|
+| Activate in orchestrator | P1 | Low |
+| Add LLM output validation hooks | P2 | Medium |
+| Expand violation types for LLM edge cases | P2 | Medium |
+| Dashboard integration for violation metrics | P3 | Medium |
+
+---
+
+### P14 - Expression Surface Realizer
+
+**Status:** DORMANT (fully implemented, not called from orchestrator)
+**Location:** `symbolu/mechanical/pipeline/p14_surface/`
+**Lines of Code:** ~640 LOC
+**Authority Level:** AUTHORITATIVE (produces constraints, not text)
+
+#### Architecture
+
+P14 produces a **SurfacePlan**, NOT text. It is a pre-acoustic, pre-renderer phase that constrains how downstream renderers produce text.
+
+```
+Critical Principle:
+- P14 produces a SurfacePlan, not text
+- P14 is CONSTRAINED by P13 (safety envelope)
+- Downstream renderers consume the SurfacePlan
+```
+
+#### SurfacePlan Policies
+
+| Policy Type | Options |
+|-------------|---------|
+| **SurfaceStyle** | MINIMAL, DEFERRAL_MINIMAL, GENTLE, NEUTRAL, FORMAL |
+| **PunctuationPolicy** | BASIC_PERIODS, STANDARD, EXPRESSIVE |
+| **HedgePolicy** | NONE, LIGHT, STANDARD |
+| **LengthPolicy** | ONE_SENTENCE, SHORT, MEDIUM, BULLETS_ALLOWED |
+| **PersonaSignalPolicy** | NONE, SUBTLE, STANDARD |
+
+#### Integration API
+
+```python
+from .p14_surface.p14_integration import maybe_run_p14
+
+# After P13 stage (P14 is constrained by P13)
+maybe_run_p14(ctx)
+# ctx.p14_surface now contains SurfacePlan
+
+# Style accessors
+from .p14_surface.p14_integration import (
+    is_minimal, is_formal, allows_exclamation,
+    allows_bullets, get_max_sentences, get_forbidden_tokens
+)
+```
+
+#### LLM Output Shaping
+
+P14 is designed to constrain LLM outputs without modifying them directly:
+- **Forbidden tokens**: Tokens the LLM must NOT emit (e.g., "certainly", "delighted")
+- **Style constraints**: Formality level, hedging requirements
+- **Length limits**: Maximum sentences, bullet permission
+- **Punctuation bounds**: Whether exclamation marks/ellipsis allowed
+
+#### Work Needed
+
+| Item | Priority | Effort |
+|------|----------|--------|
+| Activate in orchestrator | P1 | Low |
+| LLM token sampler integration | P2 | High |
+| Add forbidden token enforcement layer | P2 | Medium |
+| Expand style presets for domain-specific use | P3 | Medium |
+| Renderer integration (consume SurfacePlan) | P2 | High |
+
+---
+
+### P12 + P14 Synergy for LLM Governance
+
+Together, P12 and P14 form a governance sandwich for LLM outputs:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    LLM OUTPUT GOVERNANCE                    │
+├─────────────────────────────────────────────────────────────┤
+│  P14 (Surface Realizer)                                     │
+│  ├── Produces SurfacePlan with style/length/token policies  │
+│  ├── Constrains what LLM CAN emit                           │
+│  └── Pre-generation constraint layer                        │
+├─────────────────────────────────────────────────────────────┤
+│  LLM (External)                                             │
+│  ├── Generates text within P14 constraints                  │
+│  └── Output candidates for validation                       │
+├─────────────────────────────────────────────────────────────┤
+│  P12 (Consistency Validator)                                │
+│  ├── Audits LLM output against governance rules             │
+│  ├── Reports violations (never corrects)                    │
+│  └── Post-generation validation layer                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Integration Roadmap:**
+1. Activate P14 → produce SurfacePlan for LLM prompting
+2. Feed SurfacePlan constraints to LLM sampling (token bans, style guidance)
+3. Activate P12 → validate LLM output against all upstream constraints
+4. Report P12 violations to enable rejection/retry logic
 
 ---
 
