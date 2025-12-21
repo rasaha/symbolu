@@ -1,7 +1,7 @@
 # Symbolu Engine
 ## Technical Validation Report
 
-**Version:** 1.2
+**Version:** 1.3
 **Date:** 2025-12-21
 **Status:** Technical Diligence Ready
 
@@ -30,10 +30,10 @@
 |--------|-------|-------------|----------|
 | Routing Accuracy | 90% | 100 labeled queries, 6 categories | ±0% (deterministic) |
 | Routing Latency | 0.13ms (p50) | 1,000 queries, Enterprise Search | ±0% |
-| Routing Latency (AGI ON) | 0.60ms (p50) | 1,000 queries, Full Capability + AGI | ±0% |
-| 768D Skip Rate | 85% | Full Capability tier, mixed workload | ±3% |
-| 7B Model Usage | 90% | Full Capability tier cascade | ±2% |
-| 175B Fallback Rate | 10% | Full Capability tier cascade | ±2% |
+| Routing Latency (AGI ON) | 0.60ms (p50) | 1,000 queries, Cascade + AGI | ±0% |
+| 768D Skip Rate | 85% | Cascade tier, mixed workload | ±3% |
+| 7B Model Usage | 90% | Cascade tier cascade | ±2% |
+| 175B Fallback Rate | 10% | Cascade tier cascade | ±2% |
 | Cost Reduction | 25x | vs GPT-4 API baseline | — |
 | AGI Overhead | +0.5ms | Event tagging + balance computation | ±0.1ms |
 
@@ -115,11 +115,11 @@
            ┌───────────────┼───────────────┐
            ▼               ▼               ▼
     ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-    │ ENTERPRISE  │ │ ENTERPRISE  │ │    FULL     │
-    │   SEARCH    │ │    CHAT     │ │ CAPABILITY  │
+    │ ENTERPRISE  │ │ ENTERPRISE  │ │             │
+    │   SEARCH    │ │    CHAT     │ │   CASCADE   │
     │             │ │             │ │             │
     │  Pure STL   │ │  STL + 7B   │ │ STL + 768D  │
-    │  No LLM     │ │  Models     │ │ + Cascade   │
+    │  No LLM     │ │  Models     │ │ + 7B/175B   │
     └─────────────┘ └─────────────┘ └─────────────┘
           │               │               │
           ▼               ▼               ▼
@@ -153,7 +153,7 @@
 |------|------------|----------|---------|----------|
 | **Enterprise Search** | STL only | Classification, filtering, search | 0.1ms | $0 |
 | **Enterprise Chat** | STL + 7B | Specialized chat, domain expertise | ~500ms | Low |
-| **Full Capability** | STL + 768D + 7B/175B | Quality-critical with cost optimization | 100ms-1s | Medium |
+| **Cascade** | STL + 768D + 7B/175B | Quality-critical with cost optimization | 100ms-1s | Medium |
 
 ### Decision Matrix
 
@@ -162,8 +162,8 @@
 | Intent classification only | Enterprise Search |
 | High-volume chat (>100K/day) | Enterprise Chat |
 | Audit/compliance requirements | Enterprise Search or Chat |
-| Quality-critical applications | Full Capability |
-| Unpredictable query complexity | Full Capability |
+| Quality-critical applications | Cascade |
+| Unpredictable query complexity | Cascade |
 | Offline/edge deployment | Enterprise Search |
 
 ### Example: Support Ticket System
@@ -174,7 +174,7 @@ A support system receives **1M monthly tickets**:
 |--------|-----------|------|------|
 | 700K (70%) | Classification and routing | Enterprise Search | $0 |
 | 200K (20%) | Templated responses | Enterprise Chat (7B) | $200 |
-| 100K (10%) | Complex reasoning | Full Capability (175B) | $3,000 |
+| 100K (10%) | Complex reasoning | Cascade (175B) | $3,000 |
 | **Total** | | | **$3,200/month** |
 
 Traditional approach (all 175B): **$30,000/month**
@@ -221,8 +221,8 @@ Result: 90% cost reduction, predictable spend, auditable routing, no quality los
 |------|-----|-----|-----|-----|
 | Enterprise Search | 0.13ms | 0.21ms | 0.37ms | 0.45ms |
 | Enterprise Chat | 0.15ms | 0.25ms | 0.41ms | 0.52ms |
-| Full Capability (STL only) | 0.18ms | 0.29ms | 0.48ms | 0.60ms |
-| Full Capability (+ AGI) | 0.60ms | 0.85ms | 1.1ms | 1.4ms |
+| Cascade (STL only) | 0.18ms | 0.29ms | 0.48ms | 0.60ms |
+| Cascade (+ AGI) | 0.60ms | 0.85ms | 1.1ms | 1.4ms |
 
 **Note:** AGI features add ~0.5ms overhead. This is optional and can be disabled.
 
@@ -268,7 +268,7 @@ Result: 90% cost reduction, predictable spend, auditable routing, no quality los
 - One-off queries with no session context
 - High-throughput, low-latency requirements
 
-### 6.6 Cascade Efficiency (Full Capability Tier)
+### 6.6 Cascade Efficiency
 
 **Methodology:** 500 queries representing realistic workload distribution.
 
@@ -309,7 +309,7 @@ Result: 90% cost reduction, predictable spend, auditable routing, no quality los
 |------|--------------|---------------|-----------------|
 | Enterprise Search | $0 | $0 | **$0** |
 | Enterprise Chat | $0 | ~$0.001 (7B) | **~$0.001** |
-| Full Capability | ~$0.0001 (15% of queries) | ~$0.005 (blended) | **~$0.005** |
+| Cascade | ~$0.0001 (15% of queries) | ~$0.005 (blended) | **~$0.005** |
 | Traditional (175B all) | $0.0001 | $0.03 | **$0.03** |
 
 ### Monthly Projection (1 Million Queries)
@@ -318,7 +318,7 @@ Result: 90% cost reduction, predictable spend, auditable routing, no quality los
 |----------|--------------|----------------|
 | Enterprise Search | $0 | 100% savings |
 | Enterprise Chat | $1,000 | 97% savings |
-| Full Capability | $5,000 | 83% savings |
+| Cascade | $5,000 | 83% savings |
 | Traditional 175B | $30,000 | baseline |
 
 ### Cost Stability
@@ -401,7 +401,7 @@ engine = create_engine(tier=EngineTier.ENTERPRISE_SEARCH)
 result = engine.classify("Deploy the K8s cluster")
 print(f"Intent: {result.intent}, Confidence: {result.confidence:.0%}")
 
-# Full Capability tier
+# Cascade tier
 engine = create_engine(tier=EngineTier.CONSUMER)
 result = engine.generate("Explain quantum entanglement")
 print(f"Model used: {result.model_used}")
@@ -452,7 +452,7 @@ The following benchmarks are recommended for full production validation:
 ### A.5 LLM-Always-On Baseline Comparison
 
 - Run identical 1,000 query workload through:
-  - Symbolu Full Capability tier
+  - Symbolu Cascade tier
   - Direct GPT-4 API
 - Calculate actual API costs, latency, token consumption
 - Report savings ratio with confidence interval
@@ -495,7 +495,8 @@ See `/docs/benchmarks/ENGINE_BENCHMARK_RESULTS.md` for:
 |---------|------|---------|
 | 1.0 | 2025-12-21 | Initial validation report |
 | 1.1 | 2025-12-21 | Added AGI ON/OFF comparison, failure isolation, contribution analysis |
-| 1.2 | 2025-12-21 | Added "Why Now", visual legend, "What Symbolu Is Not", use case example; renamed Consumer → Full Capability |
+| 1.2 | 2025-12-21 | Added "Why Now", visual legend, "What Symbolu Is Not", use case example |
+| 1.3 | 2025-12-21 | Renamed tier: Consumer → Full Capability → **Cascade** |
 
 ---
 
