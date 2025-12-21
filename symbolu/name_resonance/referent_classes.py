@@ -15,9 +15,10 @@ Key properties of S:
 
 This is referential grounding, not semantics in the NLP sense.
 
-Referent Classes:
+Referent Classes (refined per ChatGPT feedback):
 - LUMINOUS: Sources and carriers of light/energy
-- ORGANISM: Living things (plants, animals, humans)
+- BIOLOGICAL_ORGANISM: Living things (plants, animals) - NOT roles
+- ROLE_BEARER: Social agents who bear roles (king, doctor)
 - ARTIFACT: Human-made objects and tools
 - NATURAL_BODY: Natural physical entities (celestial, geological)
 - SUBSTANCE: Materials and matter
@@ -28,6 +29,17 @@ Referent Classes:
 - SPATIAL: Space, location, direction
 - EMOTIONAL: Feelings, psychological states
 - SOCIAL: Roles, relationships, institutions
+- ENERGY_SOURCE: Things that produce/emit energy
+- PHENOMENON: Observable occurrences (not sources)
+
+Primary vs Secondary Referent Classes:
+- Primary: What the word IS (its core identity)
+- Secondary: What it produces/enables/affects
+
+S computation:
+- Primary overlap → high coherence (0.7-1.0)
+- Secondary overlap only → partial coherence (0.3-0.5)
+- No overlap → zero coherence
 
 Tier: Core/Substrate (Tier 1)
 Authority: NONE (referential grounding only)
@@ -37,229 +49,774 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, FrozenSet, Tuple, Set
+from typing import Dict, FrozenSet, Tuple, NamedTuple
 
 
 class ReferentClass(Enum):
     """External referent classes for non-phonemic grounding."""
-    LUMINOUS = "luminous"           # Light, energy sources/carriers
-    ORGANISM = "organism"           # Living things
-    ARTIFACT = "artifact"           # Human-made objects
-    NATURAL_BODY = "natural_body"   # Celestial, geological entities
-    SUBSTANCE = "substance"         # Materials, matter
-    PROCESS = "process"             # Actions, events
-    ABSTRACT = "abstract"           # Concepts, relations
-    SIGNAL = "signal"               # Communication, information
-    TEMPORAL = "temporal"           # Time-related
-    SPATIAL = "spatial"             # Space, location
-    EMOTIONAL = "emotional"         # Feelings, states
-    SOCIAL = "social"               # Roles, relationships
-    UNKNOWN = "unknown"             # Unmapped words
+    # Core categories
+    LUMINOUS = "luminous"                     # Light, radiance
+    BIOLOGICAL_ORGANISM = "biological"        # Living things (plants, animals)
+    ROLE_BEARER = "role_bearer"               # Social agents bearing roles
+    ARTIFACT = "artifact"                     # Human-made objects
+    NATURAL_BODY = "natural_body"             # Celestial, geological entities
+    SUBSTANCE = "substance"                   # Materials, matter
+    PROCESS = "process"                       # Actions, events
+    ABSTRACT = "abstract"                     # Concepts, relations
+    SIGNAL = "signal"                         # Communication, information
+    TEMPORAL = "temporal"                     # Time-related
+    SPATIAL = "spatial"                       # Space, location
+    EMOTIONAL = "emotional"                   # Feelings, states
+    SOCIAL = "social"                         # Roles, relationships
+
+    # Refined categories (per ChatGPT)
+    ENERGY_SOURCE = "energy_source"           # Things that produce energy
+    PHENOMENON = "phenomenon"                 # Observable occurrences
+
+    # Special
+    UNKNOWN = "unknown"                       # Unmapped words
+
+
+class ReferentProfile(NamedTuple):
+    """Primary and secondary referent classes for a word."""
+    primary: FrozenSet[ReferentClass]
+    secondary: FrozenSet[ReferentClass]
 
 
 # =============================================================================
-# Word → Referent Class Mapping
+# Word → Referent Class Mapping (Primary/Secondary)
 # =============================================================================
 
 # This is a deterministic, finite, explainable mapping.
-# Not learned, not statistical - symbolic referential grounding.
+# Primary = what it IS, Secondary = what it produces/enables
 
-WORD_TO_REFERENT: Dict[str, FrozenSet[ReferentClass]] = {
+WORD_TO_REFERENT: Dict[str, ReferentProfile] = {
     # LUMINOUS - light, energy, radiance
-    "sun": frozenset({ReferentClass.LUMINOUS, ReferentClass.NATURAL_BODY}),
-    "light": frozenset({ReferentClass.LUMINOUS, ReferentClass.ABSTRACT}),
-    "fire": frozenset({ReferentClass.LUMINOUS, ReferentClass.PROCESS}),
-    "flame": frozenset({ReferentClass.LUMINOUS, ReferentClass.PROCESS}),
-    "star": frozenset({ReferentClass.LUMINOUS, ReferentClass.NATURAL_BODY}),
-    "bright": frozenset({ReferentClass.LUMINOUS, ReferentClass.ABSTRACT}),
-    "glow": frozenset({ReferentClass.LUMINOUS, ReferentClass.PROCESS}),
-    "shine": frozenset({ReferentClass.LUMINOUS, ReferentClass.PROCESS}),
-    "radiance": frozenset({ReferentClass.LUMINOUS, ReferentClass.ABSTRACT}),
-    "beam": frozenset({ReferentClass.LUMINOUS, ReferentClass.PROCESS}),
+    "sun": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY, ReferentClass.ENERGY_SOURCE}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
+    "light": ReferentProfile(
+        primary=frozenset({ReferentClass.PHENOMENON}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
+    "fire": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS, ReferentClass.ENERGY_SOURCE}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
+    "flame": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
+    "star": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY, ReferentClass.ENERGY_SOURCE}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
+    "bright": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
+    "glow": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
+    "shine": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
+    "radiance": ReferentProfile(
+        primary=frozenset({ReferentClass.PHENOMENON}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
+    "beam": ReferentProfile(
+        primary=frozenset({ReferentClass.PHENOMENON}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
+    "dark": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
+    "darkness": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT, ReferentClass.PHENOMENON}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
 
-    # ORGANISM - living things
-    "tree": frozenset({ReferentClass.ORGANISM, ReferentClass.NATURAL_BODY}),
-    "forest": frozenset({ReferentClass.ORGANISM, ReferentClass.SPATIAL}),
-    "flower": frozenset({ReferentClass.ORGANISM}),
-    "plant": frozenset({ReferentClass.ORGANISM}),
-    "animal": frozenset({ReferentClass.ORGANISM}),
-    "bird": frozenset({ReferentClass.ORGANISM}),
-    "fish": frozenset({ReferentClass.ORGANISM}),
-    "human": frozenset({ReferentClass.ORGANISM, ReferentClass.SOCIAL}),
-    "man": frozenset({ReferentClass.ORGANISM, ReferentClass.SOCIAL}),
-    "woman": frozenset({ReferentClass.ORGANISM, ReferentClass.SOCIAL}),
-    "child": frozenset({ReferentClass.ORGANISM, ReferentClass.SOCIAL}),
-    "mother": frozenset({ReferentClass.ORGANISM, ReferentClass.SOCIAL}),
-    "father": frozenset({ReferentClass.ORGANISM, ReferentClass.SOCIAL}),
-    "leaf": frozenset({ReferentClass.ORGANISM}),
-    "root": frozenset({ReferentClass.ORGANISM, ReferentClass.ABSTRACT}),
-    "seed": frozenset({ReferentClass.ORGANISM}),
+    # BIOLOGICAL_ORGANISM - living things (NOT roles)
+    "tree": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset({ReferentClass.NATURAL_BODY}),
+    ),
+    "forest": ReferentProfile(
+        primary=frozenset({ReferentClass.SPATIAL}),
+        secondary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+    ),
+    "flower": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset(),
+    ),
+    "plant": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset(),
+    ),
+    "animal": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset(),
+    ),
+    "bird": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset(),
+    ),
+    "fish": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset(),
+    ),
+    "leaf": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset(),
+    ),
+    "root": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset({ReferentClass.ABSTRACT}),
+    ),
+    "seed": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset(),
+    ),
+    "banana": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM, ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+    "apple": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM, ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+    "orange": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM, ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+
+    # ROLE_BEARER - social agents (humans in roles)
+    "human": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM, ReferentClass.ROLE_BEARER}),
+        secondary=frozenset({ReferentClass.SOCIAL}),
+    ),
+    "man": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM, ReferentClass.ROLE_BEARER}),
+        secondary=frozenset({ReferentClass.SOCIAL}),
+    ),
+    "woman": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM, ReferentClass.ROLE_BEARER}),
+        secondary=frozenset({ReferentClass.SOCIAL}),
+    ),
+    "child": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset({ReferentClass.SOCIAL}),
+    ),
+    "mother": ReferentProfile(
+        primary=frozenset({ReferentClass.ROLE_BEARER}),
+        secondary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM, ReferentClass.SOCIAL}),
+    ),
+    "father": ReferentProfile(
+        primary=frozenset({ReferentClass.ROLE_BEARER}),
+        secondary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM, ReferentClass.SOCIAL}),
+    ),
+    "king": ReferentProfile(
+        primary=frozenset({ReferentClass.ROLE_BEARER, ReferentClass.SOCIAL}),
+        secondary=frozenset(),
+    ),
+    "queen": ReferentProfile(
+        primary=frozenset({ReferentClass.ROLE_BEARER, ReferentClass.SOCIAL}),
+        secondary=frozenset(),
+    ),
+    "doctor": ReferentProfile(
+        primary=frozenset({ReferentClass.ROLE_BEARER}),
+        secondary=frozenset({ReferentClass.SOCIAL}),
+    ),
+    "hero": ReferentProfile(
+        primary=frozenset({ReferentClass.ROLE_BEARER, ReferentClass.SOCIAL}),
+        secondary=frozenset(),
+    ),
+    "leader": ReferentProfile(
+        primary=frozenset({ReferentClass.ROLE_BEARER, ReferentClass.SOCIAL}),
+        secondary=frozenset(),
+    ),
 
     # ARTIFACT - human-made objects
-    "computer": frozenset({ReferentClass.ARTIFACT}),
-    "table": frozenset({ReferentClass.ARTIFACT}),
-    "chair": frozenset({ReferentClass.ARTIFACT}),
-    "book": frozenset({ReferentClass.ARTIFACT, ReferentClass.SIGNAL}),
-    "pencil": frozenset({ReferentClass.ARTIFACT}),
-    "pen": frozenset({ReferentClass.ARTIFACT}),
-    "tool": frozenset({ReferentClass.ARTIFACT}),
-    "machine": frozenset({ReferentClass.ARTIFACT}),
-    "house": frozenset({ReferentClass.ARTIFACT, ReferentClass.SPATIAL}),
-    "building": frozenset({ReferentClass.ARTIFACT, ReferentClass.SPATIAL}),
-    "car": frozenset({ReferentClass.ARTIFACT}),
-    "phone": frozenset({ReferentClass.ARTIFACT, ReferentClass.SIGNAL}),
-    "door": frozenset({ReferentClass.ARTIFACT, ReferentClass.SPATIAL}),
-    "window": frozenset({ReferentClass.ARTIFACT, ReferentClass.SPATIAL}),
-    "wheel": frozenset({ReferentClass.ARTIFACT}),
+    "computer": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT}),
+        secondary=frozenset({ReferentClass.SIGNAL}),
+    ),
+    "table": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT}),
+        secondary=frozenset(),
+    ),
+    "chair": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT}),
+        secondary=frozenset(),
+    ),
+    "book": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT, ReferentClass.SIGNAL}),
+        secondary=frozenset(),
+    ),
+    "pencil": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT}),
+        secondary=frozenset(),
+    ),
+    "pen": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT}),
+        secondary=frozenset(),
+    ),
+    "tool": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT}),
+        secondary=frozenset(),
+    ),
+    "machine": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT}),
+        secondary=frozenset(),
+    ),
+    "house": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT, ReferentClass.SPATIAL}),
+        secondary=frozenset(),
+    ),
+    "building": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT, ReferentClass.SPATIAL}),
+        secondary=frozenset(),
+    ),
+    "car": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT}),
+        secondary=frozenset(),
+    ),
+    "vehicle": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT}),
+        secondary=frozenset(),
+    ),
+    "phone": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT, ReferentClass.SIGNAL}),
+        secondary=frozenset(),
+    ),
+    "door": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT}),
+        secondary=frozenset({ReferentClass.SPATIAL}),
+    ),
+    "window": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT}),
+        secondary=frozenset({ReferentClass.SPATIAL}),
+    ),
+    "wheel": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT}),
+        secondary=frozenset(),
+    ),
+    "hospital": ReferentProfile(
+        primary=frozenset({ReferentClass.ARTIFACT, ReferentClass.SPATIAL}),
+        secondary=frozenset({ReferentClass.SOCIAL}),
+    ),
 
     # NATURAL_BODY - celestial, geological
-    "moon": frozenset({ReferentClass.NATURAL_BODY, ReferentClass.LUMINOUS}),
-    "earth": frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SPATIAL}),
-    "mountain": frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SPATIAL}),
-    "ocean": frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SUBSTANCE}),
-    "river": frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SUBSTANCE}),
-    "sky": frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SPATIAL}),
-    "cloud": frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SUBSTANCE}),
-    "stone": frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SUBSTANCE}),
-    "rock": frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SUBSTANCE}),
-    "sand": frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SUBSTANCE}),
-    "island": frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SPATIAL}),
-    "valley": frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SPATIAL}),
-    "hill": frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SPATIAL}),
+    "moon": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
+    "earth": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SPATIAL}),
+        secondary=frozenset(),
+    ),
+    "mountain": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SPATIAL}),
+        secondary=frozenset(),
+    ),
+    "ocean": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY}),
+        secondary=frozenset({ReferentClass.SUBSTANCE}),
+    ),
+    "river": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY}),
+        secondary=frozenset({ReferentClass.SUBSTANCE}),
+    ),
+    "sky": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SPATIAL}),
+        secondary=frozenset(),
+    ),
+    "cloud": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY}),
+        secondary=frozenset({ReferentClass.SUBSTANCE}),
+    ),
+    "stone": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+    "rock": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+    "sand": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+    "island": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SPATIAL}),
+        secondary=frozenset(),
+    ),
+    "valley": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SPATIAL}),
+        secondary=frozenset(),
+    ),
+    "hill": ReferentProfile(
+        primary=frozenset({ReferentClass.NATURAL_BODY, ReferentClass.SPATIAL}),
+        secondary=frozenset(),
+    ),
 
     # SUBSTANCE - materials, matter
-    "water": frozenset({ReferentClass.SUBSTANCE}),
-    "air": frozenset({ReferentClass.SUBSTANCE}),
-    "gold": frozenset({ReferentClass.SUBSTANCE}),
-    "iron": frozenset({ReferentClass.SUBSTANCE}),
-    "wood": frozenset({ReferentClass.SUBSTANCE, ReferentClass.ORGANISM}),
-    "metal": frozenset({ReferentClass.SUBSTANCE}),
-    "glass": frozenset({ReferentClass.SUBSTANCE}),
-    "ice": frozenset({ReferentClass.SUBSTANCE}),
-    "snow": frozenset({ReferentClass.SUBSTANCE, ReferentClass.NATURAL_BODY}),
-    "rain": frozenset({ReferentClass.SUBSTANCE, ReferentClass.PROCESS}),
-    "blood": frozenset({ReferentClass.SUBSTANCE, ReferentClass.ORGANISM}),
-    "oil": frozenset({ReferentClass.SUBSTANCE}),
+    "water": ReferentProfile(
+        primary=frozenset({ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+    "air": ReferentProfile(
+        primary=frozenset({ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+    "gold": ReferentProfile(
+        primary=frozenset({ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+    "iron": ReferentProfile(
+        primary=frozenset({ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+    "wood": ReferentProfile(
+        primary=frozenset({ReferentClass.SUBSTANCE}),
+        secondary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+    ),
+    "metal": ReferentProfile(
+        primary=frozenset({ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+    "glass": ReferentProfile(
+        primary=frozenset({ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+    "ice": ReferentProfile(
+        primary=frozenset({ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+    "snow": ReferentProfile(
+        primary=frozenset({ReferentClass.SUBSTANCE, ReferentClass.NATURAL_BODY}),
+        secondary=frozenset(),
+    ),
+    "rain": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS, ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+    "blood": ReferentProfile(
+        primary=frozenset({ReferentClass.SUBSTANCE}),
+        secondary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+    ),
+    "oil": ReferentProfile(
+        primary=frozenset({ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
+    "food": ReferentProfile(
+        primary=frozenset({ReferentClass.SUBSTANCE}),
+        secondary=frozenset(),
+    ),
 
     # PROCESS - actions, events, transformations
-    "walk": frozenset({ReferentClass.PROCESS}),
-    "run": frozenset({ReferentClass.PROCESS}),
-    "dance": frozenset({ReferentClass.PROCESS}),
-    "sing": frozenset({ReferentClass.PROCESS, ReferentClass.SIGNAL}),
-    "think": frozenset({ReferentClass.PROCESS, ReferentClass.ABSTRACT}),
-    "grow": frozenset({ReferentClass.PROCESS}),
-    "change": frozenset({ReferentClass.PROCESS, ReferentClass.ABSTRACT}),
-    "move": frozenset({ReferentClass.PROCESS}),
-    "flow": frozenset({ReferentClass.PROCESS}),
-    "burn": frozenset({ReferentClass.PROCESS, ReferentClass.LUMINOUS}),
-    "birth": frozenset({ReferentClass.PROCESS, ReferentClass.TEMPORAL}),
-    "death": frozenset({ReferentClass.PROCESS, ReferentClass.TEMPORAL}),
-    "sleep": frozenset({ReferentClass.PROCESS}),
-    "dream": frozenset({ReferentClass.PROCESS, ReferentClass.ABSTRACT}),
-    "war": frozenset({ReferentClass.PROCESS, ReferentClass.SOCIAL}),
-    "peace": frozenset({ReferentClass.ABSTRACT, ReferentClass.SOCIAL}),
+    "walk": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset(),
+    ),
+    "run": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset(),
+    ),
+    "dance": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset(),
+    ),
+    "sing": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset({ReferentClass.SIGNAL}),
+    ),
+    "think": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset({ReferentClass.ABSTRACT}),
+    ),
+    "grow": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset(),
+    ),
+    "change": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "move": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset(),
+    ),
+    "flow": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset(),
+    ),
+    "burn": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
+    "birth": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS, ReferentClass.TEMPORAL}),
+        secondary=frozenset(),
+    ),
+    "death": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS, ReferentClass.TEMPORAL}),
+        secondary=frozenset(),
+    ),
+    "sleep": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset(),
+    ),
+    "dream": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "war": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS, ReferentClass.SOCIAL}),
+        secondary=frozenset(),
+    ),
+    "oxidation": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset(),
+    ),
+    "burning": ReferentProfile(
+        primary=frozenset({ReferentClass.PROCESS}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
 
     # ABSTRACT - concepts, relations, qualities
-    "love": frozenset({ReferentClass.EMOTIONAL, ReferentClass.ABSTRACT}),
-    "hate": frozenset({ReferentClass.EMOTIONAL, ReferentClass.ABSTRACT}),
-    "truth": frozenset({ReferentClass.ABSTRACT}),
-    "justice": frozenset({ReferentClass.ABSTRACT, ReferentClass.SOCIAL}),
-    "freedom": frozenset({ReferentClass.ABSTRACT, ReferentClass.SOCIAL}),
-    "power": frozenset({ReferentClass.ABSTRACT}),
-    "beauty": frozenset({ReferentClass.ABSTRACT}),
-    "wisdom": frozenset({ReferentClass.ABSTRACT}),
-    "knowledge": frozenset({ReferentClass.ABSTRACT, ReferentClass.SIGNAL}),
-    "good": frozenset({ReferentClass.ABSTRACT}),
-    "evil": frozenset({ReferentClass.ABSTRACT}),
-    "right": frozenset({ReferentClass.ABSTRACT}),
-    "wrong": frozenset({ReferentClass.ABSTRACT}),
-    "hope": frozenset({ReferentClass.EMOTIONAL, ReferentClass.ABSTRACT}),
-    "fear": frozenset({ReferentClass.EMOTIONAL, ReferentClass.ABSTRACT}),
-    "idea": frozenset({ReferentClass.ABSTRACT}),
-    "thought": frozenset({ReferentClass.ABSTRACT, ReferentClass.PROCESS}),
-    "mind": frozenset({ReferentClass.ABSTRACT, ReferentClass.ORGANISM}),
-    "soul": frozenset({ReferentClass.ABSTRACT}),
-    "spirit": frozenset({ReferentClass.ABSTRACT}),
+    "love": ReferentProfile(
+        primary=frozenset({ReferentClass.EMOTIONAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "hate": ReferentProfile(
+        primary=frozenset({ReferentClass.EMOTIONAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "truth": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "justice": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT, ReferentClass.SOCIAL}),
+        secondary=frozenset(),
+    ),
+    "freedom": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT, ReferentClass.SOCIAL}),
+        secondary=frozenset(),
+    ),
+    "power": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "beauty": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "wisdom": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "knowledge": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset({ReferentClass.SIGNAL}),
+    ),
+    "good": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "evil": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "right": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "wrong": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "hope": ReferentProfile(
+        primary=frozenset({ReferentClass.EMOTIONAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "fear": ReferentProfile(
+        primary=frozenset({ReferentClass.EMOTIONAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "idea": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "thought": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT, ReferentClass.PROCESS}),
+        secondary=frozenset(),
+    ),
+    "mind": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+    ),
+    "soul": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "spirit": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "peace": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT, ReferentClass.SOCIAL}),
+        secondary=frozenset({ReferentClass.EMOTIONAL}),
+    ),
 
     # EMOTIONAL - feelings, psychological states
-    "happy": frozenset({ReferentClass.EMOTIONAL}),
-    "sad": frozenset({ReferentClass.EMOTIONAL}),
-    "joy": frozenset({ReferentClass.EMOTIONAL}),
-    "sorrow": frozenset({ReferentClass.EMOTIONAL}),
-    "anger": frozenset({ReferentClass.EMOTIONAL}),
-    "calm": frozenset({ReferentClass.EMOTIONAL}),
-    "anxiety": frozenset({ReferentClass.EMOTIONAL}),
-    "peace": frozenset({ReferentClass.EMOTIONAL, ReferentClass.ABSTRACT}),
+    "happy": ReferentProfile(
+        primary=frozenset({ReferentClass.EMOTIONAL}),
+        secondary=frozenset(),
+    ),
+    "sad": ReferentProfile(
+        primary=frozenset({ReferentClass.EMOTIONAL}),
+        secondary=frozenset(),
+    ),
+    "joy": ReferentProfile(
+        primary=frozenset({ReferentClass.EMOTIONAL}),
+        secondary=frozenset(),
+    ),
+    "sorrow": ReferentProfile(
+        primary=frozenset({ReferentClass.EMOTIONAL}),
+        secondary=frozenset(),
+    ),
+    "anger": ReferentProfile(
+        primary=frozenset({ReferentClass.EMOTIONAL}),
+        secondary=frozenset(),
+    ),
+    "calm": ReferentProfile(
+        primary=frozenset({ReferentClass.EMOTIONAL}),
+        secondary=frozenset(),
+    ),
+    "anxiety": ReferentProfile(
+        primary=frozenset({ReferentClass.EMOTIONAL}),
+        secondary=frozenset(),
+    ),
+    "sadness": ReferentProfile(
+        primary=frozenset({ReferentClass.EMOTIONAL}),
+        secondary=frozenset(),
+    ),
+    "emotion": ReferentProfile(
+        primary=frozenset({ReferentClass.EMOTIONAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
 
-    # SOCIAL - roles, relationships
-    "king": frozenset({ReferentClass.SOCIAL, ReferentClass.ORGANISM}),
-    "queen": frozenset({ReferentClass.SOCIAL, ReferentClass.ORGANISM}),
-    "friend": frozenset({ReferentClass.SOCIAL}),
-    "enemy": frozenset({ReferentClass.SOCIAL}),
-    "hero": frozenset({ReferentClass.SOCIAL}),
-    "leader": frozenset({ReferentClass.SOCIAL}),
-    "family": frozenset({ReferentClass.SOCIAL}),
-    "nation": frozenset({ReferentClass.SOCIAL, ReferentClass.SPATIAL}),
-    "community": frozenset({ReferentClass.SOCIAL}),
+    # SOCIAL - roles, relationships, institutions
+    "friend": ReferentProfile(
+        primary=frozenset({ReferentClass.SOCIAL, ReferentClass.ROLE_BEARER}),
+        secondary=frozenset(),
+    ),
+    "enemy": ReferentProfile(
+        primary=frozenset({ReferentClass.SOCIAL, ReferentClass.ROLE_BEARER}),
+        secondary=frozenset(),
+    ),
+    "family": ReferentProfile(
+        primary=frozenset({ReferentClass.SOCIAL}),
+        secondary=frozenset(),
+    ),
+    "nation": ReferentProfile(
+        primary=frozenset({ReferentClass.SOCIAL, ReferentClass.SPATIAL}),
+        secondary=frozenset(),
+    ),
+    "community": ReferentProfile(
+        primary=frozenset({ReferentClass.SOCIAL}),
+        secondary=frozenset(),
+    ),
 
     # SIGNAL - communication, information
-    "word": frozenset({ReferentClass.SIGNAL, ReferentClass.ABSTRACT}),
-    "voice": frozenset({ReferentClass.SIGNAL, ReferentClass.ORGANISM}),
-    "song": frozenset({ReferentClass.SIGNAL}),
-    "music": frozenset({ReferentClass.SIGNAL}),
-    "message": frozenset({ReferentClass.SIGNAL}),
-    "language": frozenset({ReferentClass.SIGNAL, ReferentClass.ABSTRACT}),
-    "name": frozenset({ReferentClass.SIGNAL, ReferentClass.ABSTRACT}),
-    "silence": frozenset({ReferentClass.SIGNAL, ReferentClass.ABSTRACT}),
+    "word": ReferentProfile(
+        primary=frozenset({ReferentClass.SIGNAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "voice": ReferentProfile(
+        primary=frozenset({ReferentClass.SIGNAL}),
+        secondary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+    ),
+    "song": ReferentProfile(
+        primary=frozenset({ReferentClass.SIGNAL}),
+        secondary=frozenset(),
+    ),
+    "music": ReferentProfile(
+        primary=frozenset({ReferentClass.SIGNAL}),
+        secondary=frozenset(),
+    ),
+    "message": ReferentProfile(
+        primary=frozenset({ReferentClass.SIGNAL}),
+        secondary=frozenset(),
+    ),
+    "language": ReferentProfile(
+        primary=frozenset({ReferentClass.SIGNAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "name": ReferentProfile(
+        primary=frozenset({ReferentClass.SIGNAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "silence": ReferentProfile(
+        primary=frozenset({ReferentClass.SIGNAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
 
     # TEMPORAL - time-related
-    "time": frozenset({ReferentClass.TEMPORAL, ReferentClass.ABSTRACT}),
-    "day": frozenset({ReferentClass.TEMPORAL}),
-    "night": frozenset({ReferentClass.TEMPORAL, ReferentClass.LUMINOUS}),
-    "year": frozenset({ReferentClass.TEMPORAL}),
-    "moment": frozenset({ReferentClass.TEMPORAL}),
-    "past": frozenset({ReferentClass.TEMPORAL, ReferentClass.ABSTRACT}),
-    "future": frozenset({ReferentClass.TEMPORAL, ReferentClass.ABSTRACT}),
-    "now": frozenset({ReferentClass.TEMPORAL}),
-    "ancient": frozenset({ReferentClass.TEMPORAL}),
-    "new": frozenset({ReferentClass.TEMPORAL}),
-    "old": frozenset({ReferentClass.TEMPORAL}),
-    "young": frozenset({ReferentClass.TEMPORAL, ReferentClass.ORGANISM}),
+    "time": ReferentProfile(
+        primary=frozenset({ReferentClass.TEMPORAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "day": ReferentProfile(
+        primary=frozenset({ReferentClass.TEMPORAL}),
+        secondary=frozenset(),
+    ),
+    "night": ReferentProfile(
+        primary=frozenset({ReferentClass.TEMPORAL}),
+        secondary=frozenset({ReferentClass.LUMINOUS}),
+    ),
+    "year": ReferentProfile(
+        primary=frozenset({ReferentClass.TEMPORAL}),
+        secondary=frozenset(),
+    ),
+    "moment": ReferentProfile(
+        primary=frozenset({ReferentClass.TEMPORAL}),
+        secondary=frozenset(),
+    ),
+    "past": ReferentProfile(
+        primary=frozenset({ReferentClass.TEMPORAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "future": ReferentProfile(
+        primary=frozenset({ReferentClass.TEMPORAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "now": ReferentProfile(
+        primary=frozenset({ReferentClass.TEMPORAL}),
+        secondary=frozenset(),
+    ),
+    "ancient": ReferentProfile(
+        primary=frozenset({ReferentClass.TEMPORAL}),
+        secondary=frozenset(),
+    ),
+    "new": ReferentProfile(
+        primary=frozenset({ReferentClass.TEMPORAL}),
+        secondary=frozenset(),
+    ),
+    "old": ReferentProfile(
+        primary=frozenset({ReferentClass.TEMPORAL}),
+        secondary=frozenset(),
+    ),
+    "young": ReferentProfile(
+        primary=frozenset({ReferentClass.TEMPORAL}),
+        secondary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+    ),
 
     # SPATIAL - space, location, direction
-    "place": frozenset({ReferentClass.SPATIAL}),
-    "space": frozenset({ReferentClass.SPATIAL, ReferentClass.ABSTRACT}),
-    "path": frozenset({ReferentClass.SPATIAL}),
-    "road": frozenset({ReferentClass.SPATIAL, ReferentClass.ARTIFACT}),
-    "world": frozenset({ReferentClass.SPATIAL}),
-    "home": frozenset({ReferentClass.SPATIAL, ReferentClass.SOCIAL}),
-    "distance": frozenset({ReferentClass.SPATIAL, ReferentClass.ABSTRACT}),
-    "height": frozenset({ReferentClass.SPATIAL, ReferentClass.ABSTRACT}),
-    "depth": frozenset({ReferentClass.SPATIAL, ReferentClass.ABSTRACT}),
+    "place": ReferentProfile(
+        primary=frozenset({ReferentClass.SPATIAL}),
+        secondary=frozenset(),
+    ),
+    "space": ReferentProfile(
+        primary=frozenset({ReferentClass.SPATIAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "path": ReferentProfile(
+        primary=frozenset({ReferentClass.SPATIAL}),
+        secondary=frozenset(),
+    ),
+    "road": ReferentProfile(
+        primary=frozenset({ReferentClass.SPATIAL, ReferentClass.ARTIFACT}),
+        secondary=frozenset(),
+    ),
+    "world": ReferentProfile(
+        primary=frozenset({ReferentClass.SPATIAL}),
+        secondary=frozenset(),
+    ),
+    "home": ReferentProfile(
+        primary=frozenset({ReferentClass.SPATIAL, ReferentClass.SOCIAL}),
+        secondary=frozenset(),
+    ),
+    "distance": ReferentProfile(
+        primary=frozenset({ReferentClass.SPATIAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "height": ReferentProfile(
+        primary=frozenset({ReferentClass.SPATIAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "depth": ReferentProfile(
+        primary=frozenset({ReferentClass.SPATIAL, ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
 
-    # Additional common words
-    "heart": frozenset({ReferentClass.ORGANISM, ReferentClass.EMOTIONAL}),
-    "hand": frozenset({ReferentClass.ORGANISM}),
-    "eye": frozenset({ReferentClass.ORGANISM}),
-    "body": frozenset({ReferentClass.ORGANISM}),
-    "face": frozenset({ReferentClass.ORGANISM, ReferentClass.SOCIAL}),
-    "head": frozenset({ReferentClass.ORGANISM}),
-    "life": frozenset({ReferentClass.ABSTRACT, ReferentClass.PROCESS}),
-    "art": frozenset({ReferentClass.ABSTRACT, ReferentClass.ARTIFACT}),
-    "science": frozenset({ReferentClass.ABSTRACT}),
-    "nature": frozenset({ReferentClass.ABSTRACT, ReferentClass.NATURAL_BODY}),
-    "god": frozenset({ReferentClass.ABSTRACT, ReferentClass.SOCIAL}),
-    "dark": frozenset({ReferentClass.LUMINOUS, ReferentClass.ABSTRACT}),
-    "darkness": frozenset({ReferentClass.LUMINOUS, ReferentClass.ABSTRACT}),
-    "banana": frozenset({ReferentClass.ORGANISM, ReferentClass.SUBSTANCE}),
-    "apple": frozenset({ReferentClass.ORGANISM, ReferentClass.SUBSTANCE}),
-    "orange": frozenset({ReferentClass.ORGANISM, ReferentClass.SUBSTANCE}),
-    "food": frozenset({ReferentClass.SUBSTANCE}),
+    # Body parts and related
+    "heart": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset({ReferentClass.EMOTIONAL}),
+    ),
+    "hand": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset(),
+    ),
+    "eye": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset(),
+    ),
+    "body": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset(),
+    ),
+    "face": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset({ReferentClass.SOCIAL}),
+    ),
+    "head": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset(),
+    ),
+    "feather": ReferentProfile(
+        primary=frozenset({ReferentClass.BIOLOGICAL_ORGANISM}),
+        secondary=frozenset(),
+    ),
+    "heavy": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+
+    # Additional abstract/complex
+    "life": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT, ReferentClass.PROCESS}),
+        secondary=frozenset(),
+    ),
+    "art": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset({ReferentClass.ARTIFACT}),
+    ),
+    "science": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset(),
+    ),
+    "nature": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset({ReferentClass.NATURAL_BODY}),
+    ),
+    "god": ReferentProfile(
+        primary=frozenset({ReferentClass.ABSTRACT}),
+        secondary=frozenset({ReferentClass.SOCIAL}),
+    ),
 }
 
 
 # =============================================================================
-# Referent Coherence Computation
+# Referent Coherence Computation (Primary/Secondary aware)
 # =============================================================================
 
 @dataclass(frozen=True)
@@ -268,22 +825,25 @@ class ReferentAnalysis:
     coherence: float  # S ∈ [0, 1]
     word_a: str
     word_b: str
-    classes_a: FrozenSet[ReferentClass]
-    classes_b: FrozenSet[ReferentClass]
-    shared_classes: FrozenSet[ReferentClass]
-    jaccard_similarity: float
+    primary_a: FrozenSet[ReferentClass]
+    primary_b: FrozenSet[ReferentClass]
+    secondary_a: FrozenSet[ReferentClass]
+    secondary_b: FrozenSet[ReferentClass]
+    shared_primary: FrozenSet[ReferentClass]
+    shared_secondary: FrozenSet[ReferentClass]
     is_grounded: bool  # Both words have known referents
+    is_unknown: bool   # Flag for UNKNOWN_REFERENT
 
 
-def get_referent_classes(word: str) -> FrozenSet[ReferentClass]:
+def get_referent_profile(word: str) -> ReferentProfile:
     """
-    Get referent classes for a word.
+    Get referent profile (primary + secondary classes) for a word.
 
     Args:
         word: The word to look up
 
     Returns:
-        FrozenSet of ReferentClass values
+        ReferentProfile with primary and secondary classes
     """
     word_lower = word.lower().strip()
 
@@ -291,20 +851,26 @@ def get_referent_classes(word: str) -> FrozenSet[ReferentClass]:
         return WORD_TO_REFERENT[word_lower]
 
     # Unknown word
-    return frozenset({ReferentClass.UNKNOWN})
+    return ReferentProfile(
+        primary=frozenset({ReferentClass.UNKNOWN}),
+        secondary=frozenset(),
+    )
 
 
 def compute_referent_coherence(word_a: str, word_b: str) -> ReferentAnalysis:
     """
     Compute referential coherence (S) between two words.
 
-    S answers: "Do these two tokens point to the same external invariant?"
+    S computation (per ChatGPT refinement):
+    - Primary overlap → high coherence (0.7-1.0)
+    - Secondary overlap only → partial coherence (0.3-0.5)
+    - No overlap → zero coherence
 
     Key properties:
     - Not phonemic
     - Not acoustic
     - Deterministic
-    - Returns 0 if referents don't overlap
+    - Properly handles primary vs secondary distinction
 
     Args:
         word_a: First word
@@ -313,74 +879,87 @@ def compute_referent_coherence(word_a: str, word_b: str) -> ReferentAnalysis:
     Returns:
         ReferentAnalysis with coherence score
     """
-    classes_a = get_referent_classes(word_a)
-    classes_b = get_referent_classes(word_b)
+    profile_a = get_referent_profile(word_a)
+    profile_b = get_referent_profile(word_b)
 
     # Check if both words are grounded (not UNKNOWN)
-    is_a_known = ReferentClass.UNKNOWN not in classes_a
-    is_b_known = ReferentClass.UNKNOWN not in classes_b
+    is_a_known = ReferentClass.UNKNOWN not in profile_a.primary
+    is_b_known = ReferentClass.UNKNOWN not in profile_b.primary
     is_grounded = is_a_known and is_b_known
+    is_unknown = not is_grounded
 
-    # If either word is unknown, we can't compute meaningful coherence
-    if not is_grounded:
-        # Return neutral score for unknown words
+    # If either word is unknown, flag it properly
+    if is_unknown:
         return ReferentAnalysis(
-            coherence=0.5,  # Neutral - we don't know
+            coherence=0.5,  # Epistemic uncertainty, not neutrality
             word_a=word_a,
             word_b=word_b,
-            classes_a=classes_a,
-            classes_b=classes_b,
-            shared_classes=frozenset(),
-            jaccard_similarity=0.0,
+            primary_a=profile_a.primary,
+            primary_b=profile_b.primary,
+            secondary_a=profile_a.secondary,
+            secondary_b=profile_b.secondary,
+            shared_primary=frozenset(),
+            shared_secondary=frozenset(),
             is_grounded=False,
+            is_unknown=True,
         )
 
-    # Compute Jaccard similarity of referent class sets
-    shared = classes_a & classes_b
-    union = classes_a | classes_b
+    # Compute primary overlap
+    shared_primary = profile_a.primary & profile_b.primary
 
-    if not union:
-        jaccard = 0.0
+    # Compute secondary overlap (including cross primary-secondary)
+    # a's secondary with b's primary/secondary, and vice versa
+    all_secondary_a = profile_a.secondary | profile_a.primary
+    all_secondary_b = profile_b.secondary | profile_b.primary
+    shared_secondary = (profile_a.secondary & all_secondary_b) | \
+                       (profile_b.secondary & all_secondary_a)
+    # Remove what's already in primary overlap
+    shared_secondary = shared_secondary - shared_primary
+
+    # Compute coherence score
+    if shared_primary:
+        # Primary overlap → high coherence
+        # Base: 0.7, boost by number of shared primary classes
+        coherence = 0.7 + (0.3 * min(len(shared_primary), 2) / 2)
+    elif shared_secondary:
+        # Secondary overlap only → partial coherence
+        # Base: 0.3, boost by number of shared secondary classes
+        coherence = 0.3 + (0.2 * min(len(shared_secondary), 2) / 2)
     else:
-        jaccard = len(shared) / len(union)
-
-    # Coherence is based on Jaccard but with boost for shared classes
-    # If they share ANY class, there's some coherence
-    if shared:
-        # Base coherence from Jaccard
-        coherence = jaccard
-
-        # Boost for having shared classes (minimum coherence if any overlap)
-        coherence = max(coherence, 0.3 * len(shared))
-
-        # Cap at 1.0
-        coherence = min(1.0, coherence)
-    else:
-        # No shared classes = no referential coherence
+        # No overlap → zero coherence
         coherence = 0.0
+
+    # Cap at 1.0
+    coherence = min(1.0, coherence)
 
     return ReferentAnalysis(
         coherence=round(coherence, 4),
         word_a=word_a,
         word_b=word_b,
-        classes_a=classes_a,
-        classes_b=classes_b,
-        shared_classes=shared,
-        jaccard_similarity=round(jaccard, 4),
+        primary_a=profile_a.primary,
+        primary_b=profile_b.primary,
+        secondary_a=profile_a.secondary,
+        secondary_b=profile_b.secondary,
+        shared_primary=shared_primary,
+        shared_secondary=shared_secondary,
         is_grounded=True,
+        is_unknown=False,
     )
 
 
 def format_referent_analysis(analysis: ReferentAnalysis) -> str:
     """Format referent analysis for display."""
-    classes_a_str = ", ".join(c.value for c in analysis.classes_a)
-    classes_b_str = ", ".join(c.value for c in analysis.classes_b)
-    shared_str = ", ".join(c.value for c in analysis.shared_classes) or "none"
+    primary_a_str = ", ".join(c.value for c in analysis.primary_a)
+    primary_b_str = ", ".join(c.value for c in analysis.primary_b)
+    shared_p_str = ", ".join(c.value for c in analysis.shared_primary) or "none"
+    shared_s_str = ", ".join(c.value for c in analysis.shared_secondary) or "none"
+
+    unknown_flag = " [UNKNOWN_REFERENT]" if analysis.is_unknown else ""
 
     return (
-        f"{analysis.word_a} [{classes_a_str}] ↔ {analysis.word_b} [{classes_b_str}]\n"
-        f"  Shared: {shared_str}\n"
-        f"  Jaccard: {analysis.jaccard_similarity:.3f}\n"
+        f"{analysis.word_a} [P: {primary_a_str}] ↔ {analysis.word_b} [P: {primary_b_str}]{unknown_flag}\n"
+        f"  Shared Primary: {shared_p_str}\n"
+        f"  Shared Secondary: {shared_s_str}\n"
         f"  Coherence (S): {analysis.coherence:.3f}"
     )
 
@@ -391,9 +970,10 @@ def format_referent_analysis(analysis: ReferentAnalysis) -> str:
 
 __all__ = [
     "ReferentClass",
+    "ReferentProfile",
     "ReferentAnalysis",
     "WORD_TO_REFERENT",
-    "get_referent_classes",
+    "get_referent_profile",
     "compute_referent_coherence",
     "format_referent_analysis",
 ]
