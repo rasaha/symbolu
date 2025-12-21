@@ -123,8 +123,8 @@
     └─────────────┘ └─────────────┘ └─────────────┘
           │               │               │
           ▼               ▼               ▼
-    Classification   Specialized      Smart routing
-    & Search         Generation       7B → 175B
+    Classification   Specialized     Smart routing
+                      generation     with fallback
 ```
 
 **Legend:**
@@ -149,11 +149,11 @@
 
 ## 5. Pick Your Tier
 
-| Tier | Components | Best For | Latency | LLM Cost |
-|------|------------|----------|---------|----------|
-| **Enterprise Search** | STL only | Classification, filtering, search | 0.1ms | $0 |
-| **Enterprise Chat** | STL + 7B | Specialized chat, domain expertise | ~500ms | Low |
-| **Cascade** | STL + 768D + 7B/175B | Quality-critical with cost optimization | 100ms-1s | Medium |
+| Tier | Purpose | Components | Latency | LLM Cost |
+|------|---------|------------|---------|----------|
+| **Enterprise Search** | Classification | STL only | 0.1ms | $0 |
+| **Enterprise Chat** | Specialized generation | STL + 7B | ~500ms | Low |
+| **Cascade** | Smart routing with fallback | STL + 768D + 7B/175B | 100ms-1s | Medium |
 
 ### Decision Matrix
 
