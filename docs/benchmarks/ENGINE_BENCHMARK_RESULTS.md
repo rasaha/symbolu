@@ -246,6 +246,8 @@ But: Still <1ms total latency for routing
 
 ### Cross-Domain Insights (Live Demo Output)
 
+**Note**: Thresholds relaxed from 0.5 to 0.1 - all pattern matches now surfaced.
+
 ```
 Available insights (structurally validated):
   [structural_match] Structural pattern match with finance analysis. (match: 30%)
@@ -327,6 +329,11 @@ Propagation needed: ['IDENTIFICATION_SINGULARITY']
 
 7. **AGI adds ~0.5ms overhead** - event tagging, balance checking, persona tracking all included in <1ms
 
+8. **Cross-domain thresholds relaxed** - lowered from 0.5/0.3/0.4 to 0.1/0.1/0.1
+   - Previously: Cross-domain insights with 26-30% similarity were filtered out
+   - Now: All structural pattern matches are surfaced for discovery
+   - Enables more cross-domain connections while keeping safety blocks for sensitive pairs
+
 ---
 
 ## Recommendations
@@ -379,3 +386,4 @@ print(f'Intent: {result.model_type.value}, Confidence: {result.confidence:.0%}')
   - feat: Add custom vocabulary support
   - feat: Add three-tier engine architecture
   - feat: Integrate AGI capabilities from 10D backbone
+  - feat: Relax cross-domain thresholds (0.5 → 0.1) for better pattern discovery

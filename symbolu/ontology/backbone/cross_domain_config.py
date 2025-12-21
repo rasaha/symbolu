@@ -176,9 +176,11 @@ class CrossDomainConfig:
     default_policy: DomainPairPolicy = DomainPairPolicy.ALLOW
 
     # Default thresholds (can be overridden per-pair)
-    default_structural_threshold: float = 0.5
-    default_causal_threshold: float = 0.3
-    default_combined_threshold: float = 0.4
+    # NOTE: Lowered from 0.5/0.3/0.4 to allow more cross-domain connections
+    # The original "anti-advertising" thresholds were filtering out valid patterns
+    default_structural_threshold: float = 0.1
+    default_causal_threshold: float = 0.1
+    default_combined_threshold: float = 0.1
 
     # Per-pair configurations
     domain_pairs: Dict[str, DomainPairConfig] = field(default_factory=dict)
@@ -402,9 +404,9 @@ def create_default_config() -> CrossDomainConfig:
     config = CrossDomainConfig(
         enabled=True,
         default_policy=DomainPairPolicy.ALLOW,
-        default_structural_threshold=0.5,
-        default_causal_threshold=0.3,
-        default_combined_threshold=0.4,
+        default_structural_threshold=0.1,
+        default_causal_threshold=0.1,
+        default_combined_threshold=0.1,
         version="1.0",
         last_updated=datetime.utcnow().isoformat(),
     )

@@ -235,11 +235,12 @@ def compute_balance(vector: DimensionalVector, threshold: float = 0.4) -> Balanc
     )
 
 
-def is_transferable_insight(vector: DimensionalVector, min_balance: float = 0.6) -> bool:
+def is_transferable_insight(vector: DimensionalVector, min_balance: float = 0.3) -> bool:
     """
     Check if a vector represents a transferable insight.
 
     Transferable insights have good balance between concrete and abstract.
+    NOTE: min_balance lowered from 0.6 to 0.3 to allow more cross-domain connections.
 
     Args:
         vector: The dimensional vector

@@ -301,7 +301,7 @@ def retrieve_similar(
     query: str,
     current_domain: Optional[str] = None,
     top_k: int = 5,
-    min_similarity: float = 0.5,
+    min_similarity: float = 0.1,  # Lowered from 0.5 to allow more cross-domain matches
     cross_domain_only: bool = False,
     store: Optional[ExperientialStore] = None,
     query_chain: Optional[List[str]] = None,
@@ -413,9 +413,9 @@ def retrieve_similar(
             pair_min_causal = thresholds["causal"]
             pair_min_combined = thresholds["combined"]
         else:
-            # Same domain or no domain specified - use defaults
+            # Same domain or no domain specified - use relaxed defaults
             pair_min_structural = min_similarity
-            pair_min_causal = 0.3
+            pair_min_causal = 0.1  # Lowered from 0.3
             pair_min_combined = min_similarity
 
         # Compute chain similarity (PRIMARY)

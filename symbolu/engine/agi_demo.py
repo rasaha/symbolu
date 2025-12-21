@@ -211,9 +211,9 @@ def run_demo():
    - Track which domains and events each user explores
    - Bridges emerge from usage, not extraction
 
-4. STRUCTURAL VALIDATION: Insights require validated structural match
-   - 10D similarity >= 0.5 OR causal chain overlap >= 0.3
-   - Without validation, cross-domain suggestions = advertising
+4. STRUCTURAL VALIDATION: Cross-domain insights are now permissive
+   - 10D similarity >= 0.1 (lowered from 0.5)
+   - Enables more cross-domain pattern discovery
 
 5. CANONICAL MATCHING (C × R × S): Source-independent semantic validation
    - C and R derive from phonemic analysis (same source)
