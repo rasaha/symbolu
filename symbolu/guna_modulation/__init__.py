@@ -396,6 +396,31 @@ from symbolu.guna_modulation.experimental_reasoning import (
     CAPABILITY_MATRIX,
 )
 
+# Mirror Balance (v2.7.4) - Self-referential balance and cross-layer dissonance
+from symbolu.guna_modulation.mirror_balance import (
+    # Core mirror types
+    MirrorPair,
+    BalanceCorrection,
+    SelfQuestion,
+    # Mirror functions
+    compute_mirror_observables,
+    create_mirror_pair,
+    compute_balance_correction,
+    apply_balance_correction,
+    compute_harmonic_mirror,
+    generate_self_questions,
+    # Mirror engine
+    MirrorBalanceEngine,
+    # Ontological layers
+    OntologicalLayer,
+    # Cross-layer dissonance
+    LayerState,
+    LayerDissonance,
+    compute_layer_dissonance,
+    generate_ambition_questions,
+    LayerDissonanceMonitor,
+)
+
 
 __all__ = [
     # Constants
@@ -630,6 +655,30 @@ __all__ = [
     "create_mcts",
     # Capability reference
     "CAPABILITY_MATRIX",
+    # =========================================================================
+    # Mirror Balance (v2.7.4)
+    # =========================================================================
+    # Core mirror types
+    "MirrorPair",
+    "BalanceCorrection",
+    "SelfQuestion",
+    # Mirror functions
+    "compute_mirror_observables",
+    "create_mirror_pair",
+    "compute_balance_correction",
+    "apply_balance_correction",
+    "compute_harmonic_mirror",
+    "generate_self_questions",
+    # Mirror engine
+    "MirrorBalanceEngine",
+    # Ontological layers
+    "OntologicalLayer",
+    # Cross-layer dissonance
+    "LayerState",
+    "LayerDissonance",
+    "compute_layer_dissonance",
+    "generate_ambition_questions",
+    "LayerDissonanceMonitor",
 ]
 
 

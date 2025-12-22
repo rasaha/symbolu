@@ -1,0 +1,468 @@
+"""
+Tests for MirrorBalance module.
+
+Tests:
+- Mirror observables computation
+- Balance detection and correction
+- Self-questioning protocol
+- Ontological layer hierarchy
+- Cross-layer dissonance detection
+- Cognitive ambition measurement
+"""
+
+import pytest
+import math
+from symbolu.guna_modulation.observables import Observables, MotionType
+from symbolu.guna_modulation.mirror_balance import (
+    # Core mirror functions
+    compute_mirror_observables,
+    create_mirror_pair,
+    MirrorPair,
+    # Balance correction
+    compute_balance_correction,
+    apply_balance_correction,
+    BalanceCorrection,
+    MirrorBalanceEngine,
+    # Harmonic mirror
+    compute_harmonic_mirror,
+    # Self-questioning
+    generate_self_questions,
+    SelfQuestion,
+    # Ontological layers
+    OntologicalLayer,
+    # Cross-layer dissonance
+    LayerState,
+    LayerDissonance,
+    compute_layer_dissonance,
+    LayerDissonanceMonitor,
+    generate_ambition_questions,
+)
+
+
+# =============================================================================
+# Test Fixtures
+# =============================================================================
+
+@pytest.fixture
+def balanced_observables():
+    """Observables that are balanced (S ≈ T, H ≈ 0.5, M ≈ 0.5)."""
+    return Observables(
+        s=0.35,
+        r=0.30,
+        t=0.35,
+        H=0.5,
+        delta_sem=0.5,
+        C_contr=0.1,
+        F_fail=0.05,
+    )
+
+
+@pytest.fixture
+def sattva_heavy_observables():
+    """Observables biased toward Sattva."""
+    return Observables(
+        s=0.7,
+        r=0.2,
+        t=0.1,
+        H=0.3,
+        delta_sem=0.2,
+        C_contr=0.05,
+        F_fail=0.0,
+    )
+
+
+@pytest.fixture
+def tamas_heavy_observables():
+    """Observables biased toward Tamas."""
+    return Observables(
+        s=0.1,
+        r=0.2,
+        t=0.7,
+        H=0.7,
+        delta_sem=0.8,
+        C_contr=0.3,
+        F_fail=0.2,
+    )
+
+
+# =============================================================================
+# Mirror Observables Tests
+# =============================================================================
+
+class TestMirrorObservables:
+    """Tests for compute_mirror_observables."""
+
+    def test_guna_swap(self, sattva_heavy_observables):
+        """Mirror swaps Sattva and Tamas."""
+        mirror = compute_mirror_observables(sattva_heavy_observables)
+        assert mirror.s == sattva_heavy_observables.t
+        assert mirror.t == sattva_heavy_observables.s
+        assert mirror.r == sattva_heavy_observables.r
+
+    def test_entropy_complement(self, balanced_observables):
+        """Mirror has complementary entropy."""
+        mirror = compute_mirror_observables(balanced_observables)
+        assert mirror.H == pytest.approx(1.0 - balanced_observables.H)
+
+    def test_motion_complement(self, balanced_observables):
+        """Mirror has complementary motion."""
+        mirror = compute_mirror_observables(balanced_observables)
+        assert mirror.delta_sem == pytest.approx(1.0 - balanced_observables.delta_sem)
+
+    def test_double_mirror_identity(self, sattva_heavy_observables):
+        """Mirroring twice returns to original."""
+        mirror = compute_mirror_observables(sattva_heavy_observables)
+        double_mirror = compute_mirror_observables(mirror)
+        assert double_mirror.s == pytest.approx(sattva_heavy_observables.s)
+        assert double_mirror.t == pytest.approx(sattva_heavy_observables.t)
+        assert double_mirror.H == pytest.approx(sattva_heavy_observables.H)
+
+    def test_balanced_mirror_similar(self, balanced_observables):
+        """Balanced observables have similar mirror."""
+        mirror = compute_mirror_observables(balanced_observables)
+        # For balanced obs (S=T, H=0.5), mirror should be identical
+        assert abs(mirror.s - balanced_observables.s) < 0.01
+        assert abs(mirror.H - balanced_observables.H) < 0.01
+
+
+# =============================================================================
+# Mirror Pair Tests
+# =============================================================================
+
+class TestMirrorPair:
+    """Tests for MirrorPair and asymmetry detection."""
+
+    def test_balanced_has_low_asymmetry(self, balanced_observables):
+        """Balanced observables have low total asymmetry."""
+        pair = create_mirror_pair(balanced_observables)
+        assert pair.total_asymmetry < 0.15
+        assert pair.is_balanced
+
+    def test_unbalanced_has_high_asymmetry(self, sattva_heavy_observables):
+        """Unbalanced observables have high asymmetry."""
+        pair = create_mirror_pair(sattva_heavy_observables)
+        assert pair.guna_asymmetry > 0.5  # |S - T| = 0.6
+        assert not pair.is_balanced
+
+    def test_balance_direction_sattva_heavy(self, sattva_heavy_observables):
+        """Detects sattva-heavy direction."""
+        pair = create_mirror_pair(sattva_heavy_observables)
+        assert "sattva-heavy" in pair.balance_direction
+
+    def test_balance_direction_tamas_heavy(self, tamas_heavy_observables):
+        """Detects tamas-heavy direction."""
+        pair = create_mirror_pair(tamas_heavy_observables)
+        assert "tamas-heavy" in pair.balance_direction
+
+
+# =============================================================================
+# Balance Correction Tests
+# =============================================================================
+
+class TestBalanceCorrection:
+    """Tests for balance correction computation and application."""
+
+    def test_correction_reduces_asymmetry(self, sattva_heavy_observables):
+        """Correction should reduce asymmetry."""
+        correction = compute_balance_correction(sattva_heavy_observables, learning_rate=0.5)
+        assert correction.asymmetry_after < correction.asymmetry_before
+        assert correction.improvement_ratio > 0
+
+    def test_small_learning_rate_small_delta(self, sattva_heavy_observables):
+        """Small learning rate produces small deltas."""
+        small = compute_balance_correction(sattva_heavy_observables, learning_rate=0.1)
+        large = compute_balance_correction(sattva_heavy_observables, learning_rate=0.5)
+        assert small.correction_magnitude < large.correction_magnitude
+
+    def test_apply_correction_maintains_constraints(self, sattva_heavy_observables):
+        """Applied correction maintains Guna sum = 1."""
+        correction = compute_balance_correction(sattva_heavy_observables, learning_rate=0.3)
+        corrected = apply_balance_correction(sattva_heavy_observables, correction)
+        assert corrected.s + corrected.r + corrected.t == pytest.approx(1.0)
+        assert 0 <= corrected.H <= 1
+        assert 0 <= corrected.delta_sem <= 1
+
+    def test_correction_moves_toward_balance(self, sattva_heavy_observables):
+        """Corrected observables are more balanced."""
+        correction = compute_balance_correction(sattva_heavy_observables, learning_rate=0.3)
+        corrected = apply_balance_correction(sattva_heavy_observables, correction)
+
+        original_pair = create_mirror_pair(sattva_heavy_observables)
+        corrected_pair = create_mirror_pair(corrected)
+
+        assert corrected_pair.total_asymmetry < original_pair.total_asymmetry
+
+
+# =============================================================================
+# Mirror Balance Engine Tests
+# =============================================================================
+
+class TestMirrorBalanceEngine:
+    """Tests for MirrorBalanceEngine."""
+
+    def test_analyze_returns_pair(self, balanced_observables):
+        """Analyze returns MirrorPair."""
+        engine = MirrorBalanceEngine()
+        pair = engine.analyze(balanced_observables)
+        assert isinstance(pair, MirrorPair)
+
+    def test_history_tracking(self, sattva_heavy_observables, tamas_heavy_observables):
+        """Engine tracks history of asymmetry."""
+        engine = MirrorBalanceEngine()
+        engine.analyze(sattva_heavy_observables)
+        engine.analyze(tamas_heavy_observables)
+        assert len(engine.asymmetry_trend) == 2
+
+    def test_auto_correct_mode(self, sattva_heavy_observables):
+        """Auto-correct mode applies corrections."""
+        engine = MirrorBalanceEngine(auto_correct=True, learning_rate=0.2)
+        corrected, pair = engine.process(sattva_heavy_observables)
+        # Should be different from original
+        assert corrected.s != sattva_heavy_observables.s
+
+    def test_no_auto_correct_mode(self, sattva_heavy_observables):
+        """Non-auto-correct mode returns original."""
+        engine = MirrorBalanceEngine(auto_correct=False)
+        result, pair = engine.process(sattva_heavy_observables)
+        assert result.s == sattva_heavy_observables.s
+
+
+# =============================================================================
+# Harmonic Mirror Tests
+# =============================================================================
+
+class TestHarmonicMirror:
+    """Tests for harmonic mirror (HRM integration)."""
+
+    def test_harmonic_mirror_blends_signals(self, sattva_heavy_observables):
+        """Harmonic mirror blends original, mirror, and balance."""
+        harmonic = compute_harmonic_mirror(sattva_heavy_observables)
+        # Should be between original and mirror
+        assert sattva_heavy_observables.s > harmonic.s > sattva_heavy_observables.t
+
+    def test_harmonic_maintains_constraints(self, sattva_heavy_observables):
+        """Harmonic maintains Guna sum = 1."""
+        harmonic = compute_harmonic_mirror(sattva_heavy_observables)
+        assert harmonic.s + harmonic.r + harmonic.t == pytest.approx(1.0)
+
+    def test_harmonic_more_balanced(self, sattva_heavy_observables):
+        """Harmonic is more balanced than original."""
+        harmonic = compute_harmonic_mirror(sattva_heavy_observables)
+        original_pair = create_mirror_pair(sattva_heavy_observables)
+        harmonic_pair = create_mirror_pair(harmonic)
+        assert harmonic_pair.total_asymmetry < original_pair.total_asymmetry
+
+
+# =============================================================================
+# Self-Questioning Tests
+# =============================================================================
+
+class TestSelfQuestioning:
+    """Tests for self-questioning protocol."""
+
+    def test_balanced_few_questions(self, balanced_observables):
+        """Balanced observables generate few questions."""
+        questions = generate_self_questions(balanced_observables)
+        assert len(questions) <= 2  # Maybe just subtle ones
+
+    def test_unbalanced_many_questions(self, tamas_heavy_observables):
+        """Unbalanced observables generate many questions."""
+        questions = generate_self_questions(tamas_heavy_observables)
+        assert len(questions) >= 3  # Multiple concerns
+
+    def test_questions_have_severity(self, sattva_heavy_observables):
+        """Questions include severity classification."""
+        questions = generate_self_questions(sattva_heavy_observables)
+        for q in questions:
+            assert q.severity in ["low", "medium", "high"]
+
+    def test_high_contradiction_flags_question(self):
+        """High contradiction generates question."""
+        obs = Observables(
+            s=0.33, r=0.34, t=0.33,
+            H=0.5, delta_sem=0.5,
+            C_contr=0.5,  # High contradiction
+            F_fail=0.0,
+        )
+        questions = generate_self_questions(obs)
+        question_signals = [q.signal for q in questions]
+        assert "contradiction" in question_signals
+
+
+# =============================================================================
+# Ontological Layer Tests
+# =============================================================================
+
+class TestOntologicalLayer:
+    """Tests for ontological layer hierarchy."""
+
+    def test_layer_levels(self):
+        """Layers have correct levels."""
+        assert OntologicalLayer.level(OntologicalLayer.SIGNAL) == 0
+        assert OntologicalLayer.level(OntologicalLayer.EMBEDDING) == 1
+        assert OntologicalLayer.level(OntologicalLayer.GUNA) == 2
+        assert OntologicalLayer.level(OntologicalLayer.OUTPUT) == 6
+
+    def test_adjacent_detection(self):
+        """Correctly detects adjacent layers."""
+        assert OntologicalLayer.is_adjacent(OntologicalLayer.SIGNAL, OntologicalLayer.EMBEDDING)
+        assert OntologicalLayer.is_adjacent(OntologicalLayer.GUNA, OntologicalLayer.MOTION)
+        assert not OntologicalLayer.is_adjacent(OntologicalLayer.SIGNAL, OntologicalLayer.GUNA)
+
+    def test_direction_ascending(self):
+        """Detects ascending direction."""
+        direction = OntologicalLayer.direction(OntologicalLayer.SIGNAL, OntologicalLayer.GUNA)
+        assert direction == "ascending"
+
+    def test_direction_descending(self):
+        """Detects descending direction."""
+        direction = OntologicalLayer.direction(OntologicalLayer.OUTPUT, OntologicalLayer.GUNA)
+        assert direction == "descending"
+
+
+# =============================================================================
+# Cross-Layer Dissonance Tests
+# =============================================================================
+
+class TestCrossLayerDissonance:
+    """Tests for cross-layer dissonance detection."""
+
+    def test_compute_dissonance(self, balanced_observables, sattva_heavy_observables):
+        """Computes dissonance between layers."""
+        layer_a = LayerState(
+            layer_id=OntologicalLayer.EMBEDDING,
+            observables=balanced_observables,
+            layer_index=0,
+        )
+        layer_b = LayerState(
+            layer_id=OntologicalLayer.GUNA,
+            observables=sattva_heavy_observables,
+            layer_index=1,
+        )
+        dissonance = compute_layer_dissonance(layer_a, layer_b)
+        assert dissonance.total_dissonance > 0
+        assert dissonance.guna_dissonance > 0
+
+    def test_constructive_dissonance(self, tamas_heavy_observables, sattva_heavy_observables):
+        """Detects constructive dissonance (improvement)."""
+        # Layer A has low coherence (tamas-heavy)
+        layer_a = LayerState(
+            layer_id=OntologicalLayer.EMBEDDING,
+            observables=tamas_heavy_observables,
+        )
+        # Layer B has high coherence (sattva-heavy)
+        layer_b = LayerState(
+            layer_id=OntologicalLayer.GUNA,
+            observables=sattva_heavy_observables,
+        )
+        dissonance = compute_layer_dissonance(layer_a, layer_b)
+        assert dissonance.is_constructive
+        assert dissonance.cognitive_ambition > 0
+
+    def test_destructive_dissonance(self, sattva_heavy_observables, tamas_heavy_observables):
+        """Detects destructive dissonance (regression)."""
+        # Layer A has high coherence
+        layer_a = LayerState(
+            layer_id=OntologicalLayer.GUNA,
+            observables=sattva_heavy_observables,
+        )
+        # Layer B has low coherence (regression)
+        layer_b = LayerState(
+            layer_id=OntologicalLayer.FUSION,
+            observables=tamas_heavy_observables,
+        )
+        dissonance = compute_layer_dissonance(layer_a, layer_b)
+        assert dissonance.coherence_gap < 0
+
+    def test_ontological_tension(self, balanced_observables, sattva_heavy_observables):
+        """Computes ontological tension for adjacent layers."""
+        layer_a = LayerState(
+            layer_id=OntologicalLayer.EMBEDDING,
+            observables=balanced_observables,
+        )
+        layer_b = LayerState(
+            layer_id=OntologicalLayer.GUNA,
+            observables=sattva_heavy_observables,
+        )
+        dissonance = compute_layer_dissonance(layer_a, layer_b)
+        assert dissonance.is_ontologically_adjacent
+        assert dissonance.ontological_tension > 0
+
+
+# =============================================================================
+# Layer Dissonance Monitor Tests
+# =============================================================================
+
+class TestLayerDissonanceMonitor:
+    """Tests for LayerDissonanceMonitor."""
+
+    def test_add_layers_computes_dissonance(self, balanced_observables, sattva_heavy_observables):
+        """Adding layers computes dissonance automatically."""
+        monitor = LayerDissonanceMonitor()
+        monitor.add_layer(OntologicalLayer.SIGNAL, balanced_observables)
+        monitor.add_layer(OntologicalLayer.EMBEDDING, sattva_heavy_observables)
+
+        report = monitor.analyze()
+        assert report["layers"] == 2
+        assert report["transitions"] == 1
+
+    def test_full_pipeline_analysis(self, balanced_observables, sattva_heavy_observables, tamas_heavy_observables):
+        """Analyzes full pipeline."""
+        monitor = LayerDissonanceMonitor()
+        monitor.add_layer(OntologicalLayer.SIGNAL, tamas_heavy_observables)
+        monitor.add_layer(OntologicalLayer.EMBEDDING, balanced_observables)
+        monitor.add_layer(OntologicalLayer.GUNA, sattva_heavy_observables)
+
+        report = monitor.analyze()
+        assert report["layers"] == 3
+        assert report["transitions"] == 2
+        assert len(report["ambition_trend"]) == 2
+
+    def test_net_ambition(self, balanced_observables, sattva_heavy_observables, tamas_heavy_observables):
+        """Computes net cognitive ambition."""
+        monitor = LayerDissonanceMonitor()
+        # Start with poor state, improve through layers
+        monitor.add_layer(OntologicalLayer.SIGNAL, tamas_heavy_observables)
+        monitor.add_layer(OntologicalLayer.GUNA, balanced_observables)
+        monitor.add_layer(OntologicalLayer.FUSION, sattva_heavy_observables)
+
+        assert monitor.net_ambition > 0  # Overall improvement
+
+
+# =============================================================================
+# Ambition Questions Tests
+# =============================================================================
+
+class TestAmbitionQuestions:
+    """Tests for ambition question generation."""
+
+    def test_generates_questions(self, balanced_observables, sattva_heavy_observables):
+        """Generates questions from dissonance."""
+        layer_a = LayerState(
+            layer_id=OntologicalLayer.EMBEDDING,
+            observables=balanced_observables,
+        )
+        layer_b = LayerState(
+            layer_id=OntologicalLayer.GUNA,
+            observables=sattva_heavy_observables,
+        )
+        dissonance = compute_layer_dissonance(layer_a, layer_b)
+        questions = generate_ambition_questions(dissonance)
+        assert len(questions) > 0
+
+    def test_constructive_question_content(self, tamas_heavy_observables, sattva_heavy_observables):
+        """Constructive dissonance generates improvement questions."""
+        layer_a = LayerState(
+            layer_id=OntologicalLayer.SIGNAL,
+            observables=tamas_heavy_observables,
+        )
+        layer_b = LayerState(
+            layer_id=OntologicalLayer.GUNA,
+            observables=sattva_heavy_observables,
+        )
+        dissonance = compute_layer_dissonance(layer_a, layer_b)
+        questions = generate_ambition_questions(dissonance)
+
+        # Should mention improvement
+        has_improvement_question = any("improvement" in q.lower() or "amplify" in q.lower() for q in questions)
+        assert has_improvement_question
