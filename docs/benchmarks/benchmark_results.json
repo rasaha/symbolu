@@ -6,9 +6,9 @@
       "total_queries": 8,
       "correct": 5,
       "accuracy": 62.5,
-      "avg_latency_ms": 0.15423049998730676,
-      "min_latency_ms": 0.09086600016416924,
-      "max_latency_ms": 0.4360759999144648,
+      "avg_latency_ms": 0.15134687495788057,
+      "min_latency_ms": 0.0824329999886686,
+      "max_latency_ms": 0.39790599998923426,
       "by_intent": {
         "action": {
           "correct": 1,
@@ -30,9 +30,9 @@
       "total_queries": 8,
       "correct": 6,
       "accuracy": 75.0,
-      "avg_latency_ms": 0.1544442499721299,
-      "min_latency_ms": 0.11271199991824687,
-      "max_latency_ms": 0.237658000060037,
+      "avg_latency_ms": 0.16393212501952803,
+      "min_latency_ms": 0.12815300010515784,
+      "max_latency_ms": 0.2401500000814849,
       "by_intent": {
         "action": {
           "correct": 3,
@@ -54,9 +54,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.18377725001528233,
-      "min_latency_ms": 0.1323359999787499,
-      "max_latency_ms": 0.3290020001713856,
+      "avg_latency_ms": 0.17369337504646865,
+      "min_latency_ms": 0.13342500005819602,
+      "max_latency_ms": 0.2328489999854355,
       "by_intent": {
         "creative": {
           "correct": 8,
@@ -70,9 +70,9 @@
       "total_queries": 8,
       "correct": 7,
       "accuracy": 87.5,
-      "avg_latency_ms": 0.13110725004139567,
-      "min_latency_ms": 0.07473699997717631,
-      "max_latency_ms": 0.23299999998016574,
+      "avg_latency_ms": 0.13534737496456728,
+      "min_latency_ms": 0.07464899999831687,
+      "max_latency_ms": 0.24403900010838697,
       "by_intent": {
         "relationship": {
           "correct": 7,
@@ -86,9 +86,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.08777137506399413,
-      "min_latency_ms": 0.03503000016280566,
-      "max_latency_ms": 0.2255570000215812,
+      "avg_latency_ms": 0.09481674999278766,
+      "min_latency_ms": 0.038253000184340635,
+      "max_latency_ms": 0.23111399991648796,
       "by_intent": {
         "reflective": {
           "correct": 8,
@@ -102,9 +102,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.1170998749842056,
-      "min_latency_ms": 0.07690699999329809,
-      "max_latency_ms": 0.13604900004793308,
+      "avg_latency_ms": 0.13026012499040007,
+      "min_latency_ms": 0.07822399993528961,
+      "max_latency_ms": 0.1737160000629956,
       "by_intent": {
         "reasoning": {
           "correct": 8,
@@ -120,9 +120,9 @@
       "total_queries": 8,
       "correct": 5,
       "accuracy": 62.5,
-      "avg_latency_ms": 0.12129262503890459,
-      "min_latency_ms": 0.08770099998400838,
-      "max_latency_ms": 0.23277200011762034,
+      "avg_latency_ms": 0.1223282500006917,
+      "min_latency_ms": 0.08158599985108594,
+      "max_latency_ms": 0.2550950000568264,
       "by_intent": {
         "action": {
           "correct": 1,
@@ -144,9 +144,9 @@
       "total_queries": 8,
       "correct": 6,
       "accuracy": 75.0,
-      "avg_latency_ms": 0.15662600000609928,
-      "min_latency_ms": 0.11217999986001814,
-      "max_latency_ms": 0.256361000083416,
+      "avg_latency_ms": 0.173934000031295,
+      "min_latency_ms": 0.1104170000871818,
+      "max_latency_ms": 0.3506909999941854,
       "by_intent": {
         "action": {
           "correct": 3,
@@ -168,9 +168,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.17570012497003518,
-      "min_latency_ms": 0.12975999993614096,
-      "max_latency_ms": 0.2644300000156363,
+      "avg_latency_ms": 0.20330212501562528,
+      "min_latency_ms": 0.15150500007621304,
+      "max_latency_ms": 0.35598799991021224,
       "by_intent": {
         "creative": {
           "correct": 8,
@@ -184,9 +184,9 @@
       "total_queries": 8,
       "correct": 7,
       "accuracy": 87.5,
-      "avg_latency_ms": 0.13597612507965096,
-      "min_latency_ms": 0.076450000051409,
-      "max_latency_ms": 0.22768500002712244,
+      "avg_latency_ms": 0.13890424995111061,
+      "min_latency_ms": 0.07621199983987026,
+      "max_latency_ms": 0.23681599986957735,
       "by_intent": {
         "relationship": {
           "correct": 7,
@@ -200,9 +200,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.09356300003560136,
-      "min_latency_ms": 0.03700799993566761,
-      "max_latency_ms": 0.235397000096782,
+      "avg_latency_ms": 0.09502125004701156,
+      "min_latency_ms": 0.03534999996190891,
+      "max_latency_ms": 0.25804200004131417,
       "by_intent": {
         "reflective": {
           "correct": 8,
@@ -216,9 +216,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.1200269999799275,
-      "min_latency_ms": 0.07666999999855761,
-      "max_latency_ms": 0.1554020000185119,
+      "avg_latency_ms": 0.11939387502479804,
+      "min_latency_ms": 0.07583799992971763,
+      "max_latency_ms": 0.14912300002833945,
       "by_intent": {
         "reasoning": {
           "correct": 8,
@@ -234,9 +234,9 @@
       "total_queries": 8,
       "correct": 5,
       "accuracy": 62.5,
-      "avg_latency_ms": 0.13522537503263266,
-      "min_latency_ms": 0.07823200007806008,
-      "max_latency_ms": 0.2009869999710645,
+      "avg_latency_ms": 0.133161750028421,
+      "min_latency_ms": 0.07934900008876866,
+      "max_latency_ms": 0.17331000003650843,
       "by_intent": {
         "action": {
           "correct": 1,
@@ -258,9 +258,9 @@
       "total_queries": 8,
       "correct": 6,
       "accuracy": 75.0,
-      "avg_latency_ms": 0.18656950004469763,
-      "min_latency_ms": 0.11663000009320967,
-      "max_latency_ms": 0.2890470000238565,
+      "avg_latency_ms": 0.17795700000533543,
+      "min_latency_ms": 0.13042399996265885,
+      "max_latency_ms": 0.2753390001544176,
       "by_intent": {
         "action": {
           "correct": 3,
@@ -282,9 +282,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.17980924997118564,
-      "min_latency_ms": 0.13009099984628847,
-      "max_latency_ms": 0.2316969998901186,
+      "avg_latency_ms": 0.18032949998314507,
+      "min_latency_ms": 0.12982699990971014,
+      "max_latency_ms": 0.23876000000200293,
       "by_intent": {
         "creative": {
           "correct": 8,
@@ -298,9 +298,9 @@
       "total_queries": 8,
       "correct": 7,
       "accuracy": 87.5,
-      "avg_latency_ms": 0.14186475002020416,
-      "min_latency_ms": 0.07353900014095416,
-      "max_latency_ms": 0.2545929999087093,
+      "avg_latency_ms": 0.13727474993174837,
+      "min_latency_ms": 0.07307099986064713,
+      "max_latency_ms": 0.22529299985762918,
       "by_intent": {
         "relationship": {
           "correct": 7,
@@ -314,9 +314,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.10879500001692577,
-      "min_latency_ms": 0.04357000011623313,
-      "max_latency_ms": 0.23278799994841393,
+      "avg_latency_ms": 0.1035228750083661,
+      "min_latency_ms": 0.041995999936261796,
+      "max_latency_ms": 0.22803799993198481,
       "by_intent": {
         "reflective": {
           "correct": 8,
@@ -330,9 +330,9 @@
       "total_queries": 8,
       "correct": 8,
       "accuracy": 100.0,
-      "avg_latency_ms": 0.1274733749596635,
-      "min_latency_ms": 0.07738299996162823,
-      "max_latency_ms": 0.1886069999272877,
+      "avg_latency_ms": 0.12148399997613524,
+      "min_latency_ms": 0.07585000003018649,
+      "max_latency_ms": 0.17739600002641964,
       "by_intent": {
         "reasoning": {
           "correct": 8,
@@ -414,21 +414,21 @@
       "top_result": "Neural Network Fundamentals",
       "expected": "Statistical Machine Learning",
       "correct": false,
-      "latency_ms": "2.56"
+      "latency_ms": "2.58"
     },
     {
       "query": "emotional well-being",
       "top_result": "Mental Health Awareness",
       "expected": "Mental Health Awareness",
       "correct": true,
-      "latency_ms": "1.59"
+      "latency_ms": "1.55"
     },
     {
       "query": "software deployment",
       "top_result": "Kubernetes Deployment",
       "expected": "Kubernetes Deployment",
       "correct": true,
-      "latency_ms": "1.69"
+      "latency_ms": "1.67"
     }
   ],
   "entropy_test": {
@@ -536,5 +536,136 @@
       }
     ],
     "determinism_verified": true
+  },
+  "posture_test": {
+    "preset_profiles": [
+      {
+        "name": "BALANCED_DEFAULT",
+        "description": "Equal weighting, neutral behavior",
+        "coherence_bias": 0.34,
+        "exploration_bias": 0.33,
+        "constraint_bias": 0.33,
+        "is_balanced": true
+      },
+      {
+        "name": "CONSERVATIVE_ENTERPRISE",
+        "description": "Risk-averse, high constraint",
+        "coherence_bias": 0.35,
+        "exploration_bias": 0.15,
+        "constraint_bias": 0.5,
+        "is_balanced": false
+      },
+      {
+        "name": "EXPLORATORY_RESEARCH",
+        "description": "Adaptive, learning-oriented",
+        "coherence_bias": 0.3,
+        "exploration_bias": 0.5,
+        "constraint_bias": 0.2,
+        "is_balanced": false
+      },
+      {
+        "name": "HIGH_COHERENCE",
+        "description": "Thorough explanations, audit-focused",
+        "coherence_bias": 0.55,
+        "exploration_bias": 0.25,
+        "constraint_bias": 0.2,
+        "is_balanced": false
+      },
+      {
+        "name": "HIGH_CONSTRAINT",
+        "description": "Maximum caution, strict refusal",
+        "coherence_bias": 0.25,
+        "exploration_bias": 0.1,
+        "constraint_bias": 0.65,
+        "is_balanced": false
+      }
+    ],
+    "tier_behavior": [
+      {
+        "tier": "tier_1",
+        "description": "Enterprise Search (STL only)",
+        "allow_override": false,
+        "max_adjustment": 0.0,
+        "scopes_tested": 6,
+        "scopes_influenced": 0,
+        "influence_rate": "0%"
+      },
+      {
+        "tier": "tier_2",
+        "description": "Enterprise Chat (STL + 7B)",
+        "allow_override": true,
+        "max_adjustment": 0.08,
+        "scopes_tested": 6,
+        "scopes_influenced": 3,
+        "influence_rate": "50%"
+      },
+      {
+        "tier": "tier_3",
+        "description": "Consumer (STL + 768D + Cascade)",
+        "allow_override": true,
+        "max_adjustment": 0.1,
+        "scopes_tested": 6,
+        "scopes_influenced": 6,
+        "influence_rate": "100%"
+      }
+    ],
+    "modulation_effects": [
+      {
+        "profile": "Conservative",
+        "routing": {
+          "original": 0.5,
+          "adjusted": 0.495,
+          "delta": -0.005
+        },
+        "conservatism": {
+          "original": 0.5,
+          "adjusted": 0.545,
+          "delta": 0.045
+        },
+        "cascade": {
+          "original": 0.5,
+          "adjusted": 0.475,
+          "delta": -0.025
+        }
+      },
+      {
+        "profile": "Exploratory",
+        "routing": {
+          "original": 0.5,
+          "adjusted": 0.515,
+          "delta": 0.015
+        },
+        "conservatism": {
+          "original": 0.5,
+          "adjusted": 0.486,
+          "delta": -0.014
+        },
+        "cascade": {
+          "original": 0.5,
+          "adjusted": 0.522,
+          "delta": 0.022
+        }
+      }
+    ],
+    "determinism_verified": true,
+    "sample_audit": {
+      "decision_posture": {
+        "coherence_bias": 0.35,
+        "exploration_bias": 0.15,
+        "constraint_bias": 0.5,
+        "applied_to": [
+          "routing_threshold",
+          "response_depth",
+          "conservatism_level"
+        ],
+        "influence_scope": "non-authoritative"
+      },
+      "posture_metadata": {
+        "tier": "tier_2",
+        "source": "deployment_default",
+        "applications_count": 6,
+        "influenced_count": 3
+      }
+    }
   }
 }

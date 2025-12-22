@@ -26,6 +26,23 @@ from symbolu.entropy import (
     TIER_3_CONFIG,
     DIMENSION_NAMES,
 )
+from symbolu.posture import (
+    DecisionPostureProfile,
+    PostureTier,
+    PostureInfluenceScope,
+    BALANCED_DEFAULT,
+    CONSERVATIVE_ENTERPRISE,
+    EXPLORATORY_RESEARCH,
+    HIGH_COHERENCE,
+    HIGH_CONSTRAINT,
+    apply_posture_to_routing,
+    apply_posture_to_conservatism,
+    apply_posture_to_cascade_aggressiveness,
+    apply_posture_to_all,
+    get_tier_default_config,
+    create_audit_record,
+    format_audit_for_api_response,
+)
 
 
 # =============================================================================
@@ -313,6 +330,148 @@ def run_entropy_benchmark() -> Dict[str, Any]:
     return results
 
 
+def run_posture_benchmark() -> Dict[str, Any]:
+    """
+    Test Configurable Decision Posture across all tiers.
+
+    Demonstrates:
+    - Preset profile characteristics
+    - Tier-specific posture influence rules (Tier 1 = no influence)
+    - Deterministic modulation behavior
+    - Audit trail generation
+    """
+    results = {
+        "preset_profiles": [],
+        "tier_behavior": [],
+        "modulation_effects": [],
+        "determinism_verified": True,
+    }
+
+    # Document preset profiles
+    presets = [
+        ("BALANCED_DEFAULT", BALANCED_DEFAULT, "Equal weighting, neutral behavior"),
+        ("CONSERVATIVE_ENTERPRISE", CONSERVATIVE_ENTERPRISE, "Risk-averse, high constraint"),
+        ("EXPLORATORY_RESEARCH", EXPLORATORY_RESEARCH, "Adaptive, learning-oriented"),
+        ("HIGH_COHERENCE", HIGH_COHERENCE, "Thorough explanations, audit-focused"),
+        ("HIGH_CONSTRAINT", HIGH_CONSTRAINT, "Maximum caution, strict refusal"),
+    ]
+
+    for name, profile, description in presets:
+        results["preset_profiles"].append({
+            "name": name,
+            "description": description,
+            "coherence_bias": round(profile.coherence_bias, 4),
+            "exploration_bias": round(profile.exploration_bias, 4),
+            "constraint_bias": round(profile.constraint_bias, 4),
+            "is_balanced": profile.is_balanced,
+        })
+
+    # Test tier-specific behavior
+    tiers = [
+        (PostureTier.TIER_1, "Enterprise Search (STL only)"),
+        (PostureTier.TIER_2, "Enterprise Chat (STL + 7B)"),
+        (PostureTier.TIER_3, "Consumer (STL + 768D + Cascade)"),
+    ]
+
+    for tier, tier_desc in tiers:
+        config = get_tier_default_config(tier)
+        base_values = {scope.value: 0.5 for scope in PostureInfluenceScope}
+
+        # Apply posture with EXPLORATORY profile (most likely to show influence)
+        all_results = apply_posture_to_all(
+            posture=EXPLORATORY_RESEARCH,
+            tier=tier,
+            base_values=base_values,
+            config=config,
+        )
+
+        influenced_count = sum(1 for r in all_results if r.was_influenced)
+
+        # Verify determinism
+        all_results2 = apply_posture_to_all(
+            posture=EXPLORATORY_RESEARCH,
+            tier=tier,
+            base_values=base_values,
+            config=config,
+        )
+        for r1, r2 in zip(all_results, all_results2):
+            if r1.adjusted_value != r2.adjusted_value:
+                results["determinism_verified"] = False
+
+        results["tier_behavior"].append({
+            "tier": tier.value,
+            "description": tier_desc,
+            "allow_override": config.allow_request_override,
+            "max_adjustment": config.max_adjustment_magnitude,
+            "scopes_tested": len(all_results),
+            "scopes_influenced": influenced_count,
+            "influence_rate": f"{influenced_count / len(all_results) * 100:.0f}%",
+        })
+
+    # Test modulation effects with different profiles
+    profiles_to_test = [
+        ("Conservative", CONSERVATIVE_ENTERPRISE),
+        ("Exploratory", EXPLORATORY_RESEARCH),
+    ]
+
+    for profile_name, profile in profiles_to_test:
+        # Test routing threshold modulation
+        routing = apply_posture_to_routing(
+            base_confidence=0.50,
+            posture=profile,
+            tier=PostureTier.TIER_3,
+        )
+
+        # Test conservatism modulation
+        conservatism = apply_posture_to_conservatism(
+            base_level=0.50,
+            posture=profile,
+            tier=PostureTier.TIER_3,
+        )
+
+        # Test cascade aggressiveness modulation
+        cascade = apply_posture_to_cascade_aggressiveness(
+            base_aggressiveness=0.50,
+            posture=profile,
+            tier=PostureTier.TIER_3,
+        )
+
+        results["modulation_effects"].append({
+            "profile": profile_name,
+            "routing": {
+                "original": round(routing.original_value, 3),
+                "adjusted": round(routing.adjusted_value, 3),
+                "delta": round(routing.adjustment_delta, 3),
+            },
+            "conservatism": {
+                "original": round(conservatism.original_value, 3),
+                "adjusted": round(conservatism.adjusted_value, 3),
+                "delta": round(conservatism.adjustment_delta, 3),
+            },
+            "cascade": {
+                "original": round(cascade.original_value, 3),
+                "adjusted": round(cascade.adjusted_value, 3),
+                "delta": round(cascade.adjustment_delta, 3),
+            },
+        })
+
+    # Generate sample audit record
+    sample_applications = apply_posture_to_all(
+        posture=CONSERVATIVE_ENTERPRISE,
+        tier=PostureTier.TIER_2,
+        base_values={scope.value: 0.5 for scope in PostureInfluenceScope},
+    )
+    audit_record = create_audit_record(
+        posture=CONSERVATIVE_ENTERPRISE,
+        tier=PostureTier.TIER_2,
+        applications=sample_applications,
+        source="deployment_default",
+    )
+    results["sample_audit"] = format_audit_for_api_response(audit_record)
+
+    return results
+
+
 def run_search_benchmark():
     """Test search/ranking capability."""
     engine = create_engine(tier=EngineTier.ENTERPRISE_SEARCH)
@@ -460,6 +619,38 @@ def print_results(all_results: Dict[str, Any]):
             print(f"{entry['query_type']:<45} {entry['expected']:<15} {entry['actual_entropy']:<10.3f} {entry['gate']:<20}")
         print()
 
+    # Configurable Decision Posture Results
+    if "posture_test" in all_results:
+        posture = all_results["posture_test"]
+        print("## CONFIGURABLE DECISION POSTURE")
+        print("-" * 80)
+        print(f"Determinism Verified: {'✓' if posture['determinism_verified'] else '✗'}")
+        print()
+
+        print("### Preset Profiles")
+        print(f"{'Profile':<30} {'Coherence':<12} {'Exploration':<12} {'Constraint':<12} {'Balanced':<10}")
+        print("-" * 80)
+        for profile in posture["preset_profiles"]:
+            balanced = "Yes" if profile["is_balanced"] else "No"
+            print(f"{profile['name']:<30} {profile['coherence_bias']:<12.4f} {profile['exploration_bias']:<12.4f} {profile['constraint_bias']:<12.4f} {balanced:<10}")
+        print()
+
+        print("### Tier-Specific Behavior")
+        print(f"{'Tier':<45} {'Override':<10} {'Max Adj':<10} {'Influenced':<12}")
+        print("-" * 80)
+        for tier in posture["tier_behavior"]:
+            override = "Yes" if tier["allow_override"] else "No"
+            print(f"{tier['description']:<45} {override:<10} {tier['max_adjustment']:<10.2f} {tier['influence_rate']:<12}")
+        print()
+
+        print("### Modulation Effects (Tier 3, base=0.5)")
+        for effect in posture["modulation_effects"]:
+            print(f"\n  {effect['profile']} Profile:")
+            print(f"    Routing:      {effect['routing']['original']:.3f} → {effect['routing']['adjusted']:.3f} (Δ {effect['routing']['delta']:+.3f})")
+            print(f"    Conservatism: {effect['conservatism']['original']:.3f} → {effect['conservatism']['adjusted']:.3f} (Δ {effect['conservatism']['delta']:+.3f})")
+            print(f"    Cascade:      {effect['cascade']['original']:.3f} → {effect['cascade']['adjusted']:.3f} (Δ {effect['cascade']['delta']:+.3f})")
+        print()
+
     # Key metrics summary
     print("## KEY METRICS SUMMARY")
     print("-" * 80)
@@ -473,6 +664,8 @@ def print_results(all_results: Dict[str, Any]):
     print(f"| Parameter savings               | 25x (175B → 7B) |")
     if "entropy_test" in all_results:
         print(f"| Entropy engine determinism      | {'Verified ✓' if all_results['entropy_test']['determinism_verified'] else 'Failed ✗'}       |")
+    if "posture_test" in all_results:
+        print(f"| Posture system determinism      | {'Verified ✓' if all_results['posture_test']['determinism_verified'] else 'Failed ✗'}       |")
     print()
 
 
@@ -517,6 +710,10 @@ def main():
     # Run entropy engine test
     print("Testing cross-domain entropy engine...")
     all_results["entropy_test"] = run_entropy_benchmark()
+
+    # Run posture system test
+    print("Testing configurable decision posture...")
+    all_results["posture_test"] = run_posture_benchmark()
 
     print()
 
