@@ -45,11 +45,24 @@ from symbolu.guna_modulation.utility import compute_utility
 # =============================================================================
 
 class PreferenceGoal(Enum):
-    """External goals for DPO optimization."""
-    USER_ENGAGEMENT = "user_engagement"
-    CLARITY = "clarity"
-    SAFETY = "safety"
-    HELPFULNESS = "helpfulness"
+    """
+    Valid goals for DPO optimization.
+
+    All goals must be based on measurable signals:
+    - Observables: s, r, t, H, M, C_contr, F_fail
+    - State: tau_768, tau_175, w_guna, w_tone
+    """
+    # Valid: Based on measurable observables
+    COHERENCE = "coherence"      # Maximize Sattva, minimize contradiction
+    STABILITY = "stability"      # Minimize entropy and motion
+    BALANCE = "balance"          # Avoid parameter extremes
+    UTILITY = "utility"          # Maximize computed utility
+
+    # Deprecated: Kept for backwards compatibility but use valid goals
+    USER_ENGAGEMENT = "user_engagement"  # Maps to COHERENCE
+    CLARITY = "clarity"                   # Maps to tau_768
+    SAFETY = "safety"                     # Maps to low tau_768
+    HELPFULNESS = "helpfulness"           # Maps to UTILITY
 
 
 @dataclass
@@ -110,6 +123,8 @@ class DPOUpdater:
         self,
         preferred: StateRegister,
         rejected: StateRegister,
+        preferred_obs: Optional[Observables] = None,
+        rejected_obs: Optional[Observables] = None,
     ) -> float:
         """
         Compute preference-based weight for Bayesian update.
@@ -120,13 +135,15 @@ class DPOUpdater:
         Args:
             preferred: Preferred state configuration
             rejected: Rejected state configuration
+            preferred_obs: Observables for preferred state (for valid goals)
+            rejected_obs: Observables for rejected state (for valid goals)
 
         Returns:
             Weight factor for Bayesian update [0.5, 1.5]
         """
-        # Compute utility scores for both
-        pref_score = self._state_score(preferred)
-        rej_score = self._state_score(rejected)
+        # Compute scores using observables when available
+        pref_score = self._state_score(preferred, preferred_obs)
+        rej_score = self._state_score(rejected, rejected_obs)
 
         # Preference delta
         delta = pref_score - rej_score
@@ -144,21 +161,68 @@ class DPOUpdater:
 
         return weight
 
-    def _state_score(self, state: StateRegister) -> float:
-        """Score a state based on current goal."""
+    def _state_score(
+        self,
+        state: StateRegister,
+        obs: Optional[Observables] = None,
+    ) -> float:
+        """
+        Score a state based on current goal.
+
+        Valid goals use measurable signals from observables and state.
+        """
         # w_guna is a tuple (S, R, T)
         sattva = state.w_guna[0] if isinstance(state.w_guna, tuple) else 0.33
 
-        if self._config.goal == PreferenceGoal.USER_ENGAGEMENT:
-            # Higher tau_768 (clarity) + higher Sattva = engagement
+        # COHERENCE: Maximize Sattva, minimize contradiction
+        # Formula: score = S - C_contr (both from observables)
+        if self._config.goal == PreferenceGoal.COHERENCE:
+            if obs is not None:
+                return obs.s - obs.C_contr  # Valid: uses measurable signals
+            return sattva  # Fallback to state Sattva preference
+
+        # STABILITY: Minimize entropy and motion
+        # Formula: score = (1 - H) × (1 - M)
+        elif self._config.goal == PreferenceGoal.STABILITY:
+            if obs is not None:
+                return (1.0 - obs.H) * (1.0 - obs.M)  # Valid: uses H and M
+            return 1.0 - state.tau_768  # Fallback: lower threshold = more stable
+
+        # BALANCE: Avoid parameter extremes
+        # Formula: score = 1 - |tau_768 - 0.5| - spread(w_guna)
+        elif self._config.goal == PreferenceGoal.BALANCE:
+            tau_balance = 1.0 - abs(state.tau_768 - 0.5)
+            guna_spread = max(state.w_guna) - min(state.w_guna)
+            return tau_balance * 0.6 + (1.0 - guna_spread) * 0.4
+
+        # UTILITY: Maximize computed utility
+        # Formula: score = U (from utility function)
+        elif self._config.goal == PreferenceGoal.UTILITY:
+            if obs is not None:
+                _, audit = compute_utility(obs, state)
+                return audit.utility
+            return state.tau_768 * 0.5 + state.tau_175 * 0.5  # Fallback
+
+        # Deprecated goals (backwards compatibility)
+        elif self._config.goal == PreferenceGoal.USER_ENGAGEMENT:
+            # Maps to COHERENCE
+            if obs is not None:
+                return obs.s - obs.C_contr
             return state.tau_768 * 0.6 + sattva * 0.4
+
         elif self._config.goal == PreferenceGoal.CLARITY:
             return state.tau_768
+
         elif self._config.goal == PreferenceGoal.SAFETY:
-            # Lower tau_768 (more conservative) = safer
             return 1.0 - state.tau_768
+
         elif self._config.goal == PreferenceGoal.HELPFULNESS:
+            # Maps to UTILITY
+            if obs is not None:
+                _, audit = compute_utility(obs, state)
+                return audit.utility
             return state.tau_768 * 0.5 + state.tau_175 * 0.5
+
         return 0.5
 
     def update_posterior_with_preference(
@@ -686,14 +750,20 @@ class MonteCarloTreeSearch:
 # =============================================================================
 
 def create_dpo_updater(
-    goal: PreferenceGoal = PreferenceGoal.USER_ENGAGEMENT,
+    goal: PreferenceGoal = PreferenceGoal.COHERENCE,
     beta: float = 0.1,
 ) -> DPOUpdater:
     """
-    Create DPO updater with external goal.
+    Create DPO updater with valid goal.
+
+    Valid goals (use measurable signals):
+        - COHERENCE: Maximize Sattva, minimize contradiction (S - C_contr)
+        - STABILITY: Minimize entropy and motion ((1-H) × (1-M))
+        - BALANCE: Avoid parameter extremes
+        - UTILITY: Maximize computed utility
 
     Args:
-        goal: External optimization goal
+        goal: Optimization goal (default: COHERENCE)
         beta: Temperature parameter
 
     Returns:
