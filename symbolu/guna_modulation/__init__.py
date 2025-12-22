@@ -258,6 +258,71 @@ from symbolu.guna_modulation.pipeline_signal_adapter import (
     modulate_from_pipeline_context,
 )
 
+# =============================================================================
+# v2.7 State Evolution (Deterministic Evaluation Layer)
+# =============================================================================
+
+from symbolu.guna_modulation.state_types import (
+    # Constants
+    DEFAULT_ALPHA,
+    POLICY_BIAS_MAX,
+    # State bounds
+    StateBounds,
+    DEFAULT_BOUNDS,
+    # State register
+    StateRegister,
+    DEFAULT_STATE,
+    # State delta
+    StateDelta,
+    # Utility functions
+    normalize_weights,
+    softmax_3,
+)
+
+from symbolu.guna_modulation.observables import (
+    # Observables container
+    Observables,
+    # Factory functions
+    observables_from_v26_pipeline,
+    # Entropy computation
+    compute_guna_entropy,
+)
+
+from symbolu.guna_modulation.utility import (
+    # Constants
+    LAMBDA_H,
+    LAMBDA_C,
+    LAMBDA_F,
+    # Audit types
+    UtilityAudit,
+    TargetStateAudit,
+    # Utility computation
+    compute_utility,
+    # Target computation
+    compute_target_tau_768,
+    compute_target_tau_175,
+    compute_target_w_tone,
+    compute_target_state,
+)
+
+from symbolu.guna_modulation.state_evolution_engine import (
+    # Configuration
+    V27Config,
+    DEFAULT_V27_CONFIG,
+    ENABLED_V27_CONFIG,
+    # Audit types
+    RuleFired,
+    StateUpdateAudit,
+    # Engine
+    StateEvolutionEngine,
+    # Factory functions
+    create_evolution_engine,
+    create_v26_engine,
+    create_v27_engine,
+    # Standalone function
+    update_state,
+)
+
 
 __all__ = [
     # Constants
@@ -376,6 +441,51 @@ __all__ = [
     "wire_from_pipeline_context",
     "wire_signals_from_router_context",
     "modulate_from_pipeline_context",
+    # =========================================================================
+    # v2.7 State Evolution
+    # =========================================================================
+    # Constants
+    "DEFAULT_ALPHA",
+    "POLICY_BIAS_MAX",
+    "LAMBDA_H",
+    "LAMBDA_C",
+    "LAMBDA_F",
+    # State types
+    "StateBounds",
+    "DEFAULT_BOUNDS",
+    "StateRegister",
+    "DEFAULT_STATE",
+    "StateDelta",
+    # Observables
+    "Observables",
+    "observables_from_v26_pipeline",
+    "compute_guna_entropy",
+    # Utility computation
+    "UtilityAudit",
+    "TargetStateAudit",
+    "compute_utility",
+    "compute_target_tau_768",
+    "compute_target_tau_175",
+    "compute_target_w_tone",
+    "compute_target_state",
+    # Configuration
+    "V27Config",
+    "DEFAULT_V27_CONFIG",
+    "ENABLED_V27_CONFIG",
+    # Audit types
+    "RuleFired",
+    "StateUpdateAudit",
+    # Engine
+    "StateEvolutionEngine",
+    # Factory functions
+    "create_evolution_engine",
+    "create_v26_engine",
+    "create_v27_engine",
+    # Standalone function
+    "update_state",
+    # Helper functions
+    "normalize_weights",
+    "softmax_3",
 ]
 
 
@@ -391,3 +501,6 @@ modulate = modulate_intensity
 
 # Pipeline integration entry point
 PipelineEngine = PipelineModulationEngine
+
+# v2.7 State Evolution entry point
+EvolutionEngine = StateEvolutionEngine
