@@ -339,6 +339,16 @@ from symbolu.guna_modulation.v27_config import (
     ENTERPRISE_T1_CONFIG,
     ENTERPRISE_T2_CONFIG,
     CONSUMER_CONFIG,
+    # Alpha 2.7: Update mode and Bayesian configuration
+    UpdateMode,
+    BayesianConfig,
+    BayesianPosterior,
+    BayesianStateRegister,
+    DEFAULT_BAYESIAN_CONFIG,
+    BAYESIAN_V27_CONFIG,
+    BAYESIAN_ENTERPRISE_T1,
+    BAYESIAN_ENTERPRISE_T2,
+    BAYESIAN_CONSUMER,
 )
 
 from symbolu.guna_modulation.state_evolution_engine import (
@@ -352,6 +362,9 @@ from symbolu.guna_modulation.state_evolution_engine import (
     create_v26_engine,
     create_v27_engine,
     create_state_engine_for_tier,
+    # Alpha 2.7: Bayesian factory functions
+    create_bayesian_engine,
+    create_bayesian_engine_for_tier,
     # Standalone function
     update_state,
 )
@@ -536,6 +549,16 @@ __all__ = [
     "ENTERPRISE_T1_CONFIG",
     "ENTERPRISE_T2_CONFIG",
     "CONSUMER_CONFIG",
+    # Alpha 2.7: Update mode and Bayesian
+    "UpdateMode",
+    "BayesianConfig",
+    "BayesianPosterior",
+    "BayesianStateRegister",
+    "DEFAULT_BAYESIAN_CONFIG",
+    "BAYESIAN_V27_CONFIG",
+    "BAYESIAN_ENTERPRISE_T1",
+    "BAYESIAN_ENTERPRISE_T2",
+    "BAYESIAN_CONSUMER",
     # Audit types
     "RuleFired",
     "StateUpdateAudit",
@@ -546,6 +569,9 @@ __all__ = [
     "create_v26_engine",
     "create_v27_engine",
     "create_state_engine_for_tier",
+    # Alpha 2.7: Bayesian factory functions
+    "create_bayesian_engine",
+    "create_bayesian_engine_for_tier",
     # Standalone function
     "update_state",
     # Helper functions
