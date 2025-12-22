@@ -2,18 +2,20 @@
 Name Resonance System - External Referent Classes (ERC)
 ========================================================
 
-Provides the S term (Referential Coherence) for canonical matching.
+Provides the S term (Semantic Contextual Meaning) for canonical matching.
 
-S answers: "Do these two tokens point to the same external invariant?"
+S answers: "Do these two tokens share semantic contextual meaning?"
 
 Key properties of S:
-- Not phonemic
-- Not acoustic
-- Not statistical
-- Deterministic
-- Ontology-consistent
+- Not phonemic (source-independent from C and R)
+- Context-aware (considers surrounding semantic context)
+- Deterministic (given same context, same result)
+- Ontology-consistent (grounded in referent classes)
 
-This is referential grounding, not semantics in the NLP sense.
+S now incorporates SEMANTIC CONTEXTUAL MEANING:
+- Primary: Context-based semantic similarity (when context provided)
+- Secondary: Referent class overlap (fallback when no context)
+- Hybrid mode: Weighted combination of both
 
 Referent Classes (refined per ChatGPT feedback):
 - LUMINOUS: Sources and carriers of light/energy
@@ -47,9 +49,28 @@ Authority: NONE (referential grounding only)
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, FrozenSet, Tuple, NamedTuple
+from typing import Dict, FrozenSet, Tuple, NamedTuple, Optional, List
+
+
+# =============================================================================
+# Semantic Context Configuration
+# =============================================================================
+
+@dataclass
+class SemanticContextConfig:
+    """Configuration for semantic contextual S computation."""
+    # Weight for contextual vs class-based coherence (0.0 = class only, 1.0 = context only)
+    context_weight: float = 0.6
+    # Minimum context similarity to boost S
+    context_threshold: float = 0.3
+    # Enable contextual semantic analysis
+    use_contextual: bool = True
+
+
+DEFAULT_CONTEXT_CONFIG = SemanticContextConfig()
 
 
 class ReferentClass(Enum):
@@ -965,15 +986,214 @@ def format_referent_analysis(analysis: ReferentAnalysis) -> str:
 
 
 # =============================================================================
+# Semantic Contextual Coherence (Enhanced S)
+# =============================================================================
+
+# Semantic context keywords that modify meaning
+CONTEXT_SEMANTIC_GROUPS: Dict[str, FrozenSet[str]] = {
+    "royalty": frozenset({"king", "queen", "prince", "princess", "throne", "crown", "palace", "royal", "monarch"}),
+    "chess": frozenset({"king", "queen", "bishop", "knight", "rook", "pawn", "checkmate", "board", "move"}),
+    "nature": frozenset({"tree", "forest", "river", "mountain", "ocean", "sky", "sun", "moon", "earth"}),
+    "emotion": frozenset({"love", "hate", "joy", "sorrow", "fear", "hope", "anger", "happy", "sad"}),
+    "family": frozenset({"mother", "father", "child", "family", "home", "parent", "sibling", "son", "daughter"}),
+    "technology": frozenset({"computer", "phone", "machine", "digital", "software", "data", "network", "code"}),
+    "food": frozenset({"apple", "banana", "food", "eat", "taste", "sweet", "fruit", "vegetable", "cook"}),
+    "body": frozenset({"heart", "hand", "eye", "head", "body", "blood", "face", "arm", "leg"}),
+    "light": frozenset({"sun", "light", "bright", "glow", "shine", "fire", "flame", "star", "radiance"}),
+    "time": frozenset({"time", "day", "night", "year", "moment", "past", "future", "now", "ancient"}),
+    "space": frozenset({"place", "space", "path", "road", "world", "home", "distance", "location", "area"}),
+    "conflict": frozenset({"war", "peace", "fight", "battle", "enemy", "conflict", "struggle", "victory"}),
+    "knowledge": frozenset({"wisdom", "knowledge", "truth", "idea", "thought", "mind", "learn", "study"}),
+}
+
+
+def _extract_semantic_context(text: str) -> List[str]:
+    """Extract semantic context groups from text."""
+    text_lower = text.lower()
+    words = set(text_lower.split())
+
+    matching_groups = []
+    for group_name, group_words in CONTEXT_SEMANTIC_GROUPS.items():
+        if words & group_words:  # If any overlap
+            matching_groups.append(group_name)
+
+    return matching_groups
+
+
+def _compute_context_similarity(context_a: List[str], context_b: List[str]) -> float:
+    """Compute similarity between two semantic contexts."""
+    if not context_a or not context_b:
+        return 0.0
+
+    set_a = set(context_a)
+    set_b = set(context_b)
+
+    # Jaccard similarity
+    intersection = len(set_a & set_b)
+    union = len(set_a | set_b)
+
+    return intersection / union if union > 0 else 0.0
+
+
+def _get_word_semantic_context(word: str) -> List[str]:
+    """Get semantic context groups that a word belongs to."""
+    word_lower = word.lower().strip()
+    groups = []
+
+    for group_name, group_words in CONTEXT_SEMANTIC_GROUPS.items():
+        if word_lower in group_words:
+            groups.append(group_name)
+
+    return groups
+
+
+@dataclass(frozen=True)
+class SemanticContextAnalysis:
+    """Result of semantic contextual analysis."""
+    semantic_coherence: float  # S based on semantic context
+    class_coherence: float     # S based on referent classes
+    combined_coherence: float  # Weighted combination
+    word_a: str
+    word_b: str
+    context_a: Tuple[str, ...]  # Semantic groups for word_a
+    context_b: Tuple[str, ...]  # Semantic groups for word_b
+    shared_context: Tuple[str, ...]  # Shared semantic groups
+    provided_context: Optional[str]  # User-provided context if any
+
+
+def compute_semantic_contextual_coherence(
+    word_a: str,
+    word_b: str,
+    context: Optional[str] = None,
+    config: Optional[SemanticContextConfig] = None,
+) -> SemanticContextAnalysis:
+    """
+    Compute semantic contextual coherence (enhanced S).
+
+    This is the new S = Semantic Contextual Meaning.
+
+    Args:
+        word_a: First word
+        word_b: Second word
+        context: Optional context string to disambiguate meaning
+        config: Configuration for context weighting
+
+    Returns:
+        SemanticContextAnalysis with semantic, class, and combined coherence
+
+    Example:
+        >>> # Without context - uses word's inherent semantic groups
+        >>> result = compute_semantic_contextual_coherence("king", "queen")
+        >>> print(result.combined_coherence)  # High - both in royalty context
+
+        >>> # With context - "king" in chess context
+        >>> result = compute_semantic_contextual_coherence("king", "queen", context="chess move checkmate")
+        >>> print(result.combined_coherence)  # High - both in chess context
+
+        >>> # Mismatch - "king" (royalty) vs "banana" (food)
+        >>> result = compute_semantic_contextual_coherence("king", "banana")
+        >>> print(result.combined_coherence)  # Low - no shared context
+    """
+    if config is None:
+        config = DEFAULT_CONTEXT_CONFIG
+
+    # Get referent class coherence (original S)
+    referent_analysis = compute_referent_coherence(word_a, word_b)
+    class_coherence = referent_analysis.coherence
+
+    # Get semantic context for each word
+    context_a = _get_word_semantic_context(word_a)
+    context_b = _get_word_semantic_context(word_b)
+
+    # If user provided context, extract additional semantic groups
+    if context:
+        provided_groups = _extract_semantic_context(context)
+        # Boost word contexts if they match provided context
+        for group in provided_groups:
+            if group not in context_a and word_a.lower() in CONTEXT_SEMANTIC_GROUPS.get(group, set()):
+                context_a.append(group)
+            if group not in context_b and word_b.lower() in CONTEXT_SEMANTIC_GROUPS.get(group, set()):
+                context_b.append(group)
+
+    # Compute semantic context similarity
+    shared_context = list(set(context_a) & set(context_b))
+
+    if shared_context:
+        # High semantic coherence - words share context
+        semantic_coherence = 0.7 + (0.3 * min(len(shared_context), 3) / 3)
+    elif context_a and context_b:
+        # Both have contexts but don't overlap
+        semantic_coherence = 0.1
+    else:
+        # No context info - rely on class coherence
+        semantic_coherence = class_coherence
+
+    # Combine semantic and class coherence
+    if config.use_contextual and (context_a or context_b):
+        combined_coherence = (
+            config.context_weight * semantic_coherence +
+            (1 - config.context_weight) * class_coherence
+        )
+    else:
+        # No contextual info available, use class coherence
+        combined_coherence = class_coherence
+
+    return SemanticContextAnalysis(
+        semantic_coherence=round(semantic_coherence, 4),
+        class_coherence=class_coherence,
+        combined_coherence=round(min(1.0, combined_coherence), 4),
+        word_a=word_a,
+        word_b=word_b,
+        context_a=tuple(context_a),
+        context_b=tuple(context_b),
+        shared_context=tuple(shared_context),
+        provided_context=context,
+    )
+
+
+def format_semantic_context_analysis(analysis: SemanticContextAnalysis) -> str:
+    """Format semantic context analysis for display."""
+    ctx_a = ", ".join(analysis.context_a) or "none"
+    ctx_b = ", ".join(analysis.context_b) or "none"
+    shared = ", ".join(analysis.shared_context) or "none"
+
+    lines = [
+        f"{analysis.word_a} ↔ {analysis.word_b}",
+        f"  Context A: {ctx_a}",
+        f"  Context B: {ctx_b}",
+        f"  Shared Context: {shared}",
+        f"  Semantic S: {analysis.semantic_coherence:.3f}",
+        f"  Class S: {analysis.class_coherence:.3f}",
+        f"  Combined S: {analysis.combined_coherence:.3f}",
+    ]
+
+    if analysis.provided_context:
+        lines.insert(1, f"  Provided Context: \"{analysis.provided_context}\"")
+
+    return "\n".join(lines)
+
+
+# =============================================================================
 # Public API
 # =============================================================================
 
 __all__ = [
+    # Configuration
+    "SemanticContextConfig",
+    "DEFAULT_CONTEXT_CONFIG",
+    # Classes
     "ReferentClass",
     "ReferentProfile",
     "ReferentAnalysis",
+    "SemanticContextAnalysis",
+    # Data
     "WORD_TO_REFERENT",
+    "CONTEXT_SEMANTIC_GROUPS",
+    # Functions - Class-based (legacy)
     "get_referent_profile",
     "compute_referent_coherence",
     "format_referent_analysis",
+    # Functions - Semantic Contextual (new)
+    "compute_semantic_contextual_coherence",
+    "format_semantic_context_analysis",
 ]

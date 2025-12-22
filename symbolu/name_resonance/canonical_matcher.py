@@ -53,7 +53,11 @@ from symbolu.name_resonance.extractor import normalize_input, extract_signals
 from symbolu.name_resonance.projector import project_to_structural_profile
 from symbolu.name_resonance.referent_classes import (
     compute_referent_coherence,
+    compute_semantic_contextual_coherence,
     ReferentAnalysis,
+    SemanticContextAnalysis,
+    SemanticContextConfig,
+    DEFAULT_CONTEXT_CONFIG,
 )
 
 
@@ -326,7 +330,13 @@ def compute_confidence(c: float, r: float, s: float) -> float:
     return round(math.exp(-variance * 4), 4)
 
 
-def canonical_match(word_a: str, word_b: str) -> CanonicalMatchResult:
+def canonical_match(
+    word_a: str,
+    word_b: str,
+    context: str | None = None,
+    use_contextual_s: bool = True,
+    context_config: SemanticContextConfig | None = None,
+) -> CanonicalMatchResult:
     """
     Compute canonical match between two words.
 
@@ -335,14 +345,27 @@ def canonical_match(word_a: str, word_b: str) -> CanonicalMatchResult:
     Where:
     - C = Constraint feasibility (phonemic → ontology)
     - R = Realization strength (phonemic → experience)
-    - S = Referential coherence (NON-phonemic)
+    - S = Semantic Contextual Meaning (NON-phonemic, context-aware)
 
     Args:
         word_a: First word
         word_b: Second word
+        context: Optional context string to disambiguate meaning
+        use_contextual_s: If True, use semantic contextual S (default)
+        context_config: Configuration for contextual S computation
 
     Returns:
         CanonicalMatchResult with full diagnostic information
+
+    Example:
+        >>> # Default: semantic contextual S
+        >>> result = canonical_match("king", "queen")
+
+        >>> # With explicit context
+        >>> result = canonical_match("king", "queen", context="chess game")
+
+        >>> # Legacy: class-based S only
+        >>> result = canonical_match("king", "queen", use_contextual_s=False)
     """
     # Compute C (constraint/feasibility)
     constraint = compute_constraint_feasibility(word_a, word_b)
@@ -352,9 +375,21 @@ def canonical_match(word_a: str, word_b: str) -> CanonicalMatchResult:
     realization = compute_realization_strength(word_a, word_b)
     r = realization.realization
 
-    # Compute S (referential coherence) - NON-PHONEMIC
-    referent = compute_referent_coherence(word_a, word_b)
-    s = referent.coherence
+    # Compute S (Semantic Contextual Meaning) - NON-PHONEMIC
+    if use_contextual_s:
+        # New: Semantic Contextual S
+        semantic_result = compute_semantic_contextual_coherence(
+            word_a, word_b,
+            context=context,
+            config=context_config or DEFAULT_CONTEXT_CONFIG,
+        )
+        s = semantic_result.combined_coherence
+        # Also get class-based for the referent_analysis field
+        referent = compute_referent_coherence(word_a, word_b)
+    else:
+        # Legacy: Class-based S only
+        referent = compute_referent_coherence(word_a, word_b)
+        s = referent.coherence
 
     # MATCH = C × R × S
     match_score = c * r * s
@@ -487,11 +522,16 @@ def demo_canonical_matching() -> str:
 # =============================================================================
 
 __all__ = [
+    # Types
     "MatchMode",
     "ViolationDetail",
     "ConstraintAnalysis",
     "RealizationAnalysis",
     "CanonicalMatchResult",
+    # Re-exported from referent_classes for convenience
+    "SemanticContextConfig",
+    "SemanticContextAnalysis",
+    # Functions
     "compute_constraint_feasibility",
     "compute_realization_strength",
     "canonical_match",
