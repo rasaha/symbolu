@@ -133,6 +133,13 @@ def _get_p37():
     return maybe_run_p37
 
 
+# Formula-only DHA module (disabled by default) - lazy loaded via @lru_cache
+@lru_cache(maxsize=1)
+def _get_formula_dha():
+    from symbolu.dha import DHAStage, DHAConfig, maybe_run_dha
+    return {"DHAStage": DHAStage, "DHAConfig": DHAConfig, "maybe_run_dha": maybe_run_dha}
+
+
 # Processing modules - lazy loaded via @lru_cache
 @lru_cache(maxsize=1)
 def _get_coherence_observer():
@@ -797,6 +804,35 @@ class SymbolUPipeline:
                 ctx.dha.adaptation_notes["p28_safety_status"] = p28_output.safety_result.status.value
         except Exception:
             # P28 phase is optional - continue if it fails
+            pass
+
+        # =======================================================================
+        # Formula-only DHA (Delivery Harmonization Algorithm)
+        # Deterministic, zero-parameter, closed-form delivery modulation
+        # Disabled by default - enable via dha_formula_enabled in request metadata
+        # Authority: OBSERVATIONAL (provides delivery profile, does not modify text)
+        # =======================================================================
+        try:
+            # Check if formula DHA is enabled via request metadata
+            formula_dha_enabled = ctx.request.metadata.get("dha_formula_enabled", False)
+            if formula_dha_enabled:
+                dha_module = _get_formula_dha()
+                DHAConfig = dha_module["DHAConfig"]
+                maybe_run_dha = dha_module["maybe_run_dha"]
+
+                # Get tier-specific config or use default
+                tier = ctx.request.metadata.get("tier", "consumer")
+                dha_config = DHAConfig.for_tier(tier)
+
+                # Run formula DHA
+                formula_dha_result = maybe_run_dha(ctx, dha_config)
+                if formula_dha_result:
+                    # Store formula DHA result in adaptation notes
+                    ctx.dha.adaptation_notes["formula_dha"] = formula_dha_result
+                    ctx.dha.adaptation_notes["formula_dha_D"] = formula_dha_result.get("D")
+                    ctx.dha.adaptation_notes["formula_dha_tone"] = formula_dha_result.get("tone_weights", {})
+        except Exception:
+            # Formula DHA is optional - continue if it fails
             pass
 
         # =======================================================================
