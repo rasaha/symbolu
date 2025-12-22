@@ -44,6 +44,11 @@ from symbolu.core.stitching.domain_distance import (
     is_cross_domain,
     UNIVERSAL_ASPECTS,
 )
+from symbolu.core.stitching.contracts import (
+    RejectionReason,
+    CandidateDecision,
+    StitchingDecision,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -333,6 +338,196 @@ class StitchingEngine:
             scores=scores,
             diagnostics=diagnostics,
         )
+
+    def evaluate(
+        self,
+        candidates: List[Any],
+        context: QueryContext,
+    ) -> StitchingDecision:
+        """
+        Evaluate candidates and return StitchingDecision (per spec v1.1).
+
+        This is the NORMATIVE entry point per STITCHING_FUSION_SPECIFICATION.md.
+
+        NORMATIVE REQUIREMENTS:
+        - MUST return boolean eligibility per candidate
+        - MUST NOT produce comparable or optimization scores
+        - Diagnostic values are for audit/debug only
+        - MUST NOT select, rank, or prioritize candidates
+
+        Args:
+            candidates: List of candidates to evaluate
+            context: Query context with domain and aspect information
+
+        Returns:
+            StitchingDecision with allowed_candidate_ids and audit trail
+        """
+        import uuid
+        from datetime import datetime
+
+        if not candidates:
+            return StitchingDecision(
+                allowed_candidate_ids=[],
+                decisions={},
+                diagnostics={"total_evaluated": 0, "total_allowed": 0},
+                audit={"audit_id": str(uuid.uuid4())[:8], "timestamp": datetime.utcnow().isoformat()},
+            )
+
+        decisions: Dict[str, CandidateDecision] = {}
+        allowed_ids: List[str] = []
+        selected_for_redundancy: List[Any] = []  # Track for redundancy calculation
+        domain_jump_count = 0
+        cross_domain_count = 0
+        domains_involved: List[str] = [context.domain]
+
+        # Sort by relevance for greedy processing (affects redundancy calculation)
+        candidates_with_relevance = [
+            (c, self._compute_relevance(c, context))
+            for c in candidates
+        ]
+        candidates_with_relevance.sort(key=lambda x: x[1], reverse=True)
+
+        for candidate, relevance in candidates_with_relevance:
+            candidate_id = getattr(candidate, "id", f"unknown_{id(candidate)}")
+            candidate_domain = getattr(candidate, "domain", "generic") or "generic"
+            is_cross = is_cross_domain(context.domain, candidate_domain)
+
+            # Track domains
+            if candidate_domain not in domains_involved:
+                domains_involved.append(candidate_domain)
+
+            # Initialize constraint status
+            constraint_status = {}
+            audit_notes: List[str] = []
+            rejection_reason: Optional[RejectionReason] = None
+            rejection_detail: Optional[str] = None
+
+            # Check confidence constraint
+            confidence = getattr(candidate, "confidence", 1.0)
+            constraint_status["confidence_ok"] = confidence >= self.config.constraints.min_confidence
+            if not constraint_status["confidence_ok"]:
+                rejection_reason = RejectionReason.LOW_CONFIDENCE
+                rejection_detail = f"confidence {confidence:.3f} < threshold {self.config.constraints.min_confidence}"
+                audit_notes.append(rejection_detail)
+
+            # Check entropy constraint
+            entropy = getattr(candidate, "entropy", 0.0)
+            constraint_status["entropy_ok"] = entropy <= self.config.constraints.max_entropy
+            if rejection_reason is None and not constraint_status["entropy_ok"]:
+                rejection_reason = RejectionReason.HIGH_ENTROPY
+                rejection_detail = f"entropy {entropy:.3f} > threshold {self.config.constraints.max_entropy}"
+                audit_notes.append(rejection_detail)
+
+            # Check domain jump cap
+            would_exceed_cap = is_cross and domain_jump_count >= self.config.constraints.max_domain_jumps
+            constraint_status["domain_cap_ok"] = not would_exceed_cap
+            if rejection_reason is None and not constraint_status["domain_cap_ok"]:
+                rejection_reason = RejectionReason.DOMAIN_JUMP_CAP
+                rejection_detail = f"domain jump cap reached ({self.config.constraints.max_domain_jumps})"
+                audit_notes.append(rejection_detail)
+
+            # Compute penalties for diagnostic purposes ONLY
+            penalties = self.penalty_calculator.compute_all_penalties(
+                candidate,
+                selected_for_redundancy,
+                context.domain,
+                context.aspect_vector,
+            )
+
+            # Diagnostic score (NOT for ranking - audit only)
+            diagnostic_score = relevance - penalties["total"]
+
+            # Check minimum score
+            constraint_status["score_ok"] = diagnostic_score >= self.config.constraints.min_score
+            if rejection_reason is None and not constraint_status["score_ok"]:
+                rejection_reason = RejectionReason.LOW_SCORE
+                rejection_detail = f"diagnostic_score {diagnostic_score:.3f} < threshold {self.config.constraints.min_score}"
+                audit_notes.append(rejection_detail)
+
+            # Check redundancy
+            is_redundant = self.penalty_calculator.is_too_redundant(candidate, selected_for_redundancy)
+            constraint_status["redundancy_ok"] = not is_redundant
+            if rejection_reason is None and not constraint_status["redundancy_ok"]:
+                rejection_reason = RejectionReason.TOO_REDUNDANT
+                rejection_detail = f"redundancy {penalties['redundancy']:.3f} >= threshold"
+                audit_notes.append(rejection_detail)
+
+            # Determine if allowed
+            allowed = rejection_reason is None
+
+            # Build diagnostic scores (for audit only)
+            diagnostic_scores = {
+                "relevance": relevance,
+                "redundancy_penalty": penalties["redundancy"],
+                "domain_jump_penalty": penalties["domain_jump"],
+                "total_diagnostic": diagnostic_score,
+                # Note: These are NOT comparable across candidates
+            }
+
+            # Record decision
+            decisions[candidate_id] = CandidateDecision(
+                candidate_id=candidate_id,
+                allowed=allowed,
+                diagnostic_scores=diagnostic_scores,
+                rejection_reason=rejection_reason,
+                rejection_detail=rejection_detail,
+                audit_notes=audit_notes,
+                constraint_status=constraint_status,
+            )
+
+            if allowed:
+                allowed_ids.append(candidate_id)
+                selected_for_redundancy.append(candidate)
+                if is_cross:
+                    domain_jump_count += 1
+                    cross_domain_count += 1
+
+                # Check beam size limit
+                if len(allowed_ids) >= self.config.beam_size:
+                    break
+
+        # Build aggregate diagnostics
+        diagnostics = {
+            "total_evaluated": len(decisions),
+            "total_allowed": len(allowed_ids),
+            "total_rejected": len(decisions) - len(allowed_ids),
+            "cross_domain_count": cross_domain_count,
+            "domains_involved": domains_involved,
+            "rejection_summary": self._build_rejection_summary(decisions),
+        }
+
+        # Build audit metadata
+        audit = {
+            "audit_id": str(uuid.uuid4())[:8],
+            "timestamp": datetime.utcnow().isoformat(),
+            "config_snapshot": {
+                "beam_size": self.config.beam_size,
+                "min_confidence": self.config.constraints.min_confidence,
+                "max_entropy": self.config.constraints.max_entropy,
+                "max_domain_jumps": self.config.constraints.max_domain_jumps,
+                "min_score": self.config.constraints.min_score,
+            },
+            "query_domain": context.domain,
+        }
+
+        return StitchingDecision(
+            allowed_candidate_ids=allowed_ids,
+            decisions=decisions,
+            diagnostics=diagnostics,
+            audit=audit,
+        )
+
+    def _build_rejection_summary(
+        self,
+        decisions: Dict[str, CandidateDecision],
+    ) -> Dict[str, int]:
+        """Build summary of rejection reasons."""
+        summary: Dict[str, int] = {}
+        for d in decisions.values():
+            if not d.allowed and d.rejection_reason:
+                key = d.rejection_reason.value
+                summary[key] = summary.get(key, 0) + 1
+        return summary
 
     def apply_penalties(
         self,

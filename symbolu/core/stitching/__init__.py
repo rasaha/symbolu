@@ -8,6 +8,9 @@ This module implements the Stitching Encoder for Symbol-U, providing:
 - Redundancy and domain-jump penalties
 - Constraint enforcement and audit trails
 
+Specification Reference:
+    docs/architecture/STITCHING_FUSION_SPECIFICATION.md
+
 Patent Reference:
     Claim [2]  - Relevance scoring with resonance coupling
     Claim [12] - Resonance modulation coefficient λres
@@ -37,6 +40,17 @@ from symbolu.core.stitching.domain_distance import (
 )
 from symbolu.core.stitching.objective import StitchingObjective
 
+# New contracts per spec v1.1
+from symbolu.core.stitching.contracts import (
+    RejectionReason,
+    CandidateDecision,
+    StitchingDecision,
+)
+from symbolu.core.stitching.handoff import (
+    StitchingToFusionHandoff,
+    create_handoff,
+)
+
 __all__ = [
     # Engine
     "StitchingEngine",
@@ -58,4 +72,11 @@ __all__ = [
     "UNIVERSAL_ASPECTS",
     # Objective (legacy compatibility)
     "StitchingObjective",
+    # Contracts (spec v1.1)
+    "RejectionReason",
+    "CandidateDecision",
+    "StitchingDecision",
+    # Handoff (spec v1.1)
+    "StitchingToFusionHandoff",
+    "create_handoff",
 ]
