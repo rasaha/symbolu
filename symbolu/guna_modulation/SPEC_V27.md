@@ -293,9 +293,9 @@ consumer = ALPHA_CONSUMER            # α=0.10, t_½≈7
 print(f"Half-life: {enterprise_t2.half_life_updates:.1f} updates")
 print(f"After 10 updates: {enterprise_t2.decay_after_n(10):.1%} remains")
 
-# Create engine for tier
-from symbolu.guna_modulation import create_engine_for_tier
-engine = create_engine_for_tier("enterprise_tier_2")
+# Create state evolution engine for tier
+from symbolu.guna_modulation import create_state_engine_for_tier
+engine = create_state_engine_for_tier("enterprise_tier_2")
 ```
 
 ### 7.4 Properties
@@ -643,14 +643,296 @@ Audit trails include full state history for reproducibility.
 
 ---
 
-## 16. Layman Explanation
+## 16. Use Cases & Configuration Examples
+
+### 16.1 Regulated Enterprise (Finance, Healthcare, Legal)
+
+**Goal:** Maximum stability, full auditability, minimal state drift.
+
+```python
+from symbolu.guna_modulation import (
+    V27Config,
+    UtilityCoefficients,
+    ToneLogitConfig,
+    StatePersistenceConfig,
+    ALPHA_ENTERPRISE_T1,
+    StateEvolutionEngine,
+)
+
+# Ultra-conservative configuration
+regulated_config = V27Config(
+    v2_7_enabled=True,
+    alpha_config=ALPHA_ENTERPRISE_T1,  # α=0.02, half-life≈35 updates
+    utility_coefficients=UtilityCoefficients(
+        c_S=1.0, c_R=-1.0, c_T=-1.0,    # Default: Sattva positive
+        lambda_H=-0.3,                   # Penalize high entropy
+        lambda_C=-0.7,                   # Strong contradiction penalty
+        lambda_F=-0.5,                   # Strong failure penalty
+    ),
+    tone_config=ToneLogitConfig(
+        k_sweet_sattva=1.2,              # Emphasize calm delivery
+        k_jolt_contr=0.2,                # Subdued corrective energy
+    ),
+    persistence_config=StatePersistenceConfig(
+        scope="tenant",
+        decay_on_restart=True,
+        restart_decay_factor=0.3,        # Aggressive reset on restart
+        max_state_age_hours=72,          # Reset after 3 days
+        storage_backend="postgres",
+    ),
+)
+
+engine = StateEvolutionEngine(config=regulated_config)
+```
+
+**Why this works:**
+- Ultra-slow α (0.02) means state changes minimally per update
+- Strong contradiction penalty prioritizes consistency
+- Tenant-scoped persistence with aggressive decay prevents long-term drift
+- Full audit trail for compliance verification
+
+---
+
+### 16.2 Enterprise Platform Team (Quality Tuning)
+
+**Goal:** Balanced responsiveness with ability to tune behavior.
+
+```python
+from symbolu.guna_modulation import (
+    ENTERPRISE_T2_CONFIG,
+    UtilityCoefficients,
+    V27Config,
+    StateEvolutionEngine,
+)
+
+# Start with tier 2 defaults, customize utility
+platform_config = V27Config(
+    v2_7_enabled=True,
+    alpha_config=ENTERPRISE_T2_CONFIG.alpha_config,  # α=0.05
+    utility_coefficients=UtilityCoefficients(
+        c_S=0.8, c_R=0.5, c_T=-1.0,      # Rajas partially positive (action OK)
+        lambda_H=-0.2,                    # Moderate entropy tolerance
+        lambda_C=-0.5,                    # Standard contradiction penalty
+        lambda_F=-0.4,                    # Standard failure penalty
+    ),
+    persistence_config=StatePersistenceConfig(
+        scope="tenant",
+        restart_decay_factor=0.5,
+        storage_backend="redis",
+    ),
+)
+
+engine = StateEvolutionEngine(config=platform_config)
+```
+
+**Why this works:**
+- Moderate α (0.05) allows meaningful adaptation over ~14 updates
+- Rajas partially positive encourages dynamic, action-oriented responses
+- Redis backend for multi-instance deployments
+
+---
+
+### 16.3 Consumer Assistant / Coaching UX
+
+**Goal:** Responsive adaptation to user patterns, experiential delivery.
+
+```python
+from symbolu.guna_modulation import (
+    CONSUMER_CONFIG,
+    ToneLogitConfig,
+    UtilityCoefficients,
+    V27Config,
+    StatePersistenceConfig,
+    StateEvolutionEngine,
+)
+
+# Fast-adapting, user-scoped configuration
+coaching_config = V27Config(
+    v2_7_enabled=True,
+    alpha_config=CONSUMER_CONFIG.alpha_config,  # α=0.10, half-life≈7
+    utility_coefficients=UtilityCoefficients(
+        c_S=0.7, c_R=0.8, c_T=-0.5,      # Rajas-positive, Tamas less penalized
+        lambda_H=-0.1,                    # Low entropy penalty (diversity OK)
+        lambda_C=-0.3,                    # Moderate contradiction sensitivity
+        lambda_F=-0.2,                    # Low failure penalty
+    ),
+    tone_config=ToneLogitConfig(
+        k_sweet_sattva=0.8,
+        k_jolt_rajas=1.0,                # Energetic delivery
+        k_metaphor_entropy=0.9,          # Abstract/poetic when high entropy
+        k_metaphor_rajas=0.6,
+    ),
+    persistence_config=StatePersistenceConfig(
+        scope="user",                    # Per-user state
+        decay_on_restart=True,
+        restart_decay_factor=0.7,        # Preserve most state on restart
+        max_state_age_hours=336,         # 2 weeks
+    ),
+)
+
+engine = StateEvolutionEngine(config=coaching_config)
+```
+
+**Why this works:**
+- Fast α (0.10) adapts within ~7 updates
+- User-scoped persistence maintains individual context
+- Rajas-positive encourages dynamic, motivating responses
+- High metaphor coefficient enables creative expression
+
+---
+
+### 16.4 Stateless Mode (v2.6 Compatibility)
+
+**Goal:** No state evolution, pure v2.6 behavior.
+
+```python
+from symbolu.guna_modulation import (
+    DEFAULT_V27_CONFIG,  # v2_7_enabled=False
+    create_v26_engine,
+    StateEvolutionEngine,
+)
+
+# Option 1: Use pre-built disabled config
+engine = StateEvolutionEngine(config=DEFAULT_V27_CONFIG)
+
+# Option 2: Use factory function
+engine = create_v26_engine()
+
+# State never changes
+audit1 = engine.update(observables_1)
+audit2 = engine.update(observables_2)
+assert audit1.state_after == audit2.state_after  # Always DEFAULT_STATE
+```
+
+**Why this works:**
+- `v2_7_enabled=False` bypasses update equation entirely
+- State remains at DEFAULT_STATE for all queries
+- Maximum predictability and simplicity
+
+---
+
+### 16.5 Research / Experimentation Mode
+
+**Goal:** Rapid iteration, full observability, session-scoped state.
+
+```python
+from symbolu.guna_modulation import (
+    V27Config,
+    AlphaConfig,
+    UtilityCoefficients,
+    ToneLogitConfig,
+    StatePersistenceConfig,
+    NEUTRAL_UTILITY_COEFFICIENTS,
+    StateEvolutionEngine,
+)
+
+# Aggressive learning, session-scoped, neutral coefficients
+research_config = V27Config(
+    v2_7_enabled=True,
+    alpha_config=AlphaConfig(alpha=0.20, tier="research"),  # Very fast
+    utility_coefficients=NEUTRAL_UTILITY_COEFFICIENTS,       # No bias
+    tone_config=ToneLogitConfig(),                           # Defaults
+    persistence_config=StatePersistenceConfig(
+        scope="session",                 # No cross-session persistence
+        decay_on_restart=False,          # N/A for session scope
+    ),
+)
+
+engine = StateEvolutionEngine(config=research_config)
+
+# Observe rapid state evolution
+for obs in observables_sequence:
+    audit = engine.update(obs)
+    print(f"U={audit.utility:.3f}, τ768={audit.state_after.tau_768:.3f}")
+```
+
+**Why this works:**
+- High α (0.20) shows dramatic state changes
+- Neutral coefficients remove any built-in preference
+- Session scope ensures clean slate each time
+
+---
+
+### 16.6 Tier-Based Factory Usage
+
+**Goal:** Quick setup with tier-appropriate defaults.
+
+```python
+from symbolu.guna_modulation import create_state_engine_for_tier
+
+# Enterprise Tier 1
+engine_t1 = create_state_engine_for_tier("enterprise_tier_1")
+print(f"α={engine_t1.alpha}, half-life={engine_t1.half_life:.1f}")
+# Output: α=0.02, half-life=34.7
+
+# Enterprise Tier 2
+engine_t2 = create_state_engine_for_tier("enterprise_tier_2")
+print(f"α={engine_t2.alpha}, half-life={engine_t2.half_life:.1f}")
+# Output: α=0.05, half-life=13.5
+
+# Consumer
+engine_consumer = create_state_engine_for_tier("consumer")
+print(f"α={engine_consumer.alpha}, half-life={engine_consumer.half_life:.1f}")
+# Output: α=0.10, half-life=6.6
+```
+
+---
+
+### 16.7 Audit Trail Inspection
+
+**Goal:** Understand why state changed.
+
+```python
+from symbolu.guna_modulation import (
+    StateEvolutionEngine,
+    ENABLED_V27_CONFIG,
+    Observables,
+)
+
+engine = StateEvolutionEngine(config=ENABLED_V27_CONFIG)
+
+# Create observables with high contradiction
+obs = Observables(
+    s=0.4, r=0.35, t=0.25,
+    H=0.5,
+    delta_sem=0.3,
+    C_contr=0.7,   # High contradiction
+    F_fail=0.1,
+)
+
+audit = engine.update(obs)
+
+# Inspect audit trail
+print(f"Utility: {audit.utility:.3f}")
+print(f"  Guna term: {audit.utility_audit.guna_term:.3f}")
+print(f"  Entropy penalty: {audit.utility_audit.entropy_penalty:.3f}")
+print(f"  Contradiction penalty: {audit.utility_audit.contradiction_penalty:.3f}")
+
+print(f"\nTarget τ175: {audit.target_state.tau_175:.3f}")
+print(f"Current τ175: {audit.state_before.tau_175:.3f}")
+print(f"New τ175: {audit.state_after.tau_175:.3f}")
+print(f"Δτ175: {audit.delta.delta_tau_175:.4f}")
+
+print(f"\nExplanation: {audit.explanation}")
+# Output: "tau_175 decreased by 0.0085 (U=-0.170, C_contr=0.700)"
+
+# Check which rules fired
+for rule in audit.rules_fired:
+    if rule.fired:
+        print(f"Rule fired: {rule.rule_id}")
+# Output: "Rule fired: RULE_HIGH_CONTRADICTION_TIGHTEN_175B"
+```
+
+---
+
+## 17. Layman Explanation
 
 > "The system already knows the answer.
 > v2.7 only adjusts its internal knobs using fixed rules, so next time it knows how strongly, how cautiously, and how deeply to act — and it can always explain why."
 
 ---
 
-## 17. Final Constraint
+## 18. Final Constraint
 
 If a behavior cannot be expressed as a **closed-form formula**, it must be **excluded**.
 
