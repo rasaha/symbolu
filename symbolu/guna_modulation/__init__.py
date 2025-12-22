@@ -258,6 +258,104 @@ from symbolu.guna_modulation.pipeline_signal_adapter import (
     modulate_from_pipeline_context,
 )
 
+# =============================================================================
+# v2.7 State Evolution (Deterministic Evaluation Layer)
+# =============================================================================
+
+from symbolu.guna_modulation.state_types import (
+    # Constants
+    DEFAULT_ALPHA,
+    POLICY_BIAS_MAX,
+    # State bounds
+    StateBounds,
+    DEFAULT_BOUNDS,
+    # State register
+    StateRegister,
+    DEFAULT_STATE,
+    # State delta
+    StateDelta,
+    # Utility functions
+    normalize_weights,
+    softmax_3,
+)
+
+from symbolu.guna_modulation.observables import (
+    # Observables container
+    Observables,
+    # Factory functions
+    observables_from_v26_pipeline,
+    # Entropy computation
+    compute_guna_entropy,
+)
+
+from symbolu.guna_modulation.utility import (
+    # Constants
+    LAMBDA_H,
+    LAMBDA_C,
+    LAMBDA_F,
+    # Audit types
+    UtilityAudit,
+    TargetStateAudit,
+    # Utility computation
+    compute_utility,
+    # Target computation
+    compute_target_tau_768,
+    compute_target_tau_175,
+    compute_target_w_tone,
+    compute_target_state,
+)
+
+# v2.7 Configuration (Fix #1-5: Operator-configurable coefficients)
+from symbolu.guna_modulation.v27_config import (
+    # Tier identifiers
+    TIER_ENTERPRISE_1,
+    TIER_ENTERPRISE_2,
+    TIER_CONSUMER,
+    # Fix #1: Utility coefficients (operator-configurable signs)
+    UtilityCoefficients,
+    DEFAULT_UTILITY_COEFFICIENTS,
+    NEUTRAL_UTILITY_COEFFICIENTS,
+    # Fix #2: Alpha configuration (tier-specific with half-life)
+    AlphaConfig,
+    ALPHA_ENTERPRISE_T1,
+    ALPHA_ENTERPRISE_T2,
+    ALPHA_CONSUMER,
+    DEFAULT_ALPHA_CONFIG,
+    get_alpha_for_tier,
+    # Fix #3: Tone logit configuration (named, bounded)
+    ToneLogitConfig,
+    DEFAULT_TONE_CONFIG,
+    # Fix #4: State persistence configuration
+    StatePersistenceConfig,
+    PERSISTENCE_GLOBAL,
+    PERSISTENCE_TENANT,
+    PERSISTENCE_USER,
+    PERSISTENCE_SESSION,
+    DEFAULT_PERSISTENCE_CONFIG,
+    # Master v2.7 configuration
+    V27Config,
+    DEFAULT_V27_CONFIG,
+    ENABLED_V27_CONFIG,
+    ENTERPRISE_T1_CONFIG,
+    ENTERPRISE_T2_CONFIG,
+    CONSUMER_CONFIG,
+)
+
+from symbolu.guna_modulation.state_evolution_engine import (
+    # Audit types
+    RuleFired,
+    StateUpdateAudit,
+    # Engine
+    StateEvolutionEngine,
+    # Factory functions
+    create_evolution_engine,
+    create_v26_engine,
+    create_v27_engine,
+    create_state_engine_for_tier,
+    # Standalone function
+    update_state,
+)
+
 
 __all__ = [
     # Constants
@@ -376,6 +474,83 @@ __all__ = [
     "wire_from_pipeline_context",
     "wire_signals_from_router_context",
     "modulate_from_pipeline_context",
+    # =========================================================================
+    # v2.7 State Evolution
+    # =========================================================================
+    # Constants
+    "DEFAULT_ALPHA",
+    "POLICY_BIAS_MAX",
+    "LAMBDA_H",
+    "LAMBDA_C",
+    "LAMBDA_F",
+    # State types
+    "StateBounds",
+    "DEFAULT_BOUNDS",
+    "StateRegister",
+    "DEFAULT_STATE",
+    "StateDelta",
+    # Observables
+    "Observables",
+    "observables_from_v26_pipeline",
+    "compute_guna_entropy",
+    # Utility computation
+    "UtilityAudit",
+    "TargetStateAudit",
+    "compute_utility",
+    "compute_target_tau_768",
+    "compute_target_tau_175",
+    "compute_target_w_tone",
+    "compute_target_state",
+    # =========================================================================
+    # v2.7 Configuration (Fix #1-5)
+    # =========================================================================
+    # Tier identifiers
+    "TIER_ENTERPRISE_1",
+    "TIER_ENTERPRISE_2",
+    "TIER_CONSUMER",
+    # Fix #1: Utility coefficients
+    "UtilityCoefficients",
+    "DEFAULT_UTILITY_COEFFICIENTS",
+    "NEUTRAL_UTILITY_COEFFICIENTS",
+    # Fix #2: Alpha configuration
+    "AlphaConfig",
+    "ALPHA_ENTERPRISE_T1",
+    "ALPHA_ENTERPRISE_T2",
+    "ALPHA_CONSUMER",
+    "DEFAULT_ALPHA_CONFIG",
+    "get_alpha_for_tier",
+    # Fix #3: Tone logit configuration
+    "ToneLogitConfig",
+    "DEFAULT_TONE_CONFIG",
+    # Fix #4: State persistence configuration
+    "StatePersistenceConfig",
+    "PERSISTENCE_GLOBAL",
+    "PERSISTENCE_TENANT",
+    "PERSISTENCE_USER",
+    "PERSISTENCE_SESSION",
+    "DEFAULT_PERSISTENCE_CONFIG",
+    # Master v2.7 configuration
+    "V27Config",
+    "DEFAULT_V27_CONFIG",
+    "ENABLED_V27_CONFIG",
+    "ENTERPRISE_T1_CONFIG",
+    "ENTERPRISE_T2_CONFIG",
+    "CONSUMER_CONFIG",
+    # Audit types
+    "RuleFired",
+    "StateUpdateAudit",
+    # Engine
+    "StateEvolutionEngine",
+    # Factory functions
+    "create_evolution_engine",
+    "create_v26_engine",
+    "create_v27_engine",
+    "create_state_engine_for_tier",
+    # Standalone function
+    "update_state",
+    # Helper functions
+    "normalize_weights",
+    "softmax_3",
 ]
 
 
@@ -391,3 +566,6 @@ modulate = modulate_intensity
 
 # Pipeline integration entry point
 PipelineEngine = PipelineModulationEngine
+
+# v2.7 State Evolution entry point
+EvolutionEngine = StateEvolutionEngine

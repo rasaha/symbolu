@@ -574,4 +574,161 @@ If a behavior cannot be expressed as a **closed-form formula**, it must be **exc
 
 ---
 
+## Appendix A: Operator Configuration Guide
+
+This appendix provides a feature-flag table for customers (enterprise or consumer) to choose Entropy mode (H) and Motion mode (M) deterministically. Each choice is an **operational lens** — there is no "good" or "bad" mode.
+
+---
+
+### A.1 Entropy Mode (H) Feature Flags
+
+| Flag | Mode | Formula | What It Measures |
+|------|------|---------|------------------|
+| `entropy_mode=guna` **(DEFAULT)** | Guna Entropy | `H = H_G / ln(3)` | Balance/dispersion across S/R/T |
+| `entropy_mode=dimensional` | Dimensional Entropy | `H = H_D / ln(10)` | Dispersion across the 10D symbolic layer space |
+| `entropy_mode=kosha` | Kosha Entropy | `H = H_K / ln(5)` | Fragmentation across experiential context bands |
+
+#### Entropy Mode Selection Guide
+
+| Mode | Typical Buyers | When It's The Wrong Choice |
+|------|----------------|---------------------------|
+| **guna** (Default) | Regulated enterprise, compliance-heavy teams, "deterministic control" customers | If you explicitly want entropy tied to layer spread or experiential fragmentation instead of guna balance |
+| **dimensional** | Research orgs, platform teams, teams tuning routing/stitching quality | If you need strict S/R/T interpretability; dimensional can feel "mixed" or less intuitive |
+| **kosha** | Consumer-facing wellbeing/coach-style UX, narrative-heavy assistants | If you're building enterprise verification/audit flows; kosha may be seen as "contextual" rather than "structural" |
+
+---
+
+### A.2 Motion Mode (M) Feature Flags
+
+| Flag | Mode | Definition | What It Measures |
+|------|------|------------|------------------|
+| `motion_mode=semantic` **(DEFAULT)** | Semantic Motion | `M = 1 − cos_sim(candidate, context)` | Conceptual displacement from the user/query frame |
+| `motion_mode=structural` | Structural Motion | `M = norm_dist(domain_jumps)` | How much form/structure shifts (rhythm/shape) |
+| `motion_mode=experiential` | Experiential Motion | `M = f(intent_type)` | Shift in experiential register / perceived internal state |
+| `motion_mode=composite` | Composite | `M = weighted_avg(M_sem, M_str, M_exp)` | Multi-signal motion |
+
+#### Motion Mode Selection Guide
+
+| Mode | Typical Buyers | When It's The Wrong Choice |
+|------|----------------|---------------------------|
+| **semantic** (Default) | Most enterprise deployments; most consumer chat deployments | If you need motion to be purely phonetic/structural or purely experiential |
+| **structural** | Brand/name resonance tools, linguistic tooling, phoneme-heavy products | If you want meaning-first motion; structural can be "true" but not aligned with user intent |
+| **experiential** | Coaching/therapy-like UX, "delivery harmonization" emphasis | If you need strict auditability tied to query semantics; experiential motion can feel less direct |
+| **composite** | Advanced customers doing tuning; internal R&D | If you want minimal knobs and simplest explainability; composite increases config burden |
+
+---
+
+### A.3 Recommended Bundles
+
+#### Regulated Enterprise (Finance/Health/Legal)
+
+```python
+SignalWiringConfig(
+    entropy_mode=EntropyMode.GUNA,      # Default
+    motion_mode=MotionMode.SEMANTIC,    # Default
+)
+```
+
+**Rationale:** Simplest audit story; lowest integration risk.
+
+#### Enterprise Platform / Infra Teams (Quality Tuning)
+
+```python
+SignalWiringConfig(
+    entropy_mode=EntropyMode.DIMENSIONAL,
+    motion_mode=MotionMode.SEMANTIC,  # or COMPOSITE
+)
+```
+
+**Rationale:** They want entropy to reflect pipeline dispersion and are comfortable with more knobs.
+
+#### Consumer Assistant / Coaching UX
+
+```python
+SignalWiringConfig(
+    entropy_mode=EntropyMode.KOSHA,
+    motion_mode=MotionMode.EXPERIENTIAL,  # or COMPOSITE
+)
+```
+
+**Rationale:** They want modulation aligned to "experience fragmentation" and delivery dynamics.
+
+#### Brand/Name Resonance / Linguistics Products
+
+```python
+SignalWiringConfig(
+    entropy_mode=EntropyMode.GUNA,  # or DIMENSIONAL
+    motion_mode=MotionMode.STRUCTURAL,
+)
+```
+
+**Rationale:** Motion is defined by sound/shape rather than semantics.
+
+---
+
+### A.4 Default Configuration
+
+```python
+# System defaults (if no configuration provided)
+DEFAULT_WIRING_CONFIG = SignalWiringConfig(
+    entropy_mode=EntropyMode.GUNA,      # Option A
+    motion_mode=MotionMode.SEMANTIC,    # Option 1
+    composite_weights=None,             # Not used unless COMPOSITE mode
+)
+```
+
+**Design Principle:** Defaults are chosen for maximum auditability and minimal configuration burden, not because they are "better."
+
+---
+
+### A.5 JSON Configuration Examples
+
+#### Enterprise Tier 1 (Regulated)
+
+```json
+{
+  "tier": "enterprise_tier_1",
+  "signal_wiring": {
+    "entropy_mode": "guna",
+    "motion_mode": "semantic"
+  },
+  "guna_weights": {
+    "w_S": 0.9,
+    "w_R": 1.05,
+    "w_T": 0.6
+  },
+  "policy": {
+    "r_risk": 0.0,
+    "r_escalation": 0.0
+  }
+}
+```
+
+#### Enterprise Tier 2 (Platform)
+
+```json
+{
+  "tier": "enterprise_tier_2",
+  "signal_wiring": {
+    "entropy_mode": "dimensional",
+    "motion_mode": "composite",
+    "composite_weights": [0.5, 0.3, 0.2]
+  }
+}
+```
+
+#### Consumer Tier (Coaching)
+
+```json
+{
+  "tier": "consumer",
+  "signal_wiring": {
+    "entropy_mode": "kosha",
+    "motion_mode": "experiential"
+  }
+}
+```
+
+---
+
 *End of Specification*
