@@ -38,6 +38,10 @@ from trading.core import (
     TradingConfig,
     AlphaConfig,
     RiskConfig,
+    # Signals & Recommendations
+    SignalScore,
+    SignalScorer,
+    Recommendation,
 )
 
 from trading.tick_processor import (
@@ -47,7 +51,15 @@ from trading.tick_processor import (
     TickSignals,
 )
 
-__version__ = "0.1.0-experimental"
+from trading.analysis import (
+    ElliottWaveAnalyzer,
+    WaveCount,
+    WaveType,
+    ElliottSignal,
+    FibonacciLevels,
+)
+
+__version__ = "0.2.0-experimental"
 __all__ = [
     # Core
     "TradingStateRegister",
@@ -57,9 +69,19 @@ __all__ = [
     "TradingConfig",
     "AlphaConfig",
     "RiskConfig",
+    # Signals & Recommendations
+    "SignalScore",
+    "SignalScorer",
+    "Recommendation",
     # Tick Processor
     "TickAggregator",
     "OrderFlowImbalance",
     "TickVolatility",
     "TickSignals",
+    # Technical Analysis
+    "ElliottWaveAnalyzer",
+    "WaveCount",
+    "WaveType",
+    "ElliottSignal",
+    "FibonacciLevels",
 ]

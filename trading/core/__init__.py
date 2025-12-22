@@ -5,6 +5,11 @@ from trading.core.observables import TickObservables
 from trading.core.utility import TradingUtility
 from trading.core.evolution_engine import TradingEvolutionEngine
 from trading.core.config import TradingConfig, AlphaConfig, RiskConfig
+from trading.core.signals import (
+    SignalScore,
+    SignalScorer,
+    Recommendation,
+)
 
 __all__ = [
     "TradingStateRegister",
@@ -14,4 +19,8 @@ __all__ = [
     "TradingConfig",
     "AlphaConfig",
     "RiskConfig",
+    # Signals
+    "SignalScore",
+    "SignalScorer",
+    "Recommendation",
 ]
