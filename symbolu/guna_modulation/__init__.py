@@ -282,6 +282,11 @@ from symbolu.guna_modulation.state_types import (
 from symbolu.guna_modulation.observables import (
     # Observables container
     Observables,
+    # Motion (M) formalization
+    MotionType,
+    compute_semantic_motion,
+    compute_structural_motion,
+    compute_temporal_motion,
     # Factory functions
     observables_from_v26_pipeline,
     # Entropy computation
@@ -506,6 +511,11 @@ __all__ = [
     "Observables",
     "observables_from_v26_pipeline",
     "compute_guna_entropy",
+    # Motion (M) formalization
+    "MotionType",
+    "compute_semantic_motion",
+    "compute_structural_motion",
+    "compute_temporal_motion",
     # Utility computation
     "UtilityAudit",
     "TargetStateAudit",
