@@ -757,6 +757,329 @@ class OntologicalLayer:
 
 
 # =============================================================================
+# Configurable Layer Comparison
+# =============================================================================
+
+@dataclass
+class LayerComparisonConfig:
+    """
+    Configuration for which layers to compare for cognitive ambition.
+
+    This is where "cognitive ability" emerges from user selection:
+    - Users choose which ontological boundaries to monitor
+    - Different tiers/domains focus on different layer transitions
+    - The system's "attention" is directed by this configuration
+
+    Attributes:
+        primary_comparison: Main layer pair to monitor (upstream, downstream)
+        secondary_comparisons: Additional layer pairs to track
+        mirror_layer: Default layer for balance comparison
+        attention_weight: Weight given to primary vs secondary [0, 1]
+        enable_cross_layer: Whether to compute cross-layer dissonance
+    """
+    primary_comparison: Tuple[str, str]  # (upstream_layer, downstream_layer)
+    secondary_comparisons: list  # List of (layer_a, layer_b) tuples
+    mirror_layer: str  # Layer used as reference for balance
+    attention_weight: float = 0.7  # Weight for primary comparison
+    enable_cross_layer: bool = True
+
+    def __post_init__(self):
+        """Validate configuration."""
+        if not 0 <= self.attention_weight <= 1:
+            raise ValueError("attention_weight must be in [0, 1]")
+
+    @property
+    def all_comparisons(self) -> list:
+        """All layer comparisons (primary + secondary)."""
+        return [self.primary_comparison] + self.secondary_comparisons
+
+    @property
+    def monitored_layers(self) -> set:
+        """Set of all layers being monitored."""
+        layers = set()
+        for a, b in self.all_comparisons:
+            layers.add(a)
+            layers.add(b)
+        layers.add(self.mirror_layer)
+        return layers
+
+
+# =============================================================================
+# Tier-Specific Layer Comparison Defaults
+# =============================================================================
+
+# Enterprise Tier 1: Focus on Fusion → State (high-level quality)
+LAYER_COMPARISON_ENTERPRISE_T1 = LayerComparisonConfig(
+    primary_comparison=(OntologicalLayer.FUSION, OntologicalLayer.STATE),
+    secondary_comparisons=[
+        (OntologicalLayer.GUNA, OntologicalLayer.FUSION),
+    ],
+    mirror_layer=OntologicalLayer.FUSION,  # Compare against fusion for balance
+    attention_weight=0.8,
+)
+
+# Enterprise Tier 2: Focus on Guna → Fusion (semantic integration)
+LAYER_COMPARISON_ENTERPRISE_T2 = LayerComparisonConfig(
+    primary_comparison=(OntologicalLayer.GUNA, OntologicalLayer.FUSION),
+    secondary_comparisons=[
+        (OntologicalLayer.EMBEDDING, OntologicalLayer.GUNA),
+        (OntologicalLayer.FUSION, OntologicalLayer.STATE),
+    ],
+    mirror_layer=OntologicalLayer.GUNA,  # Compare against Guna for balance
+    attention_weight=0.7,
+)
+
+# Consumer: Focus on State → Output (user-facing quality)
+LAYER_COMPARISON_CONSUMER = LayerComparisonConfig(
+    primary_comparison=(OntologicalLayer.STATE, OntologicalLayer.OUTPUT),
+    secondary_comparisons=[
+        (OntologicalLayer.FUSION, OntologicalLayer.STATE),
+    ],
+    mirror_layer=OntologicalLayer.OUTPUT,  # Compare against output for balance
+    attention_weight=0.6,
+)
+
+# Full pipeline monitoring (for debugging/audit)
+LAYER_COMPARISON_FULL_PIPELINE = LayerComparisonConfig(
+    primary_comparison=(OntologicalLayer.SIGNAL, OntologicalLayer.OUTPUT),
+    secondary_comparisons=[
+        (OntologicalLayer.SIGNAL, OntologicalLayer.EMBEDDING),
+        (OntologicalLayer.EMBEDDING, OntologicalLayer.GUNA),
+        (OntologicalLayer.GUNA, OntologicalLayer.MOTION),
+        (OntologicalLayer.MOTION, OntologicalLayer.FUSION),
+        (OntologicalLayer.FUSION, OntologicalLayer.STATE),
+        (OntologicalLayer.STATE, OntologicalLayer.OUTPUT),
+    ],
+    mirror_layer=OntologicalLayer.FUSION,  # Center of pipeline
+    attention_weight=0.5,  # Equal attention to all
+)
+
+# Default: Enterprise T2 behavior
+DEFAULT_LAYER_COMPARISON = LAYER_COMPARISON_ENTERPRISE_T2
+
+
+def get_layer_comparison_for_tier(tier: str) -> LayerComparisonConfig:
+    """
+    Get layer comparison configuration for a tier.
+
+    Args:
+        tier: Tier identifier ("enterprise_t1", "enterprise_t2", "consumer")
+
+    Returns:
+        Layer comparison configuration
+    """
+    tier_configs = {
+        "enterprise_t1": LAYER_COMPARISON_ENTERPRISE_T1,
+        "enterprise_t2": LAYER_COMPARISON_ENTERPRISE_T2,
+        "consumer": LAYER_COMPARISON_CONSUMER,
+        "full": LAYER_COMPARISON_FULL_PIPELINE,
+    }
+    return tier_configs.get(tier.lower(), DEFAULT_LAYER_COMPARISON)
+
+
+# =============================================================================
+# Configurable Dissonance Monitor
+# =============================================================================
+
+class ConfigurableDissonanceMonitor:
+    """
+    Dissonance monitor with user-configurable layer comparisons.
+
+    The "cognitive ability" emerges from which layers the user chooses
+    to monitor. Different configurations reveal different insights:
+
+    - Enterprise T1: Focuses on high-level state quality
+    - Enterprise T2: Focuses on semantic integration
+    - Consumer: Focuses on output quality
+    - Full: Monitors entire pipeline
+
+    Usage:
+        # Use tier-specific configuration
+        monitor = ConfigurableDissonanceMonitor.for_tier("enterprise_t2")
+
+        # Or custom configuration
+        config = LayerComparisonConfig(
+            primary_comparison=("guna", "fusion"),
+            secondary_comparisons=[],
+            mirror_layer="guna",
+        )
+        monitor = ConfigurableDissonanceMonitor(config)
+
+        # Add observations for each layer
+        monitor.observe("embedding", embedding_obs)
+        monitor.observe("guna", guna_obs)
+        monitor.observe("fusion", fusion_obs)
+
+        # Get cognitive insights
+        insights = monitor.get_cognitive_insights()
+    """
+
+    def __init__(self, config: LayerComparisonConfig = None):
+        """
+        Initialize with layer comparison configuration.
+
+        Args:
+            config: Layer comparison configuration (default: enterprise_t2)
+        """
+        self._config = config or DEFAULT_LAYER_COMPARISON
+        self._observations: dict = {}  # layer_id -> Observables
+        self._dissonances: dict = {}   # (layer_a, layer_b) -> LayerDissonance
+
+    @classmethod
+    def for_tier(cls, tier: str) -> "ConfigurableDissonanceMonitor":
+        """Create monitor with tier-specific configuration."""
+        config = get_layer_comparison_for_tier(tier)
+        return cls(config)
+
+    def observe(self, layer_id: str, observables: Observables):
+        """
+        Record observation for a layer.
+
+        Args:
+            layer_id: Layer identifier (should match OntologicalLayer constants)
+            observables: Observed signals at this layer
+        """
+        self._observations[layer_id] = observables
+        self._update_dissonances(layer_id)
+
+    def _update_dissonances(self, updated_layer: str):
+        """Update dissonances involving the updated layer."""
+        for layer_a, layer_b in self._config.all_comparisons:
+            if layer_a == updated_layer or layer_b == updated_layer:
+                if layer_a in self._observations and layer_b in self._observations:
+                    state_a = LayerState(
+                        layer_id=layer_a,
+                        observables=self._observations[layer_a],
+                    )
+                    state_b = LayerState(
+                        layer_id=layer_b,
+                        observables=self._observations[layer_b],
+                    )
+                    self._dissonances[(layer_a, layer_b)] = compute_layer_dissonance(
+                        state_a, state_b
+                    )
+
+    def get_primary_dissonance(self) -> Optional["LayerDissonance"]:
+        """Get dissonance for primary comparison."""
+        return self._dissonances.get(self._config.primary_comparison)
+
+    def get_cognitive_insights(self) -> dict:
+        """
+        Get cognitive insights from configured layer comparisons.
+
+        Returns insights about:
+        - Primary cognitive ambition
+        - Secondary ambitions
+        - Overall cognitive drive
+        - Balance relative to mirror layer
+        - Recommended attention focus
+        """
+        primary = self.get_primary_dissonance()
+        secondaries = [
+            self._dissonances.get(pair)
+            for pair in self._config.secondary_comparisons
+            if pair in self._dissonances
+        ]
+
+        # Primary ambition (weighted)
+        primary_ambition = primary.cognitive_ambition if primary else 0.0
+
+        # Secondary ambitions (averaged)
+        secondary_ambitions = [
+            d.cognitive_ambition for d in secondaries if d is not None
+        ]
+        avg_secondary = (
+            sum(secondary_ambitions) / len(secondary_ambitions)
+            if secondary_ambitions else 0.0
+        )
+
+        # Weighted total
+        w = self._config.attention_weight
+        total_ambition = w * primary_ambition + (1 - w) * avg_secondary
+
+        # Mirror layer balance
+        mirror_balance = self._compute_mirror_balance()
+
+        # Determine attention focus
+        attention_focus = self._determine_attention_focus(primary, secondaries)
+
+        return {
+            "primary_comparison": self._config.primary_comparison,
+            "primary_ambition": primary_ambition,
+            "primary_type": primary.ambition_type if primary else "unknown",
+            "secondary_ambitions": secondary_ambitions,
+            "total_ambition": total_ambition,
+            "mirror_layer": self._config.mirror_layer,
+            "mirror_balance": mirror_balance,
+            "attention_focus": attention_focus,
+            "cognitive_state": self._classify_cognitive_state(total_ambition, mirror_balance),
+        }
+
+    def _compute_mirror_balance(self) -> float:
+        """Compute balance relative to mirror layer."""
+        mirror_obs = self._observations.get(self._config.mirror_layer)
+        if mirror_obs is None:
+            return 0.5  # Neutral if mirror not observed
+
+        pair = create_mirror_pair(mirror_obs)
+        return 1.0 - pair.total_asymmetry  # Higher = more balanced
+
+    def _determine_attention_focus(
+        self,
+        primary: Optional["LayerDissonance"],
+        secondaries: list,
+    ) -> str:
+        """Determine where attention should focus."""
+        if primary is None:
+            return "awaiting_primary_layers"
+
+        # Check for destructive dissonance
+        if primary.is_destructive:
+            return f"fix_regression:{primary.layer_a.layer_id}→{primary.layer_b.layer_id}"
+
+        # Check secondaries for issues
+        for d in secondaries:
+            if d is not None and d.is_destructive:
+                return f"fix_secondary:{d.layer_a.layer_id}→{d.layer_b.layer_id}"
+
+        # Check for strong positive ambition
+        if primary.cognitive_ambition > 0.2:
+            return f"amplify:{primary.layer_a.layer_id}→{primary.layer_b.layer_id}"
+
+        # Stable state
+        return "maintain_current"
+
+    def _classify_cognitive_state(
+        self,
+        ambition: float,
+        balance: float,
+    ) -> str:
+        """Classify overall cognitive state."""
+        if ambition > 0.3 and balance > 0.7:
+            return "thriving"  # High ambition, good balance
+        elif ambition > 0.3 and balance < 0.5:
+            return "striving"  # High ambition, poor balance (needs correction)
+        elif ambition < -0.2:
+            return "regressing"  # Negative ambition
+        elif balance > 0.8:
+            return "stable"  # Low ambition, excellent balance
+        elif balance < 0.4:
+            return "unstable"  # Low ambition, poor balance
+        else:
+            return "neutral"  # Middle ground
+
+    @property
+    def config(self) -> LayerComparisonConfig:
+        """Get current configuration."""
+        return self._config
+
+    def reset(self):
+        """Clear all observations."""
+        self._observations.clear()
+        self._dissonances.clear()
+
+
+# =============================================================================
 # Cross-Layer Dissonance Detection
 # =============================================================================
 
@@ -1146,6 +1469,14 @@ __all__ = [
     "LayerState",
     "LayerDissonance",
     "OntologicalLayer",
+    # Configurable layer comparison
+    "LayerComparisonConfig",
+    "LAYER_COMPARISON_ENTERPRISE_T1",
+    "LAYER_COMPARISON_ENTERPRISE_T2",
+    "LAYER_COMPARISON_CONSUMER",
+    "LAYER_COMPARISON_FULL_PIPELINE",
+    "DEFAULT_LAYER_COMPARISON",
+    "get_layer_comparison_for_tier",
     # Functions
     "compute_mirror_observables",
     "create_mirror_pair",
@@ -1158,4 +1489,5 @@ __all__ = [
     # Engines
     "MirrorBalanceEngine",
     "LayerDissonanceMonitor",
+    "ConfigurableDissonanceMonitor",
 ]

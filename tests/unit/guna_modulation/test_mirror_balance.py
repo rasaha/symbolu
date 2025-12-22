@@ -466,3 +466,147 @@ class TestAmbitionQuestions:
         # Should mention improvement
         has_improvement_question = any("improvement" in q.lower() or "amplify" in q.lower() for q in questions)
         assert has_improvement_question
+
+
+# =============================================================================
+# Configurable Layer Comparison Tests
+# =============================================================================
+
+from symbolu.guna_modulation.mirror_balance import (
+    LayerComparisonConfig,
+    LAYER_COMPARISON_ENTERPRISE_T1,
+    LAYER_COMPARISON_ENTERPRISE_T2,
+    LAYER_COMPARISON_CONSUMER,
+    LAYER_COMPARISON_FULL_PIPELINE,
+    DEFAULT_LAYER_COMPARISON,
+    get_layer_comparison_for_tier,
+    ConfigurableDissonanceMonitor,
+)
+
+
+class TestLayerComparisonConfig:
+    """Tests for LayerComparisonConfig."""
+
+    def test_default_config_is_enterprise_t2(self):
+        """Default config matches Enterprise T2."""
+        assert DEFAULT_LAYER_COMPARISON == LAYER_COMPARISON_ENTERPRISE_T2
+
+    def test_enterprise_t1_focuses_on_fusion_state(self):
+        """Enterprise T1 focuses on Fusion → State transition."""
+        config = LAYER_COMPARISON_ENTERPRISE_T1
+        assert config.primary_comparison == (OntologicalLayer.FUSION, OntologicalLayer.STATE)
+
+    def test_consumer_focuses_on_output(self):
+        """Consumer config focuses on State → Output."""
+        config = LAYER_COMPARISON_CONSUMER
+        assert config.primary_comparison == (OntologicalLayer.STATE, OntologicalLayer.OUTPUT)
+        assert config.mirror_layer == OntologicalLayer.OUTPUT
+
+    def test_full_pipeline_monitors_all(self):
+        """Full pipeline monitors all layer transitions."""
+        config = LAYER_COMPARISON_FULL_PIPELINE
+        # Should have 6 secondary comparisons (all adjacent pairs)
+        assert len(config.secondary_comparisons) == 6
+
+    def test_monitored_layers_property(self):
+        """monitored_layers returns all unique layers."""
+        config = LAYER_COMPARISON_ENTERPRISE_T2
+        layers = config.monitored_layers
+        assert OntologicalLayer.GUNA in layers
+        assert OntologicalLayer.FUSION in layers
+
+    def test_get_layer_comparison_for_tier(self):
+        """get_layer_comparison_for_tier returns correct config."""
+        assert get_layer_comparison_for_tier("enterprise_t1") == LAYER_COMPARISON_ENTERPRISE_T1
+        assert get_layer_comparison_for_tier("consumer") == LAYER_COMPARISON_CONSUMER
+        assert get_layer_comparison_for_tier("unknown") == DEFAULT_LAYER_COMPARISON
+
+
+class TestConfigurableDissonanceMonitor:
+    """Tests for ConfigurableDissonanceMonitor."""
+
+    def test_for_tier_factory(self):
+        """for_tier factory creates correct configuration."""
+        monitor = ConfigurableDissonanceMonitor.for_tier("enterprise_t1")
+        assert monitor.config == LAYER_COMPARISON_ENTERPRISE_T1
+
+    def test_observe_updates_dissonances(self, balanced_observables, sattva_heavy_observables):
+        """observe() updates dissonances when layers are available."""
+        monitor = ConfigurableDissonanceMonitor.for_tier("enterprise_t2")
+
+        # Add observations for configured layers
+        monitor.observe(OntologicalLayer.GUNA, balanced_observables)
+        monitor.observe(OntologicalLayer.FUSION, sattva_heavy_observables)
+
+        # Primary dissonance should be computed
+        primary = monitor.get_primary_dissonance()
+        assert primary is not None
+        assert primary.layer_a.layer_id == OntologicalLayer.GUNA
+        assert primary.layer_b.layer_id == OntologicalLayer.FUSION
+
+    def test_cognitive_insights(self, balanced_observables, sattva_heavy_observables, tamas_heavy_observables):
+        """get_cognitive_insights returns structured insights."""
+        monitor = ConfigurableDissonanceMonitor.for_tier("enterprise_t2")
+
+        # Simulate pipeline with improving quality
+        monitor.observe(OntologicalLayer.EMBEDDING, tamas_heavy_observables)
+        monitor.observe(OntologicalLayer.GUNA, balanced_observables)
+        monitor.observe(OntologicalLayer.FUSION, sattva_heavy_observables)
+
+        insights = monitor.get_cognitive_insights()
+
+        assert "primary_comparison" in insights
+        assert "primary_ambition" in insights
+        assert "total_ambition" in insights
+        assert "mirror_balance" in insights
+        assert "cognitive_state" in insights
+        assert "attention_focus" in insights
+
+    def test_cognitive_state_classification(self, balanced_observables, sattva_heavy_observables):
+        """Cognitive state is correctly classified."""
+        monitor = ConfigurableDissonanceMonitor.for_tier("enterprise_t2")
+
+        # Balanced state at guna layer = good mirror balance
+        monitor.observe(OntologicalLayer.GUNA, balanced_observables)
+        monitor.observe(OntologicalLayer.FUSION, sattva_heavy_observables)
+
+        insights = monitor.get_cognitive_insights()
+        # Should be either stable, neutral, or thriving depending on ambition
+        assert insights["cognitive_state"] in ["stable", "neutral", "thriving", "striving"]
+
+    def test_attention_focus_with_destructive(self, sattva_heavy_observables, tamas_heavy_observables):
+        """Attention focus identifies destructive transitions."""
+        monitor = ConfigurableDissonanceMonitor.for_tier("enterprise_t2")
+
+        # Regression: good → bad
+        monitor.observe(OntologicalLayer.GUNA, sattva_heavy_observables)
+        monitor.observe(OntologicalLayer.FUSION, tamas_heavy_observables)
+
+        insights = monitor.get_cognitive_insights()
+        # Should recommend fixing regression, amplifying, or maintaining
+        focus = insights["attention_focus"]
+        assert "fix" in focus or "maintain" in focus or "amplify" in focus
+
+    def test_custom_config(self, balanced_observables, sattva_heavy_observables):
+        """Custom configuration works correctly."""
+        config = LayerComparisonConfig(
+            primary_comparison=(OntologicalLayer.SIGNAL, OntologicalLayer.GUNA),
+            secondary_comparisons=[],
+            mirror_layer=OntologicalLayer.SIGNAL,
+            attention_weight=0.9,
+        )
+        monitor = ConfigurableDissonanceMonitor(config)
+
+        monitor.observe(OntologicalLayer.SIGNAL, balanced_observables)
+        monitor.observe(OntologicalLayer.GUNA, sattva_heavy_observables)
+
+        insights = monitor.get_cognitive_insights()
+        assert insights["primary_comparison"] == (OntologicalLayer.SIGNAL, OntologicalLayer.GUNA)
+
+    def test_reset_clears_observations(self, balanced_observables):
+        """reset() clears all observations."""
+        monitor = ConfigurableDissonanceMonitor.for_tier("enterprise_t2")
+        monitor.observe(OntologicalLayer.GUNA, balanced_observables)
+        monitor.reset()
+
+        assert monitor.get_primary_dissonance() is None

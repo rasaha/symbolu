@@ -419,6 +419,15 @@ from symbolu.guna_modulation.mirror_balance import (
     compute_layer_dissonance,
     generate_ambition_questions,
     LayerDissonanceMonitor,
+    # Configurable layer comparison (v2.7.5)
+    LayerComparisonConfig,
+    LAYER_COMPARISON_ENTERPRISE_T1,
+    LAYER_COMPARISON_ENTERPRISE_T2,
+    LAYER_COMPARISON_CONSUMER,
+    LAYER_COMPARISON_FULL_PIPELINE,
+    DEFAULT_LAYER_COMPARISON,
+    get_layer_comparison_for_tier,
+    ConfigurableDissonanceMonitor,
 )
 
 
@@ -679,6 +688,15 @@ __all__ = [
     "compute_layer_dissonance",
     "generate_ambition_questions",
     "LayerDissonanceMonitor",
+    # Configurable layer comparison (v2.7.5)
+    "LayerComparisonConfig",
+    "LAYER_COMPARISON_ENTERPRISE_T1",
+    "LAYER_COMPARISON_ENTERPRISE_T2",
+    "LAYER_COMPARISON_CONSUMER",
+    "LAYER_COMPARISON_FULL_PIPELINE",
+    "DEFAULT_LAYER_COMPARISON",
+    "get_layer_comparison_for_tier",
+    "ConfigurableDissonanceMonitor",
 ]
 
 
