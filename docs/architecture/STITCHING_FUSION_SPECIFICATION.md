@@ -10,6 +10,59 @@ This document resolves the architectural ambiguity between Stitching and Fusion 
 
 ---
 
+## 0. Normative Requirements (Implementation MUST Follow)
+
+This section contains **binding requirements** for all implementations. These are not guidelines—they are mandatory constraints that prevent architectural drift.
+
+### 0.1 Stitching Engine Requirements
+
+| Requirement | Rationale |
+|-------------|-----------|
+| MUST return boolean eligibility (`allowed: true/false`) per candidate | Single responsibility: eligibility only |
+| MUST NOT produce comparable or optimization scores | Prevents score competition with Fusion |
+| Diagnostic values MAY exist only for audit/debug | Scores are internal, never for ranking |
+| MUST NOT select, rank, or prioritize candidates | Ranking is Fusion's responsibility |
+| MUST NOT be imported, referenced, or called by Fusion code | Module isolation prevents drift |
+| MUST remove rejected candidates from the execution path entirely | Rejected candidates cannot reach Fusion |
+| MUST expose rejection reasons only via audit metadata, not runtime inputs | Audit data stays in audit path |
+
+### 0.2 Fusion Engine Requirements
+
+| Requirement | Rationale |
+|-------------|-----------|
+| MUST receive only allowed candidates as input | Stitching decisions are final |
+| MUST NOT receive or reference Stitching diagnostic data | Prevents soft priors from diagnostics |
+| MUST NOT re-validate constraints (confidence, entropy, domain caps, etc.) | Stitching already validated |
+| MUST rank candidates using its own scoring formula only | Clean separation of concerns |
+| MUST assume all input candidates are valid by construction | Trust the handoff contract |
+| MUST NOT override or bypass Stitching decisions | Authority is non-negotiable |
+
+### 0.3 Boundary / Contract Requirements
+
+| Requirement | Rationale |
+|-------------|-----------|
+| MUST use an explicit handoff object between Stitching and Fusion | Type-safe boundary enforcement |
+| MUST NOT allow rejected candidate IDs or metadata to cross the boundary | Clean separation |
+| MUST treat Stitching → Fusion as a one-way, non-feedback boundary | No circular dependencies |
+
+### 0.4 Determinism Requirements
+
+| Requirement | Rationale |
+|-------------|-----------|
+| MUST produce identical output given identical input | Enterprise repeatability |
+| MUST NOT use randomness, timestamps, or external state in scoring | Deterministic execution |
+| Tie-breaking MUST use deterministic rule (lexicographic candidate ID) | Auditable tie resolution |
+
+### 0.5 Verification Requirements
+
+| Requirement | Implementation |
+|-------------|----------------|
+| MUST include repeatability test | Same input → same output assertion |
+| MUST include boundary violation test | Rejected candidates cannot reach Fusion |
+| Code review MUST verify no Stitching imports in Fusion module | Static analysis or manual check |
+
+---
+
 ## 1. Clear Responsibility Definition
 
 ### 1.1 Stitching: The Gatekeeper
@@ -790,6 +843,7 @@ fusion_ranking = fusion_engine.rank(handoff)
 
 ---
 
-*Document Version: 1.0*
-*Status: Implementation-Ready*
+*Document Version: 1.1*
+*Status: Implementation-Ready (with Normative Requirements)*
 *Compatibility: STL Pipeline v3.x*
+*Last Updated: Added Section 0 - Normative Requirements for drift prevention*
