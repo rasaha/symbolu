@@ -374,6 +374,28 @@ from symbolu.guna_modulation.state_evolution_engine import (
     update_state,
 )
 
+# Experimental Reasoning Extensions (v2.7.4)
+from symbolu.guna_modulation.experimental_reasoning import (
+    # DPO
+    PreferenceGoal,
+    PreferencePair,
+    DPOConfig,
+    DPOUpdater,
+    create_dpo_updater,
+    # Tree-of-Thoughts
+    ThoughtNode,
+    ToTConfig,
+    TreeOfThoughts,
+    create_tree_of_thoughts,
+    # MCTS
+    MCTSNode,
+    MCTSConfig,
+    MonteCarloTreeSearch,
+    create_mcts,
+    # Capability reference
+    CAPABILITY_MATRIX,
+)
+
 
 __all__ = [
     # Constants
@@ -587,6 +609,27 @@ __all__ = [
     # Helper functions
     "normalize_weights",
     "softmax_3",
+    # =========================================================================
+    # Experimental Reasoning Extensions (v2.7.4)
+    # =========================================================================
+    # DPO
+    "PreferenceGoal",
+    "PreferencePair",
+    "DPOConfig",
+    "DPOUpdater",
+    "create_dpo_updater",
+    # Tree-of-Thoughts
+    "ThoughtNode",
+    "ToTConfig",
+    "TreeOfThoughts",
+    "create_tree_of_thoughts",
+    # MCTS
+    "MCTSNode",
+    "MCTSConfig",
+    "MonteCarloTreeSearch",
+    "create_mcts",
+    # Capability reference
+    "CAPABILITY_MATRIX",
 ]
 
 
