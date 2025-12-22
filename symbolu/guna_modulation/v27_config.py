@@ -131,12 +131,15 @@ class BayesianPosterior:
     def variance(self) -> float:
         """Posterior variance (uncertainty)."""
         total = self.alpha + self.beta
-        return (self.alpha * self.beta) / (total * total * (total + 1))
+        if total <= 0:
+            return 0.25  # Maximum variance for Beta distribution
+        var = (self.alpha * self.beta) / (total * total * (total + 1))
+        return max(0.0, var)  # Guard against floating point issues
 
     @property
     def std(self) -> float:
         """Posterior standard deviation."""
-        return math.sqrt(self.variance)
+        return math.sqrt(max(0.0, self.variance))
 
     @property
     def confidence(self) -> float:
