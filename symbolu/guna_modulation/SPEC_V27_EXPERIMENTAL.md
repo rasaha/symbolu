@@ -1,6 +1,6 @@
 # SymbolU v2.7 Experimental Extensions Specification
 
-**Version:** 2.7.4-experimental
+**Version:** 2.7.5-experimental
 **Date:** 2025-12-22
 **Status:** Experimental (Enterprise-ready components marked)
 
@@ -15,9 +15,10 @@
 5. [DPO: Direct Preference Optimization](#dpo-direct-preference-optimization)
 6. [ToT: Tree-of-Thoughts](#tot-tree-of-thoughts)
 7. [MCTS: Monte Carlo Tree Search](#mcts-monte-carlo-tree-search)
-8. [Capability Matrix](#capability-matrix)
-9. [Enterprise Value Proposition](#enterprise-value-proposition)
-10. [AGI Assessment](#agi-assessment)
+8. [Cognitive Ability Model](#cognitive-ability-model)
+9. [Capability Matrix](#capability-matrix)
+10. [Enterprise Value Proposition](#enterprise-value-proposition)
+11. [AGI Assessment](#agi-assessment)
 
 ---
 
@@ -33,6 +34,7 @@ entropy modulation system. These extensions provide:
 | **DPO** | Preference-based optimization | ✅ Yes (with valid goals) |
 | **ToT** | Structured reasoning scaffolding | ⚠️ Experimental |
 | **MCTS** | Search-based decision making | ⚠️ Experimental |
+| **Cognitive Ability** | Measurable cognitive metrics via mirror + selective layers | ✅ Yes |
 
 **Key Insight:** These are mathematical refinements, not cognitive capabilities.
 The system remains deterministic signal processing, not intelligence.
@@ -574,18 +576,342 @@ Total simulations: 100
 
 ---
 
+## Cognitive Ability Model
+
+### Overview
+
+The Cognitive Ability Model provides **measurable cognitive metrics** by combining
+two complementary mechanisms:
+
+1. **Mirror Balance** - Self-referential balance detection (S↔T swap)
+2. **Selective Layer Comparison** - Directive attention across ontological layers
+
+This combination produces quantifiable "cognitive ability" that emerges from the
+interplay of self-reference and selective attention.
+
+### Key Insight
+
+```
+Cognitive Ability = Self-Reference (Mirror) + Selective Attention (Layers)
+```
+
+Neither mechanism alone produces full cognitive capability:
+- **Mirror-only**: Good self-awareness, but no directional focus
+- **Selective-only**: Good directional focus, but no self-awareness
+- **Combined**: Best of both - measurably superior cognitive metrics
+
+### Benchmark Results
+
+#### Overall Scores (0-1 scale, higher = better)
+
+| Scenario | Mirror-Only | Selective-Only | Combined | Winner |
+|----------|-------------|----------------|----------|--------|
+| Balanced Pipeline | 0.410 | 0.630 | 0.830 | **combined** |
+| Constructive Improvement | 0.450 | 0.630 | 0.824 | **combined** |
+| Destructive Regression | 0.470 | 0.645 | 0.865 | **combined** |
+| Internal Imbalance | 0.500 | 0.600 | 0.794 | **combined** |
+| Mixed Signals | 0.400 | 0.615 | 0.875 | **combined** |
+| **Average** | **0.446** | **0.624** | **0.838** | **combined** |
+
+**Combined wins 5/5 scenarios (100%)**
+
+#### Detailed Metric Breakdown
+
+##### Scenario: Balanced Pipeline
+
+```
+                    Mirror    Selective  Combined
+Self-Awareness:      1.00       0.40       1.00
+Directional Focus:   0.30       0.90       0.70
+Actionability:       0.20       0.60       0.80
+State Classification:0.30       0.50       0.90
+─────────────────────────────────────────────────
+TOTAL:               0.41       0.63       0.83
+Category:            low     moderate     high
+```
+
+##### Scenario: Constructive Improvement
+
+```
+                    Mirror    Selective  Combined
+Self-Awareness:      0.90       0.40       0.97
+Directional Focus:   0.30       0.90       0.70
+Actionability:       0.40       0.60       0.80
+State Classification:0.30       0.50       0.90
+─────────────────────────────────────────────────
+TOTAL:               0.45       0.63       0.82
+Category:            low     moderate     high
+```
+
+##### Scenario: Destructive Regression
+
+```
+                    Mirror    Selective  Combined
+Self-Awareness:      0.85       0.40       0.87
+Directional Focus:   0.40       0.85       0.90
+Actionability:       0.40       0.70       0.80
+State Classification:0.30       0.50       0.90
+─────────────────────────────────────────────────
+TOTAL:               0.47       0.65       0.86
+Category:            low     moderate     high
+```
+
+##### Scenario: Internal Imbalance
+
+```
+                    Mirror    Selective  Combined
+Self-Awareness:      1.00       0.40       0.82
+Directional Focus:   0.40       0.80       0.70
+Actionability:       0.40       0.60       0.80
+State Classification:0.30       0.50       0.90
+─────────────────────────────────────────────────
+TOTAL:               0.50       0.60       0.79
+Category:          moderate  moderate   moderate
+```
+
+##### Scenario: Mixed Signals
+
+```
+                    Mirror    Selective  Combined
+Self-Awareness:      0.50       0.40       0.92
+Directional Focus:   0.40       0.85       0.90
+Actionability:       0.40       0.60       0.80
+State Classification:0.30       0.50       0.90
+─────────────────────────────────────────────────
+TOTAL:               0.40       0.61       0.88
+Category:            low     moderate     high
+```
+
+#### Improvement Statistics
+
+```
+Combined vs Mirror-Only:
+  Average improvement:    +89.4%
+  Best improvement:      +120.0% (Mixed Signals)
+  Worst improvement:     +58.0% (Internal Imbalance)
+
+Combined vs Selective-Only:
+  Average improvement:    +34.2%
+  Best improvement:      +42.4% (Mixed Signals)
+  Worst improvement:     +27.5% (Destructive Regression)
+```
+
+#### Category Distribution
+
+| Approach | High | Moderate | Low |
+|----------|------|----------|-----|
+| Mirror-Only | 0% | 20% | 80% |
+| Selective-Only | 0% | 100% | 0% |
+| **Combined** | **80%** | **20%** | **0%** |
+
+#### Key Quantitative Findings
+
+1. **Self-Awareness Gap**
+   - Mirror-only average: 0.85
+   - Selective-only average: 0.40
+   - Combined average: 0.92
+   - **Combined captures mirror's strength (+130% over selective)**
+
+2. **Directional Focus Gap**
+   - Mirror-only average: 0.36
+   - Selective-only average: 0.86
+   - Combined average: 0.78
+   - **Combined captures selective's strength (+117% over mirror)**
+
+3. **Actionability Improvement**
+   - Mirror-only average: 0.36
+   - Selective-only average: 0.62
+   - Combined average: 0.80
+   - **Combined exceeds both (+29% over selective)**
+
+4. **State Classification**
+   - Mirror-only: Binary (balanced/unbalanced) = 0.30
+   - Selective-only: 5 ambition types = 0.50
+   - Combined: 6 cognitive states = 0.90
+   - **Combined has 3x classification richness**
+
+### Cognitive Metrics (Measurable)
+
+Four quantifiable metrics define cognitive capability:
+
+| Metric | Description | Mirror | Selective | Combined |
+|--------|-------------|--------|-----------|----------|
+| **Self-Awareness** | Detects internal imbalance | ✅ High | ❌ Low | ✅ High |
+| **Directional Focus** | Knows which layer to improve | ❌ Low | ✅ High | ✅ High |
+| **Actionability** | Produces actionable output | ⚠️ Medium | ⚠️ Medium | ✅ High |
+| **State Classification** | Classifies cognitive state | ❌ Binary | ⚠️ Limited | ✅ 6 states |
+
+### Ontological Layer Hierarchy
+
+The system defines 7 ontological layers for cross-layer comparison:
+
+```
+Layer 0: SIGNAL     (raw signals)
+Layer 1: EMBEDDING  (semantic embeddings)
+Layer 2: GUNA       (S/R/T classification)
+Layer 3: MOTION     (change detection)
+Layer 4: FUSION     (HRM integration)
+Layer 5: STATE      (evolved registers)
+Layer 6: OUTPUT     (final output)
+```
+
+**Cognitive ambition** emerges from comparing adjacent layers:
+
+```
+Cognitive Ambition = downstream_coherence - upstream_coherence
+
+  Positive → System is "striving" (improving as it processes)
+  Negative → System is "regressing" (losing coherence)
+  Near zero → Stable but not growing
+```
+
+### Mirror Balance
+
+The mirror creates a "reflection" of the current state to detect imbalance:
+
+```python
+# Mirror transformation
+S ↔ T swap (Sattva/Tamas exchange)
+H' = 1 - H (entropy complement)
+M' = 1 - M (motion complement)
+
+# If original ≈ mirror, state is balanced
+# If |original - mirror| is large, imbalance exists
+```
+
+### Configurable Layer Comparison
+
+Users select which ontological layers to monitor:
+
+```python
+@dataclass
+class LayerComparisonConfig:
+    primary_comparison: Tuple[str, str]  # Main layer pair
+    secondary_comparisons: list          # Additional pairs
+    mirror_layer: str                    # Balance reference
+    attention_weight: float              # Primary vs secondary
+```
+
+**Tier-Specific Defaults:**
+
+| Tier | Primary Focus | Mirror Layer | Use Case |
+|------|---------------|--------------|----------|
+| Enterprise T1 | Fusion → State | Fusion | High-level quality |
+| Enterprise T2 | Guna → Fusion | Guna | Semantic integration |
+| Consumer | State → Output | Output | Output quality |
+| **Mixed (Default)** | Guna → Fusion + State → Output | Guna | Best overall |
+
+### Cognitive State Classification
+
+The combined approach classifies into 6 cognitive states:
+
+| State | Condition | Meaning |
+|-------|-----------|---------|
+| **thriving** | High ambition, good balance | Optimal performance |
+| **striving** | High ambition, poor balance | Needs correction |
+| **stable** | Low ambition, excellent balance | Maintenance mode |
+| **regressing** | Negative ambition | Quality degradation |
+| **unstable** | Low ambition, poor balance | Needs intervention |
+| **neutral** | Middle ground | Normal operation |
+
+### Usage
+
+```python
+from symbolu.guna_modulation import (
+    ConfigurableDissonanceMonitor,
+    LAYER_COMPARISON_MIXED_DIRECTIVE,
+    OntologicalLayer,
+)
+
+# Create monitor with default (mixed directive) configuration
+monitor = ConfigurableDissonanceMonitor.for_tier("mixed")
+
+# Observe layers in pipeline
+monitor.observe(OntologicalLayer.GUNA, guna_observables)
+monitor.observe(OntologicalLayer.FUSION, fusion_observables)
+monitor.observe(OntologicalLayer.STATE, state_observables)
+
+# Get cognitive insights
+insights = monitor.get_cognitive_insights()
+
+print(f"Primary ambition: {insights['primary_ambition']:.2f}")
+print(f"Cognitive state: {insights['cognitive_state']}")
+print(f"Attention focus: {insights['attention_focus']}")
+print(f"Mirror balance: {insights['mirror_balance']:.2f}")
+
+# Example output:
+# Primary ambition: 0.35
+# Cognitive state: thriving
+# Attention focus: amplify:guna→fusion
+# Mirror balance: 0.92
+```
+
+### Running Benchmarks
+
+```python
+from symbolu.guna_modulation import (
+    run_cognitive_benchmark,
+    run_standard_benchmark_suite,
+)
+
+# Run standard benchmark suite
+results = run_standard_benchmark_suite()
+
+for r in results:
+    print(f"{r.scenario}: {r.winner} wins")
+    print(f"  Combined vs Mirror: {r.combined_improvement_over_mirror*100:.1f}%")
+    print(f"  Combined vs Selective: {r.combined_improvement_over_selective*100:.1f}%")
+```
+
+### Why This Matters
+
+The Cognitive Ability Model provides:
+
+1. **Measurable cognitive metrics** - Not vague "intelligence", but quantifiable scores
+2. **Configurable attention** - Users choose which layers matter for their use case
+3. **Self-reference + direction** - The combination that produces cognitive capability
+4. **Actionable insights** - State classification leads to specific recommendations
+
+### Relationship to AGI
+
+This is **not AGI**. The "cognitive ability" is:
+
+- Measurable signal processing properties
+- Not understanding, reasoning, or consciousness
+- Deterministic and auditable
+- A useful enterprise metric, not artificial general intelligence
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Cognitive Ability Model                             │
+│                                                      │
+│  = Measurable self-awareness + directional focus    │
+│  = Quantifiable improvement metrics                 │
+│  ≠ Understanding                                    │
+│  ≠ AGI                                              │
+│                                                      │
+│  Enterprise value: ✅ Yes (measurable, actionable)  │
+│  True cognition: ❌ No (signal processing only)     │
+└──────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Capability Matrix
 
 ### What Each Extension Adds
 
-| Capability | Bayesian | Motion | DPO | ToT | MCTS |
-|------------|----------|--------|-----|-----|------|
-| Uncertainty quantification | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Adaptive learning | ✅ | ❌ | ✅ | ❌ | ❌ |
-| Explicit signal formalization | ❌ | ✅ | ❌ | ❌ | ❌ |
-| Preference learning | ❌ | ❌ | ✅ | ❌ | ❌ |
-| Structured reasoning | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Exploration/exploitation | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Capability | Bayesian | Motion | DPO | ToT | MCTS | Cognitive |
+|------------|----------|--------|-----|-----|------|-----------|
+| Uncertainty quantification | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Adaptive learning | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Explicit signal formalization | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Preference learning | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Structured reasoning | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| Exploration/exploitation | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Self-awareness metrics | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Directional focus | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Cognitive state classification | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ### What None of Them Add (AGI Capabilities)
 
@@ -818,9 +1144,66 @@ from symbolu.guna_modulation import (
 )
 ```
 
+### Cognitive Ability Model
+
+```python
+from symbolu.guna_modulation import (
+    # Mirror Balance
+    MirrorPair,
+    BalanceCorrection,
+    SelfQuestion,
+    compute_mirror_observables,
+    create_mirror_pair,
+    compute_balance_correction,
+    apply_balance_correction,
+    compute_harmonic_mirror,
+    generate_self_questions,
+    MirrorBalanceEngine,
+
+    # Ontological Layers
+    OntologicalLayer,
+    LayerState,
+    LayerDissonance,
+    compute_layer_dissonance,
+    LayerDissonanceMonitor,
+    generate_ambition_questions,
+
+    # Configurable Layer Comparison
+    LayerComparisonConfig,
+    LAYER_COMPARISON_ENTERPRISE_T1,
+    LAYER_COMPARISON_ENTERPRISE_T2,
+    LAYER_COMPARISON_CONSUMER,
+    LAYER_COMPARISON_FULL_PIPELINE,
+    LAYER_COMPARISON_MIXED_DIRECTIVE,  # Default
+    DEFAULT_LAYER_COMPARISON,
+    get_layer_comparison_for_tier,
+    ConfigurableDissonanceMonitor,
+
+    # Benchmarking
+    CognitiveMetrics,
+    MirrorOnlyAnalyzer,
+    SelectiveOnlyAnalyzer,
+    CombinedAnalyzer,
+    BenchmarkResult,
+    run_cognitive_benchmark,
+    run_standard_benchmark_suite,
+)
+```
+
 ---
 
 ## Changelog
+
+### v2.7.5-experimental (2025-12-22)
+
+- Added Cognitive Ability Model with measurable metrics
+- Added MirrorBalance for self-referential balance detection
+- Added OntologicalLayer hierarchy (7 layers: SIGNAL → OUTPUT)
+- Added ConfigurableDissonanceMonitor for selective layer comparison
+- Added LAYER_COMPARISON_MIXED_DIRECTIVE as new default
+- Added cognitive benchmark suite with 5 scenarios
+- Benchmark results: Combined approach +89.4% over mirror-only, +34.2% over selective-only
+- Added 6 cognitive state classifications: thriving, striving, stable, regressing, unstable, neutral
 
 ### v2.7.4-experimental (2025-12-22)
 
