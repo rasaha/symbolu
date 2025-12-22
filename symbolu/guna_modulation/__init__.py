@@ -240,6 +240,24 @@ from symbolu.guna_modulation.pipeline_integration import (
     modulate_from_pipeline,
 )
 
+# Pipeline signal adapter (v2.6.1) - wires to existing pipeline signals
+from symbolu.guna_modulation.pipeline_signal_adapter import (
+    # Intent mapping
+    EXPERIENTIAL_INTENT_TYPES,
+    intent_to_experiential_delta,
+    # Delta computations from pipeline signals
+    compute_semantic_delta_from_vectors,
+    compute_structural_delta_from_stitching,
+    # Entropy extraction
+    extract_entropy_from_router_context,
+    # Context aggregation
+    PipelineSignalContext,
+    # Adapter functions
+    wire_from_pipeline_context,
+    wire_signals_from_router_context,
+    modulate_from_pipeline_context,
+)
+
 
 __all__ = [
     # Constants
@@ -341,6 +359,23 @@ __all__ = [
     "create_default_pipeline_engine",
     # Standalone function
     "modulate_from_pipeline",
+    # =========================================================================
+    # Pipeline Signal Adapter (v2.6.1)
+    # =========================================================================
+    # Intent mapping
+    "EXPERIENTIAL_INTENT_TYPES",
+    "intent_to_experiential_delta",
+    # Delta computations from pipeline signals
+    "compute_semantic_delta_from_vectors",
+    "compute_structural_delta_from_stitching",
+    # Entropy extraction
+    "extract_entropy_from_router_context",
+    # Context aggregation
+    "PipelineSignalContext",
+    # Adapter functions
+    "wire_from_pipeline_context",
+    "wire_signals_from_router_context",
+    "modulate_from_pipeline_context",
 ]
 
 
