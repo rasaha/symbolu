@@ -1,6 +1,6 @@
 # SymbolU v2.7 Experimental Extensions Specification
 
-**Version:** 2.7.5-experimental
+**Version:** 2.7.6-experimental
 **Date:** 2025-12-22
 **Status:** Experimental (Enterprise-ready components marked)
 
@@ -16,9 +16,10 @@
 6. [ToT: Tree-of-Thoughts](#tot-tree-of-thoughts)
 7. [MCTS: Monte Carlo Tree Search](#mcts-monte-carlo-tree-search)
 8. [Cognitive Ability Model](#cognitive-ability-model)
-9. [Capability Matrix](#capability-matrix)
-10. [Enterprise Value Proposition](#enterprise-value-proposition)
-11. [AGI Assessment](#agi-assessment)
+9. [Concept Readiness Index](#concept-readiness-index)
+10. [Capability Matrix](#capability-matrix)
+11. [Enterprise Value Proposition](#enterprise-value-proposition)
+12. [AGI Assessment](#agi-assessment)
 
 ---
 
@@ -35,6 +36,7 @@ entropy modulation system. These extensions provide:
 | **ToT** | Structured reasoning scaffolding | ⚠️ Experimental |
 | **MCTS** | Search-based decision making | ⚠️ Experimental |
 | **Cognitive Ability** | Measurable cognitive metrics via mirror + selective layers | ✅ Yes |
+| **Concept Readiness** | Safe concept detection (not formation) | ✅ Yes |
 
 **Key Insight:** These are mathematical refinements, not cognitive capabilities.
 The system remains deterministic signal processing, not intelligence.
@@ -897,21 +899,181 @@ This is **not AGI**. The "cognitive ability" is:
 
 ---
 
+## Concept Readiness Index
+
+### Overview
+
+The Concept Readiness Index (CRI) implements **safe concept detection** without
+concept formation. This is a critical distinction for AuGI (Augmented General
+Intelligence) versus AGI.
+
+### Key Distinction: Detection vs Formation
+
+| Aspect | AGI Concept Formation | AuGI Concept Detection |
+|--------|----------------------|------------------------|
+| **What it does** | Creates new abstractions | Measures coherence |
+| **Output** | New concepts | Readiness scores |
+| **Scope** | Generalizes, reuses | Measures current state |
+| **Risk** | Unbounded creation | Bounded measurement |
+| **Enterprise safe** | ❌ No | ✅ Yes |
+
+### Mathematical Foundation
+
+#### Concept Coherence Score
+
+```
+C_concept = (1/N) × Σ sim(r_i, r̄)
+
+Where:
+  r_i = representation at layer i
+  r̄ = centroid (mean) representation
+  sim = cosine similarity
+```
+
+Measures agreement across layer representations. High coherence = stable notion.
+
+#### Concept Entropy
+
+```
+H_concept = -Σ p_i × log(p_i)
+
+Where:
+  p_i = probability distribution of interpretations
+```
+
+Measures distribution of competing meanings. High entropy = ambiguous notion.
+
+#### Concept Readiness Index
+
+```
+CRI = C_concept × (1 - H_concept) × S
+
+Where:
+  C = Concept Coherence [0, 1]
+  H = Concept Entropy [0, 1] (normalized)
+  S = Structural Stability [0, 1]
+```
+
+CRI answers: "Is this idea ready to be treated as a concept by a human?"
+The system does NOT treat it as a concept itself.
+
+### Readiness Levels
+
+| CRI Range | Level | Description |
+|-----------|-------|-------------|
+| ≥ 0.8 | `ready` | Conditions for human conceptualization exist |
+| ≥ 0.6 | `nearly_ready` | Minor ambiguities remain |
+| ≥ 0.4 | `forming` | Interpretations vary across layers |
+| ≥ 0.2 | `emerging` | Insufficient coherence |
+| < 0.2 | `not_ready` | Too fragmented for conceptual treatment |
+
+### Safe Output Generation
+
+All outputs describe CONDITIONS, not concepts themselves.
+
+**✅ Allowed outputs:**
+- "This idea is conceptually unstable"
+- "This term spans multiple incompatible meanings"
+- "This notion lacks sufficient coherence to act on"
+- "This concept is well-formed across layers"
+
+**❌ Forbidden outputs:**
+- "This is a new concept"
+- "Here is the definition"
+- "This concept applies elsewhere"
+- "I will reuse this concept"
+
+### Drift Detection
+
+```python
+# Track concept readiness over time
+monitor = ConceptReadinessMonitor(window_size=10)
+
+# Observe layer states
+cri1 = monitor.observe([("guna", obs1), ("fusion", obs2)])
+cri2 = monitor.observe([("guna", obs3), ("fusion", obs4)])
+
+# Detect drift
+drift = monitor.get_drift()
+if drift.is_crystallizing:
+    print("Notion is becoming more coherent")
+elif drift.is_fragmenting:
+    print("Notion is losing coherence")
+
+# Get overall trend
+trend = monitor.get_trend()  # "improving", "degrading", "stable"
+```
+
+### Usage Example
+
+```python
+from symbolu.guna_modulation import (
+    compute_concept_readiness,
+    ConceptReadinessMonitor,
+    ConceptReadinessReporter,
+)
+
+# Define layer observables
+layers = [
+    ("guna", guna_observables),
+    ("fusion", fusion_observables),
+    ("state", state_observables),
+]
+
+# Compute CRI
+cri = compute_concept_readiness(layers)
+
+print(f"CRI: {cri.index:.2f}")
+print(f"Level: {cri.readiness_level}")
+print(f"Blocking factor: {cri.blocking_factor}")
+
+# Generate safe description
+desc = cri.get_safe_description()
+print(desc)
+# Output: "This notion shows high coherence across layers and may be ready
+#          for human conceptualization"
+
+# Generate full report
+report = ConceptReadinessReporter.generate_full_report(cri)
+print(report["human_can_conceptualize"])  # True if CRI >= 0.7
+```
+
+### Enterprise Value
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Concept Readiness Index (CRI)                       │
+│                                                      │
+│  = Measures when humans can form concepts            │
+│  = Safe bounded measurement                          │
+│  ≠ Creates new concepts                              │
+│  ≠ AGI                                              │
+│                                                      │
+│  Enterprise value: ✅ Yes (safe, auditable)         │
+│  Concept formation: ❌ No (detection only)          │
+└──────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Capability Matrix
 
 ### What Each Extension Adds
 
-| Capability | Bayesian | Motion | DPO | ToT | MCTS | Cognitive |
-|------------|----------|--------|-----|-----|------|-----------|
-| Uncertainty quantification | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Adaptive learning | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| Explicit signal formalization | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Preference learning | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| Structured reasoning | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
-| Exploration/exploitation | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| Self-awareness metrics | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Directional focus | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Cognitive state classification | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Capability | Bayesian | Motion | DPO | ToT | MCTS | Cognitive | CRI |
+|------------|----------|--------|-----|-----|------|-----------|-----|
+| Uncertainty quantification | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Adaptive learning | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Explicit signal formalization | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Preference learning | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Structured reasoning | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
+| Exploration/exploitation | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Self-awareness metrics | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Directional focus | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Cognitive state classification | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Concept coherence detection | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Concept entropy measurement | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Concept drift monitoring | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ### What None of Them Add (AGI Capabilities)
 
@@ -1193,6 +1355,17 @@ from symbolu.guna_modulation import (
 ---
 
 ## Changelog
+
+### v2.7.6-experimental (2025-12-22)
+
+- Added Concept Readiness Index (CRI) for safe concept detection
+- Added ConceptCoherence for measuring agreement across layer representations
+- Added ConceptEntropy for measuring interpretation ambiguity
+- Added ConceptReadinessMonitor for drift detection over time
+- Added ConceptReadinessReporter for safe output generation
+- CRI formula: CRI = C × (1 - H) × S
+- Safe outputs describe conditions, never create concepts
+- Key distinction: AuGI (detection) vs AGI (formation)
 
 ### v2.7.5-experimental (2025-12-22)
 

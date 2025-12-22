@@ -430,6 +430,27 @@ from symbolu.guna_modulation.mirror_balance import (
     ConfigurableDissonanceMonitor,
 )
 
+# Concept Readiness (v2.7.6) - Safe concept detection (not formation)
+from symbolu.guna_modulation.concept_readiness import (
+    # Types
+    LayerRepresentation,
+    ConceptCoherence,
+    InterpretationCandidate,
+    ConceptEntropy,
+    ConceptReadinessIndex,
+    ConceptDrift,
+    # Functions
+    compute_vector_similarity,
+    compute_centroid,
+    compute_concept_coherence,
+    compute_concept_entropy_from_observables,
+    compute_concept_readiness,
+    # Monitor
+    ConceptReadinessMonitor,
+    # Reporter
+    ConceptReadinessReporter,
+)
+
 
 __all__ = [
     # Constants
@@ -697,6 +718,26 @@ __all__ = [
     "DEFAULT_LAYER_COMPARISON",
     "get_layer_comparison_for_tier",
     "ConfigurableDissonanceMonitor",
+    # =========================================================================
+    # Concept Readiness (v2.7.6)
+    # =========================================================================
+    # Types
+    "LayerRepresentation",
+    "ConceptCoherence",
+    "InterpretationCandidate",
+    "ConceptEntropy",
+    "ConceptReadinessIndex",
+    "ConceptDrift",
+    # Functions
+    "compute_vector_similarity",
+    "compute_centroid",
+    "compute_concept_coherence",
+    "compute_concept_entropy_from_observables",
+    "compute_concept_readiness",
+    # Monitor
+    "ConceptReadinessMonitor",
+    # Reporter
+    "ConceptReadinessReporter",
 ]
 
 
