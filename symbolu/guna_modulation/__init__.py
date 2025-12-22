@@ -33,6 +33,18 @@ Where:
     - H_mid = 0.5
     - epsilon = 10^-9
 
+SIGNAL WIRING (v2.6.1):
+    H is computed from operator-selectable entropy sources:
+        - GUNA: H = H_G / ln(3)  [DEFAULT]
+        - DIMENSIONAL: H = H_D / ln(10)
+        - KOSHA: H = H_K / ln(5)
+
+    M is computed from operator-selectable motion modes:
+        - SEMANTIC: M = delta_sem  [DEFAULT]
+        - STRUCTURAL: M = delta_str_norm
+        - EXPERIENTIAL: M = delta_exp
+        - COMPOSITE: M = weighted average of all deltas
+
 EXPLICIT NON-CAPABILITIES (MANDATORY):
     - No learning
     - No adaptation
@@ -82,7 +94,31 @@ Usage:
         H=0.3,
     )
 
-Version: 2.6.0
+    # Using pipeline integration with signal wiring
+    from symbolu.guna_modulation import (
+        PipelineModulationEngine,
+        EntropyMode,
+        MotionMode,
+        SignalWiringConfig,
+    )
+
+    engine = PipelineModulationEngine(
+        wiring_config=SignalWiringConfig(
+            entropy_mode=EntropyMode.GUNA,  # H = H_G / ln(3)
+            motion_mode=MotionMode.SEMANTIC,  # M = delta_sem
+        ),
+    )
+    result = engine.modulate_from_pipeline(
+        base_intensity=0.8,
+        C_s=0.7,
+        H_G=0.5, H_D=1.0, H_K=0.3,
+        candidate_aspect_vector={"clarity": 0.8},
+        context_aspect_vector={"clarity": 0.7},
+        domain_jump_count=1,
+        intent="informative",
+    )
+
+Version: 2.6.1
 Date: 2025-12-22
 """
 
@@ -158,6 +194,52 @@ from symbolu.guna_modulation.entropy_modulation_engine import (
     modulate_intensity,
 )
 
+# Signal wiring (v2.6.1)
+from symbolu.guna_modulation.signal_wiring import (
+    # Constants
+    LN_3,
+    LN_5,
+    LN_10,
+    MAX_STRUCTURAL_JUMPS,
+    EXPERIENTIAL_MOTION_INTENTS,
+    # Enums (operator-selectable modes)
+    EntropyMode,
+    MotionMode,
+    # Audit types
+    EntropyWiringAudit,
+    MotionWiringAudit,
+    SignalWiringAudit,
+    WiredSignals,
+    # Configuration
+    SignalWiringConfig,
+    DEFAULT_WIRING_CONFIG,
+    # Entropy computation
+    compute_H,
+    # Motion delta computation
+    compute_semantic_delta,
+    compute_structural_delta,
+    compute_experiential_delta,
+    # Motion computation
+    compute_M,
+    compute_M_from_raw,
+    # Full signal wiring
+    wire_signals,
+    wire_signals_simple,
+)
+
+# Pipeline integration (v2.6.1)
+from symbolu.guna_modulation.pipeline_integration import (
+    # Result type
+    IntegratedModulationResult,
+    # Pipeline engine
+    PipelineModulationEngine,
+    # Factory functions
+    create_pipeline_engine,
+    create_default_pipeline_engine,
+    # Standalone function
+    modulate_from_pipeline,
+)
+
 
 __all__ = [
     # Constants
@@ -215,6 +297,50 @@ __all__ = [
     "create_engine_for_tier_name",
     # Standalone function
     "modulate_intensity",
+    # =========================================================================
+    # Signal Wiring (v2.6.1)
+    # =========================================================================
+    # Constants
+    "LN_3",
+    "LN_5",
+    "LN_10",
+    "MAX_STRUCTURAL_JUMPS",
+    "EXPERIENTIAL_MOTION_INTENTS",
+    # Enums (operator-selectable modes)
+    "EntropyMode",
+    "MotionMode",
+    # Audit types
+    "EntropyWiringAudit",
+    "MotionWiringAudit",
+    "SignalWiringAudit",
+    "WiredSignals",
+    # Configuration
+    "SignalWiringConfig",
+    "DEFAULT_WIRING_CONFIG",
+    # Entropy computation
+    "compute_H",
+    # Motion delta computation
+    "compute_semantic_delta",
+    "compute_structural_delta",
+    "compute_experiential_delta",
+    # Motion computation
+    "compute_M",
+    "compute_M_from_raw",
+    # Full signal wiring
+    "wire_signals",
+    "wire_signals_simple",
+    # =========================================================================
+    # Pipeline Integration (v2.6.1)
+    # =========================================================================
+    # Result type
+    "IntegratedModulationResult",
+    # Pipeline engine
+    "PipelineModulationEngine",
+    # Factory functions
+    "create_pipeline_engine",
+    "create_default_pipeline_engine",
+    # Standalone function
+    "modulate_from_pipeline",
 ]
 
 
@@ -227,3 +353,6 @@ Engine = EntropyModulationEngine
 
 # Quick modulation
 modulate = modulate_intensity
+
+# Pipeline integration entry point
+PipelineEngine = PipelineModulationEngine
