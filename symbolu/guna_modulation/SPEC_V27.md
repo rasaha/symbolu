@@ -1,8 +1,9 @@
 # SymbolU v2.7 — Deterministic Evaluation & State Evolution Layer
 
-**Symbol-U v2.7 — Deterministic, Zero-Parameter, Non-Learning System**
+**Symbol-U v2.7.1 — Deterministic, Operator-Configurable, Non-Learning System**
 
 **Date:** 2025-12-22
+**Version:** 2.7.1 (with operator-configurable coefficients)
 **Status:** Specification Complete
 **Classification:** Enterprise-Safe, Patent-Aligned
 **Prerequisite:** v2.6.1 (Guna Entropy Modulation + Signal Wiring)
@@ -133,25 +134,49 @@ Measures routing/delivery failure signals.
 ### 5.1 Formula (Mandatory)
 
 ```
-U_t = w_S × s_t - w_R × r_t - w_T × t_t
-      - λ_H × H_t
-      - λ_C × C^contr_t
-      - λ_F × F^fail_t
+U_t = (c_S × w_S × s_t + c_R × w_R × r_t + c_T × w_T × t_t)
+      + λ_H × H_t
+      + λ_C × C^contr_t
+      + λ_F × F^fail_t
 ```
 
-### 5.2 Fixed Constants
+### 5.2 Operator-Configurable Coefficients (Fix #1)
 
-| Constant | Value | Purpose |
-|----------|-------|---------|
-| `λ_H` | 0.3 | Entropy penalty coefficient |
-| `λ_C` | 0.5 | Contradiction penalty coefficient |
-| `λ_F` | 0.4 | Failure penalty coefficient |
+All utility coefficients are operator-configurable via `UtilityCoefficients`:
 
-### 5.3 Properties
+| Coefficient | Default | Range | Purpose |
+|-------------|---------|-------|---------|
+| `c_S` | +1.0 | [-3, +3] | Sattva contribution sign (+1 = reward) |
+| `c_R` | -1.0 | [-3, +3] | Rajas contribution sign (-1 = penalty) |
+| `c_T` | -1.0 | [-3, +3] | Tamas contribution sign (-1 = penalty) |
+| `λ_H` | -0.3 | [-1, +1] | Entropy penalty (negative = penalize) |
+| `λ_C` | -0.5 | [-1, +1] | Contradiction penalty |
+| `λ_F` | -0.4 | [-1, +1] | Failure penalty |
+
+**Validation:** `|c_S| + |c_R| + |c_T| ≤ 3` and `|λ_*| ≤ 1`
+
+### 5.3 Configuration Example
+
+```python
+from symbolu.guna_modulation import UtilityCoefficients
+
+# Default: Sattva positive, Rajas/Tamas negative
+default = UtilityCoefficients()  # c_S=+1, c_R=-1, c_T=-1
+
+# Custom: Neutral (all terms contribute equally)
+neutral = UtilityCoefficients(c_S=1.0, c_R=1.0, c_T=1.0,
+                               lambda_H=0.0, lambda_C=0.0, lambda_F=0.0)
+
+# Custom: Rajas-positive for action-oriented deployments
+action_oriented = UtilityCoefficients(c_S=0.5, c_R=0.8, c_T=-1.0)
+```
+
+### 5.4 Properties
 
 - `U_t` is **not ethics** — it is policy-aligned operational utility
 - All terms are logged for audit
 - Range: approximately [-2, 1] depending on configuration
+- **Operators can flip signs** to change the optimization objective
 
 ---
 
@@ -183,24 +208,43 @@ U_t = w_S × s_t - w_R × r_t - w_T × t_t
 
 **Interpretation:** Lower utility or higher contradiction → lower threshold → more likely to escalate.
 
-### 6.3 Target Tone Weights (Softmax)
+### 6.3 Target Tone Weights — Named Coefficients (Fix #3)
 
 ```
-ℓ_sweet = k₁ × s_t - k₂ × t_t
-ℓ_jolt = k₃ × r_t + k₄ × C^contr_t
-ℓ_metaphor = k₅ × H_t + k₆ × r_t
+ℓ_sweet = k_sweet_sattva × s_t - k_sweet_tamas × t_t
+ℓ_jolt = k_jolt_rajas × r_t + k_jolt_contr × C^contr_t
+ℓ_metaphor = k_metaphor_entropy × H_t + k_metaphor_rajas × r_t
 
 w^tone*_t = softmax([ℓ_sweet, ℓ_jolt, ℓ_metaphor])
 ```
 
-| Constant | Value | Meaning |
-|----------|-------|---------|
-| `k₁` | 1.0 | Sattva promotes sweetness |
-| `k₂` | 0.5 | Tamas reduces sweetness |
-| `k₃` | 0.8 | Rajas promotes jolt |
-| `k₄` | 0.3 | Contradiction promotes jolt |
-| `k₅` | 0.6 | Entropy promotes metaphor |
-| `k₆` | 0.4 | Rajas also promotes metaphor |
+All tone logit coefficients are named, bounded, and validated via `ToneLogitConfig`:
+
+| Coefficient | Default | Range | Meaning |
+|-------------|---------|-------|---------|
+| `k_sweet_sattva` | 1.0 | [0, 2] | Sattva promotes calm delivery |
+| `k_sweet_tamas` | 0.5 | [0, 2] | Tamas reduces calm delivery |
+| `k_jolt_rajas` | 0.8 | [0, 2] | Rajas promotes energetic delivery |
+| `k_jolt_contr` | 0.3 | [0, 2] | Contradiction promotes corrective energy |
+| `k_metaphor_entropy` | 0.6 | [0, 2] | Entropy promotes abstract/poetic tone |
+| `k_metaphor_rajas` | 0.4 | [0, 2] | Rajas also promotes metaphor |
+
+**Validation:** All coefficients must be in [0, 2] to prevent extreme softmax outputs.
+
+### 6.4 Tone Configuration Example
+
+```python
+from symbolu.guna_modulation import ToneLogitConfig
+
+# Default configuration
+default_tone = ToneLogitConfig()
+
+# Custom: More responsive to contradictions
+responsive = ToneLogitConfig(
+    k_jolt_contr=0.8,      # Higher contradiction → jolt
+    k_metaphor_entropy=0.9  # Higher entropy → metaphor
+)
+```
 
 ---
 
@@ -212,16 +256,58 @@ w^tone*_t = softmax([ℓ_sweet, ℓ_jolt, ℓ_metaphor])
 θ_{t+1} = clip((1 - α) × θ_t + α × θ*_t, bounds)
 ```
 
-### 7.2 Properties
+### 7.2 Tier-Specific Alpha with Half-Life (Fix #2)
+
+The learning rate α is tier-specific with documented half-life:
+
+| Tier | Alpha (α) | Half-Life (updates) | 90% Decay | Use Case |
+|------|-----------|---------------------|-----------|----------|
+| Enterprise T1 | 0.02 | ~35 updates | ~115 updates | Ultra-stable, regulated environments |
+| Enterprise T2 | 0.05 | ~14 updates | ~45 updates | Balanced stability and responsiveness |
+| Consumer | 0.10 | ~7 updates | ~22 updates | Faster adaptation to user patterns |
+
+**Half-Life Formula:**
+```
+t_½ = ln(0.5) / ln(1 - α) ≈ 0.693 / α
+```
+
+This means after t_½ updates, 50% of the original state remains.
+
+### 7.3 Alpha Configuration Example
+
+```python
+from symbolu.guna_modulation import (
+    AlphaConfig,
+    ALPHA_ENTERPRISE_T1,
+    ALPHA_ENTERPRISE_T2,
+    ALPHA_CONSUMER,
+    V27Config,
+)
+
+# Pre-configured tiers
+enterprise_t1 = ALPHA_ENTERPRISE_T1  # α=0.02, t_½≈35
+enterprise_t2 = ALPHA_ENTERPRISE_T2  # α=0.05, t_½≈14
+consumer = ALPHA_CONSUMER            # α=0.10, t_½≈7
+
+# Check decay properties
+print(f"Half-life: {enterprise_t2.half_life_updates:.1f} updates")
+print(f"After 10 updates: {enterprise_t2.decay_after_n(10):.1%} remains")
+
+# Create engine for tier
+from symbolu.guna_modulation import create_engine_for_tier
+engine = create_engine_for_tier("enterprise_tier_2")
+```
+
+### 7.4 Properties
 
 | Property | Value |
 |----------|-------|
-| `α` (learning rate) | 0.05 (fixed) |
+| `α` (learning rate) | Tier-specific (0.02, 0.05, or 0.10) |
 | Randomness | None |
 | Reversibility | Full (by decay toward θ_0) |
 | Determinism | Guaranteed |
 
-### 7.3 Component-wise Update
+### 7.5 Component-wise Update
 
 ```python
 tau_768_{t+1} = clip((1-α) × tau_768_t + α × tau_768*_t, bounds)
@@ -237,27 +323,49 @@ Where `δ_policy = sign(U_t) × min(|U_t|, 0.01)` for small tie-break adjustment
 
 ## 8. Version Gating (Mandatory)
 
-### 8.1 Configuration Flag
+### 8.1 Master Configuration
 
 ```python
+@dataclass(frozen=True)
 class V27Config:
-    v2_7_enabled: bool = False  # Default: behave like v2.6
-    alpha: float = 0.05
-    # ... other constants
+    v2_7_enabled: bool = False  # Master switch
+    alpha_config: AlphaConfig   # Tier-specific alpha
+    utility_coefficients: UtilityCoefficients  # Fix #1
+    tone_config: ToneLogitConfig  # Fix #3
+    persistence_config: StatePersistenceConfig  # Fix #4
 ```
 
-### 8.2 Runtime Behavior
+### 8.2 Pre-Built Configurations
+
+```python
+from symbolu.guna_modulation import (
+    DEFAULT_V27_CONFIG,      # v2.7 disabled (v2.6 behavior)
+    ENABLED_V27_CONFIG,      # v2.7 enabled, Enterprise T2
+    ENTERPRISE_T1_CONFIG,    # α=0.02, ultra-stable
+    ENTERPRISE_T2_CONFIG,    # α=0.05, balanced
+    CONSUMER_CONFIG,         # α=0.10, responsive
+)
+```
+
+### 8.3 Runtime Behavior (Fix #5: v2.6 vs v2.7)
 
 ```python
 if not config.v2_7_enabled:
-    # v2.6 behavior: state remains constant
+    # v2.6 behavior: STATELESS
+    # - No temporal memory
+    # - State remains constant
+    # - Each query processed independently
     theta_{t+1} = theta_t
-    # Update equation does NOT execute
 else:
-    # v2.7 behavior: deterministic state evolution
+    # v2.7 behavior: BOUNDED TEMPORAL MEMORY
+    # - State evolves via deterministic EMA
+    # - Bounded by hard limits (cannot drift arbitrarily)
+    # - Reversible by decay toward θ_0
+    # - Full audit trail maintained
     theta_{t+1} = update(theta_t, observables)
-    # All updates logged and auditable
 ```
+
+**Architectural Note:** v2.7 introduces bounded temporal memory. This is a deliberate departure from v2.6's stateless model. See Section 14 for detailed comparison.
 
 **Constraint:** Flag is checked at **runtime**, not compile time.
 
@@ -305,7 +413,72 @@ class StateUpdateAudit:
 
 ---
 
-## 10. Explicit Non-Capabilities
+## 10. State Persistence (Fix #4)
+
+### 10.1 Persistence Configuration
+
+State persistence is explicit, scoped, and decay-governed via `StatePersistenceConfig`:
+
+```python
+@dataclass(frozen=True)
+class StatePersistenceConfig:
+    scope: str = "tenant"              # global | tenant | user | session
+    decay_on_restart: bool = True       # Apply decay when system restarts
+    restart_decay_factor: float = 0.5   # How much state to preserve (0=reset, 1=keep)
+    max_state_age_hours: int = 168      # Reset stale state after 7 days
+    storage_backend: str = "memory"     # memory | redis | postgres
+```
+
+### 10.2 Scope Semantics
+
+| Scope | Meaning | Use Case |
+|-------|---------|----------|
+| `global` | Single state for entire system | Single-tenant deployments |
+| `tenant` | Separate state per tenant | Multi-tenant SaaS |
+| `user` | Separate state per user | Personalized responses |
+| `session` | State per session only | Stateless-by-default |
+
+### 10.3 Restart Decay
+
+On system restart, state is decayed toward default:
+
+```
+θ_restart = factor × θ_saved + (1 - factor) × θ_0
+```
+
+| Factor | Effect |
+|--------|--------|
+| 0.0 | Full reset to θ_0 |
+| 0.5 | 50% preserved, 50% reset (default) |
+| 1.0 | No decay (full preservation) |
+
+### 10.4 Persistence Configuration Example
+
+```python
+from symbolu.guna_modulation import (
+    StatePersistenceConfig,
+    PERSISTENCE_GLOBAL,
+    PERSISTENCE_TENANT,
+    PERSISTENCE_USER,
+    PERSISTENCE_SESSION,
+)
+
+# Session-scoped (no persistence)
+session_config = PERSISTENCE_SESSION  # decay_on_restart=False
+
+# Tenant-scoped with Redis backend
+production_config = StatePersistenceConfig(
+    scope="tenant",
+    decay_on_restart=True,
+    restart_decay_factor=0.7,  # Preserve 70%
+    max_state_age_hours=336,   # 2 weeks
+    storage_backend="redis",
+)
+```
+
+---
+
+## 11. Explicit Non-Capabilities
 
 This layer:
 
@@ -329,13 +502,13 @@ All state changes are:
 
 ---
 
-## 11. Determinism Proof
+## 12. Determinism Proof
 
-### 11.1 Theorem
+### 12.1 Theorem
 
 Given identical inputs `(θ_t, observables)`, the system produces identical `θ_{t+1}`.
 
-### 11.2 Proof
+### 12.2 Proof
 
 1. All formulas are pure mathematical operations
 2. No randomness in any computation path
@@ -343,7 +516,7 @@ Given identical inputs `(θ_t, observables)`, the system produces identical `θ_
 4. State update equation has no stochastic terms
 5. Same `α`, same bounds, same constants
 
-### 11.3 Test Assertion
+### 12.3 Test Assertion
 
 ```python
 def test_determinism():
@@ -362,22 +535,21 @@ def test_determinism():
 
 ---
 
-## 12. Implementation Files
+## 13. Implementation Files
 
 | File | Purpose |
 |------|---------|
 | `state_types.py` | State register and bounds definitions |
 | `observables.py` | Observable signals container |
 | `utility.py` | Policy utility computation |
-| `target_computation.py` | Target state formulas |
+| `v27_config.py` | Configuration (coefficients, tiers, persistence) |
 | `state_evolution_engine.py` | State update engine |
-| `audit.py` | Audit trail generation |
 
 ---
 
-## 13. Data Schemas
+## 14. Data Schemas
 
-### 13.1 StateRegister
+### 14.1 StateRegister
 
 ```python
 @dataclass(frozen=True)
@@ -389,7 +561,7 @@ class StateRegister:
     b_policy: float     # [-0.1, 0.1]
 ```
 
-### 13.2 Observables
+### 14.2 Observables
 
 ```python
 @dataclass(frozen=True)
@@ -403,32 +575,85 @@ class Observables:
     F_fail: float       # Failure [0, 1]
 ```
 
-### 13.3 V27Config
+### 14.3 V27Config (Updated with Fixes #1-4)
 
 ```python
 @dataclass(frozen=True)
 class V27Config:
     v2_7_enabled: bool = False
-    alpha: float = 0.05
-    lambda_H: float = 0.3
-    lambda_C: float = 0.5
-    lambda_F: float = 0.4
-    # ... other constants
+    alpha_config: AlphaConfig           # Fix #2: Tier-specific alpha
+    utility_coefficients: UtilityCoefficients  # Fix #1: Operator-configurable signs
+    tone_config: ToneLogitConfig        # Fix #3: Named, bounded coefficients
+    persistence_config: StatePersistenceConfig  # Fix #4: Scoped persistence
+
+    @property
+    def alpha(self) -> float: ...
+    @property
+    def tier(self) -> str: ...
+    @property
+    def half_life(self) -> float: ...
 ```
 
 ---
 
-## 14. Layman Explanation
+## 15. v2.6 vs v2.7 Comparison (Fix #5)
+
+### 15.1 Architectural Difference
+
+| Aspect | v2.6 | v2.7 |
+|--------|------|------|
+| **State** | Stateless | Bounded temporal memory |
+| **Query Processing** | Independent | Context-influenced |
+| **Memory** | None | Low-pass filter over observables |
+| **Drift** | Impossible | Bounded by hard limits |
+| **Audit** | Input/output only | Full state history |
+
+### 15.2 What v2.7 Temporal State IS
+
+- A **low-pass filter** over observable signals
+- **Bounded** by hard limits (cannot drift arbitrarily)
+- **Reversible** by decay toward θ_0
+- **Deterministic** given the same history
+- Aggregate statistics only (no memory of specific queries)
+
+### 15.3 What v2.7 Temporal State is NOT
+
+- ❌ Stochastic learning (no gradient updates)
+- ❌ Preference formation (no evaluation of "good" outcomes)
+- ❌ Memory of specific queries
+- ❌ Psychology or user modeling
+- ❌ Unbounded adaptation
+
+### 15.4 Enterprise Implication
+
+If `v2_7_enabled=True`, the system's behavior at time t depends on prior observations:
+
+```python
+# v2.6: Each query processed identically
+result_1 = process_query(query, config)  # Uses DEFAULT_STATE
+result_2 = process_query(query, config)  # Uses DEFAULT_STATE (same)
+
+# v2.7: State evolves based on observations
+engine = StateEvolutionEngine(ENABLED_V27_CONFIG)
+result_1 = engine.update(observables_1)  # Updates state
+result_2 = engine.update(observables_2)  # Uses evolved state
+```
+
+Audit trails include full state history for reproducibility.
+
+---
+
+## 16. Layman Explanation
 
 > "The system already knows the answer.
 > v2.7 only adjusts its internal knobs using fixed rules, so next time it knows how strongly, how cautiously, and how deeply to act — and it can always explain why."
 
 ---
 
-## 15. Final Constraint
+## 17. Final Constraint
 
 If a behavior cannot be expressed as a **closed-form formula**, it must be **excluded**.
 
 ---
 
-*End of v2.7 Specification*
+*End of v2.7.1 Specification*

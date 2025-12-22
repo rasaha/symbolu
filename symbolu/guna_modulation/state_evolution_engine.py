@@ -13,7 +13,27 @@ This engine:
 
 This is NOT learning. This is deterministic state evolution.
 
-Version: 2.7
+**Architectural Note: Temporal State (Fix #5)**
+
+v2.7 introduces bounded temporal memory via the state register θ_t.
+This is a deliberate departure from v2.6's stateless model.
+
+What it IS:
+- A low-pass filter over observable signals
+- Bounded by hard limits (cannot drift arbitrarily)
+- Reversible by decay toward θ_0
+- Deterministic given the same history
+
+What it is NOT:
+- Stochastic learning (no gradient updates)
+- Preference formation (no evaluation of "good" outcomes)
+- Memory of specific queries (only aggregate statistics)
+
+Enterprise Implication: If v2_7_enabled=True, the system's behavior at
+time t depends on prior observations. Audit trails include full state
+history for reproducibility.
+
+Version: 2.7.1
 Date: 2025-12-22
 """
 
@@ -32,6 +52,7 @@ from symbolu.guna_modulation.state_types import (
     normalize_weights,
     clip,
     EPSILON,
+    VALIDATION_EPSILON,
 )
 from symbolu.guna_modulation.observables import Observables
 from symbolu.guna_modulation.utility import (
@@ -41,34 +62,27 @@ from symbolu.guna_modulation.utility import (
     TargetStateAudit,
 )
 
-
-# =============================================================================
-# Configuration
-# =============================================================================
-
-@dataclass(frozen=True)
-class V27Config:
-    """
-    Configuration for v2.7 state evolution.
-
-    Attributes:
-        v2_7_enabled: Master switch. When False, behaves like v2.6 (no evolution)
-        alpha: Learning rate (fixed, not per-run configurable)
-    """
-    v2_7_enabled: bool = False  # Default: behave like v2.6
-    alpha: float = DEFAULT_ALPHA
-
-    def __post_init__(self):
-        """Validate configuration."""
-        if not (0.0 < self.alpha < 1.0):
-            raise ValueError(f"alpha must be in (0, 1), got {self.alpha}")
-
-
-# Default configuration (v2.7 disabled)
-DEFAULT_V27_CONFIG = V27Config(v2_7_enabled=False)
-
-# Enabled configuration
-ENABLED_V27_CONFIG = V27Config(v2_7_enabled=True)
+# Import new configuration from v27_config
+from symbolu.guna_modulation.v27_config import (
+    V27Config,
+    UtilityCoefficients,
+    ToneLogitConfig,
+    AlphaConfig,
+    StatePersistenceConfig,
+    DEFAULT_V27_CONFIG,
+    ENABLED_V27_CONFIG,
+    ENTERPRISE_T1_CONFIG,
+    ENTERPRISE_T2_CONFIG,
+    CONSUMER_CONFIG,
+    DEFAULT_UTILITY_COEFFICIENTS,
+    DEFAULT_TONE_CONFIG,
+    DEFAULT_ALPHA_CONFIG,
+    DEFAULT_PERSISTENCE_CONFIG,
+    TIER_ENTERPRISE_1,
+    TIER_ENTERPRISE_2,
+    TIER_CONSUMER,
+    get_alpha_for_tier,
+)
 
 
 # =============================================================================
@@ -122,32 +136,36 @@ class StateUpdateAudit:
     v2_7_enabled: bool
     alpha: float
 
+    # Tier info (new)
+    tier: str = "enterprise_tier_2"
+    half_life_updates: float = 14.0
+
     @property
     def explanation(self) -> str:
         """Human-readable explanation of the update."""
         if not self.v2_7_enabled:
-            return "v2.7 disabled: state unchanged"
+            return "v2.7 disabled: state unchanged (v2.6 stateless mode)"
 
         if self.delta.is_zero:
             return "State unchanged (delta within epsilon)"
 
         lines = []
 
-        if abs(self.delta.delta_tau_768) > EPSILON:
+        if abs(self.delta.delta_tau_768) > VALIDATION_EPSILON:
             direction = "increased" if self.delta.delta_tau_768 > 0 else "decreased"
             lines.append(
                 f"tau_768 {direction} by {abs(self.delta.delta_tau_768):.4f} "
                 f"(U={self.utility:.3f}, H={self.observables.H:.3f})"
             )
 
-        if abs(self.delta.delta_tau_175) > EPSILON:
+        if abs(self.delta.delta_tau_175) > VALIDATION_EPSILON:
             direction = "increased" if self.delta.delta_tau_175 > 0 else "decreased"
             lines.append(
                 f"tau_175 {direction} by {abs(self.delta.delta_tau_175):.4f} "
                 f"(U={self.utility:.3f}, C_contr={self.observables.C_contr:.3f})"
             )
 
-        if any(abs(d) > EPSILON for d in self.delta.delta_w_tone):
+        if any(abs(d) > VALIDATION_EPSILON for d in self.delta.delta_w_tone):
             lines.append(
                 f"w_tone shifted: sweet={self.delta.delta_w_tone[0]:+.4f}, "
                 f"jolt={self.delta.delta_w_tone[1]:+.4f}, "
@@ -173,11 +191,16 @@ class StateEvolutionEngine:
         - Bounded: all values stay within hard bounds
         - Reversible: by decay toward θ_0
         - Auditable: every update logged
+
+    Tier-specific behavior (Fix #2):
+        - Enterprise T1: α=0.02, half-life≈35 updates (ultra-stable)
+        - Enterprise T2: α=0.05, half-life≈14 updates (moderate)
+        - Consumer: α=0.10, half-life≈7 updates (faster response)
     """
 
     def __init__(
         self,
-        config: V27Config = DEFAULT_V27_CONFIG,
+        config: V27Config = None,
         bounds: StateBounds = DEFAULT_BOUNDS,
         initial_state: Optional[StateRegister] = None,
     ):
@@ -185,11 +208,11 @@ class StateEvolutionEngine:
         Initialize the state evolution engine.
 
         Args:
-            config: v2.7 configuration (includes enabled flag)
+            config: v2.7 configuration (includes all settings)
             bounds: Hard bounds for state values
             initial_state: Starting state (defaults to DEFAULT_STATE)
         """
-        self._config = config
+        self._config = config or DEFAULT_V27_CONFIG
         self._bounds = bounds
         self._state = initial_state or DEFAULT_STATE
         self._update_count = 0
@@ -209,11 +232,26 @@ class StateEvolutionEngine:
         """Whether v2.7 evolution is enabled."""
         return self._config.v2_7_enabled
 
+    @property
+    def alpha(self) -> float:
+        """Current learning rate α."""
+        return self._config.alpha
+
+    @property
+    def tier(self) -> str:
+        """Current tier name."""
+        return self._config.tier
+
+    @property
+    def half_life(self) -> float:
+        """Half-life in updates."""
+        return self._config.half_life
+
     def update(self, observables: Observables) -> StateUpdateAudit:
         """
         Perform one state update step.
 
-        If v2.7 is disabled, returns audit showing no change.
+        If v2.7 is disabled, returns audit showing no change (v2.6 stateless mode).
         If v2.7 is enabled, applies deterministic update equation.
 
         Args:
@@ -225,12 +263,20 @@ class StateEvolutionEngine:
         run_id = str(uuid.uuid4())[:8]
         timestamp = datetime.utcnow().isoformat()
 
-        # Compute utility
-        utility, utility_audit = compute_utility(observables, self._state)
+        # Compute utility with configurable coefficients
+        utility, utility_audit = compute_utility(
+            observables,
+            self._state,
+            coefficients=self._config.utility_coefficients,
+        )
 
-        # Compute target state
+        # Compute target state with configurable tone coefficients
         target_state, target_audit = compute_target_state(
-            observables, utility, self._state, self._bounds
+            observables,
+            utility,
+            self._state,
+            self._bounds,
+            tone_config=self._config.tone_config,
         )
 
         # Evaluate rules
@@ -239,10 +285,10 @@ class StateEvolutionEngine:
         state_before = self._state
 
         if not self._config.v2_7_enabled:
-            # v2.6 behavior: state remains constant
+            # v2.6 behavior: state remains constant (stateless)
             state_after = state_before
         else:
-            # v2.7 behavior: apply update equation
+            # v2.7 behavior: apply update equation (bounded temporal memory)
             state_after = self._apply_update(state_before, target_state)
             self._state = state_after
             self._update_count += 1
@@ -263,6 +309,8 @@ class StateEvolutionEngine:
             rules_fired=tuple(rules),
             v2_7_enabled=self._config.v2_7_enabled,
             alpha=self._config.alpha,
+            tier=self._config.tier,
+            half_life_updates=self._config.half_life,
         )
 
     def _apply_update(
@@ -383,6 +431,40 @@ class StateEvolutionEngine:
         self._state = initial_state or DEFAULT_STATE
         self._update_count = 0
 
+    def apply_restart_decay(self) -> StateRegister:
+        """
+        Apply restart decay based on persistence config.
+
+        Formula: θ_restart = factor × θ_saved + (1 - factor) × θ_0
+
+        Returns:
+            Decayed state
+        """
+        if not self._config.persistence_config.decay_on_restart:
+            return self._state
+
+        factor = self._config.persistence_config.restart_decay_factor
+        one_minus_factor = 1.0 - factor
+        default = DEFAULT_STATE
+
+        decayed_tau_768 = factor * self._state.tau_768 + one_minus_factor * default.tau_768
+        decayed_tau_175 = factor * self._state.tau_175 + one_minus_factor * default.tau_175
+        decayed_w_tone = normalize_weights((
+            factor * self._state.w_tone[0] + one_minus_factor * default.w_tone[0],
+            factor * self._state.w_tone[1] + one_minus_factor * default.w_tone[1],
+            factor * self._state.w_tone[2] + one_minus_factor * default.w_tone[2],
+        ))
+        decayed_b_policy = factor * self._state.b_policy + one_minus_factor * default.b_policy
+
+        self._state = StateRegister(
+            tau_768=self._bounds.clip_tau_768(decayed_tau_768),
+            tau_175=self._bounds.clip_tau_175(decayed_tau_175),
+            w_tone=decayed_w_tone,
+            w_guna=self._state.w_guna,  # w_guna unchanged
+            b_policy=self._bounds.clip_b_policy(decayed_b_policy),
+        )
+        return self._state
+
 
 # =============================================================================
 # Factory Functions
@@ -394,7 +476,7 @@ def create_evolution_engine(
     initial_state: Optional[StateRegister] = None,
 ) -> StateEvolutionEngine:
     """
-    Create a state evolution engine.
+    Create a state evolution engine (legacy interface).
 
     Args:
         enabled: Whether v2.7 is enabled
@@ -404,21 +486,46 @@ def create_evolution_engine(
     Returns:
         Configured StateEvolutionEngine
     """
-    config = V27Config(v2_7_enabled=enabled, alpha=alpha)
+    # Use new V27Config but with legacy alpha parameter
+    from symbolu.guna_modulation.v27_config import AlphaConfig
+    config = V27Config(
+        v2_7_enabled=enabled,
+        alpha_config=AlphaConfig(alpha=alpha, tier="custom"),
+    )
     return StateEvolutionEngine(config=config, initial_state=initial_state)
 
 
 def create_v26_engine() -> StateEvolutionEngine:
-    """Create engine that behaves like v2.6 (no evolution)."""
-    return create_evolution_engine(enabled=False)
+    """Create engine that behaves like v2.6 (no evolution, stateless)."""
+    return StateEvolutionEngine(config=V27Config.disabled())
 
 
 def create_v27_engine(
     alpha: float = DEFAULT_ALPHA,
     initial_state: Optional[StateRegister] = None,
 ) -> StateEvolutionEngine:
-    """Create engine with v2.7 evolution enabled."""
+    """Create engine with v2.7 evolution enabled (default tier)."""
     return create_evolution_engine(enabled=True, alpha=alpha, initial_state=initial_state)
+
+
+def create_state_engine_for_tier(
+    tier: str,
+    enabled: bool = True,
+    initial_state: Optional[StateRegister] = None,
+) -> StateEvolutionEngine:
+    """
+    Create state evolution engine for a specific tier with appropriate alpha.
+
+    Args:
+        tier: "enterprise_tier_1", "enterprise_tier_2", or "consumer"
+        enabled: Whether v2.7 is enabled
+        initial_state: Initial state
+
+    Returns:
+        Configured StateEvolutionEngine with tier-specific settings
+    """
+    config = V27Config.for_tier(tier, enabled=enabled)
+    return StateEvolutionEngine(config=config, initial_state=initial_state)
 
 
 # =============================================================================
@@ -428,7 +535,7 @@ def create_v27_engine(
 def update_state(
     state: StateRegister,
     observables: Observables,
-    config: V27Config = DEFAULT_V27_CONFIG,
+    config: V27Config = None,
     bounds: StateBounds = DEFAULT_BOUNDS,
 ) -> Tuple[StateRegister, StateUpdateAudit]:
     """
@@ -439,12 +546,14 @@ def update_state(
     Args:
         state: Current state θ_t
         observables: Observable signals
-        config: v2.7 configuration
+        config: v2.7 configuration (default: disabled)
         bounds: State bounds
 
     Returns:
         (new_state, audit) tuple
     """
+    if config is None:
+        config = DEFAULT_V27_CONFIG
     engine = StateEvolutionEngine(config=config, bounds=bounds, initial_state=state)
     audit = engine.update(observables)
     return engine.state, audit

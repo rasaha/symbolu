@@ -305,11 +305,43 @@ from symbolu.guna_modulation.utility import (
     compute_target_state,
 )
 
-from symbolu.guna_modulation.state_evolution_engine import (
-    # Configuration
+# v2.7 Configuration (Fix #1-5: Operator-configurable coefficients)
+from symbolu.guna_modulation.v27_config import (
+    # Tier identifiers
+    TIER_ENTERPRISE_1,
+    TIER_ENTERPRISE_2,
+    TIER_CONSUMER,
+    # Fix #1: Utility coefficients (operator-configurable signs)
+    UtilityCoefficients,
+    DEFAULT_UTILITY_COEFFICIENTS,
+    NEUTRAL_UTILITY_COEFFICIENTS,
+    # Fix #2: Alpha configuration (tier-specific with half-life)
+    AlphaConfig,
+    ALPHA_ENTERPRISE_T1,
+    ALPHA_ENTERPRISE_T2,
+    ALPHA_CONSUMER,
+    DEFAULT_ALPHA_CONFIG,
+    get_alpha_for_tier,
+    # Fix #3: Tone logit configuration (named, bounded)
+    ToneLogitConfig,
+    DEFAULT_TONE_CONFIG,
+    # Fix #4: State persistence configuration
+    StatePersistenceConfig,
+    PERSISTENCE_GLOBAL,
+    PERSISTENCE_TENANT,
+    PERSISTENCE_USER,
+    PERSISTENCE_SESSION,
+    DEFAULT_PERSISTENCE_CONFIG,
+    # Master v2.7 configuration
     V27Config,
     DEFAULT_V27_CONFIG,
     ENABLED_V27_CONFIG,
+    ENTERPRISE_T1_CONFIG,
+    ENTERPRISE_T2_CONFIG,
+    CONSUMER_CONFIG,
+)
+
+from symbolu.guna_modulation.state_evolution_engine import (
     # Audit types
     RuleFired,
     StateUpdateAudit,
@@ -319,6 +351,7 @@ from symbolu.guna_modulation.state_evolution_engine import (
     create_evolution_engine,
     create_v26_engine,
     create_v27_engine,
+    create_state_engine_for_tier,
     # Standalone function
     update_state,
 )
@@ -468,10 +501,41 @@ __all__ = [
     "compute_target_tau_175",
     "compute_target_w_tone",
     "compute_target_state",
-    # Configuration
+    # =========================================================================
+    # v2.7 Configuration (Fix #1-5)
+    # =========================================================================
+    # Tier identifiers
+    "TIER_ENTERPRISE_1",
+    "TIER_ENTERPRISE_2",
+    "TIER_CONSUMER",
+    # Fix #1: Utility coefficients
+    "UtilityCoefficients",
+    "DEFAULT_UTILITY_COEFFICIENTS",
+    "NEUTRAL_UTILITY_COEFFICIENTS",
+    # Fix #2: Alpha configuration
+    "AlphaConfig",
+    "ALPHA_ENTERPRISE_T1",
+    "ALPHA_ENTERPRISE_T2",
+    "ALPHA_CONSUMER",
+    "DEFAULT_ALPHA_CONFIG",
+    "get_alpha_for_tier",
+    # Fix #3: Tone logit configuration
+    "ToneLogitConfig",
+    "DEFAULT_TONE_CONFIG",
+    # Fix #4: State persistence configuration
+    "StatePersistenceConfig",
+    "PERSISTENCE_GLOBAL",
+    "PERSISTENCE_TENANT",
+    "PERSISTENCE_USER",
+    "PERSISTENCE_SESSION",
+    "DEFAULT_PERSISTENCE_CONFIG",
+    # Master v2.7 configuration
     "V27Config",
     "DEFAULT_V27_CONFIG",
     "ENABLED_V27_CONFIG",
+    "ENTERPRISE_T1_CONFIG",
+    "ENTERPRISE_T2_CONFIG",
+    "CONSUMER_CONFIG",
     # Audit types
     "RuleFired",
     "StateUpdateAudit",
@@ -481,6 +545,7 @@ __all__ = [
     "create_evolution_engine",
     "create_v26_engine",
     "create_v27_engine",
+    "create_state_engine_for_tier",
     # Standalone function
     "update_state",
     # Helper functions
