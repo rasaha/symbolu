@@ -318,12 +318,14 @@ class ModulationResult:
     @property
     def is_disabled(self) -> bool:
         """Check if modulation is effectively disabled (E ≈ 1.0)."""
-        return abs(self.E - 1.0) < 1e-9
+        # Use 1e-8 tolerance due to epsilon in normalization formula
+        return abs(self.E - 1.0) < 1e-8
 
     @property
     def is_unchanged(self) -> bool:
         """Check if output equals input (modulation had no effect)."""
-        return abs(self.output_intensity - self.base_intensity) < 1e-9
+        # Use 1e-7 tolerance for accumulated floating point error
+        return abs(self.output_intensity - self.base_intensity) < 1e-7
 
 
 # =============================================================================
