@@ -27,6 +27,26 @@ from enum import Enum
 
 
 # =============================================================================
+# Operating Mode
+# =============================================================================
+
+class EntropyMode(Enum):
+    """
+    Entropy engine operating mode by tier.
+
+    DIAGNOSTIC_ONLY: Tier 1 - Compute and log, no behavioral impact
+    MODULATION_ONLY: Tier 2 - Can suggest tone/verbosity adjustment, no blocking
+    FULL_GATING: Tier 3 - Full modulation + blocking for extreme incoherence
+
+    Authority scales: DIAGNOSTIC → MODULATION → GATED
+    But never becomes absolute or a decision-maker.
+    """
+    DIAGNOSTIC_ONLY = "DIAGNOSTIC_ONLY"
+    MODULATION_ONLY = "MODULATION_ONLY"
+    FULL_GATING = "FULL_GATING"
+
+
+# =============================================================================
 # Gate Classification
 # =============================================================================
 
@@ -34,12 +54,15 @@ class EntropyGate(Enum):
     """
     Entropy gate classification.
 
-    ALLOW: Entropy within acceptable bounds
-    MODULATE: Entropy elevated, tone/verbosity adjustment suggested
-    BLOCK: Entropy exceeds hard ceiling (Consumer tier only)
+    ALLOW: Entropy within acceptable bounds, proceed normally
+    ALLOW_WITH_MODULATION: Entropy elevated, tone/verbosity adjustment applied
+    BLOCK: Entropy exceeds hard ceiling (Consumer tier only, rare)
+
+    Note: BLOCK is based on structural entropy, NOT policy or content rules.
+    No ethical judgments. Only structural coherence regulation.
     """
     ALLOW = "ALLOW"
-    MODULATE = "MODULATE"
+    ALLOW_WITH_MODULATION = "ALLOW_WITH_MODULATION"
     BLOCK = "BLOCK"
 
 
@@ -87,14 +110,23 @@ class EntropyResult:
         kosha_entropy: Layer disagreement between source/target [0.0, 1.0]
         cross_domain_entropy: Structural incompatibility between domains [0.0, 1.0]
         combined_entropy: Weighted sum of all entropy values [0.0, 1.0]
-        gate: Classification result (ALLOW | MODULATE | BLOCK)
+        gate: Classification result (ALLOW | ALLOW_WITH_MODULATION | BLOCK)
+        mode: Operating mode (DIAGNOSTIC_ONLY | MODULATION_ONLY | FULL_GATING)
         trace: Explainability trace with reasoning for each score
+
+    Example output for Tier 1 (diagnostic only):
+        {
+            "entropy": {"guna": 0.42, "kosha": 0.38, "combined": 0.40},
+            "gate": "ALLOW",
+            "mode": "DIAGNOSTIC_ONLY"
+        }
     """
     guna_entropy: float
     kosha_entropy: float
     cross_domain_entropy: float
     combined_entropy: float
     gate: EntropyGate
+    mode: EntropyMode
     trace: Tuple[EntropyTraceEntry, ...]
 
     def __post_init__(self):
@@ -112,8 +144,24 @@ class EntropyResult:
             "cross_domain_entropy": self.cross_domain_entropy,
             "combined_entropy": self.combined_entropy,
             "gate": self.gate.value,
+            "mode": self.mode.value,
             "trace": [entry.to_dict() for entry in self.trace],
         }
+
+    @property
+    def is_diagnostic_only(self) -> bool:
+        """Check if this result is diagnostic only (no behavioral impact)."""
+        return self.mode == EntropyMode.DIAGNOSTIC_ONLY
+
+    @property
+    def allows_modulation(self) -> bool:
+        """Check if modulation is active for this result."""
+        return self.gate == EntropyGate.ALLOW_WITH_MODULATION
+
+    @property
+    def is_blocked(self) -> bool:
+        """Check if this result indicates blocking."""
+        return self.gate == EntropyGate.BLOCK
 
 
 # =============================================================================
@@ -125,28 +173,38 @@ class TierConfig:
     """
     Tier-specific entropy behavior configuration.
 
-    This configuration determines how entropy results affect behavior:
+    The same Entropy Engine code runs everywhere - only configuration differs.
+    This preserves: one mental model, one math, one truth.
 
-    Tier 1 (Enterprise Search):
-        allow_block=False, allow_modulation=False, log_only=True
-        - Output stored in EngineResult.metadata
-        - No behavioral impact
-
-    Tier 2 (Enterprise Chat):
-        allow_block=False, allow_modulation=True, log_only=False
-        - Allowed: tone / verbosity modulation
-        - Forbidden: refusal, rewrite, reroute
-
-    Tier 3 (Consumer / Cascade):
-        allow_block=True, allow_modulation=True, log_only=False
-        - Block only if: combined_entropy > hard ceiling
-        - Blocking must return explanation
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ Tier 1 — Enterprise Search (Pure STL)                                   │
+    │   mode: DIAGNOSTIC_ONLY                                                 │
+    │   Authority: NONE                                                       │
+    │   - Computes entropy metrics                                            │
+    │   - Logs to EngineResult.metadata                                       │
+    │   - No modulation, no gating                                            │
+    │   - Telemetry only                                                      │
+    ├─────────────────────────────────────────────────────────────────────────┤
+    │ Tier 2 — Enterprise Chat (STL + 7B)                                     │
+    │   mode: MODULATION_ONLY                                                 │
+    │   Authority: LOW-MEDIUM (advisory)                                      │
+    │   - Computes entropy metrics                                            │
+    │   - Applies tone / verbosity modulation                                 │
+    │   - Cannot block output                                                 │
+    │   - Cannot change meaning                                               │
+    ├─────────────────────────────────────────────────────────────────────────┤
+    │ Tier 3 — Consumer (STL + 768D + Cascade)                                │
+    │   mode: FULL_GATING                                                     │
+    │   Authority: MEDIUM (expression gate only)                              │
+    │   - Computes entropy metrics                                            │
+    │   - Applies modulation                                                  │
+    │   - Can gate expression when entropy is extreme                         │
+    │   - BLOCK is rare, structural incoherence only                          │
+    └─────────────────────────────────────────────────────────────────────────┘
 
     Attributes:
         tier_name: Identifier for the tier
-        allow_block: Whether BLOCK gate is permitted
-        allow_modulation: Whether MODULATE gate triggers modulation
-        log_only: If True, entropy is logged but never affects behavior
+        mode: Operating mode (DIAGNOSTIC_ONLY | MODULATION_ONLY | FULL_GATING)
         modulation_threshold: Entropy level to trigger modulation [0.0, 1.0]
         block_threshold: Entropy level to trigger block [0.0, 1.0]
         guna_weight: Weight for guna entropy in combined score
@@ -154,9 +212,7 @@ class TierConfig:
         cross_domain_weight: Weight for cross-domain entropy in combined score
     """
     tier_name: str
-    allow_block: bool
-    allow_modulation: bool
-    log_only: bool
+    mode: EntropyMode
     modulation_threshold: float = 0.5
     block_threshold: float = 0.85
     guna_weight: float = 0.30
@@ -177,6 +233,21 @@ class TierConfig:
             val = getattr(self, attr)
             if val < 0.0 or val > 1.0:
                 raise ValueError(f"{attr} must be in [0.0, 1.0], got {val}")
+
+    @property
+    def allow_block(self) -> bool:
+        """Check if blocking is allowed in this configuration."""
+        return self.mode == EntropyMode.FULL_GATING
+
+    @property
+    def allow_modulation(self) -> bool:
+        """Check if modulation is allowed in this configuration."""
+        return self.mode in (EntropyMode.MODULATION_ONLY, EntropyMode.FULL_GATING)
+
+    @property
+    def is_diagnostic_only(self) -> bool:
+        """Check if this is diagnostic-only mode."""
+        return self.mode == EntropyMode.DIAGNOSTIC_ONLY
 
 
 # =============================================================================
