@@ -854,8 +854,23 @@ LAYER_COMPARISON_FULL_PIPELINE = LayerComparisonConfig(
     attention_weight=0.5,  # Equal attention to all
 )
 
-# Default: Enterprise T2 behavior
-DEFAULT_LAYER_COMPARISON = LAYER_COMPARISON_ENTERPRISE_T2
+# Default: Mixed signals with directive layers + mirror integration
+# This provides the best cognitive capability by combining:
+# - Directive layer comparison (knows WHERE to focus attention)
+# - Mirror balance reference (knows internal state balance)
+LAYER_COMPARISON_MIXED_DIRECTIVE = LayerComparisonConfig(
+    primary_comparison=(OntologicalLayer.GUNA, OntologicalLayer.FUSION),
+    secondary_comparisons=[
+        (OntologicalLayer.FUSION, OntologicalLayer.STATE),
+        (OntologicalLayer.STATE, OntologicalLayer.OUTPUT),
+    ],
+    mirror_layer=OntologicalLayer.GUNA,  # Mirror at Guna for self-reference
+    attention_weight=0.6,  # Balanced attention across layers
+    enable_cross_layer=True,
+)
+
+# Default: Mixed directive with mirror (best cognitive performance)
+DEFAULT_LAYER_COMPARISON = LAYER_COMPARISON_MIXED_DIRECTIVE
 
 
 def get_layer_comparison_for_tier(tier: str) -> LayerComparisonConfig:
@@ -863,16 +878,22 @@ def get_layer_comparison_for_tier(tier: str) -> LayerComparisonConfig:
     Get layer comparison configuration for a tier.
 
     Args:
-        tier: Tier identifier ("enterprise_t1", "enterprise_t2", "consumer")
+        tier: Tier identifier ("enterprise_t1", "enterprise_t2", "consumer", "mixed", "full")
 
     Returns:
         Layer comparison configuration
+
+    Note:
+        "mixed" (default) provides best cognitive performance by combining
+        directive layer comparison with mirror balance integration.
     """
     tier_configs = {
         "enterprise_t1": LAYER_COMPARISON_ENTERPRISE_T1,
         "enterprise_t2": LAYER_COMPARISON_ENTERPRISE_T2,
         "consumer": LAYER_COMPARISON_CONSUMER,
         "full": LAYER_COMPARISON_FULL_PIPELINE,
+        "mixed": LAYER_COMPARISON_MIXED_DIRECTIVE,
+        "mixed_directive": LAYER_COMPARISON_MIXED_DIRECTIVE,
     }
     return tier_configs.get(tier.lower(), DEFAULT_LAYER_COMPARISON)
 
@@ -1893,6 +1914,7 @@ __all__ = [
     "LAYER_COMPARISON_ENTERPRISE_T2",
     "LAYER_COMPARISON_CONSUMER",
     "LAYER_COMPARISON_FULL_PIPELINE",
+    "LAYER_COMPARISON_MIXED_DIRECTIVE",
     "DEFAULT_LAYER_COMPARISON",
     "get_layer_comparison_for_tier",
     # Functions

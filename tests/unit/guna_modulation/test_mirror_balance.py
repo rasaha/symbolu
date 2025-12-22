@@ -486,6 +486,7 @@ from symbolu.guna_modulation.mirror_balance import (
     LAYER_COMPARISON_ENTERPRISE_T2,
     LAYER_COMPARISON_CONSUMER,
     LAYER_COMPARISON_FULL_PIPELINE,
+    LAYER_COMPARISON_MIXED_DIRECTIVE,
     DEFAULT_LAYER_COMPARISON,
     get_layer_comparison_for_tier,
     ConfigurableDissonanceMonitor,
@@ -495,9 +496,11 @@ from symbolu.guna_modulation.mirror_balance import (
 class TestLayerComparisonConfig:
     """Tests for LayerComparisonConfig."""
 
-    def test_default_config_is_enterprise_t2(self):
-        """Default config matches Enterprise T2."""
-        assert DEFAULT_LAYER_COMPARISON == LAYER_COMPARISON_ENTERPRISE_T2
+    def test_default_config_is_mixed_directive(self):
+        """Default config is Mixed Directive (directive layers + mirror)."""
+        assert DEFAULT_LAYER_COMPARISON == LAYER_COMPARISON_MIXED_DIRECTIVE
+        # Mixed directive provides best cognitive performance
+        assert DEFAULT_LAYER_COMPARISON.mirror_layer == OntologicalLayer.GUNA
 
     def test_enterprise_t1_focuses_on_fusion_state(self):
         """Enterprise T1 focuses on Fusion → State transition."""
