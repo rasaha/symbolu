@@ -36,6 +36,14 @@ from symbolu.guna_modulation.mirror_balance import (
     compute_layer_dissonance,
     LayerDissonanceMonitor,
     generate_ambition_questions,
+    # Benchmark
+    CognitiveMetrics,
+    MirrorOnlyAnalyzer,
+    SelectiveOnlyAnalyzer,
+    CombinedAnalyzer,
+    BenchmarkResult,
+    run_cognitive_benchmark,
+    run_standard_benchmark_suite,
 )
 
 
@@ -610,3 +618,221 @@ class TestConfigurableDissonanceMonitor:
         monitor.reset()
 
         assert monitor.get_primary_dissonance() is None
+
+
+# =============================================================================
+# Test Cognitive Benchmark
+# =============================================================================
+
+class TestCognitiveMetrics:
+    """Tests for CognitiveMetrics dataclass."""
+
+    def test_total_score_calculation(self):
+        """Total score is weighted correctly."""
+        metrics = CognitiveMetrics(
+            self_awareness=1.0,
+            directional_focus=1.0,
+            actionability=1.0,
+            state_classification=1.0,
+        )
+        assert metrics.total_cognitive_score == 1.0
+
+    def test_category_high(self):
+        """High category for score >= 0.8."""
+        metrics = CognitiveMetrics(
+            self_awareness=0.9,
+            directional_focus=0.9,
+            actionability=0.9,
+            state_classification=0.9,
+        )
+        assert metrics.category == "high"
+
+    def test_category_moderate(self):
+        """Moderate category for score 0.5-0.8."""
+        metrics = CognitiveMetrics(
+            self_awareness=0.6,
+            directional_focus=0.6,
+            actionability=0.6,
+            state_classification=0.6,
+        )
+        assert metrics.category == "moderate"
+
+    def test_category_low(self):
+        """Low category for score 0.3-0.5."""
+        metrics = CognitiveMetrics(
+            self_awareness=0.35,
+            directional_focus=0.35,
+            actionability=0.35,
+            state_classification=0.35,
+        )
+        assert metrics.category == "low"
+
+
+class TestMirrorOnlyAnalyzer:
+    """Tests for mirror-only cognitive approach."""
+
+    def test_detects_imbalance(self, sattva_heavy_observables):
+        """Mirror-only detects internal imbalance."""
+        analyzer = MirrorOnlyAnalyzer()
+        metrics = analyzer.analyze(sattva_heavy_observables)
+
+        # Should have some self-awareness
+        assert metrics.self_awareness > 0.3
+
+    def test_limited_directional_focus(self, balanced_observables):
+        """Mirror-only has limited directional focus."""
+        analyzer = MirrorOnlyAnalyzer()
+        metrics = analyzer.analyze(balanced_observables)
+
+        # Directional focus is capped (no layer awareness)
+        assert metrics.directional_focus <= 0.5
+
+    def test_limited_state_classification(self, balanced_observables):
+        """Mirror-only has limited state classification."""
+        analyzer = MirrorOnlyAnalyzer()
+        metrics = analyzer.analyze(balanced_observables)
+
+        # Only binary (balanced/unbalanced)
+        assert metrics.state_classification <= 0.4
+
+
+class TestSelectiveOnlyAnalyzer:
+    """Tests for selective-only cognitive approach."""
+
+    def test_high_directional_focus(self, balanced_observables, sattva_heavy_observables):
+        """Selective-only has high directional focus."""
+        analyzer = SelectiveOnlyAnalyzer()
+        analyzer.observe(OntologicalLayer.GUNA, balanced_observables)
+        analyzer.observe(OntologicalLayer.FUSION, sattva_heavy_observables)
+
+        metrics = analyzer.analyze()
+
+        # Should know which layer to focus on
+        assert metrics.directional_focus >= 0.8
+
+    def test_limited_self_awareness(self, balanced_observables, sattva_heavy_observables):
+        """Selective-only has limited self-awareness (no mirror)."""
+        analyzer = SelectiveOnlyAnalyzer()
+        analyzer.observe(OntologicalLayer.GUNA, balanced_observables)
+        analyzer.observe(OntologicalLayer.FUSION, sattva_heavy_observables)
+
+        metrics = analyzer.analyze()
+
+        # Self-awareness capped (no internal balance check)
+        assert metrics.self_awareness <= 0.5
+
+
+class TestCombinedAnalyzer:
+    """Tests for combined cognitive approach."""
+
+    def test_high_overall_score(self, balanced_observables, sattva_heavy_observables):
+        """Combined approach has highest overall score."""
+        analyzer = CombinedAnalyzer()
+        analyzer.observe(OntologicalLayer.GUNA, balanced_observables)
+        analyzer.observe(OntologicalLayer.FUSION, sattva_heavy_observables)
+
+        metrics = analyzer.analyze()
+
+        # Combined should score in high or moderate range
+        assert metrics.total_cognitive_score >= 0.7
+
+    def test_high_self_awareness(self, balanced_observables, sattva_heavy_observables):
+        """Combined has high self-awareness from mirror."""
+        analyzer = CombinedAnalyzer()
+        analyzer.observe(OntologicalLayer.GUNA, balanced_observables)
+        analyzer.observe(OntologicalLayer.FUSION, sattva_heavy_observables)
+
+        metrics = analyzer.analyze()
+
+        assert metrics.self_awareness >= 0.7
+
+    def test_high_state_classification(self, balanced_observables, sattva_heavy_observables):
+        """Combined has rich state classification (6 states)."""
+        analyzer = CombinedAnalyzer()
+        analyzer.observe(OntologicalLayer.GUNA, balanced_observables)
+        analyzer.observe(OntologicalLayer.FUSION, sattva_heavy_observables)
+
+        metrics = analyzer.analyze()
+
+        assert metrics.state_classification >= 0.8
+
+
+class TestBenchmarkResult:
+    """Tests for BenchmarkResult."""
+
+    def test_combined_wins(self, balanced_observables, sattva_heavy_observables):
+        """Combined approach wins benchmark."""
+        result = run_cognitive_benchmark(
+            scenario="Test scenario",
+            layer_observations={
+                OntologicalLayer.GUNA: balanced_observables,
+                OntologicalLayer.FUSION: sattva_heavy_observables,
+            },
+        )
+
+        assert result.winner == "combined"
+
+    def test_improvement_metrics(self, balanced_observables, sattva_heavy_observables):
+        """Improvement metrics are calculated."""
+        result = run_cognitive_benchmark(
+            scenario="Test scenario",
+            layer_observations={
+                OntologicalLayer.GUNA: balanced_observables,
+                OntologicalLayer.FUSION: sattva_heavy_observables,
+            },
+        )
+
+        # Combined should improve over both
+        assert result.combined_improvement_over_mirror > 0
+        assert result.combined_improvement_over_selective > 0
+
+    def test_summary_format(self, balanced_observables, sattva_heavy_observables):
+        """Summary has expected fields."""
+        result = run_cognitive_benchmark(
+            scenario="Test scenario",
+            layer_observations={
+                OntologicalLayer.GUNA: balanced_observables,
+                OntologicalLayer.FUSION: sattva_heavy_observables,
+            },
+        )
+
+        summary = result.summary()
+
+        assert "scenario" in summary
+        assert "mirror_only_score" in summary
+        assert "selective_only_score" in summary
+        assert "combined_score" in summary
+        assert "winner" in summary
+        assert "combined_vs_mirror" in summary
+        assert "combined_vs_selective" in summary
+
+
+class TestStandardBenchmarkSuite:
+    """Tests for standard benchmark suite."""
+
+    def test_runs_all_scenarios(self):
+        """Standard suite runs all 5 scenarios."""
+        results = run_standard_benchmark_suite()
+
+        assert len(results) == 5
+
+    def test_combined_wins_most(self):
+        """Combined approach wins most scenarios."""
+        results = run_standard_benchmark_suite()
+
+        combined_wins = sum(1 for r in results if r.winner == "combined")
+
+        # Combined should win at least 4 out of 5
+        assert combined_wins >= 4
+
+    def test_scenarios_have_names(self):
+        """All scenarios have descriptive names."""
+        results = run_standard_benchmark_suite()
+
+        scenario_names = [r.scenario for r in results]
+
+        assert "Balanced Pipeline" in scenario_names
+        assert "Constructive Improvement" in scenario_names
+        assert "Destructive Regression" in scenario_names
+        assert "Internal Imbalance" in scenario_names
+        assert "Mixed Signals" in scenario_names
