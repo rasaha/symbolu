@@ -82,6 +82,16 @@ from symbolu.guna_modulation.v27_config import (
     TIER_ENTERPRISE_2,
     TIER_CONSUMER,
     get_alpha_for_tier,
+    # Alpha 2.7: Bayesian imports
+    UpdateMode,
+    BayesianConfig,
+    BayesianPosterior,
+    BayesianStateRegister,
+    DEFAULT_BAYESIAN_CONFIG,
+    BAYESIAN_V27_CONFIG,
+    BAYESIAN_ENTERPRISE_T1,
+    BAYESIAN_ENTERPRISE_T2,
+    BAYESIAN_CONSUMER,
 )
 
 
@@ -136,9 +146,14 @@ class StateUpdateAudit:
     v2_7_enabled: bool
     alpha: float
 
-    # Tier info (new)
+    # Tier info
     tier: str = "enterprise_tier_2"
     half_life_updates: float = 14.0
+
+    # Alpha 2.7: Update mode info
+    update_mode: str = "ema"  # "ema" or "bayesian"
+    bayesian_confidence: Optional[float] = None  # Overall confidence (Bayesian mode)
+    bayesian_uncertainty: Optional[dict] = None  # Per-param uncertainty (Bayesian mode)
 
     @property
     def explanation(self) -> str:
@@ -183,8 +198,19 @@ class StateEvolutionEngine:
     """
     The v2.7 Deterministic State Evolution Engine.
 
-    Core equation:
+    Supports two update modes (Alpha 2.7):
+
+    EMA Mode (default):
         θ_{t+1} = clip((1 - α) × θ_t + α × θ*_t, bounds)
+        - Bounded by design
+        - Fixed learning rate
+        - No uncertainty quantification
+
+    Bayesian Mode (Alpha 2.7):
+        P(θ | data) ∝ P(data | θ) × P(θ)
+        - Natural bounds via priors
+        - Adaptive learning rate (automatic)
+        - Full uncertainty quantification
 
     Properties:
         - Deterministic: same inputs → same outputs
@@ -217,6 +243,14 @@ class StateEvolutionEngine:
         self._state = initial_state or DEFAULT_STATE
         self._update_count = 0
 
+        # Alpha 2.7: Initialize Bayesian state if in Bayesian mode
+        if self._config.is_bayesian:
+            self._bayesian_state = BayesianStateRegister.from_config(
+                self._config.bayesian_config
+            )
+        else:
+            self._bayesian_state = None
+
     @property
     def config(self) -> V27Config:
         """Current configuration."""
@@ -247,12 +281,37 @@ class StateEvolutionEngine:
         """Half-life in updates."""
         return self._config.half_life
 
+    # Alpha 2.7: Bayesian properties
+    @property
+    def is_bayesian(self) -> bool:
+        """Whether using Bayesian update mode."""
+        return self._config.is_bayesian
+
+    @property
+    def bayesian_state(self) -> Optional[BayesianStateRegister]:
+        """Bayesian state with posteriors (None if in EMA mode)."""
+        return self._bayesian_state
+
+    @property
+    def bayesian_confidence(self) -> Optional[float]:
+        """Overall confidence from Bayesian posteriors (None if in EMA mode)."""
+        if self._bayesian_state:
+            return self._bayesian_state.overall_confidence
+        return None
+
+    @property
+    def update_mode(self) -> str:
+        """Current update mode as string."""
+        return self._config.update_mode.value
+
     def update(self, observables: Observables) -> StateUpdateAudit:
         """
         Perform one state update step.
 
         If v2.7 is disabled, returns audit showing no change (v2.6 stateless mode).
-        If v2.7 is enabled, applies deterministic update equation.
+        If v2.7 is enabled:
+            - EMA mode: applies deterministic EMA update equation
+            - Bayesian mode (Alpha 2.7): applies Bayesian posterior update
 
         Args:
             observables: Observable signals from pipeline
@@ -284,11 +343,25 @@ class StateEvolutionEngine:
 
         state_before = self._state
 
+        # Alpha 2.7: Bayesian state tracking
+        bayesian_confidence = None
+        bayesian_uncertainty = None
+
         if not self._config.v2_7_enabled:
             # v2.6 behavior: state remains constant (stateless)
             state_after = state_before
+        elif self._config.is_bayesian:
+            # Alpha 2.7 Bayesian mode: apply Bayesian update
+            state_after = self._apply_bayesian_update(state_before, target_state, observables)
+            self._state = state_after
+            self._update_count += 1
+
+            # Record Bayesian-specific metrics
+            if self._bayesian_state:
+                bayesian_confidence = self._bayesian_state.overall_confidence
+                bayesian_uncertainty = self._bayesian_state.uncertainty_summary
         else:
-            # v2.7 behavior: apply update equation (bounded temporal memory)
+            # v2.7 EMA mode: apply EMA update equation (bounded temporal memory)
             state_after = self._apply_update(state_before, target_state)
             self._state = state_after
             self._update_count += 1
@@ -311,6 +384,9 @@ class StateEvolutionEngine:
             alpha=self._config.alpha,
             tier=self._config.tier,
             half_life_updates=self._config.half_life,
+            update_mode=self._config.update_mode.value,
+            bayesian_confidence=bayesian_confidence,
+            bayesian_uncertainty=bayesian_uncertainty,
         )
 
     def _apply_update(
@@ -359,6 +435,91 @@ class StateEvolutionEngine:
             tau_175=new_tau_175,
             w_tone=new_w_tone,
             w_guna=new_w_guna,
+            b_policy=new_b_policy,
+        )
+
+    def _apply_bayesian_update(
+        self,
+        current: StateRegister,
+        target: StateRegister,
+        observables: Observables,
+    ) -> StateRegister:
+        """
+        Apply Bayesian posterior update (Alpha 2.7).
+
+        Instead of EMA blending, updates Beta posteriors with observations.
+        The posterior mean is used as the point estimate.
+
+        P(θ | data) ∝ P(data | θ) × P(θ)
+
+        Key differences from EMA:
+        - Learning rate is adaptive (based on posterior variance)
+        - Uncertainty is quantified
+        - Prior knowledge is incorporated
+        """
+        if self._bayesian_state is None:
+            # Fallback to EMA if Bayesian state not initialized
+            return self._apply_update(current, target)
+
+        # Observation weight based on utility (higher utility = more weight)
+        # This creates an adaptive learning rate
+        base_weight = 1.0
+        utility_factor = 0.5 + 0.5 * max(-1, min(1, observables.s - observables.t))
+        observation_weight = base_weight * utility_factor
+
+        # Update posteriors with target values as observations
+        self._bayesian_state.tau_768_posterior = (
+            self._bayesian_state.tau_768_posterior.update(
+                target.tau_768, observation_weight
+            )
+        )
+        self._bayesian_state.tau_175_posterior = (
+            self._bayesian_state.tau_175_posterior.update(
+                target.tau_175, observation_weight
+            )
+        )
+
+        # Update w_tone posteriors
+        self._bayesian_state.w_tone_sweet_posterior = (
+            self._bayesian_state.w_tone_sweet_posterior.update(
+                target.w_tone[0], observation_weight
+            )
+        )
+        self._bayesian_state.w_tone_jolt_posterior = (
+            self._bayesian_state.w_tone_jolt_posterior.update(
+                target.w_tone[1], observation_weight
+            )
+        )
+        self._bayesian_state.w_tone_metaphor_posterior = (
+            self._bayesian_state.w_tone_metaphor_posterior.update(
+                target.w_tone[2], observation_weight
+            )
+        )
+
+        # Update b_policy posterior
+        self._bayesian_state.b_policy_posterior = (
+            self._bayesian_state.b_policy_posterior.update(
+                target.b_policy, observation_weight
+            )
+        )
+
+        # Extract point estimates (posterior means) with bounds
+        new_tau_768 = self._bounds.clip_tau_768(
+            self._bayesian_state.tau_768
+        )
+        new_tau_175 = self._bounds.clip_tau_175(
+            self._bayesian_state.tau_175
+        )
+        new_w_tone = normalize_weights(self._bayesian_state.w_tone)
+        new_b_policy = self._bounds.clip_b_policy(
+            self._bayesian_state.b_policy
+        )
+
+        return StateRegister(
+            tau_768=new_tau_768,
+            tau_175=new_tau_175,
+            w_tone=new_w_tone,
+            w_guna=current.w_guna,  # Unchanged
             b_policy=new_b_policy,
         )
 
@@ -512,6 +673,7 @@ def create_state_engine_for_tier(
     tier: str,
     enabled: bool = True,
     initial_state: Optional[StateRegister] = None,
+    bayesian: bool = False,
 ) -> StateEvolutionEngine:
     """
     Create state evolution engine for a specific tier with appropriate alpha.
@@ -520,12 +682,60 @@ def create_state_engine_for_tier(
         tier: "enterprise_tier_1", "enterprise_tier_2", or "consumer"
         enabled: Whether v2.7 is enabled
         initial_state: Initial state
+        bayesian: Whether to use Bayesian mode (Alpha 2.7)
 
     Returns:
         Configured StateEvolutionEngine with tier-specific settings
     """
-    config = V27Config.for_tier(tier, enabled=enabled)
+    config = V27Config.for_tier(tier, enabled=enabled, bayesian=bayesian)
     return StateEvolutionEngine(config=config, initial_state=initial_state)
+
+
+# =============================================================================
+# Alpha 2.7: Bayesian Factory Functions
+# =============================================================================
+
+def create_bayesian_engine(
+    tier: str = TIER_ENTERPRISE_2,
+    prior_strength: float = 10.0,
+    initial_state: Optional[StateRegister] = None,
+) -> StateEvolutionEngine:
+    """
+    Create state evolution engine with Bayesian update mode (Alpha 2.7).
+
+    Args:
+        tier: Tier for fallback settings
+        prior_strength: Prior strength for Bayesian updates
+        initial_state: Initial state (defaults to DEFAULT_STATE)
+
+    Returns:
+        StateEvolutionEngine with Bayesian mode enabled
+    """
+    config = V27Config.bayesian(tier=tier, prior_strength=prior_strength)
+    return StateEvolutionEngine(config=config, initial_state=initial_state)
+
+
+def create_bayesian_engine_for_tier(
+    tier: str,
+    prior_strength: float = 10.0,
+    initial_state: Optional[StateRegister] = None,
+) -> StateEvolutionEngine:
+    """
+    Create Bayesian engine for a specific tier.
+
+    Args:
+        tier: "enterprise_tier_1", "enterprise_tier_2", or "consumer"
+        prior_strength: Prior strength (higher = more resistant to change)
+        initial_state: Initial state
+
+    Returns:
+        StateEvolutionEngine with Bayesian mode and tier-specific settings
+    """
+    return create_bayesian_engine(
+        tier=tier,
+        prior_strength=prior_strength,
+        initial_state=initial_state,
+    )
 
 
 # =============================================================================

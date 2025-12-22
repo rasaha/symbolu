@@ -9,14 +9,22 @@ Includes:
 - ToneLogitConfig: Named, bounded tone coefficients
 - AlphaConfig: Tier-specific learning rates with half-life
 - StatePersistenceConfig: State storage and decay semantics
+- UpdateMode: Switch between EMA (bounded) and Bayesian (unbounded) updates
+- BayesianConfig: Configuration for Bayesian update mode
 - V27Config: Master configuration combining all above
 
-Version: 2.7.1
+Version: 2.7.2
 Date: 2025-12-22
+
+Alpha 2.7 Feature:
+- Introduces Bayesian update mode as alternative to EMA
+- Bayesian mode provides true probability distributions with uncertainty
+- Switch via update_mode="bayesian" in V27Config
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
+from enum import Enum
 import math
 
 
@@ -31,6 +39,296 @@ TIER_CONSUMER = "consumer"
 
 # Validation epsilon
 VALIDATION_EPSILON: float = 1e-6
+
+
+# =============================================================================
+# Update Mode (Alpha 2.7 Feature)
+# =============================================================================
+
+class UpdateMode(Enum):
+    """
+    State update algorithm selection.
+
+    EMA (default):
+        θ_{t+1} = (1 - α) × θ_t + α × θ*
+        - Bounded by design
+        - Fixed learning rate
+        - No uncertainty quantification
+
+    BAYESIAN (Alpha 2.7):
+        P(θ | data) ∝ P(data | θ) × P(θ)
+        - Natural bounds via priors
+        - Adaptive learning rate (automatic)
+        - Full uncertainty quantification
+        - Principled probabilistic inference
+    """
+    EMA = "ema"
+    BAYESIAN = "bayesian"
+
+
+@dataclass(frozen=True)
+class BayesianConfig:
+    """
+    Configuration for Bayesian update mode.
+
+    Uses Beta distributions for bounded parameters [0, 1] and
+    Normal distributions for unbounded parameters.
+
+    Attributes:
+        prior_strength: Equivalent sample size of prior (higher = more resistant to change)
+        min_confidence: Minimum confidence before acting on posterior
+        use_conjugate_priors: Whether to use conjugate priors (faster) or MCMC
+        uncertainty_threshold: Uncertainty level below which we trust the estimate
+    """
+    # Prior configuration
+    prior_strength: float = 10.0  # Equivalent to 10 observations
+    prior_mean_tau: float = 0.5   # Prior belief about tau thresholds
+    prior_mean_w: float = 0.333   # Prior belief about weights (uniform)
+
+    # Confidence thresholds
+    min_confidence: float = 0.6   # Minimum confidence to trust estimate
+    uncertainty_threshold: float = 0.1  # Variance below this = confident
+
+    # Algorithm selection
+    use_conjugate_priors: bool = True  # Use Beta/Normal conjugates
+
+    def __post_init__(self):
+        """Validate configuration."""
+        if self.prior_strength <= 0:
+            raise ValueError(f"prior_strength must be > 0, got {self.prior_strength}")
+        if not (0.0 <= self.min_confidence <= 1.0):
+            raise ValueError(f"min_confidence must be in [0, 1], got {self.min_confidence}")
+        if not (0.0 < self.prior_mean_tau < 1.0):
+            raise ValueError(f"prior_mean_tau must be in (0, 1), got {self.prior_mean_tau}")
+
+
+@dataclass
+class BayesianPosterior:
+    """
+    Posterior distribution for a single parameter.
+
+    For Beta distribution (bounded parameters):
+        alpha, beta = shape parameters
+        mean = alpha / (alpha + beta)
+        variance = (alpha * beta) / ((alpha + beta)^2 * (alpha + beta + 1))
+
+    For Normal distribution (unbounded parameters):
+        mu, sigma = mean and std deviation
+    """
+    # Beta distribution parameters (for bounded [0,1] params)
+    alpha: float = 1.0  # Successes + prior
+    beta: float = 1.0   # Failures + prior
+
+    # Observation count
+    n_observations: int = 0
+
+    @property
+    def mean(self) -> float:
+        """Posterior mean estimate."""
+        return self.alpha / (self.alpha + self.beta)
+
+    @property
+    def variance(self) -> float:
+        """Posterior variance (uncertainty)."""
+        total = self.alpha + self.beta
+        if total <= 0:
+            return 0.25  # Maximum variance for Beta distribution
+        var = (self.alpha * self.beta) / (total * total * (total + 1))
+        return max(0.0, var)  # Guard against floating point issues
+
+    @property
+    def std(self) -> float:
+        """Posterior standard deviation."""
+        return math.sqrt(max(0.0, self.variance))
+
+    @property
+    def confidence(self) -> float:
+        """
+        Confidence in estimate [0, 1].
+
+        Higher with more observations and lower variance.
+        """
+        # Confidence increases with observations
+        obs_factor = 1 - 1 / (1 + self.n_observations)
+        # Confidence increases with lower variance (max variance for Beta is 0.25)
+        var_factor = 1 - min(1.0, self.variance / 0.25)
+        return obs_factor * var_factor
+
+    @property
+    def credible_interval_95(self) -> Tuple[float, float]:
+        """95% credible interval (approximate)."""
+        # Approximate using mean ± 2*std, clipped to [0, 1]
+        lower = max(0.0, self.mean - 2 * self.std)
+        upper = min(1.0, self.mean + 2 * self.std)
+        return (lower, upper)
+
+    def update(self, observation: float, weight: float = 1.0) -> "BayesianPosterior":
+        """
+        Update posterior with new observation.
+
+        For bounded params, observation in [0, 1] treated as:
+        - Closer to 1 = more "successes"
+        - Closer to 0 = more "failures"
+
+        Args:
+            observation: Observed value in [0, 1]
+            weight: Weight of this observation (default 1.0)
+
+        Returns:
+            New BayesianPosterior with updated parameters
+        """
+        # Treat observation as success/failure proportion
+        successes = observation * weight
+        failures = (1 - observation) * weight
+
+        return BayesianPosterior(
+            alpha=self.alpha + successes,
+            beta=self.beta + failures,
+            n_observations=self.n_observations + 1,
+        )
+
+    def decay_toward_prior(self, decay_factor: float, prior_alpha: float = 1.0, prior_beta: float = 1.0) -> "BayesianPosterior":
+        """
+        Decay posterior toward prior (for restart/reset).
+
+        new_alpha = decay_factor * alpha + (1 - decay_factor) * prior_alpha
+        """
+        return BayesianPosterior(
+            alpha=decay_factor * self.alpha + (1 - decay_factor) * prior_alpha,
+            beta=decay_factor * self.beta + (1 - decay_factor) * prior_beta,
+            n_observations=int(self.n_observations * decay_factor),
+        )
+
+    @classmethod
+    def from_prior(cls, prior_mean: float, prior_strength: float) -> "BayesianPosterior":
+        """
+        Create posterior from prior belief.
+
+        Args:
+            prior_mean: Prior belief about parameter value
+            prior_strength: Equivalent sample size (higher = more confident prior)
+        """
+        # For Beta distribution with mean m and "strength" n:
+        # alpha = m * n, beta = (1-m) * n
+        alpha = prior_mean * prior_strength
+        beta = (1 - prior_mean) * prior_strength
+        return cls(alpha=alpha, beta=beta, n_observations=0)
+
+
+@dataclass
+class BayesianStateRegister:
+    """
+    State register with Bayesian posteriors for each parameter.
+
+    Instead of point estimates, tracks full distributions.
+    """
+    # Posteriors for tau thresholds
+    tau_768_posterior: BayesianPosterior = field(default_factory=BayesianPosterior)
+    tau_175_posterior: BayesianPosterior = field(default_factory=BayesianPosterior)
+
+    # Posteriors for tone weights (Dirichlet would be better, but using independent Betas)
+    w_tone_sweet_posterior: BayesianPosterior = field(default_factory=BayesianPosterior)
+    w_tone_jolt_posterior: BayesianPosterior = field(default_factory=BayesianPosterior)
+    w_tone_metaphor_posterior: BayesianPosterior = field(default_factory=BayesianPosterior)
+
+    # Posterior for b_policy
+    b_policy_posterior: BayesianPosterior = field(default_factory=BayesianPosterior)
+
+    @property
+    def tau_768(self) -> float:
+        """Point estimate for tau_768."""
+        return self.tau_768_posterior.mean
+
+    @property
+    def tau_175(self) -> float:
+        """Point estimate for tau_175."""
+        return self.tau_175_posterior.mean
+
+    @property
+    def w_tone(self) -> Tuple[float, float, float]:
+        """Point estimates for w_tone (normalized)."""
+        raw = (
+            self.w_tone_sweet_posterior.mean,
+            self.w_tone_jolt_posterior.mean,
+            self.w_tone_metaphor_posterior.mean,
+        )
+        total = sum(raw)
+        if total > 0:
+            return (raw[0] / total, raw[1] / total, raw[2] / total)
+        return (0.333, 0.333, 0.334)
+
+    @property
+    def b_policy(self) -> float:
+        """Point estimate for b_policy."""
+        return self.b_policy_posterior.mean
+
+    @property
+    def overall_confidence(self) -> float:
+        """Average confidence across all parameters."""
+        confidences = [
+            self.tau_768_posterior.confidence,
+            self.tau_175_posterior.confidence,
+            self.w_tone_sweet_posterior.confidence,
+            self.w_tone_jolt_posterior.confidence,
+            self.w_tone_metaphor_posterior.confidence,
+            self.b_policy_posterior.confidence,
+        ]
+        return sum(confidences) / len(confidences)
+
+    @property
+    def uncertainty_summary(self) -> Dict[str, float]:
+        """Summary of uncertainties for each parameter."""
+        return {
+            "tau_768_std": self.tau_768_posterior.std,
+            "tau_175_std": self.tau_175_posterior.std,
+            "w_tone_sweet_std": self.w_tone_sweet_posterior.std,
+            "w_tone_jolt_std": self.w_tone_jolt_posterior.std,
+            "w_tone_metaphor_std": self.w_tone_metaphor_posterior.std,
+            "b_policy_std": self.b_policy_posterior.std,
+            "overall_confidence": self.overall_confidence,
+        }
+
+    def to_dict(self) -> Dict:
+        """Export to dictionary for logging/audit."""
+        return {
+            "tau_768": self.tau_768,
+            "tau_768_ci95": self.tau_768_posterior.credible_interval_95,
+            "tau_175": self.tau_175,
+            "tau_175_ci95": self.tau_175_posterior.credible_interval_95,
+            "w_tone": self.w_tone,
+            "b_policy": self.b_policy,
+            "b_policy_ci95": self.b_policy_posterior.credible_interval_95,
+            "overall_confidence": self.overall_confidence,
+            "n_observations": self.tau_768_posterior.n_observations,
+        }
+
+    @classmethod
+    def from_config(cls, config: "BayesianConfig") -> "BayesianStateRegister":
+        """Create state register with priors from config."""
+        return cls(
+            tau_768_posterior=BayesianPosterior.from_prior(
+                config.prior_mean_tau, config.prior_strength
+            ),
+            tau_175_posterior=BayesianPosterior.from_prior(
+                config.prior_mean_tau, config.prior_strength
+            ),
+            w_tone_sweet_posterior=BayesianPosterior.from_prior(
+                config.prior_mean_w, config.prior_strength
+            ),
+            w_tone_jolt_posterior=BayesianPosterior.from_prior(
+                config.prior_mean_w, config.prior_strength
+            ),
+            w_tone_metaphor_posterior=BayesianPosterior.from_prior(
+                config.prior_mean_w, config.prior_strength
+            ),
+            b_policy_posterior=BayesianPosterior.from_prior(
+                0.5, config.prior_strength
+            ),
+        )
+
+
+# Default Bayesian configuration
+DEFAULT_BAYESIAN_CONFIG = BayesianConfig()
 
 
 # =============================================================================
@@ -318,20 +616,26 @@ class V27Config:
 
     Combines:
         - Version gating (v2_7_enabled)
-        - Alpha/learning rate (tier-specific)
+        - Update mode (EMA vs Bayesian) - Alpha 2.7 Feature
+        - Alpha/learning rate (tier-specific, for EMA mode)
+        - Bayesian configuration (for Bayesian mode)
         - Utility coefficients (operator-configurable)
         - Tone logit coefficients (named, bounded)
         - State persistence (scoped, decay-governed)
 
     Attributes:
         v2_7_enabled: Master switch. When False, behaves like v2.6.
-        alpha_config: Learning rate configuration
+        update_mode: UpdateMode.EMA (default) or UpdateMode.BAYESIAN
+        alpha_config: Learning rate configuration (used in EMA mode)
+        bayesian_config: Bayesian update configuration (used in Bayesian mode)
         utility_coefficients: Guna and penalty signs/weights
         tone_config: Tone logit coefficients
         persistence_config: State storage configuration
     """
     v2_7_enabled: bool = False
+    update_mode: UpdateMode = UpdateMode.EMA
     alpha_config: AlphaConfig = field(default_factory=lambda: DEFAULT_ALPHA_CONFIG)
+    bayesian_config: BayesianConfig = field(default_factory=lambda: DEFAULT_BAYESIAN_CONFIG)
     utility_coefficients: UtilityCoefficients = field(
         default_factory=lambda: DEFAULT_UTILITY_COEFFICIENTS
     )
@@ -355,20 +659,36 @@ class V27Config:
         """Convenience accessor for half-life in updates."""
         return self.alpha_config.half_life_updates
 
+    @property
+    def is_bayesian(self) -> bool:
+        """Check if using Bayesian update mode."""
+        return self.update_mode == UpdateMode.BAYESIAN
+
+    @property
+    def is_ema(self) -> bool:
+        """Check if using EMA update mode."""
+        return self.update_mode == UpdateMode.EMA
+
     @classmethod
-    def for_tier(cls, tier: str, enabled: bool = True) -> "V27Config":
+    def for_tier(cls, tier: str, enabled: bool = True, bayesian: bool = False) -> "V27Config":
         """
         Create configuration for a specific tier.
 
         Args:
             tier: "enterprise_tier_1", "enterprise_tier_2", or "consumer"
             enabled: Whether v2.7 is enabled
+            bayesian: Whether to use Bayesian mode (Alpha 2.7)
 
         Returns:
-            V27Config with tier-appropriate alpha
+            V27Config with tier-appropriate settings
         """
         alpha_config = get_alpha_for_tier(tier)
-        return cls(v2_7_enabled=enabled, alpha_config=alpha_config)
+        update_mode = UpdateMode.BAYESIAN if bayesian else UpdateMode.EMA
+        return cls(
+            v2_7_enabled=enabled,
+            update_mode=update_mode,
+            alpha_config=alpha_config,
+        )
 
     @classmethod
     def disabled(cls) -> "V27Config":
@@ -376,19 +696,38 @@ class V27Config:
         return cls(v2_7_enabled=False)
 
     @classmethod
-    def enterprise_t1(cls, enabled: bool = True) -> "V27Config":
+    def enterprise_t1(cls, enabled: bool = True, bayesian: bool = False) -> "V27Config":
         """Create Enterprise Tier 1 configuration (α=0.02, half-life≈35)."""
-        return cls.for_tier(TIER_ENTERPRISE_1, enabled)
+        return cls.for_tier(TIER_ENTERPRISE_1, enabled, bayesian)
 
     @classmethod
-    def enterprise_t2(cls, enabled: bool = True) -> "V27Config":
+    def enterprise_t2(cls, enabled: bool = True, bayesian: bool = False) -> "V27Config":
         """Create Enterprise Tier 2 configuration (α=0.05, half-life≈14)."""
-        return cls.for_tier(TIER_ENTERPRISE_2, enabled)
+        return cls.for_tier(TIER_ENTERPRISE_2, enabled, bayesian)
 
     @classmethod
-    def consumer(cls, enabled: bool = True) -> "V27Config":
+    def consumer(cls, enabled: bool = True, bayesian: bool = False) -> "V27Config":
         """Create Consumer configuration (α=0.10, half-life≈7)."""
-        return cls.for_tier(TIER_CONSUMER, enabled)
+        return cls.for_tier(TIER_CONSUMER, enabled, bayesian)
+
+    @classmethod
+    def bayesian(cls, tier: str = TIER_ENTERPRISE_2, prior_strength: float = 10.0) -> "V27Config":
+        """
+        Create Bayesian mode configuration (Alpha 2.7).
+
+        Args:
+            tier: Tier for fallback alpha (if needed)
+            prior_strength: Prior strength for Bayesian updates
+
+        Returns:
+            V27Config with Bayesian mode enabled
+        """
+        return cls(
+            v2_7_enabled=True,
+            update_mode=UpdateMode.BAYESIAN,
+            alpha_config=get_alpha_for_tier(tier),
+            bayesian_config=BayesianConfig(prior_strength=prior_strength),
+        )
 
 
 # Pre-built configurations
@@ -397,3 +736,9 @@ ENABLED_V27_CONFIG = V27Config.enterprise_t2(enabled=True)
 ENTERPRISE_T1_CONFIG = V27Config.enterprise_t1()
 ENTERPRISE_T2_CONFIG = V27Config.enterprise_t2()
 CONSUMER_CONFIG = V27Config.consumer()
+
+# Alpha 2.7: Bayesian configurations
+BAYESIAN_V27_CONFIG = V27Config.bayesian()
+BAYESIAN_ENTERPRISE_T1 = V27Config.enterprise_t1(bayesian=True)
+BAYESIAN_ENTERPRISE_T2 = V27Config.enterprise_t2(bayesian=True)
+BAYESIAN_CONSUMER = V27Config.consumer(bayesian=True)

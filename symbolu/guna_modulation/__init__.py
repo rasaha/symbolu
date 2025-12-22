@@ -282,6 +282,11 @@ from symbolu.guna_modulation.state_types import (
 from symbolu.guna_modulation.observables import (
     # Observables container
     Observables,
+    # Motion (M) formalization
+    MotionType,
+    compute_semantic_motion,
+    compute_structural_motion,
+    compute_temporal_motion,
     # Factory functions
     observables_from_v26_pipeline,
     # Entropy computation
@@ -339,6 +344,16 @@ from symbolu.guna_modulation.v27_config import (
     ENTERPRISE_T1_CONFIG,
     ENTERPRISE_T2_CONFIG,
     CONSUMER_CONFIG,
+    # Alpha 2.7: Update mode and Bayesian configuration
+    UpdateMode,
+    BayesianConfig,
+    BayesianPosterior,
+    BayesianStateRegister,
+    DEFAULT_BAYESIAN_CONFIG,
+    BAYESIAN_V27_CONFIG,
+    BAYESIAN_ENTERPRISE_T1,
+    BAYESIAN_ENTERPRISE_T2,
+    BAYESIAN_CONSUMER,
 )
 
 from symbolu.guna_modulation.state_evolution_engine import (
@@ -352,8 +367,67 @@ from symbolu.guna_modulation.state_evolution_engine import (
     create_v26_engine,
     create_v27_engine,
     create_state_engine_for_tier,
+    # Alpha 2.7: Bayesian factory functions
+    create_bayesian_engine,
+    create_bayesian_engine_for_tier,
     # Standalone function
     update_state,
+)
+
+# Experimental Reasoning Extensions (v2.7.4)
+from symbolu.guna_modulation.experimental_reasoning import (
+    # DPO
+    PreferenceGoal,
+    PreferencePair,
+    DPOConfig,
+    DPOUpdater,
+    create_dpo_updater,
+    # Tree-of-Thoughts
+    ThoughtNode,
+    ToTConfig,
+    TreeOfThoughts,
+    create_tree_of_thoughts,
+    # MCTS
+    MCTSNode,
+    MCTSConfig,
+    MonteCarloTreeSearch,
+    create_mcts,
+    # Capability reference
+    CAPABILITY_MATRIX,
+)
+
+# Mirror Balance (v2.7.4) - Self-referential balance and cross-layer dissonance
+from symbolu.guna_modulation.mirror_balance import (
+    # Core mirror types
+    MirrorPair,
+    BalanceCorrection,
+    SelfQuestion,
+    # Mirror functions
+    compute_mirror_observables,
+    create_mirror_pair,
+    compute_balance_correction,
+    apply_balance_correction,
+    compute_harmonic_mirror,
+    generate_self_questions,
+    # Mirror engine
+    MirrorBalanceEngine,
+    # Ontological layers
+    OntologicalLayer,
+    # Cross-layer dissonance
+    LayerState,
+    LayerDissonance,
+    compute_layer_dissonance,
+    generate_ambition_questions,
+    LayerDissonanceMonitor,
+    # Configurable layer comparison (v2.7.5)
+    LayerComparisonConfig,
+    LAYER_COMPARISON_ENTERPRISE_T1,
+    LAYER_COMPARISON_ENTERPRISE_T2,
+    LAYER_COMPARISON_CONSUMER,
+    LAYER_COMPARISON_FULL_PIPELINE,
+    DEFAULT_LAYER_COMPARISON,
+    get_layer_comparison_for_tier,
+    ConfigurableDissonanceMonitor,
 )
 
 
@@ -493,6 +567,11 @@ __all__ = [
     "Observables",
     "observables_from_v26_pipeline",
     "compute_guna_entropy",
+    # Motion (M) formalization
+    "MotionType",
+    "compute_semantic_motion",
+    "compute_structural_motion",
+    "compute_temporal_motion",
     # Utility computation
     "UtilityAudit",
     "TargetStateAudit",
@@ -536,6 +615,16 @@ __all__ = [
     "ENTERPRISE_T1_CONFIG",
     "ENTERPRISE_T2_CONFIG",
     "CONSUMER_CONFIG",
+    # Alpha 2.7: Update mode and Bayesian
+    "UpdateMode",
+    "BayesianConfig",
+    "BayesianPosterior",
+    "BayesianStateRegister",
+    "DEFAULT_BAYESIAN_CONFIG",
+    "BAYESIAN_V27_CONFIG",
+    "BAYESIAN_ENTERPRISE_T1",
+    "BAYESIAN_ENTERPRISE_T2",
+    "BAYESIAN_CONSUMER",
     # Audit types
     "RuleFired",
     "StateUpdateAudit",
@@ -546,11 +635,68 @@ __all__ = [
     "create_v26_engine",
     "create_v27_engine",
     "create_state_engine_for_tier",
+    # Alpha 2.7: Bayesian factory functions
+    "create_bayesian_engine",
+    "create_bayesian_engine_for_tier",
     # Standalone function
     "update_state",
     # Helper functions
     "normalize_weights",
     "softmax_3",
+    # =========================================================================
+    # Experimental Reasoning Extensions (v2.7.4)
+    # =========================================================================
+    # DPO
+    "PreferenceGoal",
+    "PreferencePair",
+    "DPOConfig",
+    "DPOUpdater",
+    "create_dpo_updater",
+    # Tree-of-Thoughts
+    "ThoughtNode",
+    "ToTConfig",
+    "TreeOfThoughts",
+    "create_tree_of_thoughts",
+    # MCTS
+    "MCTSNode",
+    "MCTSConfig",
+    "MonteCarloTreeSearch",
+    "create_mcts",
+    # Capability reference
+    "CAPABILITY_MATRIX",
+    # =========================================================================
+    # Mirror Balance (v2.7.4)
+    # =========================================================================
+    # Core mirror types
+    "MirrorPair",
+    "BalanceCorrection",
+    "SelfQuestion",
+    # Mirror functions
+    "compute_mirror_observables",
+    "create_mirror_pair",
+    "compute_balance_correction",
+    "apply_balance_correction",
+    "compute_harmonic_mirror",
+    "generate_self_questions",
+    # Mirror engine
+    "MirrorBalanceEngine",
+    # Ontological layers
+    "OntologicalLayer",
+    # Cross-layer dissonance
+    "LayerState",
+    "LayerDissonance",
+    "compute_layer_dissonance",
+    "generate_ambition_questions",
+    "LayerDissonanceMonitor",
+    # Configurable layer comparison (v2.7.5)
+    "LayerComparisonConfig",
+    "LAYER_COMPARISON_ENTERPRISE_T1",
+    "LAYER_COMPARISON_ENTERPRISE_T2",
+    "LAYER_COMPARISON_CONSUMER",
+    "LAYER_COMPARISON_FULL_PIPELINE",
+    "DEFAULT_LAYER_COMPARISON",
+    "get_layer_comparison_for_tier",
+    "ConfigurableDissonanceMonitor",
 ]
 
 
