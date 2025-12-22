@@ -125,6 +125,16 @@ from .integration import (
     get_dha_delivery_profile,
 )
 
+# Signal Extraction (Canonical)
+from .signal_extraction import (
+    extract_dha_inputs,
+    extract_signals_from_context_v2,
+    SignalExtractionAudit,
+    LN_3 as SIGNAL_LN_3,
+    LN_5 as SIGNAL_LN_5,
+    LN_10 as SIGNAL_LN_10,
+)
+
 
 # Public API
 __all__ = [
@@ -171,6 +181,10 @@ __all__ = [
     "extract_base_output",
     "maybe_run_dha",
     "get_dha_delivery_profile",
+    # Signal Extraction (Canonical)
+    "extract_dha_inputs",
+    "extract_signals_from_context_v2",
+    "SignalExtractionAudit",
 ]
 
 __version__ = "1.0.0"
