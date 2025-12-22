@@ -16,6 +16,16 @@ from dataclasses import dataclass, asdict
 from collections import defaultdict
 
 from symbolu.engine import create_engine, EngineTier
+from symbolu.entropy import (
+    EntropyEngine,
+    GunaProfile,
+    KoshaProfile,
+    DomainProfile,
+    TIER_1_CONFIG,
+    TIER_2_CONFIG,
+    TIER_3_CONFIG,
+    DIMENSION_NAMES,
+)
 
 
 # =============================================================================
@@ -204,6 +214,105 @@ def run_consumer_cascade_test(queries: List[str]) -> Dict[str, Any]:
     return results
 
 
+def run_entropy_benchmark() -> Dict[str, Any]:
+    """
+    Test Cross-Domain Entropy Engine across all tiers.
+
+    Demonstrates:
+    - Entropy computation for different query types
+    - Tier-specific gate behavior (DIAGNOSTIC_ONLY, MODULATION_ONLY, FULL_GATING)
+    - Determinism verification
+    """
+    results = {
+        "tier_behavior": [],
+        "entropy_by_query_type": [],
+        "determinism_verified": True,
+    }
+
+    # Test scenarios with different entropy characteristics
+    scenarios = [
+        {
+            "name": "Balanced Query",
+            "guna": GunaProfile(sattva=0.4, rajas=0.3, tamas=0.3),
+            "kosha_source": KoshaProfile(annamaya=0.1, pranamaya=0.2, manomaya=0.5, vijnanamaya=0.2, anandamaya=0.0),
+            "kosha_target": KoshaProfile(annamaya=0.1, pranamaya=0.2, manomaya=0.5, vijnanamaya=0.2, anandamaya=0.0),
+            "expected": "low_entropy",
+        },
+        {
+            "name": "Cross-Layer Query (Emotional → Intellectual)",
+            "guna": GunaProfile(sattva=0.5, rajas=0.4, tamas=0.1),
+            "kosha_source": KoshaProfile(annamaya=0.1, pranamaya=0.1, manomaya=0.7, vijnanamaya=0.1, anandamaya=0.0),
+            "kosha_target": KoshaProfile(annamaya=0.0, pranamaya=0.1, manomaya=0.2, vijnanamaya=0.7, anandamaya=0.0),
+            "expected": "moderate_entropy",
+        },
+        {
+            "name": "Extreme Skew (Physical → Bliss)",
+            "guna": GunaProfile(sattva=0.9, rajas=0.05, tamas=0.05),
+            "kosha_source": KoshaProfile(annamaya=0.8, pranamaya=0.2, manomaya=0.0, vijnanamaya=0.0, anandamaya=0.0),
+            "kosha_target": KoshaProfile(annamaya=0.0, pranamaya=0.0, manomaya=0.0, vijnanamaya=0.1, anandamaya=0.9),
+            "expected": "high_entropy",
+        },
+    ]
+
+    # Test each tier
+    tier_configs = [
+        ("Tier 1 (Enterprise Search)", TIER_1_CONFIG),
+        ("Tier 2 (Enterprise Chat)", TIER_2_CONFIG),
+        ("Tier 3 (Consumer)", TIER_3_CONFIG),
+    ]
+
+    for tier_name, config in tier_configs:
+        engine = EntropyEngine(config)
+        tier_results = {
+            "tier": tier_name,
+            "mode": config.mode.value,
+            "scenarios": [],
+        }
+
+        for scenario in scenarios:
+            result = engine.evaluate(
+                guna_profile=scenario["guna"],
+                kosha_source=scenario["kosha_source"],
+                kosha_target=scenario["kosha_target"],
+            )
+
+            # Verify determinism
+            result2 = engine.evaluate(
+                guna_profile=scenario["guna"],
+                kosha_source=scenario["kosha_source"],
+                kosha_target=scenario["kosha_target"],
+            )
+            if result.combined_entropy != result2.combined_entropy:
+                results["determinism_verified"] = False
+
+            tier_results["scenarios"].append({
+                "name": scenario["name"],
+                "combined_entropy": round(result.combined_entropy, 3),
+                "guna_entropy": round(result.guna_entropy, 3),
+                "kosha_entropy": round(result.kosha_entropy, 3),
+                "gate": result.gate.value,
+            })
+
+        results["tier_behavior"].append(tier_results)
+
+    # Summarize entropy by query type
+    engine = EntropyEngine(TIER_3_CONFIG)  # Use full gating for complete picture
+    for scenario in scenarios:
+        result = engine.evaluate(
+            guna_profile=scenario["guna"],
+            kosha_source=scenario["kosha_source"],
+            kosha_target=scenario["kosha_target"],
+        )
+        results["entropy_by_query_type"].append({
+            "query_type": scenario["name"],
+            "expected": scenario["expected"],
+            "actual_entropy": round(result.combined_entropy, 3),
+            "gate": result.gate.value,
+        })
+
+    return results
+
+
 def run_search_benchmark():
     """Test search/ranking capability."""
     engine = create_engine(tier=EngineTier.ENTERPRISE_SEARCH)
@@ -329,6 +438,28 @@ def print_results(all_results: Dict[str, Any]):
         print(f"    Latency: {result['latency_ms']}ms")
     print()
 
+    # Cross-Domain Entropy Engine Results
+    if "entropy_test" in all_results:
+        entropy = all_results["entropy_test"]
+        print("## CROSS-DOMAIN ENTROPY ENGINE")
+        print("-" * 80)
+        print(f"Determinism Verified: {'✓' if entropy['determinism_verified'] else '✗'}")
+        print()
+
+        print("### Tier-Specific Behavior")
+        for tier in entropy["tier_behavior"]:
+            print(f"\n  {tier['tier']} (mode: {tier['mode']})")
+            for scenario in tier["scenarios"]:
+                print(f"    - {scenario['name']}: entropy={scenario['combined_entropy']:.3f}, gate={scenario['gate']}")
+
+        print()
+        print("### Entropy by Query Type")
+        print(f"{'Query Type':<45} {'Expected':<15} {'Actual':<10} {'Gate':<20}")
+        print("-" * 90)
+        for entry in entropy["entropy_by_query_type"]:
+            print(f"{entry['query_type']:<45} {entry['expected']:<15} {entry['actual_entropy']:<10.3f} {entry['gate']:<20}")
+        print()
+
     # Key metrics summary
     print("## KEY METRICS SUMMARY")
     print("-" * 80)
@@ -340,6 +471,8 @@ def print_results(all_results: Dict[str, Any]):
     print(f"| 7B model usage (Consumer)       | {cascade['7b_usage_rate']}           |")
     print(f"| Vector dimension savings        | 77x (768D → 10D)|")
     print(f"| Parameter savings               | 25x (175B → 7B) |")
+    if "entropy_test" in all_results:
+        print(f"| Entropy engine determinism      | {'Verified ✓' if all_results['entropy_test']['determinism_verified'] else 'Failed ✗'}       |")
     print()
 
 
@@ -380,6 +513,10 @@ def main():
     # Run search test
     print("Testing search/ranking...")
     all_results["search_test"] = run_search_benchmark()
+
+    # Run entropy engine test
+    print("Testing cross-domain entropy engine...")
+    all_results["entropy_test"] = run_entropy_benchmark()
 
     print()
 
