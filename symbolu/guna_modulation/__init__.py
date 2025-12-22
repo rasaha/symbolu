@@ -451,6 +451,45 @@ from symbolu.guna_modulation.concept_readiness import (
     ConceptReadinessReporter,
 )
 
+# Causal Layer (v2.7.7) - do-calculus for layer pipeline
+from symbolu.guna_modulation.causal_layer import (
+    # Constants
+    LAYER_CAUSAL_ORDER,
+    LAYER_POSITION,
+    # Graph utilities
+    is_upstream,
+    is_downstream,
+    get_upstream_layers,
+    get_downstream_layers,
+    causal_distance,
+    # Graph
+    LayerCausalGraph,
+    DEFAULT_CAUSAL_GRAPH,
+    # State
+    PipelineState,
+    # Intervention
+    CausalIntervention,
+    do,
+    # Effect estimation
+    CausalEffect,
+    compute_layer_metric,
+    estimate_ate,
+    # Counterfactual
+    Counterfactual,
+    counterfactual_query,
+    # Attribution
+    LayerAttribution,
+    CausalAttribution,
+    attribute_outcome,
+    # Main interface
+    LayerCausalModel,
+    InterventionQuery,
+    # Convenience
+    create_causal_model,
+    quick_attribution,
+    quick_ate,
+)
+
 
 __all__ = [
     # Constants
@@ -738,6 +777,44 @@ __all__ = [
     "ConceptReadinessMonitor",
     # Reporter
     "ConceptReadinessReporter",
+    # =========================================================================
+    # Causal Layer (v2.7.7)
+    # =========================================================================
+    # Constants
+    "LAYER_CAUSAL_ORDER",
+    "LAYER_POSITION",
+    # Graph utilities
+    "is_upstream",
+    "is_downstream",
+    "get_upstream_layers",
+    "get_downstream_layers",
+    "causal_distance",
+    # Graph
+    "LayerCausalGraph",
+    "DEFAULT_CAUSAL_GRAPH",
+    # State
+    "PipelineState",
+    # Intervention
+    "CausalIntervention",
+    "do",
+    # Effect estimation
+    "CausalEffect",
+    "compute_layer_metric",
+    "estimate_ate",
+    # Counterfactual
+    "Counterfactual",
+    "counterfactual_query",
+    # Attribution
+    "LayerAttribution",
+    "CausalAttribution",
+    "attribute_outcome",
+    # Main interface
+    "LayerCausalModel",
+    "InterventionQuery",
+    # Convenience
+    "create_causal_model",
+    "quick_attribution",
+    "quick_ate",
 ]
 
 

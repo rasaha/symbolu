@@ -1,6 +1,6 @@
 # SymbolU v2.7 Experimental Extensions Specification
 
-**Version:** 2.7.6-experimental
+**Version:** 2.7.7-experimental
 **Date:** 2025-12-22
 **Status:** Experimental (Enterprise-ready components marked)
 
@@ -17,9 +17,10 @@
 7. [MCTS: Monte Carlo Tree Search](#mcts-monte-carlo-tree-search)
 8. [Cognitive Ability Model](#cognitive-ability-model)
 9. [Concept Readiness Index](#concept-readiness-index)
-10. [Capability Matrix](#capability-matrix)
-11. [Enterprise Value Proposition](#enterprise-value-proposition)
-12. [AGI Assessment](#agi-assessment)
+10. [Causal Layer](#causal-layer)
+11. [Capability Matrix](#capability-matrix)
+12. [Enterprise Value Proposition](#enterprise-value-proposition)
+13. [AGI Assessment](#agi-assessment)
 
 ---
 
@@ -37,6 +38,7 @@ entropy modulation system. These extensions provide:
 | **MCTS** | Search-based decision making | ⚠️ Experimental |
 | **Cognitive Ability** | Measurable cognitive metrics via mirror + selective layers | ✅ Yes |
 | **Concept Readiness** | Safe concept detection (not formation) | ✅ Yes |
+| **Causal Layer** | do-calculus for layer pipeline (ATE, counterfactuals, attribution) | ✅ Yes |
 
 **Key Insight:** These are mathematical refinements, not cognitive capabilities.
 The system remains deterministic signal processing, not intelligence.
@@ -1056,24 +1058,140 @@ print(report["human_can_conceptualize"])  # True if CRI >= 0.7
 
 ---
 
+## Causal Layer
+
+### Overview
+
+The Causal Layer module adds **do-calculus** style causal inference to SymbolU's
+layer pipeline, treating the ontological layers as a Directed Acyclic Graph (DAG).
+
+### Key Insight
+
+SymbolU's layer pipeline IS already a causal graph:
+
+```
+SIGNAL → EMBEDDING → GUNA → MOTION → FUSION → STATE → OUTPUT
+```
+
+Each layer causally affects downstream layers. This module formalizes that
+relationship using Pearl's do-calculus.
+
+### Capabilities
+
+| Operation | Description | Use Case |
+|-----------|-------------|----------|
+| **do(X=x)** | Intervention operator | "What if we set GUNA to high clarity?" |
+| **ATE** | Average Treatment Effect | "How much does GUNA affect OUTPUT?" |
+| **Counterfactual** | What-if reasoning | "What would OUTPUT be if GUNA had zero entropy?" |
+| **Attribution** | Causal attribution | "Which layer caused this instability?" |
+
+### Mathematical Foundation
+
+#### Intervention (do-operator)
+
+```
+P(Y | do(X=x)) ≠ P(Y | X=x)
+
+do(X=x) removes incoming edges to X, simulating intervention
+rather than observation.
+```
+
+#### Average Treatment Effect
+
+```
+ATE = E[Y | do(X = x_treatment)] - E[Y | do(X = x_control)]
+
+Effect decays with causal distance:
+  decay = exp(-0.2 × distance)
+```
+
+#### Counterfactual
+
+Three-step procedure:
+1. **Abduction**: Infer exogenous variables from factual
+2. **Action**: Apply intervention (modify treatment)
+3. **Prediction**: Compute counterfactual outcome
+
+### Usage Example
+
+```python
+from symbolu.guna_modulation import (
+    create_causal_model,
+    OntologicalLayer,
+    Observables,
+)
+
+# Create model and observe layer states
+model = (
+    create_causal_model()
+    .observe(OntologicalLayer.GUNA, guna_obs)
+    .observe(OntologicalLayer.FUSION, fusion_obs)
+    .observe(OntologicalLayer.OUTPUT, output_obs)
+)
+
+# 1. Attribution: Which layer caused poor output?
+attr = model.attribute(OntologicalLayer.OUTPUT)
+print(f"Primary cause: {attr.primary_cause}")
+print(f"GUNA contribution: {attr.get_attribution(OntologicalLayer.GUNA).contribution_percent:.1f}%")
+
+# 2. Intervention: What if GUNA had high clarity?
+high_clarity = Observables(s=0.8, r=0.1, t=0.1, H=0.2, ...)
+effect = model.do(OntologicalLayer.GUNA, high_clarity).effect_on(OntologicalLayer.OUTPUT)
+print(f"Effect size: {effect.effect_size:.3f}")
+print(f"Significant: {effect.is_significant}")
+
+# 3. Counterfactual: What would have happened?
+cf = model.counterfactual(
+    "What if GUNA had high clarity?",
+    treatment=OntologicalLayer.GUNA,
+    outcome=OntologicalLayer.OUTPUT,
+    intervention=high_clarity,
+)
+print(f"Would have improved: {cf.would_have_improved}")
+print(f"Improvement: {cf.improvement_percent:.1f}%")
+```
+
+### Enterprise Value
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Causal Layer                                                 │
+│                                                               │
+│  = Answers "which layer caused this?"                         │
+│  = Enables intervention planning                              │
+│  = Supports counterfactual debugging                          │
+│  ≠ Creates causal structure (uses existing pipeline)          │
+│  ≠ AGI                                                        │
+│                                                               │
+│  Enterprise value: ✅ Yes (root cause analysis, auditable)   │
+│  Causal discovery: ❌ No (fixed DAG from layer design)       │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Capability Matrix
 
 ### What Each Extension Adds
 
-| Capability | Bayesian | Motion | DPO | ToT | MCTS | Cognitive | CRI |
-|------------|----------|--------|-----|-----|------|-----------|-----|
-| Uncertainty quantification | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Adaptive learning | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Explicit signal formalization | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Preference learning | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Structured reasoning | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
-| Exploration/exploitation | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| Self-awareness metrics | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| Directional focus | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| Cognitive state classification | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| Concept coherence detection | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Concept entropy measurement | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Concept drift monitoring | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Capability | Bayesian | Motion | DPO | ToT | MCTS | Cognitive | CRI | Causal |
+|------------|----------|--------|-----|-----|------|-----------|-----|--------|
+| Uncertainty quantification | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Adaptive learning | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Explicit signal formalization | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Preference learning | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Structured reasoning | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Exploration/exploitation | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Self-awareness metrics | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Directional focus | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Cognitive state classification | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Concept coherence detection | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Concept entropy measurement | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Concept drift monitoring | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Intervention (do-operator) | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Causal effect estimation | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Counterfactual reasoning | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Causal attribution | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ### What None of Them Add (AGI Capabilities)
 
@@ -1355,6 +1473,19 @@ from symbolu.guna_modulation import (
 ---
 
 ## Changelog
+
+### v2.7.7-experimental (2025-12-22)
+
+- Added Causal Layer module with do-calculus for layer pipeline
+- Added LayerCausalGraph for DAG structure with SIGNAL → OUTPUT ordering
+- Added do() intervention operator for causal queries
+- Added ATE (Average Treatment Effect) estimation between layers
+- Added counterfactual reasoning with three-step procedure (Abduction → Action → Prediction)
+- Added Shapley-style causal attribution for outcome decomposition
+- Added LayerCausalModel as main interface for causal inference
+- Added convenience functions: create_causal_model(), quick_attribution(), quick_ate()
+- Inspired by PyWhy's causal inference framework
+- Key formula: ATE = E[Y | do(X=x₁)] - E[Y | do(X=x₀)]
 
 ### v2.7.6-experimental (2025-12-22)
 
