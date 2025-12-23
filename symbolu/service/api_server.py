@@ -11,8 +11,34 @@ Dependencies:
 If FastAPI is not installed, create_app() will raise a clean error.
 
 Endpoints:
-    POST /dilchat/analyze - Returns DILchat-formatted response
-    POST /symbolu/analyze - Returns full unified output
+    Core Analysis:
+        POST /dilchat/analyze - Returns DILchat-formatted response
+        POST /symbolu/analyze - Returns full unified output
+
+    Session Management:
+        POST /session/start - Create a new session
+        POST /session/{session_id}/analyze - Analyze within a session
+        GET /session/{session_id}/summary - Get session summary
+        GET /sessions/{session_id}/dashboard - Dashboard analytics
+        GET /sessions/{session_id}/resonance/what_if - Resonance simulation
+        GET /sessions/{session_id}/scenario/what_if - Scenario simulation
+
+    Preferences:
+        POST /preferences/user - Set user preference
+        POST /preferences/admin - Set admin preference
+        GET /preferences/user/{user_id} - Get user preference
+        GET /preferences/admin/{org_id} - Get admin preference
+
+    Demo Endpoints (for testing Symbol-U capabilities):
+        POST /demo/classify - Intent classification (Pure STL, <1ms latency)
+        POST /demo/search - Semantic search/ranking (Pure STL)
+        POST /demo/generate - Text generation (STL + 7B or Consumer tier)
+        POST /demo/name/analyze - Name resonance analysis (12D profile)
+        POST /demo/name/compare - Compare two names' profiles
+        POST /demo/name/quick-match - Quick domain compatibility check
+
+    Health:
+        GET /health - Health check
 
 Design Principles:
     1. Zero-LLM in routing/policy logic
@@ -20,6 +46,18 @@ Design Principles:
     3. Fully deterministic outputs
     4. Optional dependency (graceful error if FastAPI not installed)
     5. Presentation + transport layer only
+
+Running the Server:
+    from symbolu.service.api_server import create_app
+    import uvicorn
+
+    app = create_app()
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    # Then test with:
+    # curl -X POST http://localhost:8000/demo/classify \\
+    #      -H "Content-Type: application/json" \\
+    #      -d '{"text": "Deploy the app now"}'
 """
 
 import logging
@@ -49,6 +87,19 @@ from symbolu.service.request_models import (
     UserPreferenceUpdate,
     AdminPreferenceUpdate,
     PreferenceResponse,
+    # Demo models
+    ClassifyRequest,
+    ClassifyResponse,
+    SearchRequest,
+    SearchResponse,
+    GenerateRequest,
+    GenerateResponse,
+    NameAnalyzeRequest,
+    NameAnalyzeResponse,
+    NameCompareRequest,
+    NameCompareResponse,
+    QuickMatchRequest,
+    QuickMatchResponse,
     PYDANTIC_AVAILABLE
 )
 
@@ -1078,6 +1129,348 @@ def create_app() -> "FastAPI":
             Dict with status="ok" if server is running
         """
         return {"status": "ok", "version": "1.0.0"}
+
+    # ========================================================================
+    # DEMO ENDPOINTS - Engine Demos
+    # ========================================================================
+
+    @app.post("/demo/classify", response_model=ClassifyResponse)
+    def demo_classify(req: ClassifyRequest) -> Dict[str, Any]:
+        """
+        Intent classification demo using Enterprise Search tier (Pure STL).
+
+        This endpoint demonstrates the deterministic intent classification
+        capability with sub-millisecond latency. No LLM is used.
+
+        Args:
+            req: ClassifyRequest with text to classify
+
+        Returns:
+            ClassifyResponse with intent, confidence, and latency
+
+        Example:
+            POST /demo/classify
+            {"text": "Deploy the K8s cluster now"}
+            -> {"text": "...", "intent": "COMMAND", "confidence": 0.92, "latency_ms": 0.13}
+        """
+        try:
+            # Import engine components
+            from symbolu.engine import create_engine, EngineTier
+
+            # Create Enterprise Search engine
+            engine = create_engine(tier=EngineTier.ENTERPRISE_SEARCH)
+
+            # Classify
+            result = engine.classify(req.text)
+
+            return {
+                "text": req.text,
+                "intent": result.intent,
+                "confidence": result.confidence,
+                "latency_ms": result.latency_ms,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in /demo/classify: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Classification failed: {str(e)}"
+            )
+
+    @app.post("/demo/search", response_model=SearchResponse)
+    def demo_search(req: SearchRequest) -> Dict[str, Any]:
+        """
+        Semantic search/ranking demo using Enterprise Search tier (Pure STL).
+
+        This endpoint demonstrates deterministic document ranking
+        with sub-millisecond latency. No LLM is used.
+
+        Args:
+            req: SearchRequest with query and candidate documents
+
+        Returns:
+            SearchResponse with ranked results and scores
+
+        Example:
+            POST /demo/search
+            {
+                "query": "quantum physics theory",
+                "candidates": [
+                    "Introduction to Machine Learning",
+                    "Quantum Computing Fundamentals",
+                    "Advanced Physics Concepts"
+                ]
+            }
+            -> {"query": "...", "ranked_results": [...], "scores": {...}, "latency_ms": 0.15}
+        """
+        try:
+            # Import engine components
+            from symbolu.engine import create_engine, EngineTier
+
+            # Create Enterprise Search engine
+            engine = create_engine(tier=EngineTier.ENTERPRISE_SEARCH)
+
+            # Search/rank
+            result = engine.search(req.query, req.candidates)
+
+            return {
+                "query": req.query,
+                "ranked_results": result.metadata.get("ranked", []),
+                "scores": result.metadata.get("scores", {}),
+                "latency_ms": result.latency_ms,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in /demo/search: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Search failed: {str(e)}"
+            )
+
+    @app.post("/demo/generate", response_model=GenerateResponse)
+    def demo_generate(req: GenerateRequest) -> Dict[str, Any]:
+        """
+        Text generation demo using Enterprise Chat or Consumer tier.
+
+        This endpoint demonstrates STL-routed generation:
+        - Enterprise Chat: STL + 7B models (25x cost savings)
+        - Consumer: STL + 768D + cascading LLM (smart fallback)
+
+        Args:
+            req: GenerateRequest with text and tier selection
+
+        Returns:
+            GenerateResponse with generated text, model info, and metrics
+
+        Example:
+            POST /demo/generate
+            {"text": "Explain quantum entanglement", "tier": "enterprise_chat"}
+            -> {"text": "...", "response": "...", "model_used": "physics_7b", ...}
+        """
+        try:
+            # Import engine components
+            from symbolu.engine import create_engine, EngineTier
+
+            # Determine tier
+            tier_map = {
+                "enterprise_chat": EngineTier.ENTERPRISE_CHAT,
+                "consumer": EngineTier.CONSUMER,
+            }
+
+            tier_key = req.tier.lower().strip()
+            if tier_key not in tier_map:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid tier '{req.tier}'. Valid: enterprise_chat, consumer"
+                )
+
+            tier = tier_map[tier_key]
+
+            # Create engine
+            engine = create_engine(tier=tier)
+
+            # Generate
+            result = engine.generate(req.text)
+
+            response = {
+                "text": req.text,
+                "response": result.response,
+                "intent": result.intent,
+                "confidence": result.confidence,
+                "model_used": result.model_used,
+                "tier": req.tier,
+                "latency_ms": result.latency_ms,
+            }
+
+            # Add 768D info for Consumer tier
+            if tier == EngineTier.CONSUMER:
+                response["used_768d"] = result.metadata.get("used_768d", False)
+
+            return response
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error in /demo/generate: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Generation failed: {str(e)}"
+            )
+
+    # ========================================================================
+    # DEMO ENDPOINTS - Name Resonance
+    # ========================================================================
+
+    @app.post("/demo/name/analyze", response_model=NameAnalyzeResponse)
+    def demo_name_analyze(req: NameAnalyzeRequest) -> Dict[str, Any]:
+        """
+        Name resonance analysis demo.
+
+        This endpoint analyzes a name's phonetic structure and projects it
+        to a 12D structural profile, then matches against domain patterns.
+
+        Fully deterministic: same name always produces the same result.
+
+        Args:
+            req: NameAnalyzeRequest with name to analyze
+
+        Returns:
+            NameAnalyzeResponse with full structural analysis
+
+        Example:
+            POST /demo/name/analyze
+            {"name": "Campbell"}
+            -> {"name": "Campbell", "normalized": "campbell", "phonemes": [...], ...}
+        """
+        try:
+            # Import name resonance API
+            from symbolu.name_resonance import analyze_name
+            from symbolu.name_resonance.types import DIMENSION_NAMES
+
+            # Analyze name
+            result = analyze_name(req.name)
+
+            # Build structural profile dict
+            profile_dict = {}
+            for dim in DIMENSION_NAMES:
+                profile_dict[dim] = getattr(result.profile, dim)
+
+            # Build domain compatibility list
+            domain_list = []
+            for dr in result.domain_results:
+                domain_list.append({
+                    "domain_name": dr.domain_name,
+                    "domain_category": dr.domain_category,
+                    "classification": dr.classification.value,
+                    "compatibility_score": dr.compatibility_score,
+                    "top_matches": list(dr.top_matches) if dr.top_matches else [],
+                    "weak_matches": list(dr.weak_matches) if dr.weak_matches else [],
+                })
+
+            return {
+                "name": result.original_input,
+                "normalized": result.normalized_input.canonical,
+                "phonemes": list(result.signals.phoneme_sequence),
+                "structural_profile": profile_dict,
+                "domain_compatibility": domain_list,
+                "high_compatibility": list(result.high_compatibility),
+                "low_compatibility": list(result.low_compatibility),
+                "summary": result.summary,
+                "caveats": list(result.caveats),
+            }
+
+        except Exception as e:
+            logger.error(f"Error in /demo/name/analyze: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Name analysis failed: {str(e)}"
+            )
+
+    @app.post("/demo/name/compare", response_model=NameCompareResponse)
+    def demo_name_compare(req: NameCompareRequest) -> Dict[str, Any]:
+        """
+        Compare two names' structural profiles.
+
+        This endpoint compares the 12D structural profiles of two names,
+        showing dimension-by-dimension differences.
+
+        Args:
+            req: NameCompareRequest with two names to compare
+
+        Returns:
+            NameCompareResponse with profile comparison
+
+        Example:
+            POST /demo/name/compare
+            {"name_a": "Campbell", "name_b": "Erikson"}
+            -> {"name_a": "Campbell", "name_b": "Erikson", "profile_a": {...}, ...}
+        """
+        try:
+            # Import name resonance API
+            from symbolu.name_resonance import get_profile, compare_names
+            from symbolu.name_resonance.types import DIMENSION_NAMES
+
+            # Get profiles
+            profile_a = get_profile(req.name_a)
+            profile_b = get_profile(req.name_b)
+
+            # Build profile dicts
+            profile_a_dict = {}
+            profile_b_dict = {}
+            for dim in DIMENSION_NAMES:
+                profile_a_dict[dim] = getattr(profile_a, dim)
+                profile_b_dict[dim] = getattr(profile_b, dim)
+
+            # Get comparison text
+            comparison_text = compare_names(req.name_a, req.name_b)
+
+            return {
+                "name_a": req.name_a,
+                "name_b": req.name_b,
+                "profile_a": profile_a_dict,
+                "profile_b": profile_b_dict,
+                "comparison": comparison_text,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in /demo/name/compare: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Name comparison failed: {str(e)}"
+            )
+
+    @app.post("/demo/name/quick-match", response_model=QuickMatchResponse)
+    def demo_name_quick_match(req: QuickMatchRequest) -> Dict[str, Any]:
+        """
+        Quick domain compatibility check for a name.
+
+        This endpoint quickly checks a name's compatibility with
+        a specific domain (e.g., "Golf", "Engineering", "Law").
+
+        Args:
+            req: QuickMatchRequest with name and domain
+
+        Returns:
+            QuickMatchResponse with compatibility result
+
+        Example:
+            POST /demo/name/quick-match
+            {"name": "Campbell", "domain": "Golf"}
+            -> {"name": "Campbell", "domain": "Golf", "classification": "moderate", ...}
+        """
+        try:
+            # Import name resonance API
+            from symbolu.name_resonance import analyze_name, quick_match
+
+            # Get quick match result string
+            result_str = quick_match(req.name, req.domain)
+
+            # Also get full analysis to extract score
+            full_result = analyze_name(req.name)
+
+            # Find matching domain
+            classification = "unknown"
+            score = 0.0
+            for dr in full_result.domain_results:
+                if req.domain.lower() in dr.domain_name.lower():
+                    classification = dr.classification.value
+                    score = dr.compatibility_score
+                    break
+
+            return {
+                "name": req.name,
+                "domain": req.domain,
+                "classification": classification,
+                "score": score,
+                "result": result_str,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in /demo/name/quick-match: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Quick match failed: {str(e)}"
+            )
 
     return app
 

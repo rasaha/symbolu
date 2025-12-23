@@ -224,3 +224,218 @@ class PreferenceResponse(BaseModel if PYDANTIC_AVAILABLE else object):
             default=None,
             description="Organization identifier"
         )
+
+
+# ============================================================================
+# DEMO API MODELS - Engine Demos
+# ============================================================================
+
+class ClassifyRequest(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Request schema for intent classification demo.
+
+    Attributes:
+        text: Text to classify
+    """
+    if PYDANTIC_AVAILABLE:
+        text: str = Field(..., description="Text to classify")
+
+
+class ClassifyResponse(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Response schema for intent classification demo.
+
+    Attributes:
+        text: Original input text
+        intent: Classified intent
+        confidence: Classification confidence (0-1)
+        latency_ms: Processing latency in milliseconds
+    """
+    if PYDANTIC_AVAILABLE:
+        text: str = Field(..., description="Original input text")
+        intent: str = Field(..., description="Classified intent")
+        confidence: float = Field(..., description="Classification confidence (0-1)")
+        latency_ms: float = Field(..., description="Processing latency in milliseconds")
+
+
+class SearchRequest(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Request schema for semantic search demo.
+
+    Attributes:
+        query: Search query text
+        candidates: List of candidate documents to rank
+    """
+    if PYDANTIC_AVAILABLE:
+        query: str = Field(..., description="Search query text")
+        candidates: List[str] = Field(..., description="List of candidate documents to rank")
+
+
+class SearchResponse(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Response schema for semantic search demo.
+
+    Attributes:
+        query: Original search query
+        ranked_results: Documents ranked by relevance
+        scores: Relevance scores for each document
+        latency_ms: Processing latency in milliseconds
+    """
+    if PYDANTIC_AVAILABLE:
+        query: str = Field(..., description="Original search query")
+        ranked_results: List[str] = Field(..., description="Documents ranked by relevance")
+        scores: Dict[str, float] = Field(..., description="Relevance scores for each document")
+        latency_ms: float = Field(..., description="Processing latency in milliseconds")
+
+
+class GenerateRequest(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Request schema for generation demo (Enterprise Chat or Consumer tier).
+
+    Attributes:
+        text: Input text for generation
+        tier: Engine tier to use ("enterprise_chat" or "consumer")
+    """
+    if PYDANTIC_AVAILABLE:
+        text: str = Field(..., description="Input text for generation")
+        tier: str = Field(
+            default="enterprise_chat",
+            description="Engine tier: 'enterprise_chat' (STL + 7B) or 'consumer' (STL + 768D + LLM)"
+        )
+
+
+class GenerateResponse(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Response schema for generation demo.
+
+    Attributes:
+        text: Original input text
+        response: Generated response
+        intent: Classified intent
+        confidence: Classification confidence
+        model_used: Model used for generation
+        tier: Engine tier used
+        used_768d: Whether 768D embeddings were used (Consumer tier only)
+        latency_ms: Processing latency in milliseconds
+    """
+    if PYDANTIC_AVAILABLE:
+        text: str = Field(..., description="Original input text")
+        response: str = Field(..., description="Generated response")
+        intent: str = Field(..., description="Classified intent")
+        confidence: float = Field(..., description="Classification confidence")
+        model_used: str = Field(..., description="Model used for generation")
+        tier: str = Field(..., description="Engine tier used")
+        used_768d: Optional[bool] = Field(
+            default=None,
+            description="Whether 768D embeddings were used (Consumer tier only)"
+        )
+        latency_ms: float = Field(..., description="Processing latency in milliseconds")
+
+
+# ============================================================================
+# DEMO API MODELS - Name Resonance
+# ============================================================================
+
+class NameAnalyzeRequest(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Request schema for name resonance analysis.
+
+    Attributes:
+        name: Name to analyze
+    """
+    if PYDANTIC_AVAILABLE:
+        name: str = Field(..., description="Name to analyze")
+
+
+class NameAnalyzeResponse(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Response schema for name resonance analysis.
+
+    Attributes:
+        name: Original name input
+        normalized: Normalized canonical form
+        phonemes: Extracted phoneme sequence
+        structural_profile: 12D structural profile values
+        domain_compatibility: List of domain compatibility results
+        high_compatibility: Domains with strong/moderate compatibility
+        low_compatibility: Domains with weak compatibility
+        summary: Human-readable summary
+        caveats: Mandatory analysis caveats
+    """
+    if PYDANTIC_AVAILABLE:
+        name: str = Field(..., description="Original name input")
+        normalized: str = Field(..., description="Normalized canonical form")
+        phonemes: List[str] = Field(..., description="Extracted phoneme sequence")
+        structural_profile: Dict[str, float] = Field(..., description="12D structural profile")
+        domain_compatibility: List[Dict[str, Any]] = Field(
+            ...,
+            description="Domain compatibility results"
+        )
+        high_compatibility: List[str] = Field(..., description="High compatibility domains")
+        low_compatibility: List[str] = Field(..., description="Low compatibility domains")
+        summary: str = Field(..., description="Human-readable summary")
+        caveats: List[str] = Field(..., description="Mandatory analysis caveats")
+
+
+class NameCompareRequest(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Request schema for comparing two names.
+
+    Attributes:
+        name_a: First name to compare
+        name_b: Second name to compare
+    """
+    if PYDANTIC_AVAILABLE:
+        name_a: str = Field(..., description="First name to compare")
+        name_b: str = Field(..., description="Second name to compare")
+
+
+class NameCompareResponse(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Response schema for name comparison.
+
+    Attributes:
+        name_a: First name
+        name_b: Second name
+        profile_a: Structural profile for first name
+        profile_b: Structural profile for second name
+        comparison: Human-readable comparison text
+    """
+    if PYDANTIC_AVAILABLE:
+        name_a: str = Field(..., description="First name")
+        name_b: str = Field(..., description="Second name")
+        profile_a: Dict[str, float] = Field(..., description="Profile for first name")
+        profile_b: Dict[str, float] = Field(..., description="Profile for second name")
+        comparison: str = Field(..., description="Human-readable comparison")
+
+
+class QuickMatchRequest(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Request schema for quick domain compatibility check.
+
+    Attributes:
+        name: Name to check
+        domain: Domain to match against (e.g., "Golf", "Engineering")
+    """
+    if PYDANTIC_AVAILABLE:
+        name: str = Field(..., description="Name to check")
+        domain: str = Field(..., description="Domain to match against")
+
+
+class QuickMatchResponse(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Response schema for quick domain match.
+
+    Attributes:
+        name: Name checked
+        domain: Domain matched against
+        classification: Compatibility level (strong/moderate/partial/weak)
+        score: Compatibility score (0-1)
+        result: Human-readable result string
+    """
+    if PYDANTIC_AVAILABLE:
+        name: str = Field(..., description="Name checked")
+        domain: str = Field(..., description="Domain matched")
+        classification: str = Field(..., description="Compatibility level")
+        score: float = Field(..., description="Compatibility score (0-1)")
+        result: str = Field(..., description="Human-readable result")
