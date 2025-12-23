@@ -1,8 +1,8 @@
-# Chitta-Vṛtti Integration: Evolution from v2.6 to v2.7
+# Chitta-Vṛtti Integration: Evolution from v2.7 to v2.8
 
 ## Document Purpose
 
-This document establishes the conceptual bridge between the existing v2.6 architecture and the proposed Chitta-Vṛtti layer. It identifies what exists, what's missing, and how the pieces connect to form a coherent reasoning system.
+This document establishes the conceptual bridge between the existing v2.7 architecture and the proposed Chitta-Vṛtti layer for v2.8. It identifies what exists, what's missing, and how the pieces connect to form a coherent reasoning system.
 
 ---
 
@@ -31,7 +31,7 @@ This formula is:
 
 ---
 
-## Part 2: Current v2.6 Implementation Status
+## Part 2: Current v2.7 Implementation Status
 
 ### What Exists
 
@@ -58,7 +58,7 @@ This formula is:
 
 ### The Naming Disconnect
 
-**v2.6 uses two different vṛtti concepts:**
+**v2.7 uses two different vṛtti concepts:**
 
 | Concept | Current Name | Patañjali Name | Nature |
 |---------|--------------|----------------|--------|
@@ -81,7 +81,7 @@ This formula is:
 
 ### Mapping Between Naming Conventions
 
-| Dimension (v2.6 code) | Aspect (formula docs) | Index |
+| Dimension (v2.7 code) | Aspect (formula docs) | Index |
 |-----------------------|-----------------------|-------|
 | `Dimension.ACTION` | Karma | 1 |
 | `Dimension.IDENTIFICATION` | Identification | 2 |
@@ -160,7 +160,7 @@ The Chitta-Vṛtti module computes **p_v[v]** from cross-layer coherence:
 ### The Complete Flow
 
 ```
-         UPSTREAM (existing v2.6)
+         UPSTREAM (existing v2.7)
                   │
     ┌─────────────┴─────────────┐
     │  Syllable preprocessing   │
@@ -196,7 +196,7 @@ The Chitta-Vṛtti module computes **p_v[v]** from cross-layer coherence:
     └─────────────┬───────────────┘
                   │
                   ▼
-         DOWNSTREAM (existing v2.6)
+         DOWNSTREAM (existing v2.7)
               Stitching
               Fusion
               Rendering
@@ -237,7 +237,7 @@ These values should be:
 
 ## Part 6: Integration with Existing Signals
 
-### Signal Sources (from v2.6)
+### Signal Sources (from v2.7)
 
 | Signal | Source Module | Used For |
 |--------|---------------|----------|
@@ -335,7 +335,7 @@ Renderer
 
 ### Gap 3: Context Adaptor Bias B_c(h(c))
 
-**Issue:** Not implemented in v2.6.
+**Issue:** Not implemented in v2.7.
 
 **Definition from formula:**
 > Encodes current dialog state / observer context c via function h(c)
@@ -536,5 +536,5 @@ Before implementation, resolve:
 ---
 
 *Document version: Draft 1.0*
-*Prepared for: v2.6 → v2.7 evolution planning*
+*Prepared for: v2.7 → v2.8 evolution planning*
 *Status: Pending resolution of open questions*
