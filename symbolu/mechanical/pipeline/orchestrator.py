@@ -1,9 +1,16 @@
 """
-Symbol-U Pipeline Orchestrator (v3.0 - Linear Pipeline with Option C Router)
+Symbol-U Pipeline Orchestrator (v3.1 - Governance-First Pipeline)
 
 Main orchestration layer that coordinates all engines in a clean sequential flow.
+Now includes PO1-PO5 pre-acoustic governance phases before MLCR routing.
 
 Pipeline Sequence:
+    PO1. Grounding   -> Observer-Observed Grounding (query curation, ambiguity detection)
+    PO2. Intent      -> Intent Envelope & Response Posture (intent classification)
+    PO3. Actions     -> Allowed Action Binding (constrain planner actions)
+    PO4. Proposal    -> Planner Proposal Validation (validate against constraints)
+    PO5. Eligibility -> Execution Eligibility Gate (final governance checkpoint)
+    ---
     1. MLCR     -> Multi-Layer Consciousness Routing (query understanding)
     1.5 HRM     -> High-Resolution Mapper (conditional, when use_hrm=True)
     1.6 LCM     -> Low-Context Mapper (conditional, when use_lcm=True)
@@ -14,6 +21,7 @@ Pipeline Sequence:
     5. Renderer -> Final output surface generation
 
 Symbol-U AGI Architecture Mapping:
+    - PO1-PO5: Pre-acoustic governance (grounding, intent, action constraints, eligibility)
     - MLCR: Consciousness routing layer (WHY/HOW routing)
     - HRM: High-Resolution Mapper (deep cognitive mapping when activated)
     - LCM: Low-Context Mapper (minimal structural summary for simple queries)
@@ -22,6 +30,14 @@ Symbol-U AGI Architecture Mapping:
     - Fusion: Multi-channel blending (WHAT to say - HRM symbolic, LCM semantic, LAM temporal, MoE domain)
     - DHA: Delivery layer (HOW to say it - readiness, resistance, adaptation)
     - Renderer: Surface layer (formatted output for user consumption)
+
+Governance Model (PO1-PO5):
+    - PO1: Fuzzy logic, session context, ambiguity resolution
+    - PO2: Intent classification with response posture binding
+    - PO3: Hard action constraints for downstream processing
+    - PO4: Proposal validation with rejection audit
+    - PO5: Final execution eligibility gate (non-actuating)
+    - Authority flows downward: PO1 → PO2 → PO3 → PO4 → PO5
 
 Option C Router Integration:
     - Router decides execution path after MLCR
@@ -88,6 +104,42 @@ from .lam_integration import maybe_run_lam
 
 # Renderer integration
 from .renderer_integration import run_integrated_renderer, IntegratedRenderedOutput
+
+
+# ============================================================================
+# PO1-PO5 GOVERNANCE PHASES - lazy loaded via @lru_cache
+# Pre-acoustic governance layers that precede MLCR routing
+# ============================================================================
+
+@lru_cache(maxsize=1)
+def _get_po1():
+    from .grounding.po1_integration import maybe_run_po1
+    return maybe_run_po1
+
+
+@lru_cache(maxsize=1)
+def _get_po2():
+    from .phase_zero.po2_integration import maybe_run_po2
+    return maybe_run_po2
+
+
+@lru_cache(maxsize=1)
+def _get_po3():
+    from .phase_one.po3_integration import maybe_run_po3
+    return maybe_run_po3
+
+
+@lru_cache(maxsize=1)
+def _get_po4():
+    from .phase_po4.po4_integration import maybe_run_po4
+    return maybe_run_po4
+
+
+@lru_cache(maxsize=1)
+def _get_po5():
+    from .phase_po5.po5_integration import maybe_run_po5
+    return maybe_run_po5
+
 
 # Delivery adaptation phases (P27-P31) - lazy loaded via @lru_cache
 @lru_cache(maxsize=1)
@@ -385,6 +437,13 @@ class SymbolUPipeline:
         ctx = PipelineContext(request=request)
 
         # ================================================================
+        # PRE-ACOUSTIC GOVERNANCE: PO1-PO5
+        # Query curation and governance before MLCR routing
+        # Authority flows downward: PO1 → PO2 → PO3 → PO4 → PO5
+        # ================================================================
+        ctx = self._run_governance_chain(ctx)
+
+        # ================================================================
         # STAGE 1: MLCR - Multi-Layer Consciousness Routing
         # Route the query to understand intent, tier, entropy
         # ================================================================
@@ -488,6 +547,95 @@ class SymbolUPipeline:
     # ========================================================================
     # STAGE IMPLEMENTATIONS
     # ========================================================================
+
+    def _run_governance_chain(self, ctx: PipelineContext) -> PipelineContext:
+        """
+        Run PO1-PO5 pre-acoustic governance chain.
+
+        This governance chain runs BEFORE MLCR to provide:
+        - PO1: Query grounding (fuzzy logic, session context, ambiguity detection)
+        - PO2: Intent classification and response posture
+        - PO3: Allowed action constraints
+        - PO4: Proposal validation (placeholder for future planner integration)
+        - PO5: Execution eligibility gate
+
+        Authority Model:
+        - Authority flows downward: each phase respects upstream constraints
+        - PO1 can BLOCK the entire pipeline if grounding is ambiguous
+        - All phases are deterministic (no LLM calls)
+
+        Args:
+            ctx: Pipeline context with request.
+
+        Returns:
+            Updated context with governance envelopes populated:
+            - ctx.phase_minus_one (PO1)
+            - ctx.phase_zero (PO2)
+            - ctx.allowed_actions (PO3)
+            - ctx.po4_proposal (PO4)
+            - ctx.po5_execution_eligibility (PO5)
+        """
+        # ================================================================
+        # PO1: Observer-Observed Grounding
+        # Fuzzy logic, session context, ambiguity resolution
+        # ================================================================
+        try:
+            maybe_run_po1 = _get_po1()
+            maybe_run_po1(ctx)
+        except Exception:
+            # PO1 is optional - continue if it fails
+            pass
+
+        # ================================================================
+        # PO2: Intent Envelope & Response Posture
+        # Classifies intent and determines response posture
+        # Requires PO1 output
+        # ================================================================
+        try:
+            maybe_run_po2 = _get_po2()
+            maybe_run_po2(ctx)
+        except Exception:
+            # PO2 is optional - continue if it fails
+            pass
+
+        # ================================================================
+        # PO3: Allowed Action Binding
+        # Constrains what actions planner can propose
+        # Requires PO2 output
+        # ================================================================
+        try:
+            maybe_run_po3 = _get_po3()
+            maybe_run_po3(ctx)
+        except Exception:
+            # PO3 is optional - continue if it fails
+            pass
+
+        # ================================================================
+        # PO4: Planner Proposal Validation
+        # Validates proposed actions against PO3 constraints
+        # Requires PO2 + PO3 output
+        # Note: Currently runs with empty proposal (no planner yet)
+        # ================================================================
+        try:
+            maybe_run_po4 = _get_po4()
+            maybe_run_po4(ctx)
+        except Exception:
+            # PO4 is optional - continue if it fails
+            pass
+
+        # ================================================================
+        # PO5: Execution Eligibility Gate
+        # Final governance checkpoint (non-actuating)
+        # Requires PO1 + PO2 + PO4 output
+        # ================================================================
+        try:
+            maybe_run_po5 = _get_po5()
+            maybe_run_po5(ctx)
+        except Exception:
+            # PO5 is optional - continue if it fails
+            pass
+
+        return ctx
 
     def _run_mlcr(self, ctx: PipelineContext) -> PipelineContext:
         """
