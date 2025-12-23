@@ -39,6 +39,16 @@ from symbolu.presentation.config import (
 )
 from symbolu.presentation.engine import PresentationEngine
 from symbolu.presentation.session import SessionStateManager
+from symbolu.presentation.p6_lite import (
+    P6LiteResolver,
+    derive_regime,
+    DELIVERY_MODE_TO_REGIME,
+)
+from symbolu.presentation.p7_lite import (
+    P7LiteResolver,
+    derive_discourse_act,
+    DELIVERY_MODE_TO_DISCOURSE_ACT,
+)
 
 __all__ = [
     # Types (Part 3)
@@ -63,4 +73,12 @@ __all__ = [
     # Engine (Part 7)
     "PresentationEngine",
     "SessionStateManager",
+    # P6-Lite Bridge
+    "P6LiteResolver",
+    "derive_regime",
+    "DELIVERY_MODE_TO_REGIME",
+    # P7-Lite Bridge
+    "P7LiteResolver",
+    "derive_discourse_act",
+    "DELIVERY_MODE_TO_DISCOURSE_ACT",
 ]
