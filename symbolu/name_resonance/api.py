@@ -16,7 +16,7 @@ Usage:
         print(f"{domain.domain_name}: {domain.classification.value}")
 """
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, Any
 
 from symbolu.name_resonance.types import (
     NormalizedInput,
@@ -35,6 +35,12 @@ from symbolu.name_resonance.ontological_bridge import (
     get_ontological_vector,
     project_ontological_to_experiential,
     compute_bridged_profile,
+)
+from symbolu.name_resonance.domain_semantic_profiles import (
+    compute_name_domain_crs,
+    compute_semantic_traits,
+    NameDomainMatchResult,
+    DOMAIN_SEMANTIC_PROFILES,
 )
 
 
@@ -60,6 +66,7 @@ def analyze_name(
     *,
     domains: Optional[Tuple] = None,
     use_ontological_bridge: bool = False,
+    use_crs: bool = False,
     phonetic_weight: float = 0.6,
     ontological_weight: float = 0.4,
 ) -> NameResonanceResult:
@@ -73,9 +80,15 @@ def analyze_name(
         name: The name to analyze (single word or full name)
         domains: Optional tuple of DomainPatterns to match against.
                  Defaults to ALL_DOMAINS (careers + sports).
-        use_ontological_bridge: If True, use 10D ontological layers (C-S-R logic)
-                               bridged to 12D for enhanced analysis.
+        use_ontological_bridge: If True, use 10D ontological layers
+                               bridged to 12D for enhanced structural analysis.
                                Default False for backward compatibility.
+        use_crs: If True, use full C×R×S formula for domain matching:
+                 C = Constraint (ontological alignment)
+                 R = Realization (structural profile match)
+                 S = Semantic type coherence (non-phonemic)
+                 Requires use_ontological_bridge=True to work.
+                 Default False for backward compatibility.
         phonetic_weight: Weight for phonetic 12D component (default 0.6).
                         Only used when use_ontological_bridge=True.
         ontological_weight: Weight for ontological 10D→12D component (default 0.4).
@@ -90,11 +103,18 @@ def analyze_name(
         >>> for dr in result.domain_results[:3]:
         ...     print(f"{dr.domain_name}: {dr.classification.value}")
 
-        >>> # With ontological bridge (enhanced C-S-R phoneme logic)
+        >>> # With ontological bridge (enhanced structural analysis)
         >>> result = analyze_name("Campbell", use_ontological_bridge=True)
+
+        >>> # With full C×R×S formula (complete phoneme logic)
+        >>> result = analyze_name("Campbell", use_ontological_bridge=True, use_crs=True)
     """
     if domains is None:
         domains = ALL_DOMAINS
+
+    # use_crs requires use_ontological_bridge
+    if use_crs and not use_ontological_bridge:
+        use_ontological_bridge = True
 
     # Layer 1: Normalize
     normalized = normalize_input(name)
@@ -105,9 +125,13 @@ def analyze_name(
     # Layer 3: Project to structural profile
     phonetic_profile = project_to_structural_profile(signals)
 
+    # Get ontological vector (needed for bridge and CRS)
+    ontological_vector = None
+    if use_ontological_bridge or use_crs:
+        ontological_vector = get_ontological_vector(name)
+
     if use_ontological_bridge:
         # Enhanced: Combine phonetic 12D with ontological 10D→12D
-        ontological_vector = get_ontological_vector(name)
         ontological_contribution = project_ontological_to_experiential(ontological_vector)
 
         # Compute bridged profile
@@ -141,11 +165,41 @@ def analyze_name(
     # Layer 4: Match domains
     domain_results = match_all_domains(profile, domains)
 
+    # Layer 5 (optional): Apply C×R×S scoring
+    crs_results: Dict[str, NameDomainMatchResult] = {}
+    if use_crs and ontological_vector is not None:
+        # Compute C×R×S for each domain
+        for dr in domain_results:
+            # R = structural match score (normalize to 0-1)
+            r_score = dr.compatibility_score
+
+            # Compute full C×R×S
+            crs_result = compute_name_domain_crs(
+                name=name,
+                domain_name=dr.domain_name,
+                ontological_vector=ontological_vector,
+                structural_match_score=r_score,
+            )
+            crs_results[dr.domain_name] = crs_result
+
+        # Re-sort domain results by CRS score
+        domain_results = tuple(sorted(
+            domain_results,
+            key=lambda dr: crs_results.get(dr.domain_name, NameDomainMatchResult(
+                match_score=0, constraint=0, realization=0, semantic=0,
+                semantic_analysis=None, match_quality="weak", name=name, domain=dr.domain_name
+            )).match_score,
+            reverse=True,
+        ))
+
     # Get summary
     high_compat, low_compat = get_compatibility_summary(domain_results)
 
     # Generate summary text
-    summary = _generate_summary(name, profile, high_compat, low_compat)
+    if use_crs and crs_results:
+        summary = _generate_crs_summary(name, profile, crs_results, high_compat, low_compat)
+    else:
+        summary = _generate_summary(name, profile, high_compat, low_compat)
 
     return NameResonanceResult(
         original_input=name,
@@ -185,6 +239,40 @@ def _generate_summary(
         parts.append(f"Strong/Moderate compatibility: {', '.join(high_compat[:4])}")
     if low_compat:
         parts.append(f"Weak compatibility: {', '.join(low_compat[:3])}")
+
+    return " | ".join(parts)
+
+
+def _generate_crs_summary(
+    name: str,
+    profile: StructuralProfile,
+    crs_results: Dict[str, NameDomainMatchResult],
+    high_compat: Tuple[str, ...],
+    low_compat: Tuple[str, ...],
+) -> str:
+    """Generate human-readable summary with C×R×S scores."""
+    parts = [f"C×R×S Analysis of '{name}':"]
+
+    # Top CRS matches
+    top_crs = sorted(crs_results.values(), key=lambda x: x.match_score, reverse=True)[:3]
+    if top_crs:
+        crs_items = []
+        for crs in top_crs:
+            crs_items.append(
+                f"{crs.domain}={crs.match_score:.2f} "
+                f"(C={crs.constraint:.2f}×R={crs.realization:.2f}×S={crs.semantic:.2f})"
+            )
+        parts.append(f"Top C×R×S: {', '.join(crs_items)}")
+
+    # Semantic traits
+    if top_crs and top_crs[0].semantic_analysis:
+        traits = top_crs[0].semantic_analysis.name_dominant_traits[:3]
+        if traits:
+            parts.append(f"Dominant traits: {', '.join(traits)}")
+
+    # Domain compatibility
+    if high_compat:
+        parts.append(f"Strong/Moderate: {', '.join(high_compat[:4])}")
 
     return " | ".join(parts)
 
