@@ -1,0 +1,8 @@
+# Core dependencies
+fastapi[standard]>=0.100.0
+uvicorn>=0.20.0
+pydantic>=2.0.0
+
+# Computation
+numpy>=1.24.0
+matplotlib>=3.7.0
