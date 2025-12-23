@@ -90,6 +90,40 @@ The Presentation Layer:
 | `previous_dominant_vritti` | enum | Session history | Last turn's dominant mode |
 | `accumulated_smrti` | float | Session state | Staleness accumulation |
 
+### 2.5 V2.7 Experimental Signals (Optional)
+
+These signals are only available when v2.7 is enabled via `V27Config.v2_7_enabled`.
+V2.7 has two modes:
+- **EMA mode:** Standard exponential moving average updates
+- **Bayesian mode (Alpha 2.7):** Full uncertainty quantification with confidence intervals
+
+| Signal | Type | Range | Mode | Source | Meaning |
+|--------|------|-------|------|--------|---------|
+| `v27_enabled` | bool | T/F | Both | `V27Config` | Master switch |
+| `bayesian_mode` | bool | T/F | Both | `V27Config` | Bayesian mode active |
+| `bayesian_confidence` | float | [0,1] | Bayesian only | `BayesianStateRegister` | Reliability of estimates |
+| `credible_interval_width` | float | [0,∞) | Bayesian only | `BayesianPosterior` | Uncertainty width |
+| `cognitive_state` | enum | 6 values | Both | Cognitive Ability Model | thriving/striving/stable/regressing/unstable/neutral |
+| `mirror_balance` | float | [0,1] | Both | Cognitive Ability Model | Self-referential coherence |
+| `cognitive_ambition` | float | [-1,1] | Both | Cognitive Ability Model | Improvement vs regression |
+| `concept_readiness` | float | [0,1] | Both | CRI Module | Concept Readiness Index |
+| `concept_readiness_level` | enum | 5 values | Both | CRI Module | ready/nearly_ready/forming/emerging/not_ready |
+| `primary_cause` | str | layer name | Both | Causal Layer | Which layer caused issues |
+| `causal_attribution` | dict | layer→% | Both | Causal Layer | Attribution percentages |
+| `low_utility_streak` | int | [0,∞) | Both | Self-Improvement | Consecutive low utility observations |
+
+#### V2.7 Signal Availability by Mode
+
+| Signal | v2.7 Disabled | EMA v2.7 | Bayesian v2.7 |
+|--------|---------------|----------|---------------|
+| `bayesian_confidence` | ❌ | ❌ | ✓ |
+| `credible_interval_width` | ❌ | ❌ | ✓ |
+| `cognitive_state` | ❌ | ✓ | ✓ |
+| `mirror_balance` | ❌ | ✓ | ✓ |
+| `concept_readiness` | ❌ | ✓ | ✓ |
+| `primary_cause` | ❌ | ✓ | ✓ |
+| `low_utility_streak` | ❌ | ✓ | ✓ |
+
 ---
 
 ## Part 3: Presentation Directives
@@ -376,7 +410,117 @@ RULE_DEFAULT = PresentationRule(
 )
 ```
 
-### 4.3 Rule Priority Summary
+### 4.3 V2.7 Experimental Rules (Optional)
+
+These rules only fire when v2.7 signals are present in the SignalBundle.
+They check `bundle.has_v27_signals` or `bundle.has_bayesian_signals` before firing.
+
+#### Rule V1: Unreliable Estimate (Priority 98) — Bayesian Only
+
+**Condition:** `has_bayesian_signals AND bayesian_confidence < 0.5`
+
+**Rationale:** Low Bayesian confidence means state estimates are unreliable.
+
+```python
+RULE_UNRELIABLE_ESTIMATE_V27 = PresentationRule(
+    name="unreliable_estimate_v27",
+    priority=98,
+    condition=lambda s: (
+        s.has_bayesian_signals and s.v27.bayesian_confidence < 0.5
+    ),
+    directive=lambda s: PresentationDirective(
+        delivery_mode=DeliveryMode.ACKNOWLEDGING,
+        confidence=ConfidenceIndicator.LOW,
+        behaviors=SuggestedBehaviors(
+            show_reasoning=True,
+            offer_clarification=True,
+        ),
+        explanation=f"Low estimation confidence ({s.v27.bayesian_confidence:.0%})",
+        triggered_rule="unreliable_estimate_v27",
+    ),
+)
+```
+
+#### Rule V2: Regressing State (Priority 88) — EMA or Bayesian
+
+**Condition:** `has_v27_signals AND cognitive_state in {regressing, unstable}`
+
+**Rationale:** Cognitive regression indicates system quality is declining.
+
+```python
+RULE_REGRESSING_STATE_V27 = PresentationRule(
+    name="regressing_state_v27",
+    priority=88,
+    condition=lambda s: (
+        s.has_v27_signals and s.v27.is_regressing
+    ),
+    directive=lambda s: PresentationDirective(
+        delivery_mode=DeliveryMode.CLARIFYING,
+        confidence=ConfidenceIndicator.LOW,
+        behaviors=SuggestedBehaviors(
+            offer_clarification=True,
+            escalate_to_human=True,
+        ),
+        explanation=f"Cognitive state: {s.v27.cognitive_state}",
+        triggered_rule="regressing_state_v27",
+    ),
+)
+```
+
+#### Rule V3: Concept Unstable (Priority 78) — EMA or Bayesian
+
+**Condition:** `has_v27_signals AND concept_readiness < 0.4`
+
+**Rationale:** Concepts not yet stable enough to present confidently.
+
+```python
+RULE_CONCEPT_UNSTABLE_V27 = PresentationRule(
+    name="concept_unstable_v27",
+    priority=78,
+    condition=lambda s: (
+        s.has_v27_signals and s.v27.concept_readiness < 0.4
+    ),
+    directive=lambda s: PresentationDirective(
+        delivery_mode=DeliveryMode.HEDGED,
+        confidence=ConfidenceIndicator.LOW,
+        behaviors=SuggestedBehaviors(
+            offer_clarification=True,
+        ),
+        explanation=f"Concept not yet stable ({s.v27.concept_readiness_level})",
+        triggered_rule="concept_unstable_v27",
+    ),
+)
+```
+
+#### Rule V4: Low Utility Streak (Priority 68) — EMA or Bayesian
+
+**Condition:** `has_v27_signals AND low_utility_streak >= 5`
+
+**Rationale:** Prolonged streak of low utility indicates system needs attention.
+
+```python
+RULE_LOW_UTILITY_STREAK_V27 = PresentationRule(
+    name="low_utility_streak_v27",
+    priority=68,
+    condition=lambda s: (
+        s.has_v27_signals and s.v27.low_utility_streak >= 5
+    ),
+    directive=lambda s: PresentationDirective(
+        delivery_mode=DeliveryMode.ACKNOWLEDGING,
+        confidence=ConfidenceIndicator.MEDIUM,
+        behaviors=SuggestedBehaviors(
+            offer_clarification=True,
+            show_reasoning=True,
+        ),
+        explanation=f"System quality below optimal ({s.v27.low_utility_streak} observations)",
+        triggered_rule="low_utility_streak_v27",
+    ),
+)
+```
+
+### 4.4 Rule Priority Summary
+
+#### Core Rules (Always Active)
 
 | Priority | Rule Name | Trigger Condition |
 |----------|-----------|-------------------|
@@ -388,6 +532,32 @@ RULE_DEFAULT = PresentationRule(
 | 55 | `low_confidence` | Score < 0.4 |
 | 50 | `high_pramana` | Strong valid cognition |
 | 0 | `default` | Fallback |
+
+#### V2.7 Experimental Rules (Only when v2.7 enabled)
+
+| Priority | Rule Name | Mode | Trigger Condition |
+|----------|-----------|------|-------------------|
+| 98 | `unreliable_estimate_v27` | Bayesian only | bayesian_confidence < 0.5 |
+| 88 | `regressing_state_v27` | EMA or Bayesian | cognitive_state in {regressing, unstable} |
+| 78 | `concept_unstable_v27` | EMA or Bayesian | concept_readiness < 0.4 |
+| 68 | `low_utility_streak_v27` | EMA or Bayesian | low_utility_streak >= 5 |
+
+#### Combined Priority Order (when v2.7 enabled)
+
+```
+100: critical_viparyaya
+ 98: unreliable_estimate_v27 (Bayesian only)
+ 95: severe_nidra
+ 88: regressing_state_v27
+ 80: high_vikalpa
+ 78: concept_unstable_v27
+ 70: elevated_smrti
+ 68: low_utility_streak_v27
+ 60: moderate_uncertainty
+ 55: low_confidence
+ 50: high_pramana
+  0: default
+```
 
 ---
 
@@ -567,12 +737,26 @@ class SignalBundle:
     # === Session Context ===
     session: SessionContext
 
+    # === V2.7 Experimental Signals (Optional) ===
+    v27: Optional[V27ExperimentalSignals] = None
+
+    @property
+    def has_v27_signals(self) -> bool:
+        """Check if v2.7 experimental signals are available."""
+        return self.v27 is not None and self.v27.is_available
+
+    @property
+    def has_bayesian_signals(self) -> bool:
+        """Check if Bayesian v2.7 signals are available."""
+        return self.v27 is not None and self.v27.has_bayesian_signals
+
     @classmethod
     def from_cv_result(
         cls,
         result: ChittaVrittiResult,
         inputs: ChittaVrittiInputs,
         session: SessionContext,
+        v27: Optional[V27ExperimentalSignals] = None,
     ) -> "SignalBundle":
         """Construct bundle from CV result and context."""
         return cls(
@@ -590,7 +774,53 @@ class SignalBundle:
             layers_present_count=inputs.count_present_layers(),
             missing_layers=inputs.get_missing_layer_names(),
             session=session,
+            v27=v27,
         )
+
+
+@dataclass
+class V27ExperimentalSignals:
+    """Optional signals from v2.7 experimental features."""
+
+    # Mode flags
+    v27_enabled: bool = False
+    bayesian_mode: bool = False
+
+    # Bayesian only
+    bayesian_confidence: Optional[float] = None
+    credible_interval_width: Optional[float] = None
+
+    # EMA or Bayesian
+    cognitive_state: str = "neutral"
+    mirror_balance: float = 1.0
+    concept_readiness: float = 1.0
+    concept_readiness_level: str = "ready"
+    primary_cause: Optional[str] = None
+    low_utility_streak: int = 0
+
+    @property
+    def is_available(self) -> bool:
+        return self.v27_enabled
+
+    @property
+    def has_bayesian_signals(self) -> bool:
+        return self.v27_enabled and self.bayesian_mode
+
+    @property
+    def is_regressing(self) -> bool:
+        return self.cognitive_state in {"regressing", "unstable"}
+
+    @classmethod
+    def disabled(cls) -> "V27ExperimentalSignals":
+        return cls(v27_enabled=False)
+
+    @classmethod
+    def ema_mode(cls, **kwargs) -> "V27ExperimentalSignals":
+        return cls(v27_enabled=True, bayesian_mode=False, **kwargs)
+
+    @classmethod
+    def bayesian_mode_signals(cls, bayesian_confidence: float, **kwargs) -> "V27ExperimentalSignals":
+        return cls(v27_enabled=True, bayesian_mode=True, bayesian_confidence=bayesian_confidence, **kwargs)
 
 
 @dataclass
@@ -865,11 +1095,13 @@ tests/
 └── unit/
     └── presentation/
         ├── __init__.py
+        ├── test_types.py           # Directive type tests
+        ├── test_signals.py         # Signal bundle tests
         ├── test_rules.py           # Individual rule tests
         ├── test_engine.py          # Engine integration tests
         ├── test_session.py         # Session state tests
         ├── test_tier_configs.py    # Consumer vs Enterprise tests
-        └── test_examples.py        # Example scenario tests
+        └── test_v27_rules.py       # V2.7 experimental rules tests
 ```
 
 ---
@@ -983,6 +1215,103 @@ The system gains the ability to:
 
 ---
 
-*Document version: 1.0*
+---
+
+## Part 14: V2.7 Integration
+
+### 14.1 Constructing V27 Signals from V27Config
+
+```python
+from symbolu.guna_modulation.v27_config import V27Config, UpdateMode
+from symbolu.presentation import V27ExperimentalSignals
+
+def build_v27_signals(
+    v27_config: V27Config,
+    cognitive_state: str = "neutral",
+    concept_readiness: float = 1.0,
+    bayesian_state: Optional[BayesianStateRegister] = None,
+) -> Optional[V27ExperimentalSignals]:
+    """Build V27 signals from config and state."""
+
+    # If v2.7 is disabled, return None
+    if not v27_config.v2_7_enabled:
+        return None
+
+    # Bayesian mode: include confidence from state register
+    if v27_config.is_bayesian and bayesian_state is not None:
+        return V27ExperimentalSignals.bayesian_mode_signals(
+            bayesian_confidence=bayesian_state.overall_confidence,
+            credible_interval_width=bayesian_state.tau_768_posterior.std,
+            cognitive_state=cognitive_state,
+            concept_readiness=concept_readiness,
+        )
+
+    # EMA mode: no Bayesian signals
+    return V27ExperimentalSignals.ema_mode(
+        cognitive_state=cognitive_state,
+        concept_readiness=concept_readiness,
+    )
+```
+
+### 14.2 Complete Integration Flow
+
+```python
+from symbolu.chitta_vritti import ChittaVrittiEngine, ChittaVrittiInputs
+from symbolu.guna_modulation.v27_config import V27Config
+from symbolu.presentation import (
+    PresentationEngine,
+    SignalBundle,
+    SessionStateManager,
+    V27ExperimentalSignals,
+)
+
+# Setup
+v27_config = V27Config.bayesian()  # or V27Config.enterprise_t2()
+cv_engine = ChittaVrittiEngine(config=CV_CONFIG)
+pres_engine = PresentationEngine(config=CONSUMER_PRESENTATION_CONFIG)
+session_mgr = SessionStateManager()
+
+# Per-turn flow with v2.7
+def process_turn_with_v27(
+    inputs: ChittaVrittiInputs,
+    v27_config: V27Config,
+    bayesian_state: Optional[BayesianStateRegister] = None,
+) -> PresentationDirective:
+
+    # 1. Compute CV result
+    cv_result = cv_engine.compute(inputs)
+
+    # 2. Build V27 signals if enabled
+    v27_signals = None
+    if v27_config.v2_7_enabled:
+        v27_signals = V27ExperimentalSignals.bayesian_mode_signals(
+            bayesian_confidence=0.85,  # From state register
+        ) if v27_config.is_bayesian else V27ExperimentalSignals.ema_mode()
+
+    # 3. Update session and build signal bundle
+    session_ctx = session_mgr.update_from_cv(cv_result)
+    signals = SignalBundle.from_cv_result(cv_result, inputs, session_ctx, v27=v27_signals)
+
+    # 4. Compute presentation directive
+    directive = pres_engine.compute(signals)
+
+    return directive
+```
+
+### 14.3 Mode Comparison
+
+| Aspect | v2.7 Disabled | EMA v2.7 | Bayesian v2.7 |
+|--------|---------------|----------|---------------|
+| **Config** | `V27Config.disabled()` | `V27Config.enterprise_t2()` | `V27Config.bayesian()` |
+| **Rule count** | 8 | 12 | 12 |
+| **v27 in bundle** | None | V27ExperimentalSignals | V27ExperimentalSignals |
+| **bayesian_confidence** | N/A | N/A | [0, 1] |
+| **cognitive_state** | N/A | Available | Available |
+| **concept_readiness** | N/A | Available | Available |
+
+---
+
+*Document version: 1.1*
+*Updated: Added v2.7 experimental signal integration (EMA and Bayesian modes)*
 *Prepared for: Presentation Layer design*
-*Status: Ready for review and incremental implementation*
+*Status: Implemented with 267 tests passing*
