@@ -1,7 +1,7 @@
 /**
- * Consumer Tier Product Page
+ * Explorer Tier Product Page
  *
- * Detailed product page for the Consumer tier with comprehensive
+ * Detailed product page for the Explorer tier (RAG Lookup) with comprehensive
  * feature descriptions, design principles, and component showcases.
  */
 
@@ -9,8 +9,8 @@ import React from 'react';
 import {
   ArrowLeft,
   ArrowRight,
-  User,
-  MessageSquare,
+  Search,
+  Database,
   CheckCircle,
   Smartphone,
   Heart,
@@ -47,7 +47,7 @@ export function ConsumerProductPage({ onBack, onTryDemo }: ConsumerProductPagePr
               onClick={onTryDemo}
               className="px-5 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-500 transition-colors"
             >
-              Try Consumer Demo
+              Try Explorer Demo
             </button>
           </div>
         </div>
@@ -58,16 +58,16 @@ export function ConsumerProductPage({ onBack, onTryDemo }: ConsumerProductPagePr
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center gap-4 mb-6">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
-              <User className="w-8 h-8 text-white" />
+              <Search className="w-8 h-8 text-white" />
             </div>
             <div>
-              <span className="text-blue-400 text-sm font-medium">TIER 1</span>
-              <h1 className="text-4xl md:text-5xl font-bold">Consumer Experience</h1>
+              <span className="text-blue-400 text-sm font-medium">TIER 1 · RAG LOOKUP</span>
+              <h1 className="text-4xl md:text-5xl font-bold">Explorer Experience</h1>
             </div>
           </div>
           <p className="text-xl text-gray-400 max-w-3xl mb-8">
-            A simple, intuitive chat experience designed for end users who want straightforward
-            interaction without technical complexity. Focus on conversation, get clear feedback.
+            A simple, intuitive knowledge search experience designed for users who want straightforward
+            RAG-powered queries with quality indicators. Focus on finding answers, get clear feedback.
           </p>
           <div className="flex gap-4">
             <button
@@ -94,7 +94,7 @@ export function ConsumerProductPage({ onBack, onTryDemo }: ConsumerProductPagePr
               {
                 icon: Sparkles,
                 title: 'Simplicity First',
-                description: 'Remove all non-essential elements; focus on conversation',
+                description: 'Remove all non-essential elements; focus on search',
               },
               {
                 icon: Heart,
@@ -144,7 +144,7 @@ export function ConsumerProductPage({ onBack, onTryDemo }: ConsumerProductPagePr
                 <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
                   <MessageSquare className="w-6 h-6 text-blue-400" />
                 </div>
-                <h3 className="text-xl font-semibold">Chat Interface</h3>
+                <h3 className="text-xl font-semibold">Search Interface</h3>
               </div>
               <p className="text-gray-400 mb-6">
                 Clean, familiar message bubbles with clear visual distinction between user and assistant.
@@ -310,7 +310,7 @@ export function ConsumerProductPage({ onBack, onTryDemo }: ConsumerProductPagePr
       {/* CTA */}
       <section className="py-20 px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-6">Ready to Experience Consumer Tier?</h2>
+          <h2 className="text-3xl font-bold mb-6">Ready to Experience Explorer Tier?</h2>
           <p className="text-gray-400 text-lg mb-8">
             Start chatting with Symbol-U's simple, intuitive interface.
           </p>
@@ -318,7 +318,7 @@ export function ConsumerProductPage({ onBack, onTryDemo }: ConsumerProductPagePr
             onClick={onTryDemo}
             className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-500 transition-all shadow-xl shadow-blue-500/25"
           >
-            <span>Try Consumer Demo</span>
+            <span>Try Explorer Demo</span>
             <ArrowRight className="w-5 h-5" />
           </button>
         </div>
@@ -327,7 +327,7 @@ export function ConsumerProductPage({ onBack, onTryDemo }: ConsumerProductPagePr
       {/* Footer */}
       <footer className="py-8 px-6 border-t border-white/5">
         <div className="max-w-6xl mx-auto text-center text-gray-500 text-sm">
-          Symbol-U Consumer Tier | Simple & Intuitive
+          Symbol-U Explorer Tier | RAG Lookup
         </div>
       </footer>
     </div>

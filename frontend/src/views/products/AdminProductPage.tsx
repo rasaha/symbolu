@@ -1,7 +1,7 @@
 /**
- * Admin Tier Product Page
+ * Developer Tier Product Page
  *
- * Detailed product page for the Admin tier with comprehensive
+ * Detailed product page for the Developer tier (Customer Chat) with comprehensive
  * dashboard features, simulations, and diagnostic tools.
  */
 
@@ -9,7 +9,7 @@ import React from 'react';
 import {
   ArrowLeft,
   ArrowRight,
-  Shield,
+  Code,
   LayoutDashboard,
   LineChart,
   AlertTriangle,
@@ -52,7 +52,7 @@ export function AdminProductPage({ onBack, onTryDemo }: AdminProductPageProps) {
               onClick={onTryDemo}
               className="px-5 py-2 rounded-lg bg-orange-600 text-white text-sm font-medium hover:bg-orange-500 transition-colors"
             >
-              Try Admin Demo
+              Try Developer Demo
             </button>
           </div>
         </div>
@@ -63,15 +63,15 @@ export function AdminProductPage({ onBack, onTryDemo }: AdminProductPageProps) {
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center gap-4 mb-6">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-500/25">
-              <Shield className="w-8 h-8 text-white" />
+              <Code className="w-8 h-8 text-white" />
             </div>
             <div>
-              <span className="text-orange-400 text-sm font-medium">TIER 3</span>
-              <h1 className="text-4xl md:text-5xl font-bold">Admin Console</h1>
+              <span className="text-orange-400 text-sm font-medium">TIER 3 · CUSTOMER CHAT</span>
+              <h1 className="text-4xl md:text-5xl font-bold">Developer Console</h1>
             </div>
           </div>
           <p className="text-xl text-gray-400 max-w-3xl mb-8">
-            Full analytics dashboard with comprehensive visibility into the Symbol-U pipeline.
+            Customer-facing chat with full analytics dashboard and comprehensive pipeline visibility.
             Complete diagnostic information, trend analysis, and simulation capabilities.
           </p>
           <div className="flex gap-4">
@@ -91,7 +91,7 @@ export function AdminProductPage({ onBack, onTryDemo }: AdminProductPageProps) {
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-4">Design Principles</h2>
           <p className="text-gray-400 text-center mb-12 max-w-2xl mx-auto">
-            Built for administrators who need complete control and visibility
+            Built for developers managing customer-facing chat with complete control and visibility
           </p>
 
           <div className="grid md:grid-cols-5 gap-6">
@@ -119,7 +119,7 @@ export function AdminProductPage({ onBack, onTryDemo }: AdminProductPageProps) {
               {
                 icon: Shield,
                 title: 'Professional/Technical',
-                description: 'Orange/amber theme for admin authority',
+                description: 'Orange/amber theme for developer tools',
               },
             ].map((principle, i) => (
               <div key={i} className="text-center">
@@ -491,13 +491,13 @@ export function AdminProductPage({ onBack, onTryDemo }: AdminProductPageProps) {
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl font-bold mb-6">Ready for Full Control?</h2>
           <p className="text-gray-400 text-lg mb-8">
-            Experience the complete Admin console with all analytics and simulation tools.
+            Experience the complete Developer console for customer chat with all analytics and simulation tools.
           </p>
           <button
             onClick={onTryDemo}
             className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-orange-600 text-white font-semibold hover:bg-orange-500 transition-all shadow-xl shadow-orange-500/25"
           >
-            <span>Try Admin Demo</span>
+            <span>Try Developer Demo</span>
             <ArrowRight className="w-5 h-5" />
           </button>
         </div>
@@ -506,7 +506,7 @@ export function AdminProductPage({ onBack, onTryDemo }: AdminProductPageProps) {
       {/* Footer */}
       <footer className="py-8 px-6 border-t border-white/5">
         <div className="max-w-6xl mx-auto text-center text-gray-500 text-sm">
-          Symbol-U Admin Tier | Full Analytics Dashboard
+          Symbol-U Developer Tier | Customer Chat
         </div>
       </footer>
     </div>

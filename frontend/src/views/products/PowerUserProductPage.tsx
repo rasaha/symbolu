@@ -1,7 +1,7 @@
 /**
- * Power User Tier Product Page
+ * Analyst Tier Product Page
  *
- * Detailed product page for the Power User tier with comprehensive
+ * Detailed product page for the Analyst tier (Enterprise Chat) with comprehensive
  * feature descriptions focusing on insights, metrics, and layers.
  */
 
@@ -46,7 +46,7 @@ export function PowerUserProductPage({ onBack, onTryDemo }: PowerUserProductPage
               onClick={onTryDemo}
               className="px-5 py-2 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-500 transition-colors"
             >
-              Try Power User Demo
+              Try Analyst Demo
             </button>
           </div>
         </div>
@@ -60,12 +60,12 @@ export function PowerUserProductPage({ onBack, onTryDemo }: PowerUserProductPage
               <Layers className="w-8 h-8 text-white" />
             </div>
             <div>
-              <span className="text-purple-400 text-sm font-medium">TIER 2</span>
-              <h1 className="text-4xl md:text-5xl font-bold">Power User Experience</h1>
+              <span className="text-purple-400 text-sm font-medium">TIER 2 · ENTERPRISE CHAT</span>
+              <h1 className="text-4xl md:text-5xl font-bold">Analyst Experience</h1>
             </div>
           </div>
           <p className="text-xl text-gray-400 max-w-3xl mb-8">
-            An enhanced analytical experience with deeper insights into response quality,
+            An enterprise chat experience for internal employees with deeper insights into response quality,
             semantic layers, and cognitive metrics. Understand the "why" behind every response.
           </p>
           <div className="flex gap-4">
@@ -393,13 +393,13 @@ export function PowerUserProductPage({ onBack, onTryDemo }: PowerUserProductPage
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl font-bold mb-6">Ready to Explore Deeper Insights?</h2>
           <p className="text-gray-400 text-lg mb-8">
-            Experience the Power User tier with full layer analysis and metrics.
+            Experience the Analyst tier with full layer analysis and metrics for internal employees.
           </p>
           <button
             onClick={onTryDemo}
             className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-500 transition-all shadow-xl shadow-purple-500/25"
           >
-            <span>Try Power User Demo</span>
+            <span>Try Analyst Demo</span>
             <ArrowRight className="w-5 h-5" />
           </button>
         </div>
@@ -408,7 +408,7 @@ export function PowerUserProductPage({ onBack, onTryDemo }: PowerUserProductPage
       {/* Footer */}
       <footer className="py-8 px-6 border-t border-white/5">
         <div className="max-w-6xl mx-auto text-center text-gray-500 text-sm">
-          Symbol-U Power User Tier | Enhanced Insights
+          Symbol-U Analyst Tier | Enterprise Chat
         </div>
       </footer>
     </div>
