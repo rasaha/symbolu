@@ -4,6 +4,7 @@
 
 // Common components
 export { Header } from './common/Header';
+export { QueryGuide } from './QueryGuide';
 
 // Chat components
 export { MessageBubble } from './chat/MessageBubble';

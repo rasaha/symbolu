@@ -2,15 +2,18 @@
  * Header Component
  *
  * Top navigation bar with tier-aware styling and navigation.
+ * Includes Query Guide button for demo assistance.
  */
 
 import React from 'react';
 import type { PresentationTier } from '@/api/types';
+import { QueryGuide } from '@/components/QueryGuide';
 
 interface HeaderProps {
   tier: PresentationTier;
   onTierChange?: (tier: PresentationTier) => void;
   showTierSelector?: boolean;
+  showQueryGuide?: boolean;
 }
 
 const TIER_STYLES: Record<PresentationTier, { bg: string; accent: string; label: string }> = {
@@ -31,7 +34,7 @@ const TIER_STYLES: Record<PresentationTier, { bg: string; accent: string; label:
   },
 };
 
-export function Header({ tier, onTierChange, showTierSelector = true }: HeaderProps) {
+export function Header({ tier, onTierChange, showTierSelector = true, showQueryGuide = true }: HeaderProps) {
   const style = TIER_STYLES[tier];
 
   return (
@@ -49,21 +52,27 @@ export function Header({ tier, onTierChange, showTierSelector = true }: HeaderPr
             </div>
           </div>
 
-          {/* Tier Selector */}
-          {showTierSelector && onTierChange && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm opacity-80">Tier:</span>
-              <select
-                value={tier}
-                onChange={(e) => onTierChange(e.target.value as PresentationTier)}
-                className="bg-white/20 border border-white/30 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-white/50"
-              >
-                <option value="consumer">Consumer</option>
-                <option value="power_user">Power User</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-          )}
+          {/* Right Side Actions */}
+          <div className="flex items-center gap-4">
+            {/* Query Guide */}
+            {showQueryGuide && <QueryGuide tier={tier} />}
+
+            {/* Tier Selector */}
+            {showTierSelector && onTierChange && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm opacity-80">Tier:</span>
+                <select
+                  value={tier}
+                  onChange={(e) => onTierChange(e.target.value as PresentationTier)}
+                  className="bg-white/20 border border-white/30 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-white/50"
+                >
+                  <option value="consumer">Consumer</option>
+                  <option value="power_user">Power User</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

@@ -19,13 +19,15 @@ import {
   BarChart3,
   MessageSquare,
   Workflow,
+  Package,
 } from 'lucide-react';
 
 interface HomePageProps {
   onEnterDemo: () => void;
+  onGoToProducts?: () => void;
 }
 
-export function HomePage({ onEnterDemo }: HomePageProps) {
+export function HomePage({ onEnterDemo, onGoToProducts }: HomePageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white overflow-x-hidden">
       {/* Navigation */}
@@ -38,12 +40,23 @@ export function HomePage({ onEnterDemo }: HomePageProps) {
               </div>
               <span className="text-xl font-bold">Symbol-U</span>
             </div>
-            <button
-              onClick={onEnterDemo}
-              className="px-5 py-2 rounded-lg bg-white/10 text-white text-sm font-medium hover:bg-white/20 transition-colors"
-            >
-              Try Demo
-            </button>
+            <div className="flex items-center gap-3">
+              {onGoToProducts && (
+                <button
+                  onClick={onGoToProducts}
+                  className="flex items-center gap-2 px-5 py-2 rounded-lg text-gray-300 text-sm font-medium hover:text-white transition-colors"
+                >
+                  <Package className="w-4 h-4" />
+                  Products
+                </button>
+              )}
+              <button
+                onClick={onEnterDemo}
+                className="px-5 py-2 rounded-lg bg-white/10 text-white text-sm font-medium hover:bg-white/20 transition-colors"
+              >
+                Try Demo
+              </button>
+            </div>
           </div>
         </div>
       </nav>

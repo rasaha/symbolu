@@ -5,6 +5,8 @@
  *
  * Pages:
  * - Home: Introduction to Symbol-U with vision and demo link
+ * - Products: Product overview page with tier comparisons
+ * - Product Detail: Individual tier product pages with detailed features
  * - Tier Selector: Choose between Consumer, Power User, or Admin
  * - Consumer: Simple chat with badges & hints
  * - Power User: Chat + insights panel with metrics
@@ -14,13 +16,15 @@
 import React, { useState, useEffect } from 'react';
 import type { PresentationTier } from '@/api/types';
 import { HomePage } from '@/views/HomePage';
+import { ProductsPage } from '@/views/ProductsPage';
+import { ConsumerProductPage, PowerUserProductPage, AdminProductPage } from '@/views/products';
 import { ConsumerTierPage } from '@/views/ConsumerTierPage';
 import { PowerUserTierPage } from '@/views/PowerUserTierPage';
 import { AdminTierPage } from '@/views/AdminTierPage';
 import { useChatStore } from '@/stores/chatStore';
-import { Layers, User, Shield, Home, ArrowLeft } from 'lucide-react';
+import { Layers, User, Shield, Home, ArrowLeft, Package } from 'lucide-react';
 
-type AppPage = 'home' | 'selector' | 'tier';
+type AppPage = 'home' | 'products' | 'product_detail' | 'selector' | 'tier';
 
 // Landing page for tier selection
 function TierSelector({
@@ -162,6 +166,7 @@ function TierSelector({
 export function App() {
   const [currentPage, setCurrentPage] = useState<AppPage>('home');
   const [selectedTier, setSelectedTier] = useState<PresentationTier | null>(null);
+  const [selectedProductTier, setSelectedProductTier] = useState<PresentationTier | null>(null);
   const setTier = useChatStore((state) => state.setTier);
 
   // Check URL for page/tier parameters
@@ -169,23 +174,33 @@ export function App() {
     const params = new URLSearchParams(window.location.search);
     const pageParam = params.get('page');
     const tierParam = params.get('tier');
+    const productParam = params.get('product');
 
     if (tierParam && ['consumer', 'power_user', 'admin'].includes(tierParam)) {
       setSelectedTier(tierParam as PresentationTier);
       setTier(tierParam as PresentationTier);
       setCurrentPage('tier');
+    } else if (productParam && ['consumer', 'power_user', 'admin'].includes(productParam)) {
+      setSelectedProductTier(productParam as PresentationTier);
+      setCurrentPage('product_detail');
+    } else if (pageParam === 'products') {
+      setCurrentPage('products');
     } else if (pageParam === 'demo') {
       setCurrentPage('selector');
     }
   }, [setTier]);
 
   // Update URL helper
-  const updateURL = (page: AppPage, tier?: PresentationTier) => {
+  const updateURL = (page: AppPage, tier?: PresentationTier, product?: PresentationTier) => {
     const url = new URL(window.location.href);
     url.search = '';
 
     if (page === 'tier' && tier) {
       url.searchParams.set('tier', tier);
+    } else if (page === 'product_detail' && product) {
+      url.searchParams.set('product', product);
+    } else if (page === 'products') {
+      url.searchParams.set('page', 'products');
     } else if (page === 'selector') {
       url.searchParams.set('page', 'demo');
     }
@@ -199,12 +214,25 @@ export function App() {
     updateURL('selector');
   };
 
+  // Handle navigating to products page
+  const handleGoToProducts = () => {
+    setCurrentPage('products');
+    updateURL('products');
+  };
+
   // Handle tier selection
   const handleSelectTier = (tier: PresentationTier) => {
     setSelectedTier(tier);
     setTier(tier);
     setCurrentPage('tier');
     updateURL('tier', tier);
+  };
+
+  // Handle product tier selection (Learn More)
+  const handleSelectProductTier = (tier: PresentationTier) => {
+    setSelectedProductTier(tier);
+    setCurrentPage('product_detail');
+    updateURL('product_detail', undefined, tier);
   };
 
   // Handle back to tier selector
@@ -214,19 +242,62 @@ export function App() {
     updateURL('selector');
   };
 
+  // Handle back to products
+  const handleBackToProducts = () => {
+    setSelectedProductTier(null);
+    setCurrentPage('products');
+    updateURL('products');
+  };
+
   // Handle back to home
   const handleBackToHome = () => {
     setSelectedTier(null);
+    setSelectedProductTier(null);
     setCurrentPage('home');
     updateURL('home');
   };
 
   // Render based on current page
   if (currentPage === 'home') {
-    return <HomePage onEnterDemo={handleEnterDemo} />;
+    return <HomePage onEnterDemo={handleEnterDemo} onGoToProducts={handleGoToProducts} />;
   }
 
-  if (currentPage === 'selector' || !selectedTier) {
+  if (currentPage === 'products') {
+    return (
+      <ProductsPage
+        onSelectProductTier={handleSelectProductTier}
+        onTryDemo={handleSelectTier}
+        onBackToHome={handleBackToHome}
+      />
+    );
+  }
+
+  if (currentPage === 'product_detail' && selectedProductTier) {
+    const productComponents: Record<PresentationTier, React.ReactNode> = {
+      consumer: (
+        <ConsumerProductPage
+          onTryDemo={() => handleSelectTier('consumer')}
+          onBack={handleBackToProducts}
+        />
+      ),
+      power_user: (
+        <PowerUserProductPage
+          onTryDemo={() => handleSelectTier('power_user')}
+          onBack={handleBackToProducts}
+        />
+      ),
+      admin: (
+        <AdminProductPage
+          onTryDemo={() => handleSelectTier('admin')}
+          onBack={handleBackToProducts}
+        />
+      ),
+    };
+
+    return productComponents[selectedProductTier];
+  }
+
+  if (currentPage === 'selector' || (!selectedTier && currentPage !== 'product_detail')) {
     return (
       <TierSelector
         onSelectTier={handleSelectTier}
@@ -263,7 +334,7 @@ export function App() {
       </div>
 
       {/* Tier Page */}
-      {tierComponents[selectedTier]}
+      {tierComponents[selectedTier!]}
     </div>
   );
 }
