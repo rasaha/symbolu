@@ -643,6 +643,9 @@ class V27Config:
     persistence_config: StatePersistenceConfig = field(
         default_factory=lambda: DEFAULT_PERSISTENCE_CONFIG
     )
+    # v2.7.4: Recursive self-improvement configuration
+    self_improvement_enabled: bool = False  # Master switch (separate from config)
+    self_improvement_config: "SelfImprovementConfig" = None  # Populated via factory
 
     @property
     def alpha(self) -> float:
@@ -729,6 +732,48 @@ class V27Config:
             bayesian_config=BayesianConfig(prior_strength=prior_strength),
         )
 
+    @classmethod
+    def with_self_improvement(
+        cls,
+        tier: str = TIER_ENTERPRISE_2,
+        bayesian: bool = True,
+        auto_improve: bool = False,
+        improvement_threshold: float = 0.6,
+    ) -> "V27Config":
+        """
+        Create configuration with recursive self-improvement enabled (v2.7.4).
+
+        Args:
+            tier: Tier for learning rate configuration
+            bayesian: Use Bayesian mode (recommended for self-improvement)
+            auto_improve: Automatically execute improvements
+            improvement_threshold: Minimum priority to execute
+
+        Returns:
+            V27Config with self-improvement enabled
+        """
+        from symbolu.guna_modulation.v27_config import SelfImprovementConfig
+
+        return cls(
+            v2_7_enabled=True,
+            update_mode=UpdateMode.BAYESIAN if bayesian else UpdateMode.EMA,
+            alpha_config=get_alpha_for_tier(tier),
+            self_improvement_enabled=True,
+            self_improvement_config=SelfImprovementConfig(
+                enabled=True,
+                auto_improve=auto_improve,
+                improvement_threshold=improvement_threshold,
+            ),
+        )
+
+    @property
+    def is_self_improving(self) -> bool:
+        """Check if self-improvement is enabled."""
+        return self.self_improvement_enabled and (
+            self.self_improvement_config is not None and
+            self.self_improvement_config.enabled
+        )
+
 
 # Pre-built configurations
 DEFAULT_V27_CONFIG = V27Config.disabled()
@@ -742,3 +787,62 @@ BAYESIAN_V27_CONFIG = V27Config.bayesian()
 BAYESIAN_ENTERPRISE_T1 = V27Config.enterprise_t1(bayesian=True)
 BAYESIAN_ENTERPRISE_T2 = V27Config.enterprise_t2(bayesian=True)
 BAYESIAN_CONSUMER = V27Config.consumer(bayesian=True)
+
+
+# =============================================================================
+# Self-Improvement Configuration (v2.7.4)
+# =============================================================================
+
+@dataclass(frozen=True)
+class SelfImprovementConfig:
+    """
+    Configuration for recursive self-improvement.
+
+    Controls whether and how the system can modify its own
+    coefficients and beliefs based on utility observations.
+
+    Attributes:
+        enabled: Master switch for self-improvement
+        auto_improve: Automatically execute improvements (vs manual approval)
+        improvement_threshold: Minimum priority to execute (0.0-1.0)
+        observation_window: Number of observations before improvement cycle
+        max_coefficient_change: Maximum coefficient adjustment per cycle
+        enable_conservative_mode: Allow system to enter conservative mode
+        persist_improvements: Save learned improvements across sessions
+    """
+    enabled: bool = False  # Off by default for safety
+    auto_improve: bool = False  # Require approval by default
+    improvement_threshold: float = 0.6
+    observation_window: int = 100  # Run improvement cycle every N observations
+    max_coefficient_change: float = 0.2  # Max 20% change per cycle
+    enable_conservative_mode: bool = True
+    persist_improvements: bool = True
+
+    def __post_init__(self):
+        """Validate configuration."""
+        if not (0.0 <= self.improvement_threshold <= 1.0):
+            raise ValueError(
+                f"improvement_threshold must be in [0, 1], got {self.improvement_threshold}"
+            )
+        if self.observation_window < 10:
+            raise ValueError(
+                f"observation_window must be >= 10, got {self.observation_window}"
+            )
+        if not (0.0 < self.max_coefficient_change <= 0.5):
+            raise ValueError(
+                f"max_coefficient_change must be in (0, 0.5], got {self.max_coefficient_change}"
+            )
+
+
+# Default self-improvement configs
+DEFAULT_SELF_IMPROVEMENT_CONFIG = SelfImprovementConfig(enabled=False)
+ENABLED_SELF_IMPROVEMENT_CONFIG = SelfImprovementConfig(
+    enabled=True,
+    auto_improve=False,  # Manual approval
+    improvement_threshold=0.7,
+)
+AUTO_SELF_IMPROVEMENT_CONFIG = SelfImprovementConfig(
+    enabled=True,
+    auto_improve=True,
+    improvement_threshold=0.6,
+)
