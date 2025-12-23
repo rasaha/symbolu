@@ -342,13 +342,18 @@ class NameAnalyzeRequest(BaseModel if PYDANTIC_AVAILABLE else object):
 
     Attributes:
         name: Name to analyze
-        use_ontological_bridge: Use 10D ontological C-S-R phoneme logic (enhanced)
+        use_ontological_bridge: Use 10D ontological layers bridged to 12D
+        use_crs: Use full C×R×S formula (Constraint × Realization × Semantic)
     """
     if PYDANTIC_AVAILABLE:
         name: str = Field(..., description="Name to analyze")
         use_ontological_bridge: bool = Field(
             default=False,
-            description="Use 10D ontological layers (C-S-R logic) bridged to 12D for enhanced analysis"
+            description="Use 10D ontological layers bridged to 12D for enhanced structural analysis"
+        )
+        use_crs: bool = Field(
+            default=False,
+            description="Use full C×R×S formula: C=Constraint, R=Realization, S=Semantic type coherence"
         )
 
 
