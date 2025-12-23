@@ -1,9 +1,11 @@
 /**
  * Symbol-U Frontend App
  *
- * Main application with three-tier UX routing.
- * Each tier provides progressively more features:
+ * Main application with home page and three-tier UX routing.
  *
+ * Pages:
+ * - Home: Introduction to Symbol-U with vision and demo link
+ * - Tier Selector: Choose between Consumer, Power User, or Admin
  * - Consumer: Simple chat with badges & hints
  * - Power User: Chat + insights panel with metrics
  * - Admin: Full dashboard with analytics & simulations
@@ -11,25 +13,43 @@
 
 import React, { useState, useEffect } from 'react';
 import type { PresentationTier } from '@/api/types';
+import { HomePage } from '@/views/HomePage';
 import { ConsumerTierPage } from '@/views/ConsumerTierPage';
 import { PowerUserTierPage } from '@/views/PowerUserTierPage';
 import { AdminTierPage } from '@/views/AdminTierPage';
 import { useChatStore } from '@/stores/chatStore';
-import { Layers, User, Shield, Settings } from 'lucide-react';
+import { Layers, User, Shield, Home, ArrowLeft } from 'lucide-react';
+
+type AppPage = 'home' | 'selector' | 'tier';
 
 // Landing page for tier selection
-function TierSelector({ onSelectTier }: { onSelectTier: (tier: PresentationTier) => void }) {
+function TierSelector({
+  onSelectTier,
+  onBackToHome,
+}: {
+  onSelectTier: (tier: PresentationTier) => void;
+  onBackToHome: () => void;
+}) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-slate-900 flex items-center justify-center p-6">
       <div className="max-w-4xl w-full">
+        {/* Back to Home */}
+        <button
+          onClick={onBackToHome}
+          className="flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-sm">Back to Home</span>
+        </button>
+
         {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 mb-6 shadow-2xl">
             <Layers className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-4xl font-bold text-white mb-4">Symbol-U</h1>
+          <h1 className="text-4xl font-bold text-white mb-4">Choose Your Experience</h1>
           <p className="text-gray-400 text-lg max-w-md mx-auto">
-            Choose your experience level to begin exploring
+            Select the tier that matches your needs. Each tier provides progressively more features and insights.
           </p>
         </div>
 
@@ -140,43 +160,82 @@ function TierSelector({ onSelectTier }: { onSelectTier: (tier: PresentationTier)
 
 // Main App Component
 export function App() {
+  const [currentPage, setCurrentPage] = useState<AppPage>('home');
   const [selectedTier, setSelectedTier] = useState<PresentationTier | null>(null);
   const setTier = useChatStore((state) => state.setTier);
 
-  // Check URL for tier parameter
+  // Check URL for page/tier parameters
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const pageParam = params.get('page');
     const tierParam = params.get('tier');
+
     if (tierParam && ['consumer', 'power_user', 'admin'].includes(tierParam)) {
       setSelectedTier(tierParam as PresentationTier);
       setTier(tierParam as PresentationTier);
+      setCurrentPage('tier');
+    } else if (pageParam === 'demo') {
+      setCurrentPage('selector');
     }
   }, [setTier]);
+
+  // Update URL helper
+  const updateURL = (page: AppPage, tier?: PresentationTier) => {
+    const url = new URL(window.location.href);
+    url.search = '';
+
+    if (page === 'tier' && tier) {
+      url.searchParams.set('tier', tier);
+    } else if (page === 'selector') {
+      url.searchParams.set('page', 'demo');
+    }
+
+    window.history.pushState({}, '', url.toString());
+  };
+
+  // Handle entering demo (tier selector)
+  const handleEnterDemo = () => {
+    setCurrentPage('selector');
+    updateURL('selector');
+  };
 
   // Handle tier selection
   const handleSelectTier = (tier: PresentationTier) => {
     setSelectedTier(tier);
     setTier(tier);
-    // Update URL without reload
-    const url = new URL(window.location.href);
-    url.searchParams.set('tier', tier);
-    window.history.pushState({}, '', url.toString());
+    setCurrentPage('tier');
+    updateURL('tier', tier);
   };
 
-  // Handle back to tier selection
+  // Handle back to tier selector
   const handleBackToSelector = () => {
     setSelectedTier(null);
-    const url = new URL(window.location.href);
-    url.searchParams.delete('tier');
-    window.history.pushState({}, '', url.toString());
+    setCurrentPage('selector');
+    updateURL('selector');
   };
 
-  // Render tier selector if no tier selected
-  if (!selectedTier) {
-    return <TierSelector onSelectTier={handleSelectTier} />;
+  // Handle back to home
+  const handleBackToHome = () => {
+    setSelectedTier(null);
+    setCurrentPage('home');
+    updateURL('home');
+  };
+
+  // Render based on current page
+  if (currentPage === 'home') {
+    return <HomePage onEnterDemo={handleEnterDemo} />;
   }
 
-  // Render appropriate tier page with back navigation
+  if (currentPage === 'selector' || !selectedTier) {
+    return (
+      <TierSelector
+        onSelectTier={handleSelectTier}
+        onBackToHome={handleBackToHome}
+      />
+    );
+  }
+
+  // Render appropriate tier page with navigation
   const tierComponents: Record<PresentationTier, React.ReactNode> = {
     consumer: <ConsumerTierPage />,
     power_user: <PowerUserTierPage />,
@@ -185,13 +244,23 @@ export function App() {
 
   return (
     <div className="relative">
-      {/* Back Button */}
-      <button
-        onClick={handleBackToSelector}
-        className="fixed top-4 left-4 z-50 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/20 backdrop-blur text-white/80 text-xs font-medium hover:bg-black/30 transition-colors"
-      >
-        ← Change Tier
-      </button>
+      {/* Navigation Buttons */}
+      <div className="fixed top-4 left-4 z-50 flex items-center gap-2">
+        <button
+          onClick={handleBackToHome}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/20 backdrop-blur text-white/80 text-xs font-medium hover:bg-black/30 transition-colors"
+          title="Back to Home"
+        >
+          <Home className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={handleBackToSelector}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/20 backdrop-blur text-white/80 text-xs font-medium hover:bg-black/30 transition-colors"
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Change Tier</span>
+        </button>
+      </div>
 
       {/* Tier Page */}
       {tierComponents[selectedTier]}
