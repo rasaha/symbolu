@@ -37,6 +37,10 @@ Endpoints:
         POST /demo/name/compare - Compare two names' profiles
         POST /demo/name/quick-match - Quick domain compatibility check
 
+    Chat Endpoints (LLM-powered with tier-based model selection):
+        POST /chat - Chat with LLM (Anthropic Claude or Google Gemini)
+        GET /chat/providers - Get available LLM providers and tier info
+
     Health:
         GET /health - Health check
 
@@ -100,6 +104,10 @@ from symbolu.service.request_models import (
     NameCompareResponse,
     QuickMatchRequest,
     QuickMatchResponse,
+    # Chat models
+    ChatRequest,
+    ChatResponse as ChatAPIResponse,
+    ChatMessageModel,
     PYDANTIC_AVAILABLE
 )
 
@@ -1481,6 +1489,180 @@ def create_app() -> "FastAPI":
                 status_code=500,
                 detail=f"Quick match failed: {str(e)}"
             )
+
+    # ========================================================================
+    # CHAT ENDPOINTS - LLM Chat with Tier-based Model Selection
+    # ========================================================================
+
+    @app.post("/chat", response_model=ChatAPIResponse)
+    async def chat_endpoint(req: ChatRequest, request: Request) -> Dict[str, Any]:
+        """
+        Chat with LLM using tier-based model selection.
+
+        This endpoint provides chat functionality with automatic model selection
+        based on presentation tier:
+
+        - **Explorer (consumer)**: Uses fast, cheap models (Haiku/Flash)
+          Optimized for quick knowledge lookups with simple responses.
+
+        - **Analyst (power_user)**: Uses balanced models (Sonnet/Pro)
+          For enterprise chat with detailed, well-structured responses.
+
+        - **Developer (admin)**: Uses best models (Sonnet/Pro)
+          For customer chat with comprehensive analytics and insights.
+
+        Supported providers:
+        - **anthropic**: Claude 3.5 Haiku (fast) / Claude 3.5 Sonnet (balanced)
+        - **google**: Gemini 1.5 Flash (fast) / Gemini 1.5 Pro (balanced)
+
+        Args:
+            req: ChatRequest with message, tier, history, and options
+            request: FastAPI Request object (for security checks)
+
+        Returns:
+            ChatAPIResponse with generated content, model info, and usage stats
+
+        Example:
+            POST /chat
+            {
+                "message": "Explain quantum entanglement",
+                "tier": "power_user",
+                "provider": "anthropic"
+            }
+            -> {"content": "...", "model": "claude-3-5-sonnet-...", ...}
+        """
+        # Security layer (optional, non-invasive)
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
+        try:
+            # Import chat service
+            from symbolu.service.chat_service import ChatService, ChatMessage
+
+            # Initialize service
+            service = ChatService(provider=req.provider)
+
+            # Convert history if provided
+            history = None
+            if req.history:
+                history = [
+                    ChatMessage(role=msg.role, content=msg.content)
+                    for msg in req.history
+                ]
+
+            # Generate response
+            response = await service.chat(
+                message=req.message,
+                tier=req.tier,
+                history=history,
+                system_prompt=req.system_prompt,
+                provider=req.provider,
+                max_tokens=req.max_tokens,
+                temperature=req.temperature,
+            )
+
+            return {
+                "content": response.content,
+                "model": response.model,
+                "provider": response.provider,
+                "tier": response.tier,
+                "usage": response.usage,
+                "semantic_analysis": response.semantic_analysis,
+            }
+
+        except ValueError as e:
+            # API key or provider configuration errors
+            raise HTTPException(
+                status_code=400,
+                detail=str(e)
+            )
+        except ImportError as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"LLM provider package not installed: {str(e)}"
+            )
+        except Exception as e:
+            logger.error(f"Error in /chat: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Chat failed: {str(e)}"
+            )
+
+    @app.get("/chat/providers")
+    def get_chat_providers(request: Request) -> Dict[str, Any]:
+        """
+        Get available LLM providers and their status.
+
+        Returns:
+            Dict with available providers, default provider, and tier info
+
+        Example:
+            GET /chat/providers
+            -> {
+                "available_providers": ["anthropic", "google"],
+                "default_provider": "anthropic",
+                "tiers": {...}
+            }
+        """
+        verify_api_key(request)
+
+        try:
+            from symbolu.llm.providers import (
+                LLMClient,
+                ANTHROPIC_MODELS,
+                GOOGLE_MODELS,
+                PRESENTATION_TIER_MAP,
+            )
+            import os
+
+            # Check which providers are configured
+            providers = []
+            if os.getenv("ANTHROPIC_API_KEY"):
+                providers.append("anthropic")
+            if os.getenv("GOOGLE_API_KEY"):
+                providers.append("google")
+
+            default_provider = os.getenv("LLM_PROVIDER", "anthropic")
+            if default_provider not in providers and providers:
+                default_provider = providers[0]
+
+            return {
+                "available_providers": providers,
+                "default_provider": default_provider,
+                "tiers": {
+                    "consumer": {
+                        "label": "Explorer",
+                        "description": "Fast RAG lookup with simple responses",
+                        "models": {
+                            "anthropic": ANTHROPIC_MODELS.get("fast", "claude-3-5-haiku"),
+                            "google": GOOGLE_MODELS.get("fast", "gemini-1.5-flash"),
+                        }
+                    },
+                    "power_user": {
+                        "label": "Analyst",
+                        "description": "Enterprise chat with detailed insights",
+                        "models": {
+                            "anthropic": ANTHROPIC_MODELS.get("balanced", "claude-3-5-sonnet"),
+                            "google": GOOGLE_MODELS.get("balanced", "gemini-1.5-pro"),
+                        }
+                    },
+                    "admin": {
+                        "label": "Developer",
+                        "description": "Customer chat with full analytics",
+                        "models": {
+                            "anthropic": ANTHROPIC_MODELS.get("balanced", "claude-3-5-sonnet"),
+                            "google": GOOGLE_MODELS.get("balanced", "gemini-1.5-pro"),
+                        }
+                    },
+                },
+            }
+
+        except ImportError:
+            return {
+                "available_providers": [],
+                "default_provider": None,
+                "error": "LLM providers not installed. Run: pip install anthropic google-generativeai",
+            }
 
     return app
 

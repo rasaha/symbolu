@@ -43,6 +43,34 @@ from symbolu.llm.validator import (
     validate_no_governance_override,
 )
 
+# LLM Provider imports (optional - may not have API keys configured)
+try:
+    from symbolu.llm.providers import (
+        LLMClient,
+        LLMMessage,
+        LLMResponse,
+        StreamChunk,
+        LLMProvider,
+        ModelTier,
+        AnthropicProvider,
+        GoogleProvider,
+        get_llm_client,
+        generate,
+    )
+    _PROVIDERS_AVAILABLE = True
+except (ImportError, ValueError):
+    _PROVIDERS_AVAILABLE = False
+    LLMClient = None
+    LLMMessage = None
+    LLMResponse = None
+    StreamChunk = None
+    LLMProvider = None
+    ModelTier = None
+    AnthropicProvider = None
+    GoogleProvider = None
+    get_llm_client = None
+    generate = None
+
 __all__ = [
     # Types
     "RenderMode",
@@ -69,4 +97,16 @@ __all__ = [
     "validate_provenance",
     "validate_no_selection",
     "validate_no_governance_override",
+    # LLM Providers (optional)
+    "LLMClient",
+    "LLMMessage",
+    "LLMResponse",
+    "StreamChunk",
+    "LLMProvider",
+    "ModelTier",
+    "AnthropicProvider",
+    "GoogleProvider",
+    "get_llm_client",
+    "generate",
+    "_PROVIDERS_AVAILABLE",
 ]
