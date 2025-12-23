@@ -486,12 +486,20 @@ class TestGroupC_PersonaEngine:
     """Test suite for persona engine integration."""
 
     def test_persona_response_has_predictive_drift_profile(self):
-        """Test that PersonaResponse has predictive_drift_profile field."""
+        """Test that PersonaResponse has predictive_drift_profile field.
+
+        Note: In fallback mode (no Pydantic), use hasattr instead of model_fields.
+        """
         from symbolu.mechanical.persona.models import PersonaResponse
 
-        # PersonaResponse is a Pydantic model, use model_fields
-        field_names = list(PersonaResponse.model_fields.keys())
-        assert "predictive_drift_profile" in field_names
+        # Check for model_fields (Pydantic v2) or use hasattr (fallback)
+        if hasattr(PersonaResponse, 'model_fields'):
+            field_names = list(PersonaResponse.model_fields.keys())
+            assert "predictive_drift_profile" in field_names
+        else:
+            # In fallback mode, check via class annotations or __dataclass_fields__
+            annotations = getattr(PersonaResponse, '__annotations__', {})
+            assert "predictive_drift_profile" in annotations
 
     def test_persona_engine_extraction_method(self):
         """Test that PersonaEngine has _extract_predictive_drift_from_coherence method."""

@@ -1,14 +1,14 @@
 {
-  "timestamp": "2025-12-21T00:51:41.611145Z",
+  "timestamp": "2025-12-23T12:12:24.613052Z",
   "violations": [],
   "import_graph": {
     "authoritative_to_observer_edges": [],
-    "total_edges_scanned": 531
+    "total_edges_scanned": 504
   },
   "counts": {
-    "authoritative_modules_scanned": 120,
+    "authoritative_modules_scanned": 112,
     "observer_modules_scanned": 0,
-    "total_files_scanned": 120,
+    "total_files_scanned": 112,
     "violations_found": 0
   }
 }

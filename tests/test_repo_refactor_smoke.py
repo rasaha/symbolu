@@ -84,19 +84,14 @@ class TestKeyPipelinePhaseImports:
         assert phase_one_schema is not None
         assert phase_one_resolver is not None
 
+    @pytest.mark.skip(reason="p15_interaction was archived - see PHASE_STATUS.yaml")
     def test_p15_interaction_import(self):
-        """p15_interaction imports work."""
-        from symbolu.mechanical.pipeline.p15_interaction import (
-            InteractionMode,
-            InteractionDirective,
-            P15InteractionResolver,
-            maybe_run_p15,
-        )
+        """p15_interaction imports work.
 
-        assert InteractionMode is not None
-        assert InteractionDirective is not None
-        assert P15InteractionResolver is not None
-        assert callable(maybe_run_p15)
+        ARCHIVED: p15_interaction was moved to restoration/experiments/deprecated_phases/
+        as of 2025-12-21. The canonical P15 implementation is p15_authority_guard.
+        """
+        pass
 
     def test_p16_regression_guard_import(self):
         """p16_regression_guard imports work."""
@@ -198,20 +193,11 @@ class TestPipelineOrchestratorImport:
 class TestNoNamingConflicts:
     """Tests to verify naming conflicts are resolved."""
 
+    @pytest.mark.skip(reason="p15_interaction was archived - see PHASE_STATUS.yaml")
     def test_p15_interaction_and_authority_guard_are_distinct(self):
-        """p15_interaction and p15_authority_guard are distinct modules."""
-        from symbolu.mechanical.pipeline import p15_interaction
-        from symbolu.mechanical.pipeline import p15_authority_guard
+        """p15_interaction and p15_authority_guard are distinct modules.
 
-        # They should be different modules
-        assert p15_interaction is not p15_authority_guard
-
-        # p15_interaction has InteractionMode
-        assert hasattr(p15_interaction, "InteractionMode")
-
-        # p15_authority_guard has P15RegressionGuard
-        assert hasattr(p15_authority_guard, "P15RegressionGuard")
-
-        # Neither should have the other's main class
-        assert not hasattr(p15_interaction, "P15RegressionGuard")
-        assert not hasattr(p15_authority_guard, "InteractionMode")
+        ARCHIVED: p15_interaction was moved to restoration/experiments/deprecated_phases/
+        as of 2025-12-21. The canonical P15 implementation is p15_authority_guard.
+        """
+        pass
