@@ -49,6 +49,12 @@ from symbolu.presentation.p7_lite import (
     derive_discourse_act,
     DELIVERY_MODE_TO_DISCOURSE_ACT,
 )
+from symbolu.presentation.acoustic_chain import (
+    AcousticGovernanceChain,
+    AcousticChainResult,
+    run_acoustic_chain,
+    is_acoustically_consistent,
+)
 
 __all__ = [
     # Types (Part 3)
@@ -81,4 +87,9 @@ __all__ = [
     "P7LiteResolver",
     "derive_discourse_act",
     "DELIVERY_MODE_TO_DISCOURSE_ACT",
+    # Acoustic Governance Chain
+    "AcousticGovernanceChain",
+    "AcousticChainResult",
+    "run_acoustic_chain",
+    "is_acoustically_consistent",
 ]
