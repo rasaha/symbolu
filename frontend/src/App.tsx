@@ -21,6 +21,7 @@ import { HomePage } from '@/views/HomePage';
 import { ProductsPage } from '@/views/ProductsPage';
 import { ResearchPage } from '@/views/ResearchPage';
 import { ArticlePage } from '@/views/ArticlePage';
+import { InvestorRelationsPage } from '@/views/InvestorRelationsPage';
 import { ConsumerProductPage, PowerUserProductPage, AdminProductPage } from '@/views/products';
 import { ConsumerTierPage } from '@/views/ConsumerTierPage';
 import { PowerUserTierPage } from '@/views/PowerUserTierPage';
@@ -29,7 +30,7 @@ import { useChatStore } from '@/stores/chatStore';
 import { Layers, Search, Code, Home, ArrowLeft, Package } from 'lucide-react';
 import type { PageId } from '@/components/common/PageNavigation';
 
-type AppPage = 'home' | 'products' | 'product_detail' | 'research' | 'article' | 'selector' | 'tier';
+type AppPage = 'home' | 'products' | 'product_detail' | 'research' | 'article' | 'investor_relations' | 'selector' | 'tier';
 
 // Landing page for tier selection
 function TierSelector({
@@ -202,6 +203,8 @@ export function App() {
       setCurrentPage('research');
     } else if (pageParam === 'demo') {
       setCurrentPage('selector');
+    } else if (pageParam === 'investor-relations') {
+      setCurrentPage('investor_relations');
     }
   }, [setTier]);
 
@@ -222,6 +225,8 @@ export function App() {
       url.searchParams.set('page', 'research');
     } else if (page === 'selector') {
       url.searchParams.set('page', 'demo');
+    } else if (page === 'investor_relations') {
+      url.searchParams.set('page', 'investor-relations');
     }
 
     window.history.pushState({}, '', url.toString());
@@ -243,6 +248,12 @@ export function App() {
   const handleGoToResearch = () => {
     setCurrentPage('research');
     updateURL('research');
+  };
+
+  // Handle navigating to investor relations page
+  const handleGoToInvestorRelations = () => {
+    setCurrentPage('investor_relations');
+    updateURL('investor_relations');
   };
 
   // Handle tier selection
@@ -317,7 +328,13 @@ export function App() {
 
   // Render based on current page
   if (currentPage === 'home') {
-    return <HomePage onEnterDemo={handleEnterDemo} onGoToProducts={handleGoToProducts} />;
+    return (
+      <HomePage
+        onEnterDemo={handleEnterDemo}
+        onGoToProducts={handleGoToProducts}
+        onGoToInvestorRelations={handleGoToInvestorRelations}
+      />
+    );
   }
 
   if (currentPage === 'products') {
@@ -360,6 +377,14 @@ export function App() {
       <ResearchPage
         onNavigate={handlePageNavigate}
         onSelectArticle={handleSelectArticle}
+      />
+    );
+  }
+
+  if (currentPage === 'investor_relations') {
+    return (
+      <InvestorRelationsPage
+        onBack={handleBackToHome}
       />
     );
   }

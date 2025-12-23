@@ -19,16 +19,18 @@ import {
   BarChart3,
   Search,
   Code,
-  Workflow,
   Package,
+  MessageSquare,
+  Users,
 } from 'lucide-react';
 
 interface HomePageProps {
   onEnterDemo: () => void;
   onGoToProducts?: () => void;
+  onGoToInvestorRelations?: () => void;
 }
 
-export function HomePage({ onEnterDemo, onGoToProducts }: HomePageProps) {
+export function HomePage({ onEnterDemo, onGoToProducts, onGoToInvestorRelations }: HomePageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white overflow-x-hidden">
       {/* Navigation */}
@@ -49,6 +51,15 @@ export function HomePage({ onEnterDemo, onGoToProducts }: HomePageProps) {
                 >
                   <Package className="w-4 h-4" />
                   Products
+                </button>
+              )}
+              {onGoToInvestorRelations && (
+                <button
+                  onClick={onGoToInvestorRelations}
+                  className="flex items-center gap-2 px-5 py-2 rounded-lg text-gray-300 text-sm font-medium hover:text-white transition-colors"
+                >
+                  <Users className="w-4 h-4" />
+                  Investors
                 </button>
               )}
               <button
