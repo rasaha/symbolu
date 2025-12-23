@@ -132,10 +132,42 @@ phases:
 # Phase counts summary
 summary:
   total_implemented: 54  # Added P34, P37
-  active: 12  # Added P34, P37
+  active: 12  # PO1-PO5 + P27, P28, P29, P30, P31, P34, P37
   dormant: 39  # Reduced by 3 archived
   missing: 0  # P34, P37 now implemented
   archived: 3
+
+# Test coverage for governance chain (PO1-PO5)
+test_coverage:
+  governance_chain:
+    unit_tests:
+      - path: "tests/unit/mechanical/pipeline/grounding/test_phase_minus_one.py"
+        phase: "PO1"
+        test_count: 44
+        coverage: "Observer-Observed Grounding, Ambiguity Resolver, Clause Splitter, Fuzzy Classifier"
+      - path: "tests/unit/mechanical/pipeline/phase_zero/test_phase_zero.py"
+        phase: "PO2"
+        test_count: 26
+        coverage: "Intent Envelope, Response Posture, Phase Zero Resolver"
+      - path: "tests/unit/mechanical/pipeline/phase_one/test_phase_one.py"
+        phase: "PO3"
+        test_count: 30
+        coverage: "Allowed Action Set, Phase One Resolver, Action Mapping"
+      - path: "tests/unit/mechanical/pipeline/phase_po4/test_po4.py"
+        phase: "PO4"
+        test_count: 38
+        coverage: "Planner Proposal Envelope, PO4 Resolver, Proposal Validation"
+      - path: "tests/unit/mechanical/pipeline/phase_po5/test_po5.py"
+        phase: "PO5"
+        test_count: 36
+        coverage: "Execution Eligibility Envelope, PO5 Gate, Authority Model"
+    integration_tests:
+      - path: "tests/integration/test_orchestrator_integration.py"
+        class: "TestGovernanceChainIntegration"
+        test_count: 8
+        coverage: "PO1-PO5 activation, context population, determinism, session context"
+    total_tests: 182
+    last_verified: "2025-12-23"
 
 # Archive locations
 archive_info:
