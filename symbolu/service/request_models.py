@@ -523,7 +523,8 @@ class ChatResponse(BaseModel if PYDANTIC_AVAILABLE else object):
         model: Model used (e.g., claude-3-5-sonnet)
         provider: Provider used (anthropic or google)
         tier: Presentation tier used
-        usage: Token usage statistics
+        usage: Token usage statistics (input_tokens, output_tokens)
+        usage_stats: Accumulated usage stats with cost and limits
         semantic_analysis: Optional Symbol-U semantic analysis
     """
     if PYDANTIC_AVAILABLE:
@@ -534,6 +535,10 @@ class ChatResponse(BaseModel if PYDANTIC_AVAILABLE else object):
         usage: Dict[str, int] = Field(
             default_factory=dict,
             description="Token usage: input_tokens, output_tokens"
+        )
+        usage_stats: Optional[Dict[str, Any]] = Field(
+            default=None,
+            description="Accumulated usage stats: this_request, daily, limit info"
         )
         semantic_analysis: Optional[Dict[str, Any]] = Field(
             default=None,

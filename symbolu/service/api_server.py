@@ -40,6 +40,9 @@ Endpoints:
     Chat Endpoints (LLM-powered with tier-based model selection):
         POST /chat - Chat with LLM (Anthropic Claude or Google Gemini)
         GET /chat/providers - Get available LLM providers and tier info
+        GET /chat/usage - Get token usage statistics
+        GET /chat/usage/check - Check if within daily token limit
+        GET /chat/pricing - Get LLM pricing information
 
     Health:
         GET /health - Health check
@@ -1561,12 +1564,33 @@ def create_app() -> "FastAPI":
                 temperature=req.temperature,
             )
 
+            # Track token usage
+            usage_stats = None
+            try:
+                from symbolu.service.usage_tracker import get_usage_tracker
+
+                # Get user ID from request or use demo default
+                user_id = request.headers.get("X-User-ID", "demo_user")
+
+                tracker = get_usage_tracker()
+                usage_stats = tracker.record_usage(
+                    user_id=user_id,
+                    input_tokens=response.usage.get("input_tokens", 0),
+                    output_tokens=response.usage.get("output_tokens", 0),
+                    provider=response.provider,
+                    model=response.model,
+                    tier=req.tier,
+                )
+            except Exception as e:
+                logger.warning(f"Usage tracking failed: {e}")
+
             return {
                 "content": response.content,
                 "model": response.model,
                 "provider": response.provider,
                 "tier": response.tier,
                 "usage": response.usage,
+                "usage_stats": usage_stats,
                 "semantic_analysis": response.semantic_analysis,
             }
 
@@ -1663,6 +1687,140 @@ def create_app() -> "FastAPI":
                 "default_provider": None,
                 "error": "LLM providers not installed. Run: pip install anthropic google-generativeai",
             }
+
+    # ========================================================================
+    # USAGE TRACKING ENDPOINTS
+    # ========================================================================
+
+    @app.get("/chat/usage")
+    def get_chat_usage(request: Request) -> Dict[str, Any]:
+        """
+        Get token usage statistics for the current user.
+
+        The user is identified by the X-User-ID header (defaults to "demo_user").
+
+        Returns:
+            Dict with usage statistics:
+            - daily: Today's token usage and cost
+            - total: All-time usage and cost
+            - limit: Daily limit info and remaining tokens
+
+        Example:
+            GET /chat/usage
+            Headers: X-User-ID: my_user_id
+            -> {
+                "user_id": "my_user_id",
+                "daily": {
+                    "input_tokens": 1500,
+                    "output_tokens": 4500,
+                    "total_tokens": 6000,
+                    "cost": 0.0234,
+                    "requests": 5
+                },
+                "limit": {
+                    "daily_limit": 50000,
+                    "remaining": 44000,
+                    "is_over_limit": false
+                }
+            }
+        """
+        verify_api_key(request)
+
+        try:
+            from symbolu.service.usage_tracker import get_usage_tracker
+
+            user_id = request.headers.get("X-User-ID", "demo_user")
+            tracker = get_usage_tracker()
+
+            return tracker.get_usage(user_id)
+
+        except Exception as e:
+            logger.error(f"Error in /chat/usage: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Usage retrieval failed: {str(e)}"
+            )
+
+    @app.get("/chat/usage/check")
+    def check_usage_limit(
+        request: Request,
+        estimated_tokens: int = 1000,
+    ) -> Dict[str, Any]:
+        """
+        Check if user is within their daily token limit.
+
+        Useful for checking before making a request.
+
+        Args:
+            estimated_tokens: Estimated tokens for next request (query param)
+
+        Returns:
+            Dict with limit check result:
+            - allowed: Whether the request is within limits
+            - remaining: Remaining tokens today
+            - daily_limit: User's daily limit
+
+        Example:
+            GET /chat/usage/check?estimated_tokens=500
+            -> {"allowed": true, "remaining": 44000, "daily_limit": 50000}
+        """
+        verify_api_key(request)
+
+        try:
+            from symbolu.service.usage_tracker import get_usage_tracker
+
+            user_id = request.headers.get("X-User-ID", "demo_user")
+            tracker = get_usage_tracker()
+
+            return tracker.check_limit(user_id, estimated_tokens)
+
+        except Exception as e:
+            logger.error(f"Error in /chat/usage/check: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Limit check failed: {str(e)}"
+            )
+
+    @app.get("/chat/pricing")
+    def get_pricing_info() -> Dict[str, Any]:
+        """
+        Get LLM pricing information per model.
+
+        Returns pricing per 1M tokens for each provider and model.
+
+        Example:
+            GET /chat/pricing
+            -> {
+                "anthropic": {
+                    "claude-3-5-haiku": {"input": 0.80, "output": 4.00},
+                    ...
+                },
+                ...
+            }
+        """
+        from symbolu.service.usage_tracker import COST_PER_MILLION
+
+        return {
+            "pricing_per_million_tokens": COST_PER_MILLION,
+            "note": "Prices in USD. Actual billing comes from provider.",
+            "tiers": {
+                "consumer": {
+                    "label": "Explorer",
+                    "description": "Uses fast/cheap models (Haiku, Flash)",
+                    "typical_cost_per_request": "$0.001 - $0.005",
+                },
+                "power_user": {
+                    "label": "Analyst",
+                    "description": "Uses balanced models (Sonnet, Pro)",
+                    "typical_cost_per_request": "$0.005 - $0.02",
+                },
+                "admin": {
+                    "label": "Developer",
+                    "description": "Uses best models (Sonnet, Pro)",
+                    "typical_cost_per_request": "$0.005 - $0.02",
+                },
+            },
+        }
 
     return app
 
