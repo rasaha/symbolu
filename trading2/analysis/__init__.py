@@ -37,6 +37,15 @@ from trading2.analysis.model_selector import (
     AutocorrelationCalculator,
 )
 
+from trading2.analysis.volume_profile import (
+    VolumeProfile,
+    SessionVolumeProfile,
+    VolumeProfileResult,
+    VolumeNode,
+    ValueArea,
+    PriceLocation,
+)
+
 __all__ = [
     # Elliott Wave
     "ElliottWaveAnalyzer",
@@ -65,4 +74,12 @@ __all__ = [
     "HurstExponent",
     "VolatilityRatio",
     "AutocorrelationCalculator",
+
+    # Volume Profile
+    "VolumeProfile",
+    "SessionVolumeProfile",
+    "VolumeProfileResult",
+    "VolumeNode",
+    "ValueArea",
+    "PriceLocation",
 ]

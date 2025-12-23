@@ -24,6 +24,7 @@ from trading2.core.observables import BayesianObservables
 from trading2.analysis.elliott_wave import ElliottWaveAnalyzer, WaveCount
 from trading2.analysis.indicators import IndicatorSuite, CompositeSignal
 from trading2.analysis.model_selector import ModelSelector, ModelType, ModelRecommendation
+from trading2.analysis.volume_profile import VolumeProfile, VolumeProfileResult
 
 
 class ActiveModel(Enum):
@@ -116,6 +117,7 @@ class HybridEvolutionEngine:
     elliott_analyzer: ElliottWaveAnalyzer = field(default=None)
     indicators: IndicatorSuite = field(default=None)
     model_selector: ModelSelector = field(default=None)
+    volume_profile: VolumeProfile = field(default=None)
 
     # Runtime state
     tick_count: int = 0
@@ -132,6 +134,7 @@ class HybridEvolutionEngine:
     last_wave_count: Optional[WaveCount] = None
     last_indicator_signal: Optional[CompositeSignal] = None
     last_model_recommendation: Optional[ModelRecommendation] = None
+    last_volume_profile: Optional[VolumeProfileResult] = None
 
     # Callbacks
     on_entry_signal: Optional[Callable[[float, float], None]] = None
@@ -161,6 +164,9 @@ class HybridEvolutionEngine:
 
         if self.model_selector is None:
             self.model_selector = ModelSelector()
+
+        if self.volume_profile is None:
+            self.volume_profile = VolumeProfile(tick_size=0.01)
 
     @classmethod
     def create(
@@ -199,6 +205,10 @@ class HybridEvolutionEngine:
         adx_value = self.indicators.adx.adx
         model_rec = self.model_selector.update(price, adx_value)
         self.last_model_recommendation = model_rec
+
+        # 2.5. Update volume profile with tick data
+        tick_volume = volume if volume else 1.0
+        self.last_volume_profile = self.volume_profile.update(price, tick_volume)
 
         # 3. Update Elliott Wave (shared)
         wave_count = self.elliott_analyzer.process_bar(price, high, low)
@@ -382,11 +392,19 @@ class HybridEvolutionEngine:
         indicator_signal = self.last_indicator_signal.net_signal if self.last_indicator_signal else 0.0
         elliott_signal = self.last_wave_count.signal if self.last_wave_count else 0.0
 
-        # Final weighted combination
+        # Get volume profile signal (key levels, value area positioning)
+        vp_signal_data = self.volume_profile.get_trading_signal(
+            self.last_volume_profile.poc if self.last_volume_profile else 0.0
+        ) if self.last_volume_profile else {"signal": 0.0, "strength": 0.0}
+        volume_profile_signal = vp_signal_data.get("signal", 0.0)
+
+        # Final weighted combination including volume profile
+        # Volume profile helps identify key S/R levels
         final_signal = (
-            0.5 * combined_signal +
-            0.3 * indicator_signal +
-            0.2 * elliott_signal
+            0.35 * combined_signal +      # Primary model signal
+            0.25 * indicator_signal +      # Technical indicators
+            0.20 * elliott_signal +        # Elliott wave pattern
+            0.20 * volume_profile_signal   # Volume profile (POC, VA, HVN/LVN)
         )
 
         # Direction
@@ -399,31 +417,63 @@ class HybridEvolutionEngine:
 
         # Entry/Exit logic depends on active model
         if self.active_model == ActiveModel.EMA:
-            entry = self.ema_state.get_entry_signal()
+            base_entry = self.ema_state.get_entry_signal()
             exit_sig = self.ema_state.get_exit_signal()
             position_size = self.ema_state.position_scalar_ema
         else:
-            entry = bayesian_utility.entry_signal
+            base_entry = bayesian_utility.entry_signal
             exit_sig = bayesian_utility.exit_signal
             position_size = bayesian_utility.position_size
+
+        # Volume Profile Entry Filtering (autonomous safety)
+        # Don't enter long at resistance (VAH), don't enter short at support (VAL)
+        vp_location = vp_signal_data.get("location", "inside_value_area")
+        entry_blocked_by_vp = False
+        vp_block_reason = ""
+
+        if direction == "buy" and vp_location in ["at_vah", "above_value_area"]:
+            # Trying to go long at/above resistance - risky
+            if vp_signal_data.get("strength", 0) > 0.5:
+                entry_blocked_by_vp = True
+                vp_block_reason = "Long blocked: at VAH resistance"
+        elif direction == "sell" and vp_location in ["at_val", "below_value_area"]:
+            # Trying to go short at/below support - risky
+            if vp_signal_data.get("strength", 0) > 0.5:
+                entry_blocked_by_vp = True
+                vp_block_reason = "Short blocked: at VAL support"
+
+        # Final entry decision
+        entry = base_entry and not entry_blocked_by_vp
+
+        # Boost confidence if entering at good VP levels
+        # (long at VAL support, short at VAH resistance)
+        vp_confidence_boost = 0.0
+        if direction == "buy" and vp_location in ["at_val", "below_value_area"]:
+            vp_confidence_boost = 0.15  # Long at support
+        elif direction == "sell" and vp_location in ["at_vah", "above_value_area"]:
+            vp_confidence_boost = 0.15  # Short at resistance
 
         # Confidence
         indicator_conf = self.last_indicator_signal.confidence if self.last_indicator_signal else 0.5
         model_conf = self.last_model_recommendation.confidence if self.last_model_recommendation else 0.5
-        confidence = indicator_conf * model_conf
+        vp_strength = vp_signal_data.get("strength", 0.5)
+        confidence = min(1.0, indicator_conf * model_conf * (0.8 + 0.2 * vp_strength) + vp_confidence_boost)
 
         return {
             "signal": final_signal,
             "direction": direction,
             "confidence": confidence,
-            "should_trade": abs(final_signal) > 0.15,
+            "should_trade": abs(final_signal) > 0.15 and not entry_blocked_by_vp,
             "entry": entry,
             "exit": exit_sig,
+            "entry_blocked_by_vp": entry_blocked_by_vp,
+            "vp_block_reason": vp_block_reason,
             "position_size": position_size,
             "bayesian_signal": bayesian_signal,
             "ema_signal": ema_signal,
             "indicator_signal": indicator_signal,
             "elliott_signal": elliott_signal,
+            "volume_profile_signal": volume_profile_signal,
             "regime": self.bayesian_state.regime.value,
             "active_model": self.active_model.value,
             "blend_weight": self.blend_weight,
@@ -439,6 +489,35 @@ class HybridEvolutionEngine:
                 "sell_score": self.last_indicator_signal.sell_score if self.last_indicator_signal else 0.0,
                 "consensus": self.last_indicator_signal.consensus.value if self.last_indicator_signal else "neutral",
             },
+            "volume_profile": self._get_volume_profile_info(),
+        }
+
+    def _get_volume_profile_info(self) -> Dict[str, Any]:
+        """Get volume profile information for signal output."""
+        if not self.last_volume_profile:
+            return {
+                "poc": 0.0,
+                "vah": 0.0,
+                "val": 0.0,
+                "location": "unknown",
+                "signal": 0.0,
+            }
+
+        vp = self.last_volume_profile
+        vp_signal = self.volume_profile.get_trading_signal(vp.poc)
+
+        return {
+            "poc": vp.poc,
+            "vah": vp.vah,
+            "val": vp.val,
+            "location": vp.current_location.value,
+            "distance_to_poc_pct": vp.distance_to_poc,
+            "hvn_above": vp.nearest_hvn_above,
+            "hvn_below": vp.nearest_hvn_below,
+            "lvn_nearby": vp.nearest_lvn,
+            "signal": vp_signal["signal"],
+            "bias": vp_signal["bias"],
+            "reason": vp_signal["reason"],
         }
 
     def _handle_signals(self, signal: Dict[str, Any], price: float) -> None:
@@ -485,6 +564,7 @@ class HybridEvolutionEngine:
         self.elliott_analyzer.reset()
         self.indicators.reset()
         self.model_selector.reset()
+        self.volume_profile.reset()
         self.tick_count = 0
         self.active_model = ActiveModel.BAYESIAN
         self.blend_weight = 0.0
@@ -493,6 +573,7 @@ class HybridEvolutionEngine:
         self.last_wave_count = None
         self.last_indicator_signal = None
         self.last_model_recommendation = None
+        self.last_volume_profile = None
 
 
 def create_hybrid_engine(
