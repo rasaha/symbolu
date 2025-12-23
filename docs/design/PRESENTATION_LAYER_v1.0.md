@@ -393,47 +393,66 @@ RULE_DEFAULT = PresentationRule(
 
 ## Part 5: Tier-Specific Behavior
 
-### 5.1 Consumer Tier
+The system has 4 tiers aligned with `EngineTier`:
 
-**Philosophy:** Maximize flow, minimize interruption. Tolerate uncertainty.
+| Tier | Engine | Use Case | Presentation Philosophy |
+|------|--------|----------|------------------------|
+| `ENTERPRISE_SEARCH` | Pure STL | Classification/tagging | Strictest, minimal UX |
+| `ENTERPRISE_CHAT` | STL + 7B | Specialized chat | Strict, balanced UX |
+| `CONSUMER` | Full cascade | General use | Tolerant, flow-optimized |
+| `DEVELOPMENT` | Full access | Testing/debug | All features, verbose |
+
+### 5.1 Enterprise Search Tier
+
+**Philosophy:** Classification-focused. Minimal UX overhead. Maximum strictness for tagging accuracy.
 
 ```python
-CONSUMER_PRESENTATION_CONFIG = PresentationConfig(
-    # Thresholds (more tolerant)
-    viparyaya_critical_threshold=0.6,      # Higher = less sensitive
-    nidra_severe_threshold=0.8,
-    vikalpa_high_threshold=0.5,
-    smrti_elevated_threshold=0.6,
+ENTERPRISE_SEARCH_CONFIG = PresentationConfig(
+    tier="enterprise_search",
 
-    # Behaviors
-    allow_silent_mode=False,               # Never suppress output
-    escalate_to_human=False,               # No escalation
-    show_reasoning_by_default=False,       # Hide complexity
+    # Thresholds (strictest - classification must be accurate)
+    viparyaya_critical_threshold=0.2,      # Very sensitive to misperception
+    nidra_severe_threshold=0.4,            # Need complete information
+    vikalpa_high_threshold=0.25,           # Ambiguity is costly
+    smrti_elevated_threshold=0.3,
+    score_confident_threshold=0.9,         # High bar for "confident"
+    score_moderate_threshold=0.6,
 
-    # Language
-    hedging_phrases=["I think", "It seems like", "Possibly"],
-    clarifying_phrases=["Did you mean", "Just to confirm"],
+    # Behaviors (minimal)
+    allow_silent_mode=True,                # Suppress uncertain classifications
+    escalate_to_human=True,                # Flag for human review
+    show_reasoning_by_default=False,       # Keep output clean
+    include_diagnostics=True,              # Audit trail required
+
+    # Language (terse)
+    hedging_phrases=["[Uncertain]", "[Low confidence]"],
+    clarifying_phrases=["[Ambiguous input]", "[Requires clarification]"],
 )
 ```
 
-### 5.2 Enterprise Tier
+### 5.2 Enterprise Chat Tier
 
-**Philosophy:** Prioritize accuracy. Flag uncertainty explicitly. Audit trail.
+**Philosophy:** Balanced strictness for chat. Flag uncertainty but maintain conversation flow.
 
 ```python
-ENTERPRISE_PRESENTATION_CONFIG = PresentationConfig(
-    # Thresholds (stricter)
-    viparyaya_critical_threshold=0.3,      # Lower = more sensitive
+ENTERPRISE_CHAT_CONFIG = PresentationConfig(
+    tier="enterprise_chat",
+
+    # Thresholds (strict but conversational)
+    viparyaya_critical_threshold=0.3,
     nidra_severe_threshold=0.5,
-    vikalpa_high_threshold=0.3,
+    vikalpa_high_threshold=0.35,
     smrti_elevated_threshold=0.4,
+    score_confident_threshold=0.85,
+    score_moderate_threshold=0.5,
 
     # Behaviors
-    allow_silent_mode=True,                # Can suppress uncertain output
+    allow_silent_mode=False,               # Chat must respond
     escalate_to_human=True,                # Enable escalation
     show_reasoning_by_default=True,        # Transparency
+    include_diagnostics=True,              # Audit trail
 
-    # Language
+    # Language (professional)
     hedging_phrases=[
         "Based on available information",
         "With moderate confidence",
@@ -446,15 +465,74 @@ ENTERPRISE_PRESENTATION_CONFIG = PresentationConfig(
 )
 ```
 
-### 5.3 Threshold Comparison
+### 5.3 Consumer Tier
 
-| Parameter | Consumer | Enterprise | Delta |
-|-----------|----------|------------|-------|
-| `viparyaya_critical` | 0.6 | 0.3 | 2x more sensitive |
-| `nidra_severe` | 0.8 | 0.5 | 1.6x more sensitive |
-| `vikalpa_high` | 0.5 | 0.3 | 1.7x more sensitive |
-| `score_confident` | 0.7 | 0.85 | Stricter for "confident" |
-| `escalate_enabled` | No | Yes | Enterprise-only |
+**Philosophy:** Maximize flow, minimize interruption. Tolerate uncertainty for smooth UX.
+
+```python
+CONSUMER_CONFIG = PresentationConfig(
+    tier="consumer",
+
+    # Thresholds (most tolerant)
+    viparyaya_critical_threshold=0.6,      # Higher = less sensitive
+    nidra_severe_threshold=0.8,
+    vikalpa_high_threshold=0.5,
+    smrti_elevated_threshold=0.6,
+    score_confident_threshold=0.7,
+    score_moderate_threshold=0.4,
+
+    # Behaviors (user-friendly)
+    allow_silent_mode=False,               # Never suppress output
+    escalate_to_human=False,               # Handle internally
+    show_reasoning_by_default=False,       # Keep it simple
+    include_diagnostics=False,             # No debug info
+
+    # Language (conversational)
+    hedging_phrases=["I think", "It seems like", "Possibly"],
+    clarifying_phrases=["Did you mean", "Just to confirm"],
+)
+```
+
+### 5.4 Development Tier
+
+**Philosophy:** Full access, maximum verbosity, all features for testing/debugging.
+
+```python
+DEVELOPMENT_CONFIG = PresentationConfig(
+    tier="development",
+
+    # Thresholds (same as Enterprise Search for accuracy testing)
+    viparyaya_critical_threshold=0.2,
+    nidra_severe_threshold=0.4,
+    vikalpa_high_threshold=0.25,
+    smrti_elevated_threshold=0.3,
+    score_confident_threshold=0.9,
+    score_moderate_threshold=0.6,
+
+    # Behaviors (all enabled)
+    allow_silent_mode=True,
+    escalate_to_human=True,
+    show_reasoning_by_default=True,
+    include_diagnostics=True,              # Always for debugging
+
+    # Language (explicit tags for testing)
+    hedging_phrases=["[DEV:HEDGED]", "[DEV:UNCERTAIN]"],
+    clarifying_phrases=["[DEV:CLARIFY]", "[DEV:AMBIGUOUS]"],
+)
+```
+
+### 5.5 Threshold Comparison (All Tiers)
+
+| Parameter | Ent.Search | Ent.Chat | Consumer | Dev |
+|-----------|------------|----------|----------|-----|
+| `viparyaya_critical` | 0.2 | 0.3 | 0.6 | 0.2 |
+| `nidra_severe` | 0.4 | 0.5 | 0.8 | 0.4 |
+| `vikalpa_high` | 0.25 | 0.35 | 0.5 | 0.25 |
+| `smrti_elevated` | 0.3 | 0.4 | 0.6 | 0.3 |
+| `score_confident` | 0.9 | 0.85 | 0.7 | 0.9 |
+| `allow_silent` | Yes | No | No | Yes |
+| `escalate` | Yes | Yes | No | Yes |
+| `diagnostics` | Yes | Yes | No | Yes |
 
 ---
 
