@@ -21,6 +21,12 @@ Key Principle:
     Constraint and realization may share a bridge, but they
     may not share the same evidence base.
 
+Zero-Kill Rule:
+    If C < 0.1 (C_ZERO_KILL_THRESHOLD), S is NOT evaluated.
+    Ontologically invalid pairings get MATCH = 0 without semantic
+    computation. This ensures C acts as a hard gate - if phonemic
+    structure doesn't permit the pairing, semantic coherence is moot.
+
 Diagnostic Matrix (C × R, gated by S):
     ┌─────────────┬───────────────┬───────────────┐
     │             │   High R      │    Low R      │
@@ -302,6 +308,7 @@ def compute_realization_strength(word_a: str, word_b: str) -> RealizationAnalysi
 C_THRESHOLD = 0.6
 R_THRESHOLD = 0.5
 S_THRESHOLD = 0.2  # Low threshold - any shared referent matters
+C_ZERO_KILL_THRESHOLD = 0.1  # Zero-kill: if C < this, S is not evaluated (ontologically invalid)
 
 
 def classify_match_mode(c: float, r: float, s: float) -> MatchMode:
@@ -375,21 +382,40 @@ def canonical_match(
     realization = compute_realization_strength(word_a, word_b)
     r = realization.realization
 
-    # Compute S (Semantic Contextual Meaning) - NON-PHONEMIC
-    if use_contextual_s:
-        # New: Semantic Contextual S
-        semantic_result = compute_semantic_contextual_coherence(
-            word_a, word_b,
-            context=context,
-            config=context_config or DEFAULT_CONTEXT_CONFIG,
+    # ZERO-KILL RULE: If C is below threshold, don't evaluate S
+    # Ontologically invalid pairings get MATCH = 0 without semantic computation
+    if c < C_ZERO_KILL_THRESHOLD:
+        s = 0.0
+        # Create minimal referent analysis for zero-kill case
+        referent = ReferentAnalysis(
+            coherence=0.0,
+            word_a=word_a,
+            word_b=word_b,
+            primary_a=frozenset(),
+            primary_b=frozenset(),
+            secondary_a=frozenset(),
+            secondary_b=frozenset(),
+            shared_primary=frozenset(),
+            shared_secondary=frozenset(),
+            is_grounded=False,
+            is_unknown=True,  # Mark as unknown due to zero-kill
         )
-        s = semantic_result.combined_coherence
-        # Also get class-based for the referent_analysis field
-        referent = compute_referent_coherence(word_a, word_b)
     else:
-        # Legacy: Class-based S only
-        referent = compute_referent_coherence(word_a, word_b)
-        s = referent.coherence
+        # Compute S (Semantic Contextual Meaning) - NON-PHONEMIC
+        if use_contextual_s:
+            # New: Semantic Contextual S
+            semantic_result = compute_semantic_contextual_coherence(
+                word_a, word_b,
+                context=context,
+                config=context_config or DEFAULT_CONTEXT_CONFIG,
+            )
+            s = semantic_result.combined_coherence
+            # Also get class-based for the referent_analysis field
+            referent = compute_referent_coherence(word_a, word_b)
+        else:
+            # Legacy: Class-based S only
+            referent = compute_referent_coherence(word_a, word_b)
+            s = referent.coherence
 
     # MATCH = C × R × S
     match_score = c * r * s
