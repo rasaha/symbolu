@@ -28,6 +28,15 @@ from trading2.analysis.indicators import (
     ATR,
 )
 
+from trading2.analysis.model_selector import (
+    ModelSelector,
+    ModelType,
+    ModelRecommendation,
+    HurstExponent,
+    VolatilityRatio,
+    AutocorrelationCalculator,
+)
+
 __all__ = [
     # Elliott Wave
     "ElliottWaveAnalyzer",
@@ -48,4 +57,12 @@ __all__ = [
     "BollingerBands",
     "Stochastic",
     "ATR",
+
+    # Model Selector
+    "ModelSelector",
+    "ModelType",
+    "ModelRecommendation",
+    "HurstExponent",
+    "VolatilityRatio",
+    "AutocorrelationCalculator",
 ]

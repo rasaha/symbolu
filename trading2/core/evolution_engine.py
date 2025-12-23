@@ -29,6 +29,7 @@ from trading2.core.observables import BayesianObservables
 from trading2.core.utility import BayesianUtility, UtilityResult
 from trading2.analysis.elliott_wave import ElliottWaveAnalyzer, WaveCount
 from trading2.analysis.indicators import IndicatorSuite, CompositeSignal
+from trading2.analysis.model_selector import ModelSelector, ModelRecommendation, ModelType
 
 
 @dataclass
@@ -60,12 +61,14 @@ class BayesianEvolutionEngine:
     utility_calc: BayesianUtility = field(default=None)
     elliott_analyzer: ElliottWaveAnalyzer = field(default=None)
     indicators: IndicatorSuite = field(default=None)
+    model_selector: ModelSelector = field(default=None)
 
     # Runtime state
     tick_count: int = 0
     last_utility: Optional[UtilityResult] = None
     last_wave_count: Optional[WaveCount] = None
     last_indicator_signal: Optional[CompositeSignal] = None
+    last_model_recommendation: Optional[ModelRecommendation] = None
 
     # Audit trail
     audit_log: List[EngineAuditEntry] = field(default_factory=list)
@@ -92,6 +95,9 @@ class BayesianEvolutionEngine:
 
         if self.indicators is None:
             self.indicators = IndicatorSuite()
+
+        if self.model_selector is None:
+            self.model_selector = ModelSelector()
 
         self._audit_interval = self.config.audit_interval
 
@@ -145,6 +151,10 @@ class BayesianEvolutionEngine:
         # 1. Update technical indicators
         indicator_signal = self.indicators.update(price, high, low)
         self.last_indicator_signal = indicator_signal
+
+        # 1.5. Update model selector with ADX
+        adx_value = self.indicators.adx.adx
+        self.last_model_recommendation = self.model_selector.update(price, adx_value)
 
         # 2. Update Elliott Wave analysis
         wave_count = self.elliott_analyzer.process_bar(price, high, low)
@@ -359,6 +369,8 @@ class BayesianEvolutionEngine:
             "wave_confidence": self.state.wave_confidence,
             "last_utility": self.last_utility.utility if self.last_utility else None,
             "indicator_consensus": self.last_indicator_signal.consensus.value if self.last_indicator_signal else None,
+            "model_recommendation": self.last_model_recommendation.model.value if self.last_model_recommendation else None,
+            "hurst": self.last_model_recommendation.hurst if self.last_model_recommendation else 0.5,
         }
 
     def get_trading_signal(self) -> Dict[str, Any]:
@@ -418,6 +430,32 @@ class BayesianEvolutionEngine:
                 "sell_score": indicators.sell_score,
                 "consensus": indicators.consensus.value,
             },
+            "model_selection": self._get_model_selection_info(),
+        }
+
+    def _get_model_selection_info(self) -> Dict[str, Any]:
+        """Get model selection information."""
+        if not self.last_model_recommendation:
+            return {
+                "recommended_model": "bayesian",
+                "confidence": 0.5,
+                "hurst": 0.5,
+                "adx": 0.0,
+                "volatility_ratio": 1.0,
+                "autocorrelation": 0.0,
+                "reason": "Insufficient data",
+            }
+
+        rec = self.last_model_recommendation
+        return {
+            "recommended_model": rec.model.value,
+            "confidence": rec.confidence,
+            "hurst": rec.hurst,
+            "adx": rec.adx,
+            "volatility_ratio": rec.volatility_ratio,
+            "autocorrelation": rec.autocorrelation,
+            "reason": rec.reason,
+            "should_trade": rec.should_trade,
         }
 
     def reset(self) -> None:
@@ -425,10 +463,12 @@ class BayesianEvolutionEngine:
         self.state = BayesianStateRegister.initialize(self.config.prior)
         self.elliott_analyzer.reset()
         self.indicators.reset()
+        self.model_selector.reset()
         self.tick_count = 0
         self.last_utility = None
         self.last_wave_count = None
         self.last_indicator_signal = None
+        self.last_model_recommendation = None
         self.audit_log.clear()
 
 
