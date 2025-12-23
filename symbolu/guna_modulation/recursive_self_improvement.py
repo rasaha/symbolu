@@ -713,8 +713,8 @@ class EnterpriseSelfImprover:
         """Adjust entropy penalty based on failure pattern."""
         current = self.coefficient_overrides or DEFAULT_UTILITY_COEFFICIENTS
 
-        # Increase penalty if high entropy causes problems
-        new_lambda_H = current.lambda_H * 1.2
+        # Increase penalty if high entropy causes problems (clamped to [-1, 1])
+        new_lambda_H = max(-1.0, min(1.0, current.lambda_H * 1.1))
 
         new_coefficients = UtilityCoefficients(
             c_S=current.c_S,
@@ -794,13 +794,17 @@ class EnterpriseSelfImprover:
         coefficients: UtilityCoefficients,
     ) -> UtilityCoefficients:
         """Apply conservative adjustments to coefficients."""
+        # Clamp values to valid range [-1, 1]
+        def clamp(val: float) -> float:
+            return max(-1.0, min(1.0, val))
+
         return UtilityCoefficients(
-            c_S=coefficients.c_S,
-            c_R=coefficients.c_R * 0.8,  # Reduce Rajas influence
-            c_T=coefficients.c_T * 0.8,  # Reduce Tamas influence
-            lambda_H=coefficients.lambda_H * 1.5,  # Increase entropy penalty
-            lambda_C=coefficients.lambda_C * 1.5,  # Increase contradiction penalty
-            lambda_F=coefficients.lambda_F * 1.5,  # Increase failure penalty
+            c_S=clamp(coefficients.c_S),
+            c_R=clamp(coefficients.c_R * 0.8),  # Reduce Rajas influence
+            c_T=clamp(coefficients.c_T * 0.8),  # Reduce Tamas influence
+            lambda_H=clamp(coefficients.lambda_H * 1.2),  # Slight increase, clamped
+            lambda_C=clamp(coefficients.lambda_C * 1.2),  # Slight increase, clamped
+            lambda_F=clamp(coefficients.lambda_F * 1.2),  # Slight increase, clamped
         )
 
     def get_effective_coefficients(self) -> UtilityCoefficients:
