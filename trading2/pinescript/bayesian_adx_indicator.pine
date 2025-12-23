@@ -1,0 +1,177 @@
+//@version=6
+indicator("Bayesian ADX Signal", overlay=true, max_lines_count=500)
+
+// ============================================================================
+// INPUTS
+// ============================================================================
+adx_length = input.int(14, "ADX Length", minval=1)
+adx_smoothing = input.int(14, "ADX Smoothing", minval=1)
+prior_alpha = input.float(2.0, "Prior Alpha (Bullish Bias)", minval=0.1, maxval=10.0)
+prior_beta = input.float(2.0, "Prior Beta (Bearish Bias)", minval=0.1, maxval=10.0)
+learning_rate = input.float(0.1, "Learning Rate", minval=0.01, maxval=1.0)
+signal_threshold = input.float(0.6, "Signal Threshold", minval=0.5, maxval=0.9)
+adx_trend_threshold = input.float(25.0, "ADX Trend Threshold", minval=10.0, maxval=50.0)
+
+// Visual settings
+show_background = input.bool(true, "Show Background Color")
+show_labels = input.bool(true, "Show Signal Labels")
+show_table = input.bool(true, "Show Info Table")
+
+// ============================================================================
+// ADX CALCULATION
+// ============================================================================
+// True Range
+tr = math.max(high - low, math.abs(high - close[1]), math.abs(low - close[1]))
+
+// Directional Movement
+up_move = high - high[1]
+down_move = low[1] - low
+plus_dm = up_move > down_move and up_move > 0 ? up_move : 0
+minus_dm = down_move > up_move and down_move > 0 ? down_move : 0
+
+// Smoothed values (Wilder's smoothing)
+smoothed_tr = ta.rma(tr, adx_length)
+smoothed_plus_dm = ta.rma(plus_dm, adx_length)
+smoothed_minus_dm = ta.rma(minus_dm, adx_length)
+
+// Directional Indicators
+plus_di = smoothed_tr != 0 ? 100 * smoothed_plus_dm / smoothed_tr : 0
+minus_di = smoothed_tr != 0 ? 100 * smoothed_minus_dm / smoothed_tr : 0
+
+// ADX
+dx = plus_di + minus_di != 0 ? 100 * math.abs(plus_di - minus_di) / (plus_di + minus_di) : 0
+adx = ta.rma(dx, adx_smoothing)
+
+// ============================================================================
+// BAYESIAN POSTERIOR UPDATE
+// ============================================================================
+// Beta distribution posterior for probability of bullish move
+// P(bullish | data) using conjugate prior
+
+// Initialize posterior parameters
+var float post_alpha = prior_alpha
+var float post_beta = prior_beta
+
+// Observation: convert price action to success/failure
+price_change = close - close[1]
+is_bullish = price_change > 0 ? 1.0 : 0.0
+
+// Weight observation by ADX strength (stronger trend = more confident update)
+adx_weight = adx / 100.0  // Normalize ADX to 0-1
+observation_weight = learning_rate * (0.5 + 0.5 * adx_weight)  // Higher weight when ADX is strong
+
+// Bayesian update: Beta posterior
+// Alpha += successes, Beta += failures
+if barstate.isconfirmed
+    if is_bullish > 0.5
+        post_alpha := post_alpha + observation_weight
+    else
+        post_beta := post_beta + observation_weight
+
+    // Decay to prevent over-concentration (keeps model adaptive)
+    decay = 0.999
+    post_alpha := math.max(prior_alpha * 0.5, post_alpha * decay)
+    post_beta := math.max(prior_beta * 0.5, post_beta * decay)
+
+// Posterior mean (expected probability of bullish)
+posterior_mean = post_alpha / (post_alpha + post_beta)
+
+// Posterior variance (uncertainty)
+posterior_var = (post_alpha * post_beta) / ((post_alpha + post_beta) * (post_alpha + post_beta) * (post_alpha + post_beta + 1))
+posterior_std = math.sqrt(posterior_var)
+
+// Credible interval (approximate 95%)
+ci_low = math.max(0, posterior_mean - 2 * posterior_std)
+ci_high = math.min(1, posterior_mean + 2 * posterior_std)
+
+// ============================================================================
+// SIGNAL GENERATION
+// ============================================================================
+// Strong trend requirement
+has_trend = adx >= adx_trend_threshold
+
+// Bullish signal: high posterior probability + trend + +DI > -DI
+bullish_signal = posterior_mean >= signal_threshold and has_trend and plus_di > minus_di
+
+// Bearish signal: low posterior probability + trend + -DI > +DI
+bearish_signal = posterior_mean <= (1 - signal_threshold) and has_trend and minus_di > plus_di
+
+// Signal strength based on confidence (inverse of uncertainty)
+signal_strength = 1 - (posterior_std * 4)  // Scale std to 0-1
+
+// ============================================================================
+// PLOTTING
+// ============================================================================
+// Background color based on regime
+bg_color = show_background ? (bullish_signal ? color.new(color.green, 85) : bearish_signal ? color.new(color.red, 85) : na) : na
+bgcolor(bg_color)
+
+// Entry signals
+plotshape(bullish_signal and not bullish_signal[1], "Buy Signal", shape.triangleup, location.belowbar, color.green, size=size.normal)
+plotshape(bearish_signal and not bearish_signal[1], "Sell Signal", shape.triangledown, location.abovebar, color.red, size=size.normal)
+
+// Labels with probability
+if show_labels and bullish_signal and not bullish_signal[1]
+    label.new(bar_index, low, "BUY\nP=" + str.tostring(posterior_mean, "#.##") + "\nADX=" + str.tostring(adx, "#.#"),
+              style=label.style_label_up, color=color.green, textcolor=color.white, size=size.small)
+
+if show_labels and bearish_signal and not bearish_signal[1]
+    label.new(bar_index, high, "SELL\nP=" + str.tostring(posterior_mean, "#.##") + "\nADX=" + str.tostring(adx, "#.#"),
+              style=label.style_label_down, color=color.red, textcolor=color.white, size=size.small)
+
+// ============================================================================
+// INFO TABLE
+// ============================================================================
+if show_table and barstate.islast
+    var table info_table = table.new(position.top_right, 2, 8, bgcolor=color.new(color.black, 80), border_width=1)
+
+    // Headers
+    table.cell(info_table, 0, 0, "Metric", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 0, "Value", text_color=color.white, text_size=size.small)
+
+    // ADX
+    adx_color = adx >= adx_trend_threshold ? color.green : color.gray
+    table.cell(info_table, 0, 1, "ADX", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 1, str.tostring(adx, "#.##"), text_color=adx_color, text_size=size.small)
+
+    // +DI / -DI
+    di_color = plus_di > minus_di ? color.green : color.red
+    table.cell(info_table, 0, 2, "+DI / -DI", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 2, str.tostring(plus_di, "#.#") + " / " + str.tostring(minus_di, "#.#"), text_color=di_color, text_size=size.small)
+
+    // Posterior P(Bull)
+    prob_color = posterior_mean > 0.6 ? color.green : posterior_mean < 0.4 ? color.red : color.yellow
+    table.cell(info_table, 0, 3, "P(Bullish)", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 3, str.tostring(posterior_mean * 100, "#.#") + "%", text_color=prob_color, text_size=size.small)
+
+    // Credible Interval
+    table.cell(info_table, 0, 4, "95% CI", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 4, str.tostring(ci_low * 100, "#") + "% - " + str.tostring(ci_high * 100, "#") + "%", text_color=color.gray, text_size=size.small)
+
+    // Uncertainty
+    unc_color = posterior_std < 0.1 ? color.green : posterior_std < 0.2 ? color.yellow : color.red
+    table.cell(info_table, 0, 5, "Uncertainty", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 5, str.tostring(posterior_std, "#.###"), text_color=unc_color, text_size=size.small)
+
+    // Signal
+    signal_text = bullish_signal ? "BUY" : bearish_signal ? "SELL" : "NEUTRAL"
+    signal_color = bullish_signal ? color.green : bearish_signal ? color.red : color.gray
+    table.cell(info_table, 0, 6, "Signal", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 6, signal_text, text_color=signal_color, text_size=size.small)
+
+    // Trend Status
+    trend_text = has_trend ? (plus_di > minus_di ? "BULLISH" : "BEARISH") : "NO TREND"
+    trend_color = has_trend ? (plus_di > minus_di ? color.green : color.red) : color.gray
+    table.cell(info_table, 0, 7, "Trend", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 7, trend_text, text_color=trend_color, text_size=size.small)
+
+// ============================================================================
+// ALERTS
+// ============================================================================
+alertcondition(bullish_signal and not bullish_signal[1], "Bayesian Buy Signal", "Bayesian ADX Buy Signal - P(Bull)={{plot_0}}, ADX={{plot_1}}")
+alertcondition(bearish_signal and not bearish_signal[1], "Bayesian Sell Signal", "Bayesian ADX Sell Signal - P(Bull)={{plot_0}}, ADX={{plot_1}}")
+alertcondition(adx >= adx_trend_threshold and adx[1] < adx_trend_threshold, "Trend Emerging", "ADX crossed above threshold - Trend emerging")
+
+// Hidden plots for alerts
+plot(posterior_mean, "Posterior Mean", display=display.none)
+plot(adx, "ADX", display=display.none)
