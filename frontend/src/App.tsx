@@ -7,24 +7,29 @@
  * - Home: Introduction to Symbol-U with vision and demo link
  * - Products: Product overview page with tier comparisons
  * - Product Detail: Individual tier product pages with detailed features
- * - Tier Selector: Choose between Consumer, Power User, or Admin
- * - Consumer: Simple chat with badges & hints
- * - Power User: Chat + insights panel with metrics
- * - Admin: Full dashboard with analytics & simulations
+ * - Research: Article listing page
+ * - Article: Individual article view
+ * - Tier Selector: Choose between Explorer, Analyst, or Developer
+ * - Explorer: Simple search with badges & hints
+ * - Analyst: Enterprise chat + insights panel with metrics
+ * - Developer: Customer chat with full dashboard and analytics
  */
 
 import React, { useState, useEffect } from 'react';
 import type { PresentationTier } from '@/api/types';
 import { HomePage } from '@/views/HomePage';
 import { ProductsPage } from '@/views/ProductsPage';
+import { ResearchPage } from '@/views/ResearchPage';
+import { ArticlePage } from '@/views/ArticlePage';
 import { ConsumerProductPage, PowerUserProductPage, AdminProductPage } from '@/views/products';
 import { ConsumerTierPage } from '@/views/ConsumerTierPage';
 import { PowerUserTierPage } from '@/views/PowerUserTierPage';
 import { AdminTierPage } from '@/views/AdminTierPage';
 import { useChatStore } from '@/stores/chatStore';
 import { Layers, Search, Code, Home, ArrowLeft, Package } from 'lucide-react';
+import type { PageId } from '@/components/common/PageNavigation';
 
-type AppPage = 'home' | 'products' | 'product_detail' | 'selector' | 'tier';
+type AppPage = 'home' | 'products' | 'product_detail' | 'research' | 'article' | 'selector' | 'tier';
 
 // Landing page for tier selection
 function TierSelector({
@@ -170,6 +175,7 @@ export function App() {
   const [currentPage, setCurrentPage] = useState<AppPage>('home');
   const [selectedTier, setSelectedTier] = useState<PresentationTier | null>(null);
   const [selectedProductTier, setSelectedProductTier] = useState<PresentationTier | null>(null);
+  const [selectedArticle, setSelectedArticle] = useState<string | null>(null);
   const setTier = useChatStore((state) => state.setTier);
 
   // Check URL for page/tier parameters
@@ -178,6 +184,7 @@ export function App() {
     const pageParam = params.get('page');
     const tierParam = params.get('tier');
     const productParam = params.get('product');
+    const articleParam = params.get('article');
 
     if (tierParam && ['consumer', 'power_user', 'admin'].includes(tierParam)) {
       setSelectedTier(tierParam as PresentationTier);
@@ -186,24 +193,33 @@ export function App() {
     } else if (productParam && ['consumer', 'power_user', 'admin'].includes(productParam)) {
       setSelectedProductTier(productParam as PresentationTier);
       setCurrentPage('product_detail');
+    } else if (articleParam) {
+      setSelectedArticle(articleParam);
+      setCurrentPage('article');
     } else if (pageParam === 'products') {
       setCurrentPage('products');
+    } else if (pageParam === 'research') {
+      setCurrentPage('research');
     } else if (pageParam === 'demo') {
       setCurrentPage('selector');
     }
   }, [setTier]);
 
   // Update URL helper
-  const updateURL = (page: AppPage, tier?: PresentationTier, product?: PresentationTier) => {
+  const updateURL = (page: AppPage, options?: { tier?: PresentationTier; product?: PresentationTier; article?: string }) => {
     const url = new URL(window.location.href);
     url.search = '';
 
-    if (page === 'tier' && tier) {
-      url.searchParams.set('tier', tier);
-    } else if (page === 'product_detail' && product) {
-      url.searchParams.set('product', product);
+    if (page === 'tier' && options?.tier) {
+      url.searchParams.set('tier', options.tier);
+    } else if (page === 'product_detail' && options?.product) {
+      url.searchParams.set('product', options.product);
+    } else if (page === 'article' && options?.article) {
+      url.searchParams.set('article', options.article);
     } else if (page === 'products') {
       url.searchParams.set('page', 'products');
+    } else if (page === 'research') {
+      url.searchParams.set('page', 'research');
     } else if (page === 'selector') {
       url.searchParams.set('page', 'demo');
     }
@@ -223,19 +239,32 @@ export function App() {
     updateURL('products');
   };
 
+  // Handle navigating to research page
+  const handleGoToResearch = () => {
+    setCurrentPage('research');
+    updateURL('research');
+  };
+
   // Handle tier selection
   const handleSelectTier = (tier: PresentationTier) => {
     setSelectedTier(tier);
     setTier(tier);
     setCurrentPage('tier');
-    updateURL('tier', tier);
+    updateURL('tier', { tier });
   };
 
   // Handle product tier selection (Learn More)
   const handleSelectProductTier = (tier: PresentationTier) => {
     setSelectedProductTier(tier);
     setCurrentPage('product_detail');
-    updateURL('product_detail', undefined, tier);
+    updateURL('product_detail', { product: tier });
+  };
+
+  // Handle article selection
+  const handleSelectArticle = (articleId: string) => {
+    setSelectedArticle(articleId);
+    setCurrentPage('article');
+    updateURL('article', { article: articleId });
   };
 
   // Handle back to tier selector
@@ -252,12 +281,38 @@ export function App() {
     updateURL('products');
   };
 
+  // Handle back to research
+  const handleBackToResearch = () => {
+    setSelectedArticle(null);
+    setCurrentPage('research');
+    updateURL('research');
+  };
+
   // Handle back to home
   const handleBackToHome = () => {
     setSelectedTier(null);
     setSelectedProductTier(null);
+    setSelectedArticle(null);
     setCurrentPage('home');
     updateURL('home');
+  };
+
+  // Handle PageNavigation navigation
+  const handlePageNavigate = (pageId: PageId) => {
+    switch (pageId) {
+      case 'home':
+        handleBackToHome();
+        break;
+      case 'products':
+        handleGoToProducts();
+        break;
+      case 'research':
+        handleGoToResearch();
+        break;
+      case 'demo':
+        handleEnterDemo();
+        break;
+    }
   };
 
   // Render based on current page
@@ -300,7 +355,26 @@ export function App() {
     return productComponents[selectedProductTier];
   }
 
-  if (currentPage === 'selector' || (!selectedTier && currentPage !== 'product_detail')) {
+  if (currentPage === 'research') {
+    return (
+      <ResearchPage
+        onNavigate={handlePageNavigate}
+        onSelectArticle={handleSelectArticle}
+      />
+    );
+  }
+
+  if (currentPage === 'article' && selectedArticle) {
+    return (
+      <ArticlePage
+        articleId={selectedArticle}
+        onNavigate={handlePageNavigate}
+        onBackToList={handleBackToResearch}
+      />
+    );
+  }
+
+  if (currentPage === 'selector' || (!selectedTier && currentPage !== 'product_detail' && currentPage !== 'research' && currentPage !== 'article')) {
     return (
       <TierSelector
         onSelectTier={handleSelectTier}

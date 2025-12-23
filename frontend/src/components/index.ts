@@ -5,6 +5,8 @@
 // Common components
 export { Header } from './common/Header';
 export { QueryGuide } from './QueryGuide';
+export { PageNavigation, InternalPageHeader } from './common/PageNavigation';
+export type { PageId } from './common/PageNavigation';
 
 // Chat components
 export { MessageBubble } from './chat/MessageBubble';
