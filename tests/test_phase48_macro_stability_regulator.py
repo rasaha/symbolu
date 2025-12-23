@@ -838,9 +838,17 @@ def test_observation_only_no_policy_changes():
 
 
 def test_metadata_only_persona_impact():
-    """Test MSR only affects persona as metadata."""
+    """Test MSR only affects persona as metadata.
+
+    Note: Uses fallback BaseModel when Pydantic is not available.
+    """
     from symbolu.mechanical.persona.models import PersonaResponse
-    from pydantic import BaseModel
+
+    # Try to import pydantic's BaseModel, or use fallback
+    try:
+        from pydantic import BaseModel
+    except ImportError:
+        from symbolu.mechanical.persona.models import BaseModel  # Uses fallback
 
     # MSR should only be in metadata field, not affect tone/text
     # Verified by code review of persona engine integration
