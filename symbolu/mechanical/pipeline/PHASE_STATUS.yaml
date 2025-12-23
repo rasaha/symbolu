@@ -1,10 +1,27 @@
 # Symbol-U Pipeline Phase Status Configuration
-# Version: 1.1
+# Version: 1.2
 # Environment: production
-# Last Updated: 2025-12-21
+# Last Updated: 2025-12-23
 
-version: "1.1"
+version: "1.2"
 environment: production
+
+# =============================================================================
+# ARCHITECTURAL NOTE (2025-12-23)
+# =============================================================================
+# The dormant phases P6-P26 require the PO1-PO5 grounding chain to produce
+# their input envelopes. The current orchestrator uses a different flow:
+#   MLCR → Persona → Fusion → DHA → Renderer
+#
+# Instead of activating P6-P26 directly, we use lightweight bridges:
+#   - P6-Lite: Derives RegimeEnvelope from PresentationDirective
+#   - P7-Lite: Derives DiscourseEnvelope from PresentationDirective
+#
+# These bridges enable the acoustic governance chain (P10/P12) in the
+# Presentation Layer without requiring the full PO1-PO5 → P6-P9 chain.
+#
+# See: symbolu/presentation/p6_lite.py, p7_lite.py
+# =============================================================================
 
 # Directory to Phase ID Mapping
 # Note: Directory names do not always match phase IDs
