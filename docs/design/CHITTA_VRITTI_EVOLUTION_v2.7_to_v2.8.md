@@ -583,13 +583,20 @@ This is **metacognitive measurement** — a component of reasoning, not full rea
 
 ### Fast-Path Optimization
 
-Skip detailed computation when conditions are clearly stable:
+Skip detailed computation when conditions are clearly stable.
+
+**IMPORTANT (Refinement from Review):** Fast path must also verify no viparyaya signal,
+because a coherent inversion (high coherence + semantic opposition) is dangerous.
 
 ```python
 def compute_chitta_vritti(inputs: ChittaVrittiInputs, config: OptimizedConfig) -> ChittaVrittiResult:
-    # FAST PATH 1: Low entropy + all layers present → assume pramāṇa dominant
+    # Quick viparyaya estimate for fast-path safety
+    estimated_viparyaya = quick_opposition_check(inputs)
+
+    # FAST PATH 1: Low entropy + all layers present + no opposition → pramāṇa
     if (all_layers_present(inputs) and
-        inputs.entropy < config.fast_path_entropy_threshold):
+        inputs.entropy < config.fast_path_entropy_threshold and
+        estimated_viparyaya < config.fast_path_viparyaya_ceiling):  # SAFETY GATE
         return fast_path_pramana(inputs)
 
     # FAST PATH 2: Most layers missing → nidrā dominant
@@ -599,6 +606,22 @@ def compute_chitta_vritti(inputs: ChittaVrittiInputs, config: OptimizedConfig) -
 
     # FULL PATH: Detailed computation required
     return compute_full(inputs, config)
+
+def quick_opposition_check(inputs: ChittaVrittiInputs) -> float:
+    """Lightweight check for semantic inversion without full fracture analysis.
+
+    Returns estimated viparyaya signal [0,1].
+    Uses only the two most semantically relevant layers for speed.
+    """
+    if inputs.semantic_rep is None or inputs.structural_rep is None:
+        return 0.0  # Can't detect opposition without both layers
+
+    # Quick cosine similarity between semantic and structural
+    sim = cosine_similarity(inputs.semantic_rep, inputs.structural_rep)
+
+    if sim < -0.3:  # Early warning threshold
+        return abs(sim)  # Higher opposition → higher viparyaya estimate
+    return 0.0
 
 def fast_path_pramana(inputs: ChittaVrittiInputs) -> ChittaVrittiResult:
     """Optimized path for stable, coherent state."""
@@ -610,7 +633,7 @@ def fast_path_pramana(inputs: ChittaVrittiInputs) -> ChittaVrittiResult:
         score=0.90,
         dominant_vritti="pramana",
         primary_fracture=None,
-        explanation="Fast path: low entropy, all layers present"
+        explanation="Fast path: low entropy, all layers present, no opposition"
     )
 ```
 
@@ -627,6 +650,7 @@ class OptimizedConfig:
     # Fast-path gates
     fast_path_entropy_threshold: float = 0.1
     fast_path_coherence_threshold: float = 0.9
+    fast_path_viparyaya_ceiling: float = 0.1  # SAFETY: block fast-path if opposition detected
 
     # Vṛtti computation thresholds
     pramana_entropy_ceiling: float = 0.3       # Above this → pramāṇa decreases
@@ -639,11 +663,17 @@ class OptimizedConfig:
     smrti_window_turns: int = 3
     smrti_decay_rate: float = 0.4              # Per-turn decay
 
-    # Score penalties
+    # Score penalties (applied as step functions, not proportionally)
     penalty_viparyaya: float = 0.25
     penalty_vikalpa: float = 0.15
     penalty_smrti: float = 0.15
     penalty_nidra: float = 0.20
+
+    # Activation thresholds (penalty applies only above these)
+    viparyaya_activation_threshold: float = 0.1
+    vikalpa_activation_threshold: float = 0.15
+    smrti_activation_threshold: float = 0.2
+    nidra_activation_threshold: float = 0.25
 ```
 
 ### Vṛtti Computation Formulas
@@ -749,21 +779,40 @@ def compute_coherence(fractures: dict[tuple[str, str], float]) -> float:
 
 ### Score Composition
 
+**IMPORTANT (Refinement from Review):** Use threshold-driven penalties (step functions),
+not proportional penalties. This keeps the system interpretable and resistant to drift.
+
 ```python
 def compute_score(coherence: float, vritti: dict[str, float],
                   config: OptimizedConfig) -> float:
-    """Compute overall readiness score."""
-    # Start with coherence
+    """Compute overall readiness score using threshold-driven penalties.
+
+    Penalties apply only when vṛtti values exceed their activation thresholds,
+    not proportionally across the whole range. This prevents drift and maintains
+    interpretability.
+    """
     score = coherence
 
-    # Subtract weighted penalties for non-pramāṇa vṛttis
-    score -= vritti["viparyaya"] * config.penalty_viparyaya
-    score -= vritti["vikalpa"] * config.penalty_vikalpa
-    score -= vritti["smrti"] * config.penalty_smrti
-    score -= vritti["nidra"] * config.penalty_nidra
+    # Threshold-driven penalties (step functions)
+    # Penalty applies in FULL when threshold crossed, not proportionally
+    if vritti["viparyaya"] > config.viparyaya_activation_threshold:
+        score -= config.penalty_viparyaya
+
+    if vritti["vikalpa"] > config.vikalpa_activation_threshold:
+        score -= config.penalty_vikalpa
+
+    if vritti["smrti"] > config.smrti_activation_threshold:
+        score -= config.penalty_smrti
+
+    if vritti["nidra"] > config.nidra_activation_threshold:
+        score -= config.penalty_nidra
 
     return clamp(score, 0, 1)
 ```
+
+**Rationale:** Proportional penalties (`score -= vritti * penalty`) create continuous
+degradation that's hard to interpret. Threshold-driven penalties create clear
+decision boundaries: either the vṛtti is "activated" and penalized, or it's not.
 
 ### Caching Strategy
 
@@ -786,27 +835,88 @@ class SessionState:
 ### Tier-Specific Configurations
 
 ```python
-# Consumer: More tolerant, faster decay
+# Consumer: More tolerant, faster decay, wider thresholds
 CONSUMER_OPTIMIZED = OptimizedConfig(
     projection_dim=32,
     fast_path_entropy_threshold=0.15,     # Wider fast-path
+    fast_path_viparyaya_ceiling=0.15,     # More tolerant of minor opposition
     penalty_viparyaya=0.20,               # Lower penalties
     penalty_vikalpa=0.10,
     penalty_smrti=0.10,
     penalty_nidra=0.15,
+    viparyaya_activation_threshold=0.15,  # Higher threshold to activate
+    vikalpa_activation_threshold=0.20,
+    smrti_activation_threshold=0.25,
+    nidra_activation_threshold=0.30,
     smrti_decay_rate=0.5,                 # Faster forgetting
 )
 
-# Enterprise: Stricter, slower decay
+# Enterprise: Stricter, slower decay, tighter thresholds
 ENTERPRISE_OPTIMIZED = OptimizedConfig(
     projection_dim=32,
     fast_path_entropy_threshold=0.08,     # Narrower fast-path
+    fast_path_viparyaya_ceiling=0.05,     # Very sensitive to opposition
     penalty_viparyaya=0.35,               # Higher penalties
     penalty_vikalpa=0.20,
     penalty_smrti=0.15,
     penalty_nidra=0.30,
+    viparyaya_activation_threshold=0.05,  # Lower threshold = more sensitive
+    vikalpa_activation_threshold=0.10,
+    smrti_activation_threshold=0.15,
+    nidra_activation_threshold=0.20,
     smrti_decay_rate=0.2,                 # Slower forgetting
 )
+```
+
+### Enterprise Variant Derivation
+
+Per external review, the enterprise variant can be derived by tightening **three key numbers**:
+
+| Parameter | Consumer | Enterprise | Rationale |
+|-----------|----------|------------|-----------|
+| `fast_path_viparyaya_ceiling` | 0.15 | 0.05 | Enterprise must detect inversions earlier |
+| `viparyaya_activation_threshold` | 0.15 | 0.05 | Lower threshold = faster penalty activation |
+| `penalty_viparyaya` | 0.20 | 0.35 | Truth inversion costs more in enterprise |
+
+**Why these three?**
+
+1. **Viparyaya is the critical differentiator.** Enterprise cannot tolerate semantic inversion
+   because it may feed into downstream decisions (contracts, compliance, audit trails).
+
+2. **Other vṛttis are less critical.** Vikalpa (branching) and Smṛti (staleness) are
+   acceptable in both tiers; Nidrā (missing data) is handled by input validation.
+
+3. **Multiplicative effect.** Lowering `fast_path_viparyaya_ceiling` catches inversions
+   before fast-path; lowering `activation_threshold` catches them in full-path;
+   raising `penalty` ensures they hurt the score.
+
+**Derivation formula:**
+
+```python
+def derive_enterprise_from_consumer(consumer: OptimizedConfig) -> OptimizedConfig:
+    """Derive enterprise config by tightening viparyaya parameters."""
+    return OptimizedConfig(
+        # Keep structural parameters
+        projection_dim=consumer.projection_dim,
+        fast_path_entropy_threshold=consumer.fast_path_entropy_threshold * 0.5,
+
+        # Tighten viparyaya (THE KEY CHANGES)
+        fast_path_viparyaya_ceiling=consumer.fast_path_viparyaya_ceiling / 3,
+        penalty_viparyaya=consumer.penalty_viparyaya * 1.75,
+        viparyaya_activation_threshold=consumer.viparyaya_activation_threshold / 3,
+
+        # Moderate tightening for others
+        penalty_vikalpa=consumer.penalty_vikalpa * 1.5,
+        penalty_smrti=consumer.penalty_smrti * 1.25,
+        penalty_nidra=consumer.penalty_nidra * 1.5,
+        vikalpa_activation_threshold=consumer.vikalpa_activation_threshold * 0.75,
+        smrti_activation_threshold=consumer.smrti_activation_threshold * 0.75,
+        nidra_activation_threshold=consumer.nidra_activation_threshold * 0.75,
+
+        # Slower decay (enterprise needs longer memory)
+        smrti_decay_rate=consumer.smrti_decay_rate * 0.4,
+        smrti_window_turns=consumer.smrti_window_turns + 2,
+    )
 ```
 
 ### Performance Validation
@@ -829,16 +939,27 @@ def compute_chitta_vritti_instrumented(inputs, config):
 
 ---
 
-## Part 13: Open Questions for Resolution
+## Part 13: Open Questions Status
 
-Before implementation, resolve:
+| # | Question | Status | Resolution |
+|---|----------|--------|------------|
+| 1 | Projection dimension D | ✅ RESOLVED | D=32 (validated by review) |
+| 2 | R[v,a] seed values | ⚠️ OPEN | Use illustrative values; tune empirically |
+| 3 | B_c(h(c)) signals | ⚠️ OPEN | Deferred to implementation phase |
+| 4 | Smṛti algorithm | ✅ RESOLVED | Window=3 turns, decay=0.4/turn, threshold=0.05 |
+| 5 | Normalization | ✅ RESOLVED | L1 (simple sum normalization) |
+| 6 | Config values | ✅ RESOLVED | Validated by external review; threshold-driven |
 
-1. **Projection dimension D** — 64? 128? Other?
-2. **R[v,a] seed values** — Use illustrative values above? Different basis?
-3. **B_c(h(c)) signals** — What constitutes context for bias?
-4. **Smṛti algorithm** — Window? Decay? Threshold?
-5. **Normalization** — Softmax or L1?
-6. **Config values** — Validate Consumer/Enterprise penalties
+### Remaining Open Items
+
+1. **R[v,a] matrix values** — Current values are illustrative. Options:
+   - Use as-is for MVP
+   - Derive from philosophical sources (Yoga Sutras commentary)
+   - Tune empirically against test cases
+
+2. **B_c(h(c)) context bias** — Not implemented in v2.7; can defer:
+   - MVP: Set B_c = 0 (no context bias)
+   - v2.9: Add context bias based on session coherence, tone, entropy history
 
 ---
 
@@ -862,10 +983,15 @@ Before implementation, resolve:
 
 ---
 
-*Document version: Draft 1.2*
+*Document version: Draft 1.3*
 *Prepared for: v2.7 → v2.8 evolution planning*
-*Status: Pending resolution of open questions*
+*Status: Reviewed and refined; ready for implementation*
 
 **Changelog:**
+- Draft 1.3: Incorporated external review refinements:
+  - Added viparyaya safety gate to fast-path (prevents coherent inversions)
+  - Changed to threshold-driven penalties (step functions, not proportional)
+  - Added activation thresholds to OptimizedConfig
+  - Added Enterprise Variant Derivation section with three-number tightening
 - Draft 1.2: Added Part 12 (Real-Time Optimization Guidelines) with formulas, thresholds, caching, tier configs
 - Draft 1.1: Added explicit ChittaVrittiResult dataclass with fractures dict
