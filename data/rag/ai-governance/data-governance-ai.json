@@ -1,0 +1,12 @@
+{
+  "id": "gov-005",
+  "title": "Data Governance for AI Training and Inference",
+  "domain": "ai-governance",
+  "tags": ["data", "governance", "training", "privacy"],
+  "content": "Data governance is foundational to responsible AI systems:\n\n**Data Collection Standards:**\n\n1. **Consent and Authorization**: All training data must have documented consent or legal basis for use. Maintain consent receipts and update records when terms change.\n\n2. **Data Minimization**: Collect only data necessary for the specific AI use case. Avoid speculative data collection for undefined future purposes.\n\n3. **Quality Assurance**: Implement data validation at ingestion including format checks, range validation, consistency verification, and duplicate detection.\n\n**Data Lineage Requirements:**\nEvery dataset used in AI training must have complete lineage documentation:\n- Original source and collection date\n- Transformations applied\n- Quality scores and validation results\n- Access permissions and restrictions\n- Retention period and deletion schedule\n\n**Sensitive Data Handling:**\n- PII must be anonymized or pseudonymized before model training\n- Health data requires additional HIPAA-compliant controls\n- Financial data needs encryption at rest and in transit\n- Biometric data requires explicit consent and secure storage\n\n**Data Retention for AI:**\n- Training data: Retain for model lifetime plus 3 years\n- Inference logs: 90 days standard, 7 years for regulated industries\n- Model artifacts: Indefinite retention for reproducibility",
+  "metadata": {
+    "author": "Data Governance Office",
+    "last_updated": "2025-01-25",
+    "version": "1.8"
+  }
+}

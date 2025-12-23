@@ -1,0 +1,12 @@
+{
+  "id": "tech-005",
+  "title": "Symbol-U Deployment and Infrastructure Guide",
+  "domain": "technical",
+  "tags": ["deployment", "infrastructure", "docker", "kubernetes"],
+  "content": "Symbol-U deployment options and requirements:\n\n**Cloud Hosted (Default):**\n- Fully managed SaaS deployment\n- Multi-region availability (US, EU, APAC)\n- Automatic scaling and updates\n- 99.9% uptime SLA (Enterprise)\n\n**On-Premise Deployment:**\n\nRequirements:\n- Kubernetes 1.25+ cluster\n- 16GB RAM minimum per node\n- GPU recommended for inference (NVIDIA A10 or better)\n- PostgreSQL 14+ for metadata\n- Redis 7+ for caching\n\nDocker Compose (Development):\n```yaml\nservices:\n  symbolu-api:\n    image: symbolu/api:latest\n    ports: [\"8000:8000\"]\n  symbolu-frontend:\n    image: symbolu/frontend:latest\n    ports: [\"3000:3000\"]\n```\n\nHelm Chart (Production):\n```bash\nhelm repo add symbolu https://charts.symbolu.ai\nhelm install symbolu symbolu/symbolu-stack \\\n  --set api.replicas=3 \\\n  --set ingress.enabled=true\n```\n\n**Environment Variables:**\n- ANTHROPIC_API_KEY: Claude API access\n- GOOGLE_API_KEY: Gemini API access\n- DATABASE_URL: PostgreSQL connection\n- REDIS_URL: Cache connection\n- DAILY_TOKEN_LIMIT: Per-user daily limit",
+  "metadata": {
+    "author": "DevOps Team",
+    "last_updated": "2025-02-10",
+    "category": "infrastructure"
+  }
+}

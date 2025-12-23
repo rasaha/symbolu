@@ -1,0 +1,12 @@
+{
+  "id": "faq-005",
+  "title": "Common Issues and Troubleshooting",
+  "domain": "enterprise-faq",
+  "tags": ["troubleshooting", "errors", "support", "issues"],
+  "content": "Solutions to frequently encountered issues:\n\n**Login Problems:**\n\nQ: I can't log in with SSO\nA: Ensure your IT admin has added Symbol-U to your identity provider. Check that your email domain matches the configured SSO domain.\n\nQ: My session keeps expiring\nA: Session timeout is set by your admin (default 8 hours). Contact your admin to adjust if needed.\n\n**Performance Issues:**\n\nQ: Responses are slow\nA: Check your network connection. If using VPN, try direct connection. Large context windows (>50K tokens) may have higher latency.\n\nQ: The UI is unresponsive\nA: Clear browser cache and cookies. Disable browser extensions. Try incognito mode.\n\n**API Errors:**\n\nQ: Getting 429 Too Many Requests\nA: You've hit rate limits. Implement exponential backoff. Consider upgrading your tier for higher limits.\n\nQ: Getting 401 Unauthorized\nA: API key may be expired or revoked. Generate a new key from Settings.\n\n**Data Issues:**\n\nQ: Search results seem outdated\nA: Document indexing runs every 4 hours. Force a re-index from Admin > Data Sources.\n\nQ: Missing expected results\nA: Check document permissions. Ensure the content is in a supported format.",
+  "metadata": {
+    "author": "Support Team",
+    "last_updated": "2025-02-12",
+    "category": "support"
+  }
+}

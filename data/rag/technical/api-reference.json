@@ -1,0 +1,12 @@
+{
+  "id": "tech-004",
+  "title": "Symbol-U API Reference",
+  "domain": "technical",
+  "tags": ["api", "rest", "endpoints", "reference"],
+  "content": "Symbol-U REST API endpoints:\n\n**Authentication:**\nAll requests require Bearer token in Authorization header.\n```\nAuthorization: Bearer sk-xxxx\n```\n\n**Core Endpoints:**\n\n`POST /api/chat`\nSend a message and receive AI response.\n```json\n{\n  \"message\": \"string\",\n  \"tier\": \"consumer|power_user|admin\",\n  \"provider\": \"anthropic|google\",\n  \"history\": [{\"role\": \"user|assistant\", \"content\": \"string\"}]\n}\n```\n\n`POST /api/dilchat/analyze`\nAnalyze text with full Symbol-U pipeline.\n```json\n{\n  \"text\": \"string\",\n  \"domain\": \"string\"\n}\n```\n\n`POST /api/session/start`\nStart a new conversation session.\n```json\n{\n  \"domain\": \"string\",\n  \"user_id\": \"string\"\n}\n```\n\n`GET /api/session/{id}/summary`\nGet session analytics and summary.\n\n`GET /api/chat/usage`\nGet token usage statistics.\n\n**Rate Limits:**\n- Starter: 60 requests/minute\n- Professional: 300 requests/minute\n- Enterprise: Custom\n\n**Error Codes:**\n- 400: Bad request\n- 401: Unauthorized\n- 429: Rate limited\n- 500: Internal error",
+  "metadata": {
+    "author": "API Team",
+    "last_updated": "2025-02-15",
+    "category": "api"
+  }
+}

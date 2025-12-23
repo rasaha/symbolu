@@ -1,0 +1,12 @@
+{
+  "id": "faq-004",
+  "title": "Available Integrations and Connectors",
+  "domain": "enterprise-faq",
+  "tags": ["integrations", "api", "connectors", "slack", "teams"],
+  "content": "Symbol-U integrates with your existing tools and workflows:\n\n**Communication Platforms:**\n- Slack: Full bot integration with slash commands\n- Microsoft Teams: Native app with channel support\n- Discord: Bot for community/developer use\n\n**Knowledge Bases:**\n- Confluence: Bidirectional sync\n- Notion: Read-only connector\n- SharePoint: Enterprise connector\n- Google Drive: Document indexing\n\n**Developer Tools:**\n- GitHub: Issue and PR analysis\n- Jira: Ticket integration\n- Linear: Project sync\n- VS Code: Extension available\n\n**CRM/Support:**\n- Salesforce: Case enrichment\n- Zendesk: Ticket assistance\n- Intercom: Chat enhancement\n- HubSpot: Contact insights\n\n**API Access:**\n- REST API with OpenAPI spec\n- GraphQL endpoint (beta)\n- Webhooks for real-time events\n- SDK available for Python, Node.js, Go\n\n**Custom Integrations:**\nEnterprise customers can request custom connectors. Typical build time is 2-4 weeks depending on complexity.",
+  "metadata": {
+    "author": "Integrations Team",
+    "last_updated": "2025-02-10",
+    "category": "technical"
+  }
+}

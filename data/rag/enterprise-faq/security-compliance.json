@@ -1,0 +1,12 @@
+{
+  "id": "faq-003",
+  "title": "Security and Compliance FAQ",
+  "domain": "enterprise-faq",
+  "tags": ["security", "compliance", "soc2", "gdpr", "hipaa"],
+  "content": "Symbol-U maintains enterprise-grade security standards:\n\n**Certifications:**\n- SOC 2 Type II certified\n- ISO 27001 certified\n- GDPR compliant\n- HIPAA compliant (Enterprise tier with BAA)\n- FedRAMP authorization in progress\n\n**Data Security:**\n\nQ: Where is my data stored?\nA: Data is stored in AWS regions you select (US, EU, or APAC). Enterprise customers can specify exact regions.\n\nQ: Is my data used to train models?\nA: No. Your data is never used for model training. We use commercially licensed foundation models with strict data boundaries.\n\nQ: How is data encrypted?\nA: AES-256 encryption at rest, TLS 1.3 in transit. Enterprise customers can provide their own encryption keys (BYOK).\n\nQ: What's the data retention policy?\nA: 90 days by default. Enterprise customers can configure 30 days to 7 years based on compliance needs.\n\n**Access Control:**\n- SSO via SAML 2.0 or OIDC\n- Role-based access control (RBAC)\n- IP allowlisting available\n- MFA enforced for all accounts\n- Session timeout configurable",
+  "metadata": {
+    "author": "Security Team",
+    "last_updated": "2025-02-01",
+    "category": "security"
+  }
+}
