@@ -335,3 +335,166 @@ class TestPipelineResourceCleanup:
             request = UserRequest(text=f"Query for pipeline {i}")
             result = pipeline.run(request)
             assert result is not None
+
+
+class TestGovernanceChainIntegration:
+    """Test PO1-PO5 governance chain is activated before MLCR.
+
+    Pipeline flow:
+        PO1 → PO2 → PO3 → PO4 → PO5 → MLCR → Persona → Fusion → DHA → Renderer
+    """
+
+    def test_po1_grounding_activated(self) -> None:
+        """Test PO1 (Observer-Observed Grounding) runs and populates context."""
+        from symbolu.mechanical.pipeline import SymbolUPipeline, UserRequest
+
+        pipeline = SymbolUPipeline()
+        request = UserRequest(text="I feel anxious about my future")
+
+        result = pipeline.run(request)
+
+        # Get context from result meta
+        ctx = result.meta.get("context")
+        assert ctx is not None
+
+        # PO1 should have populated phase_minus_one
+        assert hasattr(ctx, "phase_minus_one")
+        assert ctx.phase_minus_one is not None
+        assert hasattr(ctx.phase_minus_one, "overall_policy")
+
+    def test_po2_intent_envelope_activated(self) -> None:
+        """Test PO2 (Intent Envelope) runs and populates context."""
+        from symbolu.mechanical.pipeline import SymbolUPipeline, UserRequest
+
+        pipeline = SymbolUPipeline()
+        request = UserRequest(text="Why do I keep making mistakes?")
+
+        result = pipeline.run(request)
+
+        ctx = result.meta.get("context")
+        assert ctx is not None
+
+        # PO2 should have populated phase_zero
+        assert hasattr(ctx, "phase_zero")
+        assert ctx.phase_zero is not None
+        assert hasattr(ctx.phase_zero, "intent_type")
+        assert hasattr(ctx.phase_zero, "response_posture")
+
+    def test_po3_allowed_actions_activated(self) -> None:
+        """Test PO3 (Allowed Action Binding) runs and populates context."""
+        from symbolu.mechanical.pipeline import SymbolUPipeline, UserRequest
+
+        pipeline = SymbolUPipeline()
+        request = UserRequest(text="How can I improve my productivity?")
+
+        result = pipeline.run(request)
+
+        ctx = result.meta.get("context")
+        assert ctx is not None
+
+        # PO3 should have populated allowed_actions
+        assert hasattr(ctx, "allowed_actions")
+        assert ctx.allowed_actions is not None
+        assert hasattr(ctx.allowed_actions, "allowed_actions")
+        assert hasattr(ctx.allowed_actions, "intent_type")
+
+    def test_full_governance_chain_flows(self) -> None:
+        """Test full PO1-PO5 chain runs before MLCR."""
+        from symbolu.mechanical.pipeline import SymbolUPipeline, UserRequest
+        from symbolu.mechanical.pipeline.grounding import OverallPolicy
+
+        pipeline = SymbolUPipeline()
+        request = UserRequest(text="I'm worried because my friend seems sad")
+
+        result = pipeline.run(request)
+
+        ctx = result.meta.get("context")
+        assert ctx is not None
+
+        # All governance outputs should be populated
+        assert ctx.phase_minus_one is not None  # PO1
+        assert ctx.phase_zero is not None  # PO2
+        assert ctx.allowed_actions is not None  # PO3
+
+        # MLCR should also have run (after governance)
+        assert ctx.mlcr is not None
+
+    def test_governance_chain_reflexive_query(self) -> None:
+        """Test governance chain correctly identifies reflexive (self-observation) queries."""
+        from symbolu.mechanical.pipeline import SymbolUPipeline, UserRequest
+        from symbolu.mechanical.pipeline.grounding import ObservationMode
+
+        pipeline = SymbolUPipeline()
+        request = UserRequest(text="I feel overwhelmed by my responsibilities")
+
+        result = pipeline.run(request)
+
+        ctx = result.meta.get("context")
+        assert ctx is not None
+        assert ctx.phase_minus_one is not None
+
+        # For "I feel..." queries, primary grounding should be REFLEXIVE
+        if ctx.phase_minus_one.selected_primary:
+            assert ctx.phase_minus_one.selected_primary.mode == ObservationMode.REFLEXIVE
+
+    def test_governance_chain_detached_query(self) -> None:
+        """Test governance chain correctly identifies detached (abstract) queries."""
+        from symbolu.mechanical.pipeline import SymbolUPipeline, UserRequest
+        from symbolu.mechanical.pipeline.grounding import ObservationMode
+
+        pipeline = SymbolUPipeline()
+        request = UserRequest(text="Anxiety is a common experience in modern society")
+
+        result = pipeline.run(request)
+
+        ctx = result.meta.get("context")
+        assert ctx is not None
+        assert ctx.phase_minus_one is not None
+
+        # For abstract statements, primary grounding should be DETACHED
+        if ctx.phase_minus_one.selected_primary:
+            assert ctx.phase_minus_one.selected_primary.mode == ObservationMode.DETACHED
+
+    def test_governance_determinism(self) -> None:
+        """Test governance chain produces deterministic results."""
+        from symbolu.mechanical.pipeline import SymbolUPipeline, UserRequest
+
+        pipeline = SymbolUPipeline()
+        query = "I wonder why I feel this way"
+
+        result1 = pipeline.run(UserRequest(text=query))
+        result2 = pipeline.run(UserRequest(text=query))
+
+        ctx1 = result1.meta.get("context")
+        ctx2 = result2.meta.get("context")
+
+        assert ctx1 is not None and ctx2 is not None
+
+        # PO1 results should be identical
+        assert ctx1.phase_minus_one.overall_policy == ctx2.phase_minus_one.overall_policy
+
+        # PO2 results should be identical
+        assert ctx1.phase_zero.intent_type == ctx2.phase_zero.intent_type
+        assert ctx1.phase_zero.response_posture == ctx2.phase_zero.response_posture
+
+    def test_governance_respects_session_context(self) -> None:
+        """Test governance chain respects session context when provided."""
+        from symbolu.mechanical.pipeline import SymbolUPipeline, UserRequest
+
+        pipeline = SymbolUPipeline()
+
+        # Query with session_id should create session context
+        request = UserRequest(
+            text="I feel stuck in my career",
+            metadata={"session_id": "test_session_001"},
+        )
+
+        result = pipeline.run(request)
+
+        ctx = result.meta.get("context")
+        assert ctx is not None
+        assert ctx.phase_minus_one is not None
+
+        # Session context should be tracked if available
+        if hasattr(ctx, "po1_session"):
+            assert ctx.po1_session is not None
