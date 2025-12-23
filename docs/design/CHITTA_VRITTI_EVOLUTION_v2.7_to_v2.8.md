@@ -556,7 +556,280 @@ This is **metacognitive measurement** — a component of reasoning, not full rea
 
 ---
 
-## Part 12: Open Questions for Resolution
+## Part 12: Real-Time Optimization Guidelines
+
+### Computational Profile
+
+| Operation | Complexity | Expected Runtime |
+|-----------|------------|------------------|
+| Project 4 layers to dim D | O(4 × native_dim × D) | ~10-50μs |
+| Pairwise similarity (6 pairs) | O(6 × D) | <1μs |
+| 5 vṛtti formulas | O(1) each | <1μs |
+| R[v,a] matrix multiply (5×10) | O(50) | <1μs |
+| Normalize (softmax over 10) | O(10) | <1μs |
+
+**Target:** <100μs per invocation
+
+### Memory Footprint
+
+| Component | Size | Lifecycle |
+|-----------|------|-----------|
+| R[v,a] matrix | 400 bytes (50 floats) | Static — cache at startup |
+| Projection adapters | ~D × native_dim per layer | Static — precompute |
+| ChittaVrittiResult | ~200 bytes | Per invocation |
+| Fractures dict | ~100 bytes (6 pairs) | Per invocation |
+
+**Total runtime allocation:** <1KB per invocation
+
+### Fast-Path Optimization
+
+Skip detailed computation when conditions are clearly stable:
+
+```python
+def compute_chitta_vritti(inputs: ChittaVrittiInputs, config: OptimizedConfig) -> ChittaVrittiResult:
+    # FAST PATH 1: Low entropy + all layers present → assume pramāṇa dominant
+    if (all_layers_present(inputs) and
+        inputs.entropy < config.fast_path_entropy_threshold):
+        return fast_path_pramana(inputs)
+
+    # FAST PATH 2: Most layers missing → nidrā dominant
+    missing = count_missing(inputs)
+    if missing >= 3:
+        return fast_path_nidra(inputs, missing)
+
+    # FULL PATH: Detailed computation required
+    return compute_full(inputs, config)
+
+def fast_path_pramana(inputs: ChittaVrittiInputs) -> ChittaVrittiResult:
+    """Optimized path for stable, coherent state."""
+    return ChittaVrittiResult(
+        coherence=0.95,
+        fractures={},  # Skip detailed fracture analysis
+        vritti={"pramana": 0.85, "viparyaya": 0.03, "vikalpa": 0.04,
+                "smrti": 0.04, "nidra": 0.04},
+        score=0.90,
+        dominant_vritti="pramana",
+        primary_fracture=None,
+        explanation="Fast path: low entropy, all layers present"
+    )
+```
+
+### Recommended Thresholds
+
+```python
+@dataclass(frozen=True)
+class OptimizedConfig:
+    """Production-ready threshold configuration."""
+
+    # Projection dimension (smaller = faster)
+    projection_dim: int = 32              # Start here, increase if quality degrades
+
+    # Fast-path gates
+    fast_path_entropy_threshold: float = 0.1
+    fast_path_coherence_threshold: float = 0.9
+
+    # Vṛtti computation thresholds
+    pramana_entropy_ceiling: float = 0.3       # Above this → pramāṇa decreases
+    viparyaya_opposition_floor: float = -0.5   # Similarity below this → opposition
+    vikalpa_variance_floor: float = 0.2        # Fracture variance above this → branching
+    smrti_staleness_threshold: float = 0.05    # State Δ below this → unchanged
+    nidra_presence_floor: float = 0.1          # Confidence below this → absent
+
+    # Smṛti temporal parameters
+    smrti_window_turns: int = 3
+    smrti_decay_rate: float = 0.4              # Per-turn decay
+
+    # Score penalties
+    penalty_viparyaya: float = 0.25
+    penalty_vikalpa: float = 0.15
+    penalty_smrti: float = 0.15
+    penalty_nidra: float = 0.20
+```
+
+### Vṛtti Computation Formulas
+
+**Pramāṇa (Valid Cognition):**
+```python
+def compute_pramana(coherence: float, entropy: float, motion: float,
+                    config: OptimizedConfig) -> float:
+    """High when layers agree, entropy low, motion stable."""
+    entropy_factor = max(0, 1 - entropy / config.pramana_entropy_ceiling)
+    motion_stability = 1 - min(1, motion)  # Lower motion = more stable
+    raw = coherence * entropy_factor * motion_stability
+    return clamp(raw, 0, 1)
+```
+
+**Viparyaya (Misperception):**
+```python
+def compute_viparyaya(fractures: dict, confidence: float,
+                      config: OptimizedConfig) -> float:
+    """High when layers confidently oppose each other."""
+    if not fractures:
+        return 0.0
+
+    # Find maximum opposition (fracture approaching 1.0 = anti-correlation)
+    max_fracture = max(fractures.values())
+
+    if max_fracture > 0.7:  # Strong disagreement
+        opposition_strength = (max_fracture - 0.7) / 0.3  # Scale 0.7-1.0 → 0-1
+        return clamp(opposition_strength * confidence, 0, 1)
+    return 0.0
+```
+
+**Vikalpa (Conceptual Branching):**
+```python
+def compute_vikalpa(fractures: dict, entropy: float,
+                    config: OptimizedConfig) -> float:
+    """High when agreement is uneven AND entropy is high."""
+    if not fractures or len(fractures) < 2:
+        return 0.0
+
+    fracture_values = list(fractures.values())
+    fracture_variance = variance(fracture_values)
+
+    if fracture_variance > config.vikalpa_variance_floor and entropy > 0.3:
+        return clamp(entropy * (fracture_variance / 0.5), 0, 1)
+    return 0.0
+```
+
+**Smṛti (Memory Persistence):**
+```python
+def compute_smrti(current: ChittaVrittiInputs,
+                  previous: Optional[ChittaVrittiInputs],
+                  accumulated_smrti: float,
+                  config: OptimizedConfig) -> float:
+    """High when state unchanged despite new input."""
+    if previous is None:
+        return 0.0
+
+    # Compute state delta
+    delta = compute_representation_delta(current, previous)
+
+    if delta < config.smrti_staleness_threshold:
+        # State unchanged → accumulate smṛti
+        new_smrti = min(1.0, accumulated_smrti + 0.2)
+    else:
+        # State changed → decay smṛti
+        new_smrti = accumulated_smrti * config.smrti_decay_rate
+
+    return clamp(new_smrti, 0, 1)
+```
+
+**Nidrā (Dormancy):**
+```python
+def compute_nidra(inputs: ChittaVrittiInputs) -> float:
+    """High when representations are missing or weak."""
+    layers = [inputs.phonemic_rep, inputs.semantic_rep,
+              inputs.structural_rep, inputs.temporal_rep]
+    missing_count = sum(1 for layer in layers if layer is None)
+    return missing_count / 4.0
+```
+
+**Normalization to Probability Distribution:**
+```python
+def normalize_vritti(raw_scores: dict[str, float]) -> dict[str, float]:
+    """Convert raw scores to probability distribution."""
+    # Add small epsilon to prevent division by zero
+    total = sum(raw_scores.values()) + 1e-8
+    return {k: v / total for k, v in raw_scores.items()}
+```
+
+### Aggregate Coherence Computation
+
+```python
+def compute_coherence(fractures: dict[tuple[str, str], float]) -> float:
+    """Aggregate coherence from pairwise fractures."""
+    if not fractures:
+        return 1.0  # No pairs to compare = vacuously coherent
+
+    # Coherence = 1 - mean(fractures)
+    mean_fracture = sum(fractures.values()) / len(fractures)
+    return clamp(1 - mean_fracture, 0, 1)
+```
+
+### Score Composition
+
+```python
+def compute_score(coherence: float, vritti: dict[str, float],
+                  config: OptimizedConfig) -> float:
+    """Compute overall readiness score."""
+    # Start with coherence
+    score = coherence
+
+    # Subtract weighted penalties for non-pramāṇa vṛttis
+    score -= vritti["viparyaya"] * config.penalty_viparyaya
+    score -= vritti["vikalpa"] * config.penalty_vikalpa
+    score -= vritti["smrti"] * config.penalty_smrti
+    score -= vritti["nidra"] * config.penalty_nidra
+
+    return clamp(score, 0, 1)
+```
+
+### Caching Strategy
+
+```python
+# At startup — compute once, reuse
+CACHED_R_MATRIX = load_coupling_matrix()  # 5×10 floats
+CACHED_PROJECTORS = {
+    "phonemic": PhonemeProjector(dim=32),
+    "semantic": SemanticProjector(dim=32),
+    "structural": StructuralProjector(dim=32),
+    "temporal": TemporalProjector(dim=32),
+}
+
+# Per-session — maintain smṛti state
+class SessionState:
+    previous_inputs: Optional[ChittaVrittiInputs] = None
+    accumulated_smrti: float = 0.0
+```
+
+### Tier-Specific Configurations
+
+```python
+# Consumer: More tolerant, faster decay
+CONSUMER_OPTIMIZED = OptimizedConfig(
+    projection_dim=32,
+    fast_path_entropy_threshold=0.15,     # Wider fast-path
+    penalty_viparyaya=0.20,               # Lower penalties
+    penalty_vikalpa=0.10,
+    penalty_smrti=0.10,
+    penalty_nidra=0.15,
+    smrti_decay_rate=0.5,                 # Faster forgetting
+)
+
+# Enterprise: Stricter, slower decay
+ENTERPRISE_OPTIMIZED = OptimizedConfig(
+    projection_dim=32,
+    fast_path_entropy_threshold=0.08,     # Narrower fast-path
+    penalty_viparyaya=0.35,               # Higher penalties
+    penalty_vikalpa=0.20,
+    penalty_smrti=0.15,
+    penalty_nidra=0.30,
+    smrti_decay_rate=0.2,                 # Slower forgetting
+)
+```
+
+### Performance Validation
+
+Add instrumentation to validate <100μs target:
+
+```python
+import time
+
+def compute_chitta_vritti_instrumented(inputs, config):
+    start = time.perf_counter_ns()
+    result = compute_chitta_vritti(inputs, config)
+    elapsed_us = (time.perf_counter_ns() - start) / 1000
+
+    if elapsed_us > 100:
+        log.warning(f"Chitta-Vṛtti exceeded 100μs: {elapsed_us:.1f}μs")
+
+    return result
+```
+
+---
+
+## Part 13: Open Questions for Resolution
 
 Before implementation, resolve:
 
@@ -589,7 +862,10 @@ Before implementation, resolve:
 
 ---
 
-*Document version: Draft 1.1*
+*Document version: Draft 1.2*
 *Prepared for: v2.7 → v2.8 evolution planning*
 *Status: Pending resolution of open questions*
-*Changes: Added explicit ChittaVrittiResult dataclass with fractures dict*
+
+**Changelog:**
+- Draft 1.2: Added Part 12 (Real-Time Optimization Guidelines) with formulas, thresholds, caching, tier configs
+- Draft 1.1: Added explicit ChittaVrittiResult dataclass with fractures dict
