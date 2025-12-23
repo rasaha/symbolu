@@ -59,26 +59,27 @@ function TierSelector({
 
         {/* Tier Cards */}
         <div className="grid md:grid-cols-3 gap-6">
-          {/* Consumer Tier */}
+          {/* Explorer Tier - Knowledge Base Lookup */}
           <button
             onClick={() => onSelectTier('consumer')}
             className="group relative bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6 text-left hover:bg-white/10 hover:border-blue-500/50 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-blue-500/20"
           >
             <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <User className="w-7 h-7 text-white" />
+              <Search className="w-7 h-7 text-white" />
             </div>
-            <h3 className="text-xl font-semibold text-white mb-2">Consumer</h3>
+            <h3 className="text-xl font-semibold text-white mb-2">Explorer</h3>
+            <p className="text-blue-400 text-xs font-medium mb-2">RAG Lookup</p>
             <p className="text-gray-400 text-sm mb-4">
-              Simple, clean chat experience with helpful insights and badges.
+              Simple RAG-powered search with quality indicators and hints.
             </p>
             <ul className="text-xs text-gray-500 space-y-1">
               <li className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                Chat interface
+                Search interface
               </li>
               <li className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                Response badges
+                Quality badges
               </li>
               <li className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
@@ -90,7 +91,7 @@ function TierSelector({
             </div>
           </button>
 
-          {/* Power User Tier */}
+          {/* Analyst Tier - Enterprise Chat */}
           <button
             onClick={() => onSelectTier('power_user')}
             className="group relative bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6 text-left hover:bg-white/10 hover:border-purple-500/50 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-purple-500/20"
@@ -98,9 +99,10 @@ function TierSelector({
             <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <Layers className="w-7 h-7 text-white" />
             </div>
-            <h3 className="text-xl font-semibold text-white mb-2">Power User</h3>
+            <h3 className="text-xl font-semibold text-white mb-2">Analyst</h3>
+            <p className="text-purple-400 text-xs font-medium mb-2">Enterprise Chat</p>
             <p className="text-gray-400 text-sm mb-4">
-              Enhanced insights with layer analysis and coherence metrics.
+              Internal employee chat with semantic insights and metrics.
             </p>
             <ul className="text-xs text-gray-500 space-y-1">
               <li className="flex items-center gap-2">
@@ -121,17 +123,18 @@ function TierSelector({
             </div>
           </button>
 
-          {/* Admin Tier */}
+          {/* Developer Tier - Customer Chat */}
           <button
             onClick={() => onSelectTier('admin')}
             className="group relative bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6 text-left hover:bg-white/10 hover:border-orange-500/50 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-orange-500/20"
           >
             <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <Shield className="w-7 h-7 text-white" />
+              <Code className="w-7 h-7 text-white" />
             </div>
-            <h3 className="text-xl font-semibold text-white mb-2">Admin</h3>
+            <h3 className="text-xl font-semibold text-white mb-2">Developer</h3>
+            <p className="text-orange-400 text-xs font-medium mb-2">Customer Chat</p>
             <p className="text-gray-400 text-sm mb-4">
-              Full analytics dashboard with simulations and diagnostics.
+              External customer chat with full analytics and diagnostics.
             </p>
             <ul className="text-xs text-gray-500 space-y-1">
               <li className="flex items-center gap-2">

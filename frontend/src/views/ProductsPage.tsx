@@ -8,8 +8,8 @@
 import React from 'react';
 import {
   Layers,
-  User,
-  Shield,
+  Search,
+  Code,
   ArrowRight,
   ArrowLeft,
   CheckCircle,
@@ -76,30 +76,30 @@ export function ProductsPage({ onBackToHome, onSelectProductTier, onTryDemo }: P
       <section className="py-12 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-3 gap-8">
-            {/* Consumer Tier */}
+            {/* Explorer - RAG Lookup */}
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-b from-blue-500/20 to-transparent rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative bg-slate-900/80 border border-white/10 rounded-3xl p-8 hover:border-blue-500/50 transition-all">
                 {/* Icon */}
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-6 shadow-lg shadow-blue-500/25">
-                  <User className="w-8 h-8 text-white" />
+                  <Search className="w-8 h-8 text-white" />
                 </div>
 
                 {/* Title */}
-                <h2 className="text-2xl font-bold mb-2">Consumer</h2>
-                <p className="text-blue-400 text-sm font-medium mb-4">Simple & Intuitive</p>
+                <h2 className="text-2xl font-bold mb-2">Explorer</h2>
+                <p className="text-blue-400 text-sm font-medium mb-4">RAG Lookup</p>
 
                 {/* Description */}
                 <p className="text-gray-400 mb-6">
-                  A clean, focused chat experience designed for everyday users who want straightforward
-                  interaction without technical complexity.
+                  A clean, focused knowledge search experience designed for users who want
+                  straightforward RAG-powered queries with quality indicators.
                 </p>
 
                 {/* Key Features */}
                 <div className="space-y-3 mb-8">
                   <div className="flex items-center gap-3">
                     <CheckCircle className="w-5 h-5 text-blue-400" />
-                    <span className="text-gray-300">Conversational chat interface</span>
+                    <span className="text-gray-300">Knowledge search interface</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <CheckCircle className="w-5 h-5 text-blue-400" />
@@ -117,7 +117,7 @@ export function ProductsPage({ onBackToHome, onSelectProductTier, onTryDemo }: P
 
                 {/* Ideal For */}
                 <div className="text-xs text-gray-500 mb-6">
-                  <span className="font-medium text-gray-400">Ideal for:</span> End users, general conversations
+                  <span className="font-medium text-gray-400">Ideal for:</span> Knowledge lookup, general queries
                 </div>
 
                 {/* Actions */}
@@ -139,7 +139,7 @@ export function ProductsPage({ onBackToHome, onSelectProductTier, onTryDemo }: P
               </div>
             </div>
 
-            {/* Power User Tier */}
+            {/* Analyst - Enterprise Chat */}
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-b from-purple-500/20 to-transparent rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative bg-slate-900/80 border border-white/10 rounded-3xl p-8 hover:border-purple-500/50 transition-all">
@@ -154,13 +154,13 @@ export function ProductsPage({ onBackToHome, onSelectProductTier, onTryDemo }: P
                 </div>
 
                 {/* Title */}
-                <h2 className="text-2xl font-bold mb-2">Power User</h2>
-                <p className="text-purple-400 text-sm font-medium mb-4">Enhanced Insights</p>
+                <h2 className="text-2xl font-bold mb-2">Analyst</h2>
+                <p className="text-purple-400 text-sm font-medium mb-4">Enterprise Chat</p>
 
                 {/* Description */}
                 <p className="text-gray-400 mb-6">
-                  Deep analytical experience with semantic layer views, coherence metrics,
-                  and cognitive profiling for users who want to understand the "why".
+                  Internal employee chat with semantic layer views, coherence metrics,
+                  and cognitive profiling for deeper understanding of responses.
                 </p>
 
                 {/* Key Features */}
@@ -185,7 +185,7 @@ export function ProductsPage({ onBackToHome, onSelectProductTier, onTryDemo }: P
 
                 {/* Ideal For */}
                 <div className="text-xs text-gray-500 mb-6">
-                  <span className="font-medium text-gray-400">Ideal for:</span> Researchers, analysts, curious minds
+                  <span className="font-medium text-gray-400">Ideal for:</span> Internal employees, analysts
                 </div>
 
                 {/* Actions */}
@@ -207,23 +207,23 @@ export function ProductsPage({ onBackToHome, onSelectProductTier, onTryDemo }: P
               </div>
             </div>
 
-            {/* Admin Tier */}
+            {/* Developer - Customer Chat */}
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-b from-orange-500/20 to-transparent rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative bg-slate-900/80 border border-white/10 rounded-3xl p-8 hover:border-orange-500/50 transition-all">
                 {/* Icon */}
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center mb-6 shadow-lg shadow-orange-500/25">
-                  <Shield className="w-8 h-8 text-white" />
+                  <Code className="w-8 h-8 text-white" />
                 </div>
 
                 {/* Title */}
-                <h2 className="text-2xl font-bold mb-2">Admin</h2>
-                <p className="text-orange-400 text-sm font-medium mb-4">Full Analytics</p>
+                <h2 className="text-2xl font-bold mb-2">Developer</h2>
+                <p className="text-orange-400 text-sm font-medium mb-4">Customer Chat</p>
 
                 {/* Description */}
                 <p className="text-gray-400 mb-6">
-                  Complete analytics dashboard with trend charts, risk assessment,
-                  what-if simulations, and diagnostic tools for full pipeline visibility.
+                  External customer-facing chat with full analytics dashboard, trend charts,
+                  risk assessment, and diagnostic tools for complete visibility.
                 </p>
 
                 {/* Key Features */}
@@ -248,7 +248,7 @@ export function ProductsPage({ onBackToHome, onSelectProductTier, onTryDemo }: P
 
                 {/* Ideal For */}
                 <div className="text-xs text-gray-500 mb-6">
-                  <span className="font-medium text-gray-400">Ideal for:</span> Admins, developers, analysts
+                  <span className="font-medium text-gray-400">Ideal for:</span> External customers, developers
                 </div>
 
                 {/* Actions */}
@@ -284,19 +284,22 @@ export function ProductsPage({ onBackToHome, onSelectProductTier, onTryDemo }: P
                 <tr className="border-b border-white/10">
                   <th className="text-left py-4 px-4 text-gray-400 font-medium">Feature</th>
                   <th className="text-center py-4 px-4">
-                    <span className="text-blue-400 font-semibold">Consumer</span>
+                    <div className="text-blue-400 font-semibold">Explorer</div>
+                    <div className="text-blue-400/60 text-xs">RAG Lookup</div>
                   </th>
                   <th className="text-center py-4 px-4">
-                    <span className="text-purple-400 font-semibold">Power User</span>
+                    <div className="text-purple-400 font-semibold">Analyst</div>
+                    <div className="text-purple-400/60 text-xs">Enterprise Chat</div>
                   </th>
                   <th className="text-center py-4 px-4">
-                    <span className="text-orange-400 font-semibold">Admin</span>
+                    <div className="text-orange-400 font-semibold">Developer</div>
+                    <div className="text-orange-400/60 text-xs">Customer Chat</div>
                   </th>
                 </tr>
               </thead>
               <tbody className="text-sm">
                 {[
-                  { feature: 'Chat Interface', consumer: true, power: true, admin: true },
+                  { feature: 'Search Interface', consumer: true, power: true, admin: true },
                   { feature: 'Response Badges', consumer: true, power: true, admin: true },
                   { feature: 'Hint Cards', consumer: true, power: true, admin: true },
                   { feature: 'Coherence Indicator', consumer: true, power: true, admin: true },

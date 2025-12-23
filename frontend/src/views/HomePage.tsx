@@ -17,7 +17,8 @@ import {
   GitBranch,
   Lock,
   BarChart3,
-  MessageSquare,
+  Search,
+  Code,
   Workflow,
   Package,
 } from 'lucide-react';
@@ -276,30 +277,32 @@ export function HomePage({ onEnterDemo, onGoToProducts }: HomePageProps) {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            {/* Consumer Tier */}
+            {/* Explorer - RAG Lookup */}
             <div className="group p-6 rounded-2xl bg-gradient-to-b from-blue-500/10 to-transparent border border-blue-500/20 hover:border-blue-500/40 transition-all hover:scale-105">
               <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <MessageSquare className="w-6 h-6 text-blue-400" />
+                <Search className="w-6 h-6 text-blue-400" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-blue-100">Consumer</h3>
+              <h3 className="text-lg font-semibold mb-1 text-blue-100">Explorer</h3>
+              <p className="text-blue-400 text-xs font-medium mb-3">RAG Lookup</p>
               <p className="text-gray-400 text-sm mb-4">
-                Simple, clean chat with badges and hints. Perfect for everyday users.
+                Simple knowledge search with quality indicators and hints.
               </p>
               <ul className="text-xs text-gray-500 space-y-1">
-                <li>- Chat interface</li>
+                <li>- Search interface</li>
                 <li>- Quality badges</li>
                 <li>- Hint cards</li>
               </ul>
             </div>
 
-            {/* Power User Tier */}
+            {/* Analyst - Enterprise Chat */}
             <div className="group p-6 rounded-2xl bg-gradient-to-b from-purple-500/10 to-transparent border border-purple-500/20 hover:border-purple-500/40 transition-all hover:scale-105">
               <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <Layers className="w-6 h-6 text-purple-400" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-purple-100">Power User</h3>
+              <h3 className="text-lg font-semibold mb-1 text-purple-100">Analyst</h3>
+              <p className="text-purple-400 text-xs font-medium mb-3">Enterprise Chat</p>
               <p className="text-gray-400 text-sm mb-4">
-                Enhanced insights with layer analysis and metrics. For curious minds.
+                Internal employee chat with semantic insights and metrics.
               </p>
               <ul className="text-xs text-gray-500 space-y-1">
                 <li>- Layer tabs (Symbolic/Practical/Mirror)</li>
@@ -308,14 +311,15 @@ export function HomePage({ onEnterDemo, onGoToProducts }: HomePageProps) {
               </ul>
             </div>
 
-            {/* Admin Tier */}
+            {/* Developer - Customer Chat */}
             <div className="group p-6 rounded-2xl bg-gradient-to-b from-orange-500/10 to-transparent border border-orange-500/20 hover:border-orange-500/40 transition-all hover:scale-105">
               <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Shield className="w-6 h-6 text-orange-400" />
+                <Code className="w-6 h-6 text-orange-400" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-orange-100">Admin</h3>
+              <h3 className="text-lg font-semibold mb-1 text-orange-100">Developer</h3>
+              <p className="text-orange-400 text-xs font-medium mb-3">Customer Chat</p>
               <p className="text-gray-400 text-sm mb-4">
-                Full analytics dashboard with simulations. For complete visibility.
+                External customer chat with full analytics and diagnostics.
               </p>
               <ul className="text-xs text-gray-500 space-y-1">
                 <li>- Coherence trend charts</li>
