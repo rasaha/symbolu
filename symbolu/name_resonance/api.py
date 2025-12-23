@@ -31,6 +31,11 @@ from symbolu.name_resonance.extractor import normalize_input, extract_signals
 from symbolu.name_resonance.projector import project_to_structural_profile
 from symbolu.name_resonance.matcher import match_all_domains, get_compatibility_summary
 from symbolu.name_resonance.domains import ALL_DOMAINS
+from symbolu.name_resonance.ontological_bridge import (
+    get_ontological_vector,
+    project_ontological_to_experiential,
+    compute_bridged_profile,
+)
 
 
 # =============================================================================
@@ -54,6 +59,9 @@ def analyze_name(
     name: str,
     *,
     domains: Optional[Tuple] = None,
+    use_ontological_bridge: bool = False,
+    phonetic_weight: float = 0.6,
+    ontological_weight: float = 0.4,
 ) -> NameResonanceResult:
     """
     Analyze a name's structural resonance and domain compatibility.
@@ -65,6 +73,13 @@ def analyze_name(
         name: The name to analyze (single word or full name)
         domains: Optional tuple of DomainPatterns to match against.
                  Defaults to ALL_DOMAINS (careers + sports).
+        use_ontological_bridge: If True, use 10D ontological layers (C-S-R logic)
+                               bridged to 12D for enhanced analysis.
+                               Default False for backward compatibility.
+        phonetic_weight: Weight for phonetic 12D component (default 0.6).
+                        Only used when use_ontological_bridge=True.
+        ontological_weight: Weight for ontological 10D→12D component (default 0.4).
+                           Only used when use_ontological_bridge=True.
 
     Returns:
         NameResonanceResult with full analysis and explanation
@@ -74,6 +89,9 @@ def analyze_name(
         >>> print(result.summary)
         >>> for dr in result.domain_results[:3]:
         ...     print(f"{dr.domain_name}: {dr.classification.value}")
+
+        >>> # With ontological bridge (enhanced C-S-R phoneme logic)
+        >>> result = analyze_name("Campbell", use_ontological_bridge=True)
     """
     if domains is None:
         domains = ALL_DOMAINS
@@ -85,7 +103,40 @@ def analyze_name(
     signals = extract_signals(normalized)
 
     # Layer 3: Project to structural profile
-    profile = project_to_structural_profile(signals)
+    phonetic_profile = project_to_structural_profile(signals)
+
+    if use_ontological_bridge:
+        # Enhanced: Combine phonetic 12D with ontological 10D→12D
+        ontological_vector = get_ontological_vector(name)
+        ontological_contribution = project_ontological_to_experiential(ontological_vector)
+
+        # Compute bridged profile
+        bridged_dict = compute_bridged_profile(
+            phonetic_profile.to_dict(),
+            ontological_contribution,
+            phonetic_weight=phonetic_weight,
+            ontological_weight=ontological_weight,
+        )
+
+        # Create new StructuralProfile from bridged values
+        profile = StructuralProfile(
+            force=bridged_dict["force"],
+            stability=bridged_dict["stability"],
+            duration=bridged_dict["duration"],
+            initiation=bridged_dict["initiation"],
+            flow=bridged_dict["flow"],
+            termination=bridged_dict["termination"],
+            complexity=bridged_dict["complexity"],
+            density=bridged_dict["density"],
+            balance=bridged_dict["balance"],
+            openness=bridged_dict["openness"],
+            depth=bridged_dict["depth"],
+            connectivity=bridged_dict["connectivity"],
+            signal_contributions=phonetic_profile.signal_contributions,
+        )
+    else:
+        # Default: Use phonetic profile only
+        profile = phonetic_profile
 
     # Layer 4: Match domains
     domain_results = match_all_domains(profile, domains)
