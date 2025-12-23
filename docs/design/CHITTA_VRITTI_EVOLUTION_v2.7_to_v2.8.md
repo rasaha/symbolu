@@ -157,6 +157,60 @@ The Chitta-Vṛtti module computes **p_v[v]** from cross-layer coherence:
 | **Smṛti** | High when: state unchanged despite input | Frozen / stale representations |
 | **Nidrā** | High when: representations missing/weak | Insufficient information |
 
+### Output Types
+
+The module produces a complete diagnostic result:
+
+```python
+@dataclass(frozen=True)
+class ChittaVrittiResult:
+    """Complete output from Chitta-Vṛtti computation."""
+
+    # Cross-Representation Coherence
+    coherence: float                              # Aggregate coherence [0,1]
+    fractures: dict[tuple[str, str], float]       # Per-pair fracture (1 - similarity)
+
+    # Vṛtti Distribution (THE CONTROL VECTOR for core formula)
+    vritti: dict[str, float]                      # 5 modes: pramana, viparyaya, vikalpa, smrti, nidra
+                                                  # Sums to 1.0 (probability distribution)
+
+    # Diagnostic Score
+    score: float                                  # Overall readiness [0,1]
+
+    # Explainability Fields
+    dominant_vritti: str                          # Mode with highest activation
+    primary_fracture: tuple[str, str] | None      # Layer pair with largest disagreement
+    explanation: str                              # Human-readable summary
+```
+
+### Fracture Profile
+
+The **fractures** dictionary preserves pairwise disagreement for debugging and explainability:
+
+```python
+# Example fracture profile
+fractures = {
+    ("phonemic", "semantic"): 0.15,      # Low fracture = good agreement
+    ("phonemic", "structural"): 0.42,    # Moderate fracture
+    ("phonemic", "temporal"): 0.08,      # Low fracture
+    ("semantic", "structural"): 0.67,    # HIGH FRACTURE = primary disagreement
+    ("semantic", "temporal"): 0.23,      # Moderate
+    ("structural", "temporal"): 0.31,    # Moderate
+}
+# primary_fracture = ("semantic", "structural")
+# explanation = "Semantic and structural layers disagree (fracture=0.67)"
+```
+
+**Fracture computation:**
+```
+fracture(layer_i, layer_j) = 1 - similarity(project(layer_i), project(layer_j))
+```
+
+**Use cases:**
+- **Debugging:** "Why is coherence low?" → Check highest fracture
+- **Monitoring:** Track fracture trends across sessions
+- **Explainability:** Human-readable: "Phonemic and semantic layers conflict"
+
 ### The Complete Flow
 
 ```
@@ -535,6 +589,7 @@ Before implementation, resolve:
 
 ---
 
-*Document version: Draft 1.0*
+*Document version: Draft 1.1*
 *Prepared for: v2.7 → v2.8 evolution planning*
 *Status: Pending resolution of open questions*
+*Changes: Added explicit ChittaVrittiResult dataclass with fractures dict*
