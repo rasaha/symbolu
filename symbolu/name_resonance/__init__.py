@@ -19,9 +19,20 @@ Usage:
     # Canonical matching (C × R framework)
     match = canonical_match("king", "queen")
     print(f"Match: {match.match_score} ({match.mode.value})")
+
+    # Quick helpers
+    profile = get_profile("Campbell")
+    comparison = compare_names("Campbell", "Erikson")
+    match_result = quick_match("Campbell", "Golf")
 """
 
-from symbolu.name_resonance.api import analyze_name, NameResonanceResult
+from symbolu.name_resonance.api import (
+    analyze_name,
+    get_profile,
+    compare_names,
+    quick_match,
+    NameResonanceResult,
+)
 from symbolu.name_resonance.canonical_matcher import (
     canonical_match,
     CanonicalMatchResult,
@@ -32,6 +43,9 @@ from symbolu.name_resonance.canonical_matcher import (
 
 __all__ = [
     "analyze_name",
+    "get_profile",
+    "compare_names",
+    "quick_match",
     "NameResonanceResult",
     "canonical_match",
     "CanonicalMatchResult",
