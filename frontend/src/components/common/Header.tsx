@@ -20,17 +20,17 @@ const TIER_STYLES: Record<PresentationTier, { bg: string; accent: string; label:
   consumer: {
     bg: 'bg-gradient-to-r from-blue-600 to-blue-500',
     accent: 'text-blue-100',
-    label: 'Consumer',
+    label: 'Explorer',
   },
   power_user: {
     bg: 'bg-gradient-to-r from-purple-600 to-violet-500',
     accent: 'text-purple-100',
-    label: 'Power User',
+    label: 'Analyst',
   },
   admin: {
     bg: 'bg-gradient-to-r from-orange-600 to-amber-500',
     accent: 'text-orange-100',
-    label: 'Admin',
+    label: 'Developer',
   },
 };
 
@@ -66,9 +66,9 @@ export function Header({ tier, onTierChange, showTierSelector = true, showQueryG
                   onChange={(e) => onTierChange(e.target.value as PresentationTier)}
                   className="bg-white/20 border border-white/30 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-white/50"
                 >
-                  <option value="consumer">Consumer</option>
-                  <option value="power_user">Power User</option>
-                  <option value="admin">Admin</option>
+                  <option value="consumer">Explorer</option>
+                  <option value="power_user">Analyst</option>
+                  <option value="admin">Developer</option>
                 </select>
               </div>
             )}

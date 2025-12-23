@@ -154,18 +154,18 @@ const queryGuides: Record<PresentationTier, QueryCategory[]> = {
 const tierConfig: Record<PresentationTier, { color: string; icon: React.ReactNode; name: string }> = {
   consumer: {
     color: 'blue',
-    icon: <MessageSquare className="w-5 h-5" />,
-    name: 'Consumer',
+    icon: <Search className="w-5 h-5" />,
+    name: 'Explorer',
   },
   power_user: {
     color: 'purple',
     icon: <Layers className="w-5 h-5" />,
-    name: 'Power User',
+    name: 'Analyst',
   },
   admin: {
     color: 'orange',
     icon: <Shield className="w-5 h-5" />,
-    name: 'Admin',
+    name: 'Developer',
   },
 };
 

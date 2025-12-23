@@ -22,7 +22,7 @@ import { ConsumerTierPage } from '@/views/ConsumerTierPage';
 import { PowerUserTierPage } from '@/views/PowerUserTierPage';
 import { AdminTierPage } from '@/views/AdminTierPage';
 import { useChatStore } from '@/stores/chatStore';
-import { Layers, User, Shield, Home, ArrowLeft, Package } from 'lucide-react';
+import { Layers, Search, Code, Home, ArrowLeft, Package } from 'lucide-react';
 
 type AppPage = 'home' | 'products' | 'product_detail' | 'selector' | 'tier';
 
