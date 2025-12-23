@@ -1,7 +1,7 @@
 # SymbolU v2.7 Experimental Extensions Specification
 
-**Version:** 2.7.7-experimental
-**Date:** 2025-12-22
+**Version:** 2.7.8-experimental
+**Date:** 2025-12-23
 **Status:** Experimental (Enterprise-ready components marked)
 
 ---
@@ -18,9 +18,10 @@
 8. [Cognitive Ability Model](#cognitive-ability-model)
 9. [Concept Readiness Index](#concept-readiness-index)
 10. [Causal Layer](#causal-layer)
-11. [Capability Matrix](#capability-matrix)
-12. [Enterprise Value Proposition](#enterprise-value-proposition)
-13. [AGI Assessment](#agi-assessment)
+11. [Enterprise Self-Improvement](#enterprise-self-improvement)
+12. [Capability Matrix](#capability-matrix)
+13. [Enterprise Value Proposition](#enterprise-value-proposition)
+14. [AGI Assessment](#agi-assessment)
 
 ---
 
@@ -39,6 +40,7 @@ entropy modulation system. These extensions provide:
 | **Cognitive Ability** | Measurable cognitive metrics via mirror + selective layers | ✅ Yes |
 | **Concept Readiness** | Safe concept detection (not formation) | ✅ Yes |
 | **Causal Layer** | do-calculus for layer pipeline (ATE, counterfactuals, attribution) | ✅ Yes |
+| **Self-Improvement** | Recursive self-optimization using Guna signals | ⚠️ Experimental |
 
 **Key Insight:** These are mathematical refinements, not cognitive capabilities.
 The system remains deterministic signal processing, not intelligence.
@@ -1170,28 +1172,287 @@ print(f"Improvement: {cf.improvement_percent:.1f}%")
 
 ---
 
+## Enterprise Self-Improvement
+
+### Overview
+
+The Enterprise Self-Improvement module enables SymbolU v2.7 to observe its own
+performance, identify patterns of low utility, and autonomously adjust its
+operational parameters to improve future outcomes.
+
+**Key Principle:** This is NOT ethics or value learning. It is policy-aligned
+operational self-optimization using existing Guna signals.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  EnterpriseSelfImprover                         │
+│  (Orchestrator)                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐ │
+│  │  SelfEvaluator  │───▶│   MetaReasoner  │───▶│  Improvement│ │
+│  │                 │    │                 │    │   Engine    │ │
+│  └────────┬────────┘    └────────┬────────┘    └─────────────┘ │
+│           │                      │                              │
+│           ▼                      ▼                              │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │               EnterpriseKnowledgeBase                       ││
+│  │  (Beliefs, Coefficient Adjustments, Learning State)         ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+└───────────────────────────────────────────────────────────────┬─┘
+                                                                │
+                        ┌───────────────────────────────────────┘
+                        ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 Existing Guna Modulation Layer                  │
+├─────────────────────────────────────────────────────────────────┤
+│  Observables (s, r, t, H, M, C_contr, F_fail)                  │
+│  UtilityCoefficients (c_S, c_R, c_T, λ_H, λ_C, λ_F)           │
+│  StateRegister (τ^768, τ^175, w_tone, w_guna, b_policy)       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Belief System
+
+The system maintains beliefs about optimal configurations using Bayesian confidence:
+
+```python
+@dataclass
+class Belief:
+    id: str
+    content: str
+    belief_type: BeliefType  # PRIOR, LEARNED, HYPOTHESIS, VERIFIED, DEPRECATED
+    confidence: float        # P(belief is true) in [0, 1]
+    evidence_count: int
+    supporting_evidence: int
+    contradicting_evidence: int
+```
+
+**Bayesian Update Formula:**
+
+```
+α = supporting_evidence + 1  (Beta prior α)
+β = contradicting_evidence + 1  (Beta prior β)
+confidence = α / (α + β)  (Posterior mean)
+```
+
+**Belief Type Transitions:**
+
+| Condition | State Transition |
+|-----------|------------------|
+| confidence < 0.2, evidence ≥ 10 | → DEPRECATED |
+| confidence > 0.8, evidence ≥ 20 | HYPOTHESIS → VERIFIED |
+
+### Initial Prior Beliefs
+
+| Belief ID | Content | Initial Confidence |
+|-----------|---------|-------------------|
+| `sattva_positive` | High Sattva leads to high utility | 0.7 |
+| `rajas_moderate` | Moderate Rajas is optimal | 0.6 |
+| `tamas_caution` | High Tamas requires careful handling | 0.7 |
+| `low_entropy_stable` | Low entropy indicates stable state | 0.8 |
+| `high_motion_opportunity` | High motion signals transformation | 0.6 |
+| `contradiction_penalize` | High contradiction penalizes utility | 0.8 |
+| `failure_penalize` | High failure penalizes utility | 0.9 |
+| `coefficients_balanced` | Default coefficients are well-balanced | 0.6 |
+
+### Self-Evaluation
+
+The SelfEvaluator tracks utility outcomes by context:
+
+```python
+class SelfEvaluator:
+    # Performance by context
+    utility_by_guna_dominant: Dict[str, List[float]]  # sattva, rajas, tamas
+    utility_by_motion: Dict[str, List[float]]         # low, medium, high
+    utility_by_entropy: Dict[str, List[float]]        # low, medium, high
+
+    # Trend tracking
+    low_utility_streak: int
+    max_low_utility_streak: int
+```
+
+**Failure Pattern Detection:**
+
+Identifies patterns where average utility in a context is more than 0.1 below
+the overall average:
+
+- `guna_failure`: Low utility when specific Guna dominant
+- `motion_failure`: Low utility during specific motion level
+- `entropy_failure`: Low utility during specific entropy level
+
+### Meta-Reasoner
+
+Analyzes performance and generates improvement hypotheses:
+
+| Pattern | Hypothesis Generated |
+|---------|---------------------|
+| Guna failure | Adjust Guna coefficient |
+| Motion failure | Adjust motion handling |
+| Entropy failure | Adjust λ_H (entropy penalty) |
+| Overall low utility (<0.4) | Rebalance all coefficients |
+| Utility streak ≥ 5 | Enable conservative mode |
+
+**Priority Calculation:**
+
+```
+priority = confidence × (1 + severity)
+severity = |context_avg_utility - overall_avg_utility|
+```
+
+### Improvement Actions
+
+| Action Type | Description | Effect |
+|-------------|-------------|--------|
+| `coefficient_adjustment` | Adjust single coefficient | Multiplies by 0.9 or 1.1 |
+| `coefficient_rebalance` | Move toward defaults | 20% blend toward default |
+| `mode_change` | Toggle conservative mode | Enables safety constraints |
+
+**Conservative Mode Effects:**
+
+```python
+c_R = c_R × 0.8   # Reduce Rajas influence
+c_T = c_T × 0.8   # Reduce Tamas influence
+λ_H = clamp(λ_H × 1.2, [-1, 1])   # Increase entropy penalty
+λ_C = clamp(λ_C × 1.2, [-1, 1])   # Increase contradiction penalty
+λ_F = clamp(λ_F × 1.2, [-1, 1])   # Increase failure penalty
+```
+
+### Configuration
+
+```python
+@dataclass(frozen=True)
+class SelfImprovementConfig:
+    enabled: bool = False           # Off by default for safety
+    auto_improve: bool = False      # Require explicit approval
+    improvement_threshold: float = 0.6  # Minimum priority to execute
+    observation_window: int = 100   # Observations per cycle
+    max_coefficient_change: float = 0.2  # Safety bound
+    enable_conservative_mode: bool = True
+    persist_improvements: bool = True
+```
+
+**V27Config Integration:**
+
+```python
+from symbolu.guna_modulation import V27Config
+
+# Create config with self-improvement enabled
+config = V27Config.with_self_improvement(
+    tier="enterprise-2",
+    bayesian=True,
+    auto_improve=False,  # Require approval
+    improvement_threshold=0.6
+)
+
+assert config.is_self_improving == True
+```
+
+### Usage
+
+```python
+from symbolu.guna_modulation import (
+    EnterpriseSelfImprover,
+    create_enterprise_self_improver,
+)
+
+# Create improver
+improver = create_enterprise_self_improver(
+    auto_improve=True,
+    improvement_threshold=0.6,
+)
+
+# In your pipeline, wrap utility computation:
+for observables in pipeline_output:
+    utility, audit = improver.observe(
+        observables=observables,
+        state=current_state,
+    )
+    process_utility(utility)
+
+# Get effective coefficients (after learning)
+effective = improver.get_effective_coefficients()
+
+# Get reasoning trace for debugging/audit
+trace = improver.get_reasoning_trace()
+for step in trace:
+    print(f"[{step['step']}] {step}")
+
+# Export learned state for persistence
+learned_state = improver.export_learned_state()
+```
+
+### Safety Constraints
+
+| Constraint | Value |
+|------------|-------|
+| Coefficient bounds | All values in [-1, 1] |
+| Single adjustment | ±10% per cycle |
+| Rebalance step | 20% toward defaults |
+| Overall change bound | max_coefficient_change = 0.2 |
+
+### AGI Considerations
+
+This module exhibits characteristics associated with recursive self-improvement:
+
+1. **Self-Observation:** Tracks its own utility outcomes
+2. **Pattern Recognition:** Identifies systematic failures
+3. **Hypothesis Generation:** Proposes improvements
+4. **Self-Modification:** Adjusts its own parameters
+5. **Learning:** Beliefs update via Bayesian inference
+
+However, it operates within strict safety bounds and does NOT:
+
+- Modify its own code
+- Expand its action space
+- Bypass safety constraints
+- Learn new objectives
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Enterprise Self-Improvement                                  │
+│                                                               │
+│  = Bounded self-optimization using existing signals           │
+│  = Bayesian belief updates for configuration tuning           │
+│  ≠ Unbounded self-modification                               │
+│  ≠ AGI                                                        │
+│                                                               │
+│  Enterprise value: ✅ Yes (adaptive, auditable)              │
+│  Recursive self-improvement: ⚠️ Bounded (safe experimental)  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Capability Matrix
 
 ### What Each Extension Adds
 
-| Capability | Bayesian | Motion | DPO | ToT | MCTS | Cognitive | CRI | Causal |
-|------------|----------|--------|-----|-----|------|-----------|-----|--------|
-| Uncertainty quantification | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Adaptive learning | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Explicit signal formalization | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Preference learning | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Structured reasoning | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Exploration/exploitation | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| Self-awareness metrics | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| Directional focus | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| Cognitive state classification | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| Concept coherence detection | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| Concept entropy measurement | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| Concept drift monitoring | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| Intervention (do-operator) | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Causal effect estimation | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Counterfactual reasoning | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Causal attribution | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Capability | Bayesian | Motion | DPO | ToT | MCTS | Cognitive | CRI | Causal | Self-Imp |
+|------------|----------|--------|-----|-----|------|-----------|-----|--------|----------|
+| Uncertainty quantification | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Adaptive learning | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Explicit signal formalization | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Preference learning | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Structured reasoning | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Exploration/exploitation | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Self-awareness metrics | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ |
+| Directional focus | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Cognitive state classification | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Concept coherence detection | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Concept entropy measurement | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Concept drift monitoring | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Intervention (do-operator) | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Causal effect estimation | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Counterfactual reasoning | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Causal attribution | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Self-observation | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Hypothesis generation | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Parameter self-modification | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Belief tracking | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ### What None of Them Add (AGI Capabilities)
 
@@ -1470,9 +1731,56 @@ from symbolu.guna_modulation import (
 )
 ```
 
+### Enterprise Self-Improvement
+
+```python
+from symbolu.guna_modulation import (
+    # Belief System
+    Belief,
+    BeliefType,
+
+    # Self-Evaluation
+    SelfEvaluator,
+    UtilityObservation,
+
+    # Knowledge Base
+    EnterpriseKnowledgeBase,
+
+    # Meta-Reasoner
+    MetaReasoner,
+
+    # Improvement Actions
+    ImprovementAction,
+
+    # Main Orchestrator
+    EnterpriseSelfImprover,
+
+    # Configuration
+    SelfImprovementConfig,
+
+    # Factory
+    create_enterprise_self_improver,
+)
+```
+
 ---
 
 ## Changelog
+
+### v2.7.8-experimental (2025-12-23)
+
+- Added Enterprise Self-Improvement module for recursive self-optimization
+- Added Belief system with Bayesian confidence updating (Beta distribution)
+- Added SelfEvaluator for tracking utility outcomes by context (Guna, motion, entropy)
+- Added EnterpriseKnowledgeBase with prior beliefs and coefficient adjustments
+- Added MetaReasoner for hypothesis generation from failure patterns
+- Added ImprovementAction types: coefficient_adjustment, coefficient_rebalance, mode_change
+- Added SelfImprovementConfig with safety-first defaults (enabled=False, auto_improve=False)
+- Added V27Config.with_self_improvement() factory method
+- Added V27Config.is_self_improving property
+- Added conservative mode with bounded coefficient modifications
+- Key safety: All coefficient changes clamped to [-1, 1], max 10% per cycle
+- 44 unit tests for enterprise self-improvement
 
 ### v2.7.7-experimental (2025-12-22)
 
