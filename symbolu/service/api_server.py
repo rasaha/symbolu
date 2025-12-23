@@ -1321,14 +1321,20 @@ def create_app() -> "FastAPI":
             POST /demo/name/analyze
             {"name": "Campbell"}
             -> {"name": "Campbell", "normalized": "campbell", "phonemes": [...], ...}
+
+            # With C-S-R ontological bridge (enhanced analysis)
+            {"name": "Campbell", "use_ontological_bridge": true}
         """
         try:
             # Import name resonance API
             from symbolu.name_resonance import analyze_name
             from symbolu.name_resonance.types import DIMENSION_NAMES
 
-            # Analyze name
-            result = analyze_name(req.name)
+            # Analyze name (with optional C-S-R ontological bridge)
+            result = analyze_name(
+                req.name,
+                use_ontological_bridge=req.use_ontological_bridge,
+            )
 
             # Build structural profile dict
             profile_dict = {}
