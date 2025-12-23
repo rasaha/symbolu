@@ -2,7 +2,9 @@
 
 Implements: PRESENTATION_LAYER_v1.0.md Part 4
 
-Defines the 8 prioritized presentation rules:
+Defines the prioritized presentation rules:
+
+Core Rules (always active):
 1. Critical Viparyaya (100) - Misperception detection
 2. Severe Nidrā (95) - Missing information
 3. High Vikalpa (80) - Multiple interpretations
@@ -11,6 +13,12 @@ Defines the 8 prioritized presentation rules:
 6. Low Confidence (55) - Acknowledge uncertainty
 7. High Pramāṇa (50) - Confident delivery
 8. Default (0) - Fallback rule
+
+V2.7 Experimental Rules (only when v2.7 enabled):
+- Unreliable Estimate (98) - Bayesian confidence too low (Bayesian mode only)
+- Regressing State (88) - Cognitive state indicates regression
+- Concept Unstable (78) - Concept readiness too low
+- Low Utility Streak (68) - Prolonged low utility observations
 """
 
 from dataclasses import dataclass
@@ -42,17 +50,20 @@ class PresentationRule:
     directive: Callable[[SignalBundle, PresentationConfig], PresentationDirective]
 
 
-def build_rules(config: PresentationConfig) -> list[PresentationRule]:
+def build_rules(config: PresentationConfig, include_v27_rules: bool = True) -> list[PresentationRule]:
     """Build the complete rule set for a configuration.
 
     Part 4.2: Returns rules sorted by priority (descending).
 
     Args:
         config: The tier-specific configuration
+        include_v27_rules: Whether to include v2.7 experimental rules.
+            These rules only fire when v2.7 signals are present in the bundle.
 
     Returns:
         List of PresentationRule instances, sorted by priority
     """
+    # Core rules (always active)
     rules = [
         _make_critical_viparyaya_rule(config),
         _make_severe_nidra_rule(config),
@@ -63,6 +74,16 @@ def build_rules(config: PresentationConfig) -> list[PresentationRule]:
         _make_high_pramana_rule(config),
         _make_default_rule(config),
     ]
+
+    # V2.7 experimental rules (conditionally included)
+    if include_v27_rules:
+        rules.extend([
+            _make_unreliable_estimate_rule(config),  # Priority 98 (Bayesian only)
+            _make_regressing_state_rule(config),  # Priority 88
+            _make_concept_unstable_rule(config),  # Priority 78
+            _make_low_utility_streak_rule(config),  # Priority 68
+        ])
+
     return sorted(rules, key=lambda r: r.priority, reverse=True)
 
 
@@ -314,6 +335,145 @@ def _make_default_rule(config: PresentationConfig) -> PresentationRule:
     return PresentationRule(
         name="default",
         priority=0,
+        condition=condition,
+        directive=directive,
+    )
+
+
+# =============================================================================
+# V2.7 Experimental Rules
+# =============================================================================
+# These rules only fire when v2.7 signals are present in the bundle.
+# They check s.has_v27_signals or s.has_bayesian_signals before firing.
+
+
+def _make_unreliable_estimate_rule(config: PresentationConfig) -> PresentationRule:
+    """V2.7 Rule: Unreliable Estimate (Priority 98).
+
+    Only fires in Bayesian v2.7 mode when bayesian_confidence is too low.
+
+    Condition: has_bayesian_signals AND bayesian_confidence < 0.5
+    """
+
+    def condition(s: SignalBundle, cfg: PresentationConfig) -> bool:
+        # Only fire if Bayesian signals are available
+        if not s.has_bayesian_signals:
+            return False
+        return s.v27.bayesian_confidence < 0.5
+
+    def directive(s: SignalBundle, cfg: PresentationConfig) -> PresentationDirective:
+        return PresentationDirective(
+            delivery_mode=DeliveryMode.ACKNOWLEDGING,
+            confidence=ConfidenceIndicator.LOW,
+            behaviors=SuggestedBehaviors(
+                show_reasoning=True,
+                offer_clarification=True,
+            ),
+            explanation=f"Low estimation confidence ({s.v27.bayesian_confidence:.0%})",
+            triggered_rule="unreliable_estimate_v27",
+        )
+
+    return PresentationRule(
+        name="unreliable_estimate_v27",
+        priority=98,
+        condition=condition,
+        directive=directive,
+    )
+
+
+def _make_regressing_state_rule(config: PresentationConfig) -> PresentationRule:
+    """V2.7 Rule: Regressing State (Priority 88).
+
+    Fires when cognitive state indicates regression or instability.
+
+    Condition: has_v27_signals AND cognitive_state in {regressing, unstable}
+    """
+
+    def condition(s: SignalBundle, cfg: PresentationConfig) -> bool:
+        if not s.has_v27_signals:
+            return False
+        return s.v27.is_regressing
+
+    def directive(s: SignalBundle, cfg: PresentationConfig) -> PresentationDirective:
+        return PresentationDirective(
+            delivery_mode=DeliveryMode.CLARIFYING,
+            confidence=ConfidenceIndicator.LOW,
+            behaviors=SuggestedBehaviors(
+                offer_clarification=True,
+                escalate_to_human=cfg.escalate_to_human,
+            ),
+            explanation=f"Cognitive state: {s.v27.cognitive_state}",
+            triggered_rule="regressing_state_v27",
+        )
+
+    return PresentationRule(
+        name="regressing_state_v27",
+        priority=88,
+        condition=condition,
+        directive=directive,
+    )
+
+
+def _make_concept_unstable_rule(config: PresentationConfig) -> PresentationRule:
+    """V2.7 Rule: Concept Unstable (Priority 78).
+
+    Fires when concept readiness is too low to present confidently.
+
+    Condition: has_v27_signals AND concept_readiness < 0.4
+    """
+
+    def condition(s: SignalBundle, cfg: PresentationConfig) -> bool:
+        if not s.has_v27_signals:
+            return False
+        return s.v27.concept_readiness < 0.4
+
+    def directive(s: SignalBundle, cfg: PresentationConfig) -> PresentationDirective:
+        return PresentationDirective(
+            delivery_mode=DeliveryMode.HEDGED,
+            confidence=ConfidenceIndicator.LOW,
+            behaviors=SuggestedBehaviors(
+                offer_clarification=True,
+            ),
+            explanation=f"Concept not yet stable ({s.v27.concept_readiness_level})",
+            triggered_rule="concept_unstable_v27",
+        )
+
+    return PresentationRule(
+        name="concept_unstable_v27",
+        priority=78,
+        condition=condition,
+        directive=directive,
+    )
+
+
+def _make_low_utility_streak_rule(config: PresentationConfig) -> PresentationRule:
+    """V2.7 Rule: Low Utility Streak (Priority 68).
+
+    Fires when there's a prolonged streak of low utility observations.
+
+    Condition: has_v27_signals AND low_utility_streak >= 5
+    """
+
+    def condition(s: SignalBundle, cfg: PresentationConfig) -> bool:
+        if not s.has_v27_signals:
+            return False
+        return s.v27.low_utility_streak >= 5
+
+    def directive(s: SignalBundle, cfg: PresentationConfig) -> PresentationDirective:
+        return PresentationDirective(
+            delivery_mode=DeliveryMode.ACKNOWLEDGING,
+            confidence=ConfidenceIndicator.MEDIUM,
+            behaviors=SuggestedBehaviors(
+                offer_clarification=True,
+                show_reasoning=cfg.show_reasoning_by_default,
+            ),
+            explanation=f"System quality below optimal ({s.v27.low_utility_streak} observations)",
+            triggered_rule="low_utility_streak_v27",
+        )
+
+    return PresentationRule(
+        name="low_utility_streak_v27",
+        priority=68,
         condition=condition,
         directive=directive,
     )

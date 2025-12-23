@@ -26,6 +26,7 @@ from symbolu.presentation.signals import (
     VrittiDistribution,
     SessionContext,
     SignalBundle,
+    V27ExperimentalSignals,
 )
 from symbolu.presentation.config import (
     PresentationConfig,
@@ -50,6 +51,7 @@ __all__ = [
     "VrittiDistribution",
     "SessionContext",
     "SignalBundle",
+    "V27ExperimentalSignals",
     # Config (Part 5)
     "PresentationConfig",
     "PresentationTier",

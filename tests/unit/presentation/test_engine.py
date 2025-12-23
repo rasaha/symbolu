@@ -27,7 +27,7 @@ class TestEngineBasics:
         """Engine should be created with config."""
         engine = PresentationEngine(CONSUMER_CONFIG)
         assert engine.config == CONSUMER_CONFIG
-        assert len(engine.rules) == 8
+        assert len(engine.rules) == 12  # 8 core + 4 v2.7 rules
 
     def test_compute_returns_directive(self):
         """compute should return a PresentationDirective."""
