@@ -55,6 +55,30 @@ from symbolu.presentation.acoustic_chain import (
     run_acoustic_chain,
     is_acoustically_consistent,
 )
+from symbolu.presentation.prosodic_renderer import (
+    ProsodicRenderer,
+    SSMLOutput,
+    ProsodyLevel,
+    render_ssml,
+    render_minimal_ssml,
+)
+from symbolu.presentation.governed_gate import (
+    GovernedGate,
+    GateDecision,
+    GateMode,
+    GateAction,
+    evaluate_governed,
+    evaluate_open,
+    should_block_output,
+)
+from symbolu.presentation.speech_pipeline import (
+    SpeechPipeline,
+    SpeechOutput,
+    PipelineMode,
+    generate_speech,
+    generate_ssml,
+    is_speech_allowed,
+)
 
 __all__ = [
     # Types (Part 3)
@@ -92,4 +116,25 @@ __all__ = [
     "AcousticChainResult",
     "run_acoustic_chain",
     "is_acoustically_consistent",
+    # Prosodic Renderer
+    "ProsodicRenderer",
+    "SSMLOutput",
+    "ProsodyLevel",
+    "render_ssml",
+    "render_minimal_ssml",
+    # GOVERNED Mode Gate
+    "GovernedGate",
+    "GateDecision",
+    "GateMode",
+    "GateAction",
+    "evaluate_governed",
+    "evaluate_open",
+    "should_block_output",
+    # Speech Pipeline
+    "SpeechPipeline",
+    "SpeechOutput",
+    "PipelineMode",
+    "generate_speech",
+    "generate_ssml",
+    "is_speech_allowed",
 ]
