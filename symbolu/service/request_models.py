@@ -449,3 +449,98 @@ class QuickMatchResponse(BaseModel if PYDANTIC_AVAILABLE else object):
         classification: str = Field(..., description="Compatibility level")
         score: float = Field(..., description="Compatibility score (0-1)")
         result: str = Field(..., description="Human-readable result")
+
+
+# ============================================================================
+# CHAT API MODELS
+# ============================================================================
+
+class ChatMessageModel(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Chat message model for conversation history.
+
+    Attributes:
+        role: Message role ("user", "assistant", "system")
+        content: Message content
+    """
+    if PYDANTIC_AVAILABLE:
+        role: str = Field(..., description="Message role: user, assistant, or system")
+        content: str = Field(..., description="Message content")
+
+
+class ChatRequest(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Request schema for LLM chat endpoint.
+
+    Attributes:
+        message: User message to send
+        tier: Presentation tier (consumer, power_user, admin)
+        history: Optional conversation history
+        provider: LLM provider override (anthropic, google)
+        max_tokens: Maximum tokens to generate
+        temperature: Sampling temperature (0-1)
+        system_prompt: Optional custom system prompt
+        stream: Whether to stream the response
+    """
+    if PYDANTIC_AVAILABLE:
+        message: str = Field(..., description="User message to send")
+        tier: str = Field(
+            default="power_user",
+            description="Presentation tier: consumer (Explorer), power_user (Analyst), admin (Developer)"
+        )
+        history: Optional[List[ChatMessageModel]] = Field(
+            default=None,
+            description="Optional conversation history"
+        )
+        provider: Optional[str] = Field(
+            default=None,
+            description="LLM provider: anthropic or google"
+        )
+        max_tokens: int = Field(
+            default=4096,
+            description="Maximum tokens to generate"
+        )
+        temperature: float = Field(
+            default=0.7,
+            description="Sampling temperature (0-1)"
+        )
+        system_prompt: Optional[str] = Field(
+            default=None,
+            description="Optional custom system prompt"
+        )
+        stream: bool = Field(
+            default=False,
+            description="Whether to stream the response"
+        )
+
+
+class ChatResponse(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Response schema for LLM chat endpoint.
+
+    Attributes:
+        content: Generated response content
+        model: Model used (e.g., claude-3-5-sonnet)
+        provider: Provider used (anthropic or google)
+        tier: Presentation tier used
+        usage: Token usage statistics (input_tokens, output_tokens)
+        usage_stats: Accumulated usage stats with cost and limits
+        semantic_analysis: Optional Symbol-U semantic analysis
+    """
+    if PYDANTIC_AVAILABLE:
+        content: str = Field(..., description="Generated response content")
+        model: str = Field(..., description="Model used for generation")
+        provider: str = Field(..., description="LLM provider used")
+        tier: str = Field(..., description="Presentation tier")
+        usage: Dict[str, int] = Field(
+            default_factory=dict,
+            description="Token usage: input_tokens, output_tokens"
+        )
+        usage_stats: Optional[Dict[str, Any]] = Field(
+            default=None,
+            description="Accumulated usage stats: this_request, daily, limit info"
+        )
+        semantic_analysis: Optional[Dict[str, Any]] = Field(
+            default=None,
+            description="Optional Symbol-U semantic analysis"
+        )
