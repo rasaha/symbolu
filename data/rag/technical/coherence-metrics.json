@@ -1,0 +1,12 @@
+{
+  "id": "tech-002",
+  "title": "Coherence and Entropy Metrics Explained",
+  "domain": "technical",
+  "tags": ["coherence", "entropy", "metrics", "stability"],
+  "content": "Symbol-U tracks several key metrics for response quality:\n\n**Coherence Metrics:**\n\n1. **Stability Score** (0-1): Measures consistency of semantic meaning across the response. Higher values indicate more focused, consistent output.\n   - > 0.8: Highly stable, clear focus\n   - 0.5-0.8: Moderate stability, some topic drift\n   - < 0.5: Low stability, fragmented response\n\n2. **Drift Score** (0-1): Measures deviation from session context. Lower is better.\n   - < 0.2: On-topic, contextually aligned\n   - 0.2-0.5: Minor drift, still relevant\n   - > 0.5: Significant drift, may need recentering\n\n**Entropy Metrics:**\n\n1. **H_D (Domain Entropy)**: Information density within the primary domain.\n\n2. **H_G (Global Entropy)**: Overall information spread across all domains.\n\n3. **H_K (Knowledge Entropy)**: Uncertainty in factual claims.\n\n4. **H_norm (Normalized Entropy)**: Combined entropy score scaled 0-1.\n\n**Interpreting Entropy:**\n- Low entropy (< 0.3): Focused, specific response\n- Medium entropy (0.3-0.6): Balanced exploration\n- High entropy (> 0.6): Broad, exploratory response\n\n**Session Health:**\nThe system monitors these metrics over time to detect:\n- Conversation fragmentation\n- Topic drift patterns\n- Coherence degradation",
+  "metadata": {
+    "author": "Analytics Team",
+    "last_updated": "2025-01-20",
+    "category": "metrics"
+  }
+}

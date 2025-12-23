@@ -1,0 +1,12 @@
+{
+  "id": "gov-004",
+  "title": "AI System Audit Procedures and Checklists",
+  "domain": "ai-governance",
+  "tags": ["audit", "compliance", "checklist", "procedures"],
+  "content": "Comprehensive AI audit procedures ensure ongoing compliance and performance:\n\n**Pre-Deployment Audit:**\n- Training data documentation complete\n- Model card created and reviewed\n- Bias testing across protected categories\n- Security vulnerability assessment\n- Privacy impact assessment\n- Performance benchmarks established\n- Rollback procedures documented\n- Monitoring dashboards configured\n\n**Quarterly Operational Audit:**\n- Performance metrics vs. baseline\n- Drift analysis (data and concept)\n- User feedback analysis\n- Incident review and lessons learned\n- Access control verification\n- Data retention compliance\n- Model version inventory\n\n**Annual Comprehensive Audit:**\n- Full bias and fairness assessment\n- Third-party security penetration testing\n- Regulatory compliance review\n- Stakeholder interview process\n- Competitive benchmark analysis\n- Technology refresh assessment\n- Training program effectiveness review\n\n**Audit Reporting Requirements:**\nAll audits must produce standardized reports including executive summary, findings, risk ratings, remediation recommendations, and timeline for corrective actions.",
+  "metadata": {
+    "author": "Internal Audit Department",
+    "last_updated": "2025-02-10",
+    "version": "2.0"
+  }
+}
