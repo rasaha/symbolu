@@ -1,31 +1,40 @@
 # P10/P11/P12 Activation Prerequisites
 
-**Status:** NOT READY FOR ACTIVATION
-**Date:** 2025-12-21
+**Status:** READY VIA P6/P7-LITE
+**Date:** 2025-12-23
 **Author:** Architecture Review
+**Updated:** P6-Lite and P7-Lite implemented in Presentation Layer
 
 ## Overview
 
 P10 (Acoustic Parameterization), P11 (Prosodic Evidence), and P12 (Consistency Validation) form the **acoustic governance chain**. These phases ensure that Symbol-U's output "sounds" consistent with its governance decisions.
 
-However, these phases **cannot be meaningfully activated** until their upstream dependencies are in place.
+These phases **can now be activated** via the P6-Lite and P7-Lite bridges.
 
 ---
 
-## Dependency Chain
+## Dependency Chain (Updated)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    UPSTREAM (Currently Dormant)                  │
+│                    UPSTREAM (P6-Lite/P7-Lite Available)          │
 ├─────────────────────────────────────────────────────────────────┤
-│  P6 (Regime Selection)                                          │
-│  └── Decides: HOLD / DE_ESCALATE / STABILIZE / INFORM / CLARIFY │
+│  Chitta-Vṛtti Engine (ACTIVE)                                    │
+│  └── Produces: coherence, score, vritti distribution             │
 │                                                                  │
-│  P7 (Discourse Act Resolution)                                   │
-│  └── Decides: REFLECTION / DEFERRAL / QUESTION / EXPLANATION    │
+│  Presentation Layer (ACTIVE)                                     │
+│  └── Produces: PresentationDirective with DeliveryMode           │
 │                                                                  │
-│  P9 (Lexical Selection)                                          │
-│  └── Produces: Selected words/phrases                            │
+│  P6-Lite (NEW - Active via Presentation)                         │
+│  └── Derives: HOLD / DE_ESCALATE / STABILIZE / INFORM / CLARIFY  │
+│  └── From: DeliveryMode mapping                                  │
+│                                                                  │
+│  P7-Lite (NEW - Active via Presentation)                         │
+│  └── Derives: REFLECTION / DEFERRAL / QUESTION / EXPLANATION     │
+│  └── From: DeliveryMode + SuggestedBehaviors                     │
+│                                                                  │
+│  P9 (Lexical Selection) - OPTIONAL                               │
+│  └── Produces: Selected words/phrases (can be None)              │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -168,31 +177,77 @@ Then:
 
 ---
 
-## Recommendation
+## Implemented Solution: Option B via Presentation Layer
 
-**Do not activate P10/P11/P12 until P6 (Regime Selection) is implemented.**
+**P6-Lite and P7-Lite have been implemented** in the Presentation Layer module.
 
-Rationale:
-- P12's value is in catching regime/acoustic mismatches
-- Without real regime decisions, P12 audits nothing meaningful
-- Better to implement P6 correctly than create a workaround
+### Implementation Details
 
-### Suggested Next Steps
+Location: `symbolu/presentation/p6_lite.py` and `symbolu/presentation/p7_lite.py`
 
-1. **Design P6 Regime Selection**
-   - Define regime selection rules
-   - Map user context → regime
-   - Consider: grounding mode, intent, emotional state, safety signals
+```python
+from symbolu.presentation import (
+    PresentationEngine,
+    CONSUMER_CONFIG,
+)
+from symbolu.presentation.p6_lite import derive_regime
+from symbolu.presentation.p7_lite import derive_discourse_act
+from symbolu.mechanical.pipeline.p10_acoustic.p10_acoustic_resolver import P10AcousticResolver
 
-2. **Implement P6 as Deterministic Classifier**
-   - No LLM required
-   - Rule-based selection
-   - Fallback to STABILIZE on uncertainty
+# Full pipeline
+pres_engine = PresentationEngine(CONSUMER_CONFIG)
+directive = pres_engine.compute(signal_bundle)
 
-3. **Then Activate P10 → P11 → P12**
-   - Full acoustic governance chain
-   - Meaningful P12 auditing
-   - P30 can gate on real violations
+# Derive envelopes for P10
+regime_envelope = derive_regime(directive)
+discourse_envelope = derive_discourse_act(directive)
+
+# P10 can now be used
+p10_resolver = P10AcousticResolver()
+acoustic_frame = p10_resolver.resolve(
+    lexical_frame=None,
+    discourse_envelope=discourse_envelope,
+    regime_envelope=regime_envelope,
+)
+```
+
+### Mapping Logic
+
+| DeliveryMode | OperationalRegime | DiscourseAct |
+|-------------|-------------------|--------------|
+| SILENT | HOLD | DEFERRAL |
+| ACKNOWLEDGING | STABILIZE | ACKNOWLEDGMENT |
+| CLARIFYING | CLARIFY | QUESTION |
+| HEDGED | DE_ESCALATE | REFLECTION |
+| CONFIDENT | INFORM | EXPLANATION |
+
+### Tests
+
+- 51 tests for P6-Lite
+- 35 tests for P7-Lite
+- 11 integration tests for full CV→Presentation→P10 pipeline
+- All 364 tests passing
+
+---
+
+## Current Status
+
+**P10/P11/P12 can now be activated** using P6-Lite and P7-Lite.
+
+### Activation Steps
+
+1. ✅ P6-Lite implemented (derives RegimeEnvelope)
+2. ✅ P7-Lite implemented (derives DiscourseEnvelope)
+3. ⏳ Activate P10 with derived envelopes
+4. ⏳ Activate P11 (Prosodic Evidence)
+5. ⏳ Activate P12 (Consistency Validation)
+
+### Previous Recommendation (Superseded)
+
+~~**Do not activate P10/P11/P12 until P6 (Regime Selection) is implemented.**~~
+
+The P6-Lite/P7-Lite approach provides meaningful regime/discourse signals derived from
+the Chitta-Vṛtti → Presentation Layer pipeline, enabling P12 to perform useful validation.
 
 ---
 
@@ -218,4 +273,4 @@ For reference, these are the violations P12 can detect (when properly activated)
 | `LEXICAL_PROSODIC_INCOMPATIBILITY` | MINOR | Prosody incompatible with word choice |
 | `GROUNDING_VIOLATION` | CRITICAL | Grounding constraints violated |
 
-These violations are meaningless without real P6/P7 inputs to compare against.
+These violations are now meaningful with P6-Lite/P7-Lite providing derived regime/discourse signals from the Presentation Layer.
