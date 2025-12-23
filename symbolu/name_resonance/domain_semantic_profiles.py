@@ -672,6 +672,17 @@ class NameDomainMatchResult:
     domain: str
 
 
+# =============================================================================
+# Zero-Kill Threshold
+# =============================================================================
+
+# If C (ontological constraint) falls below this threshold, the pairing
+# is considered ontologically invalid. S is not evaluated (set to 0).
+# This prevents wasting computation on impossible pairings and makes
+# the hard gate explicit.
+C_ZERO_KILL_THRESHOLD = 0.1
+
+
 def classify_match_quality(score: float) -> str:
     """Classify match score into quality tier."""
     if score >= 0.5:
@@ -692,6 +703,11 @@ def compute_name_domain_crs(
 ) -> NameDomainMatchResult:
     """
     Compute full C×R×S score for name↔domain matching.
+
+    Zero-Kill Rule:
+        If C < C_ZERO_KILL_THRESHOLD, S is not evaluated (S = 0).
+        This ensures ontologically invalid pairings get MATCH = 0
+        without wasting computation on semantic analysis.
 
     Args:
         name: The name being analyzed
@@ -715,9 +731,30 @@ def compute_name_domain_crs(
     # R = Structural realization (passed in from 12D profile matching)
     r_score = structural_match_score
 
-    # S = Semantic type coherence
-    semantic_result = compute_semantic_coherence(ontological_vector, domain_name)
-    s_score = semantic_result.coherence
+    # ZERO-KILL RULE: If C is below threshold, don't evaluate S
+    # This is the hard gate - ontologically invalid pairings get MATCH = 0
+    if c_score < C_ZERO_KILL_THRESHOLD:
+        # C is too low - ontologically invalid pairing
+        # S is not meaningful, so set to 0
+        s_score = 0.0
+        semantic_result = SemanticCoherenceResult(
+            coherence=0.0,
+            name_traits=(),
+            name_dominant_traits=(),
+            domain_name=domain_name,
+            domain_required_traits=(),
+            domain_complementary=(),
+            domain_conflicting=(),
+            matched_required=(),
+            matched_complementary=(),
+            conflicts_found=(),
+            rationale=f"Zero-kill: C={c_score:.3f} < threshold={C_ZERO_KILL_THRESHOLD} (ontologically invalid)",
+        )
+    else:
+        # C is valid - proceed with semantic evaluation
+        # S = Semantic type coherence
+        semantic_result = compute_semantic_coherence(ontological_vector, domain_name)
+        s_score = semantic_result.coherence
 
     # MATCH = C × R × S
     match_score = c_score * r_score * s_score
