@@ -5,7 +5,7 @@ Ontological Engine - PyTorch Implementation
 GPU-accelerated version of the 100D ontological engine using PyTorch.
 
 Features:
-- DistilBERT encoder integration
+- MiniLM encoder integration (384D, 2.5x faster than DistilBERT)
 - GPU acceleration (CUDA/MPS)
 - Proper backpropagation
 - Batch processing
@@ -39,14 +39,14 @@ if PYTORCH_AVAILABLE:
         """
         Multi-layer perceptron for ontological projection.
 
-        Maps encoder output (768D) to 10D ontological vector
+        Maps encoder output (384D MiniLM) to 10D ontological vector
         with skip connections and layer normalization.
         """
 
         def __init__(
             self,
-            input_dim: int = 768,
-            hidden_dims: Tuple[int, ...] = (512, 256),
+            input_dim: int = 384,
+            hidden_dims: Tuple[int, ...] = (256, 128),
             output_dim: int = 10,
             dropout: float = 0.1,
             use_skip: bool = True,
@@ -147,16 +147,16 @@ if PYTORCH_AVAILABLE:
         Direct 100D Bhava prediction from encoder embedding.
 
         Unlike BhavaLayer which derives 90D from 10D ontological,
-        this head predicts 100D bhava directly from the 768D encoder output.
+        this head predicts 100D bhava directly from the 384D encoder output.
 
-        Architecture per Grok recommendation:
-            768D → 512D → 256D → 100D
+        Architecture (optimized for MiniLM 384D):
+            384D → 256D → 128D → 100D
         """
 
         def __init__(
             self,
-            input_dim: int = 768,
-            hidden_dims: Tuple[int, ...] = (512, 256),
+            input_dim: int = 384,
+            hidden_dims: Tuple[int, ...] = (256, 128),
             output_dim: int = 100,
             dropout: float = 0.1,
         ):
@@ -234,10 +234,10 @@ if PYTORCH_AVAILABLE:
         Full PyTorch implementation of the 100D Ontological Engine.
 
         Architecture:
-            Text → Encoder (768D) → MLP → 10D Ontological
-                                       → 90D Bhava
-                                       → Reasoning Score
-                                       → Creativity Score
+            Text → Encoder (384D MiniLM) → MLP → 10D Ontological
+                                              → 90D Bhava
+                                              → Reasoning Score
+                                              → Creativity Score
 
         Usage:
             engine = PyTorchOntologicalEngine()
@@ -257,8 +257,8 @@ if PYTORCH_AVAILABLE:
 
         def __init__(
             self,
-            encoder_dim: int = 768,
-            hidden_dims: Tuple[int, ...] = (512, 256),
+            encoder_dim: int = 384,
+            hidden_dims: Tuple[int, ...] = (256, 128),
             ontological_dim: int = 10,
             bhava_dim: int = 90,
             direct_bhava_dim: int = 100,
@@ -569,8 +569,8 @@ if PYTORCH_AVAILABLE:
                 f"Total Parameters: {self.parameter_count():,}",
                 "",
                 "Architecture:",
-                f"  Encoder Input: {self.encoder_dim}D (DistilBERT/Hash)",
-                f"  Hidden Layers: 512D → 256D",
+                f"  Encoder Input: {self.encoder_dim}D (MiniLM/Hash)",
+                f"  Hidden Layers: 256D → 128D",
                 f"  Ontological Output: {self.ontological_dim}D",
                 f"  Bhava Derived: {self.bhava_dim}D (from ontological)",
             ]
@@ -581,12 +581,12 @@ if PYTORCH_AVAILABLE:
             lines.extend([
                 "",
                 "Components:",
-                f"  - MLP (768→10): {sum(p.numel() for p in self.mlp.parameters()):,} params",
+                f"  - MLP ({self.encoder_dim}→10): {sum(p.numel() for p in self.mlp.parameters()):,} params",
                 f"  - Bhava Layer (10→90): {sum(p.numel() for p in self.bhava.parameters()):,} params",
             ])
 
             if self.use_direct_bhava:
-                lines.append(f"  - Direct Bhava (768→100): {sum(p.numel() for p in self.direct_bhava.parameters()):,} params")
+                lines.append(f"  - Direct Bhava ({self.encoder_dim}→100): {sum(p.numel() for p in self.direct_bhava.parameters()):,} params")
 
             lines.extend([
                 f"  - Reasoning Head: {sum(p.numel() for p in self.reasoning_head.parameters()):,} params",

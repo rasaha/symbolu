@@ -176,11 +176,12 @@ class HybridEncoder(TextEncoder):
     Hybrid encoder that auto-selects best available encoder.
 
     Priority:
-    1. DistilBERT (if transformers available)
-    2. HashEncoder (fallback)
+    1. SentenceTransformer MiniLM (384D, 2.5x faster than DistilBERT)
+    2. DistilBERT (768D fallback if sentence-transformers unavailable)
+    3. HashEncoder (final fallback)
     """
 
-    def __init__(self, prefer_transformer: bool = True, dimension: int = 768):
+    def __init__(self, prefer_transformer: bool = True, dimension: int = 384):
         self._prefer_transformer = prefer_transformer
         self._fallback_dimension = dimension
         self._encoder: Optional[TextEncoder] = None
@@ -189,11 +190,22 @@ class HybridEncoder(TextEncoder):
     def _init_encoder(self):
         """Initialize the best available encoder."""
         if self._prefer_transformer:
+            # Try MiniLM first (faster, 384D)
+            try:
+                self._encoder = SentenceTransformerEncoder()
+                # Test that it works
+                self._encoder._load_model()
+                print("Using MiniLM encoder (384D)")
+                return
+            except (ImportError, Exception) as e:
+                print(f"MiniLM not available ({e}), trying DistilBERT...")
+
+            # Fall back to DistilBERT (768D)
             try:
                 self._encoder = DistilBERTEncoder()
                 # Test that it works
                 self._encoder._load_model()
-                print("Using DistilBERT encoder")
+                print("Using DistilBERT encoder (768D)")
                 return
             except (ImportError, Exception) as e:
                 print(f"DistilBERT not available ({e}), falling back to hash encoder")
@@ -218,22 +230,28 @@ class HybridEncoder(TextEncoder):
 
 def get_encoder(
     encoder_type: str = "auto",
-    dimension: int = 768,
+    dimension: int = 384,
     device: Optional[str] = None,
 ) -> TextEncoder:
     """
     Factory function to get a text encoder.
 
     Args:
-        encoder_type: "auto", "distilbert", or "hash"
+        encoder_type: "auto", "minilm", "distilbert", or "hash"
         dimension: Embedding dimension (for hash encoder)
         device: Device for transformer ("cuda" or "cpu")
 
     Returns:
         TextEncoder instance
+
+    Note:
+        "auto" tries MiniLM (384D) first, then DistilBERT (768D), then hash.
+        MiniLM is 2.5x faster than DistilBERT with only 5% quality drop.
     """
     if encoder_type == "hash":
         return HashEncoder(dimension=dimension)
+    elif encoder_type == "minilm":
+        return SentenceTransformerEncoder(device=device)
     elif encoder_type == "distilbert":
         return DistilBERTEncoder(device=device)
     elif encoder_type == "auto":

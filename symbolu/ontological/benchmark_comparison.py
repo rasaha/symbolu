@@ -3,7 +3,7 @@
 Ontological Engine - Encoder Comparison Benchmark
 ==================================================
 
-Compares hash encoder vs DistilBERT encoder on the ontological engine.
+Compares hash encoder vs MiniLM encoder on the ontological engine.
 
 Tests:
 1. Domain classification accuracy
@@ -13,7 +13,7 @@ Tests:
 
 Expected results:
 - Hash encoder: ~20% domain accuracy (deterministic but not semantic)
-- DistilBERT: ~80%+ domain accuracy (semantic understanding)
+- MiniLM (384D): ~75%+ domain accuracy (semantic understanding, 2.5x faster)
 
 Run with:
     python -m symbolu.ontological.benchmark_comparison
@@ -91,12 +91,12 @@ def benchmark_encoder(encoder_type: str = "hash") -> EncoderBenchmarkResult:
     Benchmark a specific encoder type.
 
     Args:
-        encoder_type: "hash" or "distilbert"
+        encoder_type: "hash" or "minilm"
 
     Returns:
         EncoderBenchmarkResult with metrics
     """
-    from symbolu.ontological.encoder import get_encoder, HashEncoder, DistilBERTEncoder
+    from symbolu.ontological.encoder import get_encoder, HashEncoder, SentenceTransformerEncoder
     from symbolu.ontological.engine import create_engine
 
     print(f"\n{'='*60}")
@@ -106,9 +106,9 @@ def benchmark_encoder(encoder_type: str = "hash") -> EncoderBenchmarkResult:
     # Get encoder
     try:
         if encoder_type == "hash":
-            encoder = HashEncoder(dimension=768)
-        elif encoder_type == "distilbert":
-            encoder = DistilBERTEncoder()
+            encoder = HashEncoder(dimension=384)
+        elif encoder_type == "minilm":
+            encoder = SentenceTransformerEncoder()
             encoder._load_model()  # Force load
         else:
             encoder = get_encoder(encoder_type)
@@ -289,24 +289,24 @@ def euclidean_distance(v1: List[float], v2: List[float]) -> float:
 
 
 def run_comparison():
-    """Run full comparison between hash and DistilBERT encoders."""
+    """Run full comparison between hash and MiniLM encoders."""
     print("\n" + "=" * 60)
     print("   ONTOLOGICAL ENGINE - ENCODER COMPARISON")
     print("=" * 60)
-    print("\nComparing hash encoder (baseline) vs DistilBERT (semantic)")
+    print("\nComparing hash encoder (baseline) vs MiniLM (384D semantic)")
 
     results = {}
 
     # Benchmark hash encoder
     results["hash"] = benchmark_encoder("hash")
 
-    # Benchmark DistilBERT encoder
+    # Benchmark MiniLM encoder
     try:
-        results["distilbert"] = benchmark_encoder("distilbert")
+        results["minilm"] = benchmark_encoder("minilm")
     except Exception as e:
-        print(f"\nDistilBERT benchmark failed: {e}")
-        results["distilbert"] = EncoderBenchmarkResult(
-            encoder_name="distilbert",
+        print(f"\nMiniLM benchmark failed: {e}")
+        results["minilm"] = EncoderBenchmarkResult(
+            encoder_name="minilm",
             domain_accuracy=0,
             reasoning_creativity_separation=0,
             avg_latency_ms=0,
@@ -320,11 +320,11 @@ def run_comparison():
     print("   COMPARISON SUMMARY")
     print("=" * 60)
 
-    print("\n{:<30} {:>15} {:>15}".format("Metric", "Hash", "DistilBERT"))
+    print("\n{:<30} {:>15} {:>15}".format("Metric", "Hash", "MiniLM"))
     print("-" * 60)
 
     hash_r = results["hash"]
-    bert_r = results["distilbert"]
+    mini_r = results["minilm"]
 
     def improvement(h, b):
         if h == 0:
@@ -335,52 +335,52 @@ def run_comparison():
     print("{:<30} {:>14.0%} {:>14.0%} ({})".format(
         "Domain Classification",
         hash_r.domain_accuracy,
-        bert_r.domain_accuracy,
-        improvement(hash_r.domain_accuracy, bert_r.domain_accuracy),
+        mini_r.domain_accuracy,
+        improvement(hash_r.domain_accuracy, mini_r.domain_accuracy),
     ))
 
     print("{:<30} {:>14.0%} {:>14.0%} ({})".format(
         "Reasoning/Creativity Sep.",
         hash_r.reasoning_creativity_separation,
-        bert_r.reasoning_creativity_separation,
-        improvement(hash_r.reasoning_creativity_separation, bert_r.reasoning_creativity_separation),
+        mini_r.reasoning_creativity_separation,
+        improvement(hash_r.reasoning_creativity_separation, mini_r.reasoning_creativity_separation),
     ))
 
     print("{:<30} {:>14.2f} {:>14.2f} ({})".format(
         "Semantic Coherence",
         hash_r.semantic_coherence,
-        bert_r.semantic_coherence,
-        improvement(hash_r.semantic_coherence, bert_r.semantic_coherence),
+        mini_r.semantic_coherence,
+        improvement(hash_r.semantic_coherence, mini_r.semantic_coherence),
     ))
 
     print("{:<30} {:>13.2f}ms {:>13.2f}ms".format(
         "Avg Latency",
         hash_r.avg_latency_ms,
-        bert_r.avg_latency_ms,
+        mini_r.avg_latency_ms,
     ))
 
     print("\n" + "=" * 60)
     print("KEY INSIGHTS")
     print("=" * 60)
 
-    if bert_r.domain_accuracy > hash_r.domain_accuracy:
-        improvement_pct = (bert_r.domain_accuracy - hash_r.domain_accuracy) / hash_r.domain_accuracy * 100 if hash_r.domain_accuracy > 0 else 100
-        print(f"\n+ DistilBERT improves domain accuracy by {improvement_pct:.0f}%")
+    if mini_r.domain_accuracy > hash_r.domain_accuracy:
+        improvement_pct = (mini_r.domain_accuracy - hash_r.domain_accuracy) / hash_r.domain_accuracy * 100 if hash_r.domain_accuracy > 0 else 100
+        print(f"\n+ MiniLM improves domain accuracy by {improvement_pct:.0f}%")
     else:
-        print("\n- DistilBERT did not improve domain accuracy (may need training)")
+        print("\n- MiniLM did not improve domain accuracy (may need training)")
 
-    if bert_r.reasoning_creativity_separation > hash_r.reasoning_creativity_separation:
+    if mini_r.reasoning_creativity_separation > hash_r.reasoning_creativity_separation:
         print("+ Better reasoning vs creativity separation with semantic encoder")
     else:
         print("- Reasoning/creativity separation similar (contrastive training needed)")
 
-    if bert_r.semantic_coherence > hash_r.semantic_coherence:
+    if mini_r.semantic_coherence > hash_r.semantic_coherence:
         print("+ Higher semantic coherence confirms better domain clustering")
 
     print("\nNEXT STEPS:")
     print("  1. Train with contrastive loss to improve reasoning/creativity separation")
     print("  2. Use larger datasets (GSM8K, ROCStories) for domain specialization")
-    print("  3. Fine-tune DistilBERT on domain-specific data")
+    print("  3. Fine-tune MiniLM on domain-specific data")
 
     return results
 
