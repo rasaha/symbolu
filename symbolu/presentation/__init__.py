@@ -90,6 +90,25 @@ from symbolu.presentation.signal_bridge import (
     PHASE_TO_DELIVERY,
     PHASE_EXPLANATIONS,
 )
+from symbolu.presentation.response_renderer import (
+    ResponseRenderer,
+    RenderedResponse,
+    ResponseSection,
+    render_response,
+    render_from_bridge,
+    format_rendered_response,
+)
+from symbolu.presentation.pipeline import (
+    PresentationPipeline,
+    PipelineConfig,
+    PipelineResult,
+    PipelineStage,
+    respond,
+    quick_respond,
+    process_with_details,
+    format_pipeline_result,
+    demo_pipeline,
+)
 
 __all__ = [
     # Types (Part 3)
@@ -158,4 +177,21 @@ __all__ = [
     "FluencyGuidance",
     "PHASE_TO_DELIVERY",
     "PHASE_EXPLANATIONS",
+    # Response Renderer (Directive → Text)
+    "ResponseRenderer",
+    "RenderedResponse",
+    "ResponseSection",
+    "render_response",
+    "render_from_bridge",
+    "format_rendered_response",
+    # Unified Pipeline (Full Query → Response)
+    "PresentationPipeline",
+    "PipelineConfig",
+    "PipelineResult",
+    "PipelineStage",
+    "respond",
+    "quick_respond",
+    "process_with_details",
+    "format_pipeline_result",
+    "demo_pipeline",
 ]
