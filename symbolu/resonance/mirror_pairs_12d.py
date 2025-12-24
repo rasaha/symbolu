@@ -3,18 +3,18 @@
 =============================
 
 The 12D ontological backbone is structured as 6 mirror pairs,
-where lower (concrete) dimensions balance with higher (abstract) dimensions.
+following the astrological mirror pattern (1↔7, 2↔8, etc.).
 
-Mirror Pairs (12D patent-exact sequence):
-    O1_POTENTIAL    ↔  O12_ABSOLVING    (Dormant ↔ Dissolution)
-    O2_IDENTITY     ↔  O11_INTEGRATION  (Classification ↔ Consolidation)
-    O3_EXECUTION    ↔  O10_UNIFYING     (Action ↔ Connection)
-    O4_STRUCTURE    ↔  O9_WITNESSES     (Form ↔ Meta-observation)
-    O5_COGNITION    ↔  O8_PURPOSE       (Perception ↔ Teleology)
-    O6_AGENCY       ↔  O7_REASONING     (Control ↔ Logic)
+Mirror Pairs (12D astrological sequence):
+    O1_POTENTIAL    ↔  O7_REASONING     (Dormant ↔ Logic)
+    O2_IDENTITY     ↔  O8_PURPOSE       (Classification ↔ Teleology)
+    O3_EXECUTION    ↔  O9_WITNESSES     (Action ↔ Meta-observation)
+    O4_STRUCTURE    ↔  O10_UNIFYING     (Form ↔ Connection)
+    O5_COGNITION    ↔  O11_INTEGRATION  (Perception ↔ Consolidation)
+    O6_AGENCY       ↔  O12_ABSOLVING    (Control ↔ Dissolution)
 
-This extends the 10D mirror architecture (5 pairs) to 12D (6 pairs),
-adding the POTENTIAL ↔ ABSOLVING pair for the new layers.
+This follows the astrological house opposition pattern where
+houses 1 and 7, 2 and 8, etc. form natural polarities.
 
 Key Principles:
     1. Lower layers (1-6) are concrete/grounded
@@ -35,57 +35,59 @@ from .types import OntologicalLayer, LAYER_NAMES
 # =============================================================================
 
 class MirrorPair12D(Enum):
-    """The 6 mirror pairs that structure the 12D space."""
+    """The 6 mirror pairs that structure the 12D space (astrological pattern)."""
 
-    # Dormant ↔ Dissolution: Latent capacity and terminal release
-    POTENTIAL_ABSOLVING = ("O1_POTENTIAL", "O12_ABSOLVING")
+    # 1↔7: Dormant ↔ Logic: Latent capacity and sequential reasoning
+    POTENTIAL_REASONING = ("O1_POTENTIAL", "O7_REASONING")
 
-    # Classification ↔ Consolidation: How we tag and how we unify
-    IDENTITY_INTEGRATION = ("O2_IDENTITY", "O11_INTEGRATION")
+    # 2↔8: Classification ↔ Teleology: How we tag and why it matters
+    IDENTITY_PURPOSE = ("O2_IDENTITY", "O8_PURPOSE")
 
-    # Action ↔ Connection: What happens and how things connect
-    EXECUTION_UNIFYING = ("O3_EXECUTION", "O10_UNIFYING")
+    # 3↔9: Action ↔ Meta-observation: What happens and how we observe it
+    EXECUTION_WITNESSES = ("O3_EXECUTION", "O9_WITNESSES")
 
-    # Form ↔ Meta-observation: Structure and how we observe it
-    STRUCTURE_WITNESSES = ("O4_STRUCTURE", "O9_WITNESSES")
+    # 4↔10: Form ↔ Connection: Structure and how things unify
+    STRUCTURE_UNIFYING = ("O4_STRUCTURE", "O10_UNIFYING")
 
-    # Perception ↔ Purpose: What we notice and why it matters
-    COGNITION_PURPOSE = ("O5_COGNITION", "O8_PURPOSE")
+    # 5↔11: Perception ↔ Consolidation: What we notice and how it integrates
+    COGNITION_INTEGRATION = ("O5_COGNITION", "O11_INTEGRATION")
 
-    # Control ↔ Logic: Decisions and their justification
-    AGENCY_REASONING = ("O6_AGENCY", "O7_REASONING")
+    # 6↔12: Control ↔ Dissolution: Decisions and their release
+    AGENCY_ABSOLVING = ("O6_AGENCY", "O12_ABSOLVING")
 
 
 # Direct mapping for fast lookup (layer name → mirror layer name)
+# Follows astrological pattern: 1↔7, 2↔8, 3↔9, 4↔10, 5↔11, 6↔12
 MIRROR_MAP_12D: Dict[str, str] = {
-    "O1_POTENTIAL": "O12_ABSOLVING",
-    "O12_ABSOLVING": "O1_POTENTIAL",
-    "O2_IDENTITY": "O11_INTEGRATION",
-    "O11_INTEGRATION": "O2_IDENTITY",
-    "O3_EXECUTION": "O10_UNIFYING",
-    "O10_UNIFYING": "O3_EXECUTION",
-    "O4_STRUCTURE": "O9_WITNESSES",
-    "O9_WITNESSES": "O4_STRUCTURE",
-    "O5_COGNITION": "O8_PURPOSE",
-    "O8_PURPOSE": "O5_COGNITION",
-    "O6_AGENCY": "O7_REASONING",
-    "O7_REASONING": "O6_AGENCY",
+    "O1_POTENTIAL": "O7_REASONING",
+    "O7_REASONING": "O1_POTENTIAL",
+    "O2_IDENTITY": "O8_PURPOSE",
+    "O8_PURPOSE": "O2_IDENTITY",
+    "O3_EXECUTION": "O9_WITNESSES",
+    "O9_WITNESSES": "O3_EXECUTION",
+    "O4_STRUCTURE": "O10_UNIFYING",
+    "O10_UNIFYING": "O4_STRUCTURE",
+    "O5_COGNITION": "O11_INTEGRATION",
+    "O11_INTEGRATION": "O5_COGNITION",
+    "O6_AGENCY": "O12_ABSOLVING",
+    "O12_ABSOLVING": "O6_AGENCY",
 }
 
 # Layer index mapping (0-indexed)
+# Astrological pattern: index i ↔ index i+6 (mod 12)
 MIRROR_INDEX_MAP: Dict[int, int] = {
-    0: 11,   # O1_POTENTIAL ↔ O12_ABSOLVING
-    11: 0,
-    1: 10,   # O2_IDENTITY ↔ O11_INTEGRATION
-    10: 1,
-    2: 9,    # O3_EXECUTION ↔ O10_UNIFYING
-    9: 2,
-    3: 8,    # O4_STRUCTURE ↔ O9_WITNESSES
-    8: 3,
-    4: 7,    # O5_COGNITION ↔ O8_PURPOSE
-    7: 4,
-    5: 6,    # O6_AGENCY ↔ O7_REASONING
-    6: 5,
+    0: 6,    # O1_POTENTIAL ↔ O7_REASONING
+    6: 0,
+    1: 7,    # O2_IDENTITY ↔ O8_PURPOSE
+    7: 1,
+    2: 8,    # O3_EXECUTION ↔ O9_WITNESSES
+    8: 2,
+    3: 9,    # O4_STRUCTURE ↔ O10_UNIFYING
+    9: 3,
+    4: 10,   # O5_COGNITION ↔ O11_INTEGRATION
+    10: 4,
+    5: 11,   # O6_AGENCY ↔ O12_ABSOLVING
+    11: 5,
 }
 
 # Lower layers (concrete, grounded) - layers 1-6
@@ -228,14 +230,14 @@ def compute_balance_12d(
     total_imbalance = 0.0
     propagation_needed = []
 
-    # 6 mirror pairs for 12D
+    # 6 mirror pairs for 12D (astrological pattern: 1↔7, 2↔8, etc.)
     pair_definitions = [
-        (MirrorPair12D.POTENTIAL_ABSOLVING, 0, 11),    # O1 ↔ O12
-        (MirrorPair12D.IDENTITY_INTEGRATION, 1, 10),   # O2 ↔ O11
-        (MirrorPair12D.EXECUTION_UNIFYING, 2, 9),      # O3 ↔ O10
-        (MirrorPair12D.STRUCTURE_WITNESSES, 3, 8),     # O4 ↔ O9
-        (MirrorPair12D.COGNITION_PURPOSE, 4, 7),       # O5 ↔ O8
-        (MirrorPair12D.AGENCY_REASONING, 5, 6),        # O6 ↔ O7
+        (MirrorPair12D.POTENTIAL_REASONING, 0, 6),     # O1 ↔ O7
+        (MirrorPair12D.IDENTITY_PURPOSE, 1, 7),        # O2 ↔ O8
+        (MirrorPair12D.EXECUTION_WITNESSES, 2, 8),     # O3 ↔ O9
+        (MirrorPair12D.STRUCTURE_UNIFYING, 3, 9),      # O4 ↔ O10
+        (MirrorPair12D.COGNITION_INTEGRATION, 4, 10),  # O5 ↔ O11
+        (MirrorPair12D.AGENCY_ABSOLVING, 5, 11),       # O6 ↔ O12
     ]
 
     for pair, lower_idx, higher_idx in pair_definitions:
