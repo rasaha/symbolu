@@ -52,6 +52,7 @@ Text → MiniLM Encoder (384D) → MLP (256→128) → 10D Ontological
 3. **BhavaLayer**
    - Derives 90D from 10D ontological
    - 9 pairs × 10 sub-layers each
+   - Supervised via consistency loss
 
 4. **Task Heads**
    - ReasoningHead: Focuses on O1, O6, O8
@@ -67,29 +68,35 @@ pip install torch sentence-transformers
 pip install datasets
 ```
 
-## Training
+## Training Modes
 
-### Quick Start (Synthetic Data)
+### 1. Contrastive Training (2 Domains)
+
+Binary classification between reasoning and creativity domains.
 
 ```bash
-# 5 epochs (~2-3 minutes)
+# Quick test with synthetic data
 python scripts/train_contrastive.py --epochs 5 --synthetic --benchmark
 
-# 10 epochs (better results)
-python scripts/train_contrastive.py --epochs 10 --synthetic --benchmark
-```
-
-### With Real Datasets
-
-```bash
-# Install datasets library
-pip install datasets
-
-# Train with GSM8K (math) and WritingPrompts (stories)
+# Full training with HuggingFace
 python scripts/train_contrastive.py --epochs 10 --huggingface --benchmark
 ```
 
-### Training Options
+### 2. Multi-Domain Training (10 Domains) ⭐ NEW
+
+Train all 10 ontological layers with multi-label support.
+
+```bash
+# Quick test
+python scripts/train_multi_domain.py --epochs 5 --samples 50 --benchmark
+
+# Full training
+python scripts/train_multi_domain.py --epochs 20 --samples 200 --benchmark
+```
+
+## Training Options
+
+### Contrastive Trainer
 
 | Flag | Description | Default |
 |------|-------------|---------|
@@ -102,45 +109,127 @@ python scripts/train_contrastive.py --epochs 10 --huggingface --benchmark
 | `--device` | Device (auto/cuda/cpu) | auto |
 | `--benchmark` | Run benchmark after training | False |
 | `--output` | Output model path | model_contrastive.pt |
+| `--seed` | Random seed | 42 |
+| `--val-split` | Validation split ratio | 0.2 |
+| `--patience` | Early stopping patience | 3 |
 
-### Offline Training (No Internet)
+### Multi-Domain Trainer
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--epochs` | Number of training epochs | 10 |
+| `--batch-size` | Batch size | 32 |
+| `--lr` | Learning rate | 1e-4 |
+| `--samples` | Samples per domain | 100 |
+| `--device` | Device (auto/cuda/cpu) | auto |
+| `--benchmark` | Run benchmark after training | False |
+| `--output` | Output model path | model_multi_domain.pt |
+| `--seed` | Random seed | 42 |
+| `--val-split` | Validation split ratio | 0.2 |
+| `--patience` | Early stopping patience | 5 |
+| `--label-smoothing` | Label smoothing | 0.1 |
+
+## Training Features
+
+### Reproducibility
+
+All training is reproducible with random seeds:
 
 ```python
-# First, save model on machine with internet:
-from symbolu.ontological import save_model_for_offline
-save_model_for_offline("./models/minilm")
+from symbolu.ontological import ContrastiveConfig
 
-# Then train offline:
-python scripts/train_contrastive.py --epochs 10 --synthetic --model-path ./models/minilm
+config = ContrastiveConfig(seed=42)  # Fixed seed
 ```
 
-## Contrastive Training
+### Validation and Early Stopping
 
-The engine uses **triplet contrastive loss** to separate reasoning from creativity:
+- Automatic train/validation split (default 20%)
+- Early stopping based on validation performance
+- Best model checkpoint saved automatically
 
-### Loss Functions
+```python
+config = ContrastiveConfig(
+    validation_split=0.2,
+    early_stopping_patience=3,
+)
+```
 
-1. **Triplet Loss**: Anchor closer to positive (same domain) than negative (different domain)
-   ```
-   L = max(0, d(anchor, positive) - d(anchor, negative) + margin)
-   ```
+### Bhava Supervision
 
-2. **Domain Separation Loss**: Maximize distance between domain centroids
-   ```
-   L = max(0, margin - distance(reasoning_centroid, creativity_centroid))
-   ```
+The 90D Bhava space is now actively trained via consistency loss:
 
-3. **Purity Loss**: Encourage sparse activations (one dominant layer)
+```python
+# Bhava target derived from ontological layer interactions
+bhava_loss = MSE(bhava_output, compute_bhava_target(onto_output))
+```
 
-4. **Orthogonality Loss**: Decorrelate the 10 dimensions
+## Datasets
 
-### Datasets
+### Built-in Datasets
+
+| Dataset | Domain | Description |
+|---------|--------|-------------|
+| **MathRAGDataset** | Reasoning | Arithmetic, algebra, geometry, logic |
+| **CreativeMathDataset** | Creativity | Fractals, golden ratio, math art, stories |
+| **MultiDomainDataset** | All 10 | Samples for each ontological layer |
+
+### External Datasets
 
 | Dataset | Domain | Description |
 |---------|--------|-------------|
 | GSM8K | Reasoning | Grade school math problems |
-| ROCStories/WritingPrompts | Creativity | Story completion tasks |
-| Synthetic | Both | Generated math/story samples |
+| ROCStories | Creativity | Story completion tasks |
+| WritingPrompts | Creativity | Creative writing prompts |
+
+### Generate Custom Datasets
+
+```python
+from symbolu.ontological import (
+    MathRAGDataset,
+    CreativeMathDataset,
+    MultiDomainDataset,
+)
+
+# Reasoning math
+math = MathRAGDataset.generate(count=1000, seed=42)
+math.save("data/math_rag.json")
+
+# Creative math
+creative = CreativeMathDataset.generate(count=500, seed=42)
+creative.save("data/creative_math.json")
+
+# All 10 domains
+multi = MultiDomainDataset.generate(samples_per_domain=100, seed=42)
+multi.save("data/multi_domain.json")
+```
+
+## Loss Functions
+
+### Contrastive Training
+
+1. **Triplet Loss**: Anchor closer to positive than negative
+   ```
+   L = max(0, d(anchor, positive) - d(anchor, negative) + margin)
+   ```
+
+2. **Domain Separation Loss**: Maximize centroid distance
+   ```
+   L = max(0, margin - distance(reasoning_centroid, creativity_centroid))
+   ```
+
+3. **Purity Loss**: Encourage sparse activations
+
+4. **Orthogonality Loss**: Decorrelate dimensions
+
+### Multi-Domain Training
+
+1. **Soft Cross-Entropy**: Multi-label classification with label smoothing
+
+2. **Bhava Consistency Loss**: Bhava reflects ontological interactions
+
+3. **Purity Loss**: One dominant layer per sample
+
+4. **Orthogonality Loss**: Independent dimensions
 
 ## Benchmark Results
 
@@ -171,25 +260,45 @@ The engine uses **triplet contrastive loss** to separate reasoning from creativi
 
 ## Python API
 
-### Basic Usage
+### Contrastive Training
 
 ```python
 from symbolu.ontological import ContrastiveTrainer, ContrastiveConfig
 
-# Create trainer
-config = ContrastiveConfig(epochs=10, batch_size=16)
+config = ContrastiveConfig(
+    epochs=10,
+    batch_size=16,
+    seed=42,
+    validation_split=0.2,
+    early_stopping_patience=3,
+)
 trainer = ContrastiveTrainer(config=config)
 
-# Train
-trainer.train(epochs=10, use_synthetic=True)
+result = trainer.train(epochs=10, use_synthetic=True)
+print(f"Best separation: {result['best_separation']:.2%}")
+print(f"Best val separation: {result['best_val_separation']:.2%}")
 
-# Benchmark
-results = trainer.benchmark()
-print(f"Separation: {results['separation_score']:.2%}")
-print(f"Accuracy: {results['overall_accuracy']:.2%}")
-
-# Save model
 trainer.save("model_contrastive.pt")
+```
+
+### Multi-Domain Training
+
+```python
+from symbolu.ontological import MultiDomainTrainer, MultiDomainConfig
+
+config = MultiDomainConfig(
+    epochs=10,
+    samples_per_domain=100,
+    seed=42,
+    label_smoothing=0.1,
+)
+trainer = MultiDomainTrainer(config=config)
+
+result = trainer.train(epochs=10)
+print(f"Best accuracy: {result['best_accuracy']:.2%}")
+
+trainer.benchmark()  # Per-domain breakdown
+trainer.save("model_multi_domain.pt")
 ```
 
 ### Analyze Text
@@ -216,29 +325,54 @@ checkpoint = torch.load("model_contrastive.pt")
 engine.load_state_dict(checkpoint["engine_state"])
 ```
 
+## Offline Training (No Internet)
+
+```python
+# First, save model on machine with internet:
+from symbolu.ontological import save_model_for_offline
+save_model_for_offline("./models/minilm")
+
+# Then train offline:
+python scripts/train_contrastive.py --epochs 10 --synthetic --model-path ./models/minilm
+```
+
 ## File Structure
 
 ```
 symbolu/ontological/
-├── __init__.py              # Module exports
-├── types.py                 # Type definitions (LAYER_NAMES, etc.)
-├── encoder.py               # MiniLM/Hash encoders
-├── pytorch_engine.py        # PyTorch engine implementation
-├── contrastive_trainer.py   # Contrastive training pipeline
-├── domain_datasets.py       # GSM8K, ROCStories loaders
-└── benchmark_comparison.py  # Encoder benchmarking
+├── __init__.py               # Module exports
+├── types.py                  # Type definitions (LAYER_NAMES, etc.)
+├── encoder.py                # MiniLM/Hash encoders
+├── pytorch_engine.py         # PyTorch engine implementation
+├── contrastive_trainer.py    # 2-domain contrastive training
+├── multi_domain_trainer.py   # 10-domain multi-label training
+├── domain_datasets.py        # GSM8K, ROCStories loaders
+├── multi_domain_dataset.py   # 10-domain dataset generator
+├── math_rag_dataset.py       # Math reasoning dataset
+├── creative_math_dataset.py  # Creative math dataset
+└── benchmark_comparison.py   # Encoder benchmarking
 
 scripts/
-└── train_contrastive.py     # CLI training script
+├── train_contrastive.py      # CLI: 2-domain training
+└── train_multi_domain.py     # CLI: 10-domain training
 ```
 
-## Next Steps
+## Recommended Training Path
 
-1. **More epochs**: Try 20-50 epochs for potentially better separation
-2. **Larger datasets**: Increase `--samples` to 1000-5000
-3. **Hyperparameter tuning**: Adjust learning rate, margins, loss weights
-4. **Additional domains**: Add more task types beyond reasoning/creativity
-5. **Fine-tuning encoder**: Unfreeze MiniLM layers for end-to-end training
+1. **Start with contrastive training** (2 domains)
+   ```bash
+   python scripts/train_contrastive.py --epochs 10 --synthetic --benchmark
+   ```
+
+2. **Expand to multi-domain** (all 10 layers)
+   ```bash
+   python scripts/train_multi_domain.py --epochs 20 --samples 200 --benchmark
+   ```
+
+3. **Fine-tune with real data**
+   ```bash
+   python scripts/train_contrastive.py --epochs 10 --huggingface --benchmark
+   ```
 
 ## References
 

@@ -48,9 +48,31 @@ try:
         ContrastiveDataset,
         create_contrastive_dataset,
     )
+    from symbolu.ontological.multi_domain_trainer import (
+        MultiDomainTrainer,
+        MultiDomainConfig,
+        train_multi_domain,
+    )
     PYTORCH_AVAILABLE = True
 except ImportError as e:
     print(f"Note: PyTorch components not available: {e}")
+
+# RAG datasets (no dependencies)
+from symbolu.ontological.math_rag_dataset import (
+    MathRAGDataset,
+    MathProblem,
+    create_math_rag_dataset,
+)
+from symbolu.ontological.creative_math_dataset import (
+    CreativeMathDataset,
+    CreativeMathItem,
+    create_creative_math_dataset,
+)
+from symbolu.ontological.multi_domain_dataset import (
+    MultiDomainDataset,
+    DomainSample,
+    create_multi_domain_dataset,
+)
 
 __all__ = [
     # Types
@@ -72,6 +94,17 @@ __all__ = [
     "save_model_for_offline",
     # PyTorch (optional)
     "PYTORCH_AVAILABLE",
+    # RAG datasets
+    "MathRAGDataset",
+    "MathProblem",
+    "create_math_rag_dataset",
+    "CreativeMathDataset",
+    "CreativeMathItem",
+    "create_creative_math_dataset",
+    # Multi-domain (10 layers)
+    "MultiDomainDataset",
+    "DomainSample",
+    "create_multi_domain_dataset",
 ]
 
 # Add PyTorch exports if available
@@ -85,4 +118,8 @@ if PYTORCH_AVAILABLE:
         "ROCStoriesDataset",
         "ContrastiveDataset",
         "create_contrastive_dataset",
+        # Multi-domain trainer
+        "MultiDomainTrainer",
+        "MultiDomainConfig",
+        "train_multi_domain",
     ])

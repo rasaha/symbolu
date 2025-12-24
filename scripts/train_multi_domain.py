@@ -1,22 +1,19 @@
 #!/usr/bin/env python3
 """
-Contrastive Training Script
-===========================
+Multi-Domain Training Script
+=============================
 
-Train the ontological engine with contrastive loss for
-reasoning vs creativity domain separation.
+Train the ontological engine on all 10 domains with multi-label support.
 
 Usage:
-    # Quick test with synthetic data
-    python scripts/train_contrastive.py --epochs 5 --synthetic
+    # Quick test
+    python scripts/train_multi_domain.py --epochs 5 --samples 50
 
-    # Full training with HuggingFace datasets
-    python scripts/train_contrastive.py --epochs 10 --huggingface
+    # Full training
+    python scripts/train_multi_domain.py --epochs 20 --samples 200
 
-    # With local data files
-    python scripts/train_contrastive.py --epochs 10 \
-        --gsm8k data/gsm8k.jsonl \
-        --stories data/rocstories.csv
+    # With benchmark
+    python scripts/train_multi_domain.py --epochs 10 --benchmark
 """
 
 import argparse
@@ -30,39 +27,23 @@ sys.path.insert(0, str(project_root))
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Train ontological engine with contrastive loss"
+        description="Train ontological engine on all 10 domains"
     )
     parser.add_argument(
         "--epochs", type=int, default=10,
         help="Number of training epochs (default: 10)"
     )
     parser.add_argument(
-        "--batch-size", type=int, default=16,
-        help="Batch size (default: 16)"
+        "--batch-size", type=int, default=32,
+        help="Batch size (default: 32)"
     )
     parser.add_argument(
         "--lr", type=float, default=1e-4,
         help="Learning rate (default: 1e-4)"
     )
     parser.add_argument(
-        "--synthetic", action="store_true",
-        help="Use synthetic data for testing"
-    )
-    parser.add_argument(
-        "--huggingface", action="store_true",
-        help="Load datasets from HuggingFace"
-    )
-    parser.add_argument(
-        "--gsm8k", type=str, default=None,
-        help="Path to GSM8K JSONL file"
-    )
-    parser.add_argument(
-        "--stories", type=str, default=None,
-        help="Path to ROCStories CSV file"
-    )
-    parser.add_argument(
-        "--samples", type=int, default=500,
-        help="Number of samples per domain (default: 500)"
+        "--samples", type=int, default=100,
+        help="Samples per domain (default: 100)"
     )
     parser.add_argument(
         "--device", type=str, default="auto",
@@ -73,8 +54,8 @@ def main():
         help="Path to local MiniLM model (for offline use)"
     )
     parser.add_argument(
-        "--output", type=str, default="model_contrastive.pt",
-        help="Output model path (default: model_contrastive.pt)"
+        "--output", type=str, default="model_multi_domain.pt",
+        help="Output model path (default: model_multi_domain.pt)"
     )
     parser.add_argument(
         "--benchmark", action="store_true",
@@ -89,17 +70,21 @@ def main():
         help="Validation split ratio (default: 0.2)"
     )
     parser.add_argument(
-        "--patience", type=int, default=3,
-        help="Early stopping patience (default: 3)"
+        "--patience", type=int, default=5,
+        help="Early stopping patience (default: 5)"
+    )
+    parser.add_argument(
+        "--label-smoothing", type=float, default=0.1,
+        help="Label smoothing (default: 0.1)"
     )
 
     args = parser.parse_args()
 
     # Import here to allow --help without torch
     try:
-        from symbolu.ontological.contrastive_trainer import (
-            ContrastiveTrainer,
-            ContrastiveConfig,
+        from symbolu.ontological.multi_domain_trainer import (
+            MultiDomainTrainer,
+            MultiDomainConfig,
         )
     except ImportError as e:
         print(f"Error: {e}")
@@ -108,45 +93,39 @@ def main():
         sys.exit(1)
 
     # Create config
-    config = ContrastiveConfig(
+    config = MultiDomainConfig(
         epochs=args.epochs,
         batch_size=args.batch_size,
         learning_rate=args.lr,
         device=args.device,
         model_path=args.model_path,
-        reasoning_samples=args.samples,
-        creativity_samples=args.samples,
-        use_huggingface=args.huggingface,
+        samples_per_domain=args.samples,
         seed=args.seed,
         validation_split=args.val_split,
         early_stopping_patience=args.patience,
+        label_smoothing=args.label_smoothing,
     )
 
     print("=" * 60)
-    print("CONTRASTIVE TRAINING")
+    print("MULTI-DOMAIN TRAINING (10 LAYERS)")
     print("=" * 60)
     print(f"Epochs: {args.epochs}")
     print(f"Batch size: {args.batch_size}")
     print(f"Learning rate: {args.lr}")
     print(f"Samples per domain: {args.samples}")
+    print(f"Total samples: {args.samples * 10}")
     print(f"Device: {args.device}")
     print(f"Seed: {args.seed}")
     print(f"Validation split: {args.val_split:.0%}")
     print(f"Early stopping patience: {args.patience}")
-    print(f"Data source: {'synthetic' if args.synthetic else 'huggingface' if args.huggingface else 'local files'}")
+    print(f"Label smoothing: {args.label_smoothing}")
     print("=" * 60)
 
     # Create trainer
-    trainer = ContrastiveTrainer(config=config)
+    trainer = MultiDomainTrainer(config=config)
 
     # Train
-    use_synthetic = args.synthetic or (not args.huggingface and not args.gsm8k)
-    result = trainer.train(
-        epochs=args.epochs,
-        use_synthetic=use_synthetic,
-        gsm8k_path=args.gsm8k,
-        stories_path=args.stories,
-    )
+    result = trainer.train(epochs=args.epochs)
 
     # Save model
     trainer.save(args.output)
@@ -156,15 +135,12 @@ def main():
     print("\n" + "=" * 60)
     print("TRAINING COMPLETE")
     print("=" * 60)
-    print(f"Best train separation: {result['best_separation']:.2%}")
-    if 'best_val_separation' in result:
-        print(f"Best val separation: {result['best_val_separation']:.2%}")
+    print(f"Best train accuracy: {result['best_accuracy']:.2%}")
+    print(f"Best val accuracy: {result['best_val_accuracy']:.2%}")
 
     # Benchmark
     if args.benchmark:
-        print("\n" + "=" * 60)
-        print("BENCHMARK RESULTS")
-        print("=" * 60)
+        print("\n")
         trainer.benchmark()
 
 
