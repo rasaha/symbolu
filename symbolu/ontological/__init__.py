@@ -2,7 +2,9 @@
 Ontological Engine Module
 =========================
 
-A learnable 100-dimensional ontological engine for text analysis.
+A learnable 144-dimensional ontological engine for text analysis.
+- 12D Ontological Layers (Potential → Absolving)
+- 132D Bhava (11 pairs × 12 sub-layers)
 
 Usage:
     from symbolu.ontological import ContrastiveTrainer
@@ -19,6 +21,9 @@ from symbolu.ontological.types import (
     TrainingBatch,
     LAYER_NAMES,
     LAYER_INDEX,
+    NUM_LAYERS,
+    NUM_BHAVA_PAIRS,
+    SUB_LAYERS_PER_PAIR,
     REASONING_LAYERS,
     CREATIVITY_LAYERS,
     TaskType,
@@ -64,6 +69,15 @@ try:
         UnifiedTrainer,
         UnifiedConfig,
     )
+    from symbolu.ontological.semantic_bhava import (
+        SemanticBhavaLayer,
+        AstrologicalOntologicalEngine,
+        PLANETARY_MAP,
+        ASPECTS,
+        BHAVA_PAIRS,
+        SUB_LAYER_NAMES,
+        get_aspect_between,
+    )
     PYTORCH_AVAILABLE = True
 except ImportError as e:
     print(f"Note: PyTorch components not available: {e}")
@@ -86,13 +100,16 @@ from symbolu.ontological.multi_domain_dataset import (
 )
 
 __all__ = [
-    # Types
+    # Types (12D)
     "OntologicalConfig",
     "OntologicalVector",
     "TrainingExample",
     "TrainingBatch",
     "LAYER_NAMES",
     "LAYER_INDEX",
+    "NUM_LAYERS",
+    "NUM_BHAVA_PAIRS",
+    "SUB_LAYERS_PER_PAIR",
     "REASONING_LAYERS",
     "CREATIVITY_LAYERS",
     "TaskType",
@@ -112,7 +129,7 @@ __all__ = [
     "CreativeMathDataset",
     "CreativeMathItem",
     "create_creative_math_dataset",
-    # Multi-domain (10 layers)
+    # Multi-domain (12 layers)
     "MultiDomainDataset",
     "DomainSample",
     "create_multi_domain_dataset",
@@ -142,4 +159,12 @@ if PYTORCH_AVAILABLE:
         "UnifiedOntologicalEngine",
         "UnifiedTrainer",
         "UnifiedConfig",
+        # Semantic Bhava (astrological) - 12D
+        "SemanticBhavaLayer",
+        "AstrologicalOntologicalEngine",
+        "PLANETARY_MAP",
+        "ASPECTS",
+        "BHAVA_PAIRS",
+        "SUB_LAYER_NAMES",
+        "get_aspect_between",
     ])
