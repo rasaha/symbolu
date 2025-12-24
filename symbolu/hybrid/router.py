@@ -41,15 +41,23 @@ try:
         get_referent_profile,
         ReferentClass,
         WORD_TO_REFERENT,
+        detect_semantic_inversion,
+        SemanticInversionResult,
     )
     SEMANTIC_CONTEXT_AVAILABLE = True
+    INVERSION_DETECTION_AVAILABLE = True
 except ImportError:
     SEMANTIC_CONTEXT_AVAILABLE = False
+    INVERSION_DETECTION_AVAILABLE = False
     CONTEXT_SEMANTIC_GROUPS = {}
     WORD_TO_REFERENT = {}
     ReferentClass = None  # type: ignore
+    SemanticInversionResult = None  # type: ignore
 
     def get_referent_profile(word: str):
+        return None
+
+    def detect_semantic_inversion(text: str, structural_coherence: float = 0.5):
         return None
 
 # Authoritative ReferentClass → ModelType Mapping
@@ -211,6 +219,11 @@ class RoutingDecision:
     dominant_layer: str
     layer_scores: Tuple[Tuple[str, float], ...]  # Top layers
     query_analysis: PhraseAnalysis
+    # Semantic inversion detection (fracture between semantic/structural layers)
+    polarity_score: float = 0.0       # Net semantic polarity (-1.0 to +1.0)
+    polarity_words: Tuple[str, ...] = ()  # Polarity words found
+    has_inversion: bool = False       # True if internal contradiction detected
+    inversion_confidence: float = 0.0  # Confidence in inversion detection
 
 
 # Layer → Model mapping (12D patent-exact sequence)
@@ -1073,12 +1086,32 @@ class SemanticRouter:
                 model_type = phoneme_model
                 confidence = max_word_score
 
+        # Semantic inversion detection (fracture between semantic/structural layers)
+        # This detects when a query has high structural coherence but contains
+        # semantic polarity words that indicate potential for misinterpretation.
+        polarity_score = 0.0
+        polarity_words: Tuple[str, ...] = ()
+        has_inversion = False
+        inversion_confidence = 0.0
+
+        if INVERSION_DETECTION_AVAILABLE and self.use_context_weighting:
+            inversion_result = detect_semantic_inversion(query, structural_coherence=confidence)
+            if inversion_result:
+                polarity_score = inversion_result.polarity_score
+                polarity_words = inversion_result.polarity_words
+                has_inversion = inversion_result.has_inversion
+                inversion_confidence = inversion_result.inversion_confidence
+
         return RoutingDecision(
             model_type=model_type,
             confidence=confidence,
             dominant_layer=dominant_layer,
             layer_scores=top_layers,
             query_analysis=analysis,
+            polarity_score=polarity_score,
+            polarity_words=polarity_words,
+            has_inversion=has_inversion,
+            inversion_confidence=inversion_confidence,
         )
 
     def route_batch(
