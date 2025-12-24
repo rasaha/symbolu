@@ -6,19 +6,28 @@ The Bhava system draws from Vedic astrology where "Bhava" means
 "house" or "state of being". Each Bhava represents relational
 dynamics between ontological layers, mapped to planetary energies.
 
-Ontological-Planetary Correspondences:
-- O1_THINKING     → Mercury (Budha) - Intellect, contemplation
-- O2_FORMING      → Venus (Shukra) - Creation, beauty, art
-- O3_ACTING       → Mars (Mangala) - Action, drive, execution
-- O4_TAGGING      → Moon (Chandra) - Emotions, feelings, reception
-- O5_DIRECTING    → Sun (Surya) - Leadership, authority, will
-- O6_REASONING    → Saturn (Shani) - Logic, structure, discipline
-- O7_PURPOSING    → Jupiter (Guru) - Purpose, expansion, wisdom
-- O8_META_OBSERVING → Ketu - Higher awareness, detachment, insight
-- O9_UNIFYING     → Rahu - Integration, desire, synthesis
-- O10_ABSOLVING   → Neptune/Moksha - Dissolution, transcendence, release
+Patent-Exact Ontological-Planetary Correspondences:
+(Lowest → Highest: Karma → Brahman)
 
-Bhava Pairs as Astrological Aspects:
+Concrete Layers (O1-O5):
+- O1_EXECUTION    → Mars (Mangala) - Karma, actions, consequences
+- O2_IDENTITY     → Moon (Chandra) - Identification, labels, roles
+- O3_FORM         → Venus (Shukra) - Body, structure, embodiment
+- O4_COGNITION    → Mercury (Budha) - Mind, attention, perception
+- O5_AGENCY       → Sun (Surya) - Ego, control, intent, authorship
+
+Abstract Layers (O6-O10):
+- O6_REASONING    → Saturn (Shani) - Intellect, logic, inference
+- O7_PURPOSE      → Jupiter (Guru) - Soul, meaning, motivation
+- O8_OBSERVATION  → Ketu - Witness, meta-awareness, reflection
+- O9_CORE         → Rahu - Atman, unified self-reference
+- O10_UNIVERSAL   → Neptune/Brahman - Coherence, absoluteness, unity
+
+Directional Semantics:
+- Upward recursion (Execution → Universal): Cause tracing, insight surfacing
+- Downward recursion (Universal → Execution): Consequence projection, grounding
+
+Bhava Pairs (9 pairs × 10 sub-layers = 90D):
 - Adjacent layers: Conjunction (synthesis)
 - 2-apart: Sextile (60°) - Harmonious flow
 - 3-apart: Square (90°) - Creative tension
@@ -43,86 +52,98 @@ except ImportError:
 # PLANETARY CORRESPONDENCES
 # =============================================================================
 
+# Patent-Exact Planetary Correspondences
+# Karma → Identification → Body → Mind → Ego → Intellect → Soul → Witness → Atman → Brahman
 PLANETARY_MAP = {
-    "O1_THINKING": {
-        "planet": "Mercury",
-        "sanskrit": "Budha",
-        "energy": "intellect",
-        "element": "air",
-        "quality": "mutable",
-        "keywords": ["thought", "analysis", "communication", "curiosity"],
-    },
-    "O2_FORMING": {
-        "planet": "Venus",
-        "sanskrit": "Shukra",
-        "energy": "creation",
-        "element": "earth/water",
-        "quality": "fixed",
-        "keywords": ["beauty", "art", "harmony", "attraction"],
-    },
-    "O3_ACTING": {
+    "O1_EXECUTION": {
         "planet": "Mars",
         "sanskrit": "Mangala",
+        "vedic": "Karma",
         "energy": "action",
         "element": "fire",
         "quality": "cardinal",
-        "keywords": ["drive", "execution", "courage", "initiative"],
+        "keywords": ["execution", "behavior", "consequence", "output"],
     },
-    "O4_TAGGING": {
+    "O2_IDENTITY": {
         "planet": "Moon",
         "sanskrit": "Chandra",
-        "energy": "emotion",
+        "vedic": "Identification",
+        "energy": "classification",
         "element": "water",
         "quality": "cardinal",
-        "keywords": ["feeling", "reception", "intuition", "memory"],
+        "keywords": ["labels", "roles", "references", "self-object"],
     },
-    "O5_DIRECTING": {
+    "O3_FORM": {
+        "planet": "Venus",
+        "sanskrit": "Shukra",
+        "vedic": "Body",
+        "energy": "structure",
+        "element": "earth/water",
+        "quality": "fixed",
+        "keywords": ["form", "embodiment", "representation", "physical"],
+    },
+    "O4_COGNITION": {
+        "planet": "Mercury",
+        "sanskrit": "Budha",
+        "vedic": "Mind",
+        "energy": "perception",
+        "element": "air",
+        "quality": "mutable",
+        "keywords": ["attention", "emotion", "perception", "mental"],
+    },
+    "O5_AGENCY": {
         "planet": "Sun",
         "sanskrit": "Surya",
+        "vedic": "Ego",
         "energy": "will",
         "element": "fire",
         "quality": "fixed",
-        "keywords": ["leadership", "authority", "identity", "vitality"],
+        "keywords": ["control", "intent", "authorship", "decision"],
     },
     "O6_REASONING": {
         "planet": "Saturn",
         "sanskrit": "Shani",
-        "energy": "structure",
+        "vedic": "Intellect",
+        "energy": "logic",
         "element": "earth",
         "quality": "cardinal",
-        "keywords": ["logic", "discipline", "limits", "mastery"],
+        "keywords": ["logic", "inference", "analysis", "structure"],
     },
-    "O7_PURPOSING": {
+    "O7_PURPOSE": {
         "planet": "Jupiter",
         "sanskrit": "Guru",
-        "energy": "expansion",
+        "vedic": "Soul",
+        "energy": "meaning",
         "element": "fire/ether",
         "quality": "mutable",
-        "keywords": ["purpose", "wisdom", "growth", "meaning"],
+        "keywords": ["meaning", "motivation", "direction", "why"],
     },
-    "O8_META_OBSERVING": {
+    "O8_OBSERVATION": {
         "planet": "Ketu",
         "sanskrit": "Ketu",
-        "energy": "detachment",
+        "vedic": "Witness",
+        "energy": "awareness",
         "element": "ether",
         "quality": "spiritual",
-        "keywords": ["awareness", "insight", "liberation", "past"],
+        "keywords": ["meta-awareness", "reflection", "monitoring", "witness"],
     },
-    "O9_UNIFYING": {
+    "O9_CORE": {
         "planet": "Rahu",
         "sanskrit": "Rahu",
-        "energy": "desire",
+        "vedic": "Atman",
+        "energy": "self",
         "element": "air/ether",
-        "quality": "obsessive",
-        "keywords": ["integration", "ambition", "future", "synthesis"],
+        "quality": "stable",
+        "keywords": ["unified-self", "stable-identity", "core", "essence"],
     },
-    "O10_ABSOLVING": {
+    "O10_UNIVERSAL": {
         "planet": "Neptune",
-        "sanskrit": "Moksha",
-        "energy": "dissolution",
-        "element": "water/ether",
+        "sanskrit": "Brahman",
+        "vedic": "Brahman",
+        "energy": "unity",
+        "element": "ether",
         "quality": "transcendent",
-        "keywords": ["release", "transcendence", "completion", "surrender"],
+        "keywords": ["coherence", "absoluteness", "unity", "universal"],
     },
 }
 
@@ -201,149 +222,161 @@ def define_bhava_pairs() -> List[BhavaPair]:
 
     pairs = []
 
+    # Patent-Exact Bhava Pair Definitions
+    # Upward: Execution → Universal (cause tracing, insight surfacing)
+    # Downward: Universal → Execution (consequence projection, grounding)
     pair_definitions = [
         {
-            "name": "Ideation-Manifestation",
-            "description": "How thought crystallizes into form",
+            # B1: O1_EXECUTION ↔ O2_IDENTITY (Karma-Identification)
+            "name": "Execution-Identity",
+            "description": "How actions create labels and roles",
             "sub_layers": [
-                "conception",      # Initial spark of idea
-                "imagination",     # Mental visualization
-                "design",          # Structural planning
-                "aesthetics",      # Beauty consideration
-                "materialization", # Bringing to physical
-                "refinement",      # Iterative improvement
-                "expression",      # Outward manifestation
-                "reception",       # How it's received
-                "integration",     # Becoming part of reality
-                "completion",      # Finished form
+                "consequence",     # Action's result
+                "attribution",     # Assigning ownership
+                "labeling",        # Naming the action
+                "role",            # Action-derived identity
+                "reference",       # Pointing to actor
+                "distinction",     # Self-object separation
+                "ownership",       # Claiming the action
+                "memory",          # Recording who did what
+                "pattern",         # Recurring action-identity
+                "archive",         # Stored karma-identity links
             ]
         },
         {
-            "name": "Creation-Action",
-            "description": "How form drives movement and execution",
+            # B2: O2_IDENTITY ↔ O3_FORM (Identification-Body)
+            "name": "Identity-Form",
+            "description": "How labels crystallize into structure",
             "sub_layers": [
-                "motivation",      # Drive to act
-                "planning",        # Strategic preparation
-                "initiation",      # First step
-                "momentum",        # Building energy
-                "adaptation",      # Adjusting course
-                "persistence",     # Continuing despite obstacles
-                "execution",       # Performing the action
-                "impact",          # Effect of action
-                "feedback",        # Response received
-                "completion",      # Action finished
+                "embodiment",      # Identity takes form
+                "representation",  # Symbolic form of identity
+                "structure",       # Organized identity
+                "pattern",         # Formal repetition
+                "shape",           # Contour of identity
+                "composition",     # Parts of form
+                "architecture",    # Structural identity
+                "manifestation",   # Identity made visible
+                "boundary",        # Form's limits
+                "crystallization", # Fixed form
             ]
         },
         {
-            "name": "Action-Emotion",
-            "description": "How actions trigger emotional responses",
+            # B3: O3_FORM ↔ O4_COGNITION (Body-Mind)
+            "name": "Form-Cognition",
+            "description": "How structure enables perception",
             "sub_layers": [
-                "anticipation",    # Pre-action feeling
-                "excitement",      # Energy of doing
-                "fear",            # Risk awareness
-                "satisfaction",    # Achievement feeling
-                "frustration",     # Obstacle response
-                "pride",           # Success emotion
-                "regret",          # Missed opportunity
-                "relief",          # Completion feeling
-                "gratitude",       # Appreciation
-                "peace",           # Post-action calm
+                "perception",      # Form perceived
+                "attention",       # Focus on form
+                "sensation",       # Bodily awareness
+                "emotion",         # Feeling about form
+                "model",           # Mental representation
+                "pattern",         # Cognitive structure
+                "recognition",     # Knowing the form
+                "memory",          # Form remembered
+                "imagination",     # Form visualized
+                "abstraction",     # Form conceptualized
             ]
         },
         {
-            "name": "Emotion-Authority",
-            "description": "How feelings inform leadership and will",
+            # B4: O4_COGNITION ↔ O5_AGENCY (Mind-Ego)
+            "name": "Cognition-Agency",
+            "description": "How perception enables control",
             "sub_layers": [
-                "intuition",       # Gut-level knowing
-                "confidence",      # Self-belief
-                "empathy",         # Understanding others
-                "passion",         # Driving force
-                "compassion",      # Caring leadership
-                "courage",         # Emotional bravery
-                "authenticity",    # True expression
-                "presence",        # Being fully here
-                "influence",       # Affecting others
-                "sovereignty",     # Self-mastery
+                "intention",       # Mental aim
+                "decision",        # Choosing to act
+                "will",            # Force of mind
+                "authorship",      # Mental ownership
+                "control",         # Directing cognition
+                "authority",       # Mental command
+                "focus",           # Concentrated will
+                "planning",        # Strategic cognition
+                "ownership",       # Claiming thoughts
+                "direction",       # Cognitive steering
             ]
         },
         {
-            "name": "Authority-Structure",
-            "description": "How leadership uses logic and discipline",
+            # B5: O5_AGENCY ↔ O6_REASONING (Ego-Intellect)
+            "name": "Agency-Reasoning",
+            "description": "How will applies logic",
             "sub_layers": [
-                "vision",          # Long-term seeing
-                "strategy",        # Planned approach
-                "boundaries",      # Healthy limits
-                "consistency",     # Reliable patterns
-                "accountability",  # Taking responsibility
-                "systems",         # Organized processes
-                "measurement",     # Tracking progress
-                "optimization",    # Improving efficiency
-                "sustainability",  # Long-term viability
-                "mastery",         # Skill development
+                "analysis",        # Breaking down intent
+                "inference",       # Reasoning from will
+                "validation",      # Checking decisions
+                "structure",       # Organized agency
+                "logic",           # Reasoned control
+                "discipline",      # Structured will
+                "rigor",           # Strict reasoning
+                "consistency",     # Non-contradictory will
+                "judgment",        # Reasoned decision
+                "accountability",  # Logical responsibility
             ]
         },
         {
-            "name": "Structure-Purpose",
-            "description": "How logic serves meaning and growth",
+            # B6: O6_REASONING ↔ O7_PURPOSE (Intellect-Soul)
+            "name": "Reasoning-Purpose",
+            "description": "How logic serves meaning",
             "sub_layers": [
-                "alignment",       # Structure matches purpose
-                "efficiency",      # Minimal waste
-                "scalability",     # Room to grow
-                "adaptability",    # Flexible frameworks
-                "integrity",       # Structural soundness
-                "wisdom",          # Deep understanding
-                "teaching",        # Sharing knowledge
+                "meaning",         # Why this logic
+                "motivation",      # Reason's drive
+                "direction",       # Purpose of reasoning
+                "alignment",       # Logic matches purpose
+                "wisdom",          # Deep reasoning
                 "philosophy",      # Underlying principles
-                "ethics",          # Moral framework
-                "legacy",          # Lasting impact
+                "ethics",          # Moral reasoning
+                "teleology",       # Purpose-oriented logic
+                "fulfillment",     # Reasoning's goal
+                "transcendence",   # Beyond mere logic
             ]
         },
         {
-            "name": "Purpose-Awareness",
-            "description": "How meaning enables higher perception",
+            # B7: O7_PURPOSE ↔ O8_OBSERVATION (Soul-Witness)
+            "name": "Purpose-Observation",
+            "description": "How meaning enables awareness",
             "sub_layers": [
-                "reflection",      # Looking back
-                "contemplation",   # Deep thinking
-                "meditation",      # Still awareness
-                "insight",         # Sudden understanding
-                "revelation",      # Deep truth revealed
-                "perspective",     # Broader view
-                "witness",         # Observer state
-                "presence",        # Being fully aware
-                "clarity",         # Clear seeing
-                "enlightenment",   # Full awareness
+                "reflection",      # Purpose observed
+                "contemplation",   # Deep awareness of why
+                "insight",         # Seeing purpose
+                "perspective",     # Broader view of meaning
+                "witness",         # Observing purpose
+                "detachment",      # Distance from motive
+                "clarity",         # Clear seeing of why
+                "monitoring",      # Tracking purpose
+                "meta-awareness",  # Aware of being aware
+                "presence",        # Fully present to meaning
             ]
         },
         {
-            "name": "Awareness-Unity",
-            "description": "How observation leads to integration",
+            # B8: O8_OBSERVATION ↔ O9_CORE (Witness-Atman)
+            "name": "Observation-Core",
+            "description": "How awareness reveals stable self",
             "sub_layers": [
-                "recognition",     # Seeing patterns
-                "connection",      # Finding links
-                "synthesis",       # Combining elements
-                "harmony",         # Balanced whole
-                "coherence",       # Logical unity
-                "resonance",       # Vibrating together
-                "oneness",         # Experiencing unity
-                "wholeness",       # Complete integration
-                "emergence",       # New properties arising
-                "transcendence",   # Beyond parts
+                "recognition",     # Seeing true self
+                "identity",        # Stable self-reference
+                "integration",     # Parts become self
+                "unity",           # One self across contexts
+                "stability",       # Unchanging core
+                "essence",         # What remains
+                "continuity",      # Self across time
+                "coherence",       # Self-consistency
+                "grounding",       # Rooted in self
+                "presence",        # Being the self
             ]
         },
         {
-            "name": "Unity-Release",
-            "description": "How integration enables transcendence",
+            # B9: O9_CORE ↔ O10_UNIVERSAL (Atman-Brahman)
+            "name": "Core-Universal",
+            "description": "How self connects to absolute",
             "sub_layers": [
-                "acceptance",      # Allowing what is
-                "surrender",       # Letting go of control
-                "forgiveness",     # Releasing resentment
-                "gratitude",       # Appreciating all
-                "completion",      # Finishing cycles
-                "dissolution",     # Boundaries fade
+                "unity",           # Self meets universal
+                "dissolution",     # Ego boundaries fade
+                "coherence",       # Total integration
+                "absoluteness",    # Beyond particulars
+                "transcendence",   # Beyond self
+                "completion",      # Nothing more needed
+                "peace",           # Final rest
                 "liberation",      # Freedom from limits
-                "peace",           # Deep calm
-                "bliss",           # Joy of being
-                "moksha",          # Ultimate release
+                "oneness",         # No separation
+                "brahman",         # Ultimate unity
             ]
         },
     ]
@@ -654,9 +687,10 @@ if PYTORCH_AVAILABLE:
                 "confidence": float(probs[dominant_idx]),
                 "uncertainty": uncertainty,
 
-                # Planetary
+                # Planetary (Patent-Exact)
                 "planet": planetary["planet"],
                 "sanskrit": planetary["sanskrit"],
+                "vedic": planetary["vedic"],  # Karma, Identification, Body, etc.
                 "energy": planetary["energy"],
                 "element": planetary["element"],
                 "keywords": planetary["keywords"],
@@ -677,31 +711,35 @@ if PYTORCH_AVAILABLE:
 
             return f"""
 ============================================================
-ASTROLOGICAL ONTOLOGICAL ENGINE
+ASTROLOGICAL ONTOLOGICAL ENGINE (Patent-Exact)
 ============================================================
 
-Ontological Layers (Planetary Correspondences):
-  O1_THINKING     → Mercury (Budha) - Intellect
-  O2_FORMING      → Venus (Shukra) - Creation
-  O3_ACTING       → Mars (Mangala) - Action
-  O4_TAGGING      → Moon (Chandra) - Emotion
-  O5_DIRECTING    → Sun (Surya) - Leadership
-  O6_REASONING    → Saturn (Shani) - Structure
-  O7_PURPOSING    → Jupiter (Guru) - Purpose
-  O8_META_OBSERVING → Ketu - Awareness
-  O9_UNIFYING     → Rahu - Integration
-  O10_ABSOLVING   → Neptune/Moksha - Transcendence
+Ontological Layers (Karma → Brahman):
+  O1_EXECUTION   → Mars (Mangala)    - Karma, actions
+  O2_IDENTITY    → Moon (Chandra)    - Identification, labels
+  O3_FORM        → Venus (Shukra)    - Body, structure
+  O4_COGNITION   → Mercury (Budha)   - Mind, perception
+  O5_AGENCY      → Sun (Surya)       - Ego, control
+  O6_REASONING   → Saturn (Shani)    - Intellect, logic
+  O7_PURPOSE     → Jupiter (Guru)    - Soul, meaning
+  O8_OBSERVATION → Ketu              - Witness, awareness
+  O9_CORE        → Rahu              - Atman, unified self
+  O10_UNIVERSAL  → Neptune (Brahman) - Coherence, unity
 
 Bhava Pairs (9 × 10 sub-layers = 90D):
-  B1: Ideation-Manifestation (O1↔O2)
-  B2: Creation-Action (O2↔O3)
-  B3: Action-Emotion (O3↔O4)
-  B4: Emotion-Authority (O4↔O5)
-  B5: Authority-Structure (O5↔O6)
-  B6: Structure-Purpose (O6↔O7)
-  B7: Purpose-Awareness (O7↔O8)
-  B8: Awareness-Unity (O8↔O9)
-  B9: Unity-Release (O9↔O10)
+  B1: Execution-Identity (Karma↔Identification)
+  B2: Identity-Form (Identification↔Body)
+  B3: Form-Cognition (Body↔Mind)
+  B4: Cognition-Agency (Mind↔Ego)
+  B5: Agency-Reasoning (Ego↔Intellect)
+  B6: Reasoning-Purpose (Intellect↔Soul)
+  B7: Purpose-Observation (Soul↔Witness)
+  B8: Observation-Core (Witness↔Atman)
+  B9: Core-Universal (Atman↔Brahman)
+
+Directional Flow:
+  Upward:   Execution → Universal (cause tracing)
+  Downward: Universal → Execution (grounding)
 
 Total Parameters: {total_params:,}
 ============================================================

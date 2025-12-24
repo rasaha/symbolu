@@ -9,26 +9,28 @@ from typing import Tuple, Dict, List, Optional, Any
 from dataclasses import dataclass, field
 
 
-# The 10 Ontological Layers
+# The 10 Ontological Layers (Patent-Exact Sequence)
+# Lowest (most concrete) → Highest (most abstract)
+# Karma → Identification → Body → Mind → Ego → Intellect → Soul → Witness → Atman → Brahman
 LAYER_NAMES: Tuple[str, ...] = (
-    "O1_THINKING",
-    "O2_FORMING",
-    "O3_ACTING",
-    "O4_TAGGING",
-    "O5_DIRECTING",
-    "O6_REASONING",
-    "O7_PURPOSING",
-    "O8_META_OBSERVING",
-    "O9_UNIFYING",
-    "O10_ABSOLVING",
+    "O1_EXECUTION",     # Karma - Actions, behaviors, consequences, output
+    "O2_IDENTITY",      # Identification - Labels, roles, references, self-object
+    "O3_FORM",          # Body - Structural, physical, representational form
+    "O4_COGNITION",     # Mind - Attention, emotion, perception, mental movement
+    "O5_AGENCY",        # Ego - Control, intent, authorship, decision authority
+    "O6_REASONING",     # Intellect - Logic, inference, analysis, structured thinking
+    "O7_PURPOSE",       # Soul - Meaning, motivation, intrinsic direction, why
+    "O8_OBSERVATION",   # Witness - Meta-awareness, reflection, monitoring
+    "O9_CORE",          # Atman - Unified self-reference, stable identity
+    "O10_UNIVERSAL",    # Brahman - Coherence, absoluteness, highest abstraction
 )
 
 # Layer name to index mapping
 LAYER_INDEX: Dict[str, int] = {name: i for i, name in enumerate(LAYER_NAMES)}
 
-# Layer groups for task heads
-REASONING_LAYERS: Tuple[int, ...] = (0, 5, 7)  # O1_THINKING, O6_REASONING, O8_META_OBSERVING
-CREATIVITY_LAYERS: Tuple[int, ...] = (1, 6, 8)  # O2_FORMING, O7_PURPOSING, O9_UNIFYING
+# Layer groups for task heads (patent-aligned indices)
+REASONING_LAYERS: Tuple[int, ...] = (3, 5, 7)  # O4_COGNITION, O6_REASONING, O8_OBSERVATION
+CREATIVITY_LAYERS: Tuple[int, ...] = (2, 6, 8)  # O3_FORM, O7_PURPOSE, O9_CORE
 
 # Task types for training
 class TaskType:

@@ -184,17 +184,18 @@ def main():
         print("ASTROLOGICAL BENCHMARK")
         print("=" * 60)
 
-        # Test examples
+        # Test examples (Patent-Exact Layer Names: Karma → Brahman)
         test_texts = [
-            ("What is consciousness?", "O1_THINKING"),
-            ("Create a beautiful painting", "O2_FORMING"),
-            ("Calculate 25 multiplied by 4", "O6_REASONING"),
-            ("I feel so happy today", "O4_TAGGING"),
-            ("Lead the team to victory", "O5_DIRECTING"),
-            ("What is the meaning of life?", "O7_PURPOSING"),
-            ("Observe your thoughts without judgment", "O8_META_OBSERVING"),
-            ("Everything is connected", "O9_UNIFYING"),
-            ("Let go and surrender", "O10_ABSOLVING"),
+            ("Run the script now", "O1_EXECUTION"),          # Karma - action/output
+            ("I am a software engineer", "O2_IDENTITY"),     # Identification - roles/labels
+            ("The structure is solid", "O3_FORM"),           # Body - form/structure
+            ("I feel so happy today", "O4_COGNITION"),       # Mind - emotion/perception
+            ("I decide to proceed", "O5_AGENCY"),            # Ego - control/decision
+            ("Calculate 25 multiplied by 4", "O6_REASONING"), # Intellect - logic/inference
+            ("What is the meaning of life?", "O7_PURPOSE"),  # Soul - meaning/why
+            ("Observe your thoughts", "O8_OBSERVATION"),     # Witness - meta-awareness
+            ("I am always myself", "O9_CORE"),               # Atman - unified self
+            ("All is one", "O10_UNIVERSAL"),                 # Brahman - coherence/unity
         ]
 
         print("\nSample Astrological Analysis:")
@@ -212,6 +213,7 @@ def main():
             print(f"  Predicted: {result['dominant_layer']} ({result['confidence']:.0%})")
             print(f"  Expected:  {expected}")
             print(f"  Planet:    {result['planet']} ({result['sanskrit']}) - {result['energy']}")
+            print(f"  Vedic:     {result.get('vedic', 'N/A')}")
             print(f"  Element:   {result['element']}")
             print(f"  Bhava:     {result['dominant_bhava']}")
             print(f"             {result['bhava_description']}")
