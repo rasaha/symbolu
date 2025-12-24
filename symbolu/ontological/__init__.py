@@ -48,6 +48,11 @@ try:
         ContrastiveDataset,
         create_contrastive_dataset,
     )
+    from symbolu.ontological.multi_domain_trainer import (
+        MultiDomainTrainer,
+        MultiDomainConfig,
+        train_multi_domain,
+    )
     PYTORCH_AVAILABLE = True
 except ImportError as e:
     print(f"Note: PyTorch components not available: {e}")
@@ -113,4 +118,8 @@ if PYTORCH_AVAILABLE:
         "ROCStoriesDataset",
         "ContrastiveDataset",
         "create_contrastive_dataset",
+        # Multi-domain trainer
+        "MultiDomainTrainer",
+        "MultiDomainConfig",
+        "train_multi_domain",
     ])
