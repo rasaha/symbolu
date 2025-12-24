@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import time
 import random
+import numpy as np
 
 # Check PyTorch availability
 try:
@@ -35,6 +36,16 @@ try:
     PYTORCH_AVAILABLE = True
 except ImportError:
     PYTORCH_AVAILABLE = False
+
+
+def set_seed(seed: int) -> None:
+    """Set random seed for reproducibility."""
+    random.seed(seed)
+    np.random.seed(seed)
+    if PYTORCH_AVAILABLE:
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
 
 
 if PYTORCH_AVAILABLE:
@@ -94,6 +105,14 @@ if PYTORCH_AVAILABLE:
         creativity_samples: int = 500
         use_huggingface: bool = False  # Set False for offline use
 
+        # Reproducibility
+        seed: int = 42
+
+        # Validation and early stopping
+        validation_split: float = 0.2
+        early_stopping_patience: int = 3
+        early_stopping_min_delta: float = 0.001
+
 
     class ContrastiveTrainer:
         """
@@ -124,6 +143,11 @@ if PYTORCH_AVAILABLE:
             config: Optional[ContrastiveConfig] = None,
         ):
             self.config = config or ContrastiveConfig()
+
+            # Set seed for reproducibility
+            set_seed(self.config.seed)
+            print(f"Random seed: {self.config.seed}")
+
             self.engine = engine or PyTorchOntologicalEngine()
 
             # Setup device
@@ -139,6 +163,8 @@ if PYTORCH_AVAILABLE:
             # Training state
             self.global_step = 0
             self.best_separation = 0.0
+            self.best_val_separation = 0.0
+            self.epochs_without_improvement = 0
             self.history: List[Dict[str, float]] = []
 
             # Mixed precision
@@ -149,6 +175,8 @@ if PYTORCH_AVAILABLE:
             print(self.engine.summary())
             print(f"Device: {self.device}")
             print(f"Encoder: {self.encoder.name}")
+            print(f"Validation split: {self.config.validation_split:.0%}")
+            print(f"Early stopping patience: {self.config.early_stopping_patience}")
 
         def _get_device(self) -> torch.device:
             """Get the best available device."""
@@ -229,6 +257,32 @@ if PYTORCH_AVAILABLE:
             print(f"  Reasoning embeddings: {reasoning_embeddings.shape}")
             print(f"  Creativity embeddings: {creativity_embeddings.shape}")
 
+            # Split into train/val
+            val_split = self.config.validation_split
+            n_r = len(reasoning_embeddings)
+            n_c = len(creativity_embeddings)
+            n_r_val = int(n_r * val_split)
+            n_c_val = int(n_c * val_split)
+
+            # Shuffle indices
+            r_indices = torch.randperm(n_r)
+            c_indices = torch.randperm(n_c)
+
+            # Split embeddings
+            train_reasoning = reasoning_embeddings[r_indices[n_r_val:]]
+            val_reasoning = reasoning_embeddings[r_indices[:n_r_val]]
+            train_creativity = creativity_embeddings[c_indices[n_c_val:]]
+            val_creativity = creativity_embeddings[c_indices[:n_c_val]]
+
+            print(f"  Train: {len(train_reasoning)} reasoning, {len(train_creativity)} creativity")
+            print(f"  Val: {len(val_reasoning)} reasoning, {len(val_creativity)} creativity")
+
+            # Update contrastive dataset to use training data only
+            contrastive_data = ContrastiveDataset(
+                reasoning_texts=all_reasoning[:n_r - n_r_val],
+                creativity_texts=all_creativity[:n_c - n_c_val],
+            )
+
             # Setup optimizer
             optimizer = AdamW(
                 self.engine.parameters(),
@@ -260,32 +314,43 @@ if PYTORCH_AVAILABLE:
             # Training loop
             print(f"\nStarting contrastive training for {epochs} epochs")
             print(f"  Steps per epoch: {steps_per_epoch}")
+            print(f"  Early stopping patience: {self.config.early_stopping_patience}")
             print()
 
             for epoch in range(epochs):
                 epoch_metrics = self._train_epoch(
                     contrastive_data,
-                    reasoning_embeddings,
-                    creativity_embeddings,
+                    train_reasoning,  # Use train split
+                    train_creativity,  # Use train split
                     optimizer,
                     scheduler,
                     epoch,
                 )
 
-                # Compute separation score
-                separation = self._compute_separation_score(
-                    reasoning_embeddings,
-                    creativity_embeddings,
+                # Compute train separation score
+                train_separation = self._compute_separation_score(
+                    train_reasoning,
+                    train_creativity,
+                )
+
+                # Compute validation separation score
+                val_separation = self._compute_separation_score(
+                    val_reasoning,
+                    val_creativity,
                 )
 
                 print(f"Epoch {epoch + 1}: loss={epoch_metrics['total_loss']:.4f}, "
-                      f"contrastive={epoch_metrics['contrastive_loss']:.4f}, "
-                      f"separation={separation:.4f}")
+                      f"train_sep={train_separation:.4f}, val_sep={val_separation:.4f}")
 
-                # Track best
-                if separation > self.best_separation:
-                    self.best_separation = separation
+                # Track best based on validation
+                if val_separation > self.best_val_separation + self.config.early_stopping_min_delta:
+                    self.best_val_separation = val_separation
+                    self.best_separation = train_separation
+                    self.epochs_without_improvement = 0
                     self._save_checkpoint("best")
+                else:
+                    self.epochs_without_improvement += 1
+                    print(f"  No improvement for {self.epochs_without_improvement} epoch(s)")
 
                 # Save checkpoint
                 if (epoch + 1) % self.config.save_every_n_epochs == 0:
@@ -294,10 +359,21 @@ if PYTORCH_AVAILABLE:
                 self.history.append({
                     "epoch": epoch + 1,
                     **epoch_metrics,
-                    "separation": separation,
+                    "train_separation": train_separation,
+                    "val_separation": val_separation,
                 })
 
-            return {"history": self.history, "best_separation": self.best_separation}
+                # Early stopping check
+                if self.epochs_without_improvement >= self.config.early_stopping_patience:
+                    print(f"\nEarly stopping triggered after {epoch + 1} epochs")
+                    print(f"Best validation separation: {self.best_val_separation:.4f}")
+                    break
+
+            return {
+                "history": self.history,
+                "best_separation": self.best_separation,
+                "best_val_separation": self.best_val_separation,
+            }
 
         def _train_epoch(
             self,

@@ -80,6 +80,18 @@ def main():
         "--benchmark", action="store_true",
         help="Run benchmark after training"
     )
+    parser.add_argument(
+        "--seed", type=int, default=42,
+        help="Random seed for reproducibility (default: 42)"
+    )
+    parser.add_argument(
+        "--val-split", type=float, default=0.2,
+        help="Validation split ratio (default: 0.2)"
+    )
+    parser.add_argument(
+        "--patience", type=int, default=3,
+        help="Early stopping patience (default: 3)"
+    )
 
     args = parser.parse_args()
 
@@ -105,6 +117,9 @@ def main():
         reasoning_samples=args.samples,
         creativity_samples=args.samples,
         use_huggingface=args.huggingface,
+        seed=args.seed,
+        validation_split=args.val_split,
+        early_stopping_patience=args.patience,
     )
 
     print("=" * 60)
@@ -115,6 +130,9 @@ def main():
     print(f"Learning rate: {args.lr}")
     print(f"Samples per domain: {args.samples}")
     print(f"Device: {args.device}")
+    print(f"Seed: {args.seed}")
+    print(f"Validation split: {args.val_split:.0%}")
+    print(f"Early stopping patience: {args.patience}")
     print(f"Data source: {'synthetic' if args.synthetic else 'huggingface' if args.huggingface else 'local files'}")
     print("=" * 60)
 
@@ -138,7 +156,9 @@ def main():
     print("\n" + "=" * 60)
     print("TRAINING COMPLETE")
     print("=" * 60)
-    print(f"Best separation: {result['best_separation']:.2%}")
+    print(f"Best train separation: {result['best_separation']:.2%}")
+    if 'best_val_separation' in result:
+        print(f"Best val separation: {result['best_val_separation']:.2%}")
 
     # Benchmark
     if args.benchmark:
