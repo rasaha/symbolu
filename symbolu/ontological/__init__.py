@@ -64,6 +64,14 @@ try:
         UnifiedTrainer,
         UnifiedConfig,
     )
+    from symbolu.ontological.semantic_bhava import (
+        SemanticBhavaLayer,
+        AstrologicalOntologicalEngine,
+        PLANETARY_MAP,
+        ASPECTS,
+        BHAVA_PAIRS,
+        get_aspect_between,
+    )
     PYTORCH_AVAILABLE = True
 except ImportError as e:
     print(f"Note: PyTorch components not available: {e}")
@@ -142,4 +150,11 @@ if PYTORCH_AVAILABLE:
         "UnifiedOntologicalEngine",
         "UnifiedTrainer",
         "UnifiedConfig",
+        # Semantic Bhava (astrological)
+        "SemanticBhavaLayer",
+        "AstrologicalOntologicalEngine",
+        "PLANETARY_MAP",
+        "ASPECTS",
+        "BHAVA_PAIRS",
+        "get_aspect_between",
     ])
