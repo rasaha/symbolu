@@ -21,13 +21,13 @@ class ModelType(Enum):
     based on the nature of the query.
     """
     GENERAL = "general"            # Fallback for mixed/unclear queries
-    REASONING = "reasoning"        # O6_REASONING - logic, analysis
-    RELATIONSHIP = "relationship"  # O9_UNIFYING - connections, love, unity
+    REASONING = "reasoning"        # O7_REASONING - logic, analysis
+    RELATIONSHIP = "relationship"  # O10_UNIFYING - connections, love, unity
     ACTION = "action"              # O3_ACTING - procedures, commands
     CREATIVE = "creative"          # O2_FORMING - creation, art, structure
     REFLECTIVE = "reflective"      # O1_THINKING - contemplation, philosophy
-    DIRECTIVE = "directive"        # O5_DIRECTING - guidance, commands
-    TRANSCENDENT = "transcendent"  # O10_ABSOLVING - abstract, spiritual
+    DIRECTIVE = "directive"        # O6_AGENCY - guidance, commands
+    TRANSCENDENT = "transcendent"  # O12_ABSOLVING - abstract, spiritual
 
 
 @dataclass(frozen=True)

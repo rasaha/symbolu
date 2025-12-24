@@ -177,9 +177,9 @@ class ReasoningHead(TaskHead):
     Task head specialized for reasoning quality assessment.
 
     Focuses on:
-    - O6_REASONING: Primary reasoning dimension
+    - O7_REASONING: Primary reasoning dimension
     - O1_THINKING: Supporting contemplative reasoning
-    - O8_META_OBSERVING: Meta-cognitive reasoning
+    - O9_WITNESSES: Meta-cognitive reasoning
 
     Output: Reasoning quality score (0-1)
     """
@@ -210,9 +210,9 @@ class ReasoningHead(TaskHead):
 
         Returns dict with:
         - overall: Overall reasoning score
-        - logical: Score from O6_REASONING
+        - logical: Score from O7_REASONING
         - contemplative: Score from O1_THINKING
-        - meta: Score from O8_META_OBSERVING
+        - meta: Score from O9_WITNESSES
         """
         overall = self.assess_reasoning(ontological_input)
 
@@ -240,8 +240,8 @@ class CreativityHead(TaskHead):
 
     Focuses on:
     - O2_FORMING: Primary creative dimension
-    - O9_UNIFYING: Synthesis and integration
-    - O7_PURPOSING: Intentional creation
+    - O10_UNIFYING: Synthesis and integration
+    - O8_PURPOSE: Intentional creation
 
     Output: Creativity quality score (0-1)
     """
@@ -273,8 +273,8 @@ class CreativityHead(TaskHead):
         Returns dict with:
         - overall: Overall creativity score
         - forming: Score from O2_FORMING (artistic structure)
-        - synthesis: Score from O9_UNIFYING (integration)
-        - intentional: Score from O7_PURPOSING (purposeful creation)
+        - synthesis: Score from O10_UNIFYING (integration)
+        - intentional: Score from O8_PURPOSE (purposeful creation)
         """
         overall = self.assess_creativity(ontological_input)
 

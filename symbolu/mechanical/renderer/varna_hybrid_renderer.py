@@ -29,8 +29,8 @@ Architecture:
     │  ┌─────────────────────────────────────────────────────────┐   │
     │  │ 2. SEMANTIC ROUTING                                     │   │
     │  │    - Route to specialized model based on dominant layer │   │
-    │  │    - O9_UNIFYING → relationship model                   │   │
-    │  │    - O6_REASONING → reasoning model                     │   │
+    │  │    - O10_UNIFYING → relationship model                   │   │
+    │  │    - O7_REASONING → reasoning model                     │   │
     │  │    - etc.                                                │   │
     │  └─────────────────────────────────────────────────────────┘   │
     │       │                                                         │
@@ -250,7 +250,7 @@ class VarnaHybridRenderer:
 
         max_idx = layer_totals.index(max(layer_totals))
         layer_names = [
-            "O1_ACTING", "O2_IDENTITY", "O3_FORMING", "O4_THINKING", "O6_AGENCY",
+            "O3_EXECUTION", "O2_IDENTITY", "O4_STRUCTURE", "O5_COGNITION", "O6_AGENCY",
             "O7_REASONING", "O8_PURPOSE", "O9_WITNESSES", "O10_UNIFYING", "O12_ABSOLVING"
         ]
         dominant_layer = layer_names[max_idx]
@@ -422,10 +422,10 @@ class VarnaHybridRenderer:
         """
         # Apply style based on dominant layer
         layer_styles = {
-            "O1_ACTING": "direct and action-oriented",
+            "O3_EXECUTION": "direct and action-oriented",
             "O2_IDENTITY": "structured and categorized",
-            "O3_FORMING": "creative and generative",
-            "O4_THINKING": "analytical and contemplative",
+            "O4_STRUCTURE": "creative and generative",
+            "O5_COGNITION": "analytical and contemplative",
             "O6_AGENCY": "guiding and purposeful",
             "O7_REASONING": "logical and systematic",
             "O8_PURPOSE": "intentional and goal-directed",

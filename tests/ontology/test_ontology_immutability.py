@@ -113,7 +113,7 @@ class TestLoadedDataImmutability:
             layers.add("O99_FAKE")
 
         with pytest.raises((TypeError, AttributeError)):
-            layers.remove("O1_ACTING")
+            layers.remove("O3_EXECUTION")
 
 
 # =============================================================================

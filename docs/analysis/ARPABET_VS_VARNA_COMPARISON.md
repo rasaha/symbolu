@@ -43,10 +43,10 @@ LIQUID_AFFINITIES = {
 "sa": {
   "bridge_meaning": "escape_pressure",
   "layers": {
-    "O1_ACTING": "exit activation state",
+    "O3_EXECUTION": "exit activation state",
     "O2_IDENTITY": "exit-route classification",
-    "O3_FORMING": "evasion shaping force",
-    "O4_THINKING": "exit pattern bias",
+    "O4_STRUCTURE": "evasion shaping force",
+    "O5_COGNITION": "exit pattern bias",
     ...
   }
 }
@@ -54,7 +54,7 @@ LIQUID_AFFINITIES = {
 
 ```json
 "a": {
-  "O1_ACTING": {
+  "O3_EXECUTION": {
     "manifestation_positive": "body awakens with fresh readiness",
     "manifestation_negative": "body startles into raw activation",
     "distortion_vector": "lateral",
@@ -113,7 +113,7 @@ Current approach:
 Varṇa approach:
 ```json
 "la": {
-  "O3_FORMING": "abrasion shaping force"
+  "O4_STRUCTURE": "abrasion shaping force"
 }
 // Clear conceptual meaning
 ```

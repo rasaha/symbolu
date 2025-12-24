@@ -129,12 +129,12 @@ BACKBONE_TO_RESONANCE: Dict[Dimension, int] = {
     Dimension.BODY: 1,          # O2_FORMING
     Dimension.ACTION: 2,        # O3_ACTING
     Dimension.IDENTIFICATION: 3, # O4_TAGGING
-    Dimension.EGO: 4,           # O5_DIRECTING
-    Dimension.INTELLECT: 5,     # O6_REASONING
-    Dimension.SOUL: 6,          # O7_PURPOSING
-    Dimension.WITNESS: 7,       # O8_META_OBSERVING
-    Dimension.SINGULARITY: 8,   # O9_UNIFYING
-    Dimension.ABSOLUTE: 9,      # O10_ABSOLVING
+    Dimension.EGO: 4,           # O6_AGENCY
+    Dimension.INTELLECT: 5,     # O7_REASONING
+    Dimension.SOUL: 6,          # O8_PURPOSE
+    Dimension.WITNESS: 7,       # O9_WITNESSES
+    Dimension.SINGULARITY: 8,   # O10_UNIFYING
+    Dimension.ABSOLUTE: 9,      # O12_ABSOLVING
 }
 
 RESONANCE_LAYER_NAMES = (
@@ -728,7 +728,7 @@ def validate_word_pair(
     # KEY INSIGHT: UNIFYING layer (O9, index 8) indicates natural harmony
     # Words with high UNIFYING create more natural pairings
     # "blue" has high UNIFYING (0.42), "red" has lower (0.31)
-    UNIFYING_INDEX = 8  # O9_UNIFYING
+    UNIFYING_INDEX = 8  # O10_UNIFYING
     unifying_score1 = vec1[UNIFYING_INDEX] if len(vec1) > UNIFYING_INDEX else 0.0
     unifying_score2 = vec2[UNIFYING_INDEX] if len(vec2) > UNIFYING_INDEX else 0.0
 

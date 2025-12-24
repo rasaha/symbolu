@@ -81,10 +81,10 @@ REQUIRED_INTERACTION_FIELDS = frozenset({
 
 # Valid layer IDs (O1 through O10)
 VALID_LAYER_IDS = frozenset({
-    "O1_ACTING",
+    "O3_EXECUTION",
     "O2_IDENTITY",
-    "O3_FORMING",
-    "O4_THINKING",
+    "O4_STRUCTURE",
+    "O5_COGNITION",
     "O6_AGENCY",
     "O7_REASONING",
     "O8_PURPOSE",
@@ -362,7 +362,7 @@ def get_all_layers(*, force_reload: bool = False) -> FrozenSet[str]:
         force_reload: If True, reload files
 
     Returns:
-        Frozen set of all valid layer IDs (O1_ACTING through O10_ABSOLVING)
+        Frozen set of all valid layer IDs (O3_EXECUTION through O12_ABSOLVING)
     """
     global _cached_layers
 
@@ -569,7 +569,7 @@ def get_layer_info(layer: str, *, force_reload: bool = False) -> Optional[LayerI
     Get information about a specific layer.
 
     Args:
-        layer: The layer ID to look up (e.g., "O1_ACTING")
+        layer: The layer ID to look up (e.g., "O3_EXECUTION")
         force_reload: If True, reload files
 
     Returns:

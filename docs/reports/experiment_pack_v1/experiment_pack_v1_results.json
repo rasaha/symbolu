@@ -147,7 +147,7 @@
       ],
       "layer_votes": {
         "O1_THINKING": 1.0,
-        "O10_ABSOLVING": 1.0,
+        "O12_ABSOLVING": 1.0,
         "O3_ACTING": 1.0
       },
       "unknown_count": 5,
@@ -200,11 +200,11 @@
         "UNKNOWN"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 1.0
+        "O12_ABSOLVING": 1.0
       },
       "unknown_count": 3,
       "total_varnas": 4,
-      "final_layer": "O10_ABSOLVING",
+      "final_layer": "O12_ABSOLVING",
       "confidence": 1.0,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "e1e2329c6c77"
@@ -439,7 +439,7 @@
       ],
       "layer_votes": {
         "O1_THINKING": 2.0,
-        "O10_ABSOLVING": 1.0
+        "O12_ABSOLVING": 1.0
       },
       "unknown_count": 4,
       "total_varnas": 7,
@@ -591,7 +591,7 @@
       ],
       "layer_votes": {
         "O3_ACTING": 1.0,
-        "O10_ABSOLVING": 1.0
+        "O12_ABSOLVING": 1.0
       },
       "unknown_count": 4,
       "total_varnas": 6,
@@ -723,12 +723,12 @@
         "UNKNOWN"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 1.0,
+        "O12_ABSOLVING": 1.0,
         "O1_THINKING": 1.0
       },
       "unknown_count": 3,
       "total_varnas": 5,
-      "final_layer": "O10_ABSOLVING",
+      "final_layer": "O12_ABSOLVING",
       "confidence": 0.5,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "ef7ec65a41a6"
@@ -899,11 +899,11 @@
         "UNKNOWN"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 1.0
+        "O12_ABSOLVING": 1.0
       },
       "unknown_count": 3,
       "total_varnas": 4,
-      "final_layer": "O10_ABSOLVING",
+      "final_layer": "O12_ABSOLVING",
       "confidence": 1.0,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "a9e2d70f0724"
@@ -1197,11 +1197,11 @@
         "UNKNOWN"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 1.0
+        "O12_ABSOLVING": 1.0
       },
       "unknown_count": 4,
       "total_varnas": 5,
-      "final_layer": "O10_ABSOLVING",
+      "final_layer": "O12_ABSOLVING",
       "confidence": 1.0,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "b87a6eb09dfb"
@@ -1249,11 +1249,11 @@
         "UNKNOWN"
       ],
       "layer_votes": {
-        "O6_REASONING": 1.0
+        "O7_REASONING": 1.0
       },
       "unknown_count": 3,
       "total_varnas": 4,
-      "final_layer": "O6_REASONING",
+      "final_layer": "O7_REASONING",
       "confidence": 1.0,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "ce401e2b036b"
@@ -1387,11 +1387,11 @@
         "UNKNOWN"
       ],
       "layer_votes": {
-        "O6_REASONING": 1.0
+        "O7_REASONING": 1.0
       },
       "unknown_count": 2,
       "total_varnas": 3,
-      "final_layer": "O6_REASONING",
+      "final_layer": "O7_REASONING",
       "confidence": 1.0,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "5753f7df1dd9"
@@ -1466,12 +1466,12 @@
         "UNKNOWN"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 1.0,
+        "O12_ABSOLVING": 1.0,
         "O3_ACTING": 1.0
       },
       "unknown_count": 5,
       "total_varnas": 7,
-      "final_layer": "O10_ABSOLVING",
+      "final_layer": "O12_ABSOLVING",
       "confidence": 0.5,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "90014789195f"
@@ -1510,11 +1510,11 @@
         "UNKNOWN"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 1.0
+        "O12_ABSOLVING": 1.0
       },
       "unknown_count": 2,
       "total_varnas": 3,
-      "final_layer": "O10_ABSOLVING",
+      "final_layer": "O12_ABSOLVING",
       "confidence": 1.0,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "24f632beb43b"
@@ -1624,12 +1624,12 @@
         "practical_cognition"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 1.0,
+        "O12_ABSOLVING": 1.0,
         "O1_THINKING": 1.0
       },
       "unknown_count": 2,
       "total_varnas": 4,
-      "final_layer": "O10_ABSOLVING",
+      "final_layer": "O12_ABSOLVING",
       "confidence": 0.5,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "08788cbcb1d5"
@@ -1696,7 +1696,7 @@
       ],
       "layer_votes": {
         "O1_THINKING": 1.0,
-        "O8_META_OBSERVING": 1.0,
+        "O9_WITNESSES": 1.0,
         "O3_ACTING": 1.0
       },
       "unknown_count": 3,
@@ -1871,12 +1871,12 @@
         "practical_cognition"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 1.0,
+        "O12_ABSOLVING": 1.0,
         "O1_THINKING": 1.0
       },
       "unknown_count": 2,
       "total_varnas": 4,
-      "final_layer": "O10_ABSOLVING",
+      "final_layer": "O12_ABSOLVING",
       "confidence": 0.5,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "932a1ba4ea4f"
@@ -1933,12 +1933,12 @@
         "practical_cognition"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 1.0,
+        "O12_ABSOLVING": 1.0,
         "O1_THINKING": 1.0
       },
       "unknown_count": 3,
       "total_varnas": 5,
-      "final_layer": "O10_ABSOLVING",
+      "final_layer": "O12_ABSOLVING",
       "confidence": 0.5,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "aa5829075b7f"
@@ -2274,12 +2274,12 @@
         "UNKNOWN"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 1.0,
+        "O12_ABSOLVING": 1.0,
         "O2_FORMING": 1.0
       },
       "unknown_count": 3,
       "total_varnas": 5,
-      "final_layer": "O10_ABSOLVING",
+      "final_layer": "O12_ABSOLVING",
       "confidence": 0.5,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "8e70e00820c6"
@@ -2379,11 +2379,11 @@
         "UNKNOWN"
       ],
       "layer_votes": {
-        "O6_REASONING": 1.0
+        "O7_REASONING": 1.0
       },
       "unknown_count": 2,
       "total_varnas": 3,
-      "final_layer": "O6_REASONING",
+      "final_layer": "O7_REASONING",
       "confidence": 1.0,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "7e30f62c61b1"
@@ -2431,11 +2431,11 @@
         "UNKNOWN"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 2.0
+        "O12_ABSOLVING": 2.0
       },
       "unknown_count": 2,
       "total_varnas": 4,
-      "final_layer": "O10_ABSOLVING",
+      "final_layer": "O12_ABSOLVING",
       "confidence": 1.0,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "f319efbc6270"
@@ -2483,12 +2483,12 @@
         "practical_cognition"
       ],
       "layer_votes": {
-        "O8_META_OBSERVING": 1.0,
+        "O9_WITNESSES": 1.0,
         "O1_THINKING": 1.0
       },
       "unknown_count": 2,
       "total_varnas": 4,
-      "final_layer": "O8_META_OBSERVING",
+      "final_layer": "O9_WITNESSES",
       "confidence": 0.5,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "d5d83c96fccf"
@@ -2563,12 +2563,12 @@
         "UNKNOWN"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 1.0,
+        "O12_ABSOLVING": 1.0,
         "O1_THINKING": 1.0
       },
       "unknown_count": 5,
       "total_varnas": 7,
-      "final_layer": "O10_ABSOLVING",
+      "final_layer": "O12_ABSOLVING",
       "confidence": 0.5,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "282fbf3ae341"
@@ -2616,11 +2616,11 @@
         "UNKNOWN"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 1.0
+        "O12_ABSOLVING": 1.0
       },
       "unknown_count": 3,
       "total_varnas": 4,
-      "final_layer": "O10_ABSOLVING",
+      "final_layer": "O12_ABSOLVING",
       "confidence": 1.0,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "116e8ffd3825"
@@ -2687,7 +2687,7 @@
       ],
       "layer_votes": {
         "O1_THINKING": 2.0,
-        "O10_ABSOLVING": 1.0
+        "O12_ABSOLVING": 1.0
       },
       "unknown_count": 3,
       "total_varnas": 6,
@@ -2739,13 +2739,13 @@
         "practical_cognition"
       ],
       "layer_votes": {
-        "O6_REASONING": 1.0,
+        "O7_REASONING": 1.0,
         "O2_FORMING": 1.0,
         "O1_THINKING": 1.0
       },
       "unknown_count": 1,
       "total_varnas": 4,
-      "final_layer": "O6_REASONING",
+      "final_layer": "O7_REASONING",
       "confidence": 0.3333333333333333,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "21caf86c6eb0"
@@ -2784,11 +2784,11 @@
         "indulgence_pressure"
       ],
       "layer_votes": {
-        "O7_PURPOSING": 2.0
+        "O8_PURPOSE": 2.0
       },
       "unknown_count": 1,
       "total_varnas": 3,
-      "final_layer": "O7_PURPOSING",
+      "final_layer": "O8_PURPOSE",
       "confidence": 1.0,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "ce2751963309"
@@ -2827,11 +2827,11 @@
         "indulgence_pressure"
       ],
       "layer_votes": {
-        "O7_PURPOSING": 2.0
+        "O8_PURPOSE": 2.0
       },
       "unknown_count": 1,
       "total_varnas": 3,
-      "final_layer": "O7_PURPOSING",
+      "final_layer": "O8_PURPOSE",
       "confidence": 1.0,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "b175fb642f66"
@@ -2870,12 +2870,12 @@
         "action_pressure"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 1.0,
+        "O12_ABSOLVING": 1.0,
         "O3_ACTING": 1.0
       },
       "unknown_count": 1,
       "total_varnas": 3,
-      "final_layer": "O10_ABSOLVING",
+      "final_layer": "O12_ABSOLVING",
       "confidence": 0.5,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "4fe893fba5da"
@@ -2923,12 +2923,12 @@
         "destruction_pressure"
       ],
       "layer_votes": {
-        "O7_PURPOSING": 1.0,
+        "O8_PURPOSE": 1.0,
         "O3_ACTING": 1.0
       },
       "unknown_count": 2,
       "total_varnas": 4,
-      "final_layer": "O7_PURPOSING",
+      "final_layer": "O8_PURPOSE",
       "confidence": 0.5,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "189556473f80"
@@ -2967,12 +2967,12 @@
         "destruction_pressure"
       ],
       "layer_votes": {
-        "O8_META_OBSERVING": 1.0,
+        "O9_WITNESSES": 1.0,
         "O3_ACTING": 1.0
       },
       "unknown_count": 1,
       "total_varnas": 3,
-      "final_layer": "O8_META_OBSERVING",
+      "final_layer": "O9_WITNESSES",
       "confidence": 0.5,
       "status": "PARTIAL_UNKNOWN",
       "routing_hash": "a7d911c5f0ba"
@@ -3178,7 +3178,7 @@
         "practical_cognition"
       ],
       "layer_votes": {
-        "O10_ABSOLVING": 1.0,
+        "O12_ABSOLVING": 1.0,
         "O1_THINKING": 2.0
       },
       "unknown_count": 4,
@@ -3333,11 +3333,11 @@
   "layer_distribution": {
     "O2_FORMING": 7,
     "O1_THINKING": 17,
-    "O10_ABSOLVING": 14,
+    "O12_ABSOLVING": 14,
     "O3_ACTING": 8,
-    "O6_REASONING": 4,
-    "O8_META_OBSERVING": 2,
-    "O7_PURPOSING": 3
+    "O7_REASONING": 4,
+    "O9_WITNESSES": 2,
+    "O8_PURPOSE": 3
   },
   "test_retest": {
     "split_agreement_rate": 0.7605820105820106,

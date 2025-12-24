@@ -439,7 +439,7 @@ def generate_reasoning_examples(n: int = 100) -> List[TrainingExample]:
     """
     Generate synthetic reasoning training examples.
 
-    Creates examples where O6_REASONING should be high.
+    Creates examples where O7_REASONING should be high.
     """
     reasoning_texts = [
         "If A implies B, and B implies C, then A implies C",

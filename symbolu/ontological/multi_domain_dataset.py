@@ -9,12 +9,12 @@ The 10 Ontological Layers:
 - O2_FORMING: Structure, creation, art, creativity
 - O3_ACTING: Procedures, commands, action
 - O4_TAGGING: Emotional tagging/classification
-- O5_DIRECTING: Guidance, instruction, leadership
-- O6_REASONING: Logic, analysis, problem-solving
-- O7_PURPOSING: Goals, intention, purposefulness
-- O8_META_OBSERVING: Meta-awareness, observation
-- O9_UNIFYING: Integration, synthesis, unity
-- O10_ABSOLVING: Resolution, completion, transcendence
+- O6_AGENCY: Guidance, instruction, leadership
+- O7_REASONING: Logic, analysis, problem-solving
+- O8_PURPOSE: Goals, intention, purposefulness
+- O9_WITNESSES: Meta-awareness, observation
+- O10_UNIFYING: Integration, synthesis, unity
+- O12_ABSOLVING: Resolution, completion, transcendence
 
 Usage:
     from symbolu.ontological.multi_domain_dataset import MultiDomainDataset
@@ -407,7 +407,7 @@ class MultiDomainDataset:
 
         return samples[:count]
 
-    # ==================== O5_DIRECTING ====================
+    # ==================== O6_AGENCY ====================
     @classmethod
     def _generate_directing(cls, count: int) -> List[DomainSample]:
         """O5: Guidance, instruction, leadership."""
@@ -468,7 +468,7 @@ class MultiDomainDataset:
 
         return samples[:count]
 
-    # ==================== O6_REASONING ====================
+    # ==================== O7_REASONING ====================
     @classmethod
     def _generate_reasoning(cls, count: int) -> List[DomainSample]:
         """O6: Logic, analysis, problem-solving."""
@@ -554,7 +554,7 @@ class MultiDomainDataset:
 
         return samples[:count]
 
-    # ==================== O7_PURPOSING ====================
+    # ==================== O8_PURPOSE ====================
     @classmethod
     def _generate_purposing(cls, count: int) -> List[DomainSample]:
         """O7: Goals, intention, purposefulness."""
@@ -624,7 +624,7 @@ class MultiDomainDataset:
 
         return samples[:count]
 
-    # ==================== O8_META_OBSERVING ====================
+    # ==================== O9_WITNESSES ====================
     @classmethod
     def _generate_meta_observing(cls, count: int) -> List[DomainSample]:
         """O8: Meta-awareness, observation."""
@@ -687,7 +687,7 @@ class MultiDomainDataset:
 
         return samples[:count]
 
-    # ==================== O9_UNIFYING ====================
+    # ==================== O10_UNIFYING ====================
     @classmethod
     def _generate_unifying(cls, count: int) -> List[DomainSample]:
         """O9: Integration, synthesis, unity."""
@@ -757,7 +757,7 @@ class MultiDomainDataset:
 
         return samples[:count]
 
-    # ==================== O10_ABSOLVING ====================
+    # ==================== O12_ABSOLVING ====================
     @classmethod
     def _generate_absolving(cls, count: int) -> List[DomainSample]:
         """O10: Resolution, completion, transcendence."""

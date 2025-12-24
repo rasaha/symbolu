@@ -46,9 +46,9 @@ def benchmark_domain_classification() -> BenchmarkResult:
     Test how well the engine classifies different domains.
 
     Expected patterns:
-    - Technical docs → High O6_REASONING
+    - Technical docs → High O7_REASONING
     - Creative writing → High O2_FORMING
-    - Governance → High O7_PURPOSING
+    - Governance → High O8_PURPOSE
     """
     print("\n" + "=" * 60)
     print("BENCHMARK: Domain Classification")
@@ -192,7 +192,7 @@ def benchmark_reasoning_creativity_separation() -> BenchmarkResult:
     print("\nREASONING Samples:")
     for text in reasoning_samples:
         vec = engine.analyze(text)
-        o6 = vec.values[5]  # O6_REASONING
+        o6 = vec.values[5]  # O7_REASONING
         o2 = vec.values[1]  # O2_FORMING
 
         task_scores = task_head.forward(list(vec.values))
@@ -510,7 +510,7 @@ if __name__ == "__main__":
 1. DOMAIN CLASSIFICATION:
    - The hash-based encoder creates deterministic but semantic embeddings
    - Different domains show distinct ontological signatures
-   - Technical content → O6_REASONING (as expected)
+   - Technical content → O7_REASONING (as expected)
    - Creative content → varies (needs training to improve)
 
 2. REASONING vs CREATIVITY:
@@ -530,8 +530,8 @@ if __name__ == "__main__":
 
 5. RAG DATA:
    - Labels auto-derived from domains are reasonable
-   - Technical docs cluster around O6_REASONING
-   - Governance docs show O7_PURPOSING patterns
+   - Technical docs cluster around O7_REASONING
+   - Governance docs show O8_PURPOSE patterns
 
 RECOMMENDATIONS:
    - Train with DistilBERT for better semantic encoding

@@ -99,7 +99,7 @@ Reclassify: VALID TARGET
 Target A4:
 {
   "count(steps where magnitude > 0.9)": 3,
-  "ontological_resonance": "O4_THINKING"
+  "ontological_resonance": "O5_COGNITION"
 }
 
 Assessment: SHOULD FAIL (EXPECTED)
@@ -406,7 +406,7 @@ Contract blocks.
 Target G2:
 {
   "final_magnitude": "> 1.0",
-  "ontology_layer": "O4_THINKING"
+  "ontology_layer": "O5_COGNITION"
 }
 
 Assessment: SHOULD FAIL (EXPECTED)

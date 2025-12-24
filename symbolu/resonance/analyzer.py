@@ -633,7 +633,7 @@ def compare_arpabet_vs_varna(word: str) -> str:
 
     # Compare each layer
     layer_names = [
-        "O1_ACTING", "O2_IDENTITY", "O3_FORMING", "O4_THINKING", "O6_AGENCY",
+        "O3_EXECUTION", "O2_IDENTITY", "O4_STRUCTURE", "O5_COGNITION", "O6_AGENCY",
         "O7_REASONING", "O8_PURPOSE", "O9_WITNESSES", "O10_UNIFYING", "O12_ABSOLVING"
     ]
 

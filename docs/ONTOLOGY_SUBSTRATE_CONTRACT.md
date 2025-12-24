@@ -100,7 +100,7 @@ from symbolu.ontology.phase4a import (
 )
 
 # Lookup example
-result = lookup_interaction("ka", "O1_ACTING")
+result = lookup_interaction("ka", "O3_EXECUTION")
 # result.manifestation_positive
 # result.manifestation_negative
 # result.distortion_vector

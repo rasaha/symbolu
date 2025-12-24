@@ -64,7 +64,7 @@ class GSM8KDataset:
         return [s.text for s in self.samples]
 
     def to_training_examples(self) -> List[TrainingExample]:
-        """Convert to TrainingExample format with O6_REASONING label."""
+        """Convert to TrainingExample format with O7_REASONING label."""
         return [
             TrainingExample(
                 text=s.text,

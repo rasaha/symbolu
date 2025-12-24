@@ -178,7 +178,7 @@ class Phase5TerminationError(Phase5Error):
     """
     Raised when an invalid operation is attempted after termination.
 
-    Once O10_ABSOLVING terminates a trajectory, no further
+    Once O12_ABSOLVING terminates a trajectory, no further
     evolution is possible without explicit restart.
     """
 

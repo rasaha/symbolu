@@ -165,7 +165,7 @@ class TestResonance:
     def test_shared_dimensions_reported(self):
         """Shared dimensions should be reported."""
         result = compare_words("truth", "light")
-        # Both have high O9_UNIFYING due to liquid/long vowels
+        # Both have high O10_UNIFYING due to liquid/long vowels
         assert isinstance(result.shared_dimensions, tuple)
 
     def test_trajectory_alignment_range(self):

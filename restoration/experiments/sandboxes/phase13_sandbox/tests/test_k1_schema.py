@@ -403,7 +403,7 @@ class TestOntologicalLayers:
         """Layers are named O1 through O10."""
         layer_names = [l.value for l in ALL_LAYERS]
         assert "O1_THINKING" in layer_names
-        assert "O10_ABSOLVING" in layer_names
+        assert "O12_ABSOLVING" in layer_names
 
 
 # =============================================================================

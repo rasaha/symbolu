@@ -33,7 +33,7 @@ Usage:
     validate_ontology()  # Raises Phase4AValidationError if inconsistent
 
     # Lookup (varna, layer) -> interaction
-    result = lookup_interaction("ka", "O1_ACTING")
+    result = lookup_interaction("ka", "O3_EXECUTION")
     # Returns: VarnaLayerInteraction with manifestation_positive, manifestation_negative,
     #          distortion_vector, sublimate_vector
 """

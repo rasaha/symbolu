@@ -250,7 +250,7 @@ class TestValidateLayers:
         output = OutputItem(
             modality="text",
             format="plain_text",
-            content="This uses O5_DIRECTING and layer 7 patterns.",
+            content="This uses O6_AGENCY and layer 7 patterns.",
         )
         response = RenderResponse(
             contract_version="1.0",
@@ -260,7 +260,7 @@ class TestValidateLayers:
             assertions=valid_assertions,
         )
         violations = validate_layers(sample_request, response)
-        # O5_DIRECTING is not in allowed_layers (O1, O2, O3 only)
+        # O6_AGENCY is not in allowed_layers (O1, O2, O3 only)
         assert len(violations) > 0
         assert any(v.violation_type == ContractViolationType.NEW_LAYER for v in violations)
 

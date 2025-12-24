@@ -108,8 +108,8 @@ class TestRoutingDecision:
         decision = RoutingDecision(
             model_type=ModelType.REASONING,
             confidence=0.85,
-            dominant_layer="O6_REASONING",
-            layer_scores=(("O6_REASONING", 0.4), ("O9_UNIFYING", 0.3)),
+            dominant_layer="O7_REASONING",
+            layer_scores=(("O7_REASONING", 0.4), ("O10_UNIFYING", 0.3)),
             trace={"provider": "test"},
         )
         assert decision.model_type == ModelType.REASONING
@@ -120,8 +120,8 @@ class TestRoutingDecision:
         decision = RoutingDecision(
             model_type=ModelType.REASONING,
             confidence=0.85,
-            dominant_layer="O6_REASONING",
-            layer_scores=(("O6_REASONING", 0.4),),
+            dominant_layer="O7_REASONING",
+            layer_scores=(("O7_REASONING", 0.4),),
             trace={},
         )
         d = decision.to_dict()
@@ -133,7 +133,7 @@ class TestRoutingDecision:
         decision = RoutingDecision(
             model_type=ModelType.REASONING,
             confidence=0.85,
-            dominant_layer="O6_REASONING",
+            dominant_layer="O7_REASONING",
             layer_scores=(),
             trace={},
         )
