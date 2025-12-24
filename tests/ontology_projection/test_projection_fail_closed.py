@@ -73,7 +73,7 @@ class TestUnsupportedLayers:
         OntologicalLayer.STRUCTURE,
         OntologicalLayer.AGENCY,
         OntologicalLayer.PURPOSE,
-        OntologicalLayer.WITNESSES,
+        # Note: WITNESSES is now a supported layer (12D migration)
     ])
     def test_unsupported_layer_returns_ineligible(
         self, layer, sample_snapshot, sample_input_ref, sample_options

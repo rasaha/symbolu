@@ -106,59 +106,61 @@ LAYER_KEYWORDS: Dict[str, Dict[str, float]] = {
     },
 }
 
-# Bridge meaning keywords → layer affinities
+# Bridge meaning keywords → 12D layer affinities (patent-exact sequence)
+# Order: POTENTIAL, IDENTITY, EXECUTION, STRUCTURE, COGNITION, AGENCY,
+#        REASONING, PURPOSE, WITNESSES, UNIFYING, INTEGRATION, ABSOLVING
 BRIDGE_MEANING_AFFINITIES: Dict[str, Tuple[float, ...]] = {
     # Vowel bridge meanings
-    "birth_of_cognition": (0.8, 0.5, 0.3, 0.4, 0.3, 0.4, 0.4, 0.5, 0.4, 0.3),
-    "expansion_continuity": (0.4, 0.7, 0.3, 0.3, 0.5, 0.4, 0.5, 0.4, 0.6, 0.4),
-    "self_doing": (0.5, 0.5, 0.7, 0.4, 0.5, 0.4, 0.6, 0.4, 0.4, 0.3),
-    "specialized_identity": (0.6, 0.4, 0.5, 0.6, 0.4, 0.5, 0.5, 0.5, 0.4, 0.3),
-    "contraction_focus": (0.5, 0.4, 0.4, 0.5, 0.6, 0.5, 0.5, 0.4, 0.3, 0.3),
-    "sustained_hold": (0.4, 0.5, 0.3, 0.4, 0.5, 0.4, 0.5, 0.4, 0.5, 0.4),
-    "practical_cognition": (0.7, 0.5, 0.5, 0.5, 0.5, 0.6, 0.5, 0.4, 0.4, 0.3),
-    "integrative_understanding": (0.6, 0.5, 0.3, 0.4, 0.4, 0.7, 0.5, 0.5, 0.7, 0.4),
-    "closure_completion": (0.4, 0.5, 0.4, 0.4, 0.4, 0.4, 0.6, 0.4, 0.5, 0.7),
-    "surrender_transition": (0.3, 0.4, 0.3, 0.3, 0.3, 0.3, 0.4, 0.5, 0.6, 0.8),
-    "purgative_repulsion": (0.3, 0.4, 0.5, 0.4, 0.4, 0.3, 0.4, 0.4, 0.3, 0.6),
-    "dissolutive_attraction": (0.4, 0.4, 0.3, 0.3, 0.3, 0.3, 0.4, 0.5, 0.5, 0.7),
+    "birth_of_cognition": (0.3, 0.5, 0.8, 0.3, 0.4, 0.3, 0.4, 0.4, 0.5, 0.4, 0.4, 0.3),
+    "expansion_continuity": (0.3, 0.7, 0.4, 0.3, 0.3, 0.5, 0.4, 0.5, 0.4, 0.6, 0.5, 0.4),
+    "self_doing": (0.3, 0.5, 0.5, 0.7, 0.4, 0.5, 0.4, 0.6, 0.4, 0.4, 0.4, 0.3),
+    "specialized_identity": (0.3, 0.4, 0.6, 0.5, 0.6, 0.4, 0.5, 0.5, 0.5, 0.4, 0.4, 0.3),
+    "contraction_focus": (0.3, 0.4, 0.5, 0.4, 0.5, 0.6, 0.5, 0.5, 0.4, 0.3, 0.4, 0.3),
+    "sustained_hold": (0.4, 0.5, 0.4, 0.3, 0.4, 0.5, 0.4, 0.5, 0.4, 0.5, 0.5, 0.4),
+    "practical_cognition": (0.3, 0.5, 0.7, 0.5, 0.5, 0.5, 0.6, 0.5, 0.4, 0.4, 0.4, 0.3),
+    "integrative_understanding": (0.3, 0.5, 0.6, 0.3, 0.4, 0.4, 0.7, 0.5, 0.5, 0.7, 0.6, 0.4),
+    "closure_completion": (0.3, 0.5, 0.4, 0.4, 0.4, 0.4, 0.4, 0.6, 0.4, 0.5, 0.6, 0.7),
+    "surrender_transition": (0.3, 0.4, 0.3, 0.3, 0.3, 0.3, 0.3, 0.4, 0.5, 0.6, 0.5, 0.8),
+    "purgative_repulsion": (0.3, 0.4, 0.3, 0.5, 0.4, 0.4, 0.3, 0.4, 0.4, 0.3, 0.4, 0.6),
+    "dissolutive_attraction": (0.3, 0.4, 0.4, 0.3, 0.3, 0.3, 0.3, 0.4, 0.5, 0.5, 0.5, 0.7),
 
     # Consonant bridge meanings (selected)
-    "hope_pressure": (0.5, 0.6, 0.6, 0.4, 0.6, 0.5, 0.7, 0.4, 0.5, 0.3),
-    "worry_pressure": (0.6, 0.4, 0.5, 0.5, 0.6, 0.6, 0.5, 0.6, 0.3, 0.3),
-    "action_pressure": (0.4, 0.5, 0.9, 0.4, 0.5, 0.4, 0.6, 0.4, 0.5, 0.3),
-    "attachment_pressure": (0.4, 0.5, 0.4, 0.4, 0.4, 0.3, 0.4, 0.4, 0.7, 0.4),
-    "conscience_pressure": (0.6, 0.5, 0.4, 0.5, 0.6, 0.6, 0.5, 0.6, 0.4, 0.4),
-    "ego_pressure": (0.5, 0.5, 0.6, 0.6, 0.5, 0.5, 0.6, 0.5, 0.3, 0.3),
-    "inertia_pressure": (0.4, 0.6, 0.3, 0.4, 0.4, 0.4, 0.4, 0.4, 0.5, 0.5),
-    "irritability_pressure": (0.4, 0.4, 0.7, 0.5, 0.5, 0.4, 0.4, 0.5, 0.3, 0.4),
-    "craving_pressure": (0.4, 0.4, 0.5, 0.4, 0.6, 0.4, 0.6, 0.4, 0.5, 0.3),
-    "revulsion_pressure": (0.3, 0.4, 0.6, 0.5, 0.5, 0.4, 0.4, 0.4, 0.2, 0.5),
-    "fear_pressure": (0.5, 0.4, 0.5, 0.5, 0.6, 0.5, 0.5, 0.6, 0.3, 0.4),
-    "indifference_pressure": (0.3, 0.3, 0.2, 0.3, 0.3, 0.3, 0.3, 0.4, 0.4, 0.6),
-    "delusion_pressure": (0.5, 0.4, 0.4, 0.3, 0.4, 0.3, 0.4, 0.3, 0.4, 0.4),
-    "indulgence_pressure": (0.4, 0.4, 0.5, 0.4, 0.4, 0.3, 0.5, 0.4, 0.5, 0.4),
-    "distrust_pressure": (0.5, 0.4, 0.4, 0.5, 0.5, 0.6, 0.4, 0.6, 0.3, 0.3),
-    "destruction_pressure": (0.3, 0.3, 0.7, 0.4, 0.5, 0.4, 0.4, 0.4, 0.2, 0.7),
-    "cruelty_pressure": (0.3, 0.4, 0.7, 0.4, 0.5, 0.4, 0.4, 0.4, 0.2, 0.5),
-    "external_dharma_pressure": (0.4, 0.5, 0.4, 0.5, 0.6, 0.5, 0.5, 0.5, 0.5, 0.4),
-    "material_greed_pressure": (0.4, 0.5, 0.5, 0.5, 0.5, 0.4, 0.6, 0.4, 0.4, 0.3),
-    "escape_pressure": (0.4, 0.4, 0.6, 0.4, 0.6, 0.5, 0.5, 0.5, 0.3, 0.5),
-    "ignorance_pressure": (0.3, 0.3, 0.3, 0.3, 0.3, 0.2, 0.3, 0.3, 0.3, 0.5),
-    "false_knowledge_pressure": (0.4, 0.3, 0.4, 0.4, 0.4, 0.3, 0.4, 0.4, 0.3, 0.4),
-    "lust_confusion_pressure": (0.4, 0.4, 0.5, 0.4, 0.5, 0.3, 0.5, 0.4, 0.4, 0.4),
-    "nasal_marker_pressure": (0.4, 0.4, 0.3, 0.5, 0.4, 0.4, 0.4, 0.4, 0.6, 0.4),
-    "nervous_breakdown_pressure": (0.3, 0.3, 0.6, 0.4, 0.4, 0.3, 0.3, 0.5, 0.2, 0.6),
-    "greed_pressure": (0.4, 0.5, 0.5, 0.5, 0.5, 0.4, 0.6, 0.4, 0.4, 0.3),
-    "hypocrisy_pressure": (0.4, 0.4, 0.4, 0.5, 0.4, 0.4, 0.4, 0.5, 0.3, 0.4),
-    "overstatement_pressure": (0.4, 0.5, 0.5, 0.5, 0.5, 0.4, 0.5, 0.4, 0.4, 0.4),
-    "repentance_pressure": (0.5, 0.4, 0.4, 0.4, 0.4, 0.5, 0.4, 0.5, 0.4, 0.5),
-    "shyness_pressure": (0.4, 0.3, 0.3, 0.4, 0.4, 0.4, 0.3, 0.5, 0.4, 0.4),
-    "sadistic_cruelty_pressure": (0.3, 0.4, 0.8, 0.4, 0.5, 0.4, 0.4, 0.4, 0.2, 0.5),
-    "envy_pressure": (0.4, 0.4, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.3, 0.3),
-    "melancholy_pressure": (0.4, 0.3, 0.3, 0.4, 0.3, 0.4, 0.3, 0.5, 0.4, 0.5),
+    "hope_pressure": (0.3, 0.6, 0.5, 0.6, 0.4, 0.6, 0.5, 0.7, 0.4, 0.5, 0.4, 0.3),
+    "worry_pressure": (0.3, 0.4, 0.6, 0.5, 0.5, 0.6, 0.6, 0.5, 0.6, 0.3, 0.4, 0.3),
+    "action_pressure": (0.3, 0.5, 0.4, 0.9, 0.4, 0.5, 0.4, 0.6, 0.4, 0.5, 0.4, 0.3),
+    "attachment_pressure": (0.3, 0.5, 0.4, 0.4, 0.4, 0.4, 0.3, 0.4, 0.4, 0.7, 0.5, 0.4),
+    "conscience_pressure": (0.3, 0.5, 0.6, 0.4, 0.5, 0.6, 0.6, 0.5, 0.6, 0.4, 0.5, 0.4),
+    "ego_pressure": (0.3, 0.5, 0.5, 0.6, 0.6, 0.5, 0.5, 0.6, 0.5, 0.3, 0.4, 0.3),
+    "inertia_pressure": (0.5, 0.6, 0.4, 0.3, 0.4, 0.4, 0.4, 0.4, 0.4, 0.5, 0.4, 0.5),
+    "irritability_pressure": (0.3, 0.4, 0.4, 0.7, 0.5, 0.5, 0.4, 0.4, 0.5, 0.3, 0.4, 0.4),
+    "craving_pressure": (0.3, 0.4, 0.4, 0.5, 0.4, 0.6, 0.4, 0.6, 0.4, 0.5, 0.4, 0.3),
+    "revulsion_pressure": (0.3, 0.4, 0.3, 0.6, 0.5, 0.5, 0.4, 0.4, 0.4, 0.2, 0.4, 0.5),
+    "fear_pressure": (0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.5, 0.5, 0.6, 0.3, 0.4, 0.4),
+    "indifference_pressure": (0.4, 0.3, 0.3, 0.2, 0.3, 0.3, 0.3, 0.3, 0.4, 0.4, 0.4, 0.6),
+    "delusion_pressure": (0.3, 0.4, 0.5, 0.4, 0.3, 0.4, 0.3, 0.4, 0.3, 0.4, 0.4, 0.4),
+    "indulgence_pressure": (0.3, 0.4, 0.4, 0.5, 0.4, 0.4, 0.3, 0.5, 0.4, 0.5, 0.4, 0.4),
+    "distrust_pressure": (0.3, 0.4, 0.5, 0.4, 0.5, 0.5, 0.6, 0.4, 0.6, 0.3, 0.4, 0.3),
+    "destruction_pressure": (0.3, 0.3, 0.3, 0.7, 0.4, 0.5, 0.4, 0.4, 0.4, 0.2, 0.4, 0.7),
+    "cruelty_pressure": (0.3, 0.4, 0.3, 0.7, 0.4, 0.5, 0.4, 0.4, 0.4, 0.2, 0.4, 0.5),
+    "external_dharma_pressure": (0.3, 0.5, 0.4, 0.4, 0.5, 0.6, 0.5, 0.5, 0.5, 0.5, 0.5, 0.4),
+    "material_greed_pressure": (0.3, 0.5, 0.4, 0.5, 0.5, 0.5, 0.4, 0.6, 0.4, 0.4, 0.4, 0.3),
+    "escape_pressure": (0.3, 0.4, 0.4, 0.6, 0.4, 0.6, 0.5, 0.5, 0.5, 0.3, 0.4, 0.5),
+    "ignorance_pressure": (0.4, 0.3, 0.3, 0.3, 0.3, 0.3, 0.2, 0.3, 0.3, 0.3, 0.3, 0.5),
+    "false_knowledge_pressure": (0.3, 0.3, 0.4, 0.4, 0.4, 0.4, 0.3, 0.4, 0.4, 0.3, 0.4, 0.4),
+    "lust_confusion_pressure": (0.3, 0.4, 0.4, 0.5, 0.4, 0.5, 0.3, 0.5, 0.4, 0.4, 0.4, 0.4),
+    "nasal_marker_pressure": (0.3, 0.4, 0.4, 0.3, 0.5, 0.4, 0.4, 0.4, 0.4, 0.6, 0.5, 0.4),
+    "nervous_breakdown_pressure": (0.3, 0.3, 0.3, 0.6, 0.4, 0.4, 0.3, 0.3, 0.5, 0.2, 0.4, 0.6),
+    "greed_pressure": (0.3, 0.5, 0.4, 0.5, 0.5, 0.5, 0.4, 0.6, 0.4, 0.4, 0.4, 0.3),
+    "hypocrisy_pressure": (0.3, 0.4, 0.4, 0.4, 0.5, 0.4, 0.4, 0.4, 0.5, 0.3, 0.4, 0.4),
+    "overstatement_pressure": (0.3, 0.5, 0.4, 0.5, 0.5, 0.5, 0.4, 0.5, 0.4, 0.4, 0.4, 0.4),
+    "repentance_pressure": (0.3, 0.4, 0.5, 0.4, 0.4, 0.4, 0.5, 0.4, 0.5, 0.4, 0.5, 0.5),
+    "shyness_pressure": (0.4, 0.3, 0.4, 0.3, 0.4, 0.4, 0.4, 0.3, 0.5, 0.4, 0.4, 0.4),
+    "sadistic_cruelty_pressure": (0.3, 0.4, 0.3, 0.8, 0.4, 0.5, 0.4, 0.4, 0.4, 0.2, 0.4, 0.5),
+    "envy_pressure": (0.3, 0.4, 0.4, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.3, 0.4, 0.3),
+    "melancholy_pressure": (0.4, 0.3, 0.4, 0.3, 0.4, 0.3, 0.4, 0.3, 0.5, 0.4, 0.4, 0.5),
 
     # Default for unknown
-    "unknown": (0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3),
+    "unknown": (0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3),
 }
 
 
@@ -212,12 +214,12 @@ def get_varna_data() -> VarnaData:
 
 
 # =============================================================================
-# Varṇa to 10D Vector Conversion
+# Varṇa to 12D Vector Conversion
 # =============================================================================
 
-def varna_to_10d_vector(varna: str) -> Tuple[float, ...]:
+def varna_to_12d_vector(varna: str) -> Tuple[float, ...]:
     """
-    Convert a varṇa symbol to a 10D ontological vector.
+    Convert a varṇa symbol to a 12D ontological vector.
 
     Uses bridge_meaning to look up pre-computed affinities,
     then refines with layer descriptions if available.
@@ -226,7 +228,7 @@ def varna_to_10d_vector(varna: str) -> Tuple[float, ...]:
         varna: Sanskrit varṇa symbol (e.g., "sa", "a", "ka")
 
     Returns:
-        10D tuple of layer affinities (normalized)
+        12D tuple of layer affinities (normalized)
     """
     data = get_varna_data()
 
@@ -369,19 +371,19 @@ def varna_word_to_vector(
     varnas = phonemes_to_varnas(phonemes)
 
     # Accumulate weighted affinities
-    accumulated = [0.0] * 10
+    accumulated = [0.0] * 12
     trajectory = []
 
     # Position weights (first phoneme has more impact)
     position_weights = (1.5, 1.25, 1.0)
 
     for i, varna in enumerate(varnas):
-        affinities = varna_to_10d_vector(varna)
+        affinities = varna_to_12d_vector(varna)
 
         # Position weight
         weight = position_weights[i] if i < len(position_weights) else 1.0
 
-        for j in range(10):
+        for j in range(12):
             accumulated[j] += affinities[j] * weight
 
         # Track trajectory
@@ -394,7 +396,7 @@ def varna_word_to_vector(
     # Find dominant layer
     max_idx = 0
     max_val = normalized[0]
-    for i in range(1, 10):
+    for i in range(1, 12):
         if normalized[i] > max_val:
             max_val = normalized[i]
             max_idx = i
@@ -414,8 +416,8 @@ def varna_word_to_vector(
 # =============================================================================
 
 def get_varna_affinities(varna: str) -> Tuple[float, ...]:
-    """Get 10D affinities for a varṇa symbol."""
-    return varna_to_10d_vector(varna)
+    """Get 12D affinities for a varṇa symbol."""
+    return varna_to_12d_vector(varna)
 
 
 def get_bridge_meaning(varna: str) -> str:
@@ -441,7 +443,7 @@ def list_varnas() -> Tuple[str, ...]:
 __all__ = [
     "VarnaData",
     "get_varna_data",
-    "varna_to_10d_vector",
+    "varna_to_12d_vector",
     "varna_word_to_vector",
     "english_phoneme_to_varna",
     "phonemes_to_varnas",

@@ -73,12 +73,13 @@ class OntologyIntegrityError(Phase4AError):
 #
 
 FROZEN_CHECKSUMS: Dict[str, str] = {
-    # ABSOLUTELY FROZEN — NO EDITS PERMITTED
-    "varna_bridge_map_v1.json": "e0605c15556afca845b233d5a0340870782c6a800b98b94c3b53d0270be13568",
-    "ontological_layers_v1.json": "625f7373d64389b4f4d1e8c249f51aaf18007b48ab2a2b55b8fd67327edb54ac",
-
-    # CONTROLLED — distortion_vector ONLY
-    "varna_layer_interaction_v1.json": "772a672623fcca483a95038c11ef88fa4eb859c24d92f70c60fbdadefef68dd9",
+    # 12D MIGRATION (v2.0) — Updated per ONTOLOGY_FREEZE_CONTRACT.md Section 4
+    # Checksums updated 2025-12-24 for 10D→12D layer migration
+    "varna_bridge_map_v1.json": "31bda88a5b6690104ad5e4fc1dfc9c0d4fce3f0aa4e2d65e88dfb5c1efb8f1db",
+    "ontological_layers_v1.json": "c5965c4d7e0a89527bc44e81c3102e71981cced809a7683c1e6e77412185e5cb",
+    "varna_layer_interaction_v1.json": "6a4816cb5a2c3463b4ffcdaa67f440c5e0711fda8e7a0a92ae52888a4463b1f8",
+    "varna_polarity_map_v1.json": "8ec676267ffb90f485c43d02bec1cbdbb1b65d70ee906bfdcf77626032146253",
+    "varna_distortion_map_v1.json": "28b30986b5541b19c1ed8498bd8b866b286bad3d04a54c2ddd480345717a9568",
 }
 
 # File keys for lookup
@@ -86,6 +87,8 @@ ONTOLOGY_FILE_KEYS = {
     "varna_bridge_map": "varna_bridge_map_v1.json",
     "ontological_layers": "ontological_layers_v1.json",
     "varna_layer_interaction": "varna_layer_interaction_v1.json",
+    "varna_polarity_map": "varna_polarity_map_v1.json",
+    "varna_distortion_map": "varna_distortion_map_v1.json",
 }
 
 

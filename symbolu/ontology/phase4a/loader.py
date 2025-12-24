@@ -79,10 +79,11 @@ REQUIRED_INTERACTION_FIELDS = frozenset({
     "sublimate_vector",
 })
 
-# Valid layer IDs (O1 through O10)
+# Valid layer IDs (O1 through O12) - 12D patent-exact sequence
 VALID_LAYER_IDS = frozenset({
-    "O3_EXECUTION",
+    "O1_POTENTIAL",
     "O2_IDENTITY",
+    "O3_EXECUTION",
     "O4_STRUCTURE",
     "O5_COGNITION",
     "O6_AGENCY",
@@ -90,6 +91,7 @@ VALID_LAYER_IDS = frozenset({
     "O8_PURPOSE",
     "O9_WITNESSES",
     "O10_UNIFYING",
+    "O11_INTEGRATION",
     "O12_ABSOLVING",
 })
 

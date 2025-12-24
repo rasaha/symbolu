@@ -252,7 +252,7 @@ class TestResonanceRAGContentAnalysis:
         assert len(analysis.words) > 0
         # Each word should have a 10D vector
         for word_vec in analysis.words:
-            assert len(word_vec.vector) == 10
+            assert len(word_vec.vector) == 12  # 12D ontological vectors
             assert word_vec.dominant_layer in LAYER_NAMES
 
     def test_compute_resonance_between_rag_chunks(self) -> None:
@@ -504,7 +504,7 @@ class TestSTLArchitecturalProperties:
         vec = analyze_word(word)
 
         # Vector should be 10D (explicit ontological layers)
-        assert len(vec.vector) == 10
+        assert len(vec.vector) == 12  # 12D ontological vectors
 
         # Dominant layer should be one of the defined layers
         assert vec.dominant_layer in LAYER_NAMES
@@ -577,7 +577,7 @@ class TestIntegrationEdgeCases:
         # Analyze single word
         analysis = analyze_word(word)
         assert analysis.word == word
-        assert len(analysis.vector) == 10
+        assert len(analysis.vector) == 12  # 12D ontological vectors
 
         # Route single word
         decision = semantic_router.route(word)

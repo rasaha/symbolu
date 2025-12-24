@@ -243,15 +243,16 @@ class VarnaHybridRenderer:
                     all_meanings.append(meaning)
 
         # Determine dominant layer from word vectors
-        layer_totals = [0.0] * 10
+        layer_totals = [0.0] * 12
         for wv in word_vectors:
             for i, score in enumerate(wv.vector):
                 layer_totals[i] += score
 
         max_idx = layer_totals.index(max(layer_totals))
         layer_names = [
-            "O3_EXECUTION", "O2_IDENTITY", "O4_STRUCTURE", "O5_COGNITION", "O6_AGENCY",
-            "O7_REASONING", "O8_PURPOSE", "O9_WITNESSES", "O10_UNIFYING", "O12_ABSOLVING"
+            "O1_POTENTIAL", "O2_IDENTITY", "O3_EXECUTION", "O4_STRUCTURE", "O5_COGNITION",
+            "O6_AGENCY", "O7_REASONING", "O8_PURPOSE", "O9_WITNESSES", "O10_UNIFYING",
+            "O11_INTEGRATION", "O12_ABSOLVING"
         ]
         dominant_layer = layer_names[max_idx]
 

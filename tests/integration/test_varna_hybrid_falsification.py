@@ -313,17 +313,17 @@ def test_invariants():
     renderer = VarnaHybridRenderer()
     failures = []
 
-    # 4.1 Vector dimensions always 10
-    print("\n4.1 Vector dimension invariant (always 10D):")
+    # 4.1 Vector dimensions always 12 (patent-exact 12D ontological layers)
+    print("\n4.1 Vector dimension invariant (always 12D):")
     test_words = ["truth", "a", "supercalifragilisticexpialidocious", "123", ""]
     for word in test_words:
         try:
             vec = analyze_word_varna(word) if word else None
-            if vec and len(vec.vector) != 10:
-                failures.append(f"Vector dim != 10 for '{word}'")
+            if vec and len(vec.vector) != 12:
+                failures.append(f"Vector dim != 12 for '{word}'")
                 print(f"    ✗ '{word}': dim={len(vec.vector)}")
             elif vec:
-                print(f"    ✓ '{word}': dim=10")
+                print(f"    ✓ '{word}': dim=12")
         except Exception as e:
             print(f"    ~ '{word}': {e}")
 

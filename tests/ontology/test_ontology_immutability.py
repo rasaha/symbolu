@@ -161,16 +161,18 @@ class TestChecksumVerification:
 
     def test_frozen_checksums_not_empty(self):
         """Frozen checksum registry must not be empty."""
-        assert len(FROZEN_CHECKSUMS) == 3, (
-            f"Expected 3 frozen checksums, got {len(FROZEN_CHECKSUMS)}"
+        assert len(FROZEN_CHECKSUMS) == 5, (
+            f"Expected 5 frozen checksums, got {len(FROZEN_CHECKSUMS)}"
         )
 
     def test_all_ontology_files_have_checksums(self):
-        """All three ontology files must have checksums."""
+        """All five ontology files must have checksums."""
         expected_files = {
             "varna_bridge_map_v1.json",
             "ontological_layers_v1.json",
             "varna_layer_interaction_v1.json",
+            "varna_polarity_map_v1.json",
+            "varna_distortion_map_v1.json",
         }
         actual_files = set(FROZEN_CHECKSUMS.keys())
 
@@ -193,7 +195,7 @@ class TestChecksumVerification:
     def test_verify_existing_files_passes(self, data_dir: Path):
         """Verifying existing ontology files must pass."""
         verified = verify_all_ontology_checksums(data_dir)
-        assert len(verified) == 3, "All three files should verify"
+        assert len(verified) == 5, "All five files should verify"
 
     def test_checksum_mismatch_raises_integrity_error(self, data_dir: Path):
         """Checksum mismatch must raise OntologyIntegrityError."""

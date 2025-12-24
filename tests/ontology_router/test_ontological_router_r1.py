@@ -422,7 +422,8 @@ class TestInvalidHintRejected:
         with pytest.raises(ProjectionBlockedError) as exc:
             router.project(request)
         error_msg = str(exc.value)
-        assert "FORMING" in error_msg or "THINKING" in error_msg
+        # Phase 4 allows EXECUTION and COGNITION (12D naming)
+        assert "STRUCTURE" in error_msg or "COGNITION" in error_msg
 
 
 # =============================================================================
@@ -1010,20 +1011,21 @@ class TestStructuralInvariants:
     """Tests verifying structural invariants."""
 
     def test_ontological_layer_has_12_members(self) -> None:
-        """Verify OntologicalLayer enum has exactly 10 members."""
+        """Verify OntologicalLayer enum has exactly 12 members."""
         assert len(OntologicalLayer) == 12
 
     def test_ontological_layer_values_are_sequential(self) -> None:
-        """Verify layer values are 1-10 sequential."""
-        expected = list(range(1, 11))
+        """Verify layer values are 1-12 sequential."""
+        expected = list(range(1, 13))
         actual = sorted([layer.value for layer in OntologicalLayer])
         assert actual == expected
 
     def test_ontological_layer_names_match_spec(self) -> None:
-        """Verify layer names match specification."""
+        """Verify layer names match 12D patent-exact specification."""
         expected_names = {
-            "ACTING", "TAGGING", "FORMING", "THINKING", "DIRECTING",
-            "REASONING", "PURPOSING", "META_OBSERVING", "UNIFYING", "ABSOLVING",
+            "POTENTIAL", "IDENTITY", "EXECUTION", "STRUCTURE", "COGNITION",
+            "AGENCY", "REASONING", "PURPOSE", "WITNESSES", "UNIFYING",
+            "INTEGRATION", "ABSOLVING",
         }
         actual_names = {layer.name for layer in OntologicalLayer}
         assert actual_names == expected_names

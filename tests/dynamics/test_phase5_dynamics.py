@@ -696,13 +696,13 @@ class TestDynamicStateModel:
 
     def test_invalid_layer_index_fails(self):
         """
-        Layer index outside 1-10 should fail.
+        Layer index outside 1-12 should fail.
         """
         with pytest.raises(ValueError):
             DynamicState(
                 time_step=0,
-                layer_id="O11_FAKE",
-                layer_index=11,  # Invalid
+                layer_id="O13_FAKE",
+                layer_index=13,  # Invalid (12D system has 1-12)
                 activation_level=0.5,
                 momentum=0.0,
                 direction=Direction.LATERAL,

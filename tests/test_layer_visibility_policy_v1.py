@@ -1041,7 +1041,7 @@ class TestDeterministicOrdering:
 
         response = gate.evaluate(projection, request)
 
-        # Should be sorted by value (ACTING=1, DIRECTING=5, UNIFYING=9)
+        # Should be sorted by value (EXECUTION=3, AGENCY=6, UNIFYING=10)
         expected_order = (
             OntologicalLayer.EXECUTION,
             OntologicalLayer.AGENCY,
@@ -1063,6 +1063,6 @@ class TestDeterministicOrdering:
 
         response = gate.evaluate(projection, request)
 
-        # Should be sorted by value (ACTING=1, TAGGING=2)
-        expected_order = (OntologicalLayer.EXECUTION, OntologicalLayer.IDENTITY)
+        # Should be sorted by value (IDENTITY=2, EXECUTION=3)
+        expected_order = (OntologicalLayer.IDENTITY, OntologicalLayer.EXECUTION)
         assert response.allowed_layers == expected_order
