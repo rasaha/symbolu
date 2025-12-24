@@ -52,6 +52,18 @@ try:
 except ImportError as e:
     print(f"Note: PyTorch components not available: {e}")
 
+# RAG datasets (no dependencies)
+from symbolu.ontological.math_rag_dataset import (
+    MathRAGDataset,
+    MathProblem,
+    create_math_rag_dataset,
+)
+from symbolu.ontological.creative_math_dataset import (
+    CreativeMathDataset,
+    CreativeMathItem,
+    create_creative_math_dataset,
+)
+
 __all__ = [
     # Types
     "OntologicalConfig",
@@ -72,6 +84,13 @@ __all__ = [
     "save_model_for_offline",
     # PyTorch (optional)
     "PYTORCH_AVAILABLE",
+    # RAG datasets
+    "MathRAGDataset",
+    "MathProblem",
+    "create_math_rag_dataset",
+    "CreativeMathDataset",
+    "CreativeMathItem",
+    "create_creative_math_dataset",
 ]
 
 # Add PyTorch exports if available
