@@ -968,9 +968,23 @@ class TestPhase49UnifiedAPIAndObserver:
 
     def test_persona_models_has_temporal_stability_profile(self):
         """D9: PersonaResponse must have persona_temporal_stability_profile field."""
-        from symbolu.mechanical.persona.models import PersonaResponse
+        from symbolu.mechanical.persona.models import PersonaResponse, PersonaMetadata
 
-        response = PersonaResponse(persona_id="test", text="test")
+        response = PersonaResponse(
+            persona_id="test",
+            text="test",
+            layers={"symbolic": {}, "practical": {}, "mirror": {}},
+            metadata=PersonaMetadata(
+                tier="HYBRID",
+                domain="test",
+                intent="how",
+                persona_id="test",
+                persona_name="Test Persona",
+                persona_description="Test persona description",
+                dha_tone="neutral",
+                dha_confidence=0.8,
+            ),
+        )
         assert hasattr(response, 'persona_temporal_stability_profile')
 
     def test_persona_engine_has_extract_method(self):

@@ -1,0 +1,12 @@
+{
+  "id": "faq-002",
+  "title": "Symbol-U Pricing and Subscription Tiers",
+  "domain": "enterprise-faq",
+  "tags": ["pricing", "subscription", "plans", "billing"],
+  "content": "Symbol-U offers flexible pricing to match your organization's needs:\n\n**Subscription Tiers:**\n\n1. **Starter** ($499/month)\n   - Up to 10 users\n   - Explorer tier access only\n   - 100K tokens/month\n   - Email support\n   - Basic analytics\n\n2. **Professional** ($1,999/month)\n   - Up to 50 users\n   - Explorer + Analyst tiers\n   - 500K tokens/month\n   - Priority support\n   - Advanced analytics + exports\n\n3. **Enterprise** (Custom pricing)\n   - Unlimited users\n   - All tiers including Developer\n   - Custom token allocation\n   - Dedicated success manager\n   - SLA guarantees\n   - On-premise deployment option\n   - Custom integrations\n\n**Add-ons:**\n- Additional tokens: $10 per 10K tokens\n- SSO integration: $200/month\n- Custom domain: $100/month\n- Audit log retention (extended): $150/month\n\n**Billing:**\n- Annual contracts receive 20% discount\n- Invoicing available for Enterprise tier\n- All prices in USD",
+  "metadata": {
+    "author": "Sales Operations",
+    "last_updated": "2025-01-01",
+    "category": "commercial"
+  }
+}

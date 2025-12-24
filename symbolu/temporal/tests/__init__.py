@@ -1,1 +1,0 @@
-"""Temporal module test suite."""

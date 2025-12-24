@@ -296,6 +296,7 @@ class TestMapperInvariance(unittest.TestCase):
                 "coherence_score": 0.60,
                 "coherence_score_v2": 0.70,
                 "coherence_score_v3": 0.80,
+                "coherence_v3_quality": 0.70,  # Phase 12: Quality gating requirement
             },
         }
 
@@ -546,6 +547,7 @@ class TestPolicySafetyInvariance(unittest.TestCase):
             "coherence": {
                 "coherence_score": 0.50,
                 "coherence_score_v3": 0.70,
+                "coherence_v3_quality": 0.60,  # Phase 12: Quality gating requirement
             },
         }
 

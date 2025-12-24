@@ -281,7 +281,7 @@ def test_mtsf_tags_sorted():
 
 def test_coherence_state_has_mtsf_fields():
     """Test that CoherenceState has MTSF fields."""
-    state = CoherenceState()
+    state = CoherenceState(convo_id="test", turn_index=1)
     assert hasattr(state, 'mtsf_snapshot')
     assert hasattr(state, 'mtsf_tsi_history')
     assert hasattr(state, 'mtsf_tvi_history')
@@ -293,7 +293,7 @@ def test_coherence_state_has_mtsf_fields():
 
 def test_coherence_state_mtsf_histories_initialized():
     """Test that MTSF histories are initialized as empty lists."""
-    state = CoherenceState()
+    state = CoherenceState(convo_id="test", turn_index=1)
     assert state.mtsf_tsi_history == []
     assert state.mtsf_tvi_history == []
     assert state.mtsf_chf_history == []
@@ -304,7 +304,7 @@ def test_coherence_state_mtsf_histories_initialized():
 
 def test_coherence_state_window_trim_includes_mtsf():
     """Test that window_trim includes MTSF histories."""
-    state = CoherenceState()
+    state = CoherenceState(convo_id="test", turn_index=1)
     # Add dummy data
     state.mtsf_tsi_history = [0.1, 0.2, 0.3, 0.4, 0.5]
     state.mtsf_tvi_history = [0.1, 0.2, 0.3, 0.4, 0.5]
@@ -333,7 +333,7 @@ def test_coherence_engine_has_update_mtsf_method():
 def test_coherence_engine_update_mtsf_with_no_data():
     """Test that update_mtsf handles missing data gracefully."""
     engine = CoherenceEngine()
-    state = CoherenceState()
+    state = CoherenceState(convo_id="test", turn_index=1)
 
     # Should not raise
     engine._update_multi_trajectory_stability_field(state)
@@ -346,7 +346,7 @@ def test_coherence_engine_update_mtsf_with_no_data():
 def test_coherence_engine_update_mtsf_with_valid_data():
     """Test that update_mtsf populates histories with valid data."""
     engine = CoherenceEngine()
-    state = CoherenceState()
+    state = CoherenceState(convo_id="test", turn_index=1)
 
     # Populate upstream snapshots
     state.temporal_forecast_snapshot = type('obj', (object,), {
@@ -374,7 +374,7 @@ def test_coherence_engine_update_mtsf_with_valid_data():
 def test_coherence_engine_mtsf_snapshot_stored():
     """Test that MTSF snapshot is stored in coherence state."""
     engine = CoherenceEngine()
-    state = CoherenceState()
+    state = CoherenceState(convo_id="test-convo", turn_index=0)
 
     # Populate upstream snapshots
     state.temporal_forecast_snapshot = type('obj', (object,), {
@@ -398,7 +398,7 @@ def test_coherence_engine_mtsf_snapshot_stored():
 def test_coherence_engine_mtsf_observation_only():
     """Test that MTSF update is observation-only (doesn't modify core fields)."""
     engine = CoherenceEngine()
-    state = CoherenceState()
+    state = CoherenceState(convo_id="test", turn_index=1)
 
     # Set some core fields
     state.tier_history = ["HYBRID"]
@@ -420,8 +420,8 @@ def test_coherence_engine_mtsf_observation_only():
 def test_coherence_engine_mtsf_deterministic_updates():
     """Test that MTSF updates are deterministic."""
     engine = CoherenceEngine()
-    state1 = CoherenceState()
-    state2 = CoherenceState()
+    state1 = CoherenceState(convo_id="test", turn_index=1)
+    state2 = CoherenceState(convo_id="test", turn_index=1)
 
     # Same snapshots
     snapshot = type('obj', (object,), {
@@ -452,7 +452,7 @@ def test_coherence_engine_mtsf_deterministic_updates():
 def test_coherence_engine_mtsf_multiple_updates():
     """Test that MTSF supports multiple turn updates."""
     engine = CoherenceEngine()
-    state = CoherenceState()
+    state = CoherenceState(convo_id="test", turn_index=1)
 
     # First update
     state.temporal_forecast_snapshot = type('obj', (object,), {
@@ -484,7 +484,7 @@ def test_coherence_engine_mtsf_histories_copy_on_new_state():
     engine = CoherenceEngine()
 
     # Create initial state with MTSF data
-    prev_state = CoherenceState()
+    prev_state = CoherenceState(convo_id="test", turn_index=1)
     prev_state.mtsf_tsi_history = [0.5, 0.6]
     prev_state.mtsf_tvi_history = [0.3, 0.2]
     prev_state.mtsf_chf_history = [0.4, 0.3]
@@ -803,12 +803,22 @@ def test_coherence_observer_mtsf_defaults():
 
 def test_persona_response_has_mtsf_field():
     """Test that PersonaResponse has persona_mtsf field."""
-    from symbolu.mechanical.persona.models import PersonaResponse
+    from symbolu.mechanical.persona.models import PersonaResponse, PersonaMetadata
 
     response = PersonaResponse(
         persona_id="test",
         text="test",
-        metadata={}
+        layers={"symbolic": {}, "practical": {}, "mirror": {}},
+        metadata=PersonaMetadata(
+            tier="HYBRID",
+            domain="test",
+            intent="how",
+            persona_id="test",
+            persona_name="Test Persona",
+            persona_description="Test persona description",
+            dha_tone="neutral",
+            dha_confidence=0.8,
+        ),
     )
 
     assert hasattr(response, 'persona_mtsf')
@@ -865,7 +875,6 @@ def test_dilchat_adapter_has_mtsf_badges():
     unified_output = {
         "text": "test",
         "domain": "therapy",
-        "interaction_mode": "SMART_INSIGHT",
         "multi_trajectory_stability_field": {
             "tsi": 0.8,
             "tvi": 0.2,
@@ -876,7 +885,10 @@ def test_dilchat_adapter_has_mtsf_badges():
         }
     }
 
-    response = build_dilchat_response(unified_output, {}, "therapy")
+    # interaction_mode must be in policy_flags (lowercase), not unified_output
+    policy_flags = {"interaction_mode": "smart_insight"}
+
+    response = build_dilchat_response(unified_output, policy_flags, "therapy")
 
     # Check for MTSF badges
     badge_labels = [b.label for b in response.badges]
@@ -923,7 +935,7 @@ def test_mtsf_no_llm_calls():
 def test_mtsf_observation_only_no_routing_changes():
     """Test that MTSF does not modify routing (observation-only)."""
     engine = CoherenceEngine()
-    state = CoherenceState()
+    state = CoherenceState(convo_id="test", turn_index=1)
 
     # Set routing fields
     state.tier_history = ["HYBRID"]
@@ -945,7 +957,7 @@ def test_mtsf_observation_only_no_routing_changes():
 def test_mtsf_observation_only_no_mapper_changes():
     """Test that MTSF does not modify mapper profiles (observation-only)."""
     engine = CoherenceEngine()
-    state = CoherenceState()
+    state = CoherenceState(convo_id="test", turn_index=1)
 
     # Set mapper fields
     state.mapper_profile_history = [{"HRM": True, "LCM": False, "LAM": False}]
@@ -965,7 +977,7 @@ def test_mtsf_observation_only_no_mapper_changes():
 def test_mtsf_observation_only_no_coherence_v1_v2_v3_changes():
     """Test that MTSF does not modify coherence v1/v2/v3 scoring."""
     engine = CoherenceEngine()
-    state = CoherenceState()
+    state = CoherenceState(convo_id="test", turn_index=1)
 
     # The MTSF should not touch any existing coherence scoring mechanisms
     # This is verified by checking that update_mtsf doesn't access these fields

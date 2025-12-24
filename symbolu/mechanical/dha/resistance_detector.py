@@ -86,8 +86,10 @@ class ResistanceDetector:
         # Detect specific resistance patterns
         patterns = self._detect_resistance_patterns(metadata)
 
-        # Determine level
-        level = self._score_to_level(composite_score)
+        # Determine level using raw resistance score, not composite
+        # The composite score is useful for other purposes but the raw score
+        # should determine the categorical level to avoid dilution effects
+        level = self._score_to_level(resistance_score)
 
         return {
             "resistance_level": level.value,

@@ -1,0 +1,396 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © SymbolU - State Evolution Oscillator Panel
+// Companion indicator for SymbolU State Evolution
+
+//@version=6
+indicator("SymbolU Oscillator", shorttitle="SymbolU Osc", overlay=false)
+
+// ============================================================================
+// CONFIGURATION INPUTS
+// ============================================================================
+
+// Trading Tier Selection
+tierInput = input.string("daytrader", "Trading Tier", options=["scalper", "daytrader", "swing", "position"])
+riskProfileInput = input.string("moderate", "Risk Profile", options=["conservative", "moderate", "aggressive"])
+
+// Display Options
+displayMode = input.string("signal", "Display Mode", options=["signal", "probability", "utility", "components"])
+showHistogram = input.bool(true, "Show Histogram")
+showThresholds = input.bool(true, "Show Entry/Exit Thresholds")
+
+// Lookback Periods
+momentumLength = input.int(14, "Momentum Length", minval=1, maxval=100)
+reversionLength = input.int(20, "Mean Reversion Length", minval=1, maxval=100)
+volatilityLength = input.int(14, "Volatility Length", minval=1, maxval=100)
+volumeLength = input.int(20, "Volume Length", minval=1, maxval=100)
+
+// ============================================================================
+// ALPHA & RISK CONFIGURATION
+// ============================================================================
+
+getAlpha(tier) =>
+    switch tier
+        "scalper" => 0.20
+        "daytrader" => 0.10
+        "swing" => 0.05
+        "position" => 0.02
+
+getRiskConfig(profile) =>
+    switch profile
+        "conservative" => array.from(0.05, 0.02, 0.04, 0.10)
+        "moderate" => array.from(0.10, 0.05, 0.08, 0.25)
+        "aggressive" => array.from(0.20, 0.10, 0.15, 0.50)
+
+float baseAlpha = getAlpha(tierInput)
+float[] riskParams = getRiskConfig(riskProfileInput)
+float crisisDrawdown = array.get(riskParams, 2)
+float crisisPositionScalar = array.get(riskParams, 3)
+
+// ============================================================================
+// OBSERVABLES CALCULATION
+// ============================================================================
+
+// Momentum
+priceChange = close - close[momentumLength]
+priceRange = ta.highest(high, momentumLength) - ta.lowest(low, momentumLength)
+momentum = priceRange > 0 ? math.max(-1.0, math.min(1.0, priceChange / priceRange)) : 0.0
+
+// Mean Reversion
+vwapValue = ta.vwap(close)
+emaValue = ta.ema(close, reversionLength)
+fairValue = (vwapValue + emaValue) / 2
+deviationPercent = (close - fairValue) / fairValue * 100
+meanReversion = math.max(-1.0, math.min(1.0, -deviationPercent / 2.0))
+
+// Noise Level
+highLowRange = high - low
+avgRange = ta.sma(highLowRange, volatilityLength)
+noiseLevel = avgRange > 0 ? math.min(1.0, highLowRange / (avgRange * 3)) : 0.5
+
+// Volatility Ratio
+atrValue = ta.atr(volatilityLength)
+anchorAtr = ta.sma(atrValue, volatilityLength * 3)
+tickVolatility = anchorAtr > 0 ? atrValue / anchorAtr : 1.0
+
+// Order Imbalance
+bullVolume = volume * (close - low) / (high - low + 0.0001)
+bearVolume = volume * (high - close) / (high - low + 0.0001)
+totalVolume = bullVolume + bearVolume
+orderImbalance = totalVolume > 0 ? (bullVolume - bearVolume) / totalVolume : 0.0
+
+// Spread & Intensity
+spreadNormalized = avgRange > 0 ? highLowRange / avgRange : 1.0
+avgVolume = ta.sma(volume, volumeLength)
+tickIntensity = avgVolume > 0 ? volume / avgVolume : 1.0
+
+// ============================================================================
+// STATE VARIABLES
+// ============================================================================
+
+var float wMomentum = 0.4
+var float wReversion = 0.4
+var float wNoise = 0.2
+var float positionScalar = 1.0
+var float tauEntry = 0.6
+var float tauExit = 0.4
+var string regime = "unknown"
+
+// ============================================================================
+// UTILITY CALCULATION
+// ============================================================================
+
+// Coefficients
+c_momentum = 1.0
+c_reversion = 1.0
+c_imbalance = 0.5
+lambda_vol = -0.3
+lambda_dd = -0.5
+lambda_spread = -0.2
+lambda_noise = -0.2
+
+// Composite signal
+rawSignal = (wMomentum * momentum + wReversion * meanReversion + wNoise * orderImbalance) / (wMomentum + wReversion + wNoise)
+
+// Signal contribution
+signalContribution = c_momentum * momentum * wMomentum + c_reversion * meanReversion * wReversion + c_imbalance * orderImbalance * wNoise
+
+// Penalties
+volExcess = math.max(0.0, tickVolatility - 1.0)
+volatilityPenalty = lambda_vol * volExcess
+spreadExcess = math.max(0.0, spreadNormalized - 1.0)
+spreadPenalty = lambda_spread * spreadExcess
+noiseExcess = math.max(0.0, noiseLevel - 0.5)
+noisePenalty = lambda_noise * noiseExcess
+
+// Regime detection
+detectRegime(vol, mom, rev, intensity) =>
+    if vol > 2.5
+        "crisis"
+    else if math.abs(mom) > 0.5 and intensity > 1.5
+        "trending"
+    else if math.abs(rev) > 0.5 and intensity < 0.8
+        "ranging"
+    else
+        "unknown"
+
+regime := detectRegime(tickVolatility, momentum, meanReversion, tickIntensity)
+
+// Regime adjustment
+regimeAdjustment = 0.0
+if regime == "crisis"
+    regimeAdjustment := -math.abs(signalContribution) * 0.5
+else if regime == "trending"
+    if momentum * c_momentum > 0
+        regimeAdjustment := 0.1 * math.abs(momentum)
+else if regime == "ranging"
+    if meanReversion * c_reversion > 0
+        regimeAdjustment := 0.1 * math.abs(meanReversion)
+
+// Final utility
+utility = signalContribution + volatilityPenalty + spreadPenalty + noisePenalty + regimeAdjustment
+totalPenalty = volatilityPenalty + spreadPenalty + noisePenalty
+
+// ============================================================================
+// STATE EVOLUTION
+// ============================================================================
+
+// Target weights
+var float targetWMom = 0.4
+var float targetWRev = 0.4
+var float targetWNoise = 0.2
+
+if tickVolatility > 2.0
+    targetWMom := 0.2
+    targetWRev := 0.2
+    targetWNoise := 0.6
+else if math.abs(momentum) > math.abs(meanReversion)
+    targetWMom := 0.5
+    targetWRev := 0.3
+    targetWNoise := 0.2
+else
+    targetWMom := 0.3
+    targetWRev := 0.5
+    targetWNoise := 0.2
+
+// EMA blend
+emaBlend(current, target, a) =>
+    (1.0 - a) * current + a * target
+
+alpha = baseAlpha
+newWMom = emaBlend(wMomentum, targetWMom, alpha)
+newWRev = emaBlend(wReversion, targetWRev, alpha)
+newWNoise = emaBlend(wNoise, targetWNoise, alpha)
+weightSum = newWMom + newWRev + newWNoise
+wMomentum := newWMom / weightSum
+wReversion := newWRev / weightSum
+wNoise := newWNoise / weightSum
+
+// Position scalar evolution
+utilityNormalized = math.max(-1.0, math.min(1.0, utility))
+positionFactor = (1.0 + utilityNormalized) / 2.0
+targetPositionScalar = regime == "crisis" ? crisisPositionScalar : positionFactor
+positionScalar := emaBlend(positionScalar, targetPositionScalar, alpha)
+
+// Threshold evolution
+targetTauEntry = math.max(0.1, math.min(0.9, 0.5 - 0.2 * utilityNormalized))
+targetTauExit = math.max(0.1, math.min(0.9, 0.3 + 0.2 * math.min(1.0, tickVolatility / 2.0)))
+tauEntry := emaBlend(tauEntry, targetTauEntry, alpha)
+tauExit := emaBlend(tauExit, targetTauExit, alpha)
+
+// ============================================================================
+// FINAL SIGNAL CALCULATION
+// ============================================================================
+
+// Volatility adjustment
+volAdjustedSignal = rawSignal
+if tickVolatility <= 1.0
+    volAdjustedSignal := rawSignal
+else if tickVolatility <= 2.0
+    damping = 1.0 - 0.3 * (tickVolatility - 1.0)
+    volAdjustedSignal := rawSignal * damping
+else if tickVolatility <= 3.0
+    damping = 0.7 - 0.4 * (tickVolatility - 2.0)
+    volAdjustedSignal := rawSignal * damping
+else
+    volAdjustedSignal := rawSignal * 0.1
+
+// Noise adjustment
+confidence = 1.0 - noiseLevel
+noiseAdjustedSignal = volAdjustedSignal * math.max(0.1, confidence)
+
+// Final signal
+finalSignal = noiseAdjustedSignal * positionScalar
+
+// ============================================================================
+// PROBABILITY CALCULATION
+// ============================================================================
+
+signalFactor = math.abs(rawSignal)
+baseProb = 50.0 + signalFactor * 30.0
+utilityAdj = math.min(10.0, math.max(-10.0, utility * 20.0))
+noiseProbPenalty = noiseLevel * 15.0
+volProbPenalty = math.min(10.0, math.max(0.0, (tickVolatility - 1.0) * 5.0))
+
+regimeProbAdj = 0.0
+if regime == "trending"
+    regimeProbAdj := rawSignal != 0 ? 5.0 : 0.0
+else if regime == "ranging"
+    regimeProbAdj := 3.0
+else if regime == "crisis"
+    regimeProbAdj := -10.0
+
+float bullishProb = 50.0
+float bearishProb = 50.0
+
+if rawSignal > 0
+    bullishProb := math.min(95.0, math.max(5.0, baseProb + utilityAdj + regimeProbAdj - noiseProbPenalty - volProbPenalty))
+    bearishProb := 100.0 - bullishProb
+else if rawSignal < 0
+    bearishProb := math.min(95.0, math.max(5.0, baseProb + utilityAdj + regimeProbAdj - noiseProbPenalty - volProbPenalty))
+    bullishProb := 100.0 - bearishProb
+
+// Net probability (bullish - bearish, scaled to -100 to 100)
+netProbability = bullishProb - bearishProb
+
+// Confidence
+baseConfidence = math.abs(rawSignal) * 50.0
+utilityConf = utility > 0 ? math.min(20.0, utility * 10.0) : math.max(-20.0, utility * 10.0)
+signalToPenaltyRatio = totalPenalty != 0 ? math.abs(signalContribution / totalPenalty) : (signalContribution > 0 ? 100.0 : 0.0)
+ratioBoost = signalToPenaltyRatio > 2.0 ? 10.0 : (signalToPenaltyRatio > 1.0 ? 5.0 : 0.0)
+regimeConfPenalty = regime == "crisis" ? 20.0 : 0.0
+volConfPenalty = tickVolatility > 1.0 ? math.min(15.0, (tickVolatility - 1.0) * 10.0) : 0.0
+signalConfidence = math.max(0.0, math.min(100.0, baseConfidence + utilityConf + ratioBoost - noiseProbPenalty - volConfPenalty - regimeConfPenalty + 40.0))
+
+// ============================================================================
+// DISPLAY VALUE SELECTION
+// ============================================================================
+
+displayValue = switch displayMode
+    "signal" => finalSignal * 100  // Scale to -100 to 100
+    "probability" => netProbability
+    "utility" => utility * 100
+    "components" => momentum * 100
+
+componentMom = momentum * 100
+componentRev = meanReversion * 100
+componentImb = orderImbalance * 100
+
+// ============================================================================
+// VISUALIZATION
+// ============================================================================
+
+// Zero line
+hline(0, "Zero", color=color.gray, linestyle=hline.style_dotted)
+
+// Entry/Exit thresholds (scaled)
+entryUpper = tauEntry * 100
+entryLower = -tauEntry * 100
+exitUpper = tauExit * 100
+exitLower = -tauExit * 100
+
+plot(showThresholds ? entryUpper : na, "Entry Upper", color=color.new(color.green, 70), style=plot.style_circles)
+plot(showThresholds ? entryLower : na, "Entry Lower", color=color.new(color.red, 70), style=plot.style_circles)
+plot(showThresholds ? exitUpper : na, "Exit Upper", color=color.new(color.orange, 80), style=plot.style_cross)
+plot(showThresholds ? exitLower : na, "Exit Lower", color=color.new(color.orange, 80), style=plot.style_cross)
+
+// Main display value
+mainColor = displayValue > 0 ? color.green : (displayValue < 0 ? color.red : color.gray)
+plot(displayValue, "Main Value", color=mainColor, linewidth=2)
+
+// Histogram
+histColor = displayValue > 0 ?
+    (displayValue > displayValue[1] ? color.new(color.lime, 20) : color.new(color.green, 40)) :
+    (displayValue < displayValue[1] ? color.new(color.maroon, 20) : color.new(color.red, 40))
+
+plot(showHistogram ? displayValue : na, "Histogram", color=histColor, style=plot.style_histogram)
+
+// Components display (when in components mode)
+plot(displayMode == "components" ? componentMom : na, "Momentum", color=color.new(color.blue, 30), linewidth=1)
+plot(displayMode == "components" ? componentRev : na, "Reversion", color=color.new(color.purple, 30), linewidth=1)
+plot(displayMode == "components" ? componentImb : na, "Imbalance", color=color.new(color.orange, 30), linewidth=1)
+
+// Confidence band
+confidenceUpper = displayValue + (signalConfidence / 100 * math.abs(displayValue) * 0.5)
+confidenceLower = displayValue - (signalConfidence / 100 * math.abs(displayValue) * 0.5)
+fill(plot(confidenceUpper, display=display.none), plot(confidenceLower, display=display.none),
+    color=color.new(mainColor, 85), title="Confidence Band")
+
+// Regime indicator line at bottom
+regimeValue = switch regime
+    "trending" => -90
+    "ranging" => -95
+    "crisis" => -100
+    => -92
+
+regimeColor = switch regime
+    "trending" => color.green
+    "ranging" => color.blue
+    "crisis" => color.red
+    => color.gray
+
+plot(regimeValue, "Regime", color=regimeColor, style=plot.style_linebr, linewidth=3)
+
+// ============================================================================
+// OVERBOUGHT/OVERSOLD ZONES
+// ============================================================================
+
+hline(70, "Overbought", color=color.new(color.red, 70))
+hline(-70, "Oversold", color=color.new(color.green, 70))
+hline(50, "Strong Bull", color=color.new(color.green, 85), linestyle=hline.style_dashed)
+hline(-50, "Strong Bear", color=color.new(color.red, 85), linestyle=hline.style_dashed)
+
+// Fill zones
+h1 = hline(100, display=display.none)
+h2 = hline(70, display=display.none)
+h3 = hline(-70, display=display.none)
+h4 = hline(-100, display=display.none)
+
+fill(h1, h2, color=color.new(color.red, 90), title="Overbought Zone")
+fill(h3, h4, color=color.new(color.green, 90), title="Oversold Zone")
+
+// ============================================================================
+// INFO TABLE
+// ============================================================================
+
+if barstate.islast
+    var table infoTable = table.new(position.bottom_right, 2, 8,
+        bgcolor=color.new(color.black, 80), border_width=1, border_color=color.gray)
+
+    table.cell(infoTable, 0, 0, "Mode", text_color=color.gray, text_halign=text.align_left)
+    table.cell(infoTable, 1, 0, displayMode, text_color=color.white, text_halign=text.align_right)
+
+    table.cell(infoTable, 0, 1, "Value", text_color=color.gray, text_halign=text.align_left)
+    table.cell(infoTable, 1, 1, str.tostring(displayValue, "#.##"),
+        text_color=mainColor, text_halign=text.align_right)
+
+    table.cell(infoTable, 0, 2, "Confidence", text_color=color.gray, text_halign=text.align_left)
+    table.cell(infoTable, 1, 2, str.tostring(signalConfidence, "#.#") + "%",
+        text_color=signalConfidence > 70 ? color.lime : color.white, text_halign=text.align_right)
+
+    table.cell(infoTable, 0, 3, "Regime", text_color=color.gray, text_halign=text.align_left)
+    table.cell(infoTable, 1, 3, str.upper(regime), text_color=regimeColor, text_halign=text.align_right)
+
+    table.cell(infoTable, 0, 4, "Vol Ratio", text_color=color.gray, text_halign=text.align_left)
+    table.cell(infoTable, 1, 4, str.tostring(tickVolatility, "#.##") + "x",
+        text_color=tickVolatility > 2 ? color.red : color.white, text_halign=text.align_right)
+
+    table.cell(infoTable, 0, 5, "Pos Scalar", text_color=color.gray, text_halign=text.align_left)
+    table.cell(infoTable, 1, 5, str.tostring(positionScalar * 100, "#") + "%",
+        text_color=positionScalar < 0.5 ? color.orange : color.white, text_halign=text.align_right)
+
+    table.cell(infoTable, 0, 6, "Weights", text_color=color.gray, text_halign=text.align_left)
+    table.cell(infoTable, 1, 6, "M:" + str.tostring(wMomentum * 100, "#") + " R:" + str.tostring(wReversion * 100, "#") + " N:" + str.tostring(wNoise * 100, "#"),
+        text_color=color.white, text_halign=text.align_right, text_size=size.tiny)
+
+    table.cell(infoTable, 0, 7, "Tier", text_color=color.gray, text_halign=text.align_left)
+    table.cell(infoTable, 1, 7, tierInput, text_color=color.white, text_halign=text.align_right)
+
+// ============================================================================
+// ALERTS
+// ============================================================================
+
+alertcondition(displayValue > 70, title="Overbought", message="SymbolU Oscillator: Overbought territory")
+alertcondition(displayValue < -70, title="Oversold", message="SymbolU Oscillator: Oversold territory")
+alertcondition(ta.crossover(displayValue, 0), title="Bullish Cross", message="SymbolU Oscillator: Bullish zero cross")
+alertcondition(ta.crossunder(displayValue, 0), title="Bearish Cross", message="SymbolU Oscillator: Bearish zero cross")
+alertcondition(regime == "crisis" and regime[1] != "crisis", title="Crisis Mode", message="SymbolU: Crisis mode detected")

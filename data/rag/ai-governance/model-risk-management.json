@@ -1,0 +1,12 @@
+{
+  "id": "gov-003",
+  "title": "AI Model Risk Management Guidelines",
+  "domain": "ai-governance",
+  "tags": ["risk", "model-management", "validation", "monitoring"],
+  "content": "Effective AI model risk management requires a comprehensive approach across the model lifecycle:\n\n**Risk Categories:**\n\n1. **Data Risk**: Issues with training data quality, representativeness, or currency. Mitigation includes data validation pipelines, drift detection, and regular data quality assessments.\n\n2. **Model Risk**: Technical failures including overfitting, concept drift, and adversarial vulnerabilities. Address through robust validation, A/B testing, and shadow deployments.\n\n3. **Operational Risk**: Deployment failures, integration issues, and scaling problems. Mitigate with canary deployments, circuit breakers, and comprehensive monitoring.\n\n4. **Reputational Risk**: Public perception issues from AI failures. Manage through human-in-the-loop processes and clear communication strategies.\n\n**Risk Assessment Matrix:**\n- Low Risk: Internal tools, non-critical decisions\n- Medium Risk: Customer-facing features, recommendations\n- High Risk: Financial decisions, healthcare, safety-critical\n- Critical Risk: Autonomous systems, irreversible actions\n\n**Monitoring Requirements by Risk Level:**\n- Low: Monthly performance reviews\n- Medium: Weekly drift analysis, daily error monitoring\n- High: Real-time monitoring, automatic rollback triggers\n- Critical: Continuous validation, human approval workflows",
+  "metadata": {
+    "author": "Risk Management Office",
+    "last_updated": "2025-01-20",
+    "version": "1.5"
+  }
+}

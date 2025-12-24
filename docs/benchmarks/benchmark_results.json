@@ -1,0 +1,671 @@
+{
+  "enterprise_search": [
+    {
+      "tier": "enterprise_search",
+      "use_case": "customer_support",
+      "total_queries": 8,
+      "correct": 5,
+      "accuracy": 62.5,
+      "avg_latency_ms": 0.15134687495788057,
+      "min_latency_ms": 0.0824329999886686,
+      "max_latency_ms": 0.39790599998923426,
+      "by_intent": {
+        "action": {
+          "correct": 1,
+          "total": 3
+        },
+        "reasoning": {
+          "correct": 2,
+          "total": 3
+        },
+        "relationship": {
+          "correct": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "tier": "enterprise_search",
+      "use_case": "developer_assistant",
+      "total_queries": 8,
+      "correct": 6,
+      "accuracy": 75.0,
+      "avg_latency_ms": 0.16393212501952803,
+      "min_latency_ms": 0.12815300010515784,
+      "max_latency_ms": 0.2401500000814849,
+      "by_intent": {
+        "action": {
+          "correct": 3,
+          "total": 3
+        },
+        "reasoning": {
+          "correct": 2,
+          "total": 3
+        },
+        "creative": {
+          "correct": 1,
+          "total": 2
+        }
+      }
+    },
+    {
+      "tier": "enterprise_search",
+      "use_case": "creative_writing",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.17369337504646865,
+      "min_latency_ms": 0.13342500005819602,
+      "max_latency_ms": 0.2328489999854355,
+      "by_intent": {
+        "creative": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "enterprise_search",
+      "use_case": "emotional_support",
+      "total_queries": 8,
+      "correct": 7,
+      "accuracy": 87.5,
+      "avg_latency_ms": 0.13534737496456728,
+      "min_latency_ms": 0.07464899999831687,
+      "max_latency_ms": 0.24403900010838697,
+      "by_intent": {
+        "relationship": {
+          "correct": 7,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "enterprise_search",
+      "use_case": "philosophical_inquiry",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.09481674999278766,
+      "min_latency_ms": 0.038253000184340635,
+      "max_latency_ms": 0.23111399991648796,
+      "by_intent": {
+        "reflective": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "enterprise_search",
+      "use_case": "technical_analysis",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.13026012499040007,
+      "min_latency_ms": 0.07822399993528961,
+      "max_latency_ms": 0.1737160000629956,
+      "by_intent": {
+        "reasoning": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    }
+  ],
+  "enterprise_chat": [
+    {
+      "tier": "enterprise_chat",
+      "use_case": "customer_support",
+      "total_queries": 8,
+      "correct": 5,
+      "accuracy": 62.5,
+      "avg_latency_ms": 0.1223282500006917,
+      "min_latency_ms": 0.08158599985108594,
+      "max_latency_ms": 0.2550950000568264,
+      "by_intent": {
+        "action": {
+          "correct": 1,
+          "total": 3
+        },
+        "reasoning": {
+          "correct": 2,
+          "total": 3
+        },
+        "relationship": {
+          "correct": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "tier": "enterprise_chat",
+      "use_case": "developer_assistant",
+      "total_queries": 8,
+      "correct": 6,
+      "accuracy": 75.0,
+      "avg_latency_ms": 0.173934000031295,
+      "min_latency_ms": 0.1104170000871818,
+      "max_latency_ms": 0.3506909999941854,
+      "by_intent": {
+        "action": {
+          "correct": 3,
+          "total": 3
+        },
+        "reasoning": {
+          "correct": 2,
+          "total": 3
+        },
+        "creative": {
+          "correct": 1,
+          "total": 2
+        }
+      }
+    },
+    {
+      "tier": "enterprise_chat",
+      "use_case": "creative_writing",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.20330212501562528,
+      "min_latency_ms": 0.15150500007621304,
+      "max_latency_ms": 0.35598799991021224,
+      "by_intent": {
+        "creative": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "enterprise_chat",
+      "use_case": "emotional_support",
+      "total_queries": 8,
+      "correct": 7,
+      "accuracy": 87.5,
+      "avg_latency_ms": 0.13890424995111061,
+      "min_latency_ms": 0.07621199983987026,
+      "max_latency_ms": 0.23681599986957735,
+      "by_intent": {
+        "relationship": {
+          "correct": 7,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "enterprise_chat",
+      "use_case": "philosophical_inquiry",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.09502125004701156,
+      "min_latency_ms": 0.03534999996190891,
+      "max_latency_ms": 0.25804200004131417,
+      "by_intent": {
+        "reflective": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "enterprise_chat",
+      "use_case": "technical_analysis",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.11939387502479804,
+      "min_latency_ms": 0.07583799992971763,
+      "max_latency_ms": 0.14912300002833945,
+      "by_intent": {
+        "reasoning": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    }
+  ],
+  "consumer": [
+    {
+      "tier": "consumer",
+      "use_case": "customer_support",
+      "total_queries": 8,
+      "correct": 5,
+      "accuracy": 62.5,
+      "avg_latency_ms": 0.133161750028421,
+      "min_latency_ms": 0.07934900008876866,
+      "max_latency_ms": 0.17331000003650843,
+      "by_intent": {
+        "action": {
+          "correct": 1,
+          "total": 3
+        },
+        "reasoning": {
+          "correct": 2,
+          "total": 3
+        },
+        "relationship": {
+          "correct": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "tier": "consumer",
+      "use_case": "developer_assistant",
+      "total_queries": 8,
+      "correct": 6,
+      "accuracy": 75.0,
+      "avg_latency_ms": 0.17795700000533543,
+      "min_latency_ms": 0.13042399996265885,
+      "max_latency_ms": 0.2753390001544176,
+      "by_intent": {
+        "action": {
+          "correct": 3,
+          "total": 3
+        },
+        "reasoning": {
+          "correct": 2,
+          "total": 3
+        },
+        "creative": {
+          "correct": 1,
+          "total": 2
+        }
+      }
+    },
+    {
+      "tier": "consumer",
+      "use_case": "creative_writing",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.18032949998314507,
+      "min_latency_ms": 0.12982699990971014,
+      "max_latency_ms": 0.23876000000200293,
+      "by_intent": {
+        "creative": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "consumer",
+      "use_case": "emotional_support",
+      "total_queries": 8,
+      "correct": 7,
+      "accuracy": 87.5,
+      "avg_latency_ms": 0.13727474993174837,
+      "min_latency_ms": 0.07307099986064713,
+      "max_latency_ms": 0.22529299985762918,
+      "by_intent": {
+        "relationship": {
+          "correct": 7,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "consumer",
+      "use_case": "philosophical_inquiry",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.1035228750083661,
+      "min_latency_ms": 0.041995999936261796,
+      "max_latency_ms": 0.22803799993198481,
+      "by_intent": {
+        "reflective": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    },
+    {
+      "tier": "consumer",
+      "use_case": "technical_analysis",
+      "total_queries": 8,
+      "correct": 8,
+      "accuracy": 100.0,
+      "avg_latency_ms": 0.12148399997613524,
+      "min_latency_ms": 0.07585000003018649,
+      "max_latency_ms": 0.17739600002641964,
+      "by_intent": {
+        "reasoning": {
+          "correct": 8,
+          "total": 8
+        }
+      }
+    }
+  ],
+  "cascade_test": {
+    "total": 8,
+    "skipped_768d": 6,
+    "used_768d": 2,
+    "used_7b": 8,
+    "used_175b": 0,
+    "queries": [
+      {
+        "query": "Write a simple poem",
+        "intent": "creative",
+        "confidence": "65%",
+        "used_768d": false,
+        "model": "creative-7b"
+      },
+      {
+        "query": "Deploy the app",
+        "intent": "action",
+        "confidence": "77%",
+        "used_768d": false,
+        "model": "action-7b"
+      },
+      {
+        "query": "Explain quantum mechanics in detail",
+        "intent": "reasoning",
+        "confidence": "70%",
+        "used_768d": true,
+        "model": "reasoning-7b"
+      },
+      {
+        "query": "I'm feeling sad",
+        "intent": "relationship",
+        "confidence": "94%",
+        "used_768d": false,
+        "model": "relationship-7b"
+      },
+      {
+        "query": "What is consciousness?",
+        "intent": "reasoning",
+        "confidence": "61%",
+        "used_768d": false,
+        "model": "reasoning-7b"
+      },
+      {
+        "query": "Run the tests",
+        "intent": "action",
+        "confidence": "65%",
+        "used_768d": false,
+        "model": "action-7b"
+      },
+      {
+        "query": "Analyze the socioeconomic implications of AI on la",
+        "intent": "reasoning",
+        "confidence": "65%",
+        "used_768d": true,
+        "model": "reasoning-7b"
+      },
+      {
+        "query": "Create a logo",
+        "intent": "creative",
+        "confidence": "75%",
+        "used_768d": false,
+        "model": "creative-7b"
+      }
+    ],
+    "768d_skip_rate": "75%",
+    "7b_usage_rate": "100%"
+  },
+  "search_test": [
+    {
+      "query": "machine learning algorithms",
+      "top_result": "Neural Network Fundamentals",
+      "expected": "Statistical Machine Learning",
+      "correct": false,
+      "latency_ms": "2.58"
+    },
+    {
+      "query": "emotional well-being",
+      "top_result": "Mental Health Awareness",
+      "expected": "Mental Health Awareness",
+      "correct": true,
+      "latency_ms": "1.55"
+    },
+    {
+      "query": "software deployment",
+      "top_result": "Kubernetes Deployment",
+      "expected": "Kubernetes Deployment",
+      "correct": true,
+      "latency_ms": "1.67"
+    }
+  ],
+  "entropy_test": {
+    "tier_behavior": [
+      {
+        "tier": "Tier 1 (Enterprise Search)",
+        "mode": "DIAGNOSTIC_ONLY",
+        "scenarios": [
+          {
+            "name": "Balanced Query",
+            "combined_entropy": 0.003,
+            "guna_entropy": 0.01,
+            "kosha_entropy": 0.0,
+            "gate": "ALLOW"
+          },
+          {
+            "name": "Cross-Layer Query (Emotional \u2192 Intellectual)",
+            "combined_entropy": 0.151,
+            "guna_entropy": 0.13,
+            "kosha_entropy": 0.373,
+            "gate": "ALLOW"
+          },
+          {
+            "name": "Extreme Skew (Physical \u2192 Bliss)",
+            "combined_entropy": 0.501,
+            "guna_entropy": 0.722,
+            "kosha_entropy": 0.946,
+            "gate": "ALLOW"
+          }
+        ]
+      },
+      {
+        "tier": "Tier 2 (Enterprise Chat)",
+        "mode": "MODULATION_ONLY",
+        "scenarios": [
+          {
+            "name": "Balanced Query",
+            "combined_entropy": 0.003,
+            "guna_entropy": 0.01,
+            "kosha_entropy": 0.0,
+            "gate": "ALLOW"
+          },
+          {
+            "name": "Cross-Layer Query (Emotional \u2192 Intellectual)",
+            "combined_entropy": 0.151,
+            "guna_entropy": 0.13,
+            "kosha_entropy": 0.373,
+            "gate": "ALLOW"
+          },
+          {
+            "name": "Extreme Skew (Physical \u2192 Bliss)",
+            "combined_entropy": 0.501,
+            "guna_entropy": 0.722,
+            "kosha_entropy": 0.946,
+            "gate": "ALLOW_WITH_MODULATION"
+          }
+        ]
+      },
+      {
+        "tier": "Tier 3 (Consumer)",
+        "mode": "FULL_GATING",
+        "scenarios": [
+          {
+            "name": "Balanced Query",
+            "combined_entropy": 0.003,
+            "guna_entropy": 0.01,
+            "kosha_entropy": 0.0,
+            "gate": "ALLOW"
+          },
+          {
+            "name": "Cross-Layer Query (Emotional \u2192 Intellectual)",
+            "combined_entropy": 0.151,
+            "guna_entropy": 0.13,
+            "kosha_entropy": 0.373,
+            "gate": "ALLOW"
+          },
+          {
+            "name": "Extreme Skew (Physical \u2192 Bliss)",
+            "combined_entropy": 0.501,
+            "guna_entropy": 0.722,
+            "kosha_entropy": 0.946,
+            "gate": "ALLOW_WITH_MODULATION"
+          }
+        ]
+      }
+    ],
+    "entropy_by_query_type": [
+      {
+        "query_type": "Balanced Query",
+        "expected": "low_entropy",
+        "actual_entropy": 0.003,
+        "gate": "ALLOW"
+      },
+      {
+        "query_type": "Cross-Layer Query (Emotional \u2192 Intellectual)",
+        "expected": "moderate_entropy",
+        "actual_entropy": 0.151,
+        "gate": "ALLOW"
+      },
+      {
+        "query_type": "Extreme Skew (Physical \u2192 Bliss)",
+        "expected": "high_entropy",
+        "actual_entropy": 0.501,
+        "gate": "ALLOW_WITH_MODULATION"
+      }
+    ],
+    "determinism_verified": true
+  },
+  "posture_test": {
+    "preset_profiles": [
+      {
+        "name": "BALANCED_DEFAULT",
+        "description": "Equal weighting, neutral behavior",
+        "coherence_bias": 0.34,
+        "exploration_bias": 0.33,
+        "constraint_bias": 0.33,
+        "is_balanced": true
+      },
+      {
+        "name": "CONSERVATIVE_ENTERPRISE",
+        "description": "Risk-averse, high constraint",
+        "coherence_bias": 0.35,
+        "exploration_bias": 0.15,
+        "constraint_bias": 0.5,
+        "is_balanced": false
+      },
+      {
+        "name": "EXPLORATORY_RESEARCH",
+        "description": "Adaptive, learning-oriented",
+        "coherence_bias": 0.3,
+        "exploration_bias": 0.5,
+        "constraint_bias": 0.2,
+        "is_balanced": false
+      },
+      {
+        "name": "HIGH_COHERENCE",
+        "description": "Thorough explanations, audit-focused",
+        "coherence_bias": 0.55,
+        "exploration_bias": 0.25,
+        "constraint_bias": 0.2,
+        "is_balanced": false
+      },
+      {
+        "name": "HIGH_CONSTRAINT",
+        "description": "Maximum caution, strict refusal",
+        "coherence_bias": 0.25,
+        "exploration_bias": 0.1,
+        "constraint_bias": 0.65,
+        "is_balanced": false
+      }
+    ],
+    "tier_behavior": [
+      {
+        "tier": "tier_1",
+        "description": "Enterprise Search (STL only)",
+        "allow_override": false,
+        "max_adjustment": 0.0,
+        "scopes_tested": 6,
+        "scopes_influenced": 0,
+        "influence_rate": "0%"
+      },
+      {
+        "tier": "tier_2",
+        "description": "Enterprise Chat (STL + 7B)",
+        "allow_override": true,
+        "max_adjustment": 0.08,
+        "scopes_tested": 6,
+        "scopes_influenced": 3,
+        "influence_rate": "50%"
+      },
+      {
+        "tier": "tier_3",
+        "description": "Consumer (STL + 768D + Cascade)",
+        "allow_override": true,
+        "max_adjustment": 0.1,
+        "scopes_tested": 6,
+        "scopes_influenced": 6,
+        "influence_rate": "100%"
+      }
+    ],
+    "modulation_effects": [
+      {
+        "profile": "Conservative",
+        "routing": {
+          "original": 0.5,
+          "adjusted": 0.495,
+          "delta": -0.005
+        },
+        "conservatism": {
+          "original": 0.5,
+          "adjusted": 0.545,
+          "delta": 0.045
+        },
+        "cascade": {
+          "original": 0.5,
+          "adjusted": 0.475,
+          "delta": -0.025
+        }
+      },
+      {
+        "profile": "Exploratory",
+        "routing": {
+          "original": 0.5,
+          "adjusted": 0.515,
+          "delta": 0.015
+        },
+        "conservatism": {
+          "original": 0.5,
+          "adjusted": 0.486,
+          "delta": -0.014
+        },
+        "cascade": {
+          "original": 0.5,
+          "adjusted": 0.522,
+          "delta": 0.022
+        }
+      }
+    ],
+    "determinism_verified": true,
+    "sample_audit": {
+      "decision_posture": {
+        "coherence_bias": 0.35,
+        "exploration_bias": 0.15,
+        "constraint_bias": 0.5,
+        "applied_to": [
+          "routing_threshold",
+          "response_depth",
+          "conservatism_level"
+        ],
+        "influence_scope": "non-authoritative"
+      },
+      "posture_metadata": {
+        "tier": "tier_2",
+        "source": "deployment_default",
+        "applications_count": 6,
+        "influenced_count": 3
+      }
+    }
+  }
+}

@@ -64,14 +64,17 @@ class DHAInput:
     def text_to_adapt(self) -> str:
         """Extract text to adapt from renderer output."""
         if self.renderer_output:
-            # Try common text fields
+            # Try common text fields - use existence checks, not falsy checks
+            # This ensures empty strings are returned correctly
             if isinstance(self.renderer_output, dict):
-                return (
-                    self.renderer_output.get("text", "") or
-                    self.renderer_output.get("rendered_text", "") or
-                    self.renderer_output.get("output", "") or
-                    str(self.renderer_output)
-                )
+                if "text" in self.renderer_output:
+                    return self.renderer_output["text"]
+                if "rendered_text" in self.renderer_output:
+                    return self.renderer_output["rendered_text"]
+                if "output" in self.renderer_output:
+                    return self.renderer_output["output"]
+                # Only use str() conversion as last resort
+                return str(self.renderer_output)
             return str(self.renderer_output)
         return ""
 

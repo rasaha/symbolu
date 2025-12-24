@@ -56,20 +56,29 @@ from .fusion_renderer import (
     SymbolicLayer,
     PracticalLayer,
     MirrorTruthLayer,
-    
+
     # Enums
     RenderMode,
     Domain,
-    
+
     # Constants
     REGULATED_DOMAINS,
     MODE_WEIGHTS,
-    
+
     # Convenience function
     render_fusion_output
 )
 
-__version__ = "3.0"
+from .varna_hybrid_renderer import (
+    # Varṇa-Hybrid Renderer
+    VarnaHybridRenderer,
+    HybridRenderMode,
+    VarnaAnalysisResult,
+    HybridRenderResult,
+    create_varna_hybrid_renderer,
+)
+
+__version__ = "3.1"  # Updated for Varṇa-Hybrid integration
 __author__ = "Rakesh Mohan"
 __all__ = [
     # Core classes
@@ -79,15 +88,22 @@ __all__ = [
     "SymbolicLayer",
     "PracticalLayer",
     "MirrorTruthLayer",
-    
+
     # Enums
     "RenderMode",
     "Domain",
-    
+
     # Constants
     "REGULATED_DOMAINS",
     "MODE_WEIGHTS",
-    
+
     # Functions
     "render_fusion_output",
+
+    # Varṇa-Hybrid Renderer
+    "VarnaHybridRenderer",
+    "HybridRenderMode",
+    "VarnaAnalysisResult",
+    "HybridRenderResult",
+    "create_varna_hybrid_renderer",
 ]

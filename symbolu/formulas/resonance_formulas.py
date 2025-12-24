@@ -1,10 +1,18 @@
 """
-Resonance Formulas - Phase 1 Temporal Math Formulas
-====================================================
+Resonance Formulas — Core/Substrate Utility
+============================================
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                         CORE/SUBSTRATE LAYER                                   ║
+║                                                                                ║
+║  This module is part of the Core/Substrate layer.                              ║
+║  It is NOT a pipeline phase and has no authority over intent, regime,          ║
+║  semantics, or delivery.                                                       ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
 
 Deterministic, zero-LLM formulas for temporal analysis.
 
-This module implements the four foundational formulas:
+This module computes the four foundational formulas:
 - SMI (Symbolic Mental Index): Normalized scalar of consciousness state
 - ΔSMI (delta SMI): Momentum tracking across turns
 - Bhava Gap: Distance between consciousness states in the 12-bhava cycle
@@ -13,20 +21,31 @@ This module implements the four foundational formulas:
 All formulas are deterministic with placeholder coefficients until
 final patent constants are inserted.
 
+This module:
+    - Computes temporal resonance metrics
+    - Measures consciousness state signals
+    - Does NOT interpret meaning
+    - Does NOT infer emotion or intent
+    - Does NOT affect delivery decisions
+
 ARCHITECTURAL NOTE:
-    This module contains foundational formulas for future acoustic realization
-    layers. It does NOT participate in live cognition. These formulas are:
+    This module contains foundational formulas for observation layers.
+    It does NOT participate in governance cognition. These formulas are:
 
-    - Dormant: Not connected to the live pipeline
-    - Foundational: Mathematical primitives for future P10+ layers
+    - Core/Substrate: Stateless mathematical utilities
+    - Foundational: Mathematical primitives for P10+ layers
     - Non-semantic: They do not influence intent, regime, or lexical decisions
+    - Non-authoritative: Cannot influence governance or routing decisions
 
-    PO phases and P6-P9 govern meaning and authority.
-    Acoustic realization is strictly post-lexical and deferred.
+    Authoritative phases (PO1-PO5, P6-P9) govern meaning and authority.
+    Core/Substrate formulas may only be observed by allowed sinks.
 
-    See: docs/ACOUSTIC_TOKENIZATION_STATUS.md
+    See: docs/architecture/core_vs_pipeline.md
 
-Version: 1.0 (Phase 1)
+HISTORICAL NOTE: Legacy docstrings may reference "Phase 1". This is a
+historical development label, NOT an authoritative pipeline phase.
+
+Version: 1.0 (Core/Substrate Utility)
 Date: 2025-12-09
 """
 

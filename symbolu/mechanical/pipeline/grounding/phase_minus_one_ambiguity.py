@@ -16,12 +16,17 @@ Safety Invariants:
 - If projection_risk == HIGH and would allow analysis → force analysis_allowed = False
 - Never select a candidate that would enable unsafe analytical operations
 - Prefer ASK_CLARIFY over potentially unsafe defaults
+
+Fuzzy Logic Integration (v2):
+- Accepts FuzzyQuerySignals to adjust confidence thresholds
+- Uses intent hints to tip borderline cases
+- Subject clarity can boost/reduce confidence
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, TYPE_CHECKING
 
 from .phase_minus_one_schema import (
     GroundingCandidate,
@@ -29,6 +34,9 @@ from .phase_minus_one_schema import (
     ProjectionRisk,
     ResolutionPolicy,
 )
+
+if TYPE_CHECKING:
+    from .phase_minus_one_fuzzy import FuzzyQuerySignals
 
 
 @dataclass
@@ -43,6 +51,8 @@ class AmbiguityResolution:
         top_candidates: Top 2 candidates considered
         confidence_delta: Difference between top 2 (if applicable)
         safety_override_applied: Whether a safety override was applied
+        fuzzy_adjustment_applied: Confidence adjustment from fuzzy signals
+        fuzzy_hints: Hints from fuzzy classifier for downstream
     """
     selected: Optional[GroundingCandidate]
     status: GroundingStatus
@@ -50,6 +60,12 @@ class AmbiguityResolution:
     top_candidates: List[GroundingCandidate]
     confidence_delta: float
     safety_override_applied: bool = False
+    fuzzy_adjustment_applied: float = 0.0
+    fuzzy_hints: List[str] = None
+
+    def __post_init__(self):
+        if self.fuzzy_hints is None:
+            self.fuzzy_hints = []
 
 
 class AmbiguityResolver:
@@ -94,13 +110,16 @@ class AmbiguityResolver:
             self.DELTA_THRESHOLD = delta_threshold
 
     def resolve(
-        self, candidates: List[GroundingCandidate]
+        self,
+        candidates: List[GroundingCandidate],
+        fuzzy_signals: Optional["FuzzyQuerySignals"] = None,
     ) -> AmbiguityResolution:
         """
         Resolve multiple candidates into a single selection or clarification request.
 
         Args:
             candidates: List of candidates sorted by confidence (desc).
+            fuzzy_signals: Optional fuzzy signals to adjust thresholds.
 
         Returns:
             AmbiguityResolution with selected candidate and resolution metadata.
@@ -127,22 +146,89 @@ class AmbiguityResolver:
         if second:
             top_candidates.append(second)
 
-        # Apply resolution rules
-        if top.confidence >= self.CONFIDENCE_THRESHOLD:
-            # Rule 1: High confidence → CONFIDENT
-            return self._resolve_confident(top, top_candidates, delta)
+        # Apply fuzzy adjustment to effective confidence
+        fuzzy_adjustment = 0.0
+        fuzzy_hints: List[str] = []
+
+        if fuzzy_signals is not None:
+            fuzzy_adjustment = fuzzy_signals.confidence_adjustment
+            fuzzy_hints = fuzzy_signals.hints.copy()
+
+        effective_confidence = top.confidence + fuzzy_adjustment
+
+        # Apply resolution rules with fuzzy-adjusted confidence
+        if effective_confidence >= self.CONFIDENCE_THRESHOLD:
+            # Rule 1: High effective confidence → CONFIDENT
+            resolution = self._resolve_confident(top, top_candidates, delta)
+            resolution.fuzzy_adjustment_applied = fuzzy_adjustment
+            resolution.fuzzy_hints = fuzzy_hints
+            return resolution
 
         elif second and delta < self.DELTA_THRESHOLD:
-            # Rule 2: Close candidates → ASK_CLARIFY
-            return self._resolve_ambiguous_close(top_candidates, delta)
+            # Rule 2: Close candidates → Check if fuzzy can help
+            # If fuzzy signals strongly favor one intent, reduce delta threshold
+            if fuzzy_signals and self._fuzzy_can_disambiguate(fuzzy_signals, top, second):
+                # Fuzzy signals tip the balance - allow SAFE_DEFAULT
+                resolution = self._resolve_safe_default(top, top_candidates, delta)
+                resolution.fuzzy_adjustment_applied = fuzzy_adjustment
+                resolution.fuzzy_hints = fuzzy_hints + ["fuzzy_disambiguation_applied"]
+                return resolution
+            # Otherwise ASK_CLARIFY
+            resolution = self._resolve_ambiguous_close(top_candidates, delta)
+            resolution.fuzzy_hints = fuzzy_hints
+            return resolution
 
-        elif top.confidence >= self.SAFE_DEFAULT_MIN_CONFIDENCE:
+        elif effective_confidence >= self.SAFE_DEFAULT_MIN_CONFIDENCE:
             # Rule 3: Moderate confidence → SAFE_DEFAULT with safety checks
-            return self._resolve_safe_default(top, top_candidates, delta)
+            resolution = self._resolve_safe_default(top, top_candidates, delta)
+            resolution.fuzzy_adjustment_applied = fuzzy_adjustment
+            resolution.fuzzy_hints = fuzzy_hints
+            return resolution
 
         else:
             # Rule 4: Low confidence → ASK_CLARIFY
-            return self._resolve_ambiguous_low(top_candidates, delta)
+            resolution = self._resolve_ambiguous_low(top_candidates, delta)
+            resolution.fuzzy_hints = fuzzy_hints
+            return resolution
+
+    def _fuzzy_can_disambiguate(
+        self,
+        fuzzy_signals: "FuzzyQuerySignals",
+        top: GroundingCandidate,
+        second: GroundingCandidate,
+    ) -> bool:
+        """
+        Check if fuzzy signals can help disambiguate close candidates.
+
+        Returns True if:
+        - Subject clarity is high (>= 0.7)
+        - Primary intent aligns with top candidate mode
+        - No mixed pronoun warning
+        """
+        # Need good subject clarity
+        if fuzzy_signals.subject_clarity < 0.7:
+            return False
+
+        # Check for mixed pronouns (ambiguity signal)
+        if "mixed_pronouns" in fuzzy_signals.hints:
+            return False
+
+        # Check intent alignment with observation mode
+        from .phase_minus_one_schema import ObservationMode
+        from .phase_minus_one_fuzzy import QueryIntentHint
+
+        intent_mode_alignment = {
+            QueryIntentHint.EMOTIONAL: ObservationMode.REFLEXIVE,
+            QueryIntentHint.REFLECTIVE: ObservationMode.REFLEXIVE,
+            QueryIntentHint.RELATIONAL: ObservationMode.RELATIONAL,
+            QueryIntentHint.INFORMATIONAL: ObservationMode.DETACHED,
+        }
+
+        expected_mode = intent_mode_alignment.get(fuzzy_signals.primary_intent)
+        if expected_mode and top.mode == expected_mode:
+            return True
+
+        return False
 
     def _resolve_confident(
         self,

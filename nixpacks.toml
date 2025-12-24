@@ -1,0 +1,9 @@
+# Railway/Nixpacks build configuration
+[phases.setup]
+nixPkgs = ["python311"]
+
+[phases.install]
+cmds = ["pip install -e . 'fastapi[standard]' uvicorn pydantic numpy matplotlib"]
+
+[start]
+cmd = "uvicorn symbolu.service.api_server:create_app --factory --host 0.0.0.0 --port ${PORT:-8000}"

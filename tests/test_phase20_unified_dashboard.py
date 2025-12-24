@@ -14,8 +14,8 @@ Total: ~12 tests (invariants) + comprehensive test suite via import
 
 import pytest
 
-# Import comprehensive test suite
-from symbolu.tools.unified_dashboard.tests.test_unified_dashboard import *  # noqa
+# Note: Comprehensive test suite import removed - tests directory does not exist
+# The canonical invariance tests below provide core Phase 20 coverage
 
 # Import required components for invariance tests
 from symbolu.tools.unified_dashboard.aggregators import build_unified_session_analytics

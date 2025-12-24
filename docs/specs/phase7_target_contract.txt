@@ -1,0 +1,303 @@
+PHASE-7 TARGET CONTRACT
+Version: 1.0
+Status: FROZEN
+Date: 2025-12-18
+
+================================================================================
+SECTION 1: PHASE-7 PURPOSE
+================================================================================
+
+Phase-7 Targeted Generation is a constraint satisfaction engine operating on
+deterministic simulation results. Phase-7 receives a mechanical target
+specification and produces ranked varna sequences whose Phase-6 simulation
+results satisfy the target constraints. The process is exhaustive enumeration
+within a bounded validity space, filtered by constraint evaluation, with no
+inference, learning, or interpretation. Phase-7 treats the Phase-4A ontology
+as read-only substrate and Phase-6 mechanics as the sole evaluation function.
+
+================================================================================
+SECTION 2: VALID TARGET DIMENSIONS
+================================================================================
+
+A target dimension is valid if and only if it is mechanically testable using
+Phase-6 simulation output. The following dimensions are permitted:
+
+2.1 MAGNITUDE CONSTRAINTS
+    - final_magnitude: numeric bounds on terminal magnitude value
+    - steps[i].magnitude: numeric bounds on magnitude at specific step index
+    - magnitude range: difference between maximum and minimum magnitude values
+    - magnitude delta: difference between consecutive step magnitudes
+
+2.2 LENGTH CONSTRAINTS
+    - len(steps): numeric bounds on total sequence length
+    - exact length: equality constraint on sequence length
+
+2.3 EVENT CONSTRAINTS
+    - steps[i].event: equality constraint on event type at specific index
+    - terminal event: constraint on final step event type
+    - event counts: numeric bounds on count of reset or modulate events
+
+2.4 TRAJECTORY SHAPE CONSTRAINTS
+    - monotonic_increasing(steps[].magnitude): boolean constraint
+    - monotonic_decreasing(steps[].magnitude): boolean constraint
+    - step delta signs: constraints on direction of magnitude changes
+
+2.5 COMPOSITIONAL CONSTRAINTS
+    - sequence exclusion: set of sequences to exclude from results
+    - sequence prefix: required starting subsequence
+    - sequence suffix: required ending subsequence
+
+2.6 TEMPLATE CONSTRAINTS
+    - template pattern: consonant/vowel pattern constraint (C/V notation)
+    - template prefix: required starting pattern
+    - template suffix: required ending pattern
+    - template exclusion: set of patterns to exclude
+
+Each dimension must reference only:
+    - numeric literals
+    - boolean values
+    - set membership
+    - Phase-4A token identifiers
+    - Phase-6 trajectory field names
+
+================================================================================
+SECTION 3: INVALID TARGET DIMENSIONS
+================================================================================
+
+A target dimension is invalid if it requires evaluation beyond Phase-6
+mechanics or references concepts outside the frozen ontology substrate.
+
+3.1 SEMANTIC DIMENSIONS (FORBIDDEN)
+    - meaning of sequence
+    - emotional quality
+    - expressive intent
+    - symbolic representation
+    - metaphorical association
+    - cultural significance
+
+3.2 INTERPRETIVE DIMENSIONS (FORBIDDEN)
+    - what sequence sounds like
+    - what sequence feels like
+    - what sequence represents
+    - what sequence evokes
+    - aesthetic quality
+    - beauty or harmony measures
+
+3.3 EXTERNAL REFERENCE DIMENSIONS (FORBIDDEN)
+    - similarity to natural language
+    - phonetic resemblance
+    - acoustic perception
+    - listener response
+    - contextual appropriateness
+
+3.4 PROBABILISTIC DIMENSIONS (FORBIDDEN)
+    - likelihood measures
+    - entropy measures
+    - surprise values
+    - information content
+    - statistical typicality
+
+3.5 OPTIMIZATION DIMENSIONS (FORBIDDEN)
+    - best sequence
+    - optimal choice
+    - preferred result
+    - quality ranking beyond constraint satisfaction
+
+Any target containing forbidden keywords or requiring unmeasurable evaluation
+shall be rejected with error type INVALID_TARGET_DIMENSION.
+
+================================================================================
+SECTION 4: PHASE-7 OPERATIONAL STAGES
+================================================================================
+
+Phase-7 operates in exactly four sequential stages with no feedback loops.
+
+4.1 GENERATE
+    Responsibility: Enumerate candidate varna sequences within validity space
+    Input: Generation configuration (length bounds, token sets, candidate limit)
+    Output: Ordered stream of candidate sequences
+    Constraint: Enumeration order must be deterministic and stable
+    Constraint: Only Phase-4A tokens permitted
+    Constraint: Sequences must satisfy Phase-6 grammar (consonant-initial)
+
+4.2 SIMULATE
+    Responsibility: Apply Phase-6 mechanics to each candidate sequence
+    Input: Single candidate sequence
+    Output: Complete trajectory with magnitude history and event record
+    Constraint: Uses Phase-6 vowel deltas exactly as defined
+    Constraint: Consonant resets magnitude to 1.0
+    Constraint: Vowel modulates magnitude by token-specific delta
+    Constraint: No state persists between simulations
+
+4.3 SCORE
+    Responsibility: Evaluate trajectory against target constraints
+    Input: Trajectory result and target specification
+    Output: Numeric score indicating constraint satisfaction
+    Constraint: Binary mode returns 1.0 (satisfies all) or 0.0 (fails any)
+    Constraint: Distance mode returns sum of constraint violations
+    Constraint: Evaluation uses only trajectory data, no external factors
+
+4.4 SELECT
+    Responsibility: Rank and filter scored candidates for output
+    Input: All scored candidates and selection configuration
+    Output: Ordered list of ranked results
+    Constraint: Ranking is by score, ties broken lexicographically by sequence
+    Constraint: Respects max_results limit
+    Constraint: Respects score_threshold filter
+    Constraint: Output order is deterministic
+
+================================================================================
+SECTION 5: OUTPUTS
+================================================================================
+
+Phase-7 emits exactly one Phase7Result structure containing:
+
+5.1 RESULTS
+    - Ordered tuple of RankedResult entries
+    - Each entry contains:
+        - sequence: tuple of varna tokens
+        - trajectory: complete Phase-6 simulation result
+        - score: numeric constraint satisfaction measure
+        - rank: 1-indexed position in result set
+
+5.2 METADATA
+    - candidates_generated: count of sequences enumerated
+    - candidates_simulated: count of sequences successfully simulated
+    - candidates_satisfying: count of sequences passing all constraints
+    - execution_deterministic: boolean (always true)
+    - target_feasible: boolean indicating if any solution exists
+    - early_terminated: boolean indicating if generation stopped early
+    - candidates_checked: count of candidates evaluated before termination
+    - cache_hits: count of prefix cache hits (if caching enabled)
+    - cache_misses: count of prefix cache misses (if caching enabled)
+
+5.3 ERRORS
+    - Tuple of ExecutionError entries
+    - Each error contains:
+        - error_type: enumerated error category
+        - message: mechanical description of failure
+        - sequence: offending sequence if applicable
+        - field: offending field name if applicable
+        - stage: which operational stage failed
+
+5.4 COMPLETENESS
+    - Completeness assessment of target specification
+    - Contains discrimination ratio, boundedness, triviality indicators
+
+No output field may contain:
+    - interpretation text
+    - natural language descriptions
+    - quality judgments
+    - semantic annotations
+
+================================================================================
+SECTION 6: FAILURE MODES
+================================================================================
+
+Phase-7 fails mechanically. No failure involves interpretation.
+
+6.1 INVALID_TARGET_DIMENSION
+    Trigger: Target contains semantic, emotional, or interpretive criteria
+    Response: Reject target, return error, produce no results
+
+6.2 UNKNOWN_TARGET_FIELD
+    Trigger: Target references non-existent trajectory field
+    Response: Reject target, return error, produce no results
+
+6.3 INVALID_CONSTRAINT_PATTERN
+    Trigger: Constraint syntax does not match expected patterns
+    Response: Reject constraint, return error, produce no results
+
+6.4 VACUOUS_TARGET
+    Trigger: Target specification is empty
+    Response: Reject target, return error, produce no results
+
+6.5 CONTRADICTORY_TARGET
+    Trigger: Static analysis detects unsatisfiable constraint combination
+    Response: Report contradiction, return error, produce no results
+
+6.6 SIMULATION_FAILURE
+    Trigger: Sequence contains invalid token for Phase-6 simulation
+    Response: Skip sequence, record error, continue processing
+
+6.7 INDEX_OUT_OF_BOUNDS
+    Trigger: Constraint references step index beyond sequence length
+    Response: Constraint fails for that sequence, continue processing
+
+All failures are reported via the errors tuple in Phase7Result.
+No exceptions escape the Phase-7 boundary.
+
+================================================================================
+SECTION 7: NON-GOALS (EXPLICIT)
+================================================================================
+
+Phase-7 is NOT responsible for:
+
+- Generating meaning
+- Expressing emotion
+- Creating beauty
+- Achieving harmony
+- Optimizing aesthetic quality
+- Learning from results
+- Improving over time
+- Inferring user intent
+- Interpreting targets semantically
+- Modifying Phase-4A ontology
+- Modifying Phase-6 mechanics
+- Smoothing or interpolating results
+- Predicting future usage
+- Recommending alternatives
+- Explaining why results satisfy constraints
+- Translating results to natural language
+- Evaluating cultural appropriateness
+- Determining contextual fitness
+- Performing neural network inference
+- Calling external APIs or LLMs
+- Introducing randomness
+- Caching results across executions (internal caching permitted within single execution)
+- Persisting state between invocations
+- Reading from or writing to external storage
+
+================================================================================
+SECTION 8: FREEZE CONDITIONS
+================================================================================
+
+Phase-7 Target Contract is FROZEN when all conditions are met:
+
+8.1 COMPLETENESS
+    - All four operational stages are specified
+    - All valid target dimensions are enumerated
+    - All invalid target dimensions are enumerated
+    - All failure modes are catalogued
+    - All non-goals are explicitly stated
+
+8.2 TESTABILITY
+    - Every valid target dimension can be evaluated mechanically
+    - Every invalid target dimension can be detected statically
+    - Every failure mode can be triggered and verified
+    - Every output field can be validated programmatically
+
+8.3 DETERMINISM
+    - Same target + same generation config + same selection config = same results
+    - Execution order does not affect output
+    - No timestamp or random components in any output
+    - Results reproducible across process invocations
+
+8.4 ISOLATION
+    - Phase-7 does not modify Phase-4A substrate
+    - Phase-7 does not modify Phase-6 mechanics
+    - Phase-7 does not require Phase-8 or later phases
+    - Phase-7 operates with only the interfaces defined in this contract
+
+8.5 NON-SEMANTIC ENFORCEMENT
+    - No semantic keywords appear in implementation
+    - No natural language generation occurs
+    - No interpretation logic exists
+    - Red flag tests pass for all forbidden terms
+
+This contract is now FROZEN. Any modification requires versioning and
+re-validation of all freeze conditions.
+
+================================================================================
+END OF PHASE-7 TARGET CONTRACT
+================================================================================

@@ -1,6 +1,13 @@
 """
 P23 - Inner-Outer Alignment Observer Resolver
 
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                    OBSERVER PHASE — WITNESS ONLY                               ║
+║                                                                                ║
+║  This phase may observe and summarize internal signals.                        ║
+║  It may NOT influence regime, discourse, semantics, lexicon, or policy.        ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
 This phase is observer-only and non-authoritative.
 
 Observes alignment between internal acoustic pressure (from P22) and
@@ -228,7 +235,7 @@ class AlignmentObserver:
         This is the main entry point. It:
             1. Computes regime pressure allowance
             2. Compares actual pressure to allowed pressure
-            3. Determines alignment state
+            3. Computes alignment state (observes without deciding)
             4. Applies discourse compatibility adjustments
             5. Returns a frozen alignment report
 

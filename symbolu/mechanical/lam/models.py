@@ -40,7 +40,9 @@ class LAMInput:
         bhava_id: Bhava state identifier.
         bhava_direction: Direction of bhava ("upward", "downward", "stable").
         kosha_id: Kosha layer identifier.
-        ontology_id: Ontology state identifier.
+        ontology_id: Ontological layer identifier (1-10), mapping to:
+                    Lower 5 (1-5): O1_action, O2_tagging, O3_forming, O4_thinking, O5_directing
+                    Upper 5 (6-10): O6_reasoning, O7_purposing, O8_meta_observing, O9_unifying, O10_absolving
         domain: Domain classification (finance, medicine, psychology, etc.)
         long_arc_tension: TTOR long-arc tension signal (0.0 to 1.0).
         temporal_tracker: Reference to TemporalBhavaTracker instance.

@@ -1,0 +1,13 @@
+{
+  "id": "gov-001",
+  "title": "AI Transparency Requirements for Enterprise Systems",
+  "domain": "ai-governance",
+  "tags": ["transparency", "compliance", "enterprise", "audit"],
+  "content": "Enterprise AI systems must maintain transparency through several key mechanisms:\n\n1. **Decision Audit Trails**: Every AI-generated decision should be traceable to its input data, model version, and reasoning pathway. This includes maintaining logs of confidence scores, alternative options considered, and the factors that influenced the final output.\n\n2. **Explainability Standards**: Organizations should implement explainability at three levels:\n   - Technical: Model architecture and training data documentation\n   - Operational: Clear reasoning chains for each decision\n   - User-facing: Plain-language explanations for end users\n\n3. **Bias Detection and Reporting**: Regular audits must assess AI outputs for demographic bias, with quarterly reports submitted to governance boards.\n\n4. **Model Cards**: Each deployed model requires a standardized model card documenting its intended use cases, limitations, training data characteristics, and performance metrics across different user segments.\n\n5. **Human Oversight Requirements**: Critical decisions require human review when confidence scores fall below 85% or when the decision impacts user rights, finances, or safety.",
+  "metadata": {
+    "author": "AI Governance Council",
+    "last_updated": "2025-01-15",
+    "version": "2.1",
+    "compliance_frameworks": ["EU AI Act", "NIST AI RMF", "ISO 42001"]
+  }
+}

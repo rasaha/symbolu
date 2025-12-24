@@ -2,14 +2,14 @@ name: Core & RAG CI
 
 on:
   push:
-    branches: ["main", "master"]
+    branches: ["main", "master", "dev", "claude/**"]
     paths:
       - "symbolu/core/**"
       - "symbolu/rag/**"
       - "symbolu/mechanical/pipeline/integration_tests/test_core_rag_integration.py"
       - ".github/workflows/core-rag-ci.yml"
   pull_request:
-    branches: ["main", "master"]
+    branches: ["main", "master", "dev", "claude/**"]
     paths:
       - "symbolu/core/**"
       - "symbolu/rag/**"
