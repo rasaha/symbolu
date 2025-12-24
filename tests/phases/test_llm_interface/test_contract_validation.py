@@ -54,7 +54,7 @@ from symbolu.llm.validator import (
 def basic_envelope() -> Envelope:
     """Basic envelope with limited tokens and layers."""
     return Envelope(
-        allowed_layers=frozenset({"O1_THINKING", "O3_ACTING", "O5_DIRECTING"}),
+        allowed_layers=frozenset({"O5_COGNITION", "O3_EXECUTION", "O6_AGENCY"}),
         allowed_tokens=frozenset({"ka", "a", "i", "u"}),
         allowed_templates=frozenset({"CVC", "CV"}),
         constraints=Constraints(

@@ -271,7 +271,7 @@ symbolu/
 ### 3.1 Phoneme Resonance Engine (`symbolu/resonance/`)
 
 #### Purpose
-Convert words to 10-dimensional ontological vectors based on phoneme structure.
+Convert words to 12-dimensional ontological vectors based on phoneme structure.
 
 #### Key Types
 
@@ -300,16 +300,16 @@ class ResonanceResult:
 
 | Index | Layer | Meaning | Phoneme Affinity |
 |-------|-------|---------|------------------|
-| 0 | O1_THINKING | Contemplation | Nasals, fricatives |
-| 1 | O2_FORMING | Structure, creation | Liquids, glides |
-| 2 | O3_ACTING | Action, force | Plosives |
+| 0 | O5_COGNITION | Contemplation | Nasals, fricatives |
+| 1 | O4_STRUCTURE | Structure, creation | Liquids, glides |
+| 2 | O3_EXECUTION | Action, force | Plosives |
 | 3 | O4_TAGGING | Classification | Short vowels |
-| 4 | O5_DIRECTING | Guidance | Fricatives, plosives |
-| 5 | O6_REASONING | Logic, analysis | Fricatives |
-| 6 | O7_PURPOSING | Intent, goals | Diphthongs |
-| 7 | O8_META_OBSERVING | Awareness | Long vowels |
-| 8 | O9_UNIFYING | Connection | Nasals, liquids |
-| 9 | O10_ABSOLVING | Transcendence | Long vowels, breath |
+| 4 | O6_AGENCY | Guidance | Fricatives, plosives |
+| 5 | O7_REASONING | Logic, analysis | Fricatives |
+| 6 | O8_PURPOSE | Intent, goals | Diphthongs |
+| 7 | O9_WITNESSES | Awareness | Long vowels |
+| 8 | O10_UNIFYING | Connection | Nasals, liquids |
+| 9 | O12_ABSOLVING | Transcendence | Long vowels, breath |
 
 ### 3.2 Phoneme Attention Head (`symbolu/hybrid/attention.py`)
 
@@ -320,7 +320,7 @@ Replace learned attention weights with deterministic phoneme similarity.
 
 ```python
 def compute_attention(tokens):
-    # 1. Convert tokens to 10D vectors
+    # 1. Convert tokens to 12D vectors
     vectors = [word_to_vector(t) for t in tokens]
 
     # 2. Compute pairwise cosine similarity
@@ -393,12 +393,12 @@ Route queries to specialized sub-models based on phoneme signature.
 
 | Dominant Layer | Model Type | Example Query |
 |---------------|------------|---------------|
-| O9_UNIFYING | RELATIONSHIP | "Love conquers all" |
-| O6_REASONING | REASONING | "Calculate the sum" |
-| O3_ACTING | ACTION | "Run the build" |
-| O2_FORMING | CREATIVE | "Create a poem" |
-| O1_THINKING | REFLECTIVE | "What is consciousness" |
-| O10_ABSOLVING | TRANSCENDENT | "The meaning of existence" |
+| O10_UNIFYING | RELATIONSHIP | "Love conquers all" |
+| O7_REASONING | REASONING | "Calculate the sum" |
+| O3_EXECUTION | ACTION | "Run the build" |
+| O4_STRUCTURE | CREATIVE | "Create a poem" |
+| O5_COGNITION | REFLECTIVE | "What is consciousness" |
+| O12_ABSOLVING | TRANSCENDENT | "The meaning of existence" |
 
 #### Savings
 
@@ -465,7 +465,7 @@ With Routing:
 │    word="love",                                                  │
 │    phonemes=("L", "AH", "V"),                                   │
 │    vector=(0.33, 0.40, 0.21, ...),  # 10 dimensions             │
-│    dominant_layer="O9_UNIFYING",                                 │
+│    dominant_layer="O10_UNIFYING",                                 │
 │    dominant_score=0.40                                           │
 │  )                                                               │
 │                                                                  │
@@ -853,7 +853,7 @@ from symbolu.hybrid import (
 
 Word: love
 Phonemes: ('L', 'AH', 'V')
-Dominant: O9_UNIFYING (0.40)
+Dominant: O10_UNIFYING (0.40)
 ```
 
 ### Phrase Comparison
@@ -880,7 +880,7 @@ Insight: Both phrases have similar phonetic harmony.
 >>> print(f"Dominant layers: {result.dominant_layers}")
 
 FLOPs: 207
-Dominant layers: ('O9_UNIFYING', 'O9_UNIFYING', 'O3_ACTING')
+Dominant layers: ('O10_UNIFYING', 'O10_UNIFYING', 'O3_EXECUTION')
 ```
 
 ---

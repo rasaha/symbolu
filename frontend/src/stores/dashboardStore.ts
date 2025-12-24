@@ -144,8 +144,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       // Set mock data
       set({
         whatIfResult: {
-          original: { entropy: 0.42, dominant_dimension: 'O1_THINKING' },
-          simulated: { entropy: 0.36, dominant_dimension: 'O8_META_OBSERVING' },
+          original: { entropy: 0.42, dominant_dimension: 'O5_COGNITION' },
+          simulated: { entropy: 0.36, dominant_dimension: 'O9_WITNESSES' },
           preset,
           delta: -0.06,
         },

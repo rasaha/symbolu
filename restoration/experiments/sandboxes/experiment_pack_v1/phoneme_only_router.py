@@ -91,71 +91,71 @@ class VarnaMatch:
 # content of bridge_meaning names in varna_bridge_map_v1.json
 #
 # Design principles:
-#   - Cognitive meanings → O1_THINKING
-#   - Formation/creation → O2_FORMING
-#   - Action/doing → O3_ACTING
+#   - Cognitive meanings → O5_COGNITION
+#   - Formation/creation → O4_STRUCTURE
+#   - Action/doing → O3_EXECUTION
 #   - Identification/labeling → O4_TAGGING
-#   - Direction/guidance → O5_DIRECTING
-#   - Causation/reasoning → O6_REASONING
-#   - Purpose/intention → O7_PURPOSING
-#   - Observation/awareness → O8_META_OBSERVING
-#   - Integration/unity → O9_UNIFYING
-#   - Resolution/release → O10_ABSOLVING
+#   - Direction/guidance → O6_AGENCY
+#   - Causation/reasoning → O7_REASONING
+#   - Purpose/intention → O8_PURPOSE
+#   - Observation/awareness → O9_WITNESSES
+#   - Integration/unity → O10_UNIFYING
+#   - Resolution/release → O12_ABSOLVING
 
 BRIDGE_MEANING_TO_LAYER: Dict[str, OntologicalLayer] = {
     # Vowel bridge meanings
-    "birth_of_cognition": OntologicalLayer.O1_THINKING,
-    "practical_cognition": OntologicalLayer.O1_THINKING,
-    "self_doing": OntologicalLayer.O3_ACTING,
-    "closure_completion": OntologicalLayer.O10_ABSOLVING,
-    "contraction_focus": OntologicalLayer.O2_FORMING,
+    "birth_of_cognition": OntologicalLayer.O5_COGNITION,
+    "practical_cognition": OntologicalLayer.O5_COGNITION,
+    "self_doing": OntologicalLayer.O3_EXECUTION,
+    "closure_completion": OntologicalLayer.O12_ABSOLVING,
+    "contraction_focus": OntologicalLayer.O4_STRUCTURE,
 
     # Ka-varga consonants (throat)
-    "hope_pressure": OntologicalLayer.O7_PURPOSING,
-    "worry_pressure": OntologicalLayer.O1_THINKING,
-    "action_pressure": OntologicalLayer.O3_ACTING,
+    "hope_pressure": OntologicalLayer.O8_PURPOSE,
+    "worry_pressure": OntologicalLayer.O5_COGNITION,
+    "action_pressure": OntologicalLayer.O3_EXECUTION,
     "attachment_pressure": OntologicalLayer.O4_TAGGING,
     "vanity_pressure": OntologicalLayer.O4_TAGGING,
 
     # Ca-varga consonants (palate)
-    "scatter_pressure": OntologicalLayer.O6_REASONING,
-    "nervous_pressure": OntologicalLayer.O8_META_OBSERVING,
-    "greed_pressure": OntologicalLayer.O7_PURPOSING,
-    "hypocrisy_pressure": OntologicalLayer.O5_DIRECTING,
+    "scatter_pressure": OntologicalLayer.O7_REASONING,
+    "nervous_pressure": OntologicalLayer.O9_WITNESSES,
+    "greed_pressure": OntologicalLayer.O8_PURPOSE,
+    "hypocrisy_pressure": OntologicalLayer.O6_AGENCY,
 
     # Tta-varga consonants (retroflex)
-    "overstatement_pressure": OntologicalLayer.O5_DIRECTING,
-    "repentance_pressure": OntologicalLayer.O10_ABSOLVING,
-    "shyness_pressure": OntologicalLayer.O8_META_OBSERVING,
-    "cruelty_pressure": OntologicalLayer.O5_DIRECTING,
+    "overstatement_pressure": OntologicalLayer.O6_AGENCY,
+    "repentance_pressure": OntologicalLayer.O12_ABSOLVING,
+    "shyness_pressure": OntologicalLayer.O9_WITNESSES,
+    "cruelty_pressure": OntologicalLayer.O6_AGENCY,
     "envy_pressure": OntologicalLayer.O4_TAGGING,
 
     # Ta-varga consonants (dental)
-    "inertia_pressure": OntologicalLayer.O6_REASONING,
-    "melancholy_pressure": OntologicalLayer.O8_META_OBSERVING,
-    "irritability_pressure": OntologicalLayer.O3_ACTING,
-    "craving_pressure": OntologicalLayer.O7_PURPOSING,
+    "inertia_pressure": OntologicalLayer.O7_REASONING,
+    "melancholy_pressure": OntologicalLayer.O9_WITNESSES,
+    "irritability_pressure": OntologicalLayer.O3_EXECUTION,
+    "craving_pressure": OntologicalLayer.O8_PURPOSE,
 
     # Pa-varga consonants (labial)
-    "revulsion_pressure": OntologicalLayer.O8_META_OBSERVING,
-    "fear_pressure": OntologicalLayer.O8_META_OBSERVING,
-    "indifference_pressure": OntologicalLayer.O10_ABSOLVING,
-    "delusion_pressure": OntologicalLayer.O1_THINKING,
-    "indulgence_pressure": OntologicalLayer.O7_PURPOSING,
+    "revulsion_pressure": OntologicalLayer.O9_WITNESSES,
+    "fear_pressure": OntologicalLayer.O9_WITNESSES,
+    "indifference_pressure": OntologicalLayer.O12_ABSOLVING,
+    "delusion_pressure": OntologicalLayer.O5_COGNITION,
+    "indulgence_pressure": OntologicalLayer.O8_PURPOSE,
 
     # Semi-vowels (ya, ra, la, va)
-    "distrust_pressure": OntologicalLayer.O8_META_OBSERVING,
-    "destruction_pressure": OntologicalLayer.O3_ACTING,
-    "external_dharma_pressure": OntologicalLayer.O9_UNIFYING,
+    "distrust_pressure": OntologicalLayer.O9_WITNESSES,
+    "destruction_pressure": OntologicalLayer.O3_EXECUTION,
+    "external_dharma_pressure": OntologicalLayer.O10_UNIFYING,
 
     # Sibilants (sha, ssa, sa)
-    "material_greed_pressure": OntologicalLayer.O7_PURPOSING,
-    "lust_confusion_pressure": OntologicalLayer.O2_FORMING,
-    "escape_pressure": OntologicalLayer.O10_ABSOLVING,
+    "material_greed_pressure": OntologicalLayer.O8_PURPOSE,
+    "lust_confusion_pressure": OntologicalLayer.O4_STRUCTURE,
+    "escape_pressure": OntologicalLayer.O12_ABSOLVING,
 
     # Aspirate and conjunct
-    "ignorance_pressure": OntologicalLayer.O1_THINKING,
-    "false_knowledge_pressure": OntologicalLayer.O6_REASONING,
+    "ignorance_pressure": OntologicalLayer.O5_COGNITION,
+    "false_knowledge_pressure": OntologicalLayer.O7_REASONING,
 }
 
 # UNKNOWN bridge meaning routing - explicitly routes to a neutral layer

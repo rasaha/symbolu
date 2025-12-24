@@ -25,29 +25,29 @@ from symbolu.ontological.types import TrainingExample, TaskType, LAYER_NAMES
 # Domain to ontological layer mappings
 DOMAIN_TO_LAYERS: Dict[str, Dict[str, float]] = {
     # Technical/Reasoning domains
-    "technical": {"O6_REASONING": 0.8, "O1_THINKING": 0.6, "O8_META_OBSERVING": 0.5},
-    "api-reference": {"O6_REASONING": 0.9, "O3_ACTING": 0.7},
-    "architecture": {"O6_REASONING": 0.8, "O2_FORMING": 0.6, "O1_THINKING": 0.7},
-    "deployment": {"O3_ACTING": 0.8, "O5_DIRECTING": 0.7},
-    "troubleshooting": {"O6_REASONING": 0.7, "O3_ACTING": 0.6},
+    "technical": {"O7_REASONING": 0.8, "O5_COGNITION": 0.6, "O9_WITNESSES": 0.5},
+    "api-reference": {"O7_REASONING": 0.9, "O3_EXECUTION": 0.7},
+    "architecture": {"O7_REASONING": 0.8, "O4_STRUCTURE": 0.6, "O5_COGNITION": 0.7},
+    "deployment": {"O3_EXECUTION": 0.8, "O6_AGENCY": 0.7},
+    "troubleshooting": {"O7_REASONING": 0.7, "O3_EXECUTION": 0.6},
 
     # Governance/Ethics domains
-    "ai-governance": {"O6_REASONING": 0.7, "O7_PURPOSING": 0.8, "O8_META_OBSERVING": 0.7},
-    "responsible-ai": {"O7_PURPOSING": 0.9, "O9_UNIFYING": 0.7, "O8_META_OBSERVING": 0.6},
-    "ethics": {"O1_THINKING": 0.8, "O7_PURPOSING": 0.8, "O9_UNIFYING": 0.6},
-    "compliance": {"O5_DIRECTING": 0.8, "O6_REASONING": 0.7},
+    "ai-governance": {"O7_REASONING": 0.7, "O8_PURPOSE": 0.8, "O9_WITNESSES": 0.7},
+    "responsible-ai": {"O8_PURPOSE": 0.9, "O10_UNIFYING": 0.7, "O9_WITNESSES": 0.6},
+    "ethics": {"O5_COGNITION": 0.8, "O8_PURPOSE": 0.8, "O10_UNIFYING": 0.6},
+    "compliance": {"O6_AGENCY": 0.8, "O7_REASONING": 0.7},
 
     # Creative domains
-    "creative": {"O2_FORMING": 0.9, "O9_UNIFYING": 0.6},
-    "design": {"O2_FORMING": 0.8, "O7_PURPOSING": 0.6},
-    "writing": {"O2_FORMING": 0.8, "O4_TAGGING": 0.5},
+    "creative": {"O4_STRUCTURE": 0.9, "O10_UNIFYING": 0.6},
+    "design": {"O4_STRUCTURE": 0.8, "O8_PURPOSE": 0.6},
+    "writing": {"O4_STRUCTURE": 0.8, "O4_TAGGING": 0.5},
 
     # Action domains
-    "procedural": {"O3_ACTING": 0.9, "O5_DIRECTING": 0.7},
-    "instructions": {"O5_DIRECTING": 0.8, "O3_ACTING": 0.7},
+    "procedural": {"O3_EXECUTION": 0.9, "O6_AGENCY": 0.7},
+    "instructions": {"O6_AGENCY": 0.8, "O3_EXECUTION": 0.7},
 
     # Default
-    "general": {"O1_THINKING": 0.5},
+    "general": {"O5_COGNITION": 0.5},
 }
 
 # Tag to task type mappings
@@ -202,7 +202,7 @@ class RAGDataLoader:
                     if layer not in labels or score > labels[layer]:
                         labels[layer] = score
 
-        return labels if labels else {"O1_THINKING": 0.5}
+        return labels if labels else {"O5_COGNITION": 0.5}
 
     def _get_task_type(self, doc: RAGDocument) -> Optional[TaskType]:
         """Determine task type from tags."""
@@ -319,7 +319,7 @@ class SyntheticDataGenerator:
 
             examples.append(TrainingExample(
                 text=text,
-                dimension_labels={"O6_REASONING": 0.9, "O1_THINKING": 0.7},
+                dimension_labels={"O7_REASONING": 0.9, "O5_COGNITION": 0.7},
                 task_type=TaskType.REASONING,
                 reasoning_label=0.9,
                 source="synthetic:reasoning",
@@ -335,7 +335,7 @@ class SyntheticDataGenerator:
 
             examples.append(TrainingExample(
                 text=text,
-                dimension_labels={"O2_FORMING": 0.9, "O9_UNIFYING": 0.6},
+                dimension_labels={"O4_STRUCTURE": 0.9, "O10_UNIFYING": 0.6},
                 task_type=TaskType.CREATIVITY,
                 creativity_label=0.9,
                 source="synthetic:creativity",
@@ -351,7 +351,7 @@ class SyntheticDataGenerator:
 
             examples.append(TrainingExample(
                 text=text,
-                dimension_labels={"O3_ACTING": 0.9, "O5_DIRECTING": 0.7},
+                dimension_labels={"O3_EXECUTION": 0.9, "O6_AGENCY": 0.7},
                 task_type=TaskType.ACTION,
                 source="synthetic:action",
             ))
@@ -366,7 +366,7 @@ class SyntheticDataGenerator:
 
             examples.append(TrainingExample(
                 text=text,
-                dimension_labels={"O1_THINKING": 0.9, "O8_META_OBSERVING": 0.7},
+                dimension_labels={"O5_COGNITION": 0.9, "O9_WITNESSES": 0.7},
                 task_type=TaskType.REFLECTION,
                 source="synthetic:reflection",
             ))

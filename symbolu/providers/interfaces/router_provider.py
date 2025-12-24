@@ -42,7 +42,7 @@ class RoutingDecision:
     Attributes:
         model_type: The type of specialized model to route to
         confidence: Confidence score for the routing decision (0.0 to 1.0)
-        dominant_layer: The dominant ontological layer (e.g., "O6_REASONING")
+        dominant_layer: The dominant ontological layer (e.g., "O7_REASONING")
         layer_scores: Top layers with their scores
         trace: Implementation-specific trace info for debugging/auditing
     """

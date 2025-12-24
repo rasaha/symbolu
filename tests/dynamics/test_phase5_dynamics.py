@@ -88,7 +88,7 @@ class TestFlatGradientStress:
         """
         result = resolve_dynamics(
             varna="ddha",
-            start_layer="O5_DIRECTING",
+            start_layer="O6_AGENCY",
             load=0.8,
             time_steps=20,
             decay_constant=0.05,
@@ -170,7 +170,7 @@ class TestRegression:
         """
         result = resolve_dynamics(
             varna="kha",  # 'kha' has degenerative tendency
-            start_layer="O7_PURPOSING",
+            start_layer="O8_PURPOSE",
             load=0.9,  # High load
             time_steps=30,
             decay_constant=0.05,
@@ -196,7 +196,7 @@ class TestRegression:
         """
         result = resolve_dynamics(
             varna="kha",
-            start_layer="O7_PURPOSING",
+            start_layer="O8_PURPOSE",
             load=0.9,
             time_steps=20,
             decay_constant=0.05,
@@ -216,7 +216,7 @@ class TestRegression:
         # Load below threshold
         result_low = resolve_dynamics(
             varna="kha",
-            start_layer="O5_DIRECTING",
+            start_layer="O6_AGENCY",
             load=0.5,  # Below threshold
             time_steps=15,
             decay_constant=0.1,
@@ -228,7 +228,7 @@ class TestRegression:
         # Load above threshold
         result_high = resolve_dynamics(
             varna="kha",
-            start_layer="O5_DIRECTING",
+            start_layer="O6_AGENCY",
             load=0.85,  # Above threshold
             time_steps=15,
             decay_constant=0.1,
@@ -248,12 +248,12 @@ class TestRegression:
         from symbolu.ontology.phase4a.lookup import lookup_interaction
 
         # Get ontology value before
-        before = lookup_interaction("kha", "O5_DIRECTING")
+        before = lookup_interaction("kha", "O6_AGENCY")
 
         # Run dynamics with regression
         resolve_dynamics(
             varna="kha",
-            start_layer="O5_DIRECTING",
+            start_layer="O6_AGENCY",
             load=0.9,
             time_steps=20,
             decay_constant=0.1,
@@ -262,7 +262,7 @@ class TestRegression:
         )
 
         # Get ontology value after
-        after = lookup_interaction("kha", "O5_DIRECTING")
+        after = lookup_interaction("kha", "O6_AGENCY")
 
         # Ontology should be unchanged
         assert before.distortion_vector == after.distortion_vector
@@ -794,7 +794,7 @@ class TestO8Handling:
         # Start at O7, should pass through O8
         result = resolve_dynamics(
             varna="ga",  # Constructive, likely to move upward
-            start_layer="O7_PURPOSING",
+            start_layer="O8_PURPOSE",
             load=0.2,
             time_steps=15,
             decay_constant=0.05,
@@ -804,7 +804,7 @@ class TestO8Handling:
         )
 
         # Find states at O8
-        o8_states = [s for s in result.trajectory if s.layer_id == "O8_META_OBSERVING"]
+        o8_states = [s for s in result.trajectory if s.layer_id == "O9_WITNESSES"]
 
         # O8 states should exist and show damping effects
         # (momentum magnitude should be lower relative to surrounding layers)
@@ -828,7 +828,7 @@ class TestTermination:
         """
         result = resolve_dynamics(
             varna="ga",
-            start_layer="O9_UNIFYING",
+            start_layer="O10_UNIFYING",
             load=0.1,  # Low load to encourage upward movement
             time_steps=20,
             decay_constant=0.05,
@@ -856,7 +856,7 @@ class TestTermination:
         """
         result = resolve_dynamics(
             varna="ga",
-            start_layer="O9_UNIFYING",
+            start_layer="O10_UNIFYING",
             load=0.1,
             time_steps=30,
             decay_constant=0.05,
@@ -874,7 +874,7 @@ class TestTermination:
 
             if termination_point is not None:
                 for i in range(termination_point, len(result.trajectory)):
-                    assert result.trajectory[i].layer_id == "O10_ABSOLVING", \
+                    assert result.trajectory[i].layer_id == "O12_ABSOLVING", \
                         "Should remain at O10 after termination"
 
 
@@ -893,7 +893,7 @@ class TestSaturation:
         """
         result = resolve_dynamics(
             varna="ga",
-            start_layer="O8_META_OBSERVING",
+            start_layer="O9_WITNESSES",
             load=0.1,
             time_steps=20,
             decay_constant=0.02,  # Low decay

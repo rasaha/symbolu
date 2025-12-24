@@ -138,16 +138,16 @@ BACKBONE_TO_RESONANCE: Dict[Dimension, int] = {
 }
 
 RESONANCE_LAYER_NAMES = (
-    "O1_THINKING",
-    "O2_FORMING",
-    "O3_ACTING",
+    "O5_COGNITION",
+    "O4_STRUCTURE",
+    "O3_EXECUTION",
     "O4_TAGGING",
-    "O5_DIRECTING",
-    "O6_REASONING",
-    "O7_PURPOSING",
-    "O8_META_OBSERVING",
-    "O9_UNIFYING",
-    "O10_ABSOLVING",
+    "O6_AGENCY",
+    "O7_REASONING",
+    "O8_PURPOSE",
+    "O9_WITNESSES",
+    "O10_UNIFYING",
+    "O12_ABSOLVING",
 )
 
 
@@ -742,7 +742,7 @@ def validate_word_pair(
     harmony_score = (combined_alignment * 0.5) + (structural_sim * 0.2) + (combined_unifying * 0.3)
 
     # Bonus for shared purpose layers
-    purpose_layers = {"O3_ACTING", "O2_FORMING", "O7_PURPOSING", "O9_UNIFYING"}
+    purpose_layers = {"O3_EXECUTION", "O4_STRUCTURE", "O8_PURPOSE", "O10_UNIFYING"}
     purpose_shared = len([l for l in shared if l in purpose_layers])
     harmony_score += purpose_shared * 0.02
 

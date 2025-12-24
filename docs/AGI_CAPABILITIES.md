@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Symbol-U implements a **10-dimensional ontological backbone** structured as **5 mirror pairs** that enables cross-domain reasoning without domain-specific training. By encoding all knowledge into a universal cognitive-mathematical structure with **event tagging**, **persona-based pattern discovery**, and **phoneme-based consistency validation**, the system can transfer insights across history, science, literature, finance, biology, and any other domain—a foundational capability for domain-agnostic reasoning.
+Symbol-U implements a **12-dimensional ontological backbone** structured as **5 mirror pairs** that enables cross-domain reasoning without domain-specific training. By encoding all knowledge into a universal cognitive-mathematical structure with **event tagging**, **persona-based pattern discovery**, and **phoneme-based consistency validation**, the system can transfer insights across history, science, literature, finance, biology, and any other domain—a foundational capability for domain-agnostic reasoning.
 
 **The key innovation:** The phoneme model provides an orthogonal consistency check—correlating articulation patterns with encoded event structure. Only structurally consistent patterns survive to storage. The system is self-consistent, self-filtering, and self-auditing.
 
@@ -30,7 +30,7 @@ Symbol-U implements a **10-dimensional ontological backbone** structured as **5 
 
 ### 1. Mirror Pair Architecture (The Simplification)
 
-The 10D space is not 10 independent dimensions—it's **5 mirror pairs** where lower (concrete) dimensions balance with higher (abstract) dimensions:
+The 12D space is not 10 independent dimensions—it's **5 mirror pairs** where lower (concrete) dimensions balance with higher (abstract) dimensions:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -208,7 +208,7 @@ Event → Words describing event → Phoneme analysis → Consistent encoding?
 
 1. User describes an event: "The empire was shattered by internal conflict"
 2. Extract key words: ["shattered", "conflict"]
-3. Get phoneme 10D vectors for each word (from resonance engine)
+3. Get phoneme 12D vectors for each word (from resonance engine)
 4. Get event 10D vector (from backbone encoder)
 5. Compare: Do the articulation patterns correlate with the event encoding?
 
@@ -642,7 +642,7 @@ Priority 2: 10D STRUCTURAL SIMILARITY (Weight: 0.3)
    [0.2, 0.4, 0.7, 0.3, ...]
    ↑
    FALLBACK when causal chains aren't explicit
-   Vector similarity in 10D space
+   Vector similarity in 12D space
 
 Priority 3: PATTERN TYPE (Weight: 0.1)
 ─────────────────────────────────────────
@@ -783,7 +783,7 @@ if not structural_match.is_valid:
 
 | Metric | Threshold | What It Measures |
 |--------|-----------|------------------|
-| 10D Similarity | ≥ 0.5 | Vector cosine in 10D space |
+| 10D Similarity | ≥ 0.5 | Vector cosine in 12D space |
 | Causal Overlap | ≥ 0.3 | LCS ratio of causal chains |
 | Shared Events | ≥ 2 | Common event types |
 | Combined Score | ≥ 0.4 | Weighted (0.6×causal + 0.3×10D + 0.1×events) |

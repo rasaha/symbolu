@@ -462,7 +462,7 @@ def generate_reasoning_examples(n: int = 100) -> List[TrainingExample]:
 
         example = TrainingExample(
             text=text,
-            dimension_labels={"O6_REASONING": 0.9, "O1_THINKING": 0.6},
+            dimension_labels={"O7_REASONING": 0.9, "O5_COGNITION": 0.6},
             task_type=None,
             reasoning_label=0.9,
             source="synthetic_reasoning",
@@ -498,7 +498,7 @@ def generate_creativity_examples(n: int = 100) -> List[TrainingExample]:
 
         example = TrainingExample(
             text=text,
-            dimension_labels={"O2_FORMING": 0.9, "O9_UNIFYING": 0.6},
+            dimension_labels={"O4_STRUCTURE": 0.9, "O10_UNIFYING": 0.6},
             task_type=None,
             creativity_label=0.9,
             source="synthetic_creativity",

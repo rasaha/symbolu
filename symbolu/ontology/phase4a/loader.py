@@ -82,15 +82,15 @@ REQUIRED_INTERACTION_FIELDS = frozenset({
 # Valid layer IDs (O1 through O10)
 VALID_LAYER_IDS = frozenset({
     "O1_ACTING",
-    "O2_TAGGING",
+    "O2_IDENTITY",
     "O3_FORMING",
     "O4_THINKING",
-    "O5_DIRECTING",
-    "O6_REASONING",
-    "O7_PURPOSING",
-    "O8_META_OBSERVING",
-    "O9_UNIFYING",
-    "O10_ABSOLVING",
+    "O6_AGENCY",
+    "O7_REASONING",
+    "O8_PURPOSE",
+    "O9_WITNESSES",
+    "O10_UNIFYING",
+    "O12_ABSOLVING",
 })
 
 

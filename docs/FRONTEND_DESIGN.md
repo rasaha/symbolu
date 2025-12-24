@@ -134,7 +134,7 @@ Detailed breakdown of the current response.
 │  ├─────────────────────────────────────────────────────┤    │
 │  │ Fusion Score: 0.82                                   │    │
 │  │ Selected Source: reasoning_model                     │    │
-│  │ Reasoning: High O1_THINKING activation detected...   │    │
+│  │ Reasoning: High O5_COGNITION activation detected...   │    │
 │  └─────────────────────────────────────────────────────┘    │
 │                                                              │
 │  ┌─────────────────────────────────────────────────────┐    │
@@ -157,11 +157,11 @@ Detailed breakdown of the current response.
 │  │ 10D ONTOLOGICAL PROFILE                              │    │
 │  ├─────────────────────────────────────────────────────┤    │
 │  │                                                      │    │
-│  │  O1_THINKING    ████████████░░ 0.62                 │    │
-│  │  O2_FORMING     ████░░░░░░░░░░ 0.21                 │    │
-│  │  O3_ACTING      ███░░░░░░░░░░░ 0.15                 │    │
+│  │  O5_COGNITION    ████████████░░ 0.62                 │    │
+│  │  O4_STRUCTURE     ████░░░░░░░░░░ 0.21                 │    │
+│  │  O3_EXECUTION      ███░░░░░░░░░░░ 0.15                 │    │
 │  │  O8_OBSERVING   █████████░░░░░ 0.45                 │    │
-│  │  O9_UNIFYING    ██████░░░░░░░░ 0.32                 │    │
+│  │  O10_UNIFYING    ██████░░░░░░░░ 0.32                 │    │
 │  │                                                      │    │
 │  └─────────────────────────────────────────────────────┘    │
 │                                                              │
@@ -207,7 +207,7 @@ Session analytics and monitoring.
 │  │ Preset: [safety_first ▼]    [Run Simulation]        │    │
 │  │                                                      │    │
 │  │ Original Entropy: 0.42  →  Simulated: 0.36          │    │
-│  │ Dominant: O1_THINKING   →  O8_OBSERVING             │    │
+│  │ Dominant: O5_COGNITION   →  O8_OBSERVING             │    │
 │  └─────────────────────────────────────────────────────┘    │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
@@ -319,16 +319,16 @@ interface BadgeProps {
 ```typescript
 interface OntologicalRadarProps {
   dimensions: {
-    O1_THINKING: number;
-    O2_FORMING: number;
-    O3_ACTING: number;
+    O5_COGNITION: number;
+    O4_STRUCTURE: number;
+    O3_EXECUTION: number;
     O4_TAGGING: number;
-    O5_DIRECTING: number;
-    O6_REASONING: number;
-    O7_PURPOSING: number;
-    O8_META_OBSERVING: number;
-    O9_UNIFYING: number;
-    O10_ABSOLVING: number;
+    O6_AGENCY: number;
+    O7_REASONING: number;
+    O8_PURPOSE: number;
+    O9_WITNESSES: number;
+    O10_UNIFYING: number;
+    O12_ABSOLVING: number;
   };
 }
 
@@ -620,7 +620,7 @@ function categorizeCoherence(value: number): 'high' | 'medium' | 'low' {
 │ Fusion Score: 0.82                                      │
 │ Source: reasoning_model                                 │
 │                                                         │
-│ The response was generated through high O1_THINKING     │
+│ The response was generated through high O5_COGNITION     │
 │ activation, indicating deep contemplative processing.   │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
@@ -635,20 +635,20 @@ SESSION: ● stable | COHERENCE: ████████░░ 0.85 ↑ | TURNS
 ### 6.5 Ontological Profile (Radar)
 
 ```
-              O1_THINKING
+              O5_COGNITION
                   ●
                 / | \
-     O10_ABS ●   |   ● O2_FORMING
+     O10_ABS ●   |   ● O4_STRUCTURE
               \  |  /
                \ | /
-    O9_UNIFY ●──●──● O3_ACTING
+    O9_UNIFY ●──●──● O3_EXECUTION
                / | \
               /  |  \
     O8_META ●   |   ● O4_TAGGING
                 |
-     O7_PURP ●──●── O5_DIRECTING
+     O7_PURP ●──●── O6_AGENCY
                 |
-           O6_REASONING
+           O7_REASONING
 ```
 
 ---

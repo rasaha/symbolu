@@ -78,7 +78,7 @@ def sample_phase7_result(sample_provenance, sample_trajectory_step):
 def sample_envelope():
     """Create sample envelope with allowed tokens and layers."""
     return Envelope(
-        allowed_layers=frozenset({"O1_THINKING", "O2_FORMING", "O3_ACTING"}),
+        allowed_layers=frozenset({"O5_COGNITION", "O4_STRUCTURE", "O3_EXECUTION"}),
         allowed_tokens=frozenset({"ka", "ga", "a", "i", "u"}),
         allowed_templates=frozenset({"TEMPLATE_001"}),
     )
@@ -160,7 +160,7 @@ class TestValidateTokens:
         """Empty allowed_tokens should skip validation."""
         # Create request with empty allowed_tokens
         empty_envelope = Envelope(
-            allowed_layers=frozenset({"O1_THINKING"}),
+            allowed_layers=frozenset({"O5_COGNITION"}),
             allowed_tokens=frozenset(),
         )
         request = RenderRequest(

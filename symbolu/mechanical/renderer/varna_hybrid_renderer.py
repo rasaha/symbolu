@@ -216,7 +216,7 @@ class VarnaHybridRenderer:
             return VarnaAnalysisResult(
                 phrase_analysis=analyze_phrase_varna(text),
                 word_vectors=(),
-                dominant_layer="O5_DIRECTING",
+                dominant_layer="O6_AGENCY",
                 overall_harmony=0.0,
                 varnas=(),
                 bridge_meanings=(),
@@ -250,8 +250,8 @@ class VarnaHybridRenderer:
 
         max_idx = layer_totals.index(max(layer_totals))
         layer_names = [
-            "O1_ACTING", "O2_TAGGING", "O3_FORMING", "O4_THINKING", "O5_DIRECTING",
-            "O6_REASONING", "O7_PURPOSING", "O8_META_OBSERVING", "O9_UNIFYING", "O10_ABSOLVING"
+            "O1_ACTING", "O2_IDENTITY", "O3_FORMING", "O4_THINKING", "O6_AGENCY",
+            "O7_REASONING", "O8_PURPOSE", "O9_WITNESSES", "O10_UNIFYING", "O12_ABSOLVING"
         ]
         dominant_layer = layer_names[max_idx]
 
@@ -423,15 +423,15 @@ class VarnaHybridRenderer:
         # Apply style based on dominant layer
         layer_styles = {
             "O1_ACTING": "direct and action-oriented",
-            "O2_TAGGING": "structured and categorized",
+            "O2_IDENTITY": "structured and categorized",
             "O3_FORMING": "creative and generative",
             "O4_THINKING": "analytical and contemplative",
-            "O5_DIRECTING": "guiding and purposeful",
-            "O6_REASONING": "logical and systematic",
-            "O7_PURPOSING": "intentional and goal-directed",
-            "O8_META_OBSERVING": "reflective and meta-aware",
-            "O9_UNIFYING": "connecting and harmonizing",
-            "O10_ABSOLVING": "transcendent and dissolving",
+            "O6_AGENCY": "guiding and purposeful",
+            "O7_REASONING": "logical and systematic",
+            "O8_PURPOSE": "intentional and goal-directed",
+            "O9_WITNESSES": "reflective and meta-aware",
+            "O10_UNIFYING": "connecting and harmonizing",
+            "O12_ABSOLVING": "transcendent and dissolving",
         }
 
         style = layer_styles.get(varna_analysis.dominant_layer, "neutral")

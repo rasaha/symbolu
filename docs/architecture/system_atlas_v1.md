@@ -533,7 +533,7 @@ It only controls ordering, framing, and presentation style.
 | `KOSHA_DESCRIPTIONS` | Layer nature, vritti tendency, acoustic quality |
 | `CANONICAL_CONSONANT_TO_KOSHA` | Consonant → Kosha mapping |
 | `CONSONANT_TO_KOSHA_MAP` | Reverse mapping |
-| `ONTOLOGICAL_LAYERS` | 10-layer ontological model |
+| `ONTOLOGICAL_LAYERS` | 12-layer ontological model |
 | `V26_STITCHING_WEIGHTS` | Stitching weights (alpha, beta, gamma, delta) |
 | `DHA_TONES` | Delivery tone mappings |
 | `VOWEL_ASPECT_BRIDGES` | Vowel → aspect mappings |

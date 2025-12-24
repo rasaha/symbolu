@@ -10,7 +10,7 @@
 
 **Yes, the Varṇa-based approach is richer and likely produces better results** because:
 
-1. **Pre-defined 10D layer meanings** per consonant (not just numeric affinities)
+1. **Pre-defined 12D layer meanings** per consonant (not just numeric affinities)
 2. **Polarity awareness** (positive/negative manifestations)
 3. **Distortion/sublimation vectors** (directional transformations)
 4. **Sanskrit acoustic substrate** (phonetically grounded in millennia of study)
@@ -44,7 +44,7 @@ LIQUID_AFFINITIES = {
   "bridge_meaning": "escape_pressure",
   "layers": {
     "O1_ACTING": "exit activation state",
-    "O2_TAGGING": "exit-route classification",
+    "O2_IDENTITY": "exit-route classification",
     "O3_FORMING": "evasion shaping force",
     "O4_THINKING": "exit pattern bias",
     ...
@@ -107,7 +107,7 @@ This is more systematic than ARPABET which is English-specific.
 Current approach:
 ```python
 "L": (0.3, 0.6, 0.2, 0.2, 0.3, 0.3, 0.4, 0.3, 0.6, 0.4)
-# What does 0.6 for O2_FORMING mean? Unclear.
+# What does 0.6 for O4_STRUCTURE mean? Unclear.
 ```
 
 Varṇa approach:

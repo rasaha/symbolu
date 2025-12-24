@@ -136,11 +136,11 @@ def benchmark_encoder(encoder_type: str = "hash") -> EncoderBenchmarkResult:
 
     # Expected dominant layers for each domain
     expected_layers = {
-        "technical": "O6_REASONING",
-        "reasoning": "O6_REASONING",
-        "creative": "O2_FORMING",
-        "action": "O3_ACTING",
-        "governance": "O7_PURPOSING",
+        "technical": "O7_REASONING",
+        "reasoning": "O7_REASONING",
+        "creative": "O4_STRUCTURE",
+        "action": "O3_EXECUTION",
+        "governance": "O8_PURPOSE",
     }
 
     print("\nAnalyzing samples...")

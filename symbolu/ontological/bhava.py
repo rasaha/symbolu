@@ -68,16 +68,16 @@ BHAVA_SUBLAYER_DESCRIPTIONS: Dict[str, str] = {
 
 # Adjacent ontological pairs (10 pairs forming a cycle)
 ONTOLOGICAL_PAIRS: Tuple[Tuple[str, str], ...] = (
-    ("O1_THINKING", "O2_FORMING"),
-    ("O2_FORMING", "O3_ACTING"),
-    ("O3_ACTING", "O4_TAGGING"),
-    ("O4_TAGGING", "O5_DIRECTING"),
-    ("O5_DIRECTING", "O6_REASONING"),
-    ("O6_REASONING", "O7_PURPOSING"),
-    ("O7_PURPOSING", "O8_META_OBSERVING"),
-    ("O8_META_OBSERVING", "O9_UNIFYING"),
-    ("O9_UNIFYING", "O10_ABSOLVING"),
-    ("O10_ABSOLVING", "O1_THINKING"),  # Cycle back
+    ("O5_COGNITION", "O4_STRUCTURE"),
+    ("O4_STRUCTURE", "O3_EXECUTION"),
+    ("O3_EXECUTION", "O4_TAGGING"),
+    ("O4_TAGGING", "O6_AGENCY"),
+    ("O6_AGENCY", "O7_REASONING"),
+    ("O7_REASONING", "O8_PURPOSE"),
+    ("O8_PURPOSE", "O9_WITNESSES"),
+    ("O9_WITNESSES", "O10_UNIFYING"),
+    ("O10_UNIFYING", "O12_ABSOLVING"),
+    ("O12_ABSOLVING", "O5_COGNITION"),  # Cycle back
 )
 
 # But we only need 9 pairs for 90 Bhavas (the 10th pair uses first ontological layer)

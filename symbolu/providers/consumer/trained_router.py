@@ -37,12 +37,12 @@ INTENT_TO_MODEL_TYPE = {
 
 # Mapping to dominant layer
 INTENT_TO_LAYER = {
-    "reasoning": "O6_REASONING",
-    "reflective": "O9_UNIFYING",
+    "reasoning": "O7_REASONING",
+    "reflective": "O10_UNIFYING",
     "creative": "O5_CREATING",
     "relationship": "O4_FEELING",
-    "action": "O3_ACTING",
-    "general": "O6_REASONING",
+    "action": "O3_EXECUTION",
+    "general": "O7_REASONING",
 }
 
 
@@ -193,11 +193,11 @@ class TrainedRouterProvider(RouterProvider):
         return RoutingDecision(
             model_type=ModelType.GENERAL,
             confidence=0.5,
-            dominant_layer="O6_REASONING",
+            dominant_layer="O7_REASONING",
             layer_scores=(
-                ("O6_REASONING", 0.2),
-                ("O9_UNIFYING", 0.15),
-                ("O3_ACTING", 0.1),
+                ("O7_REASONING", 0.2),
+                ("O10_UNIFYING", 0.15),
+                ("O3_EXECUTION", 0.1),
             ),
             trace=trace,
         )

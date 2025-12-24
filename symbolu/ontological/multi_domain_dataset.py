@@ -157,23 +157,23 @@ class MultiDomainDataset:
         templates = [
             # Philosophy
             ("What is the nature of {concept}? Perhaps it is {reflection}.",
-             ["philosophy"], ["O8_META_OBSERVING"]),
+             ["philosophy"], ["O9_WITNESSES"]),
             ("I wonder about {concept}. It seems that {reflection}.",
-             ["wonder"], ["O8_META_OBSERVING"]),
+             ["wonder"], ["O9_WITNESSES"]),
             ("The question of {concept} leads us to consider {reflection}.",
-             ["inquiry"], ["O6_REASONING"]),
+             ["inquiry"], ["O7_REASONING"]),
             # Reflection
             ("Looking back, I realize that {insight}.",
-             ["reflection"], ["O8_META_OBSERVING"]),
+             ["reflection"], ["O9_WITNESSES"]),
             ("Upon reflection, {insight} becomes clear.",
              ["contemplation"], []),
             ("In quiet moments, I find myself thinking about {concept}.",
              ["introspection"], []),
             # Existential
             ("What does it mean to {verb}? Perhaps {reflection}.",
-             ["existential"], ["O10_ABSOLVING"]),
+             ["existential"], ["O12_ABSOLVING"]),
             ("The deeper meaning of {concept} reveals {insight}.",
-             ["meaning"], ["O9_UNIFYING"]),
+             ["meaning"], ["O10_UNIFYING"]),
         ]
 
         concepts = ["consciousness", "existence", "time", "truth", "beauty",
@@ -206,7 +206,7 @@ class MultiDomainDataset:
             )
             samples.append(DomainSample(
                 text=text,
-                primary_domain="O1_THINKING",
+                primary_domain="O5_COGNITION",
                 secondary_domains=secondary,
                 category=random.choice(categories)
             ))
@@ -222,21 +222,21 @@ class MultiDomainDataset:
             ("The {material} takes shape as {creation}, flowing into {form}.",
              ["creation"], []),
             ("Imagine {creation} emerging from {source}—{quality} and alive.",
-             ["imagination"], ["O1_THINKING"]),
+             ["imagination"], ["O5_COGNITION"]),
             ("Let the colors dance: {color1} meets {color2} in a symphony of {quality}.",
              ["art"], []),
             # Structure
             ("The architecture of {concept} reveals {pattern} within {pattern}.",
-             ["structure"], ["O9_UNIFYING"]),
+             ["structure"], ["O10_UNIFYING"]),
             ("Building {creation} requires balancing {element1} with {element2}.",
-             ["construction"], ["O3_ACTING"]),
+             ["construction"], ["O3_EXECUTION"]),
             # Artistic expression
             ("The {art_form} speaks of {emotion}, capturing {quality} in every {element}.",
              ["expression"], ["O4_TAGGING"]),
             ("Through {medium}, we shape {concept} into something tangible.",
              ["craft"], []),
             ("Beauty emerges where {element1} and {element2} intersect.",
-             ["aesthetics"], ["O1_THINKING"]),
+             ["aesthetics"], ["O5_COGNITION"]),
         ]
 
         materials = ["clay", "light", "sound", "words", "stone", "code", "fabric"]
@@ -274,7 +274,7 @@ class MultiDomainDataset:
             )
             samples.append(DomainSample(
                 text=text,
-                primary_domain="O2_FORMING",
+                primary_domain="O4_STRUCTURE",
                 secondary_domains=secondary,
                 category=random.choice(categories)
             ))
@@ -295,12 +295,12 @@ class MultiDomainDataset:
              ["sequence"], []),
             # Instructions
             ("To {goal}, you must {step1} before {step2}.",
-             ["instruction"], ["O5_DIRECTING"]),
+             ["instruction"], ["O6_AGENCY"]),
             ("The process requires: {step1} → {step2} → {result}.",
              ["process"], []),
             # Action-oriented
             ("Act now: {action} while the opportunity exists.",
-             ["urgency"], ["O7_PURPOSING"]),
+             ["urgency"], ["O8_PURPOSE"]),
             ("Implement {change} by {step1} and {step2}.",
              ["implementation"], []),
             ("Do {action}. Don't hesitate. Results follow action.",
@@ -334,7 +334,7 @@ class MultiDomainDataset:
             )
             samples.append(DomainSample(
                 text=text,
-                primary_domain="O3_ACTING",
+                primary_domain="O3_EXECUTION",
                 secondary_domains=secondary,
                 category=random.choice(categories)
             ))
@@ -350,7 +350,7 @@ class MultiDomainDataset:
             ("This feels {emotion}—{intensity} and {quality}.",
              ["emotion"], []),
             ("The {subject} evokes {emotion}, a sense of {quality}.",
-             ["evocation"], ["O2_FORMING"]),
+             ["evocation"], ["O4_STRUCTURE"]),
             ("I categorize this as {category}: {emotion} with hints of {emotion2}.",
              ["classification"], []),
             # Sentiment
@@ -362,7 +362,7 @@ class MultiDomainDataset:
             ("Label: {label}. Tags: {tag1}, {tag2}, {tag3}.",
              ["tagging"], []),
             ("This belongs to {category}, characterized by {quality}.",
-             ["categorization"], ["O6_REASONING"]),
+             ["categorization"], ["O7_REASONING"]),
             ("Classification: {category} ({confidence} confidence).",
              ["classification"], []),
         ]
@@ -414,23 +414,23 @@ class MultiDomainDataset:
         templates = [
             # Leadership
             ("Lead the team toward {goal}. {strategy} will ensure success.",
-             ["leadership"], ["O7_PURPOSING"]),
+             ["leadership"], ["O8_PURPOSE"]),
             ("Guide your people through {challenge}. Show them {approach}.",
              ["guidance"], []),
             ("A leader must {quality}. Without this, {consequence}.",
-             ["wisdom"], ["O1_THINKING"]),
+             ["wisdom"], ["O5_COGNITION"]),
             # Instruction
             ("Teach them to {skill}. Start with {foundation}, then build.",
-             ["teaching"], ["O3_ACTING"]),
+             ["teaching"], ["O3_EXECUTION"]),
             ("Mentor by {approach}: show, explain, practice, master.",
              ["mentoring"], []),
             # Direction
             ("The path forward requires {direction}. Focus on {priority}.",
-             ["direction"], ["O7_PURPOSING"]),
+             ["direction"], ["O8_PURPOSE"]),
             ("Steer the project toward {goal} by {strategy}.",
              ["steering"], []),
             ("Direct your attention to {priority}. Everything else follows.",
-             ["focus"], ["O8_META_OBSERVING"]),
+             ["focus"], ["O9_WITNESSES"]),
         ]
 
         goals = ["excellence", "innovation", "growth", "stability", "transformation"]
@@ -461,7 +461,7 @@ class MultiDomainDataset:
             )
             samples.append(DomainSample(
                 text=text,
-                primary_domain="O5_DIRECTING",
+                primary_domain="O6_AGENCY",
                 secondary_domains=secondary,
                 category=random.choice(categories)
             ))
@@ -482,14 +482,14 @@ class MultiDomainDataset:
              ["sequence"], []),
             # Analysis
             ("Analyzing {subject}: {aspect1} shows {finding1}, while {aspect2} reveals {finding2}.",
-             ["analysis"], ["O8_META_OBSERVING"]),
+             ["analysis"], ["O9_WITNESSES"]),
             ("Break down {problem}: first {component1}, then {component2}.",
              ["decomposition"], []),
             # Problem-solving
             ("The solution requires {approach}. Consider {factor1} and {factor2}.",
              ["problem-solving"], []),
             ("To solve {problem}, apply {method}: {step1}, {step2}, verify.",
-             ["methodology"], ["O3_ACTING"]),
+             ["methodology"], ["O3_EXECUTION"]),
             ("The optimal path: maximize {benefit} while minimizing {cost}.",
              ["optimization"], []),
         ]
@@ -547,7 +547,7 @@ class MultiDomainDataset:
             )
             samples.append(DomainSample(
                 text=text,
-                primary_domain="O6_REASONING",
+                primary_domain="O7_REASONING",
                 secondary_domains=secondary,
                 category=random.choice(categories)
             ))
@@ -563,21 +563,21 @@ class MultiDomainDataset:
             ("The goal is clear: {goal}. Every action aligns with this purpose.",
              ["goal"], []),
             ("We aim to {objective} by {timeframe}. This drives all decisions.",
-             ["objective"], ["O5_DIRECTING"]),
+             ["objective"], ["O6_AGENCY"]),
             ("Our mission: {mission}. Our vision: {vision}.",
              ["mission"], []),
             # Intention
             ("I intend to {action} because {reason}.",
              ["intention"], []),
             ("The purpose behind {action} is {purpose}.",
-             ["purpose"], ["O1_THINKING"]),
+             ["purpose"], ["O5_COGNITION"]),
             ("With deliberate intention, we {action} to achieve {outcome}.",
              ["deliberation"], []),
             # Motivation
             ("What drives us: {motivation}. What sustains us: {sustainer}.",
              ["motivation"], []),
             ("{goal} is not just an objective—it's a calling.",
-             ["calling"], ["O10_ABSOLVING"]),
+             ["calling"], ["O12_ABSOLVING"]),
         ]
 
         goals = ["excellence in every detail", "sustainable growth",
@@ -617,7 +617,7 @@ class MultiDomainDataset:
             )
             samples.append(DomainSample(
                 text=text,
-                primary_domain="O7_PURPOSING",
+                primary_domain="O8_PURPOSE",
                 secondary_domains=secondary,
                 category=random.choice(categories)
             ))
@@ -631,7 +631,7 @@ class MultiDomainDataset:
         templates = [
             # Meta-awareness
             ("I notice that I am {observation}. This awareness itself is {quality}.",
-             ["meta-awareness"], ["O1_THINKING"]),
+             ["meta-awareness"], ["O5_COGNITION"]),
             ("Observing my own {process}, I see {pattern}.",
              ["self-observation"], []),
             ("The observer notices the observing. {insight}.",
@@ -642,10 +642,10 @@ class MultiDomainDataset:
             ("Step back and observe: {observation}. The pattern becomes clear.",
              ["stepping-back"], []),
             ("Watching without judgment: {subject} simply is {quality}.",
-             ["witnessing"], ["O10_ABSOLVING"]),
+             ["witnessing"], ["O12_ABSOLVING"]),
             # Analysis of process
             ("The process of {activity} involves {layers} layers of awareness.",
-             ["process-awareness"], ["O6_REASONING"]),
+             ["process-awareness"], ["O7_REASONING"]),
             ("Notice how {subject} changes when observed. {insight}.",
              ["observation-effect"], []),
         ]
@@ -680,7 +680,7 @@ class MultiDomainDataset:
             )
             samples.append(DomainSample(
                 text=text,
-                primary_domain="O8_META_OBSERVING",
+                primary_domain="O9_WITNESSES",
                 secondary_domains=secondary,
                 category=random.choice(categories)
             ))
@@ -696,14 +696,14 @@ class MultiDomainDataset:
             ("Bringing together {element1} and {element2} reveals {unity}.",
              ["integration"], []),
             ("The synthesis of {concept1} with {concept2} creates {emergence}.",
-             ["synthesis"], ["O2_FORMING"]),
+             ["synthesis"], ["O4_STRUCTURE"]),
             ("What seemed separate—{element1}, {element2}—is actually one.",
-             ["unity"], ["O1_THINKING"]),
+             ["unity"], ["O5_COGNITION"]),
             # Holistic
             ("The whole is greater than the sum: {parts} become {whole}.",
              ["holism"], []),
             ("Every part contains the whole. {element} reflects {totality}.",
-             ["fractality"], ["O8_META_OBSERVING"]),
+             ["fractality"], ["O9_WITNESSES"]),
             # Connection
             ("The connection between {concept1} and {concept2}: {relationship}.",
              ["connection"], []),
@@ -750,7 +750,7 @@ class MultiDomainDataset:
             )
             samples.append(DomainSample(
                 text=text,
-                primary_domain="O9_UNIFYING",
+                primary_domain="O10_UNIFYING",
                 secondary_domains=secondary,
                 category=random.choice(categories)
             ))
@@ -766,7 +766,7 @@ class MultiDomainDataset:
             ("The struggle resolves into {resolution}. Peace follows.",
              ["resolution"], []),
             ("What was {conflict} becomes {resolution}.",
-             ["transformation"], ["O9_UNIFYING"]),
+             ["transformation"], ["O10_UNIFYING"]),
             ("Release {burden}. What remains is {essence}.",
              ["release"], []),
             # Completion
@@ -775,10 +775,10 @@ class MultiDomainDataset:
             ("It is finished. {accomplishment} stands complete.",
              ["finality"], []),
             ("{cycle} ends, and in ending, begins again. Eternal return.",
-             ["cycle"], ["O9_UNIFYING"]),
+             ["cycle"], ["O10_UNIFYING"]),
             # Transcendence
             ("Beyond {limitation} lies {transcendence}.",
-             ["transcendence"], ["O1_THINKING"]),
+             ["transcendence"], ["O5_COGNITION"]),
             ("Let go of {attachment}. {freedom} awaits.",
              ["letting-go"], []),
             ("In acceptance of {reality}, find {peace}.",
@@ -823,7 +823,7 @@ class MultiDomainDataset:
             )
             samples.append(DomainSample(
                 text=text,
-                primary_domain="O10_ABSOLVING",
+                primary_domain="O12_ABSOLVING",
                 secondary_domains=secondary,
                 category=random.choice(categories)
             ))

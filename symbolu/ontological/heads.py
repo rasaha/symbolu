@@ -217,9 +217,9 @@ class ReasoningHead(TaskHead):
         overall = self.assess_reasoning(ontological_input)
 
         # Individual dimension contributions
-        o6_idx = LAYER_INDEX["O6_REASONING"]
-        o1_idx = LAYER_INDEX["O1_THINKING"]
-        o8_idx = LAYER_INDEX["O8_META_OBSERVING"]
+        o6_idx = LAYER_INDEX["O7_REASONING"]
+        o1_idx = LAYER_INDEX["O5_COGNITION"]
+        o8_idx = LAYER_INDEX["O9_WITNESSES"]
 
         # Normalize to 0-1 (from tanh -1 to 1)
         logical = (ontological_input[o6_idx] + 1) / 2
@@ -279,9 +279,9 @@ class CreativityHead(TaskHead):
         overall = self.assess_creativity(ontological_input)
 
         # Individual dimension contributions
-        o2_idx = LAYER_INDEX["O2_FORMING"]
-        o9_idx = LAYER_INDEX["O9_UNIFYING"]
-        o7_idx = LAYER_INDEX["O7_PURPOSING"]
+        o2_idx = LAYER_INDEX["O4_STRUCTURE"]
+        o9_idx = LAYER_INDEX["O10_UNIFYING"]
+        o7_idx = LAYER_INDEX["O8_PURPOSE"]
 
         # Normalize to 0-1 (from tanh -1 to 1)
         forming = (ontological_input[o2_idx] + 1) / 2

@@ -71,7 +71,7 @@ class TestPhase4AFormulaDeterminism:
 
     def test_lookup_raw_deterministic(self):
         """Test raw lookup is deterministic."""
-        results = [lookup_interaction_raw("a", "O2_TAGGING") for _ in range(10)]
+        results = [lookup_interaction_raw("a", "O2_IDENTITY") for _ in range(10)]
         assert len(set(tuple(r.items()) for r in results)) == 1
 
     def test_all_layers_lookup_deterministic(self):
@@ -147,7 +147,7 @@ class TestPhase4AZeroLLMGuarantee:
     def test_runs_offline(self):
         """Test Phase-4A runs completely offline."""
         # If this runs, Phase-4A works offline
-        result = lookup_interaction("ga", "O5_DIRECTING")
+        result = lookup_interaction("ga", "O6_AGENCY")
         assert result is not None
         assert isinstance(result, VarnaLayerInteraction)
 
@@ -272,8 +272,8 @@ class TestPhase4ALookupCorrectness:
 
     def test_lookup_includes_input_layer(self):
         """Test result includes input layer."""
-        result = lookup_interaction("ka", "O5_DIRECTING")
-        assert result.layer == "O5_DIRECTING"
+        result = lookup_interaction("ka", "O6_AGENCY")
+        assert result.layer == "O6_AGENCY"
 
     def test_distortion_vector_valid_values(self):
         """Test distortion_vector is 'lateral' or 'downward'."""
@@ -287,12 +287,12 @@ class TestPhase4ALookupCorrectness:
 
     def test_o10_has_terminating_sublimate(self):
         """Test O10_ABSOLVING typically has 'terminating' sublimate."""
-        result = lookup_interaction("a", "O10_ABSOLVING")
+        result = lookup_interaction("a", "O12_ABSOLVING")
         assert result.sublimate_vector == "terminating"
 
     def test_raw_lookup_returns_dict(self):
         """Test raw lookup returns plain dict."""
-        result = lookup_interaction_raw("sha", "O7_PURPOSING")
+        result = lookup_interaction_raw("sha", "O8_PURPOSE")
         assert isinstance(result, dict)
         assert set(result.keys()) == set(REQUIRED_INTERACTION_FIELDS)
 
@@ -396,7 +396,7 @@ class TestPhase4AExistenceChecks:
     def test_is_valid_layer_true(self):
         """Test is_valid_layer returns True for valid layer."""
         assert is_valid_layer("O1_ACTING") is True
-        assert is_valid_layer("O10_ABSOLVING") is True
+        assert is_valid_layer("O12_ABSOLVING") is True
 
 
 # =============================================================================
