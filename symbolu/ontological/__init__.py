@@ -1,123 +1,73 @@
 """
-Learnable 10D Ontological Engine
-================================
+Ontological Engine Module
+=========================
 
-A neural network-based engine that learns to map text to interpretable
-10-dimensional ontological vectors. Each dimension corresponds to a
-fundamental ontological layer:
+A learnable 100-dimensional ontological engine that trains on large data
+to improve reasoning and creativity.
 
-    O1_THINKING      - Contemplation, philosophy, reflection
-    O2_FORMING       - Structure, creation, art, creativity
-    O3_ACTING        - Procedures, commands, action
-    O4_TAGGING       - Emotional tagging/classification
-    O5_DIRECTING     - Guidance, instruction, leadership
-    O6_REASONING     - Logic, analysis, problem-solving
-    O7_PURPOSING     - Goals, intention, purposefulness
-    O8_META_OBSERVING - Meta-awareness, observation
-    O9_UNIFYING      - Integration, synthesis, unity
-    O10_ABSOLVING    - Resolution, completion, transcendence
+Architecture:
+- 10 Core Ontological Layers (O1-O10)
+- 90 Bhava Sub-layers (9 pairs × 10 sub-layers)
+- DistilBERT encoder for semantic embeddings
+- Multi-task learning with contrastive loss
 
-Unlike the deterministic STL (Symbolic Transformer Logic), this engine:
-- LEARNS from large data via gradient descent
-- Has millions of trainable parameters
-- Improves reasoning and creativity through training
-- Maintains interpretable 10D output
+Usage:
+    from symbolu.ontological import EnhancedTrainer, train_enhanced_model
 
-Architecture (Option B - Hybrid):
-    Text → Encoder (DistilBERT) → Hidden Layers → 10D Output → Task Heads
+    # Quick training
+    trainer, results = train_enhanced_model(epochs=10)
 
-Key Features:
-- Skip connections (ResNet-style) for gradient flow
-- Multi-task heads for reasoning and creativity
-- Ontological loss with purity penalties
-- Dimension-specific supervision
+    # Analyze text
+    result = trainer.analyze("If A implies B, then...")
+    print(result["dominant"])  # O6_REASONING
 """
 
 from symbolu.ontological.types import (
+    LAYER_NAMES,
+    LAYER_INDEX,
     OntologicalConfig,
     OntologicalVector,
     TrainingExample,
-    TrainingBatch,
-    LAYER_NAMES,
-    LAYER_DESCRIPTIONS,
-)
-from symbolu.ontological.engine import OntologicalEngine, create_engine
-from symbolu.ontological.losses import OntologicalLoss, CombinedLoss
-from symbolu.ontological.heads import ReasoningHead, CreativityHead, MultiTaskHead
-from symbolu.ontological.bhava import (
-    BhavaComputer90,
-    FullOntologicalVector100,
-    BhavaVector90,
-    BHAVA_NAMES_90,
-    BHAVA_SUBLAYER_NAMES,
-    summarize_bhava_structure,
-)
-from symbolu.ontological.trainer import OntologicalTrainer, TrainerConfig
-from symbolu.ontological.encoder import (
-    TextEncoder,
-    HashEncoder,
-    HybridEncoder,
-    get_encoder,
-)
-from symbolu.ontological.data_loader import (
-    RAGDataLoader,
-    SyntheticDataGenerator,
-    MixedDataLoader,
 )
 
-# PyTorch components (optional)
+# Conditionally export PyTorch components
 try:
-    from symbolu.ontological.pytorch_engine import PyTorchOntologicalEngine
-    from symbolu.ontological.pytorch_trainer import PyTorchTrainer, train_from_rag
+    from symbolu.ontological.enhanced_engine import (
+        EnhancedOntologicalEngine,
+        MultiTaskLoss,
+        MultiTaskHead,
+        DistilBERTEncoder,
+        create_training_batch,
+    )
+    from symbolu.ontological.enhanced_trainer import (
+        EnhancedTrainer,
+        TrainerConfig,
+        train_enhanced_model,
+        create_curated_dataset,
+        DOMAIN_NAMES,
+        DOMAIN_TO_IDX,
+    )
     PYTORCH_AVAILABLE = True
 except ImportError:
     PYTORCH_AVAILABLE = False
 
 __all__ = [
     # Types
+    "LAYER_NAMES",
+    "LAYER_INDEX",
     "OntologicalConfig",
     "OntologicalVector",
     "TrainingExample",
-    "TrainingBatch",
-    "LAYER_NAMES",
-    "LAYER_DESCRIPTIONS",
-    # Engine
-    "OntologicalEngine",
-    "create_engine",
-    # Losses
-    "OntologicalLoss",
-    "CombinedLoss",
-    # Heads
-    "ReasoningHead",
-    "CreativityHead",
+    # PyTorch components (if available)
+    "EnhancedOntologicalEngine",
+    "MultiTaskLoss",
     "MultiTaskHead",
-    # Bhava (90D relational)
-    "BhavaComputer90",
-    "FullOntologicalVector100",
-    "BhavaVector90",
-    "BHAVA_NAMES_90",
-    "BHAVA_SUBLAYER_NAMES",
-    "summarize_bhava_structure",
-    # Training (basic)
-    "OntologicalTrainer",
+    "DistilBERTEncoder",
+    "EnhancedTrainer",
     "TrainerConfig",
-    # Encoders
-    "TextEncoder",
-    "HashEncoder",
-    "HybridEncoder",
-    "get_encoder",
-    # Data loaders
-    "RAGDataLoader",
-    "SyntheticDataGenerator",
-    "MixedDataLoader",
-    # PyTorch (optional)
+    "train_enhanced_model",
+    "create_curated_dataset",
+    "DOMAIN_NAMES",
+    "DOMAIN_TO_IDX",
     "PYTORCH_AVAILABLE",
 ]
-
-# Add PyTorch exports if available
-if PYTORCH_AVAILABLE:
-    __all__.extend([
-        "PyTorchOntologicalEngine",
-        "PyTorchTrainer",
-        "train_from_rag",
-    ])
