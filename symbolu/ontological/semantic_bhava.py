@@ -6,33 +6,24 @@ The Bhava system draws from Vedic astrology where "Bhava" means
 "house" or "state of being". Each Bhava represents relational
 dynamics between ontological layers, mapped to planetary energies.
 
-Patent-Exact Ontological-Planetary Correspondences:
-(Lowest → Highest: Karma → Brahman)
+12-Dimensional Ontological-Planetary Correspondences:
+(Lowest → Highest: Potential → Absolving)
 
-Concrete Layers (O1-O5):
-- O1_EXECUTION    → Mars (Mangala) - Karma, actions, consequences
-- O2_IDENTITY     → Moon (Chandra) - Identification, labels, roles
-- O3_FORM         → Venus (Shukra) - Body, structure, embodiment
-- O4_COGNITION    → Mercury (Budha) - Mind, attention, perception
-- O5_AGENCY       → Sun (Surya) - Ego, control, intent, authorship
+O1_POTENTIAL    → Pluto (Yama) - Dormant, latent capacity
+O2_IDENTITY     → Moon (Chandra) - Tagging, labels, roles
+O3_EXECUTION    → Mars (Mangala) - Action, karma, consequences
+O4_STRUCTURE    → Venus (Shukra) - Forming, embodiment, patterns
+O5_COGNITION    → Mercury (Budha) - Perception, attention, emotion
+O6_AGENCY       → Sun (Surya) - Direction, control, authorship
+O7_REASONING    → Saturn (Shani) - Discrimination, logic, inference
+O8_PURPOSE      → Jupiter (Guru) - Meaning, motivation, why
+O9_WITNESSES    → Ketu - Meta-observation, awareness, reflection
+O10_UNIFYING    → Rahu - Coherence, synthesis, harmony
+O11_INTEGRATION → Uranus (Varuna) - Resolution, consolidation
+O12_ABSOLVING   → Neptune (Brahman) - Termination, dissolution, release
 
-Abstract Layers (O6-O10):
-- O6_REASONING    → Saturn (Shani) - Intellect, logic, inference
-- O7_PURPOSE      → Jupiter (Guru) - Soul, meaning, motivation
-- O8_OBSERVATION  → Ketu - Witness, meta-awareness, reflection
-- O9_CORE         → Rahu - Atman, unified self-reference
-- O10_UNIVERSAL   → Neptune/Brahman - Coherence, absoluteness, unity
-
-Directional Semantics:
-- Upward recursion (Execution → Universal): Cause tracing, insight surfacing
-- Downward recursion (Universal → Execution): Consequence projection, grounding
-
-Bhava Pairs (9 pairs × 10 sub-layers = 90D):
-- Adjacent layers: Conjunction (synthesis)
-- 2-apart: Sextile (60°) - Harmonious flow
-- 3-apart: Square (90°) - Creative tension
-- 4-apart: Trine (120°) - Natural ease
-- 5-apart: Opposition (180°) - Polarity/balance
+Bhava Pairs (11 pairs × 12 sub-layers = 132D):
+Each Bhava pair has 12 sub-layers matching the ontological layer names.
 """
 
 from typing import Dict, List, Optional, Tuple, Any
@@ -49,101 +40,117 @@ except ImportError:
 
 
 # =============================================================================
-# PLANETARY CORRESPONDENCES
+# PLANETARY CORRESPONDENCES (12D)
 # =============================================================================
 
-# Patent-Exact Planetary Correspondences
-# Karma → Identification → Body → Mind → Ego → Intellect → Soul → Witness → Atman → Brahman
 PLANETARY_MAP = {
-    "O1_EXECUTION": {
-        "planet": "Mars",
-        "sanskrit": "Mangala",
-        "vedic": "Karma",
-        "energy": "action",
-        "element": "fire",
-        "quality": "cardinal",
-        "keywords": ["execution", "behavior", "consequence", "output"],
+    "O1_POTENTIAL": {
+        "planet": "Pluto",
+        "sanskrit": "Yama",
+        "vedic": "Dormant",
+        "energy": "latent",
+        "element": "void",
+        "quality": "hidden",
+        "keywords": ["potential", "dormant", "latent", "unrealized"],
     },
     "O2_IDENTITY": {
         "planet": "Moon",
         "sanskrit": "Chandra",
-        "vedic": "Identification",
+        "vedic": "Tagging",
         "energy": "classification",
         "element": "water",
         "quality": "cardinal",
-        "keywords": ["labels", "roles", "references", "self-object"],
+        "keywords": ["identity", "labels", "roles", "references"],
     },
-    "O3_FORM": {
+    "O3_EXECUTION": {
+        "planet": "Mars",
+        "sanskrit": "Mangala",
+        "vedic": "Action",
+        "energy": "action",
+        "element": "fire",
+        "quality": "cardinal",
+        "keywords": ["execution", "behavior", "consequence", "karma"],
+    },
+    "O4_STRUCTURE": {
         "planet": "Venus",
         "sanskrit": "Shukra",
-        "vedic": "Body",
+        "vedic": "Forming",
         "energy": "structure",
         "element": "earth/water",
         "quality": "fixed",
-        "keywords": ["form", "embodiment", "representation", "physical"],
+        "keywords": ["structure", "form", "embodiment", "pattern"],
     },
-    "O4_COGNITION": {
+    "O5_COGNITION": {
         "planet": "Mercury",
         "sanskrit": "Budha",
-        "vedic": "Mind",
+        "vedic": "Perception",
         "energy": "perception",
         "element": "air",
         "quality": "mutable",
-        "keywords": ["attention", "emotion", "perception", "mental"],
+        "keywords": ["cognition", "attention", "emotion", "perception"],
     },
-    "O5_AGENCY": {
+    "O6_AGENCY": {
         "planet": "Sun",
         "sanskrit": "Surya",
-        "vedic": "Ego",
+        "vedic": "Direction",
         "energy": "will",
         "element": "fire",
         "quality": "fixed",
-        "keywords": ["control", "intent", "authorship", "decision"],
+        "keywords": ["agency", "control", "intent", "authorship"],
     },
-    "O6_REASONING": {
+    "O7_REASONING": {
         "planet": "Saturn",
         "sanskrit": "Shani",
-        "vedic": "Intellect",
+        "vedic": "Discrimination",
         "energy": "logic",
         "element": "earth",
         "quality": "cardinal",
-        "keywords": ["logic", "inference", "analysis", "structure"],
+        "keywords": ["reasoning", "discrimination", "logic", "inference"],
     },
-    "O7_PURPOSE": {
+    "O8_PURPOSE": {
         "planet": "Jupiter",
         "sanskrit": "Guru",
-        "vedic": "Soul",
+        "vedic": "Meaning",
         "energy": "meaning",
         "element": "fire/ether",
         "quality": "mutable",
-        "keywords": ["meaning", "motivation", "direction", "why"],
+        "keywords": ["purpose", "meaning", "motivation", "why"],
     },
-    "O8_OBSERVATION": {
+    "O9_WITNESSES": {
         "planet": "Ketu",
         "sanskrit": "Ketu",
-        "vedic": "Witness",
+        "vedic": "Meta-Observation",
         "energy": "awareness",
         "element": "ether",
         "quality": "spiritual",
-        "keywords": ["meta-awareness", "reflection", "monitoring", "witness"],
+        "keywords": ["witness", "meta-awareness", "reflection", "monitoring"],
     },
-    "O9_CORE": {
+    "O10_UNIFYING": {
         "planet": "Rahu",
         "sanskrit": "Rahu",
-        "vedic": "Atman",
-        "energy": "self",
+        "vedic": "Coherence",
+        "energy": "synthesis",
         "element": "air/ether",
-        "quality": "stable",
-        "keywords": ["unified-self", "stable-identity", "core", "essence"],
+        "quality": "obsessive",
+        "keywords": ["unifying", "coherence", "synthesis", "harmony"],
     },
-    "O10_UNIVERSAL": {
+    "O11_INTEGRATION": {
+        "planet": "Uranus",
+        "sanskrit": "Varuna",
+        "vedic": "Resolution",
+        "energy": "consolidation",
+        "element": "air",
+        "quality": "revolutionary",
+        "keywords": ["integration", "resolution", "consolidation", "completion"],
+    },
+    "O12_ABSOLVING": {
         "planet": "Neptune",
         "sanskrit": "Brahman",
-        "vedic": "Brahman",
-        "energy": "unity",
-        "element": "ether",
+        "vedic": "Termination",
+        "energy": "dissolution",
+        "element": "water/ether",
         "quality": "transcendent",
-        "keywords": ["coherence", "absoluteness", "unity", "universal"],
+        "keywords": ["absolving", "termination", "release", "dissolution"],
     },
 }
 
@@ -164,9 +171,11 @@ class AspectType:
 
 ASPECTS = {
     "conjunction": AspectType("Conjunction", 0, "synthesis", 8, 1.0),
+    "semi-sextile": AspectType("Semi-Sextile", 30, "subtle", 4, 0.4),
     "sextile": AspectType("Sextile", 60, "harmonious", 6, 0.6),
     "square": AspectType("Square", 90, "challenging", 8, 0.8),
     "trine": AspectType("Trine", 120, "harmonious", 8, 0.9),
+    "quincunx": AspectType("Quincunx", 150, "adjustment", 4, 0.5),
     "opposition": AspectType("Opposition", 180, "polarizing", 8, 1.0),
 }
 
@@ -174,31 +183,48 @@ ASPECTS = {
 def get_aspect_between(layer_i: int, layer_j: int) -> AspectType:
     """
     Determine the astrological aspect between two ontological layers.
-
-    Uses circular distance on the 10-layer wheel (36° per layer).
+    Uses circular distance on the 12-layer wheel (30° per layer).
     """
-    # Distance on a 10-point circle
     diff = abs(layer_i - layer_j)
-    circular_diff = min(diff, 10 - diff)
-
-    # Map to aspect (each layer = 36°)
-    angle = circular_diff * 36
+    circular_diff = min(diff, 12 - diff)
+    angle = circular_diff * 30
 
     if angle == 0:
         return ASPECTS["conjunction"]
-    elif angle <= 72:  # 1-2 steps
+    elif angle == 30:
+        return ASPECTS["semi-sextile"]
+    elif angle == 60:
         return ASPECTS["sextile"]
-    elif angle <= 108:  # 3 steps
+    elif angle == 90:
         return ASPECTS["square"]
-    elif angle <= 144:  # 4 steps
+    elif angle == 120:
         return ASPECTS["trine"]
-    else:  # 5 steps (180°)
+    elif angle == 150:
+        return ASPECTS["quincunx"]
+    else:
         return ASPECTS["opposition"]
 
 
 # =============================================================================
-# BHAVA PAIR DEFINITIONS
+# BHAVA PAIR DEFINITIONS (12 sub-layers per pair)
 # =============================================================================
+
+# The 12 sub-layer names match the ontological layers
+SUB_LAYER_NAMES = (
+    "potential",     # O1 - Dormant aspect
+    "identity",      # O2 - Tagging aspect
+    "execution",     # O3 - Action aspect
+    "structure",     # O4 - Forming aspect
+    "cognition",     # O5 - Perception aspect
+    "agency",        # O6 - Direction aspect
+    "reasoning",     # O7 - Discrimination aspect
+    "purpose",       # O8 - Meaning aspect
+    "witnesses",     # O9 - Meta-observation aspect
+    "unifying",      # O10 - Coherence aspect
+    "integration",   # O11 - Resolution aspect
+    "absolving",     # O12 - Termination aspect
+)
+
 
 @dataclass
 class BhavaPair:
@@ -214,170 +240,69 @@ class BhavaPair:
 
 def define_bhava_pairs() -> List[BhavaPair]:
     """
-    Define the 9 primary Bhava pairs with semantic meaning.
-
-    Following the adjacent-layer model (O1↔O2, O2↔O3, etc.)
+    Define the 11 primary Bhava pairs with semantic meaning.
+    Each pair has 12 sub-layers matching the ontological layer names.
     """
     from symbolu.ontological.types import LAYER_NAMES
 
     pairs = []
 
-    # Patent-Exact Bhava Pair Definitions
-    # Upward: Execution → Universal (cause tracing, insight surfacing)
-    # Downward: Universal → Execution (consequence projection, grounding)
+    # 11 Bhava pair definitions (O1↔O2 through O11↔O12)
     pair_definitions = [
         {
-            # B1: O1_EXECUTION ↔ O2_IDENTITY (Karma-Identification)
-            "name": "Execution-Identity",
-            "description": "How actions create labels and roles",
-            "sub_layers": [
-                "consequence",     # Action's result
-                "attribution",     # Assigning ownership
-                "labeling",        # Naming the action
-                "role",            # Action-derived identity
-                "reference",       # Pointing to actor
-                "distinction",     # Self-object separation
-                "ownership",       # Claiming the action
-                "memory",          # Recording who did what
-                "pattern",         # Recurring action-identity
-                "archive",         # Stored karma-identity links
-            ]
+            # B1: O1_POTENTIAL ↔ O2_IDENTITY
+            "name": "Potential-Identity",
+            "description": "How dormant capacity becomes labeled/classified",
         },
         {
-            # B2: O2_IDENTITY ↔ O3_FORM (Identification-Body)
-            "name": "Identity-Form",
-            "description": "How labels crystallize into structure",
-            "sub_layers": [
-                "embodiment",      # Identity takes form
-                "representation",  # Symbolic form of identity
-                "structure",       # Organized identity
-                "pattern",         # Formal repetition
-                "shape",           # Contour of identity
-                "composition",     # Parts of form
-                "architecture",    # Structural identity
-                "manifestation",   # Identity made visible
-                "boundary",        # Form's limits
-                "crystallization", # Fixed form
-            ]
+            # B2: O2_IDENTITY ↔ O3_EXECUTION
+            "name": "Identity-Execution",
+            "description": "How labels drive action and karma",
         },
         {
-            # B3: O3_FORM ↔ O4_COGNITION (Body-Mind)
-            "name": "Form-Cognition",
-            "description": "How structure enables perception",
-            "sub_layers": [
-                "perception",      # Form perceived
-                "attention",       # Focus on form
-                "sensation",       # Bodily awareness
-                "emotion",         # Feeling about form
-                "model",           # Mental representation
-                "pattern",         # Cognitive structure
-                "recognition",     # Knowing the form
-                "memory",          # Form remembered
-                "imagination",     # Form visualized
-                "abstraction",     # Form conceptualized
-            ]
+            # B3: O3_EXECUTION ↔ O4_STRUCTURE
+            "name": "Execution-Structure",
+            "description": "How actions crystallize into form",
         },
         {
-            # B4: O4_COGNITION ↔ O5_AGENCY (Mind-Ego)
+            # B4: O4_STRUCTURE ↔ O5_COGNITION
+            "name": "Structure-Cognition",
+            "description": "How form enables perception",
+        },
+        {
+            # B5: O5_COGNITION ↔ O6_AGENCY
             "name": "Cognition-Agency",
             "description": "How perception enables control",
-            "sub_layers": [
-                "intention",       # Mental aim
-                "decision",        # Choosing to act
-                "will",            # Force of mind
-                "authorship",      # Mental ownership
-                "control",         # Directing cognition
-                "authority",       # Mental command
-                "focus",           # Concentrated will
-                "planning",        # Strategic cognition
-                "ownership",       # Claiming thoughts
-                "direction",       # Cognitive steering
-            ]
         },
         {
-            # B5: O5_AGENCY ↔ O6_REASONING (Ego-Intellect)
+            # B6: O6_AGENCY ↔ O7_REASONING
             "name": "Agency-Reasoning",
-            "description": "How will applies logic",
-            "sub_layers": [
-                "analysis",        # Breaking down intent
-                "inference",       # Reasoning from will
-                "validation",      # Checking decisions
-                "structure",       # Organized agency
-                "logic",           # Reasoned control
-                "discipline",      # Structured will
-                "rigor",           # Strict reasoning
-                "consistency",     # Non-contradictory will
-                "judgment",        # Reasoned decision
-                "accountability",  # Logical responsibility
-            ]
+            "description": "How control applies logic",
         },
         {
-            # B6: O6_REASONING ↔ O7_PURPOSE (Intellect-Soul)
+            # B7: O7_REASONING ↔ O8_PURPOSE
             "name": "Reasoning-Purpose",
             "description": "How logic serves meaning",
-            "sub_layers": [
-                "meaning",         # Why this logic
-                "motivation",      # Reason's drive
-                "direction",       # Purpose of reasoning
-                "alignment",       # Logic matches purpose
-                "wisdom",          # Deep reasoning
-                "philosophy",      # Underlying principles
-                "ethics",          # Moral reasoning
-                "teleology",       # Purpose-oriented logic
-                "fulfillment",     # Reasoning's goal
-                "transcendence",   # Beyond mere logic
-            ]
         },
         {
-            # B7: O7_PURPOSE ↔ O8_OBSERVATION (Soul-Witness)
-            "name": "Purpose-Observation",
-            "description": "How meaning enables awareness",
-            "sub_layers": [
-                "reflection",      # Purpose observed
-                "contemplation",   # Deep awareness of why
-                "insight",         # Seeing purpose
-                "perspective",     # Broader view of meaning
-                "witness",         # Observing purpose
-                "detachment",      # Distance from motive
-                "clarity",         # Clear seeing of why
-                "monitoring",      # Tracking purpose
-                "meta-awareness",  # Aware of being aware
-                "presence",        # Fully present to meaning
-            ]
+            # B8: O8_PURPOSE ↔ O9_WITNESSES
+            "name": "Purpose-Witnesses",
+            "description": "How meaning enables meta-observation",
         },
         {
-            # B8: O8_OBSERVATION ↔ O9_CORE (Witness-Atman)
-            "name": "Observation-Core",
-            "description": "How awareness reveals stable self",
-            "sub_layers": [
-                "recognition",     # Seeing true self
-                "identity",        # Stable self-reference
-                "integration",     # Parts become self
-                "unity",           # One self across contexts
-                "stability",       # Unchanging core
-                "essence",         # What remains
-                "continuity",      # Self across time
-                "coherence",       # Self-consistency
-                "grounding",       # Rooted in self
-                "presence",        # Being the self
-            ]
+            # B9: O9_WITNESSES ↔ O10_UNIFYING
+            "name": "Witnesses-Unifying",
+            "description": "How observation enables coherence",
         },
         {
-            # B9: O9_CORE ↔ O10_UNIVERSAL (Atman-Brahman)
-            "name": "Core-Universal",
-            "description": "How self connects to absolute",
-            "sub_layers": [
-                "unity",           # Self meets universal
-                "dissolution",     # Ego boundaries fade
-                "coherence",       # Total integration
-                "absoluteness",    # Beyond particulars
-                "transcendence",   # Beyond self
-                "completion",      # Nothing more needed
-                "peace",           # Final rest
-                "liberation",      # Freedom from limits
-                "oneness",         # No separation
-                "brahman",         # Ultimate unity
-            ]
+            # B10: O10_UNIFYING ↔ O11_INTEGRATION
+            "name": "Unifying-Integration",
+            "description": "How coherence leads to resolution",
+        },
+        {
+            # B11: O11_INTEGRATION ↔ O12_ABSOLVING
+            "name": "Integration-Absolving",
+            "description": "How resolution enables termination",
         },
     ]
 
@@ -393,7 +318,7 @@ def define_bhava_pairs() -> List[BhavaPair]:
             aspect=aspect,
             name=defn["name"],
             description=defn["description"],
-            sub_layers=defn["sub_layers"],
+            sub_layers=list(SUB_LAYER_NAMES),  # All 12 sub-layers
         ))
 
     return pairs
@@ -403,36 +328,36 @@ BHAVA_PAIRS = define_bhava_pairs()
 
 
 # =============================================================================
-# SEMANTIC BHAVA LAYER (PyTorch)
+# SEMANTIC BHAVA LAYER (PyTorch) - 12D
 # =============================================================================
 
 if PYTORCH_AVAILABLE:
 
     class SemanticBhavaLayer(nn.Module):
         """
-        Semantically-grounded Bhava layer with astrological structure.
+        Semantically-grounded Bhava layer with 12D structure.
 
         Architecture:
-            10D Ontological → 9 Pair Modules → 90D Semantic Bhava
+            12D Ontological → 11 Pair Modules → 132D Semantic Bhava
 
         Each pair module:
             - Takes the two relevant ontological dimensions
-            - Computes 10 sub-layer activations
+            - Computes 12 sub-layer activations
             - Applies aspect-based modulation
         """
 
         def __init__(
             self,
-            ontological_dim: int = 10,
-            sub_layers_per_pair: int = 10,
+            ontological_dim: int = 12,
+            sub_layers_per_pair: int = 12,
             hidden_dim: int = 32,
         ):
             super().__init__()
 
             self.ontological_dim = ontological_dim
-            self.num_pairs = ontological_dim - 1  # 9 pairs
+            self.num_pairs = ontological_dim - 1  # 11 pairs
             self.sub_layers_per_pair = sub_layers_per_pair
-            self.bhava_dim = self.num_pairs * sub_layers_per_pair  # 90
+            self.bhava_dim = self.num_pairs * sub_layers_per_pair  # 132
 
             # One module per Bhava pair
             self.pair_modules = nn.ModuleList([
@@ -455,29 +380,28 @@ if PYTORCH_AVAILABLE:
             # Cross-pair attention for non-adjacent interactions
             self.cross_attention = nn.MultiheadAttention(
                 embed_dim=sub_layers_per_pair,
-                num_heads=2,
+                num_heads=3,  # 12 is divisible by 3
                 batch_first=True,
             )
 
             # Store pair definitions for interpretability
             self.pair_names = [p.name for p in BHAVA_PAIRS]
-            self.sub_layer_names = [p.sub_layers for p in BHAVA_PAIRS]
+            self.sub_layer_names = SUB_LAYER_NAMES
 
         def forward(self, onto: torch.Tensor) -> Dict[str, torch.Tensor]:
             """
             Compute semantic Bhava from ontological vector.
 
             Args:
-                onto: Ontological probabilities (batch, 10)
+                onto: Ontological probabilities (batch, 12)
 
             Returns:
                 Dict with:
-                - bhava: Full 90D vector
-                - pairs: List of 9 pair outputs (each batch, 10)
+                - bhava: Full 132D vector
+                - pairs: List of 11 pair outputs (each batch, 12)
                 - attended: Cross-attended Bhava
             """
             batch_size = onto.shape[0]
-            device = onto.device
 
             # Compute each pair's sub-layers
             pair_outputs = []
@@ -486,7 +410,7 @@ if PYTORCH_AVAILABLE:
                 pair_input = onto[:, i:i+2]  # (batch, 2)
 
                 # Compute sub-layer activations
-                sub_layers = module(pair_input)  # (batch, 10)
+                sub_layers = module(pair_input)  # (batch, 12)
 
                 # Apply aspect modulation
                 sub_layers = sub_layers * self.aspect_weights[i]
@@ -494,7 +418,7 @@ if PYTORCH_AVAILABLE:
                 pair_outputs.append(sub_layers)
 
             # Stack pairs for attention
-            pairs_stacked = torch.stack(pair_outputs, dim=1)  # (batch, 9, 10)
+            pairs_stacked = torch.stack(pair_outputs, dim=1)  # (batch, 11, 12)
 
             # Cross-pair attention (how pairs influence each other)
             attended, _ = self.cross_attention(
@@ -504,8 +428,8 @@ if PYTORCH_AVAILABLE:
             # Combine: original + attended
             combined = pairs_stacked + 0.3 * attended
 
-            # Flatten to 90D
-            bhava = combined.view(batch_size, -1)  # (batch, 90)
+            # Flatten to 132D
+            bhava = combined.view(batch_size, -1)  # (batch, 132)
 
             return {
                 "bhava": bhava,
@@ -521,7 +445,6 @@ if PYTORCH_AVAILABLE:
         ) -> List[Dict[str, Any]]:
             """
             Interpret the Bhava activations semantically.
-
             Returns top activated sub-layers with their meanings.
             """
             interpretations = []
@@ -539,7 +462,7 @@ if PYTORCH_AVAILABLE:
                         "pair": self.pair_names[pair_idx],
                         "top_sub_layers": [
                             {
-                                "name": self.sub_layer_names[pair_idx][idx],
+                                "name": self.sub_layer_names[idx],
                                 "activation": float(activations[idx]),
                             }
                             for idx in top_indices
@@ -561,11 +484,11 @@ if PYTORCH_AVAILABLE:
 
     class AstrologicalOntologicalEngine(nn.Module):
         """
-        Ontological Engine with semantically-grounded Bhava.
+        12D Ontological Engine with semantically-grounded Bhava.
 
         Combines:
-        - Evidential classification (10D + uncertainty)
-        - Semantic Bhava layer (90D with interpretable sub-layers)
+        - Evidential classification (12D + uncertainty)
+        - Semantic Bhava layer (132D with interpretable sub-layers)
         - Planetary correspondence analysis
         - Astrological aspect modulation
         """
@@ -574,7 +497,7 @@ if PYTORCH_AVAILABLE:
             self,
             encoder_dim: int = 384,
             hidden_dims: Tuple[int, ...] = (256, 128),
-            ontological_dim: int = 10,
+            ontological_dim: int = 12,
             dropout: float = 0.1,
         ):
             super().__init__()
@@ -596,13 +519,13 @@ if PYTORCH_AVAILABLE:
             self.backbone = nn.Sequential(*layers)
             self.hidden_dim = prev_dim
 
-            # Evidential head
+            # Evidential head (12D)
             self.evidential = nn.Linear(prev_dim, ontological_dim)
 
-            # Semantic Bhava layer
+            # Semantic Bhava layer (132D)
             self.bhava = SemanticBhavaLayer(
                 ontological_dim=ontological_dim,
-                sub_layers_per_pair=10,
+                sub_layers_per_pair=12,
             )
 
             # Encoder (lazy loaded)
@@ -687,10 +610,10 @@ if PYTORCH_AVAILABLE:
                 "confidence": float(probs[dominant_idx]),
                 "uncertainty": uncertainty,
 
-                # Planetary (Patent-Exact)
+                # Planetary
                 "planet": planetary["planet"],
                 "sanskrit": planetary["sanskrit"],
-                "vedic": planetary["vedic"],  # Karma, Identification, Body, etc.
+                "vedic": planetary["vedic"],
                 "energy": planetary["energy"],
                 "element": planetary["element"],
                 "keywords": planetary["keywords"],
@@ -711,35 +634,40 @@ if PYTORCH_AVAILABLE:
 
             return f"""
 ============================================================
-ASTROLOGICAL ONTOLOGICAL ENGINE (Patent-Exact)
+12D ASTROLOGICAL ONTOLOGICAL ENGINE
 ============================================================
 
-Ontological Layers (Karma → Brahman):
-  O1_EXECUTION   → Mars (Mangala)    - Karma, actions
-  O2_IDENTITY    → Moon (Chandra)    - Identification, labels
-  O3_FORM        → Venus (Shukra)    - Body, structure
-  O4_COGNITION   → Mercury (Budha)   - Mind, perception
-  O5_AGENCY      → Sun (Surya)       - Ego, control
-  O6_REASONING   → Saturn (Shani)    - Intellect, logic
-  O7_PURPOSE     → Jupiter (Guru)    - Soul, meaning
-  O8_OBSERVATION → Ketu              - Witness, awareness
-  O9_CORE        → Rahu              - Atman, unified self
-  O10_UNIVERSAL  → Neptune (Brahman) - Coherence, unity
+Ontological Layers (Potential → Absolving):
+  O1_POTENTIAL    → Pluto (Yama)      - Dormant, latent
+  O2_IDENTITY     → Moon (Chandra)    - Tagging, labels
+  O3_EXECUTION    → Mars (Mangala)    - Action, karma
+  O4_STRUCTURE    → Venus (Shukra)    - Forming, embodiment
+  O5_COGNITION    → Mercury (Budha)   - Perception, attention
+  O6_AGENCY       → Sun (Surya)       - Direction, control
+  O7_REASONING    → Saturn (Shani)    - Discrimination, logic
+  O8_PURPOSE      → Jupiter (Guru)    - Meaning, motivation
+  O9_WITNESSES    → Ketu              - Meta-observation
+  O10_UNIFYING    → Rahu              - Coherence, synthesis
+  O11_INTEGRATION → Uranus (Varuna)   - Resolution
+  O12_ABSOLVING   → Neptune (Brahman) - Termination
 
-Bhava Pairs (9 × 10 sub-layers = 90D):
-  B1: Execution-Identity (Karma↔Identification)
-  B2: Identity-Form (Identification↔Body)
-  B3: Form-Cognition (Body↔Mind)
-  B4: Cognition-Agency (Mind↔Ego)
-  B5: Agency-Reasoning (Ego↔Intellect)
-  B6: Reasoning-Purpose (Intellect↔Soul)
-  B7: Purpose-Observation (Soul↔Witness)
-  B8: Observation-Core (Witness↔Atman)
-  B9: Core-Universal (Atman↔Brahman)
+Bhava Pairs (11 × 12 sub-layers = 132D):
+  B1:  Potential-Identity (O1↔O2)
+  B2:  Identity-Execution (O2↔O3)
+  B3:  Execution-Structure (O3↔O4)
+  B4:  Structure-Cognition (O4↔O5)
+  B5:  Cognition-Agency (O5↔O6)
+  B6:  Agency-Reasoning (O6↔O7)
+  B7:  Reasoning-Purpose (O7↔O8)
+  B8:  Purpose-Witnesses (O8↔O9)
+  B9:  Witnesses-Unifying (O9↔O10)
+  B10: Unifying-Integration (O10↔O11)
+  B11: Integration-Absolving (O11↔O12)
 
-Directional Flow:
-  Upward:   Execution → Universal (cause tracing)
-  Downward: Universal → Execution (grounding)
+Sub-layers (12 per pair):
+  potential, identity, execution, structure,
+  cognition, agency, reasoning, purpose,
+  witnesses, unifying, integration, absolving
 
 Total Parameters: {total_params:,}
 ============================================================

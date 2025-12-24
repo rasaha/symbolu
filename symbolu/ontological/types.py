@@ -2,35 +2,45 @@
 Ontological Types and Definitions
 =================================
 
-Core type definitions for the 10-dimensional ontological engine.
+Core type definitions for the 12-dimensional ontological engine.
 """
 
 from typing import Tuple, Dict, List, Optional, Any
 from dataclasses import dataclass, field
 
 
-# The 10 Ontological Layers (Patent-Exact Sequence)
-# Lowest (most concrete) → Highest (most abstract)
-# Karma → Identification → Body → Mind → Ego → Intellect → Soul → Witness → Atman → Brahman
+# The 12 Ontological Layers (Patent-Exact Sequence)
+# Lowest (dormant) → Highest (termination)
 LAYER_NAMES: Tuple[str, ...] = (
-    "O1_EXECUTION",     # Karma - Actions, behaviors, consequences, output
-    "O2_IDENTITY",      # Identification - Labels, roles, references, self-object
-    "O3_FORM",          # Body - Structural, physical, representational form
-    "O4_COGNITION",     # Mind - Attention, emotion, perception, mental movement
-    "O5_AGENCY",        # Ego - Control, intent, authorship, decision authority
-    "O6_REASONING",     # Intellect - Logic, inference, analysis, structured thinking
-    "O7_PURPOSE",       # Soul - Meaning, motivation, intrinsic direction, why
-    "O8_OBSERVATION",   # Witness - Meta-awareness, reflection, monitoring
-    "O9_CORE",          # Atman - Unified self-reference, stable identity
-    "O10_UNIVERSAL",    # Brahman - Coherence, absoluteness, highest abstraction
+    "O1_POTENTIAL",     # Dormant - Latent capacity, unrealized possibility
+    "O2_IDENTITY",      # Tagging - Labels, roles, references, classification
+    "O3_EXECUTION",     # Action - Behaviors, consequences, output, karma
+    "O4_STRUCTURE",     # Forming - Physical form, patterns, embodiment
+    "O5_COGNITION",     # Perception - Attention, emotion, mental movement
+    "O6_AGENCY",        # Direction - Control, intent, authorship, steering
+    "O7_REASONING",     # Discrimination - Logic, inference, analysis
+    "O8_PURPOSE",       # Meaning - Motivation, intrinsic direction, why
+    "O9_WITNESSES",     # Meta-Observation - Awareness, reflection, monitoring
+    "O10_UNIFYING",     # Coherence - Synthesis, harmony, integration
+    "O11_INTEGRATION",  # Resolution - Consolidation, completion of parts
+    "O12_ABSOLVING",    # Termination - Release, dissolution, final boundary
 )
 
 # Layer name to index mapping
 LAYER_INDEX: Dict[str, int] = {name: i for i, name in enumerate(LAYER_NAMES)}
 
-# Layer groups for task heads (patent-aligned indices)
-REASONING_LAYERS: Tuple[int, ...] = (3, 5, 7)  # O4_COGNITION, O6_REASONING, O8_OBSERVATION
-CREATIVITY_LAYERS: Tuple[int, ...] = (2, 6, 8)  # O3_FORM, O7_PURPOSE, O9_CORE
+# Number of ontological dimensions
+NUM_LAYERS: int = 12
+
+# Number of Bhava pairs (adjacent layer relationships)
+NUM_BHAVA_PAIRS: int = 11  # 12 layers - 1
+
+# Sub-layers per Bhava pair (matches ontological layer count)
+SUB_LAYERS_PER_PAIR: int = 12
+
+# Layer groups for task heads (12D indices)
+REASONING_LAYERS: Tuple[int, ...] = (4, 6, 8)   # O5_COGNITION, O7_REASONING, O9_WITNESSES
+CREATIVITY_LAYERS: Tuple[int, ...] = (3, 7, 9)  # O4_STRUCTURE, O8_PURPOSE, O10_UNIFYING
 
 # Task types for training
 class TaskType:
@@ -41,11 +51,11 @@ class TaskType:
 
 @dataclass
 class OntologicalConfig:
-    """Configuration for the ontological engine."""
-    input_dim: int = 768  # DistilBERT output
+    """Configuration for the 12D ontological engine."""
+    input_dim: int = 768  # DistilBERT output (or 384 for MiniLM)
     hidden_dims: Tuple[int, ...] = (512, 256)
-    output_dim: int = 10  # 10 ontological layers
-    bhava_dim: int = 100  # 9 pairs × 10 sub-layers + 10 onto
+    output_dim: int = 12  # 12 ontological layers
+    bhava_dim: int = 144  # 11 pairs × 12 sub-layers + 12 onto = 132 + 12
     dropout: float = 0.1
     use_skip_connections: bool = True
     use_layer_norm: bool = True
@@ -54,17 +64,17 @@ class OntologicalConfig:
 @dataclass
 class OntologicalVector:
     """
-    A 10-dimensional vector representing ontological activations.
+    A 12-dimensional vector representing ontological activations.
     """
-    values: List[float] = field(default_factory=lambda: [0.0] * 10)
+    values: List[float] = field(default_factory=lambda: [0.0] * 12)
 
     def __post_init__(self):
-        if len(self.values) != 10:
-            raise ValueError(f"Expected 10 values, got {len(self.values)}")
+        if len(self.values) != 12:
+            raise ValueError(f"Expected 12 values, got {len(self.values)}")
 
     def to_dict(self) -> Dict[str, float]:
         """Convert to layer name -> value dictionary."""
-        return {LAYER_NAMES[i]: self.values[i] for i in range(10)}
+        return {LAYER_NAMES[i]: self.values[i] for i in range(12)}
 
     @classmethod
     def from_dict(cls, d: Dict[str, float]) -> "OntologicalVector":
@@ -78,12 +88,12 @@ class OntologicalVector:
         return LAYER_NAMES[max_idx]
 
     def reasoning_score(self) -> float:
-        """O6_REASONING activation."""
-        return self.values[5]
+        """O7_REASONING activation."""
+        return self.values[6]
 
     def creativity_score(self) -> float:
-        """O2_FORMING activation."""
-        return self.values[1]
+        """O4_STRUCTURE activation."""
+        return self.values[3]
 
 
 @dataclass
@@ -96,7 +106,7 @@ class TrainingExample:
     is_creativity: bool = False
     reasoning_score: Optional[float] = None
     creativity_score: Optional[float] = None
-    domain: Optional[int] = None  # 0-4: technical, reasoning, creative, action, governance
+    domain: Optional[int] = None  # 0-11: one of the 12 domains
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for batch processing."""
@@ -131,7 +141,7 @@ class TrainingBatch:
         onto_targets = None
         if any(e.onto_labels for e in examples):
             onto_targets = [
-                [e.onto_labels.get(name, 0.0) for name in LAYER_NAMES] if e.onto_labels else [0.0] * 10
+                [e.onto_labels.get(name, 0.0) for name in LAYER_NAMES] if e.onto_labels else [0.0] * 12
                 for e in examples
             ]
 

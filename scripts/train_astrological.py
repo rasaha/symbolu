@@ -49,7 +49,7 @@ def main():
         sys.exit(1)
 
     print("=" * 60)
-    print("ASTROLOGICAL ONTOLOGICAL ENGINE")
+    print("12D ASTROLOGICAL ONTOLOGICAL ENGINE")
     print("=" * 60)
     print(f"Epochs: {args.epochs}")
     print(f"Batch size: {args.batch_size}")
@@ -184,18 +184,20 @@ def main():
         print("ASTROLOGICAL BENCHMARK")
         print("=" * 60)
 
-        # Test examples (Patent-Exact Layer Names: Karma → Brahman)
+        # Test examples (12D Ontological Layers: Potential → Absolving)
         test_texts = [
-            ("Run the script now", "O1_EXECUTION"),          # Karma - action/output
-            ("I am a software engineer", "O2_IDENTITY"),     # Identification - roles/labels
-            ("The structure is solid", "O3_FORM"),           # Body - form/structure
-            ("I feel so happy today", "O4_COGNITION"),       # Mind - emotion/perception
-            ("I decide to proceed", "O5_AGENCY"),            # Ego - control/decision
-            ("Calculate 25 multiplied by 4", "O6_REASONING"), # Intellect - logic/inference
-            ("What is the meaning of life?", "O7_PURPOSE"),  # Soul - meaning/why
-            ("Observe your thoughts", "O8_OBSERVATION"),     # Witness - meta-awareness
-            ("I am always myself", "O9_CORE"),               # Atman - unified self
-            ("All is one", "O10_UNIVERSAL"),                 # Brahman - coherence/unity
+            ("This could become something great", "O1_POTENTIAL"),    # Dormant - latent capacity
+            ("I am a software engineer", "O2_IDENTITY"),              # Tagging - labels, roles
+            ("Run the script now", "O3_EXECUTION"),                   # Action - karma, behavior
+            ("The structure is solid", "O4_STRUCTURE"),               # Forming - embodiment
+            ("I feel so happy today", "O5_COGNITION"),                # Perception - emotion
+            ("I decide to proceed", "O6_AGENCY"),                     # Direction - control
+            ("Calculate 25 multiplied by 4", "O7_REASONING"),         # Discrimination - logic
+            ("What is the meaning of life?", "O8_PURPOSE"),           # Meaning - motivation
+            ("Observe your thoughts", "O9_WITNESSES"),                # Meta-observation
+            ("Everything is connected", "O10_UNIFYING"),              # Coherence - synthesis
+            ("All parts come together", "O11_INTEGRATION"),           # Resolution - consolidation
+            ("Let go and surrender", "O12_ABSOLVING"),                # Termination - release
         ]
 
         print("\nSample Astrological Analysis:")
