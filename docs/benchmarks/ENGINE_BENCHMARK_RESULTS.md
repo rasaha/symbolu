@@ -53,41 +53,45 @@ This document presents benchmark results for the three-tier Symbolu engine archi
 | Relationship | 88%      | 7/8 queries - improved with comprehensive keywords |
 | **Overall**  | **98%**  | 39/40 total queries |
 
-### 2. Homonym Disambiguation (12D Architecture)
+### 2. Homonym Disambiguation (12D + p_v[v] Formula)
 
-**Current Status: Fundamental Phoneme Limit Reached**
+**Current Status: p_v[v] Formula Improves Cross-Domain Matching**
 
-| Homonym  | 10D Accuracy | 12D Accuracy | Notes |
-|----------|--------------|--------------|-------|
-| "light"  | 75%          | 75%          | Physics vs art contexts distinguishable |
-| "run"    | 50%          | 50%          | Tech vs physical contexts |
-| "spring" | 50%          | 50%          | Season vs mechanism |
-| "bank"   | 20%          | 20%          | Financial vs nature (hardest case) |
-| **Overall** | **47%**   | **47%**      | 12D did not improve - see analysis below |
+| Homonym  | 10D | 12D (phoneme only) | 12D + p_v[v] | Improvement |
+|----------|-----|--------------------|--------------| ------------|
+| "light"  | 75% | 75%                | **75%**      | Maintained  |
+| "run"    | 50% | 50%                | **50%**      | Maintained  |
+| "spring" | 50% | 50%                | **75%**      | **+25%**    |
+| "bank"   | 20% | 20%                | **20%**      | (hardest)   |
+| **Overall** | 47% | 47%             | **53%**      | **+6 pts**  |
 
-**Why 12D Didn't Improve Cross-Domain Matching:**
+**How p_v[v] Formula Improves Disambiguation:**
 
-The 12D upgrade added two layers (O1_POTENTIAL, O11_INTEGRATION) but did NOT improve homonym disambiguation because:
+The core formula `p_w[a] = normalize( E(w,c) · Φ(a) · Σ p_v[v] · R[v,a] + B_c(h(c)) )` now integrated:
 
-1. **Phonemes encode SOUND, not MEANING**
-   - "bank" (financial) → phonemes B-AE-N-K → 12D vector [0.07, 0.24, 0.42, ...]
-   - "bank" (river) → phonemes B-AE-N-K → 12D vector [0.07, 0.24, 0.42, ...]
-   - Same phonemes = identical vector regardless of semantic meaning
+1. **Cognitive mode detection (p_v[v])**
+   - Financial terms → boost Pramāṇa (valid cognition) → O7_REASONING, O3_EXECUTION
+   - Nature terms → boost Vikalpa (conceptualization) → O5_COGNITION, O4_STRUCTURE
+   - Technical terms → boost Pramāṇa + Smṛti → O3_EXECUTION
 
-2. **Cross-matching depends on context words**
-   - Financial: "money" → O10_UNIFYING, "deposit" → O3_EXECUTION
-   - Nature: "river" → O4_STRUCTURE, "sunset" → O7_REASONING
-   - Both contexts have overlapping phoneme patterns, limiting disambiguation
+2. **R[v,a] matrix biasing (5×12)**
+   - Vṛtti distribution multiplied by coupling matrix
+   - Biases layer totals before dominant layer selection
 
-3. **47% is 2.8x better than random (17%)**
-   - For zero-parameter symbolic approach, this is the expected ceiling
-   - Exceeding this requires semantic understanding, not phoneme analysis
+3. **Domain-specific term detection**
+   - Financial: "deposit", "money", "account", "balance", "loan"
+   - Nature: "river", "stream", "sunset", "meadow", "peaceful"
+   - Technical: "test", "database", "migration", "deploy"
 
-**Paths to Improvement:**
-- **SessionContext accumulation**: Prior queries build disambiguation context
-- **132D Bhava layer integration**: Relational dynamics between layer pairs (not yet in router)
-- **768D semantic encoder (Tier 3)**: Uses actual word meanings, not sounds
-- **Keyword domain hints**: "bank account" → financial, "river bank" → nature
+**Remaining Limitations:**
+- "bank" still at 20% (identical phonemes regardless of meaning)
+- Phoneme patterns still dominate over vṛtti weighting
+- Further tuning of R[v,a] weights could improve results
+
+**Paths to Further Improvement:**
+- Increase vṛtti weighting strength (currently 0.5)
+- Fine-tune R[v,a] matrix couplings for 12D layers
+- Add SessionContext accumulation for multi-turn disambiguation
 
 ### 3. Latency Comparison
 
@@ -410,8 +414,9 @@ print(f'Intent: {result.model_type.value}, Confidence: {result.confidence:.0%}')
 
 - **Date**: 2025-12-24
 - **Last benchmark run**: 2025-12-24
-- **Architecture**: 12D Ontological (migrated from 10D)
+- **Architecture**: 12D Ontological + p_v[v] Formula
 - **Branch**: claude/ontological-vs-llm-comparison-NcWYe
+- **Key Improvement**: Cross-domain matching 47% → 53% (+6 pts)
 - **Commits**:
   - feat: Add keyword pattern boosting (32% → 98%)
   - feat: Add semantic cross-matching for homonyms
