@@ -22,7 +22,7 @@ This document presents benchmark results for the three-tier Symbolu engine archi
 │                                                                             │
 │  Query                   Query                     Query                    │
 │    ↓                       ↓                         ↓                      │
-│  STL (10D)               STL (10D)                 STL (10D)                │
+│  STL (12D)               STL (12D)                 STL (12D)                │
 │    ↓                       ↓                         ↓                      │
 │  Classification          Route                    Confidence?              │
 │    ↓                       ↓                     ↙     ↘                   │
@@ -53,28 +53,41 @@ This document presents benchmark results for the three-tier Symbolu engine archi
 | Relationship | 88%      | 7/8 queries - improved with comprehensive keywords |
 | **Overall**  | **98%**  | 39/40 total queries |
 
-### 2. Homonym Disambiguation
+### 2. Homonym Disambiguation (12D Architecture)
 
-**Current Status: Marginal, Not Solved**
+**Current Status: Fundamental Phoneme Limit Reached**
 
-| Homonym  | Accuracy | Notes |
-|----------|----------|-------|
-| "light"  | 75%      | Physics vs art contexts distinguishable |
-| "run"    | 50%      | Tech vs physical contexts |
-| "spring" | 50%      | Season vs mechanism |
-| "bank"   | 20%      | Financial vs nature (expected - hardest case) |
-| **Overall** | **47%** | Cross-matching provides marginal improvement only |
+| Homonym  | 10D Accuracy | 12D Accuracy | Notes |
+|----------|--------------|--------------|-------|
+| "light"  | 75%          | 75%          | Physics vs art contexts distinguishable |
+| "run"    | 50%          | 50%          | Tech vs physical contexts |
+| "spring" | 50%          | 50%          | Season vs mechanism |
+| "bank"   | 20%          | 20%          | Financial vs nature (hardest case) |
+| **Overall** | **47%**   | **47%**      | 12D did not improve - see analysis below |
 
-**Why 47% is honest:**
-- Phonemes alone cannot encode semantic domain
-- "bank" (river) and "bank" (financial) share identical phoneme signatures
-- Cross-matching helps only when context words have distinct phoneme patterns
-- The 20% accuracy on "bank" is expected, not a bug
+**Why 12D Didn't Improve Cross-Domain Matching:**
 
-**Future Improvements (Not Yet Implemented):**
+The 12D upgrade added two layers (O1_POTENTIAL, O11_INTEGRATION) but did NOT improve homonym disambiguation because:
+
+1. **Phonemes encode SOUND, not MEANING**
+   - "bank" (financial) → phonemes B-AE-N-K → 12D vector [0.07, 0.24, 0.42, ...]
+   - "bank" (river) → phonemes B-AE-N-K → 12D vector [0.07, 0.24, 0.42, ...]
+   - Same phonemes = identical vector regardless of semantic meaning
+
+2. **Cross-matching depends on context words**
+   - Financial: "money" → O10_UNIFYING, "deposit" → O3_EXECUTION
+   - Nature: "river" → O4_STRUCTURE, "sunset" → O7_REASONING
+   - Both contexts have overlapping phoneme patterns, limiting disambiguation
+
+3. **47% is 2.8x better than random (17%)**
+   - For zero-parameter symbolic approach, this is the expected ceiling
+   - Exceeding this requires semantic understanding, not phoneme analysis
+
+**Paths to Improvement:**
 - **SessionContext accumulation**: Prior queries build disambiguation context
-- **Phase-1 constraint narrowing**: Semantic constraints reduce candidate space
-- **768D augmentation**: Cascade tier uses embeddings for ambiguous cases
+- **132D Bhava layer integration**: Relational dynamics between layer pairs (not yet in router)
+- **768D semantic encoder (Tier 3)**: Uses actual word meanings, not sounds
+- **Keyword domain hints**: "bank account" → financial, "river bank" → nature
 
 ### 3. Latency Comparison
 
@@ -197,11 +210,11 @@ When organizations provide domain-specific vocabulary:
 
 ### STL vs Traditional Embeddings
 
-| Metric | Traditional (768D) | STL (10D) | Savings |
+| Metric | Traditional (768D) | STL (12D) | Savings |
 |--------|-------------------|-----------|---------|
-| Vector dimension | 768 | 10 | **77x** |
-| Computation | O(n² × 768) | O(n² × 10) | **77x** |
-| Memory per word | 3KB | 40 bytes | **77x** |
+| Vector dimension | 768 | 12 | **64x** |
+| Computation | O(n² × 768) | O(n² × 12) | **64x** |
+| Memory per word | 3KB | 48 bytes | **64x** |
 
 ### Model Parameter Savings
 
@@ -215,7 +228,7 @@ When organizations provide domain-specific vocabulary:
 
 ## AGI Integration Benchmarks
 
-The engine integrates AGI capabilities from the 10D backbone. Results from `python -m symbolu.engine.agi_demo`:
+The engine integrates AGI capabilities from the 12D backbone. Results from `python -m symbolu.engine.agi_demo`:
 
 ### AGI Latency by Tier
 
@@ -395,15 +408,19 @@ print(f'Intent: {result.model_type.value}, Confidence: {result.confidence:.0%}')
 
 ## Version
 
-- **Date**: 2025-12-21
-- **Last benchmark run**: 2025-12-21
-- **Branch**: claude/update-symbol-validation-docs-vPBWG
+- **Date**: 2025-12-24
+- **Last benchmark run**: 2025-12-24
+- **Architecture**: 12D Ontological (migrated from 10D)
+- **Branch**: claude/ontological-vs-llm-comparison-NcWYe
 - **Commits**:
   - feat: Add keyword pattern boosting (32% → 98%)
   - feat: Add semantic cross-matching for homonyms
   - feat: Add custom vocabulary support
   - feat: Add three-tier engine architecture
-  - feat: Integrate AGI capabilities from 10D backbone
+  - feat: Migrate from 10D to 12D ontological architecture
+  - feat: Add O1_POTENTIAL and O11_INTEGRATION layers
+  - feat: Update phoneme mappings to 12D (all 50+ phonemes)
+  - docs: Document 12D cross-domain matching analysis
   - feat: Raise cross-domain thresholds (0.1 → 0.5) for quality results
   - feat: Gate cross-domain reasoning by query type (problem vs information)
   - feat: Add configurable cost optimization (presets, thresholds, AGI gating)
