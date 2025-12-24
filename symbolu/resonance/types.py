@@ -15,16 +15,16 @@ class PhonemeCategory(Enum):
     """
     Phoneme categories based on articulation manner.
 
-    Each category has distinct ontological affinities:
-    - PLOSIVE: Sudden, forceful → ACTING, DIRECTING
-    - FRICATIVE: Continuous, controlled → DIRECTING, REASONING
-    - AFFRICATE: Combined action → ACTING, FORMING
-    - NASAL: Resonant, connecting → UNIFYING, THINKING
-    - LIQUID: Flowing, smooth → FORMING, UNIFYING
-    - GLIDE: Transitional → FORMING, PURPOSING
-    - VOWEL_SHORT: Brief, focused → THINKING, TAGGING
+    Each category has distinct ontological affinities (12D):
+    - PLOSIVE: Sudden, forceful → EXECUTION, AGENCY
+    - FRICATIVE: Continuous, controlled → AGENCY, REASONING
+    - AFFRICATE: Combined action → EXECUTION, STRUCTURE
+    - NASAL: Resonant, connecting → UNIFYING, COGNITION
+    - LIQUID: Flowing, smooth → STRUCTURE, UNIFYING
+    - GLIDE: Transitional → STRUCTURE, PURPOSE
+    - VOWEL_SHORT: Brief, focused → COGNITION, IDENTITY
     - VOWEL_LONG: Sustained, open → ABSOLVING, UNIFYING
-    - DIPHTHONG: Rising/falling → PURPOSING, FORMING
+    - DIPHTHONG: Rising/falling → PURPOSE, STRUCTURE
     """
     PLOSIVE = "plosive"           # p, b, t, d, k, g
     FRICATIVE = "fricative"       # f, v, s, z, sh, th, h
@@ -39,34 +39,38 @@ class PhonemeCategory(Enum):
 
 class OntologicalLayer(Enum):
     """
-    The 10 ontological layers for meaning projection.
+    The 12 ontological layers for meaning projection (patent-exact sequence).
 
     Each word resonates with multiple layers at different strengths.
     """
-    O1_THINKING = "O1_THINKING"
-    O2_FORMING = "O2_FORMING"
-    O3_ACTING = "O3_ACTING"
-    O4_TAGGING = "O4_TAGGING"
-    O5_DIRECTING = "O5_DIRECTING"
-    O6_REASONING = "O6_REASONING"
-    O7_PURPOSING = "O7_PURPOSING"
-    O8_META_OBSERVING = "O8_META_OBSERVING"
-    O9_UNIFYING = "O9_UNIFYING"
-    O10_ABSOLVING = "O10_ABSOLVING"
+    O1_POTENTIAL = "O1_POTENTIAL"          # Dormant capacity
+    O2_IDENTITY = "O2_IDENTITY"            # Classificatory marking
+    O3_EXECUTION = "O3_EXECUTION"          # Somatic initiation/karma
+    O4_STRUCTURE = "O4_STRUCTURE"          # Shaping force/embodiment
+    O5_COGNITION = "O5_COGNITION"          # Perception/attention
+    O6_AGENCY = "O6_AGENCY"                # Vector orientation/control
+    O7_REASONING = "O7_REASONING"          # Sequential logic
+    O8_PURPOSE = "O8_PURPOSE"              # Teleological orientation
+    O9_WITNESSES = "O9_WITNESSES"          # Meta-observation
+    O10_UNIFYING = "O10_UNIFYING"          # Field coherence
+    O11_INTEGRATION = "O11_INTEGRATION"    # Resolution/consolidation
+    O12_ABSOLVING = "O12_ABSOLVING"        # Terminal dissolution
 
 
-# Layer names for easy indexing
+# Layer names for easy indexing (12D patent-exact sequence)
 LAYER_NAMES: Tuple[str, ...] = (
-    "O1_THINKING",
-    "O2_FORMING",
-    "O3_ACTING",
-    "O4_TAGGING",
-    "O5_DIRECTING",
-    "O6_REASONING",
-    "O7_PURPOSING",
-    "O8_META_OBSERVING",
-    "O9_UNIFYING",
-    "O10_ABSOLVING",
+    "O1_POTENTIAL",
+    "O2_IDENTITY",
+    "O3_EXECUTION",
+    "O4_STRUCTURE",
+    "O5_COGNITION",
+    "O6_AGENCY",
+    "O7_REASONING",
+    "O8_PURPOSE",
+    "O9_WITNESSES",
+    "O10_UNIFYING",
+    "O11_INTEGRATION",
+    "O12_ABSOLVING",
 )
 
 
@@ -78,44 +82,44 @@ class PhonemeProfile:
     Attributes:
         phoneme: The phoneme symbol (ARPABET format, e.g., "L", "AY", "T")
         category: The phoneme category (LIQUID, DIPHTHONG, etc.)
-        layer_affinities: 10D vector of affinities to each ontological layer
+        layer_affinities: 12D vector of affinities to each ontological layer
     """
     phoneme: str
     category: PhonemeCategory
-    layer_affinities: Tuple[float, ...]  # 10 values, one per layer
+    layer_affinities: Tuple[float, ...]  # 12 values, one per layer
 
     def __post_init__(self):
-        if len(self.layer_affinities) != 10:
-            raise ValueError(f"layer_affinities must have 10 values, got {len(self.layer_affinities)}")
+        if len(self.layer_affinities) != 12:
+            raise ValueError(f"layer_affinities must have 12 values, got {len(self.layer_affinities)}")
 
 
 @dataclass(frozen=True)
 class WordVector:
     """
-    10D ontological vector for a word.
+    12D ontological vector for a word.
 
     Attributes:
         word: The original word
         phonemes: Tuple of phonemes extracted from the word
-        vector: 10D normalized vector (sums to ~1.0)
+        vector: 12D normalized vector (sums to ~1.0)
         trajectory: Magnitude at each phoneme position (for prosodic shape)
         dominant_layer: The layer with highest affinity
         dominant_score: The score of the dominant layer
     """
     word: str
     phonemes: Tuple[str, ...]
-    vector: Tuple[float, ...]           # 10 dimensions
+    vector: Tuple[float, ...]           # 12 dimensions
     trajectory: Tuple[float, ...]       # magnitude per phoneme
     dominant_layer: str
     dominant_score: float
 
     def __post_init__(self):
-        if len(self.vector) != 10:
-            raise ValueError(f"vector must have 10 values, got {len(self.vector)}")
+        if len(self.vector) != 12:
+            raise ValueError(f"vector must have 12 values, got {len(self.vector)}")
 
     def get_top_layers(self, n: int = 3) -> Tuple[Tuple[str, float], ...]:
         """Get the top N layers by score."""
-        indexed = [(LAYER_NAMES[i], self.vector[i]) for i in range(10)]
+        indexed = [(LAYER_NAMES[i], self.vector[i]) for i in range(12)]
         sorted_layers = sorted(indexed, key=lambda x: x[1], reverse=True)
         return tuple(sorted_layers[:n])
 
