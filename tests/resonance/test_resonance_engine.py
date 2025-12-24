@@ -3,7 +3,7 @@ Tests for Phonetic Resonance Engine
 ===================================
 
 Validates:
-1. Phoneme → 12D vector conversion
+1. Phoneme → 12D vector conversion (patent-exact sequence)
 2. Word vector properties (normalization, dimensionality)
 3. Resonance computation (cosine similarity)
 4. Phrase harmony analysis

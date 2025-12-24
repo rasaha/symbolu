@@ -15,16 +15,16 @@ class PhonemeCategory(Enum):
     """
     Phoneme categories based on articulation manner.
 
-    Each category has distinct ontological affinities:
-    - PLOSIVE: Sudden, forceful → ACTING, DIRECTING
-    - FRICATIVE: Continuous, controlled → DIRECTING, REASONING
-    - AFFRICATE: Combined action → ACTING, FORMING
-    - NASAL: Resonant, connecting → UNIFYING, THINKING
-    - LIQUID: Flowing, smooth → FORMING, UNIFYING
-    - GLIDE: Transitional → FORMING, PURPOSING
-    - VOWEL_SHORT: Brief, focused → THINKING, TAGGING
+    Each category has distinct ontological affinities (12D):
+    - PLOSIVE: Sudden, forceful → EXECUTION, AGENCY
+    - FRICATIVE: Continuous, controlled → AGENCY, REASONING
+    - AFFRICATE: Combined action → EXECUTION, STRUCTURE
+    - NASAL: Resonant, connecting → UNIFYING, COGNITION
+    - LIQUID: Flowing, smooth → STRUCTURE, UNIFYING
+    - GLIDE: Transitional → STRUCTURE, PURPOSE
+    - VOWEL_SHORT: Brief, focused → COGNITION, IDENTITY
     - VOWEL_LONG: Sustained, open → ABSOLVING, UNIFYING
-    - DIPHTHONG: Rising/falling → PURPOSING, FORMING
+    - DIPHTHONG: Rising/falling → PURPOSE, STRUCTURE
     """
     PLOSIVE = "plosive"           # p, b, t, d, k, g
     FRICATIVE = "fricative"       # f, v, s, z, sh, th, h
@@ -39,25 +39,25 @@ class PhonemeCategory(Enum):
 
 class OntologicalLayer(Enum):
     """
-    The 12 ontological layers for meaning projection.
+    The 12 ontological layers for meaning projection (patent-exact sequence).
 
     Each word resonates with multiple layers at different strengths.
     """
-    O1_POTENTIAL = "O1_POTENTIAL"
-    O2_IDENTITY = "O2_IDENTITY"
-    O3_EXECUTION = "O3_EXECUTION"
-    O4_STRUCTURE = "O4_STRUCTURE"
-    O5_COGNITION = "O5_COGNITION"
-    O6_AGENCY = "O6_AGENCY"
-    O7_REASONING = "O7_REASONING"
-    O8_PURPOSE = "O8_PURPOSE"
-    O9_WITNESSES = "O9_WITNESSES"
-    O10_UNIFYING = "O10_UNIFYING"
-    O11_INTEGRATION = "O11_INTEGRATION"
-    O12_ABSOLVING = "O12_ABSOLVING"
+    O1_POTENTIAL = "O1_POTENTIAL"          # Dormant capacity
+    O2_IDENTITY = "O2_IDENTITY"            # Classificatory marking
+    O3_EXECUTION = "O3_EXECUTION"          # Somatic initiation/karma
+    O4_STRUCTURE = "O4_STRUCTURE"          # Shaping force/embodiment
+    O5_COGNITION = "O5_COGNITION"          # Perception/attention
+    O6_AGENCY = "O6_AGENCY"                # Vector orientation/control
+    O7_REASONING = "O7_REASONING"          # Sequential logic
+    O8_PURPOSE = "O8_PURPOSE"              # Teleological orientation
+    O9_WITNESSES = "O9_WITNESSES"          # Meta-observation
+    O10_UNIFYING = "O10_UNIFYING"          # Field coherence
+    O11_INTEGRATION = "O11_INTEGRATION"    # Resolution/consolidation
+    O12_ABSOLVING = "O12_ABSOLVING"        # Terminal dissolution
 
 
-# Layer names for easy indexing
+# Layer names for easy indexing (12D patent-exact sequence)
 LAYER_NAMES: Tuple[str, ...] = (
     "O1_POTENTIAL",
     "O2_IDENTITY",

@@ -9,9 +9,9 @@
       "No observer/observed logic",
       "No contextual semantics",
       "No heuristic phonetics"
-    ]
+    ],
+    "migration_note": "Migrated from 10D to 12D layer naming (2024-12-24)"
   },
-
   "vowels": {
     "a": {
       "type": "vowel",
@@ -62,7 +62,6 @@
       "bridge_meaning": "dissolutive_attraction"
     }
   },
-
   "consonants": {
     "ka": {
       "type": "consonant",
@@ -79,7 +78,9 @@
         "O8_PURPOSE": "forward orientation vector",
         "O9_WITNESSES": "projection pattern tracking",
         "O10_UNIFYING": "collective anticipation coherence",
-        "O12_ABSOLVING": "dissolution of projection"
+        "O12_ABSOLVING": "dissolution of projection",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "kha": {
@@ -97,7 +98,9 @@
         "O8_PURPOSE": "prevention orientation vector",
         "O9_WITNESSES": "impediment pattern tracking",
         "O10_UNIFYING": "distributed vigilance coherence",
-        "O12_ABSOLVING": "vigilance termination"
+        "O12_ABSOLVING": "vigilance termination",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ga": {
@@ -115,7 +118,9 @@
         "O8_PURPOSE": "completion orientation vector",
         "O9_WITNESSES": "momentum pattern tracking",
         "O10_UNIFYING": "coordinated kinetic coherence",
-        "O12_ABSOLVING": "completion of momentum"
+        "O12_ABSOLVING": "completion of momentum",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "gha": {
@@ -133,7 +138,9 @@
         "O8_PURPOSE": "preservation orientation vector",
         "O9_WITNESSES": "adhesion pattern tracking",
         "O10_UNIFYING": "cohesive field integration",
-        "O12_ABSOLVING": "unbinding dissolution"
+        "O12_ABSOLVING": "unbinding dissolution",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "nga": {
@@ -151,10 +158,11 @@
         "O8_PURPOSE": "indication orientation vector",
         "O9_WITNESSES": "marking pattern tracking",
         "O10_UNIFYING": "marker field integration",
-        "O12_ABSOLVING": "attenuation of marking"
+        "O12_ABSOLVING": "attenuation of marking",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "ca": {
       "type": "consonant",
       "aspirated": false,
@@ -170,7 +178,9 @@
         "O8_PURPOSE": "alignment orientation vector",
         "O9_WITNESSES": "boundary pattern tracking",
         "O10_UNIFYING": "distributed constraint coherence",
-        "O12_ABSOLVING": "transcendence of boundary"
+        "O12_ABSOLVING": "transcendence of boundary",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "cha": {
@@ -188,7 +198,9 @@
         "O8_PURPOSE": "discharge orientation vector",
         "O9_WITNESSES": "saturation pattern tracking",
         "O10_UNIFYING": "cascading fragmentation field",
-        "O12_ABSOLVING": "system reset termination"
+        "O12_ABSOLVING": "system reset termination",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ja": {
@@ -206,7 +218,9 @@
         "O8_PURPOSE": "individuation orientation vector",
         "O9_WITNESSES": "self-boundary tracking",
         "O10_UNIFYING": "differentiated field integration",
-        "O12_ABSOLVING": "dissolution of self-reference"
+        "O12_ABSOLVING": "dissolution of self-reference",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "jha": {
@@ -224,7 +238,9 @@
         "O8_PURPOSE": "accumulation orientation vector",
         "O9_WITNESSES": "aggregation pattern tracking",
         "O10_UNIFYING": "pooled accumulation field",
-        "O12_ABSOLVING": "exhaustion of deficit"
+        "O12_ABSOLVING": "exhaustion of deficit",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "nya": {
@@ -242,10 +258,11 @@
         "O8_PURPOSE": "discrepancy orientation vector",
         "O9_WITNESSES": "divergence pattern tracking",
         "O10_UNIFYING": "split-field integration",
-        "O12_ABSOLVING": "convergence of layers"
+        "O12_ABSOLVING": "convergence of layers",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "tta": {
       "type": "consonant",
       "aspirated": false,
@@ -261,7 +278,9 @@
         "O8_PURPOSE": "impact maximization orientation vector",
         "O9_WITNESSES": "amplification pattern tracking",
         "O10_UNIFYING": "amplified field coherence",
-        "O12_ABSOLVING": "attenuation of amplification"
+        "O12_ABSOLVING": "attenuation of amplification",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ttha": {
@@ -279,7 +298,9 @@
         "O8_PURPOSE": "reversal orientation vector",
         "O9_WITNESSES": "retraction pattern tracking",
         "O10_UNIFYING": "corrective field integration",
-        "O12_ABSOLVING": "prior-trace termination"
+        "O12_ABSOLVING": "prior-trace termination",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "dda": {
@@ -297,7 +318,9 @@
         "O8_PURPOSE": "withdrawal orientation vector",
         "O9_WITNESSES": "exposure pattern tracking",
         "O10_UNIFYING": "contracted field integration",
-        "O12_ABSOLVING": "exhaustion of withdrawal"
+        "O12_ABSOLVING": "exhaustion of withdrawal",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ddha": {
@@ -315,7 +338,9 @@
         "O8_PURPOSE": "force application orientation vector",
         "O9_WITNESSES": "impact pattern tracking",
         "O10_UNIFYING": "concentrated force integration",
-        "O12_ABSOLVING": "collapse of intensification"
+        "O12_ABSOLVING": "collapse of intensification",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "nna": {
@@ -333,10 +358,11 @@
         "O8_PURPOSE": "parity orientation vector",
         "O9_WITNESSES": "disparity pattern tracking",
         "O10_UNIFYING": "comparative field integration",
-        "O12_ABSOLVING": "absorption of differential"
+        "O12_ABSOLVING": "absorption of differential",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "ta": {
       "type": "consonant",
       "aspirated": false,
@@ -352,7 +378,9 @@
         "O8_PURPOSE": "preservation orientation vector",
         "O9_WITNESSES": "stasis pattern tracking",
         "O10_UNIFYING": "steady state coherence",
-        "O12_ABSOLVING": "resistance termination"
+        "O12_ABSOLVING": "resistance termination",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "tha": {
@@ -370,7 +398,9 @@
         "O8_PURPOSE": "recession orientation vector",
         "O9_WITNESSES": "depletion pattern tracking",
         "O10_UNIFYING": "diminished field integration",
-        "O12_ABSOLVING": "absorption into stillness"
+        "O12_ABSOLVING": "absorption into stillness",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "da": {
@@ -388,7 +418,9 @@
         "O8_PURPOSE": "discharge orientation vector",
         "O9_WITNESSES": "friction pattern tracking",
         "O10_UNIFYING": "friction field integration",
-        "O12_ABSOLVING": "dissipation of friction"
+        "O12_ABSOLVING": "dissipation of friction",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "dha": {
@@ -406,7 +438,9 @@
         "O8_PURPOSE": "acquisition orientation vector",
         "O9_WITNESSES": "attraction pattern tracking",
         "O10_UNIFYING": "attraction field integration",
-        "O12_ABSOLVING": "exhaustion of pull"
+        "O12_ABSOLVING": "exhaustion of pull",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "na": {
@@ -424,10 +458,11 @@
         "O8_PURPOSE": "connection orientation vector",
         "O9_WITNESSES": "linkage pattern tracking",
         "O10_UNIFYING": "bonded field integration",
-        "O12_ABSOLVING": "dissolution of linkage"
+        "O12_ABSOLVING": "dissolution of linkage",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "pa": {
       "type": "consonant",
       "aspirated": false,
@@ -443,7 +478,9 @@
         "O8_PURPOSE": "separation orientation vector",
         "O9_WITNESSES": "repulsion pattern tracking",
         "O10_UNIFYING": "dispersive field integration",
-        "O12_ABSOLVING": "neutralization of repulsion"
+        "O12_ABSOLVING": "neutralization of repulsion",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "pha": {
@@ -461,7 +498,9 @@
         "O8_PURPOSE": "preservation orientation vector",
         "O9_WITNESSES": "aversive pattern tracking",
         "O10_UNIFYING": "contracted field integration",
-        "O12_ABSOLVING": "exhaustion of contraction"
+        "O12_ABSOLVING": "exhaustion of contraction",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ba": {
@@ -479,7 +518,9 @@
         "O8_PURPOSE": "disengagement orientation vector",
         "O9_WITNESSES": "detachment pattern tracking",
         "O10_UNIFYING": "dispersed field integration",
-        "O12_ABSOLVING": "nullification of engagement"
+        "O12_ABSOLVING": "nullification of engagement",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "bha": {
@@ -497,7 +538,9 @@
         "O8_PURPOSE": "divergent signal orientation vector",
         "O9_WITNESSES": "distortion pattern tracking",
         "O10_UNIFYING": "distorted field integration",
-        "O12_ABSOLVING": "distortion termination"
+        "O12_ABSOLVING": "distortion termination",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ma": {
@@ -515,10 +558,11 @@
         "O8_PURPOSE": "saturation orientation vector",
         "O9_WITNESSES": "saturation pattern tracking",
         "O10_UNIFYING": "saturated field integration",
-        "O12_ABSOLVING": "exhaustion of saturation"
+        "O12_ABSOLVING": "exhaustion of saturation",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "ya": {
       "type": "consonant",
       "aspirated": false,
@@ -534,7 +578,9 @@
         "O8_PURPOSE": "validation orientation vector",
         "O9_WITNESSES": "verification pattern tracking",
         "O10_UNIFYING": "verification field integration",
-        "O12_ABSOLVING": "dissolution of uncertainty"
+        "O12_ABSOLVING": "dissolution of uncertainty",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ra": {
@@ -552,7 +598,9 @@
         "O8_PURPOSE": "clearing orientation vector",
         "O9_WITNESSES": "dissolution pattern tracking",
         "O10_UNIFYING": "dissolution field integration",
-        "O12_ABSOLVING": "terminal dissolution"
+        "O12_ABSOLVING": "terminal dissolution",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "la": {
@@ -570,7 +618,9 @@
         "O8_PURPOSE": "erosion orientation vector",
         "O9_WITNESSES": "abrasion pattern tracking",
         "O10_UNIFYING": "abrasive field integration",
-        "O12_ABSOLVING": "exhaustion of abrasion"
+        "O12_ABSOLVING": "exhaustion of abrasion",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "va": {
@@ -588,10 +638,11 @@
         "O8_PURPOSE": "alignment orientation vector",
         "O9_WITNESSES": "alignment pattern tracking",
         "O10_UNIFYING": "prescribed-field integration",
-        "O12_ABSOLVING": "transcendence of prescription"
+        "O12_ABSOLVING": "transcendence of prescription",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "sha": {
       "type": "consonant",
       "aspirated": false,
@@ -607,7 +658,9 @@
         "O8_PURPOSE": "aggregation orientation vector",
         "O9_WITNESSES": "accumulation pattern tracking",
         "O10_UNIFYING": "aggregated field integration",
-        "O12_ABSOLVING": "dispersal of accumulation"
+        "O12_ABSOLVING": "dispersal of accumulation",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ssa": {
@@ -625,7 +678,9 @@
         "O8_PURPOSE": "sensory-approach orientation vector",
         "O9_WITNESSES": "sensory-attraction tracking",
         "O10_UNIFYING": "sensory-attraction field integration",
-        "O12_ABSOLVING": "dissolution of sensory pull"
+        "O12_ABSOLVING": "dissolution of sensory pull",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "sa": {
@@ -643,10 +698,11 @@
         "O8_PURPOSE": "departure orientation vector",
         "O9_WITNESSES": "exit pattern tracking",
         "O10_UNIFYING": "flight field integration",
-        "O12_ABSOLVING": "terminal evacuation"
+        "O12_ABSOLVING": "terminal evacuation",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "ha": {
       "type": "consonant",
       "aspirated": false,
@@ -662,10 +718,11 @@
         "O8_PURPOSE": "non-registration orientation vector",
         "O9_WITNESSES": "occlusion pattern tracking",
         "O10_UNIFYING": "occluded field integration",
-        "O12_ABSOLVING": "null-state transition"
+        "O12_ABSOLVING": "null-state transition",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "ksha": {
       "type": "consonant",
       "aspirated": true,
@@ -681,7 +738,9 @@
         "O8_PURPOSE": "misaligned orientation vector",
         "O9_WITNESSES": "error pattern tracking",
         "O10_UNIFYING": "error-propagation field integration",
-        "O12_ABSOLVING": "nullification of error"
+        "O12_ABSOLVING": "nullification of error",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     }
   }

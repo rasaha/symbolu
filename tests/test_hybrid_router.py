@@ -68,7 +68,7 @@ class TestRoutingDecision:
             model_type=ModelType.REASONING,
             confidence=0.85,
             dominant_layer="O7_REASONING",
-            layer_scores=(("O7_REASONING", 0.85), ("O1_POTENTIAL", 0.10)),
+            layer_scores=(("O7_REASONING", 0.85), ("O5_COGNITION", 0.10)),
             query_analysis=mock_analysis,
         )
 
@@ -101,7 +101,7 @@ class TestLayerToModel:
     """Tests for LAYER_TO_MODEL constant."""
 
     def test_has_all_layers(self):
-        """Should have mappings for all 12 layers."""
+        """Should have mappings for all 12 layers (patent-exact sequence)."""
         expected_layers = [
             "O1_POTENTIAL",
             "O2_IDENTITY",

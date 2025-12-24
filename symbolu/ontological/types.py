@@ -9,27 +9,37 @@ from typing import Tuple, Dict, List, Optional, Any
 from dataclasses import dataclass, field
 
 
-# The 12 Ontological Layers
+# The 12 Ontological Layers (Patent-Exact Sequence)
+# Lowest (dormant) → Highest (termination)
 LAYER_NAMES: Tuple[str, ...] = (
-    "O1_POTENTIAL",      # Dormant - Latent capacity
-    "O2_IDENTITY",       # Tagging - Labels, roles
-    "O3_EXECUTION",      # Action - Behaviors, karma
-    "O4_STRUCTURE",      # Forming - Embodiment, patterns
-    "O5_COGNITION",      # Perception - Attention, emotion
-    "O6_AGENCY",         # Direction - Control, intent
-    "O7_REASONING",      # Discrimination - Logic, inference
-    "O8_PURPOSE",        # Meaning - Motivation, why
-    "O9_WITNESSES",      # Meta-Observation - Awareness
-    "O10_UNIFYING",      # Coherence - Synthesis, harmony
-    "O11_INTEGRATION",   # Resolution - Consolidation
-    "O12_ABSOLVING",     # Termination - Dissolution
+    "O1_POTENTIAL",     # Dormant - Latent capacity, unrealized possibility
+    "O2_IDENTITY",      # Tagging - Labels, roles, references, classification
+    "O3_EXECUTION",     # Action - Behaviors, consequences, output, karma
+    "O4_STRUCTURE",     # Forming - Physical form, patterns, embodiment
+    "O5_COGNITION",     # Perception - Attention, emotion, mental movement
+    "O6_AGENCY",        # Direction - Control, intent, authorship, steering
+    "O7_REASONING",     # Discrimination - Logic, inference, analysis
+    "O8_PURPOSE",       # Meaning - Motivation, intrinsic direction, why
+    "O9_WITNESSES",     # Meta-Observation - Awareness, reflection, monitoring
+    "O10_UNIFYING",     # Coherence - Synthesis, harmony, integration
+    "O11_INTEGRATION",  # Resolution - Consolidation, completion of parts
+    "O12_ABSOLVING",    # Termination - Release, dissolution, final boundary
 )
 
 # Layer name to index mapping
 LAYER_INDEX: Dict[str, int] = {name: i for i, name in enumerate(LAYER_NAMES)}
 
-# Layer groups for task heads
-REASONING_LAYERS: Tuple[int, ...] = (4, 6, 8)  # O5_COGNITION, O7_REASONING, O9_WITNESSES
+# Number of ontological dimensions
+NUM_LAYERS: int = 12
+
+# Number of Bhava pairs (adjacent layer relationships)
+NUM_BHAVA_PAIRS: int = 11  # 12 layers - 1
+
+# Sub-layers per Bhava pair (matches ontological layer count)
+SUB_LAYERS_PER_PAIR: int = 12
+
+# Layer groups for task heads (12D indices)
+REASONING_LAYERS: Tuple[int, ...] = (4, 6, 8)   # O5_COGNITION, O7_REASONING, O9_WITNESSES
 CREATIVITY_LAYERS: Tuple[int, ...] = (3, 7, 9)  # O4_STRUCTURE, O8_PURPOSE, O10_UNIFYING
 
 # Task types for training
@@ -41,11 +51,11 @@ class TaskType:
 
 @dataclass
 class OntologicalConfig:
-    """Configuration for the ontological engine."""
-    input_dim: int = 768  # DistilBERT output
+    """Configuration for the 12D ontological engine."""
+    input_dim: int = 768  # DistilBERT output (or 384 for MiniLM)
     hidden_dims: Tuple[int, ...] = (512, 256)
     output_dim: int = 12  # 12 ontological layers
-    bhava_dim: int = 120  # 9 pairs × 12 sub-layers + 12 onto
+    bhava_dim: int = 144  # 11 pairs × 12 sub-layers + 12 onto = 132 + 12
     dropout: float = 0.1
     use_skip_connections: bool = True
     use_layer_norm: bool = True
@@ -96,7 +106,7 @@ class TrainingExample:
     is_creativity: bool = False
     reasoning_score: Optional[float] = None
     creativity_score: Optional[float] = None
-    domain: Optional[int] = None  # 0-4: technical, reasoning, creative, action, governance
+    domain: Optional[int] = None  # 0-11: one of the 12 domains
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for batch processing."""
