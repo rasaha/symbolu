@@ -79,6 +79,17 @@ from symbolu.presentation.speech_pipeline import (
     generate_ssml,
     is_speech_allowed,
 )
+from symbolu.presentation.signal_bridge import (
+    bridge_signals_to_presentation,
+    derive_fluency_guidance,
+    check_response_resonance,
+    format_bridge_result,
+    format_fluency_guidance,
+    BridgeResult,
+    FluencyGuidance,
+    PHASE_TO_DELIVERY,
+    PHASE_EXPLANATIONS,
+)
 
 __all__ = [
     # Types (Part 3)
@@ -137,4 +148,14 @@ __all__ = [
     "generate_speech",
     "generate_ssml",
     "is_speech_allowed",
+    # Signal Bridge (Rich STL → Presentation)
+    "bridge_signals_to_presentation",
+    "derive_fluency_guidance",
+    "check_response_resonance",
+    "format_bridge_result",
+    "format_fluency_guidance",
+    "BridgeResult",
+    "FluencyGuidance",
+    "PHASE_TO_DELIVERY",
+    "PHASE_EXPLANATIONS",
 ]
