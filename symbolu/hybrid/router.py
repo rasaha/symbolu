@@ -32,6 +32,41 @@ from symbolu.resonance import (
     LAYER_NAMES,
 )
 
+# Vṛtti-Aspect Coupling Matrix (5×12) for cross-domain disambiguation
+# This enables the p_v[v] formula: weights[a] = Σ_v p_v[v] · R[v,a]
+# When chitta_vritti module is available, use it; otherwise inline the matrix
+try:
+    from symbolu.chitta_vritti.coupling import get_aspect_weights, VRITTI_NAMES
+    VRITTI_COUPLING_AVAILABLE = True
+except ImportError:
+    VRITTI_COUPLING_AVAILABLE = False
+    VRITTI_NAMES = ["pramana", "viparyaya", "vikalpa", "smrti", "nidra"]
+    # Inline R[v,a] matrix (5×12) for when numpy unavailable
+    R_MATRIX_INLINE = [
+        # POT    ID     EXEC   STR    COG    AGN    RSN    PUR    WIT    UNI    INT    ABS
+        [0.40, 0.80, 0.70, 0.60, 0.70, 0.50, 0.95, 0.60, 0.80, 0.70, 0.75, 0.60],  # Pramāṇa
+        [0.30, 0.70, 0.50, 0.40, 0.60, 0.90, 0.40, 0.30, 0.50, 0.30, 0.35, 0.20],  # Viparyaya
+        [0.50, 0.50, 0.60, 0.50, 0.85, 0.60, 0.70, 0.50, 0.60, 0.40, 0.55, 0.30],  # Vikalpa
+        [0.70, 0.60, 0.80, 0.70, 0.70, 0.50, 0.60, 0.80, 0.50, 0.60, 0.70, 0.40],  # Smṛti
+        [0.85, 0.30, 0.30, 0.70, 0.40, 0.30, 0.20, 0.40, 0.60, 0.50, 0.55, 0.75],  # Nidrā
+    ]
+
+    def get_aspect_weights(vritti_distribution: Dict[str, float]) -> Dict[str, float]:
+        """Compute 12D layer weights from vṛtti distribution (inline version)."""
+        vritti_vec = [
+            vritti_distribution.get("pramana", 0.0),
+            vritti_distribution.get("viparyaya", 0.0),
+            vritti_distribution.get("vikalpa", 0.0),
+            vritti_distribution.get("smrti", 0.0),
+            vritti_distribution.get("nidra", 0.0),
+        ]
+        # Matrix multiply: (1×5) @ (5×12) = (1×12)
+        weights = [0.0] * 12
+        for v_idx, v_prob in enumerate(vritti_vec):
+            for a_idx in range(12):
+                weights[a_idx] += v_prob * R_MATRIX_INLINE[v_idx][a_idx]
+        return {LAYER_NAMES[i]: weights[i] for i in range(12)}
+
 
 # Intent keyword patterns for boosting
 # These augment phoneme analysis with common linguistic patterns
@@ -287,6 +322,136 @@ class SemanticRouter:
 
         return dot_product / (norm_a * norm_b)
 
+    def _detect_vritti_distribution(
+        self,
+        query: str,
+        word_vectors: List[WordVector],
+        pattern_scores: Dict["ModelType", float],
+    ) -> Dict[str, float]:
+        """
+        Detect cognitive mode (vṛtti) distribution from context signals.
+
+        Uses keyword patterns and phoneme characteristics to estimate
+        which cognitive mode the query represents:
+        - Pramāṇa (valid cognition): factual, logical queries
+        - Viparyaya (misperception): conflicting or uncertain queries
+        - Vikalpa (conceptualization): creative, imaginative queries
+        - Smṛti (memory): historical, reference-based queries
+        - Nidrā (dormancy): abstract, philosophical queries
+
+        Args:
+            query: The input query
+            word_vectors: Analyzed word vectors
+            pattern_scores: Detected intent pattern scores
+
+        Returns:
+            Dict mapping vṛtti names to probabilities (sums to 1.0)
+        """
+        # Initialize with uniform prior
+        vritti = {
+            "pramana": 0.2,
+            "viparyaya": 0.2,
+            "vikalpa": 0.2,
+            "smrti": 0.2,
+            "nidra": 0.2,
+        }
+
+        # Adjust based on pattern detection (increased weights for stronger influence)
+        if pattern_scores:
+            # Reasoning patterns → boost Pramāṇa (valid cognition)
+            if ModelType.REASONING in pattern_scores:
+                vritti["pramana"] += pattern_scores[ModelType.REASONING] * 0.6
+                vritti["vikalpa"] -= pattern_scores[ModelType.REASONING] * 0.2
+
+            # Creative patterns → boost Vikalpa (conceptualization)
+            if ModelType.CREATIVE in pattern_scores:
+                vritti["vikalpa"] += pattern_scores[ModelType.CREATIVE] * 0.6
+
+            # Action patterns → boost Smṛti (memory/procedure recall) and Pramāṇa
+            if ModelType.ACTION in pattern_scores:
+                vritti["smrti"] += pattern_scores[ModelType.ACTION] * 0.4
+                vritti["pramana"] += pattern_scores[ModelType.ACTION] * 0.3
+
+            # Relationship patterns → boost Vikalpa (emotional conceptualization)
+            if ModelType.RELATIONSHIP in pattern_scores:
+                vritti["vikalpa"] += pattern_scores[ModelType.RELATIONSHIP] * 0.4
+
+            # Reflective patterns → boost Nidrā (abstract dormancy)
+            if ModelType.REFLECTIVE in pattern_scores:
+                vritti["nidra"] += pattern_scores[ModelType.REFLECTIVE] * 0.5
+
+        # Domain-specific context detection for cross-domain disambiguation
+        query_lower = query.lower()
+
+        # Financial/transactional domain → Pramāṇa (factual cognition)
+        financial_terms = ["money", "deposit", "account", "balance", "loan", "bank account",
+                          "credit", "debit", "payment", "transaction", "financial"]
+        if any(term in query_lower for term in financial_terms):
+            vritti["pramana"] += 0.4
+            vritti["smrti"] += 0.2  # Procedural memory
+
+        # Nature/scenic domain → Vikalpa (creative conceptualization)
+        nature_terms = ["river", "stream", "sunset", "sunrise", "meadow", "garden",
+                       "forest", "mountain", "ocean", "sky", "peaceful", "grassy"]
+        if any(term in query_lower for term in nature_terms):
+            vritti["vikalpa"] += 0.4
+            vritti["nidra"] += 0.2  # Contemplative stillness
+
+        # Technical/procedural domain → Pramāṇa + Smṛti
+        technical_terms = ["test", "database", "migration", "deploy", "code", "script",
+                          "system", "server", "algorithm", "function"]
+        if any(term in query_lower for term in technical_terms):
+            vritti["pramana"] += 0.3
+            vritti["smrti"] += 0.3
+
+        # Question markers
+        if any(q in query_lower for q in ["how", "why", "what is", "explain"]):
+            vritti["pramana"] += 0.3  # Question-seeking = valid cognition
+        if any(q in query_lower for q in ["imagine", "pretend", "what if"]):
+            vritti["vikalpa"] += 0.4  # Hypothetical = conceptualization
+        if any(q in query_lower for q in ["remember", "recall", "when did"]):
+            vritti["smrti"] += 0.3  # Memory-based = smṛti
+
+        # Normalize to probability distribution
+        total = sum(vritti.values())
+        if total > 0:
+            vritti = {k: v / total for k, v in vritti.items()}
+
+        return vritti
+
+    def _apply_vritti_weighting(
+        self,
+        layer_totals: List[float],
+        vritti_distribution: Dict[str, float],
+        weight: float = 0.3,
+    ) -> List[float]:
+        """
+        Apply vṛtti-based weighting to layer totals using R[v,a] matrix.
+
+        Implements: biased_totals[a] = layer_totals[a] + weight * Σ_v p_v[v] · R[v,a]
+
+        This allows cognitive mode to influence layer selection, improving
+        cross-domain disambiguation for homonyms.
+
+        Args:
+            layer_totals: Raw 12D layer totals from phoneme analysis
+            vritti_distribution: 5-element vṛtti probability distribution
+            weight: How much to weight the vṛtti bias (0.0 to 1.0)
+
+        Returns:
+            Biased layer totals
+        """
+        # Get aspect weights from vṛtti distribution via R[v,a]
+        aspect_weights = get_aspect_weights(vritti_distribution)
+
+        # Apply weighting to layer totals
+        biased_totals = layer_totals.copy()
+        for i, layer_name in enumerate(LAYER_NAMES):
+            bias = aspect_weights.get(layer_name, 0.0)
+            biased_totals[i] += weight * bias
+
+        return biased_totals
+
     def _compute_cross_resonance(
         self, word_vectors: List[WordVector]
     ) -> Dict[str, float]:
@@ -412,20 +577,34 @@ class SemanticRouter:
             for i, score in enumerate(word_vec.vector):
                 layer_totals[i] += score
 
-        # Find initial dominant layer using raw totals
+        # Detect intent patterns early for vṛtti computation
+        pattern_scores = self._detect_intent_patterns(query)
+
+        # Apply p_v[v] formula: Compute vṛtti distribution and bias layer totals
+        # This enables cross-domain disambiguation for homonyms
+        # weight=0.5 for stronger vṛtti influence on layer selection
+        vritti_dist = self._detect_vritti_distribution(
+            query, list(analysis.words), pattern_scores
+        )
+        biased_layer_totals = self._apply_vritti_weighting(
+            layer_totals, vritti_dist, weight=0.5
+        )
+
+        # Find initial dominant layer using vṛtti-biased totals
         max_idx = 0
-        max_total = layer_totals[0]
+        max_total = biased_layer_totals[0]
         for i in range(1, 12):
-            if layer_totals[i] > max_total:
-                max_total = layer_totals[i]
+            if biased_layer_totals[i] > max_total:
+                max_total = biased_layer_totals[i]
                 max_idx = i
 
         initial_dominant = LAYER_NAMES[max_idx]
 
         # Apply cross-resonance disambiguation for homonyms
         # This uses pairwise word similarity to find semantic clusters
+        # NOTE: Using biased_layer_totals for vṛtti-aware disambiguation
         dominant_layer, cluster_boost = self._get_disambiguated_layer(
-            list(analysis.words), initial_dominant, layer_totals
+            list(analysis.words), initial_dominant, biased_layer_totals
         )
 
         # Calculate confidence using the best word-level dominant score
@@ -437,12 +616,12 @@ class SemanticRouter:
         # Add cluster boost to confidence
         max_word_score = min(max_word_score + cluster_boost, 1.0)
 
-        # Normalize for layer_scores display
-        total = sum(layer_totals)
+        # Normalize for layer_scores display (using biased totals)
+        total = sum(biased_layer_totals)
         if total > 0:
-            normalized = [s / total for s in layer_totals]
+            normalized = [s / total for s in biased_layer_totals]
         else:
-            normalized = layer_totals
+            normalized = biased_layer_totals
 
         # Get top 3 layers for context
         indexed = [(LAYER_NAMES[i], normalized[i]) for i in range(12)]
@@ -461,8 +640,7 @@ class SemanticRouter:
                 query_analysis=analysis,
             )
 
-        # Detect intent patterns from keywords
-        pattern_scores = self._detect_intent_patterns(query)
+        # pattern_scores already computed above for vṛtti detection
 
         # Determine model type by combining phoneme analysis with pattern matching
         phoneme_model = LAYER_TO_MODEL.get(dominant_layer, self.fallback_model)
