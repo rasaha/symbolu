@@ -59,6 +59,11 @@ try:
         EvidentialConfig,
         EvidentialHead,
     )
+    from symbolu.ontological.unified_engine import (
+        UnifiedOntologicalEngine,
+        UnifiedTrainer,
+        UnifiedConfig,
+    )
     PYTORCH_AVAILABLE = True
 except ImportError as e:
     print(f"Note: PyTorch components not available: {e}")
@@ -133,4 +138,8 @@ if PYTORCH_AVAILABLE:
         "EvidentialTrainer",
         "EvidentialConfig",
         "EvidentialHead",
+        # Unified (all features combined)
+        "UnifiedOntologicalEngine",
+        "UnifiedTrainer",
+        "UnifiedConfig",
     ])
