@@ -4,11 +4,11 @@ Semantic Router
 
 Routes queries to specialized sub-models based on phoneme signature.
 
-Key Insight:
+Key Insight (12D layers):
     Different ontological layers suggest different processing needs:
-    - O9_UNIFYING dominant → relationship/connection queries
-    - O6_REASONING dominant → logical/analytical queries
-    - O3_ACTING dominant → action/procedural queries
+    - O10_UNIFYING dominant → relationship/connection queries
+    - O7_REASONING dominant → logical/analytical queries
+    - O3_EXECUTION dominant → action/procedural queries
 
 Instead of one giant model, route to smaller specialized models.
 
@@ -114,18 +114,20 @@ class RoutingDecision:
     query_analysis: PhraseAnalysis
 
 
-# Layer → Model mapping
+# Layer → Model mapping (12D patent-exact sequence)
 LAYER_TO_MODEL: Dict[str, ModelType] = {
-    "O1_THINKING": ModelType.REFLECTIVE,
-    "O2_FORMING": ModelType.CREATIVE,
-    "O3_ACTING": ModelType.ACTION,
-    "O4_TAGGING": ModelType.GENERAL,  # Classification → general
-    "O5_DIRECTING": ModelType.DIRECTIVE,
-    "O6_REASONING": ModelType.REASONING,
-    "O7_PURPOSING": ModelType.DIRECTIVE,
-    "O8_META_OBSERVING": ModelType.REFLECTIVE,
-    "O9_UNIFYING": ModelType.RELATIONSHIP,
-    "O10_ABSOLVING": ModelType.TRANSCENDENT,
+    "O1_POTENTIAL": ModelType.GENERAL,      # Dormant → general
+    "O2_IDENTITY": ModelType.GENERAL,       # Classification → general
+    "O3_EXECUTION": ModelType.ACTION,       # Action/karma → action
+    "O4_STRUCTURE": ModelType.CREATIVE,     # Form/shape → creative
+    "O5_COGNITION": ModelType.REFLECTIVE,   # Perception → reflective
+    "O6_AGENCY": ModelType.DIRECTIVE,       # Direction/control → directive
+    "O7_REASONING": ModelType.REASONING,    # Logic → reasoning
+    "O8_PURPOSE": ModelType.DIRECTIVE,      # Intent/goals → directive
+    "O9_WITNESSES": ModelType.REFLECTIVE,   # Meta-observation → reflective
+    "O10_UNIFYING": ModelType.RELATIONSHIP, # Connection → relationship
+    "O11_INTEGRATION": ModelType.RELATIONSHIP,  # Consolidation → relationship
+    "O12_ABSOLVING": ModelType.TRANSCENDENT,    # Dissolution → transcendent
 }
 
 
@@ -404,8 +406,8 @@ class SemanticRouter:
                 query_analysis=analysis,
             )
 
-        # Aggregate layer scores across content words
-        layer_totals = [0.0] * 10
+        # Aggregate layer scores across content words (12D)
+        layer_totals = [0.0] * 12
         for word_vec in analysis.words:
             for i, score in enumerate(word_vec.vector):
                 layer_totals[i] += score
@@ -413,7 +415,7 @@ class SemanticRouter:
         # Find initial dominant layer using raw totals
         max_idx = 0
         max_total = layer_totals[0]
-        for i in range(1, 10):
+        for i in range(1, 12):
             if layer_totals[i] > max_total:
                 max_total = layer_totals[i]
                 max_idx = i
@@ -443,7 +445,7 @@ class SemanticRouter:
             normalized = layer_totals
 
         # Get top 3 layers for context
-        indexed = [(LAYER_NAMES[i], normalized[i]) for i in range(10)]
+        indexed = [(LAYER_NAMES[i], normalized[i]) for i in range(12)]
         sorted_layers = sorted(indexed, key=lambda x: x[1], reverse=True)
         top_layers = tuple(sorted_layers[:3])
 
