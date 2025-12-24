@@ -390,21 +390,17 @@ class CrossDomainIntelligence:
         """
         scores = {}
 
-        # SMI range score (25%)
+        # SMI range is a hard filter - must be within range
         smi_min, smi_max = config.smi_range
-        if smi_min <= smi <= smi_max:
-            # Score based on how centered within the range
-            range_center = (smi_min + smi_max) / 2
-            range_half = (smi_max - smi_min) / 2
-            distance_from_center = abs(smi - range_center)
-            scores["smi_range"] = 1.0 - (distance_from_center / range_half) * 0.5
-        elif smi < smi_min:
-            # Partial score for close matches
-            distance = smi_min - smi
-            scores["smi_range"] = max(0, 1.0 - distance * 3)
-        else:
-            distance = smi - smi_max
-            scores["smi_range"] = max(0, 1.0 - distance * 3)
+        if not (smi_min <= smi <= smi_max):
+            # SMI outside range - pattern does not match at all
+            return 0.0
+
+        # Score based on how centered within the range
+        range_center = (smi_min + smi_max) / 2
+        range_half = (smi_max - smi_min) / 2
+        distance_from_center = abs(smi - range_center)
+        scores["smi_range"] = 1.0 - (distance_from_center / range_half) * 0.5
 
         # Bhava range score (30%)
         bhava_min, bhava_max = config.bhava_range

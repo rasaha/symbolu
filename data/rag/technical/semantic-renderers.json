@@ -1,0 +1,12 @@
+{
+  "id": "tech-003",
+  "title": "Three-Layer Semantic Rendering System",
+  "domain": "technical",
+  "tags": ["semantic", "rendering", "layers", "fusion"],
+  "content": "Symbol-U renders responses through three complementary semantic layers:\n\n**1. Symbolic Layer**\n\nProcesses abstract meaning and conceptual relationships:\n- Fusion score: How well concepts integrate\n- Theme extraction: Core thematic elements\n- Archetype mapping: Universal pattern recognition\n- Causal patterns: Cause-effect relationships\n- Meaning vectors: Semantic direction indicators\n\nUse case: Understanding deeper meaning, conceptual analysis\n\n**2. Practical Layer**\n\nFocuses on actionable, concrete information:\n- Confidence score: Certainty in practical advice\n- Relevance score: Applicability to user's context\n- Key facts: Extracted factual statements\n- Constraints: Limitations and caveats\n- Procedures: Step-by-step guidance\n\nUse case: Getting things done, implementation guidance\n\n**3. Mirror Layer**\n\nProvides meta-analysis and self-reflection:\n- Alignment score: How well response matches intent\n- Contradictions: Internal inconsistencies detected\n- Entropy measure: Information distribution\n- Tensions: Competing interpretations\n\nUse case: Quality assurance, response validation\n\n**Layer Fusion:**\nThe final output combines all three layers based on tier configuration and query type. Explorer tier emphasizes Practical, Analyst adds Symbolic, Developer sees all including Mirror.",
+  "metadata": {
+    "author": "Core Engine Team",
+    "last_updated": "2025-02-01",
+    "category": "core-architecture"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "gov-002",
+  "title": "Responsible AI Framework: Principles and Implementation",
+  "domain": "ai-governance",
+  "tags": ["responsible-ai", "ethics", "framework", "principles"],
+  "content": "The Responsible AI Framework establishes foundational principles for ethical AI deployment:\n\n**Core Principles:**\n\n1. **Fairness**: AI systems must produce equitable outcomes across all user demographics. This requires regular fairness audits using metrics like demographic parity, equalized odds, and calibration across groups.\n\n2. **Accountability**: Clear ownership chains must exist for every AI system. The accountable party must have authority to modify, retrain, or decommission systems that violate principles.\n\n3. **Transparency**: Users have the right to know when they're interacting with AI and to receive explanations for AI-driven decisions that affect them.\n\n4. **Privacy**: AI systems must implement privacy-by-design, including data minimization, purpose limitation, and secure processing.\n\n5. **Safety**: Robust testing must occur before deployment, including adversarial testing, edge case analysis, and failure mode identification.\n\n**Implementation Checklist:**\n- Establish AI ethics review board\n- Create incident response procedures\n- Implement continuous monitoring\n- Document all training data sources\n- Maintain version control for models\n- Schedule regular bias audits",
+  "metadata": {
+    "author": "Enterprise AI Standards Board",
+    "last_updated": "2025-02-01",
+    "version": "3.0"
+  }
+}

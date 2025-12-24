@@ -43,7 +43,13 @@ class Candidate:
     kosha_signature: Optional[List[float]] = None
     ontology_signature: Optional[List[float]] = None
     smi: Optional[float] = None  # Semantic Mismatch Index
-    
+
+    # Cross-domain reasoning attributes
+    aspect_vector: Dict[str, float] = field(default_factory=dict)  # Domain-agnostic aspects
+    entropy: float = 0.0  # Entropy for stability assessment
+    embedding: Optional[List[float]] = None  # For semantic similarity
+    template_id: Optional[str] = None  # For redundancy detection
+
     # Metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
     
@@ -86,5 +92,9 @@ class Candidate:
             "kosha_signature": self.kosha_signature,
             "ontology_signature": self.ontology_signature,
             "smi": self.smi,
+            "aspect_vector": self.aspect_vector,
+            "entropy": self.entropy,
+            "embedding": self.embedding,
+            "template_id": self.template_id,
             "metadata": self.metadata,
         }

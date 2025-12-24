@@ -327,18 +327,26 @@ class TestPhase18PolicySafetyInvariance:
         assert 'import policy' not in source
 
     def test_no_phase18_in_policy_files(self):
-        """Test that policy files have no Phase 18 references."""
+        """Test that core policy files have no Phase 18 references.
+
+        Note: insight_window is allowed to READ temporal_entropy_diff for
+        observation-only gating. This test excludes insight_window since
+        it's a legitimate consumer that doesn't modify Phase 18 state.
+        """
         import subprocess
         result = subprocess.run(
             ['find', 'symbolu/policy/', '-name', '*.py'],
             capture_output=True, text=True, cwd='/home/user/symbolu'
         )
         if result.returncode == 0 and result.stdout.strip():
+            # Exclude insight_window (legitimate observation-only consumer)
             grep_result = subprocess.run(
-                ['grep', '-r', 'temporal_entropy_diff\\|entropy_volatility_history', 'symbolu/policy/'],
+                ['grep', '-r', '--exclude-dir=insight_window', '--exclude-dir=__pycache__',
+                 'temporal_entropy_diff\\|entropy_volatility_history', 'symbolu/policy/'],
                 capture_output=True, text=True, cwd='/home/user/symbolu'
             )
-            assert grep_result.returncode == 1 or len(grep_result.stdout.strip()) == 0
+            assert grep_result.returncode == 1 or len(grep_result.stdout.strip()) == 0, \
+                "Core policy files should not reference Phase 18 metrics"
 
     def test_grounding_flags_unchanged(self):
         """Test that grounding flags are unchanged."""

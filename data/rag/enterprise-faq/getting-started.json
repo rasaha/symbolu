@@ -1,0 +1,12 @@
+{
+  "id": "faq-001",
+  "title": "Getting Started with Symbol-U",
+  "domain": "enterprise-faq",
+  "tags": ["onboarding", "setup", "quickstart"],
+  "content": "Welcome to Symbol-U! Here's how to get started:\n\n**Initial Setup:**\n\n1. **Account Provisioning**: Your admin will receive credentials within 24 hours of contract signing. Each user gets individual login credentials tied to their corporate email.\n\n2. **Choose Your Tier**: Symbol-U offers three experience levels:\n   - Explorer: Simple RAG-powered search for quick answers\n   - Analyst: Enterprise chat with semantic insights and metrics\n   - Developer: Full analytics dashboard with debugging tools\n\n3. **API Integration**: For programmatic access, generate API keys from Settings > API Keys. Rate limits are based on your subscription tier.\n\n**First Steps:**\n- Complete the 5-minute interactive tutorial\n- Set your preferred domain focus (can be changed anytime)\n- Review the sample queries to understand capabilities\n- Bookmark the keyboard shortcuts reference\n\n**Support Resources:**\n- Documentation: docs.symbolu.ai\n- Support tickets: support@symbolu.ai\n- Community forum: community.symbolu.ai\n- Office hours: Thursdays 2pm PT",
+  "metadata": {
+    "author": "Customer Success",
+    "last_updated": "2025-02-15",
+    "category": "onboarding"
+  }
+}

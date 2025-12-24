@@ -38,6 +38,11 @@ from .phase_minus_one_schema import (
 from .phase_minus_one_grounding import ObserverObservedGrounding
 from .phase_minus_one_ambiguity import AmbiguityResolver
 from .phase_minus_one_clause_splitter import ConservativeClauseSplitter
+from .phase_minus_one_fuzzy import FuzzyQueryClassifier, FuzzyQuerySignals
+from .phase_minus_one_session import (
+    SessionContext,
+    SessionAwareFuzzySignals,
+)
 
 
 class PhaseMinusOnePipeline:
@@ -53,6 +58,18 @@ class PhaseMinusOnePipeline:
         # envelope.overall_policy == MULTI_CONTEXT
         # envelope.clauses[0].selected.mode == REFLEXIVE
         # envelope.clauses[1].selected.mode == RELATIONAL
+
+    Session-Aware Usage:
+        session = SessionContext.create()
+        pipeline = PhaseMinusOnePipeline()
+
+        # First query
+        envelope1 = pipeline.run_with_session("I feel anxious", session)
+        # Session learns: emotional content, reflexive grounding
+
+        # Second query - session context helps disambiguation
+        envelope2 = pipeline.run_with_session("What about that feeling?", session)
+        # Session provides: prior grounding context, domain continuity
     """
 
     def __init__(
@@ -60,6 +77,7 @@ class PhaseMinusOnePipeline:
         grounding_engine: ObserverObservedGrounding | None = None,
         resolver: AmbiguityResolver | None = None,
         splitter: ConservativeClauseSplitter | None = None,
+        fuzzy_classifier: FuzzyQueryClassifier | None = None,
     ) -> None:
         """
         Initialize the PO1 pipeline.
@@ -68,6 +86,7 @@ class PhaseMinusOnePipeline:
             grounding_engine: OOG engine instance.
             resolver: ARL resolver instance.
             splitter: CSL splitter instance.
+            fuzzy_classifier: FQC classifier instance for fuzzy disambiguation.
         """
         self.grounding_engine = grounding_engine or ObserverObservedGrounding()
         self.resolver = resolver or AmbiguityResolver()
@@ -75,6 +94,7 @@ class PhaseMinusOnePipeline:
             grounding_engine=self.grounding_engine,
             resolver=self.resolver,
         )
+        self.fuzzy_classifier = fuzzy_classifier or FuzzyQueryClassifier()
 
     def run(self, text: str) -> PhaseMinusOneEnvelope:
         """
@@ -135,28 +155,108 @@ class PhaseMinusOnePipeline:
             run_id=run_id,
         )
 
-    def _analyze_clause(
+    def run_with_session(
+        self,
+        text: str,
+        session: SessionContext,
+    ) -> PhaseMinusOneEnvelope:
+        """
+        Execute the PO1 pipeline with session context awareness.
+
+        Uses accumulated session context (prior queries, domains, persona)
+        to enhance disambiguation for the current query.
+
+        Args:
+            text: The input text to analyze.
+            session: SessionContext with accumulated session state.
+
+        Returns:
+            PhaseMinusOneEnvelope with session-enhanced grounding analysis.
+        """
+        run_id = str(uuid.uuid4())[:8]
+
+        # Handle empty input
+        if not text or not text.strip():
+            return PhaseMinusOneEnvelope(
+                overall_policy=OverallPolicy.BLOCKED,
+                clauses=[],
+                selected_primary=None,
+                original_text=text or "",
+                was_split=False,
+                debug={"reason": "empty_input"},
+                run_id=run_id,
+            )
+
+        text = text.strip()
+
+        # Step 1: Run clause splitter
+        split_result = self.splitter.split(text)
+
+        # Step 2: Analyze each clause with session context
+        clause_results: List[ClauseGroundingResult] = []
+
+        for i, (clause_text, linkage) in enumerate(
+            zip(split_result.clauses, split_result.linkage_hints)
+        ):
+            result = self._analyze_clause_with_session(
+                clause_text, linkage, i, session
+            )
+            clause_results.append(result)
+
+            # Record result in session for future queries
+            session.record_grounding_result(result)
+
+        # Step 3: Determine overall policy
+        overall_policy = self._determine_overall_policy(clause_results)
+
+        # Step 4: Select primary grounding
+        selected_primary = self._select_primary(clause_results, overall_policy)
+
+        # Step 5: Build debug info with session context
+        debug = self._build_debug_info(
+            split_result, clause_results, overall_policy, selected_primary
+        )
+        debug["session_context"] = session.to_dict()
+
+        return PhaseMinusOneEnvelope(
+            overall_policy=overall_policy,
+            clauses=clause_results,
+            selected_primary=selected_primary,
+            original_text=text,
+            was_split=split_result.was_split,
+            debug=debug,
+            run_id=run_id,
+        )
+
+    def _analyze_clause_with_session(
         self,
         clause_text: str,
         linkage: LinkageHint,
         index: int,
+        session: SessionContext,
     ) -> ClauseGroundingResult:
         """
-        Analyze a single clause.
+        Analyze a single clause with session context enhancement.
 
-        Args:
-            clause_text: The clause text.
-            linkage: Linkage hint from splitter.
-            index: Clause index (0-based).
-
-        Returns:
-            ClauseGroundingResult with grounding analysis.
+        Combines per-query fuzzy signals with session-level context
+        for improved disambiguation.
         """
+        # Run base fuzzy classifier
+        base_signals = self.fuzzy_classifier.classify(clause_text)
+
+        # Record query in session (before grounding, for context)
+        session.record_query(clause_text, base_signals)
+
+        # Create session-aware signals
+        session_signals = SessionAwareFuzzySignals.from_context(
+            base_signals, session, clause_text
+        )
+
         # Generate candidates
         candidates = self.grounding_engine.analyze(clause_text)
 
-        # Resolve ambiguity
-        resolution = self.resolver.resolve(candidates)
+        # Resolve ambiguity with session-enhanced signals
+        resolution = self.resolver.resolve(candidates, fuzzy_signals=session_signals)
 
         return ClauseGroundingResult(
             clause_text=clause_text,
@@ -166,6 +266,48 @@ class PhaseMinusOnePipeline:
             resolution_policy=resolution.policy,
             linkage_hint=linkage,
             clause_index=index,
+            fuzzy_signals=base_signals,  # Store base signals
+            fuzzy_adjustment=resolution.fuzzy_adjustment_applied,
+            fuzzy_hints=resolution.fuzzy_hints + session_signals.context_hints,
+        )
+
+    def _analyze_clause(
+        self,
+        clause_text: str,
+        linkage: LinkageHint,
+        index: int,
+    ) -> ClauseGroundingResult:
+        """
+        Analyze a single clause with fuzzy logic support.
+
+        Args:
+            clause_text: The clause text.
+            linkage: Linkage hint from splitter.
+            index: Clause index (0-based).
+
+        Returns:
+            ClauseGroundingResult with grounding analysis and fuzzy signals.
+        """
+        # Run fuzzy classifier to extract signals
+        fuzzy_signals = self.fuzzy_classifier.classify(clause_text)
+
+        # Generate candidates
+        candidates = self.grounding_engine.analyze(clause_text)
+
+        # Resolve ambiguity with fuzzy signals for disambiguation
+        resolution = self.resolver.resolve(candidates, fuzzy_signals=fuzzy_signals)
+
+        return ClauseGroundingResult(
+            clause_text=clause_text,
+            candidates=candidates,
+            selected=resolution.selected,
+            grounding_status=resolution.status,
+            resolution_policy=resolution.policy,
+            linkage_hint=linkage,
+            clause_index=index,
+            fuzzy_signals=fuzzy_signals,
+            fuzzy_adjustment=resolution.fuzzy_adjustment_applied,
+            fuzzy_hints=resolution.fuzzy_hints,
         )
 
     def _determine_overall_policy(
@@ -243,7 +385,7 @@ class PhaseMinusOnePipeline:
         overall_policy: OverallPolicy,
         selected_primary: Optional[GroundingCandidate],
     ) -> dict:
-        """Build debug/metrics information."""
+        """Build debug/metrics information including fuzzy logic stats."""
         # Mode distribution
         mode_dist = {}
         risk_dist = {}
@@ -263,6 +405,16 @@ class PhaseMinusOnePipeline:
         confidences = [
             c.selected.confidence for c in clauses if c.selected
         ]
+
+        # Fuzzy logic stats
+        fuzzy_adjustments = [c.fuzzy_adjustment for c in clauses]
+        all_fuzzy_hints = []
+        intent_distribution = {}
+        for clause in clauses:
+            all_fuzzy_hints.extend(clause.fuzzy_hints)
+            if clause.fuzzy_signals:
+                intent = clause.fuzzy_signals.primary_intent.value
+                intent_distribution[intent] = intent_distribution.get(intent, 0) + 1
 
         return {
             "split_reason": split_result.reason,
@@ -290,6 +442,19 @@ class PhaseMinusOnePipeline:
                 1 for c in clauses
                 if c.resolution_policy == ResolutionPolicy.SAFE_DEFAULT
             ) / len(clauses) if clauses else 0.0,
+            # Fuzzy logic metrics
+            "fuzzy_stats": {
+                "adjustments_applied": sum(1 for a in fuzzy_adjustments if a != 0.0),
+                "mean_adjustment": sum(fuzzy_adjustments) / len(fuzzy_adjustments) if fuzzy_adjustments else 0.0,
+                "max_adjustment": max(fuzzy_adjustments) if fuzzy_adjustments else 0.0,
+                "min_adjustment": min(fuzzy_adjustments) if fuzzy_adjustments else 0.0,
+                "hints_generated": all_fuzzy_hints,
+                "intent_distribution": intent_distribution,
+                "disambiguation_assists": sum(
+                    1 for hints in [c.fuzzy_hints for c in clauses]
+                    if "fuzzy_disambiguation_applied" in hints
+                ),
+            },
         }
 
 

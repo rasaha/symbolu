@@ -53,22 +53,23 @@ class ChannelScorer:
         - Ontology alignment with UPPER mass
         """
         base_score = candidate.channel_scores.get("hrm", 0.0)
-        
-        # Boost for WHY intent
+
+        # Boost for WHY intent - strong preference for abstract reasoning
         if context.intent == "WHY":
-            base_score *= 1.2
-        
+            base_score *= 2.0
+
         # Boost for UPPER tier
         if context.tier == "UPPER":
-            base_score *= 1.15
+            base_score *= 1.2
         
         # Boost if ontology signature aligns with upper mass
         if candidate.ontology_signature:
             upper_mass = context.ontology_mass.get("upper_mass", 0.5)
             if upper_mass > 0.5:
                 base_score *= (1 + 0.2 * (upper_mass - 0.5))
-        
-        return min(base_score, 1.0)  # Cap at 1.0
+
+        # No cap here - let the score reflect full boost effect
+        return base_score
     
     def score_lcm_channel(self, candidate: Candidate, context: FusionContext) -> float:
         """
@@ -80,20 +81,21 @@ class ChannelScorer:
         - Communication effectiveness
         """
         base_score = candidate.channel_scores.get("lcm", 0.0)
-        
-        # Boost for WHAT intent
+
+        # Boost for WHAT intent - strong preference for semantic clarity
         if context.intent == "WHAT":
-            base_score *= 1.2
-        
+            base_score *= 2.0
+
         # Boost for HYBRID tier
         if context.tier == "HYBRID":
-            base_score *= 1.1
+            base_score *= 1.15
         
         # Penalty for high entropy (unclear communication)
         if context.is_high_entropy():
             base_score *= 0.9
-        
-        return min(base_score, 1.0)
+
+        # No cap here - let the score reflect full boost effect
+        return base_score
     
     def score_moe_channel(self, candidate: Candidate, context: FusionContext) -> float:
         """
@@ -105,14 +107,14 @@ class ChannelScorer:
         - Expert knowledge
         """
         base_score = candidate.channel_scores.get("moe", 0.0)
-        
-        # Boost for HOW intent
+
+        # Boost for HOW intent - strong preference for domain expertise
         if context.intent == "HOW":
-            base_score *= 1.2
-        
+            base_score *= 2.0
+
         # Boost for LOWER tier (concrete/factual)
         if context.tier == "LOWER":
-            base_score *= 1.15
+            base_score *= 1.2
         
         # Boost for domain match
         if candidate.domain == context.domain:
@@ -123,8 +125,9 @@ class ChannelScorer:
             lower_mass = context.ontology_mass.get("lower_mass", 0.5)
             if lower_mass > 0.5:
                 base_score *= (1 + 0.2 * (lower_mass - 0.5))
-        
-        return min(base_score, 1.0)
+
+        # No cap here - let the score reflect full boost effect
+        return base_score
     
     def score_all_channels(
         self, 
@@ -179,36 +182,37 @@ class FusionScorer:
     ) -> float:
         """
         Apply modifiers to base score
-        
+
         Modifiers:
-        - Relevance boost
-        - Confidence adjustment
+        - Relevance boost (minor)
+        - Confidence adjustment (moderate)
         - SMI penalty (semantic mismatch)
         - Safety penalties for regulated mode
         """
         score = base_score
-        
-        # Relevance boost
-        score *= (1 + 0.2 * candidate.relevance_score)
-        
-        # Confidence adjustment
-        score *= candidate.confidence
-        
+
+        # Relevance boost (minor impact)
+        score *= (1 + 0.1 * candidate.relevance_score)
+
+        # Confidence adjustment (moderate impact, less aggressive)
+        # Use square root to reduce the penalty for small differences
+        score *= (0.7 + 0.3 * candidate.confidence)
+
         # SMI penalty (high mismatch = lower score)
         if candidate.smi is not None:
-            smi_penalty = 1.0 - (0.3 * min(candidate.smi, 1.0))
+            smi_penalty = 1.0 - (0.4 * min(candidate.smi, 1.0))
             score *= smi_penalty
-        
+
         # Regulated mode: strict safety penalties
         if context.is_regulated():
             # Require high confidence
             if candidate.confidence < 0.8:
                 score *= 0.7
-            
+
             # Require low SMI
             if candidate.smi and candidate.smi > 0.5:
                 score *= 0.5
-        
+
         return min(score, 1.0)
     
     def score_candidate(

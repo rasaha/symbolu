@@ -23,14 +23,15 @@ Unlike the deterministic STL (Symbolic Transformer Logic), this engine:
 - Improves reasoning and creativity through training
 - Maintains interpretable 10D output
 
-Architecture (Option B - Hybrid):
-    Text → Encoder (DistilBERT) → Hidden Layers → 10D Output → Task Heads
+Architecture:
+    Text → Encoder (MiniLM 384D) → Hidden Layers → 10D Output → Task Heads
 
 Key Features:
 - Skip connections (ResNet-style) for gradient flow
 - Multi-task heads for reasoning and creativity
 - Ontological loss with purity penalties
 - Dimension-specific supervision
+- Contrastive training for domain separation
 """
 
 from symbolu.ontological.types import (
@@ -40,6 +41,7 @@ from symbolu.ontological.types import (
     TrainingBatch,
     LAYER_NAMES,
     LAYER_DESCRIPTIONS,
+    LAYER_INDEX,
 )
 from symbolu.ontological.engine import OntologicalEngine, create_engine
 from symbolu.ontological.losses import OntologicalLoss, CombinedLoss
@@ -57,7 +59,9 @@ from symbolu.ontological.encoder import (
     TextEncoder,
     HashEncoder,
     HybridEncoder,
+    SentenceTransformerEncoder,
     get_encoder,
+    save_model_for_offline,
 )
 from symbolu.ontological.data_loader import (
     RAGDataLoader,
@@ -92,6 +96,7 @@ __all__ = [
     "TrainingBatch",
     "LAYER_NAMES",
     "LAYER_DESCRIPTIONS",
+    "LAYER_INDEX",
     # Engine
     "OntologicalEngine",
     "create_engine",
@@ -116,7 +121,9 @@ __all__ = [
     "TextEncoder",
     "HashEncoder",
     "HybridEncoder",
+    "SentenceTransformerEncoder",
     "get_encoder",
+    "save_model_for_offline",
     # Data loaders
     "RAGDataLoader",
     "SyntheticDataGenerator",

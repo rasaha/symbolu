@@ -5,11 +5,12 @@ Ontological Engine - PyTorch Implementation
 GPU-accelerated version of the 100D ontological engine using PyTorch.
 
 Features:
-- DistilBERT encoder integration
+- MiniLM encoder integration (384D, 2.5x faster than DistilBERT)
 - GPU acceleration (CUDA/MPS)
 - Proper backpropagation
 - Batch processing
 - Mixed precision training
+- Contrastive loss for domain separation
 
 Usage:
     engine = PyTorchOntologicalEngine()
@@ -39,7 +40,7 @@ if PYTORCH_AVAILABLE:
         """
         Multi-layer perceptron for ontological projection.
 
-        Maps encoder output (768D) to 10D ontological vector
+        Maps encoder output (384D MiniLM) to 10D ontological vector
         with skip connections and layer normalization.
         """
 
@@ -142,6 +143,44 @@ if PYTORCH_AVAILABLE:
             return torch.tanh(self.projection(ontological))
 
 
+    class DirectBhavaHead(nn.Module):
+        """
+        Direct 100D Bhava prediction from encoder embedding.
+
+        Unlike BhavaLayer which derives 90D from 10D ontological,
+        this head predicts 100D bhava directly from the 384D encoder output.
+
+        Architecture (optimized for MiniLM 384D):
+            384D → 256D → 128D → 100D
+        """
+
+        def __init__(
+            self,
+            input_dim: int = 384,
+            hidden_dims: Tuple[int, ...] = (256, 128),
+            output_dim: int = 100,
+            dropout: float = 0.1,
+        ):
+            super().__init__()
+
+            dims = [input_dim] + list(hidden_dims) + [output_dim]
+
+            layers = []
+            for i in range(len(dims) - 1):
+                layers.append(nn.Linear(dims[i], dims[i + 1]))
+                if i < len(dims) - 2:  # No activation on output
+                    layers.append(nn.LayerNorm(dims[i + 1]))
+                    layers.append(nn.ReLU())
+                    layers.append(nn.Dropout(dropout))
+
+            self.mlp = nn.Sequential(*layers)
+            self.output_activation = nn.Tanh()
+
+        def forward(self, encoder_output: torch.Tensor) -> torch.Tensor:
+            """Predict 100D bhava directly from encoder embedding."""
+            return self.output_activation(self.mlp(encoder_output))
+
+
     class ReasoningHead(nn.Module):
         """Task head for reasoning quality assessment."""
 
@@ -196,10 +235,11 @@ if PYTORCH_AVAILABLE:
         Full PyTorch implementation of the 100D Ontological Engine.
 
         Architecture:
-            Text → Encoder (768D) → MLP → 10D Ontological
-                                       → 90D Bhava
-                                       → Reasoning Score
-                                       → Creativity Score
+            Text → Encoder (384D MiniLM) → MLP → 10D Ontological
+                                              → 90D Bhava (derived)
+                                              → 100D Bhava (direct, optional)
+                                              → Reasoning Score
+                                              → Creativity Score
 
         Usage:
             engine = PyTorchOntologicalEngine()
@@ -223,8 +263,10 @@ if PYTORCH_AVAILABLE:
             hidden_dims: Tuple[int, ...] = (256, 128),
             ontological_dim: int = 10,
             bhava_dim: int = 90,
+            direct_bhava_dim: int = 100,
             dropout: float = 0.1,
             use_skip: bool = True,
+            use_direct_bhava: bool = False,
         ):
             super().__init__()
 
@@ -237,8 +279,18 @@ if PYTORCH_AVAILABLE:
                 use_skip=use_skip,
             )
 
-            # Bhava layer (10 → 90)
+            # Bhava layer (10 → 90) - derived from ontological
             self.bhava = BhavaLayer(ontological_dim, bhava_dim)
+
+            # Direct Bhava head (384 → 100) - optional
+            self.use_direct_bhava = use_direct_bhava
+            if use_direct_bhava:
+                self.direct_bhava = DirectBhavaHead(
+                    input_dim=encoder_dim,
+                    hidden_dims=hidden_dims,
+                    output_dim=direct_bhava_dim,
+                    dropout=dropout,
+                )
 
             # Task heads
             self.reasoning_head = ReasoningHead(ontological_dim)
@@ -248,6 +300,7 @@ if PYTORCH_AVAILABLE:
             self.encoder_dim = encoder_dim
             self.ontological_dim = ontological_dim
             self.bhava_dim = bhava_dim
+            self.direct_bhava_dim = direct_bhava_dim
 
             # Text encoder (lazy loaded)
             self._text_encoder = None
@@ -257,39 +310,50 @@ if PYTORCH_AVAILABLE:
             embeddings: torch.Tensor,
         ) -> Dict[str, torch.Tensor]:
             """
-            Forward pass.
+            Forward pass with dual-head architecture.
 
             Args:
-                embeddings: (batch, 768) encoder output
+                embeddings: (batch, 384) encoder output
 
             Returns:
                 Dict with:
-                    - ontological: (batch, 10)
-                    - bhava: (batch, 90)
-                    - full: (batch, 100)
-                    - reasoning: (batch,)
-                    - creativity: (batch,)
+                    - ontological: (batch, 10) main layer activations
+                    - bhava: (batch, 90) computed from ontological
+                    - bhava_direct: (batch, 100) predicted directly (if enabled)
+                    - full: (batch, 100) combined ontological + derived bhava
+                    - reasoning: (batch,) reasoning task score
+                    - creativity: (batch,) creativity task score
             """
-            # Ontological projection
+            # Ontological projection (384 → 10)
             ontological = self.mlp(embeddings)
 
-            # Bhava computation
+            # Derived Bhava (10 → 90)
             bhava = self.bhava(ontological)
+
+            # Direct Bhava (384 → 100) - optional
+            bhava_direct = None
+            if self.use_direct_bhava:
+                bhava_direct = self.direct_bhava(embeddings)
 
             # Task scores
             reasoning = self.reasoning_head(ontological)
             creativity = self.creativity_head(ontological)
 
-            # Full 100D vector
+            # Full 100D vector (ontological + derived bhava)
             full = torch.cat([ontological, bhava], dim=-1)
 
-            return {
+            result = {
                 "ontological": ontological,
                 "bhava": bhava,
                 "full": full,
                 "reasoning": reasoning,
                 "creativity": creativity,
             }
+
+            if bhava_direct is not None:
+                result["bhava_direct"] = bhava_direct
+
+            return result
 
         def compute_loss(
             self,
@@ -344,7 +408,7 @@ if PYTORCH_AVAILABLE:
             positive = (ontological + 1) / 2  # Shift to [0, 1]
             probs = positive / (positive.sum(dim=-1, keepdim=True) + 1e-10)
             entropy = -(probs * torch.log(probs + 1e-10)).sum(dim=-1).mean()
-            max_entropy = torch.log(torch.tensor(10.0))
+            max_entropy = torch.log(torch.tensor(10.0, device=ontological.device))
             purity_loss = entropy / max_entropy
             loss = loss + purity_weight * purity_loss
 
@@ -470,14 +534,22 @@ if PYTORCH_AVAILABLE:
             onto_values = output["ontological"][0].cpu().tolist()
             bhava_values = output["bhava"][0].cpu().tolist()
 
-            return {
+            result = {
                 "text": text,
+                "encoder": self._text_encoder.name,
                 "ontological": {LAYER_NAMES[i]: onto_values[i] for i in range(10)},
                 "bhava_count": len(bhava_values),
                 "reasoning_score": output["reasoning"][0].item(),
                 "creativity_score": output["creativity"][0].item(),
                 "dominant_layer": LAYER_NAMES[onto_values.index(max(onto_values))],
             }
+
+            # Include direct bhava if available
+            if "bhava_direct" in output:
+                bhava_direct = output["bhava_direct"][0].cpu().tolist()
+                result["bhava_direct_count"] = len(bhava_direct)
+
+            return result
 
         def parameter_count(self) -> int:
             """Count total trainable parameters."""
@@ -491,19 +563,32 @@ if PYTORCH_AVAILABLE:
                 "=" * 60,
                 "",
                 f"Total Parameters: {self.parameter_count():,}",
-                f"Encoder Dim: {self.encoder_dim}",
-                f"Ontological Dim: {self.ontological_dim}",
-                f"Bhava Dim: {self.bhava_dim}",
-                f"Full Output: {self.ontological_dim + self.bhava_dim}D",
+                "",
+                "Architecture:",
+                f"  Encoder Input: {self.encoder_dim}D (MiniLM/Hash)",
+                f"  Ontological Output: {self.ontological_dim}D",
+                f"  Bhava Derived: {self.bhava_dim}D (from ontological)",
+            ]
+
+            if self.use_direct_bhava:
+                lines.append(f"  Bhava Direct: {self.direct_bhava_dim}D (from encoder)")
+
+            lines.extend([
                 "",
                 "Components:",
-                f"  - MLP: {sum(p.numel() for p in self.mlp.parameters()):,} params",
-                f"  - Bhava: {sum(p.numel() for p in self.bhava.parameters()):,} params",
+                f"  - MLP ({self.encoder_dim}→10): {sum(p.numel() for p in self.mlp.parameters()):,} params",
+                f"  - Bhava Layer (10→90): {sum(p.numel() for p in self.bhava.parameters()):,} params",
+            ])
+
+            if self.use_direct_bhava:
+                lines.append(f"  - Direct Bhava ({self.encoder_dim}→100): {sum(p.numel() for p in self.direct_bhava.parameters()):,} params")
+
+            lines.extend([
                 f"  - Reasoning Head: {sum(p.numel() for p in self.reasoning_head.parameters()):,} params",
                 f"  - Creativity Head: {sum(p.numel() for p in self.creativity_head.parameters()):,} params",
                 "",
                 "=" * 60,
-            ]
+            ])
             return "\n".join(lines)
 
 

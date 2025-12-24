@@ -23,12 +23,19 @@ import time
 from typing import Dict, List, Tuple, Any
 from dataclasses import dataclass, field
 from collections import defaultdict
-import math
+
+# Check for PyTorch
+try:
+    import torch
+    PYTORCH_AVAILABLE = True
+except ImportError:
+    PYTORCH_AVAILABLE = False
+    print("PyTorch not available. Some benchmarks will be skipped.")
 
 
 @dataclass
 class EncoderBenchmarkResult:
-    """Results from benchmarking an encoder."""
+    """Results from encoder comparison."""
     encoder_name: str
     domain_accuracy: float
     reasoning_creativity_separation: float
@@ -39,54 +46,44 @@ class EncoderBenchmarkResult:
 
 
 def get_test_samples() -> Dict[str, List[str]]:
-    """Get test samples for each domain."""
+    """Get test samples for benchmarking."""
     return {
         "technical": [
-            "Implement a binary search tree with O(log n) insertion",
-            "Debug the null pointer exception in the authentication module",
-            "Optimize the database query using index-based lookup",
-            "Refactor the API endpoint to use async/await pattern",
-            "Write unit tests for the payment processing service",
+            "The API endpoint accepts JSON payloads with authentication headers.",
+            "Deploy the containerized application using Kubernetes orchestration.",
+            "The algorithm has O(n log n) time complexity for sorting operations.",
+            "Configure the database connection pool with maximum 50 connections.",
+            "Implement the REST API with proper error handling and validation.",
         ],
         "reasoning": [
-            "If all mammals are warm-blooded, and whales are mammals, then whales must be warm-blooded",
-            "The argument fails because it assumes correlation implies causation",
-            "Given premises A and B, we can deduce conclusion C through modus ponens",
-            "The logical fallacy here is a false dichotomy - there are more than two options",
-            "Let us analyze the validity of this syllogism step by step",
+            "If the hypothesis is true, then the conclusion follows logically.",
+            "Given the axioms, we can derive the theorem through induction.",
+            "The evidence supports the claim because of causal correlation.",
+            "By analyzing the data patterns, we deduce the underlying structure.",
+            "The logical proof demonstrates the theorem holds for all cases.",
         ],
         "creative": [
-            "The sunset painted the sky in hues of amber and rose",
-            "Imagine a world where gravity works in reverse",
-            "Her laughter was a symphony of joy and mischief",
-            "Write a poem about the loneliness of a lighthouse keeper",
-            "Design a character who can taste colors and see sounds",
+            "Colors dance like whispered dreams across the velvet sky.",
+            "The melody weaves emotions into tapestries of sound.",
+            "Imagine a world where thoughts become visible butterflies.",
+            "Poetry breathes life into the silence between words.",
+            "Stars whisper secrets to the dreaming moon above.",
         ],
         "action": [
-            "Run the deployment script and verify the health check",
-            "Click the submit button and wait for confirmation",
-            "Execute the migration and rollback if errors occur",
-            "Build the container image and push to registry",
-            "Start the server and monitor the logs",
+            "First, run the tests. Then deploy to staging. Finally, verify.",
+            "Execute the migration script before the maintenance window.",
+            "Initialize the system, configure parameters, then start services.",
+            "Build the project, run linting, and push to the repository.",
+            "Download the file, extract contents, and process each item.",
         ],
         "governance": [
-            "Establish data retention policies compliant with GDPR",
-            "Define access control rules for the admin dashboard",
-            "Create guidelines for ethical AI usage in hiring",
-            "Set up approval workflow for production deployments",
-            "Document the incident response procedure",
+            "AI systems must be fair, accountable, and transparent.",
+            "Ethical guidelines require regular bias audits and monitoring.",
+            "The responsible AI framework establishes compliance requirements.",
+            "Privacy by design ensures data minimization and purpose limitation.",
+            "Governance policies mandate quarterly security assessments.",
         ],
     }
-
-
-def cosine_similarity(v1: List[float], v2: List[float]) -> float:
-    """Calculate cosine similarity between two vectors."""
-    dot = sum(a * b for a, b in zip(v1, v2))
-    norm1 = math.sqrt(sum(a * a for a in v1))
-    norm2 = math.sqrt(sum(b * b for b in v2))
-    if norm1 == 0 or norm2 == 0:
-        return 0
-    return dot / (norm1 * norm2)
 
 
 def benchmark_encoder(encoder_type: str = "hash") -> EncoderBenchmarkResult:
@@ -99,7 +96,8 @@ def benchmark_encoder(encoder_type: str = "hash") -> EncoderBenchmarkResult:
     Returns:
         EncoderBenchmarkResult with metrics
     """
-    from symbolu.ontological.encoder import HashEncoder, SentenceTransformerEncoder
+    from symbolu.ontological.encoder import get_encoder, HashEncoder, SentenceTransformerEncoder
+    from symbolu.ontological.engine import create_engine
 
     print(f"\n{'='*60}")
     print(f"BENCHMARKING: {encoder_type.upper()} Encoder")
@@ -113,7 +111,7 @@ def benchmark_encoder(encoder_type: str = "hash") -> EncoderBenchmarkResult:
             encoder = SentenceTransformerEncoder()
             encoder._load_model()  # Force load
         else:
-            raise ValueError(f"Unknown encoder type: {encoder_type}")
+            encoder = get_encoder(encoder_type)
     except Exception as e:
         print(f"Failed to load {encoder_type} encoder: {e}")
         return EncoderBenchmarkResult(
@@ -128,175 +126,166 @@ def benchmark_encoder(encoder_type: str = "hash") -> EncoderBenchmarkResult:
 
     print(f"Encoder loaded: {encoder.name} ({encoder.dimension}D)")
 
+    # Create engine with this encoder
+    engine = create_engine()
+    engine._encoder = encoder
+
     test_samples = get_test_samples()
+    results = defaultdict(list)
     latencies = []
-    embeddings_by_domain: Dict[str, List[List[float]]] = defaultdict(list)
 
-    print("\nEncoding samples...")
+    # Expected dominant layers for each domain
+    expected_layers = {
+        "technical": "O6_REASONING",
+        "reasoning": "O6_REASONING",
+        "creative": "O2_FORMING",
+        "action": "O3_ACTING",
+        "governance": "O7_PURPOSING",
+    }
 
-    # Encode all samples and measure latency
+    print("\nAnalyzing samples...")
+
     for domain, samples in test_samples.items():
         for text in samples:
             start = time.perf_counter()
-            embedding = encoder.encode(text)
+            vec = engine.analyze(text)
             latency = (time.perf_counter() - start) * 1000
             latencies.append(latency)
-            embeddings_by_domain[domain].append(embedding)
 
-    # Calculate domain classification accuracy using centroid-based classification
-    print("\nCalculating domain classification accuracy...")
+            dominant, score = vec.dominant_layer()
+            results[domain].append({
+                "dominant": dominant,
+                "score": score,
+                "expected": expected_layers.get(domain),
+            })
 
-    # Compute centroid for each domain
-    centroids = {}
-    for domain, embeddings in embeddings_by_domain.items():
-        centroid = [sum(e[i] for e in embeddings) / len(embeddings) for i in range(len(embeddings[0]))]
-        centroids[domain] = centroid
-
-    # Classify each sample by nearest centroid (leave-one-out)
+    # Calculate domain accuracy
     correct = 0
     total = 0
     domain_accuracies = {}
 
-    for true_domain, embeddings in embeddings_by_domain.items():
-        domain_correct = 0
-        for i, emb in enumerate(embeddings):
-            # Find nearest centroid (excluding this sample from its own centroid)
-            best_domain = None
-            best_sim = -1
-            for domain, centroid in centroids.items():
-                # Adjust centroid if same domain (leave-one-out)
-                if domain == true_domain and len(embeddings) > 1:
-                    adjusted = [(c * len(embeddings) - emb[j]) / (len(embeddings) - 1)
-                               for j, c in enumerate(centroid)]
-                    sim = cosine_similarity(emb, adjusted)
-                else:
-                    sim = cosine_similarity(emb, centroid)
-
-                if sim > best_sim:
-                    best_sim = sim
-                    best_domain = domain
-
-            if best_domain == true_domain:
-                domain_correct += 1
-                correct += 1
-            total += 1
-
-        domain_accuracies[true_domain] = domain_correct / len(embeddings)
+    for domain, items in results.items():
+        expected = expected_layers.get(domain)
+        if expected:
+            matches = sum(1 for item in items if item["dominant"] == expected)
+            domain_accuracies[domain] = matches / len(items)
+            correct += matches
+            total += len(items)
 
     overall_accuracy = correct / total if total > 0 else 0
 
-    print(f"\nDomain Accuracies (centroid-based classification):")
+    print(f"\nDomain Accuracies:")
     for domain, acc in domain_accuracies.items():
         status = "+" if acc >= 0.5 else "-"
         print(f"  [{status}] {domain}: {acc:.0%}")
-    print(f"  Overall: {overall_accuracy:.0%}")
 
     # Calculate reasoning vs creativity separation
-    print("\nCalculating reasoning/creativity separation...")
+    reasoning_o6 = []
+    creativity_o2 = []
 
-    reasoning_embs = embeddings_by_domain["reasoning"]
-    creative_embs = embeddings_by_domain["creative"]
+    for domain, samples in test_samples.items():
+        for text in samples:
+            vec = engine.analyze(text)
+            values = list(vec.values)
 
-    # Measure how well-separated the two domains are
-    # (intra-domain similarity should be higher than inter-domain similarity)
+            if domain == "reasoning":
+                reasoning_o6.append(values[5])  # O6
+            elif domain == "creative":
+                creativity_o2.append(values[1])  # O2
 
-    # Intra-domain similarity
-    reasoning_intra = []
-    for i, e1 in enumerate(reasoning_embs):
-        for j, e2 in enumerate(reasoning_embs):
-            if i < j:
-                reasoning_intra.append(cosine_similarity(e1, e2))
+    # Separation: do reasoning samples have higher O6 than O2?
+    # And do creative samples have higher O2 than O6?
+    reasoning_separation = 0
+    creativity_separation = 0
 
-    creative_intra = []
-    for i, e1 in enumerate(creative_embs):
-        for j, e2 in enumerate(creative_embs):
-            if i < j:
-                creative_intra.append(cosine_similarity(e1, e2))
+    for domain, samples in test_samples.items():
+        for text in samples:
+            vec = engine.analyze(text)
+            values = list(vec.values)
+            o6, o2 = values[5], values[1]
 
-    # Inter-domain similarity
-    inter_domain = []
-    for e1 in reasoning_embs:
-        for e2 in creative_embs:
-            inter_domain.append(cosine_similarity(e1, e2))
+            if domain == "reasoning" and o6 > o2:
+                reasoning_separation += 1
+            elif domain == "creative" and o2 > o6:
+                creativity_separation += 1
 
-    avg_reasoning_intra = sum(reasoning_intra) / len(reasoning_intra) if reasoning_intra else 0
-    avg_creative_intra = sum(creative_intra) / len(creative_intra) if creative_intra else 0
-    avg_inter = sum(inter_domain) / len(inter_domain) if inter_domain else 0
+    total_separation_tests = len(test_samples["reasoning"]) + len(test_samples["creative"])
+    separation_accuracy = (reasoning_separation + creativity_separation) / total_separation_tests
 
-    # Separation score: how much higher is intra-domain similarity than inter-domain?
-    intra_avg = (avg_reasoning_intra + avg_creative_intra) / 2
-    separation_score = max(0, min(1, (intra_avg - avg_inter + 0.5)))  # Normalize to [0, 1]
-
-    print(f"  Reasoning intra-similarity: {avg_reasoning_intra:.3f}")
-    print(f"  Creative intra-similarity: {avg_creative_intra:.3f}")
-    print(f"  Inter-domain similarity: {avg_inter:.3f}")
-    print(f"  Separation score: {separation_score:.0%}")
+    print(f"\nReasoning/Creativity Separation: {separation_accuracy:.0%}")
+    print(f"  Reasoning (O6 > O2): {reasoning_separation}/{len(test_samples['reasoning'])}")
+    print(f"  Creative (O2 > O6): {creativity_separation}/{len(test_samples['creative'])}")
 
     # Calculate semantic coherence (similar texts should have similar embeddings)
-    coherence = calculate_semantic_coherence(embeddings_by_domain)
+    coherence = calculate_semantic_coherence(encoder, test_samples)
     print(f"\nSemantic Coherence: {coherence:.2f}")
 
     # Latency
     avg_latency = sum(latencies) / len(latencies)
-    print(f"Average Latency: {avg_latency:.2f}ms")
+    print(f"\nAverage Latency: {avg_latency:.2f}ms")
 
     return EncoderBenchmarkResult(
         encoder_name=encoder.name,
         domain_accuracy=overall_accuracy,
-        reasoning_creativity_separation=separation_score,
+        reasoning_creativity_separation=separation_accuracy,
         avg_latency_ms=avg_latency,
         semantic_coherence=coherence,
         samples_tested=total,
         details={
             "domain_accuracies": domain_accuracies,
-            "intra_similarity": intra_avg,
-            "inter_similarity": avg_inter,
+            "reasoning_separation": reasoning_separation,
+            "creativity_separation": creativity_separation,
         },
     )
 
 
-def calculate_semantic_coherence(embeddings_by_domain: Dict[str, List[List[float]]]) -> float:
+def calculate_semantic_coherence(encoder, test_samples: Dict[str, List[str]]) -> float:
     """
     Calculate semantic coherence score.
 
-    Higher score means samples within the same domain are more similar to each other
-    than to samples from other domains.
+    Measures whether same-domain samples cluster together in embedding space.
+    Higher score = better semantic understanding.
     """
-    total_intra = 0
-    total_inter = 0
-    intra_count = 0
-    inter_count = 0
+    import math
 
-    domains = list(embeddings_by_domain.keys())
+    domain_embeddings = {}
+    for domain, samples in test_samples.items():
+        embeddings = encoder.encode_batch(samples)
+        domain_embeddings[domain] = embeddings
 
-    for i, d1 in enumerate(domains):
-        embs1 = embeddings_by_domain[d1]
+    # Calculate average intra-domain vs inter-domain distances
+    intra_distances = []
+    inter_distances = []
 
-        # Intra-domain similarity
-        for j, e1 in enumerate(embs1):
-            for k, e2 in enumerate(embs1):
-                if j < k:
-                    total_intra += cosine_similarity(e1, e2)
-                    intra_count += 1
+    for domain, embeddings in domain_embeddings.items():
+        # Intra-domain: distances within same domain
+        for i in range(len(embeddings)):
+            for j in range(i + 1, len(embeddings)):
+                dist = euclidean_distance(embeddings[i], embeddings[j])
+                intra_distances.append(dist)
 
-        # Inter-domain similarity
-        for d2 in domains[i+1:]:
-            embs2 = embeddings_by_domain[d2]
-            for e1 in embs1:
-                for e2 in embs2:
-                    total_inter += cosine_similarity(e1, e2)
-                    inter_count += 1
+        # Inter-domain: distances to other domains
+        for other_domain, other_embeddings in domain_embeddings.items():
+            if domain != other_domain:
+                for emb1 in embeddings:
+                    for emb2 in other_embeddings:
+                        dist = euclidean_distance(emb1, emb2)
+                        inter_distances.append(dist)
 
-    avg_intra = total_intra / intra_count if intra_count > 0 else 0
-    avg_inter = total_inter / inter_count if inter_count > 0 else 0
+    avg_intra = sum(intra_distances) / len(intra_distances) if intra_distances else 1
+    avg_inter = sum(inter_distances) / len(inter_distances) if inter_distances else 1
 
-    # Coherence: ratio of intra to inter similarity (capped at 2.0)
-    if avg_inter > 0:
-        coherence = min(2.0, avg_intra / avg_inter)
-    else:
-        coherence = 1.0
+    # Coherence = ratio of inter to intra distance
+    # Higher = better (more separation between domains, tighter within domains)
+    coherence = avg_inter / (avg_intra + 1e-10)
 
     return coherence
+
+
+def euclidean_distance(v1: List[float], v2: List[float]) -> float:
+    """Calculate Euclidean distance between two vectors."""
+    import math
+    return math.sqrt(sum((a - b) ** 2 for a, b in zip(v1, v2)))
 
 
 def run_comparison():
@@ -375,7 +364,7 @@ def run_comparison():
     print("=" * 60)
 
     if mini_r.domain_accuracy > hash_r.domain_accuracy:
-        improvement_pct = (mini_r.domain_accuracy - hash_r.domain_accuracy) / max(0.01, hash_r.domain_accuracy) * 100
+        improvement_pct = (mini_r.domain_accuracy - hash_r.domain_accuracy) / hash_r.domain_accuracy * 100 if hash_r.domain_accuracy > 0 else 100
         print(f"\n+ MiniLM improves domain accuracy by {improvement_pct:.0f}%")
     else:
         print("\n- MiniLM did not improve domain accuracy (may need training)")

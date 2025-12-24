@@ -1,0 +1,457 @@
+//@version=6
+indicator("Bayesian ADX + Elliott Wave", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// ============================================================================
+// INPUTS
+// ============================================================================
+// ADX Settings
+adx_length = input.int(14, "ADX Length", minval=1, group="ADX Settings")
+adx_smoothing = input.int(14, "ADX Smoothing", minval=1, group="ADX Settings")
+adx_trend_threshold = input.float(25.0, "ADX Trend Threshold", minval=10.0, maxval=50.0, group="ADX Settings")
+
+// Bayesian Settings
+prior_alpha = input.float(2.0, "Prior Alpha (Bullish Bias)", minval=0.1, maxval=10.0, group="Bayesian Settings")
+prior_beta = input.float(2.0, "Prior Beta (Bearish Bias)", minval=0.1, maxval=10.0, group="Bayesian Settings")
+learning_rate = input.float(0.1, "Learning Rate", minval=0.01, maxval=1.0, group="Bayesian Settings")
+signal_threshold = input.float(0.6, "Signal Threshold", minval=0.5, maxval=0.9, group="Bayesian Settings")
+
+// Elliott Wave Settings
+ew_pivot_length = input.int(5, "Pivot Lookback", minval=2, maxval=20, group="Elliott Wave")
+ew_fib_tolerance = input.float(0.1, "Fibonacci Tolerance", minval=0.01, maxval=0.3, group="Elliott Wave")
+show_wave_labels = input.bool(true, "Show Wave Labels", group="Elliott Wave")
+show_wave_lines = input.bool(true, "Show Wave Lines", group="Elliott Wave")
+
+// Signal Weights
+weight_bayesian = input.float(0.5, "Bayesian Weight", minval=0.0, maxval=1.0, group="Signal Weights")
+weight_elliott = input.float(0.5, "Elliott Weight", minval=0.0, maxval=1.0, group="Signal Weights")
+
+// Visual settings
+show_background = input.bool(true, "Show Background Color", group="Display")
+show_labels = input.bool(true, "Show Signal Labels", group="Display")
+show_table = input.bool(true, "Show Info Table", group="Display")
+
+// ============================================================================
+// ADX CALCULATION
+// ============================================================================
+tr = math.max(high - low, math.abs(high - close[1]), math.abs(low - close[1]))
+up_move = high - high[1]
+down_move = low[1] - low
+plus_dm = up_move > down_move and up_move > 0 ? up_move : 0
+minus_dm = down_move > up_move and down_move > 0 ? down_move : 0
+
+smoothed_tr = ta.rma(tr, adx_length)
+smoothed_plus_dm = ta.rma(plus_dm, adx_length)
+smoothed_minus_dm = ta.rma(minus_dm, adx_length)
+
+plus_di = smoothed_tr != 0 ? 100 * smoothed_plus_dm / smoothed_tr : 0
+minus_di = smoothed_tr != 0 ? 100 * smoothed_minus_dm / smoothed_tr : 0
+
+dx = plus_di + minus_di != 0 ? 100 * math.abs(plus_di - minus_di) / (plus_di + minus_di) : 0
+adx = ta.rma(dx, adx_smoothing)
+
+// ============================================================================
+// BAYESIAN POSTERIOR UPDATE
+// ============================================================================
+var float post_alpha = prior_alpha
+var float post_beta = prior_beta
+
+price_change = close - close[1]
+is_bullish = price_change > 0 ? 1.0 : 0.0
+
+adx_weight = adx / 100.0
+observation_weight = learning_rate * (0.5 + 0.5 * adx_weight)
+
+if barstate.isconfirmed
+    if is_bullish > 0.5
+        post_alpha := post_alpha + observation_weight
+    else
+        post_beta := post_beta + observation_weight
+
+    decay = 0.999
+    post_alpha := math.max(prior_alpha * 0.5, post_alpha * decay)
+    post_beta := math.max(prior_beta * 0.5, post_beta * decay)
+
+posterior_mean = post_alpha / (post_alpha + post_beta)
+posterior_var = (post_alpha * post_beta) / ((post_alpha + post_beta) * (post_alpha + post_beta) * (post_alpha + post_beta + 1))
+posterior_std = math.sqrt(posterior_var)
+
+ci_low = math.max(0, posterior_mean - 2 * posterior_std)
+ci_high = math.min(1, posterior_mean + 2 * posterior_std)
+
+// ============================================================================
+// ELLIOTT WAVE DETECTION
+// ============================================================================
+// Pivot detection
+pivot_high = ta.pivothigh(high, ew_pivot_length, ew_pivot_length)
+pivot_low = ta.pivotlow(low, ew_pivot_length, ew_pivot_length)
+
+// Store last 6 pivots for wave analysis
+var float[] pivot_prices = array.new_float(6, na)
+var int[] pivot_bars = array.new_int(6, na)
+var bool[] pivot_is_high = array.new_bool(6, false)
+
+// Track wave state
+var int current_wave = 0  // 0=none, 1-5=impulse, -1 to -3 = ABC correction
+var bool wave_is_bullish = true
+var float wave_start_price = na
+var int wave_start_bar = na
+
+// Fibonacci ratios for validation
+fib_0382 = 0.382
+fib_0500 = 0.500
+fib_0618 = 0.618
+fib_1618 = 1.618
+fib_2618 = 2.618
+
+// Check if ratio is within tolerance of target
+is_fib_ratio(float ratio, float target) =>
+    math.abs(ratio - target) <= ew_fib_tolerance
+
+// Update pivot arrays when new pivot detected
+if not na(pivot_high)
+    // Shift array and add new pivot
+    for i = 5 to 1
+        array.set(pivot_prices, i, array.get(pivot_prices, i-1))
+        array.set(pivot_bars, i, array.get(pivot_bars, i-1))
+        array.set(pivot_is_high, i, array.get(pivot_is_high, i-1))
+    array.set(pivot_prices, 0, pivot_high)
+    array.set(pivot_bars, 0, bar_index - ew_pivot_length)
+    array.set(pivot_is_high, 0, true)
+
+if not na(pivot_low)
+    for i = 5 to 1
+        array.set(pivot_prices, i, array.get(pivot_prices, i-1))
+        array.set(pivot_bars, i, array.get(pivot_bars, i-1))
+        array.set(pivot_is_high, i, array.get(pivot_is_high, i-1))
+    array.set(pivot_prices, 0, pivot_low)
+    array.set(pivot_bars, 0, bar_index - ew_pivot_length)
+    array.set(pivot_is_high, 0, false)
+
+// Analyze wave structure using recent pivots
+// Get pivot values
+p0 = array.get(pivot_prices, 0)
+p1 = array.get(pivot_prices, 1)
+p2 = array.get(pivot_prices, 2)
+p3 = array.get(pivot_prices, 3)
+p4 = array.get(pivot_prices, 4)
+p5 = array.get(pivot_prices, 5)
+
+b0 = array.get(pivot_bars, 0)
+b1 = array.get(pivot_bars, 1)
+b2 = array.get(pivot_bars, 2)
+
+h0 = array.get(pivot_is_high, 0)
+h1 = array.get(pivot_is_high, 1)
+h2 = array.get(pivot_is_high, 2)
+h3 = array.get(pivot_is_high, 3)
+h4 = array.get(pivot_is_high, 4)
+h5 = array.get(pivot_is_high, 5)
+
+// Wave validation functions
+// For bullish impulse: alternating low-high-low-high-low-high
+// Wave 2 retraces 38.2%-61.8% of Wave 1
+// Wave 3 is often 161.8% of Wave 1
+// Wave 4 retraces 23.6%-50% of Wave 3
+// Wave 5 is often equal to Wave 1 or 61.8% of Wave 1-3
+
+// Detect Bullish Impulse Wave Pattern
+detect_bullish_impulse() =>
+    if na(p0) or na(p1) or na(p2) or na(p3) or na(p4) or na(p5)
+        0
+    else
+        // Pattern: L0(wave0) -> H1(wave1) -> L2(wave2) -> H3(wave3) -> L4(wave4) -> H5(wave5)
+        // We need: !h5, h4, !h3, h2, !h1, h0 for bullish impulse ending at high
+        if not h5 and h4 and not h3 and h2 and not h1 and h0
+            wave1 = p4 - p5  // First impulse up
+            wave2_retrace = (p4 - p3) / wave1  // Retracement
+            wave3 = p2 - p3  // Third wave up
+            wave3_ext = wave3 / wave1  // Extension ratio
+            wave4_retrace = (p2 - p1) / wave3  // Wave 4 retracement
+            wave5 = p0 - p1  // Fifth wave
+
+            // Validate Elliott rules
+            // Wave 2 should retrace 38.2%-61.8% of Wave 1
+            valid_w2 = wave2_retrace >= 0.3 and wave2_retrace <= 0.7
+            // Wave 3 should extend at least 100% of Wave 1
+            valid_w3 = wave3_ext >= 1.0
+            // Wave 4 should not overlap Wave 1 territory
+            valid_w4 = p1 > p4  // Wave 4 low above Wave 1 high
+            // Wave 3 is typically the longest
+            valid_longest = wave3 >= wave1 and wave3 >= wave5
+
+            if valid_w2 and valid_w3 and valid_w4 and valid_longest
+                5  // Complete bullish impulse at Wave 5
+            else if valid_w2 and valid_w3
+                3  // Likely in Wave 3 or beyond
+            else
+                1  // Early wave structure
+        else if not h4 and h3 and not h2 and h1 and not h0
+            // Possible Wave 4 correction in progress
+            4
+        else
+            0
+
+// Detect Bearish Impulse Wave Pattern
+detect_bearish_impulse() =>
+    if na(p0) or na(p1) or na(p2) or na(p3) or na(p4) or na(p5)
+        0
+    else
+        // Pattern: H5(wave0) -> L4(wave1) -> H3(wave2) -> L2(wave3) -> H1(wave4) -> L0(wave5)
+        if h5 and not h4 and h3 and not h2 and h1 and not h0
+            wave1 = p5 - p4  // First impulse down
+            wave2_retrace = (p3 - p4) / wave1
+            wave3 = p3 - p2
+            wave3_ext = wave3 / wave1
+            wave4_retrace = (p1 - p2) / wave3
+            wave5 = p1 - p0
+
+            valid_w2 = wave2_retrace >= 0.3 and wave2_retrace <= 0.7
+            valid_w3 = wave3_ext >= 1.0
+            valid_w4 = p1 < p4
+            valid_longest = wave3 >= wave1 and wave3 >= wave5
+
+            if valid_w2 and valid_w3 and valid_w4 and valid_longest
+                -5
+            else if valid_w2 and valid_w3
+                -3
+            else
+                -1
+        else if h4 and not h3 and h2 and not h1 and h0
+            -4
+        else
+            0
+
+// Detect ABC Correction
+detect_abc_correction() =>
+    if na(p0) or na(p1) or na(p2)
+        0
+    else
+        // Bullish ABC (correction after bearish impulse)
+        // Pattern: Low -> High -> Low (A-B-C forming higher low)
+        if not h2 and h1 and not h0 and p0 > p2
+            wave_a = p1 - p2
+            wave_b_retrace = (p1 - p0) / wave_a
+            // B typically retraces 50%-78.6% of A
+            if wave_b_retrace >= 0.4 and wave_b_retrace <= 0.85
+                1  // Bullish ABC complete
+            else
+                0
+        // Bearish ABC (correction after bullish impulse)
+        else if h2 and not h1 and h0 and p0 < p2
+            wave_a = p2 - p1
+            wave_b_retrace = (p0 - p1) / wave_a
+            if wave_b_retrace >= 0.4 and wave_b_retrace <= 0.85
+                -1  // Bearish ABC complete
+            else
+                0
+        else
+            0
+
+// Calculate wave signals
+bullish_impulse = detect_bullish_impulse()
+bearish_impulse = detect_bearish_impulse()
+abc_pattern = detect_abc_correction()
+
+// Determine Elliott Wave bias
+var float elliott_bias = 0.5  // 0 = bearish, 0.5 = neutral, 1 = bullish
+var string wave_label = "---"
+
+if bullish_impulse == 5
+    elliott_bias := 0.3  // Wave 5 complete, expect correction
+    wave_label := "W5↑ End"
+else if bullish_impulse == 3
+    elliott_bias := 0.9  // In Wave 3, strong bullish
+    wave_label := "W3↑"
+else if bullish_impulse == 4
+    elliott_bias := 0.7  // Wave 4 pullback, bullish continuation expected
+    wave_label := "W4↑"
+else if bullish_impulse == 1
+    elliott_bias := 0.65
+    wave_label := "W1↑"
+else if bearish_impulse == -5
+    elliott_bias := 0.7  // Wave 5 down complete, expect bounce
+    wave_label := "W5↓ End"
+else if bearish_impulse == -3
+    elliott_bias := 0.1  // In Wave 3 down
+    wave_label := "W3↓"
+else if bearish_impulse == -4
+    elliott_bias := 0.3
+    wave_label := "W4↓"
+else if bearish_impulse == -1
+    elliott_bias := 0.35
+    wave_label := "W1↓"
+else if abc_pattern == 1
+    elliott_bias := 0.75  // Bullish ABC complete, trend resumption
+    wave_label := "ABC↑"
+else if abc_pattern == -1
+    elliott_bias := 0.25  // Bearish ABC complete
+    wave_label := "ABC↓"
+else
+    wave_label := "---"
+
+// ============================================================================
+// COMBINED SIGNAL GENERATION
+// ============================================================================
+has_trend = adx >= adx_trend_threshold
+
+// Normalize weights
+total_weight = weight_bayesian + weight_elliott
+norm_bayes = weight_bayesian / total_weight
+norm_elliott = weight_elliott / total_weight
+
+// Combined probability
+combined_prob = norm_bayes * posterior_mean + norm_elliott * elliott_bias
+
+// Generate signals
+bullish_signal = combined_prob >= signal_threshold and has_trend and plus_di > minus_di
+bearish_signal = combined_prob <= (1 - signal_threshold) and has_trend and minus_di > plus_di
+
+// Individual component signals (for info)
+bayes_bullish = posterior_mean >= signal_threshold
+bayes_bearish = posterior_mean <= (1 - signal_threshold)
+elliott_bullish = elliott_bias >= 0.65
+elliott_bearish = elliott_bias <= 0.35
+
+// Signal agreement
+signal_agreement = (bayes_bullish and elliott_bullish) or (bayes_bearish and elliott_bearish)
+
+// ============================================================================
+// WAVE VISUALIZATION
+// ============================================================================
+// Draw wave lines connecting recent pivots
+var line wave_line_1 = na
+var line wave_line_2 = na
+var line wave_line_3 = na
+
+if show_wave_lines and not na(p0) and not na(p1) and not na(b0) and not na(b1)
+    line.delete(wave_line_1)
+    wave_line_1 := line.new(b1, p1, b0, p0,
+                            color=h0 ? color.new(color.green, 50) : color.new(color.red, 50),
+                            width=2, style=line.style_solid)
+
+if show_wave_lines and not na(p1) and not na(p2) and not na(b1) and not na(b2)
+    line.delete(wave_line_2)
+    wave_line_2 := line.new(b2, p2, b1, p1,
+                            color=h1 ? color.new(color.green, 50) : color.new(color.red, 50),
+                            width=2, style=line.style_solid)
+
+// Wave labels at pivots
+if show_wave_labels and not na(pivot_high)
+    lbl_text = bullish_impulse > 0 ? str.tostring(bullish_impulse) : bearish_impulse < 0 ? str.tostring(math.abs(bearish_impulse)) : "H"
+    lbl_color = bullish_impulse > 0 ? color.green : bearish_impulse < 0 ? color.red : color.gray
+    label.new(bar_index - ew_pivot_length, pivot_high, lbl_text,
+              style=label.style_label_down, color=lbl_color, textcolor=color.white, size=size.tiny)
+
+if show_wave_labels and not na(pivot_low)
+    lbl_text = bullish_impulse > 0 ? str.tostring(bullish_impulse) : bearish_impulse < 0 ? str.tostring(math.abs(bearish_impulse)) : "L"
+    lbl_color = bullish_impulse > 0 ? color.green : bearish_impulse < 0 ? color.red : color.gray
+    label.new(bar_index - ew_pivot_length, pivot_low, lbl_text,
+              style=label.style_label_up, color=lbl_color, textcolor=color.white, size=size.tiny)
+
+// ============================================================================
+// PLOTTING
+// ============================================================================
+bg_color = show_background ? (bullish_signal ? color.new(color.green, 85) : bearish_signal ? color.new(color.red, 85) : na) : na
+bgcolor(bg_color)
+
+// Entry signals with agreement indication
+signal_color_buy = signal_agreement and bullish_signal ? color.lime : color.green
+signal_color_sell = signal_agreement and bearish_signal ? color.fuchsia : color.red
+
+plotshape(bullish_signal and not bullish_signal[1], "Buy Signal", shape.triangleup, location.belowbar, signal_color_buy, size=size.normal)
+plotshape(bearish_signal and not bearish_signal[1], "Sell Signal", shape.triangledown, location.abovebar, signal_color_sell, size=size.normal)
+
+// Labels with combined info
+if show_labels and bullish_signal and not bullish_signal[1]
+    agree_txt = signal_agreement ? "✓" : ""
+    label.new(bar_index, low, "BUY " + agree_txt + "\nP=" + str.tostring(combined_prob, "#.##") +
+              "\nEW=" + wave_label + "\nADX=" + str.tostring(adx, "#.#"),
+              style=label.style_label_up, color=signal_color_buy, textcolor=color.white, size=size.small)
+
+if show_labels and bearish_signal and not bearish_signal[1]
+    agree_txt = signal_agreement ? "✓" : ""
+    label.new(bar_index, high, "SELL " + agree_txt + "\nP=" + str.tostring(combined_prob, "#.##") +
+              "\nEW=" + wave_label + "\nADX=" + str.tostring(adx, "#.#"),
+              style=label.style_label_down, color=signal_color_sell, textcolor=color.white, size=size.small)
+
+// ============================================================================
+// INFO TABLE
+// ============================================================================
+if show_table and barstate.islast
+    var table info_table = table.new(position.top_right, 2, 12, bgcolor=color.new(color.black, 80), border_width=1)
+
+    // Headers
+    table.cell(info_table, 0, 0, "Metric", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 0, "Value", text_color=color.white, text_size=size.small)
+
+    // ADX
+    adx_color = adx >= adx_trend_threshold ? color.green : color.gray
+    table.cell(info_table, 0, 1, "ADX", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 1, str.tostring(adx, "#.##"), text_color=adx_color, text_size=size.small)
+
+    // +DI / -DI
+    di_color = plus_di > minus_di ? color.green : color.red
+    table.cell(info_table, 0, 2, "+DI / -DI", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 2, str.tostring(plus_di, "#.#") + " / " + str.tostring(minus_di, "#.#"), text_color=di_color, text_size=size.small)
+
+    // Bayesian P(Bull)
+    prob_color = posterior_mean > 0.6 ? color.green : posterior_mean < 0.4 ? color.red : color.yellow
+    table.cell(info_table, 0, 3, "Bayesian P", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 3, str.tostring(posterior_mean * 100, "#.#") + "%", text_color=prob_color, text_size=size.small)
+
+    // Elliott Bias
+    ew_color = elliott_bias > 0.6 ? color.green : elliott_bias < 0.4 ? color.red : color.yellow
+    table.cell(info_table, 0, 4, "Elliott Bias", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 4, str.tostring(elliott_bias * 100, "#.#") + "%", text_color=ew_color, text_size=size.small)
+
+    // Wave Label
+    wave_color = elliott_bias > 0.6 ? color.green : elliott_bias < 0.4 ? color.red : color.gray
+    table.cell(info_table, 0, 5, "Wave", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 5, wave_label, text_color=wave_color, text_size=size.small)
+
+    // Combined Probability
+    comb_color = combined_prob > 0.6 ? color.green : combined_prob < 0.4 ? color.red : color.yellow
+    table.cell(info_table, 0, 6, "Combined P", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 6, str.tostring(combined_prob * 100, "#.#") + "%", text_color=comb_color, text_size=size.small)
+
+    // Credible Interval
+    table.cell(info_table, 0, 7, "95% CI", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 7, str.tostring(ci_low * 100, "#") + "% - " + str.tostring(ci_high * 100, "#") + "%", text_color=color.gray, text_size=size.small)
+
+    // Uncertainty
+    unc_color = posterior_std < 0.1 ? color.green : posterior_std < 0.2 ? color.yellow : color.red
+    table.cell(info_table, 0, 8, "Uncertainty", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 8, str.tostring(posterior_std, "#.###"), text_color=unc_color, text_size=size.small)
+
+    // Agreement
+    agree_color = signal_agreement ? color.lime : color.orange
+    agree_text = signal_agreement ? "ALIGNED" : "MIXED"
+    table.cell(info_table, 0, 9, "Agreement", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 9, agree_text, text_color=agree_color, text_size=size.small)
+
+    // Signal
+    signal_text = bullish_signal ? "BUY" : bearish_signal ? "SELL" : "NEUTRAL"
+    signal_color = bullish_signal ? color.green : bearish_signal ? color.red : color.gray
+    table.cell(info_table, 0, 10, "Signal", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 10, signal_text, text_color=signal_color, text_size=size.small)
+
+    // Trend Status
+    trend_text = has_trend ? (plus_di > minus_di ? "BULLISH" : "BEARISH") : "NO TREND"
+    trend_color = has_trend ? (plus_di > minus_di ? color.green : color.red) : color.gray
+    table.cell(info_table, 0, 11, "Trend", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 11, trend_text, text_color=trend_color, text_size=size.small)
+
+// ============================================================================
+// ALERTS
+// ============================================================================
+alertcondition(bullish_signal and not bullish_signal[1], "Buy Signal", "Bayesian+Elliott Buy Signal")
+alertcondition(bearish_signal and not bearish_signal[1], "Sell Signal", "Bayesian+Elliott Sell Signal")
+alertcondition(bullish_signal and not bullish_signal[1] and signal_agreement, "Strong Buy", "STRONG BUY - Bayesian & Elliott Aligned")
+alertcondition(bearish_signal and not bearish_signal[1] and signal_agreement, "Strong Sell", "STRONG SELL - Bayesian & Elliott Aligned")
+alertcondition(adx >= adx_trend_threshold and adx[1] < adx_trend_threshold, "Trend Emerging", "ADX crossed above threshold")
+
+// Hidden plots for alerts
+plot(combined_prob, "Combined Probability", display=display.none)
+plot(posterior_mean, "Bayesian Posterior", display=display.none)
+plot(elliott_bias, "Elliott Bias", display=display.none)
+plot(adx, "ADX", display=display.none)

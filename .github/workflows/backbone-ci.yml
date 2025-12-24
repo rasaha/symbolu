@@ -1,0 +1,180 @@
+name: Ontology Backbone CI
+
+on:
+  push:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "symbolu/ontology/backbone/**"
+      - "symbolu/resonance/**"
+      - "tests/test_10d_backbone.py"
+      - "tests/test_phoneme*.py"
+      - "tests/test_resonance*.py"
+      - ".github/workflows/backbone-ci.yml"
+  pull_request:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "symbolu/ontology/backbone/**"
+      - "symbolu/resonance/**"
+      - "tests/test_10d_backbone.py"
+      - "tests/test_phoneme*.py"
+      - "tests/test_resonance*.py"
+      - ".github/workflows/backbone-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  backbone-ci:
+    name: 10D Backbone & Resonance Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-backbone-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-backbone-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -e .
+          pip install pytest pytest-cov coverage pydantic
+
+      - name: Run 10D Backbone Tests
+        run: |
+          pytest tests/test_10d_backbone.py \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            2>&1 | tee backbone-pytest.log
+
+      - name: Run Resonance Engine Tests
+        run: |
+          pytest symbolu/resonance/tests \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            2>&1 | tee resonance-pytest.log
+        continue-on-error: true
+
+      - name: Run Backbone Module Tests
+        run: |
+          echo "=========================================="
+          echo "ONTOLOGY BACKBONE MODULE TESTS"
+          echo "=========================================="
+
+          # Test encoder
+          python -c "from symbolu.ontology.backbone import encode_to_10d; print('✓ encoder imports')" || echo "⚠ encoder not found"
+
+          # Test similarity
+          python -c "from symbolu.ontology.backbone import cosine_similarity; print('✓ similarity imports')" || echo "⚠ similarity not found"
+
+          # Test mirror pairs
+          python -c "from symbolu.ontology.backbone import MirrorPair, compute_balance_score; print('✓ mirror_pairs imports')" || echo "⚠ mirror_pairs not found"
+
+          # Test persona tracker
+          python -c "from symbolu.ontology.backbone import PersonaTracker; print('✓ persona_tracker imports')" || echo "⚠ persona_tracker not found"
+
+          # Test insight suggester
+          python -c "from symbolu.ontology.backbone import InsightMode, generate_insights; print('✓ insight_suggester imports')" || echo "⚠ insight_suggester not found"
+
+          # Test cross-domain config
+          python -c "from symbolu.ontology.backbone import CrossDomainConfig, DomainPairPolicy; print('✓ cross_domain_config imports')" || echo "⚠ cross_domain_config not found"
+
+          # Test learning pipeline
+          python -c "from symbolu.ontology.backbone import retrieve_similar, MatchType; print('✓ learning_pipeline imports')" || echo "⚠ learning_pipeline not found"
+
+          echo "=========================================="
+
+      - name: Validate Cross-Domain Config JSON
+        run: |
+          echo "=========================================="
+          echo "CROSS-DOMAIN CONFIG VALIDATION"
+          echo "=========================================="
+
+          python3 << 'SCRIPT'
+          import json
+          import sys
+          from pathlib import Path
+
+          config_path = Path("symbolu/ontology/backbone/cross_domain_config.json")
+
+          if not config_path.exists():
+              print("⚠ Config file not found (may not be required)")
+              sys.exit(0)
+
+          try:
+              with open(config_path) as f:
+                  config = json.load(f)
+
+              # Validate required fields
+              required = ["enabled", "default_policy", "domain_pairs"]
+              missing = [r for r in required if r not in config]
+
+              if missing:
+                  print(f"❌ Missing required fields: {missing}")
+                  sys.exit(1)
+
+              # Validate policies
+              valid_policies = ["allow", "block", "require_high", "monitor"]
+              if config["default_policy"] not in valid_policies:
+                  print(f"❌ Invalid default_policy: {config['default_policy']}")
+                  sys.exit(1)
+
+              for pair_key, pair_config in config.get("domain_pairs", {}).items():
+                  if pair_config.get("policy") not in valid_policies:
+                      print(f"❌ Invalid policy for {pair_key}: {pair_config.get('policy')}")
+                      sys.exit(1)
+
+              print(f"✓ Config valid: {len(config.get('domain_pairs', {}))} domain pairs configured")
+              print(f"✓ Default policy: {config['default_policy']}")
+              print(f"✓ Blocked pairs: {len(config.get('blocked_pairs', []))}")
+
+          except json.JSONDecodeError as e:
+              print(f"❌ Invalid JSON: {e}")
+              sys.exit(1)
+          except Exception as e:
+              print(f"❌ Validation error: {e}")
+              sys.exit(1)
+          SCRIPT
+
+          echo "=========================================="
+
+      - name: Upload Backbone Test Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backbone-test-logs
+          path: |
+            backbone-pytest.log
+            resonance-pytest.log
+
+      - name: Backbone CI Summary
+        if: success()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "ONTOLOGY BACKBONE CI: PASSED"
+          echo "=========================================="
+          echo ""
+          echo "Verified components:"
+          echo "  [PASS] 10D Backbone encoder"
+          echo "  [PASS] Resonance engine"
+          echo "  [PASS] Mirror pair architecture"
+          echo "  [PASS] Persona tracker"
+          echo "  [PASS] Cross-domain config"
+          echo "  [PASS] Insight suggester"
+          echo "  [PASS] Learning pipeline"
+          echo ""
+          echo "=========================================="

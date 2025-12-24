@@ -1,14 +1,23 @@
 """
-Phase 1 Output Contract - Immutable Acoustic-Symbolic Snapshot
-===============================================================
+Core/Substrate Snapshot Contract — Immutable Acoustic-Symbolic Snapshot
+=========================================================================
 
-PHASE 1 MODULE - Defines the immutable output contract for Phase 1.
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                         CORE/SUBSTRATE LAYER                                   ║
+║                                                                                ║
+║  This module is part of the Core/Substrate layer.                              ║
+║  It is NOT a pipeline phase and has no authority over intent, regime,          ║
+║  semantics, or delivery.                                                       ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+CORE/SUBSTRATE MODULE — Defines the immutable output contract for acoustic-symbolic
+tokenization (historically labeled "Phase 1").
 
 This module defines Phase1Snapshot, the canonical output structure
-produced by Phase 1 acoustic-symbolic tokenization. This snapshot
-is consumed by downstream phases (Phase 2+).
+produced by Core/Substrate acoustic-symbolic tokenization. This snapshot
+may be observed by downstream observers and allowed sinks only.
 
-ARCHITECTURAL CONSTRAINTS (PHASE 1 INVARIANTS):
+ARCHITECTURAL CONSTRAINTS (CORE/SUBSTRATE INVARIANTS):
     - NO semantics: Snapshot contains only acoustic primitives
     - NO intent: Snapshot has no purpose/goal fields
     - NO routing: Snapshot does not direct control flow
@@ -17,14 +26,25 @@ ARCHITECTURAL CONSTRAINTS (PHASE 1 INVARIANTS):
     - DETERMINISTIC: Same input always produces same snapshot
     - IMMUTABLE: Snapshot is frozen after creation
     - READ-ONLY: Downstream phases cannot modify snapshot
+    - NON-AUTHORITATIVE: Cannot influence governance or routing decisions
 
-The Phase1Snapshot is the ONLY output of Phase 1.
-It bundles:
+This module:
+    - Computes immutable acoustic-symbolic snapshots
+    - Bundles acoustic units and vṛtti assignments
+    - Does NOT interpret meaning
+    - Does NOT infer emotion or intent
+    - Does NOT affect delivery decisions
+
+The Phase1Snapshot bundles:
     1. acoustic_units: Ordered list of AcousticUnit primitives
     2. vritti_map: Corresponding vṛtti assignments
     3. metadata: Diagnostic information (non-semantic)
 
-Version: 1.0 (Phase 1 Acoustic-Symbolic Tokenization)
+HISTORICAL NOTE: The "Phase1" naming is a historical development label,
+NOT an authoritative pipeline phase. The snapshot contract is part of
+the Core/Substrate layer.
+
+Version: 1.0 (Core/Substrate Utility)
 Date: 2025-12-13
 """
 
@@ -50,9 +70,10 @@ from symbolu.formulas.vritti_mapper import (
 
 
 # ============================================================================
-# PHASE 1 INVARIANT DECLARATIONS
+# CORE/SUBSTRATE INVARIANT DECLARATIONS
 # ============================================================================
 
+# Core/Substrate invariants (historical "Phase 1" label)
 PHASE_1_INVARIANTS = {
     "NO_SEMANTICS": True,
     "NO_INTENT": True,
@@ -71,7 +92,7 @@ PHASE_VERSION = "1.0"
 
 
 # ============================================================================
-# DATACLASSES - Phase 1 Output Contract
+# DATACLASSES - Core/Substrate Output Contract (historical "Phase 1")
 # ============================================================================
 
 
@@ -106,12 +127,12 @@ class Phase1Metadata:
 @dataclass(frozen=True)
 class Phase1Snapshot:
     """
-    Immutable output of Phase 1 Acoustic-Symbolic Tokenization.
+    Immutable output of Core/Substrate Acoustic-Symbolic Tokenization.
 
-    This is the canonical contract between Phase 1 and downstream phases.
-    It bundles acoustic units with their vṛtti assignments.
+    This is the canonical contract between the Core/Substrate layer and
+    downstream observers. It bundles acoustic units with their vṛtti assignments.
 
-    PHASE 1 INVARIANTS (enforced by frozen=True):
+    CORE/SUBSTRATE INVARIANTS (enforced by frozen=True):
         - Immutable after creation
         - No semantic content
         - No intent fields
@@ -221,7 +242,7 @@ def create_phase1_snapshot(text: str) -> Phase1Snapshot:
     This is the primary entry point for Phase 1 processing.
     It orchestrates acoustic unit mapping and vṛtti assignment.
 
-    PHASE 1 INVARIANTS:
+    CORE/SUBSTRATE INVARIANTS:
         - Deterministic: Same text always produces same snapshot
         - No LLM calls: Pure rule-based processing
         - No semantics: Output contains only acoustic primitives
@@ -310,7 +331,7 @@ def create_empty_snapshot() -> Phase1Snapshot:
 
 def validate_phase1_snapshot(snapshot: Phase1Snapshot) -> bool:
     """
-    Validate a Phase1Snapshot against Phase 1 contracts.
+    Validate a Phase1Snapshot against Core/Substrate contracts.
 
     Checks:
         1. Type correctness
@@ -352,7 +373,7 @@ def assert_no_semantic_leakage(snapshot: Phase1Snapshot) -> bool:
     """
     Assert that a Phase1Snapshot contains no semantic content.
 
-    This is a defensive check to ensure Phase 1 invariants hold.
+    This is a defensive check to ensure Core/Substrate invariants hold.
     It verifies that no semantic, intent, or meaning fields exist.
 
     Args:

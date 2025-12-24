@@ -11,8 +11,41 @@ Dependencies:
 If FastAPI is not installed, create_app() will raise a clean error.
 
 Endpoints:
-    POST /dilchat/analyze - Returns DILchat-formatted response
-    POST /symbolu/analyze - Returns full unified output
+    Core Analysis:
+        POST /dilchat/analyze - Returns DILchat-formatted response
+        POST /symbolu/analyze - Returns full unified output
+
+    Session Management:
+        POST /session/start - Create a new session
+        POST /session/{session_id}/analyze - Analyze within a session
+        GET /session/{session_id}/summary - Get session summary
+        GET /sessions/{session_id}/dashboard - Dashboard analytics
+        GET /sessions/{session_id}/resonance/what_if - Resonance simulation
+        GET /sessions/{session_id}/scenario/what_if - Scenario simulation
+
+    Preferences:
+        POST /preferences/user - Set user preference
+        POST /preferences/admin - Set admin preference
+        GET /preferences/user/{user_id} - Get user preference
+        GET /preferences/admin/{org_id} - Get admin preference
+
+    Demo Endpoints (for testing Symbol-U capabilities):
+        POST /demo/classify - Intent classification (Pure STL, <1ms latency)
+        POST /demo/search - Semantic search/ranking (Pure STL)
+        POST /demo/generate - Text generation (STL + 7B or Consumer tier)
+        POST /demo/name/analyze - Name resonance analysis (12D profile)
+        POST /demo/name/compare - Compare two names' profiles
+        POST /demo/name/quick-match - Quick domain compatibility check
+
+    Chat Endpoints (LLM-powered with tier-based model selection):
+        POST /chat - Chat with LLM (Anthropic Claude or Google Gemini)
+        GET /chat/providers - Get available LLM providers and tier info
+        GET /chat/usage - Get token usage statistics
+        GET /chat/usage/check - Check if within daily token limit
+        GET /chat/pricing - Get LLM pricing information
+
+    Health:
+        GET /health - Health check
 
 Design Principles:
     1. Zero-LLM in routing/policy logic
@@ -20,6 +53,18 @@ Design Principles:
     3. Fully deterministic outputs
     4. Optional dependency (graceful error if FastAPI not installed)
     5. Presentation + transport layer only
+
+Running the Server:
+    from symbolu.service.api_server import create_app
+    import uvicorn
+
+    app = create_app()
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    # Then test with:
+    # curl -X POST http://localhost:8000/demo/classify \\
+    #      -H "Content-Type: application/json" \\
+    #      -d '{"text": "Deploy the app now"}'
 """
 
 import logging
@@ -49,6 +94,23 @@ from symbolu.service.request_models import (
     UserPreferenceUpdate,
     AdminPreferenceUpdate,
     PreferenceResponse,
+    # Demo models
+    ClassifyRequest,
+    ClassifyResponse,
+    SearchRequest,
+    SearchResponse,
+    GenerateRequest,
+    GenerateResponse,
+    NameAnalyzeRequest,
+    NameAnalyzeResponse,
+    NameCompareRequest,
+    NameCompareResponse,
+    QuickMatchRequest,
+    QuickMatchResponse,
+    # Chat models
+    ChatRequest,
+    ChatResponse as ChatAPIResponse,
+    ChatMessageModel,
     PYDANTIC_AVAILABLE
 )
 
@@ -1078,6 +1140,687 @@ def create_app() -> "FastAPI":
             Dict with status="ok" if server is running
         """
         return {"status": "ok", "version": "1.0.0"}
+
+    # ========================================================================
+    # DEMO ENDPOINTS - Engine Demos
+    # ========================================================================
+
+    @app.post("/demo/classify", response_model=ClassifyResponse)
+    def demo_classify(req: ClassifyRequest) -> Dict[str, Any]:
+        """
+        Intent classification demo using Enterprise Search tier (Pure STL).
+
+        This endpoint demonstrates the deterministic intent classification
+        capability with sub-millisecond latency. No LLM is used.
+
+        Args:
+            req: ClassifyRequest with text to classify
+
+        Returns:
+            ClassifyResponse with intent, confidence, and latency
+
+        Example:
+            POST /demo/classify
+            {"text": "Deploy the K8s cluster now"}
+            -> {"text": "...", "intent": "COMMAND", "confidence": 0.92, "latency_ms": 0.13}
+        """
+        try:
+            # Import engine components
+            from symbolu.engine import create_engine, EngineTier
+
+            # Create Enterprise Search engine
+            engine = create_engine(tier=EngineTier.ENTERPRISE_SEARCH)
+
+            # Classify
+            result = engine.classify(req.text)
+
+            return {
+                "text": req.text,
+                "intent": result.intent,
+                "confidence": result.confidence,
+                "latency_ms": result.latency_ms,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in /demo/classify: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Classification failed: {str(e)}"
+            )
+
+    @app.post("/demo/search", response_model=SearchResponse)
+    def demo_search(req: SearchRequest) -> Dict[str, Any]:
+        """
+        Semantic search/ranking demo using Enterprise Search tier (Pure STL).
+
+        This endpoint demonstrates deterministic document ranking
+        with sub-millisecond latency. No LLM is used.
+
+        Args:
+            req: SearchRequest with query and candidate documents
+
+        Returns:
+            SearchResponse with ranked results and scores
+
+        Example:
+            POST /demo/search
+            {
+                "query": "quantum physics theory",
+                "candidates": [
+                    "Introduction to Machine Learning",
+                    "Quantum Computing Fundamentals",
+                    "Advanced Physics Concepts"
+                ]
+            }
+            -> {"query": "...", "ranked_results": [...], "scores": {...}, "latency_ms": 0.15}
+        """
+        try:
+            # Import engine components
+            from symbolu.engine import create_engine, EngineTier
+
+            # Create Enterprise Search engine
+            engine = create_engine(tier=EngineTier.ENTERPRISE_SEARCH)
+
+            # Search/rank
+            result = engine.search(req.query, req.candidates)
+
+            return {
+                "query": req.query,
+                "ranked_results": result.metadata.get("ranked", []),
+                "scores": result.metadata.get("scores", {}),
+                "latency_ms": result.latency_ms,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in /demo/search: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Search failed: {str(e)}"
+            )
+
+    @app.post("/demo/generate", response_model=GenerateResponse)
+    def demo_generate(req: GenerateRequest) -> Dict[str, Any]:
+        """
+        Text generation demo using Enterprise Chat or Consumer tier.
+
+        This endpoint demonstrates STL-routed generation:
+        - Enterprise Chat: STL + 7B models (25x cost savings)
+        - Consumer: STL + 768D + cascading LLM (smart fallback)
+
+        Args:
+            req: GenerateRequest with text and tier selection
+
+        Returns:
+            GenerateResponse with generated text, model info, and metrics
+
+        Example:
+            POST /demo/generate
+            {"text": "Explain quantum entanglement", "tier": "enterprise_chat"}
+            -> {"text": "...", "response": "...", "model_used": "physics_7b", ...}
+        """
+        try:
+            # Import engine components
+            from symbolu.engine import create_engine, EngineTier
+
+            # Determine tier
+            tier_map = {
+                "enterprise_chat": EngineTier.ENTERPRISE_CHAT,
+                "consumer": EngineTier.CONSUMER,
+            }
+
+            tier_key = req.tier.lower().strip()
+            if tier_key not in tier_map:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid tier '{req.tier}'. Valid: enterprise_chat, consumer"
+                )
+
+            tier = tier_map[tier_key]
+
+            # Create engine
+            engine = create_engine(tier=tier)
+
+            # Generate
+            result = engine.generate(req.text)
+
+            response = {
+                "text": req.text,
+                "response": result.response,
+                "intent": result.intent,
+                "confidence": result.confidence,
+                "model_used": result.model_used,
+                "tier": req.tier,
+                "latency_ms": result.latency_ms,
+            }
+
+            # Add 768D info for Consumer tier
+            if tier == EngineTier.CONSUMER:
+                response["used_768d"] = result.metadata.get("used_768d", False)
+
+            return response
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error in /demo/generate: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Generation failed: {str(e)}"
+            )
+
+    # ========================================================================
+    # DEMO ENDPOINTS - Name Resonance
+    # ========================================================================
+
+    @app.post("/demo/name/analyze", response_model=NameAnalyzeResponse)
+    def demo_name_analyze(req: NameAnalyzeRequest) -> Dict[str, Any]:
+        """
+        Name resonance analysis demo.
+
+        This endpoint analyzes a name's phonetic structure and projects it
+        to a 12D structural profile, then matches against domain patterns.
+
+        Fully deterministic: same name always produces the same result.
+
+        Args:
+            req: NameAnalyzeRequest with name to analyze
+
+        Returns:
+            NameAnalyzeResponse with full structural analysis
+
+        Example:
+            POST /demo/name/analyze
+            {"name": "Campbell"}
+            -> {"name": "Campbell", "normalized": "campbell", "phonemes": [...], ...}
+
+            # With ontological bridge (enhanced structural analysis)
+            {"name": "Campbell", "use_ontological_bridge": true}
+
+            # With full C×R×S formula (complete phoneme logic)
+            {"name": "Campbell", "use_crs": true}
+        """
+        try:
+            # Import name resonance API
+            from symbolu.name_resonance import analyze_name
+            from symbolu.name_resonance.types import DIMENSION_NAMES
+
+            # Analyze name (with optional C×R×S formula)
+            result = analyze_name(
+                req.name,
+                use_ontological_bridge=req.use_ontological_bridge,
+                use_crs=req.use_crs,
+            )
+
+            # Build structural profile dict
+            profile_dict = {}
+            for dim in DIMENSION_NAMES:
+                profile_dict[dim] = getattr(result.profile, dim)
+
+            # Build domain compatibility list
+            domain_list = []
+            for dr in result.domain_results:
+                domain_list.append({
+                    "domain_name": dr.domain_name,
+                    "domain_category": dr.domain_category,
+                    "classification": dr.classification.value,
+                    "compatibility_score": dr.compatibility_score,
+                    "top_matches": list(dr.top_matches) if dr.top_matches else [],
+                    "weak_matches": list(dr.weak_matches) if dr.weak_matches else [],
+                })
+
+            return {
+                "name": result.original_input,
+                "normalized": result.normalized_input.canonical,
+                "phonemes": list(result.signals.phoneme_sequence),
+                "structural_profile": profile_dict,
+                "domain_compatibility": domain_list,
+                "high_compatibility": list(result.high_compatibility),
+                "low_compatibility": list(result.low_compatibility),
+                "summary": result.summary,
+                "caveats": list(result.caveats),
+            }
+
+        except Exception as e:
+            logger.error(f"Error in /demo/name/analyze: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Name analysis failed: {str(e)}"
+            )
+
+    @app.post("/demo/name/compare", response_model=NameCompareResponse)
+    def demo_name_compare(req: NameCompareRequest) -> Dict[str, Any]:
+        """
+        Compare two names' structural profiles.
+
+        This endpoint compares the 12D structural profiles of two names,
+        showing dimension-by-dimension differences.
+
+        Args:
+            req: NameCompareRequest with two names to compare
+
+        Returns:
+            NameCompareResponse with profile comparison
+
+        Example:
+            POST /demo/name/compare
+            {"name_a": "Campbell", "name_b": "Erikson"}
+            -> {"name_a": "Campbell", "name_b": "Erikson", "profile_a": {...}, ...}
+        """
+        try:
+            # Import name resonance API
+            from symbolu.name_resonance import get_profile, compare_names
+            from symbolu.name_resonance.types import DIMENSION_NAMES
+
+            # Get profiles
+            profile_a = get_profile(req.name_a)
+            profile_b = get_profile(req.name_b)
+
+            # Build profile dicts
+            profile_a_dict = {}
+            profile_b_dict = {}
+            for dim in DIMENSION_NAMES:
+                profile_a_dict[dim] = getattr(profile_a, dim)
+                profile_b_dict[dim] = getattr(profile_b, dim)
+
+            # Get comparison text
+            comparison_text = compare_names(req.name_a, req.name_b)
+
+            return {
+                "name_a": req.name_a,
+                "name_b": req.name_b,
+                "profile_a": profile_a_dict,
+                "profile_b": profile_b_dict,
+                "comparison": comparison_text,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in /demo/name/compare: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Name comparison failed: {str(e)}"
+            )
+
+    @app.post("/demo/name/quick-match", response_model=QuickMatchResponse)
+    def demo_name_quick_match(req: QuickMatchRequest) -> Dict[str, Any]:
+        """
+        Quick domain compatibility check for a name.
+
+        This endpoint quickly checks a name's compatibility with
+        a specific domain (e.g., "Golf", "Engineering", "Law").
+
+        Args:
+            req: QuickMatchRequest with name and domain
+
+        Returns:
+            QuickMatchResponse with compatibility result
+
+        Example:
+            POST /demo/name/quick-match
+            {"name": "Campbell", "domain": "Golf"}
+            -> {"name": "Campbell", "domain": "Golf", "classification": "moderate", ...}
+        """
+        try:
+            # Import name resonance API
+            from symbolu.name_resonance import analyze_name, quick_match
+
+            # Get quick match result string
+            result_str = quick_match(req.name, req.domain)
+
+            # Also get full analysis to extract score
+            full_result = analyze_name(req.name)
+
+            # Find matching domain
+            classification = "unknown"
+            score = 0.0
+            for dr in full_result.domain_results:
+                if req.domain.lower() in dr.domain_name.lower():
+                    classification = dr.classification.value
+                    score = dr.compatibility_score
+                    break
+
+            return {
+                "name": req.name,
+                "domain": req.domain,
+                "classification": classification,
+                "score": score,
+                "result": result_str,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in /demo/name/quick-match: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Quick match failed: {str(e)}"
+            )
+
+    # ========================================================================
+    # CHAT ENDPOINTS - LLM Chat with Tier-based Model Selection
+    # ========================================================================
+
+    @app.post("/chat", response_model=ChatAPIResponse)
+    async def chat_endpoint(req: ChatRequest, request: Request) -> Dict[str, Any]:
+        """
+        Chat with LLM using tier-based model selection.
+
+        This endpoint provides chat functionality with automatic model selection
+        based on presentation tier:
+
+        - **Explorer (consumer)**: Uses fast, cheap models (Haiku/Flash)
+          Optimized for quick knowledge lookups with simple responses.
+
+        - **Analyst (power_user)**: Uses balanced models (Sonnet/Pro)
+          For enterprise chat with detailed, well-structured responses.
+
+        - **Developer (admin)**: Uses best models (Sonnet/Pro)
+          For customer chat with comprehensive analytics and insights.
+
+        Supported providers:
+        - **anthropic**: Claude 3.5 Haiku (fast) / Claude 3.5 Sonnet (balanced)
+        - **google**: Gemini 1.5 Flash (fast) / Gemini 1.5 Pro (balanced)
+
+        Args:
+            req: ChatRequest with message, tier, history, and options
+            request: FastAPI Request object (for security checks)
+
+        Returns:
+            ChatAPIResponse with generated content, model info, and usage stats
+
+        Example:
+            POST /chat
+            {
+                "message": "Explain quantum entanglement",
+                "tier": "power_user",
+                "provider": "anthropic"
+            }
+            -> {"content": "...", "model": "claude-3-5-sonnet-...", ...}
+        """
+        # Security layer (optional, non-invasive)
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
+        try:
+            # Import chat service
+            from symbolu.service.chat_service import ChatService, ChatMessage
+
+            # Initialize service
+            service = ChatService(provider=req.provider)
+
+            # Convert history if provided
+            history = None
+            if req.history:
+                history = [
+                    ChatMessage(role=msg.role, content=msg.content)
+                    for msg in req.history
+                ]
+
+            # Generate response
+            response = await service.chat(
+                message=req.message,
+                tier=req.tier,
+                history=history,
+                system_prompt=req.system_prompt,
+                provider=req.provider,
+                max_tokens=req.max_tokens,
+                temperature=req.temperature,
+            )
+
+            # Track token usage
+            usage_stats = None
+            try:
+                from symbolu.service.usage_tracker import get_usage_tracker
+
+                # Get user ID from request or use demo default
+                user_id = request.headers.get("X-User-ID", "demo_user")
+
+                tracker = get_usage_tracker()
+                usage_stats = tracker.record_usage(
+                    user_id=user_id,
+                    input_tokens=response.usage.get("input_tokens", 0),
+                    output_tokens=response.usage.get("output_tokens", 0),
+                    provider=response.provider,
+                    model=response.model,
+                    tier=req.tier,
+                )
+            except Exception as e:
+                logger.warning(f"Usage tracking failed: {e}")
+
+            return {
+                "content": response.content,
+                "model": response.model,
+                "provider": response.provider,
+                "tier": response.tier,
+                "usage": response.usage,
+                "usage_stats": usage_stats,
+                "semantic_analysis": response.semantic_analysis,
+            }
+
+        except ValueError as e:
+            # API key or provider configuration errors
+            raise HTTPException(
+                status_code=400,
+                detail=str(e)
+            )
+        except ImportError as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"LLM provider package not installed: {str(e)}"
+            )
+        except Exception as e:
+            logger.error(f"Error in /chat: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Chat failed: {str(e)}"
+            )
+
+    @app.get("/chat/providers")
+    def get_chat_providers(request: Request) -> Dict[str, Any]:
+        """
+        Get available LLM providers and their status.
+
+        Returns:
+            Dict with available providers, default provider, and tier info
+
+        Example:
+            GET /chat/providers
+            -> {
+                "available_providers": ["anthropic", "google"],
+                "default_provider": "anthropic",
+                "tiers": {...}
+            }
+        """
+        verify_api_key(request)
+
+        try:
+            from symbolu.llm.providers import (
+                LLMClient,
+                ANTHROPIC_MODELS,
+                GOOGLE_MODELS,
+                PRESENTATION_TIER_MAP,
+            )
+            import os
+
+            # Check which providers are configured
+            providers = []
+            if os.getenv("ANTHROPIC_API_KEY"):
+                providers.append("anthropic")
+            if os.getenv("GOOGLE_API_KEY"):
+                providers.append("google")
+
+            default_provider = os.getenv("LLM_PROVIDER", "anthropic")
+            if default_provider not in providers and providers:
+                default_provider = providers[0]
+
+            return {
+                "available_providers": providers,
+                "default_provider": default_provider,
+                "tiers": {
+                    "consumer": {
+                        "label": "Explorer",
+                        "description": "Fast RAG lookup with simple responses",
+                        "models": {
+                            "anthropic": ANTHROPIC_MODELS.get("fast", "claude-3-5-haiku"),
+                            "google": GOOGLE_MODELS.get("fast", "gemini-1.5-flash"),
+                        }
+                    },
+                    "power_user": {
+                        "label": "Analyst",
+                        "description": "Enterprise chat with detailed insights",
+                        "models": {
+                            "anthropic": ANTHROPIC_MODELS.get("balanced", "claude-3-5-sonnet"),
+                            "google": GOOGLE_MODELS.get("balanced", "gemini-1.5-pro"),
+                        }
+                    },
+                    "admin": {
+                        "label": "Developer",
+                        "description": "Customer chat with full analytics",
+                        "models": {
+                            "anthropic": ANTHROPIC_MODELS.get("balanced", "claude-3-5-sonnet"),
+                            "google": GOOGLE_MODELS.get("balanced", "gemini-1.5-pro"),
+                        }
+                    },
+                },
+            }
+
+        except ImportError:
+            return {
+                "available_providers": [],
+                "default_provider": None,
+                "error": "LLM providers not installed. Run: pip install anthropic google-generativeai",
+            }
+
+    # ========================================================================
+    # USAGE TRACKING ENDPOINTS
+    # ========================================================================
+
+    @app.get("/chat/usage")
+    def get_chat_usage(request: Request) -> Dict[str, Any]:
+        """
+        Get token usage statistics for the current user.
+
+        The user is identified by the X-User-ID header (defaults to "demo_user").
+
+        Returns:
+            Dict with usage statistics:
+            - daily: Today's token usage and cost
+            - total: All-time usage and cost
+            - limit: Daily limit info and remaining tokens
+
+        Example:
+            GET /chat/usage
+            Headers: X-User-ID: my_user_id
+            -> {
+                "user_id": "my_user_id",
+                "daily": {
+                    "input_tokens": 1500,
+                    "output_tokens": 4500,
+                    "total_tokens": 6000,
+                    "cost": 0.0234,
+                    "requests": 5
+                },
+                "limit": {
+                    "daily_limit": 50000,
+                    "remaining": 44000,
+                    "is_over_limit": false
+                }
+            }
+        """
+        verify_api_key(request)
+
+        try:
+            from symbolu.service.usage_tracker import get_usage_tracker
+
+            user_id = request.headers.get("X-User-ID", "demo_user")
+            tracker = get_usage_tracker()
+
+            return tracker.get_usage(user_id)
+
+        except Exception as e:
+            logger.error(f"Error in /chat/usage: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Usage retrieval failed: {str(e)}"
+            )
+
+    @app.get("/chat/usage/check")
+    def check_usage_limit(
+        request: Request,
+        estimated_tokens: int = 1000,
+    ) -> Dict[str, Any]:
+        """
+        Check if user is within their daily token limit.
+
+        Useful for checking before making a request.
+
+        Args:
+            estimated_tokens: Estimated tokens for next request (query param)
+
+        Returns:
+            Dict with limit check result:
+            - allowed: Whether the request is within limits
+            - remaining: Remaining tokens today
+            - daily_limit: User's daily limit
+
+        Example:
+            GET /chat/usage/check?estimated_tokens=500
+            -> {"allowed": true, "remaining": 44000, "daily_limit": 50000}
+        """
+        verify_api_key(request)
+
+        try:
+            from symbolu.service.usage_tracker import get_usage_tracker
+
+            user_id = request.headers.get("X-User-ID", "demo_user")
+            tracker = get_usage_tracker()
+
+            return tracker.check_limit(user_id, estimated_tokens)
+
+        except Exception as e:
+            logger.error(f"Error in /chat/usage/check: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Limit check failed: {str(e)}"
+            )
+
+    @app.get("/chat/pricing")
+    def get_pricing_info() -> Dict[str, Any]:
+        """
+        Get LLM pricing information per model.
+
+        Returns pricing per 1M tokens for each provider and model.
+
+        Example:
+            GET /chat/pricing
+            -> {
+                "anthropic": {
+                    "claude-3-5-haiku": {"input": 0.80, "output": 4.00},
+                    ...
+                },
+                ...
+            }
+        """
+        from symbolu.service.usage_tracker import COST_PER_MILLION
+
+        return {
+            "pricing_per_million_tokens": COST_PER_MILLION,
+            "note": "Prices in USD. Actual billing comes from provider.",
+            "tiers": {
+                "consumer": {
+                    "label": "Explorer",
+                    "description": "Uses fast/cheap models (Haiku, Flash)",
+                    "typical_cost_per_request": "$0.001 - $0.005",
+                },
+                "power_user": {
+                    "label": "Analyst",
+                    "description": "Uses balanced models (Sonnet, Pro)",
+                    "typical_cost_per_request": "$0.005 - $0.02",
+                },
+                "admin": {
+                    "label": "Developer",
+                    "description": "Uses best models (Sonnet, Pro)",
+                    "typical_cost_per_request": "$0.005 - $0.02",
+                },
+            },
+        }
 
     return app
 

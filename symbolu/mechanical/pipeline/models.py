@@ -40,6 +40,12 @@ if TYPE_CHECKING:
     from symbolu.mechanical.pipeline.p18_temporal_entropy.p18_schema import P18TemporalEntropyReport
     from symbolu.mechanical.pipeline.p20_snapshot.p20_unified_snapshot_schema import UnifiedCognitiveSnapshot
     from symbolu.mechanical.pipeline.p24_projection.p24_projection_schema import P24ProjectionReport
+    from symbolu.core.counterfactual.cf_schema import CounterfactualSandboxReport
+    from symbolu.mechanical.pipeline.p33_schema_adaptive.p33_schema_snapshot import SchemaAdaptiveRoutingSnapshot
+    from symbolu.core.predictive.persona_drift.drift_report import PredictivePersonaDriftReport
+    from symbolu.policy.insight_window.insight_envelope import InsightWindowEnvelope
+    from symbolu.mechanical.pipeline.p41_scenario_regime_mapper.p41_schema import ScenarioRegimeMap
+    from symbolu.mechanical.pipeline.p52_governance_adapter.p52_schema import GovernanceRequest
 
 
 @dataclass
@@ -307,6 +313,13 @@ class PipelineContext:
     p22_acoustic_witness: Optional[Any] = None  # P22 acoustic-vrtti witness (witness-only)
     p23_alignment_report: Optional[Any] = None  # P23 inner-outer alignment report (observer-only)
     p24_projection_report: Optional["P24ProjectionReport"] = None  # P24 acoustic-ontology projection (observer-only)
+    p25: Optional["CounterfactualSandboxReport"] = None  # P25 counterfactual sandbox report (observation-only)
+    p32: Optional["InsightWindowEnvelope"] = None  # P32 insight window gating envelope (observation-only)
+    p33: Optional["SchemaAdaptiveRoutingSnapshot"] = None  # P33 schema adaptive routing snapshot (observation-only)
+    p35: Optional["PredictivePersonaDriftReport"] = None  # P35 predictive persona drift report (observation-only)
+    p41_scenario_regime_map: Optional["ScenarioRegimeMap"] = None  # P41 scenario regime map (observation-only)
+    p51_governance_readiness: Optional[Any] = None  # P51 governance readiness envelope (diagnostic-only)
+    p52_governance_request: Optional["GovernanceRequest"] = None  # P52 governance adapter request (contract-only)
     hrm_map: Optional[Any] = None  # HighResolutionMap from HRM engine
     lcm_map: Optional[Any] = None  # LowContextMap from LCM engine
     lam_map: Optional[Any] = None  # LongArcMap from LAM engine
@@ -537,6 +550,57 @@ class PipelineContext:
                 "risk_band": self.p24_projection_report.projection_risk_band.value if self.p24_projection_report else None,
                 "mismatch_type": self.p24_projection_report.mismatch_type.value if self.p24_projection_report else None,
                 "confidence": self.p24_projection_report.confidence if self.p24_projection_report else None,
+            },
+            "p25": {
+                "has_report": self.p25 is not None,
+                "baseline_ucf": self.p25.baseline_ucf if self.p25 else None,
+                "baseline_stability_band": self.p25.baseline_stability_band if self.p25 else None,
+                "scenario_count": self.p25.scenario_count() if self.p25 else 0,
+                "max_negative_delta": self.p25.max_negative_delta if self.p25 else None,
+                "max_positive_delta": self.p25.max_positive_delta if self.p25 else None,
+                "has_any_flags": self.p25.has_any_flags() if self.p25 else False,
+                "has_any_band_changes": self.p25.has_any_band_changes() if self.p25 else False,
+            },
+            "p32": {
+                "has_envelope": self.p32 is not None,
+                "is_open": self.p32.is_open if self.p32 else None,
+                "insight_depth": self.p32.insight_depth if self.p32 else None,
+                "confidence_band": self.p32.confidence_band.value if self.p32 else None,
+                "reason_code_count": len(self.p32.gating_reason_codes) if self.p32 else 0,
+                "has_acoustic_penalty": self.p32.has_acoustic_penalty() if self.p32 else False,
+            },
+            "p33": {
+                "has_snapshot": self.p33 is not None,
+                "dominant_schema": self.p33.dominant_schema if self.p33 else None,
+                "confidence": self.p33.confidence if self.p33 else None,
+                "stability_band": self.p33.stability_band.value if self.p33 else None,
+                "confidence_band": self.p33.confidence_band.value if self.p33 else None,
+                "schema_count": self.p33.get_schema_count() if self.p33 else 0,
+            },
+            "p35": {
+                "has_report": self.p35 is not None,
+                "predicted_drift_score": self.p35.predicted_drift_score if self.p35 else None,
+                "drift_risk_band": self.p35.drift_risk_band if self.p35 else None,
+                "trend_direction": self.p35.trend_direction if self.p35 else None,
+                "confidence": self.p35.confidence if self.p35 else None,
+                "factor_count": self.p35.factor_count() if self.p35 else 0,
+            },
+            "p41": {
+                "has_map": self.p41_scenario_regime_map is not None,
+                "scenario_regime": self.p41_scenario_regime_map.scenario_regime if self.p41_scenario_regime_map else None,
+                "confidence": self.p41_scenario_regime_map.confidence if self.p41_scenario_regime_map else None,
+                "signal_count": self.p41_scenario_regime_map.signal_count() if self.p41_scenario_regime_map else 0,
+            },
+            "p51": {
+                "has_envelope": self.p51_governance_readiness is not None,
+                "readiness_level": getattr(self.p51_governance_readiness, "readiness_level", None) if self.p51_governance_readiness else None,
+                "ready": getattr(self.p51_governance_readiness, "ready", None) if self.p51_governance_readiness else None,
+            },
+            "p52": {
+                "has_request": self.p52_governance_request is not None,
+                "snapshot_id": self.p52_governance_request.snapshot_id if self.p52_governance_request else None,
+                "readiness_level": self.p52_governance_request.readiness_level if self.p52_governance_request else None,
+                "trace_hash": self.p52_governance_request.trace_hash if self.p52_governance_request else None,
             },
             "hrm": {
                 "has_map": self.hrm_map is not None,

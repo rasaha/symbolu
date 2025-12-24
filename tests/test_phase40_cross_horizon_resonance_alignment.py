@@ -145,16 +145,20 @@ def test_compute_chra_with_full_inputs():
 
     # Create optional snapshots
     resonance = ResonanceWeightingSnapshot(
-        normalized_weights={},
+        weights={"coherence": 0.6, "stability": 0.4},
+        normalized_weights={"coherence": 0.6, "stability": 0.4},
         entropy_of_weights=0.4,
-        top_metrics=[],
-        top_k=3
+        dominant_metrics={"coherence": 0.6},
+        notes=[]
     )
 
     symbolic_harm = SymbolicHarmonizationSnapshot(
+        symbolic_alignment=0.7,
+        mirror_alignment=0.8,
+        guna_symbolic_resonance=0.65,
+        kosha_symbolic_resonance=0.70,
+        semantic_integrity_weight=0.75,
         symbolic_harmonization_index=0.75,
-        symbolic_alignment_factor=0.7,
-        mirror_alignment_factor=0.8,
         harmonization_entropy=0.3,
         notes=[]
     )
@@ -164,12 +168,10 @@ def test_compute_chra_with_full_inputs():
         adaptive_identity_harmonic=0.7,
         relational_identity_harmonic=0.75,
         identity_harmonics_index=0.75,
+        identity_entropy=0.30,
         identity_stability_score=0.80,
         identity_flexibility_score=0.70,
-        identity_blend="balanced",
-        identity_band="HIGH",
-        identity_tags=[],
-        raw_signals={}
+        notes=[]
     )
 
     irm = IdentityResonanceMemorySnapshot(
@@ -183,12 +185,14 @@ def test_compute_chra_with_full_inputs():
 
     drift = PredictivePersonaDriftSnapshot(
         drift_magnitude_prediction=0.3,
-        drift_momentum_score=0.4,
+        drift_direction_scores={"structure": 0.3, "warmth": 0.4, "grounding": 0.5},
         drift_stability_score=0.7,
         drift_likelihood_band="LOW",
-        drift_direction_scores={},
-        diagnostic_tags=[],
-        raw_signals={}
+        predicted_drift_horizon=3,
+        harmonic_influence_weight=0.5,
+        entropy_volatility_weight=0.4,
+        drift_momentum_score=0.4,
+        notes=[]
     )
 
     # Compute CHRA
@@ -369,7 +373,18 @@ def test_unified_output_has_phase40_field():
     """Test UnifiedOutput has cross_horizon_resonance field."""
     from symbolu.api.unified_api import UnifiedOutput
 
-    output = UnifiedOutput(text="test")
+    output = UnifiedOutput(
+        text="test",
+        symbolic={},
+        practical={},
+        mirror={},
+        dha={},
+        routing={},
+        mappers={},
+        entropy={},
+        coherence={},
+        metadata={}
+    )
 
     assert hasattr(output, 'cross_horizon_resonance')
     assert output.cross_horizon_resonance is None
@@ -381,6 +396,15 @@ def test_unified_output_to_dict_includes_phase40():
 
     output = UnifiedOutput(
         text="test",
+        symbolic={},
+        practical={},
+        mirror={},
+        dha={},
+        routing={},
+        mappers={},
+        entropy={},
+        coherence={},
+        metadata={},
         cross_horizon_resonance={
             "has": {"H1": 0.75, "H2": 0.80, "H3": 0.70},
             "rai": 0.75,
@@ -406,7 +430,10 @@ def test_coherence_observation_has_phase40_fields():
         semantic_stability_score=0.8,
         temporal_arc_score=0.7,
         mapper_volatility_score=0.3,
-        turn_number=1
+        turn_number=1,
+        tier="HYBRID",
+        domain="therapy",
+        active_mappers=["HRM"]
     )
 
     assert hasattr(obs, 'cross_horizon_resonance_snapshot')
@@ -443,10 +470,14 @@ def test_persona_engine_apply_chra_method_exists():
 def test_persona_engine_chra_tone_bounded():
     """Test Phase 40 tone adjustments are bounded at ±0.015."""
     from symbolu.mechanical.persona.engine import PersonaEngine
-    from symbolu.mechanical.persona.persona_profile import PersonaProfile
+    from symbolu.mechanical.persona.models import PersonaProfile
 
     engine = PersonaEngine()
-    persona = PersonaProfile(name="test", traits={}, tone_params={})
+    persona = PersonaProfile(
+        id="test_persona",
+        display_name="Test Persona",
+        description="Test persona for Phase 40"
+    )
 
     # Create CHRA snapshot with extreme values
     h1 = HorizonForecast(1.0, 1.0, 1.0, 1.0, 1.0, "STRONG_UPTREND")
@@ -478,10 +509,14 @@ def test_persona_engine_chra_tone_bounded():
 def test_persona_engine_chra_returns_none_without_snapshot():
     """Test Phase 40 tone application returns None without snapshot."""
     from symbolu.mechanical.persona.engine import PersonaEngine
-    from symbolu.mechanical.persona.persona_profile import PersonaProfile
+    from symbolu.mechanical.persona.models import PersonaProfile
 
     engine = PersonaEngine()
-    persona = PersonaProfile(name="test", traits={}, tone_params={})
+    persona = PersonaProfile(
+        id="test_persona",
+        display_name="Test Persona",
+        description="Test persona for Phase 40"
+    )
 
     profile = engine._apply_cross_horizon_resonance_to_tone(persona, None)
     assert profile is None

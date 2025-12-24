@@ -36,10 +36,11 @@ class IntentType(str, Enum):
 
 
 class ExpertTarget(str, Enum):
-    """Available expert systems."""
-    HRM = "HRM"      # High Reasoning Module
-    LCM = "LCM"      # Linguistic Coherence Module
-    LAM = "LAM"      # Life Anchor Module
+    """Available expert systems (5+5 Ontological Model)."""
+    OLM = "OLM"      # Ontological Layer Mapper (5+5 model) - replaces HRM
+    HRM = "HRM"      # DEPRECATED: High Reasoning Module (use OLM)
+    LCM = "LCM"      # Linguistic Coherence Module / Low-Context Mapper
+    LAM = "LAM"      # Life Anchor Module / Long-Arc Mapper
     MoE = "MoE"      # Mixture of Experts
 
 
@@ -65,12 +66,13 @@ class ActivationPlan:
     H_G: Optional[float] = None  # Guna entropy
     H_K: Optional[float] = None  # Kosha entropy (placeholder)
     
-    # Expert activation flags
-    use_hrm: bool = False
-    use_lcm: bool = False
-    use_lam: bool = False
-    use_moe: bool = False
-    use_fusion: bool = False
+    # Expert activation flags (5+5 Ontological Model)
+    use_olm: bool = False        # Ontological Layer Mapper (O1-O10)
+    use_hrm: bool = False        # DEPRECATED: alias for use_olm (backward compat)
+    use_lcm: bool = False        # Low-Context Mapper
+    use_lam: bool = False        # Long-Arc Mapper
+    use_moe: bool = False        # Mixture of Experts
+    use_fusion: bool = False     # Fusion Engine
     
     # Activated experts list
     experts: List[ExpertTarget] = field(default_factory=list)
@@ -86,10 +88,11 @@ class ActivationPlan:
     audit_log: Dict[str, Any] = field(default_factory=dict)
     
     def __post_init__(self):
-        """Build experts list from activation flags."""
+        """Build experts list from activation flags (5+5 Ontological Model)."""
         self.experts = []
-        if self.use_hrm:
-            self.experts.append(ExpertTarget.HRM)
+        # OLM activation (use_hrm is deprecated alias)
+        if self.use_olm or self.use_hrm:
+            self.experts.append(ExpertTarget.OLM)
         if self.use_lcm:
             self.experts.append(ExpertTarget.LCM)
         if self.use_lam:
@@ -122,7 +125,8 @@ class ActivationPlan:
                 "H_K": self.H_K
             },
             "activation": {
-                "hrm": self.use_hrm,
+                "olm": self.use_olm or self.use_hrm,  # OLM (5+5 ontological)
+                "hrm": self.use_hrm,  # DEPRECATED: use olm
                 "lcm": self.use_lcm,
                 "lam": self.use_lam,
                 "moe": self.use_moe,

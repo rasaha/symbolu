@@ -2,7 +2,7 @@ name: Renderer CI
 
 on:
   push:
-    branches: ["main", "master"]
+    branches: ["main", "master", "dev", "claude/**"]
     paths:
       - "symbolu/renderer/**"
       - "symbolu/core/**renderer**"
@@ -10,7 +10,7 @@ on:
       - "symbolu/mechanical/pipeline/**renderer**"
       - ".github/workflows/renderer-ci.yml"
   pull_request:
-    branches: ["main", "master"]
+    branches: ["main", "master", "dev", "claude/**"]
     paths:
       - "symbolu/renderer/**"
       - "symbolu/core/**renderer**"

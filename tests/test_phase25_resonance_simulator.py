@@ -14,8 +14,8 @@ Total: ~12 tests (invariants) + comprehensive test suite via import
 
 import pytest
 
-# Import comprehensive test suite
-from symbolu.tools.resonance_simulator.tests.test_resonance_simulator import *  # noqa
+# Note: Comprehensive test suite import removed - tests directory does not exist
+# The canonical invariance tests below provide core Phase 25 coverage
 
 # Import required components for invariance tests
 from symbolu.tools.resonance_simulator import (

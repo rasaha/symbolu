@@ -12,7 +12,7 @@ Part of mechanical layer - NO Symbol-U dependencies
 Deterministic, explainable, patent-safe
 """
 
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any, TYPE_CHECKING
 import logging
 
 from ..schemas.candidate import Candidate
@@ -21,6 +21,17 @@ from .scorer import FusionScorer
 from .conflict_resolver import ConflictResolver
 from .routing import RoutingDecider
 from .explanation import ExplanationGenerator
+from .contracts import (
+    ScoredCandidate as FusionScoredCandidate,
+    FusionRanking,
+    TIE_THRESHOLD,
+    apply_deterministic_tie_break,
+)
+
+if TYPE_CHECKING:
+    # IMPORTANT: Only import handoff for type checking
+    # This enforces the boundary: Fusion cannot access Stitching internals
+    from symbolu.core.stitching.handoff import StitchingToFusionHandoff
 
 
 logger = logging.getLogger(__name__)
@@ -166,7 +177,149 @@ class FusionEngine:
             logger.debug(f"\n{debug_report}")
         
         return result
-    
+
+    def rank(
+        self,
+        handoff: "StitchingToFusionHandoff",
+    ) -> FusionRanking:
+        """
+        Rank candidates from Stitching handoff (per spec v1.1).
+
+        This is the NORMATIVE entry point per STITCHING_FUSION_SPECIFICATION.md.
+
+        NORMATIVE REQUIREMENTS:
+        - MUST receive only allowed candidates as input (via handoff)
+        - MUST NOT receive or reference Stitching diagnostic data
+        - MUST NOT re-validate constraints
+        - MUST rank candidates using its own scoring formula only
+        - MUST assume all input candidates are valid by construction
+        - MUST NOT override or bypass Stitching decisions
+
+        Args:
+            handoff: StitchingToFusionHandoff containing allowed candidates and context
+
+        Returns:
+            FusionRanking with selected candidate and rankings
+        """
+        # BOUNDARY ASSERTION: Verify handoff is the correct type
+        # This prevents accidentally passing raw candidates or StitchingDecision
+        from symbolu.core.stitching.handoff import StitchingToFusionHandoff
+        if not isinstance(handoff, StitchingToFusionHandoff):
+            raise TypeError(
+                f"rank() requires StitchingToFusionHandoff, got {type(handoff).__name__}. "
+                "Use StitchingToFusionHandoff.from_decision() to create handoff."
+            )
+
+        candidates = handoff.allowed_candidates
+        context = handoff.context
+
+        if not candidates:
+            raise ValueError("No candidates in handoff. Cannot rank empty candidate set.")
+
+        logger.info(
+            f"Ranking {len(candidates)} candidates from handoff "
+            f"(audit_id={handoff.stitching_audit_id})"
+        )
+
+        # Step 1: Score all candidates using Fusion's formula
+        # IMPORTANT: We use ONLY channel scores (HRM/LCM/MoE), NOT Stitching diagnostics
+        scored_candidates: List[FusionScoredCandidate] = []
+
+        for candidate in candidates:
+            # Compute channel scores
+            channel_scores = self.scorer.channel_scorer.score_all_channels(candidate, context)
+
+            # Compute weighted fusion score
+            hrm_contribution = self.channel_weights["hrm"] * channel_scores["hrm"]
+            lcm_contribution = self.channel_weights["lcm"] * channel_scores["lcm"]
+            moe_contribution = self.channel_weights["moe"] * channel_scores["moe"]
+
+            base_score = hrm_contribution + lcm_contribution + moe_contribution
+
+            # Apply modifiers
+            final_score = self.scorer.apply_modifiers(base_score, candidate, context)
+
+            scored_candidates.append(FusionScoredCandidate(
+                candidate_id=candidate.id,
+                fusion_score=final_score,
+                score_components={
+                    "hrm_contribution": round(hrm_contribution, 4),
+                    "lcm_contribution": round(lcm_contribution, 4),
+                    "moe_contribution": round(moe_contribution, 4),
+                    "base_score": round(base_score, 4),
+                    "modifiers_applied": round(final_score - base_score, 4),
+                },
+            ))
+
+        # Step 2: Sort by fusion_score descending
+        scored_candidates.sort(key=lambda x: x.fusion_score, reverse=True)
+
+        # Step 3: Apply deterministic tie-breaking (per spec: lexicographic ID)
+        scored_candidates = apply_deterministic_tie_break(scored_candidates)
+
+        # Step 4: Assign ranks
+        for i, sc in enumerate(scored_candidates):
+            sc.rank = i + 1
+
+        # Step 5: Select winner (always rank 1 after tie-break)
+        winner = scored_candidates[0]
+        selected_candidate = next(
+            c for c in candidates if c.id == winner.candidate_id
+        )
+
+        # Step 6: Determine routing
+        routing = self.routing_decider.make_routing_decision(
+            selected_candidate, context, winner.fusion_score
+        )
+
+        # Step 7: Build explainability
+        explain = {
+            "selection_reason": self._build_selection_reason(winner, scored_candidates),
+            "channel_weights_used": self.channel_weights,
+            "top_3_summary": [
+                {"id": sc.candidate_id, "score": round(sc.fusion_score, 4)}
+                for sc in scored_candidates[:3]
+            ],
+        }
+        if winner.tie_break_applied:
+            explain["tie_resolution"] = winner.tie_break_reason
+
+        # Step 8: Build metadata
+        metadata = {
+            "total_candidates_evaluated": len(scored_candidates),
+            "channel_weights": self.channel_weights,
+            "context_tier": context.tier,
+            "context_intent": context.intent,
+            "stitching_audit_id": handoff.stitching_audit_id,
+            "cross_domain_count": handoff.cross_domain_info.get("cross_domain_count", 0),
+        }
+
+        return FusionRanking(
+            selected_candidate_id=winner.candidate_id,
+            selected_fusion_score=winner.fusion_score,
+            rankings=scored_candidates,
+            routing=routing,
+            explain=explain,
+            metadata=metadata,
+        )
+
+    def _build_selection_reason(
+        self,
+        winner: FusionScoredCandidate,
+        all_ranked: List[FusionScoredCandidate],
+    ) -> str:
+        """Build human-readable selection reason."""
+        if len(all_ranked) == 1:
+            return "only_candidate"
+
+        spread = winner.fusion_score - all_ranked[1].fusion_score
+        if spread > TIE_THRESHOLD:
+            return f"clear_winner_by_{spread:.3f}"
+        elif winner.tie_break_applied:
+            return f"tie_break_applied_{winner.tie_break_reason}"
+        else:
+            return "highest_score"
+
     def _select_candidate(
         self,
         ranked_candidates: List[Candidate],
@@ -175,32 +328,44 @@ class FusionEngine:
     ) -> Tuple[Optional[Candidate], str]:
         """
         Select candidate using conflict resolution if needed
-        
+
         Returns: (selected_candidate, resolution_reason)
         """
         if not ranked_candidates:
             return None, "no_candidates"
-        
-        # If only one candidate, select it
+
+        # Apply safety filters first for regulated mode (even for single candidates)
+        if context.is_regulated():
+            safe_candidates = self.conflict_resolver.apply_safety_filters(
+                ranked_candidates, context
+            )
+            if not safe_candidates:
+                return None, "all_filtered_by_safety"
+            ranked_candidates = [c for c in ranked_candidates if c in safe_candidates]
+            if not ranked_candidates:
+                return None, "all_filtered_by_safety"
+
+        # If only one candidate remains, select it
         if len(ranked_candidates) == 1:
             return ranked_candidates[0], "only_candidate"
-        
+
         # Check if top candidate is clear winner
         top_score = scores[ranked_candidates[0].id]
         second_score = scores[ranked_candidates[1].id]
-        
-        # Clear winner threshold
-        if top_score - second_score > 0.2:
+
+        # Winner threshold: respect the ranking from scorer which includes SMI penalty
+        # Use conflict resolver for close scores (< 0.02 difference)
+        if top_score - second_score > 0.02:
             return ranked_candidates[0], "clear_winner"
-        
-        # Close competition: use conflict resolver
-        logger.debug("Close competition detected, using conflict resolver")
-        
+
+        # True tie: use conflict resolver
+        logger.debug("True tie detected, using conflict resolver")
+
         selected, reason = self.conflict_resolver.resolve_conflict(
             ranked_candidates[:5],  # Consider top 5 for conflict resolution
             context
         )
-        
+
         return selected, f"conflict_resolved_{reason}"
     
     def fuse_with_fallback(

@@ -1,9 +1,16 @@
 """
-Symbol-U Pipeline Orchestrator (v3.0 - Linear Pipeline with Option C Router)
+Symbol-U Pipeline Orchestrator (v3.1 - Governance-First Pipeline)
 
 Main orchestration layer that coordinates all engines in a clean sequential flow.
+Now includes PO1-PO5 pre-acoustic governance phases before MLCR routing.
 
 Pipeline Sequence:
+    PO1. Grounding   -> Observer-Observed Grounding (query curation, ambiguity detection)
+    PO2. Intent      -> Intent Envelope & Response Posture (intent classification)
+    PO3. Actions     -> Allowed Action Binding (constrain planner actions)
+    PO4. Proposal    -> Planner Proposal Validation (validate against constraints)
+    PO5. Eligibility -> Execution Eligibility Gate (final governance checkpoint)
+    ---
     1. MLCR     -> Multi-Layer Consciousness Routing (query understanding)
     1.5 HRM     -> High-Resolution Mapper (conditional, when use_hrm=True)
     1.6 LCM     -> Low-Context Mapper (conditional, when use_lcm=True)
@@ -14,6 +21,7 @@ Pipeline Sequence:
     5. Renderer -> Final output surface generation
 
 Symbol-U AGI Architecture Mapping:
+    - PO1-PO5: Pre-acoustic governance (grounding, intent, action constraints, eligibility)
     - MLCR: Consciousness routing layer (WHY/HOW routing)
     - HRM: High-Resolution Mapper (deep cognitive mapping when activated)
     - LCM: Low-Context Mapper (minimal structural summary for simple queries)
@@ -22,6 +30,14 @@ Symbol-U AGI Architecture Mapping:
     - Fusion: Multi-channel blending (WHAT to say - HRM symbolic, LCM semantic, LAM temporal, MoE domain)
     - DHA: Delivery layer (HOW to say it - readiness, resistance, adaptation)
     - Renderer: Surface layer (formatted output for user consumption)
+
+Governance Model (PO1-PO5):
+    - PO1: Fuzzy logic, session context, ambiguity resolution
+    - PO2: Intent classification with response posture binding
+    - PO3: Hard action constraints for downstream processing
+    - PO4: Proposal validation with rejection audit
+    - PO5: Final execution eligibility gate (non-actuating)
+    - Authority flows downward: PO1 → PO2 → PO3 → PO4 → PO5
 
 Option C Router Integration:
     - Router decides execution path after MLCR
@@ -39,8 +55,20 @@ Usage:
 
 from __future__ import annotations
 
-import uuid
-from typing import Any, Dict, List, Optional
+from collections import OrderedDict
+from functools import lru_cache
+from typing import Any, Dict, List, Optional, Tuple
+
+# Provider architecture imports
+from symbolu.config import SymboluConfig
+from symbolu.providers import (
+    get_embedding_provider,
+    get_router_provider,
+    get_filter_provider,
+    EmbeddingProvider,
+    RouterProvider,
+    FilterProvider,
+)
 
 # Pipeline models and utilities
 from .models import (
@@ -61,70 +89,204 @@ from .validators import (
     validate_request,
 )
 
-# ============================================================================
-# EXTERNAL ENGINE IMPORTS
-# Import existing engines - we adapt to them, don't modify them
-# ============================================================================
-
-# MLCR Engine
+# External engine imports
 from symbolu.mechanical.mlcr.mlcr_engine import MLCR
-
-# Persona Engine Components
 from symbolu.mechanical.persona.registry import PersonaRegistry, get_default_registry
 from symbolu.mechanical.persona.selector import PersonaSelector
-
-# Fusion Engine
 from symbolu.mechanical.fusion.fusion.fusion_engine import FusionEngine
-from symbolu.mechanical.fusion.schemas.candidate import Candidate, CandidateSource
 from symbolu.mechanical.fusion.schemas.fusion_result import FusionContext
-
-# DHA Engine
 from symbolu.mechanical.dha.dha_engine import DHAEngine
 
-# HRM Integration (High-Resolution Mapper)
+# Mapper integrations
 from .hrm_integration import maybe_run_hrm
-
-# LCM Integration (Low-Context Mapper)
 from .lcm_integration import maybe_run_lcm
-
-# LAM Integration (Long-Arc Mapper)
 from .lam_integration import maybe_run_lam
 
-# Coherence Observer (Observability Layer)
-from .coherence_observer import CoherenceObserver
+# Renderer integration
+from .renderer_integration import run_integrated_renderer, IntegratedRenderedOutput
 
-# Unified API (Observability/API Contract Layer)
-from symbolu.api.unified_api import get_unified_json
 
-# Policy Layer (Domain Coherence Profiles + Advisory Flags)
-from symbolu.policy import compute_policy_flags
+# ============================================================================
+# PO1-PO5 GOVERNANCE PHASES - lazy loaded via @lru_cache
+# Pre-acoustic governance layers that precede MLCR routing
+# ============================================================================
 
-# Session Policy Layer (Session-Level Coherence Influencers)
-from symbolu.policy.session_policy import compute_session_policy_flags
+@lru_cache(maxsize=1)
+def _get_po1():
+    from .grounding.po1_integration import maybe_run_po1
+    return maybe_run_po1
 
-# Intent Arc Engine (Multi-Turn Trajectory Classification)
-from symbolu.intent.intent_arc_engine import compute_intent_arc
 
-# Identity Signature Engine (Identity Trajectory Classification)
-from symbolu.identity.identity_signature_engine import compute_identity_signature
+@lru_cache(maxsize=1)
+def _get_po2():
+    from .phase_zero.po2_integration import maybe_run_po2
+    return maybe_run_po2
 
-# Motivation Flow Engine (Motivational Driver Classification)
-from symbolu.motivation.motivation_engine import compute_motivation_flow
 
-# Trading Guardrail Engine (Phase 7: Formula-Aware Trading Guardrails)
-from symbolu.policy.trading_guardrail_engine import compute_trading_guardrails
-from symbolu.policy.domain_profiles import get_domain_profile
+@lru_cache(maxsize=1)
+def _get_po3():
+    from .phase_one.po3_integration import maybe_run_po3
+    return maybe_run_po3
 
-# DILchat Adapter (Presentation Layer for DILchat Integration)
-from symbolu.adapter import build_dilchat_payload
 
-# Renderer Components
-from symbolu.mechanical.renderer.fusion_renderer import (
-    FusionOutput,
-    FusionRenderer,
-    RenderMode,
-    Domain,
-)
+@lru_cache(maxsize=1)
+def _get_po4():
+    from .phase_po4.po4_integration import maybe_run_po4
+    return maybe_run_po4
+
+
+@lru_cache(maxsize=1)
+def _get_po5():
+    from .phase_po5.po5_integration import maybe_run_po5
+    return maybe_run_po5
+
+
+# Delivery adaptation phases (P27-P31) - lazy loaded via @lru_cache
+@lru_cache(maxsize=1)
+def _get_p27():
+    from .p27_persona import maybe_run_p27
+    return maybe_run_p27
+
+
+@lru_cache(maxsize=1)
+def _get_p28():
+    from .p28_dha import maybe_run_p28
+    return maybe_run_p28
+
+
+@lru_cache(maxsize=1)
+def _get_p29():
+    from .p29_expression import maybe_run_p29
+    return maybe_run_p29
+
+
+@lru_cache(maxsize=1)
+def _get_p30():
+    from .p30_verification import maybe_run_p30
+    return maybe_run_p30
+
+
+@lru_cache(maxsize=1)
+def _get_p31():
+    from .p31_envelope import maybe_run_p31
+    return maybe_run_p31
+
+
+# Advanced pipeline phases (P34, P37) - lazy loaded via @lru_cache
+@lru_cache(maxsize=1)
+def _get_p34():
+    from .p34_identity_harmonics import maybe_run_p34
+    return maybe_run_p34
+
+
+@lru_cache(maxsize=1)
+def _get_p37():
+    from .p37_continuity import maybe_run_p37
+    return maybe_run_p37
+
+
+# Formula-only DHA module (disabled by default) - lazy loaded via @lru_cache
+@lru_cache(maxsize=1)
+def _get_formula_dha():
+    from symbolu.dha import DHAStage, DHAConfig, maybe_run_dha
+    return {"DHAStage": DHAStage, "DHAConfig": DHAConfig, "maybe_run_dha": maybe_run_dha}
+
+
+# Processing modules - lazy loaded via @lru_cache
+@lru_cache(maxsize=1)
+def _get_coherence_observer():
+    from .coherence_observer import CoherenceObserver
+    return CoherenceObserver
+
+
+@lru_cache(maxsize=1)
+def _get_session_processing():
+    from .session_processing import process_session_context
+    return process_session_context
+
+
+@lru_cache(maxsize=1)
+def _get_output_processing():
+    from .output_processing import process_output_layers
+    return process_output_layers
+
+
+@lru_cache(maxsize=1)
+def _get_candidate_helpers():
+    from .candidate_helpers import (
+        generate_candidates,
+        create_fallback_fusion,
+        extract_text_for_dha,
+    )
+    return {
+        "generate_candidates": generate_candidates,
+        "create_fallback_fusion": create_fallback_fusion,
+        "extract_text_for_dha": extract_text_for_dha,
+    }
+
+
+# ============================================================================
+# MLCR RESULT CACHE (True LRU using OrderedDict)
+# ============================================================================
+
+# Global MLCR cache (shared across pipeline instances for efficiency)
+# Using OrderedDict for true LRU eviction based on access order
+_mlcr_cache: OrderedDict[Tuple[str, Optional[str], Optional[str]], Any] = OrderedDict()
+_MLCR_CACHE_MAX_SIZE = 1000
+
+
+def _make_mlcr_cache_key(
+    text: str, context: Dict[str, Any]
+) -> Tuple[str, Optional[str], Optional[str]]:
+    """Generate cache key from query text and context.
+
+    Uses tuple instead of hash for:
+    - Better performance (no hashing overhead)
+    - Debuggability (can inspect cache keys)
+    - Hashability (tuples are hashable)
+    """
+    return (
+        text,
+        context.get("domain"),
+        context.get("user_id"),
+    )
+
+
+def _get_cached_mlcr(
+    cache_key: Tuple[str, Optional[str], Optional[str]]
+) -> Optional[Any]:
+    """Get cached MLCR result if available.
+
+    Moves accessed key to end (marks as recently used).
+    """
+    if cache_key in _mlcr_cache:
+        _mlcr_cache.move_to_end(cache_key)  # Mark as recently used
+        return _mlcr_cache[cache_key]
+    return None
+
+
+def _set_cached_mlcr(
+    cache_key: Tuple[str, Optional[str], Optional[str]], result: Any
+) -> None:
+    """Cache MLCR result with true LRU eviction."""
+    # If key exists, move to end and update
+    if cache_key in _mlcr_cache:
+        _mlcr_cache.move_to_end(cache_key)
+        _mlcr_cache[cache_key] = result
+        return
+
+    # Evict least recently used if at capacity
+    if len(_mlcr_cache) >= _MLCR_CACHE_MAX_SIZE:
+        _mlcr_cache.popitem(last=False)  # Remove oldest (first) entry
+
+    _mlcr_cache[cache_key] = result
+
+
+def clear_mlcr_cache() -> int:
+    """Clear the MLCR cache. Returns number of entries cleared."""
+    count = len(_mlcr_cache)
+    _mlcr_cache.clear()
+    return count
 
 
 # ============================================================================
@@ -172,24 +334,58 @@ class SymbolUPipeline:
 
     def __init__(
         self,
+        config: Optional[SymboluConfig] = None,
         router: Optional[PipelineRouter] = None,
         mlcr: Optional[MLCR] = None,
         persona_selector: Optional[PersonaSelector] = None,
         persona_registry: Optional[PersonaRegistry] = None,
         fusion_engine: Optional[FusionEngine] = None,
         dha_engine: Optional[DHAEngine] = None,
+        enable_mlcr_cache: bool = True,
+        # Provider overrides (optional, for testing)
+        embedding_provider: Optional[EmbeddingProvider] = None,
+        router_provider: Optional[RouterProvider] = None,
+        filter_provider: Optional[FilterProvider] = None,
     ) -> None:
         """
         Initialize the pipeline orchestrator.
 
         Args:
+            config: Symbol-U configuration (default: enterprise mode).
+                    Controls provider selection and mode-specific behavior.
             router: Pipeline router for execution path decisions (default: linear-only).
             mlcr: MLCR engine instance (default: new MLCR()).
             persona_selector: Persona selector (default: new PersonaSelector()).
             persona_registry: Persona registry (default: global registry).
             fusion_engine: Fusion engine (default: new FusionEngine()).
             dha_engine: DHA engine (default: new DHAEngine()).
+            enable_mlcr_cache: Enable MLCR result caching (default: True).
+            embedding_provider: Override embedding provider (for testing).
+            router_provider: Override router provider (for testing).
+            filter_provider: Override filter provider (for testing).
+
+        Example:
+            # Enterprise mode (symbolic, auditable)
+            pipeline = SymbolUPipeline(config=SymboluConfig(mode="enterprise"))
+
+            # Consumer mode (pre-trained, semantic)
+            pipeline = SymbolUPipeline(config=SymboluConfig(mode="consumer"))
         """
+        # Configuration (default to enterprise mode for backward compatibility)
+        self.config = config or SymboluConfig(mode="enterprise")
+
+        # Initialize pluggable providers based on config
+        self.embedding_provider = embedding_provider or get_embedding_provider(
+            self.config.mode, self.config.embedding_config
+        )
+        self.router_provider = router_provider or get_router_provider(
+            self.config.mode, self.config.router_config
+        )
+        self.filter_provider = filter_provider or get_filter_provider(
+            self.config.mode, self.config.filter_config
+        )
+
+        # Existing engine initialization
         self.router = router or get_default_router()
         self.mlcr = mlcr or MLCR()
         self.persona_selector = persona_selector or PersonaSelector()
@@ -197,11 +393,23 @@ class SymbolUPipeline:
         self.fusion_engine = fusion_engine or FusionEngine()
         self.dha_engine = dha_engine or DHAEngine()
 
-        # Observability layer (non-invasive)
-        self.coherence_observer = CoherenceObserver()
+        # Caching configuration
+        self.enable_mlcr_cache = enable_mlcr_cache
+        self._mlcr_cache_hits = 0
+        self._mlcr_cache_misses = 0
+
+        # Observability layer (lazy-initialized)
+        self._coherence_observer = None
 
         # Statistics
         self._run_count = 0
+
+    @property
+    def coherence_observer(self):
+        """Lazy-load coherence observer on first access."""
+        if self._coherence_observer is None:
+            self._coherence_observer = _get_coherence_observer()()
+        return self._coherence_observer
 
     def run(self, request: UserRequest) -> RenderedOutput:
         """
@@ -227,6 +435,13 @@ class SymbolUPipeline:
 
         # Create pipeline context
         ctx = PipelineContext(request=request)
+
+        # ================================================================
+        # PRE-ACOUSTIC GOVERNANCE: PO1-PO5
+        # Query curation and governance before MLCR routing
+        # Authority flows downward: PO1 → PO2 → PO3 → PO4 → PO5
+        # ================================================================
+        ctx = self._run_governance_chain(ctx)
 
         # ================================================================
         # STAGE 1: MLCR - Multi-Layer Consciousness Routing
@@ -305,267 +520,20 @@ class SymbolUPipeline:
         ctx.coherence_report = observation.to_dict()
 
         # ================================================================
-        # SESSION POLICY LAYER: Compute session-level policy flags (optional, non-invasive)
-        # Generates trajectory-aware policy hints from multi-turn session metrics
-        # Does NOT modify pipeline, routing, or renderer behavior
+        # SESSION PROCESSING: Compute session-level context enrichments
+        # (policy flags, memory, recap, intent arc, identity, motivation, guardrails)
+        # Skip if skip_session_processing=True in metadata (performance optimization)
         # ================================================================
-        # Only compute session policy if session_id is provided in metadata
-        ctx.session_policy_flags = None
-        ctx.session_memory = None
-        ctx.session_recap = None
-        ctx.intent_arc = None
-        ctx.identity_signature = None
-        session_id = ctx.request.metadata.get("session_id")
-        if session_id:
-            try:
-                # Import session store here to avoid circular dependency
-                from symbolu.service.sessions import SessionStore, compute_session_summary
-
-                # Get session store (singleton pattern)
-                # In production, this should be injected via dependency injection
-                # For now, we create a temporary instance (stateless for this request)
-                # The actual session data comes from the shared session store in api_server
-                # This is safe because we're only reading, not modifying
-                session_store = SessionStore()
-                session_state = session_store.get(session_id)
-
-                if session_state:
-                    # Compute session summary from accumulated state
-                    session_summary = compute_session_summary(session_state)
-
-                    # Compute session policy flags (deterministic, zero-LLM)
-                    ctx.session_policy_flags = compute_session_policy_flags(session_summary)
-
-                    # ================================================================
-                    # SESSION MEMORY v2.0: Update memory and attach to context (optional, non-invasive)
-                    # Extracts episodic memory events using deterministic rules
-                    # Does NOT modify pipeline behavior - purely additive observability
-                    # ================================================================
-                    try:
-                        # Update session memory (detects new events)
-                        session_store.update_session(session_id, ctx)
-
-                        # Attach memory to context for unified API and DILchat adapter
-                        ctx.session_memory = session_state.session_memory
-                    except Exception:
-                        # If memory update fails, continue without it (fail-safe)
-                        ctx.session_memory = None
-
-                    # ================================================================
-                    # SESSION RECAP v1.0: Compute session-level recap (optional, non-invasive)
-                    # Generates deterministic multi-turn recap using SessionSummary,
-                    # SessionMemory, and SessionPolicyFlags
-                    # Does NOT modify pipeline behavior - purely additive observability
-                    # ================================================================
-                    try:
-                        # Import session recap module
-                        from symbolu.service.sessions.session_summarizer import compute_session_recap
-
-                        # Compute session summary from accumulated state
-                        session_summary = compute_session_summary(session_state)
-
-                        # Get domain from request metadata or summary
-                        recap_domain = ctx.request.metadata.get("domain", session_summary.last_domain)
-
-                        # Compute session recap (deterministic, zero-LLM)
-                        ctx.session_recap = compute_session_recap(
-                            session_summary=session_summary,
-                            session_memory=session_state.session_memory,
-                            session_policy=ctx.session_policy_flags,
-                            domain=recap_domain,
-                        )
-                    except Exception:
-                        # If session recap fails, continue without it (fail-safe)
-                        ctx.session_recap = None
-
-                    # ================================================================
-                    # INTENT ARC ENGINE v1.0: Compute intent arc classification (optional, non-invasive)
-                    # Deterministic multi-turn trajectory classification based on:
-                    # - SessionSummary metrics (coherence, temporal arc, mapper volatility)
-                    # - SessionMemory events (breakthrough, fragmentation, stabilization)
-                    # - SessionRecap trajectory analysis (net_trajectory, overall_state)
-                    # - SessionPolicyFlags style recommendations
-                    # Does NOT modify pipeline behavior - purely additive observability
-                    # ================================================================
-                    try:
-                        # Compute intent arc if we have session components
-                        if session_summary:
-                            ctx.intent_arc = compute_intent_arc(
-                                session_summary=session_summary,
-                                session_memory=session_state.session_memory,
-                                session_policy=ctx.session_policy_flags,
-                                session_recap=ctx.session_recap,
-                            )
-                    except Exception:
-                        # If intent arc computation fails, continue without it (fail-safe)
-                        ctx.intent_arc = None
-
-                    # ================================================================
-                    # IDENTITY SIGNATURE ENGINE v1.0: Compute identity signature classification (optional, non-invasive)
-                    # Deterministic identity trajectory classification based on:
-                    # - SessionSummary metrics (coherence, temporal arc, persona drift, mapper volatility)
-                    # - SessionMemory events (breakthrough, fragmentation, stabilization, arc_shift)
-                    # - SessionPolicyFlags (recommended styles, grounding needs)
-                    # - IntentArc classification (arc types and reasons)
-                    # - Mapper journeys (HRM/LCM/LAM synergy and dominance)
-                    # - Domain context (identity, therapy, generic)
-                    # Does NOT modify pipeline behavior - purely additive observability
-                    # ================================================================
-                    try:
-                        # Compute identity signature if we have session components
-                        if session_summary:
-                            # Get domain from request metadata or summary
-                            identity_domain = ctx.request.metadata.get("domain", session_summary.last_domain)
-
-                            ctx.identity_signature = compute_identity_signature(
-                                session_summary=session_summary,
-                                session_memory=session_state.session_memory,
-                                session_policy=ctx.session_policy_flags,
-                                intent_arc=ctx.intent_arc,
-                                domain=identity_domain,
-                            )
-                    except Exception:
-                        # If identity signature computation fails, continue without it (fail-safe)
-                        ctx.identity_signature = None
-
-                    # ================================================================
-                    # MOTIVATION FLOW ENGINE: Classify motivational driver (v1.0)
-                    # Deterministic, zero-LLM layer that classifies the motivational
-                    # driver behind a multi-turn session into 8 canonical types:
-                    # - hope_driven, fear_driven, avoidance_driven, expansion_driven
-                    # - stabilization_driven, overcorrection, assertion_driven, ambiguous_motivation
-                    # Uses signals from:
-                    # - SessionSummary metrics (coherence, temporal arc, volatility)
-                    # - SessionMemory events (breakthrough, fragmentation, stabilization)
-                    # - SessionPolicyFlags (recommended styles, grounding needs)
-                    # - IntentArc classification (arc types)
-                    # - IdentitySignature classification (identity types)
-                    # Does NOT modify pipeline behavior - purely additive observability
-                    # ================================================================
-                    try:
-                        # Compute motivation flow if we have session components
-                        if session_summary:
-                            ctx.motivation_profile = compute_motivation_flow(
-                                session_summary=session_summary,
-                                session_memory=session_state.session_memory,
-                                session_policy=ctx.session_policy_flags,
-                                intent_arc=ctx.intent_arc,
-                                identity_signature=ctx.identity_signature,
-                            )
-                    except Exception:
-                        # If motivation flow computation fails, continue without it (fail-safe)
-                        ctx.motivation_profile = None
-
-                    # ================================================================
-                    # TRADING GUARDRAIL ENGINE v1.0: Compute trading formula guardrails (optional, non-invasive)
-                    # Deterministic trading safety checks based on Symbol-U formulas
-                    # Does NOT modify pipeline behavior - purely additive observability
-                    # Only runs for trading domain when formula_guardrails_enabled=True
-                    # ================================================================
-                    try:
-                        # Get domain from request metadata or summary
-                        guardrail_domain = ctx.request.metadata.get("domain", session_summary.last_domain)
-
-                        # Only compute for trading domain
-                        if guardrail_domain == "trading":
-                            # Get domain profile to check if guardrails are enabled
-                            domain_profile = get_domain_profile(guardrail_domain)
-
-                            if domain_profile.get("formula_guardrails_enabled", False):
-                                # Compute trading guardrails (deterministic, zero-LLM)
-                                ctx.trading_guardrails = compute_trading_guardrails(
-                                    summary=session_summary,
-                                    policy=ctx.policy_flags,
-                                    motivation=ctx.motivation_profile,
-                                    intent_arc=ctx.intent_arc,
-                                    identity_signature=ctx.identity_signature,
-                                )
-                            else:
-                                ctx.trading_guardrails = None
-                        else:
-                            ctx.trading_guardrails = None
-                    except Exception:
-                        # If trading guardrails computation fails, continue without it (fail-safe)
-                        ctx.trading_guardrails = None
-            except Exception:
-                # If session policy layer fails, continue without it (fail-safe)
-                # This ensures pipeline robustness even if session tracking has issues
-                ctx.session_policy_flags = None
-                ctx.session_memory = None
+        if not ctx.request.metadata.get("skip_session_processing", False):
+            _get_session_processing()(ctx)
 
         # ================================================================
-        # UNIFIED API: Generate unified output (optional, non-invasive)
-        # Provides complete API contract for downstream consumers
+        # OUTPUT PROCESSING: Generate API outputs and presentation layers
+        # (unified API, policy flags, DILchat payload)
+        # Skip if skip_output_processing=True in metadata (performance optimization)
         # ================================================================
-        # Store unified output in context for optional access
-        # Does not modify any pipeline behavior
-        try:
-            ctx.unified_output = get_unified_json(ctx)
-        except Exception:
-            # If unified API fails, continue without it (fail-safe)
-            ctx.unified_output = None
-
-        # ================================================================
-        # POLICY LAYER: Compute policy flags (optional, non-invasive)
-        # Generates domain-specific advisory flags for UI/application
-        # Does NOT modify pipeline, routing, or renderer behavior
-        # ================================================================
-        # Only compute policy flags if unified output is available
-        if ctx.unified_output is not None:
-            try:
-                # Extract domain from request metadata or unified output
-                domain = ctx.request.metadata.get("domain", "generic")
-                if not domain or domain == "unknown":
-                    domain = ctx.unified_output.get("metadata", {}).get("domain", "generic")
-
-                # Phase 15B: Extract user_id and org_id for preference lookup
-                user_id = ctx.request.metadata.get("user_id")
-                org_id = ctx.request.metadata.get("org_id")
-
-                # Compute policy flags (deterministic, zero-LLM)
-                # Phase 15B: Passes user_id/org_id for preference lookup
-                ctx.policy_flags = compute_policy_flags(
-                    ctx.unified_output,
-                    domain,
-                    user_id=user_id,
-                    org_id=org_id
-                )
-            except Exception:
-                # If policy layer fails, continue without it (fail-safe)
-                ctx.policy_flags = None
-        else:
-            ctx.policy_flags = None
-
-        # ================================================================
-        # DILCHAT ADAPTER: Generate DILchat-facing payload (optional, non-invasive)
-        # Transforms unified output + policy flags into DILchat presentation format
-        # Does NOT modify pipeline behavior - purely additive presentation layer
-        # ================================================================
-        # Only build DILchat payload if both unified output and policy flags are available
-        if ctx.unified_output is not None and ctx.policy_flags is not None:
-            try:
-                # Extract domain (same as policy layer)
-                domain = ctx.request.metadata.get("domain", "generic")
-                if not domain or domain == "unknown":
-                    domain = ctx.unified_output.get("metadata", {}).get("domain", "generic")
-
-                # Build DILchat payload (deterministic, zero-LLM)
-                # Pass session policy flags if available
-                session_policy_dict = None
-                if ctx.session_policy_flags:
-                    session_policy_dict = ctx.session_policy_flags.to_dict()
-
-                ctx.dilchat_payload = build_dilchat_payload(
-                    ctx.unified_output,
-                    ctx.policy_flags,
-                    domain,
-                    session_policy_dict
-                )
-            except Exception:
-                # If DILchat adapter fails, continue without it (fail-safe)
-                ctx.dilchat_payload = None
-        else:
-            ctx.dilchat_payload = None
+        if not ctx.request.metadata.get("skip_output_processing", False):
+            _get_output_processing()(ctx)
 
         self._run_count += 1
 
@@ -580,6 +548,95 @@ class SymbolUPipeline:
     # STAGE IMPLEMENTATIONS
     # ========================================================================
 
+    def _run_governance_chain(self, ctx: PipelineContext) -> PipelineContext:
+        """
+        Run PO1-PO5 pre-acoustic governance chain.
+
+        This governance chain runs BEFORE MLCR to provide:
+        - PO1: Query grounding (fuzzy logic, session context, ambiguity detection)
+        - PO2: Intent classification and response posture
+        - PO3: Allowed action constraints
+        - PO4: Proposal validation (placeholder for future planner integration)
+        - PO5: Execution eligibility gate
+
+        Authority Model:
+        - Authority flows downward: each phase respects upstream constraints
+        - PO1 can BLOCK the entire pipeline if grounding is ambiguous
+        - All phases are deterministic (no LLM calls)
+
+        Args:
+            ctx: Pipeline context with request.
+
+        Returns:
+            Updated context with governance envelopes populated:
+            - ctx.phase_minus_one (PO1)
+            - ctx.phase_zero (PO2)
+            - ctx.allowed_actions (PO3)
+            - ctx.po4_proposal (PO4)
+            - ctx.po5_execution_eligibility (PO5)
+        """
+        # ================================================================
+        # PO1: Observer-Observed Grounding
+        # Fuzzy logic, session context, ambiguity resolution
+        # ================================================================
+        try:
+            maybe_run_po1 = _get_po1()
+            maybe_run_po1(ctx)
+        except Exception:
+            # PO1 is optional - continue if it fails
+            pass
+
+        # ================================================================
+        # PO2: Intent Envelope & Response Posture
+        # Classifies intent and determines response posture
+        # Requires PO1 output
+        # ================================================================
+        try:
+            maybe_run_po2 = _get_po2()
+            maybe_run_po2(ctx)
+        except Exception:
+            # PO2 is optional - continue if it fails
+            pass
+
+        # ================================================================
+        # PO3: Allowed Action Binding
+        # Constrains what actions planner can propose
+        # Requires PO2 output
+        # ================================================================
+        try:
+            maybe_run_po3 = _get_po3()
+            maybe_run_po3(ctx)
+        except Exception:
+            # PO3 is optional - continue if it fails
+            pass
+
+        # ================================================================
+        # PO4: Planner Proposal Validation
+        # Validates proposed actions against PO3 constraints
+        # Requires PO2 + PO3 output
+        # Note: Currently runs with empty proposal (no planner yet)
+        # ================================================================
+        try:
+            maybe_run_po4 = _get_po4()
+            maybe_run_po4(ctx)
+        except Exception:
+            # PO4 is optional - continue if it fails
+            pass
+
+        # ================================================================
+        # PO5: Execution Eligibility Gate
+        # Final governance checkpoint (non-actuating)
+        # Requires PO1 + PO2 + PO4 output
+        # ================================================================
+        try:
+            maybe_run_po5 = _get_po5()
+            maybe_run_po5(ctx)
+        except Exception:
+            # PO5 is optional - continue if it fails
+            pass
+
+        return ctx
+
     def _run_mlcr(self, ctx: PipelineContext) -> PipelineContext:
         """
         Run MLCR (Multi-Layer Consciousness RAG) stage.
@@ -591,21 +648,62 @@ class SymbolUPipeline:
         - Ontology mass (lower/upper)
         - Expert routing hints
 
+        Provider Integration:
+        - Uses RouterProvider to get standardized RoutingDecision
+        - RoutingDecision is stored in ctx for downstream governance use
+        - Enterprise mode: phoneme-based routing with full audit trace
+        - Consumer mode: trained classifier routing
+
         Args:
             ctx: Pipeline context with request.
 
         Returns:
-            Updated context with ctx.mlcr populated.
+            Updated context with ctx.mlcr and ctx.routing_decision populated.
         """
+        # ================================================================
+        # PROVIDER-BASED ROUTING
+        # Get standardized RoutingDecision from configured provider
+        # ================================================================
+        routing_decision = self.router_provider.route(ctx.request.text)
+        ctx.routing_decision = routing_decision
+
+        # Store routing info for audit (enterprise mode has full trace)
+        if self.config.audit_enabled:
+            ctx.routing_trace = routing_decision.trace
+
         # Build context for MLCR
         mlcr_context = {
             "user_id": ctx.request.user_id,
             "domain": ctx.request.metadata.get("domain"),
             "session_id": ctx.request.metadata.get("session_id"),
+            # Pass provider routing decision to MLCR for enrichment
+            "provider_routing": {
+                "model_type": routing_decision.model_type.value,
+                "confidence": routing_decision.confidence,
+                "dominant_layer": routing_decision.dominant_layer,
+            },
         }
 
-        # Run MLCR routing
-        mlcr_result = self.mlcr.route(ctx.request.text, mlcr_context)
+        # Check cache first (if enabled and not disabled via request metadata)
+        use_cache = (
+            self.enable_mlcr_cache
+            and not ctx.request.metadata.get("skip_mlcr_cache", False)
+        )
+        cache_key = None
+        mlcr_result = None
+
+        if use_cache:
+            cache_key = _make_mlcr_cache_key(ctx.request.text, mlcr_context)
+            mlcr_result = _get_cached_mlcr(cache_key)
+            if mlcr_result is not None:
+                self._mlcr_cache_hits += 1
+
+        # Run MLCR routing if not cached
+        if mlcr_result is None:
+            mlcr_result = self.mlcr.route(ctx.request.text, mlcr_context)
+            if use_cache and cache_key:
+                _set_cached_mlcr(cache_key, mlcr_result)
+            self._mlcr_cache_misses += 1
 
         # Wrap in MlcrResult
         ctx.mlcr = MlcrResult(
@@ -613,6 +711,10 @@ class SymbolUPipeline:
             meta={
                 "query_length": len(ctx.request.text),
                 "has_explain_log": "explain_log" in mlcr_result,
+                "cache_hit": use_cache and mlcr_result is not None,
+                "provider_mode": self.config.mode,
+                "provider_model_type": routing_decision.model_type.value,
+                "provider_confidence": routing_decision.confidence,
             },
         )
 
@@ -664,6 +766,41 @@ class SymbolUPipeline:
             persona_config=persona_config,
         )
 
+        # =======================================================================
+        # P27 Persona Selection Phase (Delivery Adaptation Band)
+        # Runs alongside existing persona logic to provide formal phase tracing
+        # =======================================================================
+        try:
+            maybe_run_p27 = _get_p27()
+            p27_output = maybe_run_p27(ctx)
+            if p27_output:
+                ctx.p27_persona = p27_output
+                # Optionally update persona_id if P27 suggests different selection
+                if p27_output.persona_id != persona_id:
+                    # P27 provides additional signal but doesn't override existing logic
+                    ctx.persona.persona_config["p27_suggestion"] = p27_output.persona_id
+                    ctx.persona.persona_config["p27_confidence"] = p27_output.selection_confidence
+        except Exception:
+            # P27 phase is optional - continue if it fails
+            pass
+
+        # =======================================================================
+        # P34 Identity Harmonics Layer (Observer Band)
+        # Computes identity coherence metrics from persona + consciousness signals
+        # Authority: OBSERVER (read-only analytics, non-actuating)
+        # =======================================================================
+        try:
+            maybe_run_p34 = _get_p34()
+            p34_output = maybe_run_p34(ctx)
+            if p34_output:
+                ctx.p34_identity_harmonics = p34_output
+                # Store identity stability score for downstream phases
+                ctx.persona.persona_config["identity_harmonics_index"] = p34_output.identity_harmonics_index
+                ctx.persona.persona_config["identity_stable"] = p34_output.is_identity_stable()
+        except Exception:
+            # P34 phase is optional - continue if it fails
+            pass
+
         return ctx
 
     def _run_fusion(self, ctx: PipelineContext) -> PipelineContext:
@@ -701,17 +838,15 @@ class SymbolUPipeline:
             regulated_mode=meta.get("domain", "") in {"medical", "legal", "financial"},
         )
 
-        # Generate candidates
-        # In v3.0, we create synthetic candidates from MLCR output
-        # Future versions will integrate real RAG candidates
-        candidates = self._generate_candidates(ctx, explain_log, activation_plan)
+        # Generate candidates from mappers and RAG
+        helpers = _get_candidate_helpers()
+        candidates = helpers["generate_candidates"](ctx, explain_log, self.fusion_engine)
 
         # Run fusion
         if candidates:
             fusion_result = self.fusion_engine.fuse(candidates, fusion_ctx)
         else:
-            # Fallback: create minimal fusion result
-            fusion_result = self._create_fallback_fusion(ctx)
+            fusion_result = helpers["create_fallback_fusion"](ctx, self.fusion_engine)
 
         ctx.fusion = FusionResult(
             fused_candidates=fusion_result,
@@ -740,8 +875,8 @@ class SymbolUPipeline:
             Updated context with ctx.dha populated.
         """
         # Build renderer output for DHA
-        # DHA expects a dict with "text" key
-        text_to_adapt = self._extract_text_for_dha(ctx)
+        helpers = _get_candidate_helpers()
+        text_to_adapt = helpers["extract_text_for_dha"](ctx)
         renderer_output = {"text": text_to_adapt}
 
         # Build metadata for readiness/resistance analysis
@@ -799,14 +934,82 @@ class SymbolUPipeline:
             },
         )
 
+        # =======================================================================
+        # P28 DHA Phase (Delivery Adaptation Band)
+        # Runs alongside existing DHA logic to provide formal phase tracing
+        # =======================================================================
+        try:
+            # Get P27 output if available for persona context
+            p27_output = getattr(ctx, 'p27_persona', None)
+            maybe_run_p28 = _get_p28()
+            p28_output = maybe_run_p28(ctx, p27_output=p27_output)
+            if p28_output:
+                ctx.p28_dha = p28_output
+                # Enrich DHA decision with P28 phase data
+                ctx.dha.adaptation_notes["p28_profile"] = p28_output.tone_profile.profile_type.value
+                ctx.dha.adaptation_notes["p28_readiness"] = p28_output.readiness_level.value
+                ctx.dha.adaptation_notes["p28_resistance"] = p28_output.resistance_level.value
+                ctx.dha.adaptation_notes["p28_safety_status"] = p28_output.safety_result.status.value
+        except Exception:
+            # P28 phase is optional - continue if it fails
+            pass
+
+        # =======================================================================
+        # Formula-only DHA (Delivery Harmonization Algorithm)
+        # Deterministic, zero-parameter, closed-form delivery modulation
+        # Disabled by default - enable via dha_formula_enabled in request metadata
+        # Authority: OBSERVATIONAL (provides delivery profile, does not modify text)
+        # =======================================================================
+        try:
+            # Check if formula DHA is enabled via request metadata
+            formula_dha_enabled = ctx.request.metadata.get("dha_formula_enabled", False)
+            if formula_dha_enabled:
+                dha_module = _get_formula_dha()
+                DHAConfig = dha_module["DHAConfig"]
+                maybe_run_dha = dha_module["maybe_run_dha"]
+
+                # Get tier-specific config or use default
+                tier = ctx.request.metadata.get("tier", "consumer")
+                dha_config = DHAConfig.for_tier(tier)
+
+                # Run formula DHA
+                formula_dha_result = maybe_run_dha(ctx, dha_config)
+                if formula_dha_result:
+                    # Store formula DHA result in adaptation notes
+                    ctx.dha.adaptation_notes["formula_dha"] = formula_dha_result
+                    ctx.dha.adaptation_notes["formula_dha_D"] = formula_dha_result.get("D")
+                    ctx.dha.adaptation_notes["formula_dha_tone"] = formula_dha_result.get("tone_weights", {})
+        except Exception:
+            # Formula DHA is optional - continue if it fails
+            pass
+
+        # =======================================================================
+        # P37 Adaptive Continuity Engine (Predictive Band)
+        # Computes narrative + identity continuity from P34 + upstream signals
+        # Authority: PREDICTIVE (analytics only, non-actuating)
+        # =======================================================================
+        try:
+            maybe_run_p37 = _get_p37()
+            p37_output = maybe_run_p37(ctx)
+            if p37_output:
+                ctx.p37_continuity = p37_output
+                # Store continuity metrics for downstream phases
+                ctx.dha.adaptation_notes["continuity_band"] = p37_output.continuity_band.value
+                ctx.dha.adaptation_notes["narrative_continuity"] = p37_output.ncc
+                ctx.dha.adaptation_notes["identity_continuity"] = p37_output.icc
+        except Exception:
+            # P37 phase is optional - continue if it fails
+            pass
+
         return ctx
 
     def _run_renderer(self, ctx: PipelineContext) -> PipelineContext:
         """
         Run final rendering stage.
 
-        Combines DHA output with persona styling for final presentation.
-        Uses FusionRenderer for structured output when available.
+        v3.1: Uses integrated renderer that combines:
+        - FusionRenderer for structured layers (Symbolic/Practical/Mirror-Truth)
+        - VarnaHybridRenderer for phoneme analysis and optimization
 
         Args:
             ctx: Pipeline context with DHA result.
@@ -814,163 +1017,117 @@ class SymbolUPipeline:
         Returns:
             Updated context with ctx.rendered populated.
         """
-        # Determine render mode from request
-        render_mode_str = ctx.request.render_mode or "standard"
-        render_mode_map = {
-            "minimal": RenderMode.MINIMAL,
-            "standard": RenderMode.STANDARD,
-            "enhanced": RenderMode.SYMBOLIC,
-            "regulated": RenderMode.REGULATED,
-        }
-        render_mode = render_mode_map.get(render_mode_str, RenderMode.STANDARD)
+        try:
+            # Use integrated renderer (FusionRenderer + VarnaHybridRenderer)
+            integrated_output = run_integrated_renderer(ctx)
 
-        # Get final text from DHA
-        final_text = ctx.dha.guarded_text if ctx.dha else ""
+            # Store the full integrated output
+            ctx.integrated_rendered = integrated_output
 
-        # Build output metadata
-        output_meta = {
-            "persona_id": ctx.persona.active_persona_id if ctx.persona else None,
-            "tone_profile": ctx.dha.tone_profile if ctx.dha else None,
-            "readiness_level": ctx.dha.readiness_level if ctx.dha else None,
-            "router_mode": ctx.router_mode,
-            "pipeline_version": "3.0",
-        }
+            # Create compatible RenderedOutput for backward compatibility
+            ctx.rendered = RenderedOutput(
+                raw_text=integrated_output.raw_text,
+                mode=integrated_output.mode,
+                meta=integrated_output.meta,
+            )
 
-        # Add MLCR trace if available
-        if ctx.mlcr:
-            output_meta["mlcr_tier"] = ctx.mlcr.explain_log.get("meta", {}).get("tier")
-            output_meta["mlcr_intent"] = ctx.mlcr.explain_log.get("meta", {}).get("intent")
+            # Store structured layers in context for downstream access
+            ctx.symbolic_layer = integrated_output.symbolic_layer
+            ctx.practical_layer = integrated_output.practical_layer
+            ctx.mirror_truth_layer = integrated_output.mirror_truth_layer
+            ctx.varna_analysis = integrated_output.varna_analysis
+            ctx.phoneme_routing = integrated_output.phoneme_routing
 
-        ctx.rendered = RenderedOutput(
-            raw_text=final_text,
-            mode=render_mode_str,
-            meta=output_meta,
-        )
+        except Exception as e:
+            # Fallback to basic rendering if integrated renderer fails
+            render_mode_str = ctx.request.render_mode or "standard"
+            final_text = ctx.dha.guarded_text if ctx.dha else ""
+
+            output_meta = {
+                "persona_id": ctx.persona.active_persona_id if ctx.persona else None,
+                "tone_profile": ctx.dha.tone_profile if ctx.dha else None,
+                "readiness_level": ctx.dha.readiness_level if ctx.dha else None,
+                "router_mode": ctx.router_mode,
+                "pipeline_version": "3.1",
+                "renderer_fallback": True,
+                "renderer_error": str(e),
+            }
+
+            if ctx.mlcr:
+                output_meta["mlcr_tier"] = ctx.mlcr.explain_log.get("meta", {}).get("tier")
+                output_meta["mlcr_intent"] = ctx.mlcr.explain_log.get("meta", {}).get("intent")
+
+            ctx.rendered = RenderedOutput(
+                raw_text=final_text,
+                mode=render_mode_str,
+                meta=output_meta,
+            )
+
+        # =======================================================================
+        # P29-P31 DELIVERY ADAPTATION BAND (Expression → Verification → Envelope)
+        # =======================================================================
+
+        # P29 Expression Finalization
+        try:
+            maybe_run_p29 = _get_p29()
+            p29_output = maybe_run_p29(ctx)
+            if p29_output:
+                ctx.p29_expression = p29_output
+        except Exception:
+            pass
+
+        # P30 Output Verification
+        try:
+            maybe_run_p30 = _get_p30()
+            p30_output = maybe_run_p30(ctx)
+            if p30_output:
+                ctx.p30_verification = p30_output
+        except Exception:
+            pass
+
+        # P31 Output Envelope
+        try:
+            maybe_run_p31 = _get_p31()
+            p31_output = maybe_run_p31(ctx)
+            if p31_output:
+                ctx.p31_envelope = p31_output
+                # Update rendered output with final envelope text
+                if p31_output.envelope_text:
+                    ctx.rendered = RenderedOutput(
+                        raw_text=p31_output.envelope_text,
+                        mode=ctx.rendered.mode if ctx.rendered else "standard",
+                        meta=ctx.rendered.meta if ctx.rendered else {},
+                    )
+        except Exception:
+            pass
 
         return ctx
 
-    # ========================================================================
-    # HELPER METHODS
-    # ========================================================================
-
-    def _generate_candidates(
-        self,
-        ctx: PipelineContext,
-        explain_log: Dict[str, Any],
-        activation_plan: Dict[str, Any],
-    ) -> List[Candidate]:
-        """
-        Generate candidates for fusion.
-
-        v3.0: Creates synthetic candidates from MLCR output.
-        Future: Will integrate RAG-retrieved candidates.
-
-        Args:
-            ctx: Pipeline context.
-            explain_log: MLCR explain log.
-            activation_plan: MLCR activation plan.
-
-        Returns:
-            List of Candidate objects for fusion.
-        """
-        candidates = []
-
-        # Create a primary candidate from the query itself
-        # This ensures fusion always has something to work with
-        query_text = ctx.request.text
-
-        # HRM candidate (symbolic/reasoning)
-        hrm_candidate = Candidate(
-            id=f"hrm_{uuid.uuid4().hex[:8]}",
-            text=f"From a deeper perspective: {query_text}",
-            source=CandidateSource.HRM,
-            channel_scores={"hrm": 0.8, "lcm": 0.4, "moe": 0.3},
-            domain=explain_log.get("meta", {}).get("domain", "general"),
-            relevance_score=0.7,
-            confidence=0.8,
-        )
-        candidates.append(hrm_candidate)
-
-        # LCM candidate (linguistic clarity)
-        lcm_candidate = Candidate(
-            id=f"lcm_{uuid.uuid4().hex[:8]}",
-            text=f"To clarify: {query_text}",
-            source=CandidateSource.LCM,
-            channel_scores={"hrm": 0.3, "lcm": 0.9, "moe": 0.4},
-            domain=explain_log.get("meta", {}).get("domain", "general"),
-            relevance_score=0.75,
-            confidence=0.85,
-        )
-        candidates.append(lcm_candidate)
-
-        # MoE candidate (domain expertise)
-        moe_candidate = Candidate(
-            id=f"moe_{uuid.uuid4().hex[:8]}",
-            text=f"Based on domain knowledge: {query_text}",
-            source=CandidateSource.MOE,
-            channel_scores={"hrm": 0.4, "lcm": 0.5, "moe": 0.85},
-            domain=explain_log.get("meta", {}).get("domain", "general"),
-            relevance_score=0.7,
-            confidence=0.75,
-        )
-        candidates.append(moe_candidate)
-
-        return candidates
-
-    def _create_fallback_fusion(self, ctx: PipelineContext) -> Any:
-        """
-        Create a minimal fusion result when no candidates available.
-
-        Args:
-            ctx: Pipeline context.
-
-        Returns:
-            Minimal fusion result object.
-        """
-        # Create a single template candidate
-        fallback_candidate = Candidate(
-            id="fallback_001",
-            text=ctx.request.text,
-            source=CandidateSource.TEMPLATE,
-            channel_scores={"hrm": 0.33, "lcm": 0.34, "moe": 0.33},
-        )
-
-        # Create minimal fusion context
-        fallback_ctx = FusionContext(
-            tier="HYBRID",
-            intent="WHAT",
-            domain="general",
-            entropy={"H_D": 0.5, "H_G": 0.5, "H_K": 0.5},
-            ontology_mass={"lower": 0.5, "upper": 0.5},
-        )
-
-        return self.fusion_engine.fuse([fallback_candidate], fallback_ctx)
-
-    def _extract_text_for_dha(self, ctx: PipelineContext) -> str:
-        """
-        Extract the text to be adapted by DHA.
-
-        Priority:
-        1. Fusion selected candidate text
-        2. Request text as fallback
-
-        Args:
-            ctx: Pipeline context with fusion result.
-
-        Returns:
-            Text string for DHA adaptation.
-        """
-        # Try to get text from fusion result
-        if ctx.fusion and ctx.fusion.selected_text:
-            return ctx.fusion.selected_text
-
-        # Fallback to request text
-        return ctx.request.text
-
     def get_stats(self) -> Dict[str, Any]:
         """Get pipeline execution statistics."""
+        total_mlcr_calls = self._mlcr_cache_hits + self._mlcr_cache_misses
+        cache_hit_rate = (
+            self._mlcr_cache_hits / total_mlcr_calls if total_mlcr_calls > 0 else 0.0
+        )
         return {
             "run_count": self._run_count,
+            "config": {
+                "mode": self.config.mode,
+                "audit_enabled": self.config.audit_enabled,
+            },
+            "providers": {
+                "embedding_dim": self.embedding_provider.get_dimension(),
+                "embedding_type": type(self.embedding_provider).__name__,
+                "router_type": type(self.router_provider).__name__,
+                "filter_type": type(self.filter_provider).__name__,
+            },
+            "mlcr_cache": {
+                "enabled": self.enable_mlcr_cache,
+                "hits": self._mlcr_cache_hits,
+                "misses": self._mlcr_cache_misses,
+                "hit_rate": round(cache_hit_rate, 3),
+                "size": len(_mlcr_cache),
+            },
             "fusion_stats": self.fusion_engine.get_statistics() if hasattr(self.fusion_engine, 'get_statistics') else {},
             "dha_stats": self.dha_engine.get_stats() if hasattr(self.dha_engine, 'get_stats') else {},
         }
@@ -981,18 +1138,31 @@ class SymbolUPipeline:
 # ============================================================================
 
 
-def run_pipeline(text: str, **kwargs: Any) -> RenderedOutput:
+def run_pipeline(
+    text: str,
+    mode: str = "enterprise",
+    **kwargs: Any,
+) -> RenderedOutput:
     """
     Convenience function to run the pipeline with minimal setup.
 
     Args:
         text: Query text.
+        mode: Provider mode - "enterprise" (symbolic) or "consumer" (pre-trained).
         **kwargs: Additional UserRequest parameters (user_id, metadata, render_mode).
 
     Returns:
         RenderedOutput from the pipeline.
+
+    Example:
+        # Enterprise mode (default)
+        result = run_pipeline("Why do I feel stuck?")
+
+        # Consumer mode
+        result = run_pipeline("Why do I feel stuck?", mode="consumer")
     """
-    pipeline = SymbolUPipeline()
+    config = SymboluConfig(mode=mode)
+    pipeline = SymbolUPipeline(config=config)
     request = UserRequest(text=text, **kwargs)
     return pipeline.run(request)
 
@@ -1000,5 +1170,7 @@ def run_pipeline(text: str, **kwargs: Any) -> RenderedOutput:
 # Public exports
 __all__ = [
     "SymbolUPipeline",
+    "SymboluConfig",
     "run_pipeline",
+    "clear_mlcr_cache",
 ]
