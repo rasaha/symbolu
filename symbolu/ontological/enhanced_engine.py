@@ -496,7 +496,7 @@ if PYTORCH_AVAILABLE:
 
                 if reasoning_mask.any() and creativity_mask.any():
                     # Get O6 (reasoning) and O2 (creativity) activations
-                    o6 = onto[:, 5]  # O6_REASONING
+                    o6 = onto[:, 5]  # O7_REASONING
                     o2 = onto[:, 1]  # O2_FORMING
 
                     # Reasoning samples should have high O6, low O2

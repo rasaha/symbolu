@@ -5,7 +5,7 @@ Ontological Engine - Multi-Domain Trainer
 Trains all 10 ontological layers with multi-label support and soft targets.
 
 Unlike ContrastiveTrainer (2 domains), this trains on all 10 layers:
-- O1_THINKING through O10_ABSOLVING
+- O1_THINKING through O12_ABSOLVING
 - Supports multi-label (samples can belong to multiple domains)
 - Uses soft cross-entropy loss with label smoothing
 - Activates the full 100D space (10D onto + 90D bhava)

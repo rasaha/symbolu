@@ -138,7 +138,7 @@ The Power User tier provides an **enhanced analytical experience** with deeper i
 │  Fusion Score: 0.82                                              │
 │  Selected Source: reasoning_model                                │
 │                                                                  │
-│  The response was generated through high O1_THINKING            │
+│  The response was generated through high O5_COGNITION            │
 │  activation, indicating deep contemplative processing.          │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘

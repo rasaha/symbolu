@@ -10,7 +10,7 @@
 
 **Yes, the Varṇa-based approach is richer and likely produces better results** because:
 
-1. **Pre-defined 10D layer meanings** per consonant (not just numeric affinities)
+1. **Pre-defined 12D layer meanings** per consonant (not just numeric affinities)
 2. **Polarity awareness** (positive/negative manifestations)
 3. **Distortion/sublimation vectors** (directional transformations)
 4. **Sanskrit acoustic substrate** (phonetically grounded in millennia of study)
@@ -43,10 +43,10 @@ LIQUID_AFFINITIES = {
 "sa": {
   "bridge_meaning": "escape_pressure",
   "layers": {
-    "O1_ACTING": "exit activation state",
-    "O2_TAGGING": "exit-route classification",
-    "O3_FORMING": "evasion shaping force",
-    "O4_THINKING": "exit pattern bias",
+    "O3_EXECUTION": "exit activation state",
+    "O2_IDENTITY": "exit-route classification",
+    "O4_STRUCTURE": "evasion shaping force",
+    "O5_COGNITION": "exit pattern bias",
     ...
   }
 }
@@ -54,7 +54,7 @@ LIQUID_AFFINITIES = {
 
 ```json
 "a": {
-  "O1_ACTING": {
+  "O3_EXECUTION": {
     "manifestation_positive": "body awakens with fresh readiness",
     "manifestation_negative": "body startles into raw activation",
     "distortion_vector": "lateral",
@@ -107,13 +107,13 @@ This is more systematic than ARPABET which is English-specific.
 Current approach:
 ```python
 "L": (0.3, 0.6, 0.2, 0.2, 0.3, 0.3, 0.4, 0.3, 0.6, 0.4)
-# What does 0.6 for O2_FORMING mean? Unclear.
+# What does 0.6 for O4_STRUCTURE mean? Unclear.
 ```
 
 Varṇa approach:
 ```json
 "la": {
-  "O3_FORMING": "abrasion shaping force"
+  "O4_STRUCTURE": "abrasion shaping force"
 }
 // Clear conceptual meaning
 ```

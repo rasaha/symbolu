@@ -3,10 +3,10 @@ Unified Ontological Engine
 ===========================
 
 The best of all worlds - combines:
-- 10-class classification (from multi_domain)
+- 12-class classification (from multi_domain)
 - Reasoning/Creativity task heads (from contrastive)
 - Bayesian uncertainty quantification (from evidential)
-- Bhava layer supervision (90D relational space)
+- Bhava layer supervision (120D relational space)
 
 Usage:
     from symbolu.ontological import UnifiedOntologicalEngine
@@ -15,12 +15,12 @@ Usage:
     result = engine.analyze("What is truth?")
 
     # All outputs available:
-    print(result["dominant_layer"])     # O1_THINKING
+    print(result["dominant_layer"])     # O1_POTENTIAL
     print(result["confidence"])         # 0.92
     print(result["uncertainty"])        # 0.15
     print(result["reasoning_score"])    # 0.35
     print(result["creativity_score"])   # 0.28
-    print(result["bhava_vector"])       # 90D relational dynamics
+    print(result["bhava_vector"])       # 120D relational dynamics
 """
 
 from typing import Dict, List, Optional, Tuple, Any
@@ -45,7 +45,7 @@ if PYTORCH_AVAILABLE:
     class EvidentialLayer(nn.Module):
         """Evidential output layer producing Dirichlet parameters."""
 
-        def __init__(self, input_dim: int, num_classes: int = 10):
+        def __init__(self, input_dim: int, num_classes: int = 12):
             super().__init__()
             self.num_classes = num_classes
             self.fc = nn.Linear(input_dim, num_classes)
@@ -67,12 +67,12 @@ if PYTORCH_AVAILABLE:
 
     class BhavaLayer(nn.Module):
         """
-        Bhava layer computing 90D relational dynamics from 10D ontological.
+        Bhava layer computing 120D relational dynamics from 12D ontological.
 
         Models interactions between ontological layer pairs.
         """
 
-        def __init__(self, ontological_dim: int = 10, bhava_dim: int = 90):
+        def __init__(self, ontological_dim: int = 12, bhava_dim: int = 120):
             super().__init__()
             self.ontological_dim = ontological_dim
             self.bhava_dim = bhava_dim
@@ -131,17 +131,17 @@ if PYTORCH_AVAILABLE:
         Architecture:
             Text → Encoder (384D) → MLP → Hidden (128D)
                                         ↓
-                              EvidentialLayer → 10D + Uncertainty
+                              EvidentialLayer → 12D + Uncertainty
                                         ↓
-                              BhavaLayer → 90D relational
+                              BhavaLayer → 120D relational
                                         ↓
                               ┌─────────┴─────────┐
                               ↓                   ↓
                         ReasoningHead       CreativityHead
 
         Features:
-        - 10-class evidential classification with uncertainty
-        - 90D Bhava relational dynamics
+        - 12-class evidential classification with uncertainty
+        - 120D Bhava relational dynamics
         - Reasoning and Creativity task scores
         - Adaptive prior beliefs
         """
@@ -150,8 +150,8 @@ if PYTORCH_AVAILABLE:
             self,
             encoder_dim: int = 384,
             hidden_dims: Tuple[int, ...] = (256, 128),
-            ontological_dim: int = 10,
-            bhava_dim: int = 90,
+            ontological_dim: int = 12,
+            bhava_dim: int = 120,
             dropout: float = 0.1,
         ):
             super().__init__()
@@ -247,7 +247,7 @@ if PYTORCH_AVAILABLE:
             - Dominant layer and confidence
             - Uncertainty quantification
             - Reasoning and creativity scores
-            - Full 100D vector (10D onto + 90D bhava)
+            - Full 132D vector (12D onto + 120D bhava)
             """
             self.eval()
 
@@ -289,7 +289,7 @@ if PYTORCH_AVAILABLE:
             else:
                 certainty_level = "confident"
 
-            # Full 100D vector
+            # Full 132D vector
             full_vector = np.concatenate([probs, bhava])
 
             return {
@@ -424,9 +424,9 @@ Architecture:
   Full Vector: {self.ontological_dim + self.bhava_dim}D
 
 Features:
-  ✓ 10-class evidential classification
+  ✓ 12-class evidential classification
   ✓ Bayesian uncertainty quantification
-  ✓ 90D Bhava relational dynamics
+  ✓ 120D Bhava relational dynamics
   ✓ Reasoning head (layers {REASONING_LAYERS})
   ✓ Creativity head (layers {CREATIVITY_LAYERS})
 
@@ -528,9 +528,9 @@ Total Parameters: {total_params:,}
 
             for i, sample in enumerate(dataset.samples):
                 domain = sample.primary_domain
-                if domain in ["O1_THINKING", "O6_REASONING", "O8_META_OBSERVING"]:
+                if domain in ["O5_COGNITION", "O7_REASONING", "O9_WITNESSES"]:
                     reasoning_targets[i] = 1.0
-                if domain in ["O2_FORMING", "O7_PURPOSING", "O9_UNIFYING"]:
+                if domain in ["O4_STRUCTURE", "O8_PURPOSE", "O10_UNIFYING"]:
                     creativity_targets[i] = 1.0
 
             # Split

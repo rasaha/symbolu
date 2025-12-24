@@ -63,7 +63,7 @@ Words are assigned to one of 10 ontological layers based on:
 
 The hypothesis: A word's phonemic structure creates "character" - propensity weights for how strongly it resonates with each layer beyond its primary assignment.
 
-Example: "catalyze" maps to O3_ACTING, but has secondary resonance with O2_FORMING and O6_REASONING.
+Example: "catalyze" maps to O3_EXECUTION, but has secondary resonance with O4_STRUCTURE and O7_REASONING.
 
 ### Stability States
 

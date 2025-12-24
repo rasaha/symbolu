@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "2.0",
   "organization": "Example Tech Company",
   "description": "Custom vocabulary for tech company domain terms, acronyms, and jargon",
   "terms": [
@@ -8,8 +8,8 @@
       "expansion": "issue tracking system",
       "intent": "action",
       "layer_affinities": {
-        "O3_ACTING": 0.8,
-        "O6_REASONING": 0.4
+        "O3_EXECUTION": 0.8,
+        "O7_REASONING": 0.4
       },
       "synonyms": ["ticket", "issue"],
       "category": "tools"
@@ -19,8 +19,8 @@
       "expansion": "Kubernetes container orchestration",
       "intent": "action",
       "layer_affinities": {
-        "O3_ACTING": 0.9,
-        "O5_DIRECTING": 0.5
+        "O3_EXECUTION": 0.9,
+        "O6_AGENCY": 0.5
       },
       "synonyms": ["kubernetes", "kube", "cluster"],
       "category": "infrastructure"
@@ -30,8 +30,8 @@
       "expansion": "continuous integration and continuous deployment",
       "intent": "action",
       "layer_affinities": {
-        "O3_ACTING": 0.9,
-        "O5_DIRECTING": 0.4
+        "O3_EXECUTION": 0.9,
+        "O6_AGENCY": 0.4
       },
       "synonyms": ["pipeline", "cicd", "build pipeline"],
       "category": "devops"
@@ -41,8 +41,8 @@
       "expansion": "pull request for code review",
       "intent": "action",
       "layer_affinities": {
-        "O3_ACTING": 0.6,
-        "O6_REASONING": 0.7
+        "O3_EXECUTION": 0.6,
+        "O7_REASONING": 0.7
       },
       "synonyms": ["pull request", "merge request", "MR"],
       "category": "development"
@@ -52,8 +52,8 @@
       "expansion": "service level agreement",
       "intent": "reasoning",
       "layer_affinities": {
-        "O6_REASONING": 0.8,
-        "O5_DIRECTING": 0.5
+        "O7_REASONING": 0.8,
+        "O6_AGENCY": 0.5
       },
       "category": "operations"
     },
@@ -62,8 +62,8 @@
       "expansion": "objectives and key results",
       "intent": "reasoning",
       "layer_affinities": {
-        "O6_REASONING": 0.7,
-        "O7_PURPOSING": 0.8
+        "O7_REASONING": 0.7,
+        "O8_PURPOSE": 0.8
       },
       "synonyms": ["objectives", "key results"],
       "category": "management"
@@ -73,8 +73,8 @@
       "expansion": "retrospective meeting",
       "intent": "reflective",
       "layer_affinities": {
-        "O1_THINKING": 0.7,
-        "O8_META_OBSERVING": 0.6
+        "O5_COGNITION": 0.7,
+        "O9_WITNESSES": 0.6
       },
       "synonyms": ["retrospective", "postmortem"],
       "category": "agile"
@@ -84,8 +84,8 @@
       "expansion": "daily standup meeting",
       "intent": "action",
       "layer_affinities": {
-        "O3_ACTING": 0.6,
-        "O5_DIRECTING": 0.5
+        "O3_EXECUTION": 0.6,
+        "O6_AGENCY": 0.5
       },
       "synonyms": ["daily", "scrum"],
       "category": "agile"
@@ -95,8 +95,8 @@
       "expansion": "minimum viable product",
       "intent": "creative",
       "layer_affinities": {
-        "O2_FORMING": 0.8,
-        "O7_PURPOSING": 0.6
+        "O4_STRUCTURE": 0.8,
+        "O8_PURPOSE": 0.6
       },
       "category": "product"
     },
@@ -105,8 +105,8 @@
       "expansion": "proof of concept",
       "intent": "reasoning",
       "layer_affinities": {
-        "O6_REASONING": 0.7,
-        "O2_FORMING": 0.5
+        "O7_REASONING": 0.7,
+        "O4_STRUCTURE": 0.5
       },
       "synonyms": ["prototype", "spike"],
       "category": "development"
@@ -116,8 +116,8 @@
       "expansion": "end of day",
       "intent": "action",
       "layer_affinities": {
-        "O3_ACTING": 0.5,
-        "O5_DIRECTING": 0.6
+        "O3_EXECUTION": 0.5,
+        "O6_AGENCY": 0.6
       },
       "category": "time"
     },
@@ -126,7 +126,7 @@
       "expansion": "work from home",
       "intent": "action",
       "layer_affinities": {
-        "O3_ACTING": 0.6
+        "O3_EXECUTION": 0.6
       },
       "synonyms": ["remote", "remote work"],
       "category": "workplace"

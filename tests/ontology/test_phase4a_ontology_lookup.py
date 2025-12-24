@@ -65,13 +65,13 @@ class TestPhase4AFormulaDeterminism:
 
     def test_lookup_same_input_same_output(self):
         """Test same (varna, layer) produces identical result every time."""
-        results = [lookup_interaction("ka", "O1_ACTING") for _ in range(10)]
+        results = [lookup_interaction("ka", "O3_EXECUTION") for _ in range(10)]
         first = results[0]
         assert all(r == first for r in results)
 
     def test_lookup_raw_deterministic(self):
         """Test raw lookup is deterministic."""
-        results = [lookup_interaction_raw("a", "O2_TAGGING") for _ in range(10)]
+        results = [lookup_interaction_raw("a", "O2_IDENTITY") for _ in range(10)]
         assert len(set(tuple(r.items()) for r in results)) == 1
 
     def test_all_layers_lookup_deterministic(self):
@@ -82,7 +82,7 @@ class TestPhase4AFormulaDeterminism:
 
     def test_all_varnas_lookup_deterministic(self):
         """Test looking up all varnas for a layer is deterministic."""
-        results = [lookup_layer_all_varnas("O3_FORMING") for _ in range(5)]
+        results = [lookup_layer_all_varnas("O4_STRUCTURE") for _ in range(5)]
         first_keys = sorted(results[0].keys())
         assert all(sorted(r.keys()) == first_keys for r in results)
 
@@ -147,7 +147,7 @@ class TestPhase4AZeroLLMGuarantee:
     def test_runs_offline(self):
         """Test Phase-4A runs completely offline."""
         # If this runs, Phase-4A works offline
-        result = lookup_interaction("ga", "O5_DIRECTING")
+        result = lookup_interaction("ga", "O6_AGENCY")
         assert result is not None
         assert isinstance(result, VarnaLayerInteraction)
 
@@ -162,7 +162,7 @@ class TestPhase4AFailFast:
     def test_missing_varna_raises_error(self):
         """Test missing varna raises Phase4AVarnaMissingError."""
         with pytest.raises(Phase4AVarnaMissingError) as exc:
-            lookup_interaction("nonexistent_varna", "O1_ACTING")
+            lookup_interaction("nonexistent_varna", "O3_EXECUTION")
         assert "nonexistent_varna" in str(exc.value)
 
     def test_missing_layer_raises_error(self):
@@ -179,7 +179,7 @@ class TestPhase4AFailFast:
     def test_empty_varna_raises_error(self):
         """Test empty varna raises error."""
         with pytest.raises(Phase4AVarnaMissingError):
-            lookup_interaction("", "O1_ACTING")
+            lookup_interaction("", "O3_EXECUTION")
 
     def test_empty_layer_raises_error(self):
         """Test empty layer raises error."""
@@ -189,12 +189,12 @@ class TestPhase4AFailFast:
     def test_whitespace_varna_raises_error(self):
         """Test whitespace-only varna raises error."""
         with pytest.raises(Phase4AVarnaMissingError):
-            lookup_interaction("   ", "O1_ACTING")
+            lookup_interaction("   ", "O3_EXECUTION")
 
     def test_error_includes_context(self):
         """Test errors include helpful context."""
         with pytest.raises(Phase4AVarnaMissingError) as exc:
-            lookup_interaction("xyz", "O1_ACTING")
+            lookup_interaction("xyz", "O3_EXECUTION")
         assert exc.value.varna == "xyz"
         assert "varna" in str(exc.value).lower()
 
@@ -202,7 +202,7 @@ class TestPhase4AFailFast:
         """Test layer error includes list of valid layers."""
         with pytest.raises(Phase4ALayerMissingError) as exc:
             lookup_interaction("ka", "O0_FAKE")
-        assert len(exc.value.valid_layers) == 10
+        assert len(exc.value.valid_layers) == 12
 
 
 # =============================================================================
@@ -228,14 +228,14 @@ class TestPhase4AValidationStrictness:
         assert len(REQUIRED_INTERACTION_FIELDS) == 4
 
     def test_valid_layer_ids_defined(self):
-        """Test all 10 layer IDs are defined."""
-        assert len(VALID_LAYER_IDS) == 10
-        assert "O1_ACTING" in VALID_LAYER_IDS
-        assert "O10_ABSOLVING" in VALID_LAYER_IDS
+        """Test all 12 layer IDs are defined."""
+        assert len(VALID_LAYER_IDS) == 12
+        assert "O1_POTENTIAL" in VALID_LAYER_IDS
+        assert "O12_ABSOLVING" in VALID_LAYER_IDS
 
     def test_interaction_has_all_required_fields(self):
         """Test looked-up interaction has all required fields."""
-        result = lookup_interaction("ka", "O1_ACTING")
+        result = lookup_interaction("ka", "O3_EXECUTION")
         assert hasattr(result, "manifestation_positive")
         assert hasattr(result, "manifestation_negative")
         assert hasattr(result, "distortion_vector")
@@ -262,43 +262,43 @@ class TestPhase4ALookupCorrectness:
 
     def test_lookup_returns_dataclass(self):
         """Test lookup returns VarnaLayerInteraction dataclass."""
-        result = lookup_interaction("a", "O1_ACTING")
+        result = lookup_interaction("a", "O3_EXECUTION")
         assert isinstance(result, VarnaLayerInteraction)
 
     def test_lookup_includes_input_varna(self):
         """Test result includes input varna."""
-        result = lookup_interaction("ka", "O1_ACTING")
+        result = lookup_interaction("ka", "O3_EXECUTION")
         assert result.varna == "ka"
 
     def test_lookup_includes_input_layer(self):
         """Test result includes input layer."""
-        result = lookup_interaction("ka", "O5_DIRECTING")
-        assert result.layer == "O5_DIRECTING"
+        result = lookup_interaction("ka", "O6_AGENCY")
+        assert result.layer == "O6_AGENCY"
 
     def test_distortion_vector_valid_values(self):
         """Test distortion_vector is 'lateral' or 'downward'."""
-        result = lookup_interaction("a", "O1_ACTING")
+        result = lookup_interaction("a", "O3_EXECUTION")
         assert result.distortion_vector in ("lateral", "downward")
 
     def test_sublimate_vector_valid_values(self):
         """Test sublimate_vector is 'upward' or 'terminating'."""
-        result = lookup_interaction("a", "O1_ACTING")
+        result = lookup_interaction("a", "O3_EXECUTION")
         assert result.sublimate_vector in ("upward", "terminating")
 
     def test_o10_has_terminating_sublimate(self):
-        """Test O10_ABSOLVING typically has 'terminating' sublimate."""
-        result = lookup_interaction("a", "O10_ABSOLVING")
+        """Test O12_ABSOLVING typically has 'terminating' sublimate."""
+        result = lookup_interaction("a", "O12_ABSOLVING")
         assert result.sublimate_vector == "terminating"
 
     def test_raw_lookup_returns_dict(self):
         """Test raw lookup returns plain dict."""
-        result = lookup_interaction_raw("sha", "O7_PURPOSING")
+        result = lookup_interaction_raw("sha", "O8_PURPOSE")
         assert isinstance(result, dict)
         assert set(result.keys()) == set(REQUIRED_INTERACTION_FIELDS)
 
     def test_manifestation_fields_are_strings(self):
         """Test manifestation fields are non-empty strings."""
-        result = lookup_interaction("ga", "O3_FORMING")
+        result = lookup_interaction("ga", "O4_STRUCTURE")
         assert isinstance(result.manifestation_positive, str)
         assert isinstance(result.manifestation_negative, str)
         assert len(result.manifestation_positive) > 0
@@ -314,29 +314,29 @@ class TestPhase4AEdgeCases:
 
     def test_vowel_lookup_works(self):
         """Test vowel varnas work."""
-        result = lookup_interaction("a", "O1_ACTING")
+        result = lookup_interaction("a", "O3_EXECUTION")
         assert result.varna == "a"
 
     def test_consonant_lookup_works(self):
         """Test consonant varnas work."""
-        result = lookup_interaction("ka", "O1_ACTING")
+        result = lookup_interaction("ka", "O3_EXECUTION")
         assert result.varna == "ka"
 
     def test_special_vowel_am_works(self):
         """Test special vowel aṁ (anusvara) works."""
         if is_valid_varna("aṁ"):
-            result = lookup_interaction("aṁ", "O1_ACTING")
+            result = lookup_interaction("aṁ", "O3_EXECUTION")
             assert result.varna == "aṁ"
 
     def test_special_vowel_aha_works(self):
         """Test special vowel aha (visarga) works."""
         if is_valid_varna("aha"):
-            result = lookup_interaction("aha", "O1_ACTING")
+            result = lookup_interaction("aha", "O3_EXECUTION")
             assert result.varna == "aha"
 
     def test_conjunct_ksha_works(self):
         """Test conjunct consonant ksha works."""
-        result = lookup_interaction("ksha", "O1_ACTING")
+        result = lookup_interaction("ksha", "O3_EXECUTION")
         assert result.varna == "ksha"
 
 
@@ -349,20 +349,20 @@ class TestPhase4AImmutability:
 
     def test_varnaLayerInteraction_is_frozen(self):
         """Test VarnaLayerInteraction cannot be modified."""
-        result = lookup_interaction("ka", "O1_ACTING")
+        result = lookup_interaction("ka", "O3_EXECUTION")
         with pytest.raises(AttributeError):
             result.varna = "modified"
 
     def test_varnaLayerInteraction_is_hashable(self):
         """Test VarnaLayerInteraction can be used in sets."""
-        result1 = lookup_interaction("ka", "O1_ACTING")
-        result2 = lookup_interaction("ka", "O1_ACTING")
+        result1 = lookup_interaction("ka", "O3_EXECUTION")
+        result2 = lookup_interaction("ka", "O3_EXECUTION")
         result_set = {result1, result2}
         assert len(result_set) == 1  # Same hash
 
     def test_to_dict_returns_copy(self):
         """Test to_dict returns a modifiable copy."""
-        result = lookup_interaction("ka", "O1_ACTING")
+        result = lookup_interaction("ka", "O3_EXECUTION")
         d = result.to_dict()
         d["varna"] = "modified"
         assert result.varna == "ka"  # Original unchanged
@@ -382,11 +382,11 @@ class TestPhase4AExistenceChecks:
 
     def test_has_interaction_true(self):
         """Test has_interaction returns True for valid pair."""
-        assert has_interaction("ka", "O1_ACTING") is True
+        assert has_interaction("ka", "O3_EXECUTION") is True
 
     def test_has_interaction_false_bad_varna(self):
         """Test has_interaction returns False for bad varna."""
-        assert has_interaction("xyz", "O1_ACTING") is False
+        assert has_interaction("xyz", "O3_EXECUTION") is False
 
     def test_is_valid_varna_true(self):
         """Test is_valid_varna returns True for valid varna."""
@@ -395,8 +395,8 @@ class TestPhase4AExistenceChecks:
 
     def test_is_valid_layer_true(self):
         """Test is_valid_layer returns True for valid layer."""
-        assert is_valid_layer("O1_ACTING") is True
-        assert is_valid_layer("O10_ABSOLVING") is True
+        assert is_valid_layer("O3_EXECUTION") is True
+        assert is_valid_layer("O12_ABSOLVING") is True
 
 
 # =============================================================================
@@ -404,14 +404,14 @@ class TestPhase4AExistenceChecks:
 # =============================================================================
 
 class TestPhase4AAllLayersCoverage:
-    """Verify all 10 layers work for varnas."""
+    """Verify all 12 layers work for varnas."""
 
     def test_all_layers_for_ka(self):
-        """Test all 10 layers work for 'ka'."""
+        """Test all 12 layers work for 'ka'."""
         result = lookup_varna_all_layers("ka")
-        assert len(result) == 10
-        assert "O1_ACTING" in result
-        assert "O10_ABSOLVING" in result
+        assert len(result) == 12
+        assert "O1_POTENTIAL" in result
+        assert "O12_ABSOLVING" in result
 
     def test_all_layers_have_required_fields(self):
         """Test all layer interactions have required fields."""

@@ -129,25 +129,25 @@ BACKBONE_TO_RESONANCE: Dict[Dimension, int] = {
     Dimension.BODY: 1,          # O2_FORMING
     Dimension.ACTION: 2,        # O3_ACTING
     Dimension.IDENTIFICATION: 3, # O4_TAGGING
-    Dimension.EGO: 4,           # O5_DIRECTING
-    Dimension.INTELLECT: 5,     # O6_REASONING
-    Dimension.SOUL: 6,          # O7_PURPOSING
-    Dimension.WITNESS: 7,       # O8_META_OBSERVING
-    Dimension.SINGULARITY: 8,   # O9_UNIFYING
-    Dimension.ABSOLUTE: 9,      # O10_ABSOLVING
+    Dimension.EGO: 4,           # O6_AGENCY
+    Dimension.INTELLECT: 5,     # O7_REASONING
+    Dimension.SOUL: 6,          # O8_PURPOSE
+    Dimension.WITNESS: 7,       # O9_WITNESSES
+    Dimension.SINGULARITY: 8,   # O10_UNIFYING
+    Dimension.ABSOLUTE: 9,      # O12_ABSOLVING
 }
 
 RESONANCE_LAYER_NAMES = (
-    "O1_THINKING",
-    "O2_FORMING",
-    "O3_ACTING",
+    "O5_COGNITION",
+    "O4_STRUCTURE",
+    "O3_EXECUTION",
     "O4_TAGGING",
-    "O5_DIRECTING",
-    "O6_REASONING",
-    "O7_PURPOSING",
-    "O8_META_OBSERVING",
-    "O9_UNIFYING",
-    "O10_ABSOLVING",
+    "O6_AGENCY",
+    "O7_REASONING",
+    "O8_PURPOSE",
+    "O9_WITNESSES",
+    "O10_UNIFYING",
+    "O12_ABSOLVING",
 )
 
 
@@ -728,7 +728,7 @@ def validate_word_pair(
     # KEY INSIGHT: UNIFYING layer (O9, index 8) indicates natural harmony
     # Words with high UNIFYING create more natural pairings
     # "blue" has high UNIFYING (0.42), "red" has lower (0.31)
-    UNIFYING_INDEX = 8  # O9_UNIFYING
+    UNIFYING_INDEX = 8  # O10_UNIFYING
     unifying_score1 = vec1[UNIFYING_INDEX] if len(vec1) > UNIFYING_INDEX else 0.0
     unifying_score2 = vec2[UNIFYING_INDEX] if len(vec2) > UNIFYING_INDEX else 0.0
 
@@ -742,7 +742,7 @@ def validate_word_pair(
     harmony_score = (combined_alignment * 0.5) + (structural_sim * 0.2) + (combined_unifying * 0.3)
 
     # Bonus for shared purpose layers
-    purpose_layers = {"O3_ACTING", "O2_FORMING", "O7_PURPOSING", "O9_UNIFYING"}
+    purpose_layers = {"O3_EXECUTION", "O4_STRUCTURE", "O8_PURPOSE", "O10_UNIFYING"}
     purpose_shared = len([l for l in shared if l in purpose_layers])
     harmony_score += purpose_shared * 0.02
 

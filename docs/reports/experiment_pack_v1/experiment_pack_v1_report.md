@@ -52,13 +52,13 @@ All varna/phoneme mappings loaded EXCLUSIVELY from:
 
 | Layer | Count | Percentage |
 |-------|-------|------------|
-| O10_ABSOLVING | 14 | 25.5% |
+| O12_ABSOLVING | 14 | 25.5% |
 | O1_THINKING | 17 | 30.9% |
 | O2_FORMING | 7 | 12.7% |
 | O3_ACTING | 8 | 14.5% |
-| O6_REASONING | 4 | 7.3% |
-| O7_PURPOSING | 3 | 5.5% |
-| O8_META_OBSERVING | 2 | 3.6% |
+| O7_REASONING | 4 | 7.3% |
+| O8_PURPOSE | 3 | 5.5% |
+| O9_WITNESSES | 2 | 3.6% |
 
 ### Test-Retest Reliability
 

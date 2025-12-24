@@ -105,11 +105,11 @@ class TestLayerAssignment:
         assert result.layer == OntologicalLayer.O2_FORMING
 
     def test_connectors_map_to_reasoning(self):
-        """Connectors map to O6_REASONING."""
+        """Connectors map to O7_REASONING."""
         assigner = create_assigner()
         result = assigner.assign("because")
 
-        assert result.layer == OntologicalLayer.O6_REASONING
+        assert result.layer == OntologicalLayer.O7_REASONING
 
     def test_catalyze_maps_to_acting(self):
         """'catalyze' maps to O3_ACTING."""
@@ -127,35 +127,35 @@ class TestOverrideLexicon:
     """Tests for word-specific overrides."""
 
     def test_purpose_words_override_to_purposing(self):
-        """Purpose words override to O7_PURPOSING."""
+        """Purpose words override to O8_PURPOSE."""
         assigner = create_assigner()
         purpose_words = ["aim", "goal", "purpose", "intention"]
 
         for word in purpose_words:
             result = assigner.assign(word)
-            assert result.layer == OntologicalLayer.O7_PURPOSING
+            assert result.layer == OntologicalLayer.O8_PURPOSE
             assert result.source == "override"
 
     def test_observe_overrides_to_meta(self):
-        """'observe' overrides to O8_META_OBSERVING."""
+        """'observe' overrides to O9_WITNESSES."""
         assigner = create_assigner()
         result = assigner.assign("observe")
 
-        assert result.layer == OntologicalLayer.O8_META_OBSERVING
+        assert result.layer == OntologicalLayer.O9_WITNESSES
 
     def test_unify_overrides_to_unifying(self):
-        """'unify' overrides to O9_UNIFYING."""
+        """'unify' overrides to O10_UNIFYING."""
         assigner = create_assigner()
         result = assigner.assign("unify")
 
-        assert result.layer == OntologicalLayer.O9_UNIFYING
+        assert result.layer == OntologicalLayer.O10_UNIFYING
 
     def test_absolve_overrides_to_absolving(self):
-        """'absolve' overrides to O10_ABSOLVING."""
+        """'absolve' overrides to O12_ABSOLVING."""
         assigner = create_assigner()
         result = assigner.assign("absolve")
 
-        assert result.layer == OntologicalLayer.O10_ABSOLVING
+        assert result.layer == OntologicalLayer.O12_ABSOLVING
 
     def test_override_has_high_confidence(self):
         """Override assignments have high confidence."""
@@ -259,7 +259,7 @@ class TestBatchAssignment:
         assert results[0].layer == OntologicalLayer.O1_THINKING
         assert results[1].layer == OntologicalLayer.O2_FORMING
         assert results[2].layer == OntologicalLayer.O3_ACTING
-        assert results[3].layer == OntologicalLayer.O6_REASONING
+        assert results[3].layer == OntologicalLayer.O7_REASONING
 
     def test_batch_preserves_order(self):
         """Batch results preserve input order."""

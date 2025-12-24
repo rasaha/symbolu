@@ -40,7 +40,7 @@ This document shows how `symbolu/hybrid/` (Phoneme-Transformer Optimization) con
 ║  │                                                                             │  ║
 ║  │   symbolu/resonance/    ─── 10D Phoneme Vectors (NEW)                      │  ║
 ║  │                                                                             │  ║
-║  │   • Phoneme → 10D ontological projection                                   │  ║
+║  │   • Phoneme → 12D ontological projection                                   │  ║
 ║  │   • Cosine similarity for word/phrase harmony                              │  ║
 ║  │   • Zero parameters, fully deterministic                                   │  ║
 ║  └─────────────────────────────────────────────────────────────────────────────┘  ║
@@ -97,7 +97,7 @@ This document shows how `symbolu/hybrid/` (Phoneme-Transformer Optimization) con
 │      VOWEL                                     VOWEL_SHORT, VOWEL_LONG          │
 │                                               DIPHTHONG, AFFRICATE              │
 │                                                                                 │
-│  Acoustic decomposition            →        10D layer affinities                │
+│  Acoustic decomposition            →        12D layer affinities                │
 │  (no semantic meaning)                      (ontological projection)            │
 │                                                                                 │
 ├─────────────────────────────────────────────────────────────────────────────────┤
@@ -157,9 +157,9 @@ This document shows how `symbolu/hybrid/` (Phoneme-Transformer Optimization) con
 │  │   │ ★ HYBRID ROUTER INTEGRATION POINT ★                          │    │    │
 │  │   │                                                               │    │    │
 │  │   │ SemanticRouter can INFORM regime selection:                   │    │    │
-│  │   │   • O9_UNIFYING dominant → REFLECT regime                    │    │    │
-│  │   │   • O6_REASONING dominant → INFORM regime                    │    │    │
-│  │   │   • O3_ACTING dominant → CLARIFY regime                      │    │    │
+│  │   │   • O10_UNIFYING dominant → REFLECT regime                    │    │    │
+│  │   │   • O7_REASONING dominant → INFORM regime                    │    │    │
+│  │   │   • O3_EXECUTION dominant → CLARIFY regime                      │    │    │
 │  │   └──────────────────────────────────────────────────────────────┘    │    │
 │  └────────────────────────────────────────────────────────────────────────┘    │
 │    │                                                                            │
@@ -276,7 +276,7 @@ This document shows how `symbolu/hybrid/` (Phoneme-Transformer Optimization) con
 │  │       word="truth",                                                     │   │
 │  │       phonemes=("T", "R", "UW", "TH"),                                  │   │
 │  │       vector=(0.31, 0.38, 0.25, ..., 0.42),  # normalized 10D           │   │
-│  │       dominant_layer="O9_UNIFYING"                                      │   │
+│  │       dominant_layer="O10_UNIFYING"                                      │   │
 │  │     )                                                                   │   │
 │  │                                                                         │   │
 │  │   compute_resonance(truth_vec, light_vec) → 0.91 (HARMONIC)            │   │
@@ -314,16 +314,16 @@ The existing Symbol-U architecture uses **Kosha** (sheaths) and **Bhava** (state
 
 | Resonance Layer | Vedantic Concept | Kosha Alignment | Phase Relevance |
 |-----------------|------------------|-----------------|-----------------|
-| O1_THINKING | Vijñānamaya | Intellectual sheath | P7 (Discourse) |
-| O2_FORMING | Manomaya | Mental sheath | P8 (Semantic) |
-| O3_ACTING | Prāṇamaya | Vital sheath | P9 (Lexical) |
+| O5_COGNITION | Vijñānamaya | Intellectual sheath | P7 (Discourse) |
+| O4_STRUCTURE | Manomaya | Mental sheath | P8 (Semantic) |
+| O3_EXECUTION | Prāṇamaya | Vital sheath | P9 (Lexical) |
 | O4_TAGGING | Annamaya | Physical sheath | P10 (Acoustic) |
-| O5_DIRECTING | Prāṇamaya | Vital sheath | P6 (Regime) |
-| O6_REASONING | Vijñānamaya | Intellectual sheath | PO3 (Action) |
-| O7_PURPOSING | Ānandamaya | Bliss sheath | PO2 (Intent) |
-| O8_META_OBSERVING | Ānandamaya | Bliss sheath | PO1 (Observer) |
-| O9_UNIFYING | Ānandamaya | Bliss sheath | Fusion |
-| O10_ABSOLVING | Beyond Kosha | Pure consciousness | — |
+| O6_AGENCY | Prāṇamaya | Vital sheath | P6 (Regime) |
+| O7_REASONING | Vijñānamaya | Intellectual sheath | PO3 (Action) |
+| O8_PURPOSE | Ānandamaya | Bliss sheath | PO2 (Intent) |
+| O9_WITNESSES | Ānandamaya | Bliss sheath | PO1 (Observer) |
+| O10_UNIFYING | Ānandamaya | Bliss sheath | Fusion |
+| O12_ABSOLVING | Beyond Kosha | Pure consciousness | — |
 
 ### 5.2 Vṛtti Types ↔ Phoneme Categories
 

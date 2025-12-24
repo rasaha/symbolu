@@ -65,7 +65,7 @@ def sample_atoms() -> tuple:
             provenance="test",
         ),
         create_atom(
-            layer=OntologicalLayer.O6_REASONING,
+            layer=OntologicalLayer.O7_REASONING,
             slot=K1Slot.EVIDENCE,
             discourse_act=DiscourseAct.TRIGGER,
             payload_ref="hash:evidence1",

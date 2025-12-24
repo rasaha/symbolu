@@ -6,7 +6,7 @@ A comprehensive guide to training and benchmarking the 100D Ontological Engine.
 
 The Ontological Engine maps text to a 100-dimensional vector space:
 - **10D Ontological Layers** (O1-O10): Core semantic dimensions
-- **90D Bhava Sub-layers**: Relational dynamics between layer pairs
+- **120D Bhava Sub-layers**: Relational dynamics between layer pairs
 
 ### The 10 Ontological Layers
 
@@ -28,7 +28,7 @@ The Ontological Engine maps text to a 100-dimensional vector space:
 ```
 Text → MiniLM Encoder (384D) → MLP (256→128) → 10D Ontological
                                             ↓
-                                    BhavaLayer → 90D Bhava
+                                    BhavaLayer → 120D Bhava
                                             ↓
                                     Full 100D Vector
                                             ↓
@@ -47,10 +47,10 @@ Text → MiniLM Encoder (384D) → MLP (256→128) → 10D Ontological
 2. **OntologicalMLP**
    - Input: 384D encoder output
    - Hidden: 256D → 128D with skip connections
-   - Output: 10D ontological vector
+   - Output: 12D ontological vector
 
 3. **BhavaLayer**
-   - Derives 90D from 10D ontological
+   - Derives 90D from 12D ontological
    - 9 pairs × 10 sub-layers each
    - Supervised via consistency loss
 
@@ -84,7 +84,7 @@ python scripts/train_contrastive.py --epochs 10 --huggingface --benchmark
 
 ### 2. Multi-Domain Training (10 Domains) ⭐ NEW
 
-Train all 10 ontological layers with multi-label support.
+Train all 12 ontological layers with multi-label support.
 
 ```bash
 # Quick test
@@ -156,7 +156,7 @@ config = ContrastiveConfig(
 
 ### Bhava Supervision
 
-The 90D Bhava space is now actively trained via consistency loss:
+The 120D Bhava space is now actively trained via consistency loss:
 
 ```python
 # Bhava target derived from ontological layer interactions
@@ -309,7 +309,7 @@ from symbolu.ontological import PyTorchOntologicalEngine
 engine = PyTorchOntologicalEngine()
 result = engine.analyze("If A implies B and B implies C, then A implies C")
 
-print(result["dominant_layer"])  # O6_REASONING
+print(result["dominant_layer"])  # O7_REASONING
 print(result["reasoning_score"])  # 0.85
 print(result["creativity_score"])  # 0.23
 ```

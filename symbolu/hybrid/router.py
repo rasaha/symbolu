@@ -95,13 +95,13 @@ REFLECTIVE_PATTERNS: Set[str] = {
 class ModelType(Enum):
     """Types of specialized models."""
     GENERAL = "general"           # Fallback for mixed/unclear
-    RELATIONSHIP = "relationship"  # O9_UNIFYING - connections, love, unity
-    REASONING = "reasoning"        # O6_REASONING - logic, analysis
-    ACTION = "action"             # O3_ACTING - procedures, commands
-    CREATIVE = "creative"         # O2_FORMING - creation, art, structure
-    REFLECTIVE = "reflective"     # O1_THINKING - contemplation, philosophy
-    DIRECTIVE = "directive"       # O5_DIRECTING - guidance, commands
-    TRANSCENDENT = "transcendent" # O10_ABSOLVING - abstract, spiritual
+    RELATIONSHIP = "relationship"  # O10_UNIFYING - connections, love, unity
+    REASONING = "reasoning"        # O7_REASONING - logic, analysis
+    ACTION = "action"             # O3_EXECUTION - procedures, commands
+    CREATIVE = "creative"         # O4_STRUCTURE - creation, art, structure
+    REFLECTIVE = "reflective"     # O5_COGNITION - contemplation, philosophy
+    DIRECTIVE = "directive"       # O6_AGENCY - guidance, commands
+    TRANSCENDENT = "transcendent" # O12_ABSOLVING - abstract, spiritual
 
 
 @dataclass(frozen=True)

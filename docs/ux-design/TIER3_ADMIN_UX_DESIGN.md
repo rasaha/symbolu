@@ -66,7 +66,7 @@ The Admin tier supports **three view modes**:
 │  └───────────────────────────────┘  │  ┌─────────────────┐ ┌─────────────────┐     │
 │                                     │  │ ENTROPY METRICS │ │ ONTOLOGICAL     │     │
 │  💬 Processing pipeline...          │  │ H_D: 0.42       │ │ Dominant:       │     │
-│                                     │  │ H_G: 0.38       │ │ O1_THINKING     │     │
+│                                     │  │ H_G: 0.38       │ │ O5_COGNITION     │     │
 │                                     │  │ H_K: 0.45       │ │ ████████░░ 0.62 │     │
 │                                     │  │ Norm: 0.41      │ │ ████░░░░░░ 0.45 │     │
 │                                     │  └─────────────────┘ └─────────────────┘     │
@@ -154,7 +154,7 @@ The Admin tier supports **three view modes**:
 │  ┌────────────────────────────┐  ┌────────────────────────────┐                    │
 │  │   ONTOLOGICAL PROFILE      │  │   WHAT-IF SIMULATOR        │                    │
 │  │                            │  │                            │                    │
-│  │   Dominant: O1_THINKING    │  │   Preset: [safety_first ▼] │                    │
+│  │   Dominant: O5_COGNITION    │  │   Preset: [safety_first ▼] │                    │
 │  │                            │  │                            │                    │
 │  │   Thinking   ██████████░░  │  │   [▶ Run Simulation]       │                    │
 │  │   Observing  ████████░░░░  │  │                            │                    │

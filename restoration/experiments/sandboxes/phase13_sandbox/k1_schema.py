@@ -134,16 +134,16 @@ def get_tier_slots(tier: K1SlotTier) -> Tuple[K1Slot, ...]:
 
 class OntologicalLayer(Enum):
     """Ontological layers from the 10-family structure."""
-    O1_THINKING = "O1_THINKING"
-    O2_FORMING = "O2_FORMING"
-    O3_ACTING = "O3_ACTING"
+    O5_COGNITION = "O5_COGNITION"
+    O4_STRUCTURE = "O4_STRUCTURE"
+    O3_EXECUTION = "O3_EXECUTION"
     O4_TAGGING = "O4_TAGGING"
-    O5_DIRECTING = "O5_DIRECTING"
-    O6_REASONING = "O6_REASONING"
-    O7_PURPOSING = "O7_PURPOSING"
-    O8_META_OBSERVING = "O8_META_OBSERVING"
-    O9_UNIFYING = "O9_UNIFYING"
-    O10_ABSOLVING = "O10_ABSOLVING"
+    O6_AGENCY = "O6_AGENCY"
+    O7_REASONING = "O7_REASONING"
+    O8_PURPOSE = "O8_PURPOSE"
+    O9_WITNESSES = "O9_WITNESSES"
+    O10_UNIFYING = "O10_UNIFYING"
+    O12_ABSOLVING = "O12_ABSOLVING"
 
 
 # =============================================================================

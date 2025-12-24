@@ -63,7 +63,7 @@ class TestFlatGradientStress:
         """
         result = resolve_dynamics(
             varna="ga",
-            start_layer="O1_ACTING",
+            start_layer="O3_EXECUTION",
             load=0.3,
             time_steps=20,
             decay_constant=0.1,
@@ -88,7 +88,7 @@ class TestFlatGradientStress:
         """
         result = resolve_dynamics(
             varna="ddha",
-            start_layer="O5_DIRECTING",
+            start_layer="O6_AGENCY",
             load=0.8,
             time_steps=20,
             decay_constant=0.05,
@@ -114,7 +114,7 @@ class TestFlatGradientStress:
         # 'ga' - constructive across all layers (ontologically flat)
         result_ga = resolve_dynamics(
             varna="ga",
-            start_layer="O1_ACTING",
+            start_layer="O3_EXECUTION",
             load=0.5,
             time_steps=15,
             decay_constant=0.1,
@@ -141,7 +141,7 @@ class TestFlatGradientStress:
         for varna in flat_varnas:
             result = resolve_dynamics(
                 varna=varna,
-                start_layer="O3_FORMING",
+                start_layer="O4_STRUCTURE",
                 load=0.4,
                 time_steps=10,
                 decay_constant=0.1,
@@ -170,7 +170,7 @@ class TestRegression:
         """
         result = resolve_dynamics(
             varna="kha",  # 'kha' has degenerative tendency
-            start_layer="O7_PURPOSING",
+            start_layer="O8_PURPOSE",
             load=0.9,  # High load
             time_steps=30,
             decay_constant=0.05,
@@ -196,7 +196,7 @@ class TestRegression:
         """
         result = resolve_dynamics(
             varna="kha",
-            start_layer="O7_PURPOSING",
+            start_layer="O8_PURPOSE",
             load=0.9,
             time_steps=20,
             decay_constant=0.05,
@@ -216,7 +216,7 @@ class TestRegression:
         # Load below threshold
         result_low = resolve_dynamics(
             varna="kha",
-            start_layer="O5_DIRECTING",
+            start_layer="O6_AGENCY",
             load=0.5,  # Below threshold
             time_steps=15,
             decay_constant=0.1,
@@ -228,7 +228,7 @@ class TestRegression:
         # Load above threshold
         result_high = resolve_dynamics(
             varna="kha",
-            start_layer="O5_DIRECTING",
+            start_layer="O6_AGENCY",
             load=0.85,  # Above threshold
             time_steps=15,
             decay_constant=0.1,
@@ -248,12 +248,12 @@ class TestRegression:
         from symbolu.ontology.phase4a.lookup import lookup_interaction
 
         # Get ontology value before
-        before = lookup_interaction("kha", "O5_DIRECTING")
+        before = lookup_interaction("kha", "O6_AGENCY")
 
         # Run dynamics with regression
         resolve_dynamics(
             varna="kha",
-            start_layer="O5_DIRECTING",
+            start_layer="O6_AGENCY",
             load=0.9,
             time_steps=20,
             decay_constant=0.1,
@@ -262,7 +262,7 @@ class TestRegression:
         )
 
         # Get ontology value after
-        after = lookup_interaction("kha", "O5_DIRECTING")
+        after = lookup_interaction("kha", "O6_AGENCY")
 
         # Ontology should be unchanged
         assert before.distortion_vector == after.distortion_vector
@@ -349,7 +349,7 @@ class TestOntologyIsolation:
         with pytest.raises(Phase5InvalidVarnaError):
             resolve_dynamics(
                 varna="invalid_varna_xyz",
-                start_layer="O1_ACTING",
+                start_layer="O3_EXECUTION",
                 load=0.5,
                 time_steps=10,
                 decay_constant=0.1,
@@ -402,7 +402,7 @@ class TestDeterminism:
         """
         params = {
             "varna": "ka",
-            "start_layer": "O1_ACTING",
+            "start_layer": "O3_EXECUTION",
             "load": 0.5,
             "time_steps": 15,
             "decay_constant": 0.1,
@@ -437,7 +437,7 @@ class TestDeterminism:
         for varna in varnas:
             result1 = resolve_dynamics(
                 varna=varna,
-                start_layer="O3_FORMING",
+                start_layer="O4_STRUCTURE",
                 load=0.6,
                 time_steps=10,
                 decay_constant=0.15,
@@ -447,7 +447,7 @@ class TestDeterminism:
 
             result2 = resolve_dynamics(
                 varna=varna,
-                start_layer="O3_FORMING",
+                start_layer="O4_STRUCTURE",
                 load=0.6,
                 time_steps=10,
                 decay_constant=0.15,
@@ -468,7 +468,7 @@ class TestDeterminism:
         """
         result_low_load = resolve_dynamics(
             varna="ka",
-            start_layer="O1_ACTING",
+            start_layer="O3_EXECUTION",
             load=0.2,
             time_steps=10,
             decay_constant=0.1,
@@ -478,7 +478,7 @@ class TestDeterminism:
 
         result_high_load = resolve_dynamics(
             varna="ka",
-            start_layer="O1_ACTING",
+            start_layer="O3_EXECUTION",
             load=0.8,
             time_steps=10,
             decay_constant=0.1,
@@ -508,7 +508,7 @@ class TestFailureModes:
         with pytest.raises(Phase5InvalidVarnaError) as exc_info:
             resolve_dynamics(
                 varna="nonexistent_varna",
-                start_layer="O1_ACTING",
+                start_layer="O3_EXECUTION",
                 load=0.5,
                 time_steps=10,
                 decay_constant=0.1,
@@ -542,7 +542,7 @@ class TestFailureModes:
         with pytest.raises((Phase5InvalidConfigError, ValueError)):
             resolve_dynamics(
                 varna="ka",
-                start_layer="O1_ACTING",
+                start_layer="O3_EXECUTION",
                 load=1.5,  # Invalid
                 time_steps=10,
                 decay_constant=0.1,
@@ -557,7 +557,7 @@ class TestFailureModes:
         with pytest.raises((Phase5InvalidConfigError, ValueError)):
             resolve_dynamics(
                 varna="ka",
-                start_layer="O1_ACTING",
+                start_layer="O3_EXECUTION",
                 load=0.5,
                 time_steps=0,  # Invalid
                 decay_constant=0.1,
@@ -572,7 +572,7 @@ class TestFailureModes:
         with pytest.raises((Phase5InvalidConfigError, ValueError)):
             resolve_dynamics(
                 varna="ka",
-                start_layer="O1_ACTING",
+                start_layer="O3_EXECUTION",
                 load=0.5,
                 time_steps=10,
                 decay_constant=2.0,  # Invalid
@@ -587,7 +587,7 @@ class TestFailureModes:
         with pytest.raises((Phase5InvalidConfigError, ValueError)):
             resolve_dynamics(
                 varna="ka",
-                start_layer="O1_ACTING",
+                start_layer="O3_EXECUTION",
                 load=0.5,
                 time_steps=10,
                 decay_constant=0.1,
@@ -602,7 +602,7 @@ class TestFailureModes:
         with pytest.raises(Phase5InvalidVarnaError):
             resolve_dynamics(
                 varna="",
-                start_layer="O1_ACTING",
+                start_layer="O3_EXECUTION",
                 load=0.5,
                 time_steps=10,
                 decay_constant=0.1,
@@ -619,7 +619,7 @@ class TestFailureModes:
         with pytest.raises(Phase5InvalidVarnaError):
             resolve_dynamics(
                 varna="zzz",  # Not a Sanskrit varna
-                start_layer="O1_ACTING",
+                start_layer="O3_EXECUTION",
                 load=0.5,
                 time_steps=10,
                 decay_constant=0.1,
@@ -643,7 +643,7 @@ class TestDynamicStateModel:
         """
         state = DynamicState(
             time_step=0,
-            layer_id="O1_ACTING",
+            layer_id="O3_EXECUTION",
             layer_index=1,
             activation_level=0.5,
             momentum=0.0,
@@ -655,7 +655,7 @@ class TestDynamicStateModel:
         )
 
         assert state.time_step == 0
-        assert state.layer_id == "O1_ACTING"
+        assert state.layer_id == "O3_EXECUTION"
         assert state.activation_level == 0.5
 
     def test_invalid_activation_level_fails(self):
@@ -665,7 +665,7 @@ class TestDynamicStateModel:
         with pytest.raises(ValueError):
             DynamicState(
                 time_step=0,
-                layer_id="O1_ACTING",
+                layer_id="O3_EXECUTION",
                 layer_index=1,
                 activation_level=1.5,  # Invalid
                 momentum=0.0,
@@ -683,7 +683,7 @@ class TestDynamicStateModel:
         with pytest.raises(ValueError):
             DynamicState(
                 time_step=0,
-                layer_id="O1_ACTING",
+                layer_id="O3_EXECUTION",
                 layer_index=1,
                 activation_level=0.5,
                 momentum=2.0,  # Invalid
@@ -718,7 +718,7 @@ class TestDynamicStateModel:
         """
         state = DynamicState(
             time_step=0,
-            layer_id="O1_ACTING",
+            layer_id="O3_EXECUTION",
             layer_index=1,
             activation_level=0.5,
             momentum=0.0,
@@ -784,7 +784,7 @@ class TestDynamicsConfig:
 
 class TestO8Handling:
     """
-    Test that O8_META_OBSERVING dampens momentum without altering polarity.
+    Test that O9_WITNESSES dampens momentum without altering polarity.
     """
 
     def test_o8_dampens_momentum(self):
@@ -794,7 +794,7 @@ class TestO8Handling:
         # Start at O7, should pass through O8
         result = resolve_dynamics(
             varna="ga",  # Constructive, likely to move upward
-            start_layer="O7_PURPOSING",
+            start_layer="O8_PURPOSE",
             load=0.2,
             time_steps=15,
             decay_constant=0.05,
@@ -804,7 +804,7 @@ class TestO8Handling:
         )
 
         # Find states at O8
-        o8_states = [s for s in result.trajectory if s.layer_id == "O8_META_OBSERVING"]
+        o8_states = [s for s in result.trajectory if s.layer_id == "O9_WITNESSES"]
 
         # O8 states should exist and show damping effects
         # (momentum magnitude should be lower relative to surrounding layers)
@@ -828,7 +828,7 @@ class TestTermination:
         """
         result = resolve_dynamics(
             varna="ga",
-            start_layer="O9_UNIFYING",
+            start_layer="O10_UNIFYING",
             load=0.1,  # Low load to encourage upward movement
             time_steps=20,
             decay_constant=0.05,
@@ -856,7 +856,7 @@ class TestTermination:
         """
         result = resolve_dynamics(
             varna="ga",
-            start_layer="O9_UNIFYING",
+            start_layer="O10_UNIFYING",
             load=0.1,
             time_steps=30,
             decay_constant=0.05,
@@ -874,7 +874,7 @@ class TestTermination:
 
             if termination_point is not None:
                 for i in range(termination_point, len(result.trajectory)):
-                    assert result.trajectory[i].layer_id == "O10_ABSOLVING", \
+                    assert result.trajectory[i].layer_id == "O12_ABSOLVING", \
                         "Should remain at O10 after termination"
 
 
@@ -893,7 +893,7 @@ class TestSaturation:
         """
         result = resolve_dynamics(
             varna="ga",
-            start_layer="O8_META_OBSERVING",
+            start_layer="O9_WITNESSES",
             load=0.1,
             time_steps=20,
             decay_constant=0.02,  # Low decay
@@ -930,7 +930,7 @@ class TestTrajectoryResult:
         """
         result = resolve_dynamics(
             varna="ka",
-            start_layer="O1_ACTING",
+            start_layer="O3_EXECUTION",
             load=0.0,  # Zero load
             time_steps=5,
             decay_constant=0.5,  # High decay
@@ -948,7 +948,7 @@ class TestTrajectoryResult:
         """
         result = resolve_dynamics(
             varna="ga",
-            start_layer="O1_ACTING",
+            start_layer="O3_EXECUTION",
             load=0.2,
             time_steps=20,
             decay_constant=0.1,
@@ -970,7 +970,7 @@ class TestTrajectoryResult:
         """
         result = resolve_dynamics(
             varna="ka",
-            start_layer="O1_ACTING",
+            start_layer="O3_EXECUTION",
             load=0.5,
             time_steps=5,
             decay_constant=0.1,
@@ -982,6 +982,6 @@ class TestTrajectoryResult:
 
         assert isinstance(result_dict, dict)
         assert result_dict["varna"] == "ka"
-        assert result_dict["start_layer"] == "O1_ACTING"
+        assert result_dict["start_layer"] == "O3_EXECUTION"
         assert isinstance(result_dict["trajectory"], list)
         assert len(result_dict["trajectory"]) == 5

@@ -6,7 +6,7 @@ Computes ontological vectors from phonemes and measures resonance
 between words and phrases.
 
 Key concepts:
-- WordVector: 10D ontological projection of a word
+- WordVector: 12D ontological projection of a word
 - Resonance: Cosine similarity between word vectors
 - Phrase Harmony: Aggregate resonance across word pairs
 """
@@ -46,10 +46,10 @@ POSITION_WEIGHTS = (1.5, 1.25, 1.0)
 
 def word_to_vector(word: str, phonemes: Tuple[str, ...]) -> WordVector:
     """
-    Convert a word (with its phonemes) to a 10D ontological vector.
+    Convert a word (with its phonemes) to a 12D ontological vector.
 
     Algorithm:
-    1. For each phoneme, get its 10D layer affinities
+    1. For each phoneme, get its 12D layer affinities
     2. Apply position weights (front phonemes matter more)
     3. Sum weighted affinities
     4. Normalize to unit vector
@@ -59,11 +59,11 @@ def word_to_vector(word: str, phonemes: Tuple[str, ...]) -> WordVector:
         phonemes: ARPABET phoneme sequence (e.g., ("S", "K", "AY"))
 
     Returns:
-        WordVector with normalized 10D projection
+        WordVector with normalized 12D projection
     """
     if not phonemes:
         # Return zero vector for empty input
-        zero_vec = tuple(0.0 for _ in range(10))
+        zero_vec = tuple(0.0 for _ in range(12))
         return WordVector(
             word=word,
             phonemes=phonemes,
@@ -74,7 +74,7 @@ def word_to_vector(word: str, phonemes: Tuple[str, ...]) -> WordVector:
         )
 
     # Accumulate weighted affinities
-    accumulated = [0.0] * 10
+    accumulated = [0.0] * 12
     trajectory = []
 
     for i, phoneme in enumerate(phonemes):
@@ -92,7 +92,7 @@ def word_to_vector(word: str, phonemes: Tuple[str, ...]) -> WordVector:
             weight = POSITION_WEIGHTS[-1]
 
         # Add weighted affinities
-        for j in range(10):
+        for j in range(12):
             accumulated[j] += affinities[j] * weight
 
         # Track trajectory (magnitude at this position)
@@ -104,12 +104,12 @@ def word_to_vector(word: str, phonemes: Tuple[str, ...]) -> WordVector:
     if total_magnitude > 0:
         normalized = tuple(v / total_magnitude for v in accumulated)
     else:
-        normalized = tuple(0.0 for _ in range(10))
+        normalized = tuple(0.0 for _ in range(12))
 
     # Find dominant layer
     max_idx = 0
     max_val = normalized[0]
-    for i in range(1, 10):
+    for i in range(1, 12):
         if normalized[i] > max_val:
             max_val = normalized[i]
             max_idx = i
@@ -154,7 +154,7 @@ def compute_resonance(vec_a: WordVector, vec_b: WordVector) -> ResonanceResult:
     conflicting = []
     high_threshold = 0.3  # Dimension is "active" if above this
 
-    for i in range(10):
+    for i in range(12):
         a_val = vec_a.vector[i]
         b_val = vec_b.vector[i]
 
@@ -286,19 +286,19 @@ def analyze_phrase_vectors(
     overall_harmony = sum(similarities) / len(similarities)
 
     # Dissonance = variance in vectors (conflict)
-    mean_vec = [0.0] * 10
+    mean_vec = [0.0] * 12
     for wv in word_vectors:
-        for i in range(10):
+        for i in range(12):
             mean_vec[i] += wv.vector[i]
     mean_vec = [v / len(word_vectors) for v in mean_vec]
 
     # Compute variance from mean
     variance = 0.0
     for wv in word_vectors:
-        for i in range(10):
+        for i in range(12):
             diff = wv.vector[i] - mean_vec[i]
             variance += diff * diff
-    overall_dissonance = variance / (len(word_vectors) * 10)
+    overall_dissonance = variance / (len(word_vectors) * 12)
 
     # Prediction
     if overall_harmony >= HARMONY_THRESHOLD:

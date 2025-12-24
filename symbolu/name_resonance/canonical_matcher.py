@@ -149,15 +149,16 @@ class CanonicalMatchResult:
 # =============================================================================
 
 LAYER_ORDER = {
-    "O1_THINKING": 0, "O2_FORMING": 1, "O3_ACTING": 2, "O4_TAGGING": 3,
-    "O5_DIRECTING": 4, "O6_REASONING": 5, "O7_PURPOSING": 6,
-    "O8_META_OBSERVING": 7, "O9_UNIFYING": 8, "O10_ABSOLVING": 9,
+    "O1_POTENTIAL": 0, "O2_IDENTITY": 1, "O3_EXECUTION": 2, "O4_STRUCTURE": 3,
+    "O5_COGNITION": 4, "O6_AGENCY": 5, "O7_REASONING": 6, "O8_PURPOSE": 7,
+    "O9_WITNESSES": 8, "O10_UNIFYING": 9, "O11_INTEGRATION": 10, "O12_ABSOLVING": 11,
 }
 
 LAYER_COMPATIBILITY: Dict[int, Tuple[int, ...]] = {
-    0: (0, 1, 2, 3), 1: (0, 1, 2, 3, 4), 2: (1, 2, 3, 4, 5),
-    3: (2, 3, 4, 5, 6), 4: (3, 4, 5, 6, 7), 5: (4, 5, 6, 7, 8),
-    6: (5, 6, 7, 8, 9), 7: (6, 7, 8, 9), 8: (7, 8, 9), 9: (7, 8, 9),
+    0: (0, 1, 2, 3, 4), 1: (0, 1, 2, 3, 4, 5), 2: (1, 2, 3, 4, 5, 6),
+    3: (2, 3, 4, 5, 6, 7), 4: (3, 4, 5, 6, 7, 8), 5: (4, 5, 6, 7, 8, 9),
+    6: (5, 6, 7, 8, 9, 10), 7: (6, 7, 8, 9, 10, 11), 8: (7, 8, 9, 10, 11),
+    9: (8, 9, 10, 11), 10: (9, 10, 11), 11: (9, 10, 11),
 }
 
 VIOLATION_WEIGHTS = {
@@ -217,8 +218,8 @@ def compute_constraint_feasibility(word_a: str, word_b: str) -> ConstraintAnalys
         ))
 
     # Check dominance pattern
-    top_3_a = sorted(range(10), key=lambda i: vec_a[i], reverse=True)[:3]
-    top_3_b = sorted(range(10), key=lambda i: vec_b[i], reverse=True)[:3]
+    top_3_a = sorted(range(12), key=lambda i: vec_a[i], reverse=True)[:3]
+    top_3_b = sorted(range(12), key=lambda i: vec_b[i], reverse=True)[:3]
     overlap = len(set(top_3_a) & set(top_3_b))
 
     if overlap == 0:

@@ -15,8 +15,8 @@ Schema:
                 "expansion": "issue tracking system",
                 "phonemes": ["JH", "IH", "R", "AH"],  # Optional
                 "layer_affinities": {                  # Optional
-                    "O3_ACTING": 0.8,
-                    "O6_REASONING": 0.6
+                    "O3_EXECUTION": 0.8,
+                    "O7_REASONING": 0.6
                 },
                 "intent": "action",                    # Optional override
                 "synonyms": ["ticket", "issue"]        # Optional
@@ -64,10 +64,10 @@ class CustomTerm:
 
     def get_layer_vector(self) -> Optional[Tuple[float, ...]]:
         """
-        Convert layer affinities to a 10D vector.
+        Convert layer affinities to a 12D vector.
 
         Returns:
-            Tuple of 10 floats, or None if no affinities defined
+            Tuple of 12 floats, or None if no affinities defined
         """
         if not self.layer_affinities:
             return None
@@ -245,7 +245,7 @@ TECH_VOCABULARY_TEMPLATE = {
             "term": "API",
             "expansion": "application programming interface",
             "intent": "action",
-            "layer_affinities": {"O3_ACTING": 0.7, "O6_REASONING": 0.6},
+            "layer_affinities": {"O3_EXECUTION": 0.7, "O7_REASONING": 0.6},
             "synonyms": ["endpoint", "interface"],
             "category": "development",
         },
@@ -253,7 +253,7 @@ TECH_VOCABULARY_TEMPLATE = {
             "term": "K8s",
             "expansion": "Kubernetes container orchestration",
             "intent": "action",
-            "layer_affinities": {"O3_ACTING": 0.8, "O5_DIRECTING": 0.5},
+            "layer_affinities": {"O3_EXECUTION": 0.8, "O6_AGENCY": 0.5},
             "synonyms": ["kubernetes", "kube"],
             "category": "infrastructure",
         },
@@ -261,7 +261,7 @@ TECH_VOCABULARY_TEMPLATE = {
             "term": "CI/CD",
             "expansion": "continuous integration and deployment",
             "intent": "action",
-            "layer_affinities": {"O3_ACTING": 0.9, "O5_DIRECTING": 0.4},
+            "layer_affinities": {"O3_EXECUTION": 0.9, "O6_AGENCY": 0.4},
             "synonyms": ["pipeline", "cicd"],
             "category": "development",
         },
@@ -269,7 +269,7 @@ TECH_VOCABULARY_TEMPLATE = {
             "term": "PR",
             "expansion": "pull request code review",
             "intent": "action",
-            "layer_affinities": {"O3_ACTING": 0.6, "O6_REASONING": 0.7},
+            "layer_affinities": {"O3_EXECUTION": 0.6, "O7_REASONING": 0.7},
             "synonyms": ["pull request", "merge request", "MR"],
             "category": "development",
         },
@@ -277,7 +277,7 @@ TECH_VOCABULARY_TEMPLATE = {
             "term": "SLA",
             "expansion": "service level agreement",
             "intent": "reasoning",
-            "layer_affinities": {"O6_REASONING": 0.7, "O5_DIRECTING": 0.5},
+            "layer_affinities": {"O7_REASONING": 0.7, "O6_AGENCY": 0.5},
             "category": "operations",
         },
     ],
@@ -291,14 +291,14 @@ FINANCE_VOCABULARY_TEMPLATE = {
             "term": "ROI",
             "expansion": "return on investment",
             "intent": "reasoning",
-            "layer_affinities": {"O6_REASONING": 0.8, "O7_PURPOSING": 0.5},
+            "layer_affinities": {"O7_REASONING": 0.8, "O8_PURPOSE": 0.5},
             "category": "metrics",
         },
         {
             "term": "KPI",
             "expansion": "key performance indicator",
             "intent": "reasoning",
-            "layer_affinities": {"O6_REASONING": 0.7, "O5_DIRECTING": 0.6},
+            "layer_affinities": {"O7_REASONING": 0.7, "O6_AGENCY": 0.6},
             "synonyms": ["metric", "indicator"],
             "category": "metrics",
         },
@@ -306,7 +306,7 @@ FINANCE_VOCABULARY_TEMPLATE = {
             "term": "P&L",
             "expansion": "profit and loss statement",
             "intent": "reasoning",
-            "layer_affinities": {"O6_REASONING": 0.8, "O4_TAGGING": 0.4},
+            "layer_affinities": {"O7_REASONING": 0.8, "O4_TAGGING": 0.4},
             "synonyms": ["income statement", "PnL"],
             "category": "accounting",
         },
@@ -314,7 +314,7 @@ FINANCE_VOCABULARY_TEMPLATE = {
             "term": "EBITDA",
             "expansion": "earnings before interest taxes depreciation amortization",
             "intent": "reasoning",
-            "layer_affinities": {"O6_REASONING": 0.9},
+            "layer_affinities": {"O7_REASONING": 0.9},
             "category": "accounting",
         },
     ],
@@ -328,14 +328,14 @@ HEALTHCARE_VOCABULARY_TEMPLATE = {
             "term": "HIPAA",
             "expansion": "health insurance portability accountability act",
             "intent": "reasoning",
-            "layer_affinities": {"O6_REASONING": 0.6, "O5_DIRECTING": 0.7},
+            "layer_affinities": {"O7_REASONING": 0.6, "O6_AGENCY": 0.7},
             "category": "compliance",
         },
         {
             "term": "EMR",
             "expansion": "electronic medical record",
             "intent": "action",
-            "layer_affinities": {"O3_ACTING": 0.6, "O4_TAGGING": 0.7},
+            "layer_affinities": {"O3_EXECUTION": 0.6, "O4_TAGGING": 0.7},
             "synonyms": ["EHR", "medical record"],
             "category": "systems",
         },
@@ -343,7 +343,7 @@ HEALTHCARE_VOCABULARY_TEMPLATE = {
             "term": "PHI",
             "expansion": "protected health information",
             "intent": "reasoning",
-            "layer_affinities": {"O6_REASONING": 0.5, "O5_DIRECTING": 0.6},
+            "layer_affinities": {"O7_REASONING": 0.5, "O6_AGENCY": 0.6},
             "category": "compliance",
         },
     ],

@@ -77,7 +77,7 @@ STL explicitly disclaims LLM-like behavior:
 
 **Location:** `symbolu/resonance/engine.py`
 
-**Function:** Converts words to 10-dimensional ontological vectors based on phoneme structure.
+**Function:** Converts words to 12-dimensional ontological vectors based on phoneme structure.
 
 **LLM-like?** NO
 
@@ -114,9 +114,9 @@ DISSONANCE_THRESHOLD = 0.3          # Fixed threshold
 ```python
 # Explicit layer-to-model mapping (not learned)
 LAYER_TO_MODEL: Dict[str, ModelType] = {
-    "O1_THINKING": ModelType.REFLECTIVE,
-    "O2_FORMING": ModelType.CREATIVE,
-    "O3_ACTING": ModelType.ACTION,
+    "O5_COGNITION": ModelType.REFLECTIVE,
+    "O4_STRUCTURE": ModelType.CREATIVE,
+    "O3_EXECUTION": ModelType.ACTION,
     ...
 }
 ```
@@ -254,7 +254,7 @@ While not an LLM, STL provides some capabilities that superficially resemble LLM
 - Similar to: LLM intent classification
 
 ### 2. Semantic Similarity
-- Computes resonance between words/phrases using 10D vectors
+- Computes resonance between words/phrases using 12D vectors
 - Similar to: LLM embedding similarity
 
 ### 3. Candidate Filtering

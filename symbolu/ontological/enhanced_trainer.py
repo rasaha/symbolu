@@ -77,7 +77,7 @@ def create_curated_dataset() -> List[Dict[str, Any]]:
     for text in reasoning_texts:
         dataset.append({
             "text": text,
-            "onto_labels": {"O6_REASONING": 0.9, "O1_THINKING": 0.6, "O2_FORMING": -0.3},
+            "onto_labels": {"O7_REASONING": 0.9, "O5_COGNITION": 0.6, "O4_STRUCTURE": -0.3},
             "is_reasoning": True,
             "is_creativity": False,
             "reasoning_score": 0.9,
@@ -107,7 +107,7 @@ def create_curated_dataset() -> List[Dict[str, Any]]:
     for text in creative_texts:
         dataset.append({
             "text": text,
-            "onto_labels": {"O2_FORMING": 0.9, "O9_UNIFYING": 0.6, "O6_REASONING": -0.3},
+            "onto_labels": {"O4_STRUCTURE": 0.9, "O10_UNIFYING": 0.6, "O7_REASONING": -0.3},
             "is_reasoning": False,
             "is_creativity": True,
             "reasoning_score": 0.2,
@@ -132,7 +132,7 @@ def create_curated_dataset() -> List[Dict[str, Any]]:
     for text in technical_texts:
         dataset.append({
             "text": text,
-            "onto_labels": {"O6_REASONING": 0.7, "O3_ACTING": 0.7, "O5_DIRECTING": 0.5},
+            "onto_labels": {"O7_REASONING": 0.7, "O3_EXECUTION": 0.7, "O6_AGENCY": 0.5},
             "is_reasoning": True,
             "is_creativity": False,
             "reasoning_score": 0.7,
@@ -157,7 +157,7 @@ def create_curated_dataset() -> List[Dict[str, Any]]:
     for text in action_texts:
         dataset.append({
             "text": text,
-            "onto_labels": {"O3_ACTING": 0.9, "O5_DIRECTING": 0.7, "O6_REASONING": 0.3},
+            "onto_labels": {"O3_EXECUTION": 0.9, "O6_AGENCY": 0.7, "O7_REASONING": 0.3},
             "is_reasoning": False,
             "is_creativity": False,
             "reasoning_score": 0.4,
@@ -182,7 +182,7 @@ def create_curated_dataset() -> List[Dict[str, Any]]:
     for text in governance_texts:
         dataset.append({
             "text": text,
-            "onto_labels": {"O7_PURPOSING": 0.8, "O8_META_OBSERVING": 0.7, "O6_REASONING": 0.5},
+            "onto_labels": {"O8_PURPOSE": 0.8, "O9_WITNESSES": 0.7, "O7_REASONING": 0.5},
             "is_reasoning": True,
             "is_creativity": False,
             "reasoning_score": 0.6,

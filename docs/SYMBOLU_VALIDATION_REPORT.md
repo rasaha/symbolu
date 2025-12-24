@@ -468,7 +468,7 @@ The following benchmarks are recommended for full production validation:
 ## Appendix B: STL Technical Specification
 
 See `/docs/SYMBOLU_ENGINE_ARCHITECTURE.md` for:
-- 10D ontological layer definitions
+- 12D ontological layer definitions
 - Phoneme-to-vector mapping
 - Confidence calculation
 - Keyword pattern boosting

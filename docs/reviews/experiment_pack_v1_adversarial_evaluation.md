@@ -44,8 +44,8 @@ The experiment validates internal consistency, not external truth. A system that
 The `BRIDGE_MEANING_TO_LAYER` mapping was designed by a human who understood what the bridge_meanings *mean*:
 
 ```python
-"hope_pressure": OntologicalLayer.O7_PURPOSING,  # Hope → Purpose
-"fear_pressure": OntologicalLayer.O8_META_OBSERVING,  # Fear → Observation
+"hope_pressure": OntologicalLayer.O8_PURPOSE,  # Hope → Purpose
+"fear_pressure": OntologicalLayer.O9_WITNESSES,  # Fear → Observation
 ```
 
 This mapping encodes semantic intuitions about what "hope" and "fear" should route to. The bridge_meanings themselves are semantically loaded labels from the varna tradition.
@@ -168,7 +168,7 @@ All produce equivalent accumulator dynamics. The 10-layer structure is not uniqu
 
 ## Question 8: Ontology Commitment Question
 
-**Question:** Is the success of the model evidence for the truth of the 10 ontological layers, or only for internal consistency?
+**Question:** Is the success of the model evidence for the truth of the 12 ontological layers, or only for internal consistency?
 
 **Answer:** **Only internal consistency.**
 
@@ -178,8 +178,8 @@ The experiment shows:
 - Ablating meanings degrades agreement
 
 None of this addresses:
-- Are there really 10 ontological layers in language/mind/reality?
-- Is O1_THINKING a "natural kind" or a convenient label?
+- Are there really 12 ontological layers in language/mind/reality?
+- Is O5_COGNITION a "natural kind" or a convenient label?
 - Would 7 layers work? 15 layers? A continuous space?
 
 The model assumes the ontology; it does not discover or validate it. Success means "the ontology is usable," not "the ontology is true."

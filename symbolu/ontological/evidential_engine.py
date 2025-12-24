@@ -39,7 +39,7 @@ if PYTORCH_AVAILABLE:
         Uncertainty is computed from lack of total evidence.
         """
 
-        def __init__(self, input_dim: int, num_classes: int = 10):
+        def __init__(self, input_dim: int, num_classes: int = 12):
             super().__init__()
             self.num_classes = num_classes
             self.fc = nn.Linear(input_dim, num_classes)
@@ -91,7 +91,7 @@ if PYTORCH_AVAILABLE:
             engine = EvidentialOntologicalEngine()
             result = engine.analyze("What is truth?")
 
-            print(result["dominant_layer"])  # O1_THINKING
+            print(result["dominant_layer"])  # O1_POTENTIAL
             print(result["confidence"])      # 0.85 (high confidence)
             print(result["uncertainty"])     # 0.15 (low uncertainty)
         """

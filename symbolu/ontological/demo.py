@@ -213,7 +213,7 @@ def demo_comparison():
         task_scores = task_head.forward(list(onto_vec.values))
 
         print(f"\n{label} Analysis:")
-        print(f"  O6_REASONING: {onto_vec.values[5]:+.3f}")
+        print(f"  O7_REASONING: {onto_vec.values[5]:+.3f}")
         print(f"  O2_FORMING:   {onto_vec.values[1]:+.3f}")
         print(f"  Task Reasoning Score:  {task_scores['reasoning_score']:.3f}")
         print(f"  Task Creativity Score: {task_scores['creativity_score']:.3f}")

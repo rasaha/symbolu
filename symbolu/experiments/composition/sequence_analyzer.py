@@ -37,7 +37,7 @@ from symbolu.ontology.phase4a.loader import get_all_varnas
 EXPERIMENT_VOWELS = frozenset({"a", "i", "u", "e", "o", "ai", "au"})
 
 # The ontological layer used for pressure initialization
-FORMING_LAYER = "O3_FORMING"
+FORMING_LAYER = "O4_STRUCTURE"
 
 # Vector mapping from ontology distortion_vector values
 # These are the known values from the frozen ontology
@@ -161,7 +161,7 @@ class SequenceAnalyzer:
     EXPERIMENTAL - This class exists solely to test positional non-commutativity.
 
     Rules:
-        - Consonants initialize/reassert pressure using O3_FORMING ontology data
+        - Consonants initialize/reassert pressure using O4_STRUCTURE ontology data
         - Vowels modulate existing pressure (magnitude and/or vector)
         - Vowels cannot introduce new pressure by themselves
         - State is tracked across the entire sequence
@@ -206,7 +206,7 @@ class SequenceAnalyzer:
 
     def _get_consonant_vector(self, token: str) -> str:
         """
-        Get the pressure vector for a consonant from O3_FORMING layer.
+        Get the pressure vector for a consonant from O4_STRUCTURE layer.
 
         Args:
             token: The consonant token

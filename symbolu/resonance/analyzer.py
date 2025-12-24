@@ -299,7 +299,7 @@ def analyze_word(word: str) -> WordVector:
 
     Example:
         >>> vec = analyze_word("love")
-        >>> print(vec.dominant_layer)  # e.g., "O9_UNIFYING"
+        >>> print(vec.dominant_layer)  # e.g., "O10_UNIFYING"
     """
     phonemes = get_phonemes(word)
     return word_to_vector(word, phonemes)
@@ -633,8 +633,8 @@ def compare_arpabet_vs_varna(word: str) -> str:
 
     # Compare each layer
     layer_names = [
-        "O1_ACTING", "O2_TAGGING", "O3_FORMING", "O4_THINKING", "O5_DIRECTING",
-        "O6_REASONING", "O7_PURPOSING", "O8_META_OBSERVING", "O9_UNIFYING", "O10_ABSOLVING"
+        "O3_EXECUTION", "O2_IDENTITY", "O4_STRUCTURE", "O5_COGNITION", "O6_AGENCY",
+        "O7_REASONING", "O8_PURPOSE", "O9_WITNESSES", "O10_UNIFYING", "O12_ABSOLVING"
     ]
 
     for i, layer in enumerate(layer_names):

@@ -20,16 +20,16 @@ Architecture:
     4. Confidence scoring
 
 Ontological Layers:
-    O1_THINKING   - Cognitive verbs, mental states
-    O2_FORMING    - Creation, shaping verbs
-    O3_ACTING     - Physical action verbs
+    O5_COGNITION   - Cognitive verbs, mental states
+    O4_STRUCTURE    - Creation, shaping verbs
+    O3_EXECUTION     - Physical action verbs
     O4_TAGGING    - Labeling, categorizing words
-    O5_DIRECTING  - Commands, guidance words
-    O6_REASONING  - Causal connectors, logical words
-    O7_PURPOSING  - Goal, intention words
-    O8_META_OBSERVING - Observation, meta-reflection
-    O9_UNIFYING   - Synthesis, integration words
-    O10_ABSOLVING - Release, resolution words
+    O6_AGENCY  - Commands, guidance words
+    O7_REASONING  - Causal connectors, logical words
+    O8_PURPOSE  - Goal, intention words
+    O9_WITNESSES - Observation, meta-reflection
+    O10_UNIFYING   - Synthesis, integration words
+    O12_ABSOLVING - Release, resolution words
 """
 
 EXPERIMENT_ONLY = True
@@ -252,19 +252,19 @@ def get_pos(word: str) -> SimplePOS:
 
 # Primary layer assignment by POS
 POS_TO_LAYER: Dict[SimplePOS, OntologicalLayer] = {
-    SimplePOS.VERB_COGNITIVE: OntologicalLayer.O1_THINKING,
-    SimplePOS.VERB_CREATION: OntologicalLayer.O2_FORMING,
-    SimplePOS.VERB_ACTION: OntologicalLayer.O3_ACTING,
-    SimplePOS.VERB_STATE: OntologicalLayer.O3_ACTING,  # Default to acting
-    SimplePOS.VERB_MODAL: OntologicalLayer.O5_DIRECTING,
-    SimplePOS.NOUN_ABSTRACT: OntologicalLayer.O1_THINKING,
+    SimplePOS.VERB_COGNITIVE: OntologicalLayer.O5_COGNITION,
+    SimplePOS.VERB_CREATION: OntologicalLayer.O4_STRUCTURE,
+    SimplePOS.VERB_ACTION: OntologicalLayer.O3_EXECUTION,
+    SimplePOS.VERB_STATE: OntologicalLayer.O3_EXECUTION,  # Default to acting
+    SimplePOS.VERB_MODAL: OntologicalLayer.O6_AGENCY,
+    SimplePOS.NOUN_ABSTRACT: OntologicalLayer.O5_COGNITION,
     SimplePOS.NOUN_CONCRETE: OntologicalLayer.O4_TAGGING,
     SimplePOS.NOUN_PERSON: OntologicalLayer.O4_TAGGING,
     SimplePOS.ADJECTIVE: OntologicalLayer.O4_TAGGING,
-    SimplePOS.ADVERB: OntologicalLayer.O5_DIRECTING,
-    SimplePOS.CONNECTOR: OntologicalLayer.O6_REASONING,
+    SimplePOS.ADVERB: OntologicalLayer.O6_AGENCY,
+    SimplePOS.CONNECTOR: OntologicalLayer.O7_REASONING,
     SimplePOS.DETERMINER: OntologicalLayer.O4_TAGGING,
-    SimplePOS.PREPOSITION: OntologicalLayer.O6_REASONING,
+    SimplePOS.PREPOSITION: OntologicalLayer.O7_REASONING,
     SimplePOS.PRONOUN: OntologicalLayer.O4_TAGGING,
     SimplePOS.UNKNOWN: OntologicalLayer.O4_TAGGING,  # Default
 }
@@ -272,14 +272,14 @@ POS_TO_LAYER: Dict[SimplePOS, OntologicalLayer] = {
 
 # Override lexicons for specific layers
 LAYER_OVERRIDE_LEXICON: Dict[OntologicalLayer, FrozenSet[str]] = {
-    OntologicalLayer.O5_DIRECTING: frozenset([
+    OntologicalLayer.O6_AGENCY: frozenset([
         "should", "must", "need", "require", "demand", "command", "order",
         "direct", "guide", "lead", "instruct", "tell", "ask", "request",
         "suggest", "recommend", "advise", "urge", "encourage", "persuade",
         "convince", "compel", "force", "allow", "permit", "let", "forbid",
         "prohibit", "prevent", "stop", "enable", "empower", "authorize",
     ]),
-    OntologicalLayer.O6_REASONING: frozenset([
+    OntologicalLayer.O7_REASONING: frozenset([
         "because", "since", "therefore", "thus", "hence", "consequently",
         "accordingly", "so", "if", "then", "unless", "although", "though",
         "whereas", "while", "however", "nevertheless", "nonetheless",
@@ -288,14 +288,14 @@ LAYER_OVERRIDE_LEXICON: Dict[OntologicalLayer, FrozenSet[str]] = {
         "infer", "deduce", "conclude", "analyze", "evaluate", "compare",
         "contrast", "distinguish", "differentiate", "correlate", "relate",
     ]),
-    OntologicalLayer.O7_PURPOSING: frozenset([
+    OntologicalLayer.O8_PURPOSE: frozenset([
         "aim", "goal", "purpose", "objective", "target", "intention",
         "intent", "plan", "strategy", "mission", "vision", "aspiration",
         "ambition", "desire", "want", "wish", "hope", "expect", "anticipate",
         "intend", "mean", "design", "destine", "seek", "pursue", "strive",
         "endeavor", "attempt", "try", "aspire", "yearn", "long",
     ]),
-    OntologicalLayer.O8_META_OBSERVING: frozenset([
+    OntologicalLayer.O9_WITNESSES: frozenset([
         "observe", "watch", "notice", "see", "perceive", "witness",
         "monitor", "track", "follow", "survey", "examine", "inspect",
         "scrutinize", "study", "analyze", "investigate", "explore",
@@ -303,14 +303,14 @@ LAYER_OVERRIDE_LEXICON: Dict[OntologicalLayer, FrozenSet[str]] = {
         "note", "remark", "comment", "reflect", "contemplate", "consider",
         "meta", "self", "aware", "conscious", "mindful", "introspect",
     ]),
-    OntologicalLayer.O9_UNIFYING: frozenset([
+    OntologicalLayer.O10_UNIFYING: frozenset([
         "unify", "unite", "combine", "merge", "integrate", "synthesize",
         "consolidate", "harmonize", "reconcile", "bridge", "connect",
         "link", "join", "bind", "tie", "gather", "collect", "assemble",
         "aggregate", "accumulate", "converge", "coalesce", "fuse", "blend",
         "mix", "mingle", "whole", "complete", "total", "all", "together",
     ]),
-    OntologicalLayer.O10_ABSOLVING: frozenset([
+    OntologicalLayer.O12_ABSOLVING: frozenset([
         "absolve", "forgive", "pardon", "excuse", "release", "free",
         "liberate", "emancipate", "discharge", "acquit", "exonerate",
         "clear", "vindicate", "resolve", "settle", "conclude", "finish",
@@ -365,22 +365,22 @@ class ContextHint:
 
 # Context patterns that suggest specific layers
 CONTEXT_PATTERNS: Dict[str, OntologicalLayer] = {
-    # Question patterns → O1_THINKING
-    "why": OntologicalLayer.O1_THINKING,
-    "how": OntologicalLayer.O1_THINKING,
-    "what if": OntologicalLayer.O1_THINKING,
-    # Command patterns → O5_DIRECTING
-    "please": OntologicalLayer.O5_DIRECTING,
-    "you should": OntologicalLayer.O5_DIRECTING,
-    "you must": OntologicalLayer.O5_DIRECTING,
-    # Causal patterns → O6_REASONING
-    "because of": OntologicalLayer.O6_REASONING,
-    "due to": OntologicalLayer.O6_REASONING,
-    "as a result": OntologicalLayer.O6_REASONING,
-    # Purpose patterns → O7_PURPOSING
-    "in order to": OntologicalLayer.O7_PURPOSING,
-    "so that": OntologicalLayer.O7_PURPOSING,
-    "for the purpose": OntologicalLayer.O7_PURPOSING,
+    # Question patterns → O5_COGNITION
+    "why": OntologicalLayer.O5_COGNITION,
+    "how": OntologicalLayer.O5_COGNITION,
+    "what if": OntologicalLayer.O5_COGNITION,
+    # Command patterns → O6_AGENCY
+    "please": OntologicalLayer.O6_AGENCY,
+    "you should": OntologicalLayer.O6_AGENCY,
+    "you must": OntologicalLayer.O6_AGENCY,
+    # Causal patterns → O7_REASONING
+    "because of": OntologicalLayer.O7_REASONING,
+    "due to": OntologicalLayer.O7_REASONING,
+    "as a result": OntologicalLayer.O7_REASONING,
+    # Purpose patterns → O8_PURPOSE
+    "in order to": OntologicalLayer.O8_PURPOSE,
+    "so that": OntologicalLayer.O8_PURPOSE,
+    "for the purpose": OntologicalLayer.O8_PURPOSE,
 }
 
 
@@ -405,14 +405,14 @@ def apply_context_adjustment(
 
     # Imperative sentences boost DIRECTING
     if context.sentence_type == "imperative":
-        if base_layer == OntologicalLayer.O3_ACTING:
-            return OntologicalLayer.O5_DIRECTING, 0.85
+        if base_layer == OntologicalLayer.O3_EXECUTION:
+            return OntologicalLayer.O6_AGENCY, 0.85
 
     # Scientific domain boosts certain layers
     if context.domain == "scientific":
-        if base_layer == OntologicalLayer.O3_ACTING:
+        if base_layer == OntologicalLayer.O3_EXECUTION:
             # Scientific actions often involve reasoning
-            return OntologicalLayer.O6_REASONING, 0.8
+            return OntologicalLayer.O7_REASONING, 0.8
 
     return base_layer, 1.0
 

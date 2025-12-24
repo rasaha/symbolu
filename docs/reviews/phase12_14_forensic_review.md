@@ -68,7 +68,7 @@
 | `K1Store` | Class | Storage with composite indices |
 | `K1Slot` | Enum | 17 typed slots across 4 tiers |
 | `DiscourseAct` | Enum | 14 structural discourse acts |
-| `OntologicalLayer` | Enum | 10 ontological layers (O1-O10) |
+| `OntologicalLayer` | Enum | 12 ontological layers (O1-O10) |
 | `LedgerEntry` | Dataclass | Audit trail entry |
 | `RetrievalStep` | Dataclass | Replay proof step |
 
@@ -791,7 +791,7 @@ The implementation is inverted from the hypothesis: **meaning (via POS) determin
 
 4. **K1 Slot-Tier Assignment (Phase-14)**
    - `_get_slot_for_layer()` mapping is hardcoded with no documented rationale
-   - Example: Why does O3_ACTING map to CAUSE but O2_FORMING maps to TARGET?
+   - Example: Why does O3_EXECUTION map to CAUSE but O4_STRUCTURE maps to TARGET?
 
 ### 5.3 Surprisingly Solid Components
 

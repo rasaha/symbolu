@@ -13,12 +13,12 @@ Key properties of S for name↔domain:
 - Deterministic: Same name + domain → same S score
 
 This module defines:
-1. Semantic traits (derived from 10D ontological layers)
+1. Semantic traits (derived from 12D ontological layers)
 2. Domain semantic profiles (what each career requires)
 3. S computation (name's inferred traits vs domain's required traits)
 
 The C×R×S formula for name↔domain:
-- C = Ontological constraint (phonemic → 10D layers alignment)
+- C = Ontological constraint (phonemic → 12D layers alignment)
 - R = Structural realization (phonemic → 12D profile match)
 - S = Semantic type coherence (inferred traits vs required traits)
 
@@ -77,52 +77,62 @@ class SemanticTrait(Enum):
 
 # Which semantic traits each ontological layer contributes to
 LAYER_TO_TRAITS: Dict[str, Tuple[Tuple[SemanticTrait, float], ...]] = {
-    "O1_THINKING": (
+    "O1_POTENTIAL": (
         (SemanticTrait.CONTEMPLATIVE, 0.9),
-        (SemanticTrait.ANALYTICAL, 0.5),
-        (SemanticTrait.SUSTAINED, 0.6),
-    ),
-    "O2_FORMING": (
-        (SemanticTrait.CREATIVE, 0.9),
-        (SemanticTrait.PURPOSEFUL, 0.6),
+        (SemanticTrait.SUSTAINED, 0.7),
         (SemanticTrait.BALANCED, 0.5),
     ),
-    "O3_ACTING": (
+    "O2_IDENTITY": (
+        (SemanticTrait.INTUITIVE, 0.8),
+        (SemanticTrait.ANALYTICAL, 0.5),
+        (SemanticTrait.BALANCED, 0.4),
+    ),
+    "O3_EXECUTION": (
         (SemanticTrait.DYNAMIC, 0.9),
         (SemanticTrait.EXPLOSIVE, 0.7),
         (SemanticTrait.DIRECTIVE, 0.4),
     ),
-    "O4_TAGGING": (
-        (SemanticTrait.INTUITIVE, 0.9),
-        (SemanticTrait.OBSERVANT, 0.5),
-        (SemanticTrait.ANALYTICAL, 0.4),
+    "O4_STRUCTURE": (
+        (SemanticTrait.CREATIVE, 0.9),
+        (SemanticTrait.PURPOSEFUL, 0.6),
+        (SemanticTrait.BALANCED, 0.5),
     ),
-    "O5_DIRECTING": (
+    "O5_COGNITION": (
+        (SemanticTrait.CONTEMPLATIVE, 0.8),
+        (SemanticTrait.OBSERVANT, 0.7),
+        (SemanticTrait.ANALYTICAL, 0.5),
+    ),
+    "O6_AGENCY": (
         (SemanticTrait.DIRECTIVE, 0.9),
         (SemanticTrait.PURPOSEFUL, 0.7),
         (SemanticTrait.DYNAMIC, 0.4),
     ),
-    "O6_REASONING": (
+    "O7_REASONING": (
         (SemanticTrait.ANALYTICAL, 0.9),
         (SemanticTrait.CONTEMPLATIVE, 0.5),
         (SemanticTrait.SUSTAINED, 0.5),
     ),
-    "O7_PURPOSING": (
+    "O8_PURPOSE": (
         (SemanticTrait.PURPOSEFUL, 0.9),
         (SemanticTrait.DIRECTIVE, 0.5),
         (SemanticTrait.HARMONIZING, 0.4),
     ),
-    "O8_META_OBSERVING": (
+    "O9_WITNESSES": (
         (SemanticTrait.OBSERVANT, 0.9),
         (SemanticTrait.CONTEMPLATIVE, 0.6),
         (SemanticTrait.BALANCED, 0.5),
     ),
-    "O9_UNIFYING": (
+    "O10_UNIFYING": (
         (SemanticTrait.HARMONIZING, 0.9),
         (SemanticTrait.FLOWING, 0.7),
         (SemanticTrait.BALANCED, 0.5),
     ),
-    "O10_ABSOLVING": (
+    "O11_INTEGRATION": (
+        (SemanticTrait.HARMONIZING, 0.8),
+        (SemanticTrait.PURPOSEFUL, 0.6),
+        (SemanticTrait.SUSTAINED, 0.5),
+    ),
+    "O12_ABSOLVING": (
         (SemanticTrait.TRANSCENDENT, 0.9),
         (SemanticTrait.FLOWING, 0.6),
         (SemanticTrait.SUSTAINED, 0.5),
@@ -442,7 +452,7 @@ def compute_semantic_traits(
     Compute semantic trait scores from ontological layer values.
 
     Args:
-        ontological_vector: 10D ontological layer values as (layer_name, value) tuples
+        ontological_vector: 12D ontological layer values as (layer_name, value) tuples
 
     Returns:
         Dict mapping SemanticTrait to score [0, 1]
@@ -537,7 +547,7 @@ def compute_semantic_coherence(
     what this career domain semantically requires?"
 
     Args:
-        ontological_vector: Name's 10D ontological layer values
+        ontological_vector: Name's 12D ontological layer values
         domain_name: Name of the domain to match against
 
     Returns:
@@ -712,7 +722,7 @@ def compute_name_domain_crs(
     Args:
         name: The name being analyzed
         domain_name: The domain to match against
-        ontological_vector: Name's 10D ontological layer values
+        ontological_vector: Name's 12D ontological layer values
         structural_match_score: R score from 12D profile matching (0-1)
 
     Returns:
