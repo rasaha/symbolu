@@ -34,33 +34,63 @@ from symbolu.resonance import (
 
 # Semantic Context (S term from C×R×S framework)
 # Provides NON-PHONEMIC semantic disambiguation for homonyms
+# Uses authoritative ReferentClass ontology from referent_classes.py
 try:
     from symbolu.name_resonance.referent_classes import (
         CONTEXT_SEMANTIC_GROUPS,
         get_referent_profile,
         ReferentClass,
+        WORD_TO_REFERENT,
     )
     SEMANTIC_CONTEXT_AVAILABLE = True
 except ImportError:
     SEMANTIC_CONTEXT_AVAILABLE = False
-    # Inline semantic context groups when module unavailable
-    CONTEXT_SEMANTIC_GROUPS = {
-        "royalty": frozenset({"king", "queen", "prince", "princess", "throne", "crown", "palace", "royal", "monarch"}),
-        "chess": frozenset({"king", "queen", "bishop", "knight", "rook", "pawn", "checkmate", "board", "move"}),
-        "nature": frozenset({"tree", "forest", "river", "mountain", "ocean", "sky", "sun", "moon", "earth", "stream", "meadow", "grassy", "peaceful", "sunset"}),
-        "emotion": frozenset({"love", "hate", "joy", "sorrow", "fear", "hope", "anger", "happy", "sad"}),
-        "family": frozenset({"mother", "father", "child", "family", "home", "parent", "sibling", "son", "daughter"}),
-        "technology": frozenset({"computer", "phone", "machine", "digital", "software", "data", "network", "code", "test", "deploy", "database", "migration"}),
-        "food": frozenset({"apple", "banana", "food", "eat", "taste", "sweet", "fruit", "vegetable", "cook"}),
-        "body": frozenset({"heart", "hand", "eye", "head", "body", "blood", "face", "arm", "leg"}),
-        "light": frozenset({"sun", "light", "bright", "glow", "shine", "fire", "flame", "star", "radiance"}),
-        "time": frozenset({"time", "day", "night", "year", "moment", "past", "future", "now", "ancient"}),
-        "space": frozenset({"place", "space", "path", "road", "world", "home", "distance", "location", "area"}),
-        "conflict": frozenset({"war", "peace", "fight", "battle", "enemy", "conflict", "struggle", "victory"}),
-        "knowledge": frozenset({"wisdom", "knowledge", "truth", "idea", "thought", "mind", "learn", "study"}),
-        "finance": frozenset({"bank", "money", "deposit", "account", "balance", "loan", "credit", "debit", "payment", "transaction", "financial", "interest", "savings"}),
-        "physical": frozenset({"run", "walk", "jump", "spring", "mechanism", "repair", "energy", "store", "mechanical"}),
+    CONTEXT_SEMANTIC_GROUPS = {}
+    WORD_TO_REFERENT = {}
+    ReferentClass = None  # type: ignore
+
+    def get_referent_profile(word: str):
+        return None
+
+# Authoritative ReferentClass → ModelType Mapping
+# This is grounded in ontological semantics, not arbitrary heuristics:
+# - PROCESS (actions, events) → ACTION (procedural tasks)
+# - ABSTRACT (concepts, relations) → REASONING (logical analysis)
+# - EMOTIONAL (feelings, states) → RELATIONSHIP (emotional connection)
+# - NATURAL_BODY (celestial, geological) → CREATIVE (nature/art)
+# - ARTIFACT (human-made objects) → ACTION (tool usage)
+# - SIGNAL (communication) → REASONING (information processing)
+# - SOCIAL (roles, relationships) → RELATIONSHIP (social connection)
+# - BIOLOGICAL_ORGANISM (living things) → CREATIVE (nature)
+# - LUMINOUS (light, energy) → REASONING (physics/perception)
+# - TEMPORAL (time) → REFLECTIVE (contemplation)
+# - SPATIAL (space, location) → CREATIVE (spatial imagination)
+REFERENT_TO_MODEL: Dict[str, "ModelType"] = {}  # Populated after ModelType is defined
+
+
+def _init_referent_to_model():
+    """Initialize the ReferentClass → ModelType mapping after ModelType is defined."""
+    global REFERENT_TO_MODEL
+    if ReferentClass is None:
+        return
+    REFERENT_TO_MODEL = {
+        ReferentClass.PROCESS: ModelType.ACTION,           # Actions, events → procedural
+        ReferentClass.ABSTRACT: ModelType.REASONING,       # Concepts → logical analysis
+        ReferentClass.EMOTIONAL: ModelType.RELATIONSHIP,   # Feelings → emotional
+        ReferentClass.NATURAL_BODY: ModelType.CREATIVE,    # Nature → creative
+        ReferentClass.ARTIFACT: ModelType.ACTION,          # Tools → action
+        ReferentClass.SIGNAL: ModelType.REASONING,         # Communication → reasoning
+        ReferentClass.SOCIAL: ModelType.RELATIONSHIP,      # Social → relationship
+        ReferentClass.BIOLOGICAL_ORGANISM: ModelType.CREATIVE,  # Living things → creative
+        ReferentClass.LUMINOUS: ModelType.REASONING,       # Light/energy → physics
+        ReferentClass.TEMPORAL: ModelType.REFLECTIVE,      # Time → contemplation
+        ReferentClass.SPATIAL: ModelType.CREATIVE,         # Space → imagination
+        ReferentClass.SUBSTANCE: ModelType.REASONING,      # Matter → analysis
+        ReferentClass.ROLE_BEARER: ModelType.RELATIONSHIP, # Roles → social
+        ReferentClass.ENERGY_SOURCE: ModelType.REASONING,  # Energy → physics
+        ReferentClass.PHENOMENON: ModelType.REASONING,     # Observations → analysis
     }
+
 
 # Vṛtti-Aspect Coupling Matrix (5×12) for cross-domain disambiguation
 # This enables the p_v[v] formula: weights[a] = Σ_v p_v[v] · R[v,a]
@@ -167,6 +197,10 @@ class ModelType(Enum):
     REFLECTIVE = "reflective"     # O5_COGNITION - contemplation, philosophy
     DIRECTIVE = "directive"       # O6_AGENCY - guidance, commands
     TRANSCENDENT = "transcendent" # O12_ABSOLVING - abstract, spiritual
+
+
+# Initialize the authoritative ReferentClass → ModelType mapping
+_init_referent_to_model()
 
 
 @dataclass(frozen=True)
@@ -482,14 +516,50 @@ class SemanticRouter:
 
         return biased_totals
 
+    def _extract_referent_distribution(self, query: str) -> Dict[Any, float]:
+        """
+        Extract referent class distribution from query using authoritative WORD_TO_REFERENT.
+
+        This uses the curated dictionary of ~200+ words with ReferentClass mappings,
+        providing ontologically grounded semantic analysis rather than arbitrary heuristics.
+
+        Args:
+            query: The input query
+
+        Returns:
+            Dict mapping ReferentClass to aggregate strength (0.0 to 1.0)
+        """
+        if not SEMANTIC_CONTEXT_AVAILABLE or not WORD_TO_REFERENT:
+            return {}
+
+        words = set(re.findall(r'\b[a-z]+\b', query.lower()))
+        referent_scores: Dict[Any, float] = {}
+
+        for word in words:
+            profile = get_referent_profile(word)
+            if profile and ReferentClass.UNKNOWN not in profile.primary:
+                # Primary referent classes get full weight
+                for ref_class in profile.primary:
+                    referent_scores[ref_class] = referent_scores.get(ref_class, 0) + 1.0
+                # Secondary referent classes get partial weight
+                for ref_class in profile.secondary:
+                    referent_scores[ref_class] = referent_scores.get(ref_class, 0) + 0.5
+
+        # Normalize to 0-1 range
+        if referent_scores:
+            max_score = max(referent_scores.values())
+            if max_score > 0:
+                referent_scores = {k: v / max_score for k, v in referent_scores.items()}
+
+        return referent_scores
+
     def _extract_semantic_context(self, query: str) -> Dict[str, float]:
         """
         Extract semantic context groups from the query (S term from C×R×S).
 
-        This is the NON-PHONEMIC component that disambiguates homonyms based
-        on semantic context rather than phoneme patterns.
-
-        The S term answers: "What semantic domain does this query belong to?"
+        Uses both:
+        1. Authoritative WORD_TO_REFERENT for grounded semantic analysis
+        2. CONTEXT_SEMANTIC_GROUPS for domain-specific keyword matching
 
         Args:
             query: The input query
@@ -500,17 +570,55 @@ class SemanticRouter:
         words = set(re.findall(r'\b[a-z]+\b', query.lower()))
         context_scores: Dict[str, float] = {}
 
+        # Use CONTEXT_SEMANTIC_GROUPS for domain keyword matching
         for group_name, group_words in CONTEXT_SEMANTIC_GROUPS.items():
             matches = words & group_words
             if matches:
-                # Score based on number of matches relative to query length
                 score = len(matches) / max(len(words), 1)
-                # Boost if multiple words match the same context
                 if len(matches) > 1:
                     score = min(score * 1.5, 1.0)
                 context_scores[group_name] = score
 
         return context_scores
+
+    def _get_model_from_referents(self, referent_dist: Dict[Any, float]) -> Optional[Tuple["ModelType", float]]:
+        """
+        Determine model type from referent class distribution using authoritative mapping.
+
+        This uses REFERENT_TO_MODEL which maps each ReferentClass to a ModelType
+        based on ontological semantics (not arbitrary heuristics).
+
+        Args:
+            referent_dist: Distribution of ReferentClass strengths
+
+        Returns:
+            Tuple of (ModelType, confidence) or None if no strong signal
+        """
+        if not referent_dist or not REFERENT_TO_MODEL:
+            return None
+
+        # Aggregate votes by ModelType
+        model_votes: Dict["ModelType", float] = {}
+        for ref_class, strength in referent_dist.items():
+            if ref_class in REFERENT_TO_MODEL:
+                model = REFERENT_TO_MODEL[ref_class]
+                model_votes[model] = model_votes.get(model, 0) + strength
+
+        if not model_votes:
+            return None
+
+        # Get highest voted model
+        best_model = max(model_votes, key=model_votes.get)
+        best_score = model_votes[best_model]
+
+        # Normalize confidence
+        total = sum(model_votes.values())
+        confidence = best_score / total if total > 0 else 0
+
+        # Only return if confidence is meaningful
+        if confidence >= 0.3:
+            return (best_model, confidence)
+        return None
 
     def _apply_semantic_context_weighting(
         self,
@@ -738,6 +846,11 @@ class SemanticRouter:
                 biased_layer_totals, semantic_context, weight=0.4
             )
 
+        # Extract authoritative referent class distribution from WORD_TO_REFERENT
+        # This uses the curated dictionary (~200+ words) for grounded semantic analysis
+        referent_dist = self._extract_referent_distribution(query)
+        referent_model_result = self._get_model_from_referents(referent_dist)
+
         # Find initial dominant layer using vṛtti-biased totals
         max_idx = 0
         max_total = biased_layer_totals[0]
@@ -846,9 +959,27 @@ class SemanticRouter:
                 semantic_strength = best_score
 
         # Priority order for model selection:
-        # 1. Strong semantic context (S term from C×R×S) - NON-PHONEMIC, best for homonyms
+        # 0. Authoritative referent class (WORD_TO_REFERENT dictionary) - grounded ontology
+        # 1. Strong semantic context (CONTEXT_SEMANTIC_GROUPS) - domain keywords
         # 2. Pattern keyword matching - explicit intent signals
         # 3. Phoneme-based layer analysis - default
+        #
+        # Referent class takes highest priority because it's derived from a curated
+        # dictionary of ~200+ words with authoritative ReferentClass mappings.
+
+        # Check authoritative referent class (use as confirmation, not override)
+        # Referent class works best when it AGREES with semantic context
+        # because word-level referents don't capture multi-word contextual meaning
+        if referent_model_result:
+            referent_model, referent_confidence = referent_model_result
+            # Only use referent directly if it agrees with semantic context
+            if semantic_model and referent_model == semantic_model and referent_confidence >= 0.4:
+                # Referent confirms semantic context - boost confidence
+                semantic_strength = min(semantic_strength + referent_confidence * 0.2, 1.0)
+            elif semantic_model is None and referent_confidence >= 0.6:
+                # No semantic context but strong referent signal - use it
+                semantic_model = referent_model
+                semantic_strength = referent_confidence * 0.8  # Discount slightly
         #
         # Semantic context is prioritized because it's NON-PHONEMIC and can
         # disambiguate homonyms that have identical phoneme signatures.
