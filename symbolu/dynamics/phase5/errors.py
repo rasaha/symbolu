@@ -101,20 +101,22 @@ class Phase5InvalidLayerError(Phase5Error):
     """
     Raised when a requested layer is invalid.
 
-    Valid layers are O1_ACTING through O10_ABSOLVING.
+    Valid layers are O1_POTENTIAL through O12_ABSOLVING.
     """
 
     VALID_LAYERS = (
-        "O1_ACTING",
-        "O2_TAGGING",
-        "O3_FORMING",
-        "O4_THINKING",
-        "O5_DIRECTING",
-        "O6_REASONING",
-        "O7_PURPOSING",
-        "O8_META_OBSERVING",
-        "O9_UNIFYING",
-        "O10_ABSOLVING",
+        "O1_POTENTIAL",
+        "O2_IDENTITY",
+        "O3_EXECUTION",
+        "O4_STRUCTURE",
+        "O5_COGNITION",
+        "O6_AGENCY",
+        "O7_REASONING",
+        "O8_PURPOSE",
+        "O9_WITNESSES",
+        "O10_UNIFYING",
+        "O11_INTEGRATION",
+        "O12_ABSOLVING",
     )
 
     def __init__(self, layer: str, reason: str = ""):

@@ -52,13 +52,15 @@ Violations raise `Phase5InvariantViolation` exceptions.
 Phase-5 allows both **upward and downward** layer traversal:
 
 ```
-O10_ABSOLVING
+O12_ABSOLVING
      ↑↓
-O9_UNIFYING
+O11_INTEGRATION
+     ↑↓
+O10_UNIFYING
      ↑↓
     ...
      ↑↓
-O1_ACTING
+O1_POTENTIAL
 ```
 
 **Important:** Downward movement in Phase-5 is **dynamic regression under load**, not "reverse sublimation" in the ontology sense.
@@ -79,7 +81,7 @@ from symbolu.dynamics.phase5 import resolve_dynamics
 
 result = resolve_dynamics(
     varna="ka",                    # Varna token (validated via Phase-4A)
-    start_layer="O1_ACTING",       # Starting layer (O1-O10)
+    start_layer="O3_EXECUTION",    # Starting layer (O1-O12)
     load=0.5,                      # External load (0.0-1.0)
     time_steps=10,                 # Simulation steps
     decay_constant=0.1,            # Momentum decay rate (0.0-1.0)
@@ -87,7 +89,7 @@ result = resolve_dynamics(
     allow_regression=True,         # Enable downward movement
     regression_threshold=0.7,      # Load level for regression
     saturation_threshold=0.9,      # Momentum saturation level
-    o8_damping_factor=0.5,         # O8 momentum damping
+    o8_damping_factor=0.5,         # O9 momentum damping
 )
 ```
 
@@ -114,14 +116,14 @@ A single state in the trajectory.
 
 ```python
 state.time_step           # Discrete time step (0-indexed)
-state.layer_id            # Current layer (e.g., "O1_ACTING")
-state.layer_index         # Numeric index (1-10)
+state.layer_id            # Current layer (e.g., "O3_EXECUTION")
+state.layer_index         # Numeric index (1-12)
 state.activation_level    # Current activation (0.0-1.0)
 state.momentum            # Directional force (-1.0 to 1.0)
 state.direction           # UP, DOWN, or LATERAL
 state.distortion_load     # Accumulated distortion pressure
 state.sublimation_load    # Accumulated sublimation pressure
-state.termination_flag    # True if terminated at O10
+state.termination_flag    # True if terminated at O12
 state.regression_flag     # True if regressed due to load
 ```
 
@@ -143,14 +145,14 @@ When `allow_regression=True` and `load >= regression_threshold`:
 
 ### Saturation
 
-At O9/O10, excess momentum triggers saturation:
+At O11/O12, excess momentum triggers saturation:
 - Momentum collapses or dampens
 - Prevents runaway accumulation
 - Models natural limits at transcendence layers
 
-### O8 Handling
+### O9 Handling
 
-O8_META_OBSERVING has special behavior:
+O9_WITNESSES has special behavior:
 - Dampens momentum by `o8_damping_factor`
 - May pause traversal
 - Does NOT alter polarity
@@ -158,7 +160,7 @@ O8_META_OBSERVING has special behavior:
 
 ### Termination
 
-At O10_ABSOLVING:
+At O12_ABSOLVING:
 - If `sublimate_vector == "terminating"`, trajectory ends
 - No implicit rebirth
 - Must explicitly restart with new `resolve_dynamics()` call
@@ -170,7 +172,7 @@ At O10_ABSOLVING:
 ```python
 result = resolve_dynamics(
     varna="ka",
-    start_layer="O1_ACTING",
+    start_layer="O3_EXECUTION",
     load=0.3,
     time_steps=15,
     decay_constant=0.1,
@@ -188,7 +190,7 @@ for state in result.trajectory:
 # 'ga' has flat constructive pattern in ontology
 result = resolve_dynamics(
     varna="ga",
-    start_layer="O1_ACTING",
+    start_layer="O3_EXECUTION",
     load=0.5,
     time_steps=20,
     decay_constant=0.1,
@@ -207,7 +209,7 @@ else:
 ```python
 result = resolve_dynamics(
     varna="kha",  # Degenerative tendency
-    start_layer="O7_PURPOSING",
+    start_layer="O8_PURPOSE",
     load=0.9,
     time_steps=25,
     decay_constant=0.05,
@@ -217,7 +219,7 @@ result = resolve_dynamics(
 )
 
 if result.regressed:
-    print(f"Regressed from O7 to {result.final_layer}")
+    print(f"Regressed from O8 to {result.final_layer}")
 ```
 
 ## Test Categories
@@ -268,7 +270,7 @@ After Phase-5, the original stress test findings can be re-classified:
 | Flat gradient (`ga`) | Trajectory shows variation | **Dynamic** — not structural |
 | Flat gradient (`ddha`) | Trajectory remains flat | **Structural** — true flatness |
 | No reverse sublimation | Regression possible under load | **Dynamic** — Phase-5 adds downward path |
-| O8 uniformly neutral | O8 dampens but doesn't alter | **Intentional** — by design |
+| O9 uniformly neutral | O9 dampens but doesn't alter | **Intentional** — by design |
 
 Phase-5 does not "fix" issues. It **reveals** their nature.
 

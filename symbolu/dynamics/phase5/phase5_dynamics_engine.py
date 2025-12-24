@@ -99,7 +99,7 @@ def _validate_inputs(varna: str, start_layer: str) -> None:
     if not is_valid_layer(start_layer):
         raise Phase5InvalidLayerError(
             start_layer,
-            reason="Not a valid ontological layer (O1-O10)"
+            reason="Not a valid ontological layer (O1-O12)"
         )
 
 
@@ -140,7 +140,7 @@ def _compute_next_state(
         2. Applies momentum accumulation
         3. Applies decay
         4. Computes direction and layer transitions
-        5. Handles special cases (O8 damping, O10 termination, regression)
+        5. Handles special cases (O9 damping, O12 termination, regression)
 
     NO ontology modification occurs. Only numerical evolution.
     """
@@ -178,9 +178,9 @@ def _compute_next_state(
     load_pressure = config.load * 0.5  # Load pushes downward
     momentum_with_load = decayed_momentum - load_pressure
 
-    # === O8 Damping ===
-    # O8_META_OBSERVING dampens momentum (witnessing without altering)
-    if current.layer_id == "O8_META_OBSERVING":
+    # === O9 Damping ===
+    # O9_WITNESSES dampens momentum (witnessing without altering)
+    if current.layer_id == "O9_WITNESSES":
         momentum_with_load *= (1.0 - config.o8_damping_factor)
 
     # Clamp momentum to valid range
@@ -206,7 +206,7 @@ def _compute_next_state(
         and direction == Direction.DOWN
     )
 
-    if direction == Direction.UP and current.layer_index < 10:
+    if direction == Direction.UP and current.layer_index < 12:
         # Upward movement requires sufficient positive momentum
         if final_momentum > 0.3:
             new_layer_index = current.layer_index + 1
@@ -216,9 +216,9 @@ def _compute_next_state(
             new_layer_index = current.layer_index - 1
             regression_flag = True
 
-    # === Saturation at O9/O10 ===
+    # === Saturation at O11/O12 ===
     # Excess upward momentum at high layers may collapse
-    if new_layer_index >= 9 and abs(final_momentum) > config.saturation_threshold:
+    if new_layer_index >= 11 and abs(final_momentum) > config.saturation_threshold:
         # Saturation causes momentum collapse
         final_momentum = final_momentum * 0.5
 
@@ -227,10 +227,10 @@ def _compute_next_state(
 
     # === Termination Check ===
     termination_flag = False
-    if new_layer_id == "O10_ABSOLVING":
+    if new_layer_id == "O12_ABSOLVING":
         # Check for termination condition
-        # Termination occurs when sublimation completes at O10
-        interaction = lookup_interaction(varna, "O10_ABSOLVING")
+        # Termination occurs when sublimation completes at O12
+        interaction = lookup_interaction(varna, "O12_ABSOLVING")
         if interaction.sublimate_vector == "terminating":
             termination_flag = True
 
@@ -238,7 +238,7 @@ def _compute_next_state(
     # Activation influenced by momentum magnitude and layer position
     base_activation = current.activation_level
     momentum_effect = abs(final_momentum) * 0.2
-    layer_effect = new_layer_index / 10.0 * 0.1
+    layer_effect = new_layer_index / 12.0 * 0.1
 
     new_activation = base_activation + momentum_effect - layer_effect
     new_activation = max(0.0, min(1.0, new_activation))
@@ -300,7 +300,7 @@ def resolve_dynamics(
 
     Args:
         varna: The varna token (e.g., "ka", "ga", "ddha")
-        start_layer: Starting ontological layer (e.g., "O1_ACTING")
+        start_layer: Starting ontological layer (e.g., "O3_EXECUTION")
         load: External load factor (0.0 to 1.0). Higher = more stress.
         time_steps: Number of discrete time steps to simulate.
         decay_constant: Rate of momentum decay per step (0.0 to 1.0).
@@ -308,20 +308,20 @@ def resolve_dynamics(
         allow_regression: If True, high load enables downward traversal.
         regression_threshold: Load level above which regression is possible.
         saturation_threshold: Momentum level at which saturation occurs.
-        o8_damping_factor: How much O8_META_OBSERVING dampens momentum.
+        o8_damping_factor: How much O9_WITNESSES dampens momentum.
 
     Returns:
         TrajectoryResult containing full numerical trajectory
 
     Raises:
         Phase5InvalidVarnaError: If varna not valid in Phase-4A
-        Phase5InvalidLayerError: If layer not valid (O1-O10)
+        Phase5InvalidLayerError: If layer not valid (O1-O12)
         Phase5InvalidConfigError: If configuration parameters invalid
 
     Example:
         >>> result = resolve_dynamics(
         ...     varna="ka",
-        ...     start_layer="O1_ACTING",
+        ...     start_layer="O3_EXECUTION",
         ...     load=0.5,
         ...     time_steps=10,
         ...     decay_constant=0.1,
@@ -331,7 +331,7 @@ def resolve_dynamics(
         >>> len(result.trajectory)
         10
         >>> result.trajectory[0].layer_id
-        'O1_ACTING'
+        'O3_EXECUTION'
     """
     # === Input Validation ===
     _validate_inputs(varna, start_layer)
