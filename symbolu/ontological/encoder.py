@@ -1,0 +1,297 @@
+"""
+Ontological Engine - Text Encoders
+===================================
+
+Text encoding modules for the ontological engine:
+1. HashEncoder: Deterministic fallback (no dependencies)
+2. DistilBERTEncoder: Pretrained transformer (requires transformers)
+3. HybridEncoder: Auto-selects based on availability
+
+Usage:
+    encoder = get_encoder()  # Auto-selects best available
+    embedding = encoder.encode("What is the meaning of truth?")
+"""
+
+import hashlib
+import math
+from typing import List, Optional, Protocol
+from abc import ABC, abstractmethod
+
+
+class TextEncoder(ABC):
+    """Abstract base class for text encoders."""
+
+    @property
+    @abstractmethod
+    def dimension(self) -> int:
+        """Return the embedding dimension."""
+        pass
+
+    @abstractmethod
+    def encode(self, text: str) -> List[float]:
+        """Encode text to embedding vector."""
+        pass
+
+    @abstractmethod
+    def encode_batch(self, texts: List[str]) -> List[List[float]]:
+        """Encode a batch of texts."""
+        pass
+
+    @property
+    def name(self) -> str:
+        """Return encoder name."""
+        return self.__class__.__name__
+
+
+class HashEncoder(TextEncoder):
+    """
+    Deterministic hash-based encoder (no dependencies).
+
+    Uses SHA-256 to generate reproducible embeddings.
+    Same input always produces the same output.
+
+    This is a fallback encoder when transformer libraries
+    are not available.
+    """
+
+    def __init__(self, dimension: int = 768):
+        self._dimension = dimension
+
+    @property
+    def dimension(self) -> int:
+        return self._dimension
+
+    def encode(self, text: str) -> List[float]:
+        """Generate embedding using hash function."""
+        vectors = []
+        num_hashes = (self._dimension + 7) // 8
+
+        for i in range(num_hashes):
+            seed = f"{text.lower().strip()}_{i}"
+            hash_bytes = hashlib.sha256(seed.encode("utf-8")).digest()
+            for j in range(0, len(hash_bytes), 4):
+                chunk = hash_bytes[j:j + 4]
+                value = int.from_bytes(chunk, byteorder="big", signed=True)
+                normalized = value / (2 ** 31)
+                vectors.append(normalized)
+                if len(vectors) >= self._dimension:
+                    break
+            if len(vectors) >= self._dimension:
+                break
+
+        return vectors[:self._dimension]
+
+    def encode_batch(self, texts: List[str]) -> List[List[float]]:
+        """Encode batch of texts."""
+        return [self.encode(text) for text in texts]
+
+
+class DistilBERTEncoder(TextEncoder):
+    """
+    DistilBERT-based encoder using HuggingFace transformers.
+
+    Provides high-quality semantic embeddings using the
+    pretrained distilbert-base-uncased model.
+
+    Requires: pip install transformers torch
+    """
+
+    def __init__(
+        self,
+        model_name: str = "distilbert-base-uncased",
+        max_length: int = 128,
+        device: Optional[str] = None,
+    ):
+        self.model_name = model_name
+        self.max_length = max_length
+        self._model = None
+        self._tokenizer = None
+        self._device = device
+        self._dimension = 768  # DistilBERT hidden size
+
+    def _load_model(self):
+        """Lazy load the model and tokenizer."""
+        if self._model is not None:
+            return
+
+        try:
+            from transformers import DistilBertModel, DistilBertTokenizer
+            import torch
+
+            self._tokenizer = DistilBertTokenizer.from_pretrained(self.model_name)
+            self._model = DistilBertModel.from_pretrained(self.model_name)
+
+            # Set device
+            if self._device is None:
+                self._device = "cuda" if torch.cuda.is_available() else "cpu"
+
+            self._model = self._model.to(self._device)
+            self._model.eval()
+
+            print(f"Loaded {self.model_name} on {self._device}")
+
+        except ImportError as e:
+            raise ImportError(
+                "DistilBERT encoder requires 'transformers' and 'torch'. "
+                "Install with: pip install transformers torch"
+            ) from e
+
+    @property
+    def dimension(self) -> int:
+        return self._dimension
+
+    def encode(self, text: str) -> List[float]:
+        """Encode single text using DistilBERT."""
+        return self.encode_batch([text])[0]
+
+    def encode_batch(self, texts: List[str]) -> List[List[float]]:
+        """Encode batch of texts using DistilBERT."""
+        self._load_model()
+
+        import torch
+
+        # Tokenize
+        inputs = self._tokenizer(
+            texts,
+            padding=True,
+            truncation=True,
+            max_length=self.max_length,
+            return_tensors="pt",
+        )
+        inputs = {k: v.to(self._device) for k, v in inputs.items()}
+
+        # Forward pass
+        with torch.no_grad():
+            outputs = self._model(**inputs)
+
+        # Use [CLS] token embedding (first token)
+        embeddings = outputs.last_hidden_state[:, 0, :]
+
+        # Convert to list
+        return embeddings.cpu().tolist()
+
+
+class HybridEncoder(TextEncoder):
+    """
+    Hybrid encoder that auto-selects best available encoder.
+
+    Priority:
+    1. DistilBERT (if transformers available)
+    2. HashEncoder (fallback)
+    """
+
+    def __init__(self, prefer_transformer: bool = True, dimension: int = 768):
+        self._prefer_transformer = prefer_transformer
+        self._fallback_dimension = dimension
+        self._encoder: Optional[TextEncoder] = None
+        self._init_encoder()
+
+    def _init_encoder(self):
+        """Initialize the best available encoder."""
+        if self._prefer_transformer:
+            try:
+                self._encoder = DistilBERTEncoder()
+                # Test that it works
+                self._encoder._load_model()
+                print("Using DistilBERT encoder")
+                return
+            except (ImportError, Exception) as e:
+                print(f"DistilBERT not available ({e}), falling back to hash encoder")
+
+        self._encoder = HashEncoder(dimension=self._fallback_dimension)
+        print("Using hash-based encoder")
+
+    @property
+    def dimension(self) -> int:
+        return self._encoder.dimension
+
+    @property
+    def name(self) -> str:
+        return f"Hybrid({self._encoder.name})"
+
+    def encode(self, text: str) -> List[float]:
+        return self._encoder.encode(text)
+
+    def encode_batch(self, texts: List[str]) -> List[List[float]]:
+        return self._encoder.encode_batch(texts)
+
+
+def get_encoder(
+    encoder_type: str = "auto",
+    dimension: int = 768,
+    device: Optional[str] = None,
+) -> TextEncoder:
+    """
+    Factory function to get a text encoder.
+
+    Args:
+        encoder_type: "auto", "distilbert", or "hash"
+        dimension: Embedding dimension (for hash encoder)
+        device: Device for transformer ("cuda" or "cpu")
+
+    Returns:
+        TextEncoder instance
+    """
+    if encoder_type == "hash":
+        return HashEncoder(dimension=dimension)
+    elif encoder_type == "distilbert":
+        return DistilBERTEncoder(device=device)
+    elif encoder_type == "auto":
+        return HybridEncoder(prefer_transformer=True, dimension=dimension)
+    else:
+        raise ValueError(f"Unknown encoder type: {encoder_type}")
+
+
+# ============================================
+# Sentence Transformer Alternative
+# ============================================
+
+class SentenceTransformerEncoder(TextEncoder):
+    """
+    Sentence Transformer encoder for semantic similarity.
+
+    Uses all-MiniLM-L6-v2 by default (384D, fast, good quality).
+
+    Requires: pip install sentence-transformers
+    """
+
+    def __init__(
+        self,
+        model_name: str = "all-MiniLM-L6-v2",
+        device: Optional[str] = None,
+    ):
+        self.model_name = model_name
+        self._model = None
+        self._device = device
+        self._dimension = 384  # Default for MiniLM
+
+    def _load_model(self):
+        """Lazy load the model."""
+        if self._model is not None:
+            return
+
+        try:
+            from sentence_transformers import SentenceTransformer
+
+            self._model = SentenceTransformer(self.model_name, device=self._device)
+            self._dimension = self._model.get_sentence_embedding_dimension()
+
+            print(f"Loaded {self.model_name} ({self._dimension}D)")
+
+        except ImportError as e:
+            raise ImportError(
+                "SentenceTransformer encoder requires 'sentence-transformers'. "
+                "Install with: pip install sentence-transformers"
+            ) from e
+
+    @property
+    def dimension(self) -> int:
+        return self._dimension
+
+    def encode(self, text: str) -> List[float]:
+        return self.encode_batch([text])[0]
+
+    def encode_batch(self, texts: List[str]) -> List[List[float]]:
+        self._load_model()
+        embeddings = self._model.encode(texts, convert_to_numpy=True)
+        return embeddings.tolist()
