@@ -53,6 +53,25 @@ from symbolu.ontological.bhava import (
     summarize_bhava_structure,
 )
 from symbolu.ontological.trainer import OntologicalTrainer, TrainerConfig
+from symbolu.ontological.encoder import (
+    TextEncoder,
+    HashEncoder,
+    HybridEncoder,
+    get_encoder,
+)
+from symbolu.ontological.data_loader import (
+    RAGDataLoader,
+    SyntheticDataGenerator,
+    MixedDataLoader,
+)
+
+# PyTorch components (optional)
+try:
+    from symbolu.ontological.pytorch_engine import PyTorchOntologicalEngine
+    from symbolu.ontological.pytorch_trainer import PyTorchTrainer, train_from_rag
+    PYTORCH_AVAILABLE = True
+except ImportError:
+    PYTORCH_AVAILABLE = False
 
 __all__ = [
     # Types
@@ -79,7 +98,26 @@ __all__ = [
     "BHAVA_NAMES_90",
     "BHAVA_SUBLAYER_NAMES",
     "summarize_bhava_structure",
-    # Training
+    # Training (basic)
     "OntologicalTrainer",
     "TrainerConfig",
+    # Encoders
+    "TextEncoder",
+    "HashEncoder",
+    "HybridEncoder",
+    "get_encoder",
+    # Data loaders
+    "RAGDataLoader",
+    "SyntheticDataGenerator",
+    "MixedDataLoader",
+    # PyTorch (optional)
+    "PYTORCH_AVAILABLE",
 ]
+
+# Add PyTorch exports if available
+if PYTORCH_AVAILABLE:
+    __all__.extend([
+        "PyTorchOntologicalEngine",
+        "PyTorchTrainer",
+        "train_from_rag",
+    ])
