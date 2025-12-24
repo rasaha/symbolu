@@ -50,7 +50,7 @@ jobs:
       - name: Run Renderer tests with coverage
         run: |
           pytest \
-            symbolu/renderer/tests \
+            tests/unit/renderer \
             --cov=symbolu/renderer \
             --cov=symbolu/mechanical/renderer \
             --cov-report=xml \
@@ -80,9 +80,9 @@ jobs:
           REGENERATE_SNAPSHOTS: "0"
         run: |
           echo "Running Rule-Based Renderer snapshot tests..."
-          REGENERATE_SNAPSHOTS=0 pytest symbolu/renderer/tests/test_rule_based_renderer_snapshots.py -q
+          REGENERATE_SNAPSHOTS=0 pytest tests/unit/renderer/test_rule_based_renderer_snapshots.py -q
           echo "Running LLM Renderer snapshot tests..."
-          REGENERATE_SNAPSHOTS=0 pytest symbolu/renderer/tests/test_llm_renderer_snapshots.py -q
+          REGENERATE_SNAPSHOTS=0 pytest tests/unit/renderer/test_llm_renderer_snapshots.py -q
 
       - name: Upload snapshot diffs
         if: failure()
@@ -90,5 +90,5 @@ jobs:
         with:
           name: renderer-snapshot-diffs
           path: |
-            symbolu/renderer/tests/*.diff
-            symbolu/renderer/tests/**/*.diff
+            tests/unit/renderer/*.diff
+            tests/unit/renderer/**/*.diff

@@ -53,23 +53,25 @@ from typing import FrozenSet, Mapping, Optional, Tuple
 
 class OntologicalLayer(Enum):
     """
-    10 ontological layers for structural projection.
+    12 ontological layers for structural projection (patent-exact sequence).
 
     Each layer represents a projection plane onto which Phase artifacts
     can be mapped. Layers are structural containers, not semantic categories.
 
     The ordering is fixed and immutable per the patent specification.
     """
-    ACTING = 1
-    TAGGING = 2
-    FORMING = 3
-    THINKING = 4
-    DIRECTING = 5
-    REASONING = 6
-    PURPOSING = 7
-    META_OBSERVING = 8
-    UNIFYING = 9
-    ABSOLVING = 10  # GATED - requires explicit opt-in
+    POTENTIAL = 1
+    IDENTITY = 2
+    EXECUTION = 3
+    STRUCTURE = 4
+    COGNITION = 5
+    AGENCY = 6
+    REASONING = 7
+    PURPOSE = 8
+    WITNESSES = 9
+    UNIFYING = 10
+    INTEGRATION = 11
+    ABSOLVING = 12  # GATED - requires explicit opt-in
 
     def __repr__(self) -> str:
         return f"OntologicalLayer.{self.name}"
@@ -194,14 +196,14 @@ class ProjectionBlockedError(Exception):
 # This is the canonical mapping from Phase IDs to default ontological layers.
 # Each phase maps to exactly one default layer.
 PHASE_TO_LAYER_DEFAULT: Mapping[str, Tuple[OntologicalLayer, ...]] = {
-    "1b": (OntologicalLayer.ACTING,),
-    "2": (OntologicalLayer.TAGGING,),
-    "3": (OntologicalLayer.FORMING,),
-    "4": (OntologicalLayer.FORMING,),
-    "5": (OntologicalLayer.THINKING,),
-    "6": (OntologicalLayer.DIRECTING,),
+    "1b": (OntologicalLayer.EXECUTION,),
+    "2": (OntologicalLayer.IDENTITY,),
+    "3": (OntologicalLayer.STRUCTURE,),
+    "4": (OntologicalLayer.STRUCTURE,),
+    "5": (OntologicalLayer.COGNITION,),
+    "6": (OntologicalLayer.AGENCY,),
     "7": (OntologicalLayer.REASONING,),
-    "8": (OntologicalLayer.META_OBSERVING,),
+    "8": (OntologicalLayer.WITNESSES,),
     "9": (OntologicalLayer.UNIFYING,),
 }
 
@@ -214,14 +216,14 @@ PHASE_TO_LAYER_DEFAULT: Mapping[str, Tuple[OntologicalLayer, ...]] = {
 #   - Declared hint MUST NOT introduce ABSOLVING unless explicitly permitted
 #   - Declared hint MUST NOT expand the default set — only refine within allowed scope
 PHASE_ALLOWED_HINTS: Mapping[str, FrozenSet[OntologicalLayer]] = {
-    "1b": frozenset({OntologicalLayer.ACTING}),
-    "2": frozenset({OntologicalLayer.TAGGING}),
-    "3": frozenset({OntologicalLayer.FORMING}),
-    "4": frozenset({OntologicalLayer.FORMING, OntologicalLayer.THINKING}),
-    "5": frozenset({OntologicalLayer.THINKING, OntologicalLayer.UNIFYING}),
-    "6": frozenset({OntologicalLayer.DIRECTING}),
+    "1b": frozenset({OntologicalLayer.EXECUTION}),
+    "2": frozenset({OntologicalLayer.IDENTITY}),
+    "3": frozenset({OntologicalLayer.STRUCTURE}),
+    "4": frozenset({OntologicalLayer.STRUCTURE, OntologicalLayer.COGNITION}),
+    "5": frozenset({OntologicalLayer.COGNITION, OntologicalLayer.UNIFYING}),
+    "6": frozenset({OntologicalLayer.AGENCY}),
     "7": frozenset({OntologicalLayer.REASONING}),
-    "8": frozenset({OntologicalLayer.META_OBSERVING}),
+    "8": frozenset({OntologicalLayer.WITNESSES}),
     "9": frozenset({OntologicalLayer.UNIFYING}),
 }
 

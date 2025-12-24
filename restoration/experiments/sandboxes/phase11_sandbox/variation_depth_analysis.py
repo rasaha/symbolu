@@ -666,7 +666,7 @@ def run_neutral_baseline_comparison() -> Dict[str, float]:
 
     # Neutral configuration: all PPV neutral (3), single baseline path
     neutral_ppv = (3, 3, 3, 3, 3, 3, 3, 3)
-    neutral_path = (OntologicalLayer.FORMING,)
+    neutral_path = (OntologicalLayer.STRUCTURE,)
     neutral_temp = 0.5
 
     # Collect outputs for neutral runs (only vary intent and mode)

@@ -118,14 +118,14 @@ class LayerVisibilityPolicy:
 
 # Standard non-gated layers available to most roles
 _STANDARD_LAYERS: FrozenSet[OntologicalLayer] = frozenset({
-    OntologicalLayer.ACTING,
-    OntologicalLayer.TAGGING,
-    OntologicalLayer.FORMING,
-    OntologicalLayer.THINKING,
-    OntologicalLayer.DIRECTING,
+    OntologicalLayer.EXECUTION,
+    OntologicalLayer.IDENTITY,
+    OntologicalLayer.STRUCTURE,
+    OntologicalLayer.COGNITION,
+    OntologicalLayer.AGENCY,
     OntologicalLayer.REASONING,
-    OntologicalLayer.PURPOSING,
-    OntologicalLayer.META_OBSERVING,
+    OntologicalLayer.PURPOSE,
+    OntologicalLayer.WITNESSES,
     OntologicalLayer.UNIFYING,
 })
 

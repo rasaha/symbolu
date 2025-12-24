@@ -93,14 +93,14 @@ class OntologicalLayer(str, Enum):
 
 # Fixed order for deterministic iteration
 ONTOLOGICAL_LAYER_ORDER: Tuple[OntologicalLayer, ...] = (
-    OntologicalLayer.ACTING,
-    OntologicalLayer.TAGGING,
-    OntologicalLayer.FORMING,
-    OntologicalLayer.THINKING,
-    OntologicalLayer.DIRECTING,
+    OntologicalLayer.EXECUTION,
+    OntologicalLayer.IDENTITY,
+    OntologicalLayer.STRUCTURE,
+    OntologicalLayer.COGNITION,
+    OntologicalLayer.AGENCY,
     OntologicalLayer.REASONING,
-    OntologicalLayer.PURPOSING,
-    OntologicalLayer.META_OBSERVING,
+    OntologicalLayer.PURPOSE,
+    OntologicalLayer.WITNESSES,
     OntologicalLayer.UNIFYING,
     OntologicalLayer.ABSOLVING,
 )
@@ -536,9 +536,9 @@ class VariationMatrixGenerator:
 
     # Default baseline configuration
     DEFAULT_PATH: Tuple[OntologicalLayer, ...] = (
-        OntologicalLayer.FORMING,
-        OntologicalLayer.THINKING,
-        OntologicalLayer.DIRECTING,
+        OntologicalLayer.STRUCTURE,
+        OntologicalLayer.COGNITION,
+        OntologicalLayer.AGENCY,
     )
     DEFAULT_PPV: Tuple[int, ...] = (3, 3, 3, 3, 3, 3, 3, 3)
     DEFAULT_TEMP: float = TEMPERATURE_VALUES[TemperatureLevel.MID]

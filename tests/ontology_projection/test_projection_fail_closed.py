@@ -67,13 +67,13 @@ class TestUnsupportedLayers:
     """Test fail-closed behavior for unsupported layers."""
 
     @pytest.mark.parametrize("layer", [
-        OntologicalLayer.SENSING,
-        OntologicalLayer.PERCEIVING,
-        OntologicalLayer.FEELING,
-        OntologicalLayer.ACTING,
-        OntologicalLayer.RELATING,
-        OntologicalLayer.TRANSCENDING,
-        OntologicalLayer.INTEGRATING,
+        OntologicalLayer.POTENTIAL,
+        OntologicalLayer.IDENTITY,
+        OntologicalLayer.EXECUTION,
+        OntologicalLayer.STRUCTURE,
+        OntologicalLayer.AGENCY,
+        OntologicalLayer.PURPOSE,
+        OntologicalLayer.WITNESSES,
     ])
     def test_unsupported_layer_returns_ineligible(
         self, layer, sample_snapshot, sample_input_ref, sample_options
@@ -97,7 +97,7 @@ class TestUnsupportedLayers:
         """ACTING layer (unsupported) should fail closed."""
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.ACTING,
+            layer=OntologicalLayer.EXECUTION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -117,7 +117,7 @@ class TestUnsupportedLayers:
         """Even failed projections should have a deterministic projection_id."""
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.ACTING,
+            layer=OntologicalLayer.EXECUTION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -179,7 +179,7 @@ class TestExceptionHandling:
 
         request = ProjectionRequest(
             snapshot_id=snapshot.snapshot_id,
-            layer=OntologicalLayer.ACTING,  # Unsupported
+            layer=OntologicalLayer.EXECUTION,  # Unsupported
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -209,7 +209,7 @@ class TestInvalidRequests:
 
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=options
@@ -232,7 +232,7 @@ class TestInvalidRequests:
 
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=options
@@ -255,7 +255,7 @@ class TestFailClosedStructure:
         """Fail-closed responses should have correct structure."""
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.ACTING,
+            layer=OntologicalLayer.EXECUTION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -285,7 +285,7 @@ class TestFailClosedStructure:
         """Fail-closed responses should preserve request info."""
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.ACTING,
+            layer=OntologicalLayer.EXECUTION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options

@@ -117,7 +117,7 @@ class TestInputImmutability:
         """Verify ExperimentConfig is immutable."""
         config = ExperimentConfig(
             intent="EXPRESS_LOSS",
-            ontological_path=(OntologicalLayer.FORMING,),
+            ontological_path=(OntologicalLayer.STRUCTURE,),
             ppv_values=(3, 3, 3, 3, 3, 3, 3, 3),
             temperature=0.5,
             mode=RenderMode.GOVERNED,
@@ -158,7 +158,7 @@ class TestInputImmutability:
         """Verify generator does not modify input configuration."""
         config = ExperimentConfig(
             intent="EXPRESS_LOSS",
-            ontological_path=(OntologicalLayer.FORMING, OntologicalLayer.THINKING),
+            ontological_path=(OntologicalLayer.STRUCTURE, OntologicalLayer.COGNITION),
             ppv_values=(1, 2, 3, 4, 5, 6, 7, 0),
             temperature=0.3,
             mode=RenderMode.GOVERNED,
@@ -181,7 +181,7 @@ class TestInputImmutability:
         """Verify harness does not modify input configuration."""
         config = ExperimentConfig(
             intent="EXPRESS_RESOLVE",
-            ontological_path=(OntologicalLayer.DIRECTING,),
+            ontological_path=(OntologicalLayer.AGENCY,),
             ppv_values=(0, 0, 0, 0, 7, 7, 7, 7),
             temperature=0.8,
             mode=RenderMode.OPEN,
@@ -363,7 +363,7 @@ class TestRecordImmutability:
 
         config = ExperimentConfig(
             intent="EXPRESS_LOSS",
-            ontological_path=(OntologicalLayer.FORMING,),
+            ontological_path=(OntologicalLayer.STRUCTURE,),
             ppv_values=(3, 3, 3, 3, 3, 3, 3, 3),
             temperature=0.5,
             mode=RenderMode.GOVERNED,
@@ -473,7 +473,7 @@ class TestDeterminism:
         """Verify same seed produces identical output."""
         config = ExperimentConfig(
             intent="EXPRESS_LOSS",
-            ontological_path=(OntologicalLayer.FORMING, OntologicalLayer.THINKING),
+            ontological_path=(OntologicalLayer.STRUCTURE, OntologicalLayer.COGNITION),
             ppv_values=(3, 4, 5, 6, 3, 4, 5, 6),
             temperature=0.5,
             mode=RenderMode.GOVERNED,
@@ -497,7 +497,7 @@ class TestDeterminism:
         """Verify harness produces identical records with same seed."""
         config = ExperimentConfig(
             intent="EXPRESS_RESOLVE",
-            ontological_path=(OntologicalLayer.DIRECTING,),
+            ontological_path=(OntologicalLayer.AGENCY,),
             ppv_values=(0, 1, 2, 3, 4, 5, 6, 7),
             temperature=0.3,
             mode=RenderMode.OPEN,
@@ -542,7 +542,7 @@ class TestDeterminism:
         """Verify config hash is deterministic."""
         config1 = ExperimentConfig(
             intent="EXPRESS_LOSS",
-            ontological_path=(OntologicalLayer.FORMING,),
+            ontological_path=(OntologicalLayer.STRUCTURE,),
             ppv_values=(3, 3, 3, 3, 3, 3, 3, 3),
             temperature=0.5,
             mode=RenderMode.GOVERNED,
@@ -552,7 +552,7 @@ class TestDeterminism:
 
         config2 = ExperimentConfig(
             intent="EXPRESS_LOSS",
-            ontological_path=(OntologicalLayer.FORMING,),
+            ontological_path=(OntologicalLayer.STRUCTURE,),
             ppv_values=(3, 3, 3, 3, 3, 3, 3, 3),
             temperature=0.5,
             mode=RenderMode.GOVERNED,
@@ -578,7 +578,7 @@ class TestOutputDifferentiation:
         for intent in INTENTS:
             config = ExperimentConfig(
                 intent=intent,
-                ontological_path=(OntologicalLayer.FORMING,),
+                ontological_path=(OntologicalLayer.STRUCTURE,),
                 ppv_values=(3, 3, 3, 3, 3, 3, 3, 3),
                 temperature=0.5,
                 mode=RenderMode.GOVERNED,
@@ -625,7 +625,7 @@ class TestOutputDifferentiation:
             ppv = tuple([ppv_val] * 8)
             config = ExperimentConfig(
                 intent="EXPRESS_LOSS",
-                ontological_path=(OntologicalLayer.FORMING,),
+                ontological_path=(OntologicalLayer.STRUCTURE,),
                 ppv_values=ppv,
                 temperature=0.5,
                 mode=RenderMode.GOVERNED,
@@ -647,7 +647,7 @@ class TestOutputDifferentiation:
         for temp in TEMPERATURE_VALUES.values():
             config = ExperimentConfig(
                 intent="EXPRESS_LOSS",
-                ontological_path=(OntologicalLayer.FORMING,),
+                ontological_path=(OntologicalLayer.STRUCTURE,),
                 ppv_values=(3, 3, 3, 3, 3, 3, 3, 3),
                 temperature=temp,
                 mode=RenderMode.GOVERNED,
@@ -669,7 +669,7 @@ class TestOutputDifferentiation:
         for mode in [RenderMode.GOVERNED, RenderMode.OPEN]:
             config = ExperimentConfig(
                 intent="EXPRESS_LOSS",
-                ontological_path=(OntologicalLayer.FORMING,),
+                ontological_path=(OntologicalLayer.STRUCTURE,),
                 ppv_values=(3, 3, 3, 3, 3, 3, 3, 3),
                 temperature=0.5,
                 mode=mode,
@@ -812,7 +812,7 @@ class TestHarnessIntegration:
 
         config = ExperimentConfig(
             intent="EXPRESS_LOSS",
-            ontological_path=(OntologicalLayer.FORMING,),
+            ontological_path=(OntologicalLayer.STRUCTURE,),
             ppv_values=(3, 3, 3, 3, 3, 3, 3, 3),
             temperature=0.5,
             mode=RenderMode.GOVERNED,
@@ -832,7 +832,7 @@ class TestHarnessIntegration:
         # Run some experiments
         config = ExperimentConfig(
             intent="EXPRESS_LOSS",
-            ontological_path=(OntologicalLayer.FORMING,),
+            ontological_path=(OntologicalLayer.STRUCTURE,),
             ppv_values=(3, 3, 3, 3, 3, 3, 3, 3),
             temperature=0.5,
             mode=RenderMode.GOVERNED,
@@ -905,7 +905,7 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="intent"):
             ExperimentConfig(
                 intent="",
-                ontological_path=(OntologicalLayer.FORMING,),
+                ontological_path=(OntologicalLayer.STRUCTURE,),
                 ppv_values=(3, 3, 3, 3, 3, 3, 3, 3),
                 temperature=0.5,
                 mode=RenderMode.GOVERNED,
@@ -918,7 +918,7 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="8"):
             ExperimentConfig(
                 intent="EXPRESS_LOSS",
-                ontological_path=(OntologicalLayer.FORMING,),
+                ontological_path=(OntologicalLayer.STRUCTURE,),
                 ppv_values=(3, 3, 3),  # Wrong length
                 temperature=0.5,
                 mode=RenderMode.GOVERNED,
@@ -931,7 +931,7 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="range"):
             ExperimentConfig(
                 intent="EXPRESS_LOSS",
-                ontological_path=(OntologicalLayer.FORMING,),
+                ontological_path=(OntologicalLayer.STRUCTURE,),
                 ppv_values=(3, 3, 3, 3, 3, 3, 3, 99),  # 99 out of range
                 temperature=0.5,
                 mode=RenderMode.GOVERNED,
@@ -944,7 +944,7 @@ class TestConfigValidation:
         with pytest.raises(ValueError, match="temperature"):
             ExperimentConfig(
                 intent="EXPRESS_LOSS",
-                ontological_path=(OntologicalLayer.FORMING,),
+                ontological_path=(OntologicalLayer.STRUCTURE,),
                 ppv_values=(3, 3, 3, 3, 3, 3, 3, 3),
                 temperature=1.5,  # Out of range
                 mode=RenderMode.GOVERNED,

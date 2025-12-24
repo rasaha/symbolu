@@ -546,10 +546,10 @@ def analyze_cross_axis_ceiling(
 
     # Sample combinations across axes
     paths = [
-        (OntologicalLayer.ACTING, OntologicalLayer.FORMING, OntologicalLayer.THINKING),
-        (OntologicalLayer.THINKING, OntologicalLayer.DIRECTING, OntologicalLayer.REASONING),
-        (OntologicalLayer.REASONING, OntologicalLayer.PURPOSING, OntologicalLayer.UNIFYING),
-        (OntologicalLayer.UNIFYING, OntologicalLayer.ABSOLVING, OntologicalLayer.ACTING),
+        (OntologicalLayer.EXECUTION, OntologicalLayer.STRUCTURE, OntologicalLayer.COGNITION),
+        (OntologicalLayer.COGNITION, OntologicalLayer.AGENCY, OntologicalLayer.REASONING),
+        (OntologicalLayer.REASONING, OntologicalLayer.PURPOSE, OntologicalLayer.UNIFYING),
+        (OntologicalLayer.UNIFYING, OntologicalLayer.ABSOLVING, OntologicalLayer.EXECUTION),
     ]
 
     temps = [0.2, 0.5, 0.8]

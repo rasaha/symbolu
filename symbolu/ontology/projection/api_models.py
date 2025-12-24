@@ -28,17 +28,19 @@ class InputRefKind(Enum):
 
 
 class OntologicalLayer(Enum):
-    """10 ontological layers for projection."""
-    SENSING = 1
-    PERCEIVING = 2
-    THINKING = 3
-    FEELING = 4
-    ACTING = 5
-    RELATING = 6
-    META_OBSERVING = 7
-    UNIFYING = 8
-    TRANSCENDING = 9
-    INTEGRATING = 10
+    """12 ontological layers for projection (patent-exact sequence)."""
+    POTENTIAL = 1
+    IDENTITY = 2
+    EXECUTION = 3
+    STRUCTURE = 4
+    COGNITION = 5
+    AGENCY = 6
+    REASONING = 7
+    PURPOSE = 8
+    WITNESSES = 9
+    UNIFYING = 10
+    INTEGRATION = 11
+    ABSOLVING = 12
 
 
 class ProjectionProfile(Enum):

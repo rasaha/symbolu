@@ -9,7 +9,8 @@
       "No substrate edits",
       "Polarity is layer-relative",
       "Kośa-consistent assignment only"
-    ]
+    ],
+    "migration_note": "Migrated from 10D to 12D layer naming (2024-12-24)"
   },
   "polarity_map": {
     "ka": {
@@ -22,7 +23,9 @@
       "O8_PURPOSE": "constructive",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "constructive",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "kha": {
       "O3_EXECUTION": "degenerative",
@@ -34,7 +37,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "ga": {
       "O3_EXECUTION": "constructive",
@@ -46,7 +51,9 @@
       "O8_PURPOSE": "constructive",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "constructive",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "gha": {
       "O3_EXECUTION": "constructive",
@@ -58,7 +65,9 @@
       "O8_PURPOSE": "transitional",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "constructive",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "nga": {
       "O3_EXECUTION": "neutral",
@@ -70,7 +79,9 @@
       "O8_PURPOSE": "neutral",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "neutral",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "ca": {
       "O3_EXECUTION": "constructive",
@@ -82,7 +93,9 @@
       "O8_PURPOSE": "constructive",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "constructive",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "cha": {
       "O3_EXECUTION": "degenerative",
@@ -94,7 +107,9 @@
       "O8_PURPOSE": "transitional",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "ja": {
       "O3_EXECUTION": "constructive",
@@ -106,7 +121,9 @@
       "O8_PURPOSE": "constructive",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "transitional",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "jha": {
       "O3_EXECUTION": "degenerative",
@@ -118,7 +135,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "nya": {
       "O3_EXECUTION": "degenerative",
@@ -130,7 +149,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "constructive"
+      "O12_ABSOLVING": "constructive",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "tta": {
       "O3_EXECUTION": "constructive",
@@ -142,7 +163,9 @@
       "O8_PURPOSE": "constructive",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "constructive",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "ttha": {
       "O3_EXECUTION": "transitional",
@@ -154,7 +177,9 @@
       "O8_PURPOSE": "transitional",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "transitional",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "dda": {
       "O3_EXECUTION": "degenerative",
@@ -166,7 +191,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "ddha": {
       "O3_EXECUTION": "degenerative",
@@ -178,7 +205,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "nna": {
       "O3_EXECUTION": "transitional",
@@ -190,7 +219,9 @@
       "O8_PURPOSE": "transitional",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "transitional",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "ta": {
       "O3_EXECUTION": "neutral",
@@ -202,7 +233,9 @@
       "O8_PURPOSE": "constructive",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "constructive",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "tha": {
       "O3_EXECUTION": "degenerative",
@@ -214,7 +247,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "da": {
       "O3_EXECUTION": "degenerative",
@@ -226,7 +261,9 @@
       "O8_PURPOSE": "transitional",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "transitional",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "dha": {
       "O3_EXECUTION": "constructive",
@@ -238,7 +275,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "transitional",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "na": {
       "O3_EXECUTION": "constructive",
@@ -250,7 +289,9 @@
       "O8_PURPOSE": "transitional",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "constructive",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "pa": {
       "O3_EXECUTION": "degenerative",
@@ -262,7 +303,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "pha": {
       "O3_EXECUTION": "degenerative",
@@ -274,7 +317,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "ba": {
       "O3_EXECUTION": "degenerative",
@@ -286,7 +331,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "bha": {
       "O3_EXECUTION": "degenerative",
@@ -298,7 +345,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "ma": {
       "O3_EXECUTION": "transitional",
@@ -310,7 +359,9 @@
       "O8_PURPOSE": "transitional",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "transitional",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "ya": {
       "O3_EXECUTION": "neutral",
@@ -322,7 +373,9 @@
       "O8_PURPOSE": "constructive",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "constructive",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "ra": {
       "O3_EXECUTION": "degenerative",
@@ -334,7 +387,9 @@
       "O8_PURPOSE": "transitional",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "la": {
       "O3_EXECUTION": "degenerative",
@@ -346,7 +401,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "va": {
       "O3_EXECUTION": "constructive",
@@ -358,7 +415,9 @@
       "O8_PURPOSE": "constructive",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "transitional",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "sha": {
       "O3_EXECUTION": "degenerative",
@@ -370,7 +429,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "ssa": {
       "O3_EXECUTION": "transitional",
@@ -382,7 +443,9 @@
       "O8_PURPOSE": "transitional",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "transitional",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "sa": {
       "O3_EXECUTION": "transitional",
@@ -394,7 +457,9 @@
       "O8_PURPOSE": "transitional",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "transitional",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "ha": {
       "O3_EXECUTION": "degenerative",
@@ -406,7 +471,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     },
     "ksha": {
       "O3_EXECUTION": "degenerative",
@@ -418,7 +485,9 @@
       "O8_PURPOSE": "degenerative",
       "O9_WITNESSES": "neutral",
       "O10_UNIFYING": "degenerative",
-      "O12_ABSOLVING": "transitional"
+      "O12_ABSOLVING": "transitional",
+      "O1_POTENTIAL": "neutral",
+      "O11_INTEGRATION": "constructive"
     }
   }
 }

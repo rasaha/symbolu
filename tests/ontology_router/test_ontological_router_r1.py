@@ -108,7 +108,7 @@ class TestDeterminism:
             artifact_id="det-test-002",
             phase_id="4",
             artifact_hash="hash_for_hint_test_xyz789",
-            declared_projection_hint=OntologicalLayer.THINKING,
+            declared_projection_hint=OntologicalLayer.COGNITION,
         )
 
         first_response = router.project(request)
@@ -146,12 +146,12 @@ class TestDeterminism:
         span_input_1 = LedgerSpanInput(
             artifact_hash="order_test",
             phase_id="3",
-            projected_layers=(OntologicalLayer.FORMING, OntologicalLayer.THINKING),
+            projected_layers=(OntologicalLayer.STRUCTURE, OntologicalLayer.COGNITION),
         )
         span_input_2 = LedgerSpanInput(
             artifact_hash="order_test",
             phase_id="3",
-            projected_layers=(OntologicalLayer.THINKING, OntologicalLayer.FORMING),
+            projected_layers=(OntologicalLayer.COGNITION, OntologicalLayer.STRUCTURE),
         )
         assert LedgerAdapter.generate_span_id(span_input_1) == \
                LedgerAdapter.generate_span_id(span_input_2)
@@ -222,24 +222,24 @@ class TestAllowlistEnforcement:
             artifact_id="p4-forming",
             phase_id="4",
             artifact_hash="hash_p4_forming",
-            declared_projection_hint=OntologicalLayer.FORMING,
+            declared_projection_hint=OntologicalLayer.STRUCTURE,
         )
         response_forming = router.project(request_forming)
-        assert response_forming.projected_layers == (OntologicalLayer.FORMING,)
+        assert response_forming.projected_layers == (OntologicalLayer.STRUCTURE,)
 
         # THINKING hint
         request_thinking = ProjectionRequest(
             artifact_id="p4-thinking",
             phase_id="4",
             artifact_hash="hash_p4_thinking",
-            declared_projection_hint=OntologicalLayer.THINKING,
+            declared_projection_hint=OntologicalLayer.COGNITION,
         )
         response_thinking = router.project(request_thinking)
-        assert response_thinking.projected_layers == (OntologicalLayer.THINKING,)
+        assert response_thinking.projected_layers == (OntologicalLayer.COGNITION,)
 
     def test_phase_5_allows_two_hints(self, router: OntologicalLayerRouter) -> None:
         """Verify phase 5 allows both THINKING and UNIFYING hints."""
-        for hint in [OntologicalLayer.THINKING, OntologicalLayer.UNIFYING]:
+        for hint in [OntologicalLayer.COGNITION, OntologicalLayer.UNIFYING]:
             request = ProjectionRequest(
                 artifact_id=f"p5-{hint.name}",
                 phase_id="5",
@@ -269,10 +269,10 @@ class TestValidHintAccepted:
             artifact_id="valid-1b",
             phase_id="1b",
             artifact_hash="hash_1b",
-            declared_projection_hint=OntologicalLayer.ACTING,
+            declared_projection_hint=OntologicalLayer.EXECUTION,
         )
         response = router.project(request)
-        assert response.projected_layers == (OntologicalLayer.ACTING,)
+        assert response.projected_layers == (OntologicalLayer.EXECUTION,)
 
     def test_valid_hint_phase_2_tagging(self, router: OntologicalLayerRouter) -> None:
         """Verify TAGGING hint accepted for phase 2."""
@@ -280,10 +280,10 @@ class TestValidHintAccepted:
             artifact_id="valid-2",
             phase_id="2",
             artifact_hash="hash_2",
-            declared_projection_hint=OntologicalLayer.TAGGING,
+            declared_projection_hint=OntologicalLayer.IDENTITY,
         )
         response = router.project(request)
-        assert response.projected_layers == (OntologicalLayer.TAGGING,)
+        assert response.projected_layers == (OntologicalLayer.IDENTITY,)
 
     def test_valid_hint_phase_3_forming(self, router: OntologicalLayerRouter) -> None:
         """Verify FORMING hint accepted for phase 3."""
@@ -291,10 +291,10 @@ class TestValidHintAccepted:
             artifact_id="valid-3",
             phase_id="3",
             artifact_hash="hash_3",
-            declared_projection_hint=OntologicalLayer.FORMING,
+            declared_projection_hint=OntologicalLayer.STRUCTURE,
         )
         response = router.project(request)
-        assert response.projected_layers == (OntologicalLayer.FORMING,)
+        assert response.projected_layers == (OntologicalLayer.STRUCTURE,)
 
     def test_valid_hint_overrides_default(self, router: OntologicalLayerRouter) -> None:
         """Verify valid hint replaces default projection."""
@@ -305,17 +305,17 @@ class TestValidHintAccepted:
             artifact_hash="hash_override",
         )
         response_no_hint = router.project(request_no_hint)
-        assert response_no_hint.projected_layers == (OntologicalLayer.FORMING,)
+        assert response_no_hint.projected_layers == (OntologicalLayer.STRUCTURE,)
 
         # With THINKING hint, should override
         request_with_hint = ProjectionRequest(
             artifact_id="override-test",
             phase_id="4",
             artifact_hash="hash_override",
-            declared_projection_hint=OntologicalLayer.THINKING,
+            declared_projection_hint=OntologicalLayer.COGNITION,
         )
         response_with_hint = router.project(request_with_hint)
-        assert response_with_hint.projected_layers == (OntologicalLayer.THINKING,)
+        assert response_with_hint.projected_layers == (OntologicalLayer.COGNITION,)
 
     def test_hint_same_as_default_works(self, router: OntologicalLayerRouter) -> None:
         """Verify hint same as default still works."""
@@ -323,10 +323,10 @@ class TestValidHintAccepted:
             artifact_id="same-as-default",
             phase_id="6",
             artifact_hash="hash_same",
-            declared_projection_hint=OntologicalLayer.DIRECTING,
+            declared_projection_hint=OntologicalLayer.AGENCY,
         )
         response = router.project(request)
-        assert response.projected_layers == (OntologicalLayer.DIRECTING,)
+        assert response.projected_layers == (OntologicalLayer.AGENCY,)
 
     def test_all_valid_hints_accepted(self, router: OntologicalLayerRouter) -> None:
         """Verify all valid hints are accepted for each phase."""
@@ -353,7 +353,7 @@ class TestInvalidHintRejected:
     def test_invalid_hint_phase_1b_rejected(self, router: OntologicalLayerRouter) -> None:
         """Verify non-ACTING hints rejected for phase 1b."""
         for layer in OntologicalLayer:
-            if layer != OntologicalLayer.ACTING:
+            if layer != OntologicalLayer.EXECUTION:
                 request = ProjectionRequest(
                     artifact_id=f"invalid-1b-{layer.name}",
                     phase_id="1b",
@@ -366,7 +366,7 @@ class TestInvalidHintRejected:
 
     def test_invalid_hint_phase_2_rejected(self, router: OntologicalLayerRouter) -> None:
         """Verify non-TAGGING hints rejected for phase 2."""
-        invalid_hints = [l for l in OntologicalLayer if l != OntologicalLayer.TAGGING]
+        invalid_hints = [l for l in OntologicalLayer if l != OntologicalLayer.IDENTITY]
         for hint in invalid_hints:
             request = ProjectionRequest(
                 artifact_id=f"invalid-2-{hint.name}",
@@ -388,7 +388,7 @@ class TestInvalidHintRejected:
             artifact_id="cross-phase",
             phase_id="3",
             artifact_hash="hash_cross",
-            declared_projection_hint=OntologicalLayer.TAGGING,
+            declared_projection_hint=OntologicalLayer.IDENTITY,
         )
         with pytest.raises(ProjectionBlockedError) as exc:
             router.project(request)
@@ -403,7 +403,7 @@ class TestInvalidHintRejected:
                 artifact_id=f"purposing-{phase_id}",
                 phase_id=phase_id,
                 artifact_hash=f"hash_purposing_{phase_id}",
-                declared_projection_hint=OntologicalLayer.PURPOSING,
+                declared_projection_hint=OntologicalLayer.PURPOSE,
             )
             with pytest.raises(ProjectionBlockedError) as exc:
                 router.project(request)
@@ -647,7 +647,7 @@ class TestMutationDetection:
         span_input = LedgerSpanInput(
             artifact_hash="immutable_span",
             phase_id="3",
-            projected_layers=(OntologicalLayer.FORMING,),
+            projected_layers=(OntologicalLayer.STRUCTURE,),
         )
         with pytest.raises(Exception):
             span_input.artifact_hash = "modified"  # type: ignore
@@ -677,7 +677,7 @@ class TestHashStability:
     """Tests verifying hash stability across runs."""
 
     def test_response_hash_stable(self, router: OntologicalLayerRouter) -> None:
-        """Verify response can be hashed consistently."""
+        """Verify response can be hashed consistwelvetly."""
         request = ProjectionRequest(
             artifact_id="hash-stable-test",
             phase_id="3",
@@ -701,7 +701,7 @@ class TestHashStability:
             current_hash = LedgerAdapter.generate_span_id(span_input)
             assert current_hash == first_hash
 
-    def test_span_id_length_consistent(self) -> None:
+    def test_span_id_length_consistwelvet(self) -> None:
         """Verify span ID length is always SPAN_ID_LENGTH."""
         for phase_id in VALID_PHASE_IDS:
             default_layers = PHASE_TO_LAYER_DEFAULT[phase_id]
@@ -718,7 +718,7 @@ class TestHashStability:
         span_input = LedgerSpanInput(
             artifact_hash="hex_test",
             phase_id="5",
-            projected_layers=(OntologicalLayer.THINKING,),
+            projected_layers=(OntologicalLayer.COGNITION,),
         )
         span_id = LedgerAdapter.generate_span_id(span_input)
         assert all(c in "0123456789abcdef" for c in span_id)
@@ -741,12 +741,12 @@ class TestHashStability:
         span_input_1 = LedgerSpanInput(
             artifact_hash="hash_a",
             phase_id="3",
-            projected_layers=(OntologicalLayer.FORMING,),
+            projected_layers=(OntologicalLayer.STRUCTURE,),
         )
         span_input_2 = LedgerSpanInput(
             artifact_hash="hash_b",
             phase_id="3",
-            projected_layers=(OntologicalLayer.FORMING,),
+            projected_layers=(OntologicalLayer.STRUCTURE,),
         )
         assert LedgerAdapter.generate_span_id(span_input_1) != \
                LedgerAdapter.generate_span_id(span_input_2)
@@ -761,7 +761,7 @@ class TestForbiddenImports:
 
     FORBIDDEN_MODULES = {
         # ML/DL frameworks
-        "torch", "pytorch", "tensorflow", "tf", "keras",
+        "torch", "pytorch", "twelvesorflow", "tf", "keras",
         "jax", "flax", "haiku", "trax",
         # NLP libraries
         "transformers", "huggingface", "spacy", "nltk",
@@ -775,7 +775,7 @@ class TestForbiddenImports:
         # Probabilistic
         "pymc", "pymc3", "pyro", "numpyro", "edward",
         # Inference
-        "onnx", "onnxruntime", "tensorrt", "tflite",
+        "onnx", "onnxruntime", "twelvesorrt", "tflite",
     }
 
     def test_no_forbidden_imports_in_router_module(self) -> None:
@@ -913,7 +913,7 @@ class TestReplayAudit:
         span_input = LedgerSpanInput(
             artifact_hash="replay_span",
             phase_id="6",
-            projected_layers=(OntologicalLayer.DIRECTING,),
+            projected_layers=(OntologicalLayer.AGENCY,),
         )
 
         span_ids = [LedgerAdapter.generate_span_id(span_input) for _ in range(20)]
@@ -1009,9 +1009,9 @@ class TestEdgeCases:
 class TestStructuralInvariants:
     """Tests verifying structural invariants."""
 
-    def test_ontological_layer_has_10_members(self) -> None:
+    def test_ontological_layer_has_12_members(self) -> None:
         """Verify OntologicalLayer enum has exactly 10 members."""
-        assert len(OntologicalLayer) == 10
+        assert len(OntologicalLayer) == 12
 
     def test_ontological_layer_values_are_sequential(self) -> None:
         """Verify layer values are 1-10 sequential."""
@@ -1119,4 +1119,4 @@ class TestAdditionalInvariance:
             artifact_hash="hash_final",
         )
         response = router.project(final_request)
-        assert response.projected_layers == (OntologicalLayer.THINKING,)
+        assert response.projected_layers == (OntologicalLayer.COGNITION,)

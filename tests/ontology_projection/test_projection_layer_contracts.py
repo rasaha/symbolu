@@ -119,7 +119,7 @@ class TestNoFreeFormText:
         """THINKING layer artifacts should contain no free-form text."""
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -135,7 +135,7 @@ class TestNoFreeFormText:
         """META_OBSERVING layer artifacts should contain no free-form text."""
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.META_OBSERVING,
+            layer=OntologicalLayer.WITNESSES,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -165,7 +165,7 @@ class TestNoFreeFormText:
 
     def test_ledger_spans_no_freeform_text(self, sample_snapshot, sample_input_ref, sample_options):
         """Ledger spans should contain no free-form text."""
-        for layer in [OntologicalLayer.THINKING, OntologicalLayer.META_OBSERVING, OntologicalLayer.UNIFYING]:
+        for layer in [OntologicalLayer.COGNITION, OntologicalLayer.WITNESSES, OntologicalLayer.UNIFYING]:
             request = ProjectionRequest(
                 snapshot_id=sample_snapshot.snapshot_id,
                 layer=layer,
@@ -331,7 +331,7 @@ class TestArtifactContentTypes:
         """THINKING layer artifacts should be tuples."""
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -346,7 +346,7 @@ class TestArtifactContentTypes:
         """META_OBSERVING layer should have WitnessFrame and InvariantTimeline."""
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.META_OBSERVING,
+            layer=OntologicalLayer.WITNESSES,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -406,7 +406,7 @@ class TestInvariantsReport:
         """Invariants report should have correct structure."""
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -421,7 +421,7 @@ class TestInvariantsReport:
         """Reason codes should be strings."""
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.ACTING,  # Unsupported
+            layer=OntologicalLayer.EXECUTION,  # Unsupported
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
