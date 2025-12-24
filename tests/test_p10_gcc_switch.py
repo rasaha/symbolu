@@ -80,7 +80,7 @@ def create_test_request(
     return Phase10Request(
         artifact_id=artifact_id,
         artifact_hash=create_test_artifact_hash(),
-        projected_layers=(OntologicalLayer.FORMING,),
+        projected_layers=(OntologicalLayer.STRUCTURE,),
         gcc_mode=gcc_mode,
     )
 
@@ -204,7 +204,7 @@ class TestDeterminism:
     def test_span_id_deterministic(self) -> None:
         """Span ID computation is deterministic."""
         artifact_hash = create_test_artifact_hash()
-        layers_hash = compute_layers_hash((OntologicalLayer.FORMING,))
+        layers_hash = compute_layers_hash((OntologicalLayer.STRUCTURE,))
 
         # Same inputs must produce same span_id
         span_id_1 = compute_gcc_span_id(artifact_hash, GCCMode.ENABLED, layers_hash)
@@ -342,7 +342,7 @@ class TestBehavioralDifference:
         # Use identical inputs except gcc_mode
         artifact_hash = create_test_artifact_hash()
         artifact_id = "test_artifact_same"
-        projected_layers = (OntologicalLayer.FORMING,)
+        projected_layers = (OntologicalLayer.STRUCTURE,)
 
         request_enabled = Phase10Request(
             artifact_id=artifact_id,
@@ -424,7 +424,7 @@ class TestLedgerIntegrity:
     def test_ledger_entry_gcc_mode_is_hash_participating(self) -> None:
         """gcc_mode affects the span_id hash."""
         artifact_hash = create_test_artifact_hash()
-        layers_hash = compute_layers_hash((OntologicalLayer.FORMING,))
+        layers_hash = compute_layers_hash((OntologicalLayer.STRUCTURE,))
 
         span_enabled = compute_gcc_span_id(artifact_hash, GCCMode.ENABLED, layers_hash)
         span_disabled = compute_gcc_span_id(artifact_hash, GCCMode.DISABLED, layers_hash)
@@ -505,7 +505,7 @@ class TestFailClosed:
             Phase10Request(
                 artifact_id="test",
                 artifact_hash="",  # Empty - invalid
-                projected_layers=(OntologicalLayer.FORMING,),
+                projected_layers=(OntologicalLayer.STRUCTURE,),
                 gcc_mode=GCCMode.ENABLED,
             )
 
@@ -515,7 +515,7 @@ class TestFailClosed:
             Phase10Request(
                 artifact_id="test",
                 artifact_hash="abc123",  # Too short
-                projected_layers=(OntologicalLayer.FORMING,),
+                projected_layers=(OntologicalLayer.STRUCTURE,),
                 gcc_mode=GCCMode.ENABLED,
             )
 
@@ -525,7 +525,7 @@ class TestFailClosed:
             Phase10Request(
                 artifact_id="test",
                 artifact_hash="z" * 64,  # Not hex
-                projected_layers=(OntologicalLayer.FORMING,),
+                projected_layers=(OntologicalLayer.STRUCTURE,),
                 gcc_mode=GCCMode.ENABLED,
             )
 
@@ -535,7 +535,7 @@ class TestFailClosed:
             Phase10Request(
                 artifact_id="",  # Empty - invalid
                 artifact_hash=create_test_artifact_hash(),
-                projected_layers=(OntologicalLayer.FORMING,),
+                projected_layers=(OntologicalLayer.STRUCTURE,),
                 gcc_mode=GCCMode.ENABLED,
             )
 
@@ -554,7 +554,7 @@ class TestFailClosed:
         request = Phase10Request(
             artifact_id="test",
             artifact_hash=create_test_artifact_hash(),
-            projected_layers=(OntologicalLayer.FORMING,),
+            projected_layers=(OntologicalLayer.STRUCTURE,),
             # gcc_mode not specified - should default to ENABLED
         )
         assert request.gcc_mode == GCCMode.ENABLED
@@ -567,7 +567,7 @@ class TestFailClosed:
         request_disabled = Phase10Request(
             artifact_id="test",
             artifact_hash=create_test_artifact_hash(),
-            projected_layers=(OntologicalLayer.FORMING,),
+            projected_layers=(OntologicalLayer.STRUCTURE,),
             gcc_mode=GCCMode.DISABLED,  # Explicit
         )
         assert request_disabled.gcc_mode == GCCMode.DISABLED
@@ -576,7 +576,7 @@ class TestFailClosed:
         request_default = Phase10Request(
             artifact_id="test",
             artifact_hash=create_test_artifact_hash(),
-            projected_layers=(OntologicalLayer.FORMING,),
+            projected_layers=(OntologicalLayer.STRUCTURE,),
         )
         assert request_default.gcc_mode == GCCMode.ENABLED
 

@@ -654,7 +654,7 @@ class TestExistingValidPaths:
             artifact_id="abc123def456",
             artifact_hash="deadbeef12345678",
             phase_id="5",
-            projected_layers=(OntologicalLayer.THINKING,),
+            projected_layers=(OntologicalLayer.COGNITION,),
             router_version="R1.0",
         )
         # All fields should be non-expressive
@@ -678,7 +678,7 @@ class TestExistingValidPaths:
             artifact_id="fedcba0987654321",
             artifact_hash="deadbeefcafe1234",
             phase_id="3",
-            projected_layers=(OntologicalLayer.FORMING,),
+            projected_layers=(OntologicalLayer.STRUCTURE,),
             router_version="R1.0",
             mapping_version="M1.0",
             seq=0,

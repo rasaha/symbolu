@@ -145,11 +145,11 @@ def _dispatch_layer(
     Raises:
         NotImplementedError: If layer is not implemented
     """
-    if layer == OntologicalLayer.THINKING:
+    if layer == OntologicalLayer.COGNITION:
         from symbolu.ontology.projection.layers.thinking import project_thinking
         return project_thinking(snapshot, request)
 
-    elif layer == OntologicalLayer.META_OBSERVING:
+    elif layer == OntologicalLayer.WITNESSES:
         from symbolu.ontology.projection.layers.meta_observing import project_meta_observing
         return project_meta_observing(snapshot, request)
 

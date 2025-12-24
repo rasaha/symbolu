@@ -100,7 +100,7 @@ class TestDeterminism:
             artifact_id="test_artifact",
             artifact_hash="a" * 64,
             phase_id="1b",
-            projected_layers=(OntologicalLayer.ACTING,),
+            projected_layers=(OntologicalLayer.EXECUTION,),
             span_id="0" * 16,
             router_version="R1.0",
         )
@@ -117,7 +117,7 @@ class TestDeterminism:
             "artifact_id": "test_artifact",
             "artifact_hash": "b" * 64,
             "phase_id": "2",
-            "projected_layers": (OntologicalLayer.TAGGING,),
+            "projected_layers": (OntologicalLayer.IDENTITY,),
             "span_id": "1" * 16,
             "router_version": "R1.0",
         }
@@ -132,7 +132,7 @@ class TestDeterminism:
         span_input = LedgerSpanInput(
             artifact_hash="c" * 64,
             phase_id="3",
-            projected_layers=(OntologicalLayer.FORMING,),
+            projected_layers=(OntologicalLayer.STRUCTURE,),
         )
 
         first_span_id = LedgerAdapter.generate_span_id(span_input)
@@ -328,7 +328,7 @@ class TestReplayErrors:
             router=router,
         )
 
-        wrong_layers = (OntologicalLayer.TAGGING,)
+        wrong_layers = (OntologicalLayer.IDENTITY,)
         wrong_span_input = LedgerSpanInput(
             artifact_hash=entry.artifact_hash,
             phase_id=entry.phase_id,
@@ -719,7 +719,7 @@ class TestSerialization:
             artifact_id="test_artifact",
             artifact_hash="0" * 64,
             phase_id="2",
-            projected_layers=(OntologicalLayer.TAGGING,),
+            projected_layers=(OntologicalLayer.IDENTITY,),
             span_id="1" * 16,
             router_version="R1.0",
         )
@@ -743,7 +743,7 @@ class TestSerialization:
             artifact_id="test_artifact",
             artifact_hash="2" * 64,
             phase_id="3",
-            projected_layers=(OntologicalLayer.FORMING,),
+            projected_layers=(OntologicalLayer.STRUCTURE,),
             span_id="3" * 16,
             router_version="R1.0",
         )
@@ -773,7 +773,7 @@ class TestValidation:
                 artifact_id="test",
                 artifact_hash="a" * 64,
                 phase_id="1b",
-                projected_layers=(OntologicalLayer.ACTING,),
+                projected_layers=(OntologicalLayer.EXECUTION,),
                 span_id="0" * 16,
                 router_version="R1.0",
                 entry_hash="0" * 16,
@@ -787,7 +787,7 @@ class TestValidation:
                 artifact_id="",
                 artifact_hash="a" * 64,
                 phase_id="1b",
-                projected_layers=(OntologicalLayer.ACTING,),
+                projected_layers=(OntologicalLayer.EXECUTION,),
                 span_id="0" * 16,
                 router_version="R1.0",
                 entry_hash="0" * 16,
@@ -801,7 +801,7 @@ class TestValidation:
                 artifact_id="test",
                 artifact_hash="a" * 64,
                 phase_id="1b",
-                projected_layers=(OntologicalLayer.ACTING,),
+                projected_layers=(OntologicalLayer.EXECUTION,),
                 span_id="0" * 16,
                 router_version="R1.0",
                 entry_hash="0" * 32,
@@ -877,7 +877,7 @@ class TestSuccessPath:
             artifact_hash="?" * 64,
             phase_id="4",
             router=router,
-            declared_hint=OntologicalLayer.THINKING,
+            declared_hint=OntologicalLayer.COGNITION,
         )
 
         entries = store.read_all()
@@ -885,7 +885,7 @@ class TestSuccessPath:
         result = verifier.verify(entries, router)
 
         assert result.success is True
-        assert entries[0].projected_layers == (OntologicalLayer.THINKING,)
+        assert entries[0].projected_layers == (OntologicalLayer.COGNITION,)
 
 
 # =============================================================================
@@ -916,7 +916,7 @@ class TestLedgerEntryDeterminism:
             "artifact_id": "test_artifact",
             "artifact_hash": "a" * 64,
             "phase_id": "1b",
-            "projected_layers": (OntologicalLayer.ACTING,),
+            "projected_layers": (OntologicalLayer.EXECUTION,),
             "router_version": "R1.0",
             "mapping_version": MAPPING_VERSION,
             "seq": 0,
@@ -1100,7 +1100,7 @@ class TestLedgerEntryWrongProjection:
             router=router,
         )
 
-        wrong_layers = (OntologicalLayer.TAGGING,)
+        wrong_layers = (OntologicalLayer.IDENTITY,)
         wrong_span_input = LedgerSpanInput(
             artifact_hash=entry.artifact_hash,
             phase_id=entry.phase_id,
@@ -1439,7 +1439,7 @@ class TestLedgerEntryValidation:
                 artifact_id="test",
                 artifact_hash="a" * 64,
                 phase_id="1b",
-                projected_layers=(OntologicalLayer.ACTING,),
+                projected_layers=(OntologicalLayer.EXECUTION,),
                 router_version="R1.0",
                 mapping_version=MAPPING_VERSION,
                 seq=-1,
@@ -1455,7 +1455,7 @@ class TestLedgerEntryValidation:
                 artifact_id="test",
                 artifact_hash="a" * 64,
                 phase_id="1b",
-                projected_layers=(OntologicalLayer.ACTING,),
+                projected_layers=(OntologicalLayer.EXECUTION,),
                 router_version="R1.0",
                 mapping_version=MAPPING_VERSION,
                 seq=0,

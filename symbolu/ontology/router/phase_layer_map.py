@@ -2,7 +2,7 @@
 Phase to Ontological Layer Mapping
 ==================================
 
-Deterministic, declarative mapping from Phase IDs to ontological layers.
+Deterministic, declarative mapping from Phase IDs to ontological layers (12D).
 
 Hard Constraints:
     - Mapping is immutable
@@ -11,15 +11,15 @@ Hard Constraints:
     - No probabilistic selection
     - Purely declarative
 
-Mapping Table:
-    Phase 1b -> TAGGING, FORMING
-    Phase 2  -> TAGGING, FORMING
-    Phase 3  -> THINKING, REASONING, DIRECTING
-    Phase 4  -> ACTING, THINKING
-    Phase 5  -> FORMING, UNIFYING
-    Phase 6  -> DIRECTING, META_OBSERVING, PURPOSING
-    Phase 7  -> ACTING, DIRECTING, THINKING
-    Phase 8  -> META_OBSERVING, DIRECTING
+Mapping Table (12D layer names):
+    Phase 1b -> IDENTITY, STRUCTURE
+    Phase 2  -> IDENTITY, STRUCTURE
+    Phase 3  -> COGNITION, REASONING, AGENCY
+    Phase 4  -> EXECUTION, COGNITION
+    Phase 5  -> STRUCTURE, UNIFYING
+    Phase 6  -> AGENCY, WITNESSES, PURPOSE
+    Phase 7  -> EXECUTION, AGENCY, COGNITION
+    Phase 8  -> WITNESSES, AGENCY
     Phase 9  -> UNIFYING, REASONING, ABSOLVING (ABSOLVING is gated)
 """
 
@@ -42,39 +42,39 @@ LayerSet = FrozenSet[OntologicalLayer]
 # Keys are phase IDs as strings, values are frozensets of layers
 _PHASE_TO_LAYERS_RAW: Mapping[str, LayerSet] = {
     "1b": frozenset({
-        OntologicalLayer.TAGGING,
-        OntologicalLayer.FORMING,
+        OntologicalLayer.IDENTITY,
+        OntologicalLayer.STRUCTURE,
     }),
     "2": frozenset({
-        OntologicalLayer.TAGGING,
-        OntologicalLayer.FORMING,
+        OntologicalLayer.IDENTITY,
+        OntologicalLayer.STRUCTURE,
     }),
     "3": frozenset({
-        OntologicalLayer.THINKING,
+        OntologicalLayer.COGNITION,
         OntologicalLayer.REASONING,
-        OntologicalLayer.DIRECTING,
+        OntologicalLayer.AGENCY,
     }),
     "4": frozenset({
-        OntologicalLayer.ACTING,
-        OntologicalLayer.THINKING,
+        OntologicalLayer.EXECUTION,
+        OntologicalLayer.COGNITION,
     }),
     "5": frozenset({
-        OntologicalLayer.FORMING,
+        OntologicalLayer.STRUCTURE,
         OntologicalLayer.UNIFYING,
     }),
     "6": frozenset({
-        OntologicalLayer.DIRECTING,
-        OntologicalLayer.META_OBSERVING,
-        OntologicalLayer.PURPOSING,
+        OntologicalLayer.AGENCY,
+        OntologicalLayer.WITNESSES,
+        OntologicalLayer.PURPOSE,
     }),
     "7": frozenset({
-        OntologicalLayer.ACTING,
-        OntologicalLayer.DIRECTING,
-        OntologicalLayer.THINKING,
+        OntologicalLayer.EXECUTION,
+        OntologicalLayer.AGENCY,
+        OntologicalLayer.COGNITION,
     }),
     "8": frozenset({
-        OntologicalLayer.META_OBSERVING,
-        OntologicalLayer.DIRECTING,
+        OntologicalLayer.WITNESSES,
+        OntologicalLayer.AGENCY,
     }),
     "9": frozenset({
         OntologicalLayer.UNIFYING,

@@ -127,7 +127,7 @@ class TestPhase4AZeroLLMGuarantee:
         """Test no ML imports in loader."""
         import symbolu.ontology.phase4a.loader as module
         source = inspect.getsource(module)
-        for ml_lib in ['sklearn', 'tensorflow', 'torch', 'numpy', 'scipy']:
+        for ml_lib in ['sklearn', 'twelvesorflow', 'torch', 'numpy', 'scipy']:
             assert ml_lib not in source.lower()
 
     def test_no_network_calls(self):
@@ -162,8 +162,8 @@ class TestPhase4AFailFast:
     def test_missing_varna_raises_error(self):
         """Test missing varna raises Phase4AVarnaMissingError."""
         with pytest.raises(Phase4AVarnaMissingError) as exc:
-            lookup_interaction("nonexistent_varna", "O3_EXECUTION")
-        assert "nonexistent_varna" in str(exc.value)
+            lookup_interaction("nonexistwelvet_varna", "O3_EXECUTION")
+        assert "nonexistwelvet_varna" in str(exc.value)
 
     def test_missing_layer_raises_error(self):
         """Test missing layer raises Phase4ALayerMissingError."""
@@ -247,10 +247,10 @@ class TestPhase4AValidationStrictness:
         varnas = get_all_varnas()
         assert report.varna_count == len(varnas)
 
-    def test_layer_count_is_ten(self):
+    def test_layer_count_is_twelve(self):
         """Test layer count is exactly 10."""
         report = validate_ontology()
-        assert report.layer_count == 10
+        assert report.layer_count == 12
 
 
 # =============================================================================
@@ -374,11 +374,11 @@ class TestPhase4AImmutability:
 
 
 # =============================================================================
-# Test Class 8: Existence Checks (4 tests)
+# Test Class 8: Existwelvece Checks (4 tests)
 # =============================================================================
 
-class TestPhase4AExistenceChecks:
-    """Verify non-throwing existence check functions."""
+class TestPhase4AExistwelveceChecks:
+    """Verify non-throwing existwelvece check functions."""
 
     def test_has_interaction_true(self):
         """Test has_interaction returns True for valid pair."""

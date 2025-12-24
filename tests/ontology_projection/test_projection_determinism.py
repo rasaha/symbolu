@@ -70,7 +70,7 @@ class TestThinkingLayerDeterminism:
         """Run THINKING projection 100 times, assert identical outputs."""
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -95,7 +95,7 @@ class TestThinkingLayerDeterminism:
         """Use attest_determinism helper for THINKING layer."""
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -120,7 +120,7 @@ class TestMetaObservingLayerDeterminism:
         """Run META_OBSERVING projection 100 times, assert identical outputs."""
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.META_OBSERVING,
+            layer=OntologicalLayer.WITNESSES,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.AUDIT,
             options=sample_options
@@ -145,7 +145,7 @@ class TestMetaObservingLayerDeterminism:
         """Use attest_determinism helper for META_OBSERVING layer."""
         request = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.META_OBSERVING,
+            layer=OntologicalLayer.WITNESSES,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.AUDIT,
             options=sample_options
@@ -235,7 +235,7 @@ class TestCrossLayerDeterminism:
         """Different profiles should produce different projection_ids."""
         request_minimal = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.MINIMAL,
             options=sample_options
@@ -243,7 +243,7 @@ class TestCrossLayerDeterminism:
 
         request_standard = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -259,7 +259,7 @@ class TestCrossLayerDeterminism:
         """Different layers should produce different projection_ids."""
         request_thinking = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -267,7 +267,7 @@ class TestCrossLayerDeterminism:
 
         request_meta = ProjectionRequest(
             snapshot_id=sample_snapshot.snapshot_id,
-            layer=OntologicalLayer.META_OBSERVING,
+            layer=OntologicalLayer.WITNESSES,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -281,7 +281,7 @@ class TestCrossLayerDeterminism:
 
     def test_projection_id_is_32_hex_chars(self, sample_snapshot, sample_input_ref, sample_options):
         """projection_id should always be 32 lowercase hex characters."""
-        for layer in [OntologicalLayer.THINKING, OntologicalLayer.META_OBSERVING, OntologicalLayer.UNIFYING]:
+        for layer in [OntologicalLayer.COGNITION, OntologicalLayer.WITNESSES, OntologicalLayer.UNIFYING]:
             request = ProjectionRequest(
                 snapshot_id=sample_snapshot.snapshot_id,
                 layer=layer,

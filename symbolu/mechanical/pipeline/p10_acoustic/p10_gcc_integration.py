@@ -172,7 +172,7 @@ def maybe_run_p10_gcc(
     # Get projected layers from context or use default
     from symbolu.ontology.router.ontological_router_r1 import OntologicalLayer
 
-    projected_layers: Tuple[OntologicalLayer, ...] = (OntologicalLayer.FORMING,)
+    projected_layers: Tuple[OntologicalLayer, ...] = (OntologicalLayer.STRUCTURE,)
     if hasattr(ctx, 'projected_layers') and ctx.projected_layers is not None:
         projected_layers = ctx.projected_layers
 

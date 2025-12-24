@@ -1,13 +1,17 @@
 {
   "meta": {
     "version": "2.0",
-    "depends_on": ["varna_bridge_map_v1.json", "ontological_layers_v1.json"],
+    "depends_on": [
+      "varna_bridge_map_v1.json",
+      "ontological_layers_v1.json"
+    ],
     "scope": "Varna × Layer interaction only",
     "rules": [
       "Never let a higher file compensate for uncertainty in a lower file",
       "No substrate edits",
       "Contextual polarity only here"
-    ]
+    ],
+    "migration_note": "Migrated from 10D to 12D layer naming (2024-12-24)"
   },
   "interaction_map": {
     "a": {
@@ -70,6 +74,18 @@
         "manifestation_negative": "arising terminates before reaching maturation",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ā": {
@@ -132,6 +148,18 @@
         "manifestation_negative": "continuity terminates through exhaustion not completion",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "i": {
@@ -194,6 +222,18 @@
         "manifestation_negative": "autonomous effort terminates in isolation",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ī": {
@@ -256,6 +296,18 @@
         "manifestation_negative": "identity terminates leaving fragmented residue",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "u": {
@@ -318,6 +370,18 @@
         "manifestation_negative": "contraction terminates in collapsed fixation",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ū": {
@@ -380,6 +444,18 @@
         "manifestation_negative": "grip terminates through exhaustion not completion",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "e": {
@@ -442,6 +518,18 @@
         "manifestation_negative": "utility terminates leaving hollow competence",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ai": {
@@ -504,6 +592,18 @@
         "manifestation_negative": "synthesis terminates leaving confused amalgam",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "o": {
@@ -566,6 +666,18 @@
         "manifestation_negative": "closure terminates leaving sealed incompleteness",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "au": {
@@ -628,6 +740,18 @@
         "manifestation_negative": "transition terminates in abandoned incompleteness",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "aṁ": {
@@ -690,6 +814,18 @@
         "manifestation_negative": "trailing terminates leaving residual echo",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "aha": {
@@ -752,6 +888,18 @@
         "manifestation_negative": "cessation terminates in non-registration without remainder",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ka": {
@@ -814,6 +962,18 @@
         "manifestation_negative": "collapse into hopelessness rather than dissolution",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "kha": {
@@ -876,6 +1036,18 @@
         "manifestation_negative": "vigilance terminates through exhaustion not resolution",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ga": {
@@ -938,6 +1110,18 @@
         "manifestation_negative": "momentum terminates without completion",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "downward",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "gha": {
@@ -1000,6 +1184,18 @@
         "manifestation_negative": "forced unbinding leaving residue of loss",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "nga": {
@@ -1062,6 +1258,18 @@
         "manifestation_negative": "markers persist after content has dissolved",
         "distortion_vector": "lateral",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ca": {
@@ -1124,6 +1332,18 @@
         "manifestation_negative": "collapse into boundary-less confusion",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "cha": {
@@ -1186,6 +1406,18 @@
         "manifestation_negative": "termination without reset leaves residual damage",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ja": {
@@ -1248,6 +1480,18 @@
         "manifestation_negative": "self-pattern dissolution experienced as annihilation",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "jha": {
@@ -1310,6 +1554,18 @@
         "manifestation_negative": "accumulation terminates leaving emptiness",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "nya": {
@@ -1372,6 +1628,18 @@
         "manifestation_negative": "layers collapse without reconciliation",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ta": {
@@ -1434,6 +1702,18 @@
         "manifestation_negative": "stasis terminates through entropy not completion",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "tha": {
@@ -1496,6 +1776,18 @@
         "manifestation_negative": "melancholy terminates in emptiness without peace",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "da": {
@@ -1558,6 +1850,18 @@
         "manifestation_negative": "irritation terminates leaving residual rawness",
         "distortion_vector": "lateral",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "dha": {
@@ -1620,6 +1924,18 @@
         "manifestation_negative": "craving terminates leaving void",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "na": {
@@ -1682,6 +1998,18 @@
         "manifestation_negative": "attachment terminates as abandonment",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "tta": {
@@ -1744,6 +2072,18 @@
         "manifestation_negative": "overstatement collapses leaving hollow residue",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ttha": {
@@ -1806,6 +2146,18 @@
         "manifestation_negative": "repentance terminates without absolution",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "dda": {
@@ -1868,6 +2220,18 @@
         "manifestation_negative": "concealment terminates in permanent hiding",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ddha": {
@@ -1930,6 +2294,18 @@
         "manifestation_negative": "force terminates leaving destruction residue",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "nna": {
@@ -1992,6 +2368,18 @@
         "manifestation_negative": "comparison terminates leaving resentment residue",
         "distortion_vector": "lateral",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "pa": {
@@ -2054,6 +2442,18 @@
         "manifestation_negative": "aversion terminates leaving residual disgust",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "pha": {
@@ -2116,6 +2516,18 @@
         "manifestation_negative": "fear terminates through collapse not resolution",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ba": {
@@ -2178,6 +2590,18 @@
         "manifestation_negative": "indifference terminates as hollow emptiness",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "bha": {
@@ -2240,6 +2664,18 @@
         "manifestation_negative": "delusion ends leaving disorientation residue",
         "distortion_vector": "lateral",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ma": {
@@ -2302,6 +2738,18 @@
         "manifestation_negative": "indulgence terminates leaving depleted hollowness",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ya": {
@@ -2364,6 +2812,18 @@
         "manifestation_negative": "distrust terminates leaving residual suspicion",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ra": {
@@ -2426,6 +2886,18 @@
         "manifestation_negative": "dissolution terminates leaving scorched ground",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "la": {
@@ -2488,6 +2960,18 @@
         "manifestation_negative": "erosion terminates leaving worn residue",
         "distortion_vector": "lateral",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "va": {
@@ -2550,6 +3034,18 @@
         "manifestation_negative": "conformity terminates leaving hollow compliance",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "sha": {
@@ -2612,6 +3108,18 @@
         "manifestation_negative": "hoarding terminates leaving cluttered residue",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ssa": {
@@ -2674,6 +3182,18 @@
         "manifestation_negative": "lust terminates leaving disoriented residue",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "sa": {
@@ -2736,6 +3256,18 @@
         "manifestation_negative": "evacuation terminates without destination",
         "distortion_vector": "lateral",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ha": {
@@ -2798,6 +3330,18 @@
         "manifestation_negative": "ignorance terminates without illumination",
         "distortion_vector": "downward",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     },
     "ksha": {
@@ -2860,6 +3404,18 @@
         "manifestation_negative": "error terminates leaving confusion residue",
         "distortion_vector": "lateral",
         "sublimate_vector": "terminating"
+      },
+      "O1_POTENTIAL": {
+        "manifestation_positive": "latent potential ready for activation",
+        "manifestation_negative": "dormant capacity without direction",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
+      },
+      "O11_INTEGRATION": {
+        "manifestation_positive": "parts consolidated into coherent resolution",
+        "manifestation_negative": "fragmented integration without completion",
+        "distortion_vector": "lateral",
+        "sublimate_vector": "upward"
       }
     }
   }

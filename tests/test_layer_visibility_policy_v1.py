@@ -118,7 +118,7 @@ class TestDeterminism:
             "artifact_id": "test_artifact",
             "span_id": "0" * 16,
             "role_id": RoleId.END_USER,
-            "effective_layers": (OntologicalLayer.ACTING, OntologicalLayer.TAGGING),
+            "effective_layers": (OntologicalLayer.EXECUTION, OntologicalLayer.IDENTITY),
         }
 
         first_hash = compute_decision_hash(**params)
@@ -131,11 +131,11 @@ class TestDeterminism:
         gate = create_exposure_gate()
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING, OntologicalLayer.TAGGING)
+            layers=(OntologicalLayer.EXECUTION, OntologicalLayer.IDENTITY)
         )
         request = make_exposure_request(
             role_id=RoleId.END_USER,
-            requested_layers=(OntologicalLayer.ACTING,),
+            requested_layers=(OntologicalLayer.EXECUTION,),
         )
 
         first_result = gate.evaluate(projection, request)
@@ -152,16 +152,16 @@ class TestDeterminism:
 
         projection = make_projection_response(
             layers=(
-                OntologicalLayer.FORMING,
-                OntologicalLayer.THINKING,
-                OntologicalLayer.DIRECTING,
+                OntologicalLayer.STRUCTURE,
+                OntologicalLayer.COGNITION,
+                OntologicalLayer.AGENCY,
             )
         )
         request = make_exposure_request(
             artifact_id="determinism_test",
             span_id="a" * 16,
             role_id=RoleId.DEVELOPER,
-            requested_layers=(OntologicalLayer.FORMING, OntologicalLayer.THINKING),
+            requested_layers=(OntologicalLayer.STRUCTURE, OntologicalLayer.COGNITION),
         )
 
         first_response = gate.evaluate(projection, request)
@@ -175,9 +175,9 @@ class TestDeterminism:
 
         projection = make_projection_response(
             layers=(
-                OntologicalLayer.ACTING,
-                OntologicalLayer.TAGGING,
-                OntologicalLayer.FORMING,
+                OntologicalLayer.EXECUTION,
+                OntologicalLayer.IDENTITY,
+                OntologicalLayer.STRUCTURE,
             )
         )
         request = make_exposure_request(
@@ -204,18 +204,18 @@ class TestUnknownRole:
         # Create policy without END_USER
         custom_policy = LayerVisibilityPolicy(
             role_allowed_layers=(
-                (RoleId.DEVELOPER, frozenset({OntologicalLayer.ACTING})),
+                (RoleId.DEVELOPER, frozenset({OntologicalLayer.EXECUTION})),
             )
         )
 
         gate = ExposureGate(policy=custom_policy)
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING,)
+            layers=(OntologicalLayer.EXECUTION,)
         )
         request = make_exposure_request(
             role_id=RoleId.END_USER,  # Not in policy
-            requested_layers=(OntologicalLayer.ACTING,),
+            requested_layers=(OntologicalLayer.EXECUTION,),
         )
 
         response = gate.evaluate(projection, request)
@@ -231,11 +231,11 @@ class TestUnknownRole:
         gate = ExposureGate(policy=empty_policy)
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING,)
+            layers=(OntologicalLayer.EXECUTION,)
         )
         request = make_exposure_request(
             role_id=RoleId.SYSTEM,
-            requested_layers=(OntologicalLayer.ACTING,),
+            requested_layers=(OntologicalLayer.EXECUTION,),
         )
 
         response = gate.evaluate(projection, request)
@@ -255,18 +255,18 @@ class TestRequestedLayerOutsidePolicy:
         # Policy only allows ACTING for END_USER
         custom_policy = LayerVisibilityPolicy(
             role_allowed_layers=(
-                (RoleId.END_USER, frozenset({OntologicalLayer.ACTING})),
+                (RoleId.END_USER, frozenset({OntologicalLayer.EXECUTION})),
             )
         )
 
         gate = ExposureGate(policy=custom_policy)
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING, OntologicalLayer.TAGGING)
+            layers=(OntologicalLayer.EXECUTION, OntologicalLayer.IDENTITY)
         )
         request = make_exposure_request(
             role_id=RoleId.END_USER,
-            requested_layers=(OntologicalLayer.ACTING, OntologicalLayer.TAGGING),
+            requested_layers=(OntologicalLayer.EXECUTION, OntologicalLayer.IDENTITY),
         )
 
         response = gate.evaluate(projection, request)
@@ -280,12 +280,12 @@ class TestRequestedLayerOutsidePolicy:
         gate = create_exposure_gate()
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING, OntologicalLayer.ABSOLVING)
+            layers=(OntologicalLayer.EXECUTION, OntologicalLayer.ABSOLVING)
         )
         # END_USER cannot access ABSOLVING in default policy
         request = make_exposure_request(
             role_id=RoleId.END_USER,
-            requested_layers=(OntologicalLayer.ACTING, OntologicalLayer.ABSOLVING),
+            requested_layers=(OntologicalLayer.EXECUTION, OntologicalLayer.ABSOLVING),
         )
 
         response = gate.evaluate(projection, request)
@@ -297,17 +297,17 @@ class TestRequestedLayerOutsidePolicy:
         gate = create_exposure_gate()
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING, OntologicalLayer.TAGGING)
+            layers=(OntologicalLayer.EXECUTION, OntologicalLayer.IDENTITY)
         )
         request = make_exposure_request(
             role_id=RoleId.END_USER,
-            requested_layers=(OntologicalLayer.ACTING, OntologicalLayer.TAGGING),
+            requested_layers=(OntologicalLayer.EXECUTION, OntologicalLayer.IDENTITY),
         )
 
         response = gate.evaluate(projection, request)
 
-        assert OntologicalLayer.ACTING in response.effective_layers
-        assert OntologicalLayer.TAGGING in response.effective_layers
+        assert OntologicalLayer.EXECUTION in response.effective_layers
+        assert OntologicalLayer.IDENTITY in response.effective_layers
 
 
 # =============================================================================
@@ -322,7 +322,7 @@ class TestAbsolvingGated:
         gate = create_exposure_gate()
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING, OntologicalLayer.ABSOLVING)
+            layers=(OntologicalLayer.EXECUTION, OntologicalLayer.ABSOLVING)
         )
         request = make_exposure_request(
             role_id=RoleId.END_USER,
@@ -339,7 +339,7 @@ class TestAbsolvingGated:
         gate = create_exposure_gate()
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING, OntologicalLayer.ABSOLVING)
+            layers=(OntologicalLayer.EXECUTION, OntologicalLayer.ABSOLVING)
         )
         request = make_exposure_request(
             role_id=RoleId.DEVELOPER,
@@ -355,7 +355,7 @@ class TestAbsolvingGated:
         gate = create_exposure_gate()
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING, OntologicalLayer.ABSOLVING)
+            layers=(OntologicalLayer.EXECUTION, OntologicalLayer.ABSOLVING)
         )
         request = make_exposure_request(
             role_id=RoleId.AUDITOR,
@@ -387,7 +387,7 @@ class TestAbsolvingGated:
         gate = create_exposure_gate()
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING, OntologicalLayer.ABSOLVING)
+            layers=(OntologicalLayer.EXECUTION, OntologicalLayer.ABSOLVING)
         )
         request = make_exposure_request(
             role_id=RoleId.AUDITOR,
@@ -398,21 +398,21 @@ class TestAbsolvingGated:
 
         # ABSOLVING should NOT be in effective layers for implicit request
         assert OntologicalLayer.ABSOLVING not in response.effective_layers
-        assert OntologicalLayer.ACTING in response.effective_layers
+        assert OntologicalLayer.EXECUTION in response.effective_layers
 
     def test_absolving_requires_explicit_request_and_policy(self) -> None:
         """ABSOLVING requires both explicit request AND policy allowlist."""
         # Create policy without ABSOLVING for AUDITOR
         custom_policy = LayerVisibilityPolicy(
             role_allowed_layers=(
-                (RoleId.AUDITOR, frozenset({OntologicalLayer.ACTING})),
+                (RoleId.AUDITOR, frozenset({OntologicalLayer.EXECUTION})),
             )
         )
 
         gate = ExposureGate(policy=custom_policy)
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING, OntologicalLayer.ABSOLVING)
+            layers=(OntologicalLayer.EXECUTION, OntologicalLayer.ABSOLVING)
         )
         request = make_exposure_request(
             role_id=RoleId.AUDITOR,
@@ -468,14 +468,14 @@ class TestImmutability:
         """ProjectionResponse is not mutated by evaluate."""
         gate = create_exposure_gate()
 
-        original_layers = (OntologicalLayer.ACTING, OntologicalLayer.TAGGING)
+        original_layers = (OntologicalLayer.EXECUTION, OntologicalLayer.IDENTITY)
         projection = make_projection_response(layers=original_layers)
 
         # Store original values
         original_projection_layers = projection.layers
 
         request = make_exposure_request(
-            requested_layers=(OntologicalLayer.ACTING,)
+            requested_layers=(OntologicalLayer.EXECUTION,)
         )
 
         gate.evaluate(projection, request)
@@ -488,13 +488,13 @@ class TestImmutability:
         gate = create_exposure_gate()
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING,)
+            layers=(OntologicalLayer.EXECUTION,)
         )
         request = make_exposure_request(
             artifact_id="test_artifact",
             span_id="a" * 16,
             role_id=RoleId.END_USER,
-            requested_layers=(OntologicalLayer.ACTING,),
+            requested_layers=(OntologicalLayer.EXECUTION,),
         )
 
         # Store original values
@@ -598,7 +598,7 @@ class TestHashStability:
             artifact_id="test",
             span_id="0" * 16,
             role_id=RoleId.END_USER,
-            effective_layers=(OntologicalLayer.ACTING,),
+            effective_layers=(OntologicalLayer.EXECUTION,),
         )
 
         assert len(hash_value) == 16
@@ -609,7 +609,7 @@ class TestHashStability:
             artifact_id="test",
             span_id="0" * 16,
             role_id=RoleId.END_USER,
-            effective_layers=(OntologicalLayer.ACTING,),
+            effective_layers=(OntologicalLayer.EXECUTION,),
         )
 
         assert all(c in "0123456789abcdef" for c in hash_value)
@@ -620,7 +620,7 @@ class TestHashStability:
             "artifact_id": "hash_test",
             "span_id": "b" * 16,
             "role_id": RoleId.DEVELOPER,
-            "effective_layers": (OntologicalLayer.THINKING, OntologicalLayer.REASONING),
+            "effective_layers": (OntologicalLayer.COGNITION, OntologicalLayer.REASONING),
         }
 
         hash1 = compute_decision_hash(**params)
@@ -634,14 +634,14 @@ class TestHashStability:
             artifact_id="test1",
             span_id="0" * 16,
             role_id=RoleId.END_USER,
-            effective_layers=(OntologicalLayer.ACTING,),
+            effective_layers=(OntologicalLayer.EXECUTION,),
         )
 
         hash2 = compute_decision_hash(
             artifact_id="test2",
             span_id="0" * 16,
             role_id=RoleId.END_USER,
-            effective_layers=(OntologicalLayer.ACTING,),
+            effective_layers=(OntologicalLayer.EXECUTION,),
         )
 
         assert hash1 != hash2
@@ -652,14 +652,14 @@ class TestHashStability:
             artifact_id="test",
             span_id="0" * 16,
             role_id=RoleId.END_USER,
-            effective_layers=(OntologicalLayer.ACTING, OntologicalLayer.TAGGING),
+            effective_layers=(OntologicalLayer.EXECUTION, OntologicalLayer.IDENTITY),
         )
 
         hash2 = compute_decision_hash(
             artifact_id="test",
             span_id="0" * 16,
             role_id=RoleId.END_USER,
-            effective_layers=(OntologicalLayer.TAGGING, OntologicalLayer.ACTING),
+            effective_layers=(OntologicalLayer.IDENTITY, OntologicalLayer.EXECUTION),
         )
 
         assert hash1 == hash2
@@ -669,13 +669,13 @@ class TestHashStability:
         gate = create_exposure_gate()
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING, OntologicalLayer.FORMING)
+            layers=(OntologicalLayer.EXECUTION, OntologicalLayer.STRUCTURE)
         )
         request = make_exposure_request(
             artifact_id="recompute_test",
             span_id="c" * 16,
             role_id=RoleId.END_USER,
-            requested_layers=(OntologicalLayer.ACTING,),
+            requested_layers=(OntologicalLayer.EXECUTION,),
         )
 
         response = gate.evaluate(projection, request)
@@ -701,8 +701,8 @@ class TestLayerVisibilityPolicy:
         """get_allowed_layers returns correct layers for role."""
         allowed = DEFAULT_POLICY.get_allowed_layers(RoleId.END_USER)
 
-        assert OntologicalLayer.ACTING in allowed
-        assert OntologicalLayer.TAGGING in allowed
+        assert OntologicalLayer.EXECUTION in allowed
+        assert OntologicalLayer.IDENTITY in allowed
         assert OntologicalLayer.ABSOLVING not in allowed
 
     def test_get_allowed_layers_unknown_role(self) -> None:
@@ -710,7 +710,7 @@ class TestLayerVisibilityPolicy:
         # Create policy without END_USER
         policy = LayerVisibilityPolicy(
             role_allowed_layers=(
-                (RoleId.DEVELOPER, frozenset({OntologicalLayer.ACTING})),
+                (RoleId.DEVELOPER, frozenset({OntologicalLayer.EXECUTION})),
             )
         )
 
@@ -720,7 +720,7 @@ class TestLayerVisibilityPolicy:
 
     def test_is_layer_allowed(self) -> None:
         """is_layer_allowed returns correct boolean."""
-        assert DEFAULT_POLICY.is_layer_allowed(RoleId.END_USER, OntologicalLayer.ACTING) is True
+        assert DEFAULT_POLICY.is_layer_allowed(RoleId.END_USER, OntologicalLayer.EXECUTION) is True
         assert DEFAULT_POLICY.is_layer_allowed(RoleId.END_USER, OntologicalLayer.ABSOLVING) is False
         assert DEFAULT_POLICY.is_layer_allowed(RoleId.AUDITOR, OntologicalLayer.ABSOLVING) is True
 
@@ -762,7 +762,7 @@ class TestExposureGate:
         gate = create_exposure_gate()
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING,)
+            layers=(OntologicalLayer.EXECUTION,)
         )
         request = make_exposure_request()
 
@@ -774,14 +774,14 @@ class TestExposureGate:
         """effective_layers is always subset of projected layers."""
         gate = create_exposure_gate()
 
-        projected = (OntologicalLayer.ACTING, OntologicalLayer.TAGGING)
+        projected = (OntologicalLayer.EXECUTION, OntologicalLayer.IDENTITY)
         projection = make_projection_response(layers=projected)
 
         request = make_exposure_request(
             requested_layers=(
-                OntologicalLayer.ACTING,
-                OntologicalLayer.TAGGING,
-                OntologicalLayer.FORMING,  # Not in projection
+                OntologicalLayer.EXECUTION,
+                OntologicalLayer.IDENTITY,
+                OntologicalLayer.STRUCTURE,  # Not in projection
             )
         )
 
@@ -795,24 +795,24 @@ class TestExposureGate:
         gate = create_exposure_gate()
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING,)
+            layers=(OntologicalLayer.EXECUTION,)
         )
         request = make_exposure_request(
-            requested_layers=(OntologicalLayer.ACTING, OntologicalLayer.TAGGING)
+            requested_layers=(OntologicalLayer.EXECUTION, OntologicalLayer.IDENTITY)
         )
 
         response = gate.evaluate(projection, request)
 
         # TAGGING was requested but not in projection
-        assert OntologicalLayer.TAGGING in response.denied_layers
-        assert OntologicalLayer.ACTING in response.effective_layers
+        assert OntologicalLayer.IDENTITY in response.denied_layers
+        assert OntologicalLayer.EXECUTION in response.effective_layers
 
     def test_implicit_layers_exclude_absolving(self) -> None:
         """Implicit layer requests exclude ABSOLVING even when projected."""
         gate = create_exposure_gate()
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING, OntologicalLayer.ABSOLVING)
+            layers=(OntologicalLayer.EXECUTION, OntologicalLayer.ABSOLVING)
         )
         request = make_exposure_request(
             role_id=RoleId.AUDITOR,  # Can access ABSOLVING
@@ -823,7 +823,7 @@ class TestExposureGate:
 
         # ABSOLVING should be excluded from implicit requests
         assert OntologicalLayer.ABSOLVING not in response.effective_layers
-        assert OntologicalLayer.ACTING in response.effective_layers
+        assert OntologicalLayer.EXECUTION in response.effective_layers
 
 
 # =============================================================================
@@ -867,7 +867,7 @@ class TestValidation:
                 artifact_id="test",
                 span_id="0" * 16,
                 role_id=RoleId.END_USER,
-                requested_layers=[OntologicalLayer.ACTING],  # type: ignore
+                requested_layers=[OntologicalLayer.EXECUTION],  # type: ignore
             )
 
     def test_invalid_layer_in_requested_layers_raises(self) -> None:
@@ -923,16 +923,16 @@ class TestSuccessPath:
         gate = create_exposure_gate()
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.ACTING,)
+            layers=(OntologicalLayer.EXECUTION,)
         )
         request = make_exposure_request(
             role_id=RoleId.END_USER,
-            requested_layers=(OntologicalLayer.ACTING,),
+            requested_layers=(OntologicalLayer.EXECUTION,),
         )
 
         response = gate.evaluate(projection, request)
 
-        assert OntologicalLayer.ACTING in response.effective_layers
+        assert OntologicalLayer.EXECUTION in response.effective_layers
         assert len(response.decision_hash) == 16
 
     def test_multiple_allowed_layers(self) -> None:
@@ -941,24 +941,24 @@ class TestSuccessPath:
 
         projection = make_projection_response(
             layers=(
-                OntologicalLayer.ACTING,
-                OntologicalLayer.TAGGING,
-                OntologicalLayer.FORMING,
+                OntologicalLayer.EXECUTION,
+                OntologicalLayer.IDENTITY,
+                OntologicalLayer.STRUCTURE,
             )
         )
         request = make_exposure_request(
             role_id=RoleId.DEVELOPER,
             requested_layers=(
-                OntologicalLayer.ACTING,
-                OntologicalLayer.TAGGING,
+                OntologicalLayer.EXECUTION,
+                OntologicalLayer.IDENTITY,
             ),
         )
 
         response = gate.evaluate(projection, request)
 
-        assert OntologicalLayer.ACTING in response.effective_layers
-        assert OntologicalLayer.TAGGING in response.effective_layers
-        assert OntologicalLayer.FORMING not in response.effective_layers
+        assert OntologicalLayer.EXECUTION in response.effective_layers
+        assert OntologicalLayer.IDENTITY in response.effective_layers
+        assert OntologicalLayer.STRUCTURE not in response.effective_layers
 
     def test_auditor_with_absolving(self) -> None:
         """Auditor can access ABSOLVING when explicitly requested."""
@@ -966,21 +966,21 @@ class TestSuccessPath:
 
         projection = make_projection_response(
             layers=(
-                OntologicalLayer.ACTING,
+                OntologicalLayer.EXECUTION,
                 OntologicalLayer.ABSOLVING,
             )
         )
         request = make_exposure_request(
             role_id=RoleId.AUDITOR,
             requested_layers=(
-                OntologicalLayer.ACTING,
+                OntologicalLayer.EXECUTION,
                 OntologicalLayer.ABSOLVING,
             ),
         )
 
         response = gate.evaluate(projection, request)
 
-        assert OntologicalLayer.ACTING in response.effective_layers
+        assert OntologicalLayer.EXECUTION in response.effective_layers
         assert OntologicalLayer.ABSOLVING in response.effective_layers
 
     def test_all_standard_layers(self) -> None:
@@ -988,14 +988,14 @@ class TestSuccessPath:
         gate = create_exposure_gate()
 
         all_standard = (
-            OntologicalLayer.ACTING,
-            OntologicalLayer.TAGGING,
-            OntologicalLayer.FORMING,
-            OntologicalLayer.THINKING,
-            OntologicalLayer.DIRECTING,
+            OntologicalLayer.EXECUTION,
+            OntologicalLayer.IDENTITY,
+            OntologicalLayer.STRUCTURE,
+            OntologicalLayer.COGNITION,
+            OntologicalLayer.AGENCY,
             OntologicalLayer.REASONING,
-            OntologicalLayer.PURPOSING,
-            OntologicalLayer.META_OBSERVING,
+            OntologicalLayer.PURPOSE,
+            OntologicalLayer.WITNESSES,
             OntologicalLayer.UNIFYING,
         )
 
@@ -1026,16 +1026,16 @@ class TestDeterministicOrdering:
         projection = make_projection_response(
             layers=(
                 OntologicalLayer.UNIFYING,
-                OntologicalLayer.ACTING,
-                OntologicalLayer.DIRECTING,
+                OntologicalLayer.EXECUTION,
+                OntologicalLayer.AGENCY,
             )
         )
         request = make_exposure_request(
             role_id=RoleId.END_USER,
             requested_layers=(
                 OntologicalLayer.UNIFYING,
-                OntologicalLayer.ACTING,
-                OntologicalLayer.DIRECTING,
+                OntologicalLayer.EXECUTION,
+                OntologicalLayer.AGENCY,
             ),
         )
 
@@ -1043,8 +1043,8 @@ class TestDeterministicOrdering:
 
         # Should be sorted by value (ACTING=1, DIRECTING=5, UNIFYING=9)
         expected_order = (
-            OntologicalLayer.ACTING,
-            OntologicalLayer.DIRECTING,
+            OntologicalLayer.EXECUTION,
+            OntologicalLayer.AGENCY,
             OntologicalLayer.UNIFYING,
         )
         assert response.effective_layers == expected_order
@@ -1054,15 +1054,15 @@ class TestDeterministicOrdering:
         gate = create_exposure_gate()
 
         projection = make_projection_response(
-            layers=(OntologicalLayer.TAGGING, OntologicalLayer.ACTING)
+            layers=(OntologicalLayer.IDENTITY, OntologicalLayer.EXECUTION)
         )
         request = make_exposure_request(
             role_id=RoleId.END_USER,
-            requested_layers=(OntologicalLayer.TAGGING, OntologicalLayer.ACTING),
+            requested_layers=(OntologicalLayer.IDENTITY, OntologicalLayer.EXECUTION),
         )
 
         response = gate.evaluate(projection, request)
 
         # Should be sorted by value (ACTING=1, TAGGING=2)
-        expected_order = (OntologicalLayer.ACTING, OntologicalLayer.TAGGING)
+        expected_order = (OntologicalLayer.EXECUTION, OntologicalLayer.IDENTITY)
         assert response.allowed_layers == expected_order

@@ -1,23 +1,24 @@
 {
   "meta": {
     "version": "2.0",
-    "scope": "Ontological layer definitions only (12D)",
+    "scope": "12D Ontological layer definitions (patent-exact sequence)",
     "depends_on": [],
     "rules": [
       "Never let a higher file compensate for uncertainty in a lower file",
       "No varna references",
       "Layer definitions are substrate-agnostic",
       "Each layer is valid independent of phonetic mapping"
-    ]
+    ],
+    "migration_note": "Upgraded from 10D to 12D per patent-exact sequence (2024-12-24)"
   },
   "layers": {
     "O1_POTENTIAL": {
       "layer_id": "O1_POTENTIAL",
-      "experiential_role": "latent capacity, dormant state",
-      "kosha_anchor": "annamaya",
+      "experiential_role": "dormant capacity and latent possibility",
+      "kosha_anchor": "pre-annamaya",
       "default_polarity_behavior": {
         "tendency": "neutral",
-        "description": "dormant potential awaiting activation"
+        "description": "holds unrealized possibility without activation"
       },
       "adjacency": {
         "prev_layer": null,
@@ -26,16 +27,16 @@
       "constraints": [
         "layer-valid-without-varnas",
         "no-semantic-content",
-        "potential-state-only"
+        "dormant-state-only"
       ]
     },
     "O2_IDENTITY": {
       "layer_id": "O2_IDENTITY",
-      "experiential_role": "tagging, labels, roles",
+      "experiential_role": "classificatory marking and role assignment",
       "kosha_anchor": "annamaya",
       "default_polarity_behavior": {
         "tendency": "neutral",
-        "description": "applies categorical markers and identity tags"
+        "description": "applies categorical markers and labels without valence"
       },
       "adjacency": {
         "prev_layer": "O1_POTENTIAL",
@@ -49,11 +50,11 @@
     },
     "O3_EXECUTION": {
       "layer_id": "O3_EXECUTION",
-      "experiential_role": "action, behaviors, karma",
-      "kosha_anchor": "pranamaya",
+      "experiential_role": "immediate somatic initiation and karma",
+      "kosha_anchor": "annamaya",
       "default_polarity_behavior": {
         "tendency": "constructive",
-        "description": "initiates physical response patterns and actions"
+        "description": "initiates physical response patterns and behavior"
       },
       "adjacency": {
         "prev_layer": "O2_IDENTITY",
@@ -67,11 +68,11 @@
     },
     "O4_STRUCTURE": {
       "layer_id": "O4_STRUCTURE",
-      "experiential_role": "forming, embodiment, patterns",
+      "experiential_role": "shaping force application and embodiment",
       "kosha_anchor": "pranamaya",
       "default_polarity_behavior": {
         "tendency": "constructive",
-        "description": "gives shape to energetic impulse"
+        "description": "gives shape to energetic impulse and form"
       },
       "adjacency": {
         "prev_layer": "O3_EXECUTION",
@@ -85,11 +86,11 @@
     },
     "O5_COGNITION": {
       "layer_id": "O5_COGNITION",
-      "experiential_role": "perception, attention, emotion",
+      "experiential_role": "perception, attention, and emotional processing",
       "kosha_anchor": "manomaya",
       "default_polarity_behavior": {
         "tendency": "transitional",
-        "description": "mediates between form and direction through perception"
+        "description": "mediates between form and direction through mental patterns"
       },
       "adjacency": {
         "prev_layer": "O4_STRUCTURE",
@@ -98,16 +99,16 @@
       "constraints": [
         "layer-valid-without-varnas",
         "no-semantic-content",
-        "perception-only"
+        "perception-emotion-only"
       ]
     },
     "O6_AGENCY": {
       "layer_id": "O6_AGENCY",
-      "experiential_role": "direction, control, intent",
+      "experiential_role": "vector orientation, control, and intent",
       "kosha_anchor": "manomaya",
       "default_polarity_behavior": {
         "tendency": "constructive",
-        "description": "establishes directional momentum toward target"
+        "description": "establishes directional momentum and authorship"
       },
       "adjacency": {
         "prev_layer": "O5_COGNITION",
@@ -121,11 +122,11 @@
     },
     "O7_REASONING": {
       "layer_id": "O7_REASONING",
-      "experiential_role": "discrimination, logic, inference",
+      "experiential_role": "sequential logic and discriminative analysis",
       "kosha_anchor": "vijnanamaya",
       "default_polarity_behavior": {
         "tendency": "neutral",
-        "description": "chains operations without inherent valence"
+        "description": "chains operations through inference without inherent valence"
       },
       "adjacency": {
         "prev_layer": "O6_AGENCY",
@@ -139,11 +140,11 @@
     },
     "O8_PURPOSE": {
       "layer_id": "O8_PURPOSE",
-      "experiential_role": "meaning, motivation, why",
+      "experiential_role": "teleological orientation and meaning",
       "kosha_anchor": "vijnanamaya",
       "default_polarity_behavior": {
         "tendency": "constructive",
-        "description": "establishes purposive end-state orientation"
+        "description": "establishes purposive end-state orientation and motivation"
       },
       "adjacency": {
         "prev_layer": "O7_REASONING",
@@ -157,7 +158,7 @@
     },
     "O9_WITNESSES": {
       "layer_id": "O9_WITNESSES",
-      "experiential_role": "meta-observation, awareness",
+      "experiential_role": "pattern-level witness tracking and meta-observation",
       "kosha_anchor": "anandamaya",
       "default_polarity_behavior": {
         "tendency": "neutral",
@@ -175,7 +176,7 @@
     },
     "O10_UNIFYING": {
       "layer_id": "O10_UNIFYING",
-      "experiential_role": "coherence, synthesis, harmony",
+      "experiential_role": "field coherence and synthesis",
       "kosha_anchor": "anandamaya",
       "default_polarity_behavior": {
         "tendency": "constructive",
@@ -193,11 +194,11 @@
     },
     "O11_INTEGRATION": {
       "layer_id": "O11_INTEGRATION",
-      "experiential_role": "resolution, consolidation",
+      "experiential_role": "resolution and consolidation of parts",
       "kosha_anchor": "anandamaya",
       "default_polarity_behavior": {
         "tendency": "constructive",
-        "description": "resolves and consolidates integrated patterns"
+        "description": "consolidates and completes partial processes"
       },
       "adjacency": {
         "prev_layer": "O10_UNIFYING",
@@ -206,16 +207,16 @@
       "constraints": [
         "layer-valid-without-varnas",
         "no-semantic-content",
-        "consolidation-only"
+        "resolution-consolidation-only"
       ]
     },
     "O12_ABSOLVING": {
       "layer_id": "O12_ABSOLVING",
-      "experiential_role": "termination, dissolution",
+      "experiential_role": "terminal dissolution or transcendence",
       "kosha_anchor": "bridge/none",
       "default_polarity_behavior": {
         "tendency": "degenerative",
-        "description": "dissolves pattern into ground state"
+        "description": "dissolves pattern into ground state and release"
       },
       "adjacency": {
         "prev_layer": "O11_INTEGRATION",
