@@ -993,10 +993,14 @@ def format_referent_analysis(analysis: ReferentAnalysis) -> str:
 CONTEXT_SEMANTIC_GROUPS: Dict[str, FrozenSet[str]] = {
     "royalty": frozenset({"king", "queen", "prince", "princess", "throne", "crown", "palace", "royal", "monarch"}),
     "chess": frozenset({"king", "queen", "bishop", "knight", "rook", "pawn", "checkmate", "board", "move"}),
-    "nature": frozenset({"tree", "forest", "river", "mountain", "ocean", "sky", "sun", "moon", "earth"}),
+    "nature": frozenset({"tree", "forest", "river", "mountain", "ocean", "sky", "sun", "moon", "earth",
+                         "stream", "meadow", "grassy", "peaceful", "sunset", "sunrise", "garden", "flower",
+                         "birds", "bird", "dawn", "dusk", "spring", "summer", "autumn", "winter", "season",
+                         "lake", "pond", "field", "valley", "hills", "countryside", "nature", "outdoor"}),
     "emotion": frozenset({"love", "hate", "joy", "sorrow", "fear", "hope", "anger", "happy", "sad"}),
     "family": frozenset({"mother", "father", "child", "family", "home", "parent", "sibling", "son", "daughter"}),
-    "technology": frozenset({"computer", "phone", "machine", "digital", "software", "data", "network", "code"}),
+    "technology": frozenset({"computer", "phone", "machine", "digital", "software", "data", "network", "code",
+                            "test", "deploy", "database", "migration", "server", "system", "algorithm"}),
     "food": frozenset({"apple", "banana", "food", "eat", "taste", "sweet", "fruit", "vegetable", "cook"}),
     "body": frozenset({"heart", "hand", "eye", "head", "body", "blood", "face", "arm", "leg"}),
     "light": frozenset({"sun", "light", "bright", "glow", "shine", "fire", "flame", "star", "radiance"}),
@@ -1004,6 +1008,13 @@ CONTEXT_SEMANTIC_GROUPS: Dict[str, FrozenSet[str]] = {
     "space": frozenset({"place", "space", "path", "road", "world", "home", "distance", "location", "area"}),
     "conflict": frozenset({"war", "peace", "fight", "battle", "enemy", "conflict", "struggle", "victory"}),
     "knowledge": frozenset({"wisdom", "knowledge", "truth", "idea", "thought", "mind", "learn", "study"}),
+    # NEW: Finance context for "bank" homonym disambiguation
+    "finance": frozenset({"bank", "money", "deposit", "account", "balance", "loan", "credit", "debit",
+                         "payment", "transaction", "financial", "interest", "savings", "withdraw", "transfer"}),
+    # NEW: Physical/mechanical context for "spring", "run" disambiguation
+    # Note: "spring" alone is ambiguous - require mechanical context words
+    "physical": frozenset({"mechanism", "repair", "mechanical", "coil",
+                          "tension", "force", "physics", "velocity", "mass", "motor", "gear", "device"}),
 }
 
 

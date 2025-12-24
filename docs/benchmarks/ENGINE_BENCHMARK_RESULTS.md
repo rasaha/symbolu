@@ -53,45 +53,58 @@ This document presents benchmark results for the three-tier Symbolu engine archi
 | Relationship | 88%      | 7/8 queries - improved with comprehensive keywords |
 | **Overall**  | **98%**  | 39/40 total queries |
 
-### 2. Homonym Disambiguation (12D + p_v[v] Formula)
+### 2. Homonym Disambiguation (12D + p_v[v] + S Term)
 
-**Current Status: p_v[v] Formula Improves Cross-Domain Matching**
+**Current Status: C×R×S Framework Achieves 76% Accuracy**
 
-| Homonym  | 10D | 12D (phoneme only) | 12D + p_v[v] | Improvement |
-|----------|-----|--------------------|--------------| ------------|
-| "light"  | 75% | 75%                | **75%**      | Maintained  |
-| "run"    | 50% | 50%                | **50%**      | Maintained  |
-| "spring" | 50% | 50%                | **75%**      | **+25%**    |
-| "bank"   | 20% | 20%                | **20%**      | (hardest)   |
-| **Overall** | 47% | 47%             | **53%**      | **+6 pts**  |
+| Homonym  | 10D | 12D + p_v[v] | 12D + p_v[v] + S | Improvement |
+|----------|-----|--------------|------------------| ------------|
+| "light"  | 75% | 75%          | **75%**          | Maintained  |
+| "run"    | 50% | 50%          | **50%**          | Maintained  |
+| "spring" | 50% | 75%          | **100%**         | **+50%**    |
+| "bank"   | 20% | 20%          | **80%**          | **+60%**    |
+| **Overall** | 47% | 53%       | **76%**          | **+29 pts** |
 
-**How p_v[v] Formula Improves Disambiguation:**
+**How C×R×S Framework Improves Disambiguation:**
 
-The core formula `p_w[a] = normalize( E(w,c) · Φ(a) · Σ p_v[v] · R[v,a] + B_c(h(c)) )` now integrated:
+The full formula now integrates all three terms:
+- **C (Constraint)**: Phonemic → Ontological layer mapping
+- **R (Realization)**: Phonemic → Experiential analysis
+- **S (Semantic Context)**: NON-PHONEMIC semantic context detection
 
-1. **Cognitive mode detection (p_v[v])**
+1. **Semantic Context Detection (S term) - NEW**
+   - Finance context: "bank", "money", "deposit" → ACTION
+   - Nature context: "river", "sunset", "meadow" → CREATIVE
+   - Technology context: "test", "deploy", "database" → ACTION
+   - Physical context: "mechanism", "repair" → ACTION
+
+2. **Cognitive mode detection (p_v[v])**
    - Financial terms → boost Pramāṇa (valid cognition) → O7_REASONING, O3_EXECUTION
    - Nature terms → boost Vikalpa (conceptualization) → O5_COGNITION, O4_STRUCTURE
    - Technical terms → boost Pramāṇa + Smṛti → O3_EXECUTION
 
-2. **R[v,a] matrix biasing (5×12)**
+3. **R[v,a] matrix biasing (5×12)**
    - Vṛtti distribution multiplied by coupling matrix
    - Biases layer totals before dominant layer selection
 
-3. **Domain-specific term detection**
-   - Financial: "deposit", "money", "account", "balance", "loan"
-   - Nature: "river", "stream", "sunset", "meadow", "peaceful"
-   - Technical: "test", "database", "migration", "deploy"
+4. **Context refinement**
+   - Nature + reflective words (peaceful, calm) → REFLECTIVE
+   - Nature + multiple nature words → boosted context strength
+   - Semantic context overrides generic keyword patterns
+
+**Key Insight:**
+The S term provides **NON-PHONEMIC** disambiguation. While "bank" (financial) and "bank" (river) have identical phonemes, the S term detects semantic context from surrounding words:
+- "deposit money at the bank" → finance context → ACTION
+- "river bank watching sunset" → nature context → CREATIVE
 
 **Remaining Limitations:**
-- "bank" still at 20% (identical phonemes regardless of meaning)
-- Phoneme patterns still dominate over vṛtti weighting
-- Further tuning of R[v,a] weights could improve results
+- "run" at 50% (edge cases where context is genuinely ambiguous)
+- Some queries match multiple contexts (nature + emotion)
 
 **Paths to Further Improvement:**
-- Increase vṛtti weighting strength (currently 0.5)
-- Fine-tune R[v,a] matrix couplings for 12D layers
-- Add SessionContext accumulation for multi-turn disambiguation
+- SessionContext accumulation for multi-turn disambiguation
+- Weighted context combination for multi-context queries
+- User preference learning for ambiguous cases
 
 ### 3. Latency Comparison
 
@@ -347,8 +360,10 @@ Propagation needed: ['IDENTIFICATION_SINGULARITY']
 
 2. **Keyword patterns boost to 90%** - explicit intent patterns handle most cases effectively
 
-3. **Cross-matching is marginal, not solved** - 47% homonym accuracy; "bank" at 20% is expected
-   - Future: SessionContext and Phase-1 constraint narrowing will materially improve this
+3. **C×R×S Framework achieves 76% homonym disambiguation** - S term (semantic context) is the key improvement
+   - "bank" improved from 20% → 80% (+60 pts) through finance/nature context detection
+   - "spring" improved to 100% through physical/nature context separation
+   - S term provides NON-PHONEMIC disambiguation that overcomes identical phoneme signatures
 
 4. **Custom vocabulary critical for domain terms** - 20-30% confidence boost for acronyms/jargon
 
@@ -414,9 +429,9 @@ print(f'Intent: {result.model_type.value}, Confidence: {result.confidence:.0%}')
 
 - **Date**: 2025-12-24
 - **Last benchmark run**: 2025-12-24
-- **Architecture**: 12D Ontological + p_v[v] Formula
+- **Architecture**: 12D Ontological + p_v[v] Formula + C×R×S Framework
 - **Branch**: claude/ontological-vs-llm-comparison-NcWYe
-- **Key Improvement**: Cross-domain matching 47% → 53% (+6 pts)
+- **Key Improvement**: Homonym disambiguation 47% → 76% (+29 pts)
 - **Commits**:
   - feat: Add keyword pattern boosting (32% → 98%)
   - feat: Add semantic cross-matching for homonyms
@@ -424,6 +439,8 @@ print(f'Intent: {result.model_type.value}, Confidence: {result.confidence:.0%}')
   - feat: Add three-tier engine architecture
   - feat: Migrate from 10D to 12D ontological architecture
   - feat: Add O1_POTENTIAL and O11_INTEGRATION layers
+  - feat: Integrate S term (semantic context) from C×R×S framework (47% → 76%)
+  - feat: Add finance/nature/physical context detection for homonyms
   - feat: Update phoneme mappings to 12D (all 50+ phonemes)
   - docs: Document 12D cross-domain matching analysis
   - feat: Raise cross-domain thresholds (0.1 → 0.5) for quality results

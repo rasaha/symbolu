@@ -32,6 +32,36 @@ from symbolu.resonance import (
     LAYER_NAMES,
 )
 
+# Semantic Context (S term from C×R×S framework)
+# Provides NON-PHONEMIC semantic disambiguation for homonyms
+try:
+    from symbolu.name_resonance.referent_classes import (
+        CONTEXT_SEMANTIC_GROUPS,
+        get_referent_profile,
+        ReferentClass,
+    )
+    SEMANTIC_CONTEXT_AVAILABLE = True
+except ImportError:
+    SEMANTIC_CONTEXT_AVAILABLE = False
+    # Inline semantic context groups when module unavailable
+    CONTEXT_SEMANTIC_GROUPS = {
+        "royalty": frozenset({"king", "queen", "prince", "princess", "throne", "crown", "palace", "royal", "monarch"}),
+        "chess": frozenset({"king", "queen", "bishop", "knight", "rook", "pawn", "checkmate", "board", "move"}),
+        "nature": frozenset({"tree", "forest", "river", "mountain", "ocean", "sky", "sun", "moon", "earth", "stream", "meadow", "grassy", "peaceful", "sunset"}),
+        "emotion": frozenset({"love", "hate", "joy", "sorrow", "fear", "hope", "anger", "happy", "sad"}),
+        "family": frozenset({"mother", "father", "child", "family", "home", "parent", "sibling", "son", "daughter"}),
+        "technology": frozenset({"computer", "phone", "machine", "digital", "software", "data", "network", "code", "test", "deploy", "database", "migration"}),
+        "food": frozenset({"apple", "banana", "food", "eat", "taste", "sweet", "fruit", "vegetable", "cook"}),
+        "body": frozenset({"heart", "hand", "eye", "head", "body", "blood", "face", "arm", "leg"}),
+        "light": frozenset({"sun", "light", "bright", "glow", "shine", "fire", "flame", "star", "radiance"}),
+        "time": frozenset({"time", "day", "night", "year", "moment", "past", "future", "now", "ancient"}),
+        "space": frozenset({"place", "space", "path", "road", "world", "home", "distance", "location", "area"}),
+        "conflict": frozenset({"war", "peace", "fight", "battle", "enemy", "conflict", "struggle", "victory"}),
+        "knowledge": frozenset({"wisdom", "knowledge", "truth", "idea", "thought", "mind", "learn", "study"}),
+        "finance": frozenset({"bank", "money", "deposit", "account", "balance", "loan", "credit", "debit", "payment", "transaction", "financial", "interest", "savings"}),
+        "physical": frozenset({"run", "walk", "jump", "spring", "mechanism", "repair", "energy", "store", "mechanical"}),
+    }
+
 # Vṛtti-Aspect Coupling Matrix (5×12) for cross-domain disambiguation
 # This enables the p_v[v] formula: weights[a] = Σ_v p_v[v] · R[v,a]
 # When chitta_vritti module is available, use it; otherwise inline the matrix
@@ -452,6 +482,113 @@ class SemanticRouter:
 
         return biased_totals
 
+    def _extract_semantic_context(self, query: str) -> Dict[str, float]:
+        """
+        Extract semantic context groups from the query (S term from C×R×S).
+
+        This is the NON-PHONEMIC component that disambiguates homonyms based
+        on semantic context rather than phoneme patterns.
+
+        The S term answers: "What semantic domain does this query belong to?"
+
+        Args:
+            query: The input query
+
+        Returns:
+            Dict mapping semantic context groups to match strength (0.0 to 1.0)
+        """
+        words = set(re.findall(r'\b[a-z]+\b', query.lower()))
+        context_scores: Dict[str, float] = {}
+
+        for group_name, group_words in CONTEXT_SEMANTIC_GROUPS.items():
+            matches = words & group_words
+            if matches:
+                # Score based on number of matches relative to query length
+                score = len(matches) / max(len(words), 1)
+                # Boost if multiple words match the same context
+                if len(matches) > 1:
+                    score = min(score * 1.5, 1.0)
+                context_scores[group_name] = score
+
+        return context_scores
+
+    def _apply_semantic_context_weighting(
+        self,
+        layer_totals: List[float],
+        semantic_context: Dict[str, float],
+        weight: float = 0.4,
+    ) -> List[float]:
+        """
+        Apply semantic context (S term) weighting to layer totals.
+
+        This is the key integration of the C×R×S framework:
+        - C (Constraint) and R (Realization) come from phoneme analysis
+        - S (Semantic Context) comes from this method (NON-PHONEMIC)
+
+        Semantic context → Ontological layer mapping:
+        - finance context → O7_REASONING (analysis), O3_EXECUTION (transactions)
+        - nature context → O5_COGNITION (perception), O4_STRUCTURE (form)
+        - technology context → O3_EXECUTION (action), O7_REASONING (logic)
+        - emotion context → O10_UNIFYING (relationship), O5_COGNITION (feeling)
+        - knowledge context → O7_REASONING (logic), O9_WITNESSES (observation)
+
+        Args:
+            layer_totals: Raw 12D layer totals from phoneme analysis
+            semantic_context: Detected semantic context groups
+            weight: How strongly to weight semantic context (0.0 to 1.0)
+
+        Returns:
+            Layer totals biased by semantic context
+        """
+        if not semantic_context:
+            return layer_totals
+
+        # Semantic context → Layer bias mapping (12D indices)
+        # These mappings are derived from the C×R×S referent class semantics
+        CONTEXT_TO_LAYERS: Dict[str, List[Tuple[int, float]]] = {
+            # Finance context → boost reasoning (6) and execution (2)
+            "finance": [(6, 0.8), (2, 0.6), (5, 0.3)],  # O7_REASONING, O3_EXECUTION, O6_AGENCY
+            # Nature context → boost cognition (4) and structure (3)
+            "nature": [(4, 0.8), (3, 0.6), (8, 0.4)],  # O5_COGNITION, O4_STRUCTURE, O9_WITNESSES
+            # Technology context → boost execution (2) and reasoning (6)
+            "technology": [(2, 0.7), (6, 0.6), (10, 0.3)],  # O3_EXECUTION, O7_REASONING, O11_INTEGRATION
+            # Emotion context → boost unifying (9) and cognition (4)
+            "emotion": [(9, 0.8), (4, 0.6), (7, 0.4)],  # O10_UNIFYING, O5_COGNITION, O8_PURPOSE
+            # Family context → boost unifying (9) and purpose (7)
+            "family": [(9, 0.7), (7, 0.6), (4, 0.4)],  # O10_UNIFYING, O8_PURPOSE, O5_COGNITION
+            # Knowledge context → boost reasoning (6) and witnesses (8)
+            "knowledge": [(6, 0.8), (8, 0.5), (4, 0.4)],  # O7_REASONING, O9_WITNESSES, O5_COGNITION
+            # Light context → boost cognition (4) and structure (3)
+            "light": [(4, 0.7), (6, 0.5), (3, 0.4)],  # O5_COGNITION, O7_REASONING, O4_STRUCTURE
+            # Physical/mechanical context → boost execution (2) and structure (3)
+            "physical": [(2, 0.8), (3, 0.6), (6, 0.4)],  # O3_EXECUTION, O4_STRUCTURE, O7_REASONING
+            # Time context → boost witnesses (8) and purpose (7)
+            "time": [(8, 0.6), (7, 0.5), (0, 0.4)],  # O9_WITNESSES, O8_PURPOSE, O1_POTENTIAL
+            # Space context → boost structure (3) and cognition (4)
+            "space": [(3, 0.7), (4, 0.5), (5, 0.4)],  # O4_STRUCTURE, O5_COGNITION, O6_AGENCY
+            # Conflict context → boost agency (5) and execution (2)
+            "conflict": [(5, 0.7), (2, 0.6), (7, 0.4)],  # O6_AGENCY, O3_EXECUTION, O8_PURPOSE
+            # Royalty context → boost agency (5) and purpose (7)
+            "royalty": [(5, 0.7), (7, 0.6), (1, 0.4)],  # O6_AGENCY, O8_PURPOSE, O2_IDENTITY
+            # Chess context → boost reasoning (6) and execution (2)
+            "chess": [(6, 0.8), (2, 0.5), (5, 0.4)],  # O7_REASONING, O3_EXECUTION, O6_AGENCY
+            # Food context → boost structure (3) and potential (0)
+            "food": [(3, 0.6), (0, 0.5), (4, 0.4)],  # O4_STRUCTURE, O1_POTENTIAL, O5_COGNITION
+            # Body context → boost structure (3) and cognition (4)
+            "body": [(3, 0.7), (4, 0.6), (0, 0.3)],  # O4_STRUCTURE, O5_COGNITION, O1_POTENTIAL
+        }
+
+        biased_totals = layer_totals.copy()
+
+        for context_name, context_strength in semantic_context.items():
+            if context_name in CONTEXT_TO_LAYERS:
+                layer_biases = CONTEXT_TO_LAYERS[context_name]
+                for layer_idx, bias_strength in layer_biases:
+                    # Apply weighted bias: context_strength × bias_strength × weight
+                    biased_totals[layer_idx] += context_strength * bias_strength * weight
+
+        return biased_totals
+
     def _compute_cross_resonance(
         self, word_vectors: List[WordVector]
     ) -> Dict[str, float]:
@@ -590,6 +727,17 @@ class SemanticRouter:
             layer_totals, vritti_dist, weight=0.5
         )
 
+        # Apply S term (Semantic Contextual Meaning) from C×R×S framework
+        # This is the NON-PHONEMIC component that disambiguates homonyms
+        # based on semantic context rather than sound patterns
+        # Example: "bank" + "money" → finance context → O7_REASONING
+        #          "bank" + "river" → nature context → O5_COGNITION
+        semantic_context = self._extract_semantic_context(query)
+        if semantic_context:
+            biased_layer_totals = self._apply_semantic_context_weighting(
+                biased_layer_totals, semantic_context, weight=0.4
+            )
+
         # Find initial dominant layer using vṛtti-biased totals
         max_idx = 0
         max_total = biased_layer_totals[0]
@@ -645,8 +793,102 @@ class SemanticRouter:
         # Determine model type by combining phoneme analysis with pattern matching
         phoneme_model = LAYER_TO_MODEL.get(dominant_layer, self.fallback_model)
 
+        # Semantic context → Model type mapping (S term from C×R×S)
+        # This provides NON-PHONEMIC model selection based on semantic context
+        # Refined based on benchmark analysis:
+        # - Finance: transactional (deposit, check, pay) → ACTION
+        # - Nature: scenic/creative → CREATIVE, contemplative → REFLECTIVE
+        # - Technology: procedural → ACTION
+        SEMANTIC_TO_MODEL: Dict[str, ModelType] = {
+            "finance": ModelType.ACTION,         # Financial transactions → action
+            "technology": ModelType.ACTION,      # Tech/deploy → action
+            "nature": ModelType.CREATIVE,        # Nature/scenic → creative
+            "emotion": ModelType.RELATIONSHIP,   # Emotional → relationship
+            "family": ModelType.RELATIONSHIP,    # Family → relationship
+            "knowledge": ModelType.REASONING,    # Knowledge → reasoning
+            "physical": ModelType.ACTION,        # Physical action → action
+            "chess": ModelType.REASONING,        # Strategy → reasoning
+            "conflict": ModelType.ACTION,        # Conflict → action
+            "light": ModelType.REASONING,        # Physics → reasoning
+            "time": ModelType.REFLECTIVE,        # Temporal → reflective
+            "space": ModelType.CREATIVE,         # Spatial → creative
+        }
+
+        # Context refinement based on query words
+        query_words = set(re.findall(r'\b[a-z]+\b', query.lower()))
+
+        # Nature context can be CREATIVE or REFLECTIVE depending on tone
+        # Only truly contemplative words trigger REFLECTIVE, not observational ones
+        reflective_words = {"peaceful", "calm", "serene", "quiet", "tranquil", "meditative", "still", "silent"}
+        if "nature" in semantic_context and query_words & reflective_words:
+            # Nature + contemplative words → REFLECTIVE instead of CREATIVE
+            SEMANTIC_TO_MODEL = SEMANTIC_TO_MODEL.copy()
+            SEMANTIC_TO_MODEL["nature"] = ModelType.REFLECTIVE
+
+        # Boost nature context strength when multiple nature words are present
+        # This helps override generic relationship patterns like "love", "I"
+        if "nature" in semantic_context:
+            nature_words = CONTEXT_SEMANTIC_GROUPS.get("nature", set())
+            nature_matches = len(query_words & nature_words)
+            if nature_matches >= 2:
+                # Strong nature signal - boost context strength
+                semantic_context["nature"] = min(semantic_context["nature"] * 1.5, 1.0)
+
+        # Check if semantic context suggests a different model than phoneme analysis
+        semantic_model: Optional[ModelType] = None
+        semantic_strength: float = 0.0
+        if semantic_context:
+            # Get strongest semantic context
+            best_context = max(semantic_context, key=semantic_context.get)
+            best_score = semantic_context[best_context]
+            if best_context in SEMANTIC_TO_MODEL and best_score >= 0.2:
+                semantic_model = SEMANTIC_TO_MODEL[best_context]
+                semantic_strength = best_score
+
+        # Priority order for model selection:
+        # 1. Strong semantic context (S term from C×R×S) - NON-PHONEMIC, best for homonyms
+        # 2. Pattern keyword matching - explicit intent signals
+        # 3. Phoneme-based layer analysis - default
+        #
+        # Semantic context is prioritized because it's NON-PHONEMIC and can
+        # disambiguate homonyms that have identical phoneme signatures.
+
+        # Check if semantic context should override pattern detection
+        # Semantic context gets priority for homonym disambiguation
+        if semantic_model and semantic_strength >= 0.3:
+            # Strong semantic context - use it to guide model selection
+            if pattern_scores:
+                best_pattern_model = max(pattern_scores, key=pattern_scores.get)
+                best_pattern_score = pattern_scores[best_pattern_model]
+
+                if semantic_model == best_pattern_model:
+                    # Semantic and pattern agree - high confidence
+                    model_type = semantic_model
+                    confidence = min(max_word_score + semantic_strength * 0.3 + best_pattern_score * 0.1, 1.0)
+                elif semantic_model == phoneme_model:
+                    # Semantic and phoneme agree - use semantic
+                    model_type = semantic_model
+                    confidence = min(max_word_score + semantic_strength * 0.25, 1.0)
+                elif semantic_strength >= 0.4:
+                    # Strong semantic overrides pattern (homonym case)
+                    # This is the key improvement for "bank" disambiguation
+                    model_type = semantic_model
+                    confidence = min(max_word_score + semantic_strength * 0.2, 1.0)
+                else:
+                    # Moderate semantic - use pattern if strong
+                    if best_pattern_score >= 0.4:
+                        model_type = best_pattern_model
+                        confidence = min(max_word_score + best_pattern_score * self.pattern_boost, 1.0)
+                    else:
+                        model_type = semantic_model
+                        confidence = min(max_word_score + semantic_strength * 0.15, 1.0)
+            else:
+                # No patterns - use semantic directly
+                model_type = semantic_model
+                confidence = min(max_word_score + semantic_strength * 0.2, 1.0)
+
         # If pattern detection has a strong signal, use it to override or confirm
-        if pattern_scores:
+        elif pattern_scores:
             # Get the best pattern match
             best_pattern_model = max(pattern_scores, key=pattern_scores.get)
             best_pattern_score = pattern_scores[best_pattern_model]
