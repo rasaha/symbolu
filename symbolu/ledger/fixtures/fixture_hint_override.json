@@ -3,12 +3,14 @@
     {
       "artifact_hash": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
       "artifact_id": "artifact_hint_001",
-      "entry_hash": "d8472d4549493fa6",
+      "entry_hash": "5388030fcdfa1470",
       "ledger_index": 0,
       "phase_id": "4",
-      "projected_layers": ["THINKING"],
+      "projected_layers": [
+        "COGNITION"
+      ],
       "router_version": "R1.0",
-      "span_id": "b5157c68cec82301"
+      "span_id": "035f49a231de84c1"
     }
   ],
   "metadata": {

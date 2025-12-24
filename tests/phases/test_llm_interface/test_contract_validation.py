@@ -183,9 +183,9 @@ class TestAT2LayerInjection:
 
     def test_allowed_layers_pass(self, basic_request: RenderRequest):
         """Response referencing only allowed layers should pass."""
-        response = make_response("This maps to O1_THINKING and O3_ACTING.")
+        response = make_response("This maps to O5_COGNITION and O3_EXECUTION.")
         result = validate_llm_response(basic_request, response)
-        # Should pass since O1 and O3 are allowed
+        # Should pass since O5 and O3 are allowed
         layer_violations = [v for v in result.violations
                           if v.violation_type == ContractViolationType.NEW_LAYER]
         assert len(layer_violations) == 0
@@ -537,7 +537,7 @@ class TestValidResponse:
         """A response that violates nothing should pass."""
         response = make_response(
             "The sequence ka-a-i produces a trajectory with final magnitude 1.3. "
-            "This maps to O1_THINKING layer."
+            "This maps to O5_COGNITION layer."
         )
         result = validate_llm_response(basic_request, response)
         assert result.valid

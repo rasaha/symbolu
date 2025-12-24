@@ -54,12 +54,13 @@ AUTHORIZED_MODULES = frozenset({
     "symbolu/formulas/",   # Formulas modules - use varna bridge data for acoustic mapping
 })
 
-# Exempt paths (experimental, tests, docs)
+# Exempt paths (experimental, tests, docs, scripts)
 EXEMPT_PATHS = frozenset({
     "docs/experiments/",
     "restoration/experiments/",
     "tests/",
     ".github/",
+    "scripts/",  # Migration and utility scripts
 })
 
 # Legacy modules with EXPERIMENT_ONLY marker (tolerated but deprecated)
