@@ -422,7 +422,8 @@ class TestInvalidHintRejected:
         with pytest.raises(ProjectionBlockedError) as exc:
             router.project(request)
         error_msg = str(exc.value)
-        assert "FORMING" in error_msg or "THINKING" in error_msg
+        # Phase 4 allows EXECUTION and COGNITION (12D naming)
+        assert "STRUCTURE" in error_msg or "COGNITION" in error_msg
 
 
 # =============================================================================
