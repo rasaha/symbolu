@@ -70,7 +70,7 @@ from symbolu.resonance.analyzer import (
 )
 
 from symbolu.resonance.varna_bridge import (
-    varna_to_10d_vector,
+    varna_to_12d_vector,
     varna_word_to_vector,
     english_phoneme_to_varna,
     phonemes_to_varnas,
@@ -120,7 +120,7 @@ __all__ = [
     "analyze_phrase_varna",
     "compare_arpabet_vs_varna",
     # Varṇa bridge functions
-    "varna_to_10d_vector",
+    "varna_to_12d_vector",
     "varna_word_to_vector",
     "english_phoneme_to_varna",
     "phonemes_to_varnas",
