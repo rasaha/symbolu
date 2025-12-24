@@ -79,6 +79,36 @@ from symbolu.presentation.speech_pipeline import (
     generate_ssml,
     is_speech_allowed,
 )
+from symbolu.presentation.signal_bridge import (
+    bridge_signals_to_presentation,
+    derive_fluency_guidance,
+    check_response_resonance,
+    format_bridge_result,
+    format_fluency_guidance,
+    BridgeResult,
+    FluencyGuidance,
+    PHASE_TO_DELIVERY,
+    PHASE_EXPLANATIONS,
+)
+from symbolu.presentation.response_renderer import (
+    ResponseRenderer,
+    RenderedResponse,
+    ResponseSection,
+    render_response,
+    render_from_bridge,
+    format_rendered_response,
+)
+from symbolu.presentation.pipeline import (
+    PresentationPipeline,
+    PipelineConfig,
+    PipelineResult,
+    PipelineStage,
+    respond,
+    quick_respond,
+    process_with_details,
+    format_pipeline_result,
+    demo_pipeline,
+)
 
 __all__ = [
     # Types (Part 3)
@@ -137,4 +167,31 @@ __all__ = [
     "generate_speech",
     "generate_ssml",
     "is_speech_allowed",
+    # Signal Bridge (Rich STL → Presentation)
+    "bridge_signals_to_presentation",
+    "derive_fluency_guidance",
+    "check_response_resonance",
+    "format_bridge_result",
+    "format_fluency_guidance",
+    "BridgeResult",
+    "FluencyGuidance",
+    "PHASE_TO_DELIVERY",
+    "PHASE_EXPLANATIONS",
+    # Response Renderer (Directive → Text)
+    "ResponseRenderer",
+    "RenderedResponse",
+    "ResponseSection",
+    "render_response",
+    "render_from_bridge",
+    "format_rendered_response",
+    # Unified Pipeline (Full Query → Response)
+    "PresentationPipeline",
+    "PipelineConfig",
+    "PipelineResult",
+    "PipelineStage",
+    "respond",
+    "quick_respond",
+    "process_with_details",
+    "format_pipeline_result",
+    "demo_pipeline",
 ]
