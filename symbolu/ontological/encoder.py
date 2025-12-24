@@ -5,7 +5,15 @@ Ontological Engine - Text Encoders
 Text encoding modules for the ontological engine:
 1. HashEncoder: Deterministic fallback (no dependencies)
 2. DistilBERTEncoder: Pretrained transformer (requires transformers)
-3. HybridEncoder: Auto-selects based on availability
+3. SentenceTransformerEncoder: MiniLM encoder (384D, fast)
+4. HybridEncoder: Auto-selects based on availability
+
+Offline Usage:
+    # First, save model on machine with HuggingFace access:
+    save_model_for_offline("./models/minilm")
+
+    # Then load from local path (no network required):
+    encoder = get_encoder("minilm", model_path="./models/minilm")
 
 Usage:
     encoder = get_encoder()  # Auto-selects best available
@@ -14,6 +22,7 @@ Usage:
 
 import hashlib
 import math
+import os
 from typing import List, Optional, Protocol
 from abc import ABC, abstractmethod
 
@@ -176,11 +185,12 @@ class HybridEncoder(TextEncoder):
     Hybrid encoder that auto-selects best available encoder.
 
     Priority:
-    1. DistilBERT (if transformers available)
-    2. HashEncoder (fallback)
+    1. SentenceTransformer MiniLM (384D, 2.5x faster than DistilBERT)
+    2. DistilBERT (768D fallback if sentence-transformers unavailable)
+    3. HashEncoder (final fallback)
     """
 
-    def __init__(self, prefer_transformer: bool = True, dimension: int = 768):
+    def __init__(self, prefer_transformer: bool = True, dimension: int = 384):
         self._prefer_transformer = prefer_transformer
         self._fallback_dimension = dimension
         self._encoder: Optional[TextEncoder] = None
@@ -189,11 +199,22 @@ class HybridEncoder(TextEncoder):
     def _init_encoder(self):
         """Initialize the best available encoder."""
         if self._prefer_transformer:
+            # Try MiniLM first (faster, 384D)
+            try:
+                self._encoder = SentenceTransformerEncoder()
+                # Test that it works
+                self._encoder._load_model()
+                print("Using MiniLM encoder (384D)")
+                return
+            except (ImportError, Exception) as e:
+                print(f"MiniLM not available ({e}), trying DistilBERT...")
+
+            # Fall back to DistilBERT (768D)
             try:
                 self._encoder = DistilBERTEncoder()
                 # Test that it works
                 self._encoder._load_model()
-                print("Using DistilBERT encoder")
+                print("Using DistilBERT encoder (768D)")
                 return
             except (ImportError, Exception) as e:
                 print(f"DistilBERT not available ({e}), falling back to hash encoder")
@@ -218,25 +239,53 @@ class HybridEncoder(TextEncoder):
 
 def get_encoder(
     encoder_type: str = "auto",
-    dimension: int = 768,
+    dimension: int = 384,
     device: Optional[str] = None,
+    model_path: Optional[str] = None,
+    offline: bool = False,
 ) -> TextEncoder:
     """
     Factory function to get a text encoder.
 
     Args:
-        encoder_type: "auto", "distilbert", or "hash"
+        encoder_type: "auto", "minilm", "distilbert", or "hash"
         dimension: Embedding dimension (for hash encoder)
         device: Device for transformer ("cuda" or "cpu")
+        model_path: Local path to saved model (for offline use)
+        offline: If True, only load from local path, never download
 
     Returns:
         TextEncoder instance
+
+    Note:
+        "auto" tries MiniLM (384D) first, then DistilBERT (768D), then hash.
+        MiniLM is 2.5x faster than DistilBERT with only 5% quality drop.
+
+    Offline Usage:
+        # First save model (on machine with HuggingFace access):
+        save_model_for_offline("./models/minilm")
+
+        # Then load offline:
+        encoder = get_encoder("minilm", model_path="./models/minilm")
     """
     if encoder_type == "hash":
         return HashEncoder(dimension=dimension)
+    elif encoder_type == "minilm":
+        return SentenceTransformerEncoder(
+            device=device,
+            model_path=model_path,
+            offline=offline,
+        )
     elif encoder_type == "distilbert":
         return DistilBERTEncoder(device=device)
     elif encoder_type == "auto":
+        # If model_path provided, use it for MiniLM
+        if model_path:
+            return SentenceTransformerEncoder(
+                device=device,
+                model_path=model_path,
+                offline=offline,
+            )
         return HybridEncoder(prefer_transformer=True, dimension=dimension)
     else:
         raise ValueError(f"Unknown encoder type: {encoder_type}")
@@ -252,17 +301,39 @@ class SentenceTransformerEncoder(TextEncoder):
 
     Uses all-MiniLM-L6-v2 by default (384D, fast, good quality).
 
+    Supports offline loading from local model path.
+
     Requires: pip install sentence-transformers
+
+    Usage:
+        # Online (downloads from HuggingFace):
+        encoder = SentenceTransformerEncoder()
+
+        # Offline (loads from local path):
+        encoder = SentenceTransformerEncoder(model_path="./models/minilm")
     """
 
     def __init__(
         self,
         model_name: str = "all-MiniLM-L6-v2",
+        model_path: Optional[str] = None,
         device: Optional[str] = None,
+        offline: bool = False,
     ):
+        """
+        Initialize the encoder.
+
+        Args:
+            model_name: HuggingFace model name (used if model_path not provided)
+            model_path: Local path to saved model (for offline use)
+            device: Device for inference ("cuda" or "cpu")
+            offline: If True, only load from local path, never download
+        """
         self.model_name = model_name
+        self.model_path = model_path
         self._model = None
         self._device = device
+        self._offline = offline
         self._dimension = 384  # Default for MiniLM
 
     def _load_model(self):
@@ -273,16 +344,44 @@ class SentenceTransformerEncoder(TextEncoder):
         try:
             from sentence_transformers import SentenceTransformer
 
-            self._model = SentenceTransformer(self.model_name, device=self._device)
+            # Determine model source
+            if self.model_path and os.path.exists(self.model_path):
+                # Load from local path
+                model_source = self.model_path
+                print(f"Loading model from local path: {self.model_path}")
+            elif self._offline:
+                raise FileNotFoundError(
+                    f"Offline mode enabled but model not found at: {self.model_path}"
+                )
+            else:
+                # Download from HuggingFace
+                model_source = self.model_name
+
+            self._model = SentenceTransformer(model_source, device=self._device)
             self._dimension = self._model.get_sentence_embedding_dimension()
 
-            print(f"Loaded {self.model_name} ({self._dimension}D)")
+            print(f"Loaded {model_source} ({self._dimension}D)")
 
         except ImportError as e:
             raise ImportError(
                 "SentenceTransformer encoder requires 'sentence-transformers'. "
                 "Install with: pip install sentence-transformers"
             ) from e
+
+    def save(self, path: str) -> None:
+        """
+        Save the model to a local path for offline use.
+
+        Args:
+            path: Directory path to save the model
+
+        Usage:
+            encoder = SentenceTransformerEncoder()
+            encoder.save("./models/minilm")
+        """
+        self._load_model()
+        self._model.save(path)
+        print(f"Model saved to: {path}")
 
     @property
     def dimension(self) -> int:
@@ -295,3 +394,32 @@ class SentenceTransformerEncoder(TextEncoder):
         self._load_model()
         embeddings = self._model.encode(texts, convert_to_numpy=True)
         return embeddings.tolist()
+
+
+def save_model_for_offline(
+    save_path: str,
+    model_name: str = "all-MiniLM-L6-v2",
+) -> None:
+    """
+    Download and save a model for offline use.
+
+    Run this on a machine with HuggingFace access, then copy
+    the saved directory to machines without access.
+
+    Args:
+        save_path: Directory to save the model
+        model_name: HuggingFace model name to download
+
+    Usage:
+        # On machine with internet:
+        save_model_for_offline("./models/minilm")
+
+        # Copy ./models/minilm to target machine, then:
+        encoder = get_encoder("minilm", model_path="./models/minilm")
+    """
+    print(f"Downloading {model_name}...")
+    encoder = SentenceTransformerEncoder(model_name=model_name)
+    encoder.save(save_path)
+    print(f"\nModel saved to: {save_path}")
+    print(f"Copy this directory to target machine and use:")
+    print(f'  encoder = get_encoder("minilm", model_path="{save_path}")')
