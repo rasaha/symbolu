@@ -39,7 +39,6 @@ from symbolu.ontological.types import (
     OntologicalVector,
     TrainingExample,
     LAYER_NAMES,
-    LAYER_DESCRIPTIONS,
     LAYER_INDEX,
 )
 from symbolu.ontological.engine import OntologicalEngine, create_engine
@@ -93,7 +92,6 @@ __all__ = [
     "OntologicalVector",
     "TrainingExample",
     "LAYER_NAMES",
-    "LAYER_DESCRIPTIONS",
     "LAYER_INDEX",
     # Engine
     "OntologicalEngine",
