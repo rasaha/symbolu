@@ -331,8 +331,8 @@ if PYTORCH_AVAILABLE:
                 optimizer.zero_grad()
 
                 # Forward pass
-                onto_output = self.engine.ontological_mlp(batch_emb)
-                bhava_output = self.engine.bhava_layer(onto_output)
+                onto_output = self.engine.mlp(batch_emb)
+                bhava_output = self.engine.bhava(onto_output)
 
                 # Domain classification loss (soft cross-entropy)
                 # Normalize labels to sum to 1 for each sample
@@ -419,7 +419,7 @@ if PYTORCH_AVAILABLE:
                 embeddings = embeddings.to(self.device)
                 labels = labels.to(self.device)
 
-                onto_output = self.engine.ontological_mlp(embeddings)
+                onto_output = self.engine.mlp(embeddings)
 
                 # Loss
                 normalized_labels = labels / (labels.sum(dim=1, keepdim=True) + 1e-8)
@@ -488,7 +488,7 @@ if PYTORCH_AVAILABLE:
                         dtype=torch.float32
                     ).unsqueeze(0).to(self.device)
 
-                    onto_output = self.engine.ontological_mlp(emb)
+                    onto_output = self.engine.mlp(emb)
                     predicted_idx = torch.argmax(onto_output, dim=1).item()
                     predicted_domain = LAYER_NAMES[predicted_idx]
 
