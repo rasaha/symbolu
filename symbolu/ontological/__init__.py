@@ -63,6 +63,11 @@ from symbolu.ontological.creative_math_dataset import (
     CreativeMathItem,
     create_creative_math_dataset,
 )
+from symbolu.ontological.multi_domain_dataset import (
+    MultiDomainDataset,
+    DomainSample,
+    create_multi_domain_dataset,
+)
 
 __all__ = [
     # Types
@@ -91,6 +96,10 @@ __all__ = [
     "CreativeMathDataset",
     "CreativeMathItem",
     "create_creative_math_dataset",
+    # Multi-domain (10 layers)
+    "MultiDomainDataset",
+    "DomainSample",
+    "create_multi_domain_dataset",
 ]
 
 # Add PyTorch exports if available
