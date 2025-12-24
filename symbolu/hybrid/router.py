@@ -32,6 +32,109 @@ from symbolu.resonance import (
     LAYER_NAMES,
 )
 
+# Semantic Context (S term from C×R×S framework)
+# Provides NON-PHONEMIC semantic disambiguation for homonyms
+# Uses authoritative ReferentClass ontology from referent_classes.py
+try:
+    from symbolu.name_resonance.referent_classes import (
+        CONTEXT_SEMANTIC_GROUPS,
+        get_referent_profile,
+        ReferentClass,
+        WORD_TO_REFERENT,
+        detect_semantic_inversion,
+        SemanticInversionResult,
+    )
+    SEMANTIC_CONTEXT_AVAILABLE = True
+    INVERSION_DETECTION_AVAILABLE = True
+except ImportError:
+    SEMANTIC_CONTEXT_AVAILABLE = False
+    INVERSION_DETECTION_AVAILABLE = False
+    CONTEXT_SEMANTIC_GROUPS = {}
+    WORD_TO_REFERENT = {}
+    ReferentClass = None  # type: ignore
+    SemanticInversionResult = None  # type: ignore
+
+    def get_referent_profile(word: str):
+        return None
+
+    def detect_semantic_inversion(text: str, structural_coherence: float = 0.5):
+        return None
+
+# Authoritative ReferentClass → ModelType Mapping
+# This is grounded in ontological semantics, not arbitrary heuristics:
+# - PROCESS (actions, events) → ACTION (procedural tasks)
+# - ABSTRACT (concepts, relations) → REASONING (logical analysis)
+# - EMOTIONAL (feelings, states) → RELATIONSHIP (emotional connection)
+# - NATURAL_BODY (celestial, geological) → CREATIVE (nature/art)
+# - ARTIFACT (human-made objects) → ACTION (tool usage)
+# - SIGNAL (communication) → REASONING (information processing)
+# - SOCIAL (roles, relationships) → RELATIONSHIP (social connection)
+# - BIOLOGICAL_ORGANISM (living things) → CREATIVE (nature)
+# - LUMINOUS (light, energy) → REASONING (physics/perception)
+# - TEMPORAL (time) → REFLECTIVE (contemplation)
+# - SPATIAL (space, location) → CREATIVE (spatial imagination)
+REFERENT_TO_MODEL: Dict[str, "ModelType"] = {}  # Populated after ModelType is defined
+
+
+def _init_referent_to_model():
+    """Initialize the ReferentClass → ModelType mapping after ModelType is defined."""
+    global REFERENT_TO_MODEL
+    if ReferentClass is None:
+        return
+    REFERENT_TO_MODEL = {
+        ReferentClass.PROCESS: ModelType.ACTION,           # Actions, events → procedural
+        ReferentClass.ABSTRACT: ModelType.REASONING,       # Concepts → logical analysis
+        ReferentClass.EMOTIONAL: ModelType.RELATIONSHIP,   # Feelings → emotional
+        ReferentClass.NATURAL_BODY: ModelType.CREATIVE,    # Nature → creative
+        ReferentClass.ARTIFACT: ModelType.ACTION,          # Tools → action
+        ReferentClass.SIGNAL: ModelType.REASONING,         # Communication → reasoning
+        ReferentClass.SOCIAL: ModelType.RELATIONSHIP,      # Social → relationship
+        ReferentClass.BIOLOGICAL_ORGANISM: ModelType.CREATIVE,  # Living things → creative
+        ReferentClass.LUMINOUS: ModelType.REASONING,       # Light/energy → physics
+        ReferentClass.TEMPORAL: ModelType.REFLECTIVE,      # Time → contemplation
+        ReferentClass.SPATIAL: ModelType.CREATIVE,         # Space → imagination
+        ReferentClass.SUBSTANCE: ModelType.REASONING,      # Matter → analysis
+        ReferentClass.ROLE_BEARER: ModelType.RELATIONSHIP, # Roles → social
+        ReferentClass.ENERGY_SOURCE: ModelType.REASONING,  # Energy → physics
+        ReferentClass.PHENOMENON: ModelType.REASONING,     # Observations → analysis
+    }
+
+
+# Vṛtti-Aspect Coupling Matrix (5×12) for cross-domain disambiguation
+# This enables the p_v[v] formula: weights[a] = Σ_v p_v[v] · R[v,a]
+# When chitta_vritti module is available, use it; otherwise inline the matrix
+try:
+    from symbolu.chitta_vritti.coupling import get_aspect_weights, VRITTI_NAMES
+    VRITTI_COUPLING_AVAILABLE = True
+except ImportError:
+    VRITTI_COUPLING_AVAILABLE = False
+    VRITTI_NAMES = ["pramana", "viparyaya", "vikalpa", "smrti", "nidra"]
+    # Inline R[v,a] matrix (5×12) for when numpy unavailable
+    R_MATRIX_INLINE = [
+        # POT    ID     EXEC   STR    COG    AGN    RSN    PUR    WIT    UNI    INT    ABS
+        [0.40, 0.80, 0.70, 0.60, 0.70, 0.50, 0.95, 0.60, 0.80, 0.70, 0.75, 0.60],  # Pramāṇa
+        [0.30, 0.70, 0.50, 0.40, 0.60, 0.90, 0.40, 0.30, 0.50, 0.30, 0.35, 0.20],  # Viparyaya
+        [0.50, 0.50, 0.60, 0.50, 0.85, 0.60, 0.70, 0.50, 0.60, 0.40, 0.55, 0.30],  # Vikalpa
+        [0.70, 0.60, 0.80, 0.70, 0.70, 0.50, 0.60, 0.80, 0.50, 0.60, 0.70, 0.40],  # Smṛti
+        [0.85, 0.30, 0.30, 0.70, 0.40, 0.30, 0.20, 0.40, 0.60, 0.50, 0.55, 0.75],  # Nidrā
+    ]
+
+    def get_aspect_weights(vritti_distribution: Dict[str, float]) -> Dict[str, float]:
+        """Compute 12D layer weights from vṛtti distribution (inline version)."""
+        vritti_vec = [
+            vritti_distribution.get("pramana", 0.0),
+            vritti_distribution.get("viparyaya", 0.0),
+            vritti_distribution.get("vikalpa", 0.0),
+            vritti_distribution.get("smrti", 0.0),
+            vritti_distribution.get("nidra", 0.0),
+        ]
+        # Matrix multiply: (1×5) @ (5×12) = (1×12)
+        weights = [0.0] * 12
+        for v_idx, v_prob in enumerate(vritti_vec):
+            for a_idx in range(12):
+                weights[a_idx] += v_prob * R_MATRIX_INLINE[v_idx][a_idx]
+        return {LAYER_NAMES[i]: weights[i] for i in range(12)}
+
 
 # Intent keyword patterns for boosting
 # These augment phoneme analysis with common linguistic patterns
@@ -104,6 +207,10 @@ class ModelType(Enum):
     TRANSCENDENT = "transcendent" # O12_ABSOLVING - abstract, spiritual
 
 
+# Initialize the authoritative ReferentClass → ModelType mapping
+_init_referent_to_model()
+
+
 @dataclass(frozen=True)
 class RoutingDecision:
     """Result of routing decision."""
@@ -112,6 +219,11 @@ class RoutingDecision:
     dominant_layer: str
     layer_scores: Tuple[Tuple[str, float], ...]  # Top layers
     query_analysis: PhraseAnalysis
+    # Semantic inversion detection (fracture between semantic/structural layers)
+    polarity_score: float = 0.0       # Net semantic polarity (-1.0 to +1.0)
+    polarity_words: Tuple[str, ...] = ()  # Polarity words found
+    has_inversion: bool = False       # True if internal contradiction detected
+    inversion_confidence: float = 0.0  # Confidence in inversion detection
 
 
 # Layer → Model mapping (12D patent-exact sequence)
@@ -181,6 +293,7 @@ class SemanticRouter:
         fallback_model: ModelType = ModelType.GENERAL,
         pattern_boost: float = 0.3,
         vocabulary: Optional[Any] = None,
+        use_context_weighting: bool = True,
     ):
         """
         Initialize router.
@@ -190,11 +303,15 @@ class SemanticRouter:
             fallback_model: Model to use when confidence is low
             pattern_boost: Amount to boost confidence when keyword patterns match
             vocabulary: Optional CustomVocabulary for domain-specific terms
+            use_context_weighting: If True, apply S term (semantic context) weighting.
+                                   Set to False for strict MVP mode (B_a(h(c)) = 0).
+                                   Default True for better homonym disambiguation.
         """
         self.confidence_threshold = confidence_threshold
         self.fallback_model = fallback_model
         self.pattern_boost = pattern_boost
         self.vocabulary = vocabulary
+        self.use_context_weighting = use_context_weighting
 
     def _check_vocabulary(self, query: str) -> Optional[Tuple[ModelType, float]]:
         """
@@ -286,6 +403,317 @@ class SemanticRouter:
             return 0.0
 
         return dot_product / (norm_a * norm_b)
+
+    def _detect_vritti_distribution(
+        self,
+        query: str,
+        word_vectors: List[WordVector],
+        pattern_scores: Dict["ModelType", float],
+    ) -> Dict[str, float]:
+        """
+        Detect cognitive mode (vṛtti) distribution from context signals.
+
+        Uses keyword patterns and phoneme characteristics to estimate
+        which cognitive mode the query represents:
+        - Pramāṇa (valid cognition): factual, logical queries
+        - Viparyaya (misperception): conflicting or uncertain queries
+        - Vikalpa (conceptualization): creative, imaginative queries
+        - Smṛti (memory): historical, reference-based queries
+        - Nidrā (dormancy): abstract, philosophical queries
+
+        Args:
+            query: The input query
+            word_vectors: Analyzed word vectors
+            pattern_scores: Detected intent pattern scores
+
+        Returns:
+            Dict mapping vṛtti names to probabilities (sums to 1.0)
+        """
+        # Initialize with uniform prior
+        vritti = {
+            "pramana": 0.2,
+            "viparyaya": 0.2,
+            "vikalpa": 0.2,
+            "smrti": 0.2,
+            "nidra": 0.2,
+        }
+
+        # Adjust based on pattern detection (increased weights for stronger influence)
+        if pattern_scores:
+            # Reasoning patterns → boost Pramāṇa (valid cognition)
+            if ModelType.REASONING in pattern_scores:
+                vritti["pramana"] += pattern_scores[ModelType.REASONING] * 0.6
+                vritti["vikalpa"] -= pattern_scores[ModelType.REASONING] * 0.2
+
+            # Creative patterns → boost Vikalpa (conceptualization)
+            if ModelType.CREATIVE in pattern_scores:
+                vritti["vikalpa"] += pattern_scores[ModelType.CREATIVE] * 0.6
+
+            # Action patterns → boost Smṛti (memory/procedure recall) and Pramāṇa
+            if ModelType.ACTION in pattern_scores:
+                vritti["smrti"] += pattern_scores[ModelType.ACTION] * 0.4
+                vritti["pramana"] += pattern_scores[ModelType.ACTION] * 0.3
+
+            # Relationship patterns → boost Vikalpa (emotional conceptualization)
+            if ModelType.RELATIONSHIP in pattern_scores:
+                vritti["vikalpa"] += pattern_scores[ModelType.RELATIONSHIP] * 0.4
+
+            # Reflective patterns → boost Nidrā (abstract dormancy)
+            if ModelType.REFLECTIVE in pattern_scores:
+                vritti["nidra"] += pattern_scores[ModelType.REFLECTIVE] * 0.5
+
+        # Domain-specific context detection for cross-domain disambiguation
+        query_lower = query.lower()
+
+        # Financial/transactional domain → Pramāṇa (factual cognition)
+        financial_terms = ["money", "deposit", "account", "balance", "loan", "bank account",
+                          "credit", "debit", "payment", "transaction", "financial"]
+        if any(term in query_lower for term in financial_terms):
+            vritti["pramana"] += 0.4
+            vritti["smrti"] += 0.2  # Procedural memory
+
+        # Nature/scenic domain → Vikalpa (creative conceptualization)
+        nature_terms = ["river", "stream", "sunset", "sunrise", "meadow", "garden",
+                       "forest", "mountain", "ocean", "sky", "peaceful", "grassy"]
+        if any(term in query_lower for term in nature_terms):
+            vritti["vikalpa"] += 0.4
+            vritti["nidra"] += 0.2  # Contemplative stillness
+
+        # Technical/procedural domain → Pramāṇa + Smṛti
+        technical_terms = ["test", "database", "migration", "deploy", "code", "script",
+                          "system", "server", "algorithm", "function"]
+        if any(term in query_lower for term in technical_terms):
+            vritti["pramana"] += 0.3
+            vritti["smrti"] += 0.3
+
+        # Question markers
+        if any(q in query_lower for q in ["how", "why", "what is", "explain"]):
+            vritti["pramana"] += 0.3  # Question-seeking = valid cognition
+        if any(q in query_lower for q in ["imagine", "pretend", "what if"]):
+            vritti["vikalpa"] += 0.4  # Hypothetical = conceptualization
+        if any(q in query_lower for q in ["remember", "recall", "when did"]):
+            vritti["smrti"] += 0.3  # Memory-based = smṛti
+
+        # Normalize to probability distribution
+        total = sum(vritti.values())
+        if total > 0:
+            vritti = {k: v / total for k, v in vritti.items()}
+
+        return vritti
+
+    def _apply_vritti_weighting(
+        self,
+        layer_totals: List[float],
+        vritti_distribution: Dict[str, float],
+        weight: float = 0.3,
+    ) -> List[float]:
+        """
+        Apply vṛtti-based weighting to layer totals using R[v,a] matrix.
+
+        Implements: biased_totals[a] = layer_totals[a] + weight * Σ_v p_v[v] · R[v,a]
+
+        This allows cognitive mode to influence layer selection, improving
+        cross-domain disambiguation for homonyms.
+
+        Args:
+            layer_totals: Raw 12D layer totals from phoneme analysis
+            vritti_distribution: 5-element vṛtti probability distribution
+            weight: How much to weight the vṛtti bias (0.0 to 1.0)
+
+        Returns:
+            Biased layer totals
+        """
+        # Get aspect weights from vṛtti distribution via R[v,a]
+        aspect_weights = get_aspect_weights(vritti_distribution)
+
+        # Apply weighting to layer totals
+        biased_totals = layer_totals.copy()
+        for i, layer_name in enumerate(LAYER_NAMES):
+            bias = aspect_weights.get(layer_name, 0.0)
+            biased_totals[i] += weight * bias
+
+        return biased_totals
+
+    def _extract_referent_distribution(self, query: str) -> Dict[Any, float]:
+        """
+        Extract referent class distribution from query using authoritative WORD_TO_REFERENT.
+
+        This uses the curated dictionary of ~200+ words with ReferentClass mappings,
+        providing ontologically grounded semantic analysis rather than arbitrary heuristics.
+
+        Args:
+            query: The input query
+
+        Returns:
+            Dict mapping ReferentClass to aggregate strength (0.0 to 1.0)
+        """
+        if not SEMANTIC_CONTEXT_AVAILABLE or not WORD_TO_REFERENT:
+            return {}
+
+        words = set(re.findall(r'\b[a-z]+\b', query.lower()))
+        referent_scores: Dict[Any, float] = {}
+
+        for word in words:
+            profile = get_referent_profile(word)
+            if profile and ReferentClass.UNKNOWN not in profile.primary:
+                # Primary referent classes get full weight
+                for ref_class in profile.primary:
+                    referent_scores[ref_class] = referent_scores.get(ref_class, 0) + 1.0
+                # Secondary referent classes get partial weight
+                for ref_class in profile.secondary:
+                    referent_scores[ref_class] = referent_scores.get(ref_class, 0) + 0.5
+
+        # Normalize to 0-1 range
+        if referent_scores:
+            max_score = max(referent_scores.values())
+            if max_score > 0:
+                referent_scores = {k: v / max_score for k, v in referent_scores.items()}
+
+        return referent_scores
+
+    def _extract_semantic_context(self, query: str) -> Dict[str, float]:
+        """
+        Extract semantic context groups from the query (S term from C×R×S).
+
+        Uses both:
+        1. Authoritative WORD_TO_REFERENT for grounded semantic analysis
+        2. CONTEXT_SEMANTIC_GROUPS for domain-specific keyword matching
+
+        Args:
+            query: The input query
+
+        Returns:
+            Dict mapping semantic context groups to match strength (0.0 to 1.0)
+        """
+        words = set(re.findall(r'\b[a-z]+\b', query.lower()))
+        context_scores: Dict[str, float] = {}
+
+        # Use CONTEXT_SEMANTIC_GROUPS for domain keyword matching
+        for group_name, group_words in CONTEXT_SEMANTIC_GROUPS.items():
+            matches = words & group_words
+            if matches:
+                score = len(matches) / max(len(words), 1)
+                if len(matches) > 1:
+                    score = min(score * 1.5, 1.0)
+                context_scores[group_name] = score
+
+        return context_scores
+
+    def _get_model_from_referents(self, referent_dist: Dict[Any, float]) -> Optional[Tuple["ModelType", float]]:
+        """
+        Determine model type from referent class distribution using authoritative mapping.
+
+        This uses REFERENT_TO_MODEL which maps each ReferentClass to a ModelType
+        based on ontological semantics (not arbitrary heuristics).
+
+        Args:
+            referent_dist: Distribution of ReferentClass strengths
+
+        Returns:
+            Tuple of (ModelType, confidence) or None if no strong signal
+        """
+        if not referent_dist or not REFERENT_TO_MODEL:
+            return None
+
+        # Aggregate votes by ModelType
+        model_votes: Dict["ModelType", float] = {}
+        for ref_class, strength in referent_dist.items():
+            if ref_class in REFERENT_TO_MODEL:
+                model = REFERENT_TO_MODEL[ref_class]
+                model_votes[model] = model_votes.get(model, 0) + strength
+
+        if not model_votes:
+            return None
+
+        # Get highest voted model
+        best_model = max(model_votes, key=model_votes.get)
+        best_score = model_votes[best_model]
+
+        # Normalize confidence
+        total = sum(model_votes.values())
+        confidence = best_score / total if total > 0 else 0
+
+        # Only return if confidence is meaningful
+        if confidence >= 0.3:
+            return (best_model, confidence)
+        return None
+
+    def _apply_semantic_context_weighting(
+        self,
+        layer_totals: List[float],
+        semantic_context: Dict[str, float],
+        weight: float = 0.4,
+    ) -> List[float]:
+        """
+        Apply semantic context (S term) weighting to layer totals.
+
+        This is the key integration of the C×R×S framework:
+        - C (Constraint) and R (Realization) come from phoneme analysis
+        - S (Semantic Context) comes from this method (NON-PHONEMIC)
+
+        Semantic context → Ontological layer mapping:
+        - finance context → O7_REASONING (analysis), O3_EXECUTION (transactions)
+        - nature context → O5_COGNITION (perception), O4_STRUCTURE (form)
+        - technology context → O3_EXECUTION (action), O7_REASONING (logic)
+        - emotion context → O10_UNIFYING (relationship), O5_COGNITION (feeling)
+        - knowledge context → O7_REASONING (logic), O9_WITNESSES (observation)
+
+        Args:
+            layer_totals: Raw 12D layer totals from phoneme analysis
+            semantic_context: Detected semantic context groups
+            weight: How strongly to weight semantic context (0.0 to 1.0)
+
+        Returns:
+            Layer totals biased by semantic context
+        """
+        if not semantic_context:
+            return layer_totals
+
+        # Semantic context → Layer bias mapping (12D indices)
+        # These mappings are derived from the C×R×S referent class semantics
+        CONTEXT_TO_LAYERS: Dict[str, List[Tuple[int, float]]] = {
+            # Finance context → boost reasoning (6) and execution (2)
+            "finance": [(6, 0.8), (2, 0.6), (5, 0.3)],  # O7_REASONING, O3_EXECUTION, O6_AGENCY
+            # Nature context → boost cognition (4) and structure (3)
+            "nature": [(4, 0.8), (3, 0.6), (8, 0.4)],  # O5_COGNITION, O4_STRUCTURE, O9_WITNESSES
+            # Technology context → boost execution (2) and reasoning (6)
+            "technology": [(2, 0.7), (6, 0.6), (10, 0.3)],  # O3_EXECUTION, O7_REASONING, O11_INTEGRATION
+            # Emotion context → boost unifying (9) and cognition (4)
+            "emotion": [(9, 0.8), (4, 0.6), (7, 0.4)],  # O10_UNIFYING, O5_COGNITION, O8_PURPOSE
+            # Family context → boost unifying (9) and purpose (7)
+            "family": [(9, 0.7), (7, 0.6), (4, 0.4)],  # O10_UNIFYING, O8_PURPOSE, O5_COGNITION
+            # Knowledge context → boost reasoning (6) and witnesses (8)
+            "knowledge": [(6, 0.8), (8, 0.5), (4, 0.4)],  # O7_REASONING, O9_WITNESSES, O5_COGNITION
+            # Light context → boost cognition (4) and structure (3)
+            "light": [(4, 0.7), (6, 0.5), (3, 0.4)],  # O5_COGNITION, O7_REASONING, O4_STRUCTURE
+            # Physical/mechanical context → boost execution (2) and structure (3)
+            "physical": [(2, 0.8), (3, 0.6), (6, 0.4)],  # O3_EXECUTION, O4_STRUCTURE, O7_REASONING
+            # Time context → boost witnesses (8) and purpose (7)
+            "time": [(8, 0.6), (7, 0.5), (0, 0.4)],  # O9_WITNESSES, O8_PURPOSE, O1_POTENTIAL
+            # Space context → boost structure (3) and cognition (4)
+            "space": [(3, 0.7), (4, 0.5), (5, 0.4)],  # O4_STRUCTURE, O5_COGNITION, O6_AGENCY
+            # Conflict context → boost agency (5) and execution (2)
+            "conflict": [(5, 0.7), (2, 0.6), (7, 0.4)],  # O6_AGENCY, O3_EXECUTION, O8_PURPOSE
+            # Royalty context → boost agency (5) and purpose (7)
+            "royalty": [(5, 0.7), (7, 0.6), (1, 0.4)],  # O6_AGENCY, O8_PURPOSE, O2_IDENTITY
+            # Chess context → boost reasoning (6) and execution (2)
+            "chess": [(6, 0.8), (2, 0.5), (5, 0.4)],  # O7_REASONING, O3_EXECUTION, O6_AGENCY
+            # Food context → boost structure (3) and potential (0)
+            "food": [(3, 0.6), (0, 0.5), (4, 0.4)],  # O4_STRUCTURE, O1_POTENTIAL, O5_COGNITION
+            # Body context → boost structure (3) and cognition (4)
+            "body": [(3, 0.7), (4, 0.6), (0, 0.3)],  # O4_STRUCTURE, O5_COGNITION, O1_POTENTIAL
+        }
+
+        biased_totals = layer_totals.copy()
+
+        for context_name, context_strength in semantic_context.items():
+            if context_name in CONTEXT_TO_LAYERS:
+                layer_biases = CONTEXT_TO_LAYERS[context_name]
+                for layer_idx, bias_strength in layer_biases:
+                    # Apply weighted bias: context_strength × bias_strength × weight
+                    biased_totals[layer_idx] += context_strength * bias_strength * weight
+
+        return biased_totals
 
     def _compute_cross_resonance(
         self, word_vectors: List[WordVector]
@@ -412,20 +840,61 @@ class SemanticRouter:
             for i, score in enumerate(word_vec.vector):
                 layer_totals[i] += score
 
-        # Find initial dominant layer using raw totals
+        # Detect intent patterns early for vṛtti computation
+        pattern_scores = self._detect_intent_patterns(query)
+
+        # Apply p_v[v] formula: Compute vṛtti distribution and bias layer totals
+        # This enables cross-domain disambiguation for homonyms
+        # weight=0.5 for stronger vṛtti influence on layer selection
+        vritti_dist = self._detect_vritti_distribution(
+            query, list(analysis.words), pattern_scores
+        )
+        biased_layer_totals = self._apply_vritti_weighting(
+            layer_totals, vritti_dist, weight=0.5
+        )
+
+        # Apply S term (Semantic Contextual Meaning) from C×R×S framework
+        # This is the NON-PHONEMIC component that disambiguates homonyms
+        # based on semantic context rather than sound patterns
+        # Example: "bank" + "money" → finance context → O7_REASONING
+        #          "bank" + "river" → nature context → O5_COGNITION
+        #
+        # NOTE: Per design spec, B_a(h(c)) = 0 for MVP (formula simplification).
+        # The S term is a lightweight approximation of B_a(h(c)) for context sensitivity.
+        # When use_context_weighting=False (strict MVP mode), we skip the S term
+        # and rely solely on phoneme analysis (C×R components only).
+        semantic_context: Dict[str, float] = {}
+        referent_dist: Dict[Any, float] = {}
+        referent_model_result = None
+
+        if self.use_context_weighting:
+            # S term active: Apply semantic context weighting
+            semantic_context = self._extract_semantic_context(query)
+            if semantic_context:
+                biased_layer_totals = self._apply_semantic_context_weighting(
+                    biased_layer_totals, semantic_context, weight=0.4
+                )
+
+            # Extract authoritative referent class distribution from WORD_TO_REFERENT
+            # This uses the curated dictionary (~200+ words) for grounded semantic analysis
+            referent_dist = self._extract_referent_distribution(query)
+            referent_model_result = self._get_model_from_referents(referent_dist)
+
+        # Find initial dominant layer using vṛtti-biased totals
         max_idx = 0
-        max_total = layer_totals[0]
+        max_total = biased_layer_totals[0]
         for i in range(1, 12):
-            if layer_totals[i] > max_total:
-                max_total = layer_totals[i]
+            if biased_layer_totals[i] > max_total:
+                max_total = biased_layer_totals[i]
                 max_idx = i
 
         initial_dominant = LAYER_NAMES[max_idx]
 
         # Apply cross-resonance disambiguation for homonyms
         # This uses pairwise word similarity to find semantic clusters
+        # NOTE: Using biased_layer_totals for vṛtti-aware disambiguation
         dominant_layer, cluster_boost = self._get_disambiguated_layer(
-            list(analysis.words), initial_dominant, layer_totals
+            list(analysis.words), initial_dominant, biased_layer_totals
         )
 
         # Calculate confidence using the best word-level dominant score
@@ -437,12 +906,12 @@ class SemanticRouter:
         # Add cluster boost to confidence
         max_word_score = min(max_word_score + cluster_boost, 1.0)
 
-        # Normalize for layer_scores display
-        total = sum(layer_totals)
+        # Normalize for layer_scores display (using biased totals)
+        total = sum(biased_layer_totals)
         if total > 0:
-            normalized = [s / total for s in layer_totals]
+            normalized = [s / total for s in biased_layer_totals]
         else:
-            normalized = layer_totals
+            normalized = biased_layer_totals
 
         # Get top 3 layers for context
         indexed = [(LAYER_NAMES[i], normalized[i]) for i in range(12)]
@@ -461,14 +930,125 @@ class SemanticRouter:
                 query_analysis=analysis,
             )
 
-        # Detect intent patterns from keywords
-        pattern_scores = self._detect_intent_patterns(query)
+        # pattern_scores already computed above for vṛtti detection
 
         # Determine model type by combining phoneme analysis with pattern matching
         phoneme_model = LAYER_TO_MODEL.get(dominant_layer, self.fallback_model)
 
+        # Semantic context → Model type mapping (S term from C×R×S)
+        # This provides NON-PHONEMIC model selection based on semantic context
+        # Refined based on benchmark analysis:
+        # - Finance: transactional (deposit, check, pay) → ACTION
+        # - Nature: scenic/creative → CREATIVE, contemplative → REFLECTIVE
+        # - Technology: procedural → ACTION
+        SEMANTIC_TO_MODEL: Dict[str, ModelType] = {
+            "finance": ModelType.ACTION,         # Financial transactions → action
+            "technology": ModelType.ACTION,      # Tech/deploy → action
+            "nature": ModelType.CREATIVE,        # Nature/scenic → creative
+            "emotion": ModelType.RELATIONSHIP,   # Emotional → relationship
+            "family": ModelType.RELATIONSHIP,    # Family → relationship
+            "knowledge": ModelType.REASONING,    # Knowledge → reasoning
+            "physical": ModelType.ACTION,        # Physical action → action
+            "chess": ModelType.REASONING,        # Strategy → reasoning
+            "conflict": ModelType.ACTION,        # Conflict → action
+            "light": ModelType.REASONING,        # Physics → reasoning
+            "time": ModelType.REFLECTIVE,        # Temporal → reflective
+            "space": ModelType.CREATIVE,         # Spatial → creative
+        }
+
+        # Context refinement based on query words
+        query_words = set(re.findall(r'\b[a-z]+\b', query.lower()))
+
+        # Nature context can be CREATIVE or REFLECTIVE depending on tone
+        # Only truly contemplative words trigger REFLECTIVE, not observational ones
+        reflective_words = {"peaceful", "calm", "serene", "quiet", "tranquil", "meditative", "still", "silent"}
+        if "nature" in semantic_context and query_words & reflective_words:
+            # Nature + contemplative words → REFLECTIVE instead of CREATIVE
+            SEMANTIC_TO_MODEL = SEMANTIC_TO_MODEL.copy()
+            SEMANTIC_TO_MODEL["nature"] = ModelType.REFLECTIVE
+
+        # Boost nature context strength when multiple nature words are present
+        # This helps override generic relationship patterns like "love", "I"
+        if "nature" in semantic_context:
+            nature_words = CONTEXT_SEMANTIC_GROUPS.get("nature", set())
+            nature_matches = len(query_words & nature_words)
+            if nature_matches >= 2:
+                # Strong nature signal - boost context strength
+                semantic_context["nature"] = min(semantic_context["nature"] * 1.5, 1.0)
+
+        # Check if semantic context suggests a different model than phoneme analysis
+        semantic_model: Optional[ModelType] = None
+        semantic_strength: float = 0.0
+        if semantic_context:
+            # Get strongest semantic context
+            best_context = max(semantic_context, key=semantic_context.get)
+            best_score = semantic_context[best_context]
+            if best_context in SEMANTIC_TO_MODEL and best_score >= 0.2:
+                semantic_model = SEMANTIC_TO_MODEL[best_context]
+                semantic_strength = best_score
+
+        # Priority order for model selection:
+        # 0. Authoritative referent class (WORD_TO_REFERENT dictionary) - grounded ontology
+        # 1. Strong semantic context (CONTEXT_SEMANTIC_GROUPS) - domain keywords
+        # 2. Pattern keyword matching - explicit intent signals
+        # 3. Phoneme-based layer analysis - default
+        #
+        # Referent class takes highest priority because it's derived from a curated
+        # dictionary of ~200+ words with authoritative ReferentClass mappings.
+
+        # Check authoritative referent class (use as confirmation, not override)
+        # Referent class works best when it AGREES with semantic context
+        # because word-level referents don't capture multi-word contextual meaning
+        if referent_model_result:
+            referent_model, referent_confidence = referent_model_result
+            # Only use referent directly if it agrees with semantic context
+            if semantic_model and referent_model == semantic_model and referent_confidence >= 0.4:
+                # Referent confirms semantic context - boost confidence
+                semantic_strength = min(semantic_strength + referent_confidence * 0.2, 1.0)
+            elif semantic_model is None and referent_confidence >= 0.6:
+                # No semantic context but strong referent signal - use it
+                semantic_model = referent_model
+                semantic_strength = referent_confidence * 0.8  # Discount slightly
+        #
+        # Semantic context is prioritized because it's NON-PHONEMIC and can
+        # disambiguate homonyms that have identical phoneme signatures.
+
+        # Check if semantic context should override pattern detection
+        # Semantic context gets priority for homonym disambiguation
+        if semantic_model and semantic_strength >= 0.3:
+            # Strong semantic context - use it to guide model selection
+            if pattern_scores:
+                best_pattern_model = max(pattern_scores, key=pattern_scores.get)
+                best_pattern_score = pattern_scores[best_pattern_model]
+
+                if semantic_model == best_pattern_model:
+                    # Semantic and pattern agree - high confidence
+                    model_type = semantic_model
+                    confidence = min(max_word_score + semantic_strength * 0.3 + best_pattern_score * 0.1, 1.0)
+                elif semantic_model == phoneme_model:
+                    # Semantic and phoneme agree - use semantic
+                    model_type = semantic_model
+                    confidence = min(max_word_score + semantic_strength * 0.25, 1.0)
+                elif semantic_strength >= 0.4:
+                    # Strong semantic overrides pattern (homonym case)
+                    # This is the key improvement for "bank" disambiguation
+                    model_type = semantic_model
+                    confidence = min(max_word_score + semantic_strength * 0.2, 1.0)
+                else:
+                    # Moderate semantic - use pattern if strong
+                    if best_pattern_score >= 0.4:
+                        model_type = best_pattern_model
+                        confidence = min(max_word_score + best_pattern_score * self.pattern_boost, 1.0)
+                    else:
+                        model_type = semantic_model
+                        confidence = min(max_word_score + semantic_strength * 0.15, 1.0)
+            else:
+                # No patterns - use semantic directly
+                model_type = semantic_model
+                confidence = min(max_word_score + semantic_strength * 0.2, 1.0)
+
         # If pattern detection has a strong signal, use it to override or confirm
-        if pattern_scores:
+        elif pattern_scores:
             # Get the best pattern match
             best_pattern_model = max(pattern_scores, key=pattern_scores.get)
             best_pattern_score = pattern_scores[best_pattern_model]
@@ -506,12 +1086,32 @@ class SemanticRouter:
                 model_type = phoneme_model
                 confidence = max_word_score
 
+        # Semantic inversion detection (fracture between semantic/structural layers)
+        # This detects when a query has high structural coherence but contains
+        # semantic polarity words that indicate potential for misinterpretation.
+        polarity_score = 0.0
+        polarity_words: Tuple[str, ...] = ()
+        has_inversion = False
+        inversion_confidence = 0.0
+
+        if INVERSION_DETECTION_AVAILABLE and self.use_context_weighting:
+            inversion_result = detect_semantic_inversion(query, structural_coherence=confidence)
+            if inversion_result:
+                polarity_score = inversion_result.polarity_score
+                polarity_words = inversion_result.polarity_words
+                has_inversion = inversion_result.has_inversion
+                inversion_confidence = inversion_result.inversion_confidence
+
         return RoutingDecision(
             model_type=model_type,
             confidence=confidence,
             dominant_layer=dominant_layer,
             layer_scores=top_layers,
             query_analysis=analysis,
+            polarity_score=polarity_score,
+            polarity_words=polarity_words,
+            has_inversion=has_inversion,
+            inversion_confidence=inversion_confidence,
         )
 
     def route_batch(
