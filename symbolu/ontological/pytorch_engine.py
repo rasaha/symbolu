@@ -142,6 +142,44 @@ if PYTORCH_AVAILABLE:
             return torch.tanh(self.projection(ontological))
 
 
+    class DirectBhavaHead(nn.Module):
+        """
+        Direct 100D Bhava prediction from encoder embedding.
+
+        Unlike BhavaLayer which derives 90D from 10D ontological,
+        this head predicts 100D bhava directly from the 768D encoder output.
+
+        Architecture per Grok recommendation:
+            768D → 512D → 256D → 100D
+        """
+
+        def __init__(
+            self,
+            input_dim: int = 768,
+            hidden_dims: Tuple[int, ...] = (512, 256),
+            output_dim: int = 100,
+            dropout: float = 0.1,
+        ):
+            super().__init__()
+
+            dims = [input_dim] + list(hidden_dims) + [output_dim]
+
+            layers = []
+            for i in range(len(dims) - 1):
+                layers.append(nn.Linear(dims[i], dims[i + 1]))
+                if i < len(dims) - 2:  # No activation on output
+                    layers.append(nn.LayerNorm(dims[i + 1]))
+                    layers.append(nn.ReLU())
+                    layers.append(nn.Dropout(dropout))
+
+            self.mlp = nn.Sequential(*layers)
+            self.output_activation = nn.Tanh()
+
+        def forward(self, encoder_output: torch.Tensor) -> torch.Tensor:
+            """Predict 100D bhava directly from encoder embedding."""
+            return self.output_activation(self.mlp(encoder_output))
+
+
     class ReasoningHead(nn.Module):
         """Task head for reasoning quality assessment."""
 
@@ -223,8 +261,10 @@ if PYTORCH_AVAILABLE:
             hidden_dims: Tuple[int, ...] = (512, 256),
             ontological_dim: int = 10,
             bhava_dim: int = 90,
+            direct_bhava_dim: int = 100,
             dropout: float = 0.1,
             use_skip: bool = True,
+            use_direct_bhava: bool = True,
         ):
             super().__init__()
 
@@ -237,8 +277,18 @@ if PYTORCH_AVAILABLE:
                 use_skip=use_skip,
             )
 
-            # Bhava layer (10 → 90)
+            # Bhava layer (10 → 90) - derived from ontological
             self.bhava = BhavaLayer(ontological_dim, bhava_dim)
+
+            # Direct Bhava head (768 → 100) - per Grok recommendation
+            self.use_direct_bhava = use_direct_bhava
+            if use_direct_bhava:
+                self.direct_bhava = DirectBhavaHead(
+                    input_dim=encoder_dim,
+                    hidden_dims=hidden_dims,
+                    output_dim=direct_bhava_dim,
+                    dropout=dropout,
+                )
 
             # Task heads
             self.reasoning_head = ReasoningHead(ontological_dim)
@@ -248,6 +298,7 @@ if PYTORCH_AVAILABLE:
             self.encoder_dim = encoder_dim
             self.ontological_dim = ontological_dim
             self.bhava_dim = bhava_dim
+            self.direct_bhava_dim = direct_bhava_dim
 
             # Text encoder (lazy loaded)
             self._text_encoder = None
@@ -257,39 +308,51 @@ if PYTORCH_AVAILABLE:
             embeddings: torch.Tensor,
         ) -> Dict[str, torch.Tensor]:
             """
-            Forward pass.
+            Forward pass with dual-head architecture.
 
             Args:
                 embeddings: (batch, 768) encoder output
 
             Returns:
                 Dict with:
-                    - ontological: (batch, 10)
-                    - bhava: (batch, 90)
-                    - full: (batch, 100)
-                    - reasoning: (batch,)
-                    - creativity: (batch,)
+                    - ontological: (batch, 10) main layer activations
+                    - bhava_derived: (batch, 90) computed from ontological
+                    - bhava_direct: (batch, 100) predicted directly from encoder
+                    - full: (batch, 100) combined ontological + derived bhava
+                    - reasoning: (batch,) reasoning task score
+                    - creativity: (batch,) creativity task score
             """
-            # Ontological projection
+            # Ontological projection (768 → 10)
             ontological = self.mlp(embeddings)
 
-            # Bhava computation
-            bhava = self.bhava(ontological)
+            # Derived Bhava (10 → 90)
+            bhava_derived = self.bhava(ontological)
+
+            # Direct Bhava (768 → 100) - per Grok recommendation
+            bhava_direct = None
+            if self.use_direct_bhava:
+                bhava_direct = self.direct_bhava(embeddings)
 
             # Task scores
             reasoning = self.reasoning_head(ontological)
             creativity = self.creativity_head(ontological)
 
-            # Full 100D vector
-            full = torch.cat([ontological, bhava], dim=-1)
+            # Full 100D vector (ontological + derived bhava)
+            full = torch.cat([ontological, bhava_derived], dim=-1)
 
-            return {
+            result = {
                 "ontological": ontological,
-                "bhava": bhava,
+                "bhava_derived": bhava_derived,
+                "bhava": bhava_derived,  # Backward compatibility
                 "full": full,
                 "reasoning": reasoning,
                 "creativity": creativity,
             }
+
+            if bhava_direct is not None:
+                result["bhava_direct"] = bhava_direct
+
+            return result
 
         def compute_loss(
             self,
@@ -297,15 +360,27 @@ if PYTORCH_AVAILABLE:
             targets: Optional[Dict[str, torch.Tensor]] = None,
             purity_weight: float = 0.1,
             orthogonality_weight: float = 0.05,
+            bhava_weight: float = 0.5,
+            contrastive_weight: float = 0.1,
+            sample_types: Optional[torch.Tensor] = None,
         ) -> torch.Tensor:
             """
-            Compute combined loss.
+            Compute multi-task combined loss per Grok recommendation.
+
+            Loss composition:
+                - Main loss: MSE on 10D ontological vector
+                - Auxiliary loss 1: BCE/MSE on 100D bhava grid
+                - Auxiliary loss 2: Orthogonality/purity regularizer
+                - Auxiliary loss 3: Contrastive pull for reasoning vs creativity
 
             Args:
                 output: Forward pass output
                 targets: Optional dict with target values
                 purity_weight: Weight for purity regularization
                 orthogonality_weight: Weight for orthogonality regularization
+                bhava_weight: Weight for direct bhava loss
+                contrastive_weight: Weight for contrastive loss
+                sample_types: Optional tensor of sample types (0=reasoning, 1=creativity)
 
             Returns:
                 Combined loss tensor
@@ -314,7 +389,7 @@ if PYTORCH_AVAILABLE:
 
             ontological = output["ontological"]
 
-            # Supervision loss (if targets provided)
+            # ===== Main Loss: MSE on 10D ontological =====
             if targets is not None:
                 if "ontological" in targets and targets["ontological"] is not None:
                     mask = ~torch.isnan(targets["ontological"])
@@ -340,15 +415,25 @@ if PYTORCH_AVAILABLE:
                             targets["creativity"][mask]
                         )
 
-            # Purity loss (encourage sparse activations)
+                # ===== Auxiliary Loss 1: BCE/MSE on 100D bhava =====
+                if "bhava_direct" in output and "bhava" in targets and targets["bhava"] is not None:
+                    bhava_direct = output["bhava_direct"]
+                    mask = ~torch.isnan(targets["bhava"])
+                    if mask.any():
+                        loss = loss + bhava_weight * F.mse_loss(
+                            bhava_direct[mask],
+                            targets["bhava"][mask]
+                        )
+
+            # ===== Auxiliary Loss 2: Purity (encourage sparse activations) =====
             positive = (ontological + 1) / 2  # Shift to [0, 1]
             probs = positive / (positive.sum(dim=-1, keepdim=True) + 1e-10)
             entropy = -(probs * torch.log(probs + 1e-10)).sum(dim=-1).mean()
-            max_entropy = torch.log(torch.tensor(10.0))
+            max_entropy = torch.log(torch.tensor(10.0, device=ontological.device))
             purity_loss = entropy / max_entropy
             loss = loss + purity_weight * purity_loss
 
-            # Orthogonality loss (decorrelate dimensions)
+            # ===== Auxiliary Loss 2b: Orthogonality (decorrelate dimensions) =====
             if ontological.size(0) > 1:
                 centered = ontological - ontological.mean(dim=0, keepdim=True)
                 cov = (centered.T @ centered) / (ontological.size(0) - 1)
@@ -356,6 +441,69 @@ if PYTORCH_AVAILABLE:
                 eye = torch.eye(10, device=ontological.device)
                 off_diag = (cov * (1 - eye)).pow(2).sum() / 90  # 10*9/2 pairs
                 loss = loss + orthogonality_weight * off_diag
+
+            # ===== Auxiliary Loss 3: Contrastive pull for reasoning vs creativity =====
+            if sample_types is not None and ontological.size(0) > 1:
+                contrastive_loss = self._compute_contrastive_loss(
+                    ontological, sample_types
+                )
+                loss = loss + contrastive_weight * contrastive_loss
+
+            return loss
+
+        def _compute_contrastive_loss(
+            self,
+            embeddings: torch.Tensor,
+            sample_types: torch.Tensor,
+            margin: float = 1.0,
+        ) -> torch.Tensor:
+            """
+            Contrastive loss to separate reasoning from creativity.
+
+            Pulls same-type samples together, pushes different-type samples apart.
+
+            Args:
+                embeddings: (batch, dim) embeddings to compare
+                sample_types: (batch,) tensor with 0=reasoning, 1=creativity
+                margin: Margin for contrastive loss
+
+            Returns:
+                Contrastive loss value
+            """
+            batch_size = embeddings.size(0)
+            if batch_size < 2:
+                return torch.tensor(0.0, device=embeddings.device)
+
+            # Compute pairwise distances
+            # Using L2 distance in the O6 vs O2 subspace (dimensions 5 and 1)
+            o6 = embeddings[:, 5:6]  # O6_REASONING
+            o2 = embeddings[:, 1:2]  # O2_FORMING
+            reasoning_creative_subspace = torch.cat([o6, o2], dim=-1)
+
+            # Pairwise L2 distances
+            dists = torch.cdist(reasoning_creative_subspace, reasoning_creative_subspace, p=2)
+
+            # Create masks for same-type and different-type pairs
+            type_match = sample_types.unsqueeze(0) == sample_types.unsqueeze(1)
+            type_diff = ~type_match
+
+            # Remove diagonal (self-comparisons)
+            eye = torch.eye(batch_size, device=embeddings.device, dtype=torch.bool)
+            type_match = type_match & ~eye
+            type_diff = type_diff & ~eye
+
+            loss = torch.tensor(0.0, device=embeddings.device)
+
+            # Pull same-type pairs together (minimize distance)
+            if type_match.any():
+                same_type_dists = dists[type_match]
+                loss = loss + same_type_dists.mean()
+
+            # Push different-type pairs apart (maximize distance up to margin)
+            if type_diff.any():
+                diff_type_dists = dists[type_diff]
+                push_loss = F.relu(margin - diff_type_dists).mean()
+                loss = loss + push_loss
 
             return loss
 
@@ -367,7 +515,7 @@ if PYTORCH_AVAILABLE:
                 text: Input text to analyze
 
             Returns:
-                Dict with ontological vector, Bhava, and task scores
+                Dict with ontological vector, Bhava (derived + direct), and task scores
             """
             # Get encoder
             if self._text_encoder is None:
@@ -388,16 +536,24 @@ if PYTORCH_AVAILABLE:
 
             # Convert to Python types
             onto_values = output["ontological"][0].cpu().tolist()
-            bhava_values = output["bhava"][0].cpu().tolist()
+            bhava_derived = output["bhava_derived"][0].cpu().tolist()
 
-            return {
+            result = {
                 "text": text,
+                "encoder": self._text_encoder.name,
                 "ontological": {LAYER_NAMES[i]: onto_values[i] for i in range(10)},
-                "bhava_count": len(bhava_values),
+                "bhava_derived_count": len(bhava_derived),
                 "reasoning_score": output["reasoning"][0].item(),
                 "creativity_score": output["creativity"][0].item(),
                 "dominant_layer": LAYER_NAMES[onto_values.index(max(onto_values))],
             }
+
+            # Include direct bhava if available
+            if "bhava_direct" in output:
+                bhava_direct = output["bhava_direct"][0].cpu().tolist()
+                result["bhava_direct_count"] = len(bhava_direct)
+
+            return result
 
         def parameter_count(self) -> int:
             """Count total trainable parameters."""
@@ -407,23 +563,44 @@ if PYTORCH_AVAILABLE:
             """Print model summary."""
             lines = [
                 "=" * 60,
-                "PYTORCH 100D ONTOLOGICAL ENGINE",
+                "PYTORCH ONTOLOGICAL ENGINE (Dual-Head Architecture)",
                 "=" * 60,
                 "",
                 f"Total Parameters: {self.parameter_count():,}",
-                f"Encoder Dim: {self.encoder_dim}",
-                f"Ontological Dim: {self.ontological_dim}",
-                f"Bhava Dim: {self.bhava_dim}",
-                f"Full Output: {self.ontological_dim + self.bhava_dim}D",
+                "",
+                "Architecture:",
+                f"  Encoder Input: {self.encoder_dim}D (DistilBERT/Hash)",
+                f"  Hidden Layers: 512D → 256D",
+                f"  Ontological Output: {self.ontological_dim}D",
+                f"  Bhava Derived: {self.bhava_dim}D (from ontological)",
+            ]
+
+            if self.use_direct_bhava:
+                lines.append(f"  Bhava Direct: {self.direct_bhava_dim}D (from encoder)")
+
+            lines.extend([
                 "",
                 "Components:",
-                f"  - MLP: {sum(p.numel() for p in self.mlp.parameters()):,} params",
-                f"  - Bhava: {sum(p.numel() for p in self.bhava.parameters()):,} params",
+                f"  - MLP (768→10): {sum(p.numel() for p in self.mlp.parameters()):,} params",
+                f"  - Bhava Layer (10→90): {sum(p.numel() for p in self.bhava.parameters()):,} params",
+            ])
+
+            if self.use_direct_bhava:
+                lines.append(f"  - Direct Bhava (768→100): {sum(p.numel() for p in self.direct_bhava.parameters()):,} params")
+
+            lines.extend([
                 f"  - Reasoning Head: {sum(p.numel() for p in self.reasoning_head.parameters()):,} params",
                 f"  - Creativity Head: {sum(p.numel() for p in self.creativity_head.parameters()):,} params",
                 "",
+                "Loss Functions:",
+                "  - MSE on 10D ontological vector",
+                "  - MSE/BCE on 100D bhava (direct)",
+                "  - Purity regularizer (prevent dimension bleeding)",
+                "  - Orthogonality regularizer (decorrelate dimensions)",
+                "  - Contrastive loss (reasoning vs creativity separation)",
+                "",
                 "=" * 60,
-            ]
+            ])
             return "\n".join(lines)
 
 
