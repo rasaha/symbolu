@@ -280,6 +280,7 @@ class SemanticRouter:
         fallback_model: ModelType = ModelType.GENERAL,
         pattern_boost: float = 0.3,
         vocabulary: Optional[Any] = None,
+        use_context_weighting: bool = True,
     ):
         """
         Initialize router.
@@ -289,11 +290,15 @@ class SemanticRouter:
             fallback_model: Model to use when confidence is low
             pattern_boost: Amount to boost confidence when keyword patterns match
             vocabulary: Optional CustomVocabulary for domain-specific terms
+            use_context_weighting: If True, apply S term (semantic context) weighting.
+                                   Set to False for strict MVP mode (B_a(h(c)) = 0).
+                                   Default True for better homonym disambiguation.
         """
         self.confidence_threshold = confidence_threshold
         self.fallback_model = fallback_model
         self.pattern_boost = pattern_boost
         self.vocabulary = vocabulary
+        self.use_context_weighting = use_context_weighting
 
     def _check_vocabulary(self, query: str) -> Optional[Tuple[ModelType, float]]:
         """
@@ -840,16 +845,27 @@ class SemanticRouter:
         # based on semantic context rather than sound patterns
         # Example: "bank" + "money" → finance context → O7_REASONING
         #          "bank" + "river" → nature context → O5_COGNITION
-        semantic_context = self._extract_semantic_context(query)
-        if semantic_context:
-            biased_layer_totals = self._apply_semantic_context_weighting(
-                biased_layer_totals, semantic_context, weight=0.4
-            )
+        #
+        # NOTE: Per design spec, B_a(h(c)) = 0 for MVP (formula simplification).
+        # The S term is a lightweight approximation of B_a(h(c)) for context sensitivity.
+        # When use_context_weighting=False (strict MVP mode), we skip the S term
+        # and rely solely on phoneme analysis (C×R components only).
+        semantic_context: Dict[str, float] = {}
+        referent_dist: Dict[Any, float] = {}
+        referent_model_result = None
 
-        # Extract authoritative referent class distribution from WORD_TO_REFERENT
-        # This uses the curated dictionary (~200+ words) for grounded semantic analysis
-        referent_dist = self._extract_referent_distribution(query)
-        referent_model_result = self._get_model_from_referents(referent_dist)
+        if self.use_context_weighting:
+            # S term active: Apply semantic context weighting
+            semantic_context = self._extract_semantic_context(query)
+            if semantic_context:
+                biased_layer_totals = self._apply_semantic_context_weighting(
+                    biased_layer_totals, semantic_context, weight=0.4
+                )
+
+            # Extract authoritative referent class distribution from WORD_TO_REFERENT
+            # This uses the curated dictionary (~200+ words) for grounded semantic analysis
+            referent_dist = self._extract_referent_distribution(query)
+            referent_model_result = self._get_model_from_referents(referent_dist)
 
         # Find initial dominant layer using vṛtti-biased totals
         max_idx = 0
