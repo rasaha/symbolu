@@ -2,16 +2,16 @@
 Ontological Engine - Core Model
 ===============================
 
-The learnable 10D ontological engine with skip connections.
+The learnable 12D ontological engine with skip connections.
 
 Architecture:
-    Text → Encoder (DistilBERT) → Hidden Layers → 10D Output
+    Text → Encoder (DistilBERT) → Hidden Layers → 12D Output
 
 Features:
 - Skip connections (ResNet-style) for gradient flow
 - Layer normalization for stable training
 - Dropout for regularization
-- Interpretable 10D output
+- Interpretable 12D output
 """
 
 import math
@@ -34,9 +34,9 @@ class HiddenState:
 
 class OntologicalEngine:
     """
-    Learnable 10D Ontological Engine (Option B - Hybrid).
+    Learnable 12D Ontological Engine (Option B - Hybrid).
 
-    Maps text to interpretable 10-dimensional ontological vectors
+    Maps text to interpretable 12-dimensional ontological vectors
     using learned transformations.
 
     Architecture:
@@ -46,11 +46,11 @@ class OntologicalEngine:
             ↓
         Hidden Layer 2 (256D) ← Skip Connection
             ↓
-        Output Layer (10D) ← Ontological Dimensions
+        Output Layer (12D) ← Ontological Dimensions
 
     Usage:
         engine = OntologicalEngine(config)
-        vector = engine.forward(embedding)  # 768D → 10D
+        vector = engine.forward(embedding)  # 768D → 12D
         result = engine.analyze("What is the meaning of truth?")
     """
 
