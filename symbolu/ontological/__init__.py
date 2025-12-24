@@ -53,6 +53,12 @@ try:
         MultiDomainConfig,
         train_multi_domain,
     )
+    from symbolu.ontological.evidential_engine import (
+        EvidentialOntologicalEngine,
+        EvidentialTrainer,
+        EvidentialConfig,
+        EvidentialHead,
+    )
     PYTORCH_AVAILABLE = True
 except ImportError as e:
     print(f"Note: PyTorch components not available: {e}")
@@ -122,4 +128,9 @@ if PYTORCH_AVAILABLE:
         "MultiDomainTrainer",
         "MultiDomainConfig",
         "train_multi_domain",
+        # Evidential (Bayesian uncertainty)
+        "EvidentialOntologicalEngine",
+        "EvidentialTrainer",
+        "EvidentialConfig",
+        "EvidentialHead",
     ])
