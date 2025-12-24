@@ -26,6 +26,16 @@ LAYER_NAMES: Tuple[str, ...] = (
 # Layer name to index mapping
 LAYER_INDEX: Dict[str, int] = {name: i for i, name in enumerate(LAYER_NAMES)}
 
+# Layer groups for task heads
+REASONING_LAYERS: Tuple[int, ...] = (0, 5, 7)  # O1_THINKING, O6_REASONING, O8_META_OBSERVING
+CREATIVITY_LAYERS: Tuple[int, ...] = (1, 6, 8)  # O2_FORMING, O7_PURPOSING, O9_UNIFYING
+
+# Task types for training
+class TaskType:
+    REASONING = "reasoning"
+    CREATIVITY = "creativity"
+    GENERAL = "general"
+
 
 @dataclass
 class OntologicalConfig:
