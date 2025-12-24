@@ -26,6 +26,16 @@ LAYER_NAMES: Tuple[str, ...] = (
 # Layer name to index mapping
 LAYER_INDEX: Dict[str, int] = {name: i for i, name in enumerate(LAYER_NAMES)}
 
+# Layer groups for task heads
+REASONING_LAYERS: Tuple[int, ...] = (0, 5, 7)  # O1_THINKING, O6_REASONING, O8_META_OBSERVING
+CREATIVITY_LAYERS: Tuple[int, ...] = (1, 6, 8)  # O2_FORMING, O7_PURPOSING, O9_UNIFYING
+
+# Task types for training
+class TaskType:
+    REASONING = "reasoning"
+    CREATIVITY = "creativity"
+    GENERAL = "general"
+
 
 @dataclass
 class OntologicalConfig:
@@ -98,3 +108,50 @@ class TrainingExample:
             "creativity_score": self.creativity_score,
             "domain": self.domain,
         }
+
+
+@dataclass
+class TrainingBatch:
+    """A batch of training examples."""
+    texts: List[str]
+    onto_targets: Optional[List[List[float]]] = None
+    bhava_targets: Optional[List[List[float]]] = None
+    reasoning_targets: Optional[List[float]] = None
+    creativity_targets: Optional[List[float]] = None
+    domains: Optional[List[int]] = None
+
+    @classmethod
+    def from_examples(cls, examples: List[TrainingExample]) -> "TrainingBatch":
+        """Create batch from list of examples."""
+        texts = [e.text for e in examples]
+
+        # Collect onto labels if any exist
+        onto_targets = None
+        if any(e.onto_labels for e in examples):
+            onto_targets = [
+                [e.onto_labels.get(name, 0.0) for name in LAYER_NAMES] if e.onto_labels else [0.0] * 10
+                for e in examples
+            ]
+
+        # Collect reasoning scores
+        reasoning_targets = None
+        if any(e.reasoning_score is not None for e in examples):
+            reasoning_targets = [e.reasoning_score or 0.0 for e in examples]
+
+        # Collect creativity scores
+        creativity_targets = None
+        if any(e.creativity_score is not None for e in examples):
+            creativity_targets = [e.creativity_score or 0.0 for e in examples]
+
+        # Collect domains
+        domains = None
+        if any(e.domain is not None for e in examples):
+            domains = [e.domain or 0 for e in examples]
+
+        return cls(
+            texts=texts,
+            onto_targets=onto_targets,
+            reasoning_targets=reasoning_targets,
+            creativity_targets=creativity_targets,
+            domains=domains,
+        )

@@ -1,37 +1,15 @@
 """
-Learnable 10D Ontological Engine
-================================
+Ontological Engine Module
+=========================
 
-A neural network-based engine that learns to map text to interpretable
-10-dimensional ontological vectors. Each dimension corresponds to a
-fundamental ontological layer:
+A learnable 100-dimensional ontological engine for text analysis.
 
-    O1_THINKING      - Contemplation, philosophy, reflection
-    O2_FORMING       - Structure, creation, art, creativity
-    O3_ACTING        - Procedures, commands, action
-    O4_TAGGING       - Emotional tagging/classification
-    O5_DIRECTING     - Guidance, instruction, leadership
-    O6_REASONING     - Logic, analysis, problem-solving
-    O7_PURPOSING     - Goals, intention, purposefulness
-    O8_META_OBSERVING - Meta-awareness, observation
-    O9_UNIFYING      - Integration, synthesis, unity
-    O10_ABSOLVING    - Resolution, completion, transcendence
+Usage:
+    from symbolu.ontological import ContrastiveTrainer
 
-Unlike the deterministic STL (Symbolic Transformer Logic), this engine:
-- LEARNS from large data via gradient descent
-- Has millions of trainable parameters
-- Improves reasoning and creativity through training
-- Maintains interpretable 10D output
-
-Architecture:
-    Text → Encoder (MiniLM 384D) → Hidden Layers → 10D Output → Task Heads
-
-Key Features:
-- Skip connections (ResNet-style) for gradient flow
-- Multi-task heads for reasoning and creativity
-- Ontological loss with purity penalties
-- Dimension-specific supervision
-- Contrastive training for domain separation
+    trainer = ContrastiveTrainer()
+    trainer.train(epochs=5, use_synthetic=True)
+    trainer.benchmark()
 """
 
 from symbolu.ontological.types import (
@@ -40,21 +18,12 @@ from symbolu.ontological.types import (
     TrainingExample,
     TrainingBatch,
     LAYER_NAMES,
-    LAYER_DESCRIPTIONS,
     LAYER_INDEX,
+    REASONING_LAYERS,
+    CREATIVITY_LAYERS,
+    TaskType,
 )
-from symbolu.ontological.engine import OntologicalEngine, create_engine
-from symbolu.ontological.losses import OntologicalLoss, CombinedLoss
-from symbolu.ontological.heads import ReasoningHead, CreativityHead, MultiTaskHead
-from symbolu.ontological.bhava import (
-    BhavaComputer90,
-    FullOntologicalVector100,
-    BhavaVector90,
-    BHAVA_NAMES_90,
-    BHAVA_SUBLAYER_NAMES,
-    summarize_bhava_structure,
-)
-from symbolu.ontological.trainer import OntologicalTrainer, TrainerConfig
+
 from symbolu.ontological.encoder import (
     TextEncoder,
     HashEncoder,
@@ -63,16 +32,11 @@ from symbolu.ontological.encoder import (
     get_encoder,
     save_model_for_offline,
 )
-from symbolu.ontological.data_loader import (
-    RAGDataLoader,
-    SyntheticDataGenerator,
-    MixedDataLoader,
-)
 
 # PyTorch components (optional)
+PYTORCH_AVAILABLE = False
 try:
     from symbolu.ontological.pytorch_engine import PyTorchOntologicalEngine
-    from symbolu.ontological.pytorch_trainer import PyTorchTrainer, train_from_rag
     from symbolu.ontological.contrastive_trainer import (
         ContrastiveTrainer,
         ContrastiveConfig,
@@ -85,8 +49,8 @@ try:
         create_contrastive_dataset,
     )
     PYTORCH_AVAILABLE = True
-except ImportError:
-    PYTORCH_AVAILABLE = False
+except ImportError as e:
+    print(f"Note: PyTorch components not available: {e}")
 
 __all__ = [
     # Types
@@ -95,28 +59,10 @@ __all__ = [
     "TrainingExample",
     "TrainingBatch",
     "LAYER_NAMES",
-    "LAYER_DESCRIPTIONS",
     "LAYER_INDEX",
-    # Engine
-    "OntologicalEngine",
-    "create_engine",
-    # Losses
-    "OntologicalLoss",
-    "CombinedLoss",
-    # Heads
-    "ReasoningHead",
-    "CreativityHead",
-    "MultiTaskHead",
-    # Bhava (90D relational)
-    "BhavaComputer90",
-    "FullOntologicalVector100",
-    "BhavaVector90",
-    "BHAVA_NAMES_90",
-    "BHAVA_SUBLAYER_NAMES",
-    "summarize_bhava_structure",
-    # Training (basic)
-    "OntologicalTrainer",
-    "TrainerConfig",
+    "REASONING_LAYERS",
+    "CREATIVITY_LAYERS",
+    "TaskType",
     # Encoders
     "TextEncoder",
     "HashEncoder",
@@ -124,10 +70,6 @@ __all__ = [
     "SentenceTransformerEncoder",
     "get_encoder",
     "save_model_for_offline",
-    # Data loaders
-    "RAGDataLoader",
-    "SyntheticDataGenerator",
-    "MixedDataLoader",
     # PyTorch (optional)
     "PYTORCH_AVAILABLE",
 ]
@@ -136,13 +78,9 @@ __all__ = [
 if PYTORCH_AVAILABLE:
     __all__.extend([
         "PyTorchOntologicalEngine",
-        "PyTorchTrainer",
-        "train_from_rag",
-        # Contrastive training
         "ContrastiveTrainer",
         "ContrastiveConfig",
         "train_contrastive",
-        # Domain datasets
         "GSM8KDataset",
         "ROCStoriesDataset",
         "ContrastiveDataset",
