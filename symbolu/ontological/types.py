@@ -2,33 +2,35 @@
 Ontological Types and Definitions
 =================================
 
-Core type definitions for the 10-dimensional ontological engine.
+Core type definitions for the 12-dimensional ontological engine.
 """
 
 from typing import Tuple, Dict, List, Optional, Any
 from dataclasses import dataclass, field
 
 
-# The 10 Ontological Layers
+# The 12 Ontological Layers
 LAYER_NAMES: Tuple[str, ...] = (
-    "O1_THINKING",
-    "O2_FORMING",
-    "O3_ACTING",
-    "O4_TAGGING",
-    "O5_DIRECTING",
-    "O6_REASONING",
-    "O7_PURPOSING",
-    "O8_META_OBSERVING",
-    "O9_UNIFYING",
-    "O10_ABSOLVING",
+    "O1_POTENTIAL",      # Dormant - Latent capacity
+    "O2_IDENTITY",       # Tagging - Labels, roles
+    "O3_EXECUTION",      # Action - Behaviors, karma
+    "O4_STRUCTURE",      # Forming - Embodiment, patterns
+    "O5_COGNITION",      # Perception - Attention, emotion
+    "O6_AGENCY",         # Direction - Control, intent
+    "O7_REASONING",      # Discrimination - Logic, inference
+    "O8_PURPOSE",        # Meaning - Motivation, why
+    "O9_WITNESSES",      # Meta-Observation - Awareness
+    "O10_UNIFYING",      # Coherence - Synthesis, harmony
+    "O11_INTEGRATION",   # Resolution - Consolidation
+    "O12_ABSOLVING",     # Termination - Dissolution
 )
 
 # Layer name to index mapping
 LAYER_INDEX: Dict[str, int] = {name: i for i, name in enumerate(LAYER_NAMES)}
 
 # Layer groups for task heads
-REASONING_LAYERS: Tuple[int, ...] = (0, 5, 7)  # O1_THINKING, O6_REASONING, O8_META_OBSERVING
-CREATIVITY_LAYERS: Tuple[int, ...] = (1, 6, 8)  # O2_FORMING, O7_PURPOSING, O9_UNIFYING
+REASONING_LAYERS: Tuple[int, ...] = (4, 6, 8)  # O5_COGNITION, O7_REASONING, O9_WITNESSES
+CREATIVITY_LAYERS: Tuple[int, ...] = (3, 7, 9)  # O4_STRUCTURE, O8_PURPOSE, O10_UNIFYING
 
 # Task types for training
 class TaskType:
@@ -42,8 +44,8 @@ class OntologicalConfig:
     """Configuration for the ontological engine."""
     input_dim: int = 768  # DistilBERT output
     hidden_dims: Tuple[int, ...] = (512, 256)
-    output_dim: int = 10  # 10 ontological layers
-    bhava_dim: int = 100  # 9 pairs × 10 sub-layers + 10 onto
+    output_dim: int = 12  # 12 ontological layers
+    bhava_dim: int = 120  # 9 pairs × 12 sub-layers + 12 onto
     dropout: float = 0.1
     use_skip_connections: bool = True
     use_layer_norm: bool = True
@@ -52,17 +54,17 @@ class OntologicalConfig:
 @dataclass
 class OntologicalVector:
     """
-    A 10-dimensional vector representing ontological activations.
+    A 12-dimensional vector representing ontological activations.
     """
-    values: List[float] = field(default_factory=lambda: [0.0] * 10)
+    values: List[float] = field(default_factory=lambda: [0.0] * 12)
 
     def __post_init__(self):
-        if len(self.values) != 10:
-            raise ValueError(f"Expected 10 values, got {len(self.values)}")
+        if len(self.values) != 12:
+            raise ValueError(f"Expected 12 values, got {len(self.values)}")
 
     def to_dict(self) -> Dict[str, float]:
         """Convert to layer name -> value dictionary."""
-        return {LAYER_NAMES[i]: self.values[i] for i in range(10)}
+        return {LAYER_NAMES[i]: self.values[i] for i in range(12)}
 
     @classmethod
     def from_dict(cls, d: Dict[str, float]) -> "OntologicalVector":
@@ -76,12 +78,12 @@ class OntologicalVector:
         return LAYER_NAMES[max_idx]
 
     def reasoning_score(self) -> float:
-        """O6_REASONING activation."""
-        return self.values[5]
+        """O7_REASONING activation."""
+        return self.values[6]
 
     def creativity_score(self) -> float:
-        """O2_FORMING activation."""
-        return self.values[1]
+        """O4_STRUCTURE activation."""
+        return self.values[3]
 
 
 @dataclass
@@ -129,7 +131,7 @@ class TrainingBatch:
         onto_targets = None
         if any(e.onto_labels for e in examples):
             onto_targets = [
-                [e.onto_labels.get(name, 0.0) for name in LAYER_NAMES] if e.onto_labels else [0.0] * 10
+                [e.onto_labels.get(name, 0.0) for name in LAYER_NAMES] if e.onto_labels else [0.0] * 12
                 for e in examples
             ]
 

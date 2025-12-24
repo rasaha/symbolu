@@ -202,7 +202,7 @@ class TestPhase4AFailFast:
         """Test layer error includes list of valid layers."""
         with pytest.raises(Phase4ALayerMissingError) as exc:
             lookup_interaction("ka", "O0_FAKE")
-        assert len(exc.value.valid_layers) == 10
+        assert len(exc.value.valid_layers) == 12
 
 
 # =============================================================================
@@ -228,10 +228,10 @@ class TestPhase4AValidationStrictness:
         assert len(REQUIRED_INTERACTION_FIELDS) == 4
 
     def test_valid_layer_ids_defined(self):
-        """Test all 10 layer IDs are defined."""
-        assert len(VALID_LAYER_IDS) == 10
-        assert "O1_ACTING" in VALID_LAYER_IDS
-        assert "O10_ABSOLVING" in VALID_LAYER_IDS
+        """Test all 12 layer IDs are defined."""
+        assert len(VALID_LAYER_IDS) == 12
+        assert "O1_POTENTIAL" in VALID_LAYER_IDS
+        assert "O12_ABSOLVING" in VALID_LAYER_IDS
 
     def test_interaction_has_all_required_fields(self):
         """Test looked-up interaction has all required fields."""
@@ -404,14 +404,14 @@ class TestPhase4AExistenceChecks:
 # =============================================================================
 
 class TestPhase4AAllLayersCoverage:
-    """Verify all 10 layers work for varnas."""
+    """Verify all 12 layers work for varnas."""
 
     def test_all_layers_for_ka(self):
-        """Test all 10 layers work for 'ka'."""
+        """Test all 12 layers work for 'ka'."""
         result = lookup_varna_all_layers("ka")
-        assert len(result) == 10
-        assert "O1_ACTING" in result
-        assert "O10_ABSOLVING" in result
+        assert len(result) == 12
+        assert "O1_POTENTIAL" in result
+        assert "O12_ABSOLVING" in result
 
     def test_all_layers_have_required_fields(self):
         """Test all layer interactions have required fields."""
