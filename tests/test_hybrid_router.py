@@ -67,14 +67,14 @@ class TestRoutingDecision:
         decision = RoutingDecision(
             model_type=ModelType.REASONING,
             confidence=0.85,
-            dominant_layer="O6_REASONING",
-            layer_scores=(("O6_REASONING", 0.85), ("O1_THINKING", 0.10)),
+            dominant_layer="O7_REASONING",
+            layer_scores=(("O7_REASONING", 0.85), ("O1_POTENTIAL", 0.10)),
             query_analysis=mock_analysis,
         )
 
         assert decision.model_type == ModelType.REASONING
         assert decision.confidence == 0.85
-        assert decision.dominant_layer == "O6_REASONING"
+        assert decision.dominant_layer == "O7_REASONING"
 
     def test_frozen(self):
         """RoutingDecision should be frozen (immutable)."""
@@ -83,7 +83,7 @@ class TestRoutingDecision:
         decision = RoutingDecision(
             model_type=ModelType.GENERAL,
             confidence=0.5,
-            dominant_layer="O4_TAGGING",
+            dominant_layer="O2_IDENTITY",
             layer_scores=(),
             query_analysis=mock_analysis,
         )
@@ -101,18 +101,20 @@ class TestLayerToModel:
     """Tests for LAYER_TO_MODEL constant."""
 
     def test_has_all_layers(self):
-        """Should have mappings for all 10 layers."""
+        """Should have mappings for all 12 layers."""
         expected_layers = [
-            "O1_THINKING",
-            "O2_FORMING",
-            "O3_ACTING",
-            "O4_TAGGING",
-            "O5_DIRECTING",
-            "O6_REASONING",
-            "O7_PURPOSING",
-            "O8_META_OBSERVING",
-            "O9_UNIFYING",
-            "O10_ABSOLVING",
+            "O1_POTENTIAL",
+            "O2_IDENTITY",
+            "O3_EXECUTION",
+            "O4_STRUCTURE",
+            "O5_COGNITION",
+            "O6_AGENCY",
+            "O7_REASONING",
+            "O8_PURPOSE",
+            "O9_WITNESSES",
+            "O10_UNIFYING",
+            "O11_INTEGRATION",
+            "O12_ABSOLVING",
         ]
         for layer in expected_layers:
             assert layer in LAYER_TO_MODEL

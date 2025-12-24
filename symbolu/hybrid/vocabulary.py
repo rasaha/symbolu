@@ -15,8 +15,8 @@ Schema:
                 "expansion": "issue tracking system",
                 "phonemes": ["JH", "IH", "R", "AH"],  # Optional
                 "layer_affinities": {                  # Optional
-                    "O3_ACTING": 0.8,
-                    "O6_REASONING": 0.6
+                    "O3_EXECUTION": 0.8,
+                    "O7_REASONING": 0.6
                 },
                 "intent": "action",                    # Optional override
                 "synonyms": ["ticket", "issue"]        # Optional
@@ -64,10 +64,10 @@ class CustomTerm:
 
     def get_layer_vector(self) -> Optional[Tuple[float, ...]]:
         """
-        Convert layer affinities to a 10D vector.
+        Convert layer affinities to a 12D vector.
 
         Returns:
-            Tuple of 10 floats, or None if no affinities defined
+            Tuple of 12 floats, or None if no affinities defined
         """
         if not self.layer_affinities:
             return None

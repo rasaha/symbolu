@@ -6,9 +6,9 @@ Routes queries to specialized sub-models based on phoneme signature.
 
 Key Insight:
     Different ontological layers suggest different processing needs:
-    - O9_UNIFYING dominant → relationship/connection queries
-    - O6_REASONING dominant → logical/analytical queries
-    - O3_ACTING dominant → action/procedural queries
+    - O10_UNIFYING dominant → relationship/connection queries
+    - O7_REASONING dominant → logical/analytical queries
+    - O3_EXECUTION dominant → action/procedural queries
 
 Instead of one giant model, route to smaller specialized models.
 
@@ -116,16 +116,18 @@ class RoutingDecision:
 
 # Layer → Model mapping
 LAYER_TO_MODEL: Dict[str, ModelType] = {
-    "O1_THINKING": ModelType.REFLECTIVE,
-    "O2_FORMING": ModelType.CREATIVE,
-    "O3_ACTING": ModelType.ACTION,
-    "O4_TAGGING": ModelType.GENERAL,  # Classification → general
-    "O5_DIRECTING": ModelType.DIRECTIVE,
-    "O6_REASONING": ModelType.REASONING,
-    "O7_PURPOSING": ModelType.DIRECTIVE,
-    "O8_META_OBSERVING": ModelType.REFLECTIVE,
-    "O9_UNIFYING": ModelType.RELATIONSHIP,
-    "O10_ABSOLVING": ModelType.TRANSCENDENT,
+    "O1_POTENTIAL": ModelType.REFLECTIVE,
+    "O2_IDENTITY": ModelType.GENERAL,  # Classification → general
+    "O3_EXECUTION": ModelType.ACTION,
+    "O4_STRUCTURE": ModelType.CREATIVE,
+    "O5_COGNITION": ModelType.REASONING,
+    "O6_AGENCY": ModelType.DIRECTIVE,
+    "O7_REASONING": ModelType.REASONING,
+    "O8_PURPOSE": ModelType.DIRECTIVE,
+    "O9_WITNESSES": ModelType.REFLECTIVE,
+    "O10_UNIFYING": ModelType.RELATIONSHIP,
+    "O11_INTEGRATION": ModelType.RELATIONSHIP,
+    "O12_ABSOLVING": ModelType.TRANSCENDENT,
 }
 
 
