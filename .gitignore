@@ -79,3 +79,6 @@ symbolu/mechanical/pipeline/ttor/tests_mapper_switching_v2/mapper_switching_repo
 symbolu/core/drift_tests/*_report.json
 symbolu/mechanical/pipeline/tests_delta/*_report.json
 symbolu/mechanical/pipeline/snapshots/*.snap
+
+# Model checkpoints (generated during training)
+checkpoints/
