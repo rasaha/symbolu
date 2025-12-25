@@ -2,16 +2,29 @@
 Ontological Engine Module
 =========================
 
-A learnable 144-dimensional ontological engine for text analysis.
+A learnable 156-dimensional ontological engine for text analysis.
 - 12D Ontological Layers (Potential → Absolving)
-- 132D Bhava (11 pairs × 12 sub-layers)
+- 144D Bhava Inter-Layer Relationships (12×12 matrix)
 
-Usage:
-    from symbolu.ontological import ContrastiveTrainer
+Engine Configuration:
+    from symbolu.ontological import config, EngineSwitch
 
-    trainer = ContrastiveTrainer()
-    trainer.train(epochs=5, use_synthetic=True)
-    trainer.benchmark()
+    # Switch engines (only one active at a time)
+    config.set_engine(EngineSwitch.SYMBOLU12_LLM_BHAVA)
+
+    # Or use profile
+    config.set_profile("generative")  # enterprise, hybrid, generative, cpu, edge
+
+    # Get engine and analyze
+    engine = config.get_engine()
+    result = engine.analyze("What is consciousness?")
+
+Available Engines:
+    - MINILM_V2: Enterprise RAG (default)
+    - SYMBOLU12_HYBRID: MiniLM + SymbolU12 layers
+    - SYMBOLU12_LLM_BHAVA: Full generative with Bhava
+    - SYMBOLU12_OPTIMIZED_BHAVA: CPU-friendly
+    - SYMBOLU12_TINY_BHAVA: Edge devices
 """
 
 from symbolu.ontological.types import (
@@ -82,6 +95,17 @@ try:
 except ImportError as e:
     print(f"Note: PyTorch components not available: {e}")
 
+# Engine Configuration (switch between engines)
+from symbolu.ontological.config import (
+    config,
+    EngineSwitch,
+    get_engine,
+    set_engine,
+    set_profile,
+    analyze,
+    ENGINE_PROFILES,
+)
+
 # RAG datasets (no dependencies)
 from symbolu.ontological.math_rag_dataset import (
     MathRAGDataset,
@@ -100,6 +124,14 @@ from symbolu.ontological.multi_domain_dataset import (
 )
 
 __all__ = [
+    # Engine Configuration (switch between engines)
+    "config",
+    "EngineSwitch",
+    "get_engine",
+    "set_engine",
+    "set_profile",
+    "analyze",
+    "ENGINE_PROFILES",
     # Types (12D)
     "OntologicalConfig",
     "OntologicalVector",
