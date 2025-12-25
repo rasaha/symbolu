@@ -283,7 +283,8 @@ def load_dataset_tokens(config: TrainingConfig, split: str = "train") -> torch.T
 
     # Load dataset
     if config.dataset == "c4":
-        dataset = load_dataset("c4", "en", split=split, streaming=True)
+        # Use allenai/c4 (the newer supported version)
+        dataset = load_dataset("allenai/c4", "en", split=split, streaming=True, trust_remote_code=True)
         # Stream and tokenize (limit for memory)
         all_tokens = []
         max_tokens = 50_000_000 if split == "train" else 1_000_000
