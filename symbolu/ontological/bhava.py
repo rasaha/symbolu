@@ -1,6 +1,41 @@
 """
-Ontological Engine - Bhava Sub-Layers (90D)
-=============================================
+Ontological Engine - Bhava Sub-Layers (90D) [DEPRECATED]
+=========================================================
+
+WARNING: This module uses the deprecated sub-layer architecture.
+For new implementations, use bhava_relationships.py instead.
+
+ARCHITECTURAL EVOLUTION:
+------------------------
+OLD (This Module - Deprecated):
+    - 9-10 pairs × 10 sub-layers = 90-100D
+    - Sequential relationships between adjacent layers only
+    - ~34% computational overhead
+
+NEW (bhava_relationships.py - Recommended):
+    - 12 × 12 = 144 inter-layer relationships
+    - All-to-all relationship modeling
+    - Based on Vedic Drishti (aspect) patterns
+    - ~5% computational overhead
+    - Richer relationship space
+
+VEDIC INSIGHT:
+--------------
+In Jyotish (Vedic Astrology), Bhavas are RELATIONSHIPS, not entities.
+The same Rashi (sign) serves different Bhava functions based on Lagna.
+This module's sub-layer approach treats Bhavas as separate entities,
+which is architecturally less elegant than the relationship approach.
+
+To migrate to the new architecture:
+    # OLD (Deprecated)
+    from symbolu.ontological.bhava import BhavaComputer90
+
+    # NEW (Recommended)
+    from symbolu.ontological.bhava_relationships import InterLayerBhavaEngine
+
+===============================================================================
+LEGACY DOCUMENTATION (for backward compatibility):
+===============================================================================
 
 Bhava layers capture relational dynamics BETWEEN ontological dimensions.
 Inspired by Bhavas (houses) in Vedic astrology, these sub-layers represent
