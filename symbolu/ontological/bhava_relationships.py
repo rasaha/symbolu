@@ -198,24 +198,38 @@ if PYTORCH_AVAILABLE:
 
     class BhavaRelationshipModule(nn.Module):
         """
-        Captures Bhava-like relationships between ontological layers
-        WITHOUT adding sub-layers.
+        Captures Bhava-like relationships between ontological layers using
+        multiplicative relevance formula with learnable exponents.
 
-        Key insight: Relationships ARE the Bhavas, not separate entities.
+        Formula:
+            rel_i = p̃_w[a_i]^θ₁ × (Σᵥ pᵥ[v] R[v,aᵢ])^θ₂ × φ_d(dᵢ|aᵢ)^θ₃ × φ_t(tᵢ|pᵥ)^θ₄ × c^θ₅
 
-        This module computes:
-        1. Relationship strength matrix (12×12) based on semantic similarity
-        2. Aspect-modulated interactions based on Vedic principles
-        3. Relationship quality embeddings for each layer pair
+        Where:
+            - p̃_w[a_i]: Weighted aspect probability
+            - Σᵥ pᵥ R[v,a]: Ontological-weighted relationship sum
+            - φ_d: Drishti (aspect) distance function
+            - φ_t: Type compatibility function
+            - c: Coherence score
+            - θ₁...θ₅: Learnable exponents (adaptive based on query complexity)
+
+        Theta values:
+            - Simple queries (Q < 1.2): θ = (1.0, 0.8, 0.6, 0.2, 0.2)
+            - Complex queries: θ = (1.0, 0.8, 0.6, 0.4, 0.3)
 
         Output: 144 relationship values (12×12 matrix flattened)
         """
+
+        # Default theta values for simple vs complex queries
+        THETA_SIMPLE = (1.0, 0.8, 0.6, 0.2, 0.2)
+        THETA_COMPLEX = (1.0, 0.8, 0.6, 0.4, 0.3)
+        COMPLEXITY_THRESHOLD = 1.2
 
         def __init__(
             self,
             embed_dim: int = 128,
             num_layers: int = 12,
             relationship_embed_dim: int = 32,
+            learnable_theta: bool = True,
         ):
             super().__init__()
 
@@ -223,15 +237,31 @@ if PYTORCH_AVAILABLE:
             self.embed_dim = embed_dim
             self.relationship_embed_dim = relationship_embed_dim
 
+            # Learnable theta exponents (initialized from defaults)
+            # θ = (θ₁, θ₂, θ₃, θ₄, θ₅)
+            if learnable_theta:
+                self.theta_simple = nn.Parameter(torch.tensor(self.THETA_SIMPLE))
+                self.theta_complex = nn.Parameter(torch.tensor(self.THETA_COMPLEX))
+            else:
+                self.register_buffer('theta_simple', torch.tensor(self.THETA_SIMPLE))
+                self.register_buffer('theta_complex', torch.tensor(self.THETA_COMPLEX))
+
             # Relationship type embeddings (like Bhava significances)
-            # Each pair (i,j) has a learned relationship character
             self.relationship_embed = nn.Parameter(
                 torch.randn(num_layers, num_layers, relationship_embed_dim) * 0.02
             )
 
-            # Aspect strengths (initialized from Vedic patterns, learnable)
+            # Aspect strengths R[v, a] (initialized from Vedic patterns, learnable)
             aspect_init = torch.tensor(ASPECT_STRENGTH_MATRIX, dtype=torch.float32)
             self.aspect_strengths = nn.Parameter(aspect_init)
+
+            # Drishti distance matrix φ_d (initialized from aspect distances)
+            drishti_init = self._init_drishti_distances()
+            self.drishti_distances = nn.Parameter(drishti_init)
+
+            # Type compatibility matrix φ_t
+            type_compat_init = self._init_type_compatibility()
+            self.type_compatibility = nn.Parameter(type_compat_init)
 
             # Relationship projections (how layer i views layer j)
             self.relationship_query = nn.Linear(embed_dim, embed_dim)
@@ -240,87 +270,249 @@ if PYTORCH_AVAILABLE:
             # Project relationship embeddings to output
             self.relationship_out = nn.Linear(relationship_embed_dim, 1)
 
-            # Layer-specific projections for computing layer embeddings
-            self.layer_proj = nn.Linear(12, embed_dim)  # Project 12D onto to embed_dim
+            # Layer-specific projections
+            self.layer_proj = nn.Linear(12, embed_dim)
+
+            # Query complexity estimator
+            self.complexity_estimator = nn.Sequential(
+                nn.Linear(12, 32),
+                nn.ReLU(),
+                nn.Linear(32, 1),
+            )
+
+        def _init_drishti_distances(self) -> torch.Tensor:
+            """
+            Initialize Drishti distance matrix φ_d.
+            Based on angular distances in Vedic aspect patterns.
+            Closer aspects = higher values.
+            """
+            distances = torch.zeros(12, 12)
+            for i in range(12):
+                for j in range(12):
+                    # Angular distance (0-6, then wraps)
+                    dist = min(abs(i - j), 12 - abs(i - j))
+                    # Convert to similarity (closer = higher)
+                    # Conjunction (0) = 1.0, Opposition (6) = 0.5, etc.
+                    distances[i, j] = 1.0 - (dist / 12.0)
+            return distances
+
+        def _init_type_compatibility(self) -> torch.Tensor:
+            """
+            Initialize type compatibility matrix φ_t.
+            Based on layer type affinities (reasoning ↔ reasoning, etc.)
+            """
+            # Layer type groups
+            # 0-2: Foundation (Potential, Identity, Execution)
+            # 3-5: Processing (Structure, Cognition, Agency)
+            # 6-8: Higher (Reasoning, Purpose, Witness)
+            # 9-11: Integration (Unifying, Integration, Absolving)
+            compatibility = torch.ones(12, 12) * 0.5  # Base compatibility
+
+            groups = [(0, 3), (3, 6), (6, 9), (9, 12)]
+            for start, end in groups:
+                for i in range(start, end):
+                    for j in range(start, end):
+                        compatibility[i, j] = 0.9  # Same group = high compat
+
+            # Cross-group affinities
+            # Reasoning (6-8) ↔ Higher cognition (4-5)
+            for i in range(6, 9):
+                for j in range(4, 6):
+                    compatibility[i, j] = 0.8
+                    compatibility[j, i] = 0.8
+
+            return compatibility
+
+        def estimate_query_complexity(
+            self,
+            ontological_probs: torch.Tensor,
+        ) -> torch.Tensor:
+            """
+            Estimate query complexity Q from ontological distribution.
+
+            Simple queries (Q < 1.2): concentrated on few layers
+            Complex queries (Q >= 1.2): distributed across many layers
+
+            Returns: (batch,) complexity scores
+            """
+            # Entropy-based complexity
+            entropy = -torch.sum(
+                ontological_probs * torch.log(ontological_probs + 1e-8),
+                dim=-1
+            )
+            # Normalize to reasonable range
+            complexity = entropy / math.log(12)  # Max entropy = log(12)
+
+            # Also use learned estimator
+            learned_complexity = self.complexity_estimator(ontological_probs).squeeze(-1)
+
+            # Combine
+            return 0.5 * complexity + 0.5 * torch.sigmoid(learned_complexity) * 2.0
+
+        def get_theta(
+            self,
+            complexity: torch.Tensor,
+        ) -> torch.Tensor:
+            """
+            Get theta values based on query complexity.
+
+            Args:
+                complexity: (batch,) complexity scores
+
+            Returns:
+                theta: (batch, 5) theta values per sample
+            """
+            # Soft interpolation based on complexity
+            # complexity < threshold → more weight on simple theta
+            # complexity >= threshold → more weight on complex theta
+            weight = torch.sigmoid(
+                (complexity - self.COMPLEXITY_THRESHOLD) * 5.0
+            ).unsqueeze(-1)  # (batch, 1)
+
+            theta = (1 - weight) * self.theta_simple + weight * self.theta_complex
+            return theta  # (batch, 5)
 
         def forward(
             self,
             ontological_probs: torch.Tensor,
+            query_complexity: Optional[torch.Tensor] = None,
         ) -> Dict[str, torch.Tensor]:
             """
-            Compute Bhava-like relationships between all layer pairs.
+            Compute Bhava relationships using multiplicative formula.
+
+            rel_i = p̃_w[a]^θ₁ × (Σᵥ pᵥ R[v,a])^θ₂ × φ_d^θ₃ × φ_t^θ₄ × c^θ₅
 
             Args:
-                ontological_probs: Ontological probabilities (batch, 12)
+                ontological_probs: (batch, 12) layer probabilities
+                query_complexity: (batch,) optional pre-computed complexity
 
             Returns:
-                Dict with:
-                - relationship_matrix: (batch, 12, 12) strength of each relationship
-                - relationship_flat: (batch, 144) flattened relationship matrix
-                - aspect_modulated: (batch, 12, 12) aspect-weighted relationships
-                - coherence: (batch,) global coherence score
+                Dict with relationship_matrix, relationship_flat, coherence, etc.
             """
             batch_size = ontological_probs.shape[0]
             device = ontological_probs.device
 
-            # Create layer embeddings by projecting ontological probabilities
-            # Each layer gets a weighted embedding based on its activation
-            layer_embeds = self.layer_proj(ontological_probs)  # (batch, embed_dim)
+            # Estimate query complexity if not provided
+            if query_complexity is None:
+                query_complexity = self.estimate_query_complexity(ontological_probs)
 
-            # Expand to create layer-specific views
-            # Use ontological probs as attention weights
-            layer_views = ontological_probs.unsqueeze(-1) * layer_embeds.unsqueeze(1)  # (batch, 12, embed_dim)
+            # Get adaptive theta values
+            theta = self.get_theta(query_complexity)  # (batch, 5)
+            θ1, θ2, θ3, θ4, θ5 = theta[:, 0], theta[:, 1], theta[:, 2], theta[:, 3], theta[:, 4]
 
-            # Compute queries and keys for relationship
-            Q = self.relationship_query(layer_views)  # (batch, 12, embed_dim)
-            K = self.relationship_key(layer_views)    # (batch, 12, embed_dim)
+            # =================================================================
+            # Component 1: p̃_w[a_i] - Weighted aspect probability
+            # =================================================================
+            # For each target layer a_i, compute weighted probability
+            # based on how strongly other layers activate it
+            p_w = torch.einsum('bv,va->ba', ontological_probs, self.aspect_strengths)
+            p_w = F.softmax(p_w, dim=-1)  # Normalize to probabilities
 
-            # Semantic relationship strength via dot product
+            # =================================================================
+            # Component 2: Σᵥ pᵥ[v] R[v, a_i] - Ontological-weighted relations
+            # =================================================================
+            # Sum of ontological probs weighted by relationship matrix
+            # (batch, 12) @ (12, 12) -> (batch, 12) for each target
+            R_weighted = torch.einsum('bv,va->ba', ontological_probs, self.aspect_strengths)
+
+            # Expand to full matrix
+            R_sum = R_weighted.unsqueeze(1).expand(-1, 12, -1)  # (batch, 12, 12)
+
+            # =================================================================
+            # Component 3: φ_d(d_i | a_i) - Drishti distance function
+            # =================================================================
+            phi_d = self.drishti_distances.unsqueeze(0).expand(batch_size, -1, -1)
+
+            # =================================================================
+            # Component 4: φ_t(t_i | p_v) - Type compatibility
+            # =================================================================
+            # Weight type compatibility by ontological probs
+            phi_t_base = self.type_compatibility.unsqueeze(0).expand(batch_size, -1, -1)
+            # Modulate by how strongly layers are active
+            layer_activity = ontological_probs.unsqueeze(1) * ontological_probs.unsqueeze(2)
+            phi_t = phi_t_base * (0.5 + 0.5 * layer_activity)
+
+            # =================================================================
+            # Component 5: c - Coherence (computed from semantic similarity)
+            # =================================================================
+            # Create layer embeddings
+            layer_embeds = self.layer_proj(ontological_probs)
+            layer_views = ontological_probs.unsqueeze(-1) * layer_embeds.unsqueeze(1)
+
+            Q = self.relationship_query(layer_views)
+            K = self.relationship_key(layer_views)
+
+            # Semantic similarity as base coherence
             S = torch.einsum('bid,bjd->bij',
                             F.normalize(Q, dim=-1),
-                            F.normalize(K, dim=-1))  # (batch, 12, 12)
+                            F.normalize(K, dim=-1))
 
-            # Apply aspect strengths (learned Bhava affinities)
-            aspect_modulated = S * self.aspect_strengths.unsqueeze(0)  # (batch, 12, 12)
+            # Global coherence score
+            c_base = S.mean(dim=(1, 2))  # (batch,)
+            c = c_base.unsqueeze(1).unsqueeze(2).expand(-1, 12, 12)
 
-            # Add relationship embedding contribution
+            # =================================================================
+            # MULTIPLICATIVE FORMULA: rel = p̃_w^θ₁ × R_sum^θ₂ × φ_d^θ₃ × φ_t^θ₄ × c^θ₅
+            # =================================================================
+            # Expand p_w to matrix form
+            p_w_matrix = p_w.unsqueeze(1).expand(-1, 12, -1)  # (batch, 12, 12)
+
+            # Apply power with broadcasting theta
+            θ1_exp = θ1.view(-1, 1, 1)
+            θ2_exp = θ2.view(-1, 1, 1)
+            θ3_exp = θ3.view(-1, 1, 1)
+            θ4_exp = θ4.view(-1, 1, 1)
+            θ5_exp = θ5.view(-1, 1, 1)
+
+            # Clamp values to avoid numerical issues with power
+            eps = 1e-6
+            p_w_safe = torch.clamp(p_w_matrix, min=eps)
+            R_sum_safe = torch.clamp(R_sum.abs(), min=eps)
+            phi_d_safe = torch.clamp(phi_d, min=eps)
+            phi_t_safe = torch.clamp(phi_t, min=eps)
+            c_safe = torch.clamp(c, min=eps)
+
+            # Multiplicative combination
+            relationship_matrix = (
+                torch.pow(p_w_safe, θ1_exp) *
+                torch.pow(R_sum_safe, θ2_exp) *
+                torch.pow(phi_d_safe, θ3_exp) *
+                torch.pow(phi_t_safe, θ4_exp) *
+                torch.pow(c_safe, θ5_exp)
+            )
+
+            # Add learned relationship embedding contribution
             rel_embed_contrib = self.relationship_out(
                 self.relationship_embed
-            ).squeeze(-1)  # (12, 12)
-
-            relationship_matrix = aspect_modulated + 0.1 * rel_embed_contrib.unsqueeze(0)
+            ).squeeze(-1)
+            relationship_matrix = relationship_matrix + 0.1 * rel_embed_contrib.unsqueeze(0)
 
             # Normalize to valid range
             relationship_matrix = torch.tanh(relationship_matrix)
 
             # Flatten for downstream use
-            relationship_flat = relationship_matrix.view(batch_size, -1)  # (batch, 144)
+            relationship_flat = relationship_matrix.view(batch_size, -1)
 
-            # Compute global coherence based on:
-            # 1. Strength of relationships (absolute values)
-            # 2. Alignment with Vedic aspect patterns
-            # 3. Off-diagonal diversity (non-self relationships)
-
-            # Relationship strength: how strong are the relationships overall
-            strength = relationship_matrix.abs().mean(dim=(1, 2))  # (batch,)
-
-            # Aspect alignment: do learned relationships match Vedic patterns
-            aspect_alignment = (relationship_matrix * self.aspect_strengths.unsqueeze(0)).mean(dim=(1, 2))
-
-            # Off-diagonal diversity: encourage non-self relationships
-            # Mask out diagonal and compute mean of off-diagonal
+            # Compute final coherence
             mask = 1.0 - torch.eye(12, device=device).unsqueeze(0)
-            off_diag_strength = (relationship_matrix.abs() * mask).sum(dim=(1, 2)) / (12 * 11)
-
-            # Combined coherence: weighted sum
-            coherence = 0.3 * strength + 0.4 * F.relu(aspect_alignment) + 0.3 * off_diag_strength
+            off_diag = (relationship_matrix.abs() * mask).sum(dim=(1, 2)) / (12 * 11)
+            coherence = 0.5 * c_base + 0.5 * off_diag
 
             return {
                 'relationship_matrix': relationship_matrix,
                 'relationship_flat': relationship_flat,
-                'aspect_modulated': aspect_modulated,
+                'aspect_modulated': R_sum,
                 'semantic_similarity': S,
                 'coherence': coherence,
+                'query_complexity': query_complexity,
+                'theta': theta,
+                'components': {
+                    'p_w': p_w,
+                    'R_sum': R_sum,
+                    'phi_d': phi_d,
+                    'phi_t': phi_t,
+                    'c': c,
+                }
             }
 
         def get_relationship_interpretation(

@@ -2,16 +2,29 @@
 Ontological Engine Module
 =========================
 
-A learnable 144-dimensional ontological engine for text analysis.
+A learnable 156-dimensional ontological engine for text analysis.
 - 12D Ontological Layers (Potential → Absolving)
-- 132D Bhava (11 pairs × 12 sub-layers)
+- 144D Bhava Inter-Layer Relationships (12×12 matrix)
 
-Usage:
-    from symbolu.ontological import ContrastiveTrainer
+Engine Configuration:
+    from symbolu.ontological import config, EngineSwitch
 
-    trainer = ContrastiveTrainer()
-    trainer.train(epochs=5, use_synthetic=True)
-    trainer.benchmark()
+    # Switch engines (only one active at a time)
+    config.set_engine(EngineSwitch.SYMBOLU12_LLM_BHAVA)
+
+    # Or use profile
+    config.set_profile("generative")  # enterprise, hybrid, generative, cpu, edge
+
+    # Get engine and analyze
+    engine = config.get_engine()
+    result = engine.analyze("What is consciousness?")
+
+Available Engines:
+    - MINILM_V2: Enterprise RAG (default)
+    - SYMBOLU12_HYBRID: MiniLM + SymbolU12 layers
+    - SYMBOLU12_LLM_BHAVA: Full generative with Bhava
+    - SYMBOLU12_OPTIMIZED_BHAVA: CPU-friendly
+    - SYMBOLU12_TINY_BHAVA: Edge devices
 """
 
 from symbolu.ontological.types import (
@@ -82,6 +95,24 @@ try:
 except ImportError as e:
     print(f"Note: PyTorch components not available: {e}")
 
+# Engine Configuration (switch between engines)
+from symbolu.ontological.config import (
+    config,
+    EngineSwitch,
+    get_engine,
+    set_engine,
+    set_profile,
+    analyze,
+    ENGINE_PROFILES,
+    # Toggle Full LLM (768D) vs Optimized (256D)
+    use_full_llm,
+    use_optimized,
+    use_tiny,
+    toggle_llm_mode,
+    is_full_llm,
+    is_optimized,
+)
+
 # RAG datasets (no dependencies)
 from symbolu.ontological.math_rag_dataset import (
     MathRAGDataset,
@@ -99,7 +130,34 @@ from symbolu.ontological.multi_domain_dataset import (
     create_multi_domain_dataset,
 )
 
+# RAG Stitching Optimization (Objective Formula)
+from symbolu.ontological.stitching_optimization import (
+    StitchingOptimizer,
+    StitchingConfig,
+    StitchingResult,
+    RAGSnippet,
+    select_optimal_snippets,
+    create_rag_snippet,
+    compute_redundancy_penalty,
+    compute_domain_jump_penalty,
+)
+
 __all__ = [
+    # Engine Configuration (switch between engines)
+    "config",
+    "EngineSwitch",
+    "get_engine",
+    "set_engine",
+    "set_profile",
+    "analyze",
+    "ENGINE_PROFILES",
+    # Toggle Full LLM (768D) vs Optimized (256D)
+    "use_full_llm",
+    "use_optimized",
+    "use_tiny",
+    "toggle_llm_mode",
+    "is_full_llm",
+    "is_optimized",
     # Types (12D)
     "OntologicalConfig",
     "OntologicalVector",
@@ -133,6 +191,15 @@ __all__ = [
     "MultiDomainDataset",
     "DomainSample",
     "create_multi_domain_dataset",
+    # RAG Stitching Optimization (Objective Formula)
+    "StitchingOptimizer",
+    "StitchingConfig",
+    "StitchingResult",
+    "RAGSnippet",
+    "select_optimal_snippets",
+    "create_rag_snippet",
+    "compute_redundancy_penalty",
+    "compute_domain_jump_penalty",
 ]
 
 # Add PyTorch exports if available
