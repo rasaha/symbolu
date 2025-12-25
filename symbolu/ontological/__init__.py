@@ -142,6 +142,45 @@ from symbolu.ontological.stitching_optimization import (
     compute_domain_jump_penalty,
 )
 
+# BCVF: Bidirectional Consistency Verification Framework
+from symbolu.ontological.bcvf import (
+    BCVFVerifier,
+    BCVFConfig,
+    ConsistencyLagrangian,
+    ConsistencyScore,
+    ForwardScorer,
+    BackwardScorer,
+    SemanticEntropyMonitor,
+    VerificationResult,
+    VerifiedCandidate,
+    verify_candidates,
+    compute_consistency_lagrangian,
+)
+
+# SCC: Semantic Coherence Controller (S1-S3)
+from symbolu.ontological.semantic_coherence import (
+    SemanticCoherenceController,
+    SCCConfig,
+    LayerCoherenceResult,
+    GlobalCoherenceResult,
+    LayerCoherenceComputer,
+    GlobalCoherenceComputer,
+    compute_coherence,
+    is_coherent,
+)
+
+# USE: Phase-Based Attention (O(n) replacement for O(n²) attention)
+from symbolu.ontological.phase_attention import (
+    PhaseAttention,
+    LinearPhaseAttention,
+    PhaseAttentionWrapper,
+    PhaseAttentionConfig,
+    PhaseEmbedding,
+    PhaseSynchronizer,
+    PhaseCorrelation,
+    replace_attention_with_phase,
+)
+
 __all__ = [
     # Engine Configuration (switch between engines)
     "config",
@@ -200,6 +239,36 @@ __all__ = [
     "create_rag_snippet",
     "compute_redundancy_penalty",
     "compute_domain_jump_penalty",
+    # BCVF: Bidirectional Consistency Verification Framework
+    "BCVFVerifier",
+    "BCVFConfig",
+    "ConsistencyLagrangian",
+    "ConsistencyScore",
+    "ForwardScorer",
+    "BackwardScorer",
+    "SemanticEntropyMonitor",
+    "VerificationResult",
+    "VerifiedCandidate",
+    "verify_candidates",
+    "compute_consistency_lagrangian",
+    # SCC: Semantic Coherence Controller (S1-S3)
+    "SemanticCoherenceController",
+    "SCCConfig",
+    "LayerCoherenceResult",
+    "GlobalCoherenceResult",
+    "LayerCoherenceComputer",
+    "GlobalCoherenceComputer",
+    "compute_coherence",
+    "is_coherent",
+    # USE: Phase-Based Attention (O(n) replacement)
+    "PhaseAttention",
+    "LinearPhaseAttention",
+    "PhaseAttentionWrapper",
+    "PhaseAttentionConfig",
+    "PhaseEmbedding",
+    "PhaseSynchronizer",
+    "PhaseCorrelation",
+    "replace_attention_with_phase",
 ]
 
 # Add PyTorch exports if available
