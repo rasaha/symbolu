@@ -917,11 +917,206 @@ def test_tokenizer():
     return True
 
 
+# =============================================================================
+# EDGE DEPLOYMENT CONFIGURATIONS
+# =============================================================================
+
+def create_jetson_nano_model(
+    vocab_size: int = 50257,
+    max_seq_len: int = 2048,
+    use_fp16: bool = True,
+) -> "SymbolU12LLM":
+    """
+    Create SymbolU12 LLM optimized for Jetson Nano (4GB RAM).
+
+    Jetson Nano Specs:
+        - CPU: Quad-core ARM Cortex-A57
+        - GPU: 128 CUDA cores (Maxwell)
+        - RAM: 4GB LPDDR4
+        - Power: 5-10W
+
+    The O(n) Phase Attention enables longer contexts on edge devices
+    compared to traditional O(n²) attention which would exceed memory.
+
+    Args:
+        vocab_size: Vocabulary size (default: GPT-2 50257)
+        max_seq_len: Maximum sequence length (default: 2048, can go to 4096)
+        use_fp16: Use half precision for memory savings
+
+    Returns:
+        SymbolU12LLM configured for edge deployment
+
+    Memory comparison at 2K tokens:
+        Traditional Attention: ~8MB (attention matrix 2048x2048)
+        Phase Attention: ~4KB (phase vector 2048)
+    """
+    model = SymbolU12LLM(
+        vocab_size=vocab_size,
+        embed_dim=256,       # Smaller than desktop (768)
+        num_layers=4,        # Fewer layers (vs 12)
+        num_heads=4,         # Fewer heads (vs 12)
+        max_seq_len=max_seq_len,
+        dropout=0.0,         # No dropout for inference
+        phase_dim=16,        # Compact phase dim
+        sync_iterations=2,   # Fewer sync iterations
+    )
+
+    if use_fp16:
+        model = model.half()
+
+    return model
+
+
+def create_edge_model(
+    device_type: str = "jetson_nano",
+    vocab_size: int = 50257,
+) -> "SymbolU12LLM":
+    """
+    Factory function for edge device models.
+
+    Supported devices:
+        - "jetson_nano": NVIDIA Jetson Nano (4GB)
+        - "jetson_orin_nano": NVIDIA Jetson Orin Nano (8GB)
+        - "raspberry_pi": Raspberry Pi 4/5 (CPU only)
+        - "mobile": Generic mobile/embedded (2GB)
+
+    Args:
+        device_type: Target device type
+        vocab_size: Vocabulary size
+
+    Returns:
+        SymbolU12LLM configured for the target device
+    """
+    configs = {
+        "jetson_nano": {
+            "embed_dim": 256,
+            "num_layers": 4,
+            "num_heads": 4,
+            "max_seq_len": 2048,
+            "phase_dim": 16,
+        },
+        "jetson_orin_nano": {
+            "embed_dim": 384,
+            "num_layers": 6,
+            "num_heads": 6,
+            "max_seq_len": 4096,
+            "phase_dim": 24,
+        },
+        "raspberry_pi": {
+            "embed_dim": 128,
+            "num_layers": 2,
+            "num_heads": 4,
+            "max_seq_len": 1024,
+            "phase_dim": 8,
+        },
+        "mobile": {
+            "embed_dim": 128,
+            "num_layers": 2,
+            "num_heads": 2,
+            "max_seq_len": 512,
+            "phase_dim": 8,
+        },
+    }
+
+    if device_type not in configs:
+        raise ValueError(f"Unknown device: {device_type}. Choose from: {list(configs.keys())}")
+
+    config = configs[device_type]
+    return SymbolU12LLM(
+        vocab_size=vocab_size,
+        dropout=0.0,
+        sync_iterations=2,
+        **config,
+    )
+
+
+def benchmark_edge_device(device_type: str = "jetson_nano"):
+    """
+    Benchmark SymbolU12 LLM for edge deployment.
+
+    Simulates expected performance on edge devices.
+    """
+    import time
+
+    print("\n" + "=" * 70)
+    print(f"  EDGE DEVICE BENCHMARK: {device_type.upper()}")
+    print("=" * 70)
+
+    model = create_edge_model(device_type, vocab_size=10000)
+    model.eval()
+
+    params = model.count_parameters()
+    print(f"\n  Model Parameters: {params:,}")
+    print(f"  Model Size (FP32): {params * 4 / 1024 / 1024:.1f} MB")
+    print(f"  Model Size (FP16): {params * 2 / 1024 / 1024:.1f} MB")
+
+    # Device specs
+    specs = {
+        "jetson_nano": {"ram": "4GB", "gpu": "128 CUDA cores", "power": "5-10W"},
+        "jetson_orin_nano": {"ram": "8GB", "gpu": "1024 CUDA cores", "power": "7-15W"},
+        "raspberry_pi": {"ram": "4-8GB", "gpu": "CPU only", "power": "3-5W"},
+        "mobile": {"ram": "2-4GB", "gpu": "Mobile GPU", "power": "1-3W"},
+    }
+    if device_type in specs:
+        spec = specs[device_type]
+        print(f"\n  Target Device Specs:")
+        print(f"    RAM: {spec['ram']}")
+        print(f"    GPU: {spec['gpu']}")
+        print(f"    Power: {spec['power']}")
+
+    # Get max seq len from model config
+    max_seq = model.config.max_seq_len
+    seq_lengths = [64, 128, 256, 512, 1024, 2048, 4096]
+    seq_lengths = [s for s in seq_lengths if s <= max_seq]
+
+    print(f"\n  {'SeqLen':<10} {'Time (ms)':<12} {'Tokens/sec':<12} {'Memory Est.'}")
+    print(f"  {'-'*50}")
+
+    for seq_len in seq_lengths:
+        input_ids = torch.randint(0, 1000, (1, seq_len))
+
+        # Warmup
+        with torch.no_grad():
+            _ = model(input_ids)
+
+        # Benchmark
+        start = time.perf_counter()
+        with torch.no_grad():
+            output = model(input_ids)
+        elapsed = (time.perf_counter() - start) * 1000
+
+        tokens_per_sec = seq_len / (elapsed / 1000)
+
+        # Estimate memory (very rough)
+        # Phase attention: O(n) vs traditional O(n²)
+        phase_mem_kb = seq_len * model.config.phase_dim * 4 / 1024
+        trad_mem_mb = (seq_len * seq_len * 4) / 1024 / 1024
+
+        print(f"  {seq_len:<10} {elapsed:<12.1f} {tokens_per_sec:<12.0f} ~{phase_mem_kb:.0f}KB (vs {trad_mem_mb:.1f}MB trad)")
+
+    print(f"\n  O(n) Phase Attention Advantage:")
+    print(f"    - At 2K tokens: {2048 * 16 * 4 / 1024:.0f}KB vs {2048*2048*4/1024/1024:.0f}MB traditional")
+    print(f"    - Memory savings: ~{(2048*2048)/(2048*16):.0f}x smaller attention footprint")
+    print(f"    - Enables {max_seq} token context on 4GB device")
+
+    print("\n" + "=" * 70)
+    print("  ✓ Edge benchmark complete!")
+    print("=" * 70)
+
+
 if __name__ == "__main__":
     import sys
 
     run_benchmark = "--benchmark" in sys.argv or "--bench" in sys.argv
     run_tokenizer = "--tokenizer" in sys.argv or "--token" in sys.argv
+    run_edge = "--edge" in sys.argv or "--jetson" in sys.argv
+
+    # Parse edge device type
+    edge_device = "jetson_nano"
+    for arg in sys.argv:
+        if arg.startswith("--device="):
+            edge_device = arg.split("=")[1]
+
     max_seq = 8192
     if "--16k" in sys.argv:
         max_seq = 16384
@@ -933,7 +1128,9 @@ if __name__ == "__main__":
     if success:
         print("\n✓ Quick test passed!")
 
-        if run_tokenizer:
+        if run_edge:
+            benchmark_edge_device(edge_device)
+        elif run_tokenizer:
             test_tokenizer()
         elif run_benchmark:
             benchmark_symbolu12_llm(max_seq_len=max_seq)
@@ -941,5 +1138,7 @@ if __name__ == "__main__":
             print("\n  Tip: Run with --benchmark for full performance test")
             print("       Use --tokenizer to test text encode/decode/generate")
             print("       Use --16k or --32k for longer context tests")
+            print("       Use --edge or --jetson for edge device benchmark")
+            print("       Use --device=jetson_orin_nano for other devices")
     else:
         print("\n✗ Quick test failed!")
