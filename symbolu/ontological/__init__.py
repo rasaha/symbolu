@@ -104,6 +104,13 @@ from symbolu.ontological.config import (
     set_profile,
     analyze,
     ENGINE_PROFILES,
+    # Toggle Full LLM (768D) vs Optimized (256D)
+    use_full_llm,
+    use_optimized,
+    use_tiny,
+    toggle_llm_mode,
+    is_full_llm,
+    is_optimized,
 )
 
 # RAG datasets (no dependencies)
@@ -132,6 +139,13 @@ __all__ = [
     "set_profile",
     "analyze",
     "ENGINE_PROFILES",
+    # Toggle Full LLM (768D) vs Optimized (256D)
+    "use_full_llm",
+    "use_optimized",
+    "use_tiny",
+    "toggle_llm_mode",
+    "is_full_llm",
+    "is_optimized",
     # Types (12D)
     "OntologicalConfig",
     "OntologicalVector",

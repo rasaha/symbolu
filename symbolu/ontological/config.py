@@ -142,6 +142,77 @@ class OntologicalConfig:
             raise ValueError(f"Unknown profile: {profile}. Available: {list(ENGINE_PROFILES.keys())}")
         self.set_engine(ENGINE_PROFILES[profile.lower()])
 
+    # =========================================================================
+    # SYMBOLU12 BHAVA TOGGLE (Full 768D vs Optimized 256D)
+    # =========================================================================
+
+    def use_full_llm(self) -> None:
+        """
+        Switch to SYMBOLU12_LLM_BHAVA (Full 768D).
+
+        Use for:
+        - Maximum generation quality
+        - Full Drishti attention (4 heads)
+        - Self-attention in layers 1-8
+        - GPU recommended
+        """
+        self.set_engine(EngineSwitch.SYMBOLU12_LLM_BHAVA)
+
+    def use_optimized(self) -> None:
+        """
+        Switch to SYMBOLU12_OPTIMIZED_BHAVA (256D CPU-friendly).
+
+        Use for:
+        - CPU deployment
+        - Lower memory usage
+        - Faster inference
+        - Still has Bhava relationships
+        """
+        self.set_engine(EngineSwitch.SYMBOLU12_OPTIMIZED_BHAVA)
+
+    def use_tiny(self) -> None:
+        """
+        Switch to SYMBOLU12_TINY_BHAVA (128D edge).
+
+        Use for:
+        - Edge/IoT devices
+        - Minimal memory footprint
+        - Fastest inference
+        """
+        self.set_engine(EngineSwitch.SYMBOLU12_TINY_BHAVA)
+
+    def toggle_llm_mode(self, full: bool = True) -> None:
+        """
+        Toggle between Full LLM and Optimized modes.
+
+        Args:
+            full: True = SYMBOLU12_LLM_BHAVA (768D)
+                  False = SYMBOLU12_OPTIMIZED_BHAVA (256D)
+
+        Example:
+            config.toggle_llm_mode(full=True)   # Full 768D
+            config.toggle_llm_mode(full=False)  # Optimized 256D
+        """
+        if full:
+            self.use_full_llm()
+        else:
+            self.use_optimized()
+
+    @property
+    def is_full_llm(self) -> bool:
+        """Check if currently using full LLM (768D)."""
+        return self._active_engine == EngineSwitch.SYMBOLU12_LLM_BHAVA
+
+    @property
+    def is_optimized(self) -> bool:
+        """Check if currently using optimized (256D)."""
+        return self._active_engine == EngineSwitch.SYMBOLU12_OPTIMIZED_BHAVA
+
+    @property
+    def is_tiny(self) -> bool:
+        """Check if currently using tiny (128D)."""
+        return self._active_engine == EngineSwitch.SYMBOLU12_TINY_BHAVA
+
     def get_engine(self) -> Any:
         """
         Get the currently active engine instance.
@@ -236,6 +307,37 @@ def set_profile(profile: str) -> None:
 def analyze(text: str) -> dict:
     """Analyze text with the currently configured engine."""
     return config.get_engine().analyze(text)
+
+
+# Toggle functions for Full LLM vs Optimized
+def use_full_llm() -> None:
+    """Switch to SYMBOLU12_LLM_BHAVA (Full 768D)."""
+    config.use_full_llm()
+
+
+def use_optimized() -> None:
+    """Switch to SYMBOLU12_OPTIMIZED_BHAVA (256D CPU-friendly)."""
+    config.use_optimized()
+
+
+def use_tiny() -> None:
+    """Switch to SYMBOLU12_TINY_BHAVA (128D edge)."""
+    config.use_tiny()
+
+
+def toggle_llm_mode(full: bool = True) -> None:
+    """Toggle: full=True → 768D, full=False → 256D optimized."""
+    config.toggle_llm_mode(full)
+
+
+def is_full_llm() -> bool:
+    """Check if using full LLM (768D)."""
+    return config.is_full_llm
+
+
+def is_optimized() -> bool:
+    """Check if using optimized (256D)."""
+    return config.is_optimized
 
 
 # =============================================================================
