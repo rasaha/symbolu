@@ -1,0 +1,2672 @@
+{
+  "title": "Vedic Drishti (Aspect) Patterns",
+  "description": "Inter-layer relationship data based on Vedic astrology principles",
+  "vedic_principle": "Bhavas are RELATIONSHIPS, not separate entities. The 12 ontological layers embody Bhava dynamics through their inter-layer relationships.",
+  "pattern_summary": {
+    "Conjunction": {
+      "distance": 0,
+      "strength": 1.0,
+      "meaning": "Same layer, self-reference"
+    },
+    "Opposition": {
+      "distance": 6,
+      "strength": 1.0,
+      "meaning": "Complementary, full aspect"
+    },
+    "Trine": {
+      "distances": [
+        4,
+        8
+      ],
+      "strength": 0.9,
+      "meaning": "Harmonious, flowing"
+    },
+    "Adjacent": {
+      "distances": [
+        1,
+        11
+      ],
+      "strength": 0.8,
+      "meaning": "Resource flow"
+    },
+    "Square": {
+      "distances": [
+        3,
+        9
+      ],
+      "strength": 0.75,
+      "meaning": "Action/tension"
+    },
+    "Sextile": {
+      "distances": [
+        2,
+        10
+      ],
+      "strength": 0.7,
+      "meaning": "Opportunity"
+    },
+    "Quincunx": {
+      "distances": [
+        5,
+        7
+      ],
+      "strength": 0.5,
+      "meaning": "Adjustment needed"
+    }
+  },
+  "patterns": [
+    {
+      "name": "Conjunction",
+      "distance": 0,
+      "strength": 1.0,
+      "description": "Same layer, strongest self-reference",
+      "actual": 1.0,
+      "verified": true
+    },
+    {
+      "name": "Opposition",
+      "distance": 6,
+      "strength": 1.0,
+      "description": "Complementary, full aspect (7th house)",
+      "actual": 1.0,
+      "verified": true
+    },
+    {
+      "name": "Trine",
+      "distance": 4,
+      "strength": 0.9,
+      "description": "Harmonious, flowing energy (5th house)",
+      "actual": 0.9,
+      "verified": true
+    },
+    {
+      "name": "Trine",
+      "distance": 8,
+      "strength": 0.9,
+      "description": "Harmonious, flowing energy (9th house)",
+      "actual": 0.9,
+      "verified": true
+    },
+    {
+      "name": "Adjacent",
+      "distance": 1,
+      "strength": 0.8,
+      "description": "Resource flow, immediate connection (2nd house)",
+      "actual": 0.8,
+      "verified": true
+    },
+    {
+      "name": "Adjacent",
+      "distance": 11,
+      "strength": 0.8,
+      "description": "Resource flow, immediate connection (12th house)",
+      "actual": 0.8,
+      "verified": true
+    },
+    {
+      "name": "Square",
+      "distance": 3,
+      "strength": 0.75,
+      "description": "Action/tension, growth through challenge (4th house)",
+      "actual": 0.75,
+      "verified": true
+    },
+    {
+      "name": "Square",
+      "distance": 9,
+      "strength": 0.75,
+      "description": "Action/tension, growth through challenge (10th house)",
+      "actual": 0.75,
+      "verified": true
+    },
+    {
+      "name": "Sextile",
+      "distance": 2,
+      "strength": 0.7,
+      "description": "Opportunity, cooperative aspects (3rd house)",
+      "actual": 0.7,
+      "verified": true
+    },
+    {
+      "name": "Sextile",
+      "distance": 10,
+      "strength": 0.7,
+      "description": "Opportunity, cooperative aspects (11th house)",
+      "actual": 0.7,
+      "verified": true
+    },
+    {
+      "name": "Quincunx",
+      "distance": 5,
+      "strength": 0.5,
+      "description": "Adjustment needed, indirect connection (6th house)",
+      "actual": 0.5,
+      "verified": true
+    },
+    {
+      "name": "Quincunx",
+      "distance": 7,
+      "strength": 0.5,
+      "description": "Adjustment needed, indirect connection (8th house)",
+      "actual": 0.5,
+      "verified": true
+    }
+  ],
+  "aspect_matrix": {
+    "dimensions": "12x12",
+    "description": "Aspect strength between layer pairs based on Vedic Drishti",
+    "matrix": [
+      [
+        1.0,
+        0.8,
+        0.7,
+        0.75,
+        0.9,
+        0.5,
+        1.0,
+        0.5,
+        0.9,
+        0.75,
+        0.7,
+        0.8
+      ],
+      [
+        0.8,
+        1.0,
+        0.8,
+        0.7,
+        0.75,
+        0.9,
+        0.5,
+        1.0,
+        0.5,
+        0.9,
+        0.75,
+        0.7
+      ],
+      [
+        0.7,
+        0.8,
+        1.0,
+        0.8,
+        0.7,
+        0.75,
+        0.9,
+        0.5,
+        1.0,
+        0.5,
+        0.9,
+        0.75
+      ],
+      [
+        0.75,
+        0.7,
+        0.8,
+        1.0,
+        0.8,
+        0.7,
+        0.75,
+        0.9,
+        0.5,
+        1.0,
+        0.5,
+        0.9
+      ],
+      [
+        0.9,
+        0.75,
+        0.7,
+        0.8,
+        1.0,
+        0.8,
+        0.7,
+        0.75,
+        0.9,
+        0.5,
+        1.0,
+        0.5
+      ],
+      [
+        0.5,
+        0.9,
+        0.75,
+        0.7,
+        0.8,
+        1.0,
+        0.8,
+        0.7,
+        0.75,
+        0.9,
+        0.5,
+        1.0
+      ],
+      [
+        1.0,
+        0.5,
+        0.9,
+        0.75,
+        0.7,
+        0.8,
+        1.0,
+        0.8,
+        0.7,
+        0.75,
+        0.9,
+        0.5
+      ],
+      [
+        0.5,
+        1.0,
+        0.5,
+        0.9,
+        0.75,
+        0.7,
+        0.8,
+        1.0,
+        0.8,
+        0.7,
+        0.75,
+        0.9
+      ],
+      [
+        0.9,
+        0.5,
+        1.0,
+        0.5,
+        0.9,
+        0.75,
+        0.7,
+        0.8,
+        1.0,
+        0.8,
+        0.7,
+        0.75
+      ],
+      [
+        0.75,
+        0.9,
+        0.5,
+        1.0,
+        0.5,
+        0.9,
+        0.75,
+        0.7,
+        0.8,
+        1.0,
+        0.8,
+        0.7
+      ],
+      [
+        0.7,
+        0.75,
+        0.9,
+        0.5,
+        1.0,
+        0.5,
+        0.9,
+        0.75,
+        0.7,
+        0.8,
+        1.0,
+        0.8
+      ],
+      [
+        0.8,
+        0.7,
+        0.75,
+        0.9,
+        0.5,
+        1.0,
+        0.5,
+        0.9,
+        0.75,
+        0.7,
+        0.8,
+        1.0
+      ]
+    ],
+    "layer_names": [
+      "O1_POTENTIAL",
+      "O2_IDENTITY",
+      "O3_EXECUTION",
+      "O4_STRUCTURE",
+      "O5_COGNITION",
+      "O6_AGENCY",
+      "O7_REASONING",
+      "O8_PURPOSE",
+      "O9_WITNESSES",
+      "O10_UNIFYING",
+      "O11_INTEGRATION",
+      "O12_ABSOLVING"
+    ]
+  },
+  "bhava_significances": [
+    {
+      "number": 1,
+      "name": "Tanu",
+      "meaning": "Self",
+      "description": "Identity, body, personality"
+    },
+    {
+      "number": 2,
+      "name": "Dhana",
+      "meaning": "Wealth",
+      "description": "Resources, speech, family"
+    },
+    {
+      "number": 3,
+      "name": "Sahaja",
+      "meaning": "Siblings",
+      "description": "Communication, courage, effort"
+    },
+    {
+      "number": 4,
+      "name": "Sukha",
+      "meaning": "Happiness",
+      "description": "Home, mother, comfort"
+    },
+    {
+      "number": 5,
+      "name": "Putra",
+      "meaning": "Children",
+      "description": "Intelligence, creativity, merit"
+    },
+    {
+      "number": 6,
+      "name": "Ripu",
+      "meaning": "Enemies",
+      "description": "Obstacles, service, health"
+    },
+    {
+      "number": 7,
+      "name": "Kalatra",
+      "meaning": "Spouse",
+      "description": "Partnerships, others, balance"
+    },
+    {
+      "number": 8,
+      "name": "Randhra",
+      "meaning": "Mystery",
+      "description": "Transformation, death, hidden"
+    },
+    {
+      "number": 9,
+      "name": "Dharma",
+      "meaning": "Fortune",
+      "description": "Higher wisdom, father, luck"
+    },
+    {
+      "number": 10,
+      "name": "Karma",
+      "meaning": "Action",
+      "description": "Career, status, public life"
+    },
+    {
+      "number": 11,
+      "name": "Labha",
+      "meaning": "Gains",
+      "description": "Fulfillment, friends, goals"
+    },
+    {
+      "number": 12,
+      "name": "Moksha",
+      "meaning": "Liberation",
+      "description": "Transcendence, loss, endings"
+    }
+  ],
+  "layer_to_bhava_mapping": [
+    {
+      "layer_index": 0,
+      "layer_name": "O1_POTENTIAL",
+      "primary_bhava": 1,
+      "bhava_name": "Tanu",
+      "bhava_meaning": "Self"
+    },
+    {
+      "layer_index": 1,
+      "layer_name": "O2_IDENTITY",
+      "primary_bhava": 2,
+      "bhava_name": "Dhana",
+      "bhava_meaning": "Wealth"
+    },
+    {
+      "layer_index": 2,
+      "layer_name": "O3_EXECUTION",
+      "primary_bhava": 3,
+      "bhava_name": "Sahaja",
+      "bhava_meaning": "Siblings"
+    },
+    {
+      "layer_index": 3,
+      "layer_name": "O4_STRUCTURE",
+      "primary_bhava": 4,
+      "bhava_name": "Sukha",
+      "bhava_meaning": "Happiness"
+    },
+    {
+      "layer_index": 4,
+      "layer_name": "O5_COGNITION",
+      "primary_bhava": 5,
+      "bhava_name": "Putra",
+      "bhava_meaning": "Children"
+    },
+    {
+      "layer_index": 5,
+      "layer_name": "O6_AGENCY",
+      "primary_bhava": 6,
+      "bhava_name": "Ripu",
+      "bhava_meaning": "Enemies"
+    },
+    {
+      "layer_index": 6,
+      "layer_name": "O7_REASONING",
+      "primary_bhava": 7,
+      "bhava_name": "Kalatra",
+      "bhava_meaning": "Spouse"
+    },
+    {
+      "layer_index": 7,
+      "layer_name": "O8_PURPOSE",
+      "primary_bhava": 8,
+      "bhava_name": "Randhra",
+      "bhava_meaning": "Mystery"
+    },
+    {
+      "layer_index": 8,
+      "layer_name": "O9_WITNESSES",
+      "primary_bhava": 9,
+      "bhava_name": "Dharma",
+      "bhava_meaning": "Fortune"
+    },
+    {
+      "layer_index": 9,
+      "layer_name": "O10_UNIFYING",
+      "primary_bhava": 10,
+      "bhava_name": "Karma",
+      "bhava_meaning": "Action"
+    },
+    {
+      "layer_index": 10,
+      "layer_name": "O11_INTEGRATION",
+      "primary_bhava": 11,
+      "bhava_name": "Labha",
+      "bhava_meaning": "Gains"
+    },
+    {
+      "layer_index": 11,
+      "layer_name": "O12_ABSOLVING",
+      "primary_bhava": 12,
+      "bhava_name": "Moksha",
+      "bhava_meaning": "Liberation"
+    }
+  ],
+  "all_relationships": [
+    {
+      "from_layer_index": 0,
+      "from_layer": "O1_POTENTIAL",
+      "to_layer_index": 0,
+      "to_layer": "O1_POTENTIAL",
+      "aspect_strength": 1.0,
+      "pattern_type": "Conjunction",
+      "distance": 0,
+      "relationship_bhava": {
+        "name": "Tanu",
+        "meaning": "Self",
+        "description": "Identity, body, personality"
+      },
+      "interpretation": "Self-reference, foundation, identity projection"
+    },
+    {
+      "from_layer_index": 0,
+      "from_layer": "O1_POTENTIAL",
+      "to_layer_index": 1,
+      "to_layer": "O2_IDENTITY",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Dhana",
+        "meaning": "Wealth",
+        "description": "Resources, speech, family"
+      },
+      "interpretation": "Resource gathering, accumulation, value assessment"
+    },
+    {
+      "from_layer_index": 0,
+      "from_layer": "O1_POTENTIAL",
+      "to_layer_index": 2,
+      "to_layer": "O3_EXECUTION",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Sahaja",
+        "meaning": "Siblings",
+        "description": "Communication, courage, effort"
+      },
+      "interpretation": "Active effort, communication, courage expression"
+    },
+    {
+      "from_layer_index": 0,
+      "from_layer": "O1_POTENTIAL",
+      "to_layer_index": 3,
+      "to_layer": "O4_STRUCTURE",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Sukha",
+        "meaning": "Happiness",
+        "description": "Home, mother, comfort"
+      },
+      "interpretation": "Grounding, stabilization, comfort seeking"
+    },
+    {
+      "from_layer_index": 0,
+      "from_layer": "O1_POTENTIAL",
+      "to_layer_index": 4,
+      "to_layer": "O5_COGNITION",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Putra",
+        "meaning": "Children",
+        "description": "Intelligence, creativity, merit"
+      },
+      "interpretation": "Creative intelligence, insight generation, merit"
+    },
+    {
+      "from_layer_index": 0,
+      "from_layer": "O1_POTENTIAL",
+      "to_layer_index": 5,
+      "to_layer": "O6_AGENCY",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Ripu",
+        "meaning": "Enemies",
+        "description": "Obstacles, service, health"
+      },
+      "interpretation": "Refinement, obstacle handling, service orientation"
+    },
+    {
+      "from_layer_index": 0,
+      "from_layer": "O1_POTENTIAL",
+      "to_layer_index": 6,
+      "to_layer": "O7_REASONING",
+      "aspect_strength": 1.0,
+      "pattern_type": "Opposition",
+      "distance": 6,
+      "relationship_bhava": {
+        "name": "Kalatra",
+        "meaning": "Spouse",
+        "description": "Partnerships, others, balance"
+      },
+      "interpretation": "Balance, complementary view, partnership dynamics"
+    },
+    {
+      "from_layer_index": 0,
+      "from_layer": "O1_POTENTIAL",
+      "to_layer_index": 7,
+      "to_layer": "O8_PURPOSE",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Randhra",
+        "meaning": "Mystery",
+        "description": "Transformation, death, hidden"
+      },
+      "interpretation": "Deep transformation, hidden aspects, joint resources"
+    },
+    {
+      "from_layer_index": 0,
+      "from_layer": "O1_POTENTIAL",
+      "to_layer_index": 8,
+      "to_layer": "O9_WITNESSES",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Dharma",
+        "meaning": "Fortune",
+        "description": "Higher wisdom, father, luck"
+      },
+      "interpretation": "Expansion, higher meaning, wisdom seeking"
+    },
+    {
+      "from_layer_index": 0,
+      "from_layer": "O1_POTENTIAL",
+      "to_layer_index": 9,
+      "to_layer": "O10_UNIFYING",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Karma",
+        "meaning": "Action",
+        "description": "Career, status, public life"
+      },
+      "interpretation": "Manifestation, concrete action, status achievement"
+    },
+    {
+      "from_layer_index": 0,
+      "from_layer": "O1_POTENTIAL",
+      "to_layer_index": 10,
+      "to_layer": "O11_INTEGRATION",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Labha",
+        "meaning": "Gains",
+        "description": "Fulfillment, friends, goals"
+      },
+      "interpretation": "Achievement, goal realization, network activation"
+    },
+    {
+      "from_layer_index": 0,
+      "from_layer": "O1_POTENTIAL",
+      "to_layer_index": 11,
+      "to_layer": "O12_ABSOLVING",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Moksha",
+        "meaning": "Liberation",
+        "description": "Transcendence, loss, endings"
+      },
+      "interpretation": "Release, transcendence, dissolution into unity"
+    },
+    {
+      "from_layer_index": 1,
+      "from_layer": "O2_IDENTITY",
+      "to_layer_index": 0,
+      "to_layer": "O1_POTENTIAL",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Moksha",
+        "meaning": "Liberation",
+        "description": "Transcendence, loss, endings"
+      },
+      "interpretation": "Release, transcendence, dissolution into unity"
+    },
+    {
+      "from_layer_index": 1,
+      "from_layer": "O2_IDENTITY",
+      "to_layer_index": 1,
+      "to_layer": "O2_IDENTITY",
+      "aspect_strength": 1.0,
+      "pattern_type": "Conjunction",
+      "distance": 0,
+      "relationship_bhava": {
+        "name": "Tanu",
+        "meaning": "Self",
+        "description": "Identity, body, personality"
+      },
+      "interpretation": "Self-reference, foundation, identity projection"
+    },
+    {
+      "from_layer_index": 1,
+      "from_layer": "O2_IDENTITY",
+      "to_layer_index": 2,
+      "to_layer": "O3_EXECUTION",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Dhana",
+        "meaning": "Wealth",
+        "description": "Resources, speech, family"
+      },
+      "interpretation": "Resource gathering, accumulation, value assessment"
+    },
+    {
+      "from_layer_index": 1,
+      "from_layer": "O2_IDENTITY",
+      "to_layer_index": 3,
+      "to_layer": "O4_STRUCTURE",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Sahaja",
+        "meaning": "Siblings",
+        "description": "Communication, courage, effort"
+      },
+      "interpretation": "Active effort, communication, courage expression"
+    },
+    {
+      "from_layer_index": 1,
+      "from_layer": "O2_IDENTITY",
+      "to_layer_index": 4,
+      "to_layer": "O5_COGNITION",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Sukha",
+        "meaning": "Happiness",
+        "description": "Home, mother, comfort"
+      },
+      "interpretation": "Grounding, stabilization, comfort seeking"
+    },
+    {
+      "from_layer_index": 1,
+      "from_layer": "O2_IDENTITY",
+      "to_layer_index": 5,
+      "to_layer": "O6_AGENCY",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Putra",
+        "meaning": "Children",
+        "description": "Intelligence, creativity, merit"
+      },
+      "interpretation": "Creative intelligence, insight generation, merit"
+    },
+    {
+      "from_layer_index": 1,
+      "from_layer": "O2_IDENTITY",
+      "to_layer_index": 6,
+      "to_layer": "O7_REASONING",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Ripu",
+        "meaning": "Enemies",
+        "description": "Obstacles, service, health"
+      },
+      "interpretation": "Refinement, obstacle handling, service orientation"
+    },
+    {
+      "from_layer_index": 1,
+      "from_layer": "O2_IDENTITY",
+      "to_layer_index": 7,
+      "to_layer": "O8_PURPOSE",
+      "aspect_strength": 1.0,
+      "pattern_type": "Opposition",
+      "distance": 6,
+      "relationship_bhava": {
+        "name": "Kalatra",
+        "meaning": "Spouse",
+        "description": "Partnerships, others, balance"
+      },
+      "interpretation": "Balance, complementary view, partnership dynamics"
+    },
+    {
+      "from_layer_index": 1,
+      "from_layer": "O2_IDENTITY",
+      "to_layer_index": 8,
+      "to_layer": "O9_WITNESSES",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Randhra",
+        "meaning": "Mystery",
+        "description": "Transformation, death, hidden"
+      },
+      "interpretation": "Deep transformation, hidden aspects, joint resources"
+    },
+    {
+      "from_layer_index": 1,
+      "from_layer": "O2_IDENTITY",
+      "to_layer_index": 9,
+      "to_layer": "O10_UNIFYING",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Dharma",
+        "meaning": "Fortune",
+        "description": "Higher wisdom, father, luck"
+      },
+      "interpretation": "Expansion, higher meaning, wisdom seeking"
+    },
+    {
+      "from_layer_index": 1,
+      "from_layer": "O2_IDENTITY",
+      "to_layer_index": 10,
+      "to_layer": "O11_INTEGRATION",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Karma",
+        "meaning": "Action",
+        "description": "Career, status, public life"
+      },
+      "interpretation": "Manifestation, concrete action, status achievement"
+    },
+    {
+      "from_layer_index": 1,
+      "from_layer": "O2_IDENTITY",
+      "to_layer_index": 11,
+      "to_layer": "O12_ABSOLVING",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Labha",
+        "meaning": "Gains",
+        "description": "Fulfillment, friends, goals"
+      },
+      "interpretation": "Achievement, goal realization, network activation"
+    },
+    {
+      "from_layer_index": 2,
+      "from_layer": "O3_EXECUTION",
+      "to_layer_index": 0,
+      "to_layer": "O1_POTENTIAL",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Labha",
+        "meaning": "Gains",
+        "description": "Fulfillment, friends, goals"
+      },
+      "interpretation": "Achievement, goal realization, network activation"
+    },
+    {
+      "from_layer_index": 2,
+      "from_layer": "O3_EXECUTION",
+      "to_layer_index": 1,
+      "to_layer": "O2_IDENTITY",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Moksha",
+        "meaning": "Liberation",
+        "description": "Transcendence, loss, endings"
+      },
+      "interpretation": "Release, transcendence, dissolution into unity"
+    },
+    {
+      "from_layer_index": 2,
+      "from_layer": "O3_EXECUTION",
+      "to_layer_index": 2,
+      "to_layer": "O3_EXECUTION",
+      "aspect_strength": 1.0,
+      "pattern_type": "Conjunction",
+      "distance": 0,
+      "relationship_bhava": {
+        "name": "Tanu",
+        "meaning": "Self",
+        "description": "Identity, body, personality"
+      },
+      "interpretation": "Self-reference, foundation, identity projection"
+    },
+    {
+      "from_layer_index": 2,
+      "from_layer": "O3_EXECUTION",
+      "to_layer_index": 3,
+      "to_layer": "O4_STRUCTURE",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Dhana",
+        "meaning": "Wealth",
+        "description": "Resources, speech, family"
+      },
+      "interpretation": "Resource gathering, accumulation, value assessment"
+    },
+    {
+      "from_layer_index": 2,
+      "from_layer": "O3_EXECUTION",
+      "to_layer_index": 4,
+      "to_layer": "O5_COGNITION",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Sahaja",
+        "meaning": "Siblings",
+        "description": "Communication, courage, effort"
+      },
+      "interpretation": "Active effort, communication, courage expression"
+    },
+    {
+      "from_layer_index": 2,
+      "from_layer": "O3_EXECUTION",
+      "to_layer_index": 5,
+      "to_layer": "O6_AGENCY",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Sukha",
+        "meaning": "Happiness",
+        "description": "Home, mother, comfort"
+      },
+      "interpretation": "Grounding, stabilization, comfort seeking"
+    },
+    {
+      "from_layer_index": 2,
+      "from_layer": "O3_EXECUTION",
+      "to_layer_index": 6,
+      "to_layer": "O7_REASONING",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Putra",
+        "meaning": "Children",
+        "description": "Intelligence, creativity, merit"
+      },
+      "interpretation": "Creative intelligence, insight generation, merit"
+    },
+    {
+      "from_layer_index": 2,
+      "from_layer": "O3_EXECUTION",
+      "to_layer_index": 7,
+      "to_layer": "O8_PURPOSE",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Ripu",
+        "meaning": "Enemies",
+        "description": "Obstacles, service, health"
+      },
+      "interpretation": "Refinement, obstacle handling, service orientation"
+    },
+    {
+      "from_layer_index": 2,
+      "from_layer": "O3_EXECUTION",
+      "to_layer_index": 8,
+      "to_layer": "O9_WITNESSES",
+      "aspect_strength": 1.0,
+      "pattern_type": "Opposition",
+      "distance": 6,
+      "relationship_bhava": {
+        "name": "Kalatra",
+        "meaning": "Spouse",
+        "description": "Partnerships, others, balance"
+      },
+      "interpretation": "Balance, complementary view, partnership dynamics"
+    },
+    {
+      "from_layer_index": 2,
+      "from_layer": "O3_EXECUTION",
+      "to_layer_index": 9,
+      "to_layer": "O10_UNIFYING",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Randhra",
+        "meaning": "Mystery",
+        "description": "Transformation, death, hidden"
+      },
+      "interpretation": "Deep transformation, hidden aspects, joint resources"
+    },
+    {
+      "from_layer_index": 2,
+      "from_layer": "O3_EXECUTION",
+      "to_layer_index": 10,
+      "to_layer": "O11_INTEGRATION",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Dharma",
+        "meaning": "Fortune",
+        "description": "Higher wisdom, father, luck"
+      },
+      "interpretation": "Expansion, higher meaning, wisdom seeking"
+    },
+    {
+      "from_layer_index": 2,
+      "from_layer": "O3_EXECUTION",
+      "to_layer_index": 11,
+      "to_layer": "O12_ABSOLVING",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Karma",
+        "meaning": "Action",
+        "description": "Career, status, public life"
+      },
+      "interpretation": "Manifestation, concrete action, status achievement"
+    },
+    {
+      "from_layer_index": 3,
+      "from_layer": "O4_STRUCTURE",
+      "to_layer_index": 0,
+      "to_layer": "O1_POTENTIAL",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Karma",
+        "meaning": "Action",
+        "description": "Career, status, public life"
+      },
+      "interpretation": "Manifestation, concrete action, status achievement"
+    },
+    {
+      "from_layer_index": 3,
+      "from_layer": "O4_STRUCTURE",
+      "to_layer_index": 1,
+      "to_layer": "O2_IDENTITY",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Labha",
+        "meaning": "Gains",
+        "description": "Fulfillment, friends, goals"
+      },
+      "interpretation": "Achievement, goal realization, network activation"
+    },
+    {
+      "from_layer_index": 3,
+      "from_layer": "O4_STRUCTURE",
+      "to_layer_index": 2,
+      "to_layer": "O3_EXECUTION",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Moksha",
+        "meaning": "Liberation",
+        "description": "Transcendence, loss, endings"
+      },
+      "interpretation": "Release, transcendence, dissolution into unity"
+    },
+    {
+      "from_layer_index": 3,
+      "from_layer": "O4_STRUCTURE",
+      "to_layer_index": 3,
+      "to_layer": "O4_STRUCTURE",
+      "aspect_strength": 1.0,
+      "pattern_type": "Conjunction",
+      "distance": 0,
+      "relationship_bhava": {
+        "name": "Tanu",
+        "meaning": "Self",
+        "description": "Identity, body, personality"
+      },
+      "interpretation": "Self-reference, foundation, identity projection"
+    },
+    {
+      "from_layer_index": 3,
+      "from_layer": "O4_STRUCTURE",
+      "to_layer_index": 4,
+      "to_layer": "O5_COGNITION",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Dhana",
+        "meaning": "Wealth",
+        "description": "Resources, speech, family"
+      },
+      "interpretation": "Resource gathering, accumulation, value assessment"
+    },
+    {
+      "from_layer_index": 3,
+      "from_layer": "O4_STRUCTURE",
+      "to_layer_index": 5,
+      "to_layer": "O6_AGENCY",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Sahaja",
+        "meaning": "Siblings",
+        "description": "Communication, courage, effort"
+      },
+      "interpretation": "Active effort, communication, courage expression"
+    },
+    {
+      "from_layer_index": 3,
+      "from_layer": "O4_STRUCTURE",
+      "to_layer_index": 6,
+      "to_layer": "O7_REASONING",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Sukha",
+        "meaning": "Happiness",
+        "description": "Home, mother, comfort"
+      },
+      "interpretation": "Grounding, stabilization, comfort seeking"
+    },
+    {
+      "from_layer_index": 3,
+      "from_layer": "O4_STRUCTURE",
+      "to_layer_index": 7,
+      "to_layer": "O8_PURPOSE",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Putra",
+        "meaning": "Children",
+        "description": "Intelligence, creativity, merit"
+      },
+      "interpretation": "Creative intelligence, insight generation, merit"
+    },
+    {
+      "from_layer_index": 3,
+      "from_layer": "O4_STRUCTURE",
+      "to_layer_index": 8,
+      "to_layer": "O9_WITNESSES",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Ripu",
+        "meaning": "Enemies",
+        "description": "Obstacles, service, health"
+      },
+      "interpretation": "Refinement, obstacle handling, service orientation"
+    },
+    {
+      "from_layer_index": 3,
+      "from_layer": "O4_STRUCTURE",
+      "to_layer_index": 9,
+      "to_layer": "O10_UNIFYING",
+      "aspect_strength": 1.0,
+      "pattern_type": "Opposition",
+      "distance": 6,
+      "relationship_bhava": {
+        "name": "Kalatra",
+        "meaning": "Spouse",
+        "description": "Partnerships, others, balance"
+      },
+      "interpretation": "Balance, complementary view, partnership dynamics"
+    },
+    {
+      "from_layer_index": 3,
+      "from_layer": "O4_STRUCTURE",
+      "to_layer_index": 10,
+      "to_layer": "O11_INTEGRATION",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Randhra",
+        "meaning": "Mystery",
+        "description": "Transformation, death, hidden"
+      },
+      "interpretation": "Deep transformation, hidden aspects, joint resources"
+    },
+    {
+      "from_layer_index": 3,
+      "from_layer": "O4_STRUCTURE",
+      "to_layer_index": 11,
+      "to_layer": "O12_ABSOLVING",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Dharma",
+        "meaning": "Fortune",
+        "description": "Higher wisdom, father, luck"
+      },
+      "interpretation": "Expansion, higher meaning, wisdom seeking"
+    },
+    {
+      "from_layer_index": 4,
+      "from_layer": "O5_COGNITION",
+      "to_layer_index": 0,
+      "to_layer": "O1_POTENTIAL",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Dharma",
+        "meaning": "Fortune",
+        "description": "Higher wisdom, father, luck"
+      },
+      "interpretation": "Expansion, higher meaning, wisdom seeking"
+    },
+    {
+      "from_layer_index": 4,
+      "from_layer": "O5_COGNITION",
+      "to_layer_index": 1,
+      "to_layer": "O2_IDENTITY",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Karma",
+        "meaning": "Action",
+        "description": "Career, status, public life"
+      },
+      "interpretation": "Manifestation, concrete action, status achievement"
+    },
+    {
+      "from_layer_index": 4,
+      "from_layer": "O5_COGNITION",
+      "to_layer_index": 2,
+      "to_layer": "O3_EXECUTION",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Labha",
+        "meaning": "Gains",
+        "description": "Fulfillment, friends, goals"
+      },
+      "interpretation": "Achievement, goal realization, network activation"
+    },
+    {
+      "from_layer_index": 4,
+      "from_layer": "O5_COGNITION",
+      "to_layer_index": 3,
+      "to_layer": "O4_STRUCTURE",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Moksha",
+        "meaning": "Liberation",
+        "description": "Transcendence, loss, endings"
+      },
+      "interpretation": "Release, transcendence, dissolution into unity"
+    },
+    {
+      "from_layer_index": 4,
+      "from_layer": "O5_COGNITION",
+      "to_layer_index": 4,
+      "to_layer": "O5_COGNITION",
+      "aspect_strength": 1.0,
+      "pattern_type": "Conjunction",
+      "distance": 0,
+      "relationship_bhava": {
+        "name": "Tanu",
+        "meaning": "Self",
+        "description": "Identity, body, personality"
+      },
+      "interpretation": "Self-reference, foundation, identity projection"
+    },
+    {
+      "from_layer_index": 4,
+      "from_layer": "O5_COGNITION",
+      "to_layer_index": 5,
+      "to_layer": "O6_AGENCY",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Dhana",
+        "meaning": "Wealth",
+        "description": "Resources, speech, family"
+      },
+      "interpretation": "Resource gathering, accumulation, value assessment"
+    },
+    {
+      "from_layer_index": 4,
+      "from_layer": "O5_COGNITION",
+      "to_layer_index": 6,
+      "to_layer": "O7_REASONING",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Sahaja",
+        "meaning": "Siblings",
+        "description": "Communication, courage, effort"
+      },
+      "interpretation": "Active effort, communication, courage expression"
+    },
+    {
+      "from_layer_index": 4,
+      "from_layer": "O5_COGNITION",
+      "to_layer_index": 7,
+      "to_layer": "O8_PURPOSE",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Sukha",
+        "meaning": "Happiness",
+        "description": "Home, mother, comfort"
+      },
+      "interpretation": "Grounding, stabilization, comfort seeking"
+    },
+    {
+      "from_layer_index": 4,
+      "from_layer": "O5_COGNITION",
+      "to_layer_index": 8,
+      "to_layer": "O9_WITNESSES",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Putra",
+        "meaning": "Children",
+        "description": "Intelligence, creativity, merit"
+      },
+      "interpretation": "Creative intelligence, insight generation, merit"
+    },
+    {
+      "from_layer_index": 4,
+      "from_layer": "O5_COGNITION",
+      "to_layer_index": 9,
+      "to_layer": "O10_UNIFYING",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Ripu",
+        "meaning": "Enemies",
+        "description": "Obstacles, service, health"
+      },
+      "interpretation": "Refinement, obstacle handling, service orientation"
+    },
+    {
+      "from_layer_index": 4,
+      "from_layer": "O5_COGNITION",
+      "to_layer_index": 10,
+      "to_layer": "O11_INTEGRATION",
+      "aspect_strength": 1.0,
+      "pattern_type": "Opposition",
+      "distance": 6,
+      "relationship_bhava": {
+        "name": "Kalatra",
+        "meaning": "Spouse",
+        "description": "Partnerships, others, balance"
+      },
+      "interpretation": "Balance, complementary view, partnership dynamics"
+    },
+    {
+      "from_layer_index": 4,
+      "from_layer": "O5_COGNITION",
+      "to_layer_index": 11,
+      "to_layer": "O12_ABSOLVING",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Randhra",
+        "meaning": "Mystery",
+        "description": "Transformation, death, hidden"
+      },
+      "interpretation": "Deep transformation, hidden aspects, joint resources"
+    },
+    {
+      "from_layer_index": 5,
+      "from_layer": "O6_AGENCY",
+      "to_layer_index": 0,
+      "to_layer": "O1_POTENTIAL",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Randhra",
+        "meaning": "Mystery",
+        "description": "Transformation, death, hidden"
+      },
+      "interpretation": "Deep transformation, hidden aspects, joint resources"
+    },
+    {
+      "from_layer_index": 5,
+      "from_layer": "O6_AGENCY",
+      "to_layer_index": 1,
+      "to_layer": "O2_IDENTITY",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Dharma",
+        "meaning": "Fortune",
+        "description": "Higher wisdom, father, luck"
+      },
+      "interpretation": "Expansion, higher meaning, wisdom seeking"
+    },
+    {
+      "from_layer_index": 5,
+      "from_layer": "O6_AGENCY",
+      "to_layer_index": 2,
+      "to_layer": "O3_EXECUTION",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Karma",
+        "meaning": "Action",
+        "description": "Career, status, public life"
+      },
+      "interpretation": "Manifestation, concrete action, status achievement"
+    },
+    {
+      "from_layer_index": 5,
+      "from_layer": "O6_AGENCY",
+      "to_layer_index": 3,
+      "to_layer": "O4_STRUCTURE",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Labha",
+        "meaning": "Gains",
+        "description": "Fulfillment, friends, goals"
+      },
+      "interpretation": "Achievement, goal realization, network activation"
+    },
+    {
+      "from_layer_index": 5,
+      "from_layer": "O6_AGENCY",
+      "to_layer_index": 4,
+      "to_layer": "O5_COGNITION",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Moksha",
+        "meaning": "Liberation",
+        "description": "Transcendence, loss, endings"
+      },
+      "interpretation": "Release, transcendence, dissolution into unity"
+    },
+    {
+      "from_layer_index": 5,
+      "from_layer": "O6_AGENCY",
+      "to_layer_index": 5,
+      "to_layer": "O6_AGENCY",
+      "aspect_strength": 1.0,
+      "pattern_type": "Conjunction",
+      "distance": 0,
+      "relationship_bhava": {
+        "name": "Tanu",
+        "meaning": "Self",
+        "description": "Identity, body, personality"
+      },
+      "interpretation": "Self-reference, foundation, identity projection"
+    },
+    {
+      "from_layer_index": 5,
+      "from_layer": "O6_AGENCY",
+      "to_layer_index": 6,
+      "to_layer": "O7_REASONING",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Dhana",
+        "meaning": "Wealth",
+        "description": "Resources, speech, family"
+      },
+      "interpretation": "Resource gathering, accumulation, value assessment"
+    },
+    {
+      "from_layer_index": 5,
+      "from_layer": "O6_AGENCY",
+      "to_layer_index": 7,
+      "to_layer": "O8_PURPOSE",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Sahaja",
+        "meaning": "Siblings",
+        "description": "Communication, courage, effort"
+      },
+      "interpretation": "Active effort, communication, courage expression"
+    },
+    {
+      "from_layer_index": 5,
+      "from_layer": "O6_AGENCY",
+      "to_layer_index": 8,
+      "to_layer": "O9_WITNESSES",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Sukha",
+        "meaning": "Happiness",
+        "description": "Home, mother, comfort"
+      },
+      "interpretation": "Grounding, stabilization, comfort seeking"
+    },
+    {
+      "from_layer_index": 5,
+      "from_layer": "O6_AGENCY",
+      "to_layer_index": 9,
+      "to_layer": "O10_UNIFYING",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Putra",
+        "meaning": "Children",
+        "description": "Intelligence, creativity, merit"
+      },
+      "interpretation": "Creative intelligence, insight generation, merit"
+    },
+    {
+      "from_layer_index": 5,
+      "from_layer": "O6_AGENCY",
+      "to_layer_index": 10,
+      "to_layer": "O11_INTEGRATION",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Ripu",
+        "meaning": "Enemies",
+        "description": "Obstacles, service, health"
+      },
+      "interpretation": "Refinement, obstacle handling, service orientation"
+    },
+    {
+      "from_layer_index": 5,
+      "from_layer": "O6_AGENCY",
+      "to_layer_index": 11,
+      "to_layer": "O12_ABSOLVING",
+      "aspect_strength": 1.0,
+      "pattern_type": "Opposition",
+      "distance": 6,
+      "relationship_bhava": {
+        "name": "Kalatra",
+        "meaning": "Spouse",
+        "description": "Partnerships, others, balance"
+      },
+      "interpretation": "Balance, complementary view, partnership dynamics"
+    },
+    {
+      "from_layer_index": 6,
+      "from_layer": "O7_REASONING",
+      "to_layer_index": 0,
+      "to_layer": "O1_POTENTIAL",
+      "aspect_strength": 1.0,
+      "pattern_type": "Opposition",
+      "distance": 6,
+      "relationship_bhava": {
+        "name": "Kalatra",
+        "meaning": "Spouse",
+        "description": "Partnerships, others, balance"
+      },
+      "interpretation": "Balance, complementary view, partnership dynamics"
+    },
+    {
+      "from_layer_index": 6,
+      "from_layer": "O7_REASONING",
+      "to_layer_index": 1,
+      "to_layer": "O2_IDENTITY",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Randhra",
+        "meaning": "Mystery",
+        "description": "Transformation, death, hidden"
+      },
+      "interpretation": "Deep transformation, hidden aspects, joint resources"
+    },
+    {
+      "from_layer_index": 6,
+      "from_layer": "O7_REASONING",
+      "to_layer_index": 2,
+      "to_layer": "O3_EXECUTION",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Dharma",
+        "meaning": "Fortune",
+        "description": "Higher wisdom, father, luck"
+      },
+      "interpretation": "Expansion, higher meaning, wisdom seeking"
+    },
+    {
+      "from_layer_index": 6,
+      "from_layer": "O7_REASONING",
+      "to_layer_index": 3,
+      "to_layer": "O4_STRUCTURE",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Karma",
+        "meaning": "Action",
+        "description": "Career, status, public life"
+      },
+      "interpretation": "Manifestation, concrete action, status achievement"
+    },
+    {
+      "from_layer_index": 6,
+      "from_layer": "O7_REASONING",
+      "to_layer_index": 4,
+      "to_layer": "O5_COGNITION",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Labha",
+        "meaning": "Gains",
+        "description": "Fulfillment, friends, goals"
+      },
+      "interpretation": "Achievement, goal realization, network activation"
+    },
+    {
+      "from_layer_index": 6,
+      "from_layer": "O7_REASONING",
+      "to_layer_index": 5,
+      "to_layer": "O6_AGENCY",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Moksha",
+        "meaning": "Liberation",
+        "description": "Transcendence, loss, endings"
+      },
+      "interpretation": "Release, transcendence, dissolution into unity"
+    },
+    {
+      "from_layer_index": 6,
+      "from_layer": "O7_REASONING",
+      "to_layer_index": 6,
+      "to_layer": "O7_REASONING",
+      "aspect_strength": 1.0,
+      "pattern_type": "Conjunction",
+      "distance": 0,
+      "relationship_bhava": {
+        "name": "Tanu",
+        "meaning": "Self",
+        "description": "Identity, body, personality"
+      },
+      "interpretation": "Self-reference, foundation, identity projection"
+    },
+    {
+      "from_layer_index": 6,
+      "from_layer": "O7_REASONING",
+      "to_layer_index": 7,
+      "to_layer": "O8_PURPOSE",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Dhana",
+        "meaning": "Wealth",
+        "description": "Resources, speech, family"
+      },
+      "interpretation": "Resource gathering, accumulation, value assessment"
+    },
+    {
+      "from_layer_index": 6,
+      "from_layer": "O7_REASONING",
+      "to_layer_index": 8,
+      "to_layer": "O9_WITNESSES",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Sahaja",
+        "meaning": "Siblings",
+        "description": "Communication, courage, effort"
+      },
+      "interpretation": "Active effort, communication, courage expression"
+    },
+    {
+      "from_layer_index": 6,
+      "from_layer": "O7_REASONING",
+      "to_layer_index": 9,
+      "to_layer": "O10_UNIFYING",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Sukha",
+        "meaning": "Happiness",
+        "description": "Home, mother, comfort"
+      },
+      "interpretation": "Grounding, stabilization, comfort seeking"
+    },
+    {
+      "from_layer_index": 6,
+      "from_layer": "O7_REASONING",
+      "to_layer_index": 10,
+      "to_layer": "O11_INTEGRATION",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Putra",
+        "meaning": "Children",
+        "description": "Intelligence, creativity, merit"
+      },
+      "interpretation": "Creative intelligence, insight generation, merit"
+    },
+    {
+      "from_layer_index": 6,
+      "from_layer": "O7_REASONING",
+      "to_layer_index": 11,
+      "to_layer": "O12_ABSOLVING",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Ripu",
+        "meaning": "Enemies",
+        "description": "Obstacles, service, health"
+      },
+      "interpretation": "Refinement, obstacle handling, service orientation"
+    },
+    {
+      "from_layer_index": 7,
+      "from_layer": "O8_PURPOSE",
+      "to_layer_index": 0,
+      "to_layer": "O1_POTENTIAL",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Ripu",
+        "meaning": "Enemies",
+        "description": "Obstacles, service, health"
+      },
+      "interpretation": "Refinement, obstacle handling, service orientation"
+    },
+    {
+      "from_layer_index": 7,
+      "from_layer": "O8_PURPOSE",
+      "to_layer_index": 1,
+      "to_layer": "O2_IDENTITY",
+      "aspect_strength": 1.0,
+      "pattern_type": "Opposition",
+      "distance": 6,
+      "relationship_bhava": {
+        "name": "Kalatra",
+        "meaning": "Spouse",
+        "description": "Partnerships, others, balance"
+      },
+      "interpretation": "Balance, complementary view, partnership dynamics"
+    },
+    {
+      "from_layer_index": 7,
+      "from_layer": "O8_PURPOSE",
+      "to_layer_index": 2,
+      "to_layer": "O3_EXECUTION",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Randhra",
+        "meaning": "Mystery",
+        "description": "Transformation, death, hidden"
+      },
+      "interpretation": "Deep transformation, hidden aspects, joint resources"
+    },
+    {
+      "from_layer_index": 7,
+      "from_layer": "O8_PURPOSE",
+      "to_layer_index": 3,
+      "to_layer": "O4_STRUCTURE",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Dharma",
+        "meaning": "Fortune",
+        "description": "Higher wisdom, father, luck"
+      },
+      "interpretation": "Expansion, higher meaning, wisdom seeking"
+    },
+    {
+      "from_layer_index": 7,
+      "from_layer": "O8_PURPOSE",
+      "to_layer_index": 4,
+      "to_layer": "O5_COGNITION",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Karma",
+        "meaning": "Action",
+        "description": "Career, status, public life"
+      },
+      "interpretation": "Manifestation, concrete action, status achievement"
+    },
+    {
+      "from_layer_index": 7,
+      "from_layer": "O8_PURPOSE",
+      "to_layer_index": 5,
+      "to_layer": "O6_AGENCY",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Labha",
+        "meaning": "Gains",
+        "description": "Fulfillment, friends, goals"
+      },
+      "interpretation": "Achievement, goal realization, network activation"
+    },
+    {
+      "from_layer_index": 7,
+      "from_layer": "O8_PURPOSE",
+      "to_layer_index": 6,
+      "to_layer": "O7_REASONING",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Moksha",
+        "meaning": "Liberation",
+        "description": "Transcendence, loss, endings"
+      },
+      "interpretation": "Release, transcendence, dissolution into unity"
+    },
+    {
+      "from_layer_index": 7,
+      "from_layer": "O8_PURPOSE",
+      "to_layer_index": 7,
+      "to_layer": "O8_PURPOSE",
+      "aspect_strength": 1.0,
+      "pattern_type": "Conjunction",
+      "distance": 0,
+      "relationship_bhava": {
+        "name": "Tanu",
+        "meaning": "Self",
+        "description": "Identity, body, personality"
+      },
+      "interpretation": "Self-reference, foundation, identity projection"
+    },
+    {
+      "from_layer_index": 7,
+      "from_layer": "O8_PURPOSE",
+      "to_layer_index": 8,
+      "to_layer": "O9_WITNESSES",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Dhana",
+        "meaning": "Wealth",
+        "description": "Resources, speech, family"
+      },
+      "interpretation": "Resource gathering, accumulation, value assessment"
+    },
+    {
+      "from_layer_index": 7,
+      "from_layer": "O8_PURPOSE",
+      "to_layer_index": 9,
+      "to_layer": "O10_UNIFYING",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Sahaja",
+        "meaning": "Siblings",
+        "description": "Communication, courage, effort"
+      },
+      "interpretation": "Active effort, communication, courage expression"
+    },
+    {
+      "from_layer_index": 7,
+      "from_layer": "O8_PURPOSE",
+      "to_layer_index": 10,
+      "to_layer": "O11_INTEGRATION",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Sukha",
+        "meaning": "Happiness",
+        "description": "Home, mother, comfort"
+      },
+      "interpretation": "Grounding, stabilization, comfort seeking"
+    },
+    {
+      "from_layer_index": 7,
+      "from_layer": "O8_PURPOSE",
+      "to_layer_index": 11,
+      "to_layer": "O12_ABSOLVING",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Putra",
+        "meaning": "Children",
+        "description": "Intelligence, creativity, merit"
+      },
+      "interpretation": "Creative intelligence, insight generation, merit"
+    },
+    {
+      "from_layer_index": 8,
+      "from_layer": "O9_WITNESSES",
+      "to_layer_index": 0,
+      "to_layer": "O1_POTENTIAL",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Putra",
+        "meaning": "Children",
+        "description": "Intelligence, creativity, merit"
+      },
+      "interpretation": "Creative intelligence, insight generation, merit"
+    },
+    {
+      "from_layer_index": 8,
+      "from_layer": "O9_WITNESSES",
+      "to_layer_index": 1,
+      "to_layer": "O2_IDENTITY",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Ripu",
+        "meaning": "Enemies",
+        "description": "Obstacles, service, health"
+      },
+      "interpretation": "Refinement, obstacle handling, service orientation"
+    },
+    {
+      "from_layer_index": 8,
+      "from_layer": "O9_WITNESSES",
+      "to_layer_index": 2,
+      "to_layer": "O3_EXECUTION",
+      "aspect_strength": 1.0,
+      "pattern_type": "Opposition",
+      "distance": 6,
+      "relationship_bhava": {
+        "name": "Kalatra",
+        "meaning": "Spouse",
+        "description": "Partnerships, others, balance"
+      },
+      "interpretation": "Balance, complementary view, partnership dynamics"
+    },
+    {
+      "from_layer_index": 8,
+      "from_layer": "O9_WITNESSES",
+      "to_layer_index": 3,
+      "to_layer": "O4_STRUCTURE",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Randhra",
+        "meaning": "Mystery",
+        "description": "Transformation, death, hidden"
+      },
+      "interpretation": "Deep transformation, hidden aspects, joint resources"
+    },
+    {
+      "from_layer_index": 8,
+      "from_layer": "O9_WITNESSES",
+      "to_layer_index": 4,
+      "to_layer": "O5_COGNITION",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Dharma",
+        "meaning": "Fortune",
+        "description": "Higher wisdom, father, luck"
+      },
+      "interpretation": "Expansion, higher meaning, wisdom seeking"
+    },
+    {
+      "from_layer_index": 8,
+      "from_layer": "O9_WITNESSES",
+      "to_layer_index": 5,
+      "to_layer": "O6_AGENCY",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Karma",
+        "meaning": "Action",
+        "description": "Career, status, public life"
+      },
+      "interpretation": "Manifestation, concrete action, status achievement"
+    },
+    {
+      "from_layer_index": 8,
+      "from_layer": "O9_WITNESSES",
+      "to_layer_index": 6,
+      "to_layer": "O7_REASONING",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Labha",
+        "meaning": "Gains",
+        "description": "Fulfillment, friends, goals"
+      },
+      "interpretation": "Achievement, goal realization, network activation"
+    },
+    {
+      "from_layer_index": 8,
+      "from_layer": "O9_WITNESSES",
+      "to_layer_index": 7,
+      "to_layer": "O8_PURPOSE",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Moksha",
+        "meaning": "Liberation",
+        "description": "Transcendence, loss, endings"
+      },
+      "interpretation": "Release, transcendence, dissolution into unity"
+    },
+    {
+      "from_layer_index": 8,
+      "from_layer": "O9_WITNESSES",
+      "to_layer_index": 8,
+      "to_layer": "O9_WITNESSES",
+      "aspect_strength": 1.0,
+      "pattern_type": "Conjunction",
+      "distance": 0,
+      "relationship_bhava": {
+        "name": "Tanu",
+        "meaning": "Self",
+        "description": "Identity, body, personality"
+      },
+      "interpretation": "Self-reference, foundation, identity projection"
+    },
+    {
+      "from_layer_index": 8,
+      "from_layer": "O9_WITNESSES",
+      "to_layer_index": 9,
+      "to_layer": "O10_UNIFYING",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Dhana",
+        "meaning": "Wealth",
+        "description": "Resources, speech, family"
+      },
+      "interpretation": "Resource gathering, accumulation, value assessment"
+    },
+    {
+      "from_layer_index": 8,
+      "from_layer": "O9_WITNESSES",
+      "to_layer_index": 10,
+      "to_layer": "O11_INTEGRATION",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Sahaja",
+        "meaning": "Siblings",
+        "description": "Communication, courage, effort"
+      },
+      "interpretation": "Active effort, communication, courage expression"
+    },
+    {
+      "from_layer_index": 8,
+      "from_layer": "O9_WITNESSES",
+      "to_layer_index": 11,
+      "to_layer": "O12_ABSOLVING",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Sukha",
+        "meaning": "Happiness",
+        "description": "Home, mother, comfort"
+      },
+      "interpretation": "Grounding, stabilization, comfort seeking"
+    },
+    {
+      "from_layer_index": 9,
+      "from_layer": "O10_UNIFYING",
+      "to_layer_index": 0,
+      "to_layer": "O1_POTENTIAL",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Sukha",
+        "meaning": "Happiness",
+        "description": "Home, mother, comfort"
+      },
+      "interpretation": "Grounding, stabilization, comfort seeking"
+    },
+    {
+      "from_layer_index": 9,
+      "from_layer": "O10_UNIFYING",
+      "to_layer_index": 1,
+      "to_layer": "O2_IDENTITY",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Putra",
+        "meaning": "Children",
+        "description": "Intelligence, creativity, merit"
+      },
+      "interpretation": "Creative intelligence, insight generation, merit"
+    },
+    {
+      "from_layer_index": 9,
+      "from_layer": "O10_UNIFYING",
+      "to_layer_index": 2,
+      "to_layer": "O3_EXECUTION",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Ripu",
+        "meaning": "Enemies",
+        "description": "Obstacles, service, health"
+      },
+      "interpretation": "Refinement, obstacle handling, service orientation"
+    },
+    {
+      "from_layer_index": 9,
+      "from_layer": "O10_UNIFYING",
+      "to_layer_index": 3,
+      "to_layer": "O4_STRUCTURE",
+      "aspect_strength": 1.0,
+      "pattern_type": "Opposition",
+      "distance": 6,
+      "relationship_bhava": {
+        "name": "Kalatra",
+        "meaning": "Spouse",
+        "description": "Partnerships, others, balance"
+      },
+      "interpretation": "Balance, complementary view, partnership dynamics"
+    },
+    {
+      "from_layer_index": 9,
+      "from_layer": "O10_UNIFYING",
+      "to_layer_index": 4,
+      "to_layer": "O5_COGNITION",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Randhra",
+        "meaning": "Mystery",
+        "description": "Transformation, death, hidden"
+      },
+      "interpretation": "Deep transformation, hidden aspects, joint resources"
+    },
+    {
+      "from_layer_index": 9,
+      "from_layer": "O10_UNIFYING",
+      "to_layer_index": 5,
+      "to_layer": "O6_AGENCY",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Dharma",
+        "meaning": "Fortune",
+        "description": "Higher wisdom, father, luck"
+      },
+      "interpretation": "Expansion, higher meaning, wisdom seeking"
+    },
+    {
+      "from_layer_index": 9,
+      "from_layer": "O10_UNIFYING",
+      "to_layer_index": 6,
+      "to_layer": "O7_REASONING",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Karma",
+        "meaning": "Action",
+        "description": "Career, status, public life"
+      },
+      "interpretation": "Manifestation, concrete action, status achievement"
+    },
+    {
+      "from_layer_index": 9,
+      "from_layer": "O10_UNIFYING",
+      "to_layer_index": 7,
+      "to_layer": "O8_PURPOSE",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Labha",
+        "meaning": "Gains",
+        "description": "Fulfillment, friends, goals"
+      },
+      "interpretation": "Achievement, goal realization, network activation"
+    },
+    {
+      "from_layer_index": 9,
+      "from_layer": "O10_UNIFYING",
+      "to_layer_index": 8,
+      "to_layer": "O9_WITNESSES",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Moksha",
+        "meaning": "Liberation",
+        "description": "Transcendence, loss, endings"
+      },
+      "interpretation": "Release, transcendence, dissolution into unity"
+    },
+    {
+      "from_layer_index": 9,
+      "from_layer": "O10_UNIFYING",
+      "to_layer_index": 9,
+      "to_layer": "O10_UNIFYING",
+      "aspect_strength": 1.0,
+      "pattern_type": "Conjunction",
+      "distance": 0,
+      "relationship_bhava": {
+        "name": "Tanu",
+        "meaning": "Self",
+        "description": "Identity, body, personality"
+      },
+      "interpretation": "Self-reference, foundation, identity projection"
+    },
+    {
+      "from_layer_index": 9,
+      "from_layer": "O10_UNIFYING",
+      "to_layer_index": 10,
+      "to_layer": "O11_INTEGRATION",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Dhana",
+        "meaning": "Wealth",
+        "description": "Resources, speech, family"
+      },
+      "interpretation": "Resource gathering, accumulation, value assessment"
+    },
+    {
+      "from_layer_index": 9,
+      "from_layer": "O10_UNIFYING",
+      "to_layer_index": 11,
+      "to_layer": "O12_ABSOLVING",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Sahaja",
+        "meaning": "Siblings",
+        "description": "Communication, courage, effort"
+      },
+      "interpretation": "Active effort, communication, courage expression"
+    },
+    {
+      "from_layer_index": 10,
+      "from_layer": "O11_INTEGRATION",
+      "to_layer_index": 0,
+      "to_layer": "O1_POTENTIAL",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Sahaja",
+        "meaning": "Siblings",
+        "description": "Communication, courage, effort"
+      },
+      "interpretation": "Active effort, communication, courage expression"
+    },
+    {
+      "from_layer_index": 10,
+      "from_layer": "O11_INTEGRATION",
+      "to_layer_index": 1,
+      "to_layer": "O2_IDENTITY",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Sukha",
+        "meaning": "Happiness",
+        "description": "Home, mother, comfort"
+      },
+      "interpretation": "Grounding, stabilization, comfort seeking"
+    },
+    {
+      "from_layer_index": 10,
+      "from_layer": "O11_INTEGRATION",
+      "to_layer_index": 2,
+      "to_layer": "O3_EXECUTION",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Putra",
+        "meaning": "Children",
+        "description": "Intelligence, creativity, merit"
+      },
+      "interpretation": "Creative intelligence, insight generation, merit"
+    },
+    {
+      "from_layer_index": 10,
+      "from_layer": "O11_INTEGRATION",
+      "to_layer_index": 3,
+      "to_layer": "O4_STRUCTURE",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Ripu",
+        "meaning": "Enemies",
+        "description": "Obstacles, service, health"
+      },
+      "interpretation": "Refinement, obstacle handling, service orientation"
+    },
+    {
+      "from_layer_index": 10,
+      "from_layer": "O11_INTEGRATION",
+      "to_layer_index": 4,
+      "to_layer": "O5_COGNITION",
+      "aspect_strength": 1.0,
+      "pattern_type": "Opposition",
+      "distance": 6,
+      "relationship_bhava": {
+        "name": "Kalatra",
+        "meaning": "Spouse",
+        "description": "Partnerships, others, balance"
+      },
+      "interpretation": "Balance, complementary view, partnership dynamics"
+    },
+    {
+      "from_layer_index": 10,
+      "from_layer": "O11_INTEGRATION",
+      "to_layer_index": 5,
+      "to_layer": "O6_AGENCY",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Randhra",
+        "meaning": "Mystery",
+        "description": "Transformation, death, hidden"
+      },
+      "interpretation": "Deep transformation, hidden aspects, joint resources"
+    },
+    {
+      "from_layer_index": 10,
+      "from_layer": "O11_INTEGRATION",
+      "to_layer_index": 6,
+      "to_layer": "O7_REASONING",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Dharma",
+        "meaning": "Fortune",
+        "description": "Higher wisdom, father, luck"
+      },
+      "interpretation": "Expansion, higher meaning, wisdom seeking"
+    },
+    {
+      "from_layer_index": 10,
+      "from_layer": "O11_INTEGRATION",
+      "to_layer_index": 7,
+      "to_layer": "O8_PURPOSE",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Karma",
+        "meaning": "Action",
+        "description": "Career, status, public life"
+      },
+      "interpretation": "Manifestation, concrete action, status achievement"
+    },
+    {
+      "from_layer_index": 10,
+      "from_layer": "O11_INTEGRATION",
+      "to_layer_index": 8,
+      "to_layer": "O9_WITNESSES",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Labha",
+        "meaning": "Gains",
+        "description": "Fulfillment, friends, goals"
+      },
+      "interpretation": "Achievement, goal realization, network activation"
+    },
+    {
+      "from_layer_index": 10,
+      "from_layer": "O11_INTEGRATION",
+      "to_layer_index": 9,
+      "to_layer": "O10_UNIFYING",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Moksha",
+        "meaning": "Liberation",
+        "description": "Transcendence, loss, endings"
+      },
+      "interpretation": "Release, transcendence, dissolution into unity"
+    },
+    {
+      "from_layer_index": 10,
+      "from_layer": "O11_INTEGRATION",
+      "to_layer_index": 10,
+      "to_layer": "O11_INTEGRATION",
+      "aspect_strength": 1.0,
+      "pattern_type": "Conjunction",
+      "distance": 0,
+      "relationship_bhava": {
+        "name": "Tanu",
+        "meaning": "Self",
+        "description": "Identity, body, personality"
+      },
+      "interpretation": "Self-reference, foundation, identity projection"
+    },
+    {
+      "from_layer_index": 10,
+      "from_layer": "O11_INTEGRATION",
+      "to_layer_index": 11,
+      "to_layer": "O12_ABSOLVING",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Dhana",
+        "meaning": "Wealth",
+        "description": "Resources, speech, family"
+      },
+      "interpretation": "Resource gathering, accumulation, value assessment"
+    },
+    {
+      "from_layer_index": 11,
+      "from_layer": "O12_ABSOLVING",
+      "to_layer_index": 0,
+      "to_layer": "O1_POTENTIAL",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Dhana",
+        "meaning": "Wealth",
+        "description": "Resources, speech, family"
+      },
+      "interpretation": "Resource gathering, accumulation, value assessment"
+    },
+    {
+      "from_layer_index": 11,
+      "from_layer": "O12_ABSOLVING",
+      "to_layer_index": 1,
+      "to_layer": "O2_IDENTITY",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Sahaja",
+        "meaning": "Siblings",
+        "description": "Communication, courage, effort"
+      },
+      "interpretation": "Active effort, communication, courage expression"
+    },
+    {
+      "from_layer_index": 11,
+      "from_layer": "O12_ABSOLVING",
+      "to_layer_index": 2,
+      "to_layer": "O3_EXECUTION",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Sukha",
+        "meaning": "Happiness",
+        "description": "Home, mother, comfort"
+      },
+      "interpretation": "Grounding, stabilization, comfort seeking"
+    },
+    {
+      "from_layer_index": 11,
+      "from_layer": "O12_ABSOLVING",
+      "to_layer_index": 3,
+      "to_layer": "O4_STRUCTURE",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Putra",
+        "meaning": "Children",
+        "description": "Intelligence, creativity, merit"
+      },
+      "interpretation": "Creative intelligence, insight generation, merit"
+    },
+    {
+      "from_layer_index": 11,
+      "from_layer": "O12_ABSOLVING",
+      "to_layer_index": 4,
+      "to_layer": "O5_COGNITION",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Ripu",
+        "meaning": "Enemies",
+        "description": "Obstacles, service, health"
+      },
+      "interpretation": "Refinement, obstacle handling, service orientation"
+    },
+    {
+      "from_layer_index": 11,
+      "from_layer": "O12_ABSOLVING",
+      "to_layer_index": 5,
+      "to_layer": "O6_AGENCY",
+      "aspect_strength": 1.0,
+      "pattern_type": "Opposition",
+      "distance": 6,
+      "relationship_bhava": {
+        "name": "Kalatra",
+        "meaning": "Spouse",
+        "description": "Partnerships, others, balance"
+      },
+      "interpretation": "Balance, complementary view, partnership dynamics"
+    },
+    {
+      "from_layer_index": 11,
+      "from_layer": "O12_ABSOLVING",
+      "to_layer_index": 6,
+      "to_layer": "O7_REASONING",
+      "aspect_strength": 0.5,
+      "pattern_type": "Quincunx",
+      "distance": 5,
+      "relationship_bhava": {
+        "name": "Randhra",
+        "meaning": "Mystery",
+        "description": "Transformation, death, hidden"
+      },
+      "interpretation": "Deep transformation, hidden aspects, joint resources"
+    },
+    {
+      "from_layer_index": 11,
+      "from_layer": "O12_ABSOLVING",
+      "to_layer_index": 7,
+      "to_layer": "O8_PURPOSE",
+      "aspect_strength": 0.9,
+      "pattern_type": "Trine",
+      "distance": 4,
+      "relationship_bhava": {
+        "name": "Dharma",
+        "meaning": "Fortune",
+        "description": "Higher wisdom, father, luck"
+      },
+      "interpretation": "Expansion, higher meaning, wisdom seeking"
+    },
+    {
+      "from_layer_index": 11,
+      "from_layer": "O12_ABSOLVING",
+      "to_layer_index": 8,
+      "to_layer": "O9_WITNESSES",
+      "aspect_strength": 0.75,
+      "pattern_type": "Square",
+      "distance": 3,
+      "relationship_bhava": {
+        "name": "Karma",
+        "meaning": "Action",
+        "description": "Career, status, public life"
+      },
+      "interpretation": "Manifestation, concrete action, status achievement"
+    },
+    {
+      "from_layer_index": 11,
+      "from_layer": "O12_ABSOLVING",
+      "to_layer_index": 9,
+      "to_layer": "O10_UNIFYING",
+      "aspect_strength": 0.7,
+      "pattern_type": "Sextile",
+      "distance": 2,
+      "relationship_bhava": {
+        "name": "Labha",
+        "meaning": "Gains",
+        "description": "Fulfillment, friends, goals"
+      },
+      "interpretation": "Achievement, goal realization, network activation"
+    },
+    {
+      "from_layer_index": 11,
+      "from_layer": "O12_ABSOLVING",
+      "to_layer_index": 10,
+      "to_layer": "O11_INTEGRATION",
+      "aspect_strength": 0.8,
+      "pattern_type": "Adjacent",
+      "distance": 1,
+      "relationship_bhava": {
+        "name": "Moksha",
+        "meaning": "Liberation",
+        "description": "Transcendence, loss, endings"
+      },
+      "interpretation": "Release, transcendence, dissolution into unity"
+    },
+    {
+      "from_layer_index": 11,
+      "from_layer": "O12_ABSOLVING",
+      "to_layer_index": 11,
+      "to_layer": "O12_ABSOLVING",
+      "aspect_strength": 1.0,
+      "pattern_type": "Conjunction",
+      "distance": 0,
+      "relationship_bhava": {
+        "name": "Tanu",
+        "meaning": "Self",
+        "description": "Identity, body, personality"
+      },
+      "interpretation": "Self-reference, foundation, identity projection"
+    }
+  ],
+  "statistics": {
+    "total_layers": 12,
+    "total_relationships": 144,
+    "self_relationships": 12,
+    "cross_relationships": 132,
+    "all_patterns_verified": true
+  }
+}

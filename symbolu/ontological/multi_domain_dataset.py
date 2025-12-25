@@ -46,8 +46,8 @@ class DomainSample:
         return self.text
 
     def get_label_vector(self) -> List[float]:
-        """Get 10D label vector with soft labels."""
-        vector = [0.0] * 10
+        """Get 12D label vector with soft labels."""
+        vector = [0.0] * 12
         # Primary domain gets highest score
         if self.primary_domain in LAYER_INDEX:
             vector[LAYER_INDEX[self.primary_domain]] = 1.0

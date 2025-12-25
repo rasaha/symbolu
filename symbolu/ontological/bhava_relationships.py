@@ -296,8 +296,24 @@ if PYTORCH_AVAILABLE:
             # Flatten for downstream use
             relationship_flat = relationship_matrix.view(batch_size, -1)  # (batch, 144)
 
-            # Compute global coherence (average of positive relationships)
-            coherence = F.relu(relationship_matrix).mean(dim=(1, 2))  # (batch,)
+            # Compute global coherence based on:
+            # 1. Strength of relationships (absolute values)
+            # 2. Alignment with Vedic aspect patterns
+            # 3. Off-diagonal diversity (non-self relationships)
+
+            # Relationship strength: how strong are the relationships overall
+            strength = relationship_matrix.abs().mean(dim=(1, 2))  # (batch,)
+
+            # Aspect alignment: do learned relationships match Vedic patterns
+            aspect_alignment = (relationship_matrix * self.aspect_strengths.unsqueeze(0)).mean(dim=(1, 2))
+
+            # Off-diagonal diversity: encourage non-self relationships
+            # Mask out diagonal and compute mean of off-diagonal
+            mask = 1.0 - torch.eye(12, device=device).unsqueeze(0)
+            off_diag_strength = (relationship_matrix.abs() * mask).sum(dim=(1, 2)) / (12 * 11)
+
+            # Combined coherence: weighted sum
+            coherence = 0.3 * strength + 0.4 * F.relu(aspect_alignment) + 0.3 * off_diag_strength
 
             return {
                 'relationship_matrix': relationship_matrix,
