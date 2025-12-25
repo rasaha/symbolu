@@ -157,6 +157,18 @@ from symbolu.ontological.bcvf import (
     compute_consistency_lagrangian,
 )
 
+# SCC: Semantic Coherence Controller (S1-S3)
+from symbolu.ontological.semantic_coherence import (
+    SemanticCoherenceController,
+    SCCConfig,
+    LayerCoherenceResult,
+    GlobalCoherenceResult,
+    LayerCoherenceComputer,
+    GlobalCoherenceComputer,
+    compute_coherence,
+    is_coherent,
+)
+
 __all__ = [
     # Engine Configuration (switch between engines)
     "config",
@@ -227,6 +239,15 @@ __all__ = [
     "VerifiedCandidate",
     "verify_candidates",
     "compute_consistency_lagrangian",
+    # SCC: Semantic Coherence Controller (S1-S3)
+    "SemanticCoherenceController",
+    "SCCConfig",
+    "LayerCoherenceResult",
+    "GlobalCoherenceResult",
+    "LayerCoherenceComputer",
+    "GlobalCoherenceComputer",
+    "compute_coherence",
+    "is_coherent",
 ]
 
 # Add PyTorch exports if available
