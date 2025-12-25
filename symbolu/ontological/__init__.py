@@ -142,6 +142,21 @@ from symbolu.ontological.stitching_optimization import (
     compute_domain_jump_penalty,
 )
 
+# BCVF: Bidirectional Consistency Verification Framework
+from symbolu.ontological.bcvf import (
+    BCVFVerifier,
+    BCVFConfig,
+    ConsistencyLagrangian,
+    ConsistencyScore,
+    ForwardScorer,
+    BackwardScorer,
+    SemanticEntropyMonitor,
+    VerificationResult,
+    VerifiedCandidate,
+    verify_candidates,
+    compute_consistency_lagrangian,
+)
+
 __all__ = [
     # Engine Configuration (switch between engines)
     "config",
@@ -200,6 +215,18 @@ __all__ = [
     "create_rag_snippet",
     "compute_redundancy_penalty",
     "compute_domain_jump_penalty",
+    # BCVF: Bidirectional Consistency Verification Framework
+    "BCVFVerifier",
+    "BCVFConfig",
+    "ConsistencyLagrangian",
+    "ConsistencyScore",
+    "ForwardScorer",
+    "BackwardScorer",
+    "SemanticEntropyMonitor",
+    "VerificationResult",
+    "VerifiedCandidate",
+    "verify_candidates",
+    "compute_consistency_lagrangian",
 ]
 
 # Add PyTorch exports if available
