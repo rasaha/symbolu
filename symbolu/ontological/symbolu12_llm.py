@@ -39,7 +39,7 @@ Usage:
 """
 
 import math
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Union
 from dataclasses import dataclass
 
 try:
@@ -50,6 +50,98 @@ try:
 except ImportError:
     PYTORCH_AVAILABLE = False
     raise ImportError("SymbolU12 LLM requires PyTorch. Install with: pip install torch")
+
+# Tokenizer support (tiktoken preferred, with fallback)
+try:
+    import tiktoken
+    TIKTOKEN_AVAILABLE = True
+except ImportError:
+    TIKTOKEN_AVAILABLE = False
+
+
+# =============================================================================
+# TOKENIZER WRAPPER
+# =============================================================================
+
+class SymbolU12Tokenizer:
+    """
+    Tokenizer for SymbolU12 LLM.
+
+    Uses tiktoken (GPT-2 encoding) if available, otherwise provides
+    a simple character-level fallback for testing.
+    """
+
+    ONTOLOGICAL_LAYER_NAMES = [
+        "O1_POTENTIAL", "O2_RESOURCE", "O3_COMMUNICATION", "O4_FOUNDATION",
+        "O5_EXPRESSION", "O6_SERVICE", "O7_PARTNERSHIP", "O8_TRANSFORMATION",
+        "O9_EXPANSION", "O10_ACHIEVEMENT", "O11_COMMUNITY", "O12_ABSOLVING"
+    ]
+
+    def __init__(self, encoding_name: str = "gpt2"):
+        """
+        Initialize tokenizer.
+
+        Args:
+            encoding_name: tiktoken encoding name ("gpt2", "cl100k_base", etc.)
+        """
+        self.encoding_name = encoding_name
+
+        if TIKTOKEN_AVAILABLE:
+            self._tokenizer = tiktoken.get_encoding(encoding_name)
+            self.vocab_size = self._tokenizer.n_vocab
+            self.backend = "tiktoken"
+        else:
+            # Fallback: simple character-level tokenizer for testing
+            self._tokenizer = None
+            self.vocab_size = 50257  # GPT-2 vocab size
+            self.backend = "fallback"
+            print("Warning: tiktoken not available. Using fallback tokenizer.")
+            print("Install tiktoken for production: pip install tiktoken")
+
+    def encode(self, text: str, add_special_tokens: bool = False) -> List[int]:
+        """
+        Encode text to token IDs.
+
+        Args:
+            text: Input text string
+            add_special_tokens: Whether to add BOS/EOS tokens
+
+        Returns:
+            List of token IDs
+        """
+        if self._tokenizer is not None:
+            tokens = self._tokenizer.encode(text)
+        else:
+            # Fallback: simple encoding (for testing only)
+            tokens = [ord(c) % self.vocab_size for c in text]
+
+        return tokens
+
+    def decode(self, tokens: List[int], skip_special_tokens: bool = True) -> str:
+        """
+        Decode token IDs to text.
+
+        Args:
+            tokens: List of token IDs
+            skip_special_tokens: Whether to skip special tokens
+
+        Returns:
+            Decoded text string
+        """
+        if self._tokenizer is not None:
+            return self._tokenizer.decode(tokens)
+        else:
+            # Fallback: simple decoding (for testing only)
+            return "".join(chr(t % 128) for t in tokens if 32 <= t % 128 < 127)
+
+    def __len__(self) -> int:
+        return self.vocab_size
+
+    def get_ontological_layer_name(self, index: int) -> str:
+        """Get the name of an ontological layer by index."""
+        if 0 <= index < 12:
+            return self.ONTOLOGICAL_LAYER_NAMES[index]
+        return f"UNKNOWN_{index}"
 
 
 # =============================================================================
@@ -362,6 +454,16 @@ class SymbolU12LLM(nn.Module):
         # Initialize weights
         self.apply(self._init_weights)
 
+        # Tokenizer (lazy loaded)
+        self._tokenizer = None
+
+    @property
+    def tokenizer(self) -> SymbolU12Tokenizer:
+        """Lazy-load tokenizer on first use."""
+        if self._tokenizer is None:
+            self._tokenizer = SymbolU12Tokenizer()
+        return self._tokenizer
+
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
@@ -409,6 +511,221 @@ class SymbolU12LLM(nn.Module):
 
     def count_parameters(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+    # =========================================================================
+    # TOKENIZER METHODS
+    # =========================================================================
+
+    def encode(self, text: str) -> torch.Tensor:
+        """
+        Encode text to token IDs tensor.
+
+        Args:
+            text: Input text string
+
+        Returns:
+            Token IDs tensor of shape (1, seq_len)
+        """
+        tokens = self.tokenizer.encode(text)
+        return torch.tensor([tokens], dtype=torch.long)
+
+    def decode(self, tokens: torch.Tensor) -> str:
+        """
+        Decode token IDs tensor to text.
+
+        Args:
+            tokens: Token IDs tensor
+
+        Returns:
+            Decoded text string
+        """
+        if tokens.dim() > 1:
+            tokens = tokens[0]  # Take first batch element
+        return self.tokenizer.decode(tokens.tolist())
+
+    # =========================================================================
+    # TEXT GENERATION
+    # =========================================================================
+
+    @torch.no_grad()
+    def generate_text(
+        self,
+        prompt: str,
+        max_new_tokens: int = 100,
+        temperature: float = 1.0,
+        top_k: int = 50,
+        top_p: float = 0.9,
+        return_ontological: bool = False,
+    ) -> Union[str, Dict[str, Any]]:
+        """
+        Generate text from a prompt.
+
+        Args:
+            prompt: Input text prompt
+            max_new_tokens: Maximum tokens to generate
+            temperature: Sampling temperature (higher = more random)
+            top_k: Top-k sampling (0 = disabled)
+            top_p: Nucleus sampling threshold
+            return_ontological: Whether to return ontological analysis
+
+        Returns:
+            Generated text string, or dict with text and ontological analysis
+        """
+        self.eval()
+        device = next(self.parameters()).device
+
+        # Encode prompt
+        input_ids = self.encode(prompt).to(device)
+        generated = input_ids
+
+        # Track ontological data if requested
+        onto_data = [] if return_ontological else None
+
+        for _ in range(max_new_tokens):
+            # Forward pass
+            output = self.forward(generated, return_ontological=return_ontological)
+            logits = output["logits"][:, -1, :] / temperature
+
+            # Top-k filtering
+            if top_k > 0:
+                indices_to_remove = logits < torch.topk(logits, top_k)[0][:, -1, None]
+                logits[indices_to_remove] = float('-inf')
+
+            # Top-p (nucleus) filtering
+            if top_p < 1.0:
+                sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+                cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+                sorted_indices_to_remove = cumulative_probs > top_p
+                sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+                sorted_indices_to_remove[:, 0] = 0
+                indices_to_remove = sorted_indices_to_remove.scatter(
+                    1, sorted_indices, sorted_indices_to_remove
+                )
+                logits[indices_to_remove] = float('-inf')
+
+            # Sample next token
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+
+            # Append token
+            generated = torch.cat([generated, next_token], dim=1)
+
+            # Track ontological for last token
+            if return_ontological:
+                onto_data.append({
+                    "ontological": output["ontological"][:, -1, :].cpu(),
+                    "coherence": output["coherence"][:, -1, :].cpu(),
+                })
+
+            # Stop if max length reached
+            if generated.shape[1] >= self.config.max_seq_len:
+                break
+
+        # Decode output
+        generated_text = self.decode(generated)
+
+        if return_ontological:
+            return {
+                "text": generated_text,
+                "prompt": prompt,
+                "generated": generated_text[len(prompt):],
+                "tokens": generated.cpu(),
+                "ontological_trace": onto_data,
+            }
+        else:
+            return generated_text
+
+    # =========================================================================
+    # TEXT ANALYSIS
+    # =========================================================================
+
+    @torch.no_grad()
+    def analyze_text(self, text: str) -> Dict[str, Any]:
+        """
+        Analyze text for ontological meaning.
+
+        Returns comprehensive analysis including:
+        - Dominant ontological layer per token
+        - Bhava relationship patterns
+        - Coherence scores
+        - Layer distribution
+
+        Args:
+            text: Input text to analyze
+
+        Returns:
+            Dict with ontological analysis
+        """
+        self.eval()
+        device = next(self.parameters()).device
+
+        # Encode
+        input_ids = self.encode(text).to(device)
+
+        # Forward pass
+        output = self.forward(input_ids, return_ontological=True)
+
+        # Extract data
+        onto = output["ontological"].squeeze(0).cpu().numpy()  # (N, 12)
+        bhava = output["bhava"].squeeze(0).cpu().numpy()  # (N, 144)
+        coherence = output["coherence"].squeeze(0).cpu().numpy()  # (N, 1)
+
+        # Get tokens for alignment
+        tokens = input_ids.squeeze(0).tolist()
+        token_strs = [self.tokenizer.decode([t]) for t in tokens]
+
+        # Analyze dominant layers
+        dominant_indices = onto.argmax(axis=1)
+        dominant_layers = [
+            self.tokenizer.get_ontological_layer_name(idx)
+            for idx in dominant_indices
+        ]
+
+        # Layer distribution (average across all tokens)
+        layer_distribution = {
+            self.tokenizer.get_ontological_layer_name(i): float(onto[:, i].mean())
+            for i in range(12)
+        }
+
+        # Global coherence
+        avg_coherence = float(coherence.mean())
+
+        # Top relationships (from Bhava matrix)
+        avg_bhava = bhava.mean(axis=0).reshape(12, 12)
+
+        return {
+            "text": text,
+            "num_tokens": len(tokens),
+            "tokens": token_strs,
+            "dominant_layers": dominant_layers,
+            "layer_distribution": layer_distribution,
+            "average_coherence": avg_coherence,
+            "coherence_per_token": coherence.flatten().tolist(),
+            "ontological_matrix": onto,
+            "bhava_matrix": avg_bhava,
+            "summary": self._generate_analysis_summary(layer_distribution, avg_coherence),
+        }
+
+    def _generate_analysis_summary(
+        self,
+        layer_distribution: Dict[str, float],
+        coherence: float
+    ) -> str:
+        """Generate human-readable analysis summary."""
+        # Find top 3 layers
+        sorted_layers = sorted(
+            layer_distribution.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )[:3]
+
+        summary_parts = []
+        summary_parts.append(f"Coherence: {coherence:.2%}")
+        summary_parts.append("Dominant layers:")
+        for layer, score in sorted_layers:
+            summary_parts.append(f"  - {layer}: {score:.2%}")
+
+        return "\n".join(summary_parts)
 
 
 # =============================================================================
@@ -547,10 +864,64 @@ def quick_test():
     return grads_ok
 
 
+def test_tokenizer():
+    """Test tokenizer integration."""
+    print("\n" + "=" * 70)
+    print("  TOKENIZER TEST")
+    print("=" * 70)
+
+    # Create model with GPT-2 vocab size
+    model = SymbolU12LLM(
+        vocab_size=50257,  # GPT-2 vocab
+        embed_dim=128,
+        num_layers=2,
+        num_heads=4,
+        max_seq_len=512,
+    )
+
+    print(f"\n  Tokenizer backend: {model.tokenizer.backend}")
+    print(f"  Vocab size: {model.tokenizer.vocab_size:,}")
+
+    # Test encode/decode
+    test_text = "The nature of consciousness is a profound mystery."
+    print(f"\n  Test text: \"{test_text}\"")
+
+    tokens = model.encode(test_text)
+    print(f"  Encoded tokens: {tokens.shape} -> {tokens[0].tolist()[:10]}...")
+
+    decoded = model.decode(tokens)
+    print(f"  Decoded text: \"{decoded}\"")
+
+    # Test text analysis
+    print(f"\n  Running ontological analysis...")
+    analysis = model.analyze_text(test_text)
+
+    print(f"\n  Analysis Results:")
+    print(f"    Tokens: {analysis['num_tokens']}")
+    print(f"    Average coherence: {analysis['average_coherence']:.4f}")
+    print(f"\n  {analysis['summary']}")
+
+    # Test generation (note: untrained model, so output will be random)
+    print(f"\n  Testing generation (untrained - output will be random)...")
+    generated = model.generate_text(
+        "Hello",
+        max_new_tokens=10,
+        temperature=1.0,
+    )
+    print(f"  Generated: \"{generated[:100]}...\"")
+
+    print("\n" + "=" * 70)
+    print("  ✓ Tokenizer test complete!")
+    print("=" * 70)
+
+    return True
+
+
 if __name__ == "__main__":
     import sys
 
     run_benchmark = "--benchmark" in sys.argv or "--bench" in sys.argv
+    run_tokenizer = "--tokenizer" in sys.argv or "--token" in sys.argv
     max_seq = 8192
     if "--16k" in sys.argv:
         max_seq = 16384
@@ -562,10 +933,13 @@ if __name__ == "__main__":
     if success:
         print("\n✓ Quick test passed!")
 
-        if run_benchmark:
+        if run_tokenizer:
+            test_tokenizer()
+        elif run_benchmark:
             benchmark_symbolu12_llm(max_seq_len=max_seq)
         else:
             print("\n  Tip: Run with --benchmark for full performance test")
+            print("       Use --tokenizer to test text encode/decode/generate")
             print("       Use --16k or --32k for longer context tests")
     else:
         print("\n✗ Quick test failed!")
