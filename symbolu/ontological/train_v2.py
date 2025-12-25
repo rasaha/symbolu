@@ -125,7 +125,7 @@ def train_v2(epochs: int = 15, batch_size: int = 32, lr: float = 1e-4):
                 reasoning_targets=batch_reasoning,
                 creativity_targets=batch_creativity,
                 kl_weight=kl_weight,
-                coherence_weight=0.2,
+                coherence_weight=0.5,  # Increased to encourage coherent relationships
                 task_weight=0.2,
             )
 
