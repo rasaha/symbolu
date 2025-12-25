@@ -169,6 +169,18 @@ from symbolu.ontological.semantic_coherence import (
     is_coherent,
 )
 
+# USE: Phase-Based Attention (O(n) replacement for O(n²) attention)
+from symbolu.ontological.phase_attention import (
+    PhaseAttention,
+    LinearPhaseAttention,
+    PhaseAttentionWrapper,
+    PhaseAttentionConfig,
+    PhaseEmbedding,
+    PhaseSynchronizer,
+    PhaseCorrelation,
+    replace_attention_with_phase,
+)
+
 __all__ = [
     # Engine Configuration (switch between engines)
     "config",
@@ -248,6 +260,15 @@ __all__ = [
     "GlobalCoherenceComputer",
     "compute_coherence",
     "is_coherent",
+    # USE: Phase-Based Attention (O(n) replacement)
+    "PhaseAttention",
+    "LinearPhaseAttention",
+    "PhaseAttentionWrapper",
+    "PhaseAttentionConfig",
+    "PhaseEmbedding",
+    "PhaseSynchronizer",
+    "PhaseCorrelation",
+    "replace_attention_with_phase",
 ]
 
 # Add PyTorch exports if available
