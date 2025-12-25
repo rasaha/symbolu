@@ -303,38 +303,61 @@ def run_full_export(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Export ontological data to RAG storage")
-    parser.add_argument(
-        "--training-data",
-        default="data/training_drishti_data.json",
-        help="Path to training data JSON file",
-    )
-    parser.add_argument(
-        "--model",
-        default="checkpoints/unified_v2_best.pt",
-        help="Path to trained model checkpoint",
-    )
-    parser.add_argument(
-        "--output-dir",
-        default="data/rag",
-        help="Output directory for RAG exports",
-    )
-    parser.add_argument(
-        "--analyze-samples",
-        action="store_true",
-        help="Analyze sample texts with trained model",
-    )
+    # Simple automatic run like train_v2.py
+    # Automatically detects training data and model, exports everything
 
-    args = parser.parse_args()
+    training_data_path = "data/training_drishti_data.json"
+    model_path = "checkpoints/unified_v2_best.pt"
+    output_dir = "data/rag"
+
+    # Auto-detect if model exists for sample analysis
+    analyze_samples = Path(model_path).exists()
+
+    if analyze_samples:
+        print(f"Found trained model at: {model_path}")
+        print("Will analyze sample texts with model\n")
+    else:
+        print(f"No model found at: {model_path}")
+        print("Exporting patterns and training data only\n")
 
     result = run_full_export(
-        training_data_path=args.training_data,
-        model_path=args.model,
-        output_dir=args.output_dir,
-        analyze_samples=args.analyze_samples,
+        training_data_path=training_data_path,
+        model_path=model_path,
+        output_dir=output_dir,
+        analyze_samples=analyze_samples,
     )
 
     print(f"\nExport summary:")
     print(f"  Documents indexed: {result['documents_indexed']}")
     print(f"  Relationships: {result['relationships']}")
     print(f"  Drishti patterns: {result['patterns']}")
+
+    print("\n" + "=" * 70)
+    print("   RECOMMENDED RAG DATABASE")
+    print("=" * 70)
+    print("""
+For Ontological Bhava relationships, BOTH are recommended:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  VECTOR DB (Pinecone/Weaviate) - Primary for similarity search     │
+│  ─────────────────────────────────────────────────────────────────  │
+│  • 156D vectors (12D onto + 144D bhava)                            │
+│  • Fast cosine similarity search                                    │
+│  • Best for: "Find texts similar to this query"                    │
+│  • Use: vector_export.json                                          │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  GRAPH DB (Neo4j) - Primary for relationship traversal             │
+│  ─────────────────────────────────────────────────────────────────  │
+│  • 12 Layer nodes + 144 Bhava relationship edges                   │
+│  • Cypher queries for relationship patterns                        │
+│  • Best for: "What Bhavas connect Cognition to Purpose?"           │
+│  • Use: graph_export.json                                           │
+└─────────────────────────────────────────────────────────────────────┘
+
+HYBRID APPROACH (Recommended):
+  1. Vector DB for semantic similarity (find relevant documents)
+  2. Graph DB for ontological reasoning (understand relationships)
+  3. knowledge_base.json for complete reference data
+""")
