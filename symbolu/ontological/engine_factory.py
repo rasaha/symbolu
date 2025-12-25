@@ -4,19 +4,43 @@ Ontological Engine Factory
 ==========================
 
 Provides a unified interface for creating and using ontological engines.
-Supports switching between:
+Supports switching between multiple engine types:
 
-1. MiniLM-based Engine (UnifiedOntologicalEngineV2)
+ENTERPRISE ENGINES (Classification + RAG):
+------------------------------------------
+1. MiniLM V2 (MINILM_V2)
    - Uses pre-trained MiniLM encoder
    - 156D output (12D ontological + 144D Bhava)
-   - Good for classification and RAG
+   - Best for classification and RAG
    - Faster training, smaller model
 
-2. SymbolU12 LLM Engine (SymbolU12_LLM)
+2. SymbolU12 Hybrid (SYMBOLU12_HYBRID)
+   - MiniLM encoder + SymbolU12 layers
+   - Best of both: transfer learning + interpretability
+   - 156D output with coherence matrix
+
+GENERATIVE ENGINES (LLM Capabilities):
+--------------------------------------
+3. SymbolU12 LLM (SYMBOLU12_LLM)
    - Full 12-layer ontological transformer
-   - Native language model (generates tokens)
-   - Explicit cognitive layers with interpretability
-   - Full generation capabilities
+   - Token-level generation capabilities
+   - Explicit cognitive layers
+
+4. SymbolU12 LLM + Bhava (SYMBOLU12_LLM_BHAVA)
+   - Full LLM with Vedic Bhava relationships
+   - 156D output with Drishti attention
+   - Interpretable inter-layer relationships
+
+CPU-FRIENDLY ENGINES:
+--------------------
+5. SymbolU12 Optimized + Bhava (SYMBOLU12_OPTIMIZED_BHAVA)
+   - CPU-friendly 256D model
+   - Full Bhava relationship support
+   - Good for edge deployment
+
+6. SymbolU12 Tiny + Bhava (SYMBOLU12_TINY_BHAVA)
+   - Smallest model (128D)
+   - For IoT/edge devices
 
 Usage:
 ------
@@ -25,18 +49,23 @@ Usage:
         OntologicalEngineType,
     )
 
-    # Create MiniLM-based engine (default)
+    # Enterprise: MiniLM-based engine (default)
     engine = create_ontological_engine(OntologicalEngineType.MINILM_V2)
+
+    # Enterprise: Hybrid (best of both)
+    engine = create_ontological_engine(OntologicalEngineType.SYMBOLU12_HYBRID)
+
+    # Generative: Full LLM with Bhava
+    engine = create_ontological_engine(OntologicalEngineType.SYMBOLU12_LLM_BHAVA)
+
+    # CPU-Friendly: Optimized with Bhava
+    engine = create_ontological_engine(OntologicalEngineType.SYMBOLU12_OPTIMIZED_BHAVA)
+
+    # All engines provide consistent output format
     result = engine.analyze("What is consciousness?")
-
-    # Create SymbolU12 LLM engine
-    llm_engine = create_ontological_engine(OntologicalEngineType.SYMBOLU12_LLM)
-    result = llm_engine.analyze("What is consciousness?")
-
-    # Both engines provide consistent output format
     print(result["dominant_layer"])
     print(result["confidence"])
-    print(result["coherence"])
+    print(result["bhava_vector"])  # 144D inter-layer relationships
 """
 
 from enum import Enum
@@ -69,6 +98,19 @@ class OntologicalEngineType(Enum):
 
     SYMBOLU12_LARGE = "symbolu12_large"
     """Large SymbolU12 (1024D)"""
+
+    # Bhava-enhanced engines (156D output: 12D onto + 144D bhava)
+    SYMBOLU12_LLM_BHAVA = "symbolu12_llm_bhava"
+    """Full SymbolU12 LLM with Vedic Bhava relationships (768D, 156D output)"""
+
+    SYMBOLU12_OPTIMIZED_BHAVA = "symbolu12_optimized_bhava"
+    """CPU-friendly SymbolU12 with Bhava relationships (256D, 156D output)"""
+
+    SYMBOLU12_TINY_BHAVA = "symbolu12_tiny_bhava"
+    """Tiny SymbolU12 with Bhava for edge devices (128D, 156D output)"""
+
+    SYMBOLU12_HYBRID = "symbolu12_hybrid"
+    """MiniLM encoder + SymbolU12 layers (best of both)"""
 
 
 class OntologicalEngineInterface(ABC):
@@ -349,6 +391,103 @@ if PYTORCH_AVAILABLE:
             return generated
 
 
+    class SymbolU12BhavaEngineWrapper(OntologicalEngineInterface, nn.Module):
+        """
+        Wrapper for SymbolU12LLMWithBhava.
+
+        Full LLM with Vedic Bhava inter-layer relationships.
+        Output: 156D (12D ontological + 144D bhava)
+        """
+
+        def __init__(self, model_type: str = "full"):
+            nn.Module.__init__(self)
+            from symbolu.ontological.symbolu12_bhava import (
+                create_symbolu12_llm_bhava,
+                create_symbolu12_optimized_bhava,
+                create_symbolu12_tiny_bhava,
+            )
+
+            if model_type == "full":
+                self._model = create_symbolu12_llm_bhava()
+                self._engine_type = OntologicalEngineType.SYMBOLU12_LLM_BHAVA
+            elif model_type == "optimized":
+                self._model = create_symbolu12_optimized_bhava()
+                self._engine_type = OntologicalEngineType.SYMBOLU12_OPTIMIZED_BHAVA
+            elif model_type == "tiny":
+                self._model = create_symbolu12_tiny_bhava()
+                self._engine_type = OntologicalEngineType.SYMBOLU12_TINY_BHAVA
+            else:
+                raise ValueError(f"Unknown model type: {model_type}")
+
+        def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+            return self._model.forward(x)
+
+        def analyze(self, text: str) -> Dict[str, Any]:
+            """Analyze text with Bhava relationships."""
+            if hasattr(self._model, 'analyze'):
+                return self._model.analyze(text)
+
+            # Fallback for optimized models
+            import numpy as np
+            self._model.eval()
+
+            # Simple tokenization
+            tokens = [ord(c) % 32000 for c in text[:512]]
+            input_ids = torch.tensor([tokens], device=next(self._model.parameters()).device)
+
+            with torch.no_grad():
+                outputs = self._model(input_ids)
+
+            probs = outputs['ontological_probs'].squeeze(0).cpu().numpy()
+            bhava = outputs['bhava_vector'].squeeze(0).cpu().numpy()
+
+            dominant_idx = int(np.argmax(probs))
+            dominant_layer = LAYER_NAMES[dominant_idx]
+
+            return {
+                'dominant_layer': dominant_layer,
+                'confidence': float(probs[dominant_idx]),
+                'probabilities': {LAYER_NAMES[i]: float(probs[i]) for i in range(12)},
+                'coherence': float(outputs['global_coherence'].mean().item()),
+                'witness_confidence': float(outputs['witness_confidence'].mean().item()),
+                'ontological_vector': probs.tolist(),
+                'bhava_vector': bhava.tolist(),
+                'full_vector': outputs['full_vector'].squeeze(0).cpu().numpy().tolist(),
+                'engine_type': self._engine_type.value,
+            }
+
+        def get_engine_type(self) -> OntologicalEngineType:
+            return self._engine_type
+
+        def get_output_dim(self) -> int:
+            return 156  # 12D onto + 144D bhava
+
+
+    class SymbolU12HybridEngineWrapper(OntologicalEngineInterface, nn.Module):
+        """
+        Wrapper for SymbolU12Hybrid (MiniLM + SymbolU12 layers).
+
+        Best of both: pre-trained encoder + interpretable layers.
+        """
+
+        def __init__(self):
+            nn.Module.__init__(self)
+            from symbolu.ontological.symbolu12_hybrid import SymbolU12Hybrid
+            self._model = SymbolU12Hybrid()
+
+        def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+            return self._model.forward(x)
+
+        def analyze(self, text: str) -> Dict[str, Any]:
+            return self._model.analyze(text)
+
+        def get_engine_type(self) -> OntologicalEngineType:
+            return OntologicalEngineType.SYMBOLU12_HYBRID
+
+        def get_output_dim(self) -> int:
+            return 156
+
+
     class SimpleTokenizer:
         """Simple character-level tokenizer fallback."""
 
@@ -433,6 +572,19 @@ def create_ontological_engine(
             max_seq_len=4096,
             num_heads=16,
         )
+
+    # Bhava-enhanced engines
+    elif engine_type == OntologicalEngineType.SYMBOLU12_LLM_BHAVA:
+        return SymbolU12BhavaEngineWrapper(model_type="full")
+
+    elif engine_type == OntologicalEngineType.SYMBOLU12_OPTIMIZED_BHAVA:
+        return SymbolU12BhavaEngineWrapper(model_type="optimized")
+
+    elif engine_type == OntologicalEngineType.SYMBOLU12_TINY_BHAVA:
+        return SymbolU12BhavaEngineWrapper(model_type="tiny")
+
+    elif engine_type == OntologicalEngineType.SYMBOLU12_HYBRID:
+        return SymbolU12HybridEngineWrapper()
 
     else:
         raise ValueError(f"Unknown engine type: {engine_type}")
