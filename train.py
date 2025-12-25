@@ -158,6 +158,12 @@ class TrainingConfig:
     # Resume
     resume: Optional[str] = None
 
+    # Coherence Loss (S3, S1-S2, S8-S9)
+    use_coherence_loss: bool = True  # Enable coherence-enhanced training
+    lambda_entropy: float = 0.01     # S5: Semantic entropy weight
+    lambda_coherence: float = 0.01   # S1-S2: Layer coherence weight
+    lambda_stability: float = 0.001  # S8-S9: Stability constraint weight
+
     # Seed
     seed: int = 42
 
@@ -463,33 +469,133 @@ class TrainingState:
     train_losses: list = field(default_factory=list)
 
 
+def compute_semantic_entropy(logits: torch.Tensor) -> torch.Tensor:
+    """
+    Compute semantic entropy (Formula S5).
+
+    H_sem = -Σ pₖ log pₖ
+
+    Lower entropy = more confident/focused predictions.
+    """
+    probs = F.softmax(logits, dim=-1)
+    log_probs = F.log_softmax(logits, dim=-1)
+    entropy = -(probs * log_probs).sum(dim=-1)
+    return entropy.mean()
+
+
+def compute_layer_coherence(hidden_states: list) -> torch.Tensor:
+    """
+    Compute cross-layer coherence (Formulas S1-S2).
+
+    C_global = Σᵢⱼ Corr(Lᵢ, Lⱼ)
+
+    Higher coherence = layers are aligned in their representations.
+    """
+    if not hidden_states or len(hidden_states) < 2:
+        return torch.tensor(0.0)
+
+    coherence = 0.0
+    count = 0
+
+    for i in range(len(hidden_states) - 1):
+        # Cosine similarity between adjacent layers (Formula S4)
+        h_i = hidden_states[i].mean(dim=1)  # [B, D]
+        h_j = hidden_states[i + 1].mean(dim=1)  # [B, D]
+
+        cos_sim = F.cosine_similarity(h_i, h_j, dim=-1).mean()
+        coherence += cos_sim
+        count += 1
+
+    return coherence / max(count, 1)
+
+
+# Global state for entropy stability tracking (S8-S9)
+_prev_entropy = None
+
+
 def compute_loss(
     model: PhaseTransformer,
     batch: Tuple[torch.Tensor, torch.Tensor],
     device: torch.device,
+    use_coherence_loss: bool = True,
+    lambda_entropy: float = 0.01,
+    lambda_coherence: float = 0.01,
+    lambda_stability: float = 0.001,
 ) -> Tuple[torch.Tensor, Dict[str, float]]:
-    """Compute cross-entropy loss."""
+    """
+    Compute enhanced loss with coherence formulas (S3, S1-S2, S8-S9).
+
+    L_coherence = L_task + λ_e·L_entropy + λ_c·L_coherence + λ_s·L_stability
+
+    Where:
+    - L_task: Standard cross-entropy (next-token prediction)
+    - L_entropy: Semantic entropy regularization (S5) - encourages confident predictions
+    - L_coherence: Layer coherence (S1-S2) - encourages aligned representations
+    - L_stability: Entropy stability (S8) - penalizes entropy spikes
+    """
+    global _prev_entropy
 
     x, y = batch
     x = x.to(device)
     y = y.to(device)
 
-    # Forward pass
-    output = model(x)
+    # Forward pass with hidden states for layer coherence
+    output = model(x, return_hidden=True)
     logits = output['logits']
+    hidden_states = output.get('hidden_states', [])
 
-    # Compute loss
+    # Compute task loss (standard cross-entropy)
     B, N, V = logits.shape
-    loss = F.cross_entropy(
+    L_task = F.cross_entropy(
         logits.view(B * N, V),
         y.view(B * N),
         ignore_index=-100,
     )
 
-    # Compute perplexity
-    perplexity = torch.exp(loss).item()
+    metrics = {
+        "loss": L_task.item(),
+        "perplexity": torch.exp(L_task).item(),
+    }
 
-    return loss, {"loss": loss.item(), "perplexity": perplexity}
+    if use_coherence_loss:
+        # S5: Semantic Entropy - target moderate entropy (not too high, not too low)
+        entropy = compute_semantic_entropy(logits)
+        target_entropy = 4.0  # ~moderate confidence
+        L_entropy = (entropy - target_entropy).pow(2)
+        metrics["entropy"] = entropy.item()
+
+        # S1-S2: Layer Coherence - maximize cross-layer alignment
+        if hidden_states:
+            coherence = compute_layer_coherence(hidden_states)
+            L_coherence_term = 1.0 - coherence  # Penalize low coherence
+            metrics["coherence"] = coherence.item()
+        else:
+            L_coherence_term = torch.tensor(0.0, device=device)
+            metrics["coherence"] = 0.0
+
+        # S8-S9: Stability Constraint - penalize entropy spikes
+        if _prev_entropy is not None:
+            entropy_change = entropy - _prev_entropy
+            # Penalize increases (dH/dt > 0 violates S8)
+            L_stability = F.relu(entropy_change)
+            metrics["entropy_change"] = entropy_change.item()
+        else:
+            L_stability = torch.tensor(0.0, device=device)
+            metrics["entropy_change"] = 0.0
+
+        _prev_entropy = entropy.detach()
+
+        # Combined Coherence Loss (S3)
+        loss = (L_task +
+                lambda_entropy * L_entropy +
+                lambda_coherence * L_coherence_term +
+                lambda_stability * L_stability)
+
+        metrics["loss_total"] = loss.item()
+    else:
+        loss = L_task
+
+    return loss, metrics
 
 
 def train_step(
@@ -502,15 +608,21 @@ def train_step(
     device: torch.device,
     accumulation_step: int,
 ) -> Dict[str, float]:
-    """Single training step with gradient accumulation."""
+    """Single training step with gradient accumulation and coherence loss."""
 
     # Mixed precision context
     use_amp = config.mixed_precision != "none" and device.type == "cuda"
     dtype = torch.bfloat16 if config.mixed_precision == "bf16" else torch.float16
 
-    # Forward pass
+    # Forward pass with coherence loss (S3, S1-S2, S8-S9)
     with autocast(enabled=use_amp, dtype=dtype):
-        loss, metrics = compute_loss(model, batch, device)
+        loss, metrics = compute_loss(
+            model, batch, device,
+            use_coherence_loss=config.use_coherence_loss,
+            lambda_entropy=config.lambda_entropy,
+            lambda_coherence=config.lambda_coherence,
+            lambda_stability=config.lambda_stability,
+        )
         loss = loss / config.gradient_accumulation
 
     # Backward pass
@@ -754,7 +866,8 @@ def train(config: TrainingConfig):
                 tokens_per_sec = (config.log_every * config.batch_size * config.max_seq_len * config.gradient_accumulation) / elapsed
                 lr = scheduler.get_last_lr()[0]
 
-                logger.info(
+                # Build log message with coherence metrics if available
+                log_msg = (
                     f"Step {state.step:>6} | "
                     f"Loss: {avg_loss:.4f} | "
                     f"PPL: {math.exp(avg_loss):.2f} | "
@@ -762,16 +875,31 @@ def train(config: TrainingConfig):
                     f"Tok/s: {tokens_per_sec:.0f}"
                 )
 
+                # Add coherence metrics if enabled (S3, S1-S2, S5)
+                if config.use_coherence_loss and "entropy" in metrics:
+                    log_msg += f" | Ent: {metrics.get('entropy', 0):.2f}"
+                    log_msg += f" | Coh: {metrics.get('coherence', 0):.3f}"
+
+                logger.info(log_msg)
+
                 # Wandb logging
                 if config.wandb and WANDB_AVAILABLE:
-                    wandb.log({
+                    log_dict = {
                         "train/loss": avg_loss,
                         "train/perplexity": math.exp(avg_loss),
                         "train/learning_rate": lr,
                         "train/tokens_per_sec": tokens_per_sec,
                         "train/total_tokens": state.total_tokens,
                         "train/epoch": state.epoch,
-                    }, step=state.step)
+                    }
+                    # Add coherence metrics
+                    if config.use_coherence_loss:
+                        log_dict.update({
+                            "train/entropy": metrics.get("entropy", 0),
+                            "train/coherence": metrics.get("coherence", 0),
+                            "train/entropy_change": metrics.get("entropy_change", 0),
+                        })
+                    wandb.log(log_dict, step=state.step)
 
                 # TensorBoard logging
                 if tb_writer is not None:
@@ -779,6 +907,10 @@ def train(config: TrainingConfig):
                     tb_writer.add_scalar("train/perplexity", math.exp(avg_loss), state.step)
                     tb_writer.add_scalar("train/learning_rate", lr, state.step)
                     tb_writer.add_scalar("train/tokens_per_sec", tokens_per_sec, state.step)
+                    # Add coherence metrics
+                    if config.use_coherence_loss:
+                        tb_writer.add_scalar("train/entropy", metrics.get("entropy", 0), state.step)
+                        tb_writer.add_scalar("train/coherence", metrics.get("coherence", 0), state.step)
 
                 step_start_time = time.time()
 
@@ -964,6 +1096,18 @@ def parse_args() -> TrainingConfig:
     # Resume
     parser.add_argument("--resume", type=str, default=None,
                        help="Resume from checkpoint")
+
+    # Coherence Loss (S3, S1-S2, S8-S9)
+    parser.add_argument("--use_coherence_loss", action="store_true", default=True,
+                       help="Enable coherence-enhanced training (S3, S1-S2, S8-S9)")
+    parser.add_argument("--no_coherence_loss", action="store_false", dest="use_coherence_loss",
+                       help="Disable coherence loss")
+    parser.add_argument("--lambda_entropy", type=float, default=0.01,
+                       help="S5: Semantic entropy weight")
+    parser.add_argument("--lambda_coherence", type=float, default=0.01,
+                       help="S1-S2: Layer coherence weight")
+    parser.add_argument("--lambda_stability", type=float, default=0.001,
+                       help="S8-S9: Stability constraint weight")
 
     # Seed
     parser.add_argument("--seed", type=int, default=42,
