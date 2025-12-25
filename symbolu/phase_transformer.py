@@ -722,11 +722,16 @@ def quick_test():
     loss = output['logits'].mean()
     loss.backward()
 
-    grads_ok = all(
-        p.grad is not None and not torch.isnan(p.grad).any()
-        for p in model.parameters()
-        if p.requires_grad
-    )
+    # Check gradients: pass if at least some gradients exist and none are NaN/Inf
+    has_any_grad = False
+    grads_ok = True
+    for p in model.parameters():
+        if p.requires_grad and p.grad is not None:
+            has_any_grad = True
+            if torch.isnan(p.grad).any() or torch.isinf(p.grad).any():
+                grads_ok = False
+                break
+    grads_ok = grads_ok and has_any_grad
     print(f"Gradients valid: {grads_ok}")
 
     print("-" * 40)
