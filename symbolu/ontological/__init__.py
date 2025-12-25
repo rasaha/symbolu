@@ -130,6 +130,18 @@ from symbolu.ontological.multi_domain_dataset import (
     create_multi_domain_dataset,
 )
 
+# RAG Stitching Optimization (Objective Formula)
+from symbolu.ontological.stitching_optimization import (
+    StitchingOptimizer,
+    StitchingConfig,
+    StitchingResult,
+    RAGSnippet,
+    select_optimal_snippets,
+    create_rag_snippet,
+    compute_redundancy_penalty,
+    compute_domain_jump_penalty,
+)
+
 __all__ = [
     # Engine Configuration (switch between engines)
     "config",
@@ -179,6 +191,15 @@ __all__ = [
     "MultiDomainDataset",
     "DomainSample",
     "create_multi_domain_dataset",
+    # RAG Stitching Optimization (Objective Formula)
+    "StitchingOptimizer",
+    "StitchingConfig",
+    "StitchingResult",
+    "RAGSnippet",
+    "select_optimal_snippets",
+    "create_rag_snippet",
+    "compute_redundancy_penalty",
+    "compute_domain_jump_penalty",
 ]
 
 # Add PyTorch exports if available
