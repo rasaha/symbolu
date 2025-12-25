@@ -1,0 +1,776 @@
+#!/usr/bin/env python3
+"""
+Phase Transformer: General-Purpose O(n) LLM
+============================================
+
+A standalone transformer that replaces O(n²) attention with O(n) phase
+synchronization. No ontological/Bhava dependencies - pure general-purpose LLM.
+
+This enables:
+1. Direct comparison with standard transformers
+2. Testing U1-U4 formulas in isolation
+3. Integration into any LLM architecture
+4. Potential licensing for cost savings
+
+Key Innovation (Patent U1-U4):
+------------------------------
+Traditional: Attention = softmax(QK^T/√d) × V    [O(n²)]
+Phase:       Attention emerges from phase sync    [O(n)]
+
+Mean-field approximation:
+    Σⱼ sin(φᵢ - φⱼ) ≈ N × sin(φᵢ - φ_mean)
+
+Usage:
+------
+    from symbolu.phase_transformer import (
+        PhaseTransformer,
+        StandardTransformer,
+        compare_models,
+    )
+
+    # Create phase transformer (O(n))
+    phase_model = PhaseTransformer(
+        vocab_size=50257,
+        embed_dim=768,
+        num_layers=12,
+        num_heads=12,
+    )
+
+    # Create standard transformer (O(n²)) for comparison
+    std_model = StandardTransformer(
+        vocab_size=50257,
+        embed_dim=768,
+        num_layers=12,
+        num_heads=12,
+    )
+
+    # Compare
+    results = compare_models(phase_model, std_model, seq_lengths=[512, 1024, 2048])
+"""
+
+import math
+import time
+from typing import Dict, List, Optional, Tuple, Any
+from dataclasses import dataclass
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+@dataclass
+class TransformerConfig:
+    """Configuration for both Phase and Standard Transformers."""
+    vocab_size: int = 50257
+    embed_dim: int = 768
+    num_layers: int = 12
+    num_heads: int = 12
+    ff_dim: Optional[int] = None  # Default: 4 * embed_dim
+    max_seq_len: int = 8192
+    dropout: float = 0.1
+
+    # Phase-specific
+    sync_steps: int = 3
+    sync_lr: float = 0.1
+
+    def __post_init__(self):
+        if self.ff_dim is None:
+            self.ff_dim = 4 * self.embed_dim
+
+
+# =============================================================================
+# PHASE ATTENTION (O(n)) - Standalone Implementation
+# =============================================================================
+
+class PhaseAttentionLayer(nn.Module):
+    """
+    O(n) Phase-Based Attention Layer.
+
+    Standalone implementation with no external dependencies.
+    Implements U1-U4 formulas directly.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.1,
+        sync_steps: int = 3,
+        sync_lr: float = 0.1,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.sync_steps = sync_steps
+
+        # Projections
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Phase parameters
+        self.phase_proj = nn.Linear(self.head_dim, self.head_dim)
+        self.sync_lr = nn.Parameter(torch.tensor(sync_lr))
+
+        # Global aggregators for O(n)
+        self.key_gate = nn.Linear(self.head_dim, self.head_dim)
+        self.value_gate = nn.Linear(self.head_dim, self.head_dim)
+
+        self.dropout = nn.Dropout(dropout)
+        self.norm = nn.LayerNorm(embed_dim)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        causal_mask: bool = True,
+    ) -> torch.Tensor:
+        """
+        Forward pass with O(n) phase attention.
+
+        Args:
+            x: [B, N, D] input tensor
+            causal_mask: Apply causal masking for autoregressive
+
+        Returns:
+            output: [B, N, D]
+        """
+        B, N, D = x.shape
+        residual = x
+
+        # Project to Q, K, V
+        Q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim)
+        K = self.k_proj(x).view(B, N, self.num_heads, self.head_dim)
+        V = self.v_proj(x).view(B, N, self.num_heads, self.head_dim)
+
+        # [B, H, N, d]
+        Q = Q.transpose(1, 2)
+        K = K.transpose(1, 2)
+        V = V.transpose(1, 2)
+
+        # Compute phases from Q (map to [0, 2π])
+        phases = torch.sigmoid(self.phase_proj(Q)) * (2 * math.pi)
+
+        # =====================================================================
+        # O(n) Mean-Field Phase Synchronization (U3-U4)
+        # =====================================================================
+        for _ in range(self.sync_steps):
+            # U3: ∂C/∂φᵢ ≈ -N × sin(φᵢ - φ_mean)
+            if causal_mask:
+                # Causal: only sync with previous tokens
+                # Cumulative mean for causal
+                cumsum = torch.cumsum(phases, dim=2)
+                counts = torch.arange(1, N + 1, device=phases.device).float()
+                phase_mean = cumsum / counts.view(1, 1, -1, 1)
+            else:
+                phase_mean = phases.mean(dim=2, keepdim=True)
+
+            gradient = -N * torch.sin(phases - phase_mean)
+
+            # U4: Δφᵢ = α × ∂C/∂φᵢ
+            phases = (phases + self.sync_lr * gradient) % (2 * math.pi)
+
+        # =====================================================================
+        # O(n) Value Aggregation
+        # =====================================================================
+        # Phase-based attention weights (soft alignment)
+        if causal_mask:
+            # Each token attends to cumulative mean of previous tokens
+            phase_weights = torch.cos(phases - phase_mean)
+        else:
+            phase_weights = torch.cos(phases - phases.mean(dim=2, keepdim=True))
+
+        # Normalize weights per head
+        phase_weights = F.softmax(phase_weights.sum(dim=-1, keepdim=True), dim=2)
+
+        # Global value context (O(n))
+        if causal_mask:
+            # Causal: cumulative weighted sum
+            V_weighted = V * phase_weights
+            V_cumsum = torch.cumsum(V_weighted, dim=2)
+            weight_cumsum = torch.cumsum(phase_weights, dim=2) + 1e-8
+            V_global = V_cumsum / weight_cumsum
+        else:
+            V_global = (V * phase_weights).sum(dim=2, keepdim=True)
+            V_global = V_global.expand(-1, -1, N, -1)
+
+        # Gate between local V and global context
+        gate = torch.sigmoid(self.value_gate(Q))
+        output = gate * V + (1 - gate) * V_global
+
+        # Reshape and project
+        output = output.transpose(1, 2).reshape(B, N, D)
+        output = self.out_proj(output)
+        output = self.dropout(output)
+
+        # Residual + LayerNorm
+        return self.norm(output + residual)
+
+
+# =============================================================================
+# STANDARD ATTENTION (O(n²)) - For Comparison
+# =============================================================================
+
+class StandardAttentionLayer(nn.Module):
+    """
+    Standard O(n²) Multi-Head Attention Layer.
+
+    For direct comparison with PhaseAttentionLayer.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.scale = self.head_dim ** -0.5
+
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        self.dropout = nn.Dropout(dropout)
+        self.norm = nn.LayerNorm(embed_dim)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        causal_mask: bool = True,
+    ) -> torch.Tensor:
+        """
+        Standard attention forward pass (O(n²)).
+        """
+        B, N, D = x.shape
+        residual = x
+
+        Q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        K = self.k_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        V = self.v_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+
+        # O(n²) attention scores
+        attn = torch.matmul(Q, K.transpose(-2, -1)) * self.scale
+
+        # Causal mask
+        if causal_mask:
+            mask = torch.triu(torch.ones(N, N, device=x.device), diagonal=1).bool()
+            attn = attn.masked_fill(mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+
+        attn = F.softmax(attn, dim=-1)
+        attn = self.dropout(attn)
+
+        # O(n²) value aggregation
+        output = torch.matmul(attn, V)
+
+        output = output.transpose(1, 2).reshape(B, N, D)
+        output = self.out_proj(output)
+        output = self.dropout(output)
+
+        return self.norm(output + residual)
+
+
+# =============================================================================
+# FEED-FORWARD NETWORK
+# =============================================================================
+
+class FeedForward(nn.Module):
+    """Standard feed-forward network."""
+
+    def __init__(
+        self,
+        embed_dim: int,
+        ff_dim: int,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(embed_dim, ff_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(ff_dim, embed_dim),
+            nn.Dropout(dropout),
+        )
+        self.norm = nn.LayerNorm(embed_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.norm(x + self.net(x))
+
+
+# =============================================================================
+# TRANSFORMER BLOCKS
+# =============================================================================
+
+class PhaseTransformerBlock(nn.Module):
+    """Transformer block with O(n) phase attention."""
+
+    def __init__(self, config: TransformerConfig):
+        super().__init__()
+        self.attention = PhaseAttentionLayer(
+            embed_dim=config.embed_dim,
+            num_heads=config.num_heads,
+            dropout=config.dropout,
+            sync_steps=config.sync_steps,
+            sync_lr=config.sync_lr,
+        )
+        self.ff = FeedForward(
+            embed_dim=config.embed_dim,
+            ff_dim=config.ff_dim,
+            dropout=config.dropout,
+        )
+
+    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
+        x = self.attention(x, causal_mask)
+        x = self.ff(x)
+        return x
+
+
+class StandardTransformerBlock(nn.Module):
+    """Transformer block with O(n²) standard attention."""
+
+    def __init__(self, config: TransformerConfig):
+        super().__init__()
+        self.attention = StandardAttentionLayer(
+            embed_dim=config.embed_dim,
+            num_heads=config.num_heads,
+            dropout=config.dropout,
+        )
+        self.ff = FeedForward(
+            embed_dim=config.embed_dim,
+            ff_dim=config.ff_dim,
+            dropout=config.dropout,
+        )
+
+    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
+        x = self.attention(x, causal_mask)
+        x = self.ff(x)
+        return x
+
+
+# =============================================================================
+# FULL TRANSFORMERS
+# =============================================================================
+
+class PhaseTransformer(nn.Module):
+    """
+    General-Purpose O(n) Phase Transformer.
+
+    Drop-in replacement for standard transformer with massive cost savings.
+    """
+
+    def __init__(
+        self,
+        vocab_size: int = 50257,
+        embed_dim: int = 768,
+        num_layers: int = 12,
+        num_heads: int = 12,
+        ff_dim: Optional[int] = None,
+        max_seq_len: int = 8192,
+        dropout: float = 0.1,
+        sync_steps: int = 3,
+        sync_lr: float = 0.1,
+    ):
+        super().__init__()
+
+        config = TransformerConfig(
+            vocab_size=vocab_size,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            max_seq_len=max_seq_len,
+            dropout=dropout,
+            sync_steps=sync_steps,
+            sync_lr=sync_lr,
+        )
+        self.config = config
+
+        # Embeddings
+        self.token_embed = nn.Embedding(vocab_size, embed_dim)
+        self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
+        self.embed_dropout = nn.Dropout(dropout)
+
+        # Transformer blocks
+        self.blocks = nn.ModuleList([
+            PhaseTransformerBlock(config) for _ in range(num_layers)
+        ])
+
+        # Output
+        self.norm = nn.LayerNorm(embed_dim)
+        self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
+
+        # Tie weights
+        self.lm_head.weight = self.token_embed.weight
+
+        # Initialize
+        self.apply(self._init_weights)
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        return_hidden: bool = False,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass.
+
+        Args:
+            input_ids: [B, N] token indices
+            return_hidden: Return hidden states
+
+        Returns:
+            Dict with 'logits' and optionally 'hidden_states'
+        """
+        B, N = input_ids.shape
+
+        # Embeddings
+        positions = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.token_embed(input_ids) + self.pos_embed(positions)
+        x = self.embed_dropout(x)
+
+        # Transformer blocks
+        hidden_states = []
+        for block in self.blocks:
+            x = block(x, causal_mask=True)
+            if return_hidden:
+                hidden_states.append(x)
+
+        # Output
+        x = self.norm(x)
+        logits = self.lm_head(x)
+
+        result = {'logits': logits}
+        if return_hidden:
+            result['hidden_states'] = hidden_states
+
+        return result
+
+    def generate(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 50,
+        temperature: float = 1.0,
+        top_k: int = 50,
+    ) -> torch.Tensor:
+        """Simple generation loop."""
+        for _ in range(max_new_tokens):
+            # Forward
+            logits = self(input_ids)['logits'][:, -1, :]
+
+            # Temperature
+            logits = logits / temperature
+
+            # Top-k
+            if top_k > 0:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = float('-inf')
+
+            # Sample
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+
+        return input_ids
+
+
+class StandardTransformer(nn.Module):
+    """
+    Standard O(n²) Transformer for comparison.
+
+    Same architecture as PhaseTransformer but with standard attention.
+    """
+
+    def __init__(
+        self,
+        vocab_size: int = 50257,
+        embed_dim: int = 768,
+        num_layers: int = 12,
+        num_heads: int = 12,
+        ff_dim: Optional[int] = None,
+        max_seq_len: int = 8192,
+        dropout: float = 0.1,
+        **kwargs,  # Ignore phase-specific params
+    ):
+        super().__init__()
+
+        config = TransformerConfig(
+            vocab_size=vocab_size,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            max_seq_len=max_seq_len,
+            dropout=dropout,
+        )
+        self.config = config
+
+        # Embeddings
+        self.token_embed = nn.Embedding(vocab_size, embed_dim)
+        self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
+        self.embed_dropout = nn.Dropout(dropout)
+
+        # Transformer blocks
+        self.blocks = nn.ModuleList([
+            StandardTransformerBlock(config) for _ in range(num_layers)
+        ])
+
+        # Output
+        self.norm = nn.LayerNorm(embed_dim)
+        self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
+
+        # Tie weights
+        self.lm_head.weight = self.token_embed.weight
+
+        self.apply(self._init_weights)
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        return_hidden: bool = False,
+    ) -> Dict[str, torch.Tensor]:
+        B, N = input_ids.shape
+
+        positions = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.token_embed(input_ids) + self.pos_embed(positions)
+        x = self.embed_dropout(x)
+
+        hidden_states = []
+        for block in self.blocks:
+            x = block(x, causal_mask=True)
+            if return_hidden:
+                hidden_states.append(x)
+
+        x = self.norm(x)
+        logits = self.lm_head(x)
+
+        result = {'logits': logits}
+        if return_hidden:
+            result['hidden_states'] = hidden_states
+
+        return result
+
+
+# =============================================================================
+# COMPARISON UTILITIES
+# =============================================================================
+
+def count_parameters(model: nn.Module) -> int:
+    """Count trainable parameters."""
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def measure_inference_time(
+    model: nn.Module,
+    input_ids: torch.Tensor,
+    num_runs: int = 10,
+    warmup: int = 3,
+) -> float:
+    """Measure average inference time in milliseconds."""
+    device = next(model.parameters()).device
+
+    # Warmup
+    with torch.no_grad():
+        for _ in range(warmup):
+            _ = model(input_ids)
+
+    if device.type == 'cuda':
+        torch.cuda.synchronize()
+
+    # Timed runs
+    start = time.time()
+    with torch.no_grad():
+        for _ in range(num_runs):
+            _ = model(input_ids)
+
+    if device.type == 'cuda':
+        torch.cuda.synchronize()
+
+    return (time.time() - start) / num_runs * 1000  # ms
+
+
+def compare_models(
+    phase_model: PhaseTransformer,
+    std_model: StandardTransformer,
+    seq_lengths: List[int] = [256, 512, 1024, 2048],
+    batch_size: int = 4,
+    device: Optional[torch.device] = None,
+) -> Dict[str, Any]:
+    """
+    Compare Phase Transformer vs Standard Transformer.
+
+    Returns detailed comparison metrics.
+    """
+    if device is None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    phase_model = phase_model.to(device).eval()
+    std_model = std_model.to(device).eval()
+
+    results = {
+        'device': str(device),
+        'phase_params': count_parameters(phase_model),
+        'std_params': count_parameters(std_model),
+        'timings': [],
+    }
+
+    print("\n" + "=" * 70)
+    print("  PHASE TRANSFORMER vs STANDARD TRANSFORMER")
+    print("=" * 70)
+    print(f"\n  Device: {device}")
+    print(f"  Phase params: {results['phase_params']:,}")
+    print(f"  Standard params: {results['std_params']:,}")
+    print(f"\n  {'SeqLen':<10} {'Standard':<15} {'Phase':<15} {'Speedup':<10} {'Savings':<10}")
+    print(f"  {'-'*60}")
+
+    for seq_len in seq_lengths:
+        input_ids = torch.randint(0, 1000, (batch_size, seq_len), device=device)
+
+        std_time = measure_inference_time(std_model, input_ids)
+        phase_time = measure_inference_time(phase_model, input_ids)
+
+        speedup = std_time / phase_time if phase_time > 0 else 0
+        savings = (std_time - phase_time) / std_time * 100 if std_time > 0 else 0
+
+        results['timings'].append({
+            'seq_len': seq_len,
+            'std_time_ms': std_time,
+            'phase_time_ms': phase_time,
+            'speedup': speedup,
+            'savings_pct': savings,
+        })
+
+        print(f"  {seq_len:<10} {std_time:<15.2f}ms {phase_time:<15.2f}ms {speedup:<10.1f}x {savings:<10.1f}%")
+
+    # Verify outputs are valid
+    print("\n  Output Validation:")
+    input_ids = torch.randint(0, 1000, (2, 128), device=device)
+
+    with torch.no_grad():
+        phase_out = phase_model(input_ids)['logits']
+        std_out = std_model(input_ids)['logits']
+
+    phase_valid = not (torch.isnan(phase_out).any() or torch.isinf(phase_out).any())
+    std_valid = not (torch.isnan(std_out).any() or torch.isinf(std_out).any())
+
+    print(f"    Phase output valid: {'✓' if phase_valid else '✗'}")
+    print(f"    Standard output valid: {'✓' if std_valid else '✗'}")
+
+    results['phase_valid'] = phase_valid
+    results['std_valid'] = std_valid
+
+    # Summary
+    avg_speedup = sum(t['speedup'] for t in results['timings']) / len(results['timings'])
+    print(f"\n  Average Speedup: {avg_speedup:.1f}x")
+    print("=" * 70)
+
+    results['avg_speedup'] = avg_speedup
+
+    return results
+
+
+def quick_test():
+    """Quick validation test."""
+    print("\nQuick Test: Phase Transformer")
+    print("-" * 40)
+
+    # Small model for quick test
+    model = PhaseTransformer(
+        vocab_size=1000,
+        embed_dim=128,
+        num_layers=2,
+        num_heads=4,
+    )
+
+    print(f"Parameters: {count_parameters(model):,}")
+
+    # Forward pass
+    input_ids = torch.randint(0, 1000, (2, 32))
+    output = model(input_ids)
+
+    print(f"Input shape: {input_ids.shape}")
+    print(f"Output shape: {output['logits'].shape}")
+    print(f"Output valid: {not torch.isnan(output['logits']).any()}")
+
+    # Backward pass
+    loss = output['logits'].mean()
+    loss.backward()
+
+    grads_ok = all(
+        p.grad is not None and not torch.isnan(p.grad).any()
+        for p in model.parameters()
+        if p.requires_grad
+    )
+    print(f"Gradients valid: {grads_ok}")
+
+    print("-" * 40)
+    return grads_ok
+
+
+# =============================================================================
+# MAIN
+# =============================================================================
+
+if __name__ == "__main__":
+    # Quick validation
+    success = quick_test()
+
+    if success:
+        print("\n✓ Quick test passed!")
+
+        # Full comparison (if resources available)
+        try:
+            phase_model = PhaseTransformer(
+                vocab_size=50257,
+                embed_dim=256,
+                num_layers=4,
+                num_heads=8,
+            )
+
+            std_model = StandardTransformer(
+                vocab_size=50257,
+                embed_dim=256,
+                num_layers=4,
+                num_heads=8,
+            )
+
+            results = compare_models(
+                phase_model,
+                std_model,
+                seq_lengths=[128, 256, 512, 1024],
+                batch_size=2,
+            )
+
+            print(f"\n✓ Comparison complete! Average speedup: {results['avg_speedup']:.1f}x")
+
+        except RuntimeError as e:
+            if "out of memory" in str(e).lower():
+                print("\n⚠ Not enough memory for full comparison")
+            else:
+                raise
+    else:
+        print("\n✗ Quick test failed!")
