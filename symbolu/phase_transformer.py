@@ -173,7 +173,9 @@ class PhaseAttentionLayer(nn.Module):
             gradient = -N * torch.sin(phases - phase_mean)
 
             # U4: Δφᵢ = α × ∂C/∂φᵢ
-            phases = (phases + self.sync_lr * gradient) % (2 * math.pi)
+            # Note: Don't use modulo (%) as it breaks gradients
+            # sin/cos are periodic, so phases outside [0, 2π] still work
+            phases = phases + self.sync_lr * gradient
 
         # =====================================================================
         # O(n) Value Aggregation
