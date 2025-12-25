@@ -422,15 +422,111 @@ Bhava: Putra - Children/Creativity
 
 ---
 
+## Alternative: SymbolU12 LLM Architecture
+
+In addition to the MiniLM-based approach, Symbol-U provides a full 12-layer ontological transformer (SymbolU12_LLM) for native language generation.
+
+### Architecture Comparison
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    MiniLM V2 vs SymbolU12 LLM                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  MiniLM V2 (UnifiedOntologicalEngineV2)                                    │
+│  ─────────────────────────────────────                                      │
+│  • Uses pre-trained MiniLM encoder (384D)                                  │
+│  • Adds evidential classification + Bhava relationships                    │
+│  • Output: 156D (12D onto + 144D Bhava)                                    │
+│  • Best for: Classification, RAG, fine-tuning                              │
+│  • Training: Fine-tune heads only                                          │
+│                                                                             │
+│  SymbolU12 LLM                                                              │
+│  ─────────────                                                              │
+│  • Full 12-layer ontological transformer                                   │
+│  • Each layer has explicit cognitive function                              │
+│  • Output: Token-level logits + coherence matrix                           │
+│  • Best for: Generation, interpretability, research                        │
+│  • Training: Full model from scratch                                       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 12 Ontological Layers
+
+| Layer | Name         | Function          | Description                        |
+|-------|--------------|-------------------|------------------------------------|
+| 1     | Potential    | Dormant           | Token activation based on relevance|
+| 2     | Identity     | Tagging           | POS, NER, syntax role assignment   |
+| 3     | Execution    | Action            | N-gram patterns, local attention   |
+| 4     | Structure    | Forming           | Phrase boundaries, clause structure|
+| 5     | Cognition    | Perception        | Semantic understanding, concepts   |
+| 6     | Agency       | Direction         | Goal-directed attention            |
+| 7     | Reasoning    | Discrimination    | Logical inference, contradictions  |
+| 8     | Purpose      | Meaning           | Intent recognition, pragmatics     |
+| 9     | Witness      | Meta-Observation  | Confidence estimation, self-aware  |
+| 10    | Unifying     | Coherence         | C'[i,j] = C[i,j] × S[i,j]          |
+| 11    | Integration  | Resolution        | Conflict resolution, belief revision|
+| 12    | Absolving    | Termination       | Completion decision, EOS           |
+
+### Usage with Engine Factory
+
+```python
+from symbolu.ontological.engine_factory import (
+    create_ontological_engine,
+    OntologicalEngineType,
+)
+
+# Create MiniLM-based engine (default, recommended for RAG)
+engine_v2 = create_ontological_engine(OntologicalEngineType.MINILM_V2)
+
+# Create SymbolU12 LLM engine (for generation/interpretability)
+engine_llm = create_ontological_engine(OntologicalEngineType.SYMBOLU12_LLM)
+
+# Both provide consistent interface
+result = engine_v2.analyze("What is consciousness?")
+result = engine_llm.analyze("What is consciousness?")
+
+# Both return same structure
+print(result["dominant_layer"])     # "O5_COGNITION"
+print(result["confidence"])         # 0.87
+print(result["coherence"])          # 0.62
+```
+
+### Key Features of SymbolU12 LLM
+
+1. **Witness Layer (Layer 9)**: Enables hallucination detection
+   ```python
+   if outputs['witness_confidence'] < 0.5:
+       print("Low confidence - may be hallucinating")
+   ```
+
+2. **Coherence Matrix (Layer 10)**: Ensures discourse consistency
+   ```python
+   # C'[i,j] = C[i,j] × S[i,j]
+   coherence = outputs['global_coherence']
+   violations = outputs['violations']
+   ```
+
+3. **Holistic Termination (Layer 12)**: Not just EOS prediction
+   ```python
+   if outputs['completion'].mean() > 0.9:
+       print("Response is semantically complete")
+   ```
+
+---
+
 ## File Reference
 
 | Script | Purpose | Run Command |
 |--------|---------|-------------|
-| `train_v2.py` | Train ontological model | `python -m symbolu.ontological.train_v2` |
+| `train_v2.py` | Train MiniLM-based model | `python -m symbolu.ontological.train_v2` |
 | `export_to_rag.py` | Export to RAG formats | `python -m symbolu.ontological.export_to_rag` |
 | `rag_query.py` | Query RAG for context | Import and use `RAGQueryEngine` |
 | `rag_storage.py` | RAG storage classes | Used internally by export |
-| `unified_engine.py` | Core ontological engine | Used by training and query |
+| `unified_engine.py` | MiniLM-based engine | Used by training and query |
+| `symbolu12_llm.py` | Full 12-layer LLM | Alternative for generation |
+| `engine_factory.py` | Engine factory | Unified interface for both engines |
 | `bhava_relationships.py` | Vedic Drishti patterns | Used by all modules |
 
 ---
