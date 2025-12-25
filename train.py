@@ -260,7 +260,8 @@ def load_tokenizer(config: TrainingConfig):
 
 def tokenize_text(text: str, tokenizer) -> torch.Tensor:
     """Tokenize text using the appropriate tokenizer."""
-    if TIKTOKEN_AVAILABLE and hasattr(tokenizer, 'encode'):
+    # Check if it's a tiktoken encoder (has 'encode_ordinary' method)
+    if TIKTOKEN_AVAILABLE and hasattr(tokenizer, 'encode_ordinary'):
         # tiktoken
         tokens = tokenizer.encode(text, allowed_special={'<|endoftext|>'})
     else:
