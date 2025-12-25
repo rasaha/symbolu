@@ -113,7 +113,7 @@ class TestLoadedDataImmutability:
             layers.add("O99_FAKE")
 
         with pytest.raises((TypeError, AttributeError)):
-            layers.remove("O1_ACTING")
+            layers.remove("O3_EXECUTION")
 
 
 # =============================================================================
@@ -161,16 +161,18 @@ class TestChecksumVerification:
 
     def test_frozen_checksums_not_empty(self):
         """Frozen checksum registry must not be empty."""
-        assert len(FROZEN_CHECKSUMS) == 3, (
-            f"Expected 3 frozen checksums, got {len(FROZEN_CHECKSUMS)}"
+        assert len(FROZEN_CHECKSUMS) == 5, (
+            f"Expected 5 frozen checksums, got {len(FROZEN_CHECKSUMS)}"
         )
 
     def test_all_ontology_files_have_checksums(self):
-        """All three ontology files must have checksums."""
+        """All five ontology files must have checksums."""
         expected_files = {
             "varna_bridge_map_v1.json",
             "ontological_layers_v1.json",
             "varna_layer_interaction_v1.json",
+            "varna_polarity_map_v1.json",
+            "varna_distortion_map_v1.json",
         }
         actual_files = set(FROZEN_CHECKSUMS.keys())
 
@@ -193,7 +195,7 @@ class TestChecksumVerification:
     def test_verify_existing_files_passes(self, data_dir: Path):
         """Verifying existing ontology files must pass."""
         verified = verify_all_ontology_checksums(data_dir)
-        assert len(verified) == 3, "All three files should verify"
+        assert len(verified) == 5, "All five files should verify"
 
     def test_checksum_mismatch_raises_integrity_error(self, data_dir: Path):
         """Checksum mismatch must raise OntologyIntegrityError."""
@@ -278,12 +280,12 @@ class TestRequiredContent:
             f"Extra: {actual_vowels - expected_vowels}"
         )
 
-    def test_all_ten_layers_present(self, ontology_data: Dict[str, Any]):
-        """All 10 ontological layers must be present."""
+    def test_all_twelve_layers_present(self, ontology_data: Dict[str, Any]):
+        """All 12 ontological layers must be present."""
         expected_layers = {
-            "O1_ACTING", "O2_TAGGING", "O3_FORMING", "O4_THINKING",
-            "O5_DIRECTING", "O6_REASONING", "O7_PURPOSING",
-            "O8_META_OBSERVING", "O9_UNIFYING", "O10_ABSOLVING"
+            "O1_POTENTIAL", "O2_IDENTITY", "O3_EXECUTION", "O4_STRUCTURE",
+            "O5_COGNITION", "O6_AGENCY", "O7_REASONING", "O8_PURPOSE",
+            "O9_WITNESSES", "O10_UNIFYING", "O11_INTEGRATION", "O12_ABSOLVING"
         }
         actual_layers = set(ontology_data["ontological_layers"]["layers"].keys())
 
@@ -299,10 +301,10 @@ class TestRequiredContent:
 
         assert len(interaction_map) > 0, "Interaction map must not be empty"
 
-        # Verify each entry has all 10 layers
+        # Verify each entry has all 12 layers
         for varna, layers in interaction_map.items():
-            assert len(layers) == 10, (
-                f"Varna '{varna}' has {len(layers)} layers, expected 10"
+            assert len(layers) == 12, (
+                f"Varna '{varna}' has {len(layers)} layers, expected 12"
             )
 
 

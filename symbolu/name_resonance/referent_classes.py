@@ -993,10 +993,14 @@ def format_referent_analysis(analysis: ReferentAnalysis) -> str:
 CONTEXT_SEMANTIC_GROUPS: Dict[str, FrozenSet[str]] = {
     "royalty": frozenset({"king", "queen", "prince", "princess", "throne", "crown", "palace", "royal", "monarch"}),
     "chess": frozenset({"king", "queen", "bishop", "knight", "rook", "pawn", "checkmate", "board", "move"}),
-    "nature": frozenset({"tree", "forest", "river", "mountain", "ocean", "sky", "sun", "moon", "earth"}),
+    "nature": frozenset({"tree", "forest", "river", "mountain", "ocean", "sky", "sun", "moon", "earth",
+                         "stream", "meadow", "grassy", "peaceful", "sunset", "sunrise", "garden", "flower",
+                         "birds", "bird", "dawn", "dusk", "spring", "summer", "autumn", "winter", "season",
+                         "lake", "pond", "field", "valley", "hills", "countryside", "nature", "outdoor"}),
     "emotion": frozenset({"love", "hate", "joy", "sorrow", "fear", "hope", "anger", "happy", "sad"}),
     "family": frozenset({"mother", "father", "child", "family", "home", "parent", "sibling", "son", "daughter"}),
-    "technology": frozenset({"computer", "phone", "machine", "digital", "software", "data", "network", "code"}),
+    "technology": frozenset({"computer", "phone", "machine", "digital", "software", "data", "network", "code",
+                            "test", "deploy", "database", "migration", "server", "system", "algorithm"}),
     "food": frozenset({"apple", "banana", "food", "eat", "taste", "sweet", "fruit", "vegetable", "cook"}),
     "body": frozenset({"heart", "hand", "eye", "head", "body", "blood", "face", "arm", "leg"}),
     "light": frozenset({"sun", "light", "bright", "glow", "shine", "fire", "flame", "star", "radiance"}),
@@ -1004,7 +1008,254 @@ CONTEXT_SEMANTIC_GROUPS: Dict[str, FrozenSet[str]] = {
     "space": frozenset({"place", "space", "path", "road", "world", "home", "distance", "location", "area"}),
     "conflict": frozenset({"war", "peace", "fight", "battle", "enemy", "conflict", "struggle", "victory"}),
     "knowledge": frozenset({"wisdom", "knowledge", "truth", "idea", "thought", "mind", "learn", "study"}),
+    # NEW: Finance context for "bank" homonym disambiguation
+    "finance": frozenset({"bank", "money", "deposit", "account", "balance", "loan", "credit", "debit",
+                         "payment", "transaction", "financial", "interest", "savings", "withdraw", "transfer"}),
+    # NEW: Physical/mechanical context for "spring", "run" disambiguation
+    # Note: "spring" alone is ambiguous - require mechanical context words
+    "physical": frozenset({"mechanism", "repair", "mechanical", "coil",
+                          "tension", "force", "physics", "velocity", "mass", "motor", "gear", "device"}),
 }
+
+
+# =============================================================================
+# Semantic Polarity Detection (for Inversion/Fracture Detection)
+# =============================================================================
+# These pairs represent semantic opposites. When two phrases have similar
+# structural patterns but opposite polarity words, we have "coherent inversion"
+# - a fracture between semantic and structural layers.
+
+POLARITY_PAIRS: List[Tuple[str, str]] = [
+    # Emotional polarity
+    ("love", "hate"),
+    ("happy", "sad"),
+    ("joy", "sorrow"),
+    ("hope", "despair"),
+    ("peace", "war"),
+    ("calm", "angry"),
+    ("trust", "distrust"),
+    ("like", "dislike"),
+    ("pleasure", "pain"),
+    ("comfort", "discomfort"),
+    # Evaluative polarity
+    ("good", "bad"),
+    ("right", "wrong"),
+    ("true", "false"),
+    ("success", "failure"),
+    ("win", "lose"),
+    ("gain", "loss"),
+    ("profit", "loss"),
+    ("benefit", "harm"),
+    ("help", "hurt"),
+    ("heal", "damage"),
+    # Existence polarity
+    ("create", "destroy"),
+    ("build", "demolish"),
+    ("grow", "shrink"),
+    ("expand", "contract"),
+    ("rise", "fall"),
+    ("increase", "decrease"),
+    ("add", "remove"),
+    ("include", "exclude"),
+    ("accept", "reject"),
+    ("allow", "forbid"),
+    # Relational polarity
+    ("together", "apart"),
+    ("unite", "divide"),
+    ("connect", "disconnect"),
+    ("join", "separate"),
+    ("friend", "enemy"),
+    ("ally", "adversary"),
+    ("support", "oppose"),
+    ("agree", "disagree"),
+    # Intensity polarity
+    ("strong", "weak"),
+    ("fast", "slow"),
+    ("hot", "cold"),
+    ("bright", "dark"),
+    ("loud", "quiet"),
+    ("full", "empty"),
+    ("rich", "poor"),
+    ("more", "less"),
+    # State polarity
+    ("alive", "dead"),
+    ("awake", "asleep"),
+    ("open", "closed"),
+    ("start", "stop"),
+    ("begin", "end"),
+    ("enter", "exit"),
+    ("come", "go"),
+    ("stay", "leave"),
+]
+
+# Build polarity map: word → polarity score (+1.0 or -1.0)
+# First word in pair is positive (+1), second is negative (-1)
+POLARITY_MAP: Dict[str, float] = {}
+for pos_word, neg_word in POLARITY_PAIRS:
+    POLARITY_MAP[pos_word] = 1.0
+    POLARITY_MAP[neg_word] = -1.0
+
+
+@dataclass(frozen=True)
+class SemanticInversionResult:
+    """Result of semantic inversion detection."""
+    has_inversion: bool           # True if coherent inversion detected
+    polarity_score: float         # Net polarity (-1.0 to +1.0)
+    polarity_words: Tuple[str, ...]  # Polarity words found
+    structural_coherence: float   # How structurally coherent (from layer analysis)
+    inversion_confidence: float   # Confidence in inversion detection (0.0 to 1.0)
+    description: str              # Human-readable description
+
+
+def detect_semantic_inversion(
+    text: str,
+    structural_coherence: float = 0.5,
+) -> SemanticInversionResult:
+    """
+    Detect semantic inversion (coherent structure with opposing meaning).
+
+    This catches cases like:
+    - "I love spending time with family" (positive)
+    - "I hate spending time with family" (negative)
+
+    Both have similar structure but opposite polarity. This is a "fracture"
+    between the semantic and structural layers.
+
+    Args:
+        text: The input text to analyze
+        structural_coherence: Coherence score from layer analysis (0.0 to 1.0)
+
+    Returns:
+        SemanticInversionResult with inversion detection
+    """
+    words = set(text.lower().split())
+
+    # Find polarity words
+    found_polarity: List[Tuple[str, float]] = []
+    for word in words:
+        # Check exact match
+        if word in POLARITY_MAP:
+            found_polarity.append((word, POLARITY_MAP[word]))
+        # Check stemmed forms (simple suffix stripping)
+        for stem in [word.rstrip("s"), word.rstrip("ing"), word.rstrip("ed")]:
+            if stem != word and stem in POLARITY_MAP:
+                found_polarity.append((stem, POLARITY_MAP[stem]))
+                break
+
+    if not found_polarity:
+        return SemanticInversionResult(
+            has_inversion=False,
+            polarity_score=0.0,
+            polarity_words=(),
+            structural_coherence=structural_coherence,
+            inversion_confidence=0.0,
+            description="No polarity words detected",
+        )
+
+    # Compute net polarity
+    polarity_sum = sum(p[1] for p in found_polarity)
+    polarity_count = len(found_polarity)
+    net_polarity = polarity_sum / polarity_count
+
+    # Check for mixed polarity (both positive and negative words)
+    has_positive = any(p[1] > 0 for p in found_polarity)
+    has_negative = any(p[1] < 0 for p in found_polarity)
+    has_mixed = has_positive and has_negative
+
+    # Inversion detection:
+    # High structural coherence + strong polarity = potential for inversion
+    # Mixed polarity within same text = internal contradiction
+    inversion_confidence = 0.0
+    has_inversion = False
+    description = ""
+
+    if has_mixed:
+        # Internal contradiction: both positive and negative polarity in same text
+        inversion_confidence = structural_coherence * 0.8
+        has_inversion = inversion_confidence >= 0.4
+        description = f"Mixed polarity detected: {[p[0] for p in found_polarity]}"
+    elif abs(net_polarity) >= 0.5 and structural_coherence >= 0.5:
+        # Strong polarity with high structural coherence
+        # This text could be inverted to opposite meaning while keeping structure
+        inversion_confidence = structural_coherence * abs(net_polarity) * 0.6
+        has_inversion = False  # Not inverted, but invertible
+        polarity_type = "positive" if net_polarity > 0 else "negative"
+        description = f"Strong {polarity_type} polarity (invertible)"
+    else:
+        description = "Weak polarity signal"
+
+    return SemanticInversionResult(
+        has_inversion=has_inversion,
+        polarity_score=net_polarity,
+        polarity_words=tuple(p[0] for p in found_polarity),
+        structural_coherence=structural_coherence,
+        inversion_confidence=inversion_confidence,
+        description=description,
+    )
+
+
+def compare_semantic_polarity(text_a: str, text_b: str) -> Dict[str, Any]:
+    """
+    Compare semantic polarity between two texts to detect inversion.
+
+    This is the primary fracture detection function. It identifies when
+    two texts have similar structure but opposite semantic polarity.
+
+    Args:
+        text_a: First text
+        text_b: Second text
+
+    Returns:
+        Dict with comparison results:
+        - is_inverted: True if texts are semantic opposites
+        - polarity_a: Polarity score of first text
+        - polarity_b: Polarity score of second text
+        - polarity_diff: Difference in polarity
+        - shared_structure: Words shared between texts (minus polarity words)
+        - fracture_score: How severe the semantic fracture is (0.0 to 1.0)
+    """
+    result_a = detect_semantic_inversion(text_a)
+    result_b = detect_semantic_inversion(text_b)
+
+    # Get words from each text
+    words_a = set(text_a.lower().split())
+    words_b = set(text_b.lower().split())
+
+    # Find shared words (excluding polarity words)
+    polarity_words = set(result_a.polarity_words) | set(result_b.polarity_words)
+    shared_structure = (words_a & words_b) - polarity_words
+
+    # Compute structural similarity
+    all_words = (words_a | words_b) - polarity_words
+    structural_similarity = len(shared_structure) / len(all_words) if all_words else 0.0
+
+    # Compute polarity difference
+    polarity_diff = result_a.polarity_score - result_b.polarity_score
+
+    # Detect inversion: high structural similarity + opposite polarity
+    is_inverted = bool(
+        structural_similarity >= 0.5 and  # Similar structure
+        abs(polarity_diff) >= 1.0 and     # Opposite polarity
+        result_a.polarity_words and       # Both have polarity
+        result_b.polarity_words
+    )
+
+    # Fracture score: how severe is the semantic fracture?
+    # High when structure is similar but polarity is opposite
+    fracture_score = structural_similarity * abs(polarity_diff) / 2.0
+    fracture_score = min(fracture_score, 1.0)
+
+    return {
+        "is_inverted": is_inverted,
+        "polarity_a": result_a.polarity_score,
+        "polarity_b": result_b.polarity_score,
+        "polarity_diff": polarity_diff,
+        "shared_structure": tuple(shared_structure),
+        "structural_similarity": structural_similarity,
+        "fracture_score": fracture_score,
+        "polarity_words_a": result_a.polarity_words,
+        "polarity_words_b": result_b.polarity_words,
+    }
 
 
 def _extract_semantic_context(text: str) -> List[str]:
@@ -1186,9 +1437,12 @@ __all__ = [
     "ReferentProfile",
     "ReferentAnalysis",
     "SemanticContextAnalysis",
+    "SemanticInversionResult",
     # Data
     "WORD_TO_REFERENT",
     "CONTEXT_SEMANTIC_GROUPS",
+    "POLARITY_PAIRS",
+    "POLARITY_MAP",
     # Functions - Class-based (legacy)
     "get_referent_profile",
     "compute_referent_coherence",
@@ -1196,4 +1450,7 @@ __all__ = [
     # Functions - Semantic Contextual (new)
     "compute_semantic_contextual_coherence",
     "format_semantic_context_analysis",
+    # Functions - Semantic Inversion (fracture detection)
+    "detect_semantic_inversion",
+    "compare_semantic_polarity",
 ]

@@ -204,7 +204,7 @@ Today's AI deployments suffer from three fundamental problems:
 
 ### What is Symbolu?
 
-Symbolu is a **deterministic AGI reasoning engine** built on a novel 10-dimensional ontological backbone. It provides intelligent query routing and response generation that is:
+Symbolu is a **deterministic AGI reasoning engine** built on a novel 12-dimensional ontological backbone. It provides intelligent query routing and response generation that is:
 
 - **Deterministic**: Same input always produces same output
 - **Auditable**: Every decision has a complete trace

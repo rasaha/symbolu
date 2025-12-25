@@ -51,15 +51,57 @@ Before merging any PR that modifies frozen ontology files, the following require
 
 | File | Current Version | Last Modified |
 |------|----------------|---------------|
-| `varna_bridge_map_v1.json` | 1.0 | 2025-12-18 (frozen) |
-| `ontological_layers_v1.json` | 1.0 | 2025-12-18 (frozen) |
-| `varna_layer_interaction_v1.json` | 1.0 | 2025-12-18 (frozen) |
-| `varna_polarity_map_v1.json` | 1.0 | 2025-12-18 (frozen) |
-| `varna_distortion_map_v1.json` | 1.0 | 2025-12-18 (frozen) |
+| `varna_bridge_map_v1.json` | 2.0 | 2025-12-24 |
+| `ontological_layers_v1.json` | 2.0 | 2025-12-24 |
+| `varna_layer_interaction_v1.json` | 2.0 | 2025-12-24 |
+| `varna_polarity_map_v1.json` | 2.0 | 2025-12-24 |
+| `varna_distortion_map_v1.json` | 2.0 | 2025-12-24 |
 
 ---
 
 ## Changelog
+
+### [2.0] - 2025-12-24
+
+#### Summary
+Major upgrade from 10D to 12D ontological layer system per patent-exact sequence.
+
+#### Changed
+- Expanded ontological system from 10 dimensions to 12 dimensions
+- Added two new layers: O1_POTENTIAL (dormant capacity) and O11_INTEGRATION (resolution/consolidation)
+- Renamed existing layers to match patent-exact sequence:
+  - O1_ACTING → O3_EXECUTION
+  - O2_TAGGING → O2_IDENTITY
+  - O3_FORMING → O4_STRUCTURE
+  - O4_THINKING → O5_COGNITION
+  - O5_DIRECTING → O6_AGENCY
+  - O6_REASONING → O7_REASONING
+  - O7_PURPOSING → O8_PURPOSE
+  - O8_META_OBSERVING → O9_WITNESSES
+  - O9_UNIFYING → O10_UNIFYING
+  - O10_ABSOLVING → O12_ABSOLVING
+- Updated Bhava relational space from 90D to 120D (12×10/2 = 66 pairs, extended)
+- Updated full vector space from 100D to 132D
+
+#### Files Modified
+- `docs/data/ontological_layers_v1.json` - Layer definitions (O1-O12)
+- `docs/data/varna_bridge_map_v1.json` - Varna to layer mappings
+- `docs/data/varna_layer_interaction_v1.json` - (Varna, Layer) interaction map
+- `docs/data/varna_polarity_map_v1.json` - Varna polarity definitions
+- `docs/data/varna_distortion_map_v1.json` - Varna distortion patterns
+
+#### Migration Notes
+- [x] Breaking change: Layer enum names changed (use new O1-O12 naming)
+- [x] Breaking change: Vector dimensions changed (12D ontological, 120D Bhava, 132D full)
+- [x] Phase-4A loader updated: yes (types.py LAYER_NAMES updated)
+- [x] Tests updated: yes (test_resonance_engine.py, test_hybrid_router.py updated)
+- All code referencing old layer names must be updated to new 12D naming scheme
+- PhonemeProfile and WordVector dataclasses now expect 12-element vectors
+
+#### Rationale
+Align ontological layer system with patent-exact 12-layer sequence for consistency and completeness. The addition of O1_POTENTIAL and O11_INTEGRATION provides fuller coverage of the experiential/consciousness spectrum.
+
+---
 
 ### [1.0] - 2025-12-18
 

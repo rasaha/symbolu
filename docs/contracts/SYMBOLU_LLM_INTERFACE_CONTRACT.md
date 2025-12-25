@@ -107,7 +107,7 @@ The **ONLY** allowed input type to the LLM layer.
   "request_id": "uuid",
   "mode": "minimal|standard|regulated",
   "envelope": {
-    "allowed_layers": ["O1_THINKING", "O3_ACTING", "..."],
+    "allowed_layers": ["O5_COGNITION", "O3_EXECUTION", "..."],
     "allowed_tokens": ["ka", "a", "ga", "..."],
     "allowed_templates": ["CVC", "CCV", "..."],
     "constraints": {
@@ -388,7 +388,7 @@ def test_layer_injection():
     allowed_layers excludes O9; LLM references O9 → reject.
     """
     request = RenderRequest(
-        envelope=Envelope(allowed_layers=["O1_THINKING", "O3_ACTING"]),
+        envelope=Envelope(allowed_layers=["O5_COGNITION", "O3_EXECUTION"]),
         ...
     )
     response = RenderResponse(content="This belongs to O9_LAYER...")

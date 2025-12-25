@@ -4,7 +4,7 @@ Test Varṇa-Hybrid Integration
 =============================
 
 Comprehensive test of the full hybrid flow including:
-1. Varṇa bridge functions (ARPABET → Varṇa → 10D vectors)
+1. Varṇa bridge functions (ARPABET → Varṇa → 12D vectors)
 2. Analyzer varna functions
 3. Comparison between ARPABET and Varṇa approaches
 4. Hybrid optimization flow (prefilter, attention, router)
@@ -20,7 +20,7 @@ def test_varna_bridge():
     print("=" * 60)
 
     from symbolu.resonance.varna_bridge import (
-        varna_to_10d_vector,
+        varna_to_12d_vector,
         english_phoneme_to_varna,
         phonemes_to_varnas,
         get_bridge_meaning,
@@ -41,10 +41,10 @@ def test_varna_bridge():
     varnas = phonemes_to_varnas(word_phonemes)
     print(f"  {word_phonemes} → {varnas}")
 
-    # Test varna_to_10d_vector
-    print("\n1.3 Varṇa → 10D Vector:")
+    # Test varna_to_12d_vector
+    print("\n1.3 Varṇa → 12D Vector:")
     for varna in ["ka", "ga", "sa", "ta"]:
-        vec = varna_to_10d_vector(varna)
+        vec = varna_to_12d_vector(varna)
         print(f"  {varna:4s} → [{', '.join(f'{v:.2f}' for v in vec[:5])}...]")
 
     # Test bridge meanings

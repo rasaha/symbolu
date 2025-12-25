@@ -3,7 +3,7 @@ Tests for Phonetic Resonance Engine
 ===================================
 
 Validates:
-1. Phoneme → 10D vector conversion
+1. Phoneme → 12D vector conversion (patent-exact sequence)
 2. Word vector properties (normalization, dimensionality)
 3. Resonance computation (cosine similarity)
 4. Phrase harmony analysis
@@ -56,9 +56,9 @@ class TestPhonemeMap:
         assert profile.category == PhonemeCategory.LIQUID
 
     def test_layer_affinities_dimension(self):
-        """Layer affinities should be 10-dimensional."""
+        """Layer affinities should be 12-dimensional."""
         affinities = get_layer_affinities("L")
-        assert len(affinities) == 10
+        assert len(affinities) == 12
 
     def test_layer_affinities_range(self):
         """Affinities should be in [0, 1] range."""
@@ -92,9 +92,9 @@ class TestWordVector:
         assert vec.word == "love"
 
     def test_vector_dimension(self):
-        """Vector should be 10-dimensional."""
+        """Vector should be 12-dimensional."""
         vec = analyze_word("truth")
-        assert len(vec.vector) == 10
+        assert len(vec.vector) == 12
 
     def test_vector_normalized(self):
         """Vector should be normalized (magnitude ≈ 1)."""
@@ -165,7 +165,7 @@ class TestResonance:
     def test_shared_dimensions_reported(self):
         """Shared dimensions should be reported."""
         result = compare_words("truth", "light")
-        # Both have high O9_UNIFYING due to liquid/long vowels
+        # Both have high O10_UNIFYING due to liquid/long vowels
         assert isinstance(result.shared_dimensions, tuple)
 
     def test_trajectory_alignment_range(self):
@@ -277,7 +277,7 @@ class TestUserExamples:
         Both phrases should produce valid harmony analyses.
 
         Note: Current affinities may show similar harmony. The infrastructure
-        correctly computes 10D vectors and similarity - affinity tuning
+        correctly computes 12D vectors and similarity - affinity tuning
         will differentiate the specific values.
         """
         result = compare_phrases("Truth is light", "Truth is darkness")
@@ -291,14 +291,14 @@ class TestUserExamples:
 
     def test_love_phonetic_profile(self):
         """
-        'Love' should have O9_UNIFYING as dominant layer.
+        'Love' should have O10_UNIFYING as dominant layer.
 
         L (liquid) + AH (open vowel) + V (flowing fricative)
         combine to give UNIFYING as the strongest dimension.
         """
         vec = analyze_word("love")
-        # O9_UNIFYING should be dominant for 'love'
-        assert vec.dominant_layer == "O9_UNIFYING"
+        # O10_UNIFYING should be dominant for 'love'
+        assert vec.dominant_layer == "O10_UNIFYING"
 
 
 # =============================================================================

@@ -1,6 +1,41 @@
 """
-Ontological Engine - Bhava Sub-Layers (90D)
-=============================================
+Ontological Engine - Bhava Sub-Layers (90D) [DEPRECATED]
+=========================================================
+
+WARNING: This module uses the deprecated sub-layer architecture.
+For new implementations, use bhava_relationships.py instead.
+
+ARCHITECTURAL EVOLUTION:
+------------------------
+OLD (This Module - Deprecated):
+    - 9-10 pairs × 10 sub-layers = 90-100D
+    - Sequential relationships between adjacent layers only
+    - ~34% computational overhead
+
+NEW (bhava_relationships.py - Recommended):
+    - 12 × 12 = 144 inter-layer relationships
+    - All-to-all relationship modeling
+    - Based on Vedic Drishti (aspect) patterns
+    - ~5% computational overhead
+    - Richer relationship space
+
+VEDIC INSIGHT:
+--------------
+In Jyotish (Vedic Astrology), Bhavas are RELATIONSHIPS, not entities.
+The same Rashi (sign) serves different Bhava functions based on Lagna.
+This module's sub-layer approach treats Bhavas as separate entities,
+which is architecturally less elegant than the relationship approach.
+
+To migrate to the new architecture:
+    # OLD (Deprecated)
+    from symbolu.ontological.bhava import BhavaComputer90
+
+    # NEW (Recommended)
+    from symbolu.ontological.bhava_relationships import InterLayerBhavaEngine
+
+===============================================================================
+LEGACY DOCUMENTATION (for backward compatibility):
+===============================================================================
 
 Bhava layers capture relational dynamics BETWEEN ontological dimensions.
 Inspired by Bhavas (houses) in Vedic astrology, these sub-layers represent
@@ -68,16 +103,16 @@ BHAVA_SUBLAYER_DESCRIPTIONS: Dict[str, str] = {
 
 # Adjacent ontological pairs (10 pairs forming a cycle)
 ONTOLOGICAL_PAIRS: Tuple[Tuple[str, str], ...] = (
-    ("O1_THINKING", "O2_FORMING"),
-    ("O2_FORMING", "O3_ACTING"),
-    ("O3_ACTING", "O4_TAGGING"),
-    ("O4_TAGGING", "O5_DIRECTING"),
-    ("O5_DIRECTING", "O6_REASONING"),
-    ("O6_REASONING", "O7_PURPOSING"),
-    ("O7_PURPOSING", "O8_META_OBSERVING"),
-    ("O8_META_OBSERVING", "O9_UNIFYING"),
-    ("O9_UNIFYING", "O10_ABSOLVING"),
-    ("O10_ABSOLVING", "O1_THINKING"),  # Cycle back
+    ("O5_COGNITION", "O4_STRUCTURE"),
+    ("O4_STRUCTURE", "O3_EXECUTION"),
+    ("O3_EXECUTION", "O4_TAGGING"),
+    ("O4_TAGGING", "O6_AGENCY"),
+    ("O6_AGENCY", "O7_REASONING"),
+    ("O7_REASONING", "O8_PURPOSE"),
+    ("O8_PURPOSE", "O9_WITNESSES"),
+    ("O9_WITNESSES", "O10_UNIFYING"),
+    ("O10_UNIFYING", "O12_ABSOLVING"),
+    ("O12_ABSOLVING", "O5_COGNITION"),  # Cycle back
 )
 
 # But we only need 9 pairs for 90 Bhavas (the 10th pair uses first ontological layer)

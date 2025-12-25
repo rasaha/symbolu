@@ -64,11 +64,11 @@ class GSM8KDataset:
         return [s.text for s in self.samples]
 
     def to_training_examples(self) -> List[TrainingExample]:
-        """Convert to TrainingExample format with O6_REASONING label."""
+        """Convert to TrainingExample format with O7_REASONING label."""
         return [
             TrainingExample(
                 text=s.text,
-                dimension_labels={"O6_REASONING": 0.9, "O1_THINKING": 0.7},
+                dimension_labels={"O7_REASONING": 0.9, "O5_COGNITION": 0.7},
                 reasoning_label=0.9,
             )
             for s in self.samples
@@ -218,7 +218,7 @@ class ROCStoriesDataset:
         return [
             TrainingExample(
                 text=s.text,
-                dimension_labels={"O2_FORMING": 0.9, "O9_UNIFYING": 0.7},
+                dimension_labels={"O4_STRUCTURE": 0.9, "O10_UNIFYING": 0.7},
                 creativity_label=0.9,
             )
             for s in self.samples

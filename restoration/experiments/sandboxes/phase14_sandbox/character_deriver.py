@@ -8,10 +8,10 @@ Core Hypothesis:
     A word's phonemic structure creates "character" - propensity weights
     for how strongly that word resonates with each of the 10 ontological layers.
 
-    Example: The word "catalyze" maps primarily to O3_ACTING, but its
+    Example: The word "catalyze" maps primarily to O3_EXECUTION, but its
     phonemic character gives it secondary resonance with:
-    - O2_FORMING (creation aspect)
-    - O6_REASONING (causal implication)
+    - O4_STRUCTURE (creation aspect)
+    - O7_REASONING (causal implication)
 
 Architecture:
     1. Take phoneme sequence from PhonemeAnalysis
@@ -62,100 +62,100 @@ If they don't, we'll know the hypothesis needs revision.
 
 CATEGORY_LAYER_AFFINITY: Dict[PhonemeCategory, Dict[OntologicalLayer, float]] = {
     PhonemeCategory.PLOSIVE: {
-        OntologicalLayer.O1_THINKING: 0.2,
-        OntologicalLayer.O2_FORMING: 0.4,
-        OntologicalLayer.O3_ACTING: 0.9,       # High - sudden action
+        OntologicalLayer.O5_COGNITION: 0.2,
+        OntologicalLayer.O4_STRUCTURE: 0.4,
+        OntologicalLayer.O3_EXECUTION: 0.9,       # High - sudden action
         OntologicalLayer.O4_TAGGING: 0.3,
-        OntologicalLayer.O5_DIRECTING: 0.7,    # Medium-high - commanding
-        OntologicalLayer.O6_REASONING: 0.3,
-        OntologicalLayer.O7_PURPOSING: 0.4,
-        OntologicalLayer.O8_META_OBSERVING: 0.2,
-        OntologicalLayer.O9_UNIFYING: 0.2,
-        OntologicalLayer.O10_ABSOLVING: 0.1,
+        OntologicalLayer.O6_AGENCY: 0.7,    # Medium-high - commanding
+        OntologicalLayer.O7_REASONING: 0.3,
+        OntologicalLayer.O8_PURPOSE: 0.4,
+        OntologicalLayer.O9_WITNESSES: 0.2,
+        OntologicalLayer.O10_UNIFYING: 0.2,
+        OntologicalLayer.O12_ABSOLVING: 0.1,
     },
     PhonemeCategory.FRICATIVE: {
-        OntologicalLayer.O1_THINKING: 0.4,
-        OntologicalLayer.O2_FORMING: 0.5,
-        OntologicalLayer.O3_ACTING: 0.5,
+        OntologicalLayer.O5_COGNITION: 0.4,
+        OntologicalLayer.O4_STRUCTURE: 0.5,
+        OntologicalLayer.O3_EXECUTION: 0.5,
         OntologicalLayer.O4_TAGGING: 0.4,
-        OntologicalLayer.O5_DIRECTING: 0.8,    # High - sustained control
-        OntologicalLayer.O6_REASONING: 0.7,    # Medium-high - process
-        OntologicalLayer.O7_PURPOSING: 0.5,
-        OntologicalLayer.O8_META_OBSERVING: 0.5,
-        OntologicalLayer.O9_UNIFYING: 0.3,
-        OntologicalLayer.O10_ABSOLVING: 0.3,
+        OntologicalLayer.O6_AGENCY: 0.8,    # High - sustained control
+        OntologicalLayer.O7_REASONING: 0.7,    # Medium-high - process
+        OntologicalLayer.O8_PURPOSE: 0.5,
+        OntologicalLayer.O9_WITNESSES: 0.5,
+        OntologicalLayer.O10_UNIFYING: 0.3,
+        OntologicalLayer.O12_ABSOLVING: 0.3,
     },
     PhonemeCategory.AFFRICATE: {
-        OntologicalLayer.O1_THINKING: 0.3,
-        OntologicalLayer.O2_FORMING: 0.6,      # Medium-high - complex creation
-        OntologicalLayer.O3_ACTING: 0.8,       # High - combined action
+        OntologicalLayer.O5_COGNITION: 0.3,
+        OntologicalLayer.O4_STRUCTURE: 0.6,      # Medium-high - complex creation
+        OntologicalLayer.O3_EXECUTION: 0.8,       # High - combined action
         OntologicalLayer.O4_TAGGING: 0.3,
-        OntologicalLayer.O5_DIRECTING: 0.7,
-        OntologicalLayer.O6_REASONING: 0.5,
-        OntologicalLayer.O7_PURPOSING: 0.5,
-        OntologicalLayer.O8_META_OBSERVING: 0.3,
-        OntologicalLayer.O9_UNIFYING: 0.4,
-        OntologicalLayer.O10_ABSOLVING: 0.2,
+        OntologicalLayer.O6_AGENCY: 0.7,
+        OntologicalLayer.O7_REASONING: 0.5,
+        OntologicalLayer.O8_PURPOSE: 0.5,
+        OntologicalLayer.O9_WITNESSES: 0.3,
+        OntologicalLayer.O10_UNIFYING: 0.4,
+        OntologicalLayer.O12_ABSOLVING: 0.2,
     },
     PhonemeCategory.NASAL: {
-        OntologicalLayer.O1_THINKING: 0.7,     # High - resonant reflection
-        OntologicalLayer.O2_FORMING: 0.5,
-        OntologicalLayer.O3_ACTING: 0.3,
+        OntologicalLayer.O5_COGNITION: 0.7,     # High - resonant reflection
+        OntologicalLayer.O4_STRUCTURE: 0.5,
+        OntologicalLayer.O3_EXECUTION: 0.3,
         OntologicalLayer.O4_TAGGING: 0.4,
-        OntologicalLayer.O5_DIRECTING: 0.3,
-        OntologicalLayer.O6_REASONING: 0.5,
-        OntologicalLayer.O7_PURPOSING: 0.5,
-        OntologicalLayer.O8_META_OBSERVING: 0.6,
-        OntologicalLayer.O9_UNIFYING: 0.8,     # High - connecting resonance
-        OntologicalLayer.O10_ABSOLVING: 0.5,
+        OntologicalLayer.O6_AGENCY: 0.3,
+        OntologicalLayer.O7_REASONING: 0.5,
+        OntologicalLayer.O8_PURPOSE: 0.5,
+        OntologicalLayer.O9_WITNESSES: 0.6,
+        OntologicalLayer.O10_UNIFYING: 0.8,     # High - connecting resonance
+        OntologicalLayer.O12_ABSOLVING: 0.5,
     },
     PhonemeCategory.LIQUID: {
-        OntologicalLayer.O1_THINKING: 0.5,
-        OntologicalLayer.O2_FORMING: 0.7,      # High - flowing creation
-        OntologicalLayer.O3_ACTING: 0.4,
+        OntologicalLayer.O5_COGNITION: 0.5,
+        OntologicalLayer.O4_STRUCTURE: 0.7,      # High - flowing creation
+        OntologicalLayer.O3_EXECUTION: 0.4,
         OntologicalLayer.O4_TAGGING: 0.3,
-        OntologicalLayer.O5_DIRECTING: 0.4,
-        OntologicalLayer.O6_REASONING: 0.5,
-        OntologicalLayer.O7_PURPOSING: 0.5,
-        OntologicalLayer.O8_META_OBSERVING: 0.5,
-        OntologicalLayer.O9_UNIFYING: 0.7,     # High - bridging
-        OntologicalLayer.O10_ABSOLVING: 0.6,
+        OntologicalLayer.O6_AGENCY: 0.4,
+        OntologicalLayer.O7_REASONING: 0.5,
+        OntologicalLayer.O8_PURPOSE: 0.5,
+        OntologicalLayer.O9_WITNESSES: 0.5,
+        OntologicalLayer.O10_UNIFYING: 0.7,     # High - bridging
+        OntologicalLayer.O12_ABSOLVING: 0.6,
     },
     PhonemeCategory.GLIDE: {
-        OntologicalLayer.O1_THINKING: 0.5,
-        OntologicalLayer.O2_FORMING: 0.6,
-        OntologicalLayer.O3_ACTING: 0.4,
+        OntologicalLayer.O5_COGNITION: 0.5,
+        OntologicalLayer.O4_STRUCTURE: 0.6,
+        OntologicalLayer.O3_EXECUTION: 0.4,
         OntologicalLayer.O4_TAGGING: 0.3,
-        OntologicalLayer.O5_DIRECTING: 0.4,
-        OntologicalLayer.O6_REASONING: 0.4,
-        OntologicalLayer.O7_PURPOSING: 0.5,
-        OntologicalLayer.O8_META_OBSERVING: 0.5,
-        OntologicalLayer.O9_UNIFYING: 0.6,
-        OntologicalLayer.O10_ABSOLVING: 0.5,
+        OntologicalLayer.O6_AGENCY: 0.4,
+        OntologicalLayer.O7_REASONING: 0.4,
+        OntologicalLayer.O8_PURPOSE: 0.5,
+        OntologicalLayer.O9_WITNESSES: 0.5,
+        OntologicalLayer.O10_UNIFYING: 0.6,
+        OntologicalLayer.O12_ABSOLVING: 0.5,
     },
     PhonemeCategory.VOWEL_SHORT: {
-        OntologicalLayer.O1_THINKING: 0.6,     # Medium-high - quick thought
-        OntologicalLayer.O2_FORMING: 0.5,
-        OntologicalLayer.O3_ACTING: 0.5,
+        OntologicalLayer.O5_COGNITION: 0.6,     # Medium-high - quick thought
+        OntologicalLayer.O4_STRUCTURE: 0.5,
+        OntologicalLayer.O3_EXECUTION: 0.5,
         OntologicalLayer.O4_TAGGING: 0.6,      # Categorizing
-        OntologicalLayer.O5_DIRECTING: 0.4,
-        OntologicalLayer.O6_REASONING: 0.5,
-        OntologicalLayer.O7_PURPOSING: 0.4,
-        OntologicalLayer.O8_META_OBSERVING: 0.5,
-        OntologicalLayer.O9_UNIFYING: 0.4,
-        OntologicalLayer.O10_ABSOLVING: 0.4,
+        OntologicalLayer.O6_AGENCY: 0.4,
+        OntologicalLayer.O7_REASONING: 0.5,
+        OntologicalLayer.O8_PURPOSE: 0.4,
+        OntologicalLayer.O9_WITNESSES: 0.5,
+        OntologicalLayer.O10_UNIFYING: 0.4,
+        OntologicalLayer.O12_ABSOLVING: 0.4,
     },
     PhonemeCategory.VOWEL_LONG: {
-        OntologicalLayer.O1_THINKING: 0.8,     # High - sustained reflection
-        OntologicalLayer.O2_FORMING: 0.6,
-        OntologicalLayer.O3_ACTING: 0.3,
+        OntologicalLayer.O5_COGNITION: 0.8,     # High - sustained reflection
+        OntologicalLayer.O4_STRUCTURE: 0.6,
+        OntologicalLayer.O3_EXECUTION: 0.3,
         OntologicalLayer.O4_TAGGING: 0.4,
-        OntologicalLayer.O5_DIRECTING: 0.4,
-        OntologicalLayer.O6_REASONING: 0.6,
-        OntologicalLayer.O7_PURPOSING: 0.6,
-        OntologicalLayer.O8_META_OBSERVING: 0.7,   # High - contemplation
-        OntologicalLayer.O9_UNIFYING: 0.6,
-        OntologicalLayer.O10_ABSOLVING: 0.8,   # High - release, openness
+        OntologicalLayer.O6_AGENCY: 0.4,
+        OntologicalLayer.O7_REASONING: 0.6,
+        OntologicalLayer.O8_PURPOSE: 0.6,
+        OntologicalLayer.O9_WITNESSES: 0.7,   # High - contemplation
+        OntologicalLayer.O10_UNIFYING: 0.6,
+        OntologicalLayer.O12_ABSOLVING: 0.8,   # High - release, openness
     },
 }
 
@@ -194,16 +194,16 @@ def get_position_weight(position: int, total: int) -> Tuple[float, float, float]
 # Layer position modifiers: how much initial/final position affects each layer
 LAYER_POSITION_MODIFIER: Dict[OntologicalLayer, Tuple[float, float]] = {
     # (initial_bonus, final_bonus)
-    OntologicalLayer.O1_THINKING: (0.1, 0.2),       # Thinking slightly boosted by reflection (final)
-    OntologicalLayer.O2_FORMING: (0.2, 0.1),        # Forming boosted by initiation
-    OntologicalLayer.O3_ACTING: (0.3, 0.0),         # Acting strongly boosted by initial (attack)
+    OntologicalLayer.O5_COGNITION: (0.1, 0.2),       # Thinking slightly boosted by reflection (final)
+    OntologicalLayer.O4_STRUCTURE: (0.2, 0.1),        # Forming boosted by initiation
+    OntologicalLayer.O3_EXECUTION: (0.3, 0.0),         # Acting strongly boosted by initial (attack)
     OntologicalLayer.O4_TAGGING: (0.1, 0.1),        # Neutral
-    OntologicalLayer.O5_DIRECTING: (0.2, 0.1),      # Directing boosted by initial (command)
-    OntologicalLayer.O6_REASONING: (0.0, 0.2),      # Reasoning boosted by conclusion
-    OntologicalLayer.O7_PURPOSING: (0.1, 0.2),      # Purpose often emerges at end
-    OntologicalLayer.O8_META_OBSERVING: (0.0, 0.2), # Observation/reflection at end
-    OntologicalLayer.O9_UNIFYING: (0.0, 0.2),       # Unification at conclusion
-    OntologicalLayer.O10_ABSOLVING: (0.0, 0.3),     # Release/resolution strongly final
+    OntologicalLayer.O6_AGENCY: (0.2, 0.1),      # Directing boosted by initial (command)
+    OntologicalLayer.O7_REASONING: (0.0, 0.2),      # Reasoning boosted by conclusion
+    OntologicalLayer.O8_PURPOSE: (0.1, 0.2),      # Purpose often emerges at end
+    OntologicalLayer.O9_WITNESSES: (0.0, 0.2), # Observation/reflection at end
+    OntologicalLayer.O10_UNIFYING: (0.0, 0.2),       # Unification at conclusion
+    OntologicalLayer.O12_ABSOLVING: (0.0, 0.3),     # Release/resolution strongly final
 }
 
 

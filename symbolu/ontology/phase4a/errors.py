@@ -84,7 +84,7 @@ class Phase4ALayerMissingError(Phase4AError):
     """
     Raised when a requested layer does not exist in ontological_layers_v1.json.
 
-    Valid layers are O1_ACTING through O10_ABSOLVING.
+    Valid layers are O3_EXECUTION through O12_ABSOLVING.
     """
 
     def __init__(self, layer: str, valid_layers: Tuple[str, ...] = ()):

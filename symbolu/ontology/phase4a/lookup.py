@@ -60,7 +60,7 @@ def lookup_interaction_raw(
 
     Args:
         varna: The varna token (e.g., "ka", "a", "sha")
-        layer: The ontological layer (e.g., "O1_ACTING")
+        layer: The ontological layer (e.g., "O3_EXECUTION")
         force_reload: If True, reload ontology files
 
     Returns:
@@ -146,7 +146,7 @@ def lookup_interaction(
 
     Example:
         >>> from symbolu.ontology.phase4a import lookup_interaction
-        >>> result = lookup_interaction("ka", "O1_ACTING")
+        >>> result = lookup_interaction("ka", "O3_EXECUTION")
         >>> result.manifestation_positive
         'body awakens with forward-seeking hope activation'
         >>> result.distortion_vector
@@ -154,7 +154,7 @@ def lookup_interaction(
 
     Args:
         varna: The varna token (e.g., "ka", "a", "sha")
-        layer: The ontological layer (e.g., "O1_ACTING")
+        layer: The ontological layer (e.g., "O3_EXECUTION")
         force_reload: If True, reload ontology files
 
     Returns:
@@ -220,7 +220,7 @@ def lookup_layer_all_varnas(
     Look up all varna interactions for a specific layer.
 
     Args:
-        layer: The ontological layer (e.g., "O1_ACTING")
+        layer: The ontological layer (e.g., "O3_EXECUTION")
         force_reload: If True, reload files
 
     Returns:

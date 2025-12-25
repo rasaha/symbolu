@@ -7,7 +7,7 @@
 
 ## 1. Overview
 
-Symbol-U uses a **10-layer ontological architecture** divided into two groups:
+Symbol-U uses a **12-layer ontological architecture** divided into two groups:
 - **Lower 5 (O1-O5):** Execution / Manifestation Layers
 - **Upper 5 (O6-O10):** Governance / Coherence Layers
 

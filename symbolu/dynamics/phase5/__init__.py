@@ -21,7 +21,7 @@ Usage:
 
     trajectory = resolve_dynamics(
         varna="ka",
-        start_layer="O1_ACTING",
+        start_layer="O3_EXECUTION",
         load=0.5,
         time_steps=10,
         decay_constant=0.1,

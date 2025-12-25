@@ -2,25 +2,27 @@
 Phonetic Resonance Engine - Phoneme Layer Mappings
 ===================================================
 
-Maps ARPABET phonemes to their 10D ontological layer affinities.
+Maps ARPABET phonemes to their 12D ontological layer affinities.
 
-Each phoneme has affinities to all 10 layers based on:
+Each phoneme has affinities to all 12 layers based on:
 - Articulation manner (how the sound is produced)
 - Articulation place (where in the mouth)
 - Voicing (voiced vs unvoiced)
 - Duration (short vs sustained)
 
-Layer order:
-    0: O1_THINKING   - Contemplation, cognition
-    1: O2_FORMING    - Structure, creation
-    2: O3_ACTING     - Action, force
-    3: O4_TAGGING    - Classification, labeling
-    4: O5_DIRECTING  - Guidance, control
-    5: O6_REASONING  - Logic, analysis
-    6: O7_PURPOSING  - Intent, goals
-    7: O8_META_OBSERVING - Awareness, observation
-    8: O9_UNIFYING   - Connection, harmony
-    9: O10_ABSOLVING - Release, transcendence
+Layer order (12D patent-exact sequence):
+    0: O1_POTENTIAL    - Dormant capacity
+    1: O2_IDENTITY     - Classification, labeling
+    2: O3_EXECUTION    - Action, karma
+    3: O4_STRUCTURE    - Form, shape
+    4: O5_COGNITION    - Perception, attention
+    5: O6_AGENCY       - Direction, control
+    6: O7_REASONING    - Logic, analysis
+    7: O8_PURPOSE      - Intent, goals
+    8: O9_WITNESSES    - Awareness, observation
+    9: O10_UNIFYING    - Connection, harmony
+    10: O11_INTEGRATION - Resolution, consolidation
+    11: O12_ABSOLVING  - Release, transcendence
 """
 
 from typing import Dict, Tuple
@@ -28,86 +30,86 @@ from symbolu.resonance.types import PhonemeCategory, PhonemeProfile
 
 
 # =============================================================================
-# Phoneme → Layer Affinity Mappings
+# Phoneme → Layer Affinity Mappings (12D)
 # =============================================================================
 # Values represent affinity strength (0.0 to 1.0) for each layer
-# Order: [O1, O2, O3, O4, O5, O6, O7, O8, O9, O10]
+# Order: [O1_POT, O2_ID, O3_EXEC, O4_STR, O5_COG, O6_AGN, O7_RSN, O8_PUR, O9_WIT, O10_UNI, O11_INT, O12_ABS]
 
-# Plosives: Sudden, forceful sounds → Acting, Directing
+# Plosives: Sudden, forceful sounds → Execution, Agency
 PLOSIVE_AFFINITIES: Dict[str, Tuple[float, ...]] = {
     # Voiceless plosives - more forceful, directive
-    "P": (0.1, 0.3, 0.8, 0.2, 0.6, 0.2, 0.4, 0.1, 0.1, 0.1),  # Bilabial
-    "T": (0.2, 0.4, 0.7, 0.3, 0.5, 0.3, 0.3, 0.2, 0.1, 0.1),  # Alveolar
-    "K": (0.2, 0.5, 0.8, 0.2, 0.7, 0.2, 0.4, 0.1, 0.1, 0.1),  # Velar
+    "P": (0.05, 0.2, 0.8, 0.3, 0.1, 0.6, 0.2, 0.4, 0.1, 0.1, 0.1, 0.1),  # Bilabial
+    "T": (0.05, 0.3, 0.7, 0.4, 0.2, 0.5, 0.3, 0.3, 0.2, 0.1, 0.1, 0.1),  # Alveolar
+    "K": (0.05, 0.2, 0.8, 0.5, 0.2, 0.7, 0.2, 0.4, 0.1, 0.1, 0.1, 0.1),  # Velar
     # Voiced plosives - more resonant, forming
-    "B": (0.2, 0.5, 0.6, 0.2, 0.4, 0.2, 0.5, 0.2, 0.3, 0.1),  # Bilabial
-    "D": (0.3, 0.5, 0.5, 0.3, 0.4, 0.4, 0.4, 0.2, 0.2, 0.1),  # Alveolar
-    "G": (0.2, 0.5, 0.6, 0.2, 0.5, 0.3, 0.5, 0.1, 0.2, 0.1),  # Velar
+    "B": (0.05, 0.2, 0.6, 0.5, 0.2, 0.4, 0.2, 0.5, 0.2, 0.3, 0.2, 0.1),  # Bilabial
+    "D": (0.05, 0.3, 0.5, 0.5, 0.3, 0.4, 0.4, 0.4, 0.2, 0.2, 0.2, 0.1),  # Alveolar
+    "G": (0.05, 0.2, 0.6, 0.5, 0.2, 0.5, 0.3, 0.5, 0.1, 0.2, 0.2, 0.1),  # Velar
 }
 
-# Fricatives: Continuous, controlled → Directing, Reasoning
+# Fricatives: Continuous, controlled → Agency, Reasoning
 FRICATIVE_AFFINITIES: Dict[str, Tuple[float, ...]] = {
-    "F": (0.2, 0.4, 0.3, 0.2, 0.6, 0.5, 0.3, 0.2, 0.2, 0.2),  # Labiodental
-    "V": (0.3, 0.4, 0.3, 0.2, 0.5, 0.4, 0.4, 0.2, 0.3, 0.2),  # Labiodental voiced
-    "TH": (0.4, 0.3, 0.2, 0.2, 0.4, 0.6, 0.3, 0.3, 0.2, 0.3),  # Dental voiceless
-    "DH": (0.4, 0.4, 0.2, 0.2, 0.4, 0.5, 0.4, 0.3, 0.3, 0.2),  # Dental voiced
-    "S": (0.3, 0.3, 0.3, 0.4, 0.6, 0.7, 0.3, 0.3, 0.1, 0.1),  # Alveolar
-    "Z": (0.3, 0.4, 0.3, 0.4, 0.5, 0.6, 0.4, 0.3, 0.2, 0.1),  # Alveolar voiced
-    "SH": (0.3, 0.4, 0.2, 0.3, 0.5, 0.5, 0.3, 0.4, 0.3, 0.2),  # Postalveolar
-    "ZH": (0.3, 0.4, 0.2, 0.3, 0.4, 0.5, 0.4, 0.4, 0.3, 0.2),  # Postalveolar voiced
-    "HH": (0.5, 0.2, 0.1, 0.1, 0.2, 0.3, 0.3, 0.5, 0.4, 0.6),  # Glottal - breath
+    "F": (0.05, 0.2, 0.3, 0.4, 0.2, 0.6, 0.5, 0.3, 0.2, 0.2, 0.2, 0.2),  # Labiodental
+    "V": (0.05, 0.2, 0.3, 0.4, 0.3, 0.5, 0.4, 0.4, 0.2, 0.3, 0.2, 0.2),  # Labiodental voiced
+    "TH": (0.05, 0.2, 0.2, 0.3, 0.4, 0.4, 0.6, 0.3, 0.3, 0.2, 0.2, 0.3),  # Dental voiceless
+    "DH": (0.05, 0.2, 0.2, 0.4, 0.4, 0.4, 0.5, 0.4, 0.3, 0.3, 0.2, 0.2),  # Dental voiced
+    "S": (0.05, 0.4, 0.3, 0.3, 0.3, 0.6, 0.7, 0.3, 0.3, 0.1, 0.1, 0.1),  # Alveolar
+    "Z": (0.05, 0.4, 0.3, 0.4, 0.3, 0.5, 0.6, 0.4, 0.3, 0.2, 0.1, 0.1),  # Alveolar voiced
+    "SH": (0.05, 0.3, 0.2, 0.4, 0.3, 0.5, 0.5, 0.3, 0.4, 0.3, 0.2, 0.2),  # Postalveolar
+    "ZH": (0.05, 0.3, 0.2, 0.4, 0.3, 0.4, 0.5, 0.4, 0.4, 0.3, 0.2, 0.2),  # Postalveolar voiced
+    "HH": (0.1, 0.1, 0.1, 0.2, 0.5, 0.2, 0.3, 0.3, 0.5, 0.4, 0.5, 0.6),  # Glottal - breath
 }
 
-# Affricates: Combined plosive+fricative → Acting, Forming
+# Affricates: Combined plosive+fricative → Execution, Structure
 AFFRICATE_AFFINITIES: Dict[str, Tuple[float, ...]] = {
-    "CH": (0.2, 0.5, 0.6, 0.3, 0.5, 0.3, 0.4, 0.2, 0.2, 0.1),  # Voiceless
-    "JH": (0.2, 0.5, 0.5, 0.3, 0.4, 0.3, 0.5, 0.2, 0.3, 0.1),  # Voiced
+    "CH": (0.05, 0.3, 0.6, 0.5, 0.2, 0.5, 0.3, 0.4, 0.2, 0.2, 0.1, 0.1),  # Voiceless
+    "JH": (0.05, 0.3, 0.5, 0.5, 0.2, 0.4, 0.3, 0.5, 0.2, 0.3, 0.2, 0.1),  # Voiced
 }
 
-# Nasals: Resonant, connecting → Unifying, Thinking
+# Nasals: Resonant, connecting → Unifying, Cognition
 NASAL_AFFINITIES: Dict[str, Tuple[float, ...]] = {
-    "M": (0.4, 0.3, 0.2, 0.2, 0.2, 0.3, 0.3, 0.3, 0.7, 0.4),  # Bilabial
-    "N": (0.5, 0.3, 0.2, 0.3, 0.3, 0.4, 0.3, 0.3, 0.6, 0.3),  # Alveolar
-    "NG": (0.4, 0.3, 0.2, 0.2, 0.2, 0.3, 0.3, 0.4, 0.7, 0.5),  # Velar
+    "M": (0.1, 0.2, 0.2, 0.3, 0.4, 0.2, 0.3, 0.3, 0.3, 0.7, 0.5, 0.4),  # Bilabial
+    "N": (0.1, 0.3, 0.2, 0.3, 0.5, 0.3, 0.4, 0.3, 0.3, 0.6, 0.4, 0.3),  # Alveolar
+    "NG": (0.1, 0.2, 0.2, 0.3, 0.4, 0.2, 0.3, 0.3, 0.4, 0.7, 0.6, 0.5),  # Velar
 }
 
-# Liquids: Flowing, smooth → Forming, Unifying
+# Liquids: Flowing, smooth → Structure, Unifying
 LIQUID_AFFINITIES: Dict[str, Tuple[float, ...]] = {
-    "L": (0.3, 0.6, 0.2, 0.2, 0.3, 0.3, 0.4, 0.3, 0.6, 0.4),  # Lateral
-    "R": (0.3, 0.5, 0.3, 0.2, 0.4, 0.3, 0.5, 0.3, 0.5, 0.3),  # Rhotic
+    "L": (0.1, 0.2, 0.2, 0.6, 0.3, 0.3, 0.3, 0.4, 0.3, 0.6, 0.5, 0.4),  # Lateral
+    "R": (0.1, 0.2, 0.3, 0.5, 0.3, 0.4, 0.3, 0.5, 0.3, 0.5, 0.4, 0.3),  # Rhotic
 }
 
-# Glides: Transitional → Forming, Purposing
+# Glides: Transitional → Structure, Purpose
 GLIDE_AFFINITIES: Dict[str, Tuple[float, ...]] = {
-    "W": (0.3, 0.5, 0.2, 0.1, 0.3, 0.2, 0.5, 0.3, 0.5, 0.4),  # Labial-velar
-    "Y": (0.3, 0.5, 0.2, 0.2, 0.4, 0.3, 0.5, 0.3, 0.4, 0.3),  # Palatal
+    "W": (0.1, 0.1, 0.2, 0.5, 0.3, 0.3, 0.2, 0.5, 0.3, 0.5, 0.4, 0.4),  # Labial-velar
+    "Y": (0.1, 0.2, 0.2, 0.5, 0.3, 0.4, 0.3, 0.5, 0.3, 0.4, 0.3, 0.3),  # Palatal
 }
 
-# Short Vowels: Brief, focused → Thinking, Tagging
+# Short Vowels: Brief, focused → Cognition, Identity
 SHORT_VOWEL_AFFINITIES: Dict[str, Tuple[float, ...]] = {
-    "IH": (0.6, 0.3, 0.2, 0.5, 0.3, 0.4, 0.3, 0.4, 0.2, 0.2),  # as in "bit"
-    "EH": (0.5, 0.4, 0.2, 0.4, 0.3, 0.4, 0.4, 0.4, 0.3, 0.2),  # as in "bet"
-    "AE": (0.4, 0.4, 0.3, 0.4, 0.3, 0.4, 0.4, 0.3, 0.3, 0.3),  # as in "bat"
-    "AH": (0.5, 0.3, 0.2, 0.3, 0.2, 0.4, 0.3, 0.5, 0.4, 0.5),  # as in "but"
-    "UH": (0.5, 0.4, 0.2, 0.3, 0.2, 0.3, 0.4, 0.4, 0.5, 0.4),  # as in "book"
+    "IH": (0.1, 0.5, 0.2, 0.3, 0.6, 0.3, 0.4, 0.3, 0.4, 0.2, 0.2, 0.2),  # as in "bit"
+    "EH": (0.1, 0.4, 0.2, 0.4, 0.5, 0.3, 0.4, 0.4, 0.4, 0.3, 0.2, 0.2),  # as in "bet"
+    "AE": (0.1, 0.4, 0.3, 0.4, 0.4, 0.3, 0.4, 0.4, 0.3, 0.3, 0.3, 0.3),  # as in "bat"
+    "AH": (0.1, 0.3, 0.2, 0.3, 0.5, 0.2, 0.4, 0.3, 0.5, 0.4, 0.4, 0.5),  # as in "but"
+    "UH": (0.1, 0.3, 0.2, 0.4, 0.5, 0.2, 0.3, 0.4, 0.4, 0.5, 0.4, 0.4),  # as in "book"
 }
 
 # Long Vowels: Sustained, open → Absolving, Unifying
 LONG_VOWEL_AFFINITIES: Dict[str, Tuple[float, ...]] = {
-    "IY": (0.5, 0.4, 0.2, 0.3, 0.3, 0.4, 0.4, 0.5, 0.5, 0.5),  # as in "beat"
-    "EY": (0.4, 0.5, 0.2, 0.3, 0.4, 0.4, 0.5, 0.4, 0.4, 0.4),  # as in "bait"
-    "AA": (0.3, 0.3, 0.3, 0.2, 0.2, 0.3, 0.3, 0.5, 0.6, 0.7),  # as in "father"
-    "AO": (0.3, 0.4, 0.2, 0.2, 0.3, 0.3, 0.4, 0.5, 0.6, 0.6),  # as in "thought"
-    "OW": (0.3, 0.5, 0.2, 0.2, 0.3, 0.3, 0.5, 0.4, 0.5, 0.5),  # as in "boat"
-    "UW": (0.4, 0.4, 0.2, 0.2, 0.2, 0.3, 0.4, 0.5, 0.6, 0.6),  # as in "boot"
+    "IY": (0.1, 0.3, 0.2, 0.4, 0.5, 0.3, 0.4, 0.4, 0.5, 0.5, 0.5, 0.5),  # as in "beat"
+    "EY": (0.1, 0.3, 0.2, 0.5, 0.4, 0.4, 0.4, 0.5, 0.4, 0.4, 0.4, 0.4),  # as in "bait"
+    "AA": (0.15, 0.2, 0.3, 0.3, 0.3, 0.2, 0.3, 0.3, 0.5, 0.6, 0.6, 0.7),  # as in "father"
+    "AO": (0.15, 0.2, 0.2, 0.4, 0.3, 0.3, 0.3, 0.4, 0.5, 0.6, 0.6, 0.6),  # as in "thought"
+    "OW": (0.1, 0.2, 0.2, 0.5, 0.3, 0.3, 0.3, 0.5, 0.4, 0.5, 0.5, 0.5),  # as in "boat"
+    "UW": (0.15, 0.2, 0.2, 0.4, 0.4, 0.2, 0.3, 0.4, 0.5, 0.6, 0.6, 0.6),  # as in "boot"
 }
 
-# Diphthongs: Rising/falling → Purposing, Forming
+# Diphthongs: Rising/falling → Purpose, Structure
 DIPHTHONG_AFFINITIES: Dict[str, Tuple[float, ...]] = {
-    "AY": (0.3, 0.5, 0.3, 0.2, 0.4, 0.3, 0.6, 0.4, 0.4, 0.4),  # as in "bite"
-    "AW": (0.3, 0.4, 0.3, 0.2, 0.3, 0.3, 0.5, 0.5, 0.5, 0.5),  # as in "bout"
-    "OY": (0.3, 0.5, 0.3, 0.3, 0.4, 0.3, 0.6, 0.4, 0.4, 0.4),  # as in "boy"
-    "ER": (0.4, 0.4, 0.2, 0.3, 0.3, 0.4, 0.4, 0.4, 0.5, 0.4),  # as in "bird"
+    "AY": (0.1, 0.2, 0.3, 0.5, 0.3, 0.4, 0.3, 0.6, 0.4, 0.4, 0.4, 0.4),  # as in "bite"
+    "AW": (0.1, 0.2, 0.3, 0.4, 0.3, 0.3, 0.3, 0.5, 0.5, 0.5, 0.5, 0.5),  # as in "bout"
+    "OY": (0.1, 0.3, 0.3, 0.5, 0.3, 0.4, 0.3, 0.6, 0.4, 0.4, 0.4, 0.4),  # as in "boy"
+    "ER": (0.1, 0.3, 0.2, 0.4, 0.4, 0.3, 0.4, 0.4, 0.4, 0.5, 0.4, 0.4),  # as in "bird"
 }
 
 
@@ -230,13 +232,13 @@ def get_phoneme_profile(phoneme: str) -> PhonemeProfile:
 
 def get_layer_affinities(phoneme: str) -> Tuple[float, ...]:
     """
-    Get the 10D layer affinities for a phoneme.
+    Get the 12D layer affinities for a phoneme.
 
     Args:
         phoneme: ARPABET phoneme symbol
 
     Returns:
-        Tuple of 10 floats representing layer affinities
+        Tuple of 12 floats representing layer affinities
     """
     return get_phoneme_profile(phoneme).layer_affinities
 

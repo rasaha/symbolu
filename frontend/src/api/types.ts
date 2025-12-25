@@ -120,29 +120,29 @@ export interface EntropyMetrics {
 // ============================================
 
 export interface OntologicalDimensions {
-  O1_THINKING: number;
-  O2_FORMING: number;
-  O3_ACTING: number;
+  O5_COGNITION: number;
+  O4_STRUCTURE: number;
+  O3_EXECUTION: number;
   O4_TAGGING: number;
-  O5_DIRECTING: number;
-  O6_REASONING: number;
-  O7_PURPOSING: number;
-  O8_META_OBSERVING: number;
-  O9_UNIFYING: number;
-  O10_ABSOLVING: number;
+  O6_AGENCY: number;
+  O7_REASONING: number;
+  O8_PURPOSE: number;
+  O9_WITNESSES: number;
+  O10_UNIFYING: number;
+  O12_ABSOLVING: number;
 }
 
 export const ONTOLOGICAL_LABELS: Record<keyof OntologicalDimensions, string> = {
-  O1_THINKING: 'Thinking',
-  O2_FORMING: 'Forming',
-  O3_ACTING: 'Acting',
+  O5_COGNITION: 'Thinking',
+  O4_STRUCTURE: 'Forming',
+  O3_EXECUTION: 'Acting',
   O4_TAGGING: 'Tagging',
-  O5_DIRECTING: 'Directing',
-  O6_REASONING: 'Reasoning',
-  O7_PURPOSING: 'Purposing',
-  O8_META_OBSERVING: 'Observing',
-  O9_UNIFYING: 'Unifying',
-  O10_ABSOLVING: 'Absolving',
+  O6_AGENCY: 'Directing',
+  O7_REASONING: 'Reasoning',
+  O8_PURPOSE: 'Purposing',
+  O9_WITNESSES: 'Observing',
+  O10_UNIFYING: 'Unifying',
+  O12_ABSOLVING: 'Absolving',
 };
 
 // ============================================

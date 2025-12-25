@@ -31,60 +31,60 @@ class TestPhaseToLayerMapping:
     def test_phase_1b_layers(self) -> None:
         """Phase 1b maps to TAGGING and FORMING."""
         layers = PHASE_TO_LAYERS["1b"]
-        assert OntologicalLayer.TAGGING in layers
-        assert OntologicalLayer.FORMING in layers
+        assert OntologicalLayer.IDENTITY in layers
+        assert OntologicalLayer.STRUCTURE in layers
         assert len(layers) == 2
 
     def test_phase_2_layers(self) -> None:
         """Phase 2 maps to TAGGING and FORMING."""
         layers = PHASE_TO_LAYERS["2"]
-        assert OntologicalLayer.TAGGING in layers
-        assert OntologicalLayer.FORMING in layers
+        assert OntologicalLayer.IDENTITY in layers
+        assert OntologicalLayer.STRUCTURE in layers
         assert len(layers) == 2
 
     def test_phase_3_layers(self) -> None:
         """Phase 3 maps to THINKING, REASONING, and DIRECTING."""
         layers = PHASE_TO_LAYERS["3"]
-        assert OntologicalLayer.THINKING in layers
+        assert OntologicalLayer.COGNITION in layers
         assert OntologicalLayer.REASONING in layers
-        assert OntologicalLayer.DIRECTING in layers
+        assert OntologicalLayer.AGENCY in layers
         assert len(layers) == 3
 
     def test_phase_4_layers(self) -> None:
         """Phase 4 maps to ACTING and THINKING."""
         layers = PHASE_TO_LAYERS["4"]
-        assert OntologicalLayer.ACTING in layers
-        assert OntologicalLayer.THINKING in layers
+        assert OntologicalLayer.EXECUTION in layers
+        assert OntologicalLayer.COGNITION in layers
         assert len(layers) == 2
 
     def test_phase_5_layers(self) -> None:
         """Phase 5 maps to FORMING and UNIFYING."""
         layers = PHASE_TO_LAYERS["5"]
-        assert OntologicalLayer.FORMING in layers
+        assert OntologicalLayer.STRUCTURE in layers
         assert OntologicalLayer.UNIFYING in layers
         assert len(layers) == 2
 
     def test_phase_6_layers(self) -> None:
         """Phase 6 maps to DIRECTING, META_OBSERVING, and PURPOSING."""
         layers = PHASE_TO_LAYERS["6"]
-        assert OntologicalLayer.DIRECTING in layers
-        assert OntologicalLayer.META_OBSERVING in layers
-        assert OntologicalLayer.PURPOSING in layers
+        assert OntologicalLayer.AGENCY in layers
+        assert OntologicalLayer.WITNESSES in layers
+        assert OntologicalLayer.PURPOSE in layers
         assert len(layers) == 3
 
     def test_phase_7_layers(self) -> None:
         """Phase 7 maps to ACTING, DIRECTING, and THINKING."""
         layers = PHASE_TO_LAYERS["7"]
-        assert OntologicalLayer.ACTING in layers
-        assert OntologicalLayer.DIRECTING in layers
-        assert OntologicalLayer.THINKING in layers
+        assert OntologicalLayer.EXECUTION in layers
+        assert OntologicalLayer.AGENCY in layers
+        assert OntologicalLayer.COGNITION in layers
         assert len(layers) == 3
 
     def test_phase_8_layers(self) -> None:
         """Phase 8 maps to META_OBSERVING and DIRECTING."""
         layers = PHASE_TO_LAYERS["8"]
-        assert OntologicalLayer.META_OBSERVING in layers
-        assert OntologicalLayer.DIRECTING in layers
+        assert OntologicalLayer.WITNESSES in layers
+        assert OntologicalLayer.AGENCY in layers
         assert len(layers) == 2
 
     def test_phase_9_layers(self) -> None:
@@ -154,17 +154,17 @@ class TestGetPhasesForLayer:
 
     def test_returns_tuple(self) -> None:
         """Function returns a tuple, not a list or set."""
-        phases = get_phases_for_layer(OntologicalLayer.THINKING)
+        phases = get_phases_for_layer(OntologicalLayer.COGNITION)
         assert isinstance(phases, tuple)
 
     def test_deterministic_ordering(self) -> None:
         """Phases are returned in sorted order."""
-        phases = get_phases_for_layer(OntologicalLayer.THINKING)
+        phases = get_phases_for_layer(OntologicalLayer.COGNITION)
         assert phases == tuple(sorted(phases))
 
     def test_thinking_layer_phases(self) -> None:
         """THINKING layer is used by phases 3, 4, and 7."""
-        phases = get_phases_for_layer(OntologicalLayer.THINKING)
+        phases = get_phases_for_layer(OntologicalLayer.COGNITION)
         assert "3" in phases
         assert "4" in phases
         assert "7" in phases

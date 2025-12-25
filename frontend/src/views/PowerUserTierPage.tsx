@@ -74,16 +74,16 @@ export function PowerUserTierPage() {
   };
 
   const mockOntological = {
-    O1_THINKING: 0.62,
-    O2_FORMING: 0.21,
-    O3_ACTING: 0.15,
+    O5_COGNITION: 0.62,
+    O4_STRUCTURE: 0.21,
+    O3_EXECUTION: 0.15,
     O4_TAGGING: 0.28,
-    O5_DIRECTING: 0.35,
-    O6_REASONING: 0.55,
-    O7_PURPOSING: 0.42,
-    O8_META_OBSERVING: 0.45,
-    O9_UNIFYING: 0.32,
-    O10_ABSOLVING: 0.18,
+    O6_AGENCY: 0.35,
+    O7_REASONING: 0.55,
+    O8_PURPOSE: 0.42,
+    O9_WITNESSES: 0.45,
+    O10_UNIFYING: 0.32,
+    O12_ABSOLVING: 0.18,
   };
 
   return (

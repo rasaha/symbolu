@@ -21,7 +21,7 @@
 
 ## 1. Executive Summary
 
-Symbol-U is a deterministic AGI engine that uses **phoneme-based 10-dimensional ontological vectors** to provide semantic reasoning without LLM inference at the routing/policy layer. The system combines:
+Symbol-U is a deterministic AGI engine that uses **phoneme-based 12-dimensional ontological vectors** to provide semantic reasoning without LLM inference at the routing/policy layer. The system combines:
 
 - **Zero-LLM Routing**: All policy decisions are deterministic and rule-based
 - **Hybrid Transformer Optimization**: 80%+ compute reduction via phoneme pre-filtering
@@ -247,16 +247,16 @@ model_type = router.route("Love conquers all")
 
 | Dim | Layer | Meaning | Phoneme Affinity |
 |-----|-------|---------|------------------|
-| 0 | O1_THINKING | Contemplation | Nasals, fricatives |
-| 1 | O2_FORMING | Structure | Liquids, glides |
-| 2 | O3_ACTING | Action | Plosives |
+| 0 | O5_COGNITION | Contemplation | Nasals, fricatives |
+| 1 | O4_STRUCTURE | Structure | Liquids, glides |
+| 2 | O3_EXECUTION | Action | Plosives |
 | 3 | O4_TAGGING | Classification | Short vowels |
-| 4 | O5_DIRECTING | Guidance | Fricatives, plosives |
-| 5 | O6_REASONING | Logic | Fricatives |
-| 6 | O7_PURPOSING | Intent | Diphthongs |
-| 7 | O8_META_OBSERVING | Awareness | Long vowels |
-| 8 | O9_UNIFYING | Connection | Nasals, liquids |
-| 9 | O10_ABSOLVING | Transcendence | Long vowels, breath |
+| 4 | O6_AGENCY | Guidance | Fricatives, plosives |
+| 5 | O7_REASONING | Logic | Fricatives |
+| 6 | O8_PURPOSE | Intent | Diphthongs |
+| 7 | O9_WITNESSES | Awareness | Long vowels |
+| 8 | O10_UNIFYING | Connection | Nasals, liquids |
+| 9 | O12_ABSOLVING | Transcendence | Long vowels, breath |
 
 ---
 

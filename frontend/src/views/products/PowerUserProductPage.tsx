@@ -281,22 +281,22 @@ export function PowerUserProductPage({ onBack, onTryDemo }: PowerUserProductPage
           <div className="max-w-3xl mx-auto bg-slate-900/60 border border-white/10 rounded-2xl p-8">
             <div className="mb-6">
               <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-400 text-sm font-medium">
-                Dominant: O1_THINKING
+                Dominant: O5_COGNITION
               </span>
             </div>
 
             <div className="space-y-3">
               {[
-                { dim: 'O1_THINKING', value: 0.62, label: 'Thinking' },
-                { dim: 'O6_REASONING', value: 0.55, label: 'Reasoning' },
-                { dim: 'O8_META_OBSERVING', value: 0.45, label: 'Observing' },
-                { dim: 'O7_PURPOSING', value: 0.42, label: 'Purposing' },
-                { dim: 'O5_DIRECTING', value: 0.35, label: 'Directing' },
-                { dim: 'O9_UNIFYING', value: 0.32, label: 'Unifying' },
+                { dim: 'O5_COGNITION', value: 0.62, label: 'Thinking' },
+                { dim: 'O7_REASONING', value: 0.55, label: 'Reasoning' },
+                { dim: 'O9_WITNESSES', value: 0.45, label: 'Observing' },
+                { dim: 'O8_PURPOSE', value: 0.42, label: 'Purposing' },
+                { dim: 'O6_AGENCY', value: 0.35, label: 'Directing' },
+                { dim: 'O10_UNIFYING', value: 0.32, label: 'Unifying' },
                 { dim: 'O4_TAGGING', value: 0.28, label: 'Tagging' },
-                { dim: 'O2_FORMING', value: 0.21, label: 'Forming' },
-                { dim: 'O10_ABSOLVING', value: 0.18, label: 'Absolving' },
-                { dim: 'O3_ACTING', value: 0.15, label: 'Acting' },
+                { dim: 'O4_STRUCTURE', value: 0.21, label: 'Forming' },
+                { dim: 'O12_ABSOLVING', value: 0.18, label: 'Absolving' },
+                { dim: 'O3_EXECUTION', value: 0.15, label: 'Acting' },
               ].map((item, i) => (
                 <div
                   key={item.dim}

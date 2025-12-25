@@ -27,7 +27,7 @@ class VarnaLayerInteraction:
 
     Attributes:
         varna: The input varna token (e.g., "ka", "a", "sha")
-        layer: The input ontological layer (e.g., "O1_ACTING")
+        layer: The input ontological layer (e.g., "O3_EXECUTION")
         manifestation_positive: Healthy expression when varna interacts with layer
         manifestation_negative: Distorted expression
         distortion_vector: Direction of negative manifestation ("lateral", "downward")
@@ -194,7 +194,7 @@ class LayerInfo:
     Information about an ontological layer.
 
     Attributes:
-        layer_id: The layer identifier (e.g., "O1_ACTING")
+        layer_id: The layer identifier (e.g., "O3_EXECUTION")
         experiential_role: The functional description
         kosha_anchor: The ontological sheath mapping
         polarity_tendency: "constructive", "neutral", or "degenerative"

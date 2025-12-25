@@ -144,7 +144,7 @@ Input: "Explain quantum entanglement"
     ┌──────────────────────────────────────────────┐
     │              STL ROUTING                     │
     ├──────────────────────────────────────────────┤
-    │  Dominant Layer: O6_REASONING                │
+    │  Dominant Layer: O7_REASONING                │
     │  Confidence: 64%                             │
     │  Route Decision: reasoning-7b                │
     └──────────────────────────────────────────────┘
@@ -192,7 +192,7 @@ Input: "Analyze the socioeconomic implications of AI"
     ┌──────────────────────────────────────────────┐
     │         STEP 1: STL ANALYSIS (always)        │
     ├──────────────────────────────────────────────┤
-    │  Dominant Layer: O6_REASONING                │
+    │  Dominant Layer: O7_REASONING                │
     │  STL Confidence: 46%                         │
     │  Decision: LOW confidence → need 768D        │
     └──────────────────────────────────────────────┘
@@ -270,7 +270,7 @@ Result: 85% of queries skip expensive 768D computation
 
 | Approach | Computation | API Cost | Relative |
 |----------|-------------|----------|----------|
-| Enterprise Search | 10D vectors | $0 | Free |
+| Enterprise Search | 12D vectors | $0 | Free |
 | Enterprise Chat | 10D + 7B | Low | 25x savings |
 | Consumer (optimized) | 10D + 15%×768D + LLM | Medium | 5-10x savings |
 | Traditional 175B | 768D + 175B always | High | Baseline |
@@ -295,16 +295,16 @@ Result: 85% of queries skip expensive 768D computation
 ```
 Layer          Semantic Meaning              Example Words
 ─────────────────────────────────────────────────────────────
-O1_THINKING    Contemplation, philosophy     "ponder", "reflect"
-O2_FORMING     Structure, creation, art      "create", "design"
-O3_ACTING      Procedures, commands          "run", "execute"
+O5_COGNITION    Contemplation, philosophy     "ponder", "reflect"
+O4_STRUCTURE     Structure, creation, art      "create", "design"
+O3_EXECUTION      Procedures, commands          "run", "execute"
 O4_TAGGING     Classification, labels        "type", "category"
-O5_DIRECTING   Guidance, instruction         "guide", "lead"
-O6_REASONING   Logic, analysis               "analyze", "deduce"
-O7_PURPOSING   Goals, intentions             "aim", "intend"
+O6_AGENCY   Guidance, instruction         "guide", "lead"
+O7_REASONING   Logic, analysis               "analyze", "deduce"
+O8_PURPOSE   Goals, intentions             "aim", "intend"
 O8_OBSERVING   Awareness, perception         "notice", "observe"
-O9_UNIFYING    Connections, relationships    "love", "bond"
-O10_ABSOLVING  Resolution, transcendence     "resolve", "transcend"
+O10_UNIFYING    Connections, relationships    "love", "bond"
+O12_ABSOLVING  Resolution, transcendence     "resolve", "transcend"
 ```
 
 ---
@@ -319,8 +319,8 @@ Organizations can define domain-specific terms:
   "expansion": "issue tracking system",
   "intent": "action",
   "layer_affinities": {
-    "O3_ACTING": 0.8,
-    "O6_REASONING": 0.4
+    "O3_EXECUTION": 0.8,
+    "O7_REASONING": 0.4
   },
   "synonyms": ["ticket", "issue"]
 }

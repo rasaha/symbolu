@@ -14,16 +14,16 @@ interface OntologicalRadarProps {
 }
 
 const DIMENSION_CONFIG: Record<keyof OntologicalDimensions, { label: string; color: string }> = {
-  O1_THINKING: { label: 'Thinking', color: 'bg-blue-500' },
-  O2_FORMING: { label: 'Forming', color: 'bg-cyan-500' },
-  O3_ACTING: { label: 'Acting', color: 'bg-emerald-500' },
+  O5_COGNITION: { label: 'Thinking', color: 'bg-blue-500' },
+  O4_STRUCTURE: { label: 'Forming', color: 'bg-cyan-500' },
+  O3_EXECUTION: { label: 'Acting', color: 'bg-emerald-500' },
   O4_TAGGING: { label: 'Tagging', color: 'bg-teal-500' },
-  O5_DIRECTING: { label: 'Directing', color: 'bg-green-500' },
-  O6_REASONING: { label: 'Reasoning', color: 'bg-yellow-500' },
-  O7_PURPOSING: { label: 'Purposing', color: 'bg-orange-500' },
-  O8_META_OBSERVING: { label: 'Observing', color: 'bg-red-500' },
-  O9_UNIFYING: { label: 'Unifying', color: 'bg-pink-500' },
-  O10_ABSOLVING: { label: 'Absolving', color: 'bg-purple-500' },
+  O6_AGENCY: { label: 'Directing', color: 'bg-green-500' },
+  O7_REASONING: { label: 'Reasoning', color: 'bg-yellow-500' },
+  O8_PURPOSE: { label: 'Purposing', color: 'bg-orange-500' },
+  O9_WITNESSES: { label: 'Observing', color: 'bg-red-500' },
+  O10_UNIFYING: { label: 'Unifying', color: 'bg-pink-500' },
+  O12_ABSOLVING: { label: 'Absolving', color: 'bg-purple-500' },
 };
 
 export function OntologicalRadar({ dimensions, compact = false }: OntologicalRadarProps) {

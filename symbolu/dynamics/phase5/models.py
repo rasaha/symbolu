@@ -39,15 +39,15 @@ class DynamicState:
 
     Attributes:
         time_step: The discrete time step (0-indexed)
-        layer_id: Current ontological layer (e.g., "O1_ACTING")
-        layer_index: Numeric layer index (1-10)
+        layer_id: Current ontological layer (e.g., "O1_POTENTIAL")
+        layer_index: Numeric layer index (1-12)
         activation_level: Current activation (0.0 to 1.0)
         momentum: Accumulated directional force (-1.0 to 1.0)
             Positive = upward, Negative = downward
         direction: Current movement direction
         distortion_load: Accumulated distortion pressure (0.0+)
         sublimation_load: Accumulated sublimation pressure (0.0+)
-        termination_flag: True if O10 termination occurred
+        termination_flag: True if O12 termination occurred
         regression_flag: True if downward movement due to load
     """
 
@@ -67,8 +67,8 @@ class DynamicState:
         if not isinstance(self.time_step, int) or self.time_step < 0:
             raise ValueError(f"time_step must be non-negative int, got {self.time_step}")
 
-        if not isinstance(self.layer_index, int) or not 1 <= self.layer_index <= 10:
-            raise ValueError(f"layer_index must be 1-10, got {self.layer_index}")
+        if not isinstance(self.layer_index, int) or not 1 <= self.layer_index <= 12:
+            raise ValueError(f"layer_index must be 1-12, got {self.layer_index}")
 
         if not 0.0 <= self.activation_level <= 1.0:
             raise ValueError(
@@ -119,7 +119,7 @@ class DynamicsConfig:
         allow_regression: If True, high load enables downward traversal.
         regression_threshold: Load level above which regression is possible.
         saturation_threshold: Momentum level at which saturation occurs.
-        o8_damping_factor: How much O8_META_OBSERVING dampens momentum.
+        o8_damping_factor: How much O9_WITNESSES dampens momentum.
     """
 
     load: float
@@ -182,7 +182,7 @@ class TrajectoryResult:
         peak_momentum: Maximum absolute momentum reached
         total_distortion: Sum of distortion loads
         total_sublimation: Sum of sublimation loads
-        terminated: True if O10 termination occurred
+        terminated: True if O12 termination occurred
         regressed: True if any downward regression occurred
         layers_visited: Set of layer IDs visited during trajectory
     """
@@ -253,16 +253,18 @@ class TrajectoryResult:
 # =============================================================================
 
 LAYER_ORDER: Tuple[str, ...] = (
-    "O1_ACTING",
-    "O2_TAGGING",
-    "O3_FORMING",
-    "O4_THINKING",
-    "O5_DIRECTING",
-    "O6_REASONING",
-    "O7_PURPOSING",
-    "O8_META_OBSERVING",
-    "O9_UNIFYING",
-    "O10_ABSOLVING",
+    "O1_POTENTIAL",
+    "O2_IDENTITY",
+    "O3_EXECUTION",
+    "O4_STRUCTURE",
+    "O5_COGNITION",
+    "O6_AGENCY",
+    "O7_REASONING",
+    "O8_PURPOSE",
+    "O9_WITNESSES",
+    "O10_UNIFYING",
+    "O11_INTEGRATION",
+    "O12_ABSOLVING",
 )
 
 LAYER_TO_INDEX: dict = {layer: i + 1 for i, layer in enumerate(LAYER_ORDER)}
@@ -270,10 +272,10 @@ INDEX_TO_LAYER: dict = {i + 1: layer for i, layer in enumerate(LAYER_ORDER)}
 
 
 def get_layer_index(layer_id: str) -> int:
-    """Get numeric index (1-10) for a layer ID."""
+    """Get numeric index (1-12) for a layer ID."""
     return LAYER_TO_INDEX.get(layer_id, 0)
 
 
 def get_layer_by_index(index: int) -> Optional[str]:
-    """Get layer ID for numeric index (1-10)."""
+    """Get layer ID for numeric index (1-12)."""
     return INDEX_TO_LAYER.get(index)

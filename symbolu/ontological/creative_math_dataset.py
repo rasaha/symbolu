@@ -47,7 +47,7 @@ class CreativeMathDataset:
     Creative math dataset generator for the CREATIVITY domain.
 
     This generates content that should activate O2_FORMING (creativity)
-    rather than O6_REASONING (logic).
+    rather than O7_REASONING (logic).
     """
 
     DOMAIN = "creativity"

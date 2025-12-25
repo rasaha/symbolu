@@ -257,8 +257,8 @@ The 10 Octave Layers map to semantic categories:
   O2_FORMING     → Structure, creation, art
   O3_ACTING      → Procedures, commands, action
   O4_FEELING     → Emotions, intuition, sensing
-  O5_DIRECTING   → Guidance, instruction, leadership
-  O6_REASONING   → Logic, analysis, problem-solving
+  O6_AGENCY   → Guidance, instruction, leadership
+  O7_REASONING   → Logic, analysis, problem-solving
   O7_RELATING    → Connections, relationships
   O8_UNIFYING    → Integration, synthesis, unity
   O9_ABSOLVING   → Resolution, completion, transcendence
@@ -266,7 +266,7 @@ The 10 Octave Layers map to semantic categories:
 
 Phoneme patterns in words create natural affinities to these layers.
 For example:
-  - "analyze" → high O6_REASONING (analytical phonemes)
+  - "analyze" → high O7_REASONING (analytical phonemes)
   - "love" → high O4_FEELING, O7_RELATING (emotional phonemes)
   - "create" → high O2_FORMING (creative phonemes)
 """)

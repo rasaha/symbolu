@@ -1,7 +1,7 @@
 {
   "meta": {
     "source": "Sanskrit Varna Mala",
-    "version": "1.0",
+    "version": "2.0",
     "purpose": "Phase-1b substrate bridge meanings (pre-semantic)",
     "constraints": [
       "No dictionary meaning",
@@ -9,9 +9,9 @@
       "No observer/observed logic",
       "No contextual semantics",
       "No heuristic phonetics"
-    ]
+    ],
+    "migration_note": "Migrated from 10D to 12D layer naming (2024-12-24)"
   },
-
   "vowels": {
     "a": {
       "type": "vowel",
@@ -62,7 +62,6 @@
       "bridge_meaning": "dissolutive_attraction"
     }
   },
-
   "consonants": {
     "ka": {
       "type": "consonant",
@@ -70,16 +69,18 @@
       "bridge_meaning": "hope_pressure",
       "varna_group": "ka_varga",
       "layers": {
-        "O1_ACTING": "forward-seeking activation",
-        "O2_TAGGING": "possibility classification",
-        "O3_FORMING": "anticipatory shaping force",
-        "O4_THINKING": "projection pattern bias",
-        "O5_DIRECTING": "toward potential state",
-        "O6_REASONING": "possibility-based sequencing",
-        "O7_PURPOSING": "forward orientation vector",
-        "O8_META_OBSERVING": "projection pattern tracking",
-        "O9_UNIFYING": "collective anticipation coherence",
-        "O10_ABSOLVING": "dissolution of projection"
+        "O3_EXECUTION": "forward-seeking activation",
+        "O2_IDENTITY": "possibility classification",
+        "O4_STRUCTURE": "anticipatory shaping force",
+        "O5_COGNITION": "projection pattern bias",
+        "O6_AGENCY": "toward potential state",
+        "O7_REASONING": "possibility-based sequencing",
+        "O8_PURPOSE": "forward orientation vector",
+        "O9_WITNESSES": "projection pattern tracking",
+        "O10_UNIFYING": "collective anticipation coherence",
+        "O12_ABSOLVING": "dissolution of projection",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "kha": {
@@ -88,16 +89,18 @@
       "bridge_meaning": "worry_pressure",
       "varna_group": "ka_varga",
       "layers": {
-        "O1_ACTING": "vigilance activation state",
-        "O2_TAGGING": "impediment classification",
-        "O3_FORMING": "constriction shaping force",
-        "O4_THINKING": "obstacle detection bias",
-        "O5_DIRECTING": "toward impedance scanning",
-        "O6_REASONING": "contingency-based sequencing",
-        "O7_PURPOSING": "prevention orientation vector",
-        "O8_META_OBSERVING": "impediment pattern tracking",
-        "O9_UNIFYING": "distributed vigilance coherence",
-        "O10_ABSOLVING": "vigilance termination"
+        "O3_EXECUTION": "vigilance activation state",
+        "O2_IDENTITY": "impediment classification",
+        "O4_STRUCTURE": "constriction shaping force",
+        "O5_COGNITION": "obstacle detection bias",
+        "O6_AGENCY": "toward impedance scanning",
+        "O7_REASONING": "contingency-based sequencing",
+        "O8_PURPOSE": "prevention orientation vector",
+        "O9_WITNESSES": "impediment pattern tracking",
+        "O10_UNIFYING": "distributed vigilance coherence",
+        "O12_ABSOLVING": "vigilance termination",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ga": {
@@ -106,16 +109,18 @@
       "bridge_meaning": "action_pressure",
       "varna_group": "ka_varga",
       "layers": {
-        "O1_ACTING": "kinetic initiation state",
-        "O2_TAGGING": "activity classification",
-        "O3_FORMING": "momentum shaping force",
-        "O4_THINKING": "action-vector bias",
-        "O5_DIRECTING": "toward execution",
-        "O6_REASONING": "execution-based sequencing",
-        "O7_PURPOSING": "completion orientation vector",
-        "O8_META_OBSERVING": "momentum pattern tracking",
-        "O9_UNIFYING": "coordinated kinetic coherence",
-        "O10_ABSOLVING": "completion of momentum"
+        "O3_EXECUTION": "kinetic initiation state",
+        "O2_IDENTITY": "activity classification",
+        "O4_STRUCTURE": "momentum shaping force",
+        "O5_COGNITION": "action-vector bias",
+        "O6_AGENCY": "toward execution",
+        "O7_REASONING": "execution-based sequencing",
+        "O8_PURPOSE": "completion orientation vector",
+        "O9_WITNESSES": "momentum pattern tracking",
+        "O10_UNIFYING": "coordinated kinetic coherence",
+        "O12_ABSOLVING": "completion of momentum",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "gha": {
@@ -124,16 +129,18 @@
       "bridge_meaning": "attachment_pressure",
       "varna_group": "ka_varga",
       "layers": {
-        "O1_ACTING": "adhesion activation state",
-        "O2_TAGGING": "possession classification",
-        "O3_FORMING": "cohesion shaping force",
-        "O4_THINKING": "retention pattern bias",
-        "O5_DIRECTING": "toward retention",
-        "O6_REASONING": "retention-based sequencing",
-        "O7_PURPOSING": "preservation orientation vector",
-        "O8_META_OBSERVING": "adhesion pattern tracking",
-        "O9_UNIFYING": "cohesive field integration",
-        "O10_ABSOLVING": "unbinding dissolution"
+        "O3_EXECUTION": "adhesion activation state",
+        "O2_IDENTITY": "possession classification",
+        "O4_STRUCTURE": "cohesion shaping force",
+        "O5_COGNITION": "retention pattern bias",
+        "O6_AGENCY": "toward retention",
+        "O7_REASONING": "retention-based sequencing",
+        "O8_PURPOSE": "preservation orientation vector",
+        "O9_WITNESSES": "adhesion pattern tracking",
+        "O10_UNIFYING": "cohesive field integration",
+        "O12_ABSOLVING": "unbinding dissolution",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "nga": {
@@ -142,35 +149,38 @@
       "bridge_meaning": "nasal_marker_pressure",
       "varna_group": "ka_varga",
       "layers": {
-        "O1_ACTING": "resonance marking activation",
-        "O2_TAGGING": "nasal categorization",
-        "O3_FORMING": "echo shaping force",
-        "O4_THINKING": "resonance pattern bias",
-        "O5_DIRECTING": "toward marking",
-        "O6_REASONING": "marking-based sequencing",
-        "O7_PURPOSING": "indication orientation vector",
-        "O8_META_OBSERVING": "marking pattern tracking",
-        "O9_UNIFYING": "marker field integration",
-        "O10_ABSOLVING": "attenuation of marking"
+        "O3_EXECUTION": "resonance marking activation",
+        "O2_IDENTITY": "nasal categorization",
+        "O4_STRUCTURE": "echo shaping force",
+        "O5_COGNITION": "resonance pattern bias",
+        "O6_AGENCY": "toward marking",
+        "O7_REASONING": "marking-based sequencing",
+        "O8_PURPOSE": "indication orientation vector",
+        "O9_WITNESSES": "marking pattern tracking",
+        "O10_UNIFYING": "marker field integration",
+        "O12_ABSOLVING": "attenuation of marking",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "ca": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "conscience_pressure",
       "varna_group": "ca_varga",
       "layers": {
-        "O1_ACTING": "boundary-checking activation",
-        "O2_TAGGING": "limit-marker classification",
-        "O3_FORMING": "constraint shaping force",
-        "O4_THINKING": "boundary detection bias",
-        "O5_DIRECTING": "toward boundary maintenance",
-        "O6_REASONING": "constraint-based sequencing",
-        "O7_PURPOSING": "alignment orientation vector",
-        "O8_META_OBSERVING": "boundary pattern tracking",
-        "O9_UNIFYING": "distributed constraint coherence",
-        "O10_ABSOLVING": "transcendence of boundary"
+        "O3_EXECUTION": "boundary-checking activation",
+        "O2_IDENTITY": "limit-marker classification",
+        "O4_STRUCTURE": "constraint shaping force",
+        "O5_COGNITION": "boundary detection bias",
+        "O6_AGENCY": "toward boundary maintenance",
+        "O7_REASONING": "constraint-based sequencing",
+        "O8_PURPOSE": "alignment orientation vector",
+        "O9_WITNESSES": "boundary pattern tracking",
+        "O10_UNIFYING": "distributed constraint coherence",
+        "O12_ABSOLVING": "transcendence of boundary",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "cha": {
@@ -179,16 +189,18 @@
       "bridge_meaning": "nervous_breakdown_pressure",
       "varna_group": "ca_varga",
       "layers": {
-        "O1_ACTING": "threshold-breach activation",
-        "O2_TAGGING": "overload classification",
-        "O3_FORMING": "fragmentation shaping force",
-        "O4_THINKING": "saturation pattern bias",
-        "O5_DIRECTING": "toward threshold collapse",
-        "O6_REASONING": "saturation-based sequencing",
-        "O7_PURPOSING": "discharge orientation vector",
-        "O8_META_OBSERVING": "saturation pattern tracking",
-        "O9_UNIFYING": "cascading fragmentation field",
-        "O10_ABSOLVING": "system reset termination"
+        "O3_EXECUTION": "threshold-breach activation",
+        "O2_IDENTITY": "overload classification",
+        "O4_STRUCTURE": "fragmentation shaping force",
+        "O5_COGNITION": "saturation pattern bias",
+        "O6_AGENCY": "toward threshold collapse",
+        "O7_REASONING": "saturation-based sequencing",
+        "O8_PURPOSE": "discharge orientation vector",
+        "O9_WITNESSES": "saturation pattern tracking",
+        "O10_UNIFYING": "cascading fragmentation field",
+        "O12_ABSOLVING": "system reset termination",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ja": {
@@ -197,16 +209,18 @@
       "bridge_meaning": "ego_pressure",
       "varna_group": "ca_varga",
       "layers": {
-        "O1_ACTING": "self-referencing activation",
-        "O2_TAGGING": "self-other differentiation",
-        "O3_FORMING": "individuation shaping force",
-        "O4_THINKING": "self-reference pattern bias",
-        "O5_DIRECTING": "toward self-boundary",
-        "O6_REASONING": "self-referential sequencing",
-        "O7_PURPOSING": "individuation orientation vector",
-        "O8_META_OBSERVING": "self-boundary tracking",
-        "O9_UNIFYING": "differentiated field integration",
-        "O10_ABSOLVING": "dissolution of self-reference"
+        "O3_EXECUTION": "self-referencing activation",
+        "O2_IDENTITY": "self-other differentiation",
+        "O4_STRUCTURE": "individuation shaping force",
+        "O5_COGNITION": "self-reference pattern bias",
+        "O6_AGENCY": "toward self-boundary",
+        "O7_REASONING": "self-referential sequencing",
+        "O8_PURPOSE": "individuation orientation vector",
+        "O9_WITNESSES": "self-boundary tracking",
+        "O10_UNIFYING": "differentiated field integration",
+        "O12_ABSOLVING": "dissolution of self-reference",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "jha": {
@@ -215,16 +229,18 @@
       "bridge_meaning": "greed_pressure",
       "varna_group": "ca_varga",
       "layers": {
-        "O1_ACTING": "deficit-driven acquisition activation",
-        "O2_TAGGING": "deficit-surplus classification",
-        "O3_FORMING": "aggregation shaping force",
-        "O4_THINKING": "deficit pattern bias",
-        "O5_DIRECTING": "toward aggregation",
-        "O6_REASONING": "acquisition-based sequencing",
-        "O7_PURPOSING": "accumulation orientation vector",
-        "O8_META_OBSERVING": "aggregation pattern tracking",
-        "O9_UNIFYING": "pooled accumulation field",
-        "O10_ABSOLVING": "exhaustion of deficit"
+        "O3_EXECUTION": "deficit-driven acquisition activation",
+        "O2_IDENTITY": "deficit-surplus classification",
+        "O4_STRUCTURE": "aggregation shaping force",
+        "O5_COGNITION": "deficit pattern bias",
+        "O6_AGENCY": "toward aggregation",
+        "O7_REASONING": "acquisition-based sequencing",
+        "O8_PURPOSE": "accumulation orientation vector",
+        "O9_WITNESSES": "aggregation pattern tracking",
+        "O10_UNIFYING": "pooled accumulation field",
+        "O12_ABSOLVING": "exhaustion of deficit",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "nya": {
@@ -233,35 +249,38 @@
       "bridge_meaning": "hypocrisy_pressure",
       "varna_group": "ca_varga",
       "layers": {
-        "O1_ACTING": "surface-depth divergence activation",
-        "O2_TAGGING": "internal-external differentiation",
-        "O3_FORMING": "discrepancy shaping force",
-        "O4_THINKING": "divergence pattern bias",
-        "O5_DIRECTING": "toward surface maintenance",
-        "O6_REASONING": "divergent sequencing",
-        "O7_PURPOSING": "discrepancy orientation vector",
-        "O8_META_OBSERVING": "divergence pattern tracking",
-        "O9_UNIFYING": "split-field integration",
-        "O10_ABSOLVING": "convergence of layers"
+        "O3_EXECUTION": "surface-depth divergence activation",
+        "O2_IDENTITY": "internal-external differentiation",
+        "O4_STRUCTURE": "discrepancy shaping force",
+        "O5_COGNITION": "divergence pattern bias",
+        "O6_AGENCY": "toward surface maintenance",
+        "O7_REASONING": "divergent sequencing",
+        "O8_PURPOSE": "discrepancy orientation vector",
+        "O9_WITNESSES": "divergence pattern tracking",
+        "O10_UNIFYING": "split-field integration",
+        "O12_ABSOLVING": "convergence of layers",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "tta": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "overstatement_pressure",
       "varna_group": "tta_varga",
       "layers": {
-        "O1_ACTING": "amplification activation state",
-        "O2_TAGGING": "magnitude classification",
-        "O3_FORMING": "amplification shaping force",
-        "O4_THINKING": "magnification pattern bias",
-        "O5_DIRECTING": "toward emphasis",
-        "O6_REASONING": "amplification-based sequencing",
-        "O7_PURPOSING": "impact maximization orientation vector",
-        "O8_META_OBSERVING": "amplification pattern tracking",
-        "O9_UNIFYING": "amplified field coherence",
-        "O10_ABSOLVING": "attenuation of amplification"
+        "O3_EXECUTION": "amplification activation state",
+        "O2_IDENTITY": "magnitude classification",
+        "O4_STRUCTURE": "amplification shaping force",
+        "O5_COGNITION": "magnification pattern bias",
+        "O6_AGENCY": "toward emphasis",
+        "O7_REASONING": "amplification-based sequencing",
+        "O8_PURPOSE": "impact maximization orientation vector",
+        "O9_WITNESSES": "amplification pattern tracking",
+        "O10_UNIFYING": "amplified field coherence",
+        "O12_ABSOLVING": "attenuation of amplification",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ttha": {
@@ -270,16 +289,18 @@
       "bridge_meaning": "repentance_pressure",
       "varna_group": "tta_varga",
       "layers": {
-        "O1_ACTING": "reversal activation state",
-        "O2_TAGGING": "prior-action classification",
-        "O3_FORMING": "retraction shaping force",
-        "O4_THINKING": "reversal pattern bias",
-        "O5_DIRECTING": "toward undoing",
-        "O6_REASONING": "correction-based sequencing",
-        "O7_PURPOSING": "reversal orientation vector",
-        "O8_META_OBSERVING": "retraction pattern tracking",
-        "O9_UNIFYING": "corrective field integration",
-        "O10_ABSOLVING": "prior-trace termination"
+        "O3_EXECUTION": "reversal activation state",
+        "O2_IDENTITY": "prior-action classification",
+        "O4_STRUCTURE": "retraction shaping force",
+        "O5_COGNITION": "reversal pattern bias",
+        "O6_AGENCY": "toward undoing",
+        "O7_REASONING": "correction-based sequencing",
+        "O8_PURPOSE": "reversal orientation vector",
+        "O9_WITNESSES": "retraction pattern tracking",
+        "O10_UNIFYING": "corrective field integration",
+        "O12_ABSOLVING": "prior-trace termination",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "dda": {
@@ -288,16 +309,18 @@
       "bridge_meaning": "shyness_pressure",
       "varna_group": "tta_varga",
       "layers": {
-        "O1_ACTING": "withdrawal activation state",
-        "O2_TAGGING": "exposure classification",
-        "O3_FORMING": "contraction shaping force",
-        "O4_THINKING": "exposure-avoidance bias",
-        "O5_DIRECTING": "toward concealment",
-        "O6_REASONING": "concealment-based sequencing",
-        "O7_PURPOSING": "withdrawal orientation vector",
-        "O8_META_OBSERVING": "exposure pattern tracking",
-        "O9_UNIFYING": "contracted field integration",
-        "O10_ABSOLVING": "exhaustion of withdrawal"
+        "O3_EXECUTION": "withdrawal activation state",
+        "O2_IDENTITY": "exposure classification",
+        "O4_STRUCTURE": "contraction shaping force",
+        "O5_COGNITION": "exposure-avoidance bias",
+        "O6_AGENCY": "toward concealment",
+        "O7_REASONING": "concealment-based sequencing",
+        "O8_PURPOSE": "withdrawal orientation vector",
+        "O9_WITNESSES": "exposure pattern tracking",
+        "O10_UNIFYING": "contracted field integration",
+        "O12_ABSOLVING": "exhaustion of withdrawal",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ddha": {
@@ -306,16 +329,18 @@
       "bridge_meaning": "sadistic_cruelty_pressure",
       "varna_group": "tta_varga",
       "layers": {
-        "O1_ACTING": "intensification activation state",
-        "O2_TAGGING": "target classification",
-        "O3_FORMING": "concentrated force shaping",
-        "O4_THINKING": "intensity pattern bias",
-        "O5_DIRECTING": "toward maximum impact",
-        "O6_REASONING": "intensity-based sequencing",
-        "O7_PURPOSING": "force application orientation vector",
-        "O8_META_OBSERVING": "impact pattern tracking",
-        "O9_UNIFYING": "concentrated force integration",
-        "O10_ABSOLVING": "collapse of intensification"
+        "O3_EXECUTION": "intensification activation state",
+        "O2_IDENTITY": "target classification",
+        "O4_STRUCTURE": "concentrated force shaping",
+        "O5_COGNITION": "intensity pattern bias",
+        "O6_AGENCY": "toward maximum impact",
+        "O7_REASONING": "intensity-based sequencing",
+        "O8_PURPOSE": "force application orientation vector",
+        "O9_WITNESSES": "impact pattern tracking",
+        "O10_UNIFYING": "concentrated force integration",
+        "O12_ABSOLVING": "collapse of intensification",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "nna": {
@@ -324,35 +349,38 @@
       "bridge_meaning": "envy_pressure",
       "varna_group": "tta_varga",
       "layers": {
-        "O1_ACTING": "differential sensing activation",
-        "O2_TAGGING": "disparity classification",
-        "O3_FORMING": "comparison shaping force",
-        "O4_THINKING": "disparity pattern bias",
-        "O5_DIRECTING": "toward equilibration",
-        "O6_REASONING": "comparison-based sequencing",
-        "O7_PURPOSING": "parity orientation vector",
-        "O8_META_OBSERVING": "disparity pattern tracking",
-        "O9_UNIFYING": "comparative field integration",
-        "O10_ABSOLVING": "absorption of differential"
+        "O3_EXECUTION": "differential sensing activation",
+        "O2_IDENTITY": "disparity classification",
+        "O4_STRUCTURE": "comparison shaping force",
+        "O5_COGNITION": "disparity pattern bias",
+        "O6_AGENCY": "toward equilibration",
+        "O7_REASONING": "comparison-based sequencing",
+        "O8_PURPOSE": "parity orientation vector",
+        "O9_WITNESSES": "disparity pattern tracking",
+        "O10_UNIFYING": "comparative field integration",
+        "O12_ABSOLVING": "absorption of differential",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "ta": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "inertia_pressure",
       "varna_group": "ta_varga",
       "layers": {
-        "O1_ACTING": "resistance activation state",
-        "O2_TAGGING": "stasis classification",
-        "O3_FORMING": "stability shaping force",
-        "O4_THINKING": "conservation pattern bias",
-        "O5_DIRECTING": "toward maintenance",
-        "O6_REASONING": "conservation-based sequencing",
-        "O7_PURPOSING": "preservation orientation vector",
-        "O8_META_OBSERVING": "stasis pattern tracking",
-        "O9_UNIFYING": "steady state coherence",
-        "O10_ABSOLVING": "resistance termination"
+        "O3_EXECUTION": "resistance activation state",
+        "O2_IDENTITY": "stasis classification",
+        "O4_STRUCTURE": "stability shaping force",
+        "O5_COGNITION": "conservation pattern bias",
+        "O6_AGENCY": "toward maintenance",
+        "O7_REASONING": "conservation-based sequencing",
+        "O8_PURPOSE": "preservation orientation vector",
+        "O9_WITNESSES": "stasis pattern tracking",
+        "O10_UNIFYING": "steady state coherence",
+        "O12_ABSOLVING": "resistance termination",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "tha": {
@@ -361,16 +389,18 @@
       "bridge_meaning": "melancholy_pressure",
       "varna_group": "ta_varga",
       "layers": {
-        "O1_ACTING": "depletion activation state",
-        "O2_TAGGING": "diminishment classification",
-        "O3_FORMING": "recession shaping force",
-        "O4_THINKING": "diminishment pattern bias",
-        "O5_DIRECTING": "toward withdrawal",
-        "O6_REASONING": "reduction-based sequencing",
-        "O7_PURPOSING": "recession orientation vector",
-        "O8_META_OBSERVING": "depletion pattern tracking",
-        "O9_UNIFYING": "diminished field integration",
-        "O10_ABSOLVING": "absorption into stillness"
+        "O3_EXECUTION": "depletion activation state",
+        "O2_IDENTITY": "diminishment classification",
+        "O4_STRUCTURE": "recession shaping force",
+        "O5_COGNITION": "diminishment pattern bias",
+        "O6_AGENCY": "toward withdrawal",
+        "O7_REASONING": "reduction-based sequencing",
+        "O8_PURPOSE": "recession orientation vector",
+        "O9_WITNESSES": "depletion pattern tracking",
+        "O10_UNIFYING": "diminished field integration",
+        "O12_ABSOLVING": "absorption into stillness",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "da": {
@@ -379,16 +409,18 @@
       "bridge_meaning": "irritability_pressure",
       "varna_group": "ta_varga",
       "layers": {
-        "O1_ACTING": "friction activation state",
-        "O2_TAGGING": "disturbance classification",
-        "O3_FORMING": "friction shaping force",
-        "O4_THINKING": "disturbance pattern bias",
-        "O5_DIRECTING": "toward discharge",
-        "O6_REASONING": "friction-based sequencing",
-        "O7_PURPOSING": "discharge orientation vector",
-        "O8_META_OBSERVING": "friction pattern tracking",
-        "O9_UNIFYING": "friction field integration",
-        "O10_ABSOLVING": "dissipation of friction"
+        "O3_EXECUTION": "friction activation state",
+        "O2_IDENTITY": "disturbance classification",
+        "O4_STRUCTURE": "friction shaping force",
+        "O5_COGNITION": "disturbance pattern bias",
+        "O6_AGENCY": "toward discharge",
+        "O7_REASONING": "friction-based sequencing",
+        "O8_PURPOSE": "discharge orientation vector",
+        "O9_WITNESSES": "friction pattern tracking",
+        "O10_UNIFYING": "friction field integration",
+        "O12_ABSOLVING": "dissipation of friction",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "dha": {
@@ -397,16 +429,18 @@
       "bridge_meaning": "craving_pressure",
       "varna_group": "ta_varga",
       "layers": {
-        "O1_ACTING": "pull activation state",
-        "O2_TAGGING": "attractor classification",
-        "O3_FORMING": "attraction shaping force",
-        "O4_THINKING": "attractor pattern bias",
-        "O5_DIRECTING": "toward acquisition",
-        "O6_REASONING": "attraction-based sequencing",
-        "O7_PURPOSING": "acquisition orientation vector",
-        "O8_META_OBSERVING": "attraction pattern tracking",
-        "O9_UNIFYING": "attraction field integration",
-        "O10_ABSOLVING": "exhaustion of pull"
+        "O3_EXECUTION": "pull activation state",
+        "O2_IDENTITY": "attractor classification",
+        "O4_STRUCTURE": "attraction shaping force",
+        "O5_COGNITION": "attractor pattern bias",
+        "O6_AGENCY": "toward acquisition",
+        "O7_REASONING": "attraction-based sequencing",
+        "O8_PURPOSE": "acquisition orientation vector",
+        "O9_WITNESSES": "attraction pattern tracking",
+        "O10_UNIFYING": "attraction field integration",
+        "O12_ABSOLVING": "exhaustion of pull",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "na": {
@@ -415,35 +449,38 @@
       "bridge_meaning": "attachment_pressure",
       "varna_group": "ta_varga",
       "layers": {
-        "O1_ACTING": "binding activation state",
-        "O2_TAGGING": "connection classification",
-        "O3_FORMING": "linkage shaping force",
-        "O4_THINKING": "connection pattern bias",
-        "O5_DIRECTING": "toward bonding",
-        "O6_REASONING": "linkage-based sequencing",
-        "O7_PURPOSING": "connection orientation vector",
-        "O8_META_OBSERVING": "linkage pattern tracking",
-        "O9_UNIFYING": "bonded field integration",
-        "O10_ABSOLVING": "dissolution of linkage"
+        "O3_EXECUTION": "binding activation state",
+        "O2_IDENTITY": "connection classification",
+        "O4_STRUCTURE": "linkage shaping force",
+        "O5_COGNITION": "connection pattern bias",
+        "O6_AGENCY": "toward bonding",
+        "O7_REASONING": "linkage-based sequencing",
+        "O8_PURPOSE": "connection orientation vector",
+        "O9_WITNESSES": "linkage pattern tracking",
+        "O10_UNIFYING": "bonded field integration",
+        "O12_ABSOLVING": "dissolution of linkage",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "pa": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "revulsion_pressure",
       "varna_group": "pa_varga",
       "layers": {
-        "O1_ACTING": "repulsion activation state",
-        "O2_TAGGING": "repellent classification",
-        "O3_FORMING": "separation shaping force",
-        "O4_THINKING": "repulsion pattern bias",
-        "O5_DIRECTING": "toward separation",
-        "O6_REASONING": "repulsion-based sequencing",
-        "O7_PURPOSING": "separation orientation vector",
-        "O8_META_OBSERVING": "repulsion pattern tracking",
-        "O9_UNIFYING": "dispersive field integration",
-        "O10_ABSOLVING": "neutralization of repulsion"
+        "O3_EXECUTION": "repulsion activation state",
+        "O2_IDENTITY": "repellent classification",
+        "O4_STRUCTURE": "separation shaping force",
+        "O5_COGNITION": "repulsion pattern bias",
+        "O6_AGENCY": "toward separation",
+        "O7_REASONING": "repulsion-based sequencing",
+        "O8_PURPOSE": "separation orientation vector",
+        "O9_WITNESSES": "repulsion pattern tracking",
+        "O10_UNIFYING": "dispersive field integration",
+        "O12_ABSOLVING": "neutralization of repulsion",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "pha": {
@@ -452,16 +489,18 @@
       "bridge_meaning": "fear_pressure",
       "varna_group": "pa_varga",
       "layers": {
-        "O1_ACTING": "contraction activation state",
-        "O2_TAGGING": "aversive stimulus classification",
-        "O3_FORMING": "defensive contraction force",
-        "O4_THINKING": "aversive pattern bias",
-        "O5_DIRECTING": "toward protective state",
-        "O6_REASONING": "protective sequencing",
-        "O7_PURPOSING": "preservation orientation vector",
-        "O8_META_OBSERVING": "aversive pattern tracking",
-        "O9_UNIFYING": "contracted field integration",
-        "O10_ABSOLVING": "exhaustion of contraction"
+        "O3_EXECUTION": "contraction activation state",
+        "O2_IDENTITY": "aversive stimulus classification",
+        "O4_STRUCTURE": "defensive contraction force",
+        "O5_COGNITION": "aversive pattern bias",
+        "O6_AGENCY": "toward protective state",
+        "O7_REASONING": "protective sequencing",
+        "O8_PURPOSE": "preservation orientation vector",
+        "O9_WITNESSES": "aversive pattern tracking",
+        "O10_UNIFYING": "contracted field integration",
+        "O12_ABSOLVING": "exhaustion of contraction",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ba": {
@@ -470,16 +509,18 @@
       "bridge_meaning": "indifference_pressure",
       "varna_group": "pa_varga",
       "layers": {
-        "O1_ACTING": "disengagement activation state",
-        "O2_TAGGING": "non-relevance classification",
-        "O3_FORMING": "detachment shaping force",
-        "O4_THINKING": "disconnection pattern bias",
-        "O5_DIRECTING": "toward detachment",
-        "O6_REASONING": "detachment-based sequencing",
-        "O7_PURPOSING": "disengagement orientation vector",
-        "O8_META_OBSERVING": "detachment pattern tracking",
-        "O9_UNIFYING": "dispersed field integration",
-        "O10_ABSOLVING": "nullification of engagement"
+        "O3_EXECUTION": "disengagement activation state",
+        "O2_IDENTITY": "non-relevance classification",
+        "O4_STRUCTURE": "detachment shaping force",
+        "O5_COGNITION": "disconnection pattern bias",
+        "O6_AGENCY": "toward detachment",
+        "O7_REASONING": "detachment-based sequencing",
+        "O8_PURPOSE": "disengagement orientation vector",
+        "O9_WITNESSES": "detachment pattern tracking",
+        "O10_UNIFYING": "dispersed field integration",
+        "O12_ABSOLVING": "nullification of engagement",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "bha": {
@@ -488,16 +529,18 @@
       "bridge_meaning": "delusion_pressure",
       "varna_group": "pa_varga",
       "layers": {
-        "O1_ACTING": "distortion activation state",
-        "O2_TAGGING": "signal-noise misclassification",
-        "O3_FORMING": "distortion shaping force",
-        "O4_THINKING": "signal distortion bias",
-        "O5_DIRECTING": "toward signal drift",
-        "O6_REASONING": "distortion-based sequencing",
-        "O7_PURPOSING": "divergent signal orientation vector",
-        "O8_META_OBSERVING": "distortion pattern tracking",
-        "O9_UNIFYING": "distorted field integration",
-        "O10_ABSOLVING": "distortion termination"
+        "O3_EXECUTION": "distortion activation state",
+        "O2_IDENTITY": "signal-noise misclassification",
+        "O4_STRUCTURE": "distortion shaping force",
+        "O5_COGNITION": "signal distortion bias",
+        "O6_AGENCY": "toward signal drift",
+        "O7_REASONING": "distortion-based sequencing",
+        "O8_PURPOSE": "divergent signal orientation vector",
+        "O9_WITNESSES": "distortion pattern tracking",
+        "O10_UNIFYING": "distorted field integration",
+        "O12_ABSOLVING": "distortion termination",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ma": {
@@ -506,35 +549,38 @@
       "bridge_meaning": "indulgence_pressure",
       "varna_group": "pa_varga",
       "layers": {
-        "O1_ACTING": "saturation activation state",
-        "O2_TAGGING": "surplus classification",
-        "O3_FORMING": "saturation shaping force",
-        "O4_THINKING": "saturation pattern bias",
-        "O5_DIRECTING": "toward saturation",
-        "O6_REASONING": "saturation-based sequencing",
-        "O7_PURPOSING": "saturation orientation vector",
-        "O8_META_OBSERVING": "saturation pattern tracking",
-        "O9_UNIFYING": "saturated field integration",
-        "O10_ABSOLVING": "exhaustion of saturation"
+        "O3_EXECUTION": "saturation activation state",
+        "O2_IDENTITY": "surplus classification",
+        "O4_STRUCTURE": "saturation shaping force",
+        "O5_COGNITION": "saturation pattern bias",
+        "O6_AGENCY": "toward saturation",
+        "O7_REASONING": "saturation-based sequencing",
+        "O8_PURPOSE": "saturation orientation vector",
+        "O9_WITNESSES": "saturation pattern tracking",
+        "O10_UNIFYING": "saturated field integration",
+        "O12_ABSOLVING": "exhaustion of saturation",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "ya": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "distrust_pressure",
       "varna_group": "semi_vowel",
       "layers": {
-        "O1_ACTING": "verification activation state",
-        "O2_TAGGING": "uncertainty classification",
-        "O3_FORMING": "verification shaping force",
-        "O4_THINKING": "uncertainty pattern bias",
-        "O5_DIRECTING": "toward verification",
-        "O6_REASONING": "verification-based sequencing",
-        "O7_PURPOSING": "validation orientation vector",
-        "O8_META_OBSERVING": "verification pattern tracking",
-        "O9_UNIFYING": "verification field integration",
-        "O10_ABSOLVING": "dissolution of uncertainty"
+        "O3_EXECUTION": "verification activation state",
+        "O2_IDENTITY": "uncertainty classification",
+        "O4_STRUCTURE": "verification shaping force",
+        "O5_COGNITION": "uncertainty pattern bias",
+        "O6_AGENCY": "toward verification",
+        "O7_REASONING": "verification-based sequencing",
+        "O8_PURPOSE": "validation orientation vector",
+        "O9_WITNESSES": "verification pattern tracking",
+        "O10_UNIFYING": "verification field integration",
+        "O12_ABSOLVING": "dissolution of uncertainty",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ra": {
@@ -543,16 +589,18 @@
       "bridge_meaning": "destruction_pressure",
       "varna_group": "semi_vowel",
       "layers": {
-        "O1_ACTING": "decomposition activation state",
-        "O2_TAGGING": "destructible classification",
-        "O3_FORMING": "dissolution shaping force",
-        "O4_THINKING": "entropy pattern bias",
-        "O5_DIRECTING": "toward dismantling",
-        "O6_REASONING": "elimination-based sequencing",
-        "O7_PURPOSING": "clearing orientation vector",
-        "O8_META_OBSERVING": "dissolution pattern tracking",
-        "O9_UNIFYING": "dissolution field integration",
-        "O10_ABSOLVING": "terminal dissolution"
+        "O3_EXECUTION": "decomposition activation state",
+        "O2_IDENTITY": "destructible classification",
+        "O4_STRUCTURE": "dissolution shaping force",
+        "O5_COGNITION": "entropy pattern bias",
+        "O6_AGENCY": "toward dismantling",
+        "O7_REASONING": "elimination-based sequencing",
+        "O8_PURPOSE": "clearing orientation vector",
+        "O9_WITNESSES": "dissolution pattern tracking",
+        "O10_UNIFYING": "dissolution field integration",
+        "O12_ABSOLVING": "terminal dissolution",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "la": {
@@ -561,16 +609,18 @@
       "bridge_meaning": "cruelty_pressure",
       "varna_group": "semi_vowel",
       "layers": {
-        "O1_ACTING": "abrasive activation state",
-        "O2_TAGGING": "friction-target classification",
-        "O3_FORMING": "abrasion shaping force",
-        "O4_THINKING": "abrasive pattern bias",
-        "O5_DIRECTING": "toward wearing down",
-        "O6_REASONING": "abrasive sequencing",
-        "O7_PURPOSING": "erosion orientation vector",
-        "O8_META_OBSERVING": "abrasion pattern tracking",
-        "O9_UNIFYING": "abrasive field integration",
-        "O10_ABSOLVING": "exhaustion of abrasion"
+        "O3_EXECUTION": "abrasive activation state",
+        "O2_IDENTITY": "friction-target classification",
+        "O4_STRUCTURE": "abrasion shaping force",
+        "O5_COGNITION": "abrasive pattern bias",
+        "O6_AGENCY": "toward wearing down",
+        "O7_REASONING": "abrasive sequencing",
+        "O8_PURPOSE": "erosion orientation vector",
+        "O9_WITNESSES": "abrasion pattern tracking",
+        "O10_UNIFYING": "abrasive field integration",
+        "O12_ABSOLVING": "exhaustion of abrasion",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "va": {
@@ -579,35 +629,38 @@
       "bridge_meaning": "external_dharma_pressure",
       "varna_group": "semi_vowel",
       "layers": {
-        "O1_ACTING": "alignment activation state",
-        "O2_TAGGING": "prescribed-pattern classification",
-        "O3_FORMING": "conformity shaping force",
-        "O4_THINKING": "external-pattern bias",
-        "O5_DIRECTING": "toward alignment",
-        "O6_REASONING": "pattern-following sequencing",
-        "O7_PURPOSING": "alignment orientation vector",
-        "O8_META_OBSERVING": "alignment pattern tracking",
-        "O9_UNIFYING": "prescribed-field integration",
-        "O10_ABSOLVING": "transcendence of prescription"
+        "O3_EXECUTION": "alignment activation state",
+        "O2_IDENTITY": "prescribed-pattern classification",
+        "O4_STRUCTURE": "conformity shaping force",
+        "O5_COGNITION": "external-pattern bias",
+        "O6_AGENCY": "toward alignment",
+        "O7_REASONING": "pattern-following sequencing",
+        "O8_PURPOSE": "alignment orientation vector",
+        "O9_WITNESSES": "alignment pattern tracking",
+        "O10_UNIFYING": "prescribed-field integration",
+        "O12_ABSOLVING": "transcendence of prescription",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "sha": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "material_greed_pressure",
       "varna_group": "sibilant",
       "layers": {
-        "O1_ACTING": "hoarding activation state",
-        "O2_TAGGING": "resource classification",
-        "O3_FORMING": "aggregation shaping force",
-        "O4_THINKING": "accumulation pattern bias",
-        "O5_DIRECTING": "toward stockpiling",
-        "O6_REASONING": "accumulation-based sequencing",
-        "O7_PURPOSING": "aggregation orientation vector",
-        "O8_META_OBSERVING": "accumulation pattern tracking",
-        "O9_UNIFYING": "aggregated field integration",
-        "O10_ABSOLVING": "dispersal of accumulation"
+        "O3_EXECUTION": "hoarding activation state",
+        "O2_IDENTITY": "resource classification",
+        "O4_STRUCTURE": "aggregation shaping force",
+        "O5_COGNITION": "accumulation pattern bias",
+        "O6_AGENCY": "toward stockpiling",
+        "O7_REASONING": "accumulation-based sequencing",
+        "O8_PURPOSE": "aggregation orientation vector",
+        "O9_WITNESSES": "accumulation pattern tracking",
+        "O10_UNIFYING": "aggregated field integration",
+        "O12_ABSOLVING": "dispersal of accumulation",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "ssa": {
@@ -616,16 +669,18 @@
       "bridge_meaning": "lust_confusion_pressure",
       "varna_group": "sibilant",
       "layers": {
-        "O1_ACTING": "sensory-pull activation state",
-        "O2_TAGGING": "sensory-attractor classification",
-        "O3_FORMING": "sensory-attraction shaping force",
-        "O4_THINKING": "sensory-pull pattern bias",
-        "O5_DIRECTING": "toward sensory attractor",
-        "O6_REASONING": "sensory-attraction sequencing",
-        "O7_PURPOSING": "sensory-approach orientation vector",
-        "O8_META_OBSERVING": "sensory-attraction tracking",
-        "O9_UNIFYING": "sensory-attraction field integration",
-        "O10_ABSOLVING": "dissolution of sensory pull"
+        "O3_EXECUTION": "sensory-pull activation state",
+        "O2_IDENTITY": "sensory-attractor classification",
+        "O4_STRUCTURE": "sensory-attraction shaping force",
+        "O5_COGNITION": "sensory-pull pattern bias",
+        "O6_AGENCY": "toward sensory attractor",
+        "O7_REASONING": "sensory-attraction sequencing",
+        "O8_PURPOSE": "sensory-approach orientation vector",
+        "O9_WITNESSES": "sensory-attraction tracking",
+        "O10_UNIFYING": "sensory-attraction field integration",
+        "O12_ABSOLVING": "dissolution of sensory pull",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
     "sa": {
@@ -634,54 +689,58 @@
       "bridge_meaning": "escape_pressure",
       "varna_group": "sibilant",
       "layers": {
-        "O1_ACTING": "exit activation state",
-        "O2_TAGGING": "exit-route classification",
-        "O3_FORMING": "evasion shaping force",
-        "O4_THINKING": "exit pattern bias",
-        "O5_DIRECTING": "toward exit",
-        "O6_REASONING": "evasion-based sequencing",
-        "O7_PURPOSING": "departure orientation vector",
-        "O8_META_OBSERVING": "exit pattern tracking",
-        "O9_UNIFYING": "flight field integration",
-        "O10_ABSOLVING": "terminal evacuation"
+        "O3_EXECUTION": "exit activation state",
+        "O2_IDENTITY": "exit-route classification",
+        "O4_STRUCTURE": "evasion shaping force",
+        "O5_COGNITION": "exit pattern bias",
+        "O6_AGENCY": "toward exit",
+        "O7_REASONING": "evasion-based sequencing",
+        "O8_PURPOSE": "departure orientation vector",
+        "O9_WITNESSES": "exit pattern tracking",
+        "O10_UNIFYING": "flight field integration",
+        "O12_ABSOLVING": "terminal evacuation",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "ha": {
       "type": "consonant",
       "aspirated": false,
       "bridge_meaning": "ignorance_pressure",
       "varna_group": "aspirate",
       "layers": {
-        "O1_ACTING": "occlusion activation state",
-        "O2_TAGGING": "non-registered classification",
-        "O3_FORMING": "occlusion shaping force",
-        "O4_THINKING": "occlusion pattern bias",
-        "O5_DIRECTING": "toward non-registration",
-        "O6_REASONING": "occlusion-based sequencing",
-        "O7_PURPOSING": "non-registration orientation vector",
-        "O8_META_OBSERVING": "occlusion pattern tracking",
-        "O9_UNIFYING": "occluded field integration",
-        "O10_ABSOLVING": "null-state transition"
+        "O3_EXECUTION": "occlusion activation state",
+        "O2_IDENTITY": "non-registered classification",
+        "O4_STRUCTURE": "occlusion shaping force",
+        "O5_COGNITION": "occlusion pattern bias",
+        "O6_AGENCY": "toward non-registration",
+        "O7_REASONING": "occlusion-based sequencing",
+        "O8_PURPOSE": "non-registration orientation vector",
+        "O9_WITNESSES": "occlusion pattern tracking",
+        "O10_UNIFYING": "occluded field integration",
+        "O12_ABSOLVING": "null-state transition",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     },
-
     "ksha": {
       "type": "consonant",
       "aspirated": true,
       "bridge_meaning": "false_knowledge_pressure",
       "varna_group": "conjunct",
       "layers": {
-        "O1_ACTING": "misalignment activation state",
-        "O2_TAGGING": "false-signal classification",
-        "O3_FORMING": "misalignment shaping force",
-        "O4_THINKING": "signal-error pattern bias",
-        "O5_DIRECTING": "toward erroneous conclusion",
-        "O6_REASONING": "error-based sequencing",
-        "O7_PURPOSING": "misaligned orientation vector",
-        "O8_META_OBSERVING": "error pattern tracking",
-        "O9_UNIFYING": "error-propagation field integration",
-        "O10_ABSOLVING": "nullification of error"
+        "O3_EXECUTION": "misalignment activation state",
+        "O2_IDENTITY": "false-signal classification",
+        "O4_STRUCTURE": "misalignment shaping force",
+        "O5_COGNITION": "signal-error pattern bias",
+        "O6_AGENCY": "toward erroneous conclusion",
+        "O7_REASONING": "error-based sequencing",
+        "O8_PURPOSE": "misaligned orientation vector",
+        "O9_WITNESSES": "error pattern tracking",
+        "O10_UNIFYING": "error-propagation field integration",
+        "O12_ABSOLVING": "nullification of error",
+        "O1_POTENTIAL": "dormant activation threshold",
+        "O11_INTEGRATION": "consolidation orientation"
       }
     }
   }

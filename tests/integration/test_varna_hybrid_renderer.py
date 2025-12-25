@@ -285,8 +285,8 @@ def test_phase_integration_points():
     # Demonstrate P6 integration (routing)
     print("8.2 P6 Regime Selection Demo:")
     regime_queries = [
-        ("I love you deeply", "REFLECT"),  # O9_UNIFYING → REFLECT
-        ("Calculate the derivative", "INFORM"),  # O6_REASONING → INFORM
+        ("I love you deeply", "REFLECT"),  # O10_UNIFYING → REFLECT
+        ("Calculate the derivative", "INFORM"),  # O7_REASONING → INFORM
         ("Run the build", "CLARIFY"),  # O3_ACTING → CLARIFY
     ]
 

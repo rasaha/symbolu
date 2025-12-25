@@ -135,7 +135,7 @@ class TestSnapshotReadOnly:
 
         request = ProjectionRequest(
             snapshot_id=snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -160,7 +160,7 @@ class TestSnapshotReadOnly:
 
         request = ProjectionRequest(
             snapshot_id=snapshot.snapshot_id,
-            layer=OntologicalLayer.META_OBSERVING,
+            layer=OntologicalLayer.WITNESSES,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -211,7 +211,7 @@ class TestSnapshotReadOnly:
 
         request = ProjectionRequest(
             snapshot_id=snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -241,7 +241,7 @@ class TestRequestReadOnly:
 
         request = ProjectionRequest(
             snapshot_id=snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -275,7 +275,7 @@ class TestRequestReadOnly:
 
         request = ProjectionRequest(
             snapshot_id=snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options
@@ -306,7 +306,7 @@ class TestRequestReadOnly:
 
         request = ProjectionRequest(
             snapshot_id=snapshot.snapshot_id,
-            layer=OntologicalLayer.META_OBSERVING,
+            layer=OntologicalLayer.WITNESSES,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.AUDIT,
             options=options
@@ -360,7 +360,7 @@ class TestMultipleRunsReadOnly:
             content_hash="abcdef1234567890deadbeefcafebabe"
         )
 
-        for layer in [OntologicalLayer.THINKING, OntologicalLayer.META_OBSERVING, OntologicalLayer.UNIFYING]:
+        for layer in [OntologicalLayer.COGNITION, OntologicalLayer.WITNESSES, OntologicalLayer.UNIFYING]:
             request = ProjectionRequest(
                 snapshot_id=snapshot.snapshot_id,
                 layer=layer,
@@ -394,7 +394,7 @@ class TestJsonSerializationReadOnly:
 
         request = ProjectionRequest(
             snapshot_id=snapshot.snapshot_id,
-            layer=OntologicalLayer.THINKING,
+            layer=OntologicalLayer.COGNITION,
             input_ref=sample_input_ref,
             projection_profile=ProjectionProfile.STANDARD,
             options=sample_options

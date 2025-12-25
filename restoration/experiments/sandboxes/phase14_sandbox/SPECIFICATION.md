@@ -86,17 +86,17 @@ Meaning can be represented through:
 │  ────────────────────────────────────                           │
 │  Input: Word + context + phonemic profile                       │
 │  Output: Primary ontological layer                              │
-│  Example: "catalyzes" → O3_ACTING (action verb)                 │
+│  Example: "catalyzes" → O3_EXECUTION (action verb)                 │
 │                                                                 │
 │  Step 5: Cross-Layer Character Derivation                       │
 │  ─────────────────────────────────────────                      │
 │  Input: Phonemic profile + primary layer                        │
 │  Output: Character propensities for other 9 layers              │
 │  Example: "catalyzes" →                                         │
-│    O1_THINKING: low (not reflective)                            │
-│    O2_FORMING: medium (creates something)                       │
-│    O3_ACTING: PRIMARY                                           │
-│    O6_REASONING: medium (implies causation)                     │
+│    O5_COGNITION: low (not reflective)                            │
+│    O4_STRUCTURE: medium (creates something)                       │
+│    O3_EXECUTION: PRIMARY                                           │
+│    O7_REASONING: medium (implies causation)                     │
 │    ...                                                          │
 │                                                                 │
 │  Step 6: K1 Atom Creation                                       │
@@ -105,7 +105,7 @@ Meaning can be represented through:
 │  Output: K1Atom stored in K1Store                               │
 │  Example:                                                       │
 │    atom_id: k1_abc123                                           │
-│    layer: O3_ACTING                                             │
+│    layer: O3_EXECUTION                                             │
 │    slot: CAUSE (catalyzes causes reaction)                      │
 │    discourse_act: TRIGGER                                       │
 │    payload_ref: "rag:chunk_id:word_pos"                         │
@@ -113,7 +113,7 @@ Meaning can be represented through:
 │                                                                 │
 │  Step 7: Pattern Accumulation                                   │
 │  ───────────────────────────                                    │
-│  Track: How often does "catalyze" → O3_ACTING?                  │
+│  Track: How often does "catalyze" → O3_EXECUTION?                  │
 │  When stable: Promote to "known mapping"                        │
 │  When conflicting: Flag for review                              │
 │                                                                 │
@@ -158,11 +158,11 @@ Meaning can be represented through:
 **Heuristic Examples**:
 | Pattern | Primary Layer |
 |---------|---------------|
-| Action verbs (run, make, do) | O3_ACTING |
-| Cognitive verbs (think, consider) | O1_THINKING |
-| Creation verbs (form, build, shape) | O2_FORMING |
-| Causal connectors (because, therefore) | O6_REASONING |
-| Goal words (aim, purpose, intend) | O7_PURPOSING |
+| Action verbs (run, make, do) | O3_EXECUTION |
+| Cognitive verbs (think, consider) | O5_COGNITION |
+| Creation verbs (form, build, shape) | O4_STRUCTURE |
+| Causal connectors (because, therefore) | O7_REASONING |
+| Goal words (aim, purpose, intend) | O8_PURPOSE |
 
 ### Step 5: Cross-Layer Character
 
@@ -193,9 +193,9 @@ WordStats = {
     "catalyze": {
         "observations": 47,
         "layer_votes": {
-            "O3_ACTING": 42,
-            "O2_FORMING": 3,
-            "O6_REASONING": 2
+            "O3_EXECUTION": 42,
+            "O4_STRUCTURE": 3,
+            "O7_REASONING": 2
         },
         "confidence": 0.89,  # 42/47
         "status": "STABLE"   # confidence > 0.8 after N observations

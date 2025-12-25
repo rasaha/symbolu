@@ -20,51 +20,51 @@ accumulation observations per word.
 
 | Word | Dominant Layer | Confidence % | Stability |
 |------|---------------|--------------|-----------|
-| truth | O5_DIRECTING | 100.0% | STABLE |
-| becoming | O3_ACTING | 100.0% | STABLE |
-| loss | O6_REASONING | 100.0% | STABLE |
-| meaning | O1_THINKING | 100.0% | STABLE |
-| essence | O5_DIRECTING | 100.0% | STABLE |
-| freedom | O1_THINKING | 100.0% | STABLE |
-| justice | O5_DIRECTING | 100.0% | STABLE |
-| wisdom | O1_THINKING | 100.0% | STABLE |
-| beauty | O3_ACTING | 100.0% | STABLE |
-| power | O3_ACTING | 100.0% | STABLE |
-| build | O3_ACTING | 100.0% | STABLE |
-| break | O3_ACTING | 100.0% | STABLE |
-| flow | O10_ABSOLVING | 100.0% | STABLE |
-| strike | O3_ACTING | 100.0% | STABLE |
-| gather | O3_ACTING | 100.0% | STABLE |
-| push | O3_ACTING | 100.0% | STABLE |
-| pull | O3_ACTING | 100.0% | STABLE |
-| throw | O10_ABSOLVING | 100.0% | STABLE |
-| catch | O3_ACTING | 100.0% | STABLE |
-| run | O9_UNIFYING | 100.0% | STABLE |
-| fear | O2_FORMING | 100.0% | STABLE |
-| calm | O3_ACTING | 100.0% | STABLE |
-| longing | O1_THINKING | 100.0% | STABLE |
-| joy | O2_FORMING | 100.0% | STABLE |
-| grief | O5_DIRECTING | 100.0% | STABLE |
-| hope | O5_DIRECTING | 100.0% | STABLE |
-| despair | O3_ACTING | 100.0% | STABLE |
-| anger | O1_THINKING | 100.0% | STABLE |
-| peace | O5_DIRECTING | 100.0% | STABLE |
-| love | O2_FORMING | 100.0% | STABLE |
-| stone | O1_THINKING | 100.0% | STABLE |
-| water | O1_THINKING | 100.0% | STABLE |
-| light | O2_FORMING | 100.0% | STABLE |
-| fire | O2_FORMING | 100.0% | STABLE |
-| wind | O3_ACTING | 100.0% | STABLE |
-| tree | O3_ACTING | 100.0% | STABLE |
-| cloud | O3_ACTING | 100.0% | STABLE |
-| earth | O2_FORMING | 100.0% | STABLE |
-| star | O5_DIRECTING | 100.0% | STABLE |
-| moon | O1_THINKING | 100.0% | STABLE |
-| change | O2_FORMING | 100.0% | STABLE |
-| process | O5_DIRECTING | 100.0% | STABLE |
-| form | O1_THINKING | 100.0% | STABLE |
-| reason | O1_THINKING | 100.0% | STABLE |
-| cause | O5_DIRECTING | 100.0% | STABLE |
+| truth | O6_AGENCY | 100.0% | STABLE |
+| becoming | O3_EXECUTION | 100.0% | STABLE |
+| loss | O7_REASONING | 100.0% | STABLE |
+| meaning | O5_COGNITION | 100.0% | STABLE |
+| essence | O6_AGENCY | 100.0% | STABLE |
+| freedom | O5_COGNITION | 100.0% | STABLE |
+| justice | O6_AGENCY | 100.0% | STABLE |
+| wisdom | O5_COGNITION | 100.0% | STABLE |
+| beauty | O3_EXECUTION | 100.0% | STABLE |
+| power | O3_EXECUTION | 100.0% | STABLE |
+| build | O3_EXECUTION | 100.0% | STABLE |
+| break | O3_EXECUTION | 100.0% | STABLE |
+| flow | O12_ABSOLVING | 100.0% | STABLE |
+| strike | O3_EXECUTION | 100.0% | STABLE |
+| gather | O3_EXECUTION | 100.0% | STABLE |
+| push | O3_EXECUTION | 100.0% | STABLE |
+| pull | O3_EXECUTION | 100.0% | STABLE |
+| throw | O12_ABSOLVING | 100.0% | STABLE |
+| catch | O3_EXECUTION | 100.0% | STABLE |
+| run | O10_UNIFYING | 100.0% | STABLE |
+| fear | O4_STRUCTURE | 100.0% | STABLE |
+| calm | O3_EXECUTION | 100.0% | STABLE |
+| longing | O5_COGNITION | 100.0% | STABLE |
+| joy | O4_STRUCTURE | 100.0% | STABLE |
+| grief | O6_AGENCY | 100.0% | STABLE |
+| hope | O6_AGENCY | 100.0% | STABLE |
+| despair | O3_EXECUTION | 100.0% | STABLE |
+| anger | O5_COGNITION | 100.0% | STABLE |
+| peace | O6_AGENCY | 100.0% | STABLE |
+| love | O4_STRUCTURE | 100.0% | STABLE |
+| stone | O5_COGNITION | 100.0% | STABLE |
+| water | O5_COGNITION | 100.0% | STABLE |
+| light | O4_STRUCTURE | 100.0% | STABLE |
+| fire | O4_STRUCTURE | 100.0% | STABLE |
+| wind | O3_EXECUTION | 100.0% | STABLE |
+| tree | O3_EXECUTION | 100.0% | STABLE |
+| cloud | O3_EXECUTION | 100.0% | STABLE |
+| earth | O4_STRUCTURE | 100.0% | STABLE |
+| star | O6_AGENCY | 100.0% | STABLE |
+| moon | O5_COGNITION | 100.0% | STABLE |
+| change | O4_STRUCTURE | 100.0% | STABLE |
+| process | O6_AGENCY | 100.0% | STABLE |
+| form | O5_COGNITION | 100.0% | STABLE |
+| reason | O5_COGNITION | 100.0% | STABLE |
+| cause | O6_AGENCY | 100.0% | STABLE |
 
 ---
 
@@ -85,23 +85,23 @@ accumulation observations per word.
 Histogram of emergent dominant layers:
 
 ```
-O1_THINKING          | #################### (10)
-O2_FORMING           | ############## (7)
-O3_ACTING            | ############################## (15)
+O5_COGNITION          | #################### (10)
+O4_STRUCTURE           | ############## (7)
+O3_EXECUTION            | ############################## (15)
 O4_TAGGING           |  (0)
-O5_DIRECTING         | ################## (9)
-O6_REASONING         | ## (1)
-O7_PURPOSING         |  (0)
-O8_META_OBSERVING    |  (0)
-O9_UNIFYING          | ## (1)
-O10_ABSOLVING        | #### (2)
+O6_AGENCY         | ################## (9)
+O7_REASONING         | ## (1)
+O8_PURPOSE         |  (0)
+O9_WITNESSES    |  (0)
+O10_UNIFYING          | ## (1)
+O12_ABSOLVING        | #### (2)
 ```
 
 **Qualitative Observations:**
 
-- **O3_ACTING** (15 words): becoming, beauty, power, build, break...
-- **O1_THINKING** (10 words): meaning, freedom, wisdom, longing, anger...
-- **O5_DIRECTING** (9 words): truth, essence, justice, grief, hope...
+- **O3_EXECUTION** (15 words): becoming, beauty, power, build, break...
+- **O5_COGNITION** (10 words): meaning, freedom, wisdom, longing, anger...
+- **O6_AGENCY** (9 words): truth, essence, justice, grief, hope...
 
 ---
 
@@ -111,11 +111,11 @@ Comparing phoneme-only routing with POS-based routing for 5 selected words:
 
 | Word | Phoneme-Only Layer | POS-Based Layer | Divergent? |
 |------|-------------------|-----------------|------------|
-| truth | O5_DIRECTING | O1_THINKING | YES |
-| build | O3_ACTING | O2_FORMING | YES |
-| fear | O2_FORMING | O1_THINKING | YES |
-| stone | O1_THINKING | O4_TAGGING | YES |
-| change | O2_FORMING | O4_TAGGING | YES |
+| truth | O6_AGENCY | O5_COGNITION | YES |
+| build | O3_EXECUTION | O4_STRUCTURE | YES |
+| fear | O4_STRUCTURE | O5_COGNITION | YES |
+| stone | O5_COGNITION | O4_TAGGING | YES |
+| change | O4_STRUCTURE | O4_TAGGING | YES |
 
 **Divergence Rate:** 5/5 words differ between methods
 
@@ -127,7 +127,7 @@ Examining phoneme category influences for select words:
 
 ### truth
 - **Phonemes:** T R UW TH
-- **Dominant Layer:** O5_DIRECTING
+- **Dominant Layer:** O6_AGENCY
 - **Vote Confidence:** 12.2%
 - **Category Influence:**
   - PLOSIVE: 25.0%
@@ -137,7 +137,7 @@ Examining phoneme category influences for select words:
 
 ### build
 - **Phonemes:** B IH L D
-- **Dominant Layer:** O3_ACTING
+- **Dominant Layer:** O3_EXECUTION
 - **Vote Confidence:** 16.5%
 - **Category Influence:**
   - PLOSIVE: 50.0%
@@ -146,7 +146,7 @@ Examining phoneme category influences for select words:
 
 ### fear
 - **Phonemes:** F IY R
-- **Dominant Layer:** O2_FORMING
+- **Dominant Layer:** O4_STRUCTURE
 - **Vote Confidence:** 11.5%
 - **Category Influence:**
   - FRICATIVE: 33.3%
@@ -155,7 +155,7 @@ Examining phoneme category influences for select words:
 
 ### stone
 - **Phonemes:** S T AA N EH
-- **Dominant Layer:** O1_THINKING
+- **Dominant Layer:** O5_COGNITION
 - **Vote Confidence:** 11.2%
 - **Category Influence:**
   - FRICATIVE: 20.0%
@@ -166,7 +166,7 @@ Examining phoneme category influences for select words:
 
 ### flow
 - **Phonemes:** F L OW
-- **Dominant Layer:** O10_ABSOLVING
+- **Dominant Layer:** O12_ABSOLVING
 - **Vote Confidence:** 11.3%
 - **Category Influence:**
   - FRICATIVE: 33.3%

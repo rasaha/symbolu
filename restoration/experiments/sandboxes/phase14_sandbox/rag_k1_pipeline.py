@@ -382,16 +382,16 @@ class RagK1Pipeline:
         """Map layer to appropriate K1 slot."""
         # Simple mapping - can be refined
         slot_mapping = {
-            OntologicalLayer.O1_THINKING: K1Slot.TARGET,
-            OntologicalLayer.O2_FORMING: K1Slot.TARGET,
-            OntologicalLayer.O3_ACTING: K1Slot.CAUSE,
+            OntologicalLayer.O5_COGNITION: K1Slot.TARGET,
+            OntologicalLayer.O4_STRUCTURE: K1Slot.TARGET,
+            OntologicalLayer.O3_EXECUTION: K1Slot.CAUSE,
             OntologicalLayer.O4_TAGGING: K1Slot.TARGET,
-            OntologicalLayer.O5_DIRECTING: K1Slot.CONSTRAINT,
-            OntologicalLayer.O6_REASONING: K1Slot.EVIDENCE,
-            OntologicalLayer.O7_PURPOSING: K1Slot.TARGET,
-            OntologicalLayer.O8_META_OBSERVING: K1Slot.REFERENCE,
-            OntologicalLayer.O9_UNIFYING: K1Slot.DEPENDENCY,
-            OntologicalLayer.O10_ABSOLVING: K1Slot.EFFECT,
+            OntologicalLayer.O6_AGENCY: K1Slot.CONSTRAINT,
+            OntologicalLayer.O7_REASONING: K1Slot.EVIDENCE,
+            OntologicalLayer.O8_PURPOSE: K1Slot.TARGET,
+            OntologicalLayer.O9_WITNESSES: K1Slot.REFERENCE,
+            OntologicalLayer.O10_UNIFYING: K1Slot.DEPENDENCY,
+            OntologicalLayer.O12_ABSOLVING: K1Slot.EFFECT,
         }
         return slot_mapping.get(layer, K1Slot.TARGET)
 

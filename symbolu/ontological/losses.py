@@ -273,7 +273,7 @@ class ReasoningLoss:
     """
     Task-specific loss for reasoning quality.
 
-    Focuses on O6_REASONING dimension with auxiliary signals.
+    Focuses on O7_REASONING dimension with auxiliary signals.
     """
 
     def __init__(self, weight: float = 1.0):

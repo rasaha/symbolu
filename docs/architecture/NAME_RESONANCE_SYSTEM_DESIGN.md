@@ -1021,7 +1021,7 @@ The Name Resonance System can leverage:
 1. **Existing phoneme infrastructure** (`symbolu/resonance/`)
    - ARPABET mapping
    - Varṇa bridge for Sanskrit
-   - 10D ontological layer system
+   - 12D ontological layer system
 
 2. **Existing types** (`symbolu/resonance/types.py`)
    - Extend `WordVector` for name-specific features

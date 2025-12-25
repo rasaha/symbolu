@@ -89,7 +89,7 @@ All pipeline components requiring ontology data MUST:
 from symbolu.ontology.phase4a import lookup_interaction, Phase4AInteractionMissingError
 
 try:
-    result = lookup_interaction("ka", "O1_ACTING")
+    result = lookup_interaction("ka", "O3_EXECUTION")
 except Phase4AInteractionMissingError:
     # Fail closed - do not proceed
     raise

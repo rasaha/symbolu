@@ -20,6 +20,10 @@ Usage:
     match = canonical_match("king", "queen")
     print(f"Match: {match.match_score} ({match.mode.value})")
 
+    # Rich resonance analysis (new!)
+    from symbolu.name_resonance import analyze_name_resonance, print_resonance_report
+    print_resonance_report("Rakesh", "Golf")
+
     # Quick helpers
     profile = get_profile("Campbell")
     comparison = compare_names("Campbell", "Erikson")
@@ -40,16 +44,45 @@ from symbolu.name_resonance.canonical_matcher import (
     demo_canonical_matching,
     format_result,
 )
+from symbolu.name_resonance.rich_resonance import (
+    analyze_name_resonance,
+    print_resonance_report,
+    compute_rich_resonance,
+    format_rich_report,
+    RichResonanceReport,
+    OrthogonalSignals,
+    PhaseProfile,
+    LayerAlignment,
+    AlignmentType,
+    ResonanceMode,
+    LAYER_PAIRS,
+    PHASES,
+)
 
 __all__ = [
+    # Traditional API
     "analyze_name",
     "get_profile",
     "compare_names",
     "quick_match",
     "NameResonanceResult",
+    # Canonical matching
     "canonical_match",
     "CanonicalMatchResult",
     "MatchMode",
     "demo_canonical_matching",
     "format_result",
+    # Rich resonance (new!)
+    "analyze_name_resonance",
+    "print_resonance_report",
+    "compute_rich_resonance",
+    "format_rich_report",
+    "RichResonanceReport",
+    "OrthogonalSignals",
+    "PhaseProfile",
+    "LayerAlignment",
+    "AlignmentType",
+    "ResonanceMode",
+    "LAYER_PAIRS",
+    "PHASES",
 ]
