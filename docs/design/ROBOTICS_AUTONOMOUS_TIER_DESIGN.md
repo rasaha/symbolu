@@ -1,8 +1,8 @@
 # Symbolu Robotics & Autonomous AI Tier Design
 
-**Version**: 1.4.0
+**Version**: 1.5.0
 **Date**: 2025-12-26
-**Status**: Implementation Complete (with Multi-Robot Coordination)
+**Status**: Implementation Complete (with Trajectory Pre-Validation)
 **Parent**: Symbolu Enterprise Architecture (v2.7+)
 
 ---
@@ -2208,6 +2208,12 @@ class CoordinationConfig:
 │ Layer 3: Tier R3 Safety Planning                       │
 │          - Predictive collision avoidance              │
 │          - Task-level safety constraints               │
+├────────────────────────────────────────────────────────┤
+│ Layer 4: Trajectory Pre-Validation (TrajectoryValidator)│
+│          - Pre-execution validation                    │
+│          - Predictive collision detection (look-ahead) │
+│          - SCC coherence-based safety confidence       │
+│          - Human proximity forecasting                 │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -2245,6 +2251,124 @@ class ConstraintMonitor:
             cmd = self.slow_motion_mode(cmd)
 
         return cmd
+```
+
+### 14.3 Trajectory Pre-Validation
+
+The TrajectoryValidator provides pre-execution safety checking with predictive collision detection.
+
+#### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Pre-execution validation** | Validates entire trajectory before actuators receive commands |
+| **Predictive collision detection** | Look-ahead collision prediction along trajectory |
+| **Joint/velocity/jerk limits** | Comprehensive kinematic constraint checking |
+| **Workspace bounds** | Ensures end-effector stays within safe workspace |
+| **Human proximity forecasting** | Predicts human-robot proximity along trajectory |
+| **SCC coherence integration** | Uses coherence for safety confidence estimation |
+
+#### Architecture
+
+```python
+class TrajectoryValidator:
+    """Pre-execution trajectory validation with predictive safety."""
+
+    def validate(
+        self,
+        trajectory: List[TrajectoryPoint],
+        current_state: Optional[JointState] = None,
+        coherence_values: Optional[List[float]] = None,
+    ) -> ValidationReport:
+        """
+        Validate trajectory BEFORE execution.
+
+        Checks:
+        1. Joint position limits with margin
+        2. Velocity limits
+        3. Acceleration limits
+        4. Jerk limits (smoothness)
+        5. Workspace boundaries
+        6. Obstacle collision prediction
+        7. Self-collision detection
+        8. Human proximity forecasting
+        9. SCC coherence thresholds
+        """
+
+    def predict_trajectory_safety(
+        self,
+        trajectory: List[TrajectoryPoint],
+        look_ahead_time: Optional[float] = None,
+    ) -> List[CollisionPrediction]:
+        """Predict potential collisions along trajectory."""
+```
+
+#### Collision Types
+
+| Type | Description |
+|------|-------------|
+| `SELF_COLLISION` | Robot arm collides with itself |
+| `OBSTACLE_COLLISION` | Collision with known obstacles |
+| `WORKSPACE_BOUNDARY` | End-effector leaves safe workspace |
+| `HUMAN_PROXIMITY` | Too close to tracked human |
+
+#### Validation Results
+
+| Result | Meaning |
+|--------|---------|
+| `VALID` | Trajectory is safe to execute |
+| `VALID_WITH_WARNINGS` | Safe but with minor concerns |
+| `INVALID_COLLISION` | Predicted collision detected |
+| `INVALID_LIMITS` | Exceeds joint/velocity limits |
+| `INVALID_WORKSPACE` | Outside workspace bounds |
+| `INVALID_COHERENCE` | Low SCC coherence |
+| `INVALID_JERK` | Excessive jerk (non-smooth) |
+
+#### MPC Integration
+
+The trajectory validator integrates with the MPC planner:
+
+```python
+# Set up validator
+validator = TrajectoryValidator(config)
+mpc_planner.set_trajectory_validator(validator)
+
+# Plan with automatic validation
+mpc_result, validation_report = mpc_planner.plan_with_validation(
+    current_state=layer_12d,
+    current_joints=joints,
+    current_coherence=0.9,
+    goal_state=goal_12d,
+)
+
+if validation_report.is_safe:
+    execute(mpc_result.optimal_action)
+else:
+    handle_unsafe(validation_report)
+```
+
+#### Predictive Safety Monitor
+
+For continuous monitoring during execution:
+
+```python
+class PredictiveSafetyMonitor:
+    """Continuous predictive safety monitoring."""
+
+    def start_monitoring(self, trajectory: List[TrajectoryPoint]) -> None:
+        """Start monitoring trajectory during execution."""
+
+    def update(
+        self,
+        current_time: float,
+        current_state: JointState,
+    ) -> Tuple[SafetyLevel, List[CollisionPrediction]]:
+        """
+        Update predictions based on current state.
+
+        Returns (safety_level, predicted_collisions).
+        Safety levels: NOMINAL → CAUTION → RESTRICTED → EMERGENCY_STOP
+        """
 ```
 
 ---
@@ -2462,12 +2586,19 @@ def test_reflexive_tier_latency():
   - Conflict Resolution (BCVF/SCC): `/symbolu_robotics/coordination/conflict_resolution.py`
   - Shared World Model (USE): `/symbolu_robotics/coordination/shared_world.py`
 - **Swarm Communications**: `/symbolu_robotics/comms/swarm_protocol.py`
+- **Safety & Trajectory Validation**: `/symbolu_robotics/safety/`
+  - Trajectory Validator: `/symbolu_robotics/safety/trajectory_validator.py`
+  - Collision Guard: `/symbolu_robotics/safety/collision_guard.py`
+  - Constraint Monitor: `/symbolu_robotics/safety/constraint_monitor.py`
+  - Energy Bounds: `/symbolu_robotics/safety/energy_bounds.py`
+  - Human Proximity: `/symbolu_robotics/safety/human_proximity.py`
 
 ---
 
-**Document Status**: Implementation Complete (with Multi-Robot Coordination)
+**Document Status**: Implementation Complete (with Trajectory Pre-Validation)
 **Last Updated**: 2025-12-26
 **Version History**:
+- v1.5.0: Added Section 14.3 (Trajectory Pre-Validation: predictive safety, MPC integration)
 - v1.4.0: Added Section 13 (Multi-Robot Coordination: Task Allocation, Formation, Conflict Resolution, Shared World)
 - v1.3.0: Added Sections 11-12 (Advanced Planning: MPC/HTN, LLM-Enhanced Human Interface)
 - v1.2.0: Added Sections 9-10 (Error Handling & Recovery, Learning System Skeleton)

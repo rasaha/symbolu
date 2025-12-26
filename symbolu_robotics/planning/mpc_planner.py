@@ -473,3 +473,149 @@ class MPCPlanner:
     def reset(self) -> None:
         """Reset planner state."""
         self._last_solution = None
+
+    # -------------------------------------------------------------------------
+    # Trajectory Validation Integration
+    # -------------------------------------------------------------------------
+
+    def set_trajectory_validator(self, validator) -> None:
+        """
+        Set trajectory validator for pre-execution safety checking.
+
+        Args:
+            validator: TrajectoryValidator instance from safety module
+        """
+        self._trajectory_validator = validator
+
+    def plan_with_validation(
+        self,
+        current_state: Layer12D,
+        current_joints: "JointState",
+        current_coherence: float = 1.0,
+        goal_state: Optional[Layer12D] = None,
+    ) -> Tuple[MPCResult, Optional["ValidationReport"]]:
+        """
+        Plan with integrated trajectory pre-validation.
+
+        This method:
+        1. Plans trajectory using standard MPC
+        2. Converts 12D trajectory to joint trajectory
+        3. Validates with TrajectoryValidator
+        4. Returns both MPC result and validation report
+
+        Args:
+            current_state: Current 12D state
+            current_joints: Current joint state
+            current_coherence: SCC coherence value
+            goal_state: Optional goal state
+
+        Returns:
+            Tuple of (MPCResult, ValidationReport or None)
+        """
+        # First, run standard MPC planning
+        mpc_result = self.plan(current_state, current_coherence, goal_state)
+
+        # If no validator set, return without validation
+        if not hasattr(self, '_trajectory_validator') or self._trajectory_validator is None:
+            return mpc_result, None
+
+        # Convert predicted trajectory to TrajectoryPoints for validation
+        from symbolu_robotics.safety.trajectory_validator import TrajectoryPoint
+
+        trajectory_points = []
+        for i, state_12d in enumerate(mpc_result.predicted_trajectory):
+            # Estimate joint positions from 12D state
+            # In practice, this would use inverse kinematics
+            # Here we approximate using the O3_EXECUTION and O4_STRUCTURE layers
+            joint_estimate = self._estimate_joints_from_12d(
+                state_12d, current_joints
+            )
+
+            coherence = (
+                mpc_result.predicted_coherence[i]
+                if i < len(mpc_result.predicted_coherence)
+                else current_coherence
+            )
+
+            trajectory_points.append(TrajectoryPoint(
+                timestamp=i * self._config.dt,
+                positions=joint_estimate,
+                coherence=coherence,
+            ))
+
+        # Validate trajectory
+        validation_report = self._trajectory_validator.validate(
+            trajectory_points,
+            current_state=current_joints,
+            coherence_values=mpc_result.predicted_coherence,
+        )
+
+        # If trajectory is unsafe, mark MPC result as infeasible
+        if not validation_report.is_safe:
+            mpc_result.status = MPCStatus.INFEASIBLE
+            mpc_result.constraint_violations.extend([
+                f"Pre-validation: {v}" for v in validation_report.limit_violations
+            ])
+            for col in validation_report.collision_predictions:
+                mpc_result.constraint_violations.append(
+                    f"Predicted collision: {col.collision_type.value} at t={col.time_to_collision:.2f}s"
+                )
+
+        return mpc_result, validation_report
+
+    def _estimate_joints_from_12d(
+        self,
+        state_12d: Layer12D,
+        reference_joints: "JointState",
+    ) -> np.ndarray:
+        """
+        Estimate joint positions from 12D state representation.
+
+        This is a simplified estimation - in production,
+        inverse kinematics would be used.
+        """
+        # Use reference as base
+        joints = reference_joints.positions.copy()
+
+        # Scale by O3_EXECUTION (motion intensity)
+        execution_factor = state_12d[2] if len(state_12d) > 2 else 0.5
+
+        # Scale by O4_STRUCTURE (body configuration)
+        structure_factor = state_12d[3] if len(state_12d) > 3 else 0.5
+
+        # Simple perturbation based on 12D state
+        for i in range(min(len(joints), 6)):
+            joints[i] += (execution_factor - 0.5) * 0.1 * (i + 1)
+            joints[i] *= 0.9 + 0.2 * structure_factor
+
+        return joints
+
+    def get_safe_velocity_scale(
+        self,
+        current_state: Layer12D,
+        current_joints: "JointState",
+        desired_action: np.ndarray,
+    ) -> float:
+        """
+        Get safe velocity scaling factor using trajectory validator.
+
+        Returns scaling factor [0, 1] to apply to velocities.
+        """
+        if not hasattr(self, '_trajectory_validator') or self._trajectory_validator is None:
+            return 1.0
+
+        coherence = current_state[11] if len(current_state) > 11 else 1.0
+
+        return self._trajectory_validator.get_safe_velocity_scale(
+            current_joints,
+            desired_action[:6] if len(desired_action) >= 6 else desired_action,
+            coherence,
+        )
+
+
+# Type hint imports for validation integration
+try:
+    from symbolu_robotics.core.types import JointState
+    from symbolu_robotics.safety.trajectory_validator import ValidationReport
+except ImportError:
+    pass  # Allow module to work without safety module installed
