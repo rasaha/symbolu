@@ -1,8 +1,8 @@
 # Symbolu Robotics & Autonomous AI Tier Design
 
-**Version**: 1.3.0
+**Version**: 1.4.0
 **Date**: 2025-12-26
-**Status**: Implementation Complete (with Advanced Planning & LLM Integration)
+**Status**: Implementation Complete (with Multi-Robot Coordination)
 **Parent**: Symbolu Enterprise Architecture (v2.7+)
 
 ---
@@ -1766,9 +1766,432 @@ CAUTION_PATTERNS = [
 
 ---
 
-## 13. Safety Architecture
+## 13. Multi-Robot Coordination
 
-### 13.1 Safety Layer Hierarchy
+The coordination module enables multiple robots to work together as a cohesive swarm or team, leveraging patent formulas for task allocation, formation control, conflict resolution, and shared world modeling.
+
+### 13.1 Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                 MULTI-ROBOT COORDINATION ARCHITECTURE                │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   ┌──────────────┐     ┌──────────────┐     ┌──────────────┐       │
+│   │Task Allocator│     │  Formation   │     │   Conflict   │       │
+│   │  (BCVF)      │     │  Controller  │     │   Resolver   │       │
+│   │              │     │  (USE/SCC)   │     │  (BCVF/SCC)  │       │
+│   └──────┬───────┘     └──────┬───────┘     └──────┬───────┘       │
+│          │                    │                    │                │
+│          └────────────┬───────┴────────────┬───────┘                │
+│                       │                    │                        │
+│              ┌────────▼────────────────────▼────────┐              │
+│              │          Swarm Protocol              │              │
+│              │    (Message passing, sync)           │              │
+│              └────────────────┬─────────────────────┘              │
+│                               │                                     │
+│              ┌────────────────▼─────────────────────┐              │
+│              │       Shared World Model             │              │
+│              │           (USE fusion)               │              │
+│              └──────────────────────────────────────┘              │
+│                                                                      │
+│   Ontological Layer Integration:                                     │
+│   • O10_UNIFYING: Task allocation coordination                       │
+│   • O9_WITNESSES: Shared world model                                 │
+│   • O12_ABSOLVING: Conflict resolution safety                        │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 13.2 Task Allocation (BCVF Auction Scoring)
+
+Auction-based multi-robot task allocation using BCVF (B1-B3) for bid scoring.
+
+#### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Auction Mechanism** | Robots bid on tasks, best bid wins |
+| **BCVF Bid Scoring** | Forward score = capability, Backward score = task fit |
+| **Priority System** | Tasks ranked by urgency (LOW → CRITICAL) |
+| **Coherence Gating** | Low-coherence bids rejected |
+
+#### BCVF Integration
+
+```python
+class TaskAllocator:
+    """BCVF-based multi-robot task allocator."""
+
+    def _score_bid(self, bid: TaskBid) -> None:
+        """Score bid using BCVF (B1-B3)."""
+
+        # Forward score (sf): Can robot execute this task?
+        # - Capability match (does robot have required skills?)
+        # - Current load (is robot available?)
+        # - SCC coherence (is robot operating well?)
+        sf = (
+            capability_weight * bid.capability_match +
+            load_weight * (1.0 - bid.current_load) +
+            coherence_weight * bid.coherence
+        )
+
+        # Backward score (sb): How well does robot fit task?
+        # - Distance (closer = better)
+        # - Capability (specialized = better)
+        # - Coherence (higher = better)
+        sb = (
+            distance_weight * distance_score +
+            capability_weight * bid.capability_match +
+            coherence_weight * bid.coherence
+        )
+
+        # Apply BCVF: B1 (Lagrangian) → B2 (Weight) → B3 (Normalize)
+        bid.bcvf_score = self._bcvf_scorer.score(sf, sb)
+
+    def close_auction(self, task_id: str) -> AllocationResult:
+        """Close auction using B3 normalization across bids."""
+        # Score all bids, apply priority bonus, select winner
+        bcvf_scores = score_action_candidates(
+            forward_scores, backward_scores, config
+        )
+        best_idx = argmax(bcvf_scores, key=lambda s: s.normalized_weight)
+        return AllocationResult(assigned_robot=bids[best_idx].robot_id)
+```
+
+#### O10_UNIFYING Layer
+
+```python
+def compute_o10_unifying(self) -> float:
+    """Compute O10_UNIFYING layer activation."""
+    # Activity: More active auctions = higher coordination
+    activity_score = min(1.0, num_active_auctions / 5.0)
+
+    # Coherence: Average bid coherence across all auctions
+    avg_coherence = mean(bid.coherence for bid in all_bids)
+
+    # Success: Task completion rate
+    success_rate = completed_tasks / total_tasks
+
+    # Combine for O10 activation
+    return 0.3 * activity_score + 0.4 * avg_coherence + 0.3 * success_rate
+```
+
+### 13.3 Formation Control (USE/SCC)
+
+Formation control for multi-robot coordination using USE for position fusion and SCC for coherence monitoring.
+
+#### Formation Types
+
+| Type | Description |
+|------|-------------|
+| LINE | Robots in a line formation |
+| V_SHAPE | V-formation (like geese) |
+| CIRCLE | Circular formation around center |
+| GRID | Grid/matrix formation |
+| WEDGE | Wedge attack formation |
+| COLUMN | Single file column |
+| DIAMOND | Diamond defensive formation |
+
+#### USE Integration for Position Fusion
+
+```python
+class FormationController:
+    """Formation control with USE multi-robot fusion."""
+
+    def compute_formation_center(self) -> Tuple[float, float, float]:
+        """Compute center using USE (U2) coherence-weighted fusion."""
+        if not self._peers:
+            return self._position
+
+        # Each peer is a "modality" with coherence weight
+        positions = []
+        weights = []
+        for peer in self._peers.values():
+            positions.append(peer.position)
+            weights.append(peer.coherence)  # U2: Coherence weighting
+
+        # Weighted centroid (analogous to U2 fusion)
+        total_weight = sum(weights) or 1.0
+        center = sum(w * p for w, p in zip(weights, positions)) / total_weight
+        return center
+```
+
+#### SCC Integration for Formation Coherence
+
+```python
+def compute_formation_coherence(self) -> float:
+    """Compute formation coherence using SCC (S2) global coherence."""
+
+    # S1: Per-robot coherence (from SCC monitor)
+    peer_coherences = [peer.coherence for peer in self._peers.values()]
+
+    # S2: Global coherence = weighted average
+    if peer_coherences:
+        mean_coherence = np.mean(peer_coherences)
+    else:
+        mean_coherence = 0.5
+
+    # Formation-specific coherence: How well are robots in position?
+    position_errors = [
+        distance(peer.position, self._get_target_position(i))
+        for i, peer in enumerate(self._peers.values())
+    ]
+    formation_accuracy = 1.0 - min(1.0, np.mean(position_errors) / spacing)
+
+    # Combine SCC coherence with formation accuracy
+    return 0.5 * mean_coherence + 0.5 * formation_accuracy
+```
+
+#### Reynolds Flocking Rules
+
+```python
+def _compute_reynolds_rules(self, my_position, my_velocity) -> Tuple[np.ndarray, ...]:
+    """Compute Reynolds flocking: cohesion, separation, alignment."""
+
+    cohesion = formation_center - my_position      # Steer toward center
+    separation = sum(my_position - peer.position)  # Avoid crowding
+    alignment = mean(peer.velocity for peer in peers)  # Match velocity
+
+    return cohesion, separation, alignment
+
+def compute_command(self, my_position, my_velocity) -> FormationCommand:
+    """Generate formation command with coherence-scaled intensity."""
+    cohesion, separation, alignment = self._compute_reynolds_rules(...)
+
+    # Scale by formation coherence (SCC)
+    coherence = self.compute_formation_coherence()
+
+    return FormationCommand(
+        target_velocity=combine(cohesion, separation, alignment),
+        formation_center=center,
+        coherence=coherence,
+        confidence=coherence,  # U4: Confidence from coherence
+    )
+```
+
+### 13.4 Conflict Resolution (BCVF/SCC)
+
+Distributed conflict detection and resolution using BCVF for strategy scoring and SCC for state monitoring.
+
+#### Conflict Types
+
+| Type | Description |
+|------|-------------|
+| PATH_CROSSING | Paths intersect in time and space |
+| RESOURCE_CONTENTION | Multiple robots need same resource |
+| GOAL_OVERLAP | Same goal assigned to multiple robots |
+| WORKSPACE_OVERLAP | Robots in same workspace volume |
+| COMMUNICATION_DEADLOCK | Waiting for each other's message |
+| PRIORITY_INVERSION | Low priority blocking high priority |
+
+#### Resolution Strategies
+
+| Strategy | Description |
+|----------|-------------|
+| PRIORITY_YIELD | Lower priority robot yields |
+| TEMPORAL_OFFSET | Stagger actions in time |
+| SPATIAL_AVOIDANCE | Reroute around conflict |
+| MUTUAL_STOP | Both robots stop until resolved |
+| RESOURCE_SHARING | Time-share the resource |
+| GOAL_NEGOTIATION | Negotiate goal changes |
+| RANDOM_BACKOFF | Random delay and retry |
+
+#### BCVF for Strategy Selection
+
+```python
+class ConflictResolver:
+    """BCVF-based conflict resolution."""
+
+    def resolve(self, conflict: Conflict) -> ResolutionResult:
+        """Resolve conflict using BCVF (B1-B3)."""
+
+        strategies = self._get_applicable_strategies(conflict)
+
+        # Score each strategy with BCVF
+        for strategy in strategies:
+            # Forward score (sf): Can we execute this resolution?
+            sf = self._compute_forward_score(strategy, conflict)
+
+            # Backward score (sb): Will this resolve the conflict?
+            sb = self._compute_backward_score(strategy, conflict)
+
+            # Apply BCVF scoring
+            strategy.bcvf_score = self._bcvf_scorer.score(sf, sb)
+
+        # Select best strategy (B3 normalization)
+        best = max(strategies, key=lambda s: s.bcvf_score.normalized_weight)
+
+        return ResolutionResult(
+            strategy=best,
+            confidence=best.bcvf_score.normalized_weight,
+        )
+```
+
+#### O12_ABSOLVING for Safety
+
+```python
+def compute_o12_absolving(self) -> float:
+    """Compute O12_ABSOLVING layer activation."""
+
+    if not self._conflicts:
+        return 0.1  # Low activation, no conflicts
+
+    # Severity: Weighted by conflict severity
+    severity_score = mean(
+        conflict.severity.value / 5.0
+        for conflict in self._conflicts.values()
+    )
+
+    # Resolution: How well are we resolving conflicts?
+    resolved = sum(
+        1 for c in self._conflicts.values()
+        if c.status == ConflictStatus.RESOLVED
+    )
+    resolution_rate = resolved / len(self._conflicts)
+
+    # Coherence: System-wide conflict coherence
+    coherence = self._scc_monitor.update(current_state).global_coherence
+
+    # O12: High when conflicts exist, reduced when resolved
+    return 0.4 * severity_score + 0.3 * (1 - resolution_rate) + 0.3 * (1 - coherence)
+```
+
+### 13.5 Shared World Model (USE)
+
+Collaborative world model building using USE for multi-robot observation fusion.
+
+#### Architecture
+
+```python
+class SharedWorldModel:
+    """Collaborative world model with USE observation fusion."""
+
+    def __init__(self, config: SharedWorldConfig):
+        # Grid-based world representation
+        self._grid: Dict[Tuple[int, int], WorldCell] = {}
+        self._use_fusion = USEFusion(config.use_config)
+
+    def add_observation(self, observation: Observation) -> None:
+        """Add observation using USE (U2) coherence-weighted fusion."""
+
+        cell = self._get_or_create_cell(observation.position)
+
+        # U1: Compute correlation with existing observations
+        correlation = self._use_fusion.compute_correlation(
+            observation.as_12d_vector(),
+            cell.observations_12d,
+        )
+
+        # U2: Weight by coherence
+        weight = observation.confidence * correlation
+
+        # U3: Temporal smoothing
+        cell.update(observation, weight)
+
+        # U4: Update confidence estimate
+        cell.confidence = self._use_fusion.compute_confidence(cell)
+```
+
+#### O9_WITNESSES Layer
+
+```python
+def compute_o9_witnesses(self) -> float:
+    """Compute O9_WITNESSES layer activation."""
+
+    if not self._grid:
+        return 0.1
+
+    # Coverage: How much of the world is observed?
+    coverage = len(self._grid) / (self.config.width * self.config.height)
+
+    # Confidence: Average cell confidence
+    confidences = [cell.confidence for cell in self._grid.values()]
+    avg_confidence = np.mean(confidences) if confidences else 0.5
+
+    # Recency: How fresh are observations?
+    ages = [time.time() - cell.last_update for cell in self._grid.values()]
+    avg_age = np.mean(ages) if ages else 10.0
+    recency = max(0.0, 1.0 - avg_age / 60.0)  # Decay over 60s
+
+    # O9: World model quality
+    return 0.3 * coverage + 0.4 * avg_confidence + 0.3 * recency
+```
+
+### 13.6 Swarm Protocol Enhancements
+
+The swarm protocol has been enhanced with full message handlers for coordination.
+
+#### New Message Types
+
+| Message Type | Purpose |
+|--------------|---------|
+| TASK_ANNOUNCE | Announce task for auction |
+| TASK_BID | Submit bid for task |
+| TASK_ASSIGN | Assign task to winner |
+| TASK_CANCEL | Cancel task auction |
+| FORMATION_UPDATE | Broadcast formation state |
+| FORMATION_JOIN | Request to join formation |
+| FORMATION_LEAVE | Leave formation |
+| CONFLICT_DETECTED | Report conflict |
+| RESOLUTION_PROPOSE | Propose resolution strategy |
+| RESOLUTION_ACCEPT | Accept resolution |
+| WORLD_OBSERVATION | Share observation |
+| WORLD_SYNC_REQUEST | Request world sync |
+
+#### Callback System
+
+```python
+class SwarmProtocol:
+    """Enhanced swarm protocol with coordination callbacks."""
+
+    def set_callbacks(
+        self,
+        on_task_announce: Callable[[str, str, Tuple, int, Optional[float]], None],
+        on_task_bid: Callable[[str, str, float, float, float, float], None],
+        on_formation_update: Callable[[str, str, Tuple, float, List, float], None],
+        on_conflict: Callable[[str, str, str, Tuple, float], None],
+        on_observation: Callable[[str, Tuple, str, float, Optional[str]], None],
+    ) -> None:
+        """Register callbacks for coordination events."""
+```
+
+### 13.7 Coordination Configuration
+
+```python
+@dataclass
+class CoordinationConfig:
+    """Complete coordination configuration."""
+
+    # Task allocation
+    auction_config: AuctionConfig = field(default_factory=AuctionConfig)
+    bid_timeout_ms: float = 500.0
+    min_bid_score: float = 0.3
+
+    # Formation
+    formation_config: FormationConfig = field(default_factory=FormationConfig)
+    default_spacing: float = 2.0
+    formation_type: FormationType = FormationType.GRID
+
+    # Conflict resolution
+    conflict_timeout_ms: float = 1000.0
+    max_retries: int = 3
+
+    # Shared world
+    world_config: SharedWorldConfig = field(default_factory=SharedWorldConfig)
+    observation_decay_s: float = 60.0
+
+    # BCVF settings for all coordination
+    bcvf_config: BCVFConfig = field(default_factory=BCVFConfig)
+
+    # SCC settings for monitoring
+    scc_config: SCCConfig = field(default_factory=SCCConfig)
+```
+
+---
+
+## 14. Safety Architecture
+
+### 14.1 Safety Layer Hierarchy
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -1788,7 +2211,7 @@ CAUTION_PATTERNS = [
 └────────────────────────────────────────────────────────┘
 ```
 
-### 13.2 O12_ABSOLVING Implementation
+### 14.2 O12_ABSOLVING Implementation
 
 ```python
 class ConstraintMonitor:
@@ -1826,9 +2249,9 @@ class ConstraintMonitor:
 
 ---
 
-## 14. Integration Patterns
+## 15. Integration Patterns
 
-### 14.1 ROS2 Bridge
+### 15.1 ROS2 Bridge
 
 ```python
 class ROS2Adapter:
@@ -1863,7 +2286,7 @@ class ROS2Adapter:
             self.cmd_pub.publish(cmd)
 ```
 
-### 14.2 Simulation Adapter (MuJoCo)
+### 15.2 Simulation Adapter (MuJoCo)
 
 ```python
 class MuJoCoAdapter:
@@ -1894,9 +2317,9 @@ class MuJoCoAdapter:
 
 ---
 
-## 15. Performance Requirements
+## 16. Performance Requirements
 
-### 15.1 Latency Budgets
+### 16.1 Latency Budgets
 
 | Tier | Target Latency | Hard Deadline | Platform |
 |------|----------------|---------------|----------|
@@ -1905,7 +2328,7 @@ class MuJoCoAdapter:
 | R3 Deliberative | 50ms | 100ms | Edge GPU |
 | R3 + Cloud | 200ms | 500ms | Cloud LLM |
 
-### 15.2 Memory Requirements
+### 16.2 Memory Requirements
 
 | Tier | RAM | Storage | Notes |
 |------|-----|---------|-------|
@@ -1915,7 +2338,7 @@ class MuJoCoAdapter:
 
 ---
 
-## 16. Development Roadmap
+## 17. Development Roadmap
 
 ### Phase 1: Core (P0) - Weeks 1-4
 - [ ] Set up `symbolu-robotics` repository
@@ -1943,9 +2366,9 @@ class MuJoCoAdapter:
 
 ---
 
-## 17. Testing Strategy
+## 18. Testing Strategy
 
-### 17.1 Unit Tests
+### 18.1 Unit Tests
 
 ```python
 def test_proprioception_encoder():
@@ -1969,7 +2392,7 @@ def test_safety_constraint():
     assert np.all(safe_cmd.velocities < 1.0)  # Slowed down
 ```
 
-### 17.2 Integration Tests
+### 18.2 Integration Tests
 
 ```python
 def test_reflexive_tier_latency():
@@ -1985,7 +2408,7 @@ def test_reflexive_tier_latency():
 
 ---
 
-## 18. Open Questions
+## 19. Open Questions
 
 1. **Shared Core Maintenance**: How to keep `core/` in sync with main branch?
    - Option A: Git submodule
@@ -2005,7 +2428,7 @@ def test_reflexive_tier_latency():
 
 ---
 
-## 19. References
+## 20. References
 
 - Symbolu Enterprise Architecture: `/docs/SYMBOLU_ENGINE_ARCHITECTURE.md`
 - 12D Ontological Backbone: `/symbolu/ontology/backbone/`
@@ -2033,12 +2456,19 @@ def test_reflexive_tier_latency():
   - HTN Planner: `/symbolu_robotics/planning/htn_planner.py`
 - **LLM-Enhanced Communications**: `/symbolu_robotics/comms/`
   - Human Interface (LLM): `/symbolu_robotics/comms/human_interface.py`
+- **Multi-Robot Coordination**: `/symbolu_robotics/coordination/`
+  - Task Allocation (BCVF): `/symbolu_robotics/coordination/task_allocation.py`
+  - Formation Control (USE/SCC): `/symbolu_robotics/coordination/formation.py`
+  - Conflict Resolution (BCVF/SCC): `/symbolu_robotics/coordination/conflict_resolution.py`
+  - Shared World Model (USE): `/symbolu_robotics/coordination/shared_world.py`
+- **Swarm Communications**: `/symbolu_robotics/comms/swarm_protocol.py`
 
 ---
 
-**Document Status**: Implementation Complete (with Advanced Planning & LLM Integration)
+**Document Status**: Implementation Complete (with Multi-Robot Coordination)
 **Last Updated**: 2025-12-26
 **Version History**:
+- v1.4.0: Added Section 13 (Multi-Robot Coordination: Task Allocation, Formation, Conflict Resolution, Shared World)
 - v1.3.0: Added Sections 11-12 (Advanced Planning: MPC/HTN, LLM-Enhanced Human Interface)
 - v1.2.0: Added Sections 9-10 (Error Handling & Recovery, Learning System Skeleton)
 - v1.1.0: Added Section 8 (Patent Formula Integration) documenting BCVF, USE, SCC
