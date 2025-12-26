@@ -1,0 +1,64 @@
+# Tier R3: Deliberative Configuration
+# Target: Task planning, full inference
+
+tier:
+  name: deliberative
+  target_latency_ms: 100.0
+  async_planning: true
+
+encoder:
+  type: fusion
+  enable_vision: true
+  enable_proprioception: true
+  enable_tactile: true
+  enable_audio: true
+  normalize_output: true
+  temporal_smoothing: 0.2
+
+vritti:
+  pramana_coherence_threshold: 0.6
+  pramana_entropy_ceiling: 0.8
+  viparyaya_conflict_threshold: 0.7
+  vikalpa_variance_floor: 0.1
+  smrti_staleness_threshold: 0.3
+  smrti_decay_rate: 0.95
+
+planning:
+  goal_stack:
+    max_depth: 10
+    default_timeout: 60.0
+  path_planner:
+    grid_resolution: 0.1
+    robot_radius: 0.3
+    max_iterations: 10000
+  action_primitives:
+    move_duration: 1.0
+    grasp_duration: 2.0
+    release_duration: 1.0
+
+world_model:
+  object_stale_timeout: 10.0
+  max_obstacles: 100
+
+human_interface:
+  enable: true
+  confirm_low_confidence: true
+  confidence_threshold: 0.5
+
+# Cloud fallback
+cloud:
+  enable: false
+  endpoint: ""
+  timeout_ms: 500
+  use_for:
+    - complex_nl_understanding
+    - novel_object_recognition
+    - unseen_goal_planning
+
+# Platform requirements
+platform:
+  recommended:
+    - Jetson Orin
+    - x86_64 with GPU
+  ram_gb: 4
+  storage_gb: 8

@@ -1,0 +1,64 @@
+# 6-DOF Manipulator Robot Configuration
+
+robot:
+  name: manipulator_6dof
+  type: arm
+  num_joints: 6
+
+joints:
+  - name: joint_0
+    type: revolute
+    axis: [0, 0, 1]
+    limits: [-3.14, 3.14]
+    velocity_limit: 2.0
+    effort_limit: 100.0
+  - name: joint_1
+    type: revolute
+    axis: [0, 1, 0]
+    limits: [-2.0, 2.0]
+    velocity_limit: 2.0
+    effort_limit: 150.0
+  - name: joint_2
+    type: revolute
+    axis: [0, 1, 0]
+    limits: [-2.5, 2.5]
+    velocity_limit: 2.5
+    effort_limit: 100.0
+  - name: joint_3
+    type: revolute
+    axis: [0, 0, 1]
+    limits: [-3.14, 3.14]
+    velocity_limit: 3.0
+    effort_limit: 50.0
+  - name: joint_4
+    type: revolute
+    axis: [0, 1, 0]
+    limits: [-2.0, 2.0]
+    velocity_limit: 3.0
+    effort_limit: 50.0
+  - name: joint_5
+    type: revolute
+    axis: [0, 0, 1]
+    limits: [-3.14, 3.14]
+    velocity_limit: 3.0
+    effort_limit: 30.0
+
+end_effector:
+  type: gripper
+  min_position: 0.0
+  max_position: 0.08
+  max_force: 40.0
+
+home_position: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+sensors:
+  joint_encoders: true
+  joint_torque: true
+  gripper_force: true
+  camera:
+    resolution: [640, 480]
+    fps: 30
+  depth:
+    resolution: [640, 480]
+    fps: 30
+    range: [0.2, 5.0]

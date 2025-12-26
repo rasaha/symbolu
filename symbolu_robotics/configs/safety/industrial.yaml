@@ -1,0 +1,35 @@
+# Industrial Safety Configuration
+# Based on ISO 10218
+
+safety:
+  mode: industrial
+  standard: ISO_10218
+
+limits:
+  max_joint_velocity: 3.0       # rad/s
+  max_joint_acceleration: 10.0  # rad/s^2
+  max_joint_effort: 200.0       # Nm
+  max_tcp_velocity: 2.0         # m/s
+  max_tcp_force: 250.0          # N
+
+zones:
+  warning_zone:
+    distance: 1.5               # meters
+    action: reduce_speed
+    speed_factor: 0.5
+
+  stop_zone:
+    distance: 0.5               # meters
+    action: stop
+
+  work_envelope:
+    type: cylinder
+    radius: 1.5
+    height: 2.0
+
+emergency_stop:
+  reaction_time_ms: 100
+  deceleration: 10.0            # rad/s^2
+
+# No human collaboration in industrial mode
+human_collaboration: false
