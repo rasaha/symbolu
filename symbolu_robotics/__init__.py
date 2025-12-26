@@ -32,6 +32,26 @@ Version: 1.0.0
 __version__ = "1.0.0"
 __author__ = "Symbolu Team"
 
+# Patent Formulas
+from symbolu_robotics.formulas.bcvf import (
+    BCVFScorer,
+    compute_consistency_lagrangian,
+    compute_bcvf_weight,
+    score_action_candidates,
+)
+from symbolu_robotics.formulas.use import (
+    USEFusion,
+    compute_correlation_matrix,
+    compute_coherence_fusion,
+    compute_confidence,
+)
+from symbolu_robotics.formulas.scc import (
+    SCCMonitor,
+    compute_layer_coherence,
+    compute_global_coherence,
+    compute_semantic_entropy,
+)
+
 # Core types
 from symbolu_robotics.core.types import (
     SensorFrame,
@@ -54,6 +74,21 @@ from symbolu_robotics.safety.constraint_monitor import ConstraintMonitor
 __all__ = [
     # Version
     "__version__",
+    # Formulas - BCVF (B1-B3)
+    "BCVFScorer",
+    "compute_consistency_lagrangian",
+    "compute_bcvf_weight",
+    "score_action_candidates",
+    # Formulas - USE (U1-U4)
+    "USEFusion",
+    "compute_correlation_matrix",
+    "compute_coherence_fusion",
+    "compute_confidence",
+    # Formulas - SCC (S1-S9)
+    "SCCMonitor",
+    "compute_layer_coherence",
+    "compute_global_coherence",
+    "compute_semantic_entropy",
     # Types
     "SensorFrame",
     "ActuatorCommand",
