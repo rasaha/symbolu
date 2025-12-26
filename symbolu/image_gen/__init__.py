@@ -128,6 +128,20 @@ from symbolu.image_gen.scc_image import (
     GlobalCoherenceResult,
     CoherenceIssue,
     create_scc_engine,
+    # S6: Integrated Information
+    IntegratedInformationComputer,
+    IntegratedInformationResult,
+    # S7: Bidirectional Consistency
+    BidirectionalConsistencyComputer,
+    BidirectionalConsistencyResult,
+    # S8-S9: Constraints
+    ConstraintChecker,
+    StabilityCheckResult,
+    DriftCheckResult,
+    ConstraintCheckResult,
+    # Extended engine with S6-S9
+    ExtendedSCCImageEngine,
+    create_extended_scc_engine,
 )
 
 # =============================================================================
@@ -231,6 +245,20 @@ __all__ = [
     "GlobalCoherenceResult",
     "CoherenceIssue",
     "create_scc_engine",
+    # S6: Integrated Information
+    "IntegratedInformationComputer",
+    "IntegratedInformationResult",
+    # S7: Bidirectional Consistency
+    "BidirectionalConsistencyComputer",
+    "BidirectionalConsistencyResult",
+    # S8-S9: Constraints
+    "ConstraintChecker",
+    "StabilityCheckResult",
+    "DriftCheckResult",
+    "ConstraintCheckResult",
+    # Extended engine
+    "ExtendedSCCImageEngine",
+    "create_extended_scc_engine",
 
     # === Monitoring ===
     "CoherenceMonitor",
