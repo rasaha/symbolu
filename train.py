@@ -62,7 +62,8 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast
+from torch.cuda.amp import GradScaler
 
 # SymbolU imports
 from symbolu.phase_transformer import PhaseTransformer, TransformerConfig
@@ -654,7 +655,7 @@ def train_step(
     dtype = torch.bfloat16 if config.mixed_precision == "bf16" else torch.float16
 
     # Forward pass with coherence loss (S3, S1-S2, S8-S9)
-    with autocast(enabled=use_amp, dtype=dtype):
+    with autocast(device_type='cuda', enabled=use_amp, dtype=dtype):
         loss, metrics = compute_loss(
             model, batch, device,
             use_coherence_loss=config.use_coherence_loss,

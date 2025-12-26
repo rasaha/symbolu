@@ -56,6 +56,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 
 
 # =============================================================================
@@ -413,8 +414,19 @@ class PhaseTransformer(nn.Module):
         # Tie weights
         self.lm_head.weight = self.token_embed.weight
 
+        # Gradient checkpointing (disabled by default)
+        self.gradient_checkpointing = False
+
         # Initialize
         self.apply(self._init_weights)
+
+    def gradient_checkpointing_enable(self):
+        """Enable gradient checkpointing to save memory at cost of speed."""
+        self.gradient_checkpointing = True
+
+    def gradient_checkpointing_disable(self):
+        """Disable gradient checkpointing."""
+        self.gradient_checkpointing = False
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
@@ -449,7 +461,16 @@ class PhaseTransformer(nn.Module):
         # Transformer blocks
         hidden_states = []
         for block in self.blocks:
-            x = block(x, causal_mask=True)
+            if self.gradient_checkpointing and self.training:
+                # Use gradient checkpointing to save memory
+                x = checkpoint(
+                    block,
+                    x,
+                    True,  # causal_mask
+                    use_reentrant=False,
+                )
+            else:
+                x = block(x, causal_mask=True)
             if return_hidden:
                 hidden_states.append(x)
 
