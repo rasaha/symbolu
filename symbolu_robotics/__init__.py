@@ -25,11 +25,13 @@ Modules:
     - state: Robot state estimation and world modeling
     - comms: Multi-agent coordination and human interface
     - adapters: Hardware abstraction (ROS2, Isaac, MuJoCo)
+    - recovery: Error handling, watchdog, tier fallback
+    - learning: Skill learning, dynamics models, calibration, sim2real
 
-Version: 1.0.0
+Version: 1.1.0
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "Symbolu Team"
 
 # Patent Formulas
@@ -71,6 +73,35 @@ from symbolu_robotics.tiers.factory import create_tier, TierLevel
 from symbolu_robotics.safety.collision_guard import CollisionGuard
 from symbolu_robotics.safety.constraint_monitor import ConstraintMonitor
 
+# Exceptions
+from symbolu_robotics.core.exceptions import (
+    RoboticsError,
+    SensorError,
+    ActuatorError,
+    SafetyError,
+    CommunicationError,
+    PlanningError,
+    TierError,
+    ErrorSeverity,
+    RecoveryAction,
+    ErrorHandler,
+)
+
+# Recovery
+from symbolu_robotics.recovery import (
+    Watchdog,
+    TierFallbackManager,
+    SensorRecoveryHandler,
+)
+
+# Learning
+from symbolu_robotics.learning import (
+    SkillLearner,
+    DynamicsModel,
+    OnlineCalibrator,
+    SimToRealAdapter,
+)
+
 __all__ = [
     # Version
     "__version__",
@@ -104,4 +135,24 @@ __all__ = [
     # Safety
     "CollisionGuard",
     "ConstraintMonitor",
+    # Exceptions
+    "RoboticsError",
+    "SensorError",
+    "ActuatorError",
+    "SafetyError",
+    "CommunicationError",
+    "PlanningError",
+    "TierError",
+    "ErrorSeverity",
+    "RecoveryAction",
+    "ErrorHandler",
+    # Recovery
+    "Watchdog",
+    "TierFallbackManager",
+    "SensorRecoveryHandler",
+    # Learning
+    "SkillLearner",
+    "DynamicsModel",
+    "OnlineCalibrator",
+    "SimToRealAdapter",
 ]

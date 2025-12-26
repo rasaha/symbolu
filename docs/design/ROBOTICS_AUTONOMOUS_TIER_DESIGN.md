@@ -1,8 +1,8 @@
 # Symbolu Robotics & Autonomous AI Tier Design
 
-**Version**: 1.1.0
+**Version**: 1.2.0
 **Date**: 2025-12-26
-**Status**: Implementation Complete
+**Status**: Implementation Complete (with Recovery & Learning)
 **Parent**: Symbolu Enterprise Architecture (v2.7+)
 
 ---
@@ -82,7 +82,8 @@ symbolu-robotics/
 │   │   ├── phoneme_maps.py        # ← symbolu/resonance/phoneme_maps.py
 │   │   ├── chitta_vritti.py       # ← symbolu/chitta_vritti/
 │   │   ├── v27_state.py           # ← symbolu/guna_modulation/v27_config.py
-│   │   └── referent_classes.py    # ← symbolu/name_resonance/referent_classes.py
+│   │   ├── referent_classes.py    # ← symbolu/name_resonance/referent_classes.py
+│   │   └── exceptions.py          # NEW: Robotics exception hierarchy
 │   │
 │   ├── encoders/                  # NEW: Sensor → 12D encoding
 │   │   ├── __init__.py
@@ -136,13 +137,26 @@ symbolu-robotics/
 │   │   ├── human_interface.py     # Natural language commands
 │   │   └── ros_bridge.py          # ROS2 integration (optional)
 │   │
-│   └── adapters/                  # Hardware abstraction
+│   ├── adapters/                  # Hardware abstraction
+│   │   ├── __init__.py
+│   │   ├── base_adapter.py
+│   │   ├── ros2_adapter.py        # ROS2 integration
+│   │   ├── isaac_adapter.py       # NVIDIA Isaac Sim
+│   │   ├── mujoco_adapter.py      # MuJoCo simulation
+│   │   └── serial_adapter.py      # Direct microcontroller
+│   │
+│   ├── recovery/                  # NEW: Error handling & recovery
+│   │   ├── __init__.py
+│   │   ├── watchdog.py            # Tier latency monitoring
+│   │   ├── fallback.py            # Tier degradation manager
+│   │   └── sensor_recovery.py     # Sensor failure handling
+│   │
+│   └── learning/                  # NEW: Learning system skeleton
 │       ├── __init__.py
-│       ├── base_adapter.py
-│       ├── ros2_adapter.py        # ROS2 integration
-│       ├── isaac_adapter.py       # NVIDIA Isaac Sim
-│       ├── mujoco_adapter.py      # MuJoCo simulation
-│       └── serial_adapter.py      # Direct microcontroller
+│       ├── skill_learning.py      # RL-based skill refinement
+│       ├── dynamics_model.py      # Learned dynamics for planning
+│       ├── calibration.py         # Online sensor/actuator calibration
+│       └── transfer.py            # Sim-to-real transfer learning
 │
 ├── configs/
 │   ├── tier_r1_reflexive.yaml     # Reflexive tier config
@@ -952,9 +966,333 @@ def test_s5_focused_activation():
 
 ---
 
-## 9. Safety Architecture
+## 9. Error Handling & Recovery System
 
-### 9.1 Safety Layer Hierarchy
+The robotics system includes comprehensive error handling and recovery mechanisms to ensure robust operation in real-world conditions.
+
+### 9.1 Exception Hierarchy
+
+All robotics errors inherit from a common base class with severity and recovery metadata:
+
+```python
+class RoboticsError(Exception):
+    """Base exception with severity and recovery action."""
+
+    def __init__(
+        self,
+        message: str,
+        severity: ErrorSeverity,
+        recovery: RecoveryAction,
+        context: Optional[Dict] = None,
+        cause: Optional[Exception] = None,
+    ):
+        self.severity = severity
+        self.recovery = recovery
+        self.context = context or {}
+        self.cause = cause
+```
+
+**Error Categories**:
+| Exception | Severity | Default Recovery | Use Case |
+|-----------|----------|------------------|----------|
+| `SensorError` | WARNING | FALLBACK_TIER | Sensor failure/timeout |
+| `ActuatorError` | ERROR | STOP_MOTION | Motor fault |
+| `SafetyError` | CRITICAL | EMERGENCY_STOP | Safety violation |
+| `CommunicationError` | WARNING | RETRY | Network issues |
+| `PlanningError` | WARNING | RETRY | Plan infeasible |
+| `TierError` | ERROR | FALLBACK_TIER | Tier timeout |
+
+**Severity Levels**: DEBUG → WARNING → ERROR → CRITICAL → FATAL
+
+**Recovery Actions**: NONE → RETRY → FALLBACK_TIER → REDUCE_SPEED → STOP_MOTION → EMERGENCY_STOP
+
+### 9.2 Watchdog System
+
+Monitors tier latency and sensor update frequency:
+
+```python
+class Watchdog:
+    """Timeout monitoring with callbacks."""
+
+    def register(self, name: str, timeout_ms: float, on_timeout: Callable) -> None
+    def kick(self, name: str) -> None  # Reset timer
+    def check(self) -> List[str]  # Returns timed-out items
+
+class TierWatchdog(Watchdog):
+    """Specialized for tier latency monitoring."""
+
+    # Pre-configured timeouts:
+    # - ReflexiveTier: 1ms
+    # - ReactiveTier: 10ms
+    # - DeliberativeTier: 100ms
+```
+
+### 9.3 Tier Fallback Manager
+
+Automatic tier degradation when higher tiers fail:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                 TIER FALLBACK HIERARCHY                   │
+├──────────────────────────────────────────────────────────┤
+│                                                           │
+│   ┌─────────────────┐                                    │
+│   │ R3 Deliberative │ ──timeout/error──┐                 │
+│   └────────┬────────┘                   │                │
+│            │ normal                     ▼                │
+│   ┌────────▼────────┐       ┌─────────────────┐         │
+│   │  R2 Reactive    │ ◄─────│  Fallback to R2 │         │
+│   └────────┬────────┘       └─────────────────┘         │
+│            │ normal                     │                │
+│   ┌────────▼────────┐       ┌───────────▼─────┐         │
+│   │  R1 Reflexive   │ ◄─────│  Fallback to R1 │         │
+│   └────────┬────────┘       └─────────────────┘         │
+│            │ error                      │                │
+│   ┌────────▼────────────────────────────▼───┐           │
+│   │              EMERGENCY STOP              │           │
+│   └──────────────────────────────────────────┘           │
+│                                                           │
+└──────────────────────────────────────────────────────────┘
+```
+
+```python
+class TierFallbackManager:
+    """Manages tier degradation and recovery."""
+
+    def report_error(self, error: RoboticsError) -> RecoveryAction:
+        """Track errors and trigger fallback if threshold exceeded."""
+
+    def execute(self, sensor_frame, command, coherence) -> Plan:
+        """Execute on current tier or fallback if needed."""
+
+    def attempt_recovery(self) -> bool:
+        """Try to restore higher tiers after cooldown."""
+```
+
+**Fallback Triggers**:
+- Tier timeout (latency exceeded)
+- Consecutive errors > threshold (default: 3)
+- Low SCC coherence (< 0.3)
+- Critical safety violation
+
+### 9.4 Sensor Recovery Handler
+
+Graceful degradation when sensors fail:
+
+```python
+class SensorRecoveryHandler:
+    """Handles sensor failures with fallback values."""
+
+    def update_coherence(self, modality_weights: Dict[str, float]) -> List[str]:
+        """Track coherence per modality, return newly failed sensors."""
+
+    def detect_failures(self, correlation_matrix, modality_names) -> List[str]:
+        """Use USE (U1) correlation to identify failed sensors."""
+
+    def get_fallback_value(self, name: str) -> np.ndarray:
+        """Return last known good value for failed sensor."""
+```
+
+**Integration with USE Formulas**:
+- Uses U1 correlation matrix to detect inconsistent sensors
+- Automatic downweighting via U2 coherence fusion
+- Maintains last known good values for graceful degradation
+
+---
+
+## 10. Learning System (Skeleton)
+
+The learning system provides infrastructure for continuous improvement of robot behavior. This is a skeleton implementation defining interfaces for future neural network integration.
+
+### 10.1 Design Principles
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    LEARNING INTEGRATION                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Learning is OPTIONAL enhancement, NOT required for operation   │
+│                                                                  │
+│  Default behaviors work without learning                         │
+│  Learning refines performance over time                          │
+│  Safety constraints override learned behaviors                   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 10.2 Skill Learning
+
+RL-based skill refinement from robot experience:
+
+```python
+class SkillLearner:
+    """Learns to improve actions from experience."""
+
+    # State representation: 12D Layer (ontology-aligned)
+    # Action space: ActuatorCommand
+    # Reward: task_success * 0.7 + scc_coherence * 0.3
+
+    def record_experience(
+        self,
+        state: Layer12D,
+        action: ActuatorCommand,
+        reward: float,
+        next_state: Layer12D,
+        coherence: float,
+    ) -> None:
+        """Record experience for learning."""
+
+    def get_action_modifier(
+        self,
+        state: Layer12D,
+        base_action: ActuatorCommand,
+    ) -> Tuple[ActuatorCommand, float]:
+        """Modify base action with learned refinement."""
+
+    def get_bcvf_modifier(self, state: Layer12D) -> np.ndarray:
+        """Learned weights to enhance BCVF action selection."""
+```
+
+**Learning Modes**:
+- `OFFLINE`: Learn from collected experience buffer
+- `ONLINE`: Continuous learning during operation (with safety constraints)
+- `IMITATION`: Learn from demonstrations
+- `DISABLED`: Use default behaviors only
+
+### 10.3 Dynamics Model
+
+Learned transition model for planning:
+
+```python
+class DynamicsModel:
+    """Predicts state transitions: s_{t+1} = f(s_t, a_t)."""
+
+    def predict(self, state: Layer12D, action: ActuatorCommand) -> Prediction:
+        """Predict next state with uncertainty estimate."""
+        return Prediction(
+            state=predicted_state,
+            uncertainty=per_dim_uncertainty,
+            coherence=predicted_coherence,
+            ensemble_disagreement=disagreement,
+        )
+
+    def predict_trajectory(
+        self,
+        initial_state: Layer12D,
+        actions: List[ActuatorCommand],
+    ) -> List[Prediction]:
+        """Multi-step prediction for planning."""
+
+    def detect_distribution_shift(
+        self,
+        recent_states: List[Layer12D],
+    ) -> Tuple[bool, float]:
+        """Detect if real data differs from training."""
+```
+
+**Integration with Deliberative Tier**:
+- Predictions used for BCVF planning
+- Uncertainty informs action selection confidence
+- Distribution shift triggers model retraining
+
+### 10.4 Online Calibration
+
+Continuous sensor and actuator calibration:
+
+```python
+class OnlineCalibrator:
+    """Calibrates sensors/actuators during operation."""
+
+    # Sensor calibration: bias, scale, drift estimation
+    # Actuator calibration: command-response model
+    # Cross-modal calibration via USE coherence
+
+    def update_coherence(
+        self,
+        coherence: float,
+        correlation_matrix: np.ndarray,
+    ) -> None:
+        """Trigger recalibration if coherence drops."""
+
+    def calibrate_all(self) -> Dict[str, bool]:
+        """Calibrate all sensors and actuators."""
+
+    def detect_drift_all(self) -> Dict[str, Tuple[bool, float]]:
+        """Detect drift in all sensors."""
+```
+
+**Auto-Recalibration Triggers**:
+- SCC coherence drop > 0.2
+- USE correlation degradation
+- Explicit command
+
+### 10.5 Sim-to-Real Transfer
+
+Domain adaptation for simulation-trained policies:
+
+```python
+class SimToRealAdapter:
+    """Adapts sim-trained policies for real deployment."""
+
+    # Domain randomization (simulation side)
+    # Online adaptation (real deployment)
+    # Coherence-based confidence estimation
+
+    def process_state(
+        self,
+        state: Layer12D,
+        coherence: float,
+    ) -> Layer12D:
+        """In sim: randomize. In real: adapt."""
+
+    def get_transfer_confidence(self) -> float:
+        """Confidence in sim-to-real transfer (0-1)."""
+
+    def is_transfer_safe(self) -> bool:
+        """Check if transfer confidence is sufficient."""
+```
+
+**Domain Gap Tracking**:
+- `coherence_gap`: SCC coherence difference sim vs real
+- `state_distribution_gap`: State distribution mismatch
+- `dynamics_gap`: Prediction error increase
+
+### 10.6 Learning-Formula Integration
+
+The learning system integrates with patent formulas:
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│              LEARNING + FORMULA INTEGRATION                     │
+├────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────┐                                           │
+│  │  SkillLearner   │──► Modifies BCVF action weights (B1-B3)   │
+│  └─────────────────┘                                           │
+│                                                                 │
+│  ┌─────────────────┐                                           │
+│  │ DynamicsModel   │──► Forward prediction for BCVF planning   │
+│  └─────────────────┘                                           │
+│                                                                 │
+│  ┌─────────────────┐                                           │
+│  │OnlineCalibrator │──► Triggered by USE (U1) correlation drop │
+│  └─────────────────┘                                           │
+│                                                                 │
+│  ┌─────────────────┐                                           │
+│  │SimToRealAdapter │──► Uses SCC coherence for confidence      │
+│  └─────────────────┘                                           │
+│                                                                 │
+│  All learning uses 12D Layer as state representation           │
+│  SCC coherence provides learning signal quality metric         │
+│                                                                 │
+└────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 11. Safety Architecture
+
+### 11.1 Safety Layer Hierarchy
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -974,7 +1312,7 @@ def test_s5_focused_activation():
 └────────────────────────────────────────────────────────┘
 ```
 
-### 9.2 O12_ABSOLVING Implementation
+### 11.2 O12_ABSOLVING Implementation
 
 ```python
 class ConstraintMonitor:
@@ -1012,9 +1350,9 @@ class ConstraintMonitor:
 
 ---
 
-## 10. Integration Patterns
+## 12. Integration Patterns
 
-### 10.1 ROS2 Bridge
+### 12.1 ROS2 Bridge
 
 ```python
 class ROS2Adapter:
@@ -1049,7 +1387,7 @@ class ROS2Adapter:
             self.cmd_pub.publish(cmd)
 ```
 
-### 10.2 Simulation Adapter (MuJoCo)
+### 12.2 Simulation Adapter (MuJoCo)
 
 ```python
 class MuJoCoAdapter:
@@ -1080,9 +1418,9 @@ class MuJoCoAdapter:
 
 ---
 
-## 11. Performance Requirements
+## 13. Performance Requirements
 
-### 11.1 Latency Budgets
+### 13.1 Latency Budgets
 
 | Tier | Target Latency | Hard Deadline | Platform |
 |------|----------------|---------------|----------|
@@ -1091,7 +1429,7 @@ class MuJoCoAdapter:
 | R3 Deliberative | 50ms | 100ms | Edge GPU |
 | R3 + Cloud | 200ms | 500ms | Cloud LLM |
 
-### 11.2 Memory Requirements
+### 13.2 Memory Requirements
 
 | Tier | RAM | Storage | Notes |
 |------|-----|---------|-------|
@@ -1101,7 +1439,7 @@ class MuJoCoAdapter:
 
 ---
 
-## 12. Development Roadmap
+## 14. Development Roadmap
 
 ### Phase 1: Core (P0) - Weeks 1-4
 - [ ] Set up `symbolu-robotics` repository
@@ -1129,9 +1467,9 @@ class MuJoCoAdapter:
 
 ---
 
-## 13. Testing Strategy
+## 15. Testing Strategy
 
-### 13.1 Unit Tests
+### 15.1 Unit Tests
 
 ```python
 def test_proprioception_encoder():
@@ -1155,7 +1493,7 @@ def test_safety_constraint():
     assert np.all(safe_cmd.velocities < 1.0)  # Slowed down
 ```
 
-### 13.2 Integration Tests
+### 15.2 Integration Tests
 
 ```python
 def test_reflexive_tier_latency():
@@ -1171,7 +1509,7 @@ def test_reflexive_tier_latency():
 
 ---
 
-## 14. Open Questions
+## 16. Open Questions
 
 1. **Shared Core Maintenance**: How to keep `core/` in sync with main branch?
    - Option A: Git submodule
@@ -1191,7 +1529,7 @@ def test_reflexive_tier_latency():
 
 ---
 
-## 15. References
+## 17. References
 
 - Symbolu Enterprise Architecture: `/docs/SYMBOLU_ENGINE_ARCHITECTURE.md`
 - 12D Ontological Backbone: `/symbolu/ontology/backbone/`
@@ -1204,10 +1542,23 @@ def test_reflexive_tier_latency():
   - USE (U1-U4): `/symbolu_robotics/formulas/use.py`
   - SCC (S1-S9): `/symbolu_robotics/formulas/scc.py`
 - Formula Tests: `/symbolu_robotics/tests/test_formulas.py`
+- **Error Handling & Recovery**: `/symbolu_robotics/recovery/`
+  - Exception Hierarchy: `/symbolu_robotics/core/exceptions.py`
+  - Watchdog: `/symbolu_robotics/recovery/watchdog.py`
+  - Tier Fallback: `/symbolu_robotics/recovery/fallback.py`
+  - Sensor Recovery: `/symbolu_robotics/recovery/sensor_recovery.py`
+- **Learning System (Skeleton)**: `/symbolu_robotics/learning/`
+  - Skill Learning: `/symbolu_robotics/learning/skill_learning.py`
+  - Dynamics Model: `/symbolu_robotics/learning/dynamics_model.py`
+  - Online Calibration: `/symbolu_robotics/learning/calibration.py`
+  - Sim2Real Transfer: `/symbolu_robotics/learning/transfer.py`
 
 ---
 
-**Document Status**: Implementation Complete
+**Document Status**: Implementation Complete (with Recovery & Learning)
 **Last Updated**: 2025-12-26
-**Changes**: Added Section 8 (Patent Formula Integration) documenting BCVF, USE, SCC implementations
+**Version History**:
+- v1.2.0: Added Sections 9-10 (Error Handling & Recovery, Learning System Skeleton)
+- v1.1.0: Added Section 8 (Patent Formula Integration) documenting BCVF, USE, SCC
+- v1.0.0: Initial design document
 **Contact**: [Architecture Team]
