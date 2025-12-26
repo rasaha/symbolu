@@ -4,10 +4,11 @@ Fusion Encoder for Robotics
 
 Multi-modal sensor fusion -> 12D encoding.
 
-Uses patent formulas:
-- U1: Cross-modal correlation matrix
-- S4: Cosine similarity between modalities
-- S5: Combined semantic entropy
+Implements USE (Unified Sensor Encoding) patent formulas:
+- U1: Cross-modal correlation matrix for sensor coherence
+- U2: Coherence-weighted fusion of modalities
+- U3: Temporal alignment via EMA smoothing
+- U4: Confidence estimation from entropy
 
 Combines outputs from:
 - Vision (camera, LIDAR)
@@ -25,10 +26,23 @@ from symbolu_robotics.encoders.proprioception import ProprioceptionEncoder
 from symbolu_robotics.encoders.tactile_encoder import TactileEncoder
 from symbolu_robotics.encoders.audio_encoder import AudioEncoder
 from symbolu_robotics.core.types import SensorFrame, Layer12D
+from symbolu_robotics.formulas.use import (
+    USEFusion,
+    USEConfig,
+    compute_correlation_matrix,
+    compute_confidence,
+    FusionResult,
+)
+from symbolu_robotics.formulas.scc import compute_semantic_entropy
 
 
 class FusionEncoder(BaseEncoder):
-    """Multi-modal fusion to 12D layer encoding using patent formulas."""
+    """
+    Multi-modal fusion to 12D layer encoding using USE patent formulas.
+
+    Implements U1-U4 for coherence-weighted sensor fusion with temporal
+    alignment and confidence estimation.
+    """
 
     def __init__(
         self,
@@ -37,7 +51,8 @@ class FusionEncoder(BaseEncoder):
         enable_proprioception: bool = True,
         enable_tactile: bool = True,
         enable_audio: bool = False,
-        modality_weights: Optional[Dict[str, float]] = None
+        temporal_alpha: float = 0.3,
+        coherence_threshold: float = 0.3,
     ):
         super().__init__(config)
 
@@ -51,14 +66,16 @@ class FusionEncoder(BaseEncoder):
         if enable_audio:
             self.encoders["audio"] = AudioEncoder(config)
 
-        # Default equal weights
-        if modality_weights is None:
-            n = len(self.encoders)
-            modality_weights = {name: 1.0 / n for name in self.encoders}
-        self.modality_weights = modality_weights
+        # USE fusion system (U1-U4)
+        self._use_fusion = USEFusion(USEConfig(
+            temporal_alpha=temporal_alpha,
+            coherence_threshold=coherence_threshold,
+            normalize_output=True,
+        ))
 
-        # Store individual outputs for coherence analysis
+        # Store individual outputs and fusion result
         self._modality_outputs: Dict[str, Layer12D] = {}
+        self._last_fusion_result: Optional[FusionResult] = None
 
     @property
     def encoder_name(self) -> str:
@@ -72,64 +89,76 @@ class FusionEncoder(BaseEncoder):
         return tuple(set(sensors))
 
     def _encode_internal(self, sensor_frame: SensorFrame) -> Layer12D:
-        # Get outputs from each modality
-        self._modality_outputs = {}
-        outputs = []
-        weights = []
+        """
+        Encode sensor frame to 12D using USE formulas (U1-U4).
 
+        Process:
+        1. Encode each modality to 12D
+        2. U1: Compute cross-modal correlation matrix
+        3. U2: Coherence-weighted fusion
+        4. U3: Temporal alignment (handled by USEFusion)
+        5. U4: Confidence estimation
+        """
+        # Get outputs from each modality encoder
+        self._modality_outputs = {}
         for name, encoder in self.encoders.items():
             output = encoder.encode(sensor_frame)
             self._modality_outputs[name] = output
-            outputs.append(output)
-            weights.append(self.modality_weights.get(name, 1.0))
+            # U3: Update USE fusion with temporal alignment
+            self._use_fusion.update(name, output)
 
-        if not outputs:
+        if not self._modality_outputs:
             return np.zeros(12, dtype=np.float32)
 
-        # Normalize weights
-        weights = np.array(weights)
-        weights = weights / np.sum(weights)
+        # U1 + U2: Perform coherence-weighted fusion
+        self._last_fusion_result = self._use_fusion.fuse()
+        fused = self._last_fusion_result.fused_vector.copy()
 
-        # Weighted combination
-        outputs = np.array(outputs)
-        fused = np.sum(outputs * weights[:, np.newaxis], axis=0)
+        # S5: Compute semantic entropy for monitoring
+        entropy = compute_semantic_entropy(fused)
 
-        # Apply U1: Coherence-weighted adjustment
-        coherence = self._compute_cross_modal_coherence(outputs)
+        # Apply coherence-based adjustments
+        coherence = self._last_fusion_result.coherence_score
+        confidence = self._last_fusion_result.confidence
+
         if coherence < 0.5:
-            # Low coherence: reduce confidence, boost O12_ABSOLVING
+            # Low coherence: reduce confidence, boost O12_ABSOLVING (safety)
             fused *= coherence
             fused[11] = max(fused[11], 1.0 - coherence)
 
-        # O11_INTEGRATION: Fusion quality indicator
+        # O11_INFORMING: Store fusion quality
         fused[10] = coherence
 
-        return fused
+        # Normalize to [0, 1] range
+        fused = np.clip(fused, 0.0, 1.0)
 
-    def _compute_cross_modal_coherence(self, outputs: np.ndarray) -> float:
+        return fused.astype(np.float32)
+
+    def get_coherence_score(self) -> float:
+        """Get overall coherence from last fusion (U1)."""
+        if self._last_fusion_result is None:
+            return 0.0
+        return self._last_fusion_result.coherence_score
+
+    def get_confidence(self) -> float:
+        """Get confidence from last fusion (U4)."""
+        if self._last_fusion_result is None:
+            return 0.0
+        return self._last_fusion_result.confidence
+
+    def get_modality_weights(self) -> Dict[str, float]:
+        """Get coherence-based modality weights (U2)."""
+        if self._last_fusion_result is None:
+            return {}
+        return self._last_fusion_result.modality_weights
+
+    def detect_sensor_failure(self, threshold: float = 0.2) -> List[str]:
         """
-        Compute U1-based cross-modal coherence.
+        Detect potential sensor failures from low coherence.
 
-        Uses simplified correlation between modality outputs.
+        Uses U1 correlation to identify inconsistent modalities.
         """
-        if len(outputs) < 2:
-            return 1.0
-
-        # S4: Pairwise cosine similarities
-        similarities = []
-        for i in range(len(outputs)):
-            for j in range(i + 1, len(outputs)):
-                norm_i = np.linalg.norm(outputs[i])
-                norm_j = np.linalg.norm(outputs[j])
-                if norm_i > 0 and norm_j > 0:
-                    sim = np.dot(outputs[i], outputs[j]) / (norm_i * norm_j)
-                    similarities.append(sim)
-
-        if not similarities:
-            return 1.0
-
-        # Average similarity as coherence measure
-        return float(np.mean(similarities))
+        return self._use_fusion.detect_sensor_failure(threshold)
 
     def get_modality_outputs(self) -> Dict[str, Layer12D]:
         """Get individual modality outputs."""
@@ -137,29 +166,25 @@ class FusionEncoder(BaseEncoder):
 
     def get_coherence_matrix(self) -> np.ndarray:
         """
-        Compute U1 coherence matrix between modalities.
+        Get U1 coherence matrix between modalities.
 
         Returns NxN matrix where N is number of modalities.
+        Uses compute_correlation_matrix from USE formulas.
         """
-        names = list(self._modality_outputs.keys())
-        n = len(names)
-        matrix = np.eye(n)
+        if not self._modality_outputs:
+            return np.array([[]])
 
-        for i in range(n):
-            for j in range(i + 1, n):
-                out_i = self._modality_outputs[names[i]]
-                out_j = self._modality_outputs[names[j]]
-                norm_i = np.linalg.norm(out_i)
-                norm_j = np.linalg.norm(out_j)
-                if norm_i > 0 and norm_j > 0:
-                    sim = np.dot(out_i, out_j) / (norm_i * norm_j)
-                    matrix[i, j] = sim
-                    matrix[j, i] = sim
+        # U1: Use formula implementation
+        return compute_correlation_matrix(self._modality_outputs)
 
-        return matrix
+    def get_fusion_result(self) -> Optional[FusionResult]:
+        """Get complete fusion result with all USE metrics."""
+        return self._last_fusion_result
 
     def reset(self) -> None:
         super().reset()
         for encoder in self.encoders.values():
             encoder.reset()
         self._modality_outputs = {}
+        self._last_fusion_result = None
+        self._use_fusion.reset()

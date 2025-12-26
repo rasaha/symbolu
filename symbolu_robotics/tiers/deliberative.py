@@ -4,6 +4,10 @@ Deliberative Tier (R3) for Robotics
 
 Deliberative planning and reasoning.
 
+Implements patent formulas:
+- BCVF (B1-B3): Bidirectional Consistency Verification for action selection
+- SCC (S1-S9): Semantic Coherence Controller for state monitoring
+
 Characteristics:
 - Runs on edge GPU or cloud
 - Full Chitta-Vritti analysis (v2.8)
@@ -12,7 +16,7 @@ Characteristics:
 - Latency target: <100ms (can be async)
 """
 
-from typing import Optional, List
+from typing import Optional, List, Tuple, Dict, Any
 import numpy as np
 
 from symbolu_robotics.tiers.base import BaseTier, TierConfig
@@ -20,6 +24,18 @@ from symbolu_robotics.core.types import SensorFrame, ActuatorCommand, Layer12D, 
 from symbolu_robotics.core.chitta_vritti import compute_vritti, VrittiResult
 from symbolu_robotics.core.mirror_pairs_12d import propagate_to_mirror_12d
 from symbolu_robotics.encoders.fusion_encoder import FusionEncoder
+from symbolu_robotics.formulas.bcvf import (
+    BCVFScorer,
+    BCVFConfig,
+    compute_consistency_lagrangian,
+    ActionScore,
+)
+from symbolu_robotics.formulas.scc import (
+    SCCMonitor,
+    SCCConfig,
+    compute_global_coherence,
+    CoherenceResult,
+)
 
 
 class WorldModel:
@@ -54,10 +70,13 @@ class TaskPlanner:
     """
     O7_REASONING + O8_PURPOSE: Task planning.
 
-    Uses BCVF (B1-B3) for action selection.
+    Uses BCVF (B1-B3) for action selection:
+    - B1: Consistency Lagrangian for scoring
+    - B2: Weight conversion from Lagrangian
+    - B3: Normalization across candidates
     """
 
-    def __init__(self):
+    def __init__(self, bcvf_config: Optional[BCVFConfig] = None):
         self._goal_stack: List[Goal] = []
         self._action_library = {
             "move_to": self._plan_move,
@@ -65,6 +84,17 @@ class TaskPlanner:
             "release": self._plan_release,
             "wait": self._plan_wait,
         }
+
+        # BCVF scorer for action selection (B1-B3)
+        self._bcvf_scorer = BCVFScorer(bcvf_config or BCVFConfig(
+            lambda_forward=1.0,
+            lambda_backward=1.0,
+            lambda_consistency=0.5,
+            beta=2.0,
+        ))
+
+        # Last scoring result for diagnostics
+        self._last_action_scores: List[ActionScore] = []
 
     def push_goal(self, goal: Goal) -> None:
         """Add goal to stack."""
@@ -83,31 +113,50 @@ class TaskPlanner:
         cognitive_mode: VrittiResult
     ) -> Plan:
         """
-        Generate plan using BCVF action selection.
+        Generate plan using BCVF action selection (B1-B3).
 
-        Uses B1-B3 formulas for scoring action candidates.
+        Process:
+        1. Generate action candidates
+        2. Compute forward scores (sf): action feasibility
+        3. Compute backward scores (sb): goal achievement
+        4. B1: Compute Consistency Lagrangian for each
+        5. B2: Convert to weights
+        6. B3: Normalize and select best
         """
         if not self._goal_stack:
             return Plan()
 
         current_goal = self._goal_stack[-1]
 
-        # B1: Generate action candidates based on goal
+        # Generate action candidates
         candidates = self._generate_candidates(current_goal, current_state, world)
 
         if not candidates:
             return Plan()
 
-        # B2: Score candidates using 12D coherence
-        scored = []
-        for action, params in candidates:
-            # Simple scoring based on layer alignment
-            score = self._score_action(action, params, current_state, cognitive_mode)
-            scored.append((score, action, params))
+        # Compute forward scores (sf): Is action physically feasible?
+        forward_scores = [
+            self._compute_forward_score(action, params, current_state, world)
+            for action, params in candidates
+        ]
 
-        # B3: Select best action
-        scored.sort(reverse=True)
-        best_score, best_action, best_params = scored[0]
+        # Compute backward scores (sb): Does action achieve goal?
+        backward_scores = [
+            self._compute_backward_score(action, params, current_goal, cognitive_mode)
+            for action, params in candidates
+        ]
+
+        # BCVF: Score candidates using B1-B3
+        self._last_action_scores = self._bcvf_scorer.score_candidates(
+            forward_scores, backward_scores
+        )
+
+        # Select best action (highest normalized weight from B3)
+        best_idx = max(
+            range(len(self._last_action_scores)),
+            key=lambda i: self._last_action_scores[i].normalized_weight
+        )
+        best_action, best_params = candidates[best_idx]
 
         # Generate plan
         plan_fn = self._action_library.get(best_action, self._plan_wait)
@@ -118,7 +167,7 @@ class TaskPlanner:
         goal: Goal,
         state: Layer12D,
         world: WorldModel
-    ) -> List[tuple]:
+    ) -> List[Tuple[str, dict]]:
         """Generate action candidates for goal."""
         candidates = []
 
@@ -136,33 +185,86 @@ class TaskPlanner:
 
         return candidates
 
-    def _score_action(
+    def _compute_forward_score(
         self,
         action: str,
         params: dict,
         state: Layer12D,
+        world: WorldModel
+    ) -> float:
+        """
+        Compute forward feasibility score sf ∈ [0,1].
+
+        sf measures: Is this action physically executable?
+        - Joint limits, collision risk, energy requirements
+        """
+        sf = 0.7  # Base feasibility
+
+        # O3_EXECUTION: Motor readiness
+        sf += state[2] * 0.15
+
+        # O12_ABSOLVING: Safety constraints reduce feasibility
+        sf -= state[11] * 0.3
+
+        # Check obstacles for move actions
+        if action == "move_to":
+            obstacles = world.get_obstacles()
+            if any(o["distance"] < 0.5 for o in obstacles):
+                sf *= 0.5  # Reduce if obstacles nearby
+
+        # Grasp needs object perception
+        if action == "grasp":
+            sf *= 0.5 + state[4] * 0.5  # O5_COGNITION
+
+        return float(np.clip(sf, 0.0, 1.0))
+
+    def _compute_backward_score(
+        self,
+        action: str,
+        params: dict,
+        goal: Goal,
         cognitive_mode: VrittiResult
     ) -> float:
-        """Score action using BCVF-inspired formula."""
-        base_score = 0.5
+        """
+        Compute backward goal-achievement score sb ∈ [0,1].
 
-        # Pramana (valid cognition) boosts confidence in action
+        sb measures: Does this action achieve the goal?
+        - Goal alignment, task completion, constraint satisfaction
+        """
+        sb = 0.5  # Base goal alignment
+
+        # Pramana (valid cognition) boosts confidence
         if cognitive_mode.dominant == "pramana":
-            base_score += 0.3
+            sb += 0.2
 
-        # Action-specific scoring
+        # Action-goal matching
+        goal_lower = goal.description.lower()
+
         if action == "move_to":
-            base_score += state[2] * 0.2  # O3_EXECUTION
-            base_score += state[7] * 0.3  # O8_PURPOSE
+            if "move" in goal_lower or "go" in goal_lower:
+                sb += 0.3
+            if goal.target_pose is not None:
+                sb += 0.2  # Has specific target
+
         elif action == "grasp":
-            base_score += state[4] * 0.3  # O5_COGNITION (object perception)
+            if "grasp" in goal_lower or "pick" in goal_lower:
+                sb += 0.4
+
         elif action == "release":
-            base_score += state[7] * 0.2  # O8_PURPOSE
+            if "release" in goal_lower or "place" in goal_lower or "put" in goal_lower:
+                sb += 0.4
 
-        # Safety penalty
-        base_score -= state[11] * 0.4  # O12_ABSOLVING
+        elif action == "wait":
+            if "stop" in goal_lower or "wait" in goal_lower:
+                sb += 0.3
+            else:
+                sb -= 0.2  # Waiting usually doesn't achieve goal
 
-        return max(0.0, min(1.0, base_score))
+        return float(np.clip(sb, 0.0, 1.0))
+
+    def get_last_action_scores(self) -> List[ActionScore]:
+        """Get BCVF scores from last planning cycle."""
+        return self._last_action_scores
 
     def _plan_move(self, params: dict, state: Layer12D) -> Plan:
         """Generate move plan."""
@@ -218,8 +320,17 @@ class DeliberativeTier(BaseTier):
     """
     Tier R3: Deliberative planning and reasoning.
 
-    Full Chitta-Vritti analysis for cognitive mode.
-    Task planning with BCVF action selection.
+    Implements:
+    - BCVF (B1-B3): Action selection via Consistency Lagrangian
+    - SCC (S1-S9): Real-time semantic coherence monitoring
+    - Full Chitta-Vritti analysis for cognitive mode
+
+    The SCC monitor tracks:
+    - S1: Per-layer coherence
+    - S2: Global coherence
+    - S5: Semantic entropy
+    - S6: Entropy rate (spike detection)
+    - S9: Safety coherence
     """
 
     def __init__(self, config: Optional[TierConfig] = None):
@@ -229,9 +340,17 @@ class DeliberativeTier(BaseTier):
         self.planner = TaskPlanner()
         self.nl_interface = NaturalLanguageInterface()
 
+        # SCC monitor for coherence tracking (S1-S9)
+        self._scc_monitor = SCCMonitor(SCCConfig(
+            coherence_threshold=0.5,
+            entropy_spike_threshold=0.3,
+            imbalance_threshold=0.5,
+        ))
+
         # Vritti state
         self._accumulated_smrti = 0.0
         self._last_vritti: Optional[VrittiResult] = None
+        self._last_coherence: Optional[CoherenceResult] = None
 
     @property
     def tier_name(self) -> str:
@@ -249,6 +368,12 @@ class DeliberativeTier(BaseTier):
         """
         Execute deliberative planning step.
 
+        Process:
+        1. Encode sensors to 12D (uses USE formulas)
+        2. SCC: Monitor coherence (S1-S9)
+        3. Chitta-Vritti: Analyze cognitive mode
+        4. BCVF: Plan actions (B1-B3)
+
         Args:
             sensor_frame: Current sensor data
             command: Optional natural language command
@@ -256,17 +381,30 @@ class DeliberativeTier(BaseTier):
         Returns:
             Plan to be executed by R2/R1 tiers
         """
-        # O5 + O11: Full perception
+        # O5 + O11: Full perception (uses USE U1-U4)
         layer_12d = self.encoder.encode(sensor_frame)
         self._metrics.layer_12d = layer_12d
 
         # Mirror balance propagation
         layer_12d = propagate_to_mirror_12d(layer_12d)
 
+        # SCC: Monitor coherence (S1-S9)
+        self._last_coherence = self._scc_monitor.update(layer_12d)
+
+        # S6: Check for entropy spike (potential anomaly)
+        if self._scc_monitor.detect_entropy_spike():
+            # Reduce action confidence when entropy spikes
+            layer_12d[11] = max(layer_12d[11], 0.5)  # Boost O12_ABSOLVING
+
+        # S3: Check coherence threshold
+        if not self._last_coherence.is_valid:
+            # Low coherence: be more cautious
+            layer_12d[11] = max(layer_12d[11], 0.7)  # Strong safety activation
+
         # v2.8: Cognitive mode analysis
         vritti_result, self._accumulated_smrti = compute_vritti(
             layer_12d=layer_12d,
-            sensor_coherence=self.encoder.metrics.layer_coherence,
+            sensor_coherence=self.encoder.get_coherence_score(),
             accumulated_smrti=self._accumulated_smrti
         )
         self._last_vritti = vritti_result
@@ -279,7 +417,7 @@ class DeliberativeTier(BaseTier):
             goal = self.nl_interface.parse(command)
             self.planner.push_goal(goal)
 
-        # O7: Planning
+        # O7: Planning with BCVF (B1-B3)
         plan = self.planner.plan(
             current_state=layer_12d,
             world=self.world_model,
@@ -302,8 +440,35 @@ class DeliberativeTier(BaseTier):
     def current_vritti(self) -> Optional[VrittiResult]:
         return self._last_vritti
 
+    @property
+    def current_coherence(self) -> Optional[CoherenceResult]:
+        """Get last SCC coherence result (S1-S9)."""
+        return self._last_coherence
+
+    def is_coherent(self) -> bool:
+        """Check if current state passes coherence threshold (S3)."""
+        return self._scc_monitor.is_coherent()
+
+    def get_safety_level(self) -> float:
+        """Get S9 safety coherence level."""
+        return self._scc_monitor.get_safety_level()
+
+    def get_weakest_layers(self, n: int = 3) -> List[int]:
+        """Get indices of n weakest layers from SCC analysis."""
+        return self._scc_monitor.get_weakest_layers(n)
+
+    def get_coherence_trend(self) -> float:
+        """Get coherence trend (positive = improving)."""
+        return self._scc_monitor.get_trend()
+
+    def get_action_scores(self) -> List[ActionScore]:
+        """Get BCVF scores from last planning cycle."""
+        return self.planner.get_last_action_scores()
+
     def reset(self) -> None:
         super().reset()
         self.encoder.reset()
+        self._scc_monitor.reset()
         self._accumulated_smrti = 0.0
         self._last_vritti = None
+        self._last_coherence = None
