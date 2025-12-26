@@ -1,8 +1,8 @@
 # Symbolu Robotics & Autonomous AI Tier Design
 
-**Version**: 1.2.0
+**Version**: 1.3.0
 **Date**: 2025-12-26
-**Status**: Implementation Complete (with Recovery & Learning)
+**Status**: Implementation Complete (with Advanced Planning & LLM Integration)
 **Parent**: Symbolu Enterprise Architecture (v2.7+)
 
 ---
@@ -122,7 +122,9 @@ symbolu-robotics/
 │   │   ├── goal_stack.py          # O8_PURPOSE hierarchy
 │   │   ├── action_primitives.py   # O3_EXECUTION library
 │   │   ├── world_model.py         # O9_WITNESSES state
-│   │   └── path_planner.py        # Spatial planning
+│   │   ├── path_planner.py        # Spatial planning
+│   │   ├── mpc_planner.py         # NEW: Model Predictive Control
+│   │   └── htn_planner.py         # NEW: Hierarchical Task Networks
 │   │
 │   ├── state/                     # Adapted from v2.7 state management
 │   │   ├── __init__.py
@@ -134,7 +136,7 @@ symbolu-robotics/
 │   ├── comms/                     # NEW: Multi-agent coordination
 │   │   ├── __init__.py
 │   │   ├── swarm_protocol.py      # O10_UNIFYING: Multi-robot
-│   │   ├── human_interface.py     # Natural language commands
+│   │   ├── human_interface.py     # ENHANCED: LLM-powered NL commands
 │   │   └── ros_bridge.py          # ROS2 integration (optional)
 │   │
 │   ├── adapters/                  # Hardware abstraction
@@ -1290,9 +1292,483 @@ The learning system integrates with patent formulas:
 
 ---
 
-## 11. Safety Architecture
+## 11. Advanced Planning Module
 
-### 11.1 Safety Layer Hierarchy
+The planning module provides sophisticated task and trajectory planning capabilities that integrate with the ontology-based control system.
+
+### 11.1 Model Predictive Control (MPC) Planner
+
+The MPC planner provides real-time trajectory optimization with receding horizon control.
+
+#### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Receding Horizon** | Optimizes control sequence, applies first action, repeats at ~50Hz |
+| **Coherence-Aware Cost** | SCC coherence (S1-S9) shapes cost function for safer trajectories |
+| **Constraint Satisfaction** | Enforces joint limits, velocity limits, collision avoidance |
+| **Warmstart Support** | Uses previous solution for faster convergence |
+| **Dynamics Integration** | Supports learned DynamicsModel for state prediction |
+
+#### Architecture
+
+```python
+class MPCPlanner:
+    """Model Predictive Control with coherence integration."""
+
+    def __init__(self, config: MPCConfig):
+        self._cost_fn = CostFunction(config)      # Stage + terminal costs
+        self._constraints = ConstraintChecker(config)  # Safety constraints
+        self._dynamics_model = None               # Optional learned model
+
+    def plan(
+        self,
+        current_state: Layer12D,
+        current_coherence: float = 1.0,
+        goal_state: Optional[Layer12D] = None,
+    ) -> MPCResult:
+        """
+        Plan optimal action via MPC.
+
+        Returns:
+            MPCResult with optimal action, predicted trajectory,
+            coherence predictions, and diagnostics
+        """
+```
+
+#### Cost Function Design
+
+The MPC cost function combines tracking error, control effort, and coherence:
+
+```
+L = Σ (state_tracking + control_effort + coherence_penalty) + terminal_cost
+```
+
+- **State tracking**: Weighted L2 error from reference trajectory
+- **Control effort**: Penalizes large actuator commands
+- **Coherence penalty**: `w × (1 - coherence)²` - low coherence = high cost
+- **Terminal cost**: Weighted error to goal, doubled if coherence < threshold
+
+#### Configuration
+
+```python
+@dataclass
+class MPCConfig:
+    prediction_horizon: int = 20   # Steps to predict ahead
+    control_horizon: int = 5       # Steps to optimize
+    dt: float = 0.05               # Time step (50Hz)
+
+    # Coherence integration (SCC)
+    use_coherence_cost: bool = True
+    coherence_cost_weight: float = 0.5
+    min_coherence_threshold: float = 0.3
+
+    # Constraints
+    velocity_limit: float = 1.0
+    acceleration_limit: float = 2.0
+    jerk_limit: float = 5.0
+```
+
+#### Integration with Dynamics Model
+
+When a trained DynamicsModel is available:
+
+```python
+# With learned dynamics
+mpc.set_dynamics_model(dynamics_model)
+result = mpc.plan(current_state, coherence)
+# Uses learned predictions for more accurate trajectory optimization
+
+# Without learned dynamics
+result = mpc.plan(current_state, coherence)
+# Falls back to simple first-order dynamics model
+```
+
+### 11.2 Hierarchical Task Network (HTN) Planner
+
+The HTN planner decomposes high-level goals into executable action primitives using hierarchical methods.
+
+#### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Task Decomposition** | Breaks complex tasks into primitive actions |
+| **BCVF Method Selection** | Uses B1-B3 formulas for method scoring |
+| **Condition Evaluation** | Supports state predicates, comparisons, expressions |
+| **Coherence Confidence** | SCC coherence modulates task confidence |
+| **Incremental Execution** | Step-by-step plan execution with monitoring |
+
+#### Architecture
+
+```python
+class HTNPlanner:
+    """Hierarchical Task Network planner with BCVF integration."""
+
+    def __init__(self, config: HTNConfig, bcvf_scorer: Optional[BCVFScorer] = None):
+        self._methods: Dict[str, List[Method]] = {}  # Task → methods
+        self._bcvf_scorer = bcvf_scorer              # Action selection
+
+    def plan(
+        self,
+        goal_task: Task,
+        initial_state: Optional[Dict] = None,
+    ) -> List[Task]:
+        """
+        Create plan via HTN decomposition.
+
+        Returns ordered list of primitive tasks.
+        """
+
+    def execute_step(
+        self,
+        layer_12d: Optional[Layer12D] = None,
+    ) -> Tuple[bool, Optional[Task]]:
+        """
+        Execute next step in current plan.
+
+        Returns (continue, current_task).
+        """
+```
+
+#### Task and Method Definition
+
+```python
+@dataclass
+class Task:
+    name: str                           # Task identifier
+    parameters: Dict[str, Any]          # Task parameters
+    preconditions: List[Condition] = [] # Required conditions
+    effects: List[Condition] = []       # State changes
+    primitive: bool = False             # True if directly executable
+    subtasks: List[Task] = []           # Decomposition (if compound)
+
+@dataclass
+class Method:
+    name: str                           # Method identifier
+    task_name: str                      # Task this method achieves
+    preconditions: List[Condition] = [] # When applicable
+    subtasks: List[Task] = []           # Decomposition
+
+    # BCVF integration
+    forward_feasibility: float = 1.0    # sf: Physical feasibility
+    backward_achievement: float = 1.0   # sb: Goal achievement
+```
+
+#### Condition System
+
+```python
+class ConditionType(Enum):
+    STATE_PREDICATE = "state_predicate"  # world["holding"] == True
+    COMPARISON = "comparison"             # layer_12d[3] > 0.5
+    EXPRESSION = "expression"             # Custom lambda
+    LAYER_THRESHOLD = "layer_threshold"   # O3_EXECUTION > threshold
+
+@dataclass
+class Condition:
+    type: ConditionType
+    key: Optional[str] = None
+    operator: Optional[str] = None   # ==, !=, <, >, <=, >=
+    value: Any = None
+    expression: Optional[Callable] = None
+    layer_index: Optional[int] = None
+```
+
+#### BCVF Method Selection
+
+When multiple methods can achieve a task, BCVF scores them:
+
+```python
+def select_method(self, task: Task, state: Dict, coherence: float) -> Method:
+    """Select best method using BCVF (B1-B3)."""
+
+    candidates = self._get_applicable_methods(task, state)
+
+    if self._bcvf_scorer and len(candidates) > 1:
+        # Use BCVF scoring
+        forward_scores = [m.forward_feasibility for m in candidates]
+        backward_scores = [m.backward_achievement for m in candidates]
+
+        scores = self._bcvf_scorer.score_candidates(
+            forward_scores, backward_scores
+        )
+
+        # Modulate by coherence
+        final_scores = [s.normalized_weight * coherence for s in scores]
+        best_idx = np.argmax(final_scores)
+        return candidates[best_idx]
+
+    return candidates[0]  # Default to first applicable
+```
+
+#### Pre-built HTN: Pick and Place
+
+```python
+def create_pick_and_place_htn() -> HTNPlanner:
+    """Create HTN for common pick-and-place task."""
+
+    planner = HTNPlanner()
+
+    # Register compound task
+    planner.register_method(Method(
+        name="pick_and_place_method",
+        task_name="pick_and_place",
+        subtasks=[
+            Task(name="approach", primitive=True),
+            Task(name="grasp", primitive=True),
+            Task(name="lift", primitive=True),
+            Task(name="move_to_target", primitive=True),
+            Task(name="lower", primitive=True),
+            Task(name="release", primitive=True),
+            Task(name="retract", primitive=True),
+        ],
+    ))
+
+    return planner
+```
+
+### 11.3 MPC + HTN Integration
+
+The two planners work together in the Deliberative Tier:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  MPC + HTN INTEGRATION                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   High-Level Goal ──► HTN Planner ──► Primitive Task Sequence   │
+│                            │                                     │
+│                            ▼                                     │
+│                    For each primitive task:                      │
+│                            │                                     │
+│                    ┌───────▼────────┐                           │
+│                    │   MPC Planner  │                           │
+│                    │ (trajectory    │                           │
+│                    │  optimization) │                           │
+│                    └───────┬────────┘                           │
+│                            │                                     │
+│                    ┌───────▼────────┐                           │
+│                    │  Tier R2/R1    │                           │
+│                    │  (execution)   │                           │
+│                    └────────────────┘                           │
+│                                                                  │
+│   Example:                                                       │
+│   "Pick up the red block" ──► HTN decomposes to 7 primitives    │
+│   Each primitive ──► MPC generates optimal trajectory           │
+│   Trajectory ──► R2/R1 execute with safety constraints          │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 12. LLM-Enhanced Human Interface
+
+The human interface module provides natural language understanding with LLM integration for complex command parsing.
+
+### 12.1 Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 LLM-ENHANCED HUMAN INTERFACE                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   User Command ──► Pattern Matching ──► Simple? ──► Yes ──► Execute
+│                           │                │                     │
+│                           │                └── No ──┐            │
+│                           │                         ▼            │
+│                           │              ┌──────────────────┐   │
+│                           │              │   LLM Provider   │   │
+│                           │              │  (OpenAI/Mock)   │   │
+│                           │              └────────┬─────────┘   │
+│                           │                       │              │
+│                           │              ParsedCommand with:     │
+│                           │              - Intent confidence     │
+│                           │              - Entity extraction     │
+│                           │              - Clarification needs   │
+│                           │                       │              │
+│                           │              ┌────────▼─────────┐   │
+│                           └──────────────│ ConversationMgr  │   │
+│                                          │ (context tracking)│   │
+│                                          └──────────────────┘   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 12.2 LLM Provider Abstraction
+
+```python
+class LLMProvider(ABC):
+    """Abstract base for LLM integration."""
+
+    @abstractmethod
+    def parse_command(
+        self,
+        text: str,
+        context: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Parse command using LLM."""
+
+    @abstractmethod
+    def generate_response(
+        self,
+        command: ParsedCommand,
+        success: bool,
+        context: Dict[str, Any],
+    ) -> str:
+        """Generate natural response."""
+
+    @abstractmethod
+    def disambiguate(
+        self,
+        text: str,
+        options: List[str],
+        context: Dict[str, Any],
+    ) -> Tuple[int, float]:
+        """Disambiguate among options, return (index, confidence)."""
+
+# Implementations
+class MockLLMProvider(LLMProvider):
+    """Testing provider with deterministic responses."""
+
+class OpenAILLMProvider(LLMProvider):
+    """OpenAI GPT integration for production."""
+```
+
+### 12.3 Intent Confidence with SCC
+
+Intent confidence integrates with SCC coherence:
+
+```python
+@dataclass
+class IntentConfidence:
+    """Confidence metrics for parsed intent."""
+
+    raw_confidence: float         # LLM confidence (0-1)
+    coherence_adjusted: float     # Adjusted by SCC coherence
+    needs_clarification: bool     # Below threshold?
+
+    @classmethod
+    def from_parse(
+        cls,
+        llm_confidence: float,
+        coherence: float,
+        threshold: float = 0.6,
+    ) -> "IntentConfidence":
+        """Compute coherence-adjusted confidence."""
+        adjusted = llm_confidence * (0.5 + 0.5 * coherence)
+        return cls(
+            raw_confidence=llm_confidence,
+            coherence_adjusted=adjusted,
+            needs_clarification=adjusted < threshold,
+        )
+```
+
+### 12.4 Enhanced Command Parsing
+
+```python
+class HumanInterface:
+    """LLM-enhanced natural language interface."""
+
+    def __init__(
+        self,
+        llm_config: Optional[LLMConfig] = None,
+        llm_provider: Optional[LLMProvider] = None,
+    ):
+        self._llm_provider = llm_provider or MockLLMProvider()
+        self._safety_patterns = self._compile_safety_patterns()
+
+    def parse_command(
+        self,
+        text: str,
+        coherence: float = 1.0,
+    ) -> ParsedCommand:
+        """
+        Parse natural language command.
+
+        Uses regex for simple commands, LLM for complex ones.
+        Coherence modulates confidence thresholds.
+        """
+        # Safety check first
+        if self._detect_unsafe_pattern(text):
+            return ParsedCommand(
+                command_type=CommandType.UNKNOWN,
+                confidence=IntentConfidence(0.0, 0.0, True),
+            )
+
+        # Try pattern matching
+        simple_result = self._try_pattern_match(text)
+        if simple_result.confidence.raw_confidence > 0.8:
+            return simple_result
+
+        # Fall back to LLM
+        return self._parse_with_llm(text, coherence)
+```
+
+### 12.5 Conversation Management
+
+```python
+class ConversationManager:
+    """Multi-turn dialogue with context tracking."""
+
+    def __init__(self, max_history: int = 10):
+        self._history: List[Tuple[str, ParsedCommand]] = []
+        self._pending_clarification: Optional[str] = None
+
+    def process_turn(
+        self,
+        text: str,
+        interface: HumanInterface,
+        coherence: float = 1.0,
+    ) -> Tuple[ParsedCommand, Optional[str]]:
+        """
+        Process conversation turn.
+
+        Returns (command, optional_clarification_question).
+        """
+        # Handle clarification response
+        if self._pending_clarification:
+            return self._resolve_clarification(text, interface)
+
+        # Parse new command
+        command = interface.parse_command(text, coherence)
+
+        # Check if clarification needed
+        if command.confidence.needs_clarification:
+            question = interface.generate_clarification(command)
+            self._pending_clarification = question
+            return command, question
+
+        self._history.append((text, command))
+        return command, None
+```
+
+### 12.6 Safety Patterns
+
+The interface includes built-in safety checks:
+
+```python
+# Unsafe command patterns (blocked)
+UNSAFE_PATTERNS = [
+    r"maximum\s+(speed|power|force)",
+    r"disable\s+safety",
+    r"override\s+limits",
+    r"ignore\s+collision",
+    r"force\s+through",
+]
+
+# Caution patterns (require confirmation)
+CAUTION_PATTERNS = [
+    r"full\s+speed",
+    r"rapid\s+movement",
+    r"close\s+to\s+human",
+]
+```
+
+---
+
+## 13. Safety Architecture
+
+### 13.1 Safety Layer Hierarchy
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -1312,7 +1788,7 @@ The learning system integrates with patent formulas:
 └────────────────────────────────────────────────────────┘
 ```
 
-### 11.2 O12_ABSOLVING Implementation
+### 13.2 O12_ABSOLVING Implementation
 
 ```python
 class ConstraintMonitor:
@@ -1350,9 +1826,9 @@ class ConstraintMonitor:
 
 ---
 
-## 12. Integration Patterns
+## 14. Integration Patterns
 
-### 12.1 ROS2 Bridge
+### 14.1 ROS2 Bridge
 
 ```python
 class ROS2Adapter:
@@ -1387,7 +1863,7 @@ class ROS2Adapter:
             self.cmd_pub.publish(cmd)
 ```
 
-### 12.2 Simulation Adapter (MuJoCo)
+### 14.2 Simulation Adapter (MuJoCo)
 
 ```python
 class MuJoCoAdapter:
@@ -1418,9 +1894,9 @@ class MuJoCoAdapter:
 
 ---
 
-## 13. Performance Requirements
+## 15. Performance Requirements
 
-### 13.1 Latency Budgets
+### 15.1 Latency Budgets
 
 | Tier | Target Latency | Hard Deadline | Platform |
 |------|----------------|---------------|----------|
@@ -1429,7 +1905,7 @@ class MuJoCoAdapter:
 | R3 Deliberative | 50ms | 100ms | Edge GPU |
 | R3 + Cloud | 200ms | 500ms | Cloud LLM |
 
-### 13.2 Memory Requirements
+### 15.2 Memory Requirements
 
 | Tier | RAM | Storage | Notes |
 |------|-----|---------|-------|
@@ -1439,7 +1915,7 @@ class MuJoCoAdapter:
 
 ---
 
-## 14. Development Roadmap
+## 16. Development Roadmap
 
 ### Phase 1: Core (P0) - Weeks 1-4
 - [ ] Set up `symbolu-robotics` repository
@@ -1467,9 +1943,9 @@ class MuJoCoAdapter:
 
 ---
 
-## 15. Testing Strategy
+## 17. Testing Strategy
 
-### 15.1 Unit Tests
+### 17.1 Unit Tests
 
 ```python
 def test_proprioception_encoder():
@@ -1493,7 +1969,7 @@ def test_safety_constraint():
     assert np.all(safe_cmd.velocities < 1.0)  # Slowed down
 ```
 
-### 15.2 Integration Tests
+### 17.2 Integration Tests
 
 ```python
 def test_reflexive_tier_latency():
@@ -1509,7 +1985,7 @@ def test_reflexive_tier_latency():
 
 ---
 
-## 16. Open Questions
+## 18. Open Questions
 
 1. **Shared Core Maintenance**: How to keep `core/` in sync with main branch?
    - Option A: Git submodule
@@ -1529,7 +2005,7 @@ def test_reflexive_tier_latency():
 
 ---
 
-## 17. References
+## 19. References
 
 - Symbolu Enterprise Architecture: `/docs/SYMBOLU_ENGINE_ARCHITECTURE.md`
 - 12D Ontological Backbone: `/symbolu/ontology/backbone/`
@@ -1552,12 +2028,18 @@ def test_reflexive_tier_latency():
   - Dynamics Model: `/symbolu_robotics/learning/dynamics_model.py`
   - Online Calibration: `/symbolu_robotics/learning/calibration.py`
   - Sim2Real Transfer: `/symbolu_robotics/learning/transfer.py`
+- **Advanced Planning**: `/symbolu_robotics/planning/`
+  - MPC Planner: `/symbolu_robotics/planning/mpc_planner.py`
+  - HTN Planner: `/symbolu_robotics/planning/htn_planner.py`
+- **LLM-Enhanced Communications**: `/symbolu_robotics/comms/`
+  - Human Interface (LLM): `/symbolu_robotics/comms/human_interface.py`
 
 ---
 
-**Document Status**: Implementation Complete (with Recovery & Learning)
+**Document Status**: Implementation Complete (with Advanced Planning & LLM Integration)
 **Last Updated**: 2025-12-26
 **Version History**:
+- v1.3.0: Added Sections 11-12 (Advanced Planning: MPC/HTN, LLM-Enhanced Human Interface)
 - v1.2.0: Added Sections 9-10 (Error Handling & Recovery, Learning System Skeleton)
 - v1.1.0: Added Section 8 (Patent Formula Integration) documenting BCVF, USE, SCC
 - v1.0.0: Initial design document
