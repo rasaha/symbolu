@@ -14,6 +14,9 @@ Usage:
 
     # Test with FLUX schnell (faster, less VRAM)
     python test_image_generation.py --mode schnell
+
+    # Test with FLUX on CPU (very slow, ~10+ minutes, no GPU required)
+    python test_image_generation.py --mode cpu
 """
 
 import argparse
@@ -254,13 +257,104 @@ def test_with_flux(model_variant="dev"):
         return False
 
 
+def test_with_flux_cpu():
+    """Test with FLUX model on CPU (very slow but works without GPU)."""
+    print("\n" + "="*60)
+    print("Testing with FLUX.1-schnell on CPU")
+    print("="*60)
+    print("\nWARNING: CPU mode is VERY SLOW (~10-30 minutes per image)")
+    print("This is only for testing when no GPU is available.\n")
+
+    try:
+        import torch
+        print(f"PyTorch version: {torch.__version__}")
+        print(f"Using device: CPU")
+        print(f"RAM will be used instead of VRAM\n")
+
+    except ImportError:
+        print("ERROR: PyTorch not installed. Run: pip install torch")
+        return False
+
+    try:
+        from symbolu.image_gen import (
+            SymbolUFluxPipeline,
+            ImageGenConfig,
+            GenerationMode,
+        )
+
+        # Use schnell variant (faster) with minimal settings for CPU
+        model_id = "black-forest-labs/FLUX.1-schnell"
+        steps = 2  # Minimal steps for CPU testing
+
+        print(f"Loading {model_id}...")
+        print("(This may take several minutes - downloading ~23GB model)")
+        print("(The model will be cached for future runs)\n")
+
+        # Create pipeline with CPU-optimized settings
+        config = ImageGenConfig(
+            mode=GenerationMode.SPEED,  # Fastest mode
+            num_inference_steps=steps,
+            width=256,   # Small size for CPU
+            height=256,
+        )
+        config.flux.model_id = model_id
+        config.flux.device = "cpu"
+        config.flux.torch_dtype = "float32"  # CPU requires float32
+        config.flux.enable_model_cpu_offload = False  # Already on CPU
+
+        pipeline = SymbolUFluxPipeline.from_pretrained(config=config)
+
+        # Generate with a simple prompt
+        prompt = "A simple red apple on a white background"
+        print(f"Generating: '{prompt}'")
+        print("Please wait... this will take 10-30 minutes on CPU...")
+
+        import time
+        start_time = time.time()
+
+        result = pipeline.generate(
+            prompt=prompt,
+            seed=42,
+        )
+
+        elapsed = time.time() - start_time
+
+        if result.success:
+            print(f"\n✓ Generation Successful!")
+            print(f"  Time elapsed: {elapsed/60:.1f} minutes")
+            print(f"  Confidence: {result.confidence}")
+            print(f"  Global coherence: {result.metrics.global_coherence:.3f}")
+            print(f"  Prompt alignment: {result.metrics.prompt_alignment:.3f}")
+            print(f"  Quality score: {result.metrics.quality_score:.3f}")
+
+            # Save image
+            output_path = Path(__file__).parent / "test_output_cpu.png"
+            result.image.save(output_path)
+            print(f"\n  Image saved to: {output_path}")
+
+            return True
+        else:
+            print(f"\n✗ Generation Failed: {result.error_message}")
+            return False
+
+    except ImportError as e:
+        print(f"ERROR: Missing dependency: {e}")
+        print("Run: pip install diffusers transformers accelerate")
+        return False
+    except Exception as e:
+        import traceback
+        print(f"ERROR: {e}")
+        traceback.print_exc()
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="Test Symbol-U Image Generation")
     parser.add_argument(
         "--mode",
-        choices=["mock", "schnell", "full"],
+        choices=["mock", "schnell", "full", "cpu"],
         default="mock",
-        help="Test mode: mock (no GPU), schnell (fast FLUX), full (FLUX dev)"
+        help="Test mode: mock (no GPU), schnell (fast FLUX), full (FLUX dev), cpu (FLUX on CPU)"
     )
     args = parser.parse_args()
 
@@ -276,6 +370,10 @@ def main():
     if args.mode in ["schnell", "full"]:
         variant = "schnell" if args.mode == "schnell" else "dev"
         success = test_with_flux(variant)
+        if not success:
+            sys.exit(1)
+    elif args.mode == "cpu":
+        success = test_with_flux_cpu()
         if not success:
             sys.exit(1)
 
