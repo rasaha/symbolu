@@ -408,10 +408,9 @@ def create_model(config: TrainingConfig) -> PhaseTransformer:
         sync_lr=config.sync_lr,
     )
 
-    # Add GQA parameters if present (for 7B model)
-    if preset.get("use_gqa"):
-        model_kwargs["use_gqa"] = True
-        model_kwargs["num_kv_heads"] = preset.get("num_kv_heads", preset["num_heads"] // 4)
+    # Note: GQA parameters in preset are for documentation/future use
+    # PhaseTransformer doesn't support GQA yet - will use standard MHA
+    # This means 7B will use more memory but will still work
 
     model = PhaseTransformer(**model_kwargs)
 
