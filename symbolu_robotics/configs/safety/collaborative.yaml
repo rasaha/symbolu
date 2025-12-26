@@ -1,0 +1,44 @@
+# Collaborative Safety Configuration
+# Based on ISO/TS 15066
+
+safety:
+  mode: collaborative
+  standard: ISO_TS_15066
+
+limits:
+  # Reduced limits for human collaboration
+  max_joint_velocity: 1.0       # rad/s
+  max_joint_acceleration: 5.0   # rad/s^2
+  max_joint_effort: 50.0        # Nm
+  max_tcp_velocity: 0.25        # m/s (per ISO/TS 15066)
+  max_tcp_force: 140.0          # N (transient)
+  max_static_force: 65.0        # N (quasi-static)
+
+human_proximity:
+  stop_distance: 0.3            # meters
+  reduced_speed_distance: 1.0   # meters
+  monitoring_distance: 2.0      # meters
+  max_speed_near_human: 0.25    # m/s
+
+power_and_force_limiting:
+  enable: true
+  max_power: 80.0               # W
+  contact_detection_threshold: 20.0  # N
+
+speed_separation_monitoring:
+  enable: true
+  robot_stopping_distance_model: true
+  human_speed_estimate: 1.6     # m/s (max walking speed)
+  reaction_time: 0.5            # seconds
+  safety_margin: 0.2            # meters
+
+hand_guiding:
+  enable: true
+  force_threshold: 5.0          # N to activate
+  max_speed: 0.25               # m/s during guidance
+
+emergency_stop:
+  reaction_time_ms: 50
+  deceleration: 5.0             # rad/s^2 (gentler for collaboration)
+
+human_collaboration: true

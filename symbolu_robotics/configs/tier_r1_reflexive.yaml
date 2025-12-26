@@ -1,0 +1,40 @@
+# Tier R1: Reflexive Configuration
+# Target: Sub-millisecond response, safety-critical
+
+tier:
+  name: reflexive
+  target_latency_ms: 1.0
+  hard_deadline_ms: 2.0
+
+encoder:
+  type: lightweight
+  normalize_output: true
+  temporal_smoothing: 0.0  # No smoothing for fastest response
+
+safety:
+  enable: true
+  collision_guard:
+    min_distance: 0.05
+    emergency_stop_distance: 0.02
+  constraint_monitor:
+    max_joint_velocity: 2.0
+    max_joint_effort: 100.0
+
+reflexes:
+  # Layer index -> velocity scale
+  0: 0.0   # O1_POTENTIAL: idle
+  1: 0.3   # O2_IDENTITY: slow orientation
+  2: 1.0   # O3_EXECUTION: full motion
+  3: 0.5   # O4_STRUCTURE: moderate motion
+  4: 0.2   # O5_COGNITION: exploratory
+  5: 0.8   # O6_AGENCY: active
+  11: 0.0  # O12_ABSOLVING: stop (safety)
+
+# Platform requirements
+platform:
+  recommended:
+    - STM32
+    - ESP32
+    - ARM Cortex-M
+  ram_kb: 64
+  storage_kb: 256

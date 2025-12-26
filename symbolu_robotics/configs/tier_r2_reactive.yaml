@@ -1,0 +1,70 @@
+# Tier R2: Reactive Configuration
+# Target: Behavioral control, edge computing
+
+tier:
+  name: reactive
+  target_latency_ms: 10.0
+  hard_deadline_ms: 20.0
+
+encoder:
+  type: fusion
+  enable_vision: true
+  enable_proprioception: true
+  enable_tactile: true
+  enable_audio: false
+  normalize_output: true
+  temporal_smoothing: 0.1
+
+decoder:
+  type: motor
+  safety_scaling: true
+  smoothing_alpha: 0.2
+  max_velocity: 2.0
+  max_acceleration: 5.0
+
+state:
+  ema_alpha: 0.1
+  variance_alpha: 0.05
+  min_updates_confidence: 5
+
+mirror_balance:
+  propagation_strength: 0.7
+  target_balance: 0.7
+  max_iterations: 3
+
+safety:
+  enable: true
+  constraint_monitor:
+    max_joint_velocity: 2.0
+    max_joint_effort: 100.0
+    human_distance_threshold: 1.0
+  energy_bounds:
+    max_power_per_joint: 50.0
+    max_total_power: 200.0
+
+behaviors:
+  safety_retreat:
+    priority: 1
+    trigger_layer: O12_ABSOLVING
+    threshold: 0.7
+  goal_seek:
+    priority: 2
+    trigger_layer: O8_PURPOSE
+    threshold: 0.6
+  execute_motion:
+    priority: 3
+    trigger_layer: O3_EXECUTION
+    threshold: 0.5
+  explore:
+    priority: 4
+    trigger_layer: O5_COGNITION
+    threshold: 0.4
+
+# Platform requirements
+platform:
+  recommended:
+    - Jetson Nano
+    - Jetson Orin Nano
+    - Raspberry Pi 5
+  ram_mb: 512
+  storage_gb: 1

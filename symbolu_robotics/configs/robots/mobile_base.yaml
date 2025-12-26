@@ -1,0 +1,30 @@
+# Mobile Base Robot Configuration
+
+robot:
+  name: mobile_base
+  type: mobile
+  drive_type: differential
+
+base:
+  wheel_radius: 0.05
+  wheel_separation: 0.3
+  max_linear_velocity: 1.0
+  max_angular_velocity: 1.5
+  max_linear_acceleration: 2.0
+  max_angular_acceleration: 3.0
+
+sensors:
+  odometry: true
+  imu:
+    rate_hz: 100
+  lidar:
+    range: [0.1, 12.0]
+    angle_range: [-3.14, 3.14]
+    resolution: 0.0175  # ~1 degree
+    rate_hz: 10
+  camera:
+    resolution: [640, 480]
+    fps: 30
+  proximity:
+    num_sensors: 8
+    range: 0.5
