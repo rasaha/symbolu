@@ -292,7 +292,7 @@ def test_with_flux_cpu():
 
         # Create pipeline with CPU-optimized settings
         config = ImageGenConfig(
-            mode=GenerationMode.SPEED,  # Fastest mode
+            mode=GenerationMode.FAST,  # Fastest mode
             num_inference_steps=steps,
             width=256,   # Small size for CPU
             height=256,
