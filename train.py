@@ -37,6 +37,11 @@ Model Sizes:
 - small: 50M params (embed=512, layers=8, heads=8)  - validation
 - medium: 100M params (embed=768, layers=12, heads=12)  - target
 - large: 350M params (embed=1024, layers=24, heads=16)  - scale test
+- xl: 1.3B params (embed=2048, layers=24, heads=16)  - large scale
+- 7b: 7B params (embed=4096, layers=32, heads=32)  - production scale
+
+7B Training (requires A100 80GB):
+python train.py --model_size 7b --dataset c4 --batch_size 1 --gradient_accumulation 64 --gradient_checkpointing --max_seq_len 2048
 """
 
 import os
@@ -130,6 +135,9 @@ class TrainingConfig:
     # Mixed precision
     mixed_precision: str = "bf16"  # none, fp16, bf16
 
+    # Gradient checkpointing (for large models)
+    gradient_checkpointing: bool = False  # Enable to reduce memory at cost of speed
+
     # Checkpointing
     checkpoint_dir: str = "checkpoints"
     save_every: int = 5000
@@ -193,6 +201,20 @@ MODEL_PRESETS = {
         "num_layers": 24,
         "num_heads": 16,
         "ff_dim": 4096,
+    },
+    "xl": {
+        "embed_dim": 2048,
+        "num_layers": 24,
+        "num_heads": 16,
+        "ff_dim": 8192,
+    },
+    "7b": {
+        "embed_dim": 4096,
+        "num_layers": 32,
+        "num_heads": 32,
+        "ff_dim": 11008,  # LLaMA-style: ~2.7x hidden dim
+        "use_gqa": True,
+        "num_kv_heads": 8,  # Grouped Query Attention: 32/8 = 4 groups
     },
 }
 
@@ -373,7 +395,8 @@ def create_model(config: TrainingConfig) -> PhaseTransformer:
 
     preset = MODEL_PRESETS[config.model_size]
 
-    model = PhaseTransformer(
+    # Base model kwargs
+    model_kwargs = dict(
         vocab_size=config.vocab_size,
         embed_dim=preset["embed_dim"],
         num_layers=preset["num_layers"],
@@ -384,6 +407,23 @@ def create_model(config: TrainingConfig) -> PhaseTransformer:
         sync_steps=config.sync_steps,
         sync_lr=config.sync_lr,
     )
+
+    # Add GQA parameters if present (for 7B model)
+    if preset.get("use_gqa"):
+        model_kwargs["use_gqa"] = True
+        model_kwargs["num_kv_heads"] = preset.get("num_kv_heads", preset["num_heads"] // 4)
+
+    model = PhaseTransformer(**model_kwargs)
+
+    # Enable gradient checkpointing for large models
+    if config.gradient_checkpointing:
+        if hasattr(model, 'gradient_checkpointing_enable'):
+            model.gradient_checkpointing_enable()
+        else:
+            # Manual gradient checkpointing support
+            for module in model.modules():
+                if hasattr(module, 'gradient_checkpointing'):
+                    module.gradient_checkpointing = True
 
     return model
 
@@ -1007,7 +1047,7 @@ def parse_args() -> TrainingConfig:
 
     # Model
     parser.add_argument("--model_size", type=str, default="small",
-                       choices=["tiny", "small", "medium", "large"],
+                       choices=["tiny", "small", "medium", "large", "xl", "7b"],
                        help="Model size preset")
     parser.add_argument("--vocab_size", type=int, default=50257,
                        help="Vocabulary size")
@@ -1051,6 +1091,10 @@ def parse_args() -> TrainingConfig:
     parser.add_argument("--mixed_precision", type=str, default="bf16",
                        choices=["none", "fp16", "bf16"],
                        help="Mixed precision training")
+
+    # Gradient checkpointing
+    parser.add_argument("--gradient_checkpointing", action="store_true",
+                       help="Enable gradient checkpointing (saves memory, slower)")
 
     # Checkpointing
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints",
@@ -1128,16 +1172,31 @@ def parse_args() -> TrainingConfig:
 if __name__ == "__main__":
     config = parse_args()
 
+    # Get estimated parameter count
+    preset = MODEL_PRESETS.get(config.model_size, {})
+    embed = preset.get("embed_dim", 512)
+    layers = preset.get("num_layers", 8)
+    ff = preset.get("ff_dim", 2048)
+    est_params = (embed * config.vocab_size +  # Embeddings
+                  layers * (4 * embed * embed + 2 * embed * ff) +  # Attention + FFN
+                  embed * config.vocab_size)  # Output projection
+    est_params_str = f"{est_params/1e9:.1f}B" if est_params > 1e9 else f"{est_params/1e6:.0f}M"
+
     print("\n" + "=" * 70)
     print("  SYMBOLU LLM TRAINING")
     print("  Phase Attention Transformer with O(n) Complexity")
     print("=" * 70)
-    print(f"\n  Model: {config.model_size}")
+    print(f"\n  Model: {config.model_size} (~{est_params_str} params)")
     print(f"  Dataset: {config.dataset}")
     print(f"  Max steps: {config.max_steps:,}")
     print(f"  Batch size: {config.batch_size} x {config.gradient_accumulation} accumulation")
+    print(f"  Effective batch: {config.batch_size * config.gradient_accumulation * config.max_seq_len:,} tokens")
     print(f"  Learning rate: {config.learning_rate}")
     print(f"  Mixed precision: {config.mixed_precision}")
+    if config.gradient_checkpointing:
+        print(f"  Gradient checkpointing: ENABLED (saves memory)")
+    if preset.get("use_gqa"):
+        print(f"  Grouped Query Attention: {preset['num_heads']} heads, {preset.get('num_kv_heads', 8)} KV heads")
     print()
 
     try:
