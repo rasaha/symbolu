@@ -487,6 +487,362 @@ class LocalAttention(nn.Module):
 
 
 # =============================================================================
+# LIGHTNING ATTENTION (O(d²) constant KV cache)
+# =============================================================================
+
+class LightningAttention(nn.Module):
+    """
+    Linear attention with constant O(d²) KV cache - inspired by TransNormerLLM/RetNet.
+
+    Memory: O(d²) regardless of sequence length (vs O(n×w) for local attention)
+    Compute: O(n·d²) per layer
+
+    Key formula:
+        kv_t = λ · kv_{t-1} + k_t^T · v_t   (d×d matrix, constant size)
+        o_t = q_t · kv_t
+
+    This enables infinite context with bounded memory.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.1,
+        decay_init: float = 0.99,
+        use_decay_mask: bool = True,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.scale = self.head_dim ** -0.5
+        self.use_decay_mask = use_decay_mask
+
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Learnable per-head decay factors
+        self.decay = nn.Parameter(torch.full((num_heads,), decay_init))
+
+        self.dropout = nn.Dropout(dropout)
+        self.norm = nn.LayerNorm(embed_dim)
+
+    def _forward_recurrent(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor) -> torch.Tensor:
+        """
+        Recurrent mode: O(d²) memory, O(n·d²) compute.
+        Best for inference with very long sequences.
+        """
+        B, H, N, D = Q.shape
+        device = Q.device
+
+        # Initialize KV cache: (B, H, d, d) - constant size!
+        kv = torch.zeros(B, H, D, D, device=device, dtype=Q.dtype)
+
+        outputs = []
+        decay = torch.sigmoid(self.decay).view(1, H, 1, 1)  # (1, H, 1, 1)
+
+        for t in range(N):
+            k_t = K[:, :, t, :]  # (B, H, D)
+            v_t = V[:, :, t, :]  # (B, H, D)
+            q_t = Q[:, :, t, :]  # (B, H, D)
+
+            # Update KV cache with decay: O(d²) per step
+            # kv_t = λ · kv_{t-1} + k_t^T · v_t
+            kv_update = torch.einsum('bhd,bhe->bhde', k_t, v_t)
+            kv = decay * kv + kv_update
+
+            # Compute output: O(d²) per step
+            o_t = torch.einsum('bhd,bhde->bhe', q_t, kv) * self.scale
+            outputs.append(o_t)
+
+        return torch.stack(outputs, dim=2)  # (B, H, N, D)
+
+    def _forward_parallel(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor) -> torch.Tensor:
+        """
+        Parallel mode: Uses cumulative sum with decay weights.
+        Better for training (parallelizable), but creates O(n²) decay matrix.
+        Falls back to chunked approach for very long sequences.
+        """
+        B, H, N, D = Q.shape
+        device = Q.device
+
+        # For shorter sequences, use full parallel computation
+        if N <= 2048:
+            # Compute decay weights matrix: (N, N) lower triangular
+            positions = torch.arange(N, device=device, dtype=Q.dtype)
+            decay = torch.sigmoid(self.decay).view(H, 1, 1)  # (H, 1, 1)
+
+            # decay_weights[i,j] = λ^(i-j) for j <= i, else 0
+            diff = positions.unsqueeze(0) - positions.unsqueeze(1)  # (N, N)
+            decay_weights = decay ** diff.unsqueeze(0).clamp(min=0)  # (H, N, N)
+            decay_weights = torch.tril(decay_weights)  # Causal mask
+
+            # Compute KV terms: (B, H, N, D, D)
+            kv_terms = torch.einsum('bhnd,bhne->bhnde', K, V)
+
+            # Cumulative weighted sum: (B, H, N, D, D)
+            kv_cumsum = torch.einsum('hts,bhtde->bhsde', decay_weights, kv_terms)
+
+            # Output: (B, H, N, D)
+            output = torch.einsum('bhnd,bhnde->bhne', Q, kv_cumsum) * self.scale
+            return output
+        else:
+            # For longer sequences, use recurrent to avoid O(n²) memory
+            return self._forward_recurrent(Q, K, V)
+
+    def forward(self, x: torch.Tensor, causal_mask: bool = True, mode: str = 'auto') -> torch.Tensor:
+        """
+        Lightning attention forward pass.
+
+        Args:
+            x: Input tensor (B, N, D)
+            causal_mask: Always True for autoregressive (built into the method)
+            mode: 'auto', 'recurrent', or 'parallel'
+        """
+        B, N, D = x.shape
+        residual = x
+
+        Q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        K = self.k_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        V = self.v_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        # Q, K, V: (B, H, N, D)
+
+        if mode == 'recurrent' or (mode == 'auto' and N > 2048):
+            output = self._forward_recurrent(Q, K, V)
+        else:
+            output = self._forward_parallel(Q, K, V)
+
+        output = output.transpose(1, 2).contiguous().view(B, N, D)
+        output = self.out_proj(output)
+        output = self.dropout(output)
+
+        return self.norm(residual + output)
+
+
+class LightningTransformerBlock(nn.Module):
+    """Transformer block with Lightning Attention."""
+
+    def __init__(self, config: TransformerConfig, decay_init: float = 0.99):
+        super().__init__()
+        self.attention = LightningAttention(
+            embed_dim=config.embed_dim,
+            num_heads=config.num_heads,
+            dropout=config.dropout,
+            decay_init=decay_init,
+        )
+        self.ff = FeedForward(
+            embed_dim=config.embed_dim,
+            ff_dim=config.ff_dim,
+            dropout=config.dropout,
+        )
+
+    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
+        x = self.attention(x, causal_mask)
+        x = self.ff(x)
+        return x
+
+
+# =============================================================================
+# STANDARD SOFTMAX ATTENTION (for grouped hybrid)
+# =============================================================================
+
+class StandardAttention(nn.Module):
+    """
+    Standard O(n²) softmax attention - used sparingly in grouped hybrid.
+    High-fidelity retrieval layer to complement linear attention.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.scale = self.head_dim ** -0.5
+
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        self.dropout = nn.Dropout(dropout)
+        self.norm = nn.LayerNorm(embed_dim)
+
+    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
+        B, N, D = x.shape
+        residual = x
+
+        Q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        K = self.k_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        V = self.v_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+
+        # Standard attention: O(n²)
+        if SDPA_AVAILABLE:
+            output = F.scaled_dot_product_attention(
+                Q, K, V, is_causal=causal_mask,
+                dropout_p=self.dropout.p if self.training else 0.0,
+            )
+        else:
+            attn = torch.matmul(Q, K.transpose(-2, -1)) * self.scale
+            if causal_mask:
+                mask = torch.triu(torch.ones(N, N, device=x.device, dtype=torch.bool), diagonal=1)
+                attn = attn.masked_fill(mask, float('-inf'))
+            attn = F.softmax(attn, dim=-1)
+            attn = self.dropout(attn)
+            output = torch.matmul(attn, V)
+
+        output = output.transpose(1, 2).contiguous().view(B, N, D)
+        output = self.out_proj(output)
+
+        return self.norm(residual + output)
+
+
+class StandardAttentionBlock(nn.Module):
+    """Transformer block with standard softmax attention."""
+
+    def __init__(self, config: TransformerConfig):
+        super().__init__()
+        self.attention = StandardAttention(
+            embed_dim=config.embed_dim,
+            num_heads=config.num_heads,
+            dropout=config.dropout,
+        )
+        self.ff = FeedForward(
+            embed_dim=config.embed_dim,
+            ff_dim=config.ff_dim,
+            dropout=config.dropout,
+        )
+
+    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
+        x = self.attention(x, causal_mask)
+        x = self.ff(x)
+        return x
+
+
+# =============================================================================
+# GROUPED HYBRID TRANSFORMER (M linear + 1 softmax pattern)
+# =============================================================================
+
+class GroupedHybridTransformer(nn.Module):
+    """
+    Grouped Hybrid Transformer: M layers of Lightning + 1 layer of Softmax.
+
+    Architecture: [Lightning × M, Softmax] × num_groups
+
+    This pattern:
+    - Uses efficient linear attention (Lightning) for most computation
+    - Periodically uses softmax attention for high-fidelity retrieval/correction
+    - Optimal M is 4-7 based on scaling laws
+
+    Memory: O(d²) for Lightning layers + O(n²) only for sparse softmax layers
+    """
+
+    def __init__(
+        self,
+        vocab_size: int = 50257,
+        embed_dim: int = 768,
+        num_heads: int = 12,
+        ff_dim: Optional[int] = None,
+        max_seq_len: int = 8192,
+        dropout: float = 0.1,
+        # Grouped hybrid params
+        M: int = 4,  # Lightning layers per group
+        num_groups: int = 3,  # Number of (M+1) groups
+        decay_init: float = 0.99,
+    ):
+        super().__init__()
+
+        if ff_dim is None:
+            ff_dim = 4 * embed_dim
+
+        config = TransformerConfig(
+            vocab_size=vocab_size,
+            embed_dim=embed_dim,
+            num_layers=num_groups * (M + 1),  # Total layers
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            max_seq_len=max_seq_len,
+            dropout=dropout,
+        )
+        self.config = config
+        self.M = M
+        self.num_groups = num_groups
+
+        # Embeddings
+        self.token_embed = nn.Embedding(vocab_size, embed_dim)
+        self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
+        self.embed_dropout = nn.Dropout(dropout)
+
+        # Build grouped layers: [Lightning × M, Softmax] × num_groups
+        self.blocks = nn.ModuleList()
+        for g in range(num_groups):
+            # M layers of Lightning Attention
+            for m in range(M):
+                self.blocks.append(LightningTransformerBlock(config, decay_init=decay_init))
+            # 1 layer of Standard Softmax Attention
+            self.blocks.append(StandardAttentionBlock(config))
+
+        # Output
+        self.norm = nn.LayerNorm(embed_dim)
+        self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
+
+        # Tie weights
+        self.lm_head.weight = self.token_embed.weight
+
+        self._init_weights()
+
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+                if module.bias is not None:
+                    torch.nn.init.zeros_(module.bias)
+            elif isinstance(module, nn.Embedding):
+                torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        return_hidden: bool = False,
+        causal_mask: bool = True,
+    ) -> Dict[str, Any]:
+        B, N = x.shape
+        device = x.device
+
+        # Embeddings
+        positions = torch.arange(N, device=device).unsqueeze(0)
+        x = self.token_embed(x) + self.pos_embed(positions)
+        x = self.embed_dropout(x)
+
+        hidden_states = [x] if return_hidden else []
+
+        # Forward through grouped blocks
+        for block in self.blocks:
+            x = block(x, causal_mask)
+            if return_hidden:
+                hidden_states.append(x)
+
+        x = self.norm(x)
+        logits = self.lm_head(x)
+
+        output = {"logits": logits}
+        if return_hidden:
+            output["hidden_states"] = hidden_states
+
+        return output
+
+    def get_num_params(self) -> int:
+        return sum(p.numel() for p in self.parameters())
+
+
+# =============================================================================
 # HYBRID ATTENTION (Local + Phase)
 # =============================================================================
 
