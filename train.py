@@ -149,7 +149,7 @@ class TrainingConfig:
     # Checkpointing
     checkpoint_dir: str = "checkpoints"
     save_every: int = 5000
-    eval_every: int = 1000
+    eval_every: int = 100
     log_every: int = 100
 
     # Dataset
@@ -1136,7 +1136,7 @@ def parse_args() -> TrainingConfig:
                        help="Checkpoint directory")
     parser.add_argument("--save_every", type=int, default=5000,
                        help="Save checkpoint every N steps")
-    parser.add_argument("--eval_every", type=int, default=1000,
+    parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
     parser.add_argument("--log_every", type=int, default=100,
                        help="Log every N steps")
