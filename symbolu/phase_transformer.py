@@ -512,6 +512,7 @@ class HybridAttentionLayer(nn.Module):
         sync_lr: float = 0.1,
         alpha_local: float = 0.8,
         alpha_phase: float = 0.2,
+        local_backend: str = 'auto',
     ):
         super().__init__()
         # Keep alphas for potential future use (e.g., residual weighting)
@@ -523,6 +524,7 @@ class HybridAttentionLayer(nn.Module):
             num_heads=num_heads,
             window_size=window_size,
             dropout=dropout,
+            backend=local_backend,
         )
 
         self.phase_attn = PhaseAttentionLayer(
@@ -557,6 +559,7 @@ class HybridTransformerBlock(nn.Module):
         self,
         config: TransformerConfig,
         window_size: int = 256,
+        local_backend: str = 'auto',
         alpha_local: float = 0.8,
         alpha_phase: float = 0.2,
     ):
@@ -570,6 +573,7 @@ class HybridTransformerBlock(nn.Module):
             sync_lr=config.sync_lr,
             alpha_local=alpha_local,
             alpha_phase=alpha_phase,
+            local_backend=local_backend,
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -586,13 +590,14 @@ class HybridTransformerBlock(nn.Module):
 class LocalTransformerBlock(nn.Module):
     """Transformer block with local attention only (for early layers)."""
 
-    def __init__(self, config: TransformerConfig, window_size: int = 256):
+    def __init__(self, config: TransformerConfig, window_size: int = 256, backend: str = 'auto'):
         super().__init__()
         self.attention = LocalAttention(
             embed_dim=config.embed_dim,
             num_heads=config.num_heads,
             window_size=window_size,
             dropout=config.dropout,
+            backend=backend,
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -838,6 +843,7 @@ class HybridPhaseTransformer(nn.Module):
         # Hybrid-specific params
         local_layers: int = 4,  # First N layers use local attention only
         window_size: int = 256,  # Local attention window
+        local_backend: str = 'auto',  # LocalAttention backend: 'auto', 'flash', 'sdpa', 'unfold'
         alpha_local: float = 0.8,  # Weight for local attention in hybrid layers
         alpha_phase: float = 0.2,  # Weight for phase attention in hybrid layers
     ):
@@ -856,6 +862,7 @@ class HybridPhaseTransformer(nn.Module):
         )
         self.config = config
         self.local_layers = local_layers
+        self.local_backend = local_backend
 
         # Embeddings
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
@@ -867,12 +874,14 @@ class HybridPhaseTransformer(nn.Module):
         for i in range(num_layers):
             if i < local_layers:
                 # Early layers: Local attention only (fast pattern learning)
-                self.blocks.append(LocalTransformerBlock(config, window_size=window_size))
+                self.blocks.append(LocalTransformerBlock(
+                    config, window_size=window_size, backend=local_backend))
             else:
                 # Later layers: Hybrid Local + Phase attention
                 self.blocks.append(HybridTransformerBlock(
                     config,
                     window_size=window_size,
+                    local_backend=local_backend,
                     alpha_local=alpha_local,
                     alpha_phase=alpha_phase,
                 ))
