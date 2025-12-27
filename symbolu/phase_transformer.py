@@ -310,6 +310,203 @@ class FeedForward(nn.Module):
 
 
 # =============================================================================
+# LOCAL ATTENTION (Sliding Window) - O(n*w)
+# =============================================================================
+
+class LocalAttention(nn.Module):
+    """
+    Sliding window local attention for fast local pattern learning.
+
+    Complexity: O(n * window_size) instead of O(n²)
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        window_size: int = 256,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.window_size = window_size
+        self.scale = self.head_dim ** -0.5
+
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        self.dropout = nn.Dropout(dropout)
+        self.norm = nn.LayerNorm(embed_dim)
+
+    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
+        """
+        Local attention with sliding window.
+
+        Each token attends only to tokens within window_size to the left.
+        """
+        B, N, D = x.shape
+        residual = x
+
+        Q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        K = self.k_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        V = self.v_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+
+        # Create local attention mask (band matrix)
+        # Each token attends to window_size tokens to the left (including itself)
+        attn = torch.matmul(Q, K.transpose(-2, -1)) * self.scale
+
+        # Create causal + local mask
+        mask = torch.ones(N, N, device=x.device, dtype=torch.bool)
+        for i in range(N):
+            start = max(0, i - self.window_size + 1)
+            mask[i, start:i+1] = False  # False = attend, True = mask out
+
+        if causal_mask:
+            # Also apply causal mask (upper triangle)
+            causal = torch.triu(torch.ones(N, N, device=x.device, dtype=torch.bool), diagonal=1)
+            mask = mask | causal
+
+        attn = attn.masked_fill(mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+        attn = F.softmax(attn, dim=-1)
+        attn = self.dropout(attn)
+
+        output = torch.matmul(attn, V)
+        output = output.transpose(1, 2).contiguous().view(B, N, D)
+        output = self.out_proj(output)
+
+        return self.norm(residual + output)
+
+
+# =============================================================================
+# HYBRID ATTENTION (Local + Phase)
+# =============================================================================
+
+class HybridAttentionLayer(nn.Module):
+    """
+    Combines local attention (fast pattern learning) with phase attention (global context).
+
+    output = α_local * LocalAttn(x) + α_phase * PhaseAttn(x)
+
+    This hybrid approach:
+    - Local: Quickly learns syntax, grammar, local patterns
+    - Phase: Handles long-range dependencies efficiently O(n)
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        window_size: int = 256,
+        dropout: float = 0.1,
+        sync_steps: int = 3,
+        sync_lr: float = 0.1,
+        alpha_local: float = 0.8,
+        alpha_phase: float = 0.2,
+    ):
+        super().__init__()
+        self.alpha_local = nn.Parameter(torch.tensor(alpha_local))
+        self.alpha_phase = nn.Parameter(torch.tensor(alpha_phase))
+
+        self.local_attn = LocalAttention(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            window_size=window_size,
+            dropout=dropout,
+        )
+
+        self.phase_attn = PhaseAttentionLayer(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            dropout=dropout,
+            sync_steps=sync_steps,
+            sync_lr=sync_lr,
+        )
+
+        self.norm = nn.LayerNorm(embed_dim)
+
+    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
+        """
+        Hybrid forward: weighted combination of local and phase attention.
+        """
+        residual = x
+
+        # Local attention path (fast, local patterns)
+        local_out = self.local_attn(x, causal_mask)
+
+        # Phase attention path (efficient global context)
+        phase_out = self.phase_attn(x, causal_mask)
+
+        # Weighted combination
+        # Subtract residual since both paths add it back
+        local_delta = local_out - residual
+        phase_delta = phase_out - residual
+
+        output = residual + self.alpha_local * local_delta + self.alpha_phase * phase_delta
+
+        return output
+
+
+class HybridTransformerBlock(nn.Module):
+    """Transformer block with hybrid local + phase attention."""
+
+    def __init__(
+        self,
+        config: TransformerConfig,
+        window_size: int = 256,
+        alpha_local: float = 0.8,
+        alpha_phase: float = 0.2,
+    ):
+        super().__init__()
+        self.attention = HybridAttentionLayer(
+            embed_dim=config.embed_dim,
+            num_heads=config.num_heads,
+            window_size=window_size,
+            dropout=config.dropout,
+            sync_steps=config.sync_steps,
+            sync_lr=config.sync_lr,
+            alpha_local=alpha_local,
+            alpha_phase=alpha_phase,
+        )
+        self.ff = FeedForward(
+            embed_dim=config.embed_dim,
+            ff_dim=config.ff_dim,
+            dropout=config.dropout,
+        )
+
+    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
+        x = self.attention(x, causal_mask)
+        x = self.ff(x)
+        return x
+
+
+class LocalTransformerBlock(nn.Module):
+    """Transformer block with local attention only (for early layers)."""
+
+    def __init__(self, config: TransformerConfig, window_size: int = 256):
+        super().__init__()
+        self.attention = LocalAttention(
+            embed_dim=config.embed_dim,
+            num_heads=config.num_heads,
+            window_size=window_size,
+            dropout=config.dropout,
+        )
+        self.ff = FeedForward(
+            embed_dim=config.embed_dim,
+            ff_dim=config.ff_dim,
+            dropout=config.dropout,
+        )
+
+    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
+        x = self.attention(x, causal_mask)
+        x = self.ff(x)
+        return x
+
+
+# =============================================================================
 # TRANSFORMER BLOCKS
 # =============================================================================
 
@@ -510,6 +707,169 @@ class PhaseTransformer(nn.Module):
 
             input_ids = torch.cat([input_ids, next_token], dim=1)
 
+        return input_ids
+
+
+class HybridPhaseTransformer(nn.Module):
+    """
+    Hybrid Phase Transformer with Local + Phase Attention.
+
+    Architecture:
+    - Early layers (1 to local_layers): Local attention only
+    - Later layers: Hybrid (Local + Phase) attention
+
+    This enables:
+    - Fast learning of local patterns (syntax, grammar)
+    - Efficient global context via Phase attention O(n)
+    - Better PPL convergence than pure Phase attention
+    """
+
+    def __init__(
+        self,
+        vocab_size: int = 50257,
+        embed_dim: int = 768,
+        num_layers: int = 12,
+        num_heads: int = 12,
+        ff_dim: Optional[int] = None,
+        max_seq_len: int = 8192,
+        dropout: float = 0.1,
+        sync_steps: int = 3,
+        sync_lr: float = 0.1,
+        # Hybrid-specific params
+        local_layers: int = 4,  # First N layers use local attention only
+        window_size: int = 256,  # Local attention window
+        alpha_local: float = 0.8,  # Weight for local attention in hybrid layers
+        alpha_phase: float = 0.2,  # Weight for phase attention in hybrid layers
+    ):
+        super().__init__()
+
+        config = TransformerConfig(
+            vocab_size=vocab_size,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            max_seq_len=max_seq_len,
+            dropout=dropout,
+            sync_steps=sync_steps,
+            sync_lr=sync_lr,
+        )
+        self.config = config
+        self.local_layers = local_layers
+
+        # Embeddings
+        self.token_embed = nn.Embedding(vocab_size, embed_dim)
+        self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
+        self.embed_dropout = nn.Dropout(dropout)
+
+        # Transformer blocks: Local (early) + Hybrid (later)
+        self.blocks = nn.ModuleList()
+        for i in range(num_layers):
+            if i < local_layers:
+                # Early layers: Local attention only (fast pattern learning)
+                self.blocks.append(LocalTransformerBlock(config, window_size=window_size))
+            else:
+                # Later layers: Hybrid Local + Phase attention
+                self.blocks.append(HybridTransformerBlock(
+                    config,
+                    window_size=window_size,
+                    alpha_local=alpha_local,
+                    alpha_phase=alpha_phase,
+                ))
+
+        # Output
+        self.norm = nn.LayerNorm(embed_dim)
+        self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
+
+        # Tie weights
+        self.lm_head.weight = self.token_embed.weight
+
+        # Gradient checkpointing (disabled by default)
+        self.gradient_checkpointing = False
+
+        # Initialize
+        self.apply(self._init_weights)
+
+    def gradient_checkpointing_enable(self):
+        """Enable gradient checkpointing to save memory at cost of speed."""
+        self.gradient_checkpointing = True
+
+    def gradient_checkpointing_disable(self):
+        """Disable gradient checkpointing."""
+        self.gradient_checkpointing = False
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        return_hidden: bool = False,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass.
+
+        Args:
+            input_ids: [B, N] token indices
+            return_hidden: Return hidden states
+
+        Returns:
+            Dict with 'logits' and optionally 'hidden_states'
+        """
+        B, N = input_ids.shape
+
+        # Embeddings
+        positions = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.token_embed(input_ids) + self.pos_embed(positions)
+        x = self.embed_dropout(x)
+
+        # Transformer blocks
+        hidden_states = []
+        for block in self.blocks:
+            if self.gradient_checkpointing and self.training:
+                x = checkpoint(
+                    block,
+                    x,
+                    True,  # causal_mask
+                    use_reentrant=False,
+                )
+            else:
+                x = block(x, causal_mask=True)
+            if return_hidden:
+                hidden_states.append(x)
+
+        # Output
+        x = self.norm(x)
+        logits = self.lm_head(x)
+
+        result = {'logits': logits}
+        if return_hidden:
+            result['hidden_states'] = hidden_states
+
+        return result
+
+    def generate(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 50,
+        temperature: float = 1.0,
+        top_k: int = 50,
+    ) -> torch.Tensor:
+        """Simple generation loop."""
+        for _ in range(max_new_tokens):
+            logits = self(input_ids)['logits'][:, -1, :]
+            logits = logits / temperature
+            if top_k > 0:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = float('-inf')
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+            input_ids = torch.cat([input_ids, next_token], dim=1)
         return input_ids
 
 

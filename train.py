@@ -66,7 +66,7 @@ from torch.amp import autocast
 from torch.cuda.amp import GradScaler
 
 # SymbolU imports
-from symbolu.phase_transformer import PhaseTransformer, TransformerConfig
+from symbolu.phase_transformer import PhaseTransformer, HybridPhaseTransformer, TransformerConfig
 
 # Optional imports
 try:
@@ -107,6 +107,7 @@ class TrainingConfig:
 
     # Model architecture
     model_size: str = "small"  # tiny, small, medium, large
+    model_type: str = "phase"  # phase, hybrid
     vocab_size: int = 50257  # GPT-2 vocab size
     max_seq_len: int = 1024
     dropout: float = 0.1
@@ -114,6 +115,12 @@ class TrainingConfig:
     # Phase-specific parameters
     sync_steps: int = 3
     sync_lr: float = 0.1
+
+    # Hybrid-specific parameters
+    local_layers: int = 4  # Number of early layers with local attention only
+    window_size: int = 256  # Local attention window size
+    alpha_local: float = 0.8  # Weight for local attention in hybrid layers
+    alpha_phase: float = 0.2  # Weight for phase attention in hybrid layers
 
     # Training hyperparameters
     batch_size: int = 16
@@ -389,8 +396,8 @@ def create_dataloaders(
 # MODEL
 # =============================================================================
 
-def create_model(config: TrainingConfig) -> PhaseTransformer:
-    """Create PhaseTransformer model based on configuration."""
+def create_model(config: TrainingConfig) -> nn.Module:
+    """Create PhaseTransformer or HybridPhaseTransformer model based on configuration."""
 
     # Get model preset
     if config.model_size not in MODEL_PRESETS:
@@ -411,11 +418,19 @@ def create_model(config: TrainingConfig) -> PhaseTransformer:
         sync_lr=config.sync_lr,
     )
 
-    # Note: GQA parameters in preset are for documentation/future use
-    # PhaseTransformer doesn't support GQA yet - will use standard MHA
-    # This means 7B will use more memory but will still work
-
-    model = PhaseTransformer(**model_kwargs)
+    # Create model based on type
+    if config.model_type == "hybrid":
+        # Add hybrid-specific parameters
+        model_kwargs.update(
+            local_layers=config.local_layers,
+            window_size=config.window_size,
+            alpha_local=config.alpha_local,
+            alpha_phase=config.alpha_phase,
+        )
+        model = HybridPhaseTransformer(**model_kwargs)
+    else:
+        # Default: pure phase attention
+        model = PhaseTransformer(**model_kwargs)
 
     # Enable gradient checkpointing for large models
     if config.gradient_checkpointing:
@@ -1056,6 +1071,9 @@ def parse_args() -> TrainingConfig:
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large", "xl", "7b"],
                        help="Model size preset")
+    parser.add_argument("--model_type", type=str, default="phase",
+                       choices=["phase", "hybrid"],
+                       help="Model type: phase (pure O(n)) or hybrid (local + phase)")
     parser.add_argument("--vocab_size", type=int, default=50257,
                        help="Vocabulary size")
     parser.add_argument("--max_seq_len", type=int, default=1024,
@@ -1068,6 +1086,16 @@ def parse_args() -> TrainingConfig:
                        help="Phase synchronization steps")
     parser.add_argument("--sync_lr", type=float, default=0.1,
                        help="Phase synchronization learning rate")
+
+    # Hybrid parameters
+    parser.add_argument("--local_layers", type=int, default=4,
+                       help="Number of early layers with local attention only (hybrid mode)")
+    parser.add_argument("--window_size", type=int, default=256,
+                       help="Local attention window size (hybrid mode)")
+    parser.add_argument("--alpha_local", type=float, default=0.8,
+                       help="Weight for local attention in hybrid layers")
+    parser.add_argument("--alpha_phase", type=float, default=0.2,
+                       help="Weight for phase attention in hybrid layers")
 
     # Training
     parser.add_argument("--batch_size", type=int, default=16,
