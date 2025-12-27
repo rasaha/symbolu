@@ -621,6 +621,39 @@ def compute_loss(
         L_entropy = (entropy - target_entropy).pow(2)
         metrics["entropy"] = entropy.item()
 
+        # =================================================================
+        # UPDATE GATE: Detect likely state changes/updates
+        # High entropy or entropy spike → reduce coherence penalty
+        # This allows the model to "update" information without being
+        # penalized for breaking coherence with earlier context
+        # =================================================================
+
+        # Normalize entropy to [0, 1] range (max entropy ~ log(vocab) ≈ 10.8)
+        max_entropy = 10.8  # log(50257)
+        normalized_entropy = torch.clamp(entropy / max_entropy, 0.0, 1.0)
+
+        # Update gate: high when entropy is high (uncertain/changing context)
+        # Using sigmoid to smooth the gate
+        # When entropy > 6.0 (moderately uncertain), gate starts activating
+        entropy_threshold = 6.0
+        update_gate = torch.sigmoid((entropy - entropy_threshold) * 2.0)
+
+        # Also consider entropy change (sudden spike = likely update)
+        if _prev_entropy is not None:
+            entropy_change = entropy - _prev_entropy
+            # Positive change (entropy increase) activates gate more
+            change_gate = torch.sigmoid(entropy_change * 5.0)
+            # Combine both signals
+            update_gate = torch.max(update_gate, change_gate * 0.5)
+
+        metrics["update_gate"] = update_gate.item()
+
+        # =================================================================
+        # CONDITIONAL COHERENCE: λ * (1 - g_update) * L_coh
+        # When update_gate is high, reduce coherence penalty
+        # =================================================================
+        coherence_scale = 1.0 - update_gate  # Reduce coherence loss during updates
+
         # S1-S2: Layer Coherence - maximize cross-layer alignment
         if hidden_states:
             coherence = compute_layer_coherence(hidden_states)
@@ -642,11 +675,12 @@ def compute_loss(
 
         _prev_entropy = entropy.detach()
 
-        # Combined Coherence Loss (S3)
+        # Combined Coherence Loss (S3) with conditional gating
+        # Coherence and stability losses are scaled by (1 - update_gate)
         loss = (L_task +
                 lambda_entropy * L_entropy +
-                lambda_coherence * L_coherence_term +
-                lambda_stability * L_stability)
+                lambda_coherence * coherence_scale * L_coherence_term +
+                lambda_stability * coherence_scale * L_stability)
 
         metrics["loss_total"] = loss.item()
     else:
