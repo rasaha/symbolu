@@ -344,37 +344,66 @@ class LocalAttention(nn.Module):
 
     def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
         """
-        Local attention with sliding window.
+        Local attention with sliding window - TRUE O(n × window_size) complexity.
 
         Each token attends only to tokens within window_size to the left.
+        Uses unfold-based approach to avoid creating N×N attention matrix.
+
+        Memory: O(n × w) instead of O(n²)
+        Compute: O(n × w × d) instead of O(n² × d)
         """
         B, N, D = x.shape
         residual = x
+        w = self.window_size
 
         Q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
         K = self.k_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
         V = self.v_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        # Q, K, V: (B, H, N, head_dim)
 
-        # Create local attention mask (band matrix)
-        # Each token attends to window_size tokens to the left (including itself)
-        attn = torch.matmul(Q, K.transpose(-2, -1)) * self.scale
+        # Pad K and V on the left so each position can look back w-1 positions
+        # This allows position 0 to have a full window (with padding)
+        K_padded = F.pad(K, (0, 0, w - 1, 0), value=0)  # (B, H, N+w-1, head_dim)
+        V_padded = F.pad(V, (0, 0, w - 1, 0), value=0)  # (B, H, N+w-1, head_dim)
 
-        # Create causal + local mask
-        mask = torch.ones(N, N, device=x.device, dtype=torch.bool)
-        for i in range(N):
-            start = max(0, i - self.window_size + 1)
-            mask[i, start:i+1] = False  # False = attend, True = mask out
+        # Use unfold to create sliding windows of size w
+        # For position i, window contains padded[i:i+w] which corresponds to original[i-w+1:i+1]
+        K_windows = K_padded.unfold(2, w, 1)  # (B, H, N, head_dim, w)
+        V_windows = V_padded.unfold(2, w, 1)  # (B, H, N, head_dim, w)
+
+        # Rearrange for attention computation
+        K_windows = K_windows.permute(0, 1, 2, 4, 3)  # (B, H, N, w, head_dim)
+        V_windows = V_windows.permute(0, 1, 2, 4, 3)  # (B, H, N, w, head_dim)
+
+        # Compute attention scores: Q @ K^T for each window
+        # Q: (B, H, N, head_dim) -> (B, H, N, 1, head_dim)
+        Q_expanded = Q.unsqueeze(3)
+        # (B, H, N, 1, head_dim) @ (B, H, N, head_dim, w) -> (B, H, N, 1, w)
+        attn = torch.matmul(Q_expanded, K_windows.transpose(-2, -1)) * self.scale
+        attn = attn.squeeze(3)  # (B, H, N, w)
 
         if causal_mask:
-            # Also apply causal mask (upper triangle)
-            causal = torch.triu(torch.ones(N, N, device=x.device, dtype=torch.bool), diagonal=1)
-            mask = mask | causal
+            # Create mask for padding positions
+            # Position i has min(i+1, w) valid tokens at the END of its window
+            # Mask out positions 0 to (w - valid_count - 1) in each window
+            positions = torch.arange(N, device=x.device)
+            valid_counts = torch.clamp(positions + 1, max=w)  # min(i+1, w)
+            window_indices = torch.arange(w, device=x.device)
+            # Mask is True where we should mask out (padding positions)
+            # Valid positions are at indices [w - valid_count, w-1]
+            # So mask out indices [0, w - valid_count - 1], i.e., where index < w - valid_count
+            mask = window_indices.unsqueeze(0) < (w - valid_counts.unsqueeze(1))
+            attn = attn.masked_fill(mask.unsqueeze(0).unsqueeze(0), float('-inf'))
 
-        attn = attn.masked_fill(mask.unsqueeze(0).unsqueeze(0), float('-inf'))
         attn = F.softmax(attn, dim=-1)
         attn = self.dropout(attn)
 
-        output = torch.matmul(attn, V)
+        # Apply attention to values
+        # (B, H, N, 1, w) @ (B, H, N, w, head_dim) -> (B, H, N, 1, head_dim)
+        attn_expanded = attn.unsqueeze(3)
+        output = torch.matmul(attn_expanded, V_windows)
+        output = output.squeeze(3)  # (B, H, N, head_dim)
+
         output = output.transpose(1, 2).contiguous().view(B, N, D)
         output = self.out_proj(output)
 

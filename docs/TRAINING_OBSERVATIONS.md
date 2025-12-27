@@ -668,26 +668,37 @@ class HybridPhaseTransformer(nn.Module):
         # Remaining layers use HybridAttentionLayer
 ```
 
-### Current Limitation: LocalAttention O(n²) Bug
+### LocalAttention O(n×w) Implementation - FIXED
 
-**Issue**: The current LocalAttention implementation creates a full N×N attention matrix before masking, making it O(n²) not O(n×w).
+**Issue (FIXED)**: The original LocalAttention implementation created a full N×N attention matrix before masking, making it O(n²) not O(n×w).
+
+**Solution**: Reimplemented using unfold-based sliding window approach:
 
 ```python
-# Current (buggy) implementation:
-attn = torch.matmul(Q, K.transpose(-2, -1))  # O(n²) matrix
-mask = create_local_mask(n, window_size)      # Then mask
-attn = attn.masked_fill(~mask, -inf)          # Still O(n²) memory
+# New O(n×w) implementation:
+# 1. Pad K, V on left by (window_size - 1)
+K_padded = F.pad(K, (0, 0, w - 1, 0), value=0)
+V_padded = F.pad(V, (0, 0, w - 1, 0), value=0)
+
+# 2. Use unfold to create windows of size w
+K_windows = K_padded.unfold(2, w, 1)  # (B, H, N, head_dim, w)
+V_windows = V_padded.unfold(2, w, 1)  # (B, H, N, head_dim, w)
+
+# 3. Compute attention only within each window
+attn = Q @ K_windows.T  # O(n × w) not O(n²)
+output = attn @ V_windows  # O(n × w) memory
 ```
 
-**Result**: Hybrid model OOMs at 16K context.
+**Result**: Hybrid model should now work at 16K+ context.
 
-| Context | Pure Phase | Hybrid |
-|---------|------------|--------|
-| 4096 | ✓ Works | ✓ Works |
-| 8192 | ✓ Works | ✓ Should work (untested) |
-| 16384 | ✓ Works (26.6GB) | ✗ OOM |
+| Context | Pure Phase | Hybrid (after fix) |
+|---------|------------|-------------------|
+| 4096 | ✓ Works | ✓ Expected to work |
+| 8192 | ✓ Works | ✓ Expected to work |
+| 16384 | ✓ Works (26.6GB) | ✓ **Needs testing** |
+| 32768 | ~50GB (estimated) | ✓ **Needs testing** |
 
-**Fix needed**: Rewrite LocalAttention to compute attention only within the window (truly O(n×w)).
+**Status**: ✓ Fixed - awaiting RunPod validation.
 
 ---
 
@@ -781,7 +792,8 @@ routine predictions.
 
 | Task | Priority | Notes |
 |------|----------|-------|
-| Fix LocalAttention to O(n×w) | High | Currently O(n²), limits hybrid to 8K |
+| ~~Fix LocalAttention to O(n×w)~~ | ~~High~~ | ✓ **DONE** - unfold-based implementation |
+| Test hybrid at 16K context | High | Should work with fix - needs RunPod |
 | Test 32K context | Medium | Should work at ~50GB VRAM |
 | Compare hybrid vs pure PPL | Medium | Need hybrid working at 8K+ first |
 | Baseline comparison | High | Need GPT-2 baseline for SOTA claims |
