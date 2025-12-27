@@ -526,16 +526,28 @@ class TrainingState:
     train_losses: list = field(default_factory=list)
 
 
-def compute_semantic_entropy(logits: torch.Tensor) -> torch.Tensor:
+def compute_semantic_entropy(logits: torch.Tensor, max_positions: int = 1024) -> torch.Tensor:
     """
     Compute semantic entropy (Formula S5).
 
     H_sem = -Σ pₖ log pₖ
 
     Lower entropy = more confident/focused predictions.
+
+    For long sequences, samples positions to avoid OOM on full softmax.
+    At 16K context, full logits = 3.3GB - sampling 1024 positions = 0.2GB.
     """
-    probs = F.softmax(logits, dim=-1)
+    B, N, V = logits.shape
+
+    # Sample positions if sequence is too long (memory optimization)
+    if N > max_positions:
+        # Sample evenly spaced positions for representative entropy
+        indices = torch.linspace(0, N - 1, max_positions, dtype=torch.long, device=logits.device)
+        logits = logits[:, indices, :]  # (B, max_positions, V)
+
+    # Compute entropy efficiently using log_softmax (avoids separate probs tensor)
     log_probs = F.log_softmax(logits, dim=-1)
+    probs = log_probs.exp()  # More memory efficient than separate softmax
     entropy = -(probs * log_probs).sum(dim=-1)
     return entropy.mean()
 
