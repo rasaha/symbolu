@@ -282,6 +282,8 @@ def load_tokenizer(config: TrainingConfig):
         return enc
     elif config.tokenizer == "gpt2" and HF_AVAILABLE:
         tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        # Suppress length warning - we handle chunking in TextDataset
+        tokenizer.model_max_length = int(1e12)
         return tokenizer
     else:
         raise ValueError(f"Tokenizer {config.tokenizer} not available")
@@ -919,6 +921,11 @@ def train(config: TrainingConfig):
                 if config.use_coherence_loss and "entropy" in metrics:
                     log_msg += f" | Ent: {metrics.get('entropy', 0):.2f}"
                     log_msg += f" | Coh: {metrics.get('coherence', 0):.3f}"
+
+                # Add GPU memory usage for scaling experiments
+                if device.type == "cuda":
+                    mem_used = torch.cuda.max_memory_allocated() / (1024**3)  # GB
+                    log_msg += f" | VRAM: {mem_used:.1f}GB"
 
                 logger.info(log_msg)
 
