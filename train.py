@@ -119,6 +119,7 @@ class TrainingConfig:
     # Hybrid-specific parameters
     local_layers: int = 4  # Number of early layers with local attention only
     window_size: int = 256  # Local attention window size
+    local_backend: str = "auto"  # LocalAttention backend: auto, flash, sdpa, unfold
     alpha_local: float = 0.8  # Weight for local attention in hybrid layers
     alpha_phase: float = 0.2  # Weight for phase attention in hybrid layers
 
