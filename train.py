@@ -119,6 +119,7 @@ class TrainingConfig:
     # Hybrid-specific parameters
     local_layers: int = 4  # Number of early layers with local attention only
     window_size: int = 256  # Local attention window size
+    local_backend: str = "auto"  # LocalAttention backend: auto, flash, sdpa, unfold
     alpha_local: float = 0.8  # Weight for local attention in hybrid layers
     alpha_phase: float = 0.2  # Weight for phase attention in hybrid layers
 
@@ -424,6 +425,7 @@ def create_model(config: TrainingConfig) -> nn.Module:
         model_kwargs.update(
             local_layers=config.local_layers,
             window_size=config.window_size,
+            local_backend=config.local_backend,
             alpha_local=config.alpha_local,
             alpha_phase=config.alpha_phase,
         )
@@ -526,16 +528,28 @@ class TrainingState:
     train_losses: list = field(default_factory=list)
 
 
-def compute_semantic_entropy(logits: torch.Tensor) -> torch.Tensor:
+def compute_semantic_entropy(logits: torch.Tensor, max_positions: int = 1024) -> torch.Tensor:
     """
     Compute semantic entropy (Formula S5).
 
     H_sem = -Σ pₖ log pₖ
 
     Lower entropy = more confident/focused predictions.
+
+    For long sequences, samples positions to avoid OOM on full softmax.
+    At 16K context, full logits = 3.3GB - sampling 1024 positions = 0.2GB.
     """
-    probs = F.softmax(logits, dim=-1)
+    B, N, V = logits.shape
+
+    # Sample positions if sequence is too long (memory optimization)
+    if N > max_positions:
+        # Sample evenly spaced positions for representative entropy
+        indices = torch.linspace(0, N - 1, max_positions, dtype=torch.long, device=logits.device)
+        logits = logits[:, indices, :]  # (B, max_positions, V)
+
+    # Compute entropy efficiently using log_softmax (avoids separate probs tensor)
     log_probs = F.log_softmax(logits, dim=-1)
+    probs = log_probs.exp()  # More memory efficient than separate softmax
     entropy = -(probs * log_probs).sum(dim=-1)
     return entropy.mean()
 
@@ -1126,6 +1140,9 @@ def parse_args() -> TrainingConfig:
                        help="Number of early layers with local attention only (hybrid mode)")
     parser.add_argument("--window_size", type=int, default=256,
                        help="Local attention window size (hybrid mode)")
+    parser.add_argument("--local_backend", type=str, default="auto",
+                       choices=["auto", "flash", "sdpa", "unfold"],
+                       help="LocalAttention backend: flash (fastest), sdpa, unfold (fallback)")
     parser.add_argument("--alpha_local", type=float, default=0.8,
                        help="Weight for local attention in hybrid layers")
     parser.add_argument("--alpha_phase", type=float, default=0.2,

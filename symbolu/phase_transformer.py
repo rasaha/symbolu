@@ -58,6 +58,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint
 
+# Check for FlashAttention / PyTorch 2.0 SDPA availability
+FLASH_ATTN_AVAILABLE = False
+SDPA_AVAILABLE = hasattr(F, 'scaled_dot_product_attention')
+
+try:
+    from flash_attn import flash_attn_func
+    from flash_attn.flash_attn_interface import flash_attn_varlen_func
+    FLASH_ATTN_AVAILABLE = True
+except ImportError:
+    pass
+
 
 # =============================================================================
 # CONFIGURATION
@@ -318,6 +329,11 @@ class LocalAttention(nn.Module):
     Sliding window local attention for fast local pattern learning.
 
     Complexity: O(n * window_size) instead of O(n²)
+
+    Backends:
+    - 'flash': FlashAttention with sliding window (fastest, requires flash-attn)
+    - 'sdpa': PyTorch 2.0 SDPA (good performance, built-in)
+    - 'unfold': Manual unfold implementation (fallback, always works)
     """
 
     def __init__(
@@ -326,6 +342,7 @@ class LocalAttention(nn.Module):
         num_heads: int,
         window_size: int = 256,
         dropout: float = 0.1,
+        backend: str = 'auto',  # 'auto', 'flash', 'sdpa', 'unfold'
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -333,6 +350,7 @@ class LocalAttention(nn.Module):
         self.head_dim = embed_dim // num_heads
         self.window_size = window_size
         self.scale = self.head_dim ** -0.5
+        self.dropout_p = dropout
 
         self.q_proj = nn.Linear(embed_dim, embed_dim)
         self.k_proj = nn.Linear(embed_dim, embed_dim)
@@ -342,56 +360,88 @@ class LocalAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.norm = nn.LayerNorm(embed_dim)
 
-    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
-        """
-        Local attention with sliding window - TRUE O(n × window_size) complexity.
+        # Select backend
+        if backend == 'auto':
+            if FLASH_ATTN_AVAILABLE:
+                self.backend = 'flash'
+            elif SDPA_AVAILABLE:
+                self.backend = 'sdpa'
+            else:
+                self.backend = 'unfold'
+        else:
+            self.backend = backend
 
-        Each token attends only to tokens within window_size to the left.
-        Uses unfold-based approach to avoid creating N×N attention matrix.
+    def _forward_flash(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor,
+                       causal: bool) -> torch.Tensor:
+        """FlashAttention with sliding window - O(n×w) kernel-level."""
+        # flash_attn expects (B, N, H, head_dim)
+        Q = Q.transpose(1, 2)  # (B, N, H, head_dim)
+        K = K.transpose(1, 2)
+        V = V.transpose(1, 2)
 
-        Memory: O(n × w) instead of O(n²)
-        Compute: O(n × w × d) instead of O(n² × d)
-        """
-        B, N, D = x.shape
-        residual = x
+        # FlashAttention with window_size parameter
+        output = flash_attn_func(
+            Q, K, V,
+            dropout_p=self.dropout_p if self.training else 0.0,
+            causal=causal,
+            window_size=(self.window_size, 0),  # (left, right) - causal means right=0
+        )
+        return output.transpose(1, 2)  # back to (B, H, N, head_dim)
+
+    def _forward_sdpa(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor,
+                      B: int, N: int, causal: bool) -> torch.Tensor:
+        """PyTorch 2.0 SDPA - creates block-sparse mask for O(n×w)."""
         w = self.window_size
 
-        Q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
-        K = self.k_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
-        V = self.v_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
-        # Q, K, V: (B, H, N, head_dim)
+        # Create sliding window + causal mask
+        # This is still O(n²) in mask creation but SDPA is optimized
+        # For true O(n×w), use flash backend
+        if causal:
+            # Create band matrix mask: each position attends to [i-w+1, i]
+            row_idx = torch.arange(N, device=Q.device).unsqueeze(1)
+            col_idx = torch.arange(N, device=Q.device).unsqueeze(0)
+            # Valid if: col <= row (causal) AND col >= row - w + 1 (window)
+            mask = (col_idx <= row_idx) & (col_idx >= row_idx - w + 1)
+            attn_mask = torch.zeros(N, N, device=Q.device, dtype=Q.dtype)
+            attn_mask.masked_fill_(~mask, float('-inf'))
+        else:
+            attn_mask = None
+
+        output = F.scaled_dot_product_attention(
+            Q, K, V,
+            attn_mask=attn_mask,
+            dropout_p=self.dropout_p if self.training else 0.0,
+            is_causal=False,  # We handle causality in attn_mask
+        )
+        return output
+
+    def _forward_unfold(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor,
+                        B: int, N: int, causal: bool) -> torch.Tensor:
+        """Unfold-based sliding window - TRUE O(n×w), no N×N tensors."""
+        w = self.window_size
 
         # Pad K and V on the left so each position can look back w-1 positions
-        # This allows position 0 to have a full window (with padding)
         K_padded = F.pad(K, (0, 0, w - 1, 0), value=0)  # (B, H, N+w-1, head_dim)
-        V_padded = F.pad(V, (0, 0, w - 1, 0), value=0)  # (B, H, N+w-1, head_dim)
+        V_padded = F.pad(V, (0, 0, w - 1, 0), value=0)
 
         # Use unfold to create sliding windows of size w
-        # For position i, window contains padded[i:i+w] which corresponds to original[i-w+1:i+1]
         K_windows = K_padded.unfold(2, w, 1)  # (B, H, N, head_dim, w)
-        V_windows = V_padded.unfold(2, w, 1)  # (B, H, N, head_dim, w)
+        V_windows = V_padded.unfold(2, w, 1)
 
         # Rearrange for attention computation
         K_windows = K_windows.permute(0, 1, 2, 4, 3)  # (B, H, N, w, head_dim)
-        V_windows = V_windows.permute(0, 1, 2, 4, 3)  # (B, H, N, w, head_dim)
+        V_windows = V_windows.permute(0, 1, 2, 4, 3)
 
         # Compute attention scores: Q @ K^T for each window
-        # Q: (B, H, N, head_dim) -> (B, H, N, 1, head_dim)
-        Q_expanded = Q.unsqueeze(3)
-        # (B, H, N, 1, head_dim) @ (B, H, N, head_dim, w) -> (B, H, N, 1, w)
+        Q_expanded = Q.unsqueeze(3)  # (B, H, N, 1, head_dim)
         attn = torch.matmul(Q_expanded, K_windows.transpose(-2, -1)) * self.scale
         attn = attn.squeeze(3)  # (B, H, N, w)
 
-        if causal_mask:
-            # Create mask for padding positions
-            # Position i has min(i+1, w) valid tokens at the END of its window
-            # Mask out positions 0 to (w - valid_count - 1) in each window
-            positions = torch.arange(N, device=x.device)
-            valid_counts = torch.clamp(positions + 1, max=w)  # min(i+1, w)
-            window_indices = torch.arange(w, device=x.device)
-            # Mask is True where we should mask out (padding positions)
-            # Valid positions are at indices [w - valid_count, w-1]
-            # So mask out indices [0, w - valid_count - 1], i.e., where index < w - valid_count
+        if causal:
+            # Mask out padding positions
+            positions = torch.arange(N, device=Q.device)
+            valid_counts = torch.clamp(positions + 1, max=w)
+            window_indices = torch.arange(w, device=Q.device)
             mask = window_indices.unsqueeze(0) < (w - valid_counts.unsqueeze(1))
             attn = attn.masked_fill(mask.unsqueeze(0).unsqueeze(0), float('-inf'))
 
@@ -399,10 +449,36 @@ class LocalAttention(nn.Module):
         attn = self.dropout(attn)
 
         # Apply attention to values
-        # (B, H, N, 1, w) @ (B, H, N, w, head_dim) -> (B, H, N, 1, head_dim)
-        attn_expanded = attn.unsqueeze(3)
+        attn_expanded = attn.unsqueeze(3)  # (B, H, N, 1, w)
         output = torch.matmul(attn_expanded, V_windows)
         output = output.squeeze(3)  # (B, H, N, head_dim)
+
+        return output
+
+    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
+        """
+        Local attention with sliding window - O(n × window_size) complexity.
+
+        Automatically selects best available backend:
+        1. FlashAttention (if available) - fastest, true O(n×w) kernel
+        2. PyTorch SDPA (if available) - good performance
+        3. Unfold (fallback) - always works, true O(n×w)
+        """
+        B, N, D = x.shape
+        residual = x
+
+        Q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        K = self.k_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        V = self.v_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        # Q, K, V: (B, H, N, head_dim)
+
+        # Select backend
+        if self.backend == 'flash' and FLASH_ATTN_AVAILABLE:
+            output = self._forward_flash(Q, K, V, causal_mask)
+        elif self.backend == 'sdpa' and SDPA_AVAILABLE:
+            output = self._forward_sdpa(Q, K, V, B, N, causal_mask)
+        else:
+            output = self._forward_unfold(Q, K, V, B, N, causal_mask)
 
         output = output.transpose(1, 2).contiguous().view(B, N, D)
         output = self.out_proj(output)
@@ -418,11 +494,12 @@ class HybridAttentionLayer(nn.Module):
     """
     Combines local attention (fast pattern learning) with phase attention (global context).
 
-    output = α_local * LocalAttn(x) + α_phase * PhaseAttn(x)
-
-    This hybrid approach:
+    Sequential processing: LocalAttn → PhaseAttn (memory efficient)
     - Local: Quickly learns syntax, grammar, local patterns
     - Phase: Handles long-range dependencies efficiently O(n)
+
+    Previous parallel approach (α_local * LocalAttn(x) + α_phase * PhaseAttn(x))
+    required 2x memory. Sequential approach processes one at a time.
     """
 
     def __init__(
@@ -435,8 +512,10 @@ class HybridAttentionLayer(nn.Module):
         sync_lr: float = 0.1,
         alpha_local: float = 0.8,
         alpha_phase: float = 0.2,
+        local_backend: str = 'auto',
     ):
         super().__init__()
+        # Keep alphas for potential future use (e.g., residual weighting)
         self.alpha_local = nn.Parameter(torch.tensor(alpha_local))
         self.alpha_phase = nn.Parameter(torch.tensor(alpha_phase))
 
@@ -445,6 +524,7 @@ class HybridAttentionLayer(nn.Module):
             num_heads=num_heads,
             window_size=window_size,
             dropout=dropout,
+            backend=local_backend,
         )
 
         self.phase_attn = PhaseAttentionLayer(
@@ -459,24 +539,17 @@ class HybridAttentionLayer(nn.Module):
 
     def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
         """
-        Hybrid forward: weighted combination of local and phase attention.
+        Sequential hybrid forward: LocalAttn first, then PhaseAttn.
+
+        Memory efficient: only one attention output in memory at a time.
         """
-        residual = x
+        # Local attention first (captures local patterns)
+        x = self.local_attn(x, causal_mask)
 
-        # Local attention path (fast, local patterns)
-        local_out = self.local_attn(x, causal_mask)
+        # Phase attention second (adds global context)
+        x = self.phase_attn(x, causal_mask)
 
-        # Phase attention path (efficient global context)
-        phase_out = self.phase_attn(x, causal_mask)
-
-        # Weighted combination
-        # Subtract residual since both paths add it back
-        local_delta = local_out - residual
-        phase_delta = phase_out - residual
-
-        output = residual + self.alpha_local * local_delta + self.alpha_phase * phase_delta
-
-        return output
+        return x
 
 
 class HybridTransformerBlock(nn.Module):
@@ -486,6 +559,7 @@ class HybridTransformerBlock(nn.Module):
         self,
         config: TransformerConfig,
         window_size: int = 256,
+        local_backend: str = 'auto',
         alpha_local: float = 0.8,
         alpha_phase: float = 0.2,
     ):
@@ -499,6 +573,7 @@ class HybridTransformerBlock(nn.Module):
             sync_lr=config.sync_lr,
             alpha_local=alpha_local,
             alpha_phase=alpha_phase,
+            local_backend=local_backend,
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -515,13 +590,14 @@ class HybridTransformerBlock(nn.Module):
 class LocalTransformerBlock(nn.Module):
     """Transformer block with local attention only (for early layers)."""
 
-    def __init__(self, config: TransformerConfig, window_size: int = 256):
+    def __init__(self, config: TransformerConfig, window_size: int = 256, backend: str = 'auto'):
         super().__init__()
         self.attention = LocalAttention(
             embed_dim=config.embed_dim,
             num_heads=config.num_heads,
             window_size=window_size,
             dropout=config.dropout,
+            backend=backend,
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -767,6 +843,7 @@ class HybridPhaseTransformer(nn.Module):
         # Hybrid-specific params
         local_layers: int = 4,  # First N layers use local attention only
         window_size: int = 256,  # Local attention window
+        local_backend: str = 'auto',  # LocalAttention backend: 'auto', 'flash', 'sdpa', 'unfold'
         alpha_local: float = 0.8,  # Weight for local attention in hybrid layers
         alpha_phase: float = 0.2,  # Weight for phase attention in hybrid layers
     ):
@@ -785,6 +862,7 @@ class HybridPhaseTransformer(nn.Module):
         )
         self.config = config
         self.local_layers = local_layers
+        self.local_backend = local_backend
 
         # Embeddings
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
@@ -796,12 +874,14 @@ class HybridPhaseTransformer(nn.Module):
         for i in range(num_layers):
             if i < local_layers:
                 # Early layers: Local attention only (fast pattern learning)
-                self.blocks.append(LocalTransformerBlock(config, window_size=window_size))
+                self.blocks.append(LocalTransformerBlock(
+                    config, window_size=window_size, backend=local_backend))
             else:
                 # Later layers: Hybrid Local + Phase attention
                 self.blocks.append(HybridTransformerBlock(
                     config,
                     window_size=window_size,
+                    local_backend=local_backend,
                     alpha_local=alpha_local,
                     alpha_phase=alpha_phase,
                 ))
