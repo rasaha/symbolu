@@ -418,11 +418,12 @@ class HybridAttentionLayer(nn.Module):
     """
     Combines local attention (fast pattern learning) with phase attention (global context).
 
-    output = α_local * LocalAttn(x) + α_phase * PhaseAttn(x)
-
-    This hybrid approach:
+    Sequential processing: LocalAttn → PhaseAttn (memory efficient)
     - Local: Quickly learns syntax, grammar, local patterns
     - Phase: Handles long-range dependencies efficiently O(n)
+
+    Previous parallel approach (α_local * LocalAttn(x) + α_phase * PhaseAttn(x))
+    required 2x memory. Sequential approach processes one at a time.
     """
 
     def __init__(
@@ -437,6 +438,7 @@ class HybridAttentionLayer(nn.Module):
         alpha_phase: float = 0.2,
     ):
         super().__init__()
+        # Keep alphas for potential future use (e.g., residual weighting)
         self.alpha_local = nn.Parameter(torch.tensor(alpha_local))
         self.alpha_phase = nn.Parameter(torch.tensor(alpha_phase))
 
@@ -459,24 +461,17 @@ class HybridAttentionLayer(nn.Module):
 
     def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
         """
-        Hybrid forward: weighted combination of local and phase attention.
+        Sequential hybrid forward: LocalAttn first, then PhaseAttn.
+
+        Memory efficient: only one attention output in memory at a time.
         """
-        residual = x
+        # Local attention first (captures local patterns)
+        x = self.local_attn(x, causal_mask)
 
-        # Local attention path (fast, local patterns)
-        local_out = self.local_attn(x, causal_mask)
+        # Phase attention second (adds global context)
+        x = self.phase_attn(x, causal_mask)
 
-        # Phase attention path (efficient global context)
-        phase_out = self.phase_attn(x, causal_mask)
-
-        # Weighted combination
-        # Subtract residual since both paths add it back
-        local_delta = local_out - residual
-        phase_delta = phase_out - residual
-
-        output = residual + self.alpha_local * local_delta + self.alpha_phase * phase_delta
-
-        return output
+        return x
 
 
 class HybridTransformerBlock(nn.Module):
