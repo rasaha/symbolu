@@ -68,11 +68,10 @@ NEW_CODE = '''    def _forward_unfold(self, Q: torch.Tensor, K: torch.Tensor, V:
 
         # For large batch × sequence, process in chunks to avoid OOM
         # K_windows memory ≈ B × H × chunk × w × head_dim × 2 bytes
-        # With H=12, w=512, head_dim=64: ~0.8MB per batch item per chunk position
-        # Target ~2GB per chunk: chunk_size = 2048 / B (conservative)
-        chunk_size = max(256, min(512, 4096 // max(B, 1)))
+        # Very aggressive chunking for large batches to leave room for gradients
+        chunk_size = max(64, min(256, 1024 // max(B, 1)))
 
-        if B * N > 16384 and N > chunk_size:
+        if B * N > 8192 and N > chunk_size:
             # Process in chunks along sequence dimension
             return self._forward_unfold_chunked(Q, K, V, B, N, causal, chunk_size)
 
