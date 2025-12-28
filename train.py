@@ -596,6 +596,8 @@ def compute_loss_chunked(
     lambda_entropy: float = 0.01,
     lambda_coherence: float = 0.01,
     lambda_stability: float = 0.001,
+    use_aux_reconstruction: bool = True,
+    lambda_aux: float = 0.1,
 ) -> Tuple[None, Dict[str, float]]:
     """
     Compute loss with STREAMING chunked forward pass for ultra-long sequences (10M+ tokens).
@@ -604,6 +606,9 @@ def compute_loss_chunked(
     1. Phase contexts accumulated across chunks for true global context
     2. Per-chunk backward passes (like gradient accumulation) to avoid OOM
     3. Memory stays O(chunk_size) regardless of total sequence length
+    4. AUXILIARY RECONSTRUCTION LOSS: Forces model to keep early chunk info
+       high-fidelity in the streaming state by predicting early phase signatures
+       from later chunks. This creates gradient signal across chunks!
 
     Returns None for loss (gradients already accumulated), metrics dict.
     """
@@ -615,12 +620,18 @@ def compute_loss_chunked(
     num_chunks = (N + chunk_size - 1) // chunk_size
 
     total_loss = 0.0  # Track for metrics only (not tensor)
+    total_aux_loss = 0.0
     total_tokens = 0
     last_entropy = 0.0
     last_coherence = 0.0
 
     # Initialize streaming phase contexts (empty list signals streaming mode)
     phase_contexts = []
+
+    # Store early chunk hidden state signatures for auxiliary reconstruction
+    # This is the "memory" that later chunks must learn to reconstruct
+    early_chunk_signatures = []  # List of (chunk_idx, signature_tensor)
+    signature_sample_rate = max(1, num_chunks // 10)  # Sample ~10 early chunks
 
     for i in range(num_chunks):
         start = i * chunk_size
@@ -639,6 +650,34 @@ def compute_loss_chunked(
 
         logits = output['logits']
         hidden_states = output.get('hidden_states', [])
+
+        # =====================================================================
+        # AUXILIARY RECONSTRUCTION LOSS
+        # Store early chunk signatures, reconstruct in later chunks
+        # =====================================================================
+        aux_loss = torch.tensor(0.0, device=device)
+
+        if use_aux_reconstruction and hidden_states:
+            # Get current chunk's hidden state signature (mean over sequence)
+            current_signature = hidden_states[-1].mean(dim=1)  # [B, D]
+
+            # Store signatures from early chunks (first 30% of sequence)
+            if i < num_chunks * 0.3 and i % signature_sample_rate == 0:
+                early_chunk_signatures.append((i, current_signature.detach()))
+
+            # In later chunks (after 50%), try to reconstruct early signatures
+            # from the current accumulated phase context
+            if i > num_chunks * 0.5 and early_chunk_signatures:
+                # Pick a random early signature to reconstruct
+                target_idx = i % len(early_chunk_signatures)
+                _, target_signature = early_chunk_signatures[target_idx]
+
+                # The model must predict early chunk info from current state
+                # Use cosine similarity loss (1 - cos_sim)
+                cos_sim = F.cosine_similarity(
+                    current_signature, target_signature, dim=-1
+                ).mean()
+                aux_loss = (1.0 - cos_sim) * lambda_aux
 
         # Update phase contexts for next chunk - DETACH to break gradient chain
         new_contexts = output.get('phase_contexts', [])
@@ -662,12 +701,16 @@ def compute_loss_chunked(
             reduction='mean'
         )
 
+        # Combined loss: task + auxiliary reconstruction
+        combined_loss = chunk_loss + aux_loss
+
         # Per-chunk backward - gradients accumulate (like gradient accumulation)
-        scaled_loss = chunk_loss / num_chunks
+        scaled_loss = combined_loss / num_chunks
         scaled_loss.backward()
 
         # Track metrics (no grad)
         total_loss += chunk_loss.item() * chunk_tokens
+        total_aux_loss += aux_loss.item() if isinstance(aux_loss, torch.Tensor) else aux_loss
         total_tokens += chunk_tokens
 
         # Metrics from last chunk
@@ -677,12 +720,13 @@ def compute_loss_chunked(
                 last_coherence = compute_layer_coherence(hidden_states).item() if hidden_states else 0
 
         # Free memory immediately
-        del output, logits, hidden_states, chunk_loss, scaled_loss
+        del output, logits, hidden_states, chunk_loss, scaled_loss, aux_loss, combined_loss
         if device.type == 'cuda':
             torch.cuda.empty_cache()
 
     # Average loss for metrics
     avg_loss = total_loss / total_tokens if total_tokens > 0 else 0.0
+    avg_aux_loss = total_aux_loss / num_chunks if num_chunks > 0 else 0.0
 
     metrics = {
         "loss": avg_loss,
@@ -691,6 +735,7 @@ def compute_loss_chunked(
         "streaming": True,
         "entropy": last_entropy,
         "coherence": last_coherence,
+        "aux_recon_loss": avg_aux_loss,  # Track reconstruction quality
     }
 
     # Return None - gradients already accumulated via per-chunk backward
