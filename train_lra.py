@@ -536,6 +536,120 @@ class SoftmaxAttentionPooler(nn.Module):
 
 
 # =============================================================================
+# PHASE PROTOTYPE CLASSIFIER (USE Formula-Inspired)
+# =============================================================================
+
+class PhasePrototypeClassifier(nn.Module):
+    """
+    Classification using phase alignment with learned class prototypes.
+
+    Inspired by USE (Unified Semantic Encoding) phase locking formula:
+        C[entity, attribute] = 1.0 → phase locked (same phase)
+        C[entity, wrong_attr] = 0.0 → orthogonal (90° apart)
+
+    For classification:
+        - Each class has a learned phase prototype
+        - Document phase is computed from token phases
+        - Classification = which prototype is document phase closest to?
+
+    This preserves Phase attention philosophy while enabling discrimination
+    through phase-prototype alignment (orthogonal classes in phase space).
+
+    Key insight: Classes are initialized π apart (orthogonal), so the
+    document phase must commit to one side or the other - no averaging!
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_classes: int,
+        num_heads: int = 4,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_classes = num_classes
+        self.num_heads = num_heads
+
+        # Phase projection: hidden states → phase angles
+        # Multi-head for richer phase representation
+        self.phase_proj = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, num_heads),
+        )
+
+        # Learnable class prototypes in phase space
+        # Initialize evenly spaced around the circle for maximum separation
+        # For binary: 0 and π (orthogonal)
+        # For 10-class: 0, 0.628, 1.257, ... (evenly spaced)
+        initial_phases = torch.linspace(0, 2 * math.pi * (num_classes - 1) / num_classes, num_classes)
+        self.class_phases = nn.Parameter(initial_phases.unsqueeze(0).expand(num_heads, -1).clone())
+        # Shape: [num_heads, num_classes]
+
+        # Attention weights for token importance (which tokens matter for phase)
+        self.token_importance = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim // 2),
+            nn.GELU(),
+            nn.Linear(embed_dim // 2, 1),
+        )
+
+        # Temperature for sharper classification
+        self.temperature = nn.Parameter(torch.ones(1) * 0.5)
+
+        # Final projection to combine heads
+        self.head_weights = nn.Parameter(torch.ones(num_heads) / num_heads)
+
+        self.dropout = nn.Dropout(dropout)
+
+        print(f"  PhasePrototypeClassifier: {num_classes} classes, {num_heads} heads")
+        print(f"  Class phase prototypes initialized {360/num_classes:.1f}° apart")
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            hidden_states: [B, N, embed_dim] encoder output
+
+        Returns:
+            logits: [B, num_classes]
+        """
+        B, N, D = hidden_states.shape
+
+        # Compute token phases [B, N, num_heads]
+        token_phases = self.phase_proj(hidden_states)
+        token_phases = torch.tanh(token_phases) * math.pi  # Bound to [-π, π]
+
+        # Compute token importance weights [B, N, 1]
+        importance = self.token_importance(hidden_states)
+        importance = F.softmax(importance, dim=1)  # Normalize across sequence
+        importance = self.dropout(importance)
+
+        # Weighted circular mean for document phase
+        # Use complex representation for proper circular averaging
+        # z = exp(i*θ), then angle(mean(z)) gives circular mean
+        complex_phases = torch.exp(1j * token_phases)  # [B, N, num_heads]
+        weighted_complex = complex_phases * importance  # [B, N, num_heads]
+        doc_complex = weighted_complex.sum(dim=1)  # [B, num_heads]
+        doc_phase = torch.angle(doc_complex)  # [B, num_heads]
+
+        # Compute similarity to each class prototype using phase difference
+        # [B, num_heads, 1] - [num_heads, num_classes] → [B, num_heads, num_classes]
+        phase_diffs = doc_phase.unsqueeze(2) - self.class_phases.unsqueeze(0)
+
+        # Cosine similarity in phase space
+        similarities = torch.cos(phase_diffs)  # [B, num_heads, num_classes]
+
+        # Combine heads with learned weights
+        head_weights = F.softmax(self.head_weights, dim=0)
+        logits = (similarities * head_weights.view(1, -1, 1)).sum(dim=1)  # [B, num_classes]
+
+        # Temperature scaling for sharper decisions
+        logits = logits / self.temperature.clamp(min=0.1)
+
+        return logits
+
+
+# =============================================================================
 # MODEL WITH CLASSIFICATION HEAD
 # =============================================================================
 
@@ -544,12 +658,14 @@ class LRAClassifier(nn.Module):
     Wrapper that adds classification head to transformer encoder.
 
     Supports:
-    - Softmax attention pooler for sharp classification (principled fix)
+    - Softmax attention pooler for sharp classification
+    - Phase prototype classifier (USE formula-inspired)
     - Byte n-gram convolution for text tasks (Grok's suggestion)
 
     Pool types:
     - mean: Average all positions (default, works for structural tasks)
     - attention: SoftmaxAttentionPooler (sharp attention, for classification)
+    - phase_prototype: PhasePrototypeClassifier (USE-inspired, classes as orthogonal phases)
     - cls: Use first token (CLS-style)
     - last: Use last token
     """
@@ -561,7 +677,7 @@ class LRAClassifier(nn.Module):
         num_classes: int,
         vocab_size: int,
         num_heads: int = 4,
-        pool: str = "mean",  # mean, attention, cls, last
+        pool: str = "mean",  # mean, attention, phase_prototype, cls, last
         num_refine: int = 1,  # Iterative refinement passes per block
         use_byte_conv: bool = False,  # Add 1D conv for byte n-grams
         byte_conv_kernel: int = 5,  # Kernel size for byte n-gram conv
@@ -602,11 +718,24 @@ class LRAClassifier(nn.Module):
                 num_heads=num_heads,
                 dropout=dropout,
             )
+            self.phase_prototype = None
             print("  Using SoftmaxAttentionPooler for classification (sharp attention)")
+        elif pool == "phase_prototype":
+            # USE formula-inspired: classes as orthogonal phase prototypes
+            # Document phase aligns with correct class prototype
+            self.phase_prototype = PhasePrototypeClassifier(
+                embed_dim=embed_dim,
+                num_classes=num_classes,
+                num_heads=num_heads,
+                dropout=dropout,
+            )
+            self.attention_pooler = None
+            print("  Using PhasePrototypeClassifier (USE formula: orthogonal class phases)")
         else:
             self.attention_pooler = None
+            self.phase_prototype = None
 
-        # Classification head
+        # Classification head (not used for phase_prototype)
         self.classifier = nn.Sequential(
             nn.Linear(embed_dim, embed_dim),
             nn.GELU(),
@@ -667,6 +796,12 @@ class LRAClassifier(nn.Module):
                         h = block(h)
 
             hidden = h  # [B, N, embed_dim]
+
+        # Phase prototype classifier bypasses pooling - does both pooling and classification
+        if self.pool == "phase_prototype":
+            # USE formula-inspired: classify by phase alignment with class prototypes
+            logits = self.phase_prototype(hidden)  # [B, num_classes]
+            return logits
 
         # Pool sequence to single vector
         if self.pool == "attention":
@@ -1180,8 +1315,8 @@ def main():
 
     # Pooling type for classification (principled fix for Phase attention)
     parser.add_argument("--pool_type", type=str, default="mean",
-                       choices=["mean", "attention", "cls", "last"],
-                       help="Pooling type: mean (default), attention (sharp softmax pooler for classification)")
+                       choices=["mean", "attention", "phase_prototype", "cls", "last"],
+                       help="Pooling type: mean (default), attention (softmax pooler), phase_prototype (USE formula: orthogonal class phases)")
 
     # Logging
     parser.add_argument("--log_every", type=int, default=100,
