@@ -531,8 +531,12 @@ def train(config: UnifiedTrainingConfig):
                 outputs = model(x)
                 loss, metrics = compute_ontological_loss(outputs, y, config)
             else:
-                # Phase or Hybrid
-                logits = model(x)
+                # Phase or Hybrid - handle both tensor and dict returns
+                output = model(x)
+                if isinstance(output, dict):
+                    logits = output.get('logits', output.get('output', output.get('last_hidden_state')))
+                else:
+                    logits = output
                 loss, metrics = compute_phase_loss(logits, y, config)
 
             # Scale for gradient accumulation
@@ -658,7 +662,12 @@ def evaluate(
                     outputs = model(x)
                     loss, metrics = compute_ontological_loss(outputs, y, config)
                 else:
-                    logits = model(x)
+                    # Phase or Hybrid - handle both tensor and dict returns
+                    output = model(x)
+                    if isinstance(output, dict):
+                        logits = output.get('logits', output.get('output', output.get('last_hidden_state')))
+                    else:
+                        logits = output
                     loss, metrics = compute_phase_loss(logits, y, config)
 
             total_loss += loss.item()
