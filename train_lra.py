@@ -58,6 +58,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 from symbolu.phase_transformer import (
     PhaseTransformer,
     HybridPhaseTransformer,
+    TransformerConfig,
+    LocalTransformerBlock,
+    HybridTransformerBlock,
+    PhaseTransformerBlock,
 )
 
 
@@ -121,10 +125,10 @@ class LRAConfig:
     model_type: str = "hybrid"  # phase, hybrid
     num_refine: int = 1  # Iterative refinement passes per block
     model_size: str = "small"
-    embed_dim: int = 256
-    num_layers: int = 6
-    num_heads: int = 4
-    ff_dim: int = 1024
+    embed_dim: Optional[int] = None  # None = use preset
+    num_layers: Optional[int] = None  # None = use preset
+    num_heads: Optional[int] = None  # None = use preset
+    ff_dim: Optional[int] = None  # None = use preset
     dropout: float = 0.1
 
     # Hybrid-specific
@@ -133,6 +137,22 @@ class LRAConfig:
     local_backend: str = "unfold"
     alpha_local: float = 0.8
     alpha_phase: float = 0.2
+
+    # Layer pattern for hybrid models (Grok's suggestion)
+    # local_first: L-L-L-L-H-H-H-H (default, current behavior)
+    # interleave: L-H-L-H-L-H-L-H (alternating for text tasks)
+    # phase_first: H-H-H-H-L-L-L-L (global context first)
+    layer_pattern: str = "local_first"
+
+    # Byte n-gram convolution for text task (Grok's suggestion)
+    # Adds 1D conv layer to capture local byte patterns before transformer
+    use_byte_conv: bool = False
+    byte_conv_kernel: int = 5  # Kernel size for byte n-gram conv
+
+    # Phase attention temperature (from patent formulas analysis)
+    # Lower temperature = sharper attention (helps classification)
+    # Higher temperature = smoother attention (default for generation)
+    phase_temperature: float = 1.0
 
     # Training
     batch_size: int = 32
@@ -426,6 +446,8 @@ def load_lra_data(
 class LRAClassifier(nn.Module):
     """
     Wrapper that adds classification head to transformer encoder.
+
+    Supports optional byte n-gram convolution for text tasks (Grok's suggestion).
     """
 
     def __init__(
@@ -436,18 +458,34 @@ class LRAClassifier(nn.Module):
         vocab_size: int,
         pool: str = "mean",  # mean, cls, last
         num_refine: int = 1,  # Iterative refinement passes per block
+        use_byte_conv: bool = False,  # Add 1D conv for byte n-grams
+        byte_conv_kernel: int = 5,  # Kernel size for byte n-gram conv
     ):
         super().__init__()
         self.encoder = encoder
         self.pool = pool
         self.num_classes = num_classes
         self.num_refine = num_refine
+        self.use_byte_conv = use_byte_conv
 
         # Replace embedding if vocab size differs
         if hasattr(encoder, 'embed'):
             old_vocab = encoder.embed.num_embeddings
             if old_vocab != vocab_size:
                 encoder.embed = nn.Embedding(vocab_size, embed_dim)
+
+        # Byte n-gram convolution layer (Grok's suggestion)
+        # Captures local byte patterns (e.g., "not" in "not good") before transformer
+        if use_byte_conv:
+            self.byte_conv = nn.Sequential(
+                nn.Conv1d(embed_dim, embed_dim, kernel_size=byte_conv_kernel,
+                          padding=byte_conv_kernel // 2, groups=1),
+                nn.GELU(),
+                nn.Conv1d(embed_dim, embed_dim, kernel_size=byte_conv_kernel,
+                          padding=byte_conv_kernel // 2, groups=1),
+            )
+        else:
+            self.byte_conv = None
 
         # Classification head
         self.classifier = nn.Sequential(
@@ -486,18 +524,27 @@ class LRAClassifier(nn.Module):
                 pos = torch.arange(N, device=x.device)
                 h = h + self.encoder.pos_embed(pos)
 
+            # Byte n-gram convolution (Grok's suggestion)
+            # Applied AFTER embedding, BEFORE transformer layers
+            # Captures local byte patterns like "not", "good", "bad"
+            if self.byte_conv is not None:
+                # Conv1d expects [B, C, N], we have [B, N, C]
+                h_conv = h.transpose(1, 2)  # [B, embed_dim, N]
+                h_conv = self.byte_conv(h_conv)  # [B, embed_dim, N]
+                h = h + h_conv.transpose(1, 2)  # Residual connection [B, N, embed_dim]
+
             # Dropout
             if hasattr(self.encoder, 'embed_dropout'):
                 h = self.encoder.embed_dropout(h)
 
-            # Process through layers with iterative refinement
-            if hasattr(self.encoder, 'layers'):
-                for layer in self.encoder.layers:
-                    for _ in range(self.num_refine):
+            # Process through layers with iterative refinement (full-pass)
+            # Each refinement pass goes through ALL blocks, like Universal Transformer
+            for _ in range(self.num_refine):
+                if hasattr(self.encoder, 'layers'):
+                    for layer in self.encoder.layers:
                         h = layer(h)
-            elif hasattr(self.encoder, 'blocks'):
-                for block in self.encoder.blocks:
-                    for _ in range(self.num_refine):
+                elif hasattr(self.encoder, 'blocks'):
+                    for block in self.encoder.blocks:
                         h = block(h)
 
             hidden = h  # [B, N, embed_dim]
@@ -516,6 +563,86 @@ class LRAClassifier(nn.Module):
         logits = self.classifier(pooled)
 
         return logits
+
+
+class InterleavedHybridEncoder(nn.Module):
+    """
+    Custom hybrid encoder with configurable layer patterns.
+
+    Supports Grok's suggestions for text classification:
+    - interleave: L-H-L-H-L-H-L-H (alternating local and hybrid)
+    - phase_first: H-H-H-H-L-L-L-L (global context first, then local refine)
+    """
+
+    def __init__(
+        self,
+        vocab_size: int,
+        embed_dim: int,
+        num_layers: int,
+        num_heads: int,
+        ff_dim: int,
+        max_seq_len: int,
+        dropout: float,
+        layer_pattern: str,  # interleave, phase_first
+        window_size: int,
+        local_backend: str,
+        alpha_local: float,
+        alpha_phase: float,
+        temperature: float = 1.0,  # Lower = sharper attention
+    ):
+        super().__init__()
+
+        self.config = TransformerConfig(
+            vocab_size=vocab_size,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            max_seq_len=max_seq_len,
+            dropout=dropout,
+            temperature=temperature,  # Pass temperature for sharper attention
+        )
+
+        # Embeddings
+        self.token_embed = nn.Embedding(vocab_size, embed_dim)
+        self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
+        self.embed_dropout = nn.Dropout(dropout)
+
+        # Build blocks based on pattern
+        self.blocks = nn.ModuleList()
+
+        for i in range(num_layers):
+            if layer_pattern == "interleave":
+                # L-H-L-H-L-H: even=local, odd=hybrid
+                if i % 2 == 0:
+                    self.blocks.append(LocalTransformerBlock(
+                        self.config, window_size=window_size, backend=local_backend))
+                else:
+                    self.blocks.append(HybridTransformerBlock(
+                        self.config, window_size=window_size, local_backend=local_backend,
+                        alpha_local=alpha_local, alpha_phase=alpha_phase))
+            elif layer_pattern == "phase_first":
+                # H-H-H-H-L-L-L-L: first half hybrid, second half local
+                if i < num_layers // 2:
+                    self.blocks.append(HybridTransformerBlock(
+                        self.config, window_size=window_size, local_backend=local_backend,
+                        alpha_local=alpha_local, alpha_phase=alpha_phase))
+                else:
+                    self.blocks.append(LocalTransformerBlock(
+                        self.config, window_size=window_size, backend=local_backend))
+            else:
+                raise ValueError(f"Unknown layer pattern: {layer_pattern}")
+
+        # Final norm
+        self.final_norm = nn.LayerNorm(embed_dim)
+
+        # LM head (not used for classification, but needed for structure)
+        self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
+
+        print(f"  InterleavedHybridEncoder: {layer_pattern} pattern")
+        pattern_str = "".join(["L" if isinstance(b, LocalTransformerBlock) else "H"
+                               for b in self.blocks])
+        print(f"  Layer pattern: {pattern_str}")
 
 
 def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, device: torch.device) -> nn.Module:
@@ -538,22 +665,44 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
             ff_dim=ff_dim,
             max_seq_len=seq_len,
             dropout=config.dropout,
+            temperature=config.phase_temperature,  # Sharper attention for classification
         )
     elif config.model_type == "hybrid":
-        encoder = HybridPhaseTransformer(
-            vocab_size=vocab_size,
-            embed_dim=embed_dim,
-            num_layers=num_layers,
-            num_heads=num_heads,
-            ff_dim=ff_dim,
-            max_seq_len=seq_len,
-            dropout=config.dropout,
-            local_layers=config.local_layers,
-            window_size=config.window_size,
-            local_backend=config.local_backend,
-            alpha_local=config.alpha_local,
-            alpha_phase=config.alpha_phase,
-        )
+        # Check layer pattern
+        if config.layer_pattern in ["interleave", "phase_first"]:
+            # Use custom interleaved encoder (Grok's suggestion)
+            encoder = InterleavedHybridEncoder(
+                vocab_size=vocab_size,
+                embed_dim=embed_dim,
+                num_layers=num_layers,
+                num_heads=num_heads,
+                ff_dim=ff_dim,
+                max_seq_len=seq_len,
+                dropout=config.dropout,
+                layer_pattern=config.layer_pattern,
+                window_size=config.window_size,
+                local_backend=config.local_backend,
+                alpha_local=config.alpha_local,
+                alpha_phase=config.alpha_phase,
+                temperature=config.phase_temperature,  # Sharper attention for classification
+            )
+        else:
+            # Default: local_first pattern (L-L-L-L-H-H-H-H)
+            encoder = HybridPhaseTransformer(
+                vocab_size=vocab_size,
+                embed_dim=embed_dim,
+                num_layers=num_layers,
+                num_heads=num_heads,
+                ff_dim=ff_dim,
+                max_seq_len=seq_len,
+                dropout=config.dropout,
+                local_layers=config.local_layers,
+                window_size=config.window_size,
+                local_backend=config.local_backend,
+                alpha_local=config.alpha_local,
+                alpha_phase=config.alpha_phase,
+                temperature=config.phase_temperature,  # Sharper attention for classification
+            )
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
 
@@ -566,13 +715,20 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
                 if hasattr(module, 'gradient_checkpointing'):
                     module.gradient_checkpointing = True
 
+    # Auto-enable byte_conv for text task if not explicitly set
+    use_byte_conv = config.use_byte_conv
+    if config.task == "text" and not use_byte_conv:
+        print("  Note: Consider --use_byte_conv for text task (Grok's suggestion)")
+
     model = LRAClassifier(
         encoder=encoder,
         embed_dim=embed_dim,
         num_classes=num_classes,
         vocab_size=vocab_size,
-        pool="mean",
+        pool="mean",  # Average all positions for classification
         num_refine=config.num_refine,
+        use_byte_conv=use_byte_conv,
+        byte_conv_kernel=config.byte_conv_kernel,
     )
 
     return model.to(device)
@@ -871,6 +1027,28 @@ def main():
     parser.add_argument("--window_size", type=int, default=256,
                        help="Local attention window size")
 
+    # Layer pattern (Grok's suggestion for text tasks)
+    parser.add_argument("--layer_pattern", type=str, default="local_first",
+                       choices=["local_first", "interleave", "phase_first"],
+                       help="Layer ordering pattern: local_first (L-L-H-H), "
+                            "interleave (L-H-L-H), phase_first (H-H-L-L)")
+
+    # Byte n-gram convolution (Grok's suggestion for text tasks)
+    parser.add_argument("--use_byte_conv", action="store_true",
+                       help="Add 1D conv layer for byte n-gram patterns (good for text)")
+    parser.add_argument("--byte_conv_kernel", type=int, default=5,
+                       help="Kernel size for byte n-gram conv (default: 5 bytes)")
+
+    # Alpha weights for hybrid attention
+    parser.add_argument("--alpha_local", type=float, default=0.8,
+                       help="Weight for local attention in hybrid layers")
+    parser.add_argument("--alpha_phase", type=float, default=0.2,
+                       help="Weight for phase attention in hybrid layers")
+
+    # Phase attention temperature (patent formula enhancement)
+    parser.add_argument("--phase_temperature", type=float, default=1.0,
+                       help="Temperature for phase attention: lower=sharper (0.1-0.5 for classification)")
+
     # Logging
     parser.add_argument("--log_every", type=int, default=100,
                        help="Log every N steps")
@@ -888,6 +1066,7 @@ def main():
         task=args.task,
         seq_len=args.seq_len,
         model_type=args.model_type,
+        num_refine=args.num_refine,
         model_size=args.model_size,
         batch_size=args.batch_size,
         max_steps=args.max_steps,
@@ -895,6 +1074,12 @@ def main():
         gradient_checkpointing=args.gradient_checkpointing,
         local_backend=args.local_backend,
         window_size=args.window_size,
+        layer_pattern=args.layer_pattern,
+        use_byte_conv=args.use_byte_conv,
+        byte_conv_kernel=args.byte_conv_kernel,
+        alpha_local=args.alpha_local,
+        alpha_phase=args.alpha_phase,
+        phase_temperature=args.phase_temperature,
         log_every=args.log_every,
         eval_every=args.eval_every,
         checkpoint_dir=args.checkpoint_dir,

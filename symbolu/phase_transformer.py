@@ -88,6 +88,7 @@ class TransformerConfig:
     # Phase-specific
     sync_steps: int = 3
     sync_lr: float = 0.1
+    temperature: float = 1.0  # Lower = sharper attention (for classification tasks)
 
     def __post_init__(self):
         if self.ff_dim is None:
@@ -113,12 +114,14 @@ class PhaseAttentionLayer(nn.Module):
         dropout: float = 0.1,
         sync_steps: int = 3,
         sync_lr: float = 0.1,
+        temperature: float = 1.0,  # Lower = sharper attention (for classification)
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
         self.sync_steps = sync_steps
+        self.temperature = temperature  # Controls attention sharpness
 
         # Projections
         self.q_proj = nn.Linear(embed_dim, embed_dim)
@@ -198,6 +201,10 @@ class PhaseAttentionLayer(nn.Module):
             phase_weights = torch.cos(phases - phase_mean)
         else:
             phase_weights = torch.cos(phases - phases.mean(dim=2, keepdim=True))
+
+        # Apply temperature scaling for sharper attention (lower temp = sharper)
+        # This helps classification tasks that need to focus on specific tokens
+        phase_weights = phase_weights / self.temperature
 
         # Normalize weights per head
         phase_weights = F.softmax(phase_weights.sum(dim=-1, keepdim=True), dim=2)
@@ -939,6 +946,7 @@ class HybridAttentionLayer(nn.Module):
         alpha_local: float = 0.8,
         alpha_phase: float = 0.2,
         local_backend: str = 'auto',
+        temperature: float = 1.0,  # Lower = sharper phase attention
     ):
         super().__init__()
         # Keep alphas for potential future use (e.g., residual weighting)
@@ -959,6 +967,7 @@ class HybridAttentionLayer(nn.Module):
             dropout=dropout,
             sync_steps=sync_steps,
             sync_lr=sync_lr,
+            temperature=temperature,  # Pass temperature for sharper attention
         )
 
         self.norm = nn.LayerNorm(embed_dim)
@@ -1000,6 +1009,7 @@ class HybridTransformerBlock(nn.Module):
             alpha_local=alpha_local,
             alpha_phase=alpha_phase,
             local_backend=local_backend,
+            temperature=getattr(config, 'temperature', 1.0),  # Sharper attention
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -1052,6 +1062,7 @@ class PhaseTransformerBlock(nn.Module):
             dropout=config.dropout,
             sync_steps=config.sync_steps,
             sync_lr=config.sync_lr,
+            temperature=getattr(config, 'temperature', 1.0),  # Sharper attention for classification
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -1109,6 +1120,7 @@ class PhaseTransformer(nn.Module):
         dropout: float = 0.1,
         sync_steps: int = 3,
         sync_lr: float = 0.1,
+        temperature: float = 1.0,  # Lower = sharper attention (for classification)
     ):
         super().__init__()
 
@@ -1122,6 +1134,7 @@ class PhaseTransformer(nn.Module):
             dropout=dropout,
             sync_steps=sync_steps,
             sync_lr=sync_lr,
+            temperature=temperature,  # Pass temperature for sharper attention
         )
         self.config = config
 
@@ -1272,6 +1285,7 @@ class HybridPhaseTransformer(nn.Module):
         local_backend: str = 'auto',  # LocalAttention backend: 'auto', 'flash', 'sdpa', 'unfold'
         alpha_local: float = 0.8,  # Weight for local attention in hybrid layers
         alpha_phase: float = 0.2,  # Weight for phase attention in hybrid layers
+        temperature: float = 1.0,  # Lower = sharper attention (for classification)
     ):
         super().__init__()
 
@@ -1285,6 +1299,7 @@ class HybridPhaseTransformer(nn.Module):
             dropout=dropout,
             sync_steps=sync_steps,
             sync_lr=sync_lr,
+            temperature=temperature,  # Pass temperature for sharper attention
         )
         self.config = config
         self.local_layers = local_layers
