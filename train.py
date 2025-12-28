@@ -598,13 +598,14 @@ def compute_loss_chunked(
     lambda_stability: float = 0.001,
 ) -> Tuple[torch.Tensor, Dict[str, float]]:
     """
-    Compute loss with chunked forward pass for ultra-long sequences (10M+ tokens).
+    Compute loss with STREAMING chunked forward pass for ultra-long sequences (10M+ tokens).
 
-    Processes the sequence in chunks to fit in GPU memory while maintaining
-    correct gradient computation through gradient checkpointing.
+    Key innovation: Phase contexts are accumulated across chunks, giving each chunk
+    access to the global phase mean from ALL previous tokens. This maintains true
+    10M+ token context while fitting in limited GPU memory.
 
-    For phase attention, each chunk computes its own local phase mean.
-    This is an approximation but enables arbitrary sequence lengths.
+    Memory: O(chunk_size) per forward pass
+    Context: Full sequence (accumulated phase statistics)
     """
     x, y = batch
     x = x.to(device)
@@ -617,6 +618,9 @@ def compute_loss_chunked(
     total_tokens = 0
     chunk_metrics = []
 
+    # Initialize streaming phase contexts (empty list signals streaming mode)
+    phase_contexts = []
+
     for i in range(num_chunks):
         start = i * chunk_size
         end = min((i + 1) * chunk_size, N)
@@ -624,10 +628,20 @@ def compute_loss_chunked(
         x_chunk = x[:, start:end]
         y_chunk = y[:, start:end]
 
-        # Forward pass on chunk
-        output = model(x_chunk, return_hidden=True)
+        # Forward pass with streaming phase context
+        # Each chunk sees accumulated phase stats from all previous chunks
+        output = model(
+            x_chunk,
+            return_hidden=True,
+            phase_contexts=phase_contexts,  # Pass accumulated contexts
+            position_offset=start,          # Correct positional encoding
+        )
+
         logits = output['logits']
         hidden_states = output.get('hidden_states', [])
+
+        # Update phase contexts for next chunk (streaming accumulation)
+        phase_contexts = output.get('phase_contexts', [])
 
         # Compute task loss for this chunk
         B_c, N_c, V = logits.shape
@@ -662,6 +676,7 @@ def compute_loss_chunked(
         "loss": avg_loss.item(),
         "perplexity": torch.exp(avg_loss).item(),
         "num_chunks": num_chunks,
+        "streaming": True,  # Indicate streaming mode was used
     }
 
     if chunk_metrics:
