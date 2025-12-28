@@ -568,6 +568,12 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
 def train_lra(config: LRAConfig):
     """Main training loop for LRA."""
 
+    # Early banner
+    print(f"\n{'='*70}")
+    print("   LRA BENCHMARK TRAINING")
+    print("   Long Range Arena for Efficient Attention")
+    print(f"{'='*70}")
+
     torch.manual_seed(config.seed)
     np.random.seed(config.seed)
 
@@ -582,14 +588,18 @@ def train_lra(config: LRAConfig):
     seq_len = config.seq_len or task_info["seq_len"]
     vocab_size = task_info["vocab_size"]
 
-    print(f"\n{'='*70}")
-    print(f"   LRA BENCHMARK: {config.task.upper()}")
-    print(f"{'='*70}")
-    print(f"\n  Task: {task_info['description']}")
+    print(f"\n  Task: {config.task.upper()} - {task_info['description']}")
     print(f"  Sequence Length: {seq_len:,}")
-    print(f"  Model: {config.model_type.upper()}")
+    print(f"  Classes: {task_info['num_classes']}")
+    print(f"  Model Type: {config.model_type.upper()}")
+    print(f"  Model Size: {config.model_size}")
+    print(f"  Batch Size: {config.batch_size}")
+    print(f"  Max Steps: {config.max_steps:,}")
+    print(f"  Learning Rate: {config.learning_rate}")
     print(f"  Device: {device}")
     print(f"  Gradient Checkpointing: {config.gradient_checkpointing}")
+    print(f"  Mixed Precision: {config.mixed_precision}")
+    print()
 
     # Load data
     train_loader, val_loader, num_classes = load_lra_data(
