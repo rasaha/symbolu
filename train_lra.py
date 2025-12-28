@@ -121,10 +121,10 @@ class LRAConfig:
     model_type: str = "hybrid"  # phase, hybrid
     num_refine: int = 1  # Iterative refinement passes per block
     model_size: str = "small"
-    embed_dim: int = 256
-    num_layers: int = 6
-    num_heads: int = 4
-    ff_dim: int = 1024
+    embed_dim: Optional[int] = None  # None = use preset
+    num_layers: Optional[int] = None  # None = use preset
+    num_heads: Optional[int] = None  # None = use preset
+    ff_dim: Optional[int] = None  # None = use preset
     dropout: float = 0.1
 
     # Hybrid-specific
@@ -490,14 +490,14 @@ class LRAClassifier(nn.Module):
             if hasattr(self.encoder, 'embed_dropout'):
                 h = self.encoder.embed_dropout(h)
 
-            # Process through layers with iterative refinement
-            if hasattr(self.encoder, 'layers'):
-                for layer in self.encoder.layers:
-                    for _ in range(self.num_refine):
+            # Process through layers with iterative refinement (full-pass)
+            # Each refinement pass goes through ALL blocks, like Universal Transformer
+            for _ in range(self.num_refine):
+                if hasattr(self.encoder, 'layers'):
+                    for layer in self.encoder.layers:
                         h = layer(h)
-            elif hasattr(self.encoder, 'blocks'):
-                for block in self.encoder.blocks:
-                    for _ in range(self.num_refine):
+                elif hasattr(self.encoder, 'blocks'):
+                    for block in self.encoder.blocks:
                         h = block(h)
 
             hidden = h  # [B, N, embed_dim]
@@ -571,7 +571,7 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
         embed_dim=embed_dim,
         num_classes=num_classes,
         vocab_size=vocab_size,
-        pool="mean",
+        pool="mean",  # Average all positions for classification
         num_refine=config.num_refine,
     )
 
