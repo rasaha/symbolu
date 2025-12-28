@@ -571,7 +571,7 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
         embed_dim=embed_dim,
         num_classes=num_classes,
         vocab_size=vocab_size,
-        pool="mean",
+        pool="cls",  # Use first position as summary token
         num_refine=config.num_refine,
     )
 
