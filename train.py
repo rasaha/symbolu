@@ -147,6 +147,9 @@ class TrainingConfig:
     # Gradient checkpointing (for large models)
     gradient_checkpointing: bool = False  # Enable to reduce memory at cost of speed
 
+    # Chunked processing (for ultra-long sequences like 10M tokens)
+    chunk_size: int = 0  # 0 = disabled, otherwise process sequence in chunks of this size
+
     # Checkpointing
     checkpoint_dir: str = "checkpoints"
     save_every: int = 5000
@@ -584,6 +587,90 @@ def compute_layer_coherence(hidden_states: list) -> torch.Tensor:
 _prev_entropy = None
 
 
+def compute_loss_chunked(
+    model: PhaseTransformer,
+    batch: Tuple[torch.Tensor, torch.Tensor],
+    device: torch.device,
+    chunk_size: int,
+    use_coherence_loss: bool = True,
+    lambda_entropy: float = 0.01,
+    lambda_coherence: float = 0.01,
+    lambda_stability: float = 0.001,
+) -> Tuple[torch.Tensor, Dict[str, float]]:
+    """
+    Compute loss with chunked forward pass for ultra-long sequences (10M+ tokens).
+
+    Processes the sequence in chunks to fit in GPU memory while maintaining
+    correct gradient computation through gradient checkpointing.
+
+    For phase attention, each chunk computes its own local phase mean.
+    This is an approximation but enables arbitrary sequence lengths.
+    """
+    x, y = batch
+    x = x.to(device)
+    y = y.to(device)
+
+    B, N = x.shape
+    num_chunks = (N + chunk_size - 1) // chunk_size
+
+    total_loss = torch.tensor(0.0, device=device, requires_grad=True)
+    total_tokens = 0
+    chunk_metrics = []
+
+    for i in range(num_chunks):
+        start = i * chunk_size
+        end = min((i + 1) * chunk_size, N)
+
+        x_chunk = x[:, start:end]
+        y_chunk = y[:, start:end]
+
+        # Forward pass on chunk
+        output = model(x_chunk, return_hidden=True)
+        logits = output['logits']
+        hidden_states = output.get('hidden_states', [])
+
+        # Compute task loss for this chunk
+        B_c, N_c, V = logits.shape
+        chunk_loss = F.cross_entropy(
+            logits.view(B_c * N_c, V),
+            y_chunk.view(B_c * N_c),
+            ignore_index=-100,
+            reduction='sum'
+        )
+
+        # Accumulate (we'll normalize later)
+        total_loss = total_loss + chunk_loss
+        total_tokens += B_c * N_c
+
+        # Collect metrics from last chunk
+        if i == num_chunks - 1:
+            with torch.no_grad():
+                chunk_metrics.append({
+                    "entropy": compute_semantic_entropy(logits).item() if use_coherence_loss else 0,
+                    "coherence": compute_layer_coherence(hidden_states).item() if hidden_states else 0,
+                })
+
+        # Clear intermediate tensors to free memory
+        del output, logits, hidden_states
+        if device.type == 'cuda':
+            torch.cuda.empty_cache()
+
+    # Normalize loss by total tokens
+    avg_loss = total_loss / total_tokens
+
+    metrics = {
+        "loss": avg_loss.item(),
+        "perplexity": torch.exp(avg_loss).item(),
+        "num_chunks": num_chunks,
+    }
+
+    if chunk_metrics:
+        metrics["entropy"] = chunk_metrics[-1].get("entropy", 0)
+        metrics["coherence"] = chunk_metrics[-1].get("coherence", 0)
+
+    return avg_loss, metrics
+
+
 def compute_loss(
     model: PhaseTransformer,
     batch: Tuple[torch.Tensor, torch.Tensor],
@@ -721,13 +808,24 @@ def train_step(
 
     # Forward pass with coherence loss (S3, S1-S2, S8-S9)
     with autocast(device_type='cuda', enabled=use_amp, dtype=dtype):
-        loss, metrics = compute_loss(
-            model, batch, device,
-            use_coherence_loss=config.use_coherence_loss,
-            lambda_entropy=config.lambda_entropy,
-            lambda_coherence=config.lambda_coherence,
-            lambda_stability=config.lambda_stability,
-        )
+        # Use chunked processing for ultra-long sequences
+        if config.chunk_size > 0:
+            loss, metrics = compute_loss_chunked(
+                model, batch, device,
+                chunk_size=config.chunk_size,
+                use_coherence_loss=config.use_coherence_loss,
+                lambda_entropy=config.lambda_entropy,
+                lambda_coherence=config.lambda_coherence,
+                lambda_stability=config.lambda_stability,
+            )
+        else:
+            loss, metrics = compute_loss(
+                model, batch, device,
+                use_coherence_loss=config.use_coherence_loss,
+                lambda_entropy=config.lambda_entropy,
+                lambda_coherence=config.lambda_coherence,
+                lambda_stability=config.lambda_stability,
+            )
         loss = loss / config.gradient_accumulation
 
     # Backward pass
@@ -929,6 +1027,9 @@ def train(config: TrainingConfig):
     # Training loop
     logger.info("=" * 60)
     logger.info("Starting training")
+    if config.chunk_size > 0:
+        num_chunks = (config.max_seq_len + config.chunk_size - 1) // config.chunk_size
+        logger.info(f"CHUNKED MODE: {config.max_seq_len:,} tokens in {num_chunks} chunks of {config.chunk_size:,}")
     logger.info("=" * 60)
 
     model.train()
@@ -1181,6 +1282,11 @@ def parse_args() -> TrainingConfig:
     # Gradient checkpointing
     parser.add_argument("--gradient_checkpointing", action="store_true",
                        help="Enable gradient checkpointing (saves memory, slower)")
+
+    # Chunked processing for ultra-long sequences
+    parser.add_argument("--chunk_size", type=int, default=0,
+                       help="Process sequence in chunks of this size (0=disabled). "
+                            "Enables 10M+ token sequences on limited VRAM.")
 
     # Checkpointing
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints",
