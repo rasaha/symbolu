@@ -121,10 +121,10 @@ class LRAConfig:
     model_type: str = "hybrid"  # phase, hybrid
     num_refine: int = 1  # Iterative refinement passes per block
     model_size: str = "small"
-    embed_dim: int = 256
-    num_layers: int = 6
-    num_heads: int = 4
-    ff_dim: int = 1024
+    embed_dim: Optional[int] = None  # None = use preset
+    num_layers: Optional[int] = None  # None = use preset
+    num_heads: Optional[int] = None  # None = use preset
+    ff_dim: Optional[int] = None  # None = use preset
     dropout: float = 0.1
 
     # Hybrid-specific
