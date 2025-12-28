@@ -490,14 +490,14 @@ class LRAClassifier(nn.Module):
             if hasattr(self.encoder, 'embed_dropout'):
                 h = self.encoder.embed_dropout(h)
 
-            # Process through layers with iterative refinement
-            if hasattr(self.encoder, 'layers'):
-                for layer in self.encoder.layers:
-                    for _ in range(self.num_refine):
+            # Process through layers with iterative refinement (full-pass)
+            # Each refinement pass goes through ALL blocks, like Universal Transformer
+            for _ in range(self.num_refine):
+                if hasattr(self.encoder, 'layers'):
+                    for layer in self.encoder.layers:
                         h = layer(h)
-            elif hasattr(self.encoder, 'blocks'):
-                for block in self.encoder.blocks:
-                    for _ in range(self.num_refine):
+                elif hasattr(self.encoder, 'blocks'):
+                    for block in self.encoder.blocks:
                         h = block(h)
 
             hidden = h  # [B, N, embed_dim]
