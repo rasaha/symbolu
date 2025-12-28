@@ -56,7 +56,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
 
 from symbolu.phase_transformer import (
-    PhaseAttentionTransformer,
+    PhaseTransformer,
     HybridPhaseTransformer,
 )
 
@@ -514,7 +514,7 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
     seq_len = config.seq_len or LRA_TASKS[config.task]["seq_len"]
 
     if config.model_type == "phase":
-        encoder = PhaseAttentionTransformer(
+        encoder = PhaseTransformer(
             vocab_size=vocab_size,
             embed_dim=embed_dim,
             num_layers=num_layers,
