@@ -1049,3 +1049,224 @@ python train.py --model_type hybrid --model_size small \
 *Document updated: December 27, 2025*
 *Branch: claude/validate-phase-attention-Dm8dC*
 *Repository: github.com/rasaha/symbolu*
+
+---
+
+## Session Update: December 28, 2025
+
+### New Training Scripts Created
+
+#### 1. train_unified_llm.py - Unified LLM Training
+
+Comprehensive training script supporting multiple model architectures:
+
+| Model Type | Description | Usage |
+|------------|-------------|-------|
+| `ontological` | Standard attention + 12D ontological × 144D bhava | `--model_type ontological` |
+| `phase` | Pure Phase Attention O(n) | `--model_type phase` |
+| `hybrid` | Local + Phase Attention | `--model_type hybrid` |
+
+**Features:**
+- WikiText-103 dataset with GPT-2 tokenizer
+- Gradient checkpointing support
+- Mixed precision (bf16/fp16)
+- Configurable batch size and gradient accumulation
+- Multiple backend support for LocalAttention
+
+#### 2. train_lra.py - Long Range Arena Benchmark
+
+LRA benchmark training for validating long-range dependency learning:
+
+| Task | Description | Seq Length |
+|------|-------------|------------|
+| `pathfinder` | Path detection in images | 8K-16K |
+| `pathx` | Extended pathfinder | 16K |
+| `listops` | Hierarchical list operations | 2K |
+| `text` | Text classification | 4K |
+| `retrieval` | Document retrieval | 4K |
+| `image` | Image classification | 1K |
+
+### Bug Fixes Applied
+
+#### 1. Dict Return Type Handling (train_unified_llm.py)
+
+**Problem**: PhaseTransformer and HybridPhaseTransformer return `Dict[str, torch.Tensor]` with 'logits' key, but code expected raw tensor.
+
+```python
+# OLD (crashed):
+logits = model(x)
+loss = compute_loss(logits, y)  # AttributeError: 'dict' has no 'shape'
+
+# NEW (fixed):
+output = model(x)
+if isinstance(output, dict):
+    logits = output.get('logits', output.get('output'))
+else:
+    logits = output
+loss = compute_loss(logits, y)
+```
+
+**Files**: `train_unified_llm.py` (lines 534-540, 665-671)
+
+#### 2. LRA Introduction Banner
+
+**Problem**: train_lra.py lacked introduction banner matching train_unified_llm.py style.
+
+**Solution**: Added banner at start of `train_lra()`:
+
+```python
+print(f"\n{'='*70}")
+print("   LRA BENCHMARK TRAINING")
+print("   Long Range Arena for Efficient Attention")
+print(f"{'='*70}")
+```
+
+**File**: `train_lra.py` (lines 582-586)
+
+#### 3. Chunked Unfold Processing for LocalAttention
+
+**Problem**: LocalAttention unfold created large intermediate tensors causing OOM with large batches.
+
+**Solution**: Added chunked processing that splits sequence into smaller chunks:
+
+```python
+def _forward_unfold(self, Q, K, V, B, N, causal):
+    # Aggressive chunking for large batches
+    chunk_size = max(64, min(256, 1024 // max(B, 1)))
+
+    if B * N > 8192 and N > chunk_size:
+        return self._forward_unfold_chunked(Q, K, V, B, N, causal, chunk_size)
+    # ... regular unfold for small batches
+```
+
+| Batch Size | Chunk Size | Chunks for 8K seq |
+|------------|------------|-------------------|
+| 32 | 64 | 128 |
+| 16 | 64 | 128 |
+| 8 | 128 | 64 |
+| 4 | 256 | 32 |
+
+**File**: `symbolu/phase_transformer.py` (lines 418-525)
+
+**Note**: Chunking reduces peak memory per attention operation but does NOT reduce total activation memory. Large batch × seq combinations still require reducing batch size.
+
+### Validation Results
+
+#### Unified LLM Hybrid 16K - SUCCESS ✓
+
+```bash
+python train_unified_llm.py --model_type hybrid --model_size small \
+  --max_seq_len 16384 --gradient_checkpointing --batch_size 1 \
+  --gradient_accumulation 8 --local_backend unfold --max_steps 100 \
+  --log_every 10 --eval_every 50
+```
+
+| Metric | Value |
+|--------|-------|
+| Model | Hybrid (63.6M params) |
+| Context Length | 16,384 tokens |
+| VRAM Usage | **15.2 GB** |
+| Throughput | ~9,700 tok/sec |
+| Loss (start→end) | 8.72 → 6.17 |
+| Val Loss | 6.10 |
+| Val PPL | 444.61 |
+| Status | ✓ **SUCCESS** |
+
+**Key Finding**: Hybrid model learns effectively at 16K context with only 15.2GB VRAM!
+
+#### Hybrid 32K - SUCCESS ✓ (from previous session)
+
+| Metric | Value |
+|--------|-------|
+| Context Length | 32,768 tokens |
+| VRAM Usage | **26.5 GB** |
+| Throughput | ~9,700 tok/sec |
+| Loss (start→end) | 10.86 → 9.60 |
+| Status | ✓ **SUCCESS** |
+
+### Memory Budget Analysis
+
+The critical insight from LRA testing: **total tokens per batch determines memory usage**, not just sequence length.
+
+| Config | Tokens/Batch | VRAM (est) | Status |
+|--------|--------------|------------|--------|
+| batch=1, seq=16K | 16K | ~15 GB | ✓ Works |
+| batch=2, seq=8K | 16K | ~15 GB | ✓ Should work |
+| batch=4, seq=8K | 32K | ~30 GB | ✓ Should work |
+| batch=8, seq=8K | 64K | ~50 GB | ⚠️ Tight |
+| batch=16, seq=8K | 128K | ~79 GB | ✗ OOM |
+| batch=32, seq=8K | 256K | ~150 GB | ✗ OOM |
+
+**Recommendation for A100 80GB:**
+
+| Seq Length | Max Batch | Effective via Accumulation |
+|------------|-----------|---------------------------|
+| 8K | 4-8 | 32 (batch=4, accum=8) |
+| 16K | 1-2 | 16 (batch=2, accum=8) |
+| 32K | 1 | 8 (batch=1, accum=8) |
+
+### Patch Scripts Created
+
+New `patches/` directory with Python patch scripts for easy deployment:
+
+| Script | Purpose |
+|--------|---------|
+| `fix_unfold_oom.py` | Adds chunked unfold processing |
+| `fix_lra_intro_banner.py` | Adds LRA introduction banner |
+| `apply_all.py` | Runs all patches sequentially |
+
+**Usage on RunPod:**
+```bash
+git pull origin claude/validate-phase-attention-Dm8dC
+python patches/apply_all.py
+```
+
+**Or apply individually:**
+```bash
+python patches/fix_unfold_oom.py
+python patches/fix_lra_intro_banner.py
+```
+
+### Quick sed Commands for Manual Patching
+
+If git pull isn't available, use these sed commands:
+
+```bash
+# Fix chunking (if needed):
+sed -i 's/chunk_size = max(256, min(512, 4096/chunk_size = max(64, min(256, 1024/g' symbolu/phase_transformer.py
+sed -i 's/if B \* N > 16384 and/if B * N > 8192 and/g' symbolu/phase_transformer.py
+```
+
+### Updated Remaining Work
+
+| Task | Priority | Status |
+|------|----------|--------|
+| ~~Fix LocalAttention O(n×w)~~ | ~~High~~ | ✓ DONE |
+| ~~Test Phase 32K~~ | ~~High~~ | ✓ DONE (22GB VRAM) |
+| ~~Test Hybrid 16K~~ | ~~High~~ | ✓ DONE (15.2GB VRAM) |
+| ~~Test Hybrid 32K~~ | ~~High~~ | ✓ DONE (26.5GB VRAM) |
+| ~~Create train_unified_llm.py~~ | ~~High~~ | ✓ DONE |
+| ~~Create train_lra.py~~ | ~~High~~ | ✓ DONE |
+| ~~Fix dict return handling~~ | ~~High~~ | ✓ DONE |
+| LRA Pathfinder 8K validation | Medium | In progress (batch_size 2) |
+| Test LightningAttention | Medium | Implemented, not tested |
+| Test GroupedHybridTransformer | Medium | Implemented, not tested |
+| Baseline GPT-2 comparison | High | Not started |
+
+### Commits This Session
+
+```
+dc35215 fix: Even more aggressive chunking - chunk_size=64 for B=32
+af48fff feat: Add LRA intro banner patch and apply_all script
+6735e20 fix: Use more aggressive chunking for unfold OOM prevention
+4174527 feat: Add patch script for unfold OOM fix
+3a22a41 fix: Add chunked processing to LocalAttention unfold for large batches
+03c5217 feat: Add unified validation script for Phase/Hybrid models
+392dde4 fix: Handle dict return type from Phase/Hybrid models in unified LLM training
+```
+
+---
+
+*Document updated: December 28, 2025*
+*Branch: claude/validate-phase-attention-Dm8dC*
+*Repository: github.com/rasaha/symbolu*
