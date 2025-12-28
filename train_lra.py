@@ -470,11 +470,22 @@ class LRAClassifier(nn.Module):
             # Use embedding + layers directly
             B, N = x.shape
 
-            # Embedding
-            h = self.encoder.embed(x)
+            # Embedding (handle different naming conventions)
+            if hasattr(self.encoder, 'token_embed'):
+                h = self.encoder.token_embed(x)
+            elif hasattr(self.encoder, 'embed'):
+                h = self.encoder.embed(x)
+            else:
+                raise AttributeError("Encoder has no embed or token_embed attribute")
+
+            # Position embedding
             if hasattr(self.encoder, 'pos_embed'):
                 pos = torch.arange(N, device=x.device)
                 h = h + self.encoder.pos_embed(pos)
+
+            # Dropout
+            if hasattr(self.encoder, 'embed_dropout'):
+                h = self.encoder.embed_dropout(h)
 
             # Process through layers
             if hasattr(self.encoder, 'layers'):
