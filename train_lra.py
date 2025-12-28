@@ -149,6 +149,11 @@ class LRAConfig:
     use_byte_conv: bool = False
     byte_conv_kernel: int = 5  # Kernel size for byte n-gram conv
 
+    # Phase attention temperature (from patent formulas analysis)
+    # Lower temperature = sharper attention (helps classification)
+    # Higher temperature = smoother attention (default for generation)
+    phase_temperature: float = 1.0
+
     # Training
     batch_size: int = 32
     gradient_accumulation: int = 1
@@ -583,6 +588,7 @@ class InterleavedHybridEncoder(nn.Module):
         local_backend: str,
         alpha_local: float,
         alpha_phase: float,
+        temperature: float = 1.0,  # Lower = sharper attention
     ):
         super().__init__()
 
@@ -594,6 +600,7 @@ class InterleavedHybridEncoder(nn.Module):
             ff_dim=ff_dim,
             max_seq_len=max_seq_len,
             dropout=dropout,
+            temperature=temperature,  # Pass temperature for sharper attention
         )
 
         # Embeddings
@@ -658,6 +665,7 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
             ff_dim=ff_dim,
             max_seq_len=seq_len,
             dropout=config.dropout,
+            temperature=config.phase_temperature,  # Sharper attention for classification
         )
     elif config.model_type == "hybrid":
         # Check layer pattern
@@ -676,6 +684,7 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
                 local_backend=config.local_backend,
                 alpha_local=config.alpha_local,
                 alpha_phase=config.alpha_phase,
+                temperature=config.phase_temperature,  # Sharper attention for classification
             )
         else:
             # Default: local_first pattern (L-L-L-L-H-H-H-H)
@@ -692,6 +701,7 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
                 local_backend=config.local_backend,
                 alpha_local=config.alpha_local,
                 alpha_phase=config.alpha_phase,
+                temperature=config.phase_temperature,  # Sharper attention for classification
             )
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
@@ -1035,6 +1045,10 @@ def main():
     parser.add_argument("--alpha_phase", type=float, default=0.2,
                        help="Weight for phase attention in hybrid layers")
 
+    # Phase attention temperature (patent formula enhancement)
+    parser.add_argument("--phase_temperature", type=float, default=1.0,
+                       help="Temperature for phase attention: lower=sharper (0.1-0.5 for classification)")
+
     # Logging
     parser.add_argument("--log_every", type=int, default=100,
                        help="Log every N steps")
@@ -1065,6 +1079,7 @@ def main():
         byte_conv_kernel=args.byte_conv_kernel,
         alpha_local=args.alpha_local,
         alpha_phase=args.alpha_phase,
+        phase_temperature=args.phase_temperature,
         log_every=args.log_every,
         eval_every=args.eval_every,
         checkpoint_dir=args.checkpoint_dir,
