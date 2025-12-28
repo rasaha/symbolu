@@ -1893,5 +1893,5 @@ a067cc5 docs: Update TRAINING_OBSERVATIONS with LRA benchmarks and WikiText resu
 ---
 
 *Document updated: December 28, 2025*
-*Branch: claude/validate-phase-attention-Dm8dC*
+*Branch: claude/validate-phase-attention-d5pfX*
 *Repository: github.com/rasaha/symbolu*
