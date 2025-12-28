@@ -63,7 +63,7 @@ except ImportError:
 sys.path.insert(0, str(Path(__file__).parent))
 
 from symbolu.phase_transformer import (
-    PhaseAttentionTransformer,
+    PhaseTransformer,
     HybridPhaseTransformer,
 )
 
@@ -292,7 +292,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
                     module.gradient_checkpointing = True
 
     elif config.model_type == "phase":
-        model = PhaseAttentionTransformer(
+        model = PhaseTransformer(
             vocab_size=config.vocab_size,
             embed_dim=preset["embed_dim"],
             num_layers=preset["num_layers"],
