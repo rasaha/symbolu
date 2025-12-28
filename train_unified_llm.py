@@ -302,7 +302,6 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             dropout=config.dropout,
             sync_steps=config.sync_steps,
             sync_lr=config.sync_lr,
-            gradient_checkpointing=config.gradient_checkpointing,
         )
 
     elif config.model_type == "hybrid":
@@ -319,11 +318,19 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             local_backend=config.local_backend,
             alpha_local=config.alpha_local,
             alpha_phase=config.alpha_phase,
-            gradient_checkpointing=config.gradient_checkpointing,
         )
 
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
+
+    # Enable gradient checkpointing after model creation
+    if config.gradient_checkpointing:
+        if hasattr(model, 'gradient_checkpointing_enable'):
+            model.gradient_checkpointing_enable()
+        else:
+            for module in model.modules():
+                if hasattr(module, 'gradient_checkpointing'):
+                    module.gradient_checkpointing = True
 
     return model.to(device)
 

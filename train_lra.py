@@ -522,7 +522,6 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
             ff_dim=ff_dim,
             max_seq_len=seq_len,
             dropout=config.dropout,
-            gradient_checkpointing=config.gradient_checkpointing,
         )
     elif config.model_type == "hybrid":
         encoder = HybridPhaseTransformer(
@@ -538,10 +537,18 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
             local_backend=config.local_backend,
             alpha_local=config.alpha_local,
             alpha_phase=config.alpha_phase,
-            gradient_checkpointing=config.gradient_checkpointing,
         )
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
+
+    # Enable gradient checkpointing after model creation
+    if config.gradient_checkpointing:
+        if hasattr(encoder, 'gradient_checkpointing_enable'):
+            encoder.gradient_checkpointing_enable()
+        else:
+            for module in encoder.modules():
+                if hasattr(module, 'gradient_checkpointing'):
+                    module.gradient_checkpointing = True
 
     model = LRAClassifier(
         encoder=encoder,
