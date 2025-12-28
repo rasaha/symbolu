@@ -154,6 +154,13 @@ class LRAConfig:
     # Higher temperature = smoother attention (default for generation)
     phase_temperature: float = 1.0
 
+    # Pooling type for classification head
+    # mean: Average pooling (default, good for structural tasks)
+    # attention: SoftmaxAttentionPooler (sharp attention, best for classification)
+    # cls: First token (CLS-style)
+    # last: Last token
+    pool_type: str = "mean"
+
     # Training
     batch_size: int = 32
     gradient_accumulation: int = 1
@@ -440,6 +447,95 @@ def load_lra_data(
 
 
 # =============================================================================
+# SOFTMAX ATTENTION POOLER (Principled Classification Head)
+# =============================================================================
+
+class SoftmaxAttentionPooler(nn.Module):
+    """
+    Attention-based pooling using standard dot-product softmax attention.
+
+    This is the principled fix for Phase attention's classification weakness:
+    - Phase attention: smooth (phases converge → uniform attention)
+    - Softmax attention: sharp (can focus on specific tokens)
+
+    Uses a learnable query that attends over the sequence to find
+    the most relevant tokens for classification (e.g., "not" in "not good").
+
+    Architecture:
+        query: [1, d_model] learnable parameter
+        keys:  [B, N, d_model] from encoder hidden states
+        values: [B, N, d_model] from encoder hidden states
+
+        attention = softmax(query @ keys.T / sqrt(d))  # Sharp!
+        output = attention @ values  # [B, d_model]
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int = 4,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+
+        # Learnable query for classification (like CLS token but explicit)
+        self.query = nn.Parameter(torch.randn(1, 1, embed_dim) * 0.02)
+
+        # Project keys and values
+        self.key_proj = nn.Linear(embed_dim, embed_dim)
+        self.value_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Output projection
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+        self.dropout = nn.Dropout(dropout)
+
+        # Temperature for sharpness (lower = sharper)
+        self.temperature = nn.Parameter(torch.ones(1))
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            hidden_states: [B, N, embed_dim] encoder output
+
+        Returns:
+            pooled: [B, embed_dim] classification-ready representation
+        """
+        B, N, D = hidden_states.shape
+
+        # Expand query to batch
+        query = self.query.expand(B, -1, -1)  # [B, 1, D]
+
+        # Project keys and values
+        keys = self.key_proj(hidden_states)    # [B, N, D]
+        values = self.value_proj(hidden_states)  # [B, N, D]
+
+        # Multi-head reshape
+        query = query.view(B, 1, self.num_heads, self.head_dim).transpose(1, 2)  # [B, H, 1, d]
+        keys = keys.view(B, N, self.num_heads, self.head_dim).transpose(1, 2)    # [B, H, N, d]
+        values = values.view(B, N, self.num_heads, self.head_dim).transpose(1, 2)  # [B, H, N, d]
+
+        # Compute attention scores (standard dot-product)
+        scale = (self.head_dim ** -0.5) / self.temperature.clamp(min=0.1)
+        scores = torch.matmul(query, keys.transpose(-2, -1)) * scale  # [B, H, 1, N]
+
+        # SHARP softmax attention (not Phase's smooth mean-field!)
+        attn_weights = F.softmax(scores, dim=-1)  # [B, H, 1, N]
+        attn_weights = self.dropout(attn_weights)
+
+        # Weighted sum of values
+        context = torch.matmul(attn_weights, values)  # [B, H, 1, d]
+
+        # Reshape and project
+        context = context.transpose(1, 2).contiguous().view(B, 1, D)  # [B, 1, D]
+        output = self.out_proj(context.squeeze(1))  # [B, D]
+
+        return output
+
+
+# =============================================================================
 # MODEL WITH CLASSIFICATION HEAD
 # =============================================================================
 
@@ -447,7 +543,15 @@ class LRAClassifier(nn.Module):
     """
     Wrapper that adds classification head to transformer encoder.
 
-    Supports optional byte n-gram convolution for text tasks (Grok's suggestion).
+    Supports:
+    - Softmax attention pooler for sharp classification (principled fix)
+    - Byte n-gram convolution for text tasks (Grok's suggestion)
+
+    Pool types:
+    - mean: Average all positions (default, works for structural tasks)
+    - attention: SoftmaxAttentionPooler (sharp attention, for classification)
+    - cls: Use first token (CLS-style)
+    - last: Use last token
     """
 
     def __init__(
@@ -456,10 +560,12 @@ class LRAClassifier(nn.Module):
         embed_dim: int,
         num_classes: int,
         vocab_size: int,
-        pool: str = "mean",  # mean, cls, last
+        num_heads: int = 4,
+        pool: str = "mean",  # mean, attention, cls, last
         num_refine: int = 1,  # Iterative refinement passes per block
         use_byte_conv: bool = False,  # Add 1D conv for byte n-grams
         byte_conv_kernel: int = 5,  # Kernel size for byte n-gram conv
+        dropout: float = 0.1,
     ):
         super().__init__()
         self.encoder = encoder
@@ -467,6 +573,7 @@ class LRAClassifier(nn.Module):
         self.num_classes = num_classes
         self.num_refine = num_refine
         self.use_byte_conv = use_byte_conv
+        self.embed_dim = embed_dim
 
         # Replace embedding if vocab size differs
         if hasattr(encoder, 'embed'):
@@ -487,11 +594,23 @@ class LRAClassifier(nn.Module):
         else:
             self.byte_conv = None
 
+        # Softmax attention pooler (principled fix for classification)
+        # Uses standard dot-product attention instead of Phase's smooth attention
+        if pool == "attention":
+            self.attention_pooler = SoftmaxAttentionPooler(
+                embed_dim=embed_dim,
+                num_heads=num_heads,
+                dropout=dropout,
+            )
+            print("  Using SoftmaxAttentionPooler for classification (sharp attention)")
+        else:
+            self.attention_pooler = None
+
         # Classification head
         self.classifier = nn.Sequential(
             nn.Linear(embed_dim, embed_dim),
             nn.GELU(),
-            nn.Dropout(0.1),
+            nn.Dropout(dropout),
             nn.Linear(embed_dim, num_classes),
         )
 
@@ -549,8 +668,11 @@ class LRAClassifier(nn.Module):
 
             hidden = h  # [B, N, embed_dim]
 
-        # Pool
-        if self.pool == "mean":
+        # Pool sequence to single vector
+        if self.pool == "attention":
+            # Use SoftmaxAttentionPooler (sharp, discriminative attention)
+            pooled = self.attention_pooler(hidden)  # [B, embed_dim]
+        elif self.pool == "mean":
             pooled = hidden.mean(dim=1)  # [B, embed_dim]
         elif self.pool == "cls":
             pooled = hidden[:, 0]
@@ -720,15 +842,22 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
     if config.task == "text" and not use_byte_conv:
         print("  Note: Consider --use_byte_conv for text task (Grok's suggestion)")
 
+    # Auto-suggest attention pooler for text classification
+    pool_type = config.pool_type
+    if config.task == "text" and pool_type == "mean":
+        print("  Note: Consider --pool_type attention for text classification")
+
     model = LRAClassifier(
         encoder=encoder,
         embed_dim=embed_dim,
         num_classes=num_classes,
         vocab_size=vocab_size,
-        pool="mean",  # Average all positions for classification
+        num_heads=num_heads,
+        pool=pool_type,
         num_refine=config.num_refine,
         use_byte_conv=use_byte_conv,
         byte_conv_kernel=config.byte_conv_kernel,
+        dropout=config.dropout,
     )
 
     return model.to(device)
@@ -1049,6 +1178,11 @@ def main():
     parser.add_argument("--phase_temperature", type=float, default=1.0,
                        help="Temperature for phase attention: lower=sharper (0.1-0.5 for classification)")
 
+    # Pooling type for classification (principled fix for Phase attention)
+    parser.add_argument("--pool_type", type=str, default="mean",
+                       choices=["mean", "attention", "cls", "last"],
+                       help="Pooling type: mean (default), attention (sharp softmax pooler for classification)")
+
     # Logging
     parser.add_argument("--log_every", type=int, default=100,
                        help="Log every N steps")
@@ -1080,6 +1214,7 @@ def main():
         alpha_local=args.alpha_local,
         alpha_phase=args.alpha_phase,
         phase_temperature=args.phase_temperature,
+        pool_type=args.pool_type,
         log_every=args.log_every,
         eval_every=args.eval_every,
         checkpoint_dir=args.checkpoint_dir,
