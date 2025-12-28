@@ -596,16 +596,16 @@ def compute_loss_chunked(
     lambda_entropy: float = 0.01,
     lambda_coherence: float = 0.01,
     lambda_stability: float = 0.001,
-) -> Tuple[torch.Tensor, Dict[str, float]]:
+) -> Tuple[None, Dict[str, float]]:
     """
     Compute loss with STREAMING chunked forward pass for ultra-long sequences (10M+ tokens).
 
-    Key innovation: Phase contexts are accumulated across chunks, giving each chunk
-    access to the global phase mean from ALL previous tokens. This maintains true
-    10M+ token context while fitting in limited GPU memory.
+    Key innovations:
+    1. Phase contexts accumulated across chunks for true global context
+    2. Per-chunk backward passes (like gradient accumulation) to avoid OOM
+    3. Memory stays O(chunk_size) regardless of total sequence length
 
-    Memory: O(chunk_size) per forward pass
-    Context: Full sequence (accumulated phase statistics)
+    Returns None for loss (gradients already accumulated), metrics dict.
     """
     x, y = batch
     x = x.to(device)
@@ -614,9 +614,10 @@ def compute_loss_chunked(
     B, N = x.shape
     num_chunks = (N + chunk_size - 1) // chunk_size
 
-    total_loss = torch.tensor(0.0, device=device, requires_grad=True)
+    total_loss = 0.0  # Track for metrics only (not tensor)
     total_tokens = 0
-    chunk_metrics = []
+    last_entropy = 0.0
+    last_coherence = 0.0
 
     # Initialize streaming phase contexts (empty list signals streaming mode)
     phase_contexts = []
@@ -629,61 +630,71 @@ def compute_loss_chunked(
         y_chunk = y[:, start:end]
 
         # Forward pass with streaming phase context
-        # Each chunk sees accumulated phase stats from all previous chunks
         output = model(
             x_chunk,
             return_hidden=True,
-            phase_contexts=phase_contexts,  # Pass accumulated contexts
-            position_offset=start,          # Correct positional encoding
+            phase_contexts=phase_contexts,
+            position_offset=start,
         )
 
         logits = output['logits']
         hidden_states = output.get('hidden_states', [])
 
-        # Update phase contexts for next chunk (streaming accumulation)
-        phase_contexts = output.get('phase_contexts', [])
+        # Update phase contexts for next chunk - DETACH to break gradient chain
+        new_contexts = output.get('phase_contexts', [])
+        phase_contexts = []
+        for ctx in new_contexts:
+            detached_ctx = {}
+            for k, v in ctx.items():
+                if isinstance(v, torch.Tensor):
+                    detached_ctx[k] = v.detach()
+                else:
+                    detached_ctx[k] = v
+            phase_contexts.append(detached_ctx)
 
-        # Compute task loss for this chunk
+        # Compute chunk loss
         B_c, N_c, V = logits.shape
+        chunk_tokens = B_c * N_c
         chunk_loss = F.cross_entropy(
             logits.view(B_c * N_c, V),
             y_chunk.view(B_c * N_c),
             ignore_index=-100,
-            reduction='sum'
+            reduction='mean'
         )
 
-        # Accumulate (we'll normalize later)
-        total_loss = total_loss + chunk_loss
-        total_tokens += B_c * N_c
+        # Per-chunk backward - gradients accumulate (like gradient accumulation)
+        scaled_loss = chunk_loss / num_chunks
+        scaled_loss.backward()
 
-        # Collect metrics from last chunk
-        if i == num_chunks - 1:
+        # Track metrics (no grad)
+        total_loss += chunk_loss.item() * chunk_tokens
+        total_tokens += chunk_tokens
+
+        # Metrics from last chunk
+        if i == num_chunks - 1 and use_coherence_loss:
             with torch.no_grad():
-                chunk_metrics.append({
-                    "entropy": compute_semantic_entropy(logits).item() if use_coherence_loss else 0,
-                    "coherence": compute_layer_coherence(hidden_states).item() if hidden_states else 0,
-                })
+                last_entropy = compute_semantic_entropy(logits).item()
+                last_coherence = compute_layer_coherence(hidden_states).item() if hidden_states else 0
 
-        # Clear intermediate tensors to free memory
-        del output, logits, hidden_states
+        # Free memory immediately
+        del output, logits, hidden_states, chunk_loss, scaled_loss
         if device.type == 'cuda':
             torch.cuda.empty_cache()
 
-    # Normalize loss by total tokens
-    avg_loss = total_loss / total_tokens
+    # Average loss for metrics
+    avg_loss = total_loss / total_tokens if total_tokens > 0 else 0.0
 
     metrics = {
-        "loss": avg_loss.item(),
-        "perplexity": torch.exp(avg_loss).item(),
+        "loss": avg_loss,
+        "perplexity": math.exp(avg_loss) if avg_loss < 20 else float('inf'),
         "num_chunks": num_chunks,
-        "streaming": True,  # Indicate streaming mode was used
+        "streaming": True,
+        "entropy": last_entropy,
+        "coherence": last_coherence,
     }
 
-    if chunk_metrics:
-        metrics["entropy"] = chunk_metrics[-1].get("entropy", 0)
-        metrics["coherence"] = chunk_metrics[-1].get("coherence", 0)
-
-    return avg_loss, metrics
+    # Return None - gradients already accumulated via per-chunk backward
+    return None, metrics
 
 
 def compute_loss(
@@ -825,6 +836,7 @@ def train_step(
     with autocast(device_type='cuda', enabled=use_amp, dtype=dtype):
         # Use chunked processing for ultra-long sequences
         if config.chunk_size > 0:
+            # Chunked mode: backward already done per-chunk, returns None for loss
             loss, metrics = compute_loss_chunked(
                 model, batch, device,
                 chunk_size=config.chunk_size,
@@ -833,6 +845,7 @@ def train_step(
                 lambda_coherence=config.lambda_coherence,
                 lambda_stability=config.lambda_stability,
             )
+            # loss is None - gradients already accumulated in compute_loss_chunked
         else:
             loss, metrics = compute_loss(
                 model, batch, device,
@@ -841,13 +854,13 @@ def train_step(
                 lambda_coherence=config.lambda_coherence,
                 lambda_stability=config.lambda_stability,
             )
-        loss = loss / config.gradient_accumulation
+            loss = loss / config.gradient_accumulation
 
-    # Backward pass
-    if scaler is not None:
-        scaler.scale(loss).backward()
-    else:
-        loss.backward()
+            # Backward pass (only for non-chunked mode)
+            if scaler is not None:
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
 
     # Gradient step (after accumulation)
     if (accumulation_step + 1) % config.gradient_accumulation == 0:
