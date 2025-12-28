@@ -470,11 +470,22 @@ class LRAClassifier(nn.Module):
             # Use embedding + layers directly
             B, N = x.shape
 
-            # Embedding
-            h = self.encoder.embed(x)
+            # Embedding (handle different naming conventions)
+            if hasattr(self.encoder, 'token_embed'):
+                h = self.encoder.token_embed(x)
+            elif hasattr(self.encoder, 'embed'):
+                h = self.encoder.embed(x)
+            else:
+                raise AttributeError("Encoder has no embed or token_embed attribute")
+
+            # Position embedding
             if hasattr(self.encoder, 'pos_embed'):
                 pos = torch.arange(N, device=x.device)
                 h = h + self.encoder.pos_embed(pos)
+
+            # Dropout
+            if hasattr(self.encoder, 'embed_dropout'):
+                h = self.encoder.embed_dropout(h)
 
             # Process through layers
             if hasattr(self.encoder, 'layers'):
@@ -522,7 +533,6 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
             ff_dim=ff_dim,
             max_seq_len=seq_len,
             dropout=config.dropout,
-            gradient_checkpointing=config.gradient_checkpointing,
         )
     elif config.model_type == "hybrid":
         encoder = HybridPhaseTransformer(
@@ -538,10 +548,18 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
             local_backend=config.local_backend,
             alpha_local=config.alpha_local,
             alpha_phase=config.alpha_phase,
-            gradient_checkpointing=config.gradient_checkpointing,
         )
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
+
+    # Enable gradient checkpointing after model creation
+    if config.gradient_checkpointing:
+        if hasattr(encoder, 'gradient_checkpointing_enable'):
+            encoder.gradient_checkpointing_enable()
+        else:
+            for module in encoder.modules():
+                if hasattr(module, 'gradient_checkpointing'):
+                    module.gradient_checkpointing = True
 
     model = LRAClassifier(
         encoder=encoder,
@@ -561,6 +579,12 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
 def train_lra(config: LRAConfig):
     """Main training loop for LRA."""
 
+    # Early banner
+    print(f"\n{'='*70}")
+    print("   LRA BENCHMARK TRAINING")
+    print("   Long Range Arena for Efficient Attention")
+    print(f"{'='*70}")
+
     torch.manual_seed(config.seed)
     np.random.seed(config.seed)
 
@@ -575,14 +599,18 @@ def train_lra(config: LRAConfig):
     seq_len = config.seq_len or task_info["seq_len"]
     vocab_size = task_info["vocab_size"]
 
-    print(f"\n{'='*70}")
-    print(f"   LRA BENCHMARK: {config.task.upper()}")
-    print(f"{'='*70}")
-    print(f"\n  Task: {task_info['description']}")
+    print(f"\n  Task: {config.task.upper()} - {task_info['description']}")
     print(f"  Sequence Length: {seq_len:,}")
-    print(f"  Model: {config.model_type.upper()}")
+    print(f"  Classes: {task_info['num_classes']}")
+    print(f"  Model Type: {config.model_type.upper()}")
+    print(f"  Model Size: {config.model_size}")
+    print(f"  Batch Size: {config.batch_size}")
+    print(f"  Max Steps: {config.max_steps:,}")
+    print(f"  Learning Rate: {config.learning_rate}")
     print(f"  Device: {device}")
     print(f"  Gradient Checkpointing: {config.gradient_checkpointing}")
+    print(f"  Mixed Precision: {config.mixed_precision}")
+    print()
 
     # Load data
     train_loader, val_loader, num_classes = load_lra_data(

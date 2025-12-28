@@ -302,7 +302,6 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             dropout=config.dropout,
             sync_steps=config.sync_steps,
             sync_lr=config.sync_lr,
-            gradient_checkpointing=config.gradient_checkpointing,
         )
 
     elif config.model_type == "hybrid":
@@ -319,11 +318,19 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             local_backend=config.local_backend,
             alpha_local=config.alpha_local,
             alpha_phase=config.alpha_phase,
-            gradient_checkpointing=config.gradient_checkpointing,
         )
 
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
+
+    # Enable gradient checkpointing after model creation
+    if config.gradient_checkpointing:
+        if hasattr(model, 'gradient_checkpointing_enable'):
+            model.gradient_checkpointing_enable()
+        else:
+            for module in model.modules():
+                if hasattr(module, 'gradient_checkpointing'):
+                    module.gradient_checkpointing = True
 
     return model.to(device)
 
@@ -524,8 +531,12 @@ def train(config: UnifiedTrainingConfig):
                 outputs = model(x)
                 loss, metrics = compute_ontological_loss(outputs, y, config)
             else:
-                # Phase or Hybrid
-                logits = model(x)
+                # Phase or Hybrid - handle both tensor and dict returns
+                output = model(x)
+                if isinstance(output, dict):
+                    logits = output.get('logits', output.get('output', output.get('last_hidden_state')))
+                else:
+                    logits = output
                 loss, metrics = compute_phase_loss(logits, y, config)
 
             # Scale for gradient accumulation
@@ -651,7 +662,12 @@ def evaluate(
                     outputs = model(x)
                     loss, metrics = compute_ontological_loss(outputs, y, config)
                 else:
-                    logits = model(x)
+                    # Phase or Hybrid - handle both tensor and dict returns
+                    output = model(x)
+                    if isinstance(output, dict):
+                        logits = output.get('logits', output.get('output', output.get('last_hidden_state')))
+                    else:
+                        logits = output
                     loss, metrics = compute_phase_loss(logits, y, config)
 
             total_loss += loss.item()
