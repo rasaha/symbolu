@@ -119,6 +119,7 @@ class LRAConfig:
 
     # Model
     model_type: str = "hybrid"  # phase, hybrid
+    num_refine: int = 1  # Iterative refinement passes per block
     model_size: str = "small"
     embed_dim: int = 256
     num_layers: int = 6
@@ -434,11 +435,13 @@ class LRAClassifier(nn.Module):
         num_classes: int,
         vocab_size: int,
         pool: str = "mean",  # mean, cls, last
+        num_refine: int = 1,  # Iterative refinement passes per block
     ):
         super().__init__()
         self.encoder = encoder
         self.pool = pool
         self.num_classes = num_classes
+        self.num_refine = num_refine
 
         # Replace embedding if vocab size differs
         if hasattr(encoder, 'embed'):
@@ -487,13 +490,15 @@ class LRAClassifier(nn.Module):
             if hasattr(self.encoder, 'embed_dropout'):
                 h = self.encoder.embed_dropout(h)
 
-            # Process through layers
+            # Process through layers with iterative refinement
             if hasattr(self.encoder, 'layers'):
                 for layer in self.encoder.layers:
-                    h = layer(h)
+                    for _ in range(self.num_refine):
+                        h = layer(h)
             elif hasattr(self.encoder, 'blocks'):
                 for block in self.encoder.blocks:
-                    h = block(h)
+                    for _ in range(self.num_refine):
+                        h = block(h)
 
             hidden = h  # [B, N, embed_dim]
 
@@ -567,6 +572,7 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
         num_classes=num_classes,
         vocab_size=vocab_size,
         pool="mean",
+        num_refine=config.num_refine,
     )
 
     return model.to(device)
@@ -842,6 +848,8 @@ def main():
     parser.add_argument("--model_type", type=str, default="hybrid",
                        choices=["phase", "hybrid"],
                        help="Model architecture")
+    parser.add_argument("--num_refine", type=int, default=1,
+                       help="Iterative refinement passes per block (2-3 for ListOps)")
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large"],
                        help="Model size preset")
