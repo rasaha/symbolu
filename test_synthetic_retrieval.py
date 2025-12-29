@@ -350,19 +350,25 @@ def check_answer(model, tokenizer, context: str, question: str, expected: str, d
 
     # Generate continuation
     with torch.no_grad():
-        # Get logits for next token prediction
-        outputs = model(input_tensor)
-
         # Generate a few tokens
         generated = []
         current_input = input_tensor
 
         for _ in range(len(expected) + 10):  # Generate slightly more than expected
-            outputs = model(current_input)
-            next_token_logits = outputs[:, -1, :]
-            next_token = torch.argmax(next_token_logits, dim=-1)
-            generated.append(next_token.item())
-            current_input = torch.cat([current_input, next_token.unsqueeze(0)], dim=1)
+            output = model(current_input)
+
+            # Handle dict output from model
+            if isinstance(output, dict):
+                logits = output.get('logits', output.get('output'))
+            else:
+                logits = output
+
+            next_token_logits = logits[0, -1, :]
+            next_token = torch.argmax(next_token_logits).item()
+            generated.append(next_token)
+
+            next_token_tensor = torch.tensor([[next_token]], device=device)
+            current_input = torch.cat([current_input, next_token_tensor], dim=1)
 
             # Stop if we've generated enough
             if len(generated) > len(expected) + 5:
