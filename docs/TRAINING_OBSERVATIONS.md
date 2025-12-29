@@ -2136,3 +2136,330 @@ b766550 feat: Add interleaved layer pattern and byte n-gram conv for LRA Text
 *Document updated: December 28, 2025*
 *Branch: claude/validate-phase-attention-d5pfX*
 *Repository: github.com/rasaha/symbolu*
+
+---
+
+## Session Update: December 29, 2025
+
+### The Retrieval Problem: Why 0% Needle Accuracy
+
+After validating O(n) memory scaling and achieving good PPL on WikiText, we tested the model's retrieval capability:
+
+| Test | Result | Expected |
+|------|--------|----------|
+| Needle in Haystack | **0% accuracy** | 0% at PPL ~120 |
+| Synthetic Retrieval (Key-Value) | **0% accuracy** | 0% at PPL ~120 |
+| Synthetic Retrieval (UUID) | **0% accuracy** | 0% at PPL ~120 |
+
+**Key Insight from Google's Analysis:**
+
+> "At Perplexity of 120, the model is still in the **N-gram phase.** It knows that 'The' usually follows 'at', but it hasn't yet learned to **preserve unique markers** (like UUIDs or keys) through its recurrent steps."
+
+The model outputs generic WikiText-style phrases (e.g., `'s , and the same y`) instead of retrieving specific information because:
+
+1. **WikiText trains local prediction, not retrieval**
+2. **Phase state "smears" unique tokens** without specific training
+3. **No training signal teaches: "When you see a question, search your state"**
+
+### Solution: Retrieval-Enriched Training (train_retrieval.py)
+
+Based on Google's recommendation, we implemented a hybrid training curriculum:
+
+| Stage | Data Mix | Goal |
+|-------|----------|------|
+| **Stage 1** (Previous) | 100% WikiText | Learn grammar, language structure |
+| **Stage 2** (New) | 90% WikiText + 10% Retrieval | Teach phase memory preservation |
+| **Stage 3** (Future) | 95% Long docs + 5% Retrieval | Refine precision at 128K context |
+
+### New Scripts Created
+
+#### 1. retrieval_dataset.py - Synthetic Retrieval Data Generator
+
+Generates training data with explicit retrieval tasks:
+
+```bash
+python retrieval_dataset.py --output retrieval_train.json --num_samples 10000
+```
+
+**Task Types Generated:**
+
+| Task | % | Description | Example |
+|------|---|-------------|---------|
+| `kv_single` | 35% | Single key-value retrieval | "The code for Project Alpha is XYZ123... What is the code?" |
+| `kv_multi` | 20% | Multiple keys, retrieve one | "Code for Alpha: X, Beta: Y, Gamma: Z... What's Beta's code?" |
+| `ordered_list` | 15% | Position in sequence | "Items: A, B, C, D... What is item 3?" |
+| `factual` | 15% | Fact recall | "Population of X reached Y in Z... What was the population?" |
+| `copy` | 15% | Simple copy task | "MEMORIZE: ABC123... What should you memorize?" |
+
+**Sample Output:**
+```
+Task distribution:
+  copy: 1525 (15.2%)
+  factual: 1555 (15.6%)
+  kv_multi: 1982 (19.8%)
+  kv_single: 3446 (34.5%)
+  ordered_list: 1492 (14.9%)
+
+Average context length: 892 words
+```
+
+#### 2. train_retrieval.py - Hybrid Training Wrapper
+
+Wraps `train.py` to inject retrieval samples at a configurable ratio:
+
+```bash
+python train_retrieval.py --model_type hybrid --model_size tiny \
+  --dataset wikitext103 --max_seq_len 131072 \
+  --retrieval_ratio 0.1 \
+  --resume checkpoints/best.pt \
+  [other train.py arguments]
+```
+
+**Key Arguments:**
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--retrieval_ratio` | 0.1 | Fraction of batches that are retrieval tasks |
+| `--retrieval_json` | retrieval_train.json | Path to generated retrieval data |
+
+**How It Works:**
+
+1. Parses `--retrieval_ratio` and `--retrieval_json` arguments
+2. Patches `train.py`'s `create_dataloaders()` function
+3. Replaces `TextDataset` with `HybridTextDataset`
+4. 90% of batches: normal WikiText chunks
+5. 10% of batches: retrieval Q&A formatted as training sequences
+6. Calls `train.train(config)` normally
+
+**HybridTextDataset Class:**
+
+```python
+class HybridTextDataset(Dataset):
+    def __getitem__(self, idx):
+        # Randomly decide: retrieval or language modeling?
+        if random.random() < self.retrieval_ratio:
+            return self._get_retrieval_sample()  # Q&A format
+        else:
+            return self._get_lm_sample(idx)      # WikiText chunk
+```
+
+#### 3. hybrid_dataloader.py - Standalone Hybrid Data Loader
+
+For custom integration without modifying train.py:
+
+```python
+from hybrid_dataloader import HybridIterableDataset, create_hybrid_dataloader
+
+# Create hybrid dataloader
+loader = create_hybrid_dataloader(
+    wikitext_dataset=wiki_dataset,
+    retrieval_json_path='retrieval_train.json',
+    tokenizer=tokenizer,
+    retrieval_ratio=0.1,
+)
+```
+
+### Memory Impact
+
+**No additional VRAM required.** The hybrid training uses the same tensor shapes:
+
+| Aspect | train.py | train_retrieval.py |
+|--------|----------|-------------------|
+| Model size | Same | Same |
+| Batch size | Same | Same |
+| Sequence length | Same | Same |
+| **VRAM usage** | **Same** | **Same** |
+
+The only difference is the *content* of the tokens, not the tensor dimensions.
+
+### Why This Helps Phase Attention
+
+Phase Attention compresses context into a fixed-size state. Without retrieval training:
+
+```
+WikiText training:
+  Input: "The quick brown fox jumps over the lazy dog..."
+  Model learns: P("jumps" | "fox") = high
+  Phase state: Generic language patterns
+
+With retrieval training:
+  Input: "The code for Alpha is XYZ123... Question: What is Alpha's code?"
+  Model learns: "XYZ123" should have HIGHER signal in phase state than filler
+  Phase state: Preserves unique markers
+```
+
+The retrieval tasks teach the model:
+1. **Some tokens are more important than others** (keys vs filler)
+2. **Questions trigger retrieval behavior** (not just next-word prediction)
+3. **Phase state must preserve specific information** (not just statistics)
+
+### Usage Commands
+
+```bash
+# Step 1: Generate retrieval data (one-time, CPU only)
+python retrieval_dataset.py --output retrieval_train.json --num_samples 10000
+
+# Step 2: Run hybrid training (resumes from checkpoint)
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export TOKENIZERS_PARALLELISM=false
+python -u train_retrieval.py --model_type hybrid --model_size tiny \
+  --dataset wikitext103 --max_seq_len 131072 \
+  --batch_size 1 --gradient_accumulation 4 \
+  --max_steps 10000 --use_coherence_loss \
+  --gradient_checkpointing --local_backend unfold \
+  --window_size 128 --warmup_steps 100 \
+  --log_every 10 --eval_every 50 \
+  --retrieval_ratio 0.1 \
+  --resume checkpoints/best.pt 2>&1 | tee -a train_hybrid_128k_tiny.log
+```
+
+### Warmup Steps Tuning
+
+The `--warmup_steps` parameter controls learning rate warmup during training:
+
+```
+Learning Rate Schedule:
+
+  LR |          ___________plateau___________
+     |         /
+     |        /
+     |       /  ← warmup period
+     |      /
+     |_____/
+     0    warmup_steps              max_steps
+```
+
+**What warmup_steps does:**
+- During warmup: LR linearly increases from 0 → target LR
+- After warmup: LR follows scheduler (cosine decay, etc.)
+- Purpose: Prevents unstable gradients at training start
+
+**Recommended values when resuming:**
+
+| Scenario | Warmup Steps | Reasoning |
+|----------|--------------|-----------|
+| Fresh training (from scratch) | 300-500 | Model needs gentle start |
+| Resume with same data | 100-200 | Model already stable |
+| Resume with NEW data (retrieval) | **50-100** | Want new signal to take effect quickly |
+
+**Why reduce warmup for retrieval training:**
+
+When resuming from a checkpoint (PPL ~120) to add retrieval:
+- Model weights are already "warmed up" from previous training
+- High warmup = low LR for first N steps = retrieval signal is weak
+- Low warmup = full LR sooner = retrieval patterns learned faster
+
+```bash
+# For retrieval training from existing checkpoint:
+--warmup_steps 50   # Aggressive - full LR at step 50
+--warmup_steps 100  # Moderate - full LR at step 100 (recommended)
+--warmup_steps 300  # Conservative - might be too slow for retrieval
+```
+
+**Example comparison:**
+
+| warmup_steps | Steps to full LR | Retrieval batches at full LR (first 1000 steps) |
+|--------------|------------------|------------------------------------------------|
+| 300 | 300 | ~70 (10% of 700 remaining steps) |
+| 100 | 100 | ~90 (10% of 900 remaining steps) |
+| 50 | 50 | ~95 (10% of 950 remaining steps) |
+
+**Recommendation:** Use `--warmup_steps 100` or `--warmup_steps 50` when resuming with retrieval data to maximize the learning signal from retrieval tasks.
+
+### Learning Rate Tuning
+
+The `--learning_rate` parameter can be increased for faster convergence, especially when:
+- GPU throughput is stable (consistent tok/s)
+- Training loss is decreasing smoothly
+- No gradient spikes or NaN values
+
+**Default vs Aggressive LR:**
+
+| Scenario | Learning Rate | Risk | Benefit |
+|----------|---------------|------|---------|
+| Conservative (default) | 1e-4 | Low | Stable but slow |
+| Moderate | 2e-4 | Medium | Faster convergence |
+| Aggressive | 3e-4 to 5e-4 | Higher | Much faster, may need tuning |
+
+**When to increase LR:**
+
+```bash
+# Default (safe)
+--learning_rate 1e-4
+
+# Faster convergence (recommended for stable training)
+--learning_rate 2e-4
+
+# Aggressive (monitor for instability)
+--learning_rate 3e-4
+```
+
+**Signs you can increase LR:**
+- Stable throughput (tok/s doesn't fluctuate wildly)
+- Loss decreasing smoothly without spikes
+- Coherence staying above 0.9
+- Entropy stable (not spiking)
+
+**Signs LR is too high:**
+- Loss spikes or goes to NaN
+- Coherence drops suddenly
+- Entropy becomes unstable
+- Training diverges
+
+**Combined recommendation for retrieval training:**
+
+```bash
+# Optimized for fast retrieval learning from checkpoint:
+python -u train_retrieval.py --model_type hybrid --model_size tiny \
+  --dataset wikitext103 --max_seq_len 131072 \
+  --batch_size 1 --gradient_accumulation 4 \
+  --max_steps 10000 --use_coherence_loss \
+  --gradient_checkpointing --local_backend unfold \
+  --window_size 128 \
+  --warmup_steps 50 \
+  --learning_rate 2e-4 \
+  --log_every 10 --eval_every 50 \
+  --retrieval_ratio 0.1 \
+  --resume checkpoints/best.pt
+```
+
+**Key changes from default:**
+| Parameter | Default | Optimized | Effect |
+|-----------|---------|-----------|--------|
+| `--warmup_steps` | 300 | 50 | Full LR at step 50 |
+| `--learning_rate` | 1e-4 | 2e-4 | 2x faster weight updates |
+| Combined | - | - | ~4x faster effective learning |
+
+### Expected Outcomes
+
+After hybrid training with retrieval tasks:
+
+| Metric | Before (Pure WikiText) | After (Hybrid) | Target |
+|--------|------------------------|----------------|--------|
+| Val PPL | ~120 | <50 | <30 |
+| Needle Accuracy | 0% | 30-60% | >80% |
+| Key-Value Retrieval | 0% | 40-70% | >85% |
+| UUID Passkey | 0% | 20-50% | >70% |
+
+### Files Added
+
+| File | Purpose |
+|------|---------|
+| `retrieval_dataset.py` | Generate synthetic retrieval training data |
+| `train_retrieval.py` | Wrapper for hybrid LM + retrieval training |
+| `hybrid_dataloader.py` | Standalone hybrid data loader class |
+| `test_synthetic_retrieval.py` | Test retrieval accuracy on checkpoints |
+
+### Commits
+
+```
+56958d6 fix: Call train.parse_args() and train.train() instead of train.main()
+b8b3196 feat: Add train_retrieval.py for hybrid LM + retrieval training
+a8343b5 feat: Add Retrieval-Enriched training dataset generator for Phase Attention warm-up
+```
+
+---
+
+*Document updated: December 29, 2025*
+*Branch: claude/validate-phase-attention-d5pfX*
+*Repository: github.com/rasaha/symbolu*
