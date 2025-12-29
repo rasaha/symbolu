@@ -1227,6 +1227,45 @@ class PhaseTransformer(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
+    def forward_hidden(
+        self,
+        input_ids: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Forward pass returning hidden states BEFORE LM head.
+
+        Use this for memory-efficient training with chunked LM head processing.
+        For 5M+ context, calling lm_head on full hidden creates 1TB+ tensor.
+        Instead, process lm_head in chunks during loss computation.
+
+        Args:
+            input_ids: [B, N] token indices
+
+        Returns:
+            hidden: [B, N, embed_dim] - final hidden states before LM head
+        """
+        B, N = input_ids.shape
+
+        # Embeddings
+        positions = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.token_embed(input_ids) + self.pos_embed(positions)
+        x = self.embed_dropout(x)
+
+        # Transformer blocks
+        for block in self.blocks:
+            if self.gradient_checkpointing and self.training:
+                x = checkpoint(
+                    block,
+                    x,
+                    True,  # causal_mask
+                    use_reentrant=False,
+                )
+            else:
+                x = block(x, causal_mask=True)
+
+        # Return normalized hidden states (before LM head)
+        return self.norm(x)
+
     def forward(
         self,
         input_ids: torch.Tensor,
@@ -1429,6 +1468,45 @@ class HybridPhaseTransformer(nn.Module):
                 torch.nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+
+    def forward_hidden(
+        self,
+        input_ids: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Forward pass returning hidden states BEFORE LM head.
+
+        Use this for memory-efficient training with chunked LM head processing.
+        For 5M+ context, calling lm_head on full hidden creates 1TB+ tensor.
+        Instead, process lm_head in chunks during loss computation.
+
+        Args:
+            input_ids: [B, N] token indices
+
+        Returns:
+            hidden: [B, N, embed_dim] - final hidden states before LM head
+        """
+        B, N = input_ids.shape
+
+        # Embeddings
+        positions = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.token_embed(input_ids) + self.pos_embed(positions)
+        x = self.embed_dropout(x)
+
+        # Transformer blocks
+        for block in self.blocks:
+            if self.gradient_checkpointing and self.training:
+                x = checkpoint(
+                    block,
+                    x,
+                    True,  # causal_mask
+                    use_reentrant=False,
+                )
+            else:
+                x = block(x, causal_mask=True)
+
+        # Return normalized hidden states (before LM head)
+        return self.norm(x)
 
     def forward(
         self,
