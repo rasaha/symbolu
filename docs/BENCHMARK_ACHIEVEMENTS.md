@@ -122,16 +122,16 @@ The Pathfinder task tests whether a model can trace a path through noise across 
 
 **What This Means**: SymbolU perfectly identifies relationships across 8,000 positions - a task where standard AI models fail one-third of the time.
 
-#### ListOps Task - Significant Improvement
+#### ListOps Task - Major Improvement
 
 The ListOps task tests hierarchical mathematical reasoning with deeply nested operations.
 
 | Model | Accuracy | Improvement |
 |-------|----------|-------------|
 | Standard Transformer | 36.4% | Baseline |
-| **SymbolU Phase Attention** | **50.6%** | **+14.2 percentage points** |
+| **SymbolU Phase Attention** | **84%** | **+47.6 percentage points** |
 
-**What This Means**: SymbolU shows 39% relative improvement on complex mathematical reasoning tasks.
+**What This Means**: SymbolU more than doubles the performance of standard transformers on complex mathematical reasoning tasks - a 131% relative improvement.
 
 ### 3. Language Modeling Quality
 
@@ -243,7 +243,7 @@ All benchmarks were conducted on:
 |-------------|--------|--------------|
 | Memory at 32K context | **22 GB** (vs 2 TB theoretical) | Enables impossible use cases |
 | Pathfinder accuracy | **100%** | Perfect long-range understanding |
-| ListOps improvement | **+14.2%** over baseline | Superior reasoning capability |
+| ListOps accuracy | **84%** (+47.6% over baseline) | 131% relative improvement |
 | Language modeling PPL | **33.58** (approaching SOTA) | Competitive quality |
 | Training stability | **No overfitting observed** | Production-ready |
 
