@@ -34,7 +34,112 @@ Components:
 - cognitive_state.py: CognitiveState dataclass and operations
 - phoneme_encoder.py: Text → phoneme energy distribution
 - ontology_mapper.py: Phonemes → Bhava state position
+- token_decoder.py: CognitiveState → constrained token projection
 - ontological_trainer.py: Training loop for Tier 3
+
+Usage:
+------
+    from symbolu.experimental import (
+        CognitiveState,
+        StateDelta,
+        StateProjector,
+        OntologicalDeltaPredictor,
+        PhonemeEncoder,
+        OntologyMapper,
+        OntologicalPerception,
+        ConstrainedTokenDecoder,
+        OntologicalGenerator,
+        train_ontological,
+    )
+
+    # Create perception pipeline
+    perception = OntologicalPerception(embed_dim=768)
+
+    # Get cognitive states from hidden
+    output = perception(hidden_states)
+    cognitive_states = output['full_state']  # [B, T, 124]
+
+    # Train on state deltas (NOT tokens!)
+    predictor = OntologicalDeltaPredictor(state_dim=124)
+    loss, metrics = predictor.compute_loss(cognitive_states)
+
+    # Decode to tokens only when needed
+    decoder = ConstrainedTokenDecoder(state_dim=124, vocab_size=50257)
+    tokens, probs = decoder.sample(cognitive_states[:, -1])
 """
 
-from .cognitive_state import CognitiveState, StateDelta
+# Core state representations
+from .cognitive_state import (
+    CognitiveState,
+    StateDelta,
+    StateProjector,
+    OntologicalDeltaPredictor,
+    ConstraintMaskGenerator,
+)
+
+# Phoneme processing
+from .phoneme_encoder import (
+    PhonemeEncoder,
+    PhonemeDecoder,
+    PhonotacticChecker,
+    IPA_PHONEMES,
+    NUM_PHONEMES,
+    simple_g2p,
+)
+
+# Ontology mapping
+from .ontology_mapper import (
+    OntologyMapper,
+    OntologicalPerception,
+    RhetoricalMarkerDetector,
+    BhavaState,
+    NUM_BHAVA_STATES,
+    BHAVA_TO_IDX,
+    IDX_TO_BHAVA,
+)
+
+# Token decoding
+from .token_decoder import (
+    ConstrainedTokenDecoder,
+    OntologicalGenerator,
+)
+
+# Training
+from .ontological_trainer import (
+    OntologicalTrainingConfig,
+    OntologicalTransformer,
+    train_ontological,
+    compute_ontological_loss,
+)
+
+__all__ = [
+    # Core
+    'CognitiveState',
+    'StateDelta',
+    'StateProjector',
+    'OntologicalDeltaPredictor',
+    'ConstraintMaskGenerator',
+    # Phoneme
+    'PhonemeEncoder',
+    'PhonemeDecoder',
+    'PhonotacticChecker',
+    'IPA_PHONEMES',
+    'NUM_PHONEMES',
+    'simple_g2p',
+    # Ontology
+    'OntologyMapper',
+    'OntologicalPerception',
+    'RhetoricalMarkerDetector',
+    'BhavaState',
+    'NUM_BHAVA_STATES',
+    'BHAVA_TO_IDX',
+    'IDX_TO_BHAVA',
+    # Decoder
+    'ConstrainedTokenDecoder',
+    'OntologicalGenerator',
+    # Training
+    'OntologicalTrainingConfig',
+    'OntologicalTransformer',
+    'train_ontological',
+    'compute_ontological_loss',
+]
