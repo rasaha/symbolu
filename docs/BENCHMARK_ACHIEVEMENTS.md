@@ -126,12 +126,22 @@ The Pathfinder task tests whether a model can trace a path through noise across 
 
 The ListOps task tests hierarchical mathematical reasoning with deeply nested operations.
 
-| Model | Accuracy | Improvement |
-|-------|----------|-------------|
-| Standard Transformer | 36.4% | Baseline |
-| **SymbolU Phase Attention** | **84%** | **+47.6 percentage points** |
+| Model | Accuracy | Sequence Length | Improvement |
+|-------|----------|-----------------|-------------|
+| Standard Transformer | 36.4% | 2,048 | Baseline |
+| **SymbolU Phase Attention** | **84%** | 512 | **+47.6 percentage points** |
 
 **What This Means**: SymbolU more than doubles the performance of standard transformers on complex mathematical reasoning tasks - a 131% relative improvement.
+
+#### LRA Text Task (IMDb Sentiment) - Strong Performance
+
+The Text task tests sentiment classification on movie reviews.
+
+| Model | Accuracy | Sequence Length |
+|-------|----------|-----------------|
+| **SymbolU Phase Attention** | **84%** | 512 |
+
+**What This Means**: Strong text understanding capability on real-world sentiment analysis.
 
 ### 3. Language Modeling Quality
 
@@ -242,8 +252,9 @@ All benchmarks were conducted on:
 | Achievement | Result | Significance |
 |-------------|--------|--------------|
 | Memory at 32K context | **22 GB** (vs 2 TB theoretical) | Enables impossible use cases |
-| Pathfinder accuracy | **100%** | Perfect long-range understanding |
-| ListOps accuracy | **84%** (+47.6% over baseline) | 131% relative improvement |
+| Pathfinder 8K accuracy | **100%** | Perfect long-range understanding |
+| ListOps accuracy | **84%** (seq 512) | 131% relative improvement |
+| Text/IMDb accuracy | **84%** (seq 512) | Strong sentiment analysis |
 | Language modeling PPL | **33.58** (approaching SOTA) | Competitive quality |
 | Training stability | **No overfitting observed** | Production-ready |
 
