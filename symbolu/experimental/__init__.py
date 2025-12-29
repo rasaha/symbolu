@@ -134,6 +134,14 @@ from .unified_symbolu12 import (
     create_unified_symbolu12,
 )
 
+# Hybrid RAG (Token + State-Delta fusion)
+from .hybrid_rag_integration import (
+    HybridRAGConfig,
+    HybridRAGEngine,
+    FusionMode,
+    create_hybrid_engine,
+)
+
 __all__ = [
     # Core
     'CognitiveState',
@@ -179,4 +187,9 @@ __all__ = [
     'VrittiOntologyCoupling',
     'UnifiedSymbolU12Complete',
     'create_unified_symbolu12',
+    # Hybrid RAG (Token + State-Delta fusion)
+    'HybridRAGConfig',
+    'HybridRAGEngine',
+    'FusionMode',
+    'create_hybrid_engine',
 ]
