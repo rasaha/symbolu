@@ -37,6 +37,19 @@ Why Hybrid?
 - Token RAG: Fast, good for exact matches, keyword recall
 - State-Delta: Slower, but captures MEANING structure
 
+Holographic Retrieval (Dynamic Alpha):
+--------------------------------------
+Uses query ENTROPY to dynamically weight between retrieval methods:
+
+| Scenario          | Entropy | Strategy                        |
+|-------------------|---------|--------------------------------|
+| Specific/Technical| LOW     | Token RAG (80%) - exact match  |
+| Exploratory/Vague | HIGH    | State-Delta (80%) - meaning    |
+
+This handles two critical edge cases:
+1. "Proper Noun Problem": "Jijñāsā" or "ATP-12345" → Token finds exact
+2. "Conceptual Gap Problem": "metabolism" finds "ATP synthesis" → State-Delta
+
 Example:
   Query: "How do proteins fold?"
 
@@ -102,6 +115,7 @@ class FusionMode(Enum):
     WEIGHTED_AVERAGE = "weighted_avg"  # Weighted combination
     RECIPROCAL_RANK = "rrf"            # Reciprocal Rank Fusion
     RERANKING = "rerank"               # Use State-Delta to rerank Token results
+    DYNAMIC_ALPHA = "dynamic_alpha"    # Entropy-adaptive fusion (holographic)
 
 
 @dataclass
@@ -135,6 +149,16 @@ class HybridRAGConfig:
 
     # Minimum score threshold
     min_score: float = 0.0
+
+    # Dynamic Alpha (Entropy-Adaptive) parameters
+    # When entropy is LOW (specific/technical) → favor Token RAG
+    # When entropy is HIGH (exploratory/vague) → favor State-Delta RAG
+    entropy_low_threshold: float = 0.3   # Below this = specific query
+    entropy_high_threshold: float = 0.7  # Above this = exploratory query
+    token_weight_at_low_entropy: float = 0.8   # Favor exact matches
+    state_weight_at_low_entropy: float = 0.2
+    token_weight_at_high_entropy: float = 0.2  # Favor meaning matches
+    state_weight_at_high_entropy: float = 0.8
 
     def validate(self):
         """Validate configuration."""
@@ -195,6 +219,9 @@ class HybridRAGEngine:
         # Source text cache (trajectory_id -> original text)
         # Needed because StateTrajectory doesn't store full text
         self.source_text_cache: Dict[str, str] = {}
+
+        # Query entropy (for Dynamic Alpha fusion)
+        self._current_query_entropy: float = 0.5  # Default mid-range
 
     def index_corpus(
         self,
@@ -379,6 +406,12 @@ class HybridRAGEngine:
             hidden = self._text_to_hidden(query_text)
             query_state = self._project_state(hidden)
 
+        # Extract query entropy for Dynamic Alpha fusion
+        if query_state is not None:
+            self._current_query_entropy = self._extract_entropy(query_state)
+        else:
+            self._current_query_entropy = 0.5  # Default mid-range
+
         # Get results from both methods
         if self.config.mode == FusionMode.TOKEN_ONLY:
             return self._token_retrieval(query_text, corpus_id, top_k)
@@ -479,6 +512,67 @@ class HybridRAGEngine:
 
         return candidates
 
+    def _extract_entropy(self, state: torch.Tensor) -> float:
+        """
+        Extract entropy value from cognitive state.
+
+        Entropy indicates query certainty:
+        - LOW entropy (< 0.3): Specific/technical query → favor Token RAG
+        - HIGH entropy (> 0.7): Exploratory/vague query → favor State-Delta
+
+        Args:
+            state: [state_dim] cognitive state tensor
+
+        Returns:
+            Entropy value in [0, 1]
+        """
+        # Layout: phoneme[44] + topic[64] + ontology[12] + dynamics[4]
+        # dynamics = [coherence, entropy, confidence, momentum]
+        entropy_idx = 44 + 64 + 12 + 1  # Index of entropy in dynamics
+        if state.dim() == 1 and state.size(0) > entropy_idx:
+            entropy = state[entropy_idx].item()
+            return max(0.0, min(1.0, entropy))  # Clamp to [0, 1]
+        return 0.5  # Default mid-range
+
+    def _compute_dynamic_weights(self, entropy: float) -> Tuple[float, float]:
+        """
+        Compute token/state weights based on query entropy.
+
+        This is the "Dynamic Alpha" from holographic retrieval:
+        - Low entropy queries (specific) → weight Token RAG higher
+        - High entropy queries (vague) → weight State-Delta higher
+
+        Args:
+            entropy: Query entropy in [0, 1]
+
+        Returns:
+            (token_weight, state_weight) tuple summing to 1.0
+        """
+        low_thresh = self.config.entropy_low_threshold
+        high_thresh = self.config.entropy_high_threshold
+
+        if entropy <= low_thresh:
+            # Specific query → favor exact matches
+            return (
+                self.config.token_weight_at_low_entropy,
+                self.config.state_weight_at_low_entropy,
+            )
+        elif entropy >= high_thresh:
+            # Exploratory query → favor meaning matches
+            return (
+                self.config.token_weight_at_high_entropy,
+                self.config.state_weight_at_high_entropy,
+            )
+        else:
+            # Interpolate between thresholds
+            t = (entropy - low_thresh) / (high_thresh - low_thresh)
+            token_w = (
+                (1 - t) * self.config.token_weight_at_low_entropy +
+                t * self.config.token_weight_at_high_entropy
+            )
+            state_w = 1.0 - token_w
+            return (token_w, state_w)
+
     def _fuse_results(
         self,
         token_results: List[CandidateEntry],
@@ -492,6 +586,8 @@ class HybridRAGEngine:
             return self._rrf_fusion(token_results, state_results, top_k)
         elif self.config.mode == FusionMode.RERANKING:
             return self._reranking_fusion(token_results, state_results, top_k)
+        elif self.config.mode == FusionMode.DYNAMIC_ALPHA:
+            return self._dynamic_alpha_fusion(token_results, state_results, top_k)
         else:
             return token_results[:top_k]
 
@@ -616,6 +712,83 @@ class HybridRAGEngine:
         token_results.sort(key=lambda x: x.score, reverse=True)
         return token_results[:top_k]
 
+    def _dynamic_alpha_fusion(
+        self,
+        token_results: List[CandidateEntry],
+        state_results: List[CandidateEntry],
+        top_k: int,
+    ) -> List[CandidateEntry]:
+        """
+        Entropy-Adaptive Fusion: "Holographic Retrieval"
+
+        Uses query entropy to dynamically weight between Token and State-Delta:
+        - LOW entropy (specific query like "Jijñāsā" or "ATP-12345")
+          → Weight Token RAG higher (80/20) - exact matches matter
+        - HIGH entropy (vague query like "how does metabolism work?")
+          → Weight State-Delta higher (20/80) - meaning/trajectory matters
+
+        This handles the two hardest edge cases:
+        1. "Proper Noun Problem": Specific terms found via Token RAG
+        2. "Conceptual Gap Problem": Related concepts found via State-Delta
+
+        Returns combined results with adaptive weights.
+        """
+        # Get dynamic weights based on query entropy
+        token_weight, state_weight = self._compute_dynamic_weights(
+            self._current_query_entropy
+        )
+
+        # Normalize scores if needed
+        if self.config.normalize_scores:
+            token_results = self._normalize_scores(token_results)
+            state_results = self._normalize_scores(state_results)
+
+        # Build text -> scores mapping
+        combined: Dict[str, Dict[str, Any]] = {}
+
+        for entry in token_results:
+            key = entry.text[:100]
+            combined[key] = {
+                'entry': entry,
+                'token_score': entry.score,
+                'state_score': 0.0,
+            }
+
+        for entry in state_results:
+            key = entry.text[:100]
+            if key in combined:
+                combined[key]['state_score'] = entry.score
+            else:
+                combined[key] = {
+                    'entry': entry,
+                    'token_score': 0.0,
+                    'state_score': entry.score,
+                }
+
+        # Compute dynamically weighted scores
+        results = []
+        for key, data in combined.items():
+            fused_score = (
+                token_weight * data['token_score'] +
+                state_weight * data['state_score']
+            )
+
+            if fused_score >= self.config.min_score:
+                entry = data['entry']
+                # Update metadata with dynamic alpha info
+                entry.metadata['fusion_type'] = 'dynamic_alpha'
+                entry.metadata['query_entropy'] = self._current_query_entropy
+                entry.metadata['dynamic_token_weight'] = token_weight
+                entry.metadata['dynamic_state_weight'] = state_weight
+                entry.metadata['token_score'] = data['token_score']
+                entry.metadata['state_score'] = data['state_score']
+                entry.score = fused_score
+                results.append(entry)
+
+        # Sort and return top_k
+        results.sort(key=lambda x: x.score, reverse=True)
+        return results[:top_k]
+
     def _normalize_scores(
         self,
         entries: List[CandidateEntry],
@@ -653,6 +826,20 @@ class HybridRAGEngine:
             lines.append(f"  Token Score: {entry.metadata['token_score']:.4f}")
         if 'state_score' in entry.metadata:
             lines.append(f"  State Score: {entry.metadata['state_score']:.4f}")
+
+        # Dynamic Alpha specific info
+        if fusion_type == 'dynamic_alpha':
+            entropy = entry.metadata.get('query_entropy', 0.5)
+            token_w = entry.metadata.get('dynamic_token_weight', 0.5)
+            state_w = entry.metadata.get('dynamic_state_weight', 0.5)
+            lines.append(f"\nDynamic Alpha (Holographic):")
+            lines.append(f"  Query Entropy: {entropy:.3f}")
+            if entropy < 0.3:
+                lines.append(f"  Strategy: SPECIFIC → Token-weighted ({token_w:.0%}/{state_w:.0%})")
+            elif entropy > 0.7:
+                lines.append(f"  Strategy: EXPLORATORY → State-weighted ({token_w:.0%}/{state_w:.0%})")
+            else:
+                lines.append(f"  Strategy: BALANCED → Interpolated ({token_w:.0%}/{state_w:.0%})")
 
         if retrieval_type == 'state_delta':
             lines.append(f"\nState-Delta Matching:")
