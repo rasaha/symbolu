@@ -286,7 +286,19 @@ class SyntheticRetrievalTest:
 
 def load_model(checkpoint_path: str, model_size: str, max_context: int, device: str):
     """Load model from checkpoint."""
+    import os
     preset = MODEL_PRESETS[model_size]
+
+    # Check for config file to get correct max_seq_len
+    config_path = os.path.join(os.path.dirname(checkpoint_path), "config.json")
+    checkpoint_max_seq_len = 131072  # Default for this checkpoint
+    if os.path.exists(config_path):
+        import json
+        with open(config_path) as f:
+            ckpt_config = json.load(f)
+            checkpoint_max_seq_len = ckpt_config.get("max_seq_len", 131072)
+
+    print(f"Using max_seq_len={checkpoint_max_seq_len} from checkpoint config")
 
     # Try hybrid first, fall back to phase
     try:
@@ -296,7 +308,7 @@ def load_model(checkpoint_path: str, model_size: str, max_context: int, device: 
             num_layers=preset["num_layers"],
             num_heads=preset["num_heads"],
             ff_dim=preset["ff_dim"],
-            max_seq_len=max_context + 1024,
+            max_seq_len=checkpoint_max_seq_len,
             dropout=0.0,
             local_layers=2,
             window_size=128,
@@ -310,7 +322,7 @@ def load_model(checkpoint_path: str, model_size: str, max_context: int, device: 
             num_layers=preset["num_layers"],
             num_heads=preset["num_heads"],
             ff_dim=preset["ff_dim"],
-            max_seq_len=max_context + 1024,
+            max_seq_len=checkpoint_max_seq_len,
             dropout=0.0,
         )
 
