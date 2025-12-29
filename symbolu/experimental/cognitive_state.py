@@ -364,6 +364,94 @@ class StateProjector(nn.Module):
     def state_dim(self) -> int:
         return self.num_phonemes + self.topic_dim + self.num_ontology + 4
 
+    def forward_dict(self, hidden: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """
+        Project to dictionary format (matches Google's CognitiveStateProjector).
+
+        Args:
+            hidden: [B, T, hidden_dim] or [B, hidden_dim]
+
+        Returns:
+            Dict with topic, ontology, entropy (computed from ontology)
+        """
+        phoneme = self.phoneme_proj(hidden)
+        topic = self.topic_proj(hidden)
+        ontology = self.ontology_proj(hidden)
+        dynamics = self.dynamics_proj(hidden)
+
+        # Compute entropy from ontology distribution (Google's approach)
+        entropy = -torch.sum(ontology * torch.log(ontology + 1e-9), dim=-1)
+
+        return {
+            "phoneme": phoneme,
+            "topic": F.normalize(topic, p=2, dim=-1),  # L2 normalized
+            "ontology": ontology,
+            "entropy": entropy,
+            "dynamics": dynamics,
+            "full_state": torch.cat([phoneme, topic, ontology, dynamics], dim=-1),
+        }
+
+
+class CognitiveStateProjectorLite(nn.Module):
+    """
+    Lightweight state projector matching Google's suggested interface.
+
+    This is a minimal version for quick experimentation:
+    - 64-dim topic (L2 normalized)
+    - 12-dim ontology (softmax)
+    - 1-dim entropy (computed from ontology)
+
+    Total: 77 dims (vs 124 for full StateProjector)
+
+    Use this for:
+    - Quick prototyping
+    - Memory-constrained environments
+    - When phoneme layer isn't needed
+
+    Use full StateProjector for:
+    - Cross-lingual applications
+    - Phonotactic constraints
+    - Maximum interpretability
+    """
+
+    def __init__(self, d_model: int, topic_dim: int = 64, num_ontology: int = 12):
+        super().__init__()
+        self.d_model = d_model
+        self.topic_dim = topic_dim
+        self.num_ontology = num_ontology
+
+        # Projects d_model into the 64-dim Topic Space
+        self.topic_proj = nn.Linear(d_model, topic_dim)
+        # Projects d_model into the 12-dim Bhava/Ontology Space
+        self.ontology_proj = nn.Linear(d_model, num_ontology)
+
+    def forward(self, h_t: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """
+        Project hidden state to cognitive components.
+
+        Args:
+            h_t: [B, T, d_model] or [B, d_model]
+
+        Returns:
+            Dict with topic[64], ontology[12], entropy[1]
+        """
+        topic = F.normalize(self.topic_proj(h_t), p=2, dim=-1)
+        # Softmax gives us the probability distribution over 12 states
+        ontology = F.softmax(self.ontology_proj(h_t), dim=-1)
+
+        # Entropy of the ontology distribution indicates 'certainty'
+        entropy = -torch.sum(ontology * torch.log(ontology + 1e-9), dim=-1)
+
+        return {
+            "topic": topic,
+            "ontology": ontology,
+            "entropy": entropy,
+        }
+
+    @property
+    def state_dim(self) -> int:
+        return self.topic_dim + self.num_ontology + 1  # topic + ontology + entropy
+
 
 # =============================================================================
 # ONTOLOGICAL STATE DELTA PREDICTOR

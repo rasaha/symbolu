@@ -74,6 +74,7 @@ from .cognitive_state import (
     CognitiveState,
     StateDelta,
     StateProjector,
+    CognitiveStateProjectorLite,  # Lightweight version (Google's interface)
     OntologicalDeltaPredictor,
     ConstraintMaskGenerator,
 )
@@ -127,6 +128,7 @@ __all__ = [
     'CognitiveState',
     'StateDelta',
     'StateProjector',
+    'CognitiveStateProjectorLite',
     'OntologicalDeltaPredictor',
     'ConstraintMaskGenerator',
     # Phoneme
