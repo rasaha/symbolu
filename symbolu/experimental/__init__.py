@@ -134,6 +134,26 @@ from .unified_symbolu12 import (
     create_unified_symbolu12,
 )
 
+# Hybrid RAG (Token + State-Delta fusion)
+from .hybrid_rag_integration import (
+    HybridRAGConfig,
+    HybridRAGEngine,
+    FusionMode,
+    create_hybrid_engine,
+)
+
+# Cognitive Loss (Chitta Gradient) - Interpretable RLHF
+from .cognitive_loss import (
+    CognitiveLossFunction,
+    DHAValidator,
+    CognitiveDiagnosis,
+    DiagnosisType,
+    create_cognitive_loss,
+    diagnose_generation,
+    BHAVA_TO_IDEAL_VRITTI,
+    HEALTHY_TRANSITIONS,
+)
+
 __all__ = [
     # Core
     'CognitiveState',
@@ -179,4 +199,18 @@ __all__ = [
     'VrittiOntologyCoupling',
     'UnifiedSymbolU12Complete',
     'create_unified_symbolu12',
+    # Hybrid RAG (Token + State-Delta fusion)
+    'HybridRAGConfig',
+    'HybridRAGEngine',
+    'FusionMode',
+    'create_hybrid_engine',
+    # Cognitive Loss (Chitta Gradient) - Interpretable RLHF
+    'CognitiveLossFunction',
+    'DHAValidator',
+    'CognitiveDiagnosis',
+    'DiagnosisType',
+    'create_cognitive_loss',
+    'diagnose_generation',
+    'BHAVA_TO_IDEAL_VRITTI',
+    'HEALTHY_TRANSITIONS',
 ]

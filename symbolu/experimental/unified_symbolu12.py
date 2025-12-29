@@ -477,41 +477,79 @@ class VrittiModulatedAttention(nn.Module):
 
 class VrittiOntologyCoupling(nn.Module):
     """
-    The R[v,a] coupling matrix: maps 5 Vṛttis to 12 Ontological aspects.
+    The R[v,a] coupling matrix: SPARSE mapping from 5 Vṛttis to 12 Bhavas.
 
-    This learns which "Mental Ripples" (Vṛttis) lead to which
-    "Ontological States" (Bhavas).
+    Key insight: Not all Vṛttis couple to all Bhavas equally.
+    The mapping is SPARSE with natural affinities:
 
-    From v2.8 spec, the semantic basis:
-    - Pramāṇa → Intellect (ANALYTICAL): Valid cognition activates analysis
-    - Viparyaya → Ego (EVALUATIVE): Misperception activates judgment
-    - Vikalpa → Mind (NARRATIVE): Conceptual branching activates story
-    - Smṛti → Soul (CERTAIN): Memory persistence activates certainty
-    - Nidrā → Body/Brahman: Dormancy activates physical or transcendent
+    Natural Bhava-Vritti Affinities:
+    --------------------------------
+    Pramāṇa (valid cognition):
+        → FACTUAL, CERTAIN, INSTRUCTIVE, ANALYTICAL
+        Grounded, verifiable knowledge states
+
+    Viparyaya (error/opposition):
+        → ARGUMENTATIVE, SPECULATIVE
+        Oppositional or uncertain reasoning
+
+    Vikalpa (branching/imagination):
+        → SPECULATIVE, QUESTIONING, NARRATIVE
+        Creative, exploratory cognition
+
+    Smṛti (memory/recall):
+        → NARRATIVE, FACTUAL, EVALUATIVE
+        Recall-based cognition
+
+    Nidrā (absence/dormancy):
+        → EMOTIVE, METALINGUISTIC
+        Detached from direct content
+
+    Matrix interpretation:
+    - High diagonality → Aligned, coherent understanding
+    - Dense off-diagonal → Complex multi-mode reasoning
+    - Sparse → Simple, focused cognition
     """
 
     def __init__(self, config: UnifiedSymbolU12Config):
         super().__init__()
         self.config = config
 
-        # Initialize R[v,a] with semantic priors
+        # Initialize R[v,a] with SPARSE semantic priors
         # Shape: [num_vritti=5, num_ontology=12]
-        init_matrix = torch.zeros(config.num_vritti, config.num_ontology)
+        #
+        # Natural Bhava-Vritti affinities (not all 5 map to all 12):
+        #
+        # Pramāṇa (valid cognition) → FACTUAL, ANALYTICAL, INSTRUCTIVE, CERTAIN
+        #   These are grounded, verifiable knowledge states
+        #
+        # Viparyaya (error/opposition) → ARGUMENTATIVE, SPECULATIVE
+        #   Opposition or uncertain reasoning
+        #
+        # Vikalpa (branching/imagination) → SPECULATIVE, QUESTIONING, NARRATIVE
+        #   Creative, exploratory cognition
+        #
+        # Smṛti (memory) → NARRATIVE, FACTUAL, EVALUATIVE
+        #   Recall-based cognition
+        #
+        # Nidrā (absence/dormancy) → EMOTIVE, METALINGUISTIC
+        #   Detached from direct content
+        #
+        # Bhava indices:
+        #   0=FACTUAL, 1=ANALYTICAL, 2=EVALUATIVE, 3=NARRATIVE
+        #   4=ARGUMENTATIVE, 5=INSTRUCTIVE, 6=CERTAIN, 7=SPECULATIVE
+        #   8=QUESTIONING, 9=EMOTIVE, 10=PERFORMATIVE, 11=METALINGUISTIC
 
-        # Semantic initialization based on v2.8 design
-        # Row = Vṛtti, Col = Bhava
         semantic_priors = torch.tensor([
-            # FACT ANAL EVAL NARR ARGU INST CERT SPEC QUES POSI NEGA NEUT
-            [0.7, 0.95, 0.5, 0.3, 0.6, 0.7, 0.8, 0.3, 0.4, 0.5, 0.3, 0.6],  # Pramāṇa
-            [0.5, 0.4, 0.90, 0.4, 0.7, 0.5, 0.3, 0.6, 0.5, 0.4, 0.7, 0.3],  # Viparyaya
-            [0.4, 0.7, 0.6, 0.85, 0.5, 0.6, 0.4, 0.7, 0.6, 0.6, 0.5, 0.4],  # Vikalpa
-            [0.6, 0.5, 0.4, 0.5, 0.4, 0.5, 0.80, 0.4, 0.3, 0.5, 0.4, 0.5],  # Smṛti
-            [0.3, 0.2, 0.3, 0.4, 0.2, 0.3, 0.3, 0.5, 0.2, 0.4, 0.5, 0.75],  # Nidrā
+            # FACT ANAL EVAL NARR ARGU INST CERT SPEC QUES EMOT PERF META
+            [0.9, 0.6, 0.2, 0.1, 0.1, 0.8, 0.9, 0.1, 0.1, 0.1, 0.3, 0.2],  # Pramāṇa
+            [0.1, 0.1, 0.2, 0.1, 0.8, 0.1, 0.1, 0.5, 0.2, 0.2, 0.1, 0.1],  # Viparyaya
+            [0.1, 0.2, 0.2, 0.5, 0.1, 0.1, 0.1, 0.8, 0.8, 0.2, 0.3, 0.2],  # Vikalpa
+            [0.6, 0.2, 0.6, 0.8, 0.1, 0.3, 0.3, 0.1, 0.1, 0.3, 0.2, 0.1],  # Smṛti
+            [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.2, 0.5],  # Nidrā
         ])
 
         init_matrix = (
-            config.coupling_init_diagonal * torch.eye(config.num_vritti, config.num_ontology) +
-            0.3 * semantic_priors +
+            0.5 * semantic_priors +  # Primary: sparse semantic structure
             config.coupling_init_noise * torch.randn(config.num_vritti, config.num_ontology)
         )
 
