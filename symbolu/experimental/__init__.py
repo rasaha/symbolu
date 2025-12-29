@@ -36,6 +36,7 @@ Components:
 - ontology_mapper.py: Phonemes → Bhava state position
 - token_decoder.py: CognitiveState → constrained token projection
 - ontological_trainer.py: Training loop for Tier 3
+- state_retrieval.py: State trajectory indexing and retrieval
 
 Usage:
 ------
@@ -112,6 +113,15 @@ from .ontological_trainer import (
     compute_ontological_loss,
 )
 
+# Retrieval (State-based RAG)
+from .state_retrieval import (
+    StateTrajectory,
+    RetrievalResult,
+    OntologyPatternMatcher,
+    StateTrajectoryIndex,
+    StateGuidedRetriever,
+)
+
 __all__ = [
     # Core
     'CognitiveState',
@@ -142,4 +152,10 @@ __all__ = [
     'OntologicalTransformer',
     'train_ontological',
     'compute_ontological_loss',
+    # Retrieval
+    'StateTrajectory',
+    'RetrievalResult',
+    'OntologyPatternMatcher',
+    'StateTrajectoryIndex',
+    'StateGuidedRetriever',
 ]
