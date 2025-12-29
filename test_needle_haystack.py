@@ -85,11 +85,12 @@ class NeedleConfig:
     seed: int = 42
 
 
+# Match train.py model sizes exactly
 MODEL_PRESETS = {
-    "tiny": {"embed_dim": 128, "num_layers": 4, "num_heads": 2, "ff_dim": 512},
-    "small": {"embed_dim": 256, "num_layers": 6, "num_heads": 4, "ff_dim": 1024},
-    "medium": {"embed_dim": 512, "num_layers": 8, "num_heads": 8, "ff_dim": 2048},
-    "large": {"embed_dim": 768, "num_layers": 12, "num_heads": 12, "ff_dim": 3072},
+    "tiny": {"embed_dim": 256, "num_layers": 4, "num_heads": 4, "ff_dim": 1024},
+    "small": {"embed_dim": 512, "num_layers": 8, "num_heads": 8, "ff_dim": 2048},  # 56M params
+    "medium": {"embed_dim": 768, "num_layers": 12, "num_heads": 12, "ff_dim": 3072},  # ~125M params
+    "large": {"embed_dim": 1024, "num_layers": 24, "num_heads": 16, "ff_dim": 4096},  # ~350M params
 }
 
 
