@@ -22,6 +22,10 @@ SymbolU12 is a unified cognitive architecture that combines Phase Attention Tran
 10. [R[v,a] Coupling Matrix Analysis](#10-rva-coupling-matrix)
 11. [Training Architecture](#11-training-architecture)
 12. [Tuning Guidelines](#12-tuning-guidelines)
+13. [Sparse R[v,a] Natural Affinities](#13-sparse-rva-natural-affinities)
+14. [DHA Post-Validation Architecture](#14-dha-post-validation-architecture)
+15. [Interpretable RLHF: Chitta Gradient](#15-interpretable-rlhf-chitta-gradient)
+16. [Complete Bhava→Vritti→Steering→Validation Loop](#16-complete-loop)
 
 ---
 
@@ -829,6 +833,458 @@ def diagnose_cognitive_state(state, vritti):
 
 ---
 
+## 13. Sparse R[v,a] Natural Affinities
+
+### The Key Insight
+
+Not all Vrittis map to all Bhavas. The relationship is **sparse by nature** - derived from philosophical foundations, not learned heuristically.
+
+```
+"Pramāṇa cannot naturally arise from EMOTIVE context;
+ Nidrā cannot be the cognitive mode for FACTUAL output."
+```
+
+### Sparse Affinity Matrix
+
+The R[v,a] coupling is not dense (5×12 = 60 connections). Only ~25 natural affinities exist:
+
+```
+                        Bhava States (12)
+                 FACT ANAL EVAL NARR ARGU INST CERT SPEC QUES EMOT PERF META
+              ┌────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬────┐
+   Pramāṇa    │ ●● │  ● │    │    │    │ ●● │ ●● │    │    │    │    │    │
+   Viparyaya  │    │    │    │    │ ●● │    │    │  ● │    │    │    │    │
+   Vikalpa    │    │    │    │  ● │    │    │    │ ●● │ ●● │    │    │    │
+   Smṛti      │  ● │    │  ● │ ●● │    │    │    │    │    │    │    │    │
+   Nidrā      │    │    │    │    │    │    │    │    │    │ ●● │    │  ● │
+              └────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┘
+
+   ●● = Strong affinity (0.8+)     ● = Moderate affinity (0.5-0.7)
+   Empty = Weak/No affinity (<0.3)
+```
+
+### Natural Groupings
+
+| Vritti | Primary Bhavas | Reasoning |
+|--------|---------------|-----------|
+| **Pramāṇa** (Valid Knowledge) | FACTUAL, CERTAIN, INSTRUCTIVE, ANALYTICAL | Clear, authoritative, verifiable |
+| **Viparyaya** (Error/Opposition) | ARGUMENTATIVE, SPECULATIVE | Challenging assumptions, counterpoints |
+| **Vikalpa** (Branching/Fantasy) | SPECULATIVE, QUESTIONING, NARRATIVE | Exploring possibilities, hypotheticals |
+| **Smṛti** (Memory) | NARRATIVE, FACTUAL, EVALUATIVE | Drawing on past knowledge, judgment |
+| **Nidrā** (Absence/Sleep) | EMOTIVE, METALINGUISTIC | Disengaged cognition, meta-level |
+
+### Implementation
+
+```python
+# In VrittiOntologyCoupling (unified_symbolu12.py)
+semantic_priors = torch.tensor([
+    # FACT ANAL EVAL NARR ARGU INST CERT SPEC QUES EMOT PERF META
+    [0.9, 0.6, 0.2, 0.1, 0.1, 0.8, 0.9, 0.1, 0.1, 0.1, 0.3, 0.2],  # Pramāṇa
+    [0.1, 0.1, 0.2, 0.1, 0.8, 0.1, 0.1, 0.5, 0.2, 0.2, 0.1, 0.1],  # Viparyaya
+    [0.1, 0.2, 0.2, 0.5, 0.1, 0.1, 0.1, 0.8, 0.8, 0.2, 0.3, 0.2],  # Vikalpa
+    [0.6, 0.2, 0.6, 0.8, 0.1, 0.3, 0.3, 0.1, 0.1, 0.3, 0.2, 0.1],  # Smṛti
+    [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.2, 0.5],  # Nidrā
+])
+```
+
+### Why Sparse?
+
+1. **Philosophical Coherence**: Yoga Sutras define Vrittis with specific cognitive domains
+2. **Training Efficiency**: Fewer parameters to learn, faster convergence
+3. **Interpretability**: Clear "this shouldn't happen" signals
+4. **Error Detection**: Dense coupling in sparse regions indicates model confusion
+
+---
+
+## 14. DHA Post-Validation Architecture
+
+### Pre-Steering vs Post-Validation
+
+A critical distinction in the SymbolU architecture:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        GENERATION PIPELINE                              │
+│                                                                         │
+│  ┌─────────────────┐                      ┌─────────────────┐          │
+│  │  PRE-STEERING   │                      │ POST-VALIDATION │          │
+│  │  (DURING gen)   │                      │  (AFTER gen)    │          │
+│  │                 │                      │                 │          │
+│  │ VrittiModulated │──► Generation ──────►│  DHA Validator  │          │
+│  │   Attention     │                      │                 │          │
+│  │                 │                      │                 │          │
+│  │ BidirectionalGuna                      │ Chitta Gradient │          │
+│  │   Mapper        │                      │   (Loss fn)     │          │
+│  └─────────────────┘                      └─────────────────┘          │
+│         ▲                                          │                    │
+│         │                                          │                    │
+│         │        ┌──────────────────────┐          │                    │
+│         └────────│  Threshold Updates   │◄─────────┘                    │
+│                  │  (Learning Loop)     │                               │
+│                  └──────────────────────┘                               │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### What Each Does
+
+| Component | When | What | Adjusts |
+|-----------|------|------|---------|
+| **VrittiModulatedAttention** | DURING | Shapes attention patterns | How model "thinks" |
+| **BidirectionalGunaMapper** | DURING | Converts Bhava→Guna→Bias | What model "focuses on" |
+| **DHAValidator** | AFTER | Checks if steering worked | Thresholds for next time |
+| **CognitiveLossFunction** | AFTER | Gradient from diagnosis | Model weights |
+
+### DHA as Diagnostic Post-Validator
+
+The DHA (Dynamic Heuristic Adjustment) doesn't steer - it **validates** that steering worked:
+
+```python
+class DHAValidator:
+    """
+    Post-generation diagnostic that:
+    1. Checks if Vritti matched expectations
+    2. Checks if output Bhava was appropriate
+    3. Diagnoses specific failure modes
+    4. Recommends threshold adjustments
+    """
+
+    def diagnose(self, input_bhava, actual_vritti, output_bhava, human_rating):
+        # What Vritti SHOULD have been based on input Bhava
+        expected_vritti = input_bhava @ BHAVA_TO_IDEAL_VRITTI
+
+        # Compare actual vs expected
+        vritti_distance = cosine_distance(actual_vritti, expected_vritti)
+
+        # Check if output Bhava is a healthy transition
+        bhava_aligned = output_bhava in HEALTHY_TRANSITIONS[input_bhava]
+
+        # Diagnose failure type
+        return CognitiveDiagnosis(...)
+```
+
+### Diagnostic Types
+
+| Diagnosis | Meaning | Recommendation |
+|-----------|---------|----------------|
+| **VALIDATED** | Everything worked | None needed |
+| **OVER_HEDGED** | Viparyaya when Pramāṇa expected | Decrease viparyaya_threshold |
+| **OVER_CONFIDENT** | Pramāṇa when Viparyaya expected | Increase viparyaya_threshold |
+| **STUCK** | Smṛti too high, not progressing | Decrease smrti_decay_rate |
+| **DISENGAGED** | Nidrā high inappropriately | Check input quality |
+| **TRANSITION_ERROR** | Unhealthy Bhava transition | Review transition logic |
+
+### The Learning Loop
+
+```
+1. Human provides rating (0-1)
+2. DHAValidator diagnoses what went wrong
+3. CognitiveLossFunction computes gradient
+4. Model weights update
+5. Thresholds adjust for domain
+6. Next generation uses updated steering
+```
+
+---
+
+## 15. Interpretable RLHF: Chitta Gradient
+
+### Traditional RLHF vs Chitta Gradient
+
+| Aspect | OpenAI RLHF | SymbolU Chitta Gradient |
+|--------|-------------|-------------------------|
+| **Reward Model** | Black-box neural network | Explicit Bhava/Vritti distances |
+| **Gradient Source** | Opaque reward → policy gradient | Dist(actual, ideal) → interpretable gradient |
+| **Debugging** | "Reward was low" | "Viparyaya when Pramāṇa expected" |
+| **Human Feedback** | Preference pairs | Rating + cognitive diagnosis |
+| **What Improves** | Vague "alignment" | Specific R[v,a] entries, thresholds |
+
+### The Chitta Gradient Formula
+
+```
+L_cognitive = α·Dist(Vritti_actual, Vritti_ideal)
+            + β·Dist(Bhava_out, Bhava_target)
+            + γ·TransitionPenalty
+
+Where:
+- α = 0.4 (Vritti alignment weight)
+- β = 0.4 (Bhava alignment weight)
+- γ = 0.2 (Transition quality weight)
+```
+
+### Visual: Gradient Flow
+
+```
+Human Rating: 0.3 (bad)
+        │
+        ▼
+┌───────────────────────────────────────────────────────────┐
+│                   DHAValidator                             │
+│                                                            │
+│  Input Bhava: QUESTIONING ────────────────────────────┐   │
+│                                                        │   │
+│  Expected Vritti: Vikalpa (0.8)                       │   │
+│  Actual Vritti:   Pramāṇa (0.7)  ←── MISMATCH         │   │
+│                                                        │   │
+│  Expected Output: FACTUAL/ANALYTICAL                  │   │
+│  Actual Output:   CERTAIN         ←── OK              │   │
+│                                                        │   │
+│  Diagnosis: OVER_CONFIDENT                            │   │
+│  → "Pramāṇa=0.7 when Vikalpa expected"               │   │
+└───────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌───────────────────────────────────────────────────────────┐
+│                CognitiveLossFunction                       │
+│                                                            │
+│  vritti_loss = KL(actual, expected) = 0.85                │
+│  bhava_loss  = 0.0 (transition was OK)                    │
+│  transition_loss = 0.0                                    │
+│                                                            │
+│  total_loss = 0.4*0.85 + 0.4*0.0 + 0.2*0.0               │
+│             = 0.34                                         │
+│                                                            │
+│  Scale by rating: 0.34 * (2.0 - 0.3) = 0.578             │
+└───────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌───────────────────────────────────────────────────────────┐
+│                   Gradient Updates                         │
+│                                                            │
+│  1. R[v,a] entry for QUESTIONING→Vikalpa increases       │
+│  2. VrittiModulatedAttention learns to broaden more      │
+│  3. vikalpa_activation_threshold decreases                │
+└───────────────────────────────────────────────────────────┘
+```
+
+### Healthy Bhava Transitions
+
+Not all Bhava→Bhava transitions make sense. The model learns:
+
+```python
+HEALTHY_TRANSITIONS = {
+    8: [0, 1, 5, 6],   # QUESTIONING → FACTUAL, ANALYTICAL, INSTRUCTIVE, CERTAIN
+    7: [0, 1, 6, 7],   # SPECULATIVE → FACTUAL/CERTAIN or stay speculative
+    0: [0, 1, 2, 5],   # FACTUAL → deepen to ANALYTICAL or EVALUATIVE
+    4: [0, 4, 1],      # ARGUMENTATIVE → FACTUAL (resolution) or continue
+    3: [3, 0, 2],      # NARRATIVE → continue or conclude with FACTUAL
+}
+```
+
+**Examples:**
+- ✓ QUESTIONING → FACTUAL (question answered)
+- ✓ SPECULATIVE → CERTAIN (hypothesis confirmed)
+- ✗ FACTUAL → EMOTIVE (inappropriate escalation)
+- ✗ QUESTIONING → EMOTIVE (evasion instead of answer)
+
+### Implementation
+
+```python
+from symbolu.experimental import CognitiveLossFunction, DHAValidator
+
+# During training
+loss_fn = CognitiveLossFunction(alpha=0.4, beta=0.4, gamma=0.2)
+
+loss_dict = loss_fn(
+    vritti_actual=model_output['vritti'],
+    bhava_input=input_state['ontology'],
+    bhava_output=output_state['ontology'],
+    human_rating=0.8,  # 0-1 scale
+)
+
+loss_dict['total_loss'].backward()
+
+# For diagnosis
+validator = DHAValidator()
+diagnosis = validator.diagnose(
+    input_bhava=input_state['ontology'],
+    actual_vritti=model_output['vritti'],
+    output_bhava=output_state['ontology'],
+    human_rating=0.3,
+)
+print(diagnosis.message)  # "Over-confident: Pramāṇa=0.7 when Vikalpa expected"
+print(diagnosis.recommended_adjustment)  # "Increase vikalpa_activation_threshold"
+```
+
+---
+
+## 16. Complete Bhava→Vritti→Steering→Validation Loop {#16-complete-loop}
+
+### The Full Cognitive Pipeline
+
+This section ties together all components into a single coherent flow:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            COMPLETE COGNITIVE LOOP                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  INPUT                                                                      │
+│    │                                                                        │
+│    ▼                                                                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  1. PERCEPTION: Extract CognitiveState                              │   │
+│  │     Input Tokens → StateProjector → [Phoneme, Topic, Ontology, Dyn] │   │
+│  │                                            │                         │   │
+│  │                                            ▼                         │   │
+│  │                                    Input Bhava [12]                  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                            │                                │
+│                                            ▼                                │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  2. VRITTI COMPUTATION: Which cognitive mode?                        │   │
+│  │                                                                      │   │
+│  │     Input Bhava → DifferentiableChittaVritti → Vritti [5]           │   │
+│  │                                                                      │   │
+│  │     Example: QUESTIONING → [0.1, 0.1, 0.8, 0.0, 0.0]                │   │
+│  │                            (High Vikalpa = branching)               │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                            │                                │
+│                                            ▼                                │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  3. PRE-STEERING: Shape generation before it happens                 │   │
+│  │                                                                      │   │
+│  │     ├─ BidirectionalGunaMapper: Bhava → Guna → Attention Bias       │   │
+│  │     │                                                                │   │
+│  │     └─ VrittiModulatedAttention: Vritti → Attention Patterns        │   │
+│  │           • Pramāṇa high → Sharpen focus                            │   │
+│  │           • Vikalpa high → Broaden exploration                      │   │
+│  │           • Smṛti high → Extend context window                      │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                            │                                │
+│                                            ▼                                │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  4. GENERATION: Produce output with steered attention                │   │
+│  │                                                                      │   │
+│  │     Phase Attention Transformer → Output Tokens                     │   │
+│  │     (Using modulated attention patterns)                            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                            │                                │
+│                                            ▼                                │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  5. OUTPUT PERCEPTION: Extract output CognitiveState                 │   │
+│  │                                                                      │   │
+│  │     Output Tokens → StateProjector → Output Bhava [12]              │   │
+│  │     Also capture: Actual Vritti during generation [5]               │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                            │                                │
+│                                            ▼                                │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  6. POST-VALIDATION: Did steering work?                              │   │
+│  │                                                                      │   │
+│  │     DHAValidator.diagnose(                                          │   │
+│  │         input_bhava,                                                │   │
+│  │         actual_vritti,                                              │   │
+│  │         output_bhava,                                               │   │
+│  │         human_rating                                                │   │
+│  │     )                                                               │   │
+│  │                                                                      │   │
+│  │     → CognitiveDiagnosis: VALIDATED / OVER_HEDGED / STUCK / etc.   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                            │                                │
+│                                            ▼                                │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  7. LEARNING: Update from diagnosis                                  │   │
+│  │                                                                      │   │
+│  │     CognitiveLossFunction(                                          │   │
+│  │         vritti_actual, bhava_input, bhava_output, human_rating      │   │
+│  │     )                                                               │   │
+│  │                                                                      │   │
+│  │     Gradients update:                                               │   │
+│  │     • R[v,a] coupling matrix entries                                │   │
+│  │     • VrittiModulatedAttention parameters                           │   │
+│  │     • Activation thresholds                                         │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                            │                                │
+│                                            ▼                                │
+│                                    NEXT GENERATION                          │
+│                                  (with updated model)                       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Worked Example
+
+**Scenario**: User asks "What causes rain?"
+
+```
+Step 1: PERCEPTION
+  Input: "What causes rain?"
+  Bhava: [0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.8, 0.0, 0.0, 0.0]
+         (QUESTIONING = 0.8)
+
+Step 2: VRITTI COMPUTATION
+  From sparse R[v,a]: QUESTIONING → Vikalpa
+  Vritti: [0.1, 0.1, 0.7, 0.1, 0.0]
+          (Vikalpa = 0.7 = exploring possibilities)
+
+Step 3: PRE-STEERING
+  • BidirectionalGunaMapper: QUESTIONING → Rajas-dominant
+    → Attention explores wider context
+  • VrittiModulatedAttention: Vikalpa high
+    → Broadens attention, considers multiple explanations
+
+Step 4: GENERATION
+  Output: "Rain is caused by water vapor condensing in clouds..."
+  (Factual explanation, properly steered)
+
+Step 5: OUTPUT PERCEPTION
+  Output Bhava: [0.7, 0.2, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                (FACTUAL = 0.7, ANALYTICAL = 0.2)
+  Actual Vritti: [0.6, 0.0, 0.2, 0.1, 0.1]
+                 (Pramāṇa = 0.6, shifted during answer)
+
+Step 6: POST-VALIDATION
+  Expected Vritti: Vikalpa (0.7)
+  Actual Vritti: Pramāṇa (0.6) ← Shifted to deliver answer
+
+  Check transition: QUESTIONING → FACTUAL
+  Is [0] in HEALTHY_TRANSITIONS[8]? YES ✓
+
+  Diagnosis: VALIDATED
+  "Chain validated: QUESTIONING → Vikalpa/Pramāṇa → FACTUAL"
+
+Step 7: LEARNING
+  Human rating: 0.9 (good answer)
+  Loss is low (0.12)
+  Small gradient update, model reinforced
+```
+
+### Failure Example
+
+**Scenario**: User asks "What causes rain?" but model responds emotionally
+
+```
+Step 5: OUTPUT PERCEPTION
+  Output: "Rain makes me feel so peaceful and calm..."
+  Output Bhava: [0.1, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.0, 0.0]
+                (EMOTIVE = 0.8)
+
+Step 6: POST-VALIDATION
+  Check transition: QUESTIONING → EMOTIVE
+  Is [9] in HEALTHY_TRANSITIONS[8]? NO ✗
+
+  Diagnosis: TRANSITION_ERROR
+  "Unhealthy transition: QUESTIONING → EMOTIVE"
+  "Expected: FACTUAL, ANALYTICAL, INSTRUCTIVE, or CERTAIN"
+
+Step 7: LEARNING
+  Human rating: 0.2 (didn't answer question)
+  High transition penalty (1.0)
+  Strong gradient update:
+  • Decrease EMOTIVE weight when input is QUESTIONING
+  • Increase FACTUAL weight for question-answering
+```
+
+### Summary: Why This Architecture?
+
+1. **Interpretable**: Every component has explicit meaning
+2. **Steerable**: Pre-steering shapes generation, post-validation confirms
+3. **Learnable**: Chitta Gradient provides interpretable loss
+4. **Diagnosable**: Clear failure modes with specific recommendations
+5. **Grounded**: Philosophy-derived constraints (sparse R[v,a])
+
+---
+
 ## Appendix: File Reference
 
 | Component | File Path |
@@ -837,10 +1293,15 @@ def diagnose_cognitive_state(state, vritti):
 | DifferentiableChittaVritti | `symbolu/experimental/unified_symbolu12.py` |
 | BidirectionalGunaMapper | `symbolu/experimental/unified_symbolu12.py` |
 | VrittiModulatedAttention | `symbolu/experimental/unified_symbolu12.py` |
+| VrittiOntologyCoupling | `symbolu/experimental/unified_symbolu12.py` |
 | HybridRAGEngine | `symbolu/experimental/hybrid_rag_integration.py` |
 | StateTrajectoryIndex | `symbolu/experimental/state_retrieval.py` |
 | ChittaVrittiResult | `symbolu/chitta_vritti/types.py` |
 | GunaModulation | `symbolu/guna_modulation/` |
+| **CognitiveLossFunction** | `symbolu/experimental/cognitive_loss.py` |
+| **DHAValidator** | `symbolu/experimental/cognitive_loss.py` |
+| **BHAVA_TO_IDEAL_VRITTI** | `symbolu/experimental/cognitive_loss.py` |
+| **HEALTHY_TRANSITIONS** | `symbolu/experimental/cognitive_loss.py` |
 | Training Script | `scripts/train_symbolu12.py` |
 
 ---
@@ -852,6 +1313,9 @@ def diagnose_cognitive_state(state, vritti):
 - **v2.8**: Chitta-Vritti integration (5 cognitive modes)
 - **v2.9**: Bidirectional Guna + Vritti-Modulated Attention
 - **v3.0**: Holographic Retrieval (Dynamic Alpha RAG)
+- **v3.1**: Sparse R[v,a] Natural Affinities (philosophy-derived)
+- **v3.2**: DHA Post-Validation Architecture
+- **v3.3**: Interpretable RLHF (Chitta Gradient Loss Function)
 
 ---
 
