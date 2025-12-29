@@ -202,7 +202,8 @@ def main():
     sys.argv = [sys.argv[0]] + remaining
 
     import train
-    train.main()
+    config = train.parse_args()
+    train.train(config)
 
 
 if __name__ == "__main__":
