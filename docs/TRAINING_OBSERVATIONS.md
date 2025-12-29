@@ -1608,11 +1608,64 @@ python -u train_retrieval.py --model_type hybrid --model_size tiny \
   --batch_size 1 --gradient_accumulation 4 \
   --max_steps 10000 --use_coherence_loss \
   --gradient_checkpointing --local_backend unfold \
-  --window_size 128 --warmup_steps 300 \
+  --window_size 128 --warmup_steps 100 \
   --log_every 10 --eval_every 50 \
   --retrieval_ratio 0.1 \
   --resume checkpoints/best.pt 2>&1 | tee -a train_hybrid_128k_tiny.log
 ```
+
+### Warmup Steps Tuning
+
+The `--warmup_steps` parameter controls learning rate warmup during training:
+
+```
+Learning Rate Schedule:
+
+  LR |          ___________plateau___________
+     |         /
+     |        /
+     |       /  ← warmup period
+     |      /
+     |_____/
+     0    warmup_steps              max_steps
+```
+
+**What warmup_steps does:**
+- During warmup: LR linearly increases from 0 → target LR
+- After warmup: LR follows scheduler (cosine decay, etc.)
+- Purpose: Prevents unstable gradients at training start
+
+**Recommended values when resuming:**
+
+| Scenario | Warmup Steps | Reasoning |
+|----------|--------------|-----------|
+| Fresh training (from scratch) | 300-500 | Model needs gentle start |
+| Resume with same data | 100-200 | Model already stable |
+| Resume with NEW data (retrieval) | **50-100** | Want new signal to take effect quickly |
+
+**Why reduce warmup for retrieval training:**
+
+When resuming from a checkpoint (PPL ~120) to add retrieval:
+- Model weights are already "warmed up" from previous training
+- High warmup = low LR for first N steps = retrieval signal is weak
+- Low warmup = full LR sooner = retrieval patterns learned faster
+
+```bash
+# For retrieval training from existing checkpoint:
+--warmup_steps 50   # Aggressive - full LR at step 50
+--warmup_steps 100  # Moderate - full LR at step 100 (recommended)
+--warmup_steps 300  # Conservative - might be too slow for retrieval
+```
+
+**Example comparison:**
+
+| warmup_steps | Steps to full LR | Retrieval batches at full LR (first 1000 steps) |
+|--------------|------------------|------------------------------------------------|
+| 300 | 300 | ~70 (10% of 700 remaining steps) |
+| 100 | 100 | ~90 (10% of 900 remaining steps) |
+| 50 | 50 | ~95 (10% of 950 remaining steps) |
+
+**Recommendation:** Use `--warmup_steps 100` or `--warmup_steps 50` when resuming with retrieval data to maximize the learning signal from retrieval tasks.
 
 ### Expected Outcomes
 
