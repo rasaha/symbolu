@@ -1667,6 +1667,70 @@ When resuming from a checkpoint (PPL ~120) to add retrieval:
 
 **Recommendation:** Use `--warmup_steps 100` or `--warmup_steps 50` when resuming with retrieval data to maximize the learning signal from retrieval tasks.
 
+### Learning Rate Tuning
+
+The `--learning_rate` parameter can be increased for faster convergence, especially when:
+- GPU throughput is stable (consistent tok/s)
+- Training loss is decreasing smoothly
+- No gradient spikes or NaN values
+
+**Default vs Aggressive LR:**
+
+| Scenario | Learning Rate | Risk | Benefit |
+|----------|---------------|------|---------|
+| Conservative (default) | 1e-4 | Low | Stable but slow |
+| Moderate | 2e-4 | Medium | Faster convergence |
+| Aggressive | 3e-4 to 5e-4 | Higher | Much faster, may need tuning |
+
+**When to increase LR:**
+
+```bash
+# Default (safe)
+--learning_rate 1e-4
+
+# Faster convergence (recommended for stable training)
+--learning_rate 2e-4
+
+# Aggressive (monitor for instability)
+--learning_rate 3e-4
+```
+
+**Signs you can increase LR:**
+- Stable throughput (tok/s doesn't fluctuate wildly)
+- Loss decreasing smoothly without spikes
+- Coherence staying above 0.9
+- Entropy stable (not spiking)
+
+**Signs LR is too high:**
+- Loss spikes or goes to NaN
+- Coherence drops suddenly
+- Entropy becomes unstable
+- Training diverges
+
+**Combined recommendation for retrieval training:**
+
+```bash
+# Optimized for fast retrieval learning from checkpoint:
+python -u train_retrieval.py --model_type hybrid --model_size tiny \
+  --dataset wikitext103 --max_seq_len 131072 \
+  --batch_size 1 --gradient_accumulation 4 \
+  --max_steps 10000 --use_coherence_loss \
+  --gradient_checkpointing --local_backend unfold \
+  --window_size 128 \
+  --warmup_steps 50 \
+  --learning_rate 2e-4 \
+  --log_every 10 --eval_every 50 \
+  --retrieval_ratio 0.1 \
+  --resume checkpoints/best.pt
+```
+
+**Key changes from default:**
+| Parameter | Default | Optimized | Effect |
+|-----------|---------|-----------|--------|
+| `--warmup_steps` | 300 | 50 | Full LR at step 50 |
+| `--learning_rate` | 1e-4 | 2e-4 | 2x faster weight updates |
+| Combined | - | - | ~4x faster effective learning |
+
 ### Expected Outcomes
 
 After hybrid training with retrieval tasks:
