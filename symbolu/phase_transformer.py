@@ -50,7 +50,7 @@ Usage:
 
 import math
 import time
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Union
 from dataclasses import dataclass
 
 import torch
@@ -88,6 +88,7 @@ class TransformerConfig:
     # Phase-specific
     sync_steps: int = 3
     sync_lr: float = 0.1
+    temperature: float = 1.0  # Lower = sharper attention (for classification tasks)
 
     def __post_init__(self):
         if self.ff_dim is None:
@@ -113,12 +114,14 @@ class PhaseAttentionLayer(nn.Module):
         dropout: float = 0.1,
         sync_steps: int = 3,
         sync_lr: float = 0.1,
+        temperature: float = 1.0,  # Lower = sharper attention (for classification)
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
         self.sync_steps = sync_steps
+        self.temperature = temperature  # Controls attention sharpness
 
         # Projections
         self.q_proj = nn.Linear(embed_dim, embed_dim)
@@ -141,16 +144,19 @@ class PhaseAttentionLayer(nn.Module):
         self,
         x: torch.Tensor,
         causal_mask: bool = True,
-    ) -> torch.Tensor:
+        phase_context: Optional[Dict[str, torch.Tensor]] = None,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, Dict[str, torch.Tensor]]]:
         """
         Forward pass with O(n) phase attention.
 
         Args:
             x: [B, N, D] input tensor
             causal_mask: Apply causal masking for autoregressive
+            phase_context: Optional dict with 'phase_sum' and 'phase_count' for
+                          streaming across chunks. If provided, returns updated context.
 
         Returns:
-            output: [B, N, D]
+            output: [B, N, D] or (output, updated_phase_context) if phase_context given
         """
         B, N, D = x.shape
         residual = x
@@ -170,7 +176,18 @@ class PhaseAttentionLayer(nn.Module):
 
         # =====================================================================
         # O(n) Mean-Field Phase Synchronization (U3-U4)
+        # With streaming support for cross-chunk global context
         # =====================================================================
+
+        # Initialize or use external phase context for streaming
+        if phase_context is not None:
+            # Streaming mode: incorporate phases from previous chunks
+            prev_phase_sum = phase_context.get('phase_sum', torch.zeros_like(phases[:, :, :1, :]))
+            prev_count = phase_context.get('phase_count', 0)
+        else:
+            prev_phase_sum = None
+            prev_count = 0
+
         for _ in range(self.sync_steps):
             # U3: ∂C/∂φᵢ ≈ -N × sin(φᵢ - φ_mean)
             if causal_mask:
@@ -178,9 +195,21 @@ class PhaseAttentionLayer(nn.Module):
                 # Cumulative mean for causal
                 cumsum = torch.cumsum(phases, dim=2)
                 counts = torch.arange(1, N + 1, device=phases.device).float()
+
+                # Add previous chunk context if streaming
+                if prev_phase_sum is not None and prev_count > 0:
+                    cumsum = cumsum + prev_phase_sum
+                    counts = counts + prev_count
+
                 phase_mean = cumsum / counts.view(1, 1, -1, 1)
             else:
-                phase_mean = phases.mean(dim=2, keepdim=True)
+                # Non-causal: use global mean including previous chunks
+                if prev_phase_sum is not None and prev_count > 0:
+                    total_sum = phases.sum(dim=2, keepdim=True) + prev_phase_sum
+                    total_count = N + prev_count
+                    phase_mean = total_sum / total_count
+                else:
+                    phase_mean = phases.mean(dim=2, keepdim=True)
 
             gradient = -N * torch.sin(phases - phase_mean)
 
@@ -188,6 +217,14 @@ class PhaseAttentionLayer(nn.Module):
             # Note: Don't use modulo (%) as it breaks gradients
             # sin/cos are periodic, so phases outside [0, 2π] still work
             phases = phases + self.sync_lr * gradient
+
+        # Update phase context for next chunk (if streaming)
+        new_phase_context = None
+        if phase_context is not None:
+            new_phase_context = {
+                'phase_sum': (prev_phase_sum if prev_phase_sum is not None else 0) + phases.sum(dim=2, keepdim=True),
+                'phase_count': prev_count + N,
+            }
 
         # =====================================================================
         # O(n) Value Aggregation
@@ -198,6 +235,10 @@ class PhaseAttentionLayer(nn.Module):
             phase_weights = torch.cos(phases - phase_mean)
         else:
             phase_weights = torch.cos(phases - phases.mean(dim=2, keepdim=True))
+
+        # Apply temperature scaling for sharper attention (lower temp = sharper)
+        # This helps classification tasks that need to focus on specific tokens
+        phase_weights = phase_weights / self.temperature
 
         # Normalize weights per head
         phase_weights = F.softmax(phase_weights.sum(dim=-1, keepdim=True), dim=2)
@@ -223,7 +264,12 @@ class PhaseAttentionLayer(nn.Module):
         output = self.dropout(output)
 
         # Residual + LayerNorm
-        return self.norm(output + residual)
+        result = self.norm(output + residual)
+
+        # Return with phase context if streaming
+        if new_phase_context is not None:
+            return result, new_phase_context
+        return result
 
 
 # =============================================================================
@@ -939,6 +985,7 @@ class HybridAttentionLayer(nn.Module):
         alpha_local: float = 0.8,
         alpha_phase: float = 0.2,
         local_backend: str = 'auto',
+        temperature: float = 1.0,  # Lower = sharper phase attention
     ):
         super().__init__()
         # Keep alphas for potential future use (e.g., residual weighting)
@@ -959,6 +1006,7 @@ class HybridAttentionLayer(nn.Module):
             dropout=dropout,
             sync_steps=sync_steps,
             sync_lr=sync_lr,
+            temperature=temperature,  # Pass temperature for sharper attention
         )
 
         self.norm = nn.LayerNorm(embed_dim)
@@ -1000,6 +1048,7 @@ class HybridTransformerBlock(nn.Module):
             alpha_local=alpha_local,
             alpha_phase=alpha_phase,
             local_backend=local_backend,
+            temperature=getattr(config, 'temperature', 1.0),  # Sharper attention
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -1052,6 +1101,7 @@ class PhaseTransformerBlock(nn.Module):
             dropout=config.dropout,
             sync_steps=config.sync_steps,
             sync_lr=config.sync_lr,
+            temperature=getattr(config, 'temperature', 1.0),  # Sharper attention for classification
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -1059,10 +1109,21 @@ class PhaseTransformerBlock(nn.Module):
             dropout=config.dropout,
         )
 
-    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
-        x = self.attention(x, causal_mask)
-        x = self.ff(x)
-        return x
+    def forward(
+        self,
+        x: torch.Tensor,
+        causal_mask: bool = True,
+        phase_context: Optional[Dict[str, torch.Tensor]] = None,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, Dict[str, torch.Tensor]]]:
+        """Forward with optional streaming phase context."""
+        if phase_context is not None:
+            x, new_context = self.attention(x, causal_mask, phase_context)
+            x = self.ff(x)
+            return x, new_context
+        else:
+            x = self.attention(x, causal_mask)
+            x = self.ff(x)
+            return x
 
 
 class StandardTransformerBlock(nn.Module):
@@ -1109,6 +1170,7 @@ class PhaseTransformer(nn.Module):
         dropout: float = 0.1,
         sync_steps: int = 3,
         sync_lr: float = 0.1,
+        temperature: float = 1.0,  # Lower = sharper attention (for classification)
     ):
         super().__init__()
 
@@ -1122,6 +1184,7 @@ class PhaseTransformer(nn.Module):
             dropout=dropout,
             sync_steps=sync_steps,
             sync_lr=sync_lr,
+            temperature=temperature,  # Pass temperature for sharper attention
         )
         self.config = config
 
@@ -1168,37 +1231,59 @@ class PhaseTransformer(nn.Module):
         self,
         input_ids: torch.Tensor,
         return_hidden: bool = False,
-    ) -> Dict[str, torch.Tensor]:
+        phase_contexts: Optional[List[Dict[str, torch.Tensor]]] = None,
+        position_offset: int = 0,
+    ) -> Dict[str, Any]:
         """
-        Forward pass.
+        Forward pass with optional streaming phase context.
 
         Args:
             input_ids: [B, N] token indices
             return_hidden: Return hidden states
+            phase_contexts: List of phase contexts per layer for streaming (10M+ tokens)
+            position_offset: Position offset for streaming (chunk start position)
 
         Returns:
-            Dict with 'logits' and optionally 'hidden_states'
+            Dict with 'logits', optionally 'hidden_states', and 'phase_contexts' if streaming
         """
         B, N = input_ids.shape
 
-        # Embeddings
-        positions = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        # Embeddings with position offset for streaming
+        positions = torch.arange(position_offset, position_offset + N, device=input_ids.device).unsqueeze(0)
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
+        # Initialize phase contexts if streaming but none provided
+        streaming = phase_contexts is not None
+        if streaming and len(phase_contexts) == 0:
+            phase_contexts = [{}] * len(self.blocks)
+
         # Transformer blocks
         hidden_states = []
-        for block in self.blocks:
-            if self.gradient_checkpointing and self.training:
-                # Use gradient checkpointing to save memory
-                x = checkpoint(
-                    block,
-                    x,
-                    True,  # causal_mask
-                    use_reentrant=False,
-                )
+        new_phase_contexts = []
+
+        for i, block in enumerate(self.blocks):
+            if streaming:
+                # Streaming mode: pass and collect phase contexts
+                layer_context = phase_contexts[i] if i < len(phase_contexts) else {}
+                if self.gradient_checkpointing and self.training:
+                    # Note: checkpointing with streaming requires special handling
+                    x, new_ctx = block(x, causal_mask=True, phase_context=layer_context)
+                else:
+                    x, new_ctx = block(x, causal_mask=True, phase_context=layer_context)
+                new_phase_contexts.append(new_ctx)
             else:
-                x = block(x, causal_mask=True)
+                # Normal mode
+                if self.gradient_checkpointing and self.training:
+                    x = checkpoint(
+                        block,
+                        x,
+                        True,  # causal_mask
+                        use_reentrant=False,
+                    )
+                else:
+                    x = block(x, causal_mask=True)
+
             if return_hidden:
                 hidden_states.append(x)
 
@@ -1209,6 +1294,8 @@ class PhaseTransformer(nn.Module):
         result = {'logits': logits}
         if return_hidden:
             result['hidden_states'] = hidden_states
+        if streaming:
+            result['phase_contexts'] = new_phase_contexts
 
         return result
 
@@ -1272,6 +1359,7 @@ class HybridPhaseTransformer(nn.Module):
         local_backend: str = 'auto',  # LocalAttention backend: 'auto', 'flash', 'sdpa', 'unfold'
         alpha_local: float = 0.8,  # Weight for local attention in hybrid layers
         alpha_phase: float = 0.2,  # Weight for phase attention in hybrid layers
+        temperature: float = 1.0,  # Lower = sharper attention (for classification)
     ):
         super().__init__()
 
@@ -1285,6 +1373,7 @@ class HybridPhaseTransformer(nn.Module):
             dropout=dropout,
             sync_steps=sync_steps,
             sync_lr=sync_lr,
+            temperature=temperature,  # Pass temperature for sharper attention
         )
         self.config = config
         self.local_layers = local_layers

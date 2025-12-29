@@ -58,6 +58,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 from symbolu.phase_transformer import (
     PhaseTransformer,
     HybridPhaseTransformer,
+    TransformerConfig,
+    LocalTransformerBlock,
+    HybridTransformerBlock,
+    PhaseTransformerBlock,
 )
 
 
@@ -121,10 +125,10 @@ class LRAConfig:
     model_type: str = "hybrid"  # phase, hybrid
     num_refine: int = 1  # Iterative refinement passes per block
     model_size: str = "small"
-    embed_dim: int = 256
-    num_layers: int = 6
-    num_heads: int = 4
-    ff_dim: int = 1024
+    embed_dim: Optional[int] = None  # None = use preset
+    num_layers: Optional[int] = None  # None = use preset
+    num_heads: Optional[int] = None  # None = use preset
+    ff_dim: Optional[int] = None  # None = use preset
     dropout: float = 0.1
 
     # Hybrid-specific
@@ -133,6 +137,29 @@ class LRAConfig:
     local_backend: str = "unfold"
     alpha_local: float = 0.8
     alpha_phase: float = 0.2
+
+    # Layer pattern for hybrid models (Grok's suggestion)
+    # local_first: L-L-L-L-H-H-H-H (default, current behavior)
+    # interleave: L-H-L-H-L-H-L-H (alternating for text tasks)
+    # phase_first: H-H-H-H-L-L-L-L (global context first)
+    layer_pattern: str = "local_first"
+
+    # Byte n-gram convolution for text task (Grok's suggestion)
+    # Adds 1D conv layer to capture local byte patterns before transformer
+    use_byte_conv: bool = False
+    byte_conv_kernel: int = 5  # Kernel size for byte n-gram conv
+
+    # Phase attention temperature (from patent formulas analysis)
+    # Lower temperature = sharper attention (helps classification)
+    # Higher temperature = smoother attention (default for generation)
+    phase_temperature: float = 1.0
+
+    # Pooling type for classification head
+    # mean: Average pooling (default, good for structural tasks)
+    # attention: SoftmaxAttentionPooler (sharp attention, best for classification)
+    # cls: First token (CLS-style)
+    # last: Last token
+    pool_type: str = "mean"
 
     # Training
     batch_size: int = 32
@@ -420,12 +447,227 @@ def load_lra_data(
 
 
 # =============================================================================
+# SOFTMAX ATTENTION POOLER (Principled Classification Head)
+# =============================================================================
+
+class SoftmaxAttentionPooler(nn.Module):
+    """
+    Attention-based pooling using standard dot-product softmax attention.
+
+    This is the principled fix for Phase attention's classification weakness:
+    - Phase attention: smooth (phases converge → uniform attention)
+    - Softmax attention: sharp (can focus on specific tokens)
+
+    Uses a learnable query that attends over the sequence to find
+    the most relevant tokens for classification (e.g., "not" in "not good").
+
+    Architecture:
+        query: [1, d_model] learnable parameter
+        keys:  [B, N, d_model] from encoder hidden states
+        values: [B, N, d_model] from encoder hidden states
+
+        attention = softmax(query @ keys.T / sqrt(d))  # Sharp!
+        output = attention @ values  # [B, d_model]
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int = 4,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+
+        # Learnable query for classification (like CLS token but explicit)
+        self.query = nn.Parameter(torch.randn(1, 1, embed_dim) * 0.02)
+
+        # Project keys and values
+        self.key_proj = nn.Linear(embed_dim, embed_dim)
+        self.value_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Output projection
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+        self.dropout = nn.Dropout(dropout)
+
+        # Temperature for sharpness (lower = sharper)
+        self.temperature = nn.Parameter(torch.ones(1))
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            hidden_states: [B, N, embed_dim] encoder output
+
+        Returns:
+            pooled: [B, embed_dim] classification-ready representation
+        """
+        B, N, D = hidden_states.shape
+
+        # Expand query to batch
+        query = self.query.expand(B, -1, -1)  # [B, 1, D]
+
+        # Project keys and values
+        keys = self.key_proj(hidden_states)    # [B, N, D]
+        values = self.value_proj(hidden_states)  # [B, N, D]
+
+        # Multi-head reshape
+        query = query.view(B, 1, self.num_heads, self.head_dim).transpose(1, 2)  # [B, H, 1, d]
+        keys = keys.view(B, N, self.num_heads, self.head_dim).transpose(1, 2)    # [B, H, N, d]
+        values = values.view(B, N, self.num_heads, self.head_dim).transpose(1, 2)  # [B, H, N, d]
+
+        # Compute attention scores (standard dot-product)
+        scale = (self.head_dim ** -0.5) / self.temperature.clamp(min=0.1)
+        scores = torch.matmul(query, keys.transpose(-2, -1)) * scale  # [B, H, 1, N]
+
+        # SHARP softmax attention (not Phase's smooth mean-field!)
+        attn_weights = F.softmax(scores, dim=-1)  # [B, H, 1, N]
+        attn_weights = self.dropout(attn_weights)
+
+        # Weighted sum of values
+        context = torch.matmul(attn_weights, values)  # [B, H, 1, d]
+
+        # Reshape and project
+        context = context.transpose(1, 2).contiguous().view(B, 1, D)  # [B, 1, D]
+        output = self.out_proj(context.squeeze(1))  # [B, D]
+
+        return output
+
+
+# =============================================================================
+# PHASE PROTOTYPE CLASSIFIER (USE Formula-Inspired)
+# =============================================================================
+
+class PhasePrototypeClassifier(nn.Module):
+    """
+    Classification using phase alignment with learned class prototypes.
+
+    Inspired by USE (Unified Semantic Encoding) phase locking formula:
+        C[entity, attribute] = 1.0 → phase locked (same phase)
+        C[entity, wrong_attr] = 0.0 → orthogonal (90° apart)
+
+    For classification:
+        - Each class has a learned phase prototype
+        - Document phase is computed from token phases
+        - Classification = which prototype is document phase closest to?
+
+    This preserves Phase attention philosophy while enabling discrimination
+    through phase-prototype alignment (orthogonal classes in phase space).
+
+    Key insight: Classes are initialized π apart (orthogonal), so the
+    document phase must commit to one side or the other - no averaging!
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_classes: int,
+        num_heads: int = 4,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_classes = num_classes
+        self.num_heads = num_heads
+
+        # Phase projection: hidden states → phase angles
+        # Multi-head for richer phase representation
+        self.phase_proj = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, num_heads),
+        )
+
+        # Learnable class prototypes in phase space
+        # Initialize evenly spaced around the circle for maximum separation
+        # For binary: 0 and π (orthogonal)
+        # For 10-class: 0, 0.628, 1.257, ... (evenly spaced)
+        initial_phases = torch.linspace(0, 2 * math.pi * (num_classes - 1) / num_classes, num_classes)
+        self.class_phases = nn.Parameter(initial_phases.unsqueeze(0).expand(num_heads, -1).clone())
+        # Shape: [num_heads, num_classes]
+
+        # Attention weights for token importance (which tokens matter for phase)
+        self.token_importance = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim // 2),
+            nn.GELU(),
+            nn.Linear(embed_dim // 2, 1),
+        )
+
+        # Temperature for sharper classification
+        self.temperature = nn.Parameter(torch.ones(1) * 0.5)
+
+        # Final projection to combine heads
+        self.head_weights = nn.Parameter(torch.ones(num_heads) / num_heads)
+
+        self.dropout = nn.Dropout(dropout)
+
+        print(f"  PhasePrototypeClassifier: {num_classes} classes, {num_heads} heads")
+        print(f"  Class phase prototypes initialized {360/num_classes:.1f}° apart")
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            hidden_states: [B, N, embed_dim] encoder output
+
+        Returns:
+            logits: [B, num_classes]
+        """
+        B, N, D = hidden_states.shape
+
+        # Compute token phases [B, N, num_heads]
+        token_phases = self.phase_proj(hidden_states)
+        token_phases = torch.tanh(token_phases) * math.pi  # Bound to [-π, π]
+
+        # Compute token importance weights [B, N, 1]
+        importance = self.token_importance(hidden_states)
+        importance = F.softmax(importance, dim=1)  # Normalize across sequence
+        importance = self.dropout(importance)
+
+        # Weighted circular mean for document phase
+        # Use complex representation for proper circular averaging
+        # z = exp(i*θ), then angle(mean(z)) gives circular mean
+        complex_phases = torch.exp(1j * token_phases)  # [B, N, num_heads]
+        weighted_complex = complex_phases * importance  # [B, N, num_heads]
+        doc_complex = weighted_complex.sum(dim=1)  # [B, num_heads]
+        doc_phase = torch.angle(doc_complex)  # [B, num_heads]
+
+        # Compute similarity to each class prototype using phase difference
+        # [B, num_heads, 1] - [num_heads, num_classes] → [B, num_heads, num_classes]
+        phase_diffs = doc_phase.unsqueeze(2) - self.class_phases.unsqueeze(0)
+
+        # Cosine similarity in phase space
+        similarities = torch.cos(phase_diffs)  # [B, num_heads, num_classes]
+
+        # Combine heads with learned weights
+        head_weights = F.softmax(self.head_weights, dim=0)
+        logits = (similarities * head_weights.view(1, -1, 1)).sum(dim=1)  # [B, num_classes]
+
+        # Temperature scaling for sharper decisions
+        logits = logits / self.temperature.clamp(min=0.1)
+
+        return logits
+
+
+# =============================================================================
 # MODEL WITH CLASSIFICATION HEAD
 # =============================================================================
 
 class LRAClassifier(nn.Module):
     """
     Wrapper that adds classification head to transformer encoder.
+
+    Supports:
+    - Softmax attention pooler for sharp classification
+    - Phase prototype classifier (USE formula-inspired)
+    - Byte n-gram convolution for text tasks (Grok's suggestion)
+
+    Pool types:
+    - mean: Average all positions (default, works for structural tasks)
+    - attention: SoftmaxAttentionPooler (sharp attention, for classification)
+    - phase_prototype: PhasePrototypeClassifier (USE-inspired, classes as orthogonal phases)
+    - cls: Use first token (CLS-style)
+    - last: Use last token
     """
 
     def __init__(
@@ -434,14 +676,20 @@ class LRAClassifier(nn.Module):
         embed_dim: int,
         num_classes: int,
         vocab_size: int,
-        pool: str = "mean",  # mean, cls, last
+        num_heads: int = 4,
+        pool: str = "mean",  # mean, attention, phase_prototype, cls, last
         num_refine: int = 1,  # Iterative refinement passes per block
+        use_byte_conv: bool = False,  # Add 1D conv for byte n-grams
+        byte_conv_kernel: int = 5,  # Kernel size for byte n-gram conv
+        dropout: float = 0.1,
     ):
         super().__init__()
         self.encoder = encoder
         self.pool = pool
         self.num_classes = num_classes
         self.num_refine = num_refine
+        self.use_byte_conv = use_byte_conv
+        self.embed_dim = embed_dim
 
         # Replace embedding if vocab size differs
         if hasattr(encoder, 'embed'):
@@ -449,11 +697,49 @@ class LRAClassifier(nn.Module):
             if old_vocab != vocab_size:
                 encoder.embed = nn.Embedding(vocab_size, embed_dim)
 
-        # Classification head
+        # Byte n-gram convolution layer (Grok's suggestion)
+        # Captures local byte patterns (e.g., "not" in "not good") before transformer
+        if use_byte_conv:
+            self.byte_conv = nn.Sequential(
+                nn.Conv1d(embed_dim, embed_dim, kernel_size=byte_conv_kernel,
+                          padding=byte_conv_kernel // 2, groups=1),
+                nn.GELU(),
+                nn.Conv1d(embed_dim, embed_dim, kernel_size=byte_conv_kernel,
+                          padding=byte_conv_kernel // 2, groups=1),
+            )
+        else:
+            self.byte_conv = None
+
+        # Softmax attention pooler (principled fix for classification)
+        # Uses standard dot-product attention instead of Phase's smooth attention
+        if pool == "attention":
+            self.attention_pooler = SoftmaxAttentionPooler(
+                embed_dim=embed_dim,
+                num_heads=num_heads,
+                dropout=dropout,
+            )
+            self.phase_prototype = None
+            print("  Using SoftmaxAttentionPooler for classification (sharp attention)")
+        elif pool == "phase_prototype":
+            # USE formula-inspired: classes as orthogonal phase prototypes
+            # Document phase aligns with correct class prototype
+            self.phase_prototype = PhasePrototypeClassifier(
+                embed_dim=embed_dim,
+                num_classes=num_classes,
+                num_heads=num_heads,
+                dropout=dropout,
+            )
+            self.attention_pooler = None
+            print("  Using PhasePrototypeClassifier (USE formula: orthogonal class phases)")
+        else:
+            self.attention_pooler = None
+            self.phase_prototype = None
+
+        # Classification head (not used for phase_prototype)
         self.classifier = nn.Sequential(
             nn.Linear(embed_dim, embed_dim),
             nn.GELU(),
-            nn.Dropout(0.1),
+            nn.Dropout(dropout),
             nn.Linear(embed_dim, num_classes),
         )
 
@@ -486,24 +772,42 @@ class LRAClassifier(nn.Module):
                 pos = torch.arange(N, device=x.device)
                 h = h + self.encoder.pos_embed(pos)
 
+            # Byte n-gram convolution (Grok's suggestion)
+            # Applied AFTER embedding, BEFORE transformer layers
+            # Captures local byte patterns like "not", "good", "bad"
+            if self.byte_conv is not None:
+                # Conv1d expects [B, C, N], we have [B, N, C]
+                h_conv = h.transpose(1, 2)  # [B, embed_dim, N]
+                h_conv = self.byte_conv(h_conv)  # [B, embed_dim, N]
+                h = h + h_conv.transpose(1, 2)  # Residual connection [B, N, embed_dim]
+
             # Dropout
             if hasattr(self.encoder, 'embed_dropout'):
                 h = self.encoder.embed_dropout(h)
 
-            # Process through layers with iterative refinement
-            if hasattr(self.encoder, 'layers'):
-                for layer in self.encoder.layers:
-                    for _ in range(self.num_refine):
+            # Process through layers with iterative refinement (full-pass)
+            # Each refinement pass goes through ALL blocks, like Universal Transformer
+            for _ in range(self.num_refine):
+                if hasattr(self.encoder, 'layers'):
+                    for layer in self.encoder.layers:
                         h = layer(h)
-            elif hasattr(self.encoder, 'blocks'):
-                for block in self.encoder.blocks:
-                    for _ in range(self.num_refine):
+                elif hasattr(self.encoder, 'blocks'):
+                    for block in self.encoder.blocks:
                         h = block(h)
 
             hidden = h  # [B, N, embed_dim]
 
-        # Pool
-        if self.pool == "mean":
+        # Phase prototype classifier bypasses pooling - does both pooling and classification
+        if self.pool == "phase_prototype":
+            # USE formula-inspired: classify by phase alignment with class prototypes
+            logits = self.phase_prototype(hidden)  # [B, num_classes]
+            return logits
+
+        # Pool sequence to single vector
+        if self.pool == "attention":
+            # Use SoftmaxAttentionPooler (sharp, discriminative attention)
+            pooled = self.attention_pooler(hidden)  # [B, embed_dim]
+        elif self.pool == "mean":
             pooled = hidden.mean(dim=1)  # [B, embed_dim]
         elif self.pool == "cls":
             pooled = hidden[:, 0]
@@ -516,6 +820,86 @@ class LRAClassifier(nn.Module):
         logits = self.classifier(pooled)
 
         return logits
+
+
+class InterleavedHybridEncoder(nn.Module):
+    """
+    Custom hybrid encoder with configurable layer patterns.
+
+    Supports Grok's suggestions for text classification:
+    - interleave: L-H-L-H-L-H-L-H (alternating local and hybrid)
+    - phase_first: H-H-H-H-L-L-L-L (global context first, then local refine)
+    """
+
+    def __init__(
+        self,
+        vocab_size: int,
+        embed_dim: int,
+        num_layers: int,
+        num_heads: int,
+        ff_dim: int,
+        max_seq_len: int,
+        dropout: float,
+        layer_pattern: str,  # interleave, phase_first
+        window_size: int,
+        local_backend: str,
+        alpha_local: float,
+        alpha_phase: float,
+        temperature: float = 1.0,  # Lower = sharper attention
+    ):
+        super().__init__()
+
+        self.config = TransformerConfig(
+            vocab_size=vocab_size,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            max_seq_len=max_seq_len,
+            dropout=dropout,
+            temperature=temperature,  # Pass temperature for sharper attention
+        )
+
+        # Embeddings
+        self.token_embed = nn.Embedding(vocab_size, embed_dim)
+        self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
+        self.embed_dropout = nn.Dropout(dropout)
+
+        # Build blocks based on pattern
+        self.blocks = nn.ModuleList()
+
+        for i in range(num_layers):
+            if layer_pattern == "interleave":
+                # L-H-L-H-L-H: even=local, odd=hybrid
+                if i % 2 == 0:
+                    self.blocks.append(LocalTransformerBlock(
+                        self.config, window_size=window_size, backend=local_backend))
+                else:
+                    self.blocks.append(HybridTransformerBlock(
+                        self.config, window_size=window_size, local_backend=local_backend,
+                        alpha_local=alpha_local, alpha_phase=alpha_phase))
+            elif layer_pattern == "phase_first":
+                # H-H-H-H-L-L-L-L: first half hybrid, second half local
+                if i < num_layers // 2:
+                    self.blocks.append(HybridTransformerBlock(
+                        self.config, window_size=window_size, local_backend=local_backend,
+                        alpha_local=alpha_local, alpha_phase=alpha_phase))
+                else:
+                    self.blocks.append(LocalTransformerBlock(
+                        self.config, window_size=window_size, backend=local_backend))
+            else:
+                raise ValueError(f"Unknown layer pattern: {layer_pattern}")
+
+        # Final norm
+        self.final_norm = nn.LayerNorm(embed_dim)
+
+        # LM head (not used for classification, but needed for structure)
+        self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
+
+        print(f"  InterleavedHybridEncoder: {layer_pattern} pattern")
+        pattern_str = "".join(["L" if isinstance(b, LocalTransformerBlock) else "H"
+                               for b in self.blocks])
+        print(f"  Layer pattern: {pattern_str}")
 
 
 def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, device: torch.device) -> nn.Module:
@@ -538,22 +922,44 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
             ff_dim=ff_dim,
             max_seq_len=seq_len,
             dropout=config.dropout,
+            temperature=config.phase_temperature,  # Sharper attention for classification
         )
     elif config.model_type == "hybrid":
-        encoder = HybridPhaseTransformer(
-            vocab_size=vocab_size,
-            embed_dim=embed_dim,
-            num_layers=num_layers,
-            num_heads=num_heads,
-            ff_dim=ff_dim,
-            max_seq_len=seq_len,
-            dropout=config.dropout,
-            local_layers=config.local_layers,
-            window_size=config.window_size,
-            local_backend=config.local_backend,
-            alpha_local=config.alpha_local,
-            alpha_phase=config.alpha_phase,
-        )
+        # Check layer pattern
+        if config.layer_pattern in ["interleave", "phase_first"]:
+            # Use custom interleaved encoder (Grok's suggestion)
+            encoder = InterleavedHybridEncoder(
+                vocab_size=vocab_size,
+                embed_dim=embed_dim,
+                num_layers=num_layers,
+                num_heads=num_heads,
+                ff_dim=ff_dim,
+                max_seq_len=seq_len,
+                dropout=config.dropout,
+                layer_pattern=config.layer_pattern,
+                window_size=config.window_size,
+                local_backend=config.local_backend,
+                alpha_local=config.alpha_local,
+                alpha_phase=config.alpha_phase,
+                temperature=config.phase_temperature,  # Sharper attention for classification
+            )
+        else:
+            # Default: local_first pattern (L-L-L-L-H-H-H-H)
+            encoder = HybridPhaseTransformer(
+                vocab_size=vocab_size,
+                embed_dim=embed_dim,
+                num_layers=num_layers,
+                num_heads=num_heads,
+                ff_dim=ff_dim,
+                max_seq_len=seq_len,
+                dropout=config.dropout,
+                local_layers=config.local_layers,
+                window_size=config.window_size,
+                local_backend=config.local_backend,
+                alpha_local=config.alpha_local,
+                alpha_phase=config.alpha_phase,
+                temperature=config.phase_temperature,  # Sharper attention for classification
+            )
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
 
@@ -566,13 +972,27 @@ def create_lra_model(config: LRAConfig, num_classes: int, vocab_size: int, devic
                 if hasattr(module, 'gradient_checkpointing'):
                     module.gradient_checkpointing = True
 
+    # Auto-enable byte_conv for text task if not explicitly set
+    use_byte_conv = config.use_byte_conv
+    if config.task == "text" and not use_byte_conv:
+        print("  Note: Consider --use_byte_conv for text task (Grok's suggestion)")
+
+    # Auto-suggest attention pooler for text classification
+    pool_type = config.pool_type
+    if config.task == "text" and pool_type == "mean":
+        print("  Note: Consider --pool_type attention for text classification")
+
     model = LRAClassifier(
         encoder=encoder,
         embed_dim=embed_dim,
         num_classes=num_classes,
         vocab_size=vocab_size,
-        pool="mean",
+        num_heads=num_heads,
+        pool=pool_type,
         num_refine=config.num_refine,
+        use_byte_conv=use_byte_conv,
+        byte_conv_kernel=config.byte_conv_kernel,
+        dropout=config.dropout,
     )
 
     return model.to(device)
@@ -871,6 +1291,33 @@ def main():
     parser.add_argument("--window_size", type=int, default=256,
                        help="Local attention window size")
 
+    # Layer pattern (Grok's suggestion for text tasks)
+    parser.add_argument("--layer_pattern", type=str, default="local_first",
+                       choices=["local_first", "interleave", "phase_first"],
+                       help="Layer ordering pattern: local_first (L-L-H-H), "
+                            "interleave (L-H-L-H), phase_first (H-H-L-L)")
+
+    # Byte n-gram convolution (Grok's suggestion for text tasks)
+    parser.add_argument("--use_byte_conv", action="store_true",
+                       help="Add 1D conv layer for byte n-gram patterns (good for text)")
+    parser.add_argument("--byte_conv_kernel", type=int, default=5,
+                       help="Kernel size for byte n-gram conv (default: 5 bytes)")
+
+    # Alpha weights for hybrid attention
+    parser.add_argument("--alpha_local", type=float, default=0.8,
+                       help="Weight for local attention in hybrid layers")
+    parser.add_argument("--alpha_phase", type=float, default=0.2,
+                       help="Weight for phase attention in hybrid layers")
+
+    # Phase attention temperature (patent formula enhancement)
+    parser.add_argument("--phase_temperature", type=float, default=1.0,
+                       help="Temperature for phase attention: lower=sharper (0.1-0.5 for classification)")
+
+    # Pooling type for classification (principled fix for Phase attention)
+    parser.add_argument("--pool_type", type=str, default="mean",
+                       choices=["mean", "attention", "phase_prototype", "cls", "last"],
+                       help="Pooling type: mean (default), attention (softmax pooler), phase_prototype (USE formula: orthogonal class phases)")
+
     # Logging
     parser.add_argument("--log_every", type=int, default=100,
                        help="Log every N steps")
@@ -888,6 +1335,7 @@ def main():
         task=args.task,
         seq_len=args.seq_len,
         model_type=args.model_type,
+        num_refine=args.num_refine,
         model_size=args.model_size,
         batch_size=args.batch_size,
         max_steps=args.max_steps,
@@ -895,6 +1343,13 @@ def main():
         gradient_checkpointing=args.gradient_checkpointing,
         local_backend=args.local_backend,
         window_size=args.window_size,
+        layer_pattern=args.layer_pattern,
+        use_byte_conv=args.use_byte_conv,
+        byte_conv_kernel=args.byte_conv_kernel,
+        alpha_local=args.alpha_local,
+        alpha_phase=args.alpha_phase,
+        phase_temperature=args.phase_temperature,
+        pool_type=args.pool_type,
         log_every=args.log_every,
         eval_every=args.eval_every,
         checkpoint_dir=args.checkpoint_dir,
