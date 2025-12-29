@@ -185,10 +185,16 @@ class TrainingConfig:
     lambda_stability: float = 0.001  # S8-S9: Stability constraint weight
 
     # Loss Type (memory-efficient options for long context)
-    loss_type: str = "cross_entropy"  # cross_entropy, contrastive, infonce
+    loss_type: str = "cross_entropy"  # cross_entropy, contrastive, infonce, state_delta
     num_negatives: int = 1024         # Number of negative samples for contrastive
     contrastive_margin: float = 1.0   # Margin for hinge loss
     contrastive_temperature: float = 0.1  # Temperature for InfoNCE
+
+    # State-Centric Training (for 10M+ context - NO LM head required!)
+    lambda_delta: float = 1.0         # State delta prediction weight
+    lambda_entropy_state: float = 0.1 # Entropy change weight
+    lambda_constraint: float = 0.1    # Constraint satisfaction weight
+    target_entropy_rate: float = 0.5  # Target entropy rate
 
     # Chunked LM Head (for ultra-long contexts 1M+)
     lm_head_chunk_size: int = 0  # 0 = disabled, >0 = chunk size for LM head processing
@@ -725,6 +731,91 @@ def compute_infonce_loss(
     return loss.mean()
 
 
+def compute_state_centric_loss(
+    model: PhaseTransformer,
+    batch: Tuple[torch.Tensor, torch.Tensor],
+    device: torch.device,
+    lambda_delta: float = 1.0,
+    lambda_entropy: float = 0.1,
+    lambda_constraint: float = 0.1,
+    target_entropy_rate: float = 0.5,
+) -> Tuple[torch.Tensor, Dict[str, float]]:
+    """
+    State-centric training loss - NO TOKEN PREDICTION (no LM head).
+
+    Instead of:
+        hidden → LM head (50K dim) → CE loss  [O(B·T·V) memory = 200GB at 1M]
+
+    We use:
+        hidden → state_delta_predictor (768 dim) → state losses  [O(B·T·d) = 3GB at 1M]
+
+    Training signals:
+    1. State delta prediction: predict h[t+1] - h[t]
+    2. Entropy change: smooth information flow
+    3. Constraint satisfaction: bounded norms, diversity, smoothness
+
+    Memory savings: 50K/768 = ~65x reduction per position
+    At 1M context: 200GB → 3GB
+
+    This enables training at 10M+ context without ANY vocabulary projection.
+    Tokens become a projection for inference, not the training objective.
+
+    Args:
+        model: PhaseTransformer or HybridPhaseTransformer with state_delta_predictor
+        batch: (input_ids, target_ids) - targets not used for state-centric training
+        device: torch device
+        lambda_delta: Weight for state delta prediction loss
+        lambda_entropy: Weight for entropy change loss
+        lambda_constraint: Weight for constraint satisfaction loss
+        target_entropy_rate: Target rate of entropy change
+
+    Returns:
+        loss: Combined state-centric loss
+        metrics: Dict with all loss components
+    """
+    from symbolu.phase_transformer import (
+        compute_entropy_change_loss,
+        compute_constraint_satisfaction_loss,
+    )
+
+    x, _ = batch  # y (targets) not needed for state-centric training
+    x = x.to(device)
+
+    # Get hidden states (no LM head projection!)
+    hidden_states = model.forward_hidden(x)  # [B, T, embed_dim]
+
+    # 1. State delta prediction loss
+    delta_loss, delta_metrics = model.state_delta_predictor.compute_loss(hidden_states)
+
+    # 2. Entropy change loss (information flow regularization)
+    entropy_loss, entropy_metrics = compute_entropy_change_loss(
+        hidden_states, target_entropy_rate=target_entropy_rate
+    )
+
+    # 3. Constraint satisfaction loss
+    constraint_loss, constraint_metrics = compute_constraint_satisfaction_loss(hidden_states)
+
+    # Combined loss
+    total_loss = (
+        lambda_delta * delta_loss +
+        lambda_entropy * entropy_loss +
+        lambda_constraint * constraint_loss
+    )
+
+    # Compile metrics
+    metrics = {
+        'loss': total_loss.item(),
+        'delta_loss': delta_loss.item(),
+        'entropy_loss': entropy_loss.item(),
+        'constraint_loss': constraint_loss.item(),
+        **{k: v.item() if torch.is_tensor(v) else v for k, v in delta_metrics.items()},
+        **{k: v.item() if torch.is_tensor(v) else v for k, v in entropy_metrics.items()},
+        **{k: v.item() if torch.is_tensor(v) else v for k, v in constraint_metrics.items()},
+    }
+
+    return total_loss, metrics
+
+
 # Global state for entropy stability tracking (S8-S9)
 _prev_entropy = None
 
@@ -1218,8 +1309,24 @@ def train_step(
 
     # Forward pass with coherence loss (S3, S1-S2, S8-S9)
     with autocast(device_type='cuda', enabled=use_amp, dtype=dtype):
+        # State-centric training: NO LM head, predict state deltas instead
+        if config.loss_type == "state_delta":
+            loss, metrics = compute_state_centric_loss(
+                model, batch, device,
+                lambda_delta=config.lambda_delta,
+                lambda_entropy=config.lambda_entropy_state,
+                lambda_constraint=config.lambda_constraint,
+                target_entropy_rate=config.target_entropy_rate,
+            )
+            loss = loss / config.gradient_accumulation
+
+            # Backward pass
+            if scaler is not None:
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
         # Use chunked processing for ultra-long sequences
-        if config.chunk_size > 0:
+        elif config.chunk_size > 0:
             # Chunked mode: backward already done per-chunk, returns None for loss
             loss, metrics = compute_loss_chunked(
                 model, batch, device,
@@ -1763,14 +1870,24 @@ def parse_args() -> TrainingConfig:
 
     # Loss Type (memory-efficient options for 1M+ context)
     parser.add_argument("--loss_type", type=str, default="cross_entropy",
-                       choices=["cross_entropy", "contrastive", "infonce"],
-                       help="Loss type: cross_entropy (fused), contrastive (hinge), infonce (NCE)")
+                       choices=["cross_entropy", "contrastive", "infonce", "state_delta"],
+                       help="Loss type: cross_entropy (fused), contrastive (hinge), infonce (NCE), state_delta (no LM head)")
     parser.add_argument("--num_negatives", type=int, default=1024,
                        help="Number of negative samples for contrastive losses")
     parser.add_argument("--contrastive_margin", type=float, default=1.0,
                        help="Margin for contrastive hinge loss")
     parser.add_argument("--contrastive_temperature", type=float, default=0.1,
                        help="Temperature for InfoNCE loss")
+
+    # State-Centric Training (for 10M+ context - NO LM head required!)
+    parser.add_argument("--lambda_delta", type=float, default=1.0,
+                       help="Weight for state delta prediction loss (state_delta mode)")
+    parser.add_argument("--lambda_entropy_state", type=float, default=0.1,
+                       help="Weight for entropy change loss (state_delta mode)")
+    parser.add_argument("--lambda_constraint", type=float, default=0.1,
+                       help="Weight for constraint satisfaction loss (state_delta mode)")
+    parser.add_argument("--target_entropy_rate", type=float, default=0.5,
+                       help="Target rate of entropy change for state-centric training")
 
     # Chunked LM Head (for ultra-long contexts)
     parser.add_argument("--lm_head_chunk_size", type=int, default=0,
@@ -1821,6 +1938,9 @@ if __name__ == "__main__":
     print(f"  Loss type: {config.loss_type}", end="")
     if config.loss_type in ("contrastive", "infonce"):
         print(f" (num_neg={config.num_negatives})")
+    elif config.loss_type == "state_delta":
+        print(f" (NO LM HEAD - 65x memory savings!)")
+        print(f"  State-centric training: λ_delta={config.lambda_delta}, λ_entropy={config.lambda_entropy_state}, λ_constraint={config.lambda_constraint}")
     else:
         print(" (fused)")
     if config.gradient_checkpointing:

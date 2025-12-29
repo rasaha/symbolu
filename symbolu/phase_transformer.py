@@ -367,6 +367,208 @@ class FeedForward(nn.Module):
 
 
 # =============================================================================
+# STATE DELTA PREDICTOR - State-Centric Training (No LM Head Required)
+# =============================================================================
+
+class StateDeltaPredictor(nn.Module):
+    """
+    Predicts next hidden state delta for state-centric training.
+
+    Instead of token prediction (expensive LM head):
+        hidden → LM head (50K dim) → CE loss  [O(B·T·V) memory]
+
+    We predict state deltas (cheap):
+        h[t] → delta predictor → h[t+1] - h[t]  [O(B·T·d) memory]
+
+    This enables:
+    1. Training without vocabulary projection (infinite context)
+    2. Learning dynamics rather than discrete tokens
+    3. Coherence/entropy-based training signals
+
+    Memory savings: 50K/768 = ~65x reduction per position
+    At 1M context: 200GB → 3GB
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        hidden_dim: Optional[int] = None,
+        dropout: float = 0.1,
+        num_layers: int = 2,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        hidden_dim = hidden_dim or embed_dim * 2
+
+        # Multi-layer delta predictor
+        layers = []
+        in_dim = embed_dim
+        for i in range(num_layers - 1):
+            layers.extend([
+                nn.Linear(in_dim, hidden_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+            ])
+            in_dim = hidden_dim
+        layers.append(nn.Linear(in_dim, embed_dim))
+
+        self.delta_net = nn.Sequential(*layers)
+        self.norm = nn.LayerNorm(embed_dim)
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        """
+        Predict state deltas from current hidden states.
+
+        Args:
+            hidden_states: [B, T, embed_dim] - current hidden states
+
+        Returns:
+            predicted_deltas: [B, T-1, embed_dim] - predicted h[t+1] - h[t]
+        """
+        # Predict delta for each position (what should change next)
+        deltas = self.delta_net(hidden_states[:, :-1])  # [B, T-1, embed_dim]
+        return self.norm(deltas)
+
+    def compute_loss(
+        self,
+        hidden_states: torch.Tensor,
+        reduction: str = 'mean',
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+        """
+        Compute state delta prediction loss.
+
+        Args:
+            hidden_states: [B, T, embed_dim] - hidden states from forward pass
+            reduction: 'mean', 'sum', or 'none'
+
+        Returns:
+            loss: State delta prediction loss
+            metrics: Dict with delta_mae, delta_cosine_sim
+        """
+        # Actual deltas: h[t+1] - h[t]
+        actual_deltas = hidden_states[:, 1:] - hidden_states[:, :-1]  # [B, T-1, d]
+
+        # Predicted deltas
+        predicted_deltas = self.forward(hidden_states)  # [B, T-1, d]
+
+        # L2 loss (MSE)
+        delta_loss = F.mse_loss(predicted_deltas, actual_deltas, reduction=reduction)
+
+        # Metrics
+        with torch.no_grad():
+            delta_mae = F.l1_loss(predicted_deltas, actual_deltas)
+            # Cosine similarity between predicted and actual deltas
+            cos_sim = F.cosine_similarity(
+                predicted_deltas.reshape(-1, self.embed_dim),
+                actual_deltas.reshape(-1, self.embed_dim),
+                dim=-1
+            ).mean()
+
+        metrics = {
+            'delta_loss': delta_loss.detach(),
+            'delta_mae': delta_mae,
+            'delta_cosine_sim': cos_sim,
+        }
+
+        return delta_loss, metrics
+
+
+def compute_entropy_change_loss(
+    hidden_states: torch.Tensor,
+    target_entropy_rate: float = 0.0,
+) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    """
+    Compute entropy change loss - encourages smooth information flow.
+
+    Measures how much "information" changes between consecutive states
+    using the magnitude of state changes as a proxy for entropy.
+
+    Args:
+        hidden_states: [B, T, embed_dim]
+        target_entropy_rate: Target rate of entropy change (0 = stable)
+
+    Returns:
+        loss: Entropy change regularization loss
+        metrics: Dict with entropy_rate, entropy_variance
+    """
+    # State changes as proxy for information change
+    deltas = hidden_states[:, 1:] - hidden_states[:, :-1]  # [B, T-1, d]
+
+    # Entropy proxy: L2 norm of deltas (information magnitude)
+    entropy_proxy = torch.norm(deltas, dim=-1)  # [B, T-1]
+
+    # Mean entropy rate
+    entropy_rate = entropy_proxy.mean()
+
+    # Variance of entropy rate (want consistency)
+    entropy_variance = entropy_proxy.var()
+
+    # Loss: deviation from target rate + variance penalty
+    loss = (entropy_rate - target_entropy_rate).abs() + 0.1 * entropy_variance
+
+    metrics = {
+        'entropy_rate': entropy_rate.detach(),
+        'entropy_variance': entropy_variance.detach(),
+    }
+
+    return loss, metrics
+
+
+def compute_constraint_satisfaction_loss(
+    hidden_states: torch.Tensor,
+    phase_coherence: Optional[torch.Tensor] = None,
+) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    """
+    Compute constraint satisfaction loss for state-centric training.
+
+    Constraints:
+    1. Bounded norm: Hidden states should have bounded magnitude
+    2. Diversity: States should be diverse (not collapse to same point)
+    3. Smoothness: Consecutive states should be smooth (Lipschitz)
+
+    Args:
+        hidden_states: [B, T, embed_dim]
+        phase_coherence: Optional phase coherence from attention (if available)
+
+    Returns:
+        loss: Constraint satisfaction loss
+        metrics: Dict with norm_violation, diversity, smoothness
+    """
+    B, T, D = hidden_states.shape
+
+    # 1. Bounded norm constraint (soft constraint)
+    norms = torch.norm(hidden_states, dim=-1)  # [B, T]
+    max_norm = 10.0  # Soft upper bound
+    norm_violation = F.relu(norms - max_norm).mean()
+
+    # 2. Diversity constraint: states should span the space
+    # Use variance across time as diversity measure
+    diversity = hidden_states.var(dim=1).mean()  # Want high diversity
+    diversity_loss = F.relu(1.0 - diversity)  # Penalize if diversity < 1
+
+    # 3. Smoothness constraint: Lipschitz bound on state changes
+    deltas = hidden_states[:, 1:] - hidden_states[:, :-1]
+    delta_norms = torch.norm(deltas, dim=-1)  # [B, T-1]
+    max_delta = 5.0  # Soft Lipschitz bound
+    smoothness_violation = F.relu(delta_norms - max_delta).mean()
+
+    # Combined loss
+    loss = norm_violation + diversity_loss + smoothness_violation
+
+    metrics = {
+        'norm_violation': norm_violation.detach(),
+        'diversity': diversity.detach(),
+        'smoothness_violation': smoothness_violation.detach(),
+    }
+
+    # Add phase coherence if available
+    if phase_coherence is not None:
+        metrics['phase_coherence'] = phase_coherence.detach()
+
+    return loss, metrics
+
+
+# =============================================================================
 # LOCAL ATTENTION (Sliding Window) - O(n*w)
 # =============================================================================
 
@@ -1205,6 +1407,14 @@ class PhaseTransformer(nn.Module):
         # Tie weights
         self.lm_head.weight = self.token_embed.weight
 
+        # State-centric training head (optional, for token-free training)
+        self.state_delta_predictor = StateDeltaPredictor(
+            embed_dim=embed_dim,
+            hidden_dim=embed_dim * 2,
+            dropout=dropout,
+            num_layers=2,
+        )
+
         # Gradient checkpointing (disabled by default)
         self.gradient_checkpointing = False
 
@@ -1446,6 +1656,14 @@ class HybridPhaseTransformer(nn.Module):
 
         # Tie weights
         self.lm_head.weight = self.token_embed.weight
+
+        # State-centric training head (optional, for token-free training)
+        self.state_delta_predictor = StateDeltaPredictor(
+            embed_dim=embed_dim,
+            hidden_dim=embed_dim * 2,
+            dropout=dropout,
+            num_layers=2,
+        )
 
         # Gradient checkpointing (disabled by default)
         self.gradient_checkpointing = False
