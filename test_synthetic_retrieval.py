@@ -40,6 +40,52 @@ MODEL_PRESETS = {
 }
 
 
+class SimpleTokenizer:
+    """Simple word-based tokenizer fallback."""
+
+    def __init__(self, vocab_size: int = 50257):
+        self.vocab_size = vocab_size
+        self.word_to_id = {}
+        self.id_to_word = {}
+        self.next_id = 256  # Reserve 0-255 for bytes
+
+    def encode(self, text: str) -> list:
+        """Encode text to token ids."""
+        words = text.split()
+        ids = []
+        for word in words:
+            if word not in self.word_to_id:
+                self.word_to_id[word] = self.next_id
+                self.id_to_word[self.next_id] = word
+                self.next_id = (self.next_id + 1) % self.vocab_size
+            ids.append(self.word_to_id[word])
+        return ids
+
+    def decode(self, ids: list) -> str:
+        """Decode token ids to text."""
+        words = []
+        for id in ids:
+            if id in self.id_to_word:
+                words.append(self.id_to_word[id])
+            else:
+                words.append(f"[{id}]")
+        return " ".join(words)
+
+
+def get_tokenizer():
+    """Get tokenizer with fallback."""
+    try:
+        import tiktoken
+        return tiktoken.get_encoding("gpt2")
+    except ImportError:
+        try:
+            from transformers import GPT2Tokenizer
+            return GPT2Tokenizer.from_pretrained("gpt2")
+        except ImportError:
+            print("Warning: Using simple tokenizer fallback")
+            return SimpleTokenizer()
+
+
 class SyntheticRetrievalTest:
     """Generate and test synthetic retrieval tasks."""
 
@@ -240,24 +286,42 @@ class SyntheticRetrievalTest:
 
 def load_model(checkpoint_path: str, model_size: str, max_context: int, device: str):
     """Load model from checkpoint."""
-    config = MODEL_PRESETS[model_size].copy()
-    config["max_seq_len"] = max_context + 1024  # Buffer
-    config["vocab_size"] = 50257  # GPT-2
-    config["use_flash_attn"] = True
-    config["window_size"] = 128
+    preset = MODEL_PRESETS[model_size]
 
     # Try hybrid first, fall back to phase
     try:
-        model = HybridPhaseTransformer(**config)
-    except:
-        model = PhaseTransformer(**config)
+        model = HybridPhaseTransformer(
+            vocab_size=50257,
+            embed_dim=preset["embed_dim"],
+            num_layers=preset["num_layers"],
+            num_heads=preset["num_heads"],
+            ff_dim=preset["ff_dim"],
+            max_seq_len=max_context + 1024,
+            dropout=0.0,
+            local_layers=2,
+            window_size=128,
+            local_backend="unfold",
+        )
+    except Exception as e:
+        print(f"HybridPhaseTransformer failed: {e}, trying PhaseTransformer")
+        model = PhaseTransformer(
+            vocab_size=50257,
+            embed_dim=preset["embed_dim"],
+            num_layers=preset["num_layers"],
+            num_heads=preset["num_heads"],
+            ff_dim=preset["ff_dim"],
+            max_seq_len=max_context + 1024,
+            dropout=0.0,
+        )
 
     # Load checkpoint
     checkpoint = torch.load(checkpoint_path, map_location=device)
     if "model_state_dict" in checkpoint:
-        model.load_state_dict(checkpoint["model_state_dict"])
+        model.load_state_dict(checkpoint["model_state_dict"], strict=False)
+    elif "model" in checkpoint:
+        model.load_state_dict(checkpoint["model"], strict=False)
     else:
-        model.load_state_dict(checkpoint)
+        model.load_state_dict(checkpoint, strict=False)
 
     model.to(device)
     model.eval()
@@ -315,8 +379,7 @@ def run_test(args):
     print(f"Using device: {device}")
 
     # Load tokenizer
-    import tiktoken
-    tokenizer = tiktoken.get_encoding("gpt2")
+    tokenizer = get_tokenizer()
 
     # Load model
     print(f"Loading checkpoint from {args.checkpoint}")
