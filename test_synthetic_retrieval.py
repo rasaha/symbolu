@@ -28,7 +28,7 @@ from tqdm import tqdm
 import sys
 sys.path.insert(0, str(Path(__file__).parent))
 
-from model import PhaseAttentionTransformer, HybridPhaseTransformer
+from symbolu.phase_transformer import PhaseTransformer, HybridPhaseTransformer
 
 
 # Model presets matching train.py
@@ -250,7 +250,7 @@ def load_model(checkpoint_path: str, model_size: str, max_context: int, device: 
     try:
         model = HybridPhaseTransformer(**config)
     except:
-        model = PhaseAttentionTransformer(**config)
+        model = PhaseTransformer(**config)
 
     # Load checkpoint
     checkpoint = torch.load(checkpoint_path, map_location=device)
