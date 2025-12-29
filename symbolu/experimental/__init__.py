@@ -123,6 +123,17 @@ from .state_retrieval import (
     StateGuidedRetriever,
 )
 
+# Unified SymbolU12 (complete integration v2.6/v2.7/v2.8)
+from .unified_symbolu12 import (
+    UnifiedSymbolU12Config,
+    DifferentiableChittaVritti,
+    BidirectionalGunaMapper,
+    VrittiModulatedAttention,
+    VrittiOntologyCoupling,
+    UnifiedSymbolU12Complete,
+    create_unified_symbolu12,
+)
+
 __all__ = [
     # Core
     'CognitiveState',
@@ -160,4 +171,12 @@ __all__ = [
     'OntologyPatternMatcher',
     'StateTrajectoryIndex',
     'StateGuidedRetriever',
+    # Unified SymbolU12 (v2.6/v2.7/v2.8 integration)
+    'UnifiedSymbolU12Config',
+    'DifferentiableChittaVritti',
+    'BidirectionalGunaMapper',
+    'VrittiModulatedAttention',
+    'VrittiOntologyCoupling',
+    'UnifiedSymbolU12Complete',
+    'create_unified_symbolu12',
 ]
