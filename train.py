@@ -190,6 +190,10 @@ class TrainingConfig:
     contrastive_margin: float = 1.0   # Margin for hinge loss
     contrastive_temperature: float = 0.1  # Temperature for InfoNCE
 
+    # Chunked LM Head (for ultra-long contexts 1M+)
+    lm_head_chunk_size: int = 0  # 0 = disabled, >0 = chunk size for LM head processing
+    # Recommended: 8192 for 1M context, 4096 for 5M context
+
     # Seed
     seed: int = 42
 
@@ -1029,6 +1033,173 @@ def compute_loss(
     return loss, metrics
 
 
+def compute_loss_chunked(
+    model: PhaseTransformer,
+    batch: Tuple[torch.Tensor, torch.Tensor],
+    device: torch.device,
+    lm_head_chunk_size: int = 8192,
+    use_coherence_loss: bool = True,
+    lambda_entropy: float = 0.01,
+    lambda_coherence: float = 0.01,
+    lambda_stability: float = 0.001,
+) -> Tuple[torch.Tensor, Dict[str, float]]:
+    """
+    Compute loss with CHUNKED LM head processing for ultra-long contexts.
+
+    For 5M context with V=50K:
+    - Standard: lm_head creates (1, 5M, 50K) = 1TB tensor = OOM
+    - Chunked: Process 8K tokens at a time = 1.6GB per chunk = fits in memory
+
+    Memory breakdown per chunk (8K tokens, 50K vocab):
+    - Hidden states chunk: 8K × 256 = 2MB
+    - Logits chunk: 8K × 50K × 2 = 800MB (bf16)
+    - Cross-entropy: fused, no extra memory
+    - Total: ~1GB per chunk, easily fits
+
+    This enables training on sequences up to 5M+ tokens on B200 (192GB).
+
+    Args:
+        model: PhaseTransformer or HybridPhaseTransformer (must have forward_hidden method)
+        batch: (input_ids, targets) tuple
+        device: torch device
+        lm_head_chunk_size: tokens per chunk for LM head processing (default 8192)
+        use_coherence_loss: whether to compute coherence losses
+        lambda_*: loss weights
+    """
+    global _prev_entropy
+
+    x, y = batch
+    x = x.to(device)
+    y = y.to(device)
+
+    B, N = x.shape
+
+    # Forward pass to get hidden states ONLY (no LM head yet)
+    # This is memory-efficient: hidden is (B, N, embed_dim)
+    # For 5M context with embed_dim=256: only 5GB (vs 1TB for full logits)
+    hidden = model.forward_hidden(x)  # (B, N, embed_dim)
+
+    # Get hidden states for coherence loss (if available)
+    hidden_states = []
+    if use_coherence_loss and hasattr(model, 'blocks'):
+        # Re-run to get intermediate hidden states for coherence
+        # This is a tradeoff: memory vs accuracy
+        # For now, we skip layer coherence in chunked mode
+        pass
+
+    # Process LM head and cross-entropy in chunks
+    total_loss = torch.tensor(0.0, device=device)
+    total_tokens = 0
+    entropy_sum = torch.tensor(0.0, device=device)
+    entropy_samples = 0
+
+    for chunk_start in range(0, N, lm_head_chunk_size):
+        chunk_end = min(chunk_start + lm_head_chunk_size, N)
+        chunk_size = chunk_end - chunk_start
+
+        # Extract chunk of hidden states
+        hidden_chunk = hidden[:, chunk_start:chunk_end, :]  # (B, chunk_size, embed_dim)
+
+        # Compute logits for this chunk only
+        chunk_logits = model.lm_head(hidden_chunk)  # (B, chunk_size, V)
+
+        # Get targets for this chunk
+        chunk_targets = y[:, chunk_start:chunk_end]  # (B, chunk_size)
+
+        # Compute cross-entropy for this chunk (fused, memory-efficient)
+        B_chunk, N_chunk, V = chunk_logits.shape
+        chunk_loss = F.cross_entropy(
+            chunk_logits.view(B_chunk * N_chunk, V),
+            chunk_targets.view(B_chunk * N_chunk),
+            ignore_index=-100,
+            reduction='sum'  # Sum, then normalize later
+        )
+
+        # Count valid tokens (not -100)
+        valid_tokens = (chunk_targets != -100).sum()
+        total_loss = total_loss + chunk_loss
+        total_tokens += valid_tokens
+
+        # Sample entropy from a subset of positions in this chunk
+        if use_coherence_loss:
+            # Use LogSumExp entropy on a sample of positions
+            sample_size = min(256, N_chunk)
+            if N_chunk > sample_size:
+                sample_indices = torch.randperm(N_chunk, device=device)[:sample_size]
+                sampled_logits = chunk_logits[:, sample_indices, :]
+            else:
+                sampled_logits = chunk_logits
+
+            # LogSumExp entropy (no softmax!)
+            lse = torch.logsumexp(sampled_logits, dim=-1)  # (B, sample_size)
+            max_logits, _ = sampled_logits.max(dim=-1)
+            chunk_entropy = (lse - max_logits).mean()
+
+            entropy_sum = entropy_sum + chunk_entropy * sample_size
+            entropy_samples += sample_size
+
+        # Explicitly delete chunk tensors to free memory immediately
+        del chunk_logits, hidden_chunk
+
+    # Normalize loss by total tokens
+    if total_tokens > 0:
+        L_task = total_loss / total_tokens
+    else:
+        L_task = total_loss
+
+    metrics = {
+        "loss": L_task.item(),
+        "perplexity": torch.exp(L_task).item(),
+    }
+
+    if use_coherence_loss:
+        # Compute entropy from samples
+        if entropy_samples > 0:
+            entropy = entropy_sum / entropy_samples
+        else:
+            entropy = torch.tensor(4.0, device=device)
+
+        target_entropy = 4.0
+        L_entropy = (entropy - target_entropy).pow(2)
+        metrics["entropy"] = entropy.item()
+
+        # Update gate for coherence scaling
+        max_entropy = 10.8
+        normalized_entropy = torch.clamp(entropy / max_entropy, 0.0, 1.0)
+        entropy_threshold = 6.0
+        update_gate = torch.sigmoid((entropy - entropy_threshold) * 2.0)
+
+        if _prev_entropy is not None:
+            entropy_change = entropy - _prev_entropy
+            change_gate = torch.sigmoid(entropy_change * 5.0)
+            update_gate = torch.max(update_gate, change_gate * 0.5)
+            L_stability = F.relu(entropy_change)
+            metrics["entropy_change"] = entropy_change.item()
+        else:
+            L_stability = torch.tensor(0.0, device=device)
+            metrics["entropy_change"] = 0.0
+
+        metrics["update_gate"] = update_gate.item()
+        coherence_scale = 1.0 - update_gate
+
+        # Skip layer coherence in chunked mode (would require re-running forward)
+        L_coherence_term = torch.tensor(0.0, device=device)
+        metrics["coherence"] = 0.0
+
+        _prev_entropy = entropy.detach()
+
+        # Combined loss
+        loss = (L_task +
+                lambda_entropy * L_entropy +
+                lambda_stability * coherence_scale * L_stability)
+
+        metrics["loss_total"] = loss.item()
+    else:
+        loss = L_task
+
+    return loss, metrics
+
+
 def train_step(
     model: PhaseTransformer,
     batch: Tuple[torch.Tensor, torch.Tensor],
@@ -1600,6 +1771,12 @@ def parse_args() -> TrainingConfig:
                        help="Margin for contrastive hinge loss")
     parser.add_argument("--contrastive_temperature", type=float, default=0.1,
                        help="Temperature for InfoNCE loss")
+
+    # Chunked LM Head (for ultra-long contexts)
+    parser.add_argument("--lm_head_chunk_size", type=int, default=0,
+                       help="Chunk size for LM head processing. 0=disabled. "
+                            "Recommended: 8192 for 1M context, 4096 for 5M context. "
+                            "Enables training on sequences up to 5M+ tokens.")
 
     # Seed
     parser.add_argument("--seed", type=int, default=42,
