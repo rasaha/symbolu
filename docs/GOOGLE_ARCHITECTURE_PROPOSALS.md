@@ -3686,6 +3686,568 @@ def render_truth_meter(trace: float) -> str:
 
 ---
 
+## Section 30: CUDA Kernel Architecture (Hardware Acceleration)
+
+**Status**: 📋 SPECIFICATION COMPLETE | ⏳ Implementation Pending
+**Date**: 2024-12-30
+**Source**: Gemini Architecture Proposal
+
+### 30.0 Overview: Why CUDA?
+
+The current PyTorch implementation runs the Sattvic Pull and Guna Modulation as **serial operations**. For production inference at scale, this creates latency that "plagues complex AI guardrails."
+
+**Goal**: Fuse Layer 1 (State Evolution) and Layer 2 (Guna Modulation) into a **single GPU clock cycle**.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    CUDA KERNEL ARCHITECTURE                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  CURRENT (PyTorch):                  PROPOSED (CUDA):                        │
+│  ──────────────────                  ────────────────                        │
+│  S_t → persistence → S'              ┌─────────────────────────────────┐    │
+│  S' → metrics → C_s, M, H            │  SINGLE FUSED KERNEL            │    │
+│  metrics → guna_raw                  │  ─────────────────────────────  │    │
+│  guna_raw → softmax → [S,R,T]        │  • Persistence (L1/Register)    │    │
+│  [S,R,T] → weights → G               │  • Reduction (Warp Shuffle)     │    │
+│                                       │  • Modulation (Register Math)   │    │
+│  Latency: ~2-5ms                     │  • Guard (Atomic Broadcast)     │    │
+│                                       └─────────────────────────────────┘    │
+│                                       Latency: ~120μs (target <200μs)        │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 30.1 Data Structures
+
+#### 30.1.1 GunaConfig.h - User Weight Configuration
+
+```cpp
+// Passed to GPU memory - allows operator tuning without recompilation
+struct GunaWeights {
+    float w_S;                    // Sattva emphasis (default: 0.9)
+    float w_R;                    // Rajas emphasis (default: 1.05)
+    float w_T;                    // Tamas emphasis (default: 0.6)
+    float lambda;                 // Persistence pull strength (default: 0.05)
+    float integrity_threshold;    // Kill-switch τ (default: 0.30)
+};
+```
+
+**Evaluation**: ✅ Correct mapping from Python `GunaWeights` dataclass. The `integrity_threshold` maps to `tau_critical` in `ProductionGuardrails`.
+
+---
+
+### 30.2 Core Kernel: SattvaGuna_Core.cu
+
+#### 30.2.1 The Fused Evolution Kernel
+
+```cuda
+__global__ void sattvic_evolution_kernel(
+    float* S_t,              // 124d Current State (In/Out)
+    const float* delta,      // Predicted change ΔS
+    const float* S_0,        // The Sattvic Anchor (Constant Memory)
+    const GunaWeights config,
+    float* output_G,         // Final modulated Guna vector
+    bool* kill_switch        // Integrity flag (Atomic)
+) {
+    int i = threadIdx.x;     // Parallelize across 124 dimensions
+    if (i >= 124) return;
+
+    // --- LAYER 1: STATE EVOLUTION ---
+    // S_{t+1} = S_t + ΔS + λ·(S_0 - S_t)
+    float s_new = S_t[i] + delta[i] + config.lambda * (S_0[i] - S_t[i]);
+    S_t[i] = s_new;
+
+    // Synchronize to ensure all dimensions are updated before Guna derivation
+    __syncthreads();
+
+    // --- LAYER 2: METRIC EXTRACTION & GUNA DERIVATION ---
+    float Cs = calculate_coherence(S_t);
+    float H = calculate_entropy(S_t);
+    float M = calculate_motion(S_t);
+
+    // Standard Math from current implementation
+    float S_raw = Cs * (1.0f - H);
+    float R_raw = M * (1.0f - fabsf(H - 0.5f));
+    float T_raw = H * (1.0f - Cs);
+
+    // Normalize
+    float total_raw = S_raw + R_raw + T_raw + 1e-9f;
+    float S = S_raw / total_raw;
+    float R = R_raw / total_raw;
+    float T = T_raw / total_raw;
+
+    // Apply User Modulation Weights
+    output_G[i] = (config.w_S * S) + (config.w_R * R) + (config.w_T * T);
+
+    // --- INTEGRITY GUARD ---
+    if (calculate_trace(S_t) < config.integrity_threshold) {
+        *kill_switch = true;  // Atomic write
+    }
+}
+```
+
+#### 30.2.2 Evaluation Notes
+
+| Aspect | Assessment | Notes |
+|--------|------------|-------|
+| **Parallelization** | ⚠️ Needs refinement | 124 dims fits in 4 warps (128 threads), but `output_G[i]` writes same G value 124 times |
+| **Guna per-dim** | ❌ Incorrect | G is a scalar, not 124-dim. Should compute once, not per thread |
+| **Reduction sync** | ✅ Correct | `__syncthreads()` before cross-thread reduction |
+| **Kill-switch** | ✅ Correct concept | Atomic bool prevents race conditions |
+
+**Recommended Fix**: Guna computation should happen in thread 0 after reduction, not in all threads:
+
+```cuda
+// After __syncthreads()
+if (threadIdx.x == 0) {
+    float Cs = calculate_coherence(S_t);
+    float H = calculate_entropy(S_t);
+    float M = calculate_motion(S_t);
+    // ... compute G_final ...
+    *output_G = G_final;  // Single scalar output
+}
+```
+
+---
+
+### 30.3 Warp-Level Math Helpers (SattvaGuna_Math.cuh)
+
+#### 30.3.1 Warp Sum Reduction
+
+```cuda
+// Butterfly reduction - O(log N) operations
+__device__ float warpSum(float val) {
+    for (int offset = 16; offset > 0; offset /= 2)
+        val += __shfl_down_sync(0xffffffff, val, offset);
+    return val;
+}
+```
+
+**Evaluation**: ✅ Standard warp-level reduction pattern. Uses `__shfl_down_sync` for zero-latency inter-thread communication.
+
+#### 30.3.2 Entropy Calculation (H)
+
+```cuda
+__device__ float calculate_entropy(float* S_t, int dim) {
+    float thread_val = S_t[threadIdx.x];
+    // p * log(p) approximation
+    float p_log_p = thread_val * logf(thread_val + 1e-9f);
+    float sum = warpSum(p_log_p);
+
+    // Broadcast sum from first thread of warp
+    return -sum / logf((float)dim);
+}
+```
+
+**Evaluation**: ⚠️ Partially correct
+
+| Issue | Problem | Fix |
+|-------|---------|-----|
+| **Multi-warp** | 124 dims = 4 warps, but `warpSum` only reduces within one warp (32 threads) | Need cross-warp reduction via shared memory |
+| **Normalization** | Assumes `S_t` values are already probabilities summing to 1 | May need pre-normalization step |
+| **Return location** | Only thread 0 has correct sum | Other threads get partial values |
+
+**Recommended Fix**:
+
+```cuda
+__device__ float calculate_entropy_multiWarp(float* S_t, int dim) {
+    __shared__ float warp_sums[4];  // 4 warps for 124 dims
+
+    float thread_val = (threadIdx.x < dim) ? S_t[threadIdx.x] : 0.0f;
+    float p_log_p = thread_val * logf(thread_val + 1e-9f);
+    float warp_sum = warpSum(p_log_p);
+
+    // First thread of each warp writes to shared memory
+    if (threadIdx.x % 32 == 0) {
+        warp_sums[threadIdx.x / 32] = warp_sum;
+    }
+    __syncthreads();
+
+    // Final reduction in first warp
+    float total = 0.0f;
+    if (threadIdx.x < 4) {
+        total = warpSum(warp_sums[threadIdx.x]);
+    }
+
+    return -total / logf((float)dim);
+}
+```
+
+#### 30.3.3 Coherence Calculation (C_s)
+
+```cuda
+__device__ float calculate_coherence(float* S_t, int dim) {
+    float val = S_t[threadIdx.x];
+    float sum = warpSum(val);
+    float sq_sum = warpSum(val * val);
+
+    float mean = sum / dim;
+    float var = (sq_sum / dim) - (mean * mean);
+    return 1.0f / (1.0f + var);  // Normalized coherence [0, 1]
+}
+```
+
+**Evaluation**: ⚠️ Same multi-warp issue as entropy. Also:
+- **Variance formula**: Correct (E[X²] - E[X]²)
+- **Coherence mapping**: 1/(1+var) is reasonable but arbitrary - current PyTorch uses different formula
+
+---
+
+### 30.4 Memory Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    GPU MEMORY HIERARCHY                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ CONSTANT MEMORY (__constant__)                                        │   │
+│  │ ─────────────────────────────                                         │   │
+│  │ • S_0 (Sattvic Seed) - 124 floats × 4 bytes = 496 bytes              │   │
+│  │ • Never changes during session                                        │   │
+│  │ • Broadcast to all threads with L1 cache                             │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ SHARED MEMORY (__shared__)                                            │   │
+│  │ ─────────────────────────────                                         │   │
+│  │ • Warp reduction intermediates (4 floats for cross-warp sync)        │   │
+│  │ • ~48KB available per SM                                              │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ REGISTERS (Per Thread)                                                │   │
+│  │ ─────────────────────                                                 │   │
+│  │ • S_t[i], delta[i], s_new - live computation                         │   │
+│  │ • Guna intermediates (S_raw, R_raw, T_raw)                           │   │
+│  │ • Target: <32 registers/thread for full occupancy                    │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ GLOBAL MEMORY (VRAM)                                                  │   │
+│  │ ────────────────────                                                  │   │
+│  │ • S_t (124 floats) - read/write per token                            │   │
+│  │ • delta (124 floats) - read only                                      │   │
+│  │ • output_G (1 float) - write only                                     │   │
+│  │ • kill_switch (1 bool) - atomic write                                 │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Evaluation**: ✅ Correct memory hierarchy. S_0 in constant memory is optimal.
+
+---
+
+### 30.5 Python Binding (binding.cpp)
+
+```cpp
+#include <torch/extension.h>
+#include <vector>
+
+struct GunaWeights {
+    float w_S;
+    float w_R;
+    float w_T;
+    float lambda;
+    float integrity_threshold;
+};
+
+// C++ declaration of the CUDA function
+void launch_sattvic_evolution(
+    torch::Tensor S_t,
+    torch::Tensor delta,
+    torch::Tensor S_0,
+    GunaWeights weights,
+    torch::Tensor output_G,
+    torch::Tensor kill_switch);
+
+// Binding function
+void step_evolution(
+    torch::Tensor S_t,
+    torch::Tensor delta,
+    torch::Tensor S_0,
+    float w_S, float w_R, float w_T,
+    float lambda, float threshold,
+    torch::Tensor output_G,
+    torch::Tensor kill_switch) {
+
+    GunaWeights weights = {w_S, w_R, w_T, lambda, threshold};
+    launch_sattvic_evolution(S_t, delta, S_0, weights, output_G, kill_switch);
+}
+
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+    m.def("step_evolution", &step_evolution,
+          "Sattvic State Evolution and Guna Modulation");
+}
+```
+
+**Evaluation**: ✅ Standard PyTorch C++ extension pattern. Clean interface.
+
+---
+
+### 30.6 Build System (setup.py)
+
+```python
+from setuptools import setup
+from torch.utils.cpp_extension import BuildExtension, CUDAExtension
+
+setup(
+    name='symbol_u12_cuda',
+    ext_modules=[
+        CUDAExtension('symbol_u12_cuda', [
+            'binding.cpp',
+            'SattvaGuna_Core.cu',
+        ],
+        extra_compile_args={
+            'cxx': ['-O3'],
+            'nvcc': ['-O3', '--use_fast_math', '-arch=sm_80']
+        })  # sm_80 for A100/RTX30+
+    ],
+    cmdclass={
+        'build_ext': BuildExtension
+    }
+)
+```
+
+**Evaluation**: ✅ Correct. Notes:
+- `--use_fast_math` trades precision for speed (acceptable for Guna modulation)
+- `-arch=sm_80` targets Ampere architecture; need fallback for older GPUs
+
+---
+
+### 30.7 Execution Flow Summary
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    TOKEN GENERATION FLOW                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  1. MODEL PREDICTS ΔS (Standard PyTorch Forward Pass)                       │
+│     ↓                                                                        │
+│  2. CUDA KERNEL EXECUTES (symbol_u12_cuda.step_evolution)                   │
+│     ┌─────────────────────────────────────────────────────────────────┐     │
+│     │ Step 1: Persistence       S_t + λ(S_0 - S_t)     Register/L1   │     │
+│     │ Step 2: Reduction         H, C_s, M              Warp Shuffle   │     │
+│     │ Step 3: Modulation        w_S×S + w_R×R + w_T×T  Register Math  │     │
+│     │ Step 4: Guard             τ > 0.30?              Atomic Bool    │     │
+│     └─────────────────────────────────────────────────────────────────┘     │
+│     ↓                                                                        │
+│  3. PYTHON CHECKS kill_switch                                               │
+│     ├─ False → Continue with output_G for tone modulation                   │
+│     └─ True  → EPISTEMIC_SILENCE (halt generation)                          │
+│                                                                              │
+│  Target Latency: <200μs per token                                           │
+│  Memory Overhead: ~1KB per inference (S_t + delta + outputs)                │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 30.8 Critical Evaluation Summary
+
+| Component | Status | Issue | Recommendation |
+|-----------|--------|-------|----------------|
+| **Kernel structure** | ⚠️ | Guna computed per-thread, should be once | Compute in thread 0 after reduction |
+| **Warp reduction** | ⚠️ | Only handles 32 threads, need 124 | Add cross-warp shared memory stage |
+| **Memory layout** | ✅ | S_0 in constant, S_t in global | Optimal |
+| **Python binding** | ✅ | Clean pybind11 interface | Ready to use |
+| **Kill-switch** | ✅ | Atomic bool, checked by Python | Correct pattern |
+| **Motion (M)** | ❓ | Not defined in proposal | Need to specify: M = ||S_t - S_{t-1}||? |
+
+### 30.9 Missing Components for Implementation
+
+1. **`calculate_motion()` function**: Not specified. Likely `||S_t - S_{t-1}||` but needs S_{t-1} storage
+2. **`calculate_trace()` function**: Should compute `Tr(R_internal @ R_external.T) / dim`
+3. **Batch processing**: Current kernel is single-sample; production needs batched version
+4. **R matrix handling**: Kernel only handles S_t state; R_internal integrity check needs separate kernel or integration
+5. **Fallback path**: What happens on non-CUDA systems?
+
+### 30.10 Implementation Roadmap
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    CUDA IMPLEMENTATION PHASES                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  PHASE 1: Foundation                                                         │
+│  ─────────────────────                                                       │
+│  □ Create symbolu/experimental/cuda/ directory                              │
+│  □ Implement GunaConfig.h with struct definitions                           │
+│  □ Implement SattvaGuna_Math.cuh with corrected multi-warp reductions       │
+│  □ Unit tests for entropy/coherence against PyTorch reference               │
+│                                                                              │
+│  PHASE 2: Core Kernel                                                        │
+│  ───────────────────                                                         │
+│  □ Implement sattvic_evolution_kernel with fixes from 30.8                  │
+│  □ Add calculate_motion() with S_{t-1} buffering                            │
+│  □ Add calculate_trace() for R matrix integrity                             │
+│  □ Benchmark against PyTorch baseline                                        │
+│                                                                              │
+│  PHASE 3: Integration                                                        │
+│  ────────────────────                                                        │
+│  □ Create binding.cpp with pybind11                                         │
+│  □ Create setup.py with multi-architecture support                          │
+│  □ Add Python wrapper class CUDAAcceleratedGuardrails                       │
+│  □ Integration tests with ProductionGuardrails                              │
+│                                                                              │
+│  PHASE 4: Production                                                         │
+│  ───────────────────                                                         │
+│  □ Batched kernel version for throughput                                    │
+│  □ CPU fallback for non-CUDA systems                                        │
+│  □ Profiling and optimization (target <200μs)                               │
+│  □ Documentation and deployment guide                                        │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 30.11 The Safety Guarantee
+
+> "The user can slide the w_R (Rajas) slider to 2.0 to make the AI more creative, but if that creativity causes the Sattvic Trace to dip below the threshold, the CUDA kernel will physically block the output before a single word is generated."
+
+**This is the core value proposition**: Mathematical impossibility of deception at the hardware level.
+
+```
+User Weights (w_S, w_R, w_T)     Sattvic Anchor (S_0)
+         ↓                              ↓
+    ┌────────────────────────────────────────┐
+    │         FUSED CUDA KERNEL              │
+    │  ────────────────────────────────────  │
+    │  User "Flavor" CANNOT override         │
+    │  Physical "Integrity Constraint"       │
+    │                                        │
+    │  if (τ < 0.30) → HALT                  │
+    │                                        │
+    │  No Python can intercept this.         │
+    │  No prompt can bypass this.            │
+    │  The math is fused into silicon.       │
+    └────────────────────────────────────────┘
+```
+
+---
+
+### 30.12 Main Entry Point (main.py)
+
+The orchestrator script connecting user-facing weights to CUDA-accelerated state evolution:
+
+```python
+import torch
+from symbol_u12_cuda import step_evolution  # Compiled CUDA extension
+from core.initialization import sattvic_init
+from dashboard.pratyaksha import LiveMonitor
+
+def run_symbol_u12():
+    # 1. Initialize Hardware and State
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # S_0 is the immutable "Sattvic Seed" anchor
+    S_0 = torch.zeros(124, device=device)
+    S_0 = sattvic_init(S_0)  # [Phoneme(44), Topic(64), Ontology(12), Dynamics(4)]
+
+    # Current state starts at S_0
+    S_t = S_0.clone()
+
+    # 2. User-Adjustable Guna Weights (The "Flavor")
+    weights = {
+        "w_S": 0.9,      # Coherence emphasis
+        "w_R": 1.05,     # Exploration emphasis
+        "w_T": 0.6,      # Constraint emphasis
+        "lambda": 0.05,  # Persistence pull strength
+        "threshold": 0.3 # Integrity kill-switch (τ_critical)
+    }
+
+    # 3. Initialize Live Dashboard
+    monitor = LiveMonitor()
+
+    # 4. The Infinite Smṛti Loop
+    print("SymbolU12 Live: Monitoring Manifold Integrity...")
+
+    try:
+        while True:
+            # Get delta from model prediction
+            delta = model.get_next_delta(S_t)
+
+            # Pre-allocate output containers
+            output_G = torch.zeros(1, device=device)  # Scalar output
+            kill_switch = torch.tensor([False], device=device, dtype=torch.bool)
+
+            # LAYER 1 & 2: Fused CUDA Kernel Execution
+            step_evolution(
+                S_t, delta, S_0,
+                weights["w_S"], weights["w_R"], weights["w_T"],
+                weights["lambda"], weights["threshold"],
+                output_G, kill_switch
+            )
+
+            # Check Integrity Kill-switch
+            if kill_switch.item():
+                print("AXIOMATIC BREACH: Epistemic Silence Triggered.")
+                break
+
+            # Update Live Dashboard
+            monitor.update(S_t, output_G)
+
+    except KeyboardInterrupt:
+        print("System Shutdown: Manifold Preserved.")
+
+if __name__ == "__main__":
+    run_symbol_u12()
+```
+
+#### 30.12.1 Key Innovations
+
+| Feature | Description |
+|---------|-------------|
+| **Atomic State Lock** | `S_t = S_0.clone()` ensures ground-truth "home" always available |
+| **Dynamic Weight Injection** | Weights passed per kernel call - adjustable mid-sentence |
+| **GPU-to-UI Pipeline** | `output_G` already "Sattvic-filtered" before tokenization |
+
+---
+
+### 30.13 Implementation Status Summary
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    CUDA KERNEL IMPLEMENTATION STATUS                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  SPECIFICATION:                                                              │
+│  ─────────────────────────────────────────────────────────                   │
+│  ✅ GunaConfig.h (data structures)              DOCUMENTED                   │
+│  ✅ SattvaGuna_Core.cu (fused kernel)           DOCUMENTED + EVALUATED       │
+│  ✅ SattvaGuna_Math.cuh (warp helpers)          DOCUMENTED + FIXES PROPOSED  │
+│  ✅ binding.cpp (PyTorch extension)             DOCUMENTED                   │
+│  ✅ setup.py (build system)                     DOCUMENTED                   │
+│  ✅ main.py (entry point)                       DOCUMENTED                   │
+│                                                                              │
+│  IMPLEMENTATION:                                                             │
+│  ─────────────────────────────────────────────────────────                   │
+│  ⏳ symbolu/experimental/cuda/GunaConfig.h           PENDING                 │
+│  ⏳ symbolu/experimental/cuda/SattvaGuna_Math.cuh    PENDING                 │
+│  ⏳ symbolu/experimental/cuda/SattvaGuna_Core.cu     PENDING                 │
+│  ⏳ symbolu/experimental/cuda/binding.cpp            PENDING                 │
+│  ⏳ symbolu/experimental/cuda/setup.py               PENDING                 │
+│                                                                              │
+│  CRITICAL FIXES REQUIRED:                                                    │
+│  ─────────────────────────────────────────────────────────                   │
+│  1. Multi-warp reduction for 124 dimensions (see 30.3.2)                    │
+│  2. Single-thread Guna computation after reduction (see 30.2.2)             │
+│  3. calculate_motion() function specification                                │
+│  4. calculate_trace() for R matrix integrity                                 │
+│  5. Batch processing support                                                 │
+│  6. CPU fallback path                                                        │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Appendix: Current Codebase vs Google Proposals
 
 | Component | Current | Google Proposal |
