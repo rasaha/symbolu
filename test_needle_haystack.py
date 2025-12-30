@@ -24,9 +24,14 @@ Author: SymbolU Team
 Date: December 2025
 """
 
+import os
+
+# Set CUDA memory and tokenizer environment variables before importing torch
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 import argparse
 import json
-import os
 import random
 import sys
 import time
@@ -263,6 +268,20 @@ def load_model(config: NeedleConfig, device: torch.device) -> torch.nn.Module:
     num_heads = preset["num_heads"]
     ff_dim = preset["ff_dim"]
 
+    # If loading checkpoint, extract max_seq_len from it
+    max_seq_len = config.max_context + 1024  # Default with safety margin
+    ckpt = None
+    if config.checkpoint and os.path.exists(config.checkpoint):
+        ckpt = torch.load(config.checkpoint, map_location=device, weights_only=False)
+        if "config" in ckpt:
+            max_seq_len = ckpt["config"].get("max_seq_len", max_seq_len)
+        elif "model" in ckpt:
+            # Infer from pos_embed shape
+            for key, val in ckpt["model"].items():
+                if "pos_embed" in key:
+                    max_seq_len = val.shape[0]
+                    break
+
     if config.model_type == "phase":
         model = PhaseTransformer(
             vocab_size=config.vocab_size,
@@ -270,7 +289,7 @@ def load_model(config: NeedleConfig, device: torch.device) -> torch.nn.Module:
             num_layers=num_layers,
             num_heads=num_heads,
             ff_dim=ff_dim,
-            max_seq_len=config.max_context + 1024,
+            max_seq_len=max_seq_len,
             dropout=0.0,  # No dropout for eval
         )
     else:  # hybrid
@@ -280,7 +299,7 @@ def load_model(config: NeedleConfig, device: torch.device) -> torch.nn.Module:
             num_layers=num_layers,
             num_heads=num_heads,
             ff_dim=ff_dim,
-            max_seq_len=config.max_context + 1024,
+            max_seq_len=max_seq_len,
             dropout=0.0,
             local_layers=2,
             window_size=256,
@@ -293,10 +312,10 @@ def load_model(config: NeedleConfig, device: torch.device) -> torch.nn.Module:
             if hasattr(module, 'gradient_checkpointing'):
                 module.gradient_checkpointing = True
 
-    # Load checkpoint if specified
-    if config.checkpoint and os.path.exists(config.checkpoint):
+    # Load checkpoint weights (ckpt already loaded above for config extraction)
+    if ckpt is not None:
         print(f"Loading checkpoint from {config.checkpoint}")
-        ckpt = torch.load(config.checkpoint, map_location=device)
+        # ckpt was already loaded above to extract max_seq_len
         if "model" in ckpt:
             model.load_state_dict(ckpt["model"], strict=False)
         else:
