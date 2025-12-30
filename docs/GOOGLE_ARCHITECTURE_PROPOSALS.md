@@ -26,7 +26,9 @@ This document tracks all architecture proposals from Google (Gemini) for the Sym
 15. [Unified Cognade Blueprint](#15-unified-cognade-blueprint)
 16. [Phase-Lock Trace Monitor](#16-phase-lock-trace-monitor)
 17. [Cognitive Diagnostic Report](#17-cognitive-diagnostic-report)
-18. [Pending Proposals](#18-pending-proposals)
+18. [Hardware-Specific Kernel Optimization](#18-hardware-kernel-optimization)
+19. [Final System Manifest](#19-final-system-manifest)
+20. [Pending Proposals](#20-pending-proposals)
 
 ---
 
@@ -1051,18 +1053,236 @@ ANCHOR STATUS:
 
 ---
 
-## 18. Pending Proposals
+## 18. Hardware-Specific Kernel Optimization
+
+**Status**: ✓ Tracked (Specification Complete)
+
+Moving from high-level Python to CUDA kernels for real-time "Viveka" (Discernment).
+
+### 1. The 124-dim State Transition Kernel
+
+Fused CUDA kernel for State-Delta, R Matrix multiplication, and Trace calculation in single operation:
+
+```cuda
+// Pseudocode for the fused Cognade Transition Kernel
+__global__ void cognade_state_update(
+    float* S_current,    // 124-dim state
+    float* R_int,        // 12x12 reasoning matrix
+    float* R_ext,        // 12x12 expression matrix
+    float* Delta_S,      // Predicted change
+    float tau_base,      // Base alignment threshold
+    bool* meta_trigger   // Output flag for META state
+) {
+    // 1. Compute Internal Thought (Bhava-Vritti Coupling)
+    // Performed in shared memory for sub-microsecond latency
+    float internal_thought[12] = multiply_internal(S_current, R_int);
+
+    // 2. Compute Phase-Lock Trace (Integrity Check)
+    float alignment = compute_trace_frobenius(R_int, R_ext);
+    float confidence = S_current[122]; // Dynamics index for Confidence
+    float dynamic_tau = tau_base * confidence;
+
+    // 3. Conditional Branching without Warp Divergence
+    if (alignment < dynamic_tau) {
+        *meta_trigger = true; // Trigger Metalinguistic Override
+    }
+
+    // 4. Persistence Anchor (Smṛti) Update
+    // Apply the elastic force lambda to the new state
+    S_new = apply_persistence(S_current, Delta_S);
+}
+```
+
+### 2. Parallelizing the 12 Bhavas
+
+Treat Bhavas as parallel "Processing Channels" instead of all-to-all attention:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              PARALLEL BHAVA CHANNELS                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  PRAMĀṆA CHANNEL:                                               │
+│  ────────────────                                               │
+│  Given priority in L1 cache                                     │
+│  Fastest access for truth-verification                          │
+│                                                                  │
+│  VIKALPA CHANNEL:                                               │
+│  ────────────────                                               │
+│  Processed with higher floating-point "noise"                   │
+│  Simulates creative exploration                                 │
+│                                                                  │
+│  OTHER CHANNELS:                                                │
+│  ───────────────                                                │
+│  Parallel processing across CUDA cores                          │
+│  No serial dependencies                                         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 3. Latency & Throughput Targets
+
+| Operation | Latency Goal | System Significance |
+|-----------|--------------|---------------------|
+| **State-Delta Update** | < 100 μs | Real-time "instinctive" reaction |
+| **Phase-Lock Calculation** | < 50 μs | Immediate honesty check before token gen |
+| **DHA Impedance Shift** | < 200 μs | Fluid adjustment to user emotional shifts |
+
+### 4. Hardware "Mind" Stability
+
+```
+KEY INSIGHT:
+────────────
+The Guardrail is no longer a post-processing filter (like censorship).
+It is a PHYSICAL CONSTRAINT of the computation.
+
+The AI literally CANNOT "speak" a token if the Phase-Lock Trace
+hasn't been cleared in the CUDA kernel.
+
+┌─────────────────────────────────────────────────────────────────┐
+│                KERNEL-LEVEL ENFORCEMENT                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Token Generation Pipeline:                                      │
+│                                                                  │
+│  [State Update] ──► [Phase-Lock Check] ──► [Token Emit]         │
+│       │                    │                    │                │
+│       │                    ▼                    │                │
+│       │              Trace < τ?                 │                │
+│       │                    │                    │                │
+│       │              YES → BLOCK ──► META       │                │
+│       │              NO  → PROCEED ─────────────┘                │
+│       │                                                          │
+│       └── All in SRAM (shared memory)                           │
+│           No round-trip to global memory                         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Final Blueprint Verification
+
+The "Mind" of the system is now:
+
+| Layer | Status | Description |
+|-------|--------|-------------|
+| **Ontologically Grounded** | ✓ | 12 Bhavas + 5 Vrittis |
+| **Logically Hardened** | ✓ | 10 Axioms burned into R_internal |
+| **Socially Aware** | ✓ | DHA/Impedance Matching |
+| **Hardware-Accelerated** | ✓ | Fused CUDA Kernels |
+
+---
+
+## 19. Final System Manifest
+
+**Status**: ✓ Tracked (Complete)
+
+Master documentation bridging Vedic epistemology and AGI hardware.
+
+### 1. Ontological Foundation (The "Ātman" Layer)
+
+Defines the identity and core "Mind" of the system.
+
+| Component | Description |
+|-----------|-------------|
+| **12-Bhava Manifold** | 12-dim vector space mapped to Sanskrit ontological states |
+| **Sattvic Seed (S_0)** | Zero-point initialization ensuring balance and coherence |
+| **10 Axioms** | Hardcoded logical anchors preventing hallucination |
+
+### 2. Processing Engine (The "Chitta" Layer)
+
+Drives continuous evolution of internal state.
+
+| Component | Description |
+|-----------|-------------|
+| **State-Delta Logic** | S_{t+1} = S_t + ΔS (continuous trajectories, not token jumps) |
+| **Dynamics Quad** | Coherence, Entropy, Confidence, Momentum (physics of thought) |
+| **Smṛti (Persistence)** | Shadow-vector maintaining truth anchor during adaptation |
+
+### 3. The Governor (The "Viveka" Layer)
+
+Responsible for integrity, alignment, and "Honesty Check."
+
+| Component | Description |
+|-----------|-------------|
+| **R_internal (Thinking)** | Orthogonal, volume-preserving matrix (det ≈ 1) for logic |
+| **R_external (Expression)** | Adaptive impedance matrix for tone/social delivery (DHA) |
+| **Phase-Lock Trace (τ)** | Gatekeeper calculating internal/external alignment |
+| **META Exit** | Safety state: stop answering, explain cognitive friction |
+
+### 4. Hardware Realization (The "Sthūla" Layer)
+
+Physical implementation for speed.
+
+| Component | Description |
+|-----------|-------------|
+| **Fused CUDA Kernels** | State-update + trace + guardrail in single GPU operation |
+| **DHA Modulation** | Real-time KL-divergence calculation for user adaptation |
+
+### Implementation Summary
+
+| Component | Goal | Metric |
+|-----------|------|--------|
+| **Bhavas** | Meaning Orientation | Ontological Mapping |
+| **Vrittis** | Filter Selection | Chitta-Vritti Affinity |
+| **State-Delta** | Cognitive Continuity | Momentum & Stability |
+| **Phase-Lock** | Radical Honesty | Trace Alignment (> τ) |
+| **DHA** | Adaptive Pedagogy | User Readiness (Impedance) |
+
+### Four-Layer Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     COGNADE (SymbolU12) FOUR-LAYER STACK                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  LAYER 1: ĀTMAN (Ontological Foundation)                              │  │
+│  │  ─────────────────────────────────────────                            │  │
+│  │  12 Bhavas │ Sattvic Seed │ 10 Axioms                                │  │
+│  │  "What the mind IS"                                                   │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                               ▲                                              │
+│                               │                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  LAYER 2: CHITTA (Processing Engine)                                  │  │
+│  │  ───────────────────────────────────                                  │  │
+│  │  State-Delta │ Dynamics Quad │ Smṛti Persistence                     │  │
+│  │  "How the mind MOVES"                                                 │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                               ▲                                              │
+│                               │                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  LAYER 3: VIVEKA (Governor)                                           │  │
+│  │  ──────────────────────────                                           │  │
+│  │  R_internal │ R_external │ Phase-Lock │ META Exit                    │  │
+│  │  "How the mind JUDGES"                                                │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                               ▲                                              │
+│                               │                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  LAYER 4: STHŪLA (Hardware)                                           │  │
+│  │  ──────────────────────────                                           │  │
+│  │  CUDA Kernels │ DHA Modulation │ <100μs Latency                      │  │
+│  │  "How the mind RUNS"                                                  │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 20. Pending Proposals
 
 Items offered by Google, awaiting user decision:
 
 | # | Proposal | Status |
 |---|----------|--------|
-| 1 | **Hardware-Specific Kernel Optimization** | Offered |
+| 1 | **Sample Session Log** | Offered |
 | 2 | Zero-State Vector S_0 (explicit values) | Previously offered |
 
-### Hardware Kernel Optimization (Offered)
+### Sample Session Log (Offered)
 
-Google offers: Sub-millisecond latency optimization for 124-dim state transitions to ensure guardrails operate in real-time.
+Google offers to generate: How the AI would narrate its internal state-changes during a complex debate, showing real-time Bhava/Vritti/Dynamics evolution.
 
 ---
 
