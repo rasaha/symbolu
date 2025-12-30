@@ -264,6 +264,35 @@ from .training import (
     StressTest,
 )
 
+# Pratyaksha Dashboard Module
+from .dashboard import (
+    # Data Stream
+    AlertLevel,
+    AxiomType as DashboardAxiomType,
+    BhavaSnapshot,
+    DynamicsSnapshot,
+    AlertSnapshot,
+    StateSnapshot,
+    DashboardStream,
+    StateSnapshotBuilder,
+    get_dashboard_stream,
+    reset_dashboard_stream,
+    # Triggers
+    TriggerThresholds,
+    AxiomaticTriggerSystem,
+    # Visualization
+    TraceEKG,
+    BhavaRadar,
+    DynamicGauges,
+    render_truth_meter,
+    PratyakshaDashboard,
+    # Production Guardrails
+    GuardrailAction,
+    GuardrailResult,
+    ProductionGuardrails,
+    GUARDRAIL_SUMMARY,
+)
+
 __all__ = [
     # Core
     'CognitiveState',
@@ -403,4 +432,27 @@ __all__ = [
     'IQValidator',
     'InQValidator',
     'StressTest',
+    # Pratyaksha Dashboard Module
+    'AlertLevel',
+    'DashboardAxiomType',
+    'BhavaSnapshot',
+    'DynamicsSnapshot',
+    'AlertSnapshot',
+    'StateSnapshot',
+    'DashboardStream',
+    'StateSnapshotBuilder',
+    'get_dashboard_stream',
+    'reset_dashboard_stream',
+    'TriggerThresholds',
+    'AxiomaticTriggerSystem',
+    'TraceEKG',
+    'BhavaRadar',
+    'DynamicGauges',
+    'render_truth_meter',
+    'PratyakshaDashboard',
+    # Production Guardrails
+    'GuardrailAction',
+    'GuardrailResult',
+    'ProductionGuardrails',
+    'GUARDRAIL_SUMMARY',
 ]
