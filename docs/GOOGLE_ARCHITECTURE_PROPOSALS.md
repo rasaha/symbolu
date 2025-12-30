@@ -1654,13 +1654,13 @@ nohup ./bin/trace_monitor --mode "ABLATION_B" --log "./logs/viveka_gate.log" &
 │  Data Stream (data_stream.py)                  ████████████████████ 100%    │
 │  Axiomatic Triggers (axiomatic_triggers.py)    ████████████████████ 100%    │
 │  Streamlit Dashboard (pratyaksha.py)           ████████████████████ 100%    │
+│  Production Guardrails (guardrails.py)         ████████████████████ 100%    │
 │  ─────────────────────────────────────────────────────────────────────────  │
 │  PENDING:                                                                    │
 │  CUDA Kernels                                  ░░░░░░░░░░░░░░░░░░░░   0%    │
-│  Production Guardrails Wrapper                 ██████████░░░░░░░░░░  50%    │
 │                                                                              │
-│  OVERALL: 15/17 modules complete (~8,700 lines PyTorch code)                │
-│  STATUS: Dashboard ready for real-time Phase-Lock monitoring                 │
+│  OVERALL: 16/17 modules complete (~9,100 lines PyTorch code)                │
+│  STATUS: Production guardrails with kill-switch ready for deployment        │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1904,8 +1904,9 @@ fac_result = runner.run_fac_validation()
 | `dashboard/data_stream.py` | ~450 | StateSnapshot, DashboardStream, queue-based streaming |
 | `dashboard/axiomatic_triggers.py` | ~400 | Identity/Causality/Category breach detection |
 | `dashboard/pratyaksha.py` | ~500 | Streamlit dashboard with EKG, Radar, Gauges |
+| `dashboard/guardrails.py` | ~450 | ProductionGuardrails with kill-switch, Smṛti refresh |
 | `dashboard/__init__.py` | ~100 | Module exports |
-| **Subtotal** | **~1450** | Real-time monitoring infrastructure |
+| **Subtotal** | **~1900** | Real-time monitoring + production guardrails |
 
 #### Grand Total
 
@@ -1913,8 +1914,8 @@ fac_result = runner.run_fac_validation()
 |----------|-------|
 | Core Modules | ~4000 |
 | Training Module | ~3400 |
-| Dashboard Module | ~1450 |
-| **Total** | **~8850** |
+| Dashboard Module | ~1900 |
+| **Total** | **~9300** |
 
 All implementations follow Google's specifications from Sections 1-29.
 
@@ -3308,10 +3309,14 @@ Trace Stability Over Training:
 | **TraceMonitor** | `training/utils.py` | ✅ Complete | Rolling window stability tracking with drift detection |
 | **DeterminantMonitor** | `training/utils.py` | ✅ Complete | Tracks det(R) deviation from 1.0 |
 | **Sattva1Monitor** | `training/utils.py` | ✅ Complete | Unified dashboard combining all monitors |
-| **ProductionGuardrails** | N/A | ⚠️ Pending | Full production wrapper (spec complete) |
-| **TruthMeter UI** | N/A | ⚠️ Pending | Terminal visualization (spec complete) |
+| **ProductionGuardrails** | `dashboard/guardrails.py` | ✅ Complete | Full production wrapper with kill-switch, Smṛti refresh, DHA softening |
+| **TruthMeter UI** | `dashboard/pratyaksha.py` | ✅ Complete | `render_truth_meter()` ASCII visualization |
 
-**Why Partially Implemented**: The core monitoring logic (entropy tracking, drift detection, determinant checking) is implemented in `training/utils.py` for training-time validation. The `ProductionGuardrails` class specified below wraps these into a production-ready module with kill-switch capability.
+**Implementation Complete**: All production guardrails now implemented in `dashboard/guardrails.py` (~450 lines). The `ProductionGuardrails` class provides:
+- **Identity Lock (Kill-Switch)**: Epistemic Silence when τ < 0.30 for 3+ consecutive violations
+- **Entropy Sentinel**: High entropy detection with configurable threshold (default 0.85)
+- **Emotive Turbulence**: DHA Softening when emotive_level > 0.70
+- **Smṛti Refresh**: Drift correction when ||R - R_gold|| > 0.05
 
 ### 29.0 The Problem: Model Drift
 

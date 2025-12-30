@@ -286,6 +286,11 @@ from .dashboard import (
     DynamicGauges,
     render_truth_meter,
     PratyakshaDashboard,
+    # Production Guardrails
+    GuardrailAction,
+    GuardrailResult,
+    ProductionGuardrails,
+    GUARDRAIL_SUMMARY,
 )
 
 __all__ = [
@@ -445,4 +450,9 @@ __all__ = [
     'DynamicGauges',
     'render_truth_meter',
     'PratyakshaDashboard',
+    # Production Guardrails
+    'GuardrailAction',
+    'GuardrailResult',
+    'ProductionGuardrails',
+    'GUARDRAIL_SUMMARY',
 ]

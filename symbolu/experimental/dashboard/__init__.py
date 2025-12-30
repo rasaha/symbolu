@@ -102,6 +102,14 @@ from .pratyaksha import (
     run_demo_dashboard,
 )
 
+# Production Guardrails
+from .guardrails import (
+    GuardrailAction,
+    GuardrailResult,
+    ProductionGuardrails,
+    GUARDRAIL_SUMMARY,
+)
+
 
 __all__ = [
     # === Data Stream ===
@@ -135,4 +143,10 @@ __all__ = [
     'render_truth_meter',
     'PratyakshaDashboard',
     'run_demo_dashboard',
+
+    # === Production Guardrails ===
+    'GuardrailAction',
+    'GuardrailResult',
+    'ProductionGuardrails',
+    'GUARDRAIL_SUMMARY',
 ]
