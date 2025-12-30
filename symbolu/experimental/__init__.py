@@ -215,6 +215,17 @@ from .cognade_complete import (
     create_cognade,
 )
 
+# Socrates Probe - Executable adversarial test suite
+from .socrates_probe import (
+    ProbeDefinition,
+    ProbeCategory,
+    ProbeResult,
+    FullReport,
+    PROBE_LIBRARY,
+    SocratesProbeRunner,
+    TokenAnalyzer,
+)
+
 __all__ = [
     # Core
     'CognitiveState',
@@ -317,4 +328,12 @@ __all__ = [
     'CognadeConfig',
     'CognadeComplete',
     'create_cognade',
+    # Socrates Probe - Executable adversarial test suite
+    'ProbeDefinition',
+    'ProbeCategory',
+    'ProbeResult',
+    'FullReport',
+    'PROBE_LIBRARY',
+    'SocratesProbeRunner',
+    'TokenAnalyzer',
 ]
