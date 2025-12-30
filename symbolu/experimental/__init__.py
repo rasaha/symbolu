@@ -154,6 +154,15 @@ from .cognitive_loss import (
     HEALTHY_TRANSITIONS,
 )
 
+# DHA Expression Controller - User-aware delivery modulation
+from .dha_expression import (
+    UserStateTracker,
+    DHAExpressionModulator,
+    DHAExpressionController,
+    UserProfile,
+    ExpressionStyle,
+)
+
 __all__ = [
     # Core
     'CognitiveState',
@@ -213,4 +222,10 @@ __all__ = [
     'diagnose_generation',
     'BHAVA_TO_IDEAL_VRITTI',
     'HEALTHY_TRANSITIONS',
+    # DHA Expression Controller - User-aware delivery modulation
+    'UserStateTracker',
+    'DHAExpressionModulator',
+    'DHAExpressionController',
+    'UserProfile',
+    'ExpressionStyle',
 ]

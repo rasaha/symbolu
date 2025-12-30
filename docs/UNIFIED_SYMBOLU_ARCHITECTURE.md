@@ -26,6 +26,7 @@ SymbolU12 is a unified cognitive architecture that combines Phase Attention Tran
 14. [DHA Post-Validation Architecture](#14-dha-post-validation-architecture)
 15. [Interpretable RLHF: Chitta Gradient](#15-interpretable-rlhf-chitta-gradient)
 16. [Complete Bhava→Vritti→Steering→Validation Loop](#16-complete-loop)
+17. [DHA Expression Controller](#17-dha-expression-controller)
 
 ---
 
@@ -1285,6 +1286,163 @@ Step 7: LEARNING
 
 ---
 
+## 17. DHA Expression Controller {#17-dha-expression-controller}
+
+### The Key Insight
+
+The system needs two distinct modulation layers:
+- **Understanding Modulation**: How the model processes input (Vritti on content)
+- **Expression Modulation**: How the model delivers output (Vritti on user state)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    UNDERSTANDING vs EXPRESSION                          │
+│                                                                         │
+│   UNDERSTANDING (Content-Centric)         EXPRESSION (User-Centric)    │
+│   ───────────────────────────────         ─────────────────────────    │
+│                                                                         │
+│   "What cognitive mode for                "How should I deliver        │
+│    THIS CONTENT?"                          to THIS USER?"              │
+│                                                                         │
+│   Input → Chitta-Vritti → Vritti          User History → Accumulated  │
+│           (on content)                     Vritti → Expression Style   │
+│                                                                         │
+│   Same framework, different targets                                     │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### No New Framework - Reuse v2.7 + v2.8
+
+Instead of duplicating Chitta-Vritti, we apply existing components differently:
+
+| Component | Understanding Use | Expression Use |
+|-----------|-------------------|----------------|
+| **Chitta-Vritti (v2.8)** | Content → Vritti | Content → Vritti (same) |
+| **State Evolution (v2.7)** | State tracking | **User Vritti tracking** |
+| **Guna Mapper** | Attention bias | **Expression style** |
+
+### User State Tracking
+
+Apply v2.7 temporal evolution to track USER Vritti across turns:
+
+```python
+# v2.7 State Evolution applied to User Vritti
+user_vritti_{t+1} = (1 - α) · user_vritti_t + α · content_vritti_t
+
+# Example: 3-turn conversation
+Turn 1: Content Vritti = [0.1, 0.6, 0.2, 0.1, 0.0]  # User skeptical (Viparyaya)
+        User Vritti    = [0.1, 0.6, 0.2, 0.1, 0.0]  # First turn, same as content
+
+Turn 2: Content Vritti = [0.2, 0.5, 0.2, 0.1, 0.0]  # Still skeptical
+        User Vritti    = [0.14, 0.56, 0.2, 0.1, 0.0] # Accumulated (α=0.4)
+
+Turn 3: Content Vritti = [0.7, 0.1, 0.1, 0.1, 0.0]  # User becoming receptive
+        User Vritti    = [0.36, 0.38, 0.16, 0.1, 0.0] # History still shows caution
+```
+
+### Expression Modulation
+
+The DHA Expression Modulator uses accumulated User Vritti to adjust delivery:
+
+```
+User Vritti Analysis:
+├── High Viparyaya (resistance) → Dampen delta, gentle delivery
+├── High Vikalpa (confusion) → Smooth transitions, step-by-step
+├── High Pramāṇa (readiness) → Direct delivery, full information
+└── High Nidrā (disengagement) → Reserved, re-engage first
+```
+
+### Google's Three Axes
+
+| Axis | User Signal | Modulation |
+|------|-------------|------------|
+| **Ego State** | Resistance level | Vocabulary & Authority (Parent/Adult/Child) |
+| **Information Density** | Confusion level | Dilute with metaphors vs raw data |
+| **Pacing** | Readiness level | Bodha (conclusion) vs Anumāna (step-by-step) |
+
+### Implementation
+
+```python
+from symbolu.experimental import DHAExpressionController
+
+# Create controller (uses v2.7 decay rate)
+controller = DHAExpressionController(decay_rate=0.4)
+
+# Each turn: update and modulate
+for turn in conversation:
+    # Get content Vritti from current input (v2.8)
+    content_vritti = chitta_vritti(input_bhava)
+
+    # Get raw understanding
+    state_delta = model.understand(input)
+
+    # Modulate for user-appropriate expression
+    result = controller(state_delta, content_vritti)
+
+    # Use modulated delta for generation
+    output = model.generate(result['communication_delta'])
+
+    # Access delivery guidance
+    print(result['style'])              # SATTVIC / RAJASIC / TAMASIC
+    print(result['delivery_guidance'])  # Human-readable guidance
+```
+
+### Expression Styles
+
+| Style | Trigger | Delivery |
+|-------|---------|----------|
+| **SATTVIC** | High resistance OR confusion | Gentle, nurturing, non-confrontational |
+| **RAJASIC** | High readiness, low resistance | Direct, confident, expert-level |
+| **TAMASIC** | Low engagement | Reserved, minimal, re-engagement focus |
+
+### Complete Flow with Expression
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                  UNDERSTANDING + EXPRESSION PIPELINE                    │
+│                                                                         │
+│  Input                                                                  │
+│    │                                                                    │
+│    ├──► Content Bhava → Chitta-Vritti → Content Vritti                 │
+│    │                                          │                         │
+│    │                                          ├──► Pre-Steering         │
+│    │                                          │    (VrittiModulated     │
+│    │                                          │     Attention)          │
+│    │                                          │                         │
+│    │                                          └──► UserStateTracker     │
+│    │                                               (v2.7 evolution)     │
+│    │                                                    │               │
+│    ▼                                                    ▼               │
+│  Generation ─────────────────────────────────► User Vritti              │
+│    │                                                    │               │
+│    ▼                                                    ▼               │
+│  State-Delta (raw understanding)              DHAExpressionModulator   │
+│    │                                                    │               │
+│    └──────────────────────┬─────────────────────────────┘               │
+│                           ▼                                             │
+│                  Communication-Delta                                    │
+│                  (user-optimized)                                       │
+│                           │                                             │
+│                           ▼                                             │
+│                    Token Rendering                                      │
+│                           │                                             │
+│                           ▼                                             │
+│                       Output                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Single-Turn vs Multi-Turn
+
+| Scenario | User Vritti | Expression Modulation |
+|----------|-------------|----------------------|
+| **Single-turn** | = Content Vritti | Based on current input only |
+| **Multi-turn, consistent** | ≈ Content Vritti | History reinforces current |
+| **Multi-turn, evolving** | ≠ Content Vritti | History provides context |
+
+**Key**: Multi-turn is where expression modulation adds value. The system remembers that the user was skeptical even if current input seems neutral.
+
+---
+
 ## Appendix: File Reference
 
 | Component | File Path |
@@ -1302,6 +1460,9 @@ Step 7: LEARNING
 | **DHAValidator** | `symbolu/experimental/cognitive_loss.py` |
 | **BHAVA_TO_IDEAL_VRITTI** | `symbolu/experimental/cognitive_loss.py` |
 | **HEALTHY_TRANSITIONS** | `symbolu/experimental/cognitive_loss.py` |
+| **UserStateTracker** | `symbolu/experimental/dha_expression.py` |
+| **DHAExpressionModulator** | `symbolu/experimental/dha_expression.py` |
+| **DHAExpressionController** | `symbolu/experimental/dha_expression.py` |
 | Training Script | `scripts/train_symbolu12.py` |
 
 ---
@@ -1316,6 +1477,7 @@ Step 7: LEARNING
 - **v3.1**: Sparse R[v,a] Natural Affinities (philosophy-derived)
 - **v3.2**: DHA Post-Validation Architecture
 - **v3.3**: Interpretable RLHF (Chitta Gradient Loss Function)
+- **v3.4**: DHA Expression Controller (user-aware delivery modulation)
 
 ---
 
