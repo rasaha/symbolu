@@ -103,6 +103,123 @@ except ImportError:
 
 
 # =============================================================================
+# CONSTANTS
+# =============================================================================
+
+# Entropy constants for coherence loss (S3, S5, S8-S9)
+# These control the semantic entropy regularization behavior
+ENTROPY_MAX = 10.8          # log(50257) - maximum possible entropy for GPT-2 vocab
+ENTROPY_TARGET = 4.0        # Target entropy for moderate confidence
+ENTROPY_UPDATE_THRESHOLD = 6.0  # Entropy above this triggers update gate
+
+
+class EntropyTracker:
+    """
+    Tracks entropy across training steps for stability loss (S8-S9).
+
+    Encapsulates the previously global _prev_entropy state and provides
+    helper methods for computing update gates and stability losses.
+    """
+
+    def __init__(self):
+        self.prev_entropy: Optional[torch.Tensor] = None
+
+    def compute_coherence_terms(
+        self,
+        entropy: torch.Tensor,
+        device: torch.device,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Dict[str, float]]:
+        """
+        Compute entropy loss, update gate, and stability loss.
+
+        Returns:
+            L_entropy: Entropy regularization loss
+            update_gate: Gate for scaling coherence loss (0-1)
+            L_stability: Stability loss penalizing entropy spikes
+            metrics: Dict with entropy, update_gate, entropy_change
+        """
+        metrics = {}
+
+        # Entropy loss - target moderate confidence
+        L_entropy = (entropy - ENTROPY_TARGET).pow(2)
+        metrics["entropy"] = entropy.item()
+
+        # Update gate: high when entropy is high (uncertain/changing context)
+        update_gate = torch.sigmoid((entropy - ENTROPY_UPDATE_THRESHOLD) * 2.0)
+
+        # Stability loss from entropy change
+        if self.prev_entropy is not None:
+            entropy_change = entropy - self.prev_entropy
+            # Combine with entropy spike detection
+            change_gate = torch.sigmoid(entropy_change * 5.0)
+            update_gate = torch.max(update_gate, change_gate * 0.5)
+            # Penalize entropy increases (dH/dt > 0 violates S8)
+            L_stability = F.relu(entropy_change)
+            metrics["entropy_change"] = entropy_change.item()
+        else:
+            L_stability = torch.tensor(0.0, device=device)
+            metrics["entropy_change"] = 0.0
+
+        metrics["update_gate"] = update_gate.item()
+
+        # Update state for next step
+        self.prev_entropy = entropy.detach()
+
+        return L_entropy, update_gate, L_stability, metrics
+
+    def reset(self):
+        """Reset tracker state (e.g., at start of new epoch)."""
+        self.prev_entropy = None
+
+
+# Global entropy tracker instance
+_entropy_tracker = EntropyTracker()
+
+
+class MetricsLogger:
+    """
+    Unified logging to wandb and TensorBoard.
+
+    Reduces duplicated logging code throughout the training loop.
+    """
+
+    def __init__(
+        self,
+        config: 'TrainingConfig',
+        tb_writer: Optional['SummaryWriter'] = None
+    ):
+        self.config = config
+        self.tb_writer = tb_writer
+        self.wandb_enabled = config.wandb and WANDB_AVAILABLE
+
+    def log(self, metrics: Dict[str, float], step: int, prefix: str = "train"):
+        """
+        Log metrics to wandb and TensorBoard.
+
+        Args:
+            metrics: Dict of metric name -> value
+            step: Current training step
+            prefix: Prefix for metric names (e.g., "train", "val")
+        """
+        # Wandb logging
+        if self.wandb_enabled:
+            wandb_metrics = {f"{prefix}/{k}": v for k, v in metrics.items()}
+            wandb.log(wandb_metrics, step=step)
+
+        # TensorBoard logging
+        if self.tb_writer is not None:
+            for name, value in metrics.items():
+                self.tb_writer.add_scalar(f"{prefix}/{name}", value, step)
+
+    def close(self):
+        """Clean up logging resources."""
+        if self.wandb_enabled:
+            wandb.finish()
+        if self.tb_writer is not None:
+            self.tb_writer.close()
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -821,11 +938,7 @@ def compute_state_centric_loss(
     return total_loss, metrics
 
 
-# Global state for entropy stability tracking (S8-S9)
-_prev_entropy = None
-
-
-def compute_loss_chunked(
+def compute_loss_streaming(
     model: PhaseTransformer,
     batch: Tuple[torch.Tensor, torch.Tensor],
     device: torch.device,
@@ -1013,8 +1126,6 @@ def compute_loss(
     - L_coherence: Layer coherence (S1-S2)
     - L_stability: Entropy stability (S8)
     """
-    global _prev_entropy
-
     x, y = batch
     x = x.to(device)
     y = y.to(device)
@@ -1055,44 +1166,17 @@ def compute_loss(
     }
 
     if use_coherence_loss:
-        # S5: Semantic Entropy - target moderate entropy (not too high, not too low)
+        # Compute semantic entropy
         entropy = compute_semantic_entropy(logits)
-        target_entropy = 4.0  # ~moderate confidence
-        L_entropy = (entropy - target_entropy).pow(2)
-        metrics["entropy"] = entropy.item()
 
-        # =================================================================
-        # UPDATE GATE: Detect likely state changes/updates
-        # High entropy or entropy spike → reduce coherence penalty
-        # This allows the model to "update" information without being
-        # penalized for breaking coherence with earlier context
-        # =================================================================
+        # Use entropy tracker for update gate and stability (S5, S8-S9)
+        L_entropy, update_gate, L_stability, entropy_metrics = _entropy_tracker.compute_coherence_terms(
+            entropy, device
+        )
+        metrics.update(entropy_metrics)
 
-        # Normalize entropy to [0, 1] range (max entropy ~ log(vocab) ≈ 10.8)
-        max_entropy = 10.8  # log(50257)
-        normalized_entropy = torch.clamp(entropy / max_entropy, 0.0, 1.0)
-
-        # Update gate: high when entropy is high (uncertain/changing context)
-        # Using sigmoid to smooth the gate
-        # When entropy > 6.0 (moderately uncertain), gate starts activating
-        entropy_threshold = 6.0
-        update_gate = torch.sigmoid((entropy - entropy_threshold) * 2.0)
-
-        # Also consider entropy change (sudden spike = likely update)
-        if _prev_entropy is not None:
-            entropy_change = entropy - _prev_entropy
-            # Positive change (entropy increase) activates gate more
-            change_gate = torch.sigmoid(entropy_change * 5.0)
-            # Combine both signals
-            update_gate = torch.max(update_gate, change_gate * 0.5)
-
-        metrics["update_gate"] = update_gate.item()
-
-        # =================================================================
-        # CONDITIONAL COHERENCE: λ * (1 - g_update) * L_coh
-        # When update_gate is high, reduce coherence penalty
-        # =================================================================
-        coherence_scale = 1.0 - update_gate  # Reduce coherence loss during updates
+        # Reduce coherence loss during updates
+        coherence_scale = 1.0 - update_gate
 
         # S1-S2: Layer Coherence - maximize cross-layer alignment
         if hidden_states:
@@ -1103,20 +1187,7 @@ def compute_loss(
             L_coherence_term = torch.tensor(0.0, device=device)
             metrics["coherence"] = 0.0
 
-        # S8-S9: Stability Constraint - penalize entropy spikes
-        if _prev_entropy is not None:
-            entropy_change = entropy - _prev_entropy
-            # Penalize increases (dH/dt > 0 violates S8)
-            L_stability = F.relu(entropy_change)
-            metrics["entropy_change"] = entropy_change.item()
-        else:
-            L_stability = torch.tensor(0.0, device=device)
-            metrics["entropy_change"] = 0.0
-
-        _prev_entropy = entropy.detach()
-
         # Combined Coherence Loss (S3) with conditional gating
-        # Coherence and stability losses are scaled by (1 - update_gate)
         loss = (L_task +
                 lambda_entropy * L_entropy +
                 lambda_coherence * coherence_scale * L_coherence_term +
@@ -1129,7 +1200,7 @@ def compute_loss(
     return loss, metrics
 
 
-def compute_loss_chunked(
+def compute_loss_chunked_lm_head(
     model: PhaseTransformer,
     batch: Tuple[torch.Tensor, torch.Tensor],
     device: torch.device,
@@ -1162,8 +1233,6 @@ def compute_loss_chunked(
         use_coherence_loss: whether to compute coherence losses
         lambda_*: loss weights
     """
-    global _prev_entropy
-
     x, y = batch
     x = x.to(device)
     y = y.to(device)
@@ -1253,36 +1322,18 @@ def compute_loss_chunked(
         if entropy_samples > 0:
             entropy = entropy_sum / entropy_samples
         else:
-            entropy = torch.tensor(4.0, device=device)
+            entropy = torch.tensor(ENTROPY_TARGET, device=device)
 
-        target_entropy = 4.0
-        L_entropy = (entropy - target_entropy).pow(2)
-        metrics["entropy"] = entropy.item()
+        # Use entropy tracker for update gate and stability (S5, S8-S9)
+        L_entropy, update_gate, L_stability, entropy_metrics = _entropy_tracker.compute_coherence_terms(
+            entropy, device
+        )
+        metrics.update(entropy_metrics)
 
-        # Update gate for coherence scaling
-        max_entropy = 10.8
-        normalized_entropy = torch.clamp(entropy / max_entropy, 0.0, 1.0)
-        entropy_threshold = 6.0
-        update_gate = torch.sigmoid((entropy - entropy_threshold) * 2.0)
-
-        if _prev_entropy is not None:
-            entropy_change = entropy - _prev_entropy
-            change_gate = torch.sigmoid(entropy_change * 5.0)
-            update_gate = torch.max(update_gate, change_gate * 0.5)
-            L_stability = F.relu(entropy_change)
-            metrics["entropy_change"] = entropy_change.item()
-        else:
-            L_stability = torch.tensor(0.0, device=device)
-            metrics["entropy_change"] = 0.0
-
-        metrics["update_gate"] = update_gate.item()
         coherence_scale = 1.0 - update_gate
 
         # Skip layer coherence in chunked mode (would require re-running forward)
-        L_coherence_term = torch.tensor(0.0, device=device)
         metrics["coherence"] = 0.0
-
-        _prev_entropy = entropy.detach()
 
         # Combined loss
         loss = (L_task +
@@ -1330,10 +1381,10 @@ def train_step(
                 scaler.scale(loss).backward()
             else:
                 loss.backward()
-        # Use chunked processing for ultra-long sequences
+        # Use streaming chunked processing for ultra-long sequences
         elif config.chunk_size > 0:
-            # Chunked mode: backward already done per-chunk, returns None for loss
-            loss, metrics = compute_loss_chunked(
+            # Streaming mode: backward already done per-chunk, returns None for loss
+            loss, metrics = compute_loss_streaming(
                 model, batch, device,
                 chunk_size=config.chunk_size,
                 use_coherence_loss=config.use_coherence_loss,
@@ -1341,7 +1392,7 @@ def train_step(
                 lambda_coherence=config.lambda_coherence,
                 lambda_stability=config.lambda_stability,
             )
-            # loss is None - gradients already accumulated in compute_loss_chunked
+            # loss is None - gradients already accumulated in compute_loss_streaming
         else:
             loss, metrics = compute_loss(
                 model, batch, device,
