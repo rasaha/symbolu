@@ -24,9 +24,14 @@ Author: SymbolU Team
 Date: December 2025
 """
 
+import os
+
+# Set CUDA memory and tokenizer environment variables before importing torch
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 import argparse
 import json
-import os
 import random
 import sys
 import time

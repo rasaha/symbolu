@@ -21,6 +21,11 @@ Usage:
 """
 
 import os
+
+# Set CUDA memory and tokenizer environment variables before importing torch
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 import sys
 import json
 import random

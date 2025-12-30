@@ -45,6 +45,11 @@ python train.py --model_size 7b --dataset c4 --batch_size 1 --gradient_accumulat
 """
 
 import os
+
+# Set CUDA memory and tokenizer environment variables before importing torch
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 import sys
 import math
 import time
