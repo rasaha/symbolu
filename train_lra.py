@@ -66,6 +66,17 @@ from symbolu.phase_transformer import (
 
 
 # =============================================================================
+# PERFORMANCE OPTIMIZATIONS
+# =============================================================================
+# TF32 for faster matrix multiplications on Ampere+ GPUs (A100, H100)
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
+# cuDNN autotuning for optimal convolution algorithms
+torch.backends.cudnn.benchmark = True
+
+
+# =============================================================================
 # LRA TASK CONFIGURATIONS
 # =============================================================================
 
@@ -426,21 +437,26 @@ def load_lra_data(
     train_dataset = TensorDataset(train_X, train_y)
     val_dataset = TensorDataset(val_X, val_y)
 
+    num_workers = 4
     train_loader = DataLoader(
         train_dataset,
         batch_size=32,  # Will be overridden
         shuffle=True,
-        num_workers=4,
+        num_workers=num_workers,
         pin_memory=True,
         drop_last=True,
+        prefetch_factor=2 if num_workers > 0 else None,
+        persistent_workers=num_workers > 0,
     )
 
     val_loader = DataLoader(
         val_dataset,
         batch_size=32,
         shuffle=False,
-        num_workers=4,
+        num_workers=num_workers,
         pin_memory=True,
+        prefetch_factor=2 if num_workers > 0 else None,
+        persistent_workers=num_workers > 0,
     )
 
     return train_loader, val_loader, num_classes
@@ -1044,7 +1060,7 @@ def train_lra(config: LRAConfig):
         num_train=50000, num_val=5000,
     )
 
-    # Override batch size
+    # Override batch size with performance optimizations
     train_loader = DataLoader(
         train_loader.dataset,
         batch_size=config.batch_size,
@@ -1052,6 +1068,8 @@ def train_lra(config: LRAConfig):
         num_workers=config.num_workers,
         pin_memory=True,
         drop_last=True,
+        prefetch_factor=2 if config.num_workers > 0 else None,
+        persistent_workers=config.num_workers > 0,
     )
     val_loader = DataLoader(
         val_loader.dataset,
@@ -1059,6 +1077,8 @@ def train_lra(config: LRAConfig):
         shuffle=False,
         num_workers=config.num_workers,
         pin_memory=True,
+        prefetch_factor=2 if config.num_workers > 0 else None,
+        persistent_workers=config.num_workers > 0,
     )
 
     # Create model

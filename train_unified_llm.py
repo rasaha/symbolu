@@ -85,6 +85,17 @@ except ImportError as e:
 
 
 # =============================================================================
+# PERFORMANCE OPTIMIZATIONS
+# =============================================================================
+# TF32 for faster matrix multiplications on Ampere+ GPUs (A100, H100)
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
+# cuDNN autotuning for optimal convolution algorithms
+torch.backends.cudnn.benchmark = True
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -246,6 +257,8 @@ def load_data(config: UnifiedTrainingConfig, tokenizer) -> Tuple[DataLoader, Dat
         num_workers=config.num_workers,
         pin_memory=True,
         drop_last=True,
+        prefetch_factor=2 if config.num_workers > 0 else None,
+        persistent_workers=config.num_workers > 0,
     )
 
     val_loader = DataLoader(
@@ -255,6 +268,8 @@ def load_data(config: UnifiedTrainingConfig, tokenizer) -> Tuple[DataLoader, Dat
         num_workers=config.num_workers,
         pin_memory=True,
         drop_last=True,
+        prefetch_factor=2 if config.num_workers > 0 else None,
+        persistent_workers=config.num_workers > 0,
     )
 
     return train_loader, val_loader
