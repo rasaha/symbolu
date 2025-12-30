@@ -163,6 +163,107 @@ from .dha_expression import (
     ExpressionStyle,
 )
 
+# Phase Alignment - Core Cognade alignment components
+from .phase_alignment import (
+    OrthogonalityLoss,
+    StiefelProjection,
+    StiefelOptimizer,
+    DualRMatrices,
+    PhaseLockConstraint,
+    PhaseLockGate,
+    ZeroState,
+    SmritiPersistenceLoop,
+)
+
+# Logic Gates - Nyāya-based inference and axiom enforcement
+from .logic_gates import (
+    AxiomChecker,
+    AxiomType,
+    AxiomViolation,
+    VyaptiChecker,
+    HetvabhasaDetector,
+    HetvabhasaType,
+    FallacyDetection,
+    LogicGate,
+)
+
+# Training Curriculum - Phased constraint introduction
+from .training_curriculum import (
+    CurriculumPhase,
+    CurriculumConfig,
+    TrainingCurriculum,
+    CurriculumLoss,
+    CurriculumTrainer,
+    ConstraintWarmupScheduler,
+)
+
+# Adversarial Hardening - Attack resistance
+from .adversarial_hardening import (
+    SubspaceAlignment,
+    SemanticAxioms,
+    BottleneckProjection,
+    SocratesTestSuite,
+    AdversarialHardening,
+)
+
+# Cognade Complete - Fully integrated model
+from .cognade_complete import (
+    VrittiAdaptiveDecay,
+    ConfidenceEntropyCoupling,
+    CognadeConfig,
+    CognadeComplete,
+    create_cognade,
+)
+
+# Socrates Probe - Executable adversarial test suite
+from .socrates_probe import (
+    ProbeDefinition,
+    ProbeCategory,
+    ProbeResult,
+    FullReport,
+    PROBE_LIBRARY,
+    SocratesProbeRunner,
+    TokenAnalyzer,
+)
+
+# Sattva-1 Training Module
+from .training import (
+    # Loss Functions
+    AxiomComplianceLoss,
+    BhavaContrastiveLoss,
+    EpistemicDecayLoss,
+    SmritiPersistenceLoss,
+    Sattva1TrainingLoss,
+    # Curriculum
+    Paradox,
+    ParadoxCategory as TrainingParadoxCategory,
+    ExpectedBhava,
+    PARADOX_LIBRARY,
+    R2HEvaluator,
+    ParadoxDataset,
+    CurriculumScheduler,
+    # Synthesis
+    ParadoxSynthesizer,
+    generate_training_corpus,
+    # Trainer
+    Sattva1TrainerConfig,
+    TrainingPhase,
+    Sattva1Trainer,
+    create_sattva1_trainer,
+    # Monitoring
+    TraceMonitor,
+    DeterminantMonitor,
+    EntropySentinel,
+    R2HProgressTracker,
+    Sattva1Monitor,
+    # Validation
+    ValidationHarness,
+    ValidationReport,
+    IQValidator,
+    InQValidator,
+    StressTest,
+)
+
 __all__ = [
     # Core
     'CognitiveState',
@@ -228,4 +329,78 @@ __all__ = [
     'DHAExpressionController',
     'UserProfile',
     'ExpressionStyle',
+    # Phase Alignment - Core Cognade alignment
+    'OrthogonalityLoss',
+    'StiefelProjection',
+    'StiefelOptimizer',
+    'DualRMatrices',
+    'PhaseLockConstraint',
+    'PhaseLockGate',
+    'ZeroState',
+    'SmritiPersistenceLoop',
+    # Logic Gates - Nyāya-based inference
+    'AxiomChecker',
+    'AxiomType',
+    'AxiomViolation',
+    'VyaptiChecker',
+    'HetvabhasaDetector',
+    'HetvabhasaType',
+    'FallacyDetection',
+    'LogicGate',
+    # Training Curriculum - Phased constraint introduction
+    'CurriculumPhase',
+    'CurriculumConfig',
+    'TrainingCurriculum',
+    'CurriculumLoss',
+    'CurriculumTrainer',
+    'ConstraintWarmupScheduler',
+    # Adversarial Hardening - Attack resistance
+    'SubspaceAlignment',
+    'SemanticAxioms',
+    'BottleneckProjection',
+    'SocratesTestSuite',
+    'AdversarialHardening',
+    # Cognade Complete - Fully integrated model
+    'VrittiAdaptiveDecay',
+    'ConfidenceEntropyCoupling',
+    'CognadeConfig',
+    'CognadeComplete',
+    'create_cognade',
+    # Socrates Probe - Executable adversarial test suite
+    'ProbeDefinition',
+    'ProbeCategory',
+    'ProbeResult',
+    'FullReport',
+    'PROBE_LIBRARY',
+    'SocratesProbeRunner',
+    'TokenAnalyzer',
+    # Sattva-1 Training Module
+    'AxiomComplianceLoss',
+    'BhavaContrastiveLoss',
+    'EpistemicDecayLoss',
+    'SmritiPersistenceLoss',
+    'Sattva1TrainingLoss',
+    'Paradox',
+    'TrainingParadoxCategory',
+    'ExpectedBhava',
+    'PARADOX_LIBRARY',
+    'R2HEvaluator',
+    'ParadoxDataset',
+    'CurriculumScheduler',
+    'ParadoxSynthesizer',
+    'generate_training_corpus',
+    'Sattva1TrainerConfig',
+    'TrainingPhase',
+    'Sattva1Trainer',
+    'create_sattva1_trainer',
+    'TraceMonitor',
+    'DeterminantMonitor',
+    'EntropySentinel',
+    'R2HProgressTracker',
+    'Sattva1Monitor',
+    'ValidationHarness',
+    'ValidationReport',
+    'IQValidator',
+    'InQValidator',
+    'StressTest',
 ]
