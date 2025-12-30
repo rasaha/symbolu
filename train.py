@@ -70,6 +70,18 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR
 from torch.amp import autocast
 from torch.cuda.amp import GradScaler
 
+# =============================================================================
+# PERFORMANCE: Enable hardware acceleration features
+# =============================================================================
+# TF32: Use TensorFloat-32 on Ampere+ GPUs (A100, H100, B200)
+# Provides 2-3x speedup for FP32 math with minimal accuracy loss
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
+# cuDNN Benchmark: Auto-tune convolution algorithms for faster execution
+# Small overhead on first batch, then faster for rest of training
+torch.backends.cudnn.benchmark = True
+
 # SymbolU imports
 from symbolu.phase_transformer import PhaseTransformer, HybridPhaseTransformer, TransformerConfig
 
@@ -297,6 +309,10 @@ class TrainingConfig:
     num_workers: int = 4
     pin_memory: bool = True
 
+    # Performance
+    use_compile: bool = False  # Use torch.compile for 10-30% speedup (requires PyTorch 2.0+)
+    compile_mode: str = "reduce-overhead"  # default, reduce-overhead, max-autotune
+
     # Resume
     resume: Optional[str] = None
 
@@ -512,23 +528,29 @@ def create_dataloaders(
     train_dataset = TextDataset(train_tokens, config.max_seq_len)
     val_dataset = TextDataset(val_tokens, config.max_seq_len)
 
-    # Create dataloaders
+    # Create dataloaders with performance optimizations
+    # - prefetch_factor: Prefetch 2 batches per worker to hide data loading latency
+    # - persistent_workers: Keep workers alive between epochs (avoids respawn overhead)
+    dataloader_kwargs = dict(
+        num_workers=config.num_workers,
+        pin_memory=config.pin_memory,
+        drop_last=True,
+        prefetch_factor=2 if config.num_workers > 0 else None,
+        persistent_workers=config.num_workers > 0,
+    )
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=config.batch_size,
         shuffle=True,
-        num_workers=config.num_workers,
-        pin_memory=config.pin_memory,
-        drop_last=True,
+        **dataloader_kwargs,
     )
 
     val_loader = DataLoader(
         val_dataset,
         batch_size=config.batch_size,
         shuffle=False,
-        num_workers=config.num_workers,
-        pin_memory=config.pin_memory,
-        drop_last=True,
+        **dataloader_kwargs,
     )
 
     return train_loader, val_loader
@@ -1558,6 +1580,15 @@ def train(config: TrainingConfig):
     num_params = count_parameters(model)
     logger.info(f"Model parameters: {num_params:,} ({num_params/1e6:.1f}M)")
 
+    # torch.compile for 10-30% speedup (PyTorch 2.0+)
+    if config.use_compile:
+        try:
+            logger.info(f"Compiling model with mode='{config.compile_mode}'...")
+            model = torch.compile(model, mode=config.compile_mode)
+            logger.info("Model compiled successfully")
+        except Exception as e:
+            logger.warning(f"torch.compile failed (requires PyTorch 2.0+): {e}")
+
     # Create optimizer and scheduler
     optimizer = create_optimizer(model, config)
     scheduler = create_scheduler(optimizer, config)
@@ -1907,6 +1938,13 @@ def parse_args() -> TrainingConfig:
                        help="Device to use")
     parser.add_argument("--num_workers", type=int, default=4,
                        help="DataLoader workers")
+
+    # Performance
+    parser.add_argument("--compile", action="store_true", dest="use_compile",
+                       help="Use torch.compile for 10-30%% speedup (PyTorch 2.0+)")
+    parser.add_argument("--compile_mode", type=str, default="reduce-overhead",
+                       choices=["default", "reduce-overhead", "max-autotune"],
+                       help="torch.compile mode: default, reduce-overhead (faster), max-autotune (best)")
 
     # Resume
     parser.add_argument("--resume", type=str, default=None,
