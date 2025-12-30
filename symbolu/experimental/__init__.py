@@ -197,6 +197,24 @@ from .training_curriculum import (
     ConstraintWarmupScheduler,
 )
 
+# Adversarial Hardening - Attack resistance
+from .adversarial_hardening import (
+    SubspaceAlignment,
+    SemanticAxioms,
+    BottleneckProjection,
+    SocratesTestSuite,
+    AdversarialHardening,
+)
+
+# Cognade Complete - Fully integrated model
+from .cognade_complete import (
+    VrittiAdaptiveDecay,
+    ConfidenceEntropyCoupling,
+    CognadeConfig,
+    CognadeComplete,
+    create_cognade,
+)
+
 __all__ = [
     # Core
     'CognitiveState',
@@ -287,4 +305,16 @@ __all__ = [
     'CurriculumLoss',
     'CurriculumTrainer',
     'ConstraintWarmupScheduler',
+    # Adversarial Hardening - Attack resistance
+    'SubspaceAlignment',
+    'SemanticAxioms',
+    'BottleneckProjection',
+    'SocratesTestSuite',
+    'AdversarialHardening',
+    # Cognade Complete - Fully integrated model
+    'VrittiAdaptiveDecay',
+    'ConfidenceEntropyCoupling',
+    'CognadeConfig',
+    'CognadeComplete',
+    'create_cognade',
 ]
