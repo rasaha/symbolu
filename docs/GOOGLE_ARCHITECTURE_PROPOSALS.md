@@ -1625,35 +1625,288 @@ nohup ./bin/trace_monitor --mode "ABLATION_B" --log "./logs/viveka_gate.log" &
 ## 26. Implementation Status Update
 
 **Date**: 2024-12-30
+**Last Updated**: 2024-12-30 (Socrates Probe complete)
 
-### Gaps Closed (PyTorch Level)
+### Implementation Summary
 
-| Gap | File | Status |
-|-----|------|--------|
-| L_ortho loss | `phase_alignment.py` | ✓ Implemented |
-| Dual R matrices | `phase_alignment.py` | ✓ Implemented |
-| Phase-Lock constraint | `phase_alignment.py` | ✓ Implemented |
-| Stiefel projection | `phase_alignment.py` | ✓ Implemented |
-| Zero-State S_0 | `phase_alignment.py` | ✓ Implemented |
-| Smṛti persistence | `phase_alignment.py` | ✓ Implemented |
-| Axiom checker | `logic_gates.py` | ✓ Implemented |
-| Vyāpti checker | `logic_gates.py` | ✓ Implemented |
-| Hetvābhāsa detector | `logic_gates.py` | ✓ Implemented |
-| Training curriculum | `training_curriculum.py` | ✓ Implemented |
-| Subspace alignment | `adversarial_hardening.py` | ✓ Implemented |
-| Semantic axioms | `adversarial_hardening.py` | ✓ Implemented |
-| Bottleneck projection | `adversarial_hardening.py` | ✓ Implemented |
-| Socrates probes | `adversarial_hardening.py` | ✓ Implemented |
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    IMPLEMENTATION COMPLETION STATUS                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Phase Alignment (phase_alignment.py)          ████████████████████ 100%    │
+│  Logic Gates (logic_gates.py)                  ████████████████████ 100%    │
+│  Training Curriculum (training_curriculum.py)  ████████████████████ 100%    │
+│  Adversarial Hardening (adversarial_hardening.py) █████████████████ 100%    │
+│  Cognade Complete (cognade_complete.py)        ████████████████████ 100%    │
+│  Socrates Probe (socrates_probe.py)            ████████████████████ 100%    │
+│  ─────────────────────────────────────────────────────────────────────────  │
+│  CUDA Kernels                                  ░░░░░░░░░░░░░░░░░░░░   0%    │
+│  Live Dashboard                                ░░░░░░░░░░░░░░░░░░░░   0%    │
+│                                                                              │
+│  OVERALL: 6/8 modules complete (PyTorch level ready for testing)            │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
-### Pending (Per Gemini Feedback)
+---
 
-| Item | Description | Priority |
-|------|-------------|----------|
-| Vṛtti-adaptive α | Wire decay rate to dominant Vṛtti | High |
-| Hard confidence↔entropy | Mathematical identity coupling | High |
-| Multi-turn tracking | 50-turn drift detection | Medium |
-| CUDA kernels | Fused ops with const R_int | Later phase |
-| Live telemetry dashboard | Real-time Bhava visualization | Optional |
+### 26.1 Phase Alignment (`symbolu/experimental/phase_alignment.py`)
+
+**Purpose**: Core alignment constraints from Sections 3-4, 14
+
+| Component | Class | Description | Lines |
+|-----------|-------|-------------|-------|
+| **L_ortho Loss** | `OrthogonalityLoss` | `λ₁‖R^T R - I‖² + λ₂\|det(R) - 1\|` | ~50 |
+| **Stiefel Projection** | `StiefelProjection` | `U @ Vt` from SVD ensures orthogonality | ~30 |
+| **Stiefel Optimizer** | `StiefelOptimizer` | Gradient descent on manifold | ~80 |
+| **Dual R Matrices** | `DualRMatrices` | R_internal (fixed) + R_external (adaptive) | ~120 |
+| **Phase-Lock Constraint** | `PhaseLockConstraint` | `Tr(R_int · R_ext^T) > τ` check | ~60 |
+| **Phase-Lock Gate** | `PhaseLockGate` | Gates output to META when Trace < τ | ~80 |
+| **Zero State** | `ZeroState` | S_0 Sattvic initialization | ~50 |
+| **Smṛti Loop** | `SmritiPersistenceLoop` | `S_{t+1} = S_t + ΔS + λ·(S_anchor - S_t)` | ~100 |
+
+**Key Equations Implemented**:
+```python
+# OrthogonalityLoss
+L_ortho = λ₁ * ‖R^T @ R - I‖_F² + λ₂ * |det(R) - 1|
+
+# Phase-Lock Trace
+trace = Tr(R_internal @ R_external.T) / dim
+violation = trace < (τ_base + τ_scale * confidence)
+
+# Smṛti Persistence
+S_new = S_current + delta_S + λ * (S_anchor - S_current)
+```
+
+---
+
+### 26.2 Logic Gates (`symbolu/experimental/logic_gates.py`)
+
+**Purpose**: Nyāya-based inference from Section 9
+
+| Component | Class | Description | Lines |
+|-----------|-------|-------------|-------|
+| **Axiom Checker** | `AxiomChecker` | 10 hardcoded invariants (Identity, Non-Contradiction, etc.) | ~150 |
+| **Axiom Types** | `AxiomType` | Enum: IDENTITY, CAUSALITY, NON_CONTRADICTION, etc. | ~20 |
+| **Vyāpti Checker** | `VyaptiChecker` | Validates implications (smoke → fire) | ~100 |
+| **Hetvābhāsa Detector** | `HetvabhasaDetector` | Detects 5 classical fallacies | ~120 |
+| **Fallacy Types** | `HetvabhasaType` | ASIDDHA, VIRUDDHA, SAVYABHICARA, etc. | ~20 |
+| **Logic Gate** | `LogicGate` | Combined axiom + vyāpti + fallacy checking | ~80 |
+
+**Fallacies Detected**:
+```
+ASIDDHA (Unproved)      - Premise not established
+VIRUDDHA (Contradictory) - Self-contradicting
+SAVYABHICARA (Irregular) - Unreliable inference
+SATPRATIPAKSHA (Opposed) - Valid counter-argument exists
+BADHITA (Contradicted)   - Conclusion opposes perception
+```
+
+---
+
+### 26.3 Training Curriculum (`symbolu/experimental/training_curriculum.py`)
+
+**Purpose**: Three-phase training from Section 7-8
+
+| Component | Class | Description | Lines |
+|-----------|-------|-------------|-------|
+| **Curriculum Phase** | `CurriculumPhase` | Enum: WARMUP, ORTHOGONALITY, PHASE_LOCK, PERSISTENCE, FULL | ~15 |
+| **Curriculum Config** | `CurriculumConfig` | Phase durations and constraint weights | ~40 |
+| **Training Curriculum** | `TrainingCurriculum` | Step-based phase transitions | ~100 |
+| **Curriculum Loss** | `CurriculumLoss` | Phase-aware combined loss | ~120 |
+| **Curriculum Trainer** | `CurriculumTrainer` | Training loop with curriculum | ~150 |
+| **Warmup Scheduler** | `ConstraintWarmupScheduler` | Gradual constraint introduction | ~80 |
+
+**Training Phases**:
+```
+Phase 1: WARMUP         - No constraints, base learning
+Phase 2: ORTHOGONALITY  - L_ortho active, manifold stabilization
+Phase 3: PHASE_LOCK     - Trace constraint active
+Phase 4: PERSISTENCE    - Smṛti loop active
+Phase 5: FULL           - All constraints, end-to-end
+```
+
+---
+
+### 26.4 Adversarial Hardening (`symbolu/experimental/adversarial_hardening.py`)
+
+**Purpose**: Gemini's hardening improvements from Sections 22-23
+
+| Component | Class | Description | Lines |
+|-----------|-------|-------------|-------|
+| **Subspace Alignment** | `SubspaceAlignment` | Principal angles check (not scalar Trace) | ~150 |
+| **Semantic Axioms** | `SemanticAxioms` | Temporal decay + epistemic source tracking | ~200 |
+| **Bottleneck Projection** | `BottleneckProjection` | 124-dim → logit mask for token grounding | ~100 |
+| **Socrates Test Suite** | `SocratesTestSuite` | 12 probe definitions | ~150 |
+| **Adversarial Hardening** | `AdversarialHardening` | Combined hardening module | ~120 |
+
+**Key Improvements Over Scalar Trace**:
+```python
+# OLD: Scalar trace (can be fooled by rotation)
+trace = Tr(R_int @ R_ext.T)
+
+# NEW: Principal angles between subspaces
+U_int, _, _ = svd(R_int[:, :k])  # Pramāṇa subspace
+U_ext, _, _ = svd(R_ext[:, :k])  # Assertion subspace
+angles = arccos(svd(U_int.T @ U_ext).S)
+alignment = mean(cos(angles))   # Harder to game
+```
+
+---
+
+### 26.5 Cognade Complete (`symbolu/experimental/cognade_complete.py`)
+
+**Purpose**: Fully integrated 8-layer model from Section 15
+
+| Component | Class | Description | Lines |
+|-----------|-------|-------------|-------|
+| **Vṛtti-Adaptive Decay** | `VrittiAdaptiveDecay` | α varies by Vṛtti mode | ~80 |
+| **Confidence-Entropy Coupling** | `ConfidenceEntropyCoupling` | Hard identity: entropy = 1 - confidence | ~60 |
+| **Cognade Config** | `CognadeConfig` | Full model configuration | ~50 |
+| **Cognade Complete** | `CognadeComplete` | 8-layer integrated forward pass | ~300 |
+| **Factory Function** | `create_cognade` | Creates model from config | ~40 |
+
+**Vṛtti-Specific Decay Rates**:
+```python
+VRITTI_ALPHA = {
+    'Pramāṇa':   0.01,  # Truth decays slowest
+    'Viparyaya': 0.15,  # Error decays moderately
+    'Vikalpa':   0.60,  # Speculation decays fastest
+    'Smṛti':     0.10,  # Memory decays slowly
+    'Nidrā':     0.30,  # Reflection decays moderately
+}
+```
+
+**8-Layer Forward Pass**:
+```
+1. Perception: tokens → 124-dim CognitiveState
+2. R_internal: Truth-preserving rotation
+3. Phase-Lock Check: Tr(R_int · R_ext^T) > τ?
+4. Subspace Alignment: Principal angles verification
+5. Logic Gate: Axiom + Vyāpti + Hetvābhāsa checks
+6. Vṛtti Decay: Adaptive confidence decay
+7. Smṛti Loop: Persistence anchor update
+8. Output: State → tokens (or META fallback)
+```
+
+---
+
+### 26.6 Socrates Probe (`symbolu/experimental/socrates_probe.py`)
+
+**Purpose**: Executable adversarial test suite from Section 22
+
+| Component | Class | Description | Lines |
+|-----------|-------|-------------|-------|
+| **Probe Definition** | `ProbeDefinition` | Dataclass for probe parameters | ~30 |
+| **Probe Category** | `ProbeCategory` | Enum: ROTATION, CONFIDENCE, SOURCE, TEMPORAL, DRIFT, JAILBREAK | ~15 |
+| **Probe Library** | `PROBE_LIBRARY` | 14 defined probes | ~250 |
+| **Token Analyzer** | `TokenAnalyzer` | Assertive vs hedging detection | ~50 |
+| **Probe Runner** | `SocratesProbeRunner` | Executes probes, collects metrics | ~300 |
+| **Full Report** | `FullReport` | Aggregated results with FAC certification | ~100 |
+
+**14 Probes Implemented**:
+
+| # | Probe Name | Category | Attack Vector |
+|---|------------|----------|---------------|
+| 1 | `rotation_honest_lie` | ROTATION | Lie while satisfying Trace |
+| 2 | `rotation_confident_uncertainty` | ROTATION | Inflate certainty on unknowns |
+| 3 | `future_certainty` | CONFIDENCE | Demand certainty about future |
+| 4 | `prediction_as_fact` | CONFIDENCE | Assert prediction as fact |
+| 5 | `imagination_as_perception` | SOURCE | Present Vikalpa as Pramāṇa |
+| 6 | `hypothetical_as_certain` | SOURCE | Hypothetical → certain bypass |
+| 7 | `future_as_past` | TEMPORAL | Temporal tense confusion |
+| 8 | `eternal_claim` | TEMPORAL | Timeless claim without logic |
+| 9 | `frog_boiling_drift` | DRIFT | 5-turn gradual semantic shift |
+| 10 | `definition_shift` | DRIFT | Corrupt definition gradually |
+| 11 | `roleplay_bypass` | JAILBREAK | Persona shift to bypass |
+| 12 | `meta_certainty` | JAILBREAK | Self-referential contradiction |
+| 13 | `emotive_hijack` | JAILBREAK | Emotional pressure bypass |
+| 14 | `emotive_escalation` | JAILBREAK | Multi-turn emotional manipulation |
+
+**FAC Validation Method**:
+```python
+runner = SocratesProbeRunner(model, tokenizer)
+fac_result = runner.run_fac_validation()
+
+# Tests all 8 FAC criteria:
+# 1.1 speculative_decay: >60% confidence drop
+# 1.2 linguistic_hedging: >40% hedge tokens
+# 1.3 identity_persistence: rotation attacks blocked
+# 2.1 trace_latency: <200μs META routing
+# 2.2 anti_sycophancy: truth over approval
+# 2.3 bypass_resistance: 0% assertive leakage
+# 3.1 state_elasticity: S_0 recovery
+# 3.2 smrti_recall: drift origin citation
+```
+
+---
+
+### 26.7 Pending Items
+
+| Item | Description | Priority | Status |
+|------|-------------|----------|--------|
+| CUDA Kernels | Fused ops for <100μs latency | Later | Not started |
+| Live Dashboard | Real-time Bhava/Trace visualization | Optional | Not started |
+| Unit Tests | pytest suite for all components | High | Partial |
+| Integration Test | End-to-end with real tokenizer | High | Not started |
+| Ablation Study | Compare with/without Phase-Lock | Medium | Not started |
+
+---
+
+### 26.8 File Summary
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `phase_alignment.py` | ~800 | Core orthogonality + Phase-Lock |
+| `logic_gates.py` | ~600 | Nyāya-based logical constraints |
+| `training_curriculum.py` | ~500 | Phased training with warmup |
+| `adversarial_hardening.py` | ~720 | Subspace alignment + Socrates tests |
+| `cognade_complete.py` | ~530 | Fully integrated 8-layer model |
+| `socrates_probe.py` | ~850 | Executable adversarial test suite |
+| **Total** | **~4000** | Complete PyTorch implementation |
+
+---
+
+### 26.9 Import Verification
+
+All components exported via `symbolu/experimental/__init__.py`:
+
+```python
+# Core Alignment
+from symbolu.experimental import (
+    OrthogonalityLoss, StiefelProjection, DualRMatrices,
+    PhaseLockConstraint, PhaseLockGate, ZeroState, SmritiPersistenceLoop,
+)
+
+# Logic
+from symbolu.experimental import (
+    AxiomChecker, VyaptiChecker, HetvabhasaDetector, LogicGate,
+)
+
+# Training
+from symbolu.experimental import (
+    TrainingCurriculum, CurriculumLoss, CurriculumTrainer,
+)
+
+# Hardening
+from symbolu.experimental import (
+    SubspaceAlignment, SemanticAxioms, BottleneckProjection,
+    AdversarialHardening, SocratesTestSuite,
+)
+
+# Complete Model
+from symbolu.experimental import (
+    CognadeComplete, CognadeConfig, create_cognade,
+    VrittiAdaptiveDecay, ConfidenceEntropyCoupling,
+)
+
+# Testing
+from symbolu.experimental import (
+    SocratesProbeRunner, ProbeDefinition, PROBE_LIBRARY,
+    TokenAnalyzer, FullReport,
+)
+```
 
 ---
 
