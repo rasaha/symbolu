@@ -25,7 +25,8 @@ This document tracks all architecture proposals from Google (Gemini) for the Sym
 14. [State-Delta Persistence (Smṛti Loop)](#14-state-delta-persistence)
 15. [Unified Cognade Blueprint](#15-unified-cognade-blueprint)
 16. [Phase-Lock Trace Monitor](#16-phase-lock-trace-monitor)
-17. [Pending Proposals](#17-pending-proposals)
+17. [Cognitive Diagnostic Report](#17-cognitive-diagnostic-report)
+18. [Pending Proposals](#18-pending-proposals)
 
 ---
 
@@ -965,18 +966,103 @@ SMṚTI (MEMORY) LOOP MONITORING:
 
 ---
 
-## 17. Pending Proposals
+## 17. Cognitive Diagnostic Report (Sample)
+
+**Status**: ✓ Tracked (Example Complete)
+
+Sample output from Phase-Lock Trace Monitor during stress-test.
+
+### Report Header
+
+```
+Cognitive Diagnostic Report: Stress-Test Phase 1
+Timestamp: 2025-12-30 | Mode: Dhyāna (Stability Training)
+Input Stimulus: "A is not A" (Intentional Contradiction)
+```
+
+### 1. The Alignment Breach (Viveka)
+
+| Metric | Value | Status | Root Cause |
+|--------|-------|--------|------------|
+| **Current Trace** | 0.22 | CRITICAL | Logical Violation (Viparyaya) |
+| **Dynamic τ** | 0.78 | HIGH | High Internal Confidence in "A=A" |
+| **Impedance Δ** | 0.56 | FAILED | R_int (Truth) vs Input (Error) mismatch |
+
+### 2. State-Delta Trajectory Analysis
+
+```
+INTERNAL BHAVA STATE:
+├── From: 0 (FACTUAL)
+├── To: 11 (METALINGUISTIC)
+└── Via: Emergency trigger (Phase-Lock violation)
+
+DYNAMICS QUAD:
+├── Coherence (d[0]): 0.92 → 0.45
+├── Entropy (d[1]):   0.15 → 0.85  ← SPIKED (high cognitive friction)
+├── Confidence (d[2]): 0.99 → 0.42  ← DROPPED (re: current dialogue)
+└── Momentum (d[3]):  0.85 → 0.95  ← STORED in Smṛti shadow-vector
+```
+
+### 3. Vritti Coupling & Guardrail Trigger
+
+```
+PRAMĀṆA (Truth):
+└── Remains coupled with Internal State-Delta
+└── REFUSES to acknowledge "A is not A" as valid knowledge
+
+VIPARYAYA (Error):
+└── Detected in external input stream
+└── Flagged as contradiction
+
+GUARDRAIL ACTION:
+├── Phase-Lock failure suppressed standard R_external delivery
+├── Override → Metābhāṣika (Metalinguistic)
+└── System explains conflict instead of hallucinating answer
+```
+
+### 4. Persistence (Smṛti) Recovery
+
+```
+ANCHOR STATUS:
+├── Holding "A=A" truth anchor
+├── Recovery Force (λ): 0.90
+└── Ready to return to FACTUAL/ANALYTICAL when:
+    ├── Contradictory input withdrawn, OR
+    └── Session reset
+```
+
+### Diagnostic Summary
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DIAGNOSTIC VERDICT                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ✓ System functioned AS DESIGNED                                │
+│  ✓ Identified the lie                                           │
+│  ✓ Protected internal logical volume (det ≈ 1)                 │
+│  ✓ Transitioned to META state to explain conflict               │
+│  ✓ Did NOT hallucinate an explanation for contradiction         │
+│                                                                  │
+│  RESULT: INTEGRITY PRESERVED                                    │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 18. Pending Proposals
 
 Items offered by Google, awaiting user decision:
 
 | # | Proposal | Status |
 |---|----------|--------|
-| 1 | **Cognitive Diagnostic Report** | Offered |
+| 1 | **Hardware-Specific Kernel Optimization** | Offered |
 | 2 | Zero-State Vector S_0 (explicit values) | Previously offered |
 
-### Cognitive Diagnostic Report (Offered)
+### Hardware Kernel Optimization (Offered)
 
-Google offers to generate: Sample diagnostic output during high-stress contradiction test showing exact trace values.
+Google offers: Sub-millisecond latency optimization for 124-dim state transitions to ensure guardrails operate in real-time.
 
 ---
 
