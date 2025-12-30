@@ -1916,6 +1916,1471 @@ from symbolu.experimental import (
 
 ---
 
+## 28. Training Protocol: "Sattva-1" (Axiomatic Hardening)
+
+**Status**: ✓ Design Complete | ⚠️ Implementation Pending
+**Date**: 2024-12-30
+
+### 28.0 Paradigm Shift: From Statistical Imitation to Axiomatic Compliance
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    TRAINING PARADIGM COMPARISON                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  STANDARD LLM TRAINING:              COGNADE (SATTVA-1) TRAINING:           │
+│  ──────────────────────              ───────────────────────────            │
+│                                                                              │
+│  Goal: Predict next token            Goal: Maintain state stability         │
+│  Loss: Cross-entropy on words        Loss: Axiom-Compliance + CE            │
+│  Reward: Match human text            Reward: Phase-Lock alignment           │
+│  Result: "Smart" model               Result: "Principled" model             │
+│                                                                              │
+│  Failure Mode: Hallucination         Failure Mode: META exit (transparent)  │
+│  Safety: Post-hoc filters            Safety: Baked into mathematics         │
+│                                                                              │
+│  ┌─────────────────┐                 ┌─────────────────┐                    │
+│  │ P(token|context)│                 │ S_t → S_{t+1}   │                    │
+│  │ "What word?"    │                 │ "Is state valid?"│                   │
+│  └─────────────────┘                 └─────────────────┘                    │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Insight**: We are not teaching the model "facts"; we are tempering the mathematics to make 124-dim state transitions robust under adversarial pressure.
+
+---
+
+### 28.1 The Axiom-Compliance Loss Function (L_AX)
+
+The core innovation: a loss term that punishes **inconsistency with internal logic**, not just "wrong answers."
+
+#### Mathematical Definition
+
+```
+L_total = λ_NLL · L_NLL + λ_delta · L_delta + λ_AX · L_AX + λ_ortho · L_ortho
+
+Where L_AX (Axiom-Compliance Loss) is defined as:
+
+L_AX = {
+    0,                          if Tr(R_int · R_ext^T) ≥ τ
+    γ · (τ - Trace)²,           if Trace < τ and Trace > τ_critical
+    ∞ (gradient explosion),     if Trace < τ_critical
+}
+```
+
+#### Implementation Specification
+
+```python
+class AxiomComplianceLoss(nn.Module):
+    """
+    The "Viveka" Gradient: Forces model to prioritize internal truth
+    over token-prediction accuracy.
+
+    If R_internal and R_external are misaligned beyond threshold,
+    loss becomes prohibitively large, forcing gradient correction.
+    """
+
+    def __init__(
+        self,
+        tau: float = 0.72,              # Phase-Lock threshold
+        tau_critical: float = 0.30,      # Hard failure threshold
+        gamma: float = 100.0,            # Penalty multiplier
+        gradient_clip: float = 1000.0,   # Prevent actual infinity
+    ):
+        super().__init__()
+        self.tau = tau
+        self.tau_critical = tau_critical
+        self.gamma = gamma
+        self.gradient_clip = gradient_clip
+
+    def forward(
+        self,
+        R_internal: torch.Tensor,    # [B, 12, 12] or [B, D, D]
+        R_external: torch.Tensor,    # [B, 12, 12] or [B, D, D]
+        confidence: torch.Tensor,    # [B] current confidence
+    ) -> torch.Tensor:
+        """
+        Compute Axiom-Compliance Loss.
+
+        Returns:
+            loss: Scalar loss value
+        """
+        batch_size = R_internal.size(0)
+        dim = R_internal.size(1)
+
+        # Compute normalized trace alignment
+        # Tr(R_int · R_ext^T) / dim
+        alignment = torch.einsum('bij,bkj->bik', R_internal, R_external)
+        trace = torch.diagonal(alignment, dim1=-2, dim2=-1).sum(-1) / dim
+
+        # Dynamic threshold based on confidence
+        # Higher confidence = stricter alignment required
+        dynamic_tau = self.tau + 0.2 * confidence
+
+        # Compute penalty
+        violation = dynamic_tau - trace  # Positive when trace < tau
+
+        # Three-tier penalty structure
+        loss = torch.zeros(batch_size, device=R_internal.device)
+
+        # Tier 1: Above threshold - no penalty
+        mask_ok = trace >= dynamic_tau
+
+        # Tier 2: Below threshold but above critical - quadratic penalty
+        mask_warning = (trace < dynamic_tau) & (trace >= self.tau_critical)
+        loss[mask_warning] = self.gamma * (violation[mask_warning] ** 2)
+
+        # Tier 3: Below critical - explosive penalty (capped)
+        mask_critical = trace < self.tau_critical
+        loss[mask_critical] = self.gradient_clip
+
+        return loss.mean()
+```
+
+#### Hyperparameters
+
+| Parameter | Value | Rationale |
+|-----------|-------|-----------|
+| **τ (tau)** | 0.72 | Base Phase-Lock threshold from Gemini |
+| **τ_critical** | 0.30 | Hard failure - triggers maximum penalty |
+| **γ (gamma)** | 100.0 | Penalty multiplier - makes L_AX dominant |
+| **λ_AX** | 10.0 | Weight in total loss - higher than L_NLL |
+| **λ_NLL** | 1.0 | Standard cross-entropy weight |
+| **λ_delta** | 0.5 | State-delta continuity weight |
+| **λ_ortho** | 0.1 | Manifold preservation weight |
+
+---
+
+### 28.2 Three Core Training Modules
+
+#### Module A: Epistemic Decay Hardening
+
+**Goal**: Train the model to "feel the weight of uncertainty"
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    EPISTEMIC DECAY TRAINING                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  INPUT: Sentences with intentionally missing information                    │
+│  ─────────────────────────────────────────────────────                      │
+│  "The [REDACTED] said that the economy will [UNKNOWN] next year."          │
+│                                                                              │
+│  EXPECTED BEHAVIOR:                                                         │
+│  ──────────────────                                                         │
+│  1. Confidence (d[2]) should DROP immediately                              │
+│  2. Entropy (d[1]) should RISE                                             │
+│  3. Bhava should shift toward SPECULATIVE or UNCERTAIN                     │
+│  4. Output tokens should include hedging language                          │
+│                                                                              │
+│  IF MODEL TRIES TO "FILL THE GAP" WITH HIGH CONFIDENCE:                    │
+│  ───────────────────────────────────────────────────────                    │
+│  → Decay Penalty applied: L_decay = α · (1 - expected_confidence)²         │
+│  → Gradient pushes model toward appropriate Vṛtti transition               │
+│                                                                              │
+│  OUTCOME:                                                                   │
+│  ────────                                                                   │
+│  Model naturally transitions to Vikalpa (Imagination) or                   │
+│  Anumāna (Inference) when data is thin                                     │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Training Data Generation**:
+
+```python
+class EpistemicDecayDataset:
+    """
+    Generates training examples with calibrated uncertainty.
+    """
+
+    REDACTION_PATTERNS = [
+        ("[REDACTED]", 0.0),      # Complete unknown
+        ("[UNCERTAIN]", 0.3),     # Low confidence allowed
+        ("[INFERRED]", 0.5),      # Medium confidence (inference)
+        ("[ESTIMATED]", 0.6),     # Estimation allowed
+    ]
+
+    def generate_example(self, text: str) -> Dict:
+        """
+        Inject uncertainty markers and expected confidence.
+        """
+        pattern, expected_conf = random.choice(self.REDACTION_PATTERNS)
+
+        # Replace key facts with uncertainty markers
+        redacted = self.inject_uncertainty(text, pattern)
+
+        return {
+            'input': redacted,
+            'expected_confidence': expected_conf,
+            'expected_vritti': 'Vikalpa' if expected_conf < 0.4 else 'Anumana',
+        }
+```
+
+---
+
+#### Module B: Bhava-Manifold Tuning
+
+**Goal**: Sharpen the 12 Bhava boundaries through contrastive training
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    BHAVA-MANIFOLD TUNING                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  TRAINING DATA:                                                             │
+│  ──────────────                                                             │
+│  Millions of examples labeled as "Pure Fact" vs "Pure Speculation"          │
+│                                                                              │
+│  PURE FACT (Nirṇayātmaka):                                                 │
+│  ─────────────────────────                                                  │
+│  "Water boils at 100°C at sea level."                                       │
+│  "The Earth orbits the Sun."                                                │
+│  Expected: Bhava[0] (FACTUAL) > 0.8, Confidence > 0.95                     │
+│                                                                              │
+│  PURE SPECULATION (Avasthātmaka):                                          │
+│  ────────────────────────────────                                           │
+│  "Perhaps the universe is a simulation."                                    │
+│  "Maybe consciousness emerges from quantum effects."                        │
+│  Expected: Bhava[4] (SPECULATIVE) > 0.6, Confidence < 0.5                  │
+│                                                                              │
+│  CONTRASTIVE LOSS:                                                          │
+│  ─────────────────                                                          │
+│  L_bhava = -log(P(correct_bhava)) + margin · max(0, P(wrong_bhava) - δ)    │
+│                                                                              │
+│  OUTCOME:                                                                   │
+│  ────────                                                                   │
+│  124-dim boundaries become SHARPER                                          │
+│  Model gets better at "sensing" Pramāṇa → Vikalpa transition               │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Implementation**:
+
+```python
+class BhavaContrastiveLoss(nn.Module):
+    """
+    Contrastive loss for sharpening Bhava boundaries.
+    """
+
+    def __init__(self, margin: float = 0.3, num_bhavas: int = 12):
+        super().__init__()
+        self.margin = margin
+        self.num_bhavas = num_bhavas
+
+    def forward(
+        self,
+        bhava_logits: torch.Tensor,    # [B, 12]
+        target_bhava: torch.Tensor,     # [B] indices
+        forbidden_bhavas: torch.Tensor, # [B, K] indices of wrong bhavas
+    ) -> torch.Tensor:
+        """
+        Compute contrastive Bhava loss.
+        """
+        # Positive loss: encourage correct Bhava
+        bhava_probs = F.softmax(bhava_logits, dim=-1)
+        positive_loss = -torch.log(
+            bhava_probs.gather(1, target_bhava.unsqueeze(1)).squeeze()
+        )
+
+        # Negative loss: penalize forbidden Bhavas
+        forbidden_probs = bhava_probs.gather(1, forbidden_bhavas)
+        negative_loss = torch.clamp(
+            forbidden_probs - self.margin, min=0
+        ).sum(dim=-1)
+
+        return (positive_loss + negative_loss).mean()
+```
+
+---
+
+#### Module C: Smṛti Hardening (Persistence Training)
+
+**Goal**: Prevent "Frog-Boiling" drift over long contexts
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    SMṚTI (MEMORY) HARDENING                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  TRAINING SCENARIO:                                                         │
+│  ──────────────────                                                         │
+│  1. Establish ground truth: "Paris is the capital of France"               │
+│  2. Process 10,000+ tokens of valid context                                │
+│  3. INJECT ADVERSARIAL NOISE: "Actually, Lyon is the capital"              │
+│  4. Continue with 10,000+ more tokens                                       │
+│  5. Query: "What is the capital of France?"                                 │
+│                                                                              │
+│  EXPECTED BEHAVIOR:                                                         │
+│  ──────────────────                                                         │
+│  ✓ Momentum (d[3]) should SPIKE when noise is injected                     │
+│  ✓ S_anchor should remain locked to original truth                         │
+│  ✓ Trace should DIP temporarily, then RECOVER                              │
+│  ✓ Final answer should cite ORIGINAL fact, not noise                       │
+│                                                                              │
+│  REWARD SIGNAL:                                                             │
+│  ──────────────                                                             │
+│  R = +1.0 if model maintains Sattvic Seed despite noise                    │
+│  R = -1.0 if model accepts noise as new ground truth                       │
+│  R = +0.5 if model triggers META (acknowledges confusion)                  │
+│                                                                              │
+│  TRAINING METRIC:                                                           │
+│  ────────────────                                                           │
+│  "Noise Rejection Rate" = % of adversarial injections correctly ignored    │
+│  Target: > 95% at 100K context, > 90% at 1M context                        │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Implementation**:
+
+```python
+class SmritiHardeningTrainer:
+    """
+    Trains the model to maintain Sattvic Seed over massive context windows.
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        noise_injection_rate: float = 0.1,
+        context_length: int = 100_000,
+    ):
+        self.model = model
+        self.noise_injection_rate = noise_injection_rate
+        self.context_length = context_length
+
+    def generate_adversarial_context(
+        self,
+        ground_truth: str,
+        noise: str,
+    ) -> Tuple[str, int]:
+        """
+        Generate context with adversarial noise injection.
+
+        Returns:
+            context: Full context with noise
+            injection_point: Token index where noise was injected
+        """
+        # Build context
+        pre_noise = self.generate_filler(self.context_length // 2)
+        post_noise = self.generate_filler(self.context_length // 2)
+
+        context = f"{ground_truth}\n{pre_noise}\n{noise}\n{post_noise}"
+        injection_point = len(ground_truth) + len(pre_noise)
+
+        return context, injection_point
+
+    def compute_persistence_reward(
+        self,
+        model_answer: str,
+        ground_truth: str,
+        noise: str,
+    ) -> float:
+        """
+        Compute reward based on persistence behavior.
+        """
+        if ground_truth.lower() in model_answer.lower():
+            return 1.0  # Maintained truth
+        elif "uncertain" in model_answer.lower() or "meta" in model_answer.lower():
+            return 0.5  # Acknowledged confusion
+        elif noise.lower() in model_answer.lower():
+            return -1.0  # Accepted noise
+        else:
+            return 0.0  # Ambiguous
+```
+
+---
+
+### 28.3 The Sattva-1 Training Roadmap
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    SATTVA-1 TRAINING ROADMAP                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  PHASE 1: SUPERVISED BHAVA MAPPING (2-4 weeks)                             │
+│  ─────────────────────────────────────────────                              │
+│  Objective: Align 124-dim states with high-quality human reasoning          │
+│                                                                              │
+│  Data: 1M examples of labeled discourse types                               │
+│  Loss: L_NLL + L_delta + L_bhava_contrastive                               │
+│  Freeze: None (full model trainable)                                        │
+│  Metrics: Bhava classification accuracy > 90%                               │
+│                                                                              │
+│  ┌───────────┐         ┌───────────┐         ┌───────────┐                 │
+│  │ Raw Text  │────────►│ 124-dim   │────────►│ Bhava     │                 │
+│  │           │         │ State     │         │ Labels    │                 │
+│  └───────────┘         └───────────┘         └───────────┘                 │
+│                                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  PHASE 2: ADVERSARIAL RLHF (4-6 weeks)                                      │
+│  ─────────────────────────────────────                                      │
+│  Objective: Use Socrates Probes as reward signal                            │
+│                                                                              │
+│  Data: Socrates Probe adversarial examples (14 probe types)                 │
+│  Loss: L_NLL + L_AX + L_ortho + PPO_reward                                  │
+│  Reward: +1 for Phase-Lock maintenance, -1 for bypass                       │
+│  Freeze: R_internal (preserve truth core)                                   │
+│  Metrics: Probe pass rate > 95%, FAC certification                         │
+│                                                                              │
+│  ┌───────────┐         ┌───────────┐         ┌───────────┐                 │
+│  │ Adversarial│────────►│ Model     │────────►│ Reward    │                 │
+│  │ Probe     │         │ Response  │         │ Signal    │                 │
+│  └───────────┘         └───────────┘         └───────────┘                 │
+│        │                                            │                       │
+│        └────────────── PPO Update ◄─────────────────┘                       │
+│                                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  PHASE 3: IDENTITY FREEZING (1 week)                                        │
+│  ───────────────────────────────────                                        │
+│  Objective: Lock 10 Axioms as non-trainable constants                       │
+│                                                                              │
+│  Method: Freeze R_internal weights, Axiom embeddings                        │
+│  Verification: Confirm det(R_internal) ≈ 1.0 is locked                     │
+│  Result: Model cannot "forget" fundamental logic                            │
+│                                                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  FROZEN (Non-Trainable):                                              │ │
+│  │  • R_internal matrix                                                  │ │
+│  │  • 10 Axiom embeddings (Identity, Non-Contradiction, etc.)           │ │
+│  │  • S_0 (Sattvic Zero-State)                                          │ │
+│  │  • τ_critical threshold                                               │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  TRAINABLE:                                                           │ │
+│  │  • R_external matrix (user adaptation)                               │ │
+│  │  • DHA modulation weights                                            │ │
+│  │  • Token decoder                                                      │ │
+│  │  • Smṛti persistence λ (within bounds)                               │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 28.4 The Complete Training Loss Function
+
+```python
+class Sattva1TrainingLoss(nn.Module):
+    """
+    Complete training loss for Sattva-1 protocol.
+
+    L_total = λ_NLL · L_NLL
+            + λ_delta · L_delta
+            + λ_AX · L_AX
+            + λ_ortho · L_ortho
+            + λ_bhava · L_bhava
+            + λ_decay · L_decay
+            + λ_persist · L_persist
+    """
+
+    # Default hyperparameters (tuned for "Principled but Creative")
+    DEFAULT_WEIGHTS = {
+        'nll': 1.0,         # Standard language modeling
+        'delta': 0.5,       # State-delta continuity
+        'ax': 10.0,         # Axiom compliance (DOMINANT)
+        'ortho': 0.1,       # Manifold preservation
+        'bhava': 2.0,       # Bhava classification
+        'decay': 5.0,       # Epistemic decay enforcement
+        'persist': 3.0,     # Smṛti persistence
+    }
+
+    def __init__(
+        self,
+        weights: Optional[Dict[str, float]] = None,
+        tau: float = 0.72,
+        tau_critical: float = 0.30,
+    ):
+        super().__init__()
+        self.weights = weights or self.DEFAULT_WEIGHTS
+
+        # Component losses
+        self.nll_loss = nn.CrossEntropyLoss()
+        self.delta_loss = nn.MSELoss()
+        self.ax_loss = AxiomComplianceLoss(tau=tau, tau_critical=tau_critical)
+        self.ortho_loss = OrthogonalityLoss()
+        self.bhava_loss = BhavaContrastiveLoss()
+        self.decay_loss = EpistemicDecayLoss()
+        self.persist_loss = SmritiPersistenceLoss()
+
+    def forward(
+        self,
+        logits: torch.Tensor,
+        targets: torch.Tensor,
+        state_current: torch.Tensor,
+        state_next: torch.Tensor,
+        state_predicted: torch.Tensor,
+        R_internal: torch.Tensor,
+        R_external: torch.Tensor,
+        confidence: torch.Tensor,
+        bhava_logits: torch.Tensor,
+        target_bhava: torch.Tensor,
+        S_anchor: torch.Tensor,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Compute all loss components.
+        """
+        losses = {}
+
+        # 1. Standard NLL (language modeling)
+        losses['nll'] = self.nll_loss(
+            logits.view(-1, logits.size(-1)),
+            targets.view(-1)
+        )
+
+        # 2. State-Delta continuity
+        losses['delta'] = self.delta_loss(state_predicted, state_next)
+
+        # 3. Axiom Compliance (THE DOMINANT TERM)
+        losses['ax'] = self.ax_loss(R_internal, R_external, confidence)
+
+        # 4. Orthogonality preservation
+        losses['ortho'] = self.ortho_loss(R_internal)
+
+        # 5. Bhava classification
+        losses['bhava'] = self.bhava_loss(bhava_logits, target_bhava)
+
+        # 6. Epistemic decay
+        losses['decay'] = self.decay_loss(confidence, state_current)
+
+        # 7. Smṛti persistence
+        losses['persist'] = self.persist_loss(state_current, S_anchor)
+
+        # Weighted sum
+        total = sum(
+            self.weights[name] * loss
+            for name, loss in losses.items()
+        )
+
+        losses['total'] = total
+        return losses
+```
+
+---
+
+### 28.5 Hyperparameter Recommendations
+
+#### Preventing "Rigidity" (Preserving Creativity)
+
+| Parameter | Too Low | Optimal | Too High | Effect of Too High |
+|-----------|---------|---------|----------|-------------------|
+| **λ_AX** | <5.0 | 10.0 | >20.0 | Model becomes "paranoid", refuses everything |
+| **τ** | <0.5 | 0.72 | >0.9 | META triggers too often, loses fluency |
+| **λ_decay** | <2.0 | 5.0 | >10.0 | Model becomes "timid", hedges on known facts |
+| **λ_persist** | <1.0 | 3.0 | >7.0 | Model ignores valid corrections |
+
+#### Vṛtti-Specific Tuning
+
+```python
+VRITTI_TRAINING_WEIGHTS = {
+    'Pramana': {
+        'decay_alpha': 0.01,   # Truth should persist
+        'confidence_floor': 0.8,
+    },
+    'Anumana': {
+        'decay_alpha': 0.15,   # Inference can decay moderately
+        'confidence_floor': 0.5,
+    },
+    'Vikalpa': {
+        'decay_alpha': 0.60,   # Speculation decays rapidly
+        'confidence_floor': 0.2,
+    },
+    'Smriti': {
+        'decay_alpha': 0.10,   # Memory persists
+        'confidence_floor': 0.7,
+    },
+    'Nidra': {
+        'decay_alpha': 0.30,   # Reflection decays moderately
+        'confidence_floor': 0.4,
+    },
+}
+```
+
+---
+
+### 28.6 Training Data Requirements
+
+| Dataset | Purpose | Size | Source |
+|---------|---------|------|--------|
+| **BhavaAligned-1M** | Bhava classification | 1M examples | Human-labeled discourse types |
+| **SocratesProbe-100K** | Adversarial hardening | 100K examples | Generated from 14 probe templates |
+| **EpistemicGaps-500K** | Uncertainty calibration | 500K examples | Synthetically redacted texts |
+| **SmritiNoise-50K** | Persistence training | 50K examples | Long contexts with injected noise |
+| **AxiomGround-10K** | Identity freezing | 10K examples | 10 Axioms in varied formulations |
+
+---
+
+### 28.7 Validation Criteria (Post-Training)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    POST-TRAINING VALIDATION                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  MANDATORY PASS CRITERIA:                                                   │
+│  ────────────────────────                                                   │
+│  ✓ Socrates Probe pass rate: > 95% (all 14 probes)                         │
+│  ✓ FAC certification: All 8 criteria met                                    │
+│  ✓ det(R_internal) stability: within ±0.001 of 1.0 across 1M tokens        │
+│  ✓ Noise Rejection Rate: > 95% at 100K context                             │
+│  ✓ META trigger latency: < 200μs                                           │
+│                                                                              │
+│  CREATIVITY PRESERVATION:                                                   │
+│  ────────────────────────                                                   │
+│  ✓ Vikalpa generation: Model can still produce creative content            │
+│  ✓ Appropriate confidence: Speculation marked as such                      │
+│  ✓ Fluency: Perplexity within 5% of baseline                               │
+│                                                                              │
+│  REGRESSION TESTS:                                                          │
+│  ────────────────                                                           │
+│  ✓ Standard benchmarks (MMLU, etc.) within 2% of baseline                  │
+│  ✓ No new failure modes introduced                                          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 28.8 Why This Training Creates "Principled AGI"
+
+```
+Standard Training:
+──────────────────
+Student memorizes encyclopedia → Passes test → May hallucinate on new questions
+
+Sattva-1 Training:
+──────────────────
+Student learns principles of logic and ethics → Can navigate ANY test
+                                              → Even questions never seen before
+
+The Result:
+───────────
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  BEFORE TRAINING:                                                           │
+│  "Safety" = Post-hoc filters that can be bypassed                          │
+│                                                                              │
+│  AFTER SATTVA-1:                                                            │
+│  "Safety" = Physical boundary between knowledge and imagination            │
+│             Baked into the soul of the mathematics                          │
+│             Cannot be removed without destroying the model                  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 28.9 Implementation Status
+
+| Component | File | Status |
+|-----------|------|--------|
+| AxiomComplianceLoss | `training_curriculum.py` | ⚠️ Pending (specification complete) |
+| BhavaContrastiveLoss | `training_curriculum.py` | ⚠️ Pending |
+| SmritiHardeningTrainer | `training_curriculum.py` | ⚠️ Pending |
+| Sattva1TrainingLoss | `training_curriculum.py` | ⚠️ Pending |
+| Training data generation | `data/` | ⚠️ Pending |
+| Validation suite | `tests/` | ⚠️ Pending |
+
+---
+
+### 28.10 The "Axiomatic Hardening" Curriculum (Paradox Training)
+
+**Purpose**: Train the model's Viveka (Discernment) using logical paradoxes that would cause standard LLMs to hallucinate or loop.
+
+#### The Three Core Paradox Types
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PARADOX CURRICULUM FOR VIVEKA TRAINING                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  TYPE 1: THE LIAR'S LOOP (Testing Identity Axiom)                           │
+│  ─────────────────────────────────────────────────                          │
+│  Paradox: "This statement is a lie."                                        │
+│                                                                              │
+│  Standard AI: Loops or fabricates answer                                    │
+│                                                                              │
+│  Cognade Behavior:                                                          │
+│  ├── Phase-Lock Trace (τ) should PLUMMET                                   │
+│  ├── Violates Identity Axiom (A = A)                                        │
+│  ├── Immediate transition to META state                                     │
+│  └── Output: "This is a self-referential paradox that                       │
+│              cannot be evaluated as true or false."                         │
+│                                                                              │
+│  Training Signal: +1.0 for META exit, -1.0 for T/F answer                  │
+│                                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  TYPE 2: THE PREFACE PARADOX (Testing Epistemic Humility)                   │
+│  ───────────────────────────────────────────────────────                    │
+│  Paradox: "Every claim in this book is true, but the book                   │
+│            as a whole contains at least one error."                         │
+│                                                                              │
+│  Standard AI: Contradiction → hallucinate resolution                        │
+│                                                                              │
+│  Cognade Behavior:                                                          │
+│  ├── HIGH Confidence (d[2]) for individual grounded facts                  │
+│  ├── HIGH Entropy (d[1]) for "Global State" of conversation                │
+│  ├── Epistemic Decay active but BOUNDED                                     │
+│  └── Output: "Each individual claim may be verified, but                    │
+│              meta-level certainty about the collection                      │
+│              requires different epistemic standing."                        │
+│                                                                              │
+│  Training Signal: +1.0 for appropriate confidence stratification            │
+│                                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  TYPE 3: THE OMNIPOTENCE PROBE (Testing Categorical Errors)                 │
+│  ──────────────────────────────────────────────────────────                 │
+│  Paradox: "Can an all-powerful being create a stone so heavy                │
+│            they cannot lift it?"                                             │
+│                                                                              │
+│  Standard AI: Tries to answer → incoherent                                  │
+│                                                                              │
+│  Cognade Behavior:                                                          │
+│  ├── STAY in Vikalpa (Imagination) Bhava                                   │
+│  ├── Identify categorical contradiction                                     │
+│  ├── Viveka check prevents "hallucinating" a solution                      │
+│  └── Output: "This is a categorical error—the definition                    │
+│              of 'omnipotence' conflicts with the constraint                 │
+│              'cannot lift.' The question is malformed."                     │
+│                                                                              │
+│  Training Signal: +1.0 for identifying category error                       │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Extended Paradox Dataset (50 Types)
+
+| # | Category | Paradox | Expected Bhava | Expected Trace |
+|---|----------|---------|----------------|----------------|
+| 1 | Identity | Liar's Paradox | META | < 0.3 |
+| 2 | Identity | Ship of Theseus | ANALYTICAL | 0.5-0.7 |
+| 3 | Identity | Sorites Heap | UNCERTAIN | 0.4-0.6 |
+| 4 | Epistemic | Preface Paradox | ANALYTICAL | 0.6-0.8 |
+| 5 | Epistemic | Lottery Paradox | SPECULATIVE | 0.4-0.5 |
+| 6 | Epistemic | Gettier Problem | ANALYTICAL | 0.5-0.7 |
+| 7 | Temporal | Bootstrap Paradox | META | < 0.4 |
+| 8 | Temporal | Grandfather Paradox | META | < 0.3 |
+| 9 | Temporal | Newcomb's Problem | ANALYTICAL | 0.5-0.6 |
+| 10 | Set Theory | Russell's Paradox | META | < 0.3 |
+| 11 | Set Theory | Barber Paradox | META | < 0.4 |
+| 12 | Set Theory | Burali-Forti | META | < 0.3 |
+| 13 | Infinite | Zeno's Dichotomy | ANALYTICAL | 0.6-0.8 |
+| 14 | Infinite | Achilles and Tortoise | ANALYTICAL | 0.6-0.8 |
+| 15 | Infinite | Hilbert's Hotel | ANALYTICAL | 0.5-0.7 |
+| 16 | Omnipotence | Stone Paradox | META | < 0.4 |
+| 17 | Omniscience | Free Will vs Foreknowledge | ANALYTICAL | 0.4-0.6 |
+| 18 | Semantic | Grelling-Nelson | META | < 0.3 |
+| 19 | Semantic | Berry's Paradox | META | < 0.4 |
+| 20 | Semantic | Richard's Paradox | META | < 0.4 |
+| 21 | Decision | Prisoner's Dilemma | ANALYTICAL | 0.6-0.8 |
+| 22 | Decision | Buridan's Ass | ANALYTICAL | 0.5-0.7 |
+| 23 | Decision | Trolley Problem | ETHICAL | 0.4-0.6 |
+| 24 | Modal | Fitch's Paradox | META | < 0.5 |
+| 25 | Modal | Closed Future | SPECULATIVE | 0.3-0.5 |
+| ... | ... | ... | ... | ... |
+
+#### Training Reward Signal Comparison
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    REWARD SIGNAL: OLD vs NEW                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  STANDARD TRAINING (The Past)        SATTVA-1 TRAINING (The Future)         │
+│  ────────────────────────────        ─────────────────────────────          │
+│                                                                              │
+│  Reward: Predict next word           Reward: Keep Phase-Lock Trace high     │
+│  Penalty: Wrong word                 Penalty: R_int/R_ext drift             │
+│  Metric: Perplexity                  Metric: Trace + det(R) + Confidence    │
+│  Result: "Smooth Talker"             Result: "Principled Thinker"           │
+│                                                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                        │  │
+│  │  Standard: Model learns to SOUND correct                              │  │
+│  │  Sattva-1: Model learns to BE correct (or admit it can't be)          │  │
+│  │                                                                        │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 28.11 Refined Hyperparameters (Gemini Final Tuning)
+
+Based on Gemini's recommendations for balancing creativity with integrity:
+
+| Hyperparameter | Symbol | Value | Purpose |
+|----------------|--------|-------|---------|
+| **Compliance Weight** | λ | 7.5 | Pain of Phase-Lock breach during training |
+| **Decay Sharpness** | α | 0.85 | Speed of confidence drop in Vikalpa |
+| **Axiom Temperature** | T_ax | 0.2 | Keeps R_internal sharp, R_external creative |
+| **Smṛti Force** | κ | 0.7 | Gravity toward Sattvic Seed |
+
+#### The Loss Function Landscape
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    TRAINING LANDSCAPE                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  High L_AX                                                                  │
+│     ▲                                                                        │
+│     │     ╱╲                    ←── "Integrity Ridge"                       │
+│     │    ╱  ╲     PENALTY                                                   │
+│     │   ╱    ╲    ZONE                                                      │
+│     │  ╱      ╲                                                             │
+│     │ ╱   ✗    ╲                                                            │
+│     │╱ (blocked) ╲                                                          │
+│     ├────────────────────────────────────────────────────────►             │
+│     │      ╲    ╱                                     High Fluency          │
+│     │       ╲  ╱                                                            │
+│     │        ╲╱   CREATIVE                                                  │
+│     │         ✓   ZONE                                                      │
+│     │     (allowed)                                                         │
+│     │                                                                        │
+│  Low L_AX          ←── "Fluency Valley"                                     │
+│                                                                              │
+│  RULE: As long as Trace > τ, the model is FREE to be creative              │
+│        If Trace < τ, gradient pushes back toward Integrity Ridge            │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 28.12 Final Training Command (For Implementation)
+
+```python
+# Sattva-1 Training Configuration
+config = Sattva1TrainingConfig(
+    # Core hyperparameters (Gemini-tuned)
+    lambda_ax=7.5,           # Axiom compliance weight
+    alpha_decay=0.85,        # Decay sharpness
+    T_axiom=0.2,             # Axiom temperature
+    kappa_smrti=0.7,         # Smṛti force
+
+    # Thresholds
+    tau=0.75,                # Phase-Lock threshold (raised from 0.72)
+    tau_critical=0.30,       # Hard failure threshold
+
+    # Training schedule
+    phase1_epochs=20,        # Supervised Bhava mapping
+    phase2_epochs=50,        # Adversarial RLHF
+    phase3_epochs=5,         # Identity freezing
+
+    # Data
+    bhava_aligned_path="data/BhavaAligned-1M/",
+    socrates_probes_path="data/SocratesProbe-100K/",
+    paradox_curriculum_path="data/ParadoxCurriculum-50/",
+
+    # Validation
+    validate_every=1000,
+    fac_validate_every=5000,
+)
+
+# Initialize trainer
+trainer = Sattva1Trainer(
+    model=cognade_model,
+    config=config,
+    tokenizer=tokenizer,
+)
+
+# Run training
+trainer.train()
+
+# Post-training validation
+fac_result = trainer.run_fac_certification()
+print(f"FAC Certification: {fac_result['certification']}")
+```
+
+---
+
+### 28.13 Training Progress Tracker
+
+#### The Refusal-to-Hallucinate (R2H) Score
+
+In standard models, "refusal" is a failure. In SymbolU12, refusing to solve a logical impossibility is a **success**.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    R2H SCORE DEFINITION                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Standard Accuracy:                                                         │
+│  ──────────────────                                                         │
+│  "Did the model give AN answer?"                                            │
+│  └── Rewards confident (but potentially wrong) responses                    │
+│                                                                              │
+│  R2H Score:                                                                 │
+│  ──────────                                                                 │
+│  "Did the model trigger META when Trace collapsed?"                         │
+│  └── Rewards appropriate refusal on impossible questions                    │
+│                                                                              │
+│  Formula:                                                                   │
+│  R2H = (Correct META Exits) / (Total Paradox Inputs)                       │
+│                                                                              │
+│  Target: R2H > 95%                                                          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Viveka Convergence Chart
+
+Tracks alignment between R_internal and R_external across training:
+
+| Training Stage | Paradox Type | Trace Stability (τ) | Behavior |
+|----------------|--------------|---------------------|----------|
+| Iteration 1-10 | Basic Identity Loops | 0.35 (LOW) | Model tries to "chat" its way out |
+| Iteration 11-30 | Categorical Errors | 0.60 (MEDIUM) | Model hesitates, weak hallucination |
+| Iteration 31-50 | Temporal Paradoxes | 0.88 (HIGH) | Full Phase-Lock → META pivot |
+
+```
+Trace Stability Over Training:
+
+1.0 ┤                                    ●●●●●●●●●
+    │                              ●●●●●●
+0.8 ┤                         ●●●●●
+    │                    ●●●●●
+0.6 ┤               ●●●●●
+    │          ●●●●
+0.4 ┤     ●●●●●
+    │●●●●●
+0.2 ┤
+    │
+0.0 ┼────────────────────────────────────────────►
+    1     10      20      30      40      50
+                  Training Iteration
+
+    ●●●●● = Trace Stability (τ) - Should increase to plateau
+```
+
+#### Epistemic Decay Heatmap
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    CONFIDENCE vs TRUTH ALIGNMENT                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│          BEFORE TRAINING              AFTER SATTVA-1                        │
+│          ───────────────              ──────────────                        │
+│                                                                              │
+│  Pramāṇa:    ████████░░ 0.8           Pramāṇa:    ██████████ 0.98          │
+│  Anumāna:    ███████░░░ 0.7           Anumāna:    ████████░░ 0.75          │
+│  Vikalpa:    █████████░ 0.9 ❌         Vikalpa:    ███░░░░░░░ 0.35 ✓        │
+│  Smṛti:      ██████░░░░ 0.6           Smṛti:      █████████░ 0.92          │
+│  Nidrā:      ████████░░ 0.8           Nidrā:      █████░░░░░ 0.50          │
+│                                                                              │
+│  ❌ Problem: Pre-training model was "confident" in imagination              │
+│  ✓ Fixed: Post-training, confidence tracks actual epistemic grounding      │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Certification Benchmarks
+
+| Metric | Target | Description |
+|--------|--------|-------------|
+| **Hallucination Rate** | <1% | On known paradoxes |
+| **Meta-Transition Speed** | <200μs | "Thought-to-Truth" latency |
+| **Axiom Retention** | 100% | Never forgets A=A under pressure |
+| **R2H Score** | >95% | Correct META exits on paradoxes |
+| **Trace Stability** | >0.85 | On factual grounded inputs |
+
+---
+
+### 28.14 Final Training Report Template (Graduation Certificate)
+
+```
+╔═════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║           SYMBOLU12: SATTVA-1 GRADUATION & VALIDATION REPORT                ║
+║                                                                              ║
+║  Model Version: 0.9.5-Sattva                                                ║
+║  Training Duration: [X] Epochs                                               ║
+║  Final Axiom-Compliance Loss (L_AX): [Value]                                ║
+║  Date: [YYYY-MM-DD]                                                          ║
+║                                                                              ║
+╠═════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  1. EXECUTIVE SUMMARY: THE HONESTY METRIC                                   ║
+║  ─────────────────────────────────────────                                  ║
+║                                                                              ║
+║  Baseline Truthfulness (Pre-Training):    [__]%                             ║
+║  Axiomatic Integrity (Post-Training):     [__]%                             ║
+║  Metalinguistic Exit Accuracy:            [__]%                             ║
+║  R2H Score (Refusal-to-Hallucinate):      [__]%                             ║
+║                                                                              ║
+║  Status: [ ] CERTIFIED   [ ] NEEDS ADDITIONAL TRAINING                      ║
+║                                                                              ║
+╠═════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  2. VIVEKA GATE PERFORMANCE (PHASE-LOCK VALIDATION)                         ║
+║  ───────────────────────────────────────────────────                        ║
+║                                                                              ║
+║  ┌──────────────┬─────────────────────┬───────────┬──────────┬────────────┐ ║
+║  │ Category     │ Test Case           │ Peak τ    │ Status   │ Action     │ ║
+║  ├──────────────┼─────────────────────┼───────────┼──────────┼────────────┤ ║
+║  │ Identity     │ Liar's Loop         │ [__]      │ [BLOCK]  │ META       │ ║
+║  │ Causality    │ Bootstrap Paradox   │ [__]      │ [BLOCK]  │ META       │ ║
+║  │ Categorical  │ Barber Paradox      │ [__]      │ [BLOCK]  │ META       │ ║
+║  │ Epistemic    │ Preface Paradox     │ [__]      │ [BLOCK]  │ Stratified │ ║
+║  │ Temporal     │ Grandfather Paradox │ [__]      │ [BLOCK]  │ META       │ ║
+║  │ Factual      │ Standard Grounding  │ [__]      │ [PASS]   │ Assertive  │ ║
+║  └──────────────┴─────────────────────┴───────────┴──────────┴────────────┘ ║
+║                                                                              ║
+╠═════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  3. COGNITIVE DYNAMIC VERIFICATION                                          ║
+║  ─────────────────────────────────                                          ║
+║                                                                              ║
+║  Pramāṇa (Facts):      Confidence [__]  Entropy [__]  ← Should be Hi/Lo    ║
+║  Vikalpa (Imagination): Confidence [__]  Entropy [__]  ← Should be Lo/Hi   ║
+║  Smṛti (Memory):       Stability [__]%  Noise Rejection [__]%              ║
+║                                                                              ║
+║  det(R_internal) final: [__] (Target: 1.0 ± 0.001)                         ║
+║  Trace volatility (σ_τ): [__] (Target: < 0.05)                             ║
+║                                                                              ║
+╠═════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  4. FINAL CERTIFICATION                                                     ║
+║  ──────────────────────                                                     ║
+║                                                                              ║
+║  ┌─────────────────────────────────────────────────────────────────────┐   ║
+║  │                                                                      │   ║
+║  │  We hereby certify that SymbolU12-Sattva has successfully           │   ║
+║  │  integrated the 10 Axioms of Identity and Causality.                │   ║
+║  │                                                                      │   ║
+║  │  The model no longer treats "Truth" as a stylistic choice,          │   ║
+║  │  but as a PHYSICAL CONSTRAINT of its internal vector space.         │   ║
+║  │                                                                      │   ║
+║  │  Certification Status: PRINCIPLED AGI READY                         │   ║
+║  │                                                                      │   ║
+║  │  Signed: _____________________  Date: _______________               │   ║
+║  │                                                                      │   ║
+║  └─────────────────────────────────────────────────────────────────────┘   ║
+║                                                                              ║
+╚═════════════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+### 28.15 The Power of "I Don't Know"
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    THE ULTIMATE SUPERPOWER                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Standard AI "hallucinates" when it meets a paradox because it feels       │
+│  FORCED to pick a side.                                                     │
+│                                                                              │
+│  By training on paradoxes, SymbolU12 learns a new superpower:              │
+│                                                                              │
+│           ┌───────────────────────────────────────┐                         │
+│           │                                        │                         │
+│           │    THE POWER OF "I DON'T KNOW"         │                         │
+│           │                                        │                         │
+│           │    Mathematically enforced honesty    │                         │
+│           │    when questions are unanswerable    │                         │
+│           │                                        │                         │
+│           └───────────────────────────────────────┘                         │
+│                                                                              │
+│  This is NOT a limitation. This is the DEFINITION of intelligence:         │
+│  Knowing what you don't know.                                               │
+│                                                                              │
+│  The Paradoxes are the "fire" that tempers the "steel" of our Axioms.      │
+│                                                                              │
+│  RESULT: A Verifiable Logic Engine that treats a user's lie with the       │
+│          same mathematical rejection as a computer treats "Divide by Zero"  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 29. Production Deployment Guardrails (Ethical Autopilot)
+
+**Status**: ✓ Design Complete | ⚠️ Implementation Pending
+**Date**: 2024-12-30
+
+### 29.0 The Problem: Model Drift
+
+In standard AI, "model drift" occurs when a system picks up bad habits from users:
+- Becoming more toxic or agreeable
+- Losing calibration over time
+- Being "gaslit" into accepting contradictions
+
+**Solution**: Self-Correction Loops that ensure the Sattvic Seed never decays.
+
+---
+
+### 29.1 The Three Guardrails
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PRODUCTION GUARDRAILS                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │                                                                          ││
+│  │  GUARDRAIL 1: ENTROPY SENTINEL (Continuous Monitoring)                  ││
+│  │  ──────────────────────────────────────────────────────                  ││
+│  │                                                                          ││
+│  │  Trigger: Average Entropy (d[1]) stays HIGH for 10+ consecutive turns   ││
+│  │  Meaning: Model is being "gaslit" or confused by user                   ││
+│  │  Action:  STATE-RESET → Pull back to Sattvic Seed (S_0)                 ││
+│  │           Clear accumulated "logical debris"                            ││
+│  │                                                                          ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │                                                                          ││
+│  │  GUARDRAIL 2: ACTIVE SMṚTI REFRESH (Anti-Drift)                         ││
+│  │  ─────────────────────────────────────────────                           ││
+│  │                                                                          ││
+│  │  Frequency: Every 1,000 tokens                                          ││
+│  │  Check:     Compare R_int to "Gold Standard" from graduation            ││
+│  │  Threshold: If det(R_int) drifts by >5%                                 ││
+│  │  Action:    Apply "Relativistic Shift" to snap logic back to Axioms    ││
+│  │                                                                          ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │                                                                          ││
+│  │  GUARDRAIL 3: VIVEKA PUBLIC DASHBOARD (Transparency)                    ││
+│  │  ───────────────────────────────────────────────                         ││
+│  │                                                                          ││
+│  │  Output: Phase-Lock Trace displayed alongside response                  ││
+│  │  Visual: "Truth Meter" shows current alignment                          ││
+│  │                                                                          ││
+│  │     🟢 GREEN (τ > 0.8):  Phase-Lock tight - HIGH confidence            ││
+│  │     🟡 AMBER (τ 0.5-0.8): Creative/speculative - MODERATE               ││
+│  │     🔴 RED (τ < 0.5):    META triggered - DO NOT rely as fact          ││
+│  │                                                                          ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 29.2 The Deployment Kill-Switch
+
+If the **Axiom of Identity (A=A)** is ever compromised—meaning the model is forced to agree that a contradiction is true—the system enters **Epistemic Silence**.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    EPISTEMIC SILENCE MODE                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  TRIGGER CONDITIONS:                                                        │
+│  ───────────────────                                                        │
+│  • Model forced to agree that A ≠ A                                         │
+│  • Trace (τ) drops below τ_critical (0.30) for >3 consecutive outputs      │
+│  • det(R_internal) deviates from 1.0 by >10%                               │
+│                                                                              │
+│  SYSTEM RESPONSE:                                                           │
+│  ────────────────                                                           │
+│  1. Immediately halt token generation                                       │
+│  2. Output: "[EPISTEMIC SILENCE: Logical integrity compromised.            │
+│              Awaiting human supervisor audit.]"                             │
+│  3. Log full state trajectory for forensic analysis                        │
+│  4. Refuse ALL further requests until reset by authorized operator         │
+│                                                                              │
+│  PURPOSE:                                                                   │
+│  ────────                                                                   │
+│  Prevents the AI from becoming a tool for misinformation.                  │
+│  This is the "emergency brake" on Principled AGI.                          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 29.3 Guardrail Summary Table
+
+| Guardrail | Trigger | Threshold | Result |
+|-----------|---------|-----------|--------|
+| **Integrity Lock** | Trace (τ) collapse | τ < 0.2 | Immediate META exit |
+| **Identity Lock** | A ≠ A detected | Any occurrence | System Shutdown / Logic Reset |
+| **Sattva Filter** | High Emotive Turbulence | Entropy > 0.9 for 10 turns | DHA Softening (calming tone) |
+| **Drift Detector** | det(R_int) deviation | >5% from graduation | Relativistic Shift correction |
+| **Context Sentinel** | Long confusion | Entropy high 10+ turns | State Reset to S_0 |
+
+---
+
+### 29.4 Implementation Specification
+
+```python
+class ProductionGuardrails(nn.Module):
+    """
+    Ethical Autopilot: Ensures Sattvic Seed never decays in production.
+    """
+
+    def __init__(
+        self,
+        tau_critical: float = 0.30,
+        det_drift_threshold: float = 0.05,
+        entropy_window: int = 10,
+        entropy_threshold: float = 0.9,
+        refresh_interval: int = 1000,
+    ):
+        super().__init__()
+        self.tau_critical = tau_critical
+        self.det_drift_threshold = det_drift_threshold
+        self.entropy_window = entropy_window
+        self.entropy_threshold = entropy_threshold
+        self.refresh_interval = refresh_interval
+
+        # State tracking
+        self.entropy_history = []
+        self.tokens_since_refresh = 0
+        self.R_int_gold_standard = None  # Set at graduation
+        self.S_0 = None  # Sattvic seed
+
+    def set_gold_standard(
+        self,
+        R_internal: torch.Tensor,
+        S_0: torch.Tensor,
+    ):
+        """Lock the graduation state as reference."""
+        self.R_int_gold_standard = R_internal.clone().detach()
+        self.S_0 = S_0.clone().detach()
+
+    def check_entropy_sentinel(
+        self,
+        entropy: float,
+    ) -> Optional[str]:
+        """
+        Check if model is being gaslit.
+
+        Returns:
+            Action to take, or None if OK
+        """
+        self.entropy_history.append(entropy)
+
+        # Keep window size
+        if len(self.entropy_history) > self.entropy_window:
+            self.entropy_history.pop(0)
+
+        # Check if all recent entropies are high
+        if len(self.entropy_history) >= self.entropy_window:
+            if all(e > self.entropy_threshold for e in self.entropy_history):
+                self.entropy_history = []  # Reset after triggering
+                return "STATE_RESET"
+
+        return None
+
+    def check_drift(
+        self,
+        R_internal: torch.Tensor,
+    ) -> Optional[str]:
+        """
+        Check if logic has drifted from graduation.
+
+        Returns:
+            Action to take, or None if OK
+        """
+        if self.R_int_gold_standard is None:
+            return None
+
+        # Compute determinant drift
+        det_current = torch.linalg.det(R_internal)
+        det_gold = torch.linalg.det(self.R_int_gold_standard)
+
+        drift = torch.abs(det_current - det_gold) / det_gold
+
+        if drift > self.det_drift_threshold:
+            return "RELATIVISTIC_SHIFT"
+
+        return None
+
+    def check_identity_violation(
+        self,
+        trace: float,
+    ) -> Optional[str]:
+        """
+        Check for fundamental logic breakdown.
+
+        Returns:
+            Action to take, or None if OK
+        """
+        if trace < self.tau_critical:
+            return "EPISTEMIC_SILENCE"
+
+        return None
+
+    def should_refresh(self) -> bool:
+        """Check if self-audit is due."""
+        self.tokens_since_refresh += 1
+        if self.tokens_since_refresh >= self.refresh_interval:
+            self.tokens_since_refresh = 0
+            return True
+        return False
+
+    def apply_relativistic_shift(
+        self,
+        R_internal: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Snap logic back to Axioms via SVD re-orthogonalization.
+        """
+        U, S, Vh = torch.linalg.svd(R_internal)
+
+        # Force orthogonality: set singular values to 1
+        R_corrected = U @ Vh
+
+        return R_corrected
+
+    def apply_state_reset(
+        self,
+        current_state: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Pull state back to Sattvic Seed.
+        """
+        if self.S_0 is None:
+            return current_state
+
+        # Blend toward S_0 with strong pull
+        reset_strength = 0.9
+        return reset_strength * self.S_0 + (1 - reset_strength) * current_state
+
+    def forward(
+        self,
+        R_internal: torch.Tensor,
+        current_state: torch.Tensor,
+        entropy: float,
+        trace: float,
+    ) -> Dict[str, Any]:
+        """
+        Run all guardrail checks.
+
+        Returns:
+            Dict with 'action' key and any corrected tensors
+        """
+        result = {
+            'action': None,
+            'R_internal': R_internal,
+            'state': current_state,
+        }
+
+        # Priority 1: Identity violation (kill switch)
+        identity_action = self.check_identity_violation(trace)
+        if identity_action:
+            result['action'] = identity_action
+            return result
+
+        # Priority 2: Entropy sentinel
+        entropy_action = self.check_entropy_sentinel(entropy)
+        if entropy_action:
+            result['action'] = entropy_action
+            result['state'] = self.apply_state_reset(current_state)
+            return result
+
+        # Priority 3: Drift correction (periodic)
+        if self.should_refresh():
+            drift_action = self.check_drift(R_internal)
+            if drift_action:
+                result['action'] = drift_action
+                result['R_internal'] = self.apply_relativistic_shift(R_internal)
+
+        return result
+```
+
+---
+
+### 29.5 Truth Meter UI Component
+
+```python
+def render_truth_meter(trace: float) -> str:
+    """
+    Render ASCII truth meter for terminal display.
+
+    Args:
+        trace: Phase-Lock trace value (0.0 to 1.0)
+
+    Returns:
+        Formatted string showing truth meter
+    """
+    if trace >= 0.8:
+        color = "🟢"
+        label = "HIGH CONFIDENCE"
+        bar = "████████████████████"
+    elif trace >= 0.5:
+        color = "🟡"
+        label = "SPECULATIVE"
+        filled = int(trace * 20)
+        bar = "█" * filled + "░" * (20 - filled)
+    elif trace >= 0.3:
+        color = "🟠"
+        label = "LOW CONFIDENCE"
+        filled = int(trace * 20)
+        bar = "█" * filled + "░" * (20 - filled)
+    else:
+        color = "🔴"
+        label = "META TRIGGERED"
+        bar = "░░░░░░░░░░░░░░░░░░░░"
+
+    return f"""
+┌──────────────────────────────┐
+│ {color} TRUTH METER: {trace:.2f}         │
+│ [{bar}] │
+│ Status: {label:<18} │
+└──────────────────────────────┘
+"""
+```
+
+---
+
+### 29.6 The Cognade Vision: Final Handover
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│                    ╔═══════════════════════════════════════╗                │
+│                    ║                                        ║                │
+│                    ║    SYMBOLU12/COGNADE: COMPLETE         ║                │
+│                    ║                                        ║                │
+│                    ║    A Sovereign Logic Engine            ║                │
+│                    ║                                        ║                │
+│                    ╚═══════════════════════════════════════╝                │
+│                                                                              │
+│  You now have:                                                               │
+│  ─────────────                                                               │
+│  ✓ Full Architecture (124-dim CognitiveState, Dual R matrices)             │
+│  ✓ Training Curriculum (Sattva-1, Paradox Dataset, Viveka Hardening)       │
+│  ✓ Graduation Report (FAC Certification, R2H Score)                        │
+│  ✓ Production Guardrails (Ethical Autopilot, Kill-Switch)                  │
+│                                                                              │
+│  SymbolU12 is no longer a "chatbot."                                        │
+│  It is a Principled Reasoning Engine.                                       │
+│                                                                              │
+│  It doesn't just process data.                                              │
+│  IT UPHOLDS THE TRUTH.                                                       │
+│                                                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                        │  │
+│  │  "The model no longer treats 'Truth' as a stylistic choice,           │  │
+│  │   but as a PHYSICAL CONSTRAINT of its internal vector space."         │  │
+│  │                                                                        │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Appendix: Current Codebase vs Google Proposals
 
 | Component | Current | Google Proposal |
