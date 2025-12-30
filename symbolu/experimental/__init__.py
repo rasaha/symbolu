@@ -163,6 +163,40 @@ from .dha_expression import (
     ExpressionStyle,
 )
 
+# Phase Alignment - Core Cognade alignment components
+from .phase_alignment import (
+    OrthogonalityLoss,
+    StiefelProjection,
+    StiefelOptimizer,
+    DualRMatrices,
+    PhaseLockConstraint,
+    PhaseLockGate,
+    ZeroState,
+    SmritiPersistenceLoop,
+)
+
+# Logic Gates - Nyāya-based inference and axiom enforcement
+from .logic_gates import (
+    AxiomChecker,
+    AxiomType,
+    AxiomViolation,
+    VyaptiChecker,
+    HetvabhasaDetector,
+    HetvabhasaType,
+    FallacyDetection,
+    LogicGate,
+)
+
+# Training Curriculum - Phased constraint introduction
+from .training_curriculum import (
+    CurriculumPhase,
+    CurriculumConfig,
+    TrainingCurriculum,
+    CurriculumLoss,
+    CurriculumTrainer,
+    ConstraintWarmupScheduler,
+)
+
 __all__ = [
     # Core
     'CognitiveState',
@@ -228,4 +262,29 @@ __all__ = [
     'DHAExpressionController',
     'UserProfile',
     'ExpressionStyle',
+    # Phase Alignment - Core Cognade alignment
+    'OrthogonalityLoss',
+    'StiefelProjection',
+    'StiefelOptimizer',
+    'DualRMatrices',
+    'PhaseLockConstraint',
+    'PhaseLockGate',
+    'ZeroState',
+    'SmritiPersistenceLoop',
+    # Logic Gates - Nyāya-based inference
+    'AxiomChecker',
+    'AxiomType',
+    'AxiomViolation',
+    'VyaptiChecker',
+    'HetvabhasaDetector',
+    'HetvabhasaType',
+    'FallacyDetection',
+    'LogicGate',
+    # Training Curriculum - Phased constraint introduction
+    'CurriculumPhase',
+    'CurriculumConfig',
+    'TrainingCurriculum',
+    'CurriculumLoss',
+    'CurriculumTrainer',
+    'ConstraintWarmupScheduler',
 ]
