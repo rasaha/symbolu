@@ -693,6 +693,249 @@ The PAU is the critical path. Optimizations:
 
 ---
 
+## 11. Comparison: PA-VPU vs NVIDIA Jetson Orin
+
+### 11.1 Platform Overview
+
+| Specification | Jetson Orin NX | Jetson AGX Orin | PA-VPU (This Design) |
+|---------------|----------------|-----------------|----------------------|
+| **Process Node** | 8nm | 8nm | 5nm (target) |
+| **CPU** | 8-core Arm Cortex-A78AE | 12-core Arm Cortex-A78AE | None (accelerator) |
+| **GPU** | 1024 CUDA + 32 Tensor | 2048 CUDA + 64 Tensor | None (phase units) |
+| **AI Accelerator** | 2× NVDLA | 2× NVDLA | PAU + OPU + SDU |
+| **Memory** | 16GB LPDDR5 | 64GB LPDDR5 | 80GB HBM3 |
+| **Memory BW** | 102 GB/s | 205 GB/s | 3,350 GB/s |
+| **AI TOPS** | 100 TOPS (INT8) | 275 TOPS (INT8) | ~50 TOPS (FP16) |
+| **TDP** | 25W | 60W | 75W |
+| **Form Factor** | Module (70×45mm) | Module (100×87mm) | Chip (custom) |
+
+### 11.2 Architecture Comparison
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      JETSON ORIN ARCHITECTURE                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │  ARM CPU    │  │  Ampere GPU │  │    NVDLA    │  │     PVA     │        │
+│  │  (General)  │  │  (Parallel) │  │  (DL Accel) │  │  (Vision)   │        │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘        │
+│         │                │                │                │                │
+│         └────────────────┴────────────────┴────────────────┘                │
+│                                   │                                         │
+│                          ┌────────┴────────┐                                │
+│                          │   LPDDR5 Memory │                                │
+│                          │   102-205 GB/s  │                                │
+│                          └─────────────────┘                                │
+│                                                                             │
+│  Approach: General-purpose heterogeneous compute                            │
+│  Attention: Standard O(n²) via cuDNN/TensorRT                              │
+│  Temporal: External KV cache management                                     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        PA-VPU ARCHITECTURE                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │     PEU     │  │     PAU     │  │     OPU     │  │     SDU     │        │
+│  │  (Patches)  │  │  (Phase)    │  │  (Ontology) │  │  (Delta)    │        │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘        │
+│         │                │                │                │                │
+│         └────────────────┴───────┬────────┴────────────────┘                │
+│                                  │                                          │
+│                          ┌───────┴───────┐                                  │
+│                          │  TCU (25 KB)  │  ← O(1) temporal context        │
+│                          └───────┬───────┘                                  │
+│                                  │                                          │
+│                          ┌───────┴───────┐                                  │
+│                          │  HBM3 Memory  │                                  │
+│                          │  3,350 GB/s   │                                  │
+│                          └───────────────┘                                  │
+│                                                                             │
+│  Approach: Purpose-built phase synchronization                              │
+│  Attention: O(n) via mean-field approximation                              │
+│  Temporal: Built-in O(1) via TCU accumulator                               │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 11.3 Attention Mechanism Comparison
+
+| Aspect | Jetson Orin (cuDNN/TensorRT) | PA-VPU (Phase Attention) |
+|--------|------------------------------|--------------------------|
+| **Algorithm** | Scaled dot-product attention | Mean-field phase sync |
+| **Complexity** | O(n²) per layer | O(n) per layer |
+| **Memory Scaling** | O(n²) attention matrix | O(n) linear |
+| **FlashAttention** | Yes (CUDA kernel) | N/A (native O(n)) |
+| **KV Cache** | Per-token storage | Phase accumulator only |
+| **Max Context (64GB)** | ~32K tokens | ~2M tokens |
+
+**Concrete Example - 4K Video Frame (32,400 patches):**
+
+| Metric | Jetson AGX Orin | PA-VPU |
+|--------|-----------------|--------|
+| Attention matrix size | 32,400² × 2B = 2.1 GB | N/A |
+| Per-layer memory | 2.1 GB | 50 MB |
+| 12-layer total | 25 GB (exceeds 64GB with act.) | 600 MB |
+| Feasibility | Requires chunking/FlashAttn | Native support |
+
+### 11.4 Temporal Context Comparison
+
+**Scenario: 10-second 4K video @ 60fps = 600 frames**
+
+| Metric | Jetson Orin | PA-VPU |
+|--------|-------------|--------|
+| KV cache per frame | 400 MB | N/A |
+| 600-frame context | 240 GB (impossible) | 25 KB |
+| Memory strategy | Sliding window / eviction | Full history |
+| Context quality | Lossy (window limit) | Lossless (all frames) |
+| Latency spike | Yes (cache miss) | No (O(1) access) |
+
+### 11.5 Advantages of PA-VPU over Jetson Orin
+
+| Advantage | Description | Impact |
+|-----------|-------------|--------|
+| **1. True O(n) Scaling** | No attention matrix computation | 4K+ resolution without chunking |
+| **2. Unlimited Temporal Context** | 25KB regardless of video length | Hour-long video understanding |
+| **3. 16× Memory Bandwidth** | HBM3 vs LPDDR5 | Bottleneck elimination |
+| **4. Interpretable Output** | 124-dim Cognitive State | Explainable AI |
+| **5. Ontological Grounding** | 12-layer semantic hierarchy | Structured reasoning |
+| **6. Native Phase Coherence** | Built-in temporal smoothing | No post-processing needed |
+| **7. Deterministic Latency** | Fixed pipeline depth | Real-time guarantees |
+| **8. Lower Complexity** | Single-purpose accelerator | Smaller verification surface |
+
+### 11.6 Advantages of Jetson Orin over PA-VPU
+
+| Advantage | Description | Impact |
+|-----------|-------------|--------|
+| **1. General Purpose** | CPU + GPU + DLA + PVA | Run any workload |
+| **2. Mature Ecosystem** | CUDA, TensorRT, DeepStream | Immediate deployment |
+| **3. Existing Models** | Run any PyTorch/TF model | No retraining needed |
+| **4. Edge Form Factor** | 25-60W module | Embedded deployment |
+| **5. Production Ready** | Available now, proven | No development risk |
+| **6. Peripheral Support** | USB, PCIe, GPIO, CSI | Complete system |
+| **7. Software Stack** | JetPack, TAO, Isaac | Full toolchain |
+| **8. Multi-Task** | Vision + LLM + control | Single platform |
+
+### 11.7 Detailed Trade-off Analysis
+
+#### Power Efficiency (TOPS/W)
+
+| Platform | Peak TOPS | TDP | TOPS/W | Notes |
+|----------|-----------|-----|--------|-------|
+| Orin NX (INT8) | 100 | 25W | 4.0 | General compute |
+| AGX Orin (INT8) | 275 | 60W | 4.6 | General compute |
+| PA-VPU (FP16) | 50 | 75W | 0.67 | Phase-specific |
+| PA-VPU (effective)* | 500 | 75W | 6.7 | O(n) equivalent |
+
+*Effective TOPS accounts for O(n) vs O(n²): processing 32K tokens with O(n) is equivalent to ~10× more TOPS with O(n²).
+
+#### Workload Suitability
+
+| Workload | Jetson Orin | PA-VPU | Winner |
+|----------|-------------|--------|--------|
+| Short video (<1min) | ✓ Good | ✓ Good | Tie |
+| Long video (>10min) | ✗ OOM | ✓ Native | PA-VPU |
+| 4K real-time | ⚠ Chunked | ✓ Native | PA-VPU |
+| 8K processing | ✗ Impractical | ✓ Feasible | PA-VPU |
+| Multi-stream (4×4K) | ⚠ Limited | ✓ Headroom | PA-VPU |
+| Object detection | ✓ Optimized | ⚠ Via ontology | Orin |
+| Pose estimation | ✓ Native | ⚠ Custom | Orin |
+| LLM inference | ✓ Supported | ✗ Not designed | Orin |
+| Robotic control | ✓ Isaac | ⚠ External CPU | Orin |
+| Edge deployment | ✓ 25W option | ⚠ 75W | Orin |
+
+#### Development Effort
+
+| Aspect | Jetson Orin | PA-VPU |
+|--------|-------------|--------|
+| Time to first demo | Days | Months (FPGA) / Years (ASIC) |
+| Model porting | Export + optimize | Retrain for phase attention |
+| Debugging tools | Nsight, profilers | Custom (must build) |
+| Community support | Large | None (novel architecture) |
+| Documentation | Extensive | This document + internal |
+
+### 11.8 Hybrid Architecture Recommendation
+
+For maximum flexibility, consider a hybrid approach:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    HYBRID SYSTEM ARCHITECTURE                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │                        JETSON AGX ORIN                                 │ │
+│  │                                                                        │ │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                    │ │
+│  │  │  ARM CPU    │  │  GPU        │  │  NVDLA      │                    │ │
+│  │  │  Control    │  │  Short-term │  │  Detection  │                    │ │
+│  │  │  Planning   │  │  Processing │  │  Tracking   │                    │ │
+│  │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘                    │ │
+│  │         └────────────────┴────────────────┘                            │ │
+│  │                          │                                             │ │
+│  └──────────────────────────┼─────────────────────────────────────────────┘ │
+│                             │ PCIe 4.0                                      │
+│  ┌──────────────────────────┼─────────────────────────────────────────────┐ │
+│  │                          ▼                                             │ │
+│  │                    PA-VPU ACCELERATOR                                  │ │
+│  │                                                                        │ │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                    │ │
+│  │  │  Long-term  │  │  Ontology   │  │  State      │                    │ │
+│  │  │  Context    │  │  Mapping    │  │  Delta      │                    │ │
+│  │  │  (TCU)      │  │  (OPU)      │  │  (SDU)      │                    │ │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘                    │ │
+│  │                                                                        │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│  Division of Labor:                                                         │
+│  ├─ Orin GPU: Frame-level feature extraction (short context)              │
+│  ├─ Orin DLA: Object detection, tracking (optimized models)               │
+│  ├─ Orin CPU: Control logic, planning, I/O                                │
+│  ├─ PA-VPU: Long-term temporal context (unlimited history)                │
+│  └─ PA-VPU: Ontological state for high-level reasoning                    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 11.9 Decision Matrix
+
+| If your priority is... | Choose | Reasoning |
+|------------------------|--------|-----------|
+| Time to market | Jetson Orin | Production-ready ecosystem |
+| Long video understanding | PA-VPU | O(1) temporal context |
+| 8K or multi-stream | PA-VPU | HBM3 bandwidth |
+| Edge deployment (<30W) | Jetson Orin NX | Lower power envelope |
+| Interpretable AI | PA-VPU | Ontological state output |
+| Running existing models | Jetson Orin | CUDA/TensorRT support |
+| Novel research | PA-VPU | Unique capabilities |
+| Robotics platform | Jetson Orin | Isaac SDK, ROS2 |
+| Maximum flexibility | Hybrid | Best of both worlds |
+
+### 11.10 Migration Path
+
+**From Jetson Orin to PA-VPU:**
+
+1. **Phase 1**: Run PA-VPU as PCIe accelerator alongside Orin
+2. **Phase 2**: Offload temporal context to PA-VPU TCU
+3. **Phase 3**: Move attention layers to PA-VPU PAU
+4. **Phase 4**: Full PA-VPU for video, Orin for control only
+
+**Development Timeline:**
+
+| Phase | Duration | Deliverable |
+|-------|----------|-------------|
+| FPGA Prototype | 6 months | Proof of concept on Alveo U280 |
+| ASIC RTL | 12 months | Verified Verilog |
+| Tape-out | 6 months | GDS to foundry |
+| Bring-up | 3 months | First silicon validation |
+| Production | 6 months | Volume manufacturing |
+| **Total** | **33 months** | Production PA-VPU |
+
+---
+
 ## Appendix A: Register Quick Reference
 
 | Unit | Base Address | Size |
