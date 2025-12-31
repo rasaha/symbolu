@@ -311,7 +311,11 @@ class TrainingConfig:
     tokenizer: str = "gpt2"  # gpt2, tiktoken, custom
 
     # Evaluation
-    eval_samples: int = 5000  # Use more samples for reliable spike detection
+    # eval_samples = max sequences to evaluate (NOT tokens)
+    # With batch_size=32, eval_samples=256 means 8 batches = 256K tokens
+    # WikiText-103 val set is only 248K tokens (~7 batches), so 256 uses full set
+    # For larger datasets (C4), keep this reasonable to avoid slow evals
+    eval_samples: int = 256  # ~8 batches = 256K tokens at batch_size=32, seq_len=1024
 
     # Logging
     wandb: bool = False
@@ -2436,8 +2440,8 @@ def parse_args() -> TrainingConfig:
                        help="Tokenizer to use")
 
     # Evaluation
-    parser.add_argument("--eval_samples", type=int, default=5000,
-                       help="Number of evaluation samples (higher = more reliable spike detection)")
+    parser.add_argument("--eval_samples", type=int, default=256,
+                       help="Max sequences to evaluate (256 = ~8 batches = 256K tokens)")
 
     # Logging
     parser.add_argument("--wandb", action="store_true",
