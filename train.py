@@ -1910,14 +1910,18 @@ def train(config: TrainingConfig):
                     state.ema_ppl = current_ppl
                 elif state.step > config.warmup_steps // 2:
                     # =================================================================
-                    # HARD SAFETY LIMITS - Use EMA to avoid single-batch false positives
-                    # Only trigger if SMOOTHED PPL exceeds threshold
+                    # HARD SAFETY LIMITS - Use RAW PPL (not EMA) for spike detection
+                    # EMA carries ghost values; raw PPL is more reliable
                     # =================================================================
-                    if state.ema_ppl > state.best_ppl * 2.0:
-                        # MAJOR SPIKE (>2x): Backtrack + 0.7x LR + Reset momentum
+
+                    # Minimum LR floor - never let lr_scale drop below 0.1 (10% of base LR)
+                    MIN_LR_SCALE = 0.1
+
+                    if current_ppl > state.best_ppl * 2.0:
+                        # MAJOR SPIKE (>2x): Backtrack + 0.8x LR + Reset momentum
                         state.spike_count += 1
                         old_scale = state.lr_scale
-                        state.lr_scale *= 0.7  # Persistent reduction
+                        state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.8)
 
                         # Try to backtrack to best checkpoint
                         best_ckpt = checkpoint_dir / "best.pt"
@@ -1929,13 +1933,13 @@ def train(config: TrainingConfig):
                         # Reset optimizer momentum (clear bad gradients)
                         optimizer.state = collections.defaultdict(dict)
 
-                        logger.info(f"  🚨 MAJOR PPL spike (EMA {state.ema_ppl:.1f} > {state.best_ppl:.1f}*2.0)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
+                        logger.info(f"  🚨 MAJOR PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*2.0)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
 
-                    elif state.ema_ppl > state.best_ppl * 1.5:
-                        # MODERATE SPIKE (>1.5x): Backtrack to oldest available + 0.7x LR + Reset momentum
+                    elif current_ppl > state.best_ppl * 1.5:
+                        # MODERATE SPIKE (>1.5x): Backtrack to oldest available + 0.85x LR + Reset momentum
                         state.spike_count += 1
                         old_scale = state.lr_scale
-                        state.lr_scale *= 0.7  # Persistent reduction
+                        state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.85)
 
                         # Find oldest available step checkpoint (we keep last 5)
                         # This gives us the most stable point to backtrack to
@@ -1958,7 +1962,7 @@ def train(config: TrainingConfig):
                         # Reset optimizer momentum
                         optimizer.state = collections.defaultdict(dict)
 
-                        logger.info(f"  ⚠️ PPL spike (EMA {state.ema_ppl:.1f} > {state.best_ppl:.1f}*1.5)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
+                        logger.info(f"  ⚠️ PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*1.5)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
 
                     # =================================================================
                     # TREND-BASED ADAPTIVE LR with DAMPING (per Google's advice)
@@ -1996,7 +2000,7 @@ def train(config: TrainingConfig):
                                 # AGGRESSIVE: Confirmed trend (2 consecutive bad evals)
                                 # Reduce LR by 0.92x + reset momentum
                                 old_scale = state.lr_scale
-                                state.lr_scale *= 0.92
+                                state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.92)
 
                                 # Reset momentum only on confirmed trends
                                 optimizer.state = collections.defaultdict(dict)
@@ -2011,7 +2015,7 @@ def train(config: TrainingConfig):
                             elif state.trend_patience == 1:
                                 # GENTLE: First warning, small nudge (no momentum reset)
                                 old_scale = state.lr_scale
-                                state.lr_scale *= 0.98  # Very gentle 2% reduction
+                                state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.98)
 
                                 logger.info(
                                     f"  📊 PPL watching: Δ=[{delta_2:+.1f}, {delta_1:+.1f}], "
