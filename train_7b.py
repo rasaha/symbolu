@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-SymbolU Unified 7B - RunPod Training Script
-============================================
+SymbolU Phase 7B - RunPod Training Script
+==========================================
 
-Train SymbolU Unified at 7B parameters to validate architecture at scale.
+Train SymbolU Phase Attention at 7B parameters to validate O(n) architecture at scale.
+
+This is a PURE Phase Attention model - NO Bhava/Ontological components.
+For Bhava models, use train_unified_llm.py with --model_type ontological
 
 Hardware Requirements:
 - Minimum: 1x A100 80GB (bf16)
@@ -27,14 +30,15 @@ Usage:
     # Full training (50000 steps) - ~$500+
     python train_7b.py --steps 50000 --checkpoint_dir /workspace/checkpoints_7b
 
-Architecture at 7B:
+Architecture at 7B (LLaMA-style + Phase Attention):
 - embed_dim: 4096
 - num_heads: 32
-- num_layers: 32 (but 12 ontological structure)
+- num_kv_heads: 8 (GQA)
+- num_layers: 32
 - vocab_size: 32000
-- Phase Attention O(n)
-- 12x12 Bhava (144D)
-- BCVF Trustworthiness
+- Phase Attention O(n) complexity
+- SwiGLU FFN
+- RMSNorm
 """
 
 import argparse
@@ -74,10 +78,10 @@ torch.backends.cudnn.benchmark = True
 # =============================================================================
 
 @dataclass
-class SymbolU7BConfig:
-    """7B parameter configuration for SymbolU Unified."""
+class Phase7BConfig:
+    """7B parameter configuration for Phase Attention model."""
 
-    # Model dimensions (7B scale)
+    # Model dimensions (7B scale, LLaMA-style)
     vocab_size: int = 32000
     embed_dim: int = 4096
     num_heads: int = 32
@@ -85,27 +89,21 @@ class SymbolU7BConfig:
     num_layers: int = 32
     max_seq_len: int = 2048
 
-    # Phase Attention
+    # Phase Attention parameters
     phase_dim: int = 128
     sync_steps: int = 3
-    use_linear_phase: bool = True  # O(n) attention
+    sync_lr: float = 0.1
 
-    # Bhava
-    bhava_embed_dim: int = 256
-    num_ontological_layers: int = 12  # Semantic structure
-
-    # FFN
-    ffn_mult: float = 2.67  # SwiGLU
+    # FFN (SwiGLU)
+    ffn_mult: float = 2.67
     intermediate_size: int = None  # Auto-computed
 
     # Memory optimization
     use_gradient_checkpointing: bool = True
     use_flash_attention: bool = True
 
-    # BCVF
-    lambda_forward: float = 1.0
-    lambda_backward: float = 1.0
-    lambda_consistency: float = 0.5
+    # Dropout
+    dropout: float = 0.0
 
     def __post_init__(self):
         if self.intermediate_size is None:
@@ -113,24 +111,35 @@ class SymbolU7BConfig:
 
     def estimate_parameters(self) -> int:
         """Estimate total parameters."""
-        # Embeddings
-        embed_params = self.vocab_size * self.embed_dim * 2  # embed + lm_head (tied)
+        # Embeddings (tied weights)
+        embed_params = self.vocab_size * self.embed_dim
 
         # Per layer
-        # Attention: Q, K, V, O projections
-        attn_params = self.embed_dim * self.embed_dim * 4
-        # FFN: gate, up, down
-        ffn_params = self.embed_dim * self.intermediate_size * 3
-        # Norms
-        norm_params = self.embed_dim * 4
+        # Attention: Q, K (GQA), V (GQA), O projections
+        q_params = self.embed_dim * self.embed_dim
+        kv_dim = self.num_kv_heads * (self.embed_dim // self.num_heads)
+        k_params = self.embed_dim * kv_dim
+        v_params = self.embed_dim * kv_dim
+        o_params = self.embed_dim * self.embed_dim
+        attn_params = q_params + k_params + v_params + o_params
 
-        layer_params = attn_params + ffn_params + norm_params
+        # Phase projection
+        head_dim = self.embed_dim // self.num_heads
+        phase_params = head_dim * self.phase_dim
+
+        # FFN: gate, up, down (SwiGLU)
+        ffn_params = self.embed_dim * self.intermediate_size * 3
+
+        # Norms (2 per layer)
+        norm_params = self.embed_dim * 2
+
+        layer_params = attn_params + phase_params + ffn_params + norm_params
         total_layer_params = layer_params * self.num_layers
 
-        # Bhava module
-        bhava_params = self.bhava_embed_dim * 12 * 12 * 2
+        # Final norm
+        final_norm = self.embed_dim
 
-        total = embed_params + total_layer_params + bhava_params
+        total = embed_params + total_layer_params + final_norm
         return total
 
 
@@ -145,10 +154,11 @@ class EfficientPhaseAttention(nn.Module):
     Uses:
     - Grouped Query Attention (GQA) for KV memory reduction
     - Flash Attention when available
+    - Phase synchronization via mean-field approximation
     - Gradient checkpointing compatible
     """
 
-    def __init__(self, config: SymbolU7BConfig):
+    def __init__(self, config: Phase7BConfig):
         super().__init__()
         self.embed_dim = config.embed_dim
         self.num_heads = config.num_heads
@@ -164,15 +174,15 @@ class EfficientPhaseAttention(nn.Module):
         self.v_proj = nn.Linear(config.embed_dim, kv_dim, bias=False)
         self.o_proj = nn.Linear(config.embed_dim, config.embed_dim, bias=False)
 
-        # Phase components
+        # Phase components (O(n) mean-field synchronization)
         self.phase_dim = config.phase_dim
         self.phase_proj = nn.Linear(self.head_dim, config.phase_dim, bias=False)
-        self.sync_lr = nn.Parameter(torch.tensor(0.1))
+        self.sync_lr = nn.Parameter(torch.tensor(config.sync_lr))
         self.sync_steps = config.sync_steps
 
         self.use_flash = config.use_flash_attention and hasattr(F, 'scaled_dot_product_attention')
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         B, N, D = x.shape
 
         # Project Q, K, V
@@ -189,19 +199,22 @@ class EfficientPhaseAttention(nn.Module):
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
 
-        # Phase synchronization (O(n) mean-field)
+        # Phase synchronization (O(n) mean-field approximation)
         phases = torch.sigmoid(self.phase_proj(q.mean(dim=2))) * (2 * math.pi)
         for _ in range(self.sync_steps):
             phase_mean = phases.mean(dim=-1, keepdim=True)
             gradient = -torch.sin(phases - phase_mean)
             phases = (phases + self.sync_lr * gradient) % (2 * math.pi)
 
+        # Phase coherence (how synchronized the phases are)
+        phase_coherence = torch.cos(phases - phases.mean(dim=-1, keepdim=True)).mean(dim=-1)
+
         # Attention computation
         if self.use_flash:
             # Use Flash Attention (memory efficient)
             out = F.scaled_dot_product_attention(q, k, v, is_causal=True)
         else:
-            # Manual attention with phase modulation
+            # Manual attention
             scale = 1.0 / math.sqrt(self.head_dim)
             attn = torch.matmul(q, k.transpose(-2, -1)) * scale
 
@@ -214,21 +227,25 @@ class EfficientPhaseAttention(nn.Module):
 
         # Reshape and project
         out = out.transpose(1, 2).reshape(B, N, D)
-        return self.o_proj(out)
+
+        return {
+            'output': self.o_proj(out),
+            'phase_coherence': phase_coherence.mean(dim=1),  # [B]
+        }
 
 
 # =============================================================================
 # 7B TRANSFORMER BLOCK
 # =============================================================================
 
-class SymbolU7BBlock(nn.Module):
-    """Single transformer block for 7B model."""
+class Phase7BBlock(nn.Module):
+    """Single transformer block for 7B Phase model."""
 
-    def __init__(self, config: SymbolU7BConfig, layer_idx: int):
+    def __init__(self, config: Phase7BConfig, layer_idx: int):
         super().__init__()
         self.layer_idx = layer_idx
 
-        # Pre-norm
+        # Pre-norm (RMSNorm)
         self.attn_norm = nn.RMSNorm(config.embed_dim)
         self.ffn_norm = nn.RMSNorm(config.embed_dim)
 
@@ -240,44 +257,48 @@ class SymbolU7BBlock(nn.Module):
         self.up_proj = nn.Linear(config.embed_dim, config.intermediate_size, bias=False)
         self.down_proj = nn.Linear(config.intermediate_size, config.embed_dim, bias=False)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Attention
+    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+        # Attention with residual
         h = self.attn_norm(x)
-        x = x + self.attn(h)
+        attn_out = self.attn(h)
+        x = x + attn_out['output']
 
-        # FFN
+        # FFN with residual (SwiGLU)
         h = self.ffn_norm(x)
         x = x + self.down_proj(F.silu(self.gate_proj(h)) * self.up_proj(h))
 
-        return x
+        return {
+            'output': x,
+            'phase_coherence': attn_out['phase_coherence'],
+        }
 
 
 # =============================================================================
-# SYMBOLU 7B MODEL
+# PHASE 7B MODEL
 # =============================================================================
 
-class SymbolU7B(nn.Module):
+class Phase7B(nn.Module):
     """
-    SymbolU Unified at 7B parameters.
+    Phase Attention Transformer at 7B parameters.
 
     Features:
-    - 32 transformer layers with Phase Attention O(n)
-    - 12 ontological semantic layers (mapped from 32)
-    - 12x12 Bhava relationships (144D)
-    - BCVF trustworthiness
+    - 32 transformer layers with O(n) Phase Attention
+    - Grouped Query Attention (GQA) for memory efficiency
+    - SwiGLU FFN
+    - RMSNorm
     - Gradient checkpointing for memory
     """
 
-    def __init__(self, config: Optional[SymbolU7BConfig] = None):
+    def __init__(self, config: Optional[Phase7BConfig] = None):
         super().__init__()
-        self.config = config or SymbolU7BConfig()
+        self.config = config or Phase7BConfig()
 
         # Embeddings
         self.embed_tokens = nn.Embedding(self.config.vocab_size, self.config.embed_dim)
 
         # Layers
         self.layers = nn.ModuleList([
-            SymbolU7BBlock(self.config, i) for i in range(self.config.num_layers)
+            Phase7BBlock(self.config, i) for i in range(self.config.num_layers)
         ])
 
         # Output
@@ -286,10 +307,6 @@ class SymbolU7B(nn.Module):
 
         # Tie weights
         self.lm_head.weight = self.embed_tokens.weight
-
-        # Bhava module (lightweight)
-        self.bhava_proj = nn.Linear(self.config.embed_dim, 12)
-        self.bhava_relationships = nn.Parameter(torch.randn(12, 12) * 0.02)
 
         # Gradient checkpointing flag
         self.gradient_checkpointing = self.config.use_gradient_checkpointing
@@ -304,40 +321,30 @@ class SymbolU7B(nn.Module):
         # Embeddings
         x = self.embed_tokens(input_ids)
 
-        # Track layer outputs for ontological mapping
-        layer_outputs = []
+        # Track phase coherence across layers
+        coherence_sum = 0.0
+        num_layers = 0
 
         # Forward through layers
         for i, layer in enumerate(self.layers):
             if self.gradient_checkpointing and self.training:
-                x = torch.utils.checkpoint.checkpoint(layer, x, use_reentrant=False)
+                # Checkpoint for memory efficiency
+                layer_out = torch.utils.checkpoint.checkpoint(
+                    layer, x, use_reentrant=False
+                )
             else:
-                x = layer(x)
+                layer_out = layer(x)
 
-            # Sample layers for ontological mapping (every ~3 layers)
-            if i % 3 == 0 or i == len(self.layers) - 1:
-                layer_outputs.append(x.mean(dim=1))
+            x = layer_out['output']
+            coherence_sum += layer_out['phase_coherence']
+            num_layers += 1
 
-        # Ensure we have 12 ontological representations
-        while len(layer_outputs) < 12:
-            layer_outputs.append(layer_outputs[-1])
-        layer_outputs = layer_outputs[:12]
+        # Average coherence across layers
+        avg_coherence = coherence_sum / num_layers
 
         # Output
         x = self.norm(x)
         logits = self.lm_head(x)
-
-        # Ontological probs
-        stacked = torch.stack(layer_outputs, dim=1)  # [B, 12, D]
-        onto_logits = self.bhava_proj(stacked).mean(dim=-1)  # [B, 12]
-        ontological_probs = F.softmax(onto_logits, dim=-1)
-
-        # Bhava relationships
-        bhava_matrix = torch.sigmoid(self.bhava_relationships)
-        bhava_vector = bhava_matrix.flatten().unsqueeze(0).expand(B, -1)  # [B, 144]
-
-        # Coherence
-        coherence = (ontological_probs * ontological_probs).sum(dim=-1)  # [B]
 
         # Loss
         loss = None
@@ -353,9 +360,7 @@ class SymbolU7B(nn.Module):
         return {
             'logits': logits,
             'loss': loss,
-            'ontological_probs': ontological_probs,
-            'bhava_vector': bhava_vector,
-            'coherence': coherence,
+            'coherence': avg_coherence,  # Phase synchronization quality
         }
 
     def count_parameters(self) -> int:
@@ -391,7 +396,8 @@ def train_7b(args):
     """Main training function."""
 
     print("=" * 70)
-    print("   SYMBOLU UNIFIED 7B - Training")
+    print("   SYMBOLU PHASE 7B - Training")
+    print("   Pure Phase Attention O(n) - No Bhava/Ontological")
     print("=" * 70)
 
     # Device
@@ -403,7 +409,7 @@ def train_7b(args):
         print(f"Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
     # Config
-    config = SymbolU7BConfig(
+    config = Phase7BConfig(
         max_seq_len=args.seq_len,
         use_gradient_checkpointing=True,
         use_flash_attention=True,
@@ -412,14 +418,17 @@ def train_7b(args):
     print(f"\nModel Configuration:")
     print(f"  embed_dim: {config.embed_dim}")
     print(f"  num_heads: {config.num_heads}")
+    print(f"  num_kv_heads: {config.num_kv_heads} (GQA)")
     print(f"  num_layers: {config.num_layers}")
     print(f"  vocab_size: {config.vocab_size}")
     print(f"  max_seq_len: {config.max_seq_len}")
+    print(f"  phase_dim: {config.phase_dim}")
+    print(f"  sync_steps: {config.sync_steps}")
     print(f"  Estimated params: {config.estimate_parameters() / 1e9:.2f}B")
 
     # Create model
     print("\nCreating model...")
-    model = SymbolU7B(config)
+    model = Phase7B(config)
     actual_params = model.count_parameters()
     print(f"Actual parameters: {actual_params:,} ({actual_params/1e9:.2f}B)")
 
@@ -533,7 +542,7 @@ def train_7b(args):
                         optimizer.state = collections.defaultdict(dict)
                         for pg in optimizer.param_groups:
                             pg['lr'] = new_lr
-                        print(f"  ⚠️ PPL spike ({current_loss:.4f} > {best_loss:.4f}*1.5)! LR: {old_lr:.2e} → {new_lr:.2e} + momentum reset")
+                        print(f"  ⚠️ Loss spike ({current_loss:.4f} > {best_loss:.4f}*1.5)! LR: {old_lr:.2e} → {new_lr:.2e} + momentum reset")
                     elif current_loss > best_loss * 1.3:
                         # MINOR SPIKE: 0.85x LR only
                         old_lr = optimizer.param_groups[0]['lr']
@@ -580,7 +589,10 @@ def train_7b(args):
 # =============================================================================
 
 def main():
-    parser = argparse.ArgumentParser(description='SymbolU 7B Training')
+    parser = argparse.ArgumentParser(
+        description='SymbolU Phase 7B Training (Pure Phase Attention, No Bhava)',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
 
     # Training
     parser.add_argument('--steps', type=int, default=100, help='Training steps')
