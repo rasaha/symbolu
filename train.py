@@ -1980,11 +1980,16 @@ def train(config: TrainingConfig):
                                 old_scale = state.lr_scale
                                 state.lr_scale *= reduction
 
+                                # CRITICAL: Reset Adam momentum to prevent "echo spikes"
+                                # Without this, old bad gradients in m/v buffers cause
+                                # continued divergence even after LR reduction
+                                optimizer.state = collections.defaultdict(dict)
+
                                 trend_type = "accelerating ⚠️" if is_accelerating else "increasing"
                                 logger.info(
                                     f"  📈 PPL {trend_type}: Δ=[{delta_2:+.1f}, {delta_1:+.1f}], "
                                     f"rate={relative_rate*100:.1f}%/eval. "
-                                    f"LR scale: {old_scale:.3f} → {state.lr_scale:.3f}"
+                                    f"LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + momentum reset"
                                 )
 
                 # Track best
