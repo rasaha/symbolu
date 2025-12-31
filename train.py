@@ -1554,6 +1554,56 @@ def save_checkpoint(
     torch.save(checkpoint, path)
 
 
+def save_checkpoint_light(
+    model: PhaseTransformer,
+    state: TrainingState,
+    config: TrainingConfig,
+    path: str,
+):
+    """
+    Save lightweight checkpoint (model only, no optimizer).
+
+    Used for eval-interval checkpoints to save disk space.
+    A 145M model saves ~550MB vs ~1.6GB with optimizer state.
+    """
+    checkpoint = {
+        "model": model.state_dict(),
+        "state": asdict(state),
+        "config": asdict(config),
+    }
+    torch.save(checkpoint, path)
+
+
+def cleanup_old_checkpoints(checkpoint_dir: Path, keep_last: int = 5):
+    """
+    Remove old step_*.pt checkpoints, keeping only the last N.
+
+    This prevents disk space exhaustion when saving at every eval interval.
+    Always preserves: best.pt, latest.pt, final.pt
+    """
+    import re
+
+    # Find all step_*.pt files
+    step_files = []
+    for f in checkpoint_dir.glob("step_*.pt"):
+        match = re.match(r"step_(\d+)\.pt", f.name)
+        if match:
+            step_num = int(match.group(1))
+            step_files.append((step_num, f))
+
+    # Sort by step number
+    step_files.sort(key=lambda x: x[0])
+
+    # Remove all but the last N
+    if len(step_files) > keep_last:
+        files_to_remove = step_files[:-keep_last]
+        for step_num, filepath in files_to_remove:
+            try:
+                filepath.unlink()
+            except OSError:
+                pass  # Ignore errors (file might be in use)
+
+
 def load_checkpoint(
     path: str,
     model: PhaseTransformer,
@@ -1812,13 +1862,16 @@ def train(config: TrainingConfig):
                     f"Val PPL: {val_metrics['val_perplexity']:.2f}"
                 )
 
-                # Save checkpoint at every eval for backtracking support
+                # Save lightweight checkpoint at every eval for backtracking support
+                # Uses model-only saves (~550MB vs ~1.6GB) to prevent disk exhaustion
                 eval_ckpt_path = checkpoint_dir / f"step_{state.step}.pt"
                 if not eval_ckpt_path.exists():
-                    save_checkpoint(
-                        model, optimizer, scheduler, scaler, state, config,
+                    save_checkpoint_light(
+                        model, state, config,
                         str(eval_ckpt_path)
                     )
+                    # Clean up old eval checkpoints, keep last 5 for backtracking
+                    cleanup_old_checkpoints(checkpoint_dir, keep_last=5)
 
                 # Auto-reduce LR on PPL spike with adaptive response
                 # Track best PPL (initialize if not set)
@@ -1853,21 +1906,25 @@ def train(config: TrainingConfig):
                         logger.info(f"  🚨 MAJOR PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*2.0)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
 
                     elif current_ppl > state.best_ppl * 1.5:
-                        # MODERATE SPIKE (>1.5x): Backtrack 200 steps + 0.7x LR + Reset momentum
+                        # MODERATE SPIKE (>1.5x): Backtrack to oldest available + 0.7x LR + Reset momentum
                         state.spike_count += 1
                         old_scale = state.lr_scale
                         state.lr_scale *= 0.7  # Persistent reduction
 
-                        # Try to backtrack 200 steps (2 eval intervals)
-                        backtrack_steps = 200
-                        target_step = state.step - backtrack_steps
-                        backtrack_ckpt = checkpoint_dir / f"step_{target_step}.pt"
-                        if backtrack_ckpt.exists():
-                            logger.info(f"  🔄 MODERATE SPIKE! Backtracking to step {target_step}...")
+                        # Find oldest available step checkpoint (we keep last 5)
+                        # This gives us the most stable point to backtrack to
+                        backtrack_ckpt = None
+                        for f in sorted(checkpoint_dir.glob("step_*.pt")):
+                            # Take the oldest (first in sorted order)
+                            backtrack_ckpt = f
+                            break
+
+                        if backtrack_ckpt and backtrack_ckpt.exists():
+                            logger.info(f"  🔄 MODERATE SPIKE! Backtracking to {backtrack_ckpt.name}...")
                             ckpt = torch.load(backtrack_ckpt, map_location=device, weights_only=False)
                             model.load_state_dict(ckpt['model'])
                         elif (checkpoint_dir / "best.pt").exists():
-                            # Fall back to best checkpoint if 200-step checkpoint doesn't exist
+                            # Fall back to best checkpoint if no step checkpoints exist
                             logger.info(f"  🔄 MODERATE SPIKE! Backtracking to best checkpoint...")
                             ckpt = torch.load(checkpoint_dir / "best.pt", map_location=device, weights_only=False)
                             model.load_state_dict(ckpt['model'])
