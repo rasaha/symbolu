@@ -1966,6 +1966,14 @@ def parse_args() -> TrainingConfig:
     parser.add_argument("--alpha_phase", type=float, default=0.6,
                        help="Weight for phase attention in hybrid layers (was 0.2, now 0.6)")
 
+    # Alpha decay schedule (for phase attention)
+    parser.add_argument("--alpha_phase_start", type=float, default=0.6,
+                       help="Initial alpha_phase value (decays over time)")
+    parser.add_argument("--alpha_phase_end", type=float, default=0.4,
+                       help="Final alpha_phase value after decay")
+    parser.add_argument("--alpha_decay_steps", type=int, default=10000,
+                       help="Steps over which alpha_phase decays from start to end")
+
     # Training
     parser.add_argument("--batch_size", type=int, default=16,
                        help="Batch size per GPU")

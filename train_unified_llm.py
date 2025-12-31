@@ -122,6 +122,11 @@ class UnifiedTrainingConfig:
     alpha_local: float = 0.8
     alpha_phase: float = 0.2
 
+    # Alpha decay schedule (for phase/hybrid attention)
+    alpha_phase_start: float = 0.6
+    alpha_phase_end: float = 0.4
+    alpha_decay_steps: int = 10000
+
     # Ontological-specific parameters
     bhava_embed_dim: int = 128
     num_drishti_heads: int = 4
@@ -349,6 +354,32 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
                     module.gradient_checkpointing = True
 
     return model.to(device)
+
+
+def update_alpha_schedule(model: nn.Module, step: int, config: UnifiedTrainingConfig) -> float:
+    """
+    Update alpha_phase for HybridAttentionLayer modules based on decay schedule.
+
+    Returns current alpha_phase value.
+    """
+    if config.model_type not in ("phase", "hybrid"):
+        return config.alpha_phase  # No decay for ontological
+
+    # Calculate current alpha based on linear decay
+    if step >= config.alpha_decay_steps:
+        current_alpha = config.alpha_phase_end
+    else:
+        frac = step / config.alpha_decay_steps
+        current_alpha = config.alpha_phase_start + frac * (config.alpha_phase_end - config.alpha_phase_start)
+
+    # Update all HybridAttentionLayer modules
+    for module in model.modules():
+        if hasattr(module, 'alpha_phase') and isinstance(module.alpha_phase, nn.Parameter):
+            module.alpha_phase.data.fill_(current_alpha)
+            if hasattr(module, 'alpha_local'):
+                module.alpha_local.data.fill_(1.0 - current_alpha)
+
+    return current_alpha
 
 
 # =============================================================================
@@ -588,6 +619,9 @@ def train(config: UnifiedTrainingConfig):
             if global_step >= config.warmup_steps:
                 scheduler.step()
 
+            # Update alpha schedule for phase/hybrid models
+            current_alpha = update_alpha_schedule(model, global_step, config)
+
             global_step += 1
             avg_loss = running_loss / config.gradient_accumulation
             train_losses.append(avg_loss)
@@ -624,6 +658,10 @@ def train(config: UnifiedTrainingConfig):
                         log_msg += f" | Coh: {metrics['coherence']:.3f}"
                     if "onto_entropy" in metrics:
                         log_msg += f" | Ent: {metrics['onto_entropy']:.2f}"
+
+                # Add alpha for phase/hybrid models
+                if config.model_type in ("phase", "hybrid"):
+                    log_msg += f" | α_phase: {current_alpha:.2f}"
 
                 print(log_msg)
                 step_start_time = time.time()
@@ -801,6 +839,20 @@ def main():
                        help="LocalAttention backend")
     parser.add_argument("--window_size", type=int, default=256,
                        help="Local attention window size")
+    parser.add_argument("--local_layers", type=int, default=4,
+                       help="Number of local-only attention layers (hybrid mode)")
+    parser.add_argument("--alpha_local", type=float, default=0.8,
+                       help="Weight for local attention in hybrid layers")
+    parser.add_argument("--alpha_phase", type=float, default=0.2,
+                       help="Weight for phase attention in hybrid layers")
+
+    # Alpha decay schedule (for phase/hybrid attention)
+    parser.add_argument("--alpha_phase_start", type=float, default=0.6,
+                       help="Initial alpha_phase value (decays over time)")
+    parser.add_argument("--alpha_phase_end", type=float, default=0.4,
+                       help="Final alpha_phase value after decay")
+    parser.add_argument("--alpha_decay_steps", type=int, default=10000,
+                       help="Steps over which alpha_phase decays from start to end")
 
     # Ontological-specific
     parser.add_argument("--lambda_bhava", type=float, default=0.1,
