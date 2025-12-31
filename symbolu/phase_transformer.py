@@ -137,6 +137,11 @@ class PhaseAttentionLayer(nn.Module):
         self.key_gate = nn.Linear(self.head_dim, self.head_dim)
         self.value_gate = nn.Linear(self.head_dim, self.head_dim)
 
+        # Initialize value_gate bias to preserve memory (sigmoid(3) ≈ 0.95)
+        # This makes the model start as "perfect memory" and learn to incorporate global context
+        nn.init.zeros_(self.value_gate.weight)
+        nn.init.constant_(self.value_gate.bias, 3.0)  # High gate = preserve local V
+
         self.dropout = nn.Dropout(dropout)
         self.norm = nn.LayerNorm(embed_dim)
 
@@ -1215,17 +1220,33 @@ class HybridAttentionLayer(nn.Module):
 
     def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
         """
-        Sequential hybrid forward: LocalAttn first, then PhaseAttn.
+        Weighted hybrid forward: Blend local and phase attention outputs.
 
-        Memory efficient: only one attention output in memory at a time.
+        Key fix: Phase attention processes ORIGINAL input (not local's output)
+        so it can do proper long-range retrieval without local interference.
+
+        Uses alpha weights to blend contributions:
+        - alpha_local: Weight for local attention (syntax, grammar)
+        - alpha_phase: Weight for phase attention (long-range context)
         """
-        # Local attention first (captures local patterns)
-        x = self.local_attn(x, causal_mask)
+        residual = x
 
-        # Phase attention second (adds global context)
-        x = self.phase_attn(x, causal_mask)
+        # Local attention on original input (captures local patterns)
+        x_local = self.local_attn(x, causal_mask)
 
-        return x
+        # Phase attention on ORIGINAL input (captures global context)
+        # This is critical: phase needs raw input to do long-range retrieval
+        x_phase = self.phase_attn(residual, causal_mask)
+
+        # Weighted combination using learnable alphas
+        # Normalize alphas to sum to 1 for stability
+        alpha_sum = torch.abs(self.alpha_local) + torch.abs(self.alpha_phase) + 1e-8
+        w_local = torch.abs(self.alpha_local) / alpha_sum
+        w_phase = torch.abs(self.alpha_phase) / alpha_sum
+
+        output = w_local * x_local + w_phase * x_phase
+
+        return output
 
 
 class HybridTransformerBlock(nn.Module):

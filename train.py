@@ -251,11 +251,15 @@ class TrainingConfig:
     sync_lr: float = 0.1
 
     # Hybrid-specific parameters
-    local_layers: int = 4  # Number of early layers with local attention only
+    # NOTE: Updated defaults based on diagnostic findings:
+    # - 6/6 split works better than 4/8 for semantic feature extraction
+    # - Higher alpha_phase (0.6) forces the model to use long-range attention
+    # - Gate init changed to 0.95 to preserve memory (learn to forget, not remember)
+    local_layers: int = 6  # Number of early layers with local attention only (was 4)
     window_size: int = 256  # Local attention window size
     local_backend: str = "auto"  # LocalAttention backend: auto, flash, sdpa, unfold
-    alpha_local: float = 0.8  # Weight for local attention in hybrid layers
-    alpha_phase: float = 0.2  # Weight for phase attention in hybrid layers
+    alpha_local: float = 0.4  # Weight for local attention in hybrid layers (was 0.8)
+    alpha_phase: float = 0.6  # Weight for phase attention in hybrid layers (was 0.2)
 
     # Training hyperparameters
     batch_size: int = 16
@@ -1851,18 +1855,18 @@ def parse_args() -> TrainingConfig:
     parser.add_argument("--sync_lr", type=float, default=0.1,
                        help="Phase synchronization learning rate")
 
-    # Hybrid parameters
-    parser.add_argument("--local_layers", type=int, default=4,
-                       help="Number of early layers with local attention only (hybrid mode)")
+    # Hybrid parameters (updated defaults for better long-range retrieval)
+    parser.add_argument("--local_layers", type=int, default=6,
+                       help="Number of early layers with local attention only (was 4, now 6)")
     parser.add_argument("--window_size", type=int, default=256,
                        help="Local attention window size (hybrid mode)")
     parser.add_argument("--local_backend", type=str, default="auto",
                        choices=["auto", "flash", "sdpa", "unfold"],
                        help="LocalAttention backend: flash (fastest), sdpa, unfold (fallback)")
-    parser.add_argument("--alpha_local", type=float, default=0.8,
-                       help="Weight for local attention in hybrid layers")
-    parser.add_argument("--alpha_phase", type=float, default=0.2,
-                       help="Weight for phase attention in hybrid layers")
+    parser.add_argument("--alpha_local", type=float, default=0.4,
+                       help="Weight for local attention in hybrid layers (was 0.8, now 0.4)")
+    parser.add_argument("--alpha_phase", type=float, default=0.6,
+                       help="Weight for phase attention in hybrid layers (was 0.2, now 0.6)")
 
     # Training
     parser.add_argument("--batch_size", type=int, default=16,
