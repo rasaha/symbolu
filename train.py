@@ -311,7 +311,7 @@ class TrainingConfig:
     tokenizer: str = "gpt2"  # gpt2, tiktoken, custom
 
     # Evaluation
-    eval_samples: int = 1000
+    eval_samples: int = 5000  # Use more samples for reliable spike detection
 
     # Logging
     wandb: bool = False
@@ -2096,154 +2096,150 @@ def train(config: TrainingConfig):
                     # Clean up old eval checkpoints, keep last 5 for backtracking
                     cleanup_old_checkpoints(checkpoint_dir, keep_last=5)
 
-                # Auto-reduce LR on PPL spike with adaptive response
-                # Track best PPL (initialize if not set)
+                # =================================================================
+                # SPIKE DETECTION using LOSS DELTA (not PPL ratio)
+                # Per ChatGPT's analysis: PPL ratios are too sensitive (exponential)
+                # Loss deltas are more stable and require consecutive regressions
+                # =================================================================
+
+                # Initialize state variables (backwards compatibility)
+                if not hasattr(state, 'best_loss'):
+                    state.best_loss = float('inf')
                 if not hasattr(state, 'best_ppl'):
                     state.best_ppl = float('inf')
                 if not hasattr(state, 'spike_count'):
                     state.spike_count = 0
                 if not hasattr(state, 'lr_scale'):
-                    state.lr_scale = 1.0  # Persistent LR multiplier
-                if not hasattr(state, 'ppl_history'):
-                    state.ppl_history = []
-                if not hasattr(state, 'ema_ppl'):
-                    state.ema_ppl = 0.0
+                    state.lr_scale = 1.0
+                if not hasattr(state, 'consecutive_regressions'):
+                    state.consecutive_regressions = 0
+                if not hasattr(state, 'loss_history'):
+                    state.loss_history = []
 
+                current_loss = val_metrics['val_loss']
                 current_ppl = val_metrics['val_perplexity']
 
-                # Update EMA PPL (smooths out single bad batches)
-                # EMA = 0.9 * old + 0.1 * new (responds to trends, ignores noise)
-                if state.ema_ppl == 0.0:
-                    state.ema_ppl = current_ppl  # Initialize with first value
-                else:
-                    state.ema_ppl = 0.9 * state.ema_ppl + 0.1 * current_ppl
+                # Track loss history for trend detection
+                state.loss_history.append(current_loss)
+                if len(state.loss_history) > 10:
+                    state.loss_history = state.loss_history[-10:]
 
-                # Track PPL history for trend detection (keep last 10 for smoother trends)
-                state.ppl_history.append(current_ppl)
-                if len(state.ppl_history) > 10:
-                    state.ppl_history = state.ppl_history[-10:]
-
-                if current_ppl < state.best_ppl:
+                # Check for new best
+                if current_loss < state.best_loss:
+                    state.best_loss = current_loss
                     state.best_ppl = current_ppl
-                    # CRITICAL: Reset EMA to current PPL when new best found
-                    # Otherwise EMA carries "ghost" of old high values
-                    state.ema_ppl = current_ppl
+                    state.consecutive_regressions = 0  # Reset on improvement
                 elif state.step > config.warmup_steps // 2:
                     # =================================================================
-                    # HARD SAFETY LIMITS - Use RAW PPL (not EMA) for spike detection
-                    # EMA carries ghost values; raw PPL is more reliable
+                    # LOSS-BASED SPIKE DETECTION with CONSECUTIVE REGRESSION REQUIREMENT
+                    # - Use absolute loss delta (not PPL ratio)
+                    # - Require 2 consecutive regressions before backtracking
+                    # - This prevents thrashing on validation noise
                     # =================================================================
 
-                    # Minimum LR floor - never let lr_scale drop below 0.1 (10% of base LR)
                     MIN_LR_SCALE = 0.1
+                    loss_delta = current_loss - state.best_loss
 
-                    if current_ppl > state.best_ppl * 2.0:
-                        # MAJOR SPIKE (>2x): Backtrack + 0.8x LR + Reset momentum
-                        state.spike_count += 1
-                        old_scale = state.lr_scale
-                        state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.8)
+                    # Track consecutive regressions
+                    if loss_delta > 0.05:  # Any significant regression
+                        state.consecutive_regressions += 1
+                    else:
+                        state.consecutive_regressions = max(0, state.consecutive_regressions - 1)
 
-                        # Try to backtrack to best checkpoint
-                        best_ckpt = checkpoint_dir / "best.pt"
-                        if best_ckpt.exists():
-                            logger.info(f"  🔄 MAJOR SPIKE! Backtracking to best checkpoint...")
-                            ckpt = torch.load(best_ckpt, map_location=device, weights_only=False)
-                            model.load_state_dict(ckpt['model'])
+                    # Only act after 2 consecutive regressions (prevents noise-triggered rollback)
+                    if state.consecutive_regressions >= 2:
+                        if loss_delta > 0.25:
+                            # MAJOR SPIKE: loss increased by >0.25 for 2+ consecutive evals
+                            state.spike_count += 1
+                            old_scale = state.lr_scale
+                            state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.8)
 
-                        # Reset optimizer momentum (clear bad gradients)
-                        optimizer.state = collections.defaultdict(dict)
+                            best_ckpt = checkpoint_dir / "best.pt"
+                            if best_ckpt.exists():
+                                logger.info(f"  🔄 MAJOR SPIKE! Backtracking to best checkpoint...")
+                                ckpt = torch.load(best_ckpt, map_location=device, weights_only=False)
+                                model.load_state_dict(ckpt['model'])
 
-                        logger.info(f"  🚨 MAJOR PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*2.0)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
+                            optimizer.state = collections.defaultdict(dict)
+                            state.consecutive_regressions = 0  # Reset after action
 
-                    elif current_ppl > state.best_ppl * 1.5:
-                        # MODERATE SPIKE (>1.5x): Backtrack to oldest available + 0.85x LR + Reset momentum
-                        state.spike_count += 1
-                        old_scale = state.lr_scale
-                        state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.85)
+                            logger.info(f"  🚨 MAJOR loss spike (Δ={loss_delta:.3f} > 0.25)! Backtrack + LR: {old_scale:.3f} → {state.lr_scale:.3f}")
 
-                        # Find oldest available step checkpoint (we keep last 5)
-                        # This gives us the most stable point to backtrack to
-                        backtrack_ckpt = None
-                        for f in sorted(checkpoint_dir.glob("step_*.pt")):
-                            # Take the oldest (first in sorted order)
-                            backtrack_ckpt = f
-                            break
+                        elif loss_delta > 0.15:
+                            # MODERATE SPIKE: loss increased by >0.15 for 2+ consecutive evals
+                            state.spike_count += 1
+                            old_scale = state.lr_scale
+                            state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.85)
 
-                        if backtrack_ckpt and backtrack_ckpt.exists():
-                            logger.info(f"  🔄 MODERATE SPIKE! Backtracking to {backtrack_ckpt.name}...")
-                            ckpt = torch.load(backtrack_ckpt, map_location=device, weights_only=False)
-                            model.load_state_dict(ckpt['model'])
-                        elif (checkpoint_dir / "best.pt").exists():
-                            # Fall back to best checkpoint if no step checkpoints exist
-                            logger.info(f"  🔄 MODERATE SPIKE! Backtracking to best checkpoint...")
-                            ckpt = torch.load(checkpoint_dir / "best.pt", map_location=device, weights_only=False)
-                            model.load_state_dict(ckpt['model'])
+                            # Find oldest step checkpoint
+                            backtrack_ckpt = None
+                            for f in sorted(checkpoint_dir.glob("step_*.pt")):
+                                backtrack_ckpt = f
+                                break
 
-                        # Reset optimizer momentum
-                        optimizer.state = collections.defaultdict(dict)
+                            if backtrack_ckpt and backtrack_ckpt.exists():
+                                logger.info(f"  🔄 MODERATE SPIKE! Backtracking to {backtrack_ckpt.name}...")
+                                ckpt = torch.load(backtrack_ckpt, map_location=device, weights_only=False)
+                                model.load_state_dict(ckpt['model'])
+                            elif (checkpoint_dir / "best.pt").exists():
+                                logger.info(f"  🔄 MODERATE SPIKE! Backtracking to best checkpoint...")
+                                ckpt = torch.load(checkpoint_dir / "best.pt", map_location=device, weights_only=False)
+                                model.load_state_dict(ckpt['model'])
 
-                        logger.info(f"  ⚠️ PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*1.5)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
+                            optimizer.state = collections.defaultdict(dict)
+                            state.consecutive_regressions = 0
+
+                            logger.info(f"  ⚠️ Loss spike (Δ={loss_delta:.3f} > 0.15)! Backtrack + LR: {old_scale:.3f} → {state.lr_scale:.3f}")
 
                     # =================================================================
-                    # TREND-BASED ADAPTIVE LR with DAMPING (per Google's advice)
-                    # - Higher threshold (12%) to avoid triggering on noise
-                    # - Patience counter requires 2 consecutive bad evals
-                    # - Two-tier response: gentle vs aggressive
+                    # TREND-BASED GENTLE LR ADJUSTMENT (single regression warning)
                     # =================================================================
-                    elif len(state.ppl_history) >= 3:
+                    elif len(state.loss_history) >= 3:
                         # Initialize patience if not present
                         if not hasattr(state, 'trend_patience'):
                             state.trend_patience = 0
 
-                        # Compute rate of change over last 3 evals
-                        delta_1 = state.ppl_history[-1] - state.ppl_history[-2]  # Most recent
-                        delta_2 = state.ppl_history[-2] - state.ppl_history[-3]  # Previous
+                        # Compute rate of change over last 3 evals (using LOSS, not PPL)
+                        loss_delta_1 = state.loss_history[-1] - state.loss_history[-2]
+                        loss_delta_2 = state.loss_history[-2] - state.loss_history[-3]
 
-                        # Check if PPL is increasing (positive deltas)
-                        if delta_1 > 0:
-                            # Relative rate: how fast is PPL growing relative to current value
-                            relative_rate = delta_1 / current_ppl if current_ppl > 0 else 0
-
-                            # Is it accelerating? Requires SIGNIFICANT surge (1.2x, not just >)
-                            is_accelerating = delta_1 > (1.2 * delta_2) and delta_2 > 0
+                        # Check if loss is increasing (positive deltas)
+                        if loss_delta_1 > 0.02:  # Small threshold to ignore noise
+                            # Is it accelerating?
+                            is_accelerating = loss_delta_1 > (1.2 * loss_delta_2) and loss_delta_2 > 0
 
                             # Determine if this is a concerning trend
-                            is_concerning = relative_rate > 0.12 or is_accelerating
+                            is_concerning = loss_delta_1 > 0.05 or is_accelerating
 
                             if is_concerning:
                                 state.trend_patience += 1
                             else:
-                                state.trend_patience = 0  # Reset on good eval
+                                state.trend_patience = 0
 
                             # TWO-TIER RESPONSE based on patience
                             if state.trend_patience >= 2:
                                 # AGGRESSIVE: Confirmed trend (2 consecutive bad evals)
-                                # Reduce LR by 0.92x + reset momentum
                                 old_scale = state.lr_scale
                                 state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.92)
-
-                                # Reset momentum only on confirmed trends
                                 optimizer.state = collections.defaultdict(dict)
 
                                 logger.info(
-                                    f"  📈 PPL trend CONFIRMED: Δ=[{delta_2:+.1f}, {delta_1:+.1f}], "
-                                    f"rate={relative_rate*100:.1f}%/eval, patience={state.trend_patience}. "
-                                    f"LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + momentum reset"
+                                    f"  📈 Loss trend CONFIRMED: Δ=[{loss_delta_2:+.3f}, {loss_delta_1:+.3f}]. "
+                                    f"LR: {old_scale:.3f} → {state.lr_scale:.3f} + momentum reset"
                                 )
-                                state.trend_patience = 0  # Reset after intervention
+                                state.trend_patience = 0
 
                             elif state.trend_patience == 1:
-                                # GENTLE: First warning, small nudge (no momentum reset)
+                                # GENTLE: First warning, small nudge
                                 old_scale = state.lr_scale
                                 state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.98)
 
                                 logger.info(
-                                    f"  📊 PPL watching: Δ=[{delta_2:+.1f}, {delta_1:+.1f}], "
-                                    f"rate={relative_rate*100:.1f}%/eval. "
-                                    f"LR scale: {old_scale:.3f} → {state.lr_scale:.3f} (gentle, patience=1)"
+                                    f"  📊 Loss watching: Δ=[{loss_delta_2:+.3f}, {loss_delta_1:+.3f}]. "
+                                    f"LR: {old_scale:.3f} → {state.lr_scale:.3f} (gentle)"
                                 )
                         else:
-                            # PPL decreased or stable - reset patience
+                            # Loss stable or decreasing - reset patience
                             state.trend_patience = 0
 
                 # Track best
@@ -2440,8 +2436,8 @@ def parse_args() -> TrainingConfig:
                        help="Tokenizer to use")
 
     # Evaluation
-    parser.add_argument("--eval_samples", type=int, default=1000,
-                       help="Number of evaluation samples")
+    parser.add_argument("--eval_samples", type=int, default=5000,
+                       help="Number of evaluation samples (higher = more reliable spike detection)")
 
     # Logging
     parser.add_argument("--wandb", action="store_true",
