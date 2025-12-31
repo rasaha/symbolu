@@ -693,6 +693,93 @@ def update_alpha_schedule(
 
 
 # =============================================================================
+# GRADIENT DIAGNOSTICS
+# =============================================================================
+
+def compute_tier_gradient_norms(model: nn.Module) -> dict:
+    """
+    Compute gradient norms per tier to verify all layers are learning.
+
+    Returns dict with:
+    - stable_grad_norm: Gradient norm for MLP/embed params
+    - local_attn_grad_norm: Gradient norm for Quadratic attention params
+    - phase_attn_grad_norm: Gradient norm for Phase attention params
+    - stable_grad_max: Max gradient in stable tier
+    - local_attn_grad_max: Max gradient in local tier
+    - phase_attn_grad_max: Max gradient in phase tier
+
+    If a tier has grad_norm ≈ 0, those layers are NOT learning.
+    """
+    ATTN_PATTERNS = ["q_proj", "k_proj", "v_proj", "o_proj", "out_proj"]
+
+    stable_grads = []
+    local_attn_grads = []
+    phase_attn_grads = []
+
+    for name, param in model.named_parameters():
+        if param.grad is None:
+            continue
+
+        grad_norm = param.grad.data.norm(2).item()
+        name_lower = name.lower()
+
+        # Classify into tier
+        is_attn = any(pattern in name_lower for pattern in ATTN_PATTERNS)
+
+        if not is_attn:
+            stable_grads.append(grad_norm)
+        elif 'phase_attn' in name_lower or 'phase_attention' in name_lower:
+            phase_attn_grads.append(grad_norm)
+        else:
+            local_attn_grads.append(grad_norm)
+
+    def safe_stats(grads):
+        if not grads:
+            return 0.0, 0.0
+        total_norm = (sum(g**2 for g in grads)) ** 0.5
+        max_norm = max(grads)
+        return total_norm, max_norm
+
+    stable_norm, stable_max = safe_stats(stable_grads)
+    local_norm, local_max = safe_stats(local_attn_grads)
+    phase_norm, phase_max = safe_stats(phase_attn_grads)
+
+    return {
+        'stable_grad_norm': stable_norm,
+        'local_attn_grad_norm': local_norm,
+        'phase_attn_grad_norm': phase_norm,
+        'stable_grad_max': stable_max,
+        'local_attn_grad_max': local_max,
+        'phase_attn_grad_max': phase_max,
+        'stable_param_count': len(stable_grads),
+        'local_attn_param_count': len(local_attn_grads),
+        'phase_attn_param_count': len(phase_attn_grads),
+    }
+
+
+def log_tier_gradients(model: nn.Module, step: int, logger) -> None:
+    """Log gradient norms per tier to verify learning health."""
+    stats = compute_tier_gradient_norms(model)
+
+    # Format: show norm and whether tier is "alive" (learning)
+    def status(norm):
+        if norm < 1e-8:
+            return "❌ DEAD"
+        elif norm < 1e-5:
+            return "⚠️ WEAK"
+        else:
+            return "✅"
+
+    logger.info(f"  📊 Gradient Health @ Step {step}:")
+    logger.info(f"     Stable ({stats['stable_param_count']} params):     "
+                f"norm={stats['stable_grad_norm']:.2e} {status(stats['stable_grad_norm'])}")
+    logger.info(f"     Local Attn ({stats['local_attn_param_count']} params): "
+                f"norm={stats['local_attn_grad_norm']:.2e} {status(stats['local_attn_grad_norm'])}")
+    logger.info(f"     Phase Attn ({stats['phase_attn_param_count']} params): "
+                f"norm={stats['phase_attn_grad_norm']:.2e} {status(stats['phase_attn_grad_norm'])}")
+
+
+# =============================================================================
 # OPTIMIZER & SCHEDULER
 # =============================================================================
 
@@ -2391,6 +2478,11 @@ def train(config: TrainingConfig):
             # Quality sampling - generate text to monitor training progress
             if config.sample_every > 0 and state.step % config.sample_every == 0 and tokenizer is not None:
                 run_quality_samples(model, tokenizer, config, device, state.step, logger)
+
+            # Gradient health check - verify all tiers are learning
+            # Runs at same frequency as quality sampling
+            if config.sample_every > 0 and state.step % config.sample_every == 0:
+                log_tier_gradients(model, state.step, logger)
 
             # Reset throughput timer AFTER eval/checkpoint to exclude their time
             if state.step % config.log_every == 0:
