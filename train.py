@@ -1692,6 +1692,10 @@ def train(config: TrainingConfig):
     accumulation_step = 0
     running_loss = 0.0
 
+    # Initialize lr_scale if not present (for backwards compatibility)
+    if not hasattr(state, 'lr_scale'):
+        state.lr_scale = 1.0
+
     while state.step < config.max_steps:
         # Get batch (handle epoch boundaries)
         try:
@@ -1706,6 +1710,12 @@ def train(config: TrainingConfig):
             model, batch, optimizer, scheduler, scaler,
             config, device, accumulation_step
         )
+
+        # Apply persistent lr_scale after scheduler updates LR
+        base_lr = scheduler.get_last_lr()[0]
+        scaled_lr = base_lr * state.lr_scale
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = scaled_lr
 
         accumulation_step += 1
         running_loss += metrics["loss"]
@@ -1725,16 +1735,21 @@ def train(config: TrainingConfig):
             if state.step % config.log_every == 0:
                 elapsed = time.time() - step_start_time
                 tokens_per_sec = (config.log_every * config.batch_size * config.max_seq_len * config.gradient_accumulation) / elapsed
-                lr = scheduler.get_last_lr()[0]
+                base_lr = scheduler.get_last_lr()[0]
+                actual_lr = base_lr * state.lr_scale  # Scaled LR
 
                 # Build log message with coherence metrics if available
                 log_msg = (
                     f"Step {state.step:>6} | "
                     f"Loss: {avg_loss:.4f} | "
                     f"PPL: {math.exp(avg_loss):.2f} | "
-                    f"LR: {lr:.2e} | "
+                    f"LR: {actual_lr:.2e} | "
                     f"Tok/s: {tokens_per_sec:.0f}"
                 )
+
+                # Show lr_scale if not 1.0
+                if state.lr_scale < 0.99:
+                    log_msg += f" | LR_scale: {state.lr_scale:.2f}"
 
                 # Add coherence metrics if enabled (S3, S1-S2, S5)
                 if config.use_coherence_loss and "entropy" in metrics:
@@ -1756,7 +1771,8 @@ def train(config: TrainingConfig):
                     log_dict = {
                         "train/loss": avg_loss,
                         "train/perplexity": math.exp(avg_loss),
-                        "train/learning_rate": lr,
+                        "train/learning_rate": actual_lr,
+                        "train/lr_scale": state.lr_scale,
                         "train/tokens_per_sec": tokens_per_sec,
                         "train/total_tokens": state.total_tokens,
                         "train/epoch": state.epoch,
@@ -1775,7 +1791,8 @@ def train(config: TrainingConfig):
                 if tb_writer is not None:
                     tb_writer.add_scalar("train/loss", avg_loss, state.step)
                     tb_writer.add_scalar("train/perplexity", math.exp(avg_loss), state.step)
-                    tb_writer.add_scalar("train/learning_rate", lr, state.step)
+                    tb_writer.add_scalar("train/learning_rate", actual_lr, state.step)
+                    tb_writer.add_scalar("train/lr_scale", state.lr_scale, state.step)
                     tb_writer.add_scalar("train/tokens_per_sec", tokens_per_sec, state.step)
                     # Add coherence metrics
                     if config.use_coherence_loss:
@@ -1809,6 +1826,8 @@ def train(config: TrainingConfig):
                     state.best_ppl = float('inf')
                 if not hasattr(state, 'spike_count'):
                     state.spike_count = 0
+                if not hasattr(state, 'lr_scale'):
+                    state.lr_scale = 1.0  # Persistent LR multiplier
 
                 current_ppl = val_metrics['val_perplexity']
                 if current_ppl < state.best_ppl:
@@ -1818,8 +1837,8 @@ def train(config: TrainingConfig):
                     if current_ppl > state.best_ppl * 2.0:
                         # MAJOR SPIKE (>2x): Backtrack + 0.7x LR + Reset momentum
                         state.spike_count += 1
-                        old_lr = optimizer.param_groups[0]['lr']
-                        new_lr = old_lr * 0.7
+                        old_scale = state.lr_scale
+                        state.lr_scale *= 0.7  # Persistent reduction
 
                         # Try to backtrack to best checkpoint
                         best_ckpt = checkpoint_dir / "best.pt"
@@ -1831,15 +1850,13 @@ def train(config: TrainingConfig):
                         # Reset optimizer momentum (clear bad gradients)
                         optimizer.state = collections.defaultdict(dict)
 
-                        for param_group in optimizer.param_groups:
-                            param_group['lr'] = new_lr
-                        logger.info(f"  🚨 MAJOR PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*2.0)! Backtrack + LR: {old_lr:.2e} → {new_lr:.2e} + Momentum reset")
+                        logger.info(f"  🚨 MAJOR PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*2.0)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
 
                     elif current_ppl > state.best_ppl * 1.5:
                         # MODERATE SPIKE (>1.5x): Backtrack 200 steps + 0.7x LR + Reset momentum
                         state.spike_count += 1
-                        old_lr = optimizer.param_groups[0]['lr']
-                        new_lr = old_lr * 0.7
+                        old_scale = state.lr_scale
+                        state.lr_scale *= 0.7  # Persistent reduction
 
                         # Try to backtrack 200 steps (2 eval intervals)
                         backtrack_steps = 200
@@ -1858,25 +1875,19 @@ def train(config: TrainingConfig):
                         # Reset optimizer momentum
                         optimizer.state = collections.defaultdict(dict)
 
-                        for param_group in optimizer.param_groups:
-                            param_group['lr'] = new_lr
-                        logger.info(f"  ⚠️ PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*1.5)! Backtrack + LR: {old_lr:.2e} → {new_lr:.2e} + Momentum reset")
+                        logger.info(f"  ⚠️ PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*1.5)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
 
                     elif current_ppl > state.best_ppl * 1.3:
                         # MINOR SPIKE (>1.3x): 0.85x LR only (no reset)
-                        old_lr = optimizer.param_groups[0]['lr']
-                        new_lr = old_lr * 0.85
-                        for param_group in optimizer.param_groups:
-                            param_group['lr'] = new_lr
-                        logger.info(f"  ⚡ Minor PPL increase ({current_ppl:.1f} > {state.best_ppl:.1f}*1.3). LR: {old_lr:.2e} → {new_lr:.2e}")
+                        old_scale = state.lr_scale
+                        state.lr_scale *= 0.85  # Persistent reduction
+                        logger.info(f"  ⚡ Minor PPL increase ({current_ppl:.1f} > {state.best_ppl:.1f}*1.3). LR scale: {old_scale:.3f} → {state.lr_scale:.3f}")
 
                     elif current_ppl > state.best_ppl * 1.2:
                         # EARLY WARNING (>1.2x): 0.9x LR only (gentlest intervention)
-                        old_lr = optimizer.param_groups[0]['lr']
-                        new_lr = old_lr * 0.9
-                        for param_group in optimizer.param_groups:
-                            param_group['lr'] = new_lr
-                        logger.info(f"  📉 Early warning ({current_ppl:.1f} > {state.best_ppl:.1f}*1.2). LR: {old_lr:.2e} → {new_lr:.2e}")
+                        old_scale = state.lr_scale
+                        state.lr_scale *= 0.9  # Persistent reduction
+                        logger.info(f"  📉 Early warning ({current_ppl:.1f} > {state.best_ppl:.1f}*1.2). LR scale: {old_scale:.3f} → {state.lr_scale:.3f}")
 
                 # Track best
                 if val_metrics['val_loss'] < state.best_val_loss:
