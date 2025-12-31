@@ -7,6 +7,7 @@ Train SymbolU models with support for:
 1. SymbolU12 with Bhava (standard attention + 12D ontological + 144D bhava)
 2. Phase Attention (O(n) complexity)
 3. Hybrid (Local + Phase attention)
+4. Gen 2: Hierarchical Complex Bhava (3-tier phase rotation)
 
 This script unifies all architectures under a single training interface.
 
@@ -24,8 +25,12 @@ Usage:
     python train_unified_llm.py --model_type hybrid --model_size small \
         --dataset wikitext103 --max_steps 1000 --local_backend unfold
 
+    # Train Gen 2 model (Hierarchical Complex Bhava)
+    python train_unified_llm.py --model_type gen2 --model_size small \
+        --dataset wikitext103 --max_steps 1000
+
     # Long context training (16K/32K)
-    python train_unified_llm.py --model_type ontological --model_size small \
+    python train_unified_llm.py --model_type gen2 --model_size small \
         --max_seq_len 16384 --gradient_checkpointing --batch_size 1
 
 Author: SymbolU Team
@@ -83,6 +88,20 @@ try:
 except ImportError as e:
     ONTOLOGICAL_AVAILABLE = False
     print(f"Warning: Ontological models not available: {e}")
+
+# Import Gen 2 models (Hierarchical Complex Bhava)
+try:
+    from symbolu.ontological.symbolu12_gen2 import (
+        SymbolU12Gen2,
+        SymbolU12Gen2Config,
+        create_symbolu12_gen2_small,
+        create_symbolu12_gen2_medium,
+        create_symbolu12_gen2_large,
+    )
+    GEN2_AVAILABLE = True
+except ImportError as e:
+    GEN2_AVAILABLE = False
+    print(f"Warning: Gen 2 models not available: {e}")
 
 
 # =============================================================================
@@ -341,6 +360,27 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             alpha_phase=config.alpha_phase,
         )
 
+    elif config.model_type == "gen2":
+        if not GEN2_AVAILABLE:
+            raise ImportError("Gen 2 models not available. Check imports.")
+
+        # Create SymbolU12 Gen 2 (Hierarchical Complex Bhava)
+        gen2_config = SymbolU12Gen2Config(
+            vocab_size=config.vocab_size,
+            embed_dim=preset["embed_dim"],
+            num_heads=preset["num_heads"],
+            num_layers=preset["num_layers"],
+            complex_dim=64,  # Complex embedding dimension
+            max_seq_len=config.max_seq_len,
+            dropout=config.dropout,
+            ffn_mult=preset["ff_dim"] / preset["embed_dim"],
+        )
+
+        model = SymbolU12Gen2(gen2_config)
+        print(f"\n  [Gen 2] Hierarchical Complex Bhava enabled")
+        print(f"  [Gen 2] Complex dim: {gen2_config.complex_dim}")
+        print(f"  [Gen 2] Hierarchy: 3-tier phase rotation")
+
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
 
@@ -579,6 +619,15 @@ def train(config: UnifiedTrainingConfig):
             if config.model_type == "ontological":
                 outputs = model(x)
                 loss, metrics = compute_ontological_loss(outputs, y, config)
+            elif config.model_type == "gen2":
+                outputs = model(x, labels=y)
+                loss = outputs['loss']
+                metrics = {
+                    'coherence': outputs['coherence'].mean().item(),
+                    'level_1_coh': outputs['level_coherences'][:, 0].mean().item(),
+                    'level_2_coh': outputs['level_coherences'][:, 1].mean().item(),
+                    'level_3_coh': outputs['level_coherences'][:, 2].mean().item(),
+                }
             else:
                 # Phase or Hybrid - handle both tensor and dict returns
                 output = model(x)
@@ -658,6 +707,13 @@ def train(config: UnifiedTrainingConfig):
                         log_msg += f" | Coh: {metrics['coherence']:.3f}"
                     if "onto_entropy" in metrics:
                         log_msg += f" | Ent: {metrics['onto_entropy']:.2f}"
+
+                # Add Gen 2 hierarchical metrics
+                if config.model_type == "gen2":
+                    if "coherence" in metrics:
+                        log_msg += f" | Coh: {metrics['coherence']:.3f}"
+                    if "level_3_coh" in metrics:
+                        log_msg += f" | L3: {metrics['level_3_coh']:.2f}"
 
                 # Add alpha for phase/hybrid models
                 if config.model_type in ("phase", "hybrid"):
@@ -754,6 +810,10 @@ def evaluate(
                 if config.model_type == "ontological":
                     outputs = model(x)
                     loss, metrics = compute_ontological_loss(outputs, y, config)
+                elif config.model_type == "gen2":
+                    outputs = model(x, labels=y)
+                    loss = outputs['loss']
+                    metrics = {'coherence': outputs['coherence'].mean().item()}
                 else:
                     # Phase or Hybrid - handle both tensor and dict returns
                     output = model(x)
@@ -803,8 +863,8 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid"],
-                       help="Model architecture type")
+                       choices=["ontological", "phase", "hybrid", "gen2"],
+                       help="Model architecture type (gen2 = hierarchical complex Bhava)")
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large"],
                        help="Model size preset")
