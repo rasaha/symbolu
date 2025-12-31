@@ -7,6 +7,7 @@ Train SymbolU models with support for:
 1. SymbolU12 with Bhava (standard attention + 12D ontological + 144D bhava)
 2. Phase Attention (O(n) complexity)
 3. Hybrid (Local + Phase attention)
+4. Gen 2: Hierarchical Complex Bhava (3-tier phase rotation)
 
 This script unifies all architectures under a single training interface.
 
@@ -24,8 +25,12 @@ Usage:
     python train_unified_llm.py --model_type hybrid --model_size small \
         --dataset wikitext103 --max_steps 1000 --local_backend unfold
 
+    # Train Gen 2 model (Hierarchical Complex Bhava)
+    python train_unified_llm.py --model_type gen2 --model_size small \
+        --dataset wikitext103 --max_steps 1000
+
     # Long context training (16K/32K)
-    python train_unified_llm.py --model_type ontological --model_size small \
+    python train_unified_llm.py --model_type gen2 --model_size small \
         --max_seq_len 16384 --gradient_checkpointing --batch_size 1
 
 Author: SymbolU Team
@@ -33,6 +38,7 @@ Date: December 2025
 """
 
 import argparse
+import collections
 import json
 import logging
 import math
@@ -83,6 +89,20 @@ except ImportError as e:
     ONTOLOGICAL_AVAILABLE = False
     print(f"Warning: Ontological models not available: {e}")
 
+# Import Gen 2 models (Hierarchical Complex Bhava)
+try:
+    from symbolu.ontological.symbolu12_gen2 import (
+        SymbolU12Gen2,
+        SymbolU12Gen2Config,
+        create_symbolu12_gen2_small,
+        create_symbolu12_gen2_medium,
+        create_symbolu12_gen2_large,
+    )
+    GEN2_AVAILABLE = True
+except ImportError as e:
+    GEN2_AVAILABLE = False
+    print(f"Warning: Gen 2 models not available: {e}")
+
 
 # =============================================================================
 # PERFORMANCE OPTIMIZATIONS
@@ -120,6 +140,11 @@ class UnifiedTrainingConfig:
     local_backend: str = "auto"
     alpha_local: float = 0.8
     alpha_phase: float = 0.2
+
+    # Alpha decay schedule (for phase/hybrid attention)
+    alpha_phase_start: float = 0.6
+    alpha_phase_end: float = 0.4
+    alpha_decay_steps: int = 10000
 
     # Ontological-specific parameters
     bhava_embed_dim: int = 128
@@ -335,6 +360,27 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             alpha_phase=config.alpha_phase,
         )
 
+    elif config.model_type == "gen2":
+        if not GEN2_AVAILABLE:
+            raise ImportError("Gen 2 models not available. Check imports.")
+
+        # Create SymbolU12 Gen 2 (Hierarchical Complex Bhava)
+        gen2_config = SymbolU12Gen2Config(
+            vocab_size=config.vocab_size,
+            embed_dim=preset["embed_dim"],
+            num_heads=preset["num_heads"],
+            num_layers=preset["num_layers"],
+            complex_dim=64,  # Complex embedding dimension
+            max_seq_len=config.max_seq_len,
+            dropout=config.dropout,
+            ffn_mult=preset["ff_dim"] / preset["embed_dim"],
+        )
+
+        model = SymbolU12Gen2(gen2_config)
+        print(f"\n  [Gen 2] Hierarchical Complex Bhava enabled")
+        print(f"  [Gen 2] Complex dim: {gen2_config.complex_dim}")
+        print(f"  [Gen 2] Hierarchy: 3-tier phase rotation")
+
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
 
@@ -348,6 +394,32 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
                     module.gradient_checkpointing = True
 
     return model.to(device)
+
+
+def update_alpha_schedule(model: nn.Module, step: int, config: UnifiedTrainingConfig) -> float:
+    """
+    Update alpha_phase for HybridAttentionLayer modules based on decay schedule.
+
+    Returns current alpha_phase value.
+    """
+    if config.model_type not in ("phase", "hybrid"):
+        return config.alpha_phase  # No decay for ontological
+
+    # Calculate current alpha based on linear decay
+    if step >= config.alpha_decay_steps:
+        current_alpha = config.alpha_phase_end
+    else:
+        frac = step / config.alpha_decay_steps
+        current_alpha = config.alpha_phase_start + frac * (config.alpha_phase_end - config.alpha_phase_start)
+
+    # Update all HybridAttentionLayer modules
+    for module in model.modules():
+        if hasattr(module, 'alpha_phase') and isinstance(module.alpha_phase, nn.Parameter):
+            module.alpha_phase.data.fill_(current_alpha)
+            if hasattr(module, 'alpha_local'):
+                module.alpha_local.data.fill_(1.0 - current_alpha)
+
+    return current_alpha
 
 
 # =============================================================================
@@ -510,6 +582,8 @@ def train(config: UnifiedTrainingConfig):
     # Training state
     global_step = 0
     best_val_loss = float("inf")
+    best_ppl = float("inf")
+    spike_count = 0
     train_losses = []
 
     # Checkpoint directory
@@ -545,6 +619,15 @@ def train(config: UnifiedTrainingConfig):
             if config.model_type == "ontological":
                 outputs = model(x)
                 loss, metrics = compute_ontological_loss(outputs, y, config)
+            elif config.model_type == "gen2":
+                outputs = model(x, labels=y)
+                loss = outputs['loss']
+                metrics = {
+                    'coherence': outputs['coherence'].mean().item(),
+                    'level_1_coh': outputs['level_coherences'][:, 0].mean().item(),
+                    'level_2_coh': outputs['level_coherences'][:, 1].mean().item(),
+                    'level_3_coh': outputs['level_coherences'][:, 2].mean().item(),
+                }
             else:
                 # Phase or Hybrid - handle both tensor and dict returns
                 output = model(x)
@@ -585,6 +668,9 @@ def train(config: UnifiedTrainingConfig):
             if global_step >= config.warmup_steps:
                 scheduler.step()
 
+            # Update alpha schedule for phase/hybrid models
+            current_alpha = update_alpha_schedule(model, global_step, config)
+
             global_step += 1
             avg_loss = running_loss / config.gradient_accumulation
             train_losses.append(avg_loss)
@@ -622,13 +708,61 @@ def train(config: UnifiedTrainingConfig):
                     if "onto_entropy" in metrics:
                         log_msg += f" | Ent: {metrics['onto_entropy']:.2f}"
 
+                # Add Gen 2 hierarchical metrics
+                if config.model_type == "gen2":
+                    if "coherence" in metrics:
+                        log_msg += f" | Coh: {metrics['coherence']:.3f}"
+                    if "level_3_coh" in metrics:
+                        log_msg += f" | L3: {metrics['level_3_coh']:.2f}"
+
+                # Add alpha for phase/hybrid models
+                if config.model_type in ("phase", "hybrid"):
+                    log_msg += f" | α_phase: {current_alpha:.2f}"
+
                 print(log_msg)
                 step_start_time = time.time()
 
             # Evaluation
             if global_step % config.eval_every == 0:
                 val_loss, val_metrics = evaluate(model, val_loader, device, config, autocast_dtype)
-                print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_metrics['ppl']:.2f}")
+                val_ppl = val_metrics['ppl']
+                print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
+
+                # Adaptive LR on PPL spike
+                if val_ppl < best_ppl:
+                    best_ppl = val_ppl
+                elif global_step > config.warmup_steps:
+                    if val_ppl > best_ppl * 2.0:
+                        # MAJOR SPIKE: Backtrack + 0.7x LR + momentum reset
+                        spike_count += 1
+                        old_lr = optimizer.param_groups[0]['lr']
+                        new_lr = old_lr * 0.7
+                        # Try to load best checkpoint
+                        best_ckpt = ckpt_dir / "best.pt"
+                        if best_ckpt.exists():
+                            print(f"  🔄 MAJOR SPIKE! Backtracking to best checkpoint...")
+                            ckpt = torch.load(best_ckpt, map_location=device)
+                            model.load_state_dict(ckpt['model_state_dict'])
+                        optimizer.state = collections.defaultdict(dict)
+                        for pg in optimizer.param_groups:
+                            pg['lr'] = new_lr
+                        print(f"  🚨 MAJOR PPL spike ({val_ppl:.1f} > {best_ppl:.1f}*2)! Backtrack + LR: {old_lr:.2e} → {new_lr:.2e} + Momentum reset")
+                    elif val_ppl > best_ppl * 1.5:
+                        # MODERATE SPIKE: 0.7x LR + momentum reset
+                        spike_count += 1
+                        old_lr = optimizer.param_groups[0]['lr']
+                        new_lr = old_lr * 0.7
+                        optimizer.state = collections.defaultdict(dict)
+                        for pg in optimizer.param_groups:
+                            pg['lr'] = new_lr
+                        print(f"  ⚠️ PPL spike ({val_ppl:.1f} > {best_ppl:.1f}*1.5)! LR: {old_lr:.2e} → {new_lr:.2e} + Momentum reset")
+                    elif val_ppl > best_ppl * 1.3:
+                        # MINOR SPIKE: 0.85x LR only
+                        old_lr = optimizer.param_groups[0]['lr']
+                        new_lr = old_lr * 0.85
+                        for pg in optimizer.param_groups:
+                            pg['lr'] = new_lr
+                        print(f"  ⚡ Minor PPL increase ({val_ppl:.1f} > {best_ppl:.1f}*1.3). LR: {old_lr:.2e} → {new_lr:.2e}")
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
@@ -676,6 +810,10 @@ def evaluate(
                 if config.model_type == "ontological":
                     outputs = model(x)
                     loss, metrics = compute_ontological_loss(outputs, y, config)
+                elif config.model_type == "gen2":
+                    outputs = model(x, labels=y)
+                    loss = outputs['loss']
+                    metrics = {'coherence': outputs['coherence'].mean().item()}
                 else:
                     # Phase or Hybrid - handle both tensor and dict returns
                     output = model(x)
@@ -725,8 +863,8 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid"],
-                       help="Model architecture type")
+                       choices=["ontological", "phase", "hybrid", "gen2"],
+                       help="Model architecture type (gen2 = hierarchical complex Bhava)")
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large"],
                        help="Model size preset")
@@ -761,6 +899,20 @@ def main():
                        help="LocalAttention backend")
     parser.add_argument("--window_size", type=int, default=256,
                        help="Local attention window size")
+    parser.add_argument("--local_layers", type=int, default=4,
+                       help="Number of local-only attention layers (hybrid mode)")
+    parser.add_argument("--alpha_local", type=float, default=0.8,
+                       help="Weight for local attention in hybrid layers")
+    parser.add_argument("--alpha_phase", type=float, default=0.2,
+                       help="Weight for phase attention in hybrid layers")
+
+    # Alpha decay schedule (for phase/hybrid attention)
+    parser.add_argument("--alpha_phase_start", type=float, default=0.6,
+                       help="Initial alpha_phase value (decays over time)")
+    parser.add_argument("--alpha_phase_end", type=float, default=0.4,
+                       help="Final alpha_phase value after decay")
+    parser.add_argument("--alpha_decay_steps", type=int, default=10000,
+                       help="Steps over which alpha_phase decays from start to end")
 
     # Ontological-specific
     parser.add_argument("--lambda_bhava", type=float, default=0.1,
