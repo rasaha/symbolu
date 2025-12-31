@@ -268,7 +268,7 @@ class TrainingConfig:
     # then Phase layers join in for long-range structure
     alpha_phase_start: float = 0.0   # Initial: Phase attention OFF (training wheels)
     alpha_phase_end: float = 0.6     # Final: Full phase attention
-    alpha_warmup_steps: int = 5000   # Steps to fade in phase attention
+    alpha_warmup_steps: int = 10000  # Steps to fade in phase attention (V8: extended runway)
 
     # Training hyperparameters
     batch_size: int = 16
@@ -288,7 +288,7 @@ class TrainingConfig:
     # The Q, K, V projections in attention are sensitive to high LR (softmax saturation).
     # Apply a "cooling factor" to attention params while keeping phase/MLP at full LR.
     # 0.5 is balanced; use 0.3 for "safety first" during instability
-    attn_cooling_factor: float = 0.5  # Multiply attention layer LR by this factor
+    attn_cooling_factor: float = 0.3  # Multiply attention layer LR by this factor (V8: more cooling)
 
     # Learning rate schedule
     lr_scheduler: str = "cosine"  # cosine, linear, constant
@@ -2159,8 +2159,24 @@ def train(config: TrainingConfig):
                     state.best_loss = current_loss
                     state.best_ppl = current_ppl
                     state.consecutive_regressions = 0  # Reset on improvement
-                elif state.step > config.warmup_steps // 2:
+                elif state.step >= config.alpha_warmup_steps:
                     # =================================================================
+                    # V8 "LET IT COOK" STRATEGY:
+                    # Control logic DISABLED during alpha warmup phase.
+                    #
+                    # During alpha fade-in (0→0.6), the loss landscape is shifting as
+                    # Phase layers gradually take over from Quadratic layers. This
+                    # causes normal "coordinate drift" jitter that looks like spikes.
+                    #
+                    # Intervening during this phase causes:
+                    # - LR collapse (repeated 0.8x/0.85x scaling)
+                    # - Momentum destruction (repeated resets)
+                    # - Degenerate patterns ("ssssss", "the the the")
+                    #
+                    # After alpha is stable (step >= alpha_warmup_steps), control
+                    # logic re-enables for genuine instability detection.
+                    # =================================================================
+                    #
                     # LOSS-BASED SPIKE DETECTION with CONSECUTIVE REGRESSION REQUIREMENT
                     # - Use absolute loss delta (not PPL ratio)
                     # - Require 2 consecutive regressions before backtracking
@@ -2271,6 +2287,20 @@ def train(config: TrainingConfig):
                         else:
                             # Loss stable or decreasing - reset patience
                             state.trend_patience = 0
+                else:
+                    # =================================================================
+                    # ALPHA WARMUP PHASE: Observation only, no intervention
+                    # During this phase, we just watch and log without taking action.
+                    # The model is migrating from Quadratic to hybrid representation.
+                    # =================================================================
+                    loss_delta = current_loss - state.best_loss
+                    steps_remaining = config.alpha_warmup_steps - state.step
+                    if loss_delta > 0.15:
+                        # Would have been a spike, but we're in observation mode
+                        logger.info(
+                            f"  🔍 [OBSERVE] Loss Δ={loss_delta:.3f} (would trigger control). "
+                            f"Alpha warmup: {steps_remaining} steps remaining. Letting it cook..."
+                        )
 
                 # Track best
                 if val_metrics['val_loss'] < state.best_val_loss:
@@ -2399,7 +2429,7 @@ def parse_args() -> TrainingConfig:
                        help="Initial alpha_phase (0.0 = phase OFF, training wheels)")
     parser.add_argument("--alpha_phase_end", type=float, default=0.6,
                        help="Final alpha_phase after fade-in")
-    parser.add_argument("--alpha_warmup_steps", type=int, default=5000,
+    parser.add_argument("--alpha_warmup_steps", type=int, default=10000,
                        help="Steps to fade in phase attention (0→0.6)")
 
     # Training
@@ -2419,7 +2449,7 @@ def parse_args() -> TrainingConfig:
                        help="Weight decay")
     parser.add_argument("--max_grad_norm", type=float, default=1.0,
                        help="Gradient clipping norm")
-    parser.add_argument("--attn_cooling_factor", type=float, default=0.5,
+    parser.add_argument("--attn_cooling_factor", type=float, default=0.3,
                        help="LLRD cooling factor for attention layers (0.5 = 50%% of base LR, 0.3 = safety first)")
 
     # LR schedule
