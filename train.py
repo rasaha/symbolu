@@ -356,6 +356,14 @@ class TrainingConfig:
     # Seed
     seed: int = 42
 
+    # Quality Sampling (periodic generation to monitor training quality)
+    sample_every: int = 500  # Generate samples every N steps (0 = disabled)
+    sample_prompts: tuple = (
+        "The history of the Roman Empire began when",
+        "In computer science, algorithms are",
+        "The weather today is expected to be",
+    )
+
 
 # Model size presets
 MODEL_PRESETS = {
@@ -1615,6 +1623,114 @@ def evaluate(
     }
 
 
+@torch.no_grad()
+def generate_sample(
+    model: PhaseTransformer,
+    tokenizer,
+    prompt: str,
+    device: torch.device,
+    max_new_tokens: int = 50,
+    temperature: float = 0.8,
+    top_p: float = 0.9,
+) -> str:
+    """
+    Generate text from a prompt for quality monitoring.
+
+    Uses nucleus (top-p) sampling with temperature for diverse outputs.
+    """
+    model.eval()
+
+    # Encode prompt
+    input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+
+    # Generate tokens one by one
+    generated = input_ids.clone()
+
+    for _ in range(max_new_tokens):
+        # Forward pass
+        outputs = model(generated)
+
+        # Handle different output formats
+        if isinstance(outputs, dict):
+            logits = outputs['logits']
+        elif isinstance(outputs, torch.Tensor):
+            logits = outputs
+        else:
+            logits = outputs[0]
+
+        # Get next token logits
+        next_logits = logits[:, -1, :] / temperature
+
+        # Top-p (nucleus) sampling
+        sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
+        cumsum = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+        # Remove tokens with cumulative probability above threshold
+        sorted_indices_to_remove = cumsum > top_p
+        sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+        sorted_indices_to_remove[:, 0] = False
+
+        # Set removed tokens to -inf
+        indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+        next_logits[indices_to_remove] = float('-inf')
+
+        # Sample
+        probs = F.softmax(next_logits, dim=-1)
+        next_token = torch.multinomial(probs, num_samples=1)
+
+        # Append and check for EOS
+        generated = torch.cat([generated, next_token], dim=1)
+
+        # Stop on common end tokens
+        if next_token.item() in [tokenizer.eos_token_id, tokenizer.encode('\n')[0]]:
+            break
+
+    # Decode only the generated part
+    generated_text = tokenizer.decode(generated[0, input_ids.shape[1]:], skip_special_tokens=True)
+
+    model.train()
+    return generated_text
+
+
+def run_quality_samples(
+    model: PhaseTransformer,
+    tokenizer,
+    config: TrainingConfig,
+    device: torch.device,
+    step: int,
+    logger,
+):
+    """
+    Generate sample outputs to monitor training quality.
+
+    This provides a qualitative check that the model is learning
+    meaningful language patterns, not just minimizing perplexity.
+    """
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info(f"  📝 QUALITY SAMPLES (Step {step})")
+    logger.info("=" * 60)
+
+    for prompt in config.sample_prompts:
+        try:
+            generated = generate_sample(
+                model, tokenizer, prompt, device,
+                max_new_tokens=50,
+                temperature=0.8,
+                top_p=0.9,
+            )
+            # Clean up and truncate for display
+            generated = generated.strip().replace('\n', ' ')[:200]
+            logger.info(f"  Prompt: \"{prompt}\"")
+            logger.info(f"  Output: \"{generated}\"")
+            logger.info("")
+        except Exception as e:
+            logger.warning(f"  Sampling failed for prompt '{prompt[:30]}...': {e}")
+
+    logger.info("=" * 60)
+    logger.info("")
+
+
 def save_checkpoint(
     model: PhaseTransformer,
     optimizer: AdamW,
@@ -1794,6 +1910,9 @@ def train(config: TrainingConfig):
     train_loader, val_loader = create_dataloaders(config)
     logger.info(f"Train batches: {len(train_loader):,}")
     logger.info(f"Val batches: {len(val_loader):,}")
+
+    # Load tokenizer for quality sampling
+    tokenizer = load_tokenizer(config) if config.sample_every > 0 else None
 
     # Wandb
     if config.wandb and WANDB_AVAILABLE:
@@ -2158,6 +2277,10 @@ def train(config: TrainingConfig):
                     str(latest_path)
                 )
 
+            # Quality sampling - generate text to monitor training progress
+            if config.sample_every > 0 and state.step % config.sample_every == 0 and tokenizer is not None:
+                run_quality_samples(model, tokenizer, config, device, state.step, logger)
+
             # Reset throughput timer AFTER eval/checkpoint to exclude their time
             if state.step % config.log_every == 0:
                 step_start_time = time.time()
@@ -2295,6 +2418,8 @@ def parse_args() -> TrainingConfig:
                        help="Evaluate every N steps")
     parser.add_argument("--log_every", type=int, default=100,
                        help="Log every N steps")
+    parser.add_argument("--sample_every", type=int, default=500,
+                       help="Generate quality samples every N steps (0 = disabled)")
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext2",
