@@ -1794,6 +1794,21 @@ def train(config: TrainingConfig):
                     f"Val PPL: {val_metrics['val_perplexity']:.2f}"
                 )
 
+                # Auto-reduce LR on PPL spike (50% worse than best)
+                # Track best PPL (initialize if not set)
+                if not hasattr(state, 'best_ppl'):
+                    state.best_ppl = float('inf')
+
+                current_ppl = val_metrics['val_perplexity']
+                if current_ppl < state.best_ppl:
+                    state.best_ppl = current_ppl
+                elif current_ppl > state.best_ppl * 1.5 and state.step > config.warmup_steps // 2:
+                    old_lr = optimizer.param_groups[0]['lr']
+                    new_lr = old_lr * 0.5
+                    for param_group in optimizer.param_groups:
+                        param_group['lr'] = new_lr
+                    logger.info(f"  ⚠️ PPL spike detected ({current_ppl:.1f} > {state.best_ppl:.1f}*1.5)! Reducing LR: {old_lr:.2e} → {new_lr:.2e}")
+
                 # Track best
                 if val_metrics['val_loss'] < state.best_val_loss:
                     state.best_val_loss = val_metrics['val_loss']
