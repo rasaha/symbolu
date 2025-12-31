@@ -288,7 +288,8 @@ class TrainingConfig:
     # The Q, K, V projections in attention are sensitive to high LR (softmax saturation).
     # Apply a "cooling factor" to attention params while keeping phase/MLP at full LR.
     # 0.5 is balanced; use 0.3 for "safety first" during instability
-    attn_cooling_factor: float = 0.3  # Multiply attention layer LR by this factor (V8: more cooling)
+    attn_cooling_factor: float = 1.0  # Local/Quadratic attention LR multiplier (baseline, full LR)
+    phase_cooling_factor: float = 0.2  # Phase attention LR multiplier (sensitive, needs strong cooling)
 
     # Learning rate schedule
     lr_scheduler: str = "cosine"  # cosine, linear, constant
@@ -697,64 +698,92 @@ def update_alpha_schedule(
 
 def create_optimizer(model: nn.Module, config: TrainingConfig) -> AdamW:
     """
-    Create AdamW optimizer with LLRD (Layer-wise Learning Rate Decay).
+    Create AdamW optimizer with TWO-TIER LLRD (Layer-wise Learning Rate Decay).
 
-    Separates parameters into 4 groups:
-    1. Stable params with decay (embeddings, MLP, phase-specific params)
-    2. Stable params without decay (bias, norm)
-    3. Cooled attention params with decay (q_proj, k_proj, v_proj, o_proj, out_proj)
-    4. Cooled attention params without decay
+    Separates parameters into 6 groups for hybrid Local+Phase architecture:
+    1. Stable params with decay (embeddings, MLP, non-attention params) - FULL LR (1.0x)
+    2. Stable params without decay (bias, norm) - FULL LR (1.0x)
+    3. Local/Quadratic attention params with decay - BASELINE LR (1.0x)
+    4. Local/Quadratic attention params without decay - BASELINE LR (1.0x)
+    5. Phase attention params with decay - STRONG cooling (0.2x)
+    6. Phase attention params without decay - STRONG cooling (0.2x)
 
-    The attention cooling factor (default 0.8x) dampens the "twitchy" Q/K/V projections
-    while keeping phase/MLP layers at full LR. This prevents softmax saturation spikes.
+    The Two-Tier approach recognizes that:
+    - Local/Quadratic (O(n²)) layers are the "heavy lifters" - stable, can handle full LR
+    - Phase (O(n)) layers are "precision rotators" - sensitive, need strong cooling
     """
 
-    # Attention parameter patterns - these get cooled LR
+    # Attention parameter patterns
     ATTN_PATTERNS = ["q_proj", "k_proj", "v_proj", "o_proj", "out_proj"]
 
-    def is_attention_param(name: str) -> bool:
-        """Check if parameter is an attention projection (sensitive to high LR)."""
+    def get_param_tier(name: str) -> str:
+        """
+        Classify parameter into tier: 'stable', 'local_attn', or 'phase_attn'.
+        """
         name_lower = name.lower()
-        return any(pattern in name_lower for pattern in ATTN_PATTERNS)
+
+        # Check if it's an attention parameter
+        is_attn = any(pattern in name_lower for pattern in ATTN_PATTERNS)
+        if not is_attn:
+            return 'stable'
+
+        # Distinguish between local_attn and phase_attn
+        if 'phase_attn' in name_lower or 'phase_attention' in name_lower:
+            return 'phase_attn'
+        elif 'local_attn' in name_lower or 'local_attention' in name_lower:
+            return 'local_attn'
+        else:
+            # Default attention params (e.g., in non-hybrid models) get local tier
+            return 'local_attn'
 
     def is_no_decay_param(name: str) -> bool:
         """Check if parameter should skip weight decay."""
         return 'bias' in name or 'norm' in name or 'embed' in name
 
-    # Separate into 4 groups
+    # Separate into 6 groups
     stable_decay_params = []
     stable_no_decay_params = []
-    cooled_decay_params = []
-    cooled_no_decay_params = []
+    local_attn_decay_params = []
+    local_attn_no_decay_params = []
+    phase_attn_decay_params = []
+    phase_attn_no_decay_params = []
 
     # Track parameter counts for logging
     stable_param_count = 0
-    cooled_param_count = 0
+    local_attn_param_count = 0
+    phase_attn_param_count = 0
 
     for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
 
         num_params = param.numel()
+        tier = get_param_tier(name)
+        no_decay = is_no_decay_param(name)
 
-        if is_attention_param(name):
-            # Attention parameters - apply cooling factor
-            cooled_param_count += num_params
-            if is_no_decay_param(name):
-                cooled_no_decay_params.append(param)
-            else:
-                cooled_decay_params.append(param)
-        else:
-            # Stable parameters - full LR
+        if tier == 'stable':
             stable_param_count += num_params
-            if is_no_decay_param(name):
+            if no_decay:
                 stable_no_decay_params.append(param)
             else:
                 stable_decay_params.append(param)
+        elif tier == 'local_attn':
+            local_attn_param_count += num_params
+            if no_decay:
+                local_attn_no_decay_params.append(param)
+            else:
+                local_attn_decay_params.append(param)
+        else:  # phase_attn
+            phase_attn_param_count += num_params
+            if no_decay:
+                phase_attn_no_decay_params.append(param)
+            else:
+                phase_attn_decay_params.append(param)
 
-    # Compute LRs
+    # Compute LRs for each tier
     base_lr = config.learning_rate
-    cooled_lr = base_lr * config.attn_cooling_factor
+    local_lr = base_lr * config.attn_cooling_factor    # Mild cooling (0.5x)
+    phase_lr = base_lr * config.phase_cooling_factor   # Strong cooling (0.2x)
 
     param_groups = [
         {
@@ -770,16 +799,28 @@ def create_optimizer(model: nn.Module, config: TrainingConfig) -> AdamW:
             "name": "stable_no_decay",
         },
         {
-            "params": cooled_decay_params,
-            "lr": cooled_lr,
+            "params": local_attn_decay_params,
+            "lr": local_lr,
             "weight_decay": config.weight_decay,
-            "name": "cooled_attention",
+            "name": "local_attn",
         },
         {
-            "params": cooled_no_decay_params,
-            "lr": cooled_lr,
+            "params": local_attn_no_decay_params,
+            "lr": local_lr,
             "weight_decay": 0.0,
-            "name": "cooled_attn_no_decay",
+            "name": "local_attn_no_decay",
+        },
+        {
+            "params": phase_attn_decay_params,
+            "lr": phase_lr,
+            "weight_decay": config.weight_decay,
+            "name": "phase_attn",
+        },
+        {
+            "params": phase_attn_no_decay_params,
+            "lr": phase_lr,
+            "weight_decay": 0.0,
+            "name": "phase_attn_no_decay",
         },
     ]
 
@@ -793,11 +834,12 @@ def create_optimizer(model: nn.Module, config: TrainingConfig) -> AdamW:
         eps=config.eps,
     )
 
-    # Log the LLRD configuration
+    # Log the Two-Tier LLRD configuration
     logger = logging.getLogger(__name__)
-    logger.info(f"LLRD Optimizer Groups:")
-    logger.info(f"  Stable context: {stable_param_count/1e6:.1f}M params @ LR {base_lr:.2e}")
-    logger.info(f"  Cooled attention: {cooled_param_count/1e6:.1f}M params @ LR {cooled_lr:.2e} ({config.attn_cooling_factor}x)")
+    logger.info(f"Two-Tier LLRD Optimizer Groups:")
+    logger.info(f"  Stable (MLP/embed): {stable_param_count/1e6:.1f}M params @ LR {base_lr:.2e} (1.0x)")
+    logger.info(f"  Local Attention:    {local_attn_param_count/1e6:.1f}M params @ LR {local_lr:.2e} ({config.attn_cooling_factor}x)")
+    logger.info(f"  Phase Attention:    {phase_attn_param_count/1e6:.1f}M params @ LR {phase_lr:.2e} ({config.phase_cooling_factor}x)")
 
     return optimizer
 
@@ -1996,13 +2038,14 @@ def train(config: TrainingConfig):
         )
 
         # Apply persistent lr_scale after scheduler updates LR
-        # LLRD-aware: preserve the cooling factor ratio between groups
+        # Two-Tier LLRD: preserve the cooling factor ratio between groups
         base_lr = scheduler.get_last_lr()[0]
         for param_group in optimizer.param_groups:
             group_name = param_group.get('name', '')
-            # Cooled groups get base_lr * cooling_factor * lr_scale
-            # Stable groups get base_lr * lr_scale
-            if 'cooled' in group_name:
+            # Three tiers: stable (1.0x), local_attn (0.5x), phase_attn (0.2x)
+            if 'phase_attn' in group_name:
+                param_group['lr'] = base_lr * config.phase_cooling_factor * state.lr_scale
+            elif 'local_attn' in group_name:
                 param_group['lr'] = base_lr * config.attn_cooling_factor * state.lr_scale
             else:
                 param_group['lr'] = base_lr * state.lr_scale
@@ -2026,8 +2069,10 @@ def train(config: TrainingConfig):
                 elapsed = time.time() - step_start_time
                 tokens_per_sec = (config.log_every * config.batch_size * config.max_seq_len * config.gradient_accumulation) / elapsed
                 base_lr = scheduler.get_last_lr()[0]
-                stable_lr = base_lr * state.lr_scale  # Stable (phase/MLP) LR
-                cooled_lr = stable_lr * config.attn_cooling_factor  # Attention LR
+                # Three-tier LRs: Stable (1.0x) > Local (0.5x) > Phase (0.2x)
+                stable_lr = base_lr * state.lr_scale
+                local_lr = stable_lr * config.attn_cooling_factor
+                phase_lr = stable_lr * config.phase_cooling_factor
 
                 # Build log message with coherence metrics if available
                 log_msg = (
@@ -2038,11 +2083,11 @@ def train(config: TrainingConfig):
                     f"Tok/s: {tokens_per_sec:.0f}"
                 )
 
-                # Show lr_scale and cooled LR if not at defaults
+                # Show lr_scale and tier LRs if not at defaults
                 if state.lr_scale < 0.99:
                     log_msg += f" | LR_scale: {state.lr_scale:.2f}"
-                if config.attn_cooling_factor < 0.99:
-                    log_msg += f" | Attn_LR: {cooled_lr:.2e}"
+                # Show local/phase LRs (Two-Tier Push)
+                log_msg += f" | Local: {local_lr:.1e} | Phase: {phase_lr:.1e}"
 
                 # Add coherence metrics if enabled (S3, S1-S2, S5)
                 if config.use_coherence_loss and "entropy" in metrics:
@@ -2073,7 +2118,8 @@ def train(config: TrainingConfig):
                         "train/loss": avg_loss,
                         "train/perplexity": math.exp(avg_loss),
                         "train/learning_rate": stable_lr,
-                        "train/attention_lr": cooled_lr,
+                        "train/local_attn_lr": local_lr,
+                        "train/phase_attn_lr": phase_lr,
                         "train/lr_scale": state.lr_scale,
                         "train/tokens_per_sec": tokens_per_sec,
                         "train/total_tokens": state.total_tokens,
@@ -2094,7 +2140,8 @@ def train(config: TrainingConfig):
                     tb_writer.add_scalar("train/loss", avg_loss, state.step)
                     tb_writer.add_scalar("train/perplexity", math.exp(avg_loss), state.step)
                     tb_writer.add_scalar("train/learning_rate", stable_lr, state.step)
-                    tb_writer.add_scalar("train/attention_lr", cooled_lr, state.step)
+                    tb_writer.add_scalar("train/local_attn_lr", local_lr, state.step)
+                    tb_writer.add_scalar("train/phase_attn_lr", phase_lr, state.step)
                     tb_writer.add_scalar("train/lr_scale", state.lr_scale, state.step)
                     tb_writer.add_scalar("train/tokens_per_sec", tokens_per_sec, state.step)
                     # Add coherence metrics
@@ -2449,8 +2496,10 @@ def parse_args() -> TrainingConfig:
                        help="Weight decay")
     parser.add_argument("--max_grad_norm", type=float, default=1.0,
                        help="Gradient clipping norm")
-    parser.add_argument("--attn_cooling_factor", type=float, default=0.3,
-                       help="LLRD cooling factor for attention layers (0.5 = 50%% of base LR, 0.3 = safety first)")
+    parser.add_argument("--attn_cooling_factor", type=float, default=1.0,
+                       help="Local/Quadratic attention LR multiplier (1.0 = baseline, full LR)")
+    parser.add_argument("--phase_cooling_factor", type=float, default=0.2,
+                       help="Phase attention LR multiplier (0.2 = 20%% of base LR, strong cooling)")
 
     # LR schedule
     parser.add_argument("--lr_scheduler", type=str, default="cosine",
