@@ -389,6 +389,79 @@ class TextDataset(Dataset):
 
 
 # =============================================================================
+# LR SCHEDULE: LINEAR WARMUP + COSINE DECAY
+# =============================================================================
+
+def get_lr(step: int, warmup_steps: int, max_steps: int, peak_lr: float, min_lr_ratio: float) -> float:
+    """
+    Compute learning rate with linear warmup + cosine decay.
+
+    Args:
+        step: Current training step
+        warmup_steps: Number of warmup steps
+        max_steps: Total training steps
+        peak_lr: Peak learning rate (after warmup)
+        min_lr_ratio: Minimum LR as ratio of peak (e.g., 0.1 = 10% of peak)
+
+    Returns:
+        Learning rate for this step
+    """
+    min_lr = peak_lr * min_lr_ratio
+
+    if step < warmup_steps:
+        # Linear warmup: 0 -> peak_lr
+        return peak_lr * (step + 1) / warmup_steps
+    elif step >= max_steps:
+        return min_lr
+    else:
+        # Cosine decay: peak_lr -> min_lr
+        decay_steps = max_steps - warmup_steps
+        decay_progress = (step - warmup_steps) / decay_steps
+        cosine_decay = 0.5 * (1 + math.cos(math.pi * decay_progress))
+        return min_lr + (peak_lr - min_lr) * cosine_decay
+
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+@torch.no_grad()
+def validate(model: nn.Module, val_dataloader: DataLoader, device: torch.device) -> Dict[str, float]:
+    """
+    Run validation and compute metrics.
+
+    Returns:
+        Dict with val_loss, val_perplexity, val_coherence
+    """
+    model.eval()
+    total_loss = 0.0
+    total_coherence = 0.0
+    num_batches = 0
+
+    for batch in val_dataloader:
+        input_ids = batch['input_ids'].to(device)
+        labels = batch['labels'].to(device)
+
+        with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+            outputs = model(input_ids, labels=labels)
+
+        total_loss += outputs['loss'].item()
+        total_coherence += outputs['coherence'].mean().item()
+        num_batches += 1
+
+    model.train()
+
+    avg_loss = total_loss / max(num_batches, 1)
+    avg_coherence = total_coherence / max(num_batches, 1)
+
+    return {
+        'val_loss': avg_loss,
+        'val_perplexity': math.exp(avg_loss) if avg_loss < 20 else float('inf'),
+        'val_coherence': avg_coherence,
+    }
+
+
+# =============================================================================
 # TRAINING LOOP
 # =============================================================================
 
@@ -451,7 +524,11 @@ def train_7b(args):
 
     # Dataset (dummy for testing)
     print("\nCreating dataset...")
-    dataset = TextDataset(None, max_length=args.seq_len, num_samples=args.steps * args.batch_size)
+    train_samples = args.steps * args.batch_size * args.gradient_accumulation
+    dataset = TextDataset(None, max_length=args.seq_len, num_samples=train_samples)
+
+    # Validation dataset
+    val_dataset = TextDataset(None, max_length=args.seq_len, num_samples=args.num_val_samples)
 
     # DataLoader with performance optimizations
     num_workers = 4
@@ -466,20 +543,34 @@ def train_7b(args):
         persistent_workers=num_workers > 0,
     )
 
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=2,
+        pin_memory=True,
+    )
+
     # Training
     print(f"\nStarting training...")
     print(f"  Steps: {args.steps}")
     print(f"  Batch size: {args.batch_size}")
     print(f"  Gradient accumulation: {args.gradient_accumulation}")
     print(f"  Effective batch size: {args.batch_size * args.gradient_accumulation}")
-    print(f"  Learning rate: {args.learning_rate}")
+    print(f"  Peak LR: {args.learning_rate}")
+    print(f"  Warmup steps: {args.warmup_steps}")
+    print(f"  Min LR ratio: {args.min_lr_ratio} (final LR: {args.learning_rate * args.min_lr_ratio:.2e})")
+    print(f"  Eval interval: {args.eval_interval} steps" if args.eval_interval > 0 else "  Eval: disabled")
 
     model.train()
     start_time = time.time()
     total_loss = 0
     step = 0
     best_loss = float('inf')
+    best_val_loss = float('inf')
     spike_count = 0
+    base_lr = args.learning_rate  # Track base LR separately from adaptive adjustments
+    lr_scale = 1.0  # Multiplier from adaptive LR reductions
 
     for batch_idx, batch in enumerate(dataloader):
         if step >= args.steps:
@@ -499,6 +590,13 @@ def train_7b(args):
         # Step
         if (batch_idx + 1) % args.gradient_accumulation == 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
+            # Apply LR schedule: warmup + cosine decay, multiplied by adaptive scale
+            scheduled_lr = get_lr(step, args.warmup_steps, args.steps, base_lr, args.min_lr_ratio)
+            current_lr = scheduled_lr * lr_scale
+            for pg in optimizer.param_groups:
+                pg['lr'] = current_lr
+
             optimizer.step()
             optimizer.zero_grad()
             step += 1
@@ -516,40 +614,57 @@ def train_7b(args):
                 else:
                     mem = 0
 
-                print(f"Step {step:5d} | Loss: {avg_loss:.4f} | "
+                print(f"Step {step:5d} | Loss: {avg_loss:.4f} | LR: {current_lr:.2e} | "
                       f"Tok/s: {tokens_per_sec:.0f} | Mem: {mem:.1f}GB | "
                       f"Coh: {outputs['coherence'].mean():.3f}")
 
-                # Adaptive LR on loss spike
+                # Adaptive LR on loss spike (adjusts lr_scale)
                 current_loss = loss.item() * args.gradient_accumulation
                 if current_loss < best_loss:
                     best_loss = current_loss
-                elif step > 100:  # After warmup
+                elif step > args.warmup_steps:  # After warmup
                     if current_loss > best_loss * 2.0:
                         # MAJOR SPIKE: 0.7x LR + momentum reset
                         spike_count += 1
-                        old_lr = optimizer.param_groups[0]['lr']
-                        new_lr = old_lr * 0.7
+                        old_scale = lr_scale
+                        lr_scale *= 0.7
                         optimizer.state = collections.defaultdict(dict)
-                        for pg in optimizer.param_groups:
-                            pg['lr'] = new_lr
-                        print(f"  🚨 MAJOR spike ({current_loss:.4f} > {best_loss:.4f}*2)! LR: {old_lr:.2e} → {new_lr:.2e} + momentum reset")
+                        print(f"  🚨 MAJOR spike ({current_loss:.4f} > {best_loss:.4f}*2)! Scale: {old_scale:.2f} → {lr_scale:.2f} + momentum reset")
                     elif current_loss > best_loss * 1.5:
                         # MODERATE SPIKE: 0.7x LR + momentum reset
                         spike_count += 1
-                        old_lr = optimizer.param_groups[0]['lr']
-                        new_lr = old_lr * 0.7
+                        old_scale = lr_scale
+                        lr_scale *= 0.7
                         optimizer.state = collections.defaultdict(dict)
-                        for pg in optimizer.param_groups:
-                            pg['lr'] = new_lr
-                        print(f"  ⚠️ Loss spike ({current_loss:.4f} > {best_loss:.4f}*1.5)! LR: {old_lr:.2e} → {new_lr:.2e} + momentum reset")
+                        print(f"  ⚠️ Loss spike ({current_loss:.4f} > {best_loss:.4f}*1.5)! Scale: {old_scale:.2f} → {lr_scale:.2f} + momentum reset")
                     elif current_loss > best_loss * 1.3:
                         # MINOR SPIKE: 0.85x LR only
-                        old_lr = optimizer.param_groups[0]['lr']
-                        new_lr = old_lr * 0.85
-                        for pg in optimizer.param_groups:
-                            pg['lr'] = new_lr
-                        print(f"  ⚡ Minor spike ({current_loss:.4f} > {best_loss:.4f}*1.3). LR: {old_lr:.2e} → {new_lr:.2e}")
+                        old_scale = lr_scale
+                        lr_scale *= 0.85
+                        print(f"  ⚡ Minor spike ({current_loss:.4f} > {best_loss:.4f}*1.3). Scale: {old_scale:.2f} → {lr_scale:.2f}")
+
+            # Validation
+            if args.eval_interval > 0 and step % args.eval_interval == 0:
+                val_metrics = validate(model, val_dataloader, device)
+                val_ppl = val_metrics['val_perplexity']
+                print(f"  📊 Validation | Loss: {val_metrics['val_loss']:.4f} | "
+                      f"PPL: {val_ppl:.2f} | Coh: {val_metrics['val_coherence']:.3f}")
+
+                # Save best checkpoint
+                if val_metrics['val_loss'] < best_val_loss and args.checkpoint_dir:
+                    best_val_loss = val_metrics['val_loss']
+                    os.makedirs(args.checkpoint_dir, exist_ok=True)
+                    best_path = os.path.join(args.checkpoint_dir, 'best_7b.pt')
+                    torch.save({
+                        'step': step,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'config': config,
+                        'val_loss': best_val_loss,
+                        'val_perplexity': val_ppl,
+                        'lr_scale': lr_scale,
+                    }, best_path)
+                    print(f"  💾 New best! Saved to {best_path}")
 
     # Summary
     elapsed = time.time() - start_time
@@ -558,10 +673,12 @@ def train_7b(args):
     print("=" * 70)
     print(f"\nTotal time: {elapsed:.1f}s ({elapsed/60:.1f} min)")
     print(f"Steps completed: {step}")
-    print(f"Final loss: {total_loss/step:.4f}")
+    print(f"Final train loss: {total_loss/step:.4f}")
+    print(f"Best val loss: {best_val_loss:.4f}" if best_val_loss < float('inf') else "Best val loss: N/A (no validation)")
+    print(f"Final LR scale: {lr_scale:.2f} (spike reductions: {spike_count})")
     print(f"Tokens processed: {step * args.batch_size * args.seq_len:,}")
 
-    # Save checkpoint
+    # Save final checkpoint
     if args.checkpoint_dir:
         os.makedirs(args.checkpoint_dir, exist_ok=True)
         checkpoint_path = os.path.join(args.checkpoint_dir, 'checkpoint_7b.pt')
@@ -570,9 +687,13 @@ def train_7b(args):
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'config': config,
-            'loss': total_loss / step,
+            'train_loss': total_loss / step,
+            'val_loss': best_val_loss if best_val_loss < float('inf') else None,
+            'lr_scale': lr_scale,
         }, checkpoint_path)
-        print(f"\nCheckpoint saved: {checkpoint_path}")
+        print(f"\nFinal checkpoint saved: {checkpoint_path}")
+        if best_val_loss < float('inf'):
+            print(f"Best checkpoint: {os.path.join(args.checkpoint_dir, 'best_7b.pt')}")
 
     # Cost estimate
     if device.type == 'cuda':
@@ -598,8 +719,14 @@ def main():
     parser.add_argument('--steps', type=int, default=100, help='Training steps')
     parser.add_argument('--batch_size', type=int, default=1, help='Batch size')
     parser.add_argument('--gradient_accumulation', type=int, default=8, help='Gradient accumulation')
-    parser.add_argument('--learning_rate', type=float, default=1e-4, help='Learning rate')
+    parser.add_argument('--learning_rate', type=float, default=1e-4, help='Peak learning rate')
     parser.add_argument('--seq_len', type=int, default=1024, help='Sequence length')
+    parser.add_argument('--warmup_steps', type=int, default=100, help='LR warmup steps (linear)')
+    parser.add_argument('--min_lr_ratio', type=float, default=0.1, help='Min LR as ratio of peak (for cosine decay)')
+
+    # Validation
+    parser.add_argument('--eval_interval', type=int, default=100, help='Eval every N steps (0=no eval)')
+    parser.add_argument('--num_val_samples', type=int, default=100, help='Number of validation samples')
 
     # Logging
     parser.add_argument('--log_every', type=int, default=10, help='Log every N steps')
