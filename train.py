@@ -1828,17 +1828,31 @@ def train(config: TrainingConfig):
                         logger.info(f"  🚨 MAJOR PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*2.0)! Backtrack + LR: {old_lr:.2e} → {new_lr:.2e} + Momentum reset")
 
                     elif current_ppl > state.best_ppl * 1.5:
-                        # MODERATE SPIKE (>1.5x): 0.7x LR + Reset momentum (no backtrack)
+                        # MODERATE SPIKE (>1.5x): Backtrack 200 steps + 0.7x LR + Reset momentum
                         state.spike_count += 1
                         old_lr = optimizer.param_groups[0]['lr']
                         new_lr = old_lr * 0.7
+
+                        # Try to backtrack 200 steps (2 eval intervals)
+                        backtrack_steps = 200
+                        target_step = state.step - backtrack_steps
+                        backtrack_ckpt = checkpoint_dir / f"step_{target_step}.pt"
+                        if backtrack_ckpt.exists():
+                            logger.info(f"  🔄 MODERATE SPIKE! Backtracking to step {target_step}...")
+                            ckpt = torch.load(backtrack_ckpt, map_location=device)
+                            model.load_state_dict(ckpt['model_state_dict'])
+                        elif (checkpoint_dir / "best.pt").exists():
+                            # Fall back to best checkpoint if 200-step checkpoint doesn't exist
+                            logger.info(f"  🔄 MODERATE SPIKE! Backtracking to best checkpoint...")
+                            ckpt = torch.load(checkpoint_dir / "best.pt", map_location=device)
+                            model.load_state_dict(ckpt['model_state_dict'])
 
                         # Reset optimizer momentum
                         optimizer.state = collections.defaultdict(dict)
 
                         for param_group in optimizer.param_groups:
                             param_group['lr'] = new_lr
-                        logger.info(f"  ⚠️ PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*1.5)! LR: {old_lr:.2e} → {new_lr:.2e} + Momentum reset")
+                        logger.info(f"  ⚠️ PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*1.5)! Backtrack + LR: {old_lr:.2e} → {new_lr:.2e} + Momentum reset")
 
                     elif current_ppl > state.best_ppl * 1.3:
                         # MINOR SPIKE (>1.3x): 0.85x LR only (no reset)
@@ -1847,6 +1861,14 @@ def train(config: TrainingConfig):
                         for param_group in optimizer.param_groups:
                             param_group['lr'] = new_lr
                         logger.info(f"  ⚡ Minor PPL increase ({current_ppl:.1f} > {state.best_ppl:.1f}*1.3). LR: {old_lr:.2e} → {new_lr:.2e}")
+
+                    elif current_ppl > state.best_ppl * 1.2:
+                        # EARLY WARNING (>1.2x): 0.9x LR only (gentlest intervention)
+                        old_lr = optimizer.param_groups[0]['lr']
+                        new_lr = old_lr * 0.9
+                        for param_group in optimizer.param_groups:
+                            param_group['lr'] = new_lr
+                        logger.info(f"  📉 Early warning ({current_ppl:.1f} > {state.best_ppl:.1f}*1.2). LR: {old_lr:.2e} → {new_lr:.2e}")
 
                 # Track best
                 if val_metrics['val_loss'] < state.best_val_loss:
