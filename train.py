@@ -2016,8 +2016,16 @@ def train(config: TrainingConfig):
 
                 # Add coherence metrics if enabled (S3, S1-S2, S5)
                 if config.use_coherence_loss and "entropy" in metrics:
-                    log_msg += f" | Ent: {metrics.get('entropy', 0):.2f}"
+                    ent_val = metrics.get('entropy', 0)
+                    log_msg += f" | Ent: {ent_val:.2f}"
                     log_msg += f" | Coh: {metrics.get('coherence', 0):.3f}"
+
+                    # Mode collapse warning: entropy dropping too low means model is
+                    # getting stuck on predictable patterns instead of learning
+                    if ent_val < 1.5:
+                        log_msg += " ⚠️ LOW_ENT"
+                    elif ent_val < 2.0:
+                        log_msg += " (ent↓)"
 
                 # Add GPU memory usage for scaling experiments
                 if device.type == "cuda":
