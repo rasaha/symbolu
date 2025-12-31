@@ -733,6 +733,7 @@ class TrainingState:
     train_losses: list = field(default_factory=list)
     ppl_history: list = field(default_factory=list)  # Track PPL for trend detection
     trend_patience: int = 0  # Patience counter for trend-based interventions
+    ema_ppl: float = 0.0  # Exponential moving average of PPL (smooths noise)
 
 
 def compute_semantic_entropy(logits: torch.Tensor, max_positions: int = 1024) -> torch.Tensor:
@@ -1885,21 +1886,31 @@ def train(config: TrainingConfig):
                     state.lr_scale = 1.0  # Persistent LR multiplier
                 if not hasattr(state, 'ppl_history'):
                     state.ppl_history = []
+                if not hasattr(state, 'ema_ppl'):
+                    state.ema_ppl = 0.0
 
                 current_ppl = val_metrics['val_perplexity']
 
-                # Track PPL history for trend detection (keep last 5)
+                # Update EMA PPL (smooths out single bad batches)
+                # EMA = 0.9 * old + 0.1 * new (responds to trends, ignores noise)
+                if state.ema_ppl == 0.0:
+                    state.ema_ppl = current_ppl  # Initialize with first value
+                else:
+                    state.ema_ppl = 0.9 * state.ema_ppl + 0.1 * current_ppl
+
+                # Track PPL history for trend detection (keep last 10 for smoother trends)
                 state.ppl_history.append(current_ppl)
-                if len(state.ppl_history) > 5:
-                    state.ppl_history = state.ppl_history[-5:]
+                if len(state.ppl_history) > 10:
+                    state.ppl_history = state.ppl_history[-10:]
 
                 if current_ppl < state.best_ppl:
                     state.best_ppl = current_ppl
                 elif state.step > config.warmup_steps // 2:
                     # =================================================================
-                    # HARD SAFETY LIMITS (catastrophic spikes - always trigger)
+                    # HARD SAFETY LIMITS - Use EMA to avoid single-batch false positives
+                    # Only trigger if SMOOTHED PPL exceeds threshold
                     # =================================================================
-                    if current_ppl > state.best_ppl * 2.0:
+                    if state.ema_ppl > state.best_ppl * 2.0:
                         # MAJOR SPIKE (>2x): Backtrack + 0.7x LR + Reset momentum
                         state.spike_count += 1
                         old_scale = state.lr_scale
@@ -1915,9 +1926,9 @@ def train(config: TrainingConfig):
                         # Reset optimizer momentum (clear bad gradients)
                         optimizer.state = collections.defaultdict(dict)
 
-                        logger.info(f"  🚨 MAJOR PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*2.0)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
+                        logger.info(f"  🚨 MAJOR PPL spike (EMA {state.ema_ppl:.1f} > {state.best_ppl:.1f}*2.0)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
 
-                    elif current_ppl > state.best_ppl * 1.5:
+                    elif state.ema_ppl > state.best_ppl * 1.5:
                         # MODERATE SPIKE (>1.5x): Backtrack to oldest available + 0.7x LR + Reset momentum
                         state.spike_count += 1
                         old_scale = state.lr_scale
@@ -1944,7 +1955,7 @@ def train(config: TrainingConfig):
                         # Reset optimizer momentum
                         optimizer.state = collections.defaultdict(dict)
 
-                        logger.info(f"  ⚠️ PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*1.5)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
+                        logger.info(f"  ⚠️ PPL spike (EMA {state.ema_ppl:.1f} > {state.best_ppl:.1f}*1.5)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
 
                     # =================================================================
                     # TREND-BASED ADAPTIVE LR with DAMPING (per Google's advice)
