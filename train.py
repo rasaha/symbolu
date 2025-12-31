@@ -45,6 +45,7 @@ python train.py --model_size 7b --dataset c4 --batch_size 1 --gradient_accumulat
 """
 
 import os
+import collections
 
 # Set CUDA memory and tokenizer environment variables before importing torch
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
@@ -1794,20 +1795,58 @@ def train(config: TrainingConfig):
                     f"Val PPL: {val_metrics['val_perplexity']:.2f}"
                 )
 
-                # Auto-reduce LR on PPL spike (50% worse than best)
+                # Auto-reduce LR on PPL spike with adaptive response
                 # Track best PPL (initialize if not set)
                 if not hasattr(state, 'best_ppl'):
                     state.best_ppl = float('inf')
+                if not hasattr(state, 'spike_count'):
+                    state.spike_count = 0
 
                 current_ppl = val_metrics['val_perplexity']
                 if current_ppl < state.best_ppl:
                     state.best_ppl = current_ppl
-                elif current_ppl > state.best_ppl * 1.5 and state.step > config.warmup_steps // 2:
-                    old_lr = optimizer.param_groups[0]['lr']
-                    new_lr = old_lr * 0.5
-                    for param_group in optimizer.param_groups:
-                        param_group['lr'] = new_lr
-                    logger.info(f"  ⚠️ PPL spike detected ({current_ppl:.1f} > {state.best_ppl:.1f}*1.5)! Reducing LR: {old_lr:.2e} → {new_lr:.2e}")
+                elif state.step > config.warmup_steps // 2:
+                    # Tiered spike response
+                    if current_ppl > state.best_ppl * 2.0:
+                        # MAJOR SPIKE (>2x): Backtrack + 0.7x LR + Reset momentum
+                        state.spike_count += 1
+                        old_lr = optimizer.param_groups[0]['lr']
+                        new_lr = old_lr * 0.7
+
+                        # Try to backtrack to best checkpoint
+                        best_ckpt = checkpoint_dir / "best.pt"
+                        if best_ckpt.exists():
+                            logger.info(f"  🔄 MAJOR SPIKE! Backtracking to best checkpoint...")
+                            ckpt = torch.load(best_ckpt, map_location=device)
+                            model.load_state_dict(ckpt['model_state_dict'])
+
+                        # Reset optimizer momentum (clear bad gradients)
+                        optimizer.state = collections.defaultdict(dict)
+
+                        for param_group in optimizer.param_groups:
+                            param_group['lr'] = new_lr
+                        logger.info(f"  🚨 MAJOR PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*2.0)! Backtrack + LR: {old_lr:.2e} → {new_lr:.2e} + Momentum reset")
+
+                    elif current_ppl > state.best_ppl * 1.5:
+                        # MODERATE SPIKE (>1.5x): 0.7x LR + Reset momentum (no backtrack)
+                        state.spike_count += 1
+                        old_lr = optimizer.param_groups[0]['lr']
+                        new_lr = old_lr * 0.7
+
+                        # Reset optimizer momentum
+                        optimizer.state = collections.defaultdict(dict)
+
+                        for param_group in optimizer.param_groups:
+                            param_group['lr'] = new_lr
+                        logger.info(f"  ⚠️ PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*1.5)! LR: {old_lr:.2e} → {new_lr:.2e} + Momentum reset")
+
+                    elif current_ppl > state.best_ppl * 1.3:
+                        # MINOR SPIKE (>1.3x): 0.85x LR only (no reset)
+                        old_lr = optimizer.param_groups[0]['lr']
+                        new_lr = old_lr * 0.85
+                        for param_group in optimizer.param_groups:
+                            param_group['lr'] = new_lr
+                        logger.info(f"  ⚡ Minor PPL increase ({current_ppl:.1f} > {state.best_ppl:.1f}*1.3). LR: {old_lr:.2e} → {new_lr:.2e}")
 
                 # Track best
                 if val_metrics['val_loss'] < state.best_val_loss:
