@@ -1817,8 +1817,8 @@ def train(config: TrainingConfig):
                         best_ckpt = checkpoint_dir / "best.pt"
                         if best_ckpt.exists():
                             logger.info(f"  🔄 MAJOR SPIKE! Backtracking to best checkpoint...")
-                            ckpt = torch.load(best_ckpt, map_location=device)
-                            model.load_state_dict(ckpt['model_state_dict'])
+                            ckpt = torch.load(best_ckpt, map_location=device, weights_only=False)
+                            model.load_state_dict(ckpt['model'])
 
                         # Reset optimizer momentum (clear bad gradients)
                         optimizer.state = collections.defaultdict(dict)
@@ -1839,13 +1839,13 @@ def train(config: TrainingConfig):
                         backtrack_ckpt = checkpoint_dir / f"step_{target_step}.pt"
                         if backtrack_ckpt.exists():
                             logger.info(f"  🔄 MODERATE SPIKE! Backtracking to step {target_step}...")
-                            ckpt = torch.load(backtrack_ckpt, map_location=device)
-                            model.load_state_dict(ckpt['model_state_dict'])
+                            ckpt = torch.load(backtrack_ckpt, map_location=device, weights_only=False)
+                            model.load_state_dict(ckpt['model'])
                         elif (checkpoint_dir / "best.pt").exists():
                             # Fall back to best checkpoint if 200-step checkpoint doesn't exist
                             logger.info(f"  🔄 MODERATE SPIKE! Backtracking to best checkpoint...")
-                            ckpt = torch.load(checkpoint_dir / "best.pt", map_location=device)
-                            model.load_state_dict(ckpt['model_state_dict'])
+                            ckpt = torch.load(checkpoint_dir / "best.pt", map_location=device, weights_only=False)
+                            model.load_state_dict(ckpt['model'])
 
                         # Reset optimizer momentum
                         optimizer.state = collections.defaultdict(dict)
