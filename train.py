@@ -1615,18 +1615,22 @@ def evaluate(
     config: TrainingConfig,
     device: torch.device,
 ) -> Dict[str, float]:
-    """Evaluate model on validation set."""
+    """
+    Evaluate model on validation set.
+
+    For small validation sets (like WikiText-103 with only 7 batches),
+    we use ALL available batches to maximize signal quality.
+    The noise comes from the inherent size of the dataset, not our sampling.
+    """
     model.eval()
 
     total_loss = 0.0
     total_tokens = 0
     num_batches = 0
-    max_batches = config.eval_samples // config.batch_size
 
+    # Use ALL validation batches for maximum signal (don't limit with eval_samples)
+    # Small val sets need every batch to reduce noise
     for batch in val_loader:
-        if num_batches >= max_batches:
-            break
-
         loss, _ = compute_loss(model, batch, device)
         total_loss += loss.item()
         total_tokens += batch[0].numel()
@@ -1930,7 +1934,12 @@ def train(config: TrainingConfig):
     logger.info("Loading dataset...")
     train_loader, val_loader = create_dataloaders(config)
     logger.info(f"Train batches: {len(train_loader):,}")
-    logger.info(f"Val batches: {len(val_loader):,}")
+    val_batches = len(val_loader)
+    val_tokens = val_batches * config.batch_size * config.max_seq_len
+    logger.info(f"Val batches: {val_batches:,} ({val_tokens/1000:.0f}K tokens)")
+    if val_batches < 20:
+        logger.warning(f"  ⚠️ Small validation set! Only {val_batches} batches - metrics will be noisy.")
+        logger.warning(f"     Spike detection requires 2 consecutive regressions to reduce false alarms.")
 
     # Load tokenizer for quality sampling
     tokenizer = load_tokenizer(config) if config.sample_every > 0 else None
