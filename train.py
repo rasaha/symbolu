@@ -732,6 +732,7 @@ class TrainingState:
     total_tokens: int = 0
     train_losses: list = field(default_factory=list)
     ppl_history: list = field(default_factory=list)  # Track PPL for trend detection
+    trend_patience: int = 0  # Patience counter for trend-based interventions
 
 
 def compute_semantic_entropy(logits: torch.Tensor, max_positions: int = 1024) -> torch.Tensor:
@@ -1946,51 +1947,66 @@ def train(config: TrainingConfig):
                         logger.info(f"  ⚠️ PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*1.5)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
 
                     # =================================================================
-                    # TREND-BASED ADAPTIVE LR (replaces fixed 1.2x/1.3x thresholds)
-                    # Uses rate of change instead of arbitrary multipliers
+                    # TREND-BASED ADAPTIVE LR with DAMPING (per Google's advice)
+                    # - Higher threshold (12%) to avoid triggering on noise
+                    # - Patience counter requires 2 consecutive bad evals
+                    # - Two-tier response: gentle vs aggressive
                     # =================================================================
                     elif len(state.ppl_history) >= 3:
+                        # Initialize patience if not present
+                        if not hasattr(state, 'trend_patience'):
+                            state.trend_patience = 0
+
                         # Compute rate of change over last 3 evals
                         delta_1 = state.ppl_history[-1] - state.ppl_history[-2]  # Most recent
                         delta_2 = state.ppl_history[-2] - state.ppl_history[-3]  # Previous
 
                         # Check if PPL is increasing (positive deltas)
                         if delta_1 > 0:
-                            # Compute average rate of increase
-                            avg_delta = (delta_1 + max(0, delta_2)) / 2
-
                             # Relative rate: how fast is PPL growing relative to current value
-                            relative_rate = avg_delta / current_ppl if current_ppl > 0 else 0
+                            relative_rate = delta_1 / current_ppl if current_ppl > 0 else 0
 
-                            # Is it accelerating? (getting worse faster)
-                            is_accelerating = delta_1 > delta_2 and delta_2 > 0
+                            # Is it accelerating? Requires SIGNIFICANT surge (1.2x, not just >)
+                            is_accelerating = delta_1 > (1.2 * delta_2) and delta_2 > 0
 
-                            if is_accelerating or relative_rate > 0.05:
-                                # Proportional reduction based on severity
-                                # relative_rate of 0.05 (5% growth) -> 0.95x LR
-                                # relative_rate of 0.10 (10% growth) -> 0.90x LR
-                                # relative_rate of 0.20 (20% growth) -> 0.80x LR
-                                reduction = 1.0 - min(0.20, relative_rate)  # Cap at 0.80x
-                                reduction = max(0.80, reduction)  # Floor at 0.80x
+                            # Determine if this is a concerning trend
+                            is_concerning = relative_rate > 0.12 or is_accelerating
 
-                                # Extra penalty if accelerating
-                                if is_accelerating:
-                                    reduction *= 0.95  # Additional 5% reduction
+                            if is_concerning:
+                                state.trend_patience += 1
+                            else:
+                                state.trend_patience = 0  # Reset on good eval
 
+                            # TWO-TIER RESPONSE based on patience
+                            if state.trend_patience >= 2:
+                                # AGGRESSIVE: Confirmed trend (2 consecutive bad evals)
+                                # Reduce LR by 0.92x + reset momentum
                                 old_scale = state.lr_scale
-                                state.lr_scale *= reduction
+                                state.lr_scale *= 0.92
 
-                                # CRITICAL: Reset Adam momentum to prevent "echo spikes"
-                                # Without this, old bad gradients in m/v buffers cause
-                                # continued divergence even after LR reduction
+                                # Reset momentum only on confirmed trends
                                 optimizer.state = collections.defaultdict(dict)
 
-                                trend_type = "accelerating ⚠️" if is_accelerating else "increasing"
                                 logger.info(
-                                    f"  📈 PPL {trend_type}: Δ=[{delta_2:+.1f}, {delta_1:+.1f}], "
-                                    f"rate={relative_rate*100:.1f}%/eval. "
+                                    f"  📈 PPL trend CONFIRMED: Δ=[{delta_2:+.1f}, {delta_1:+.1f}], "
+                                    f"rate={relative_rate*100:.1f}%/eval, patience={state.trend_patience}. "
                                     f"LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + momentum reset"
                                 )
+                                state.trend_patience = 0  # Reset after intervention
+
+                            elif state.trend_patience == 1:
+                                # GENTLE: First warning, small nudge (no momentum reset)
+                                old_scale = state.lr_scale
+                                state.lr_scale *= 0.98  # Very gentle 2% reduction
+
+                                logger.info(
+                                    f"  📊 PPL watching: Δ=[{delta_2:+.1f}, {delta_1:+.1f}], "
+                                    f"rate={relative_rate*100:.1f}%/eval. "
+                                    f"LR scale: {old_scale:.3f} → {state.lr_scale:.3f} (gentle, patience=1)"
+                                )
+                        else:
+                            # PPL decreased or stable - reset patience
+                            state.trend_patience = 0
 
                 # Track best
                 if val_metrics['val_loss'] < state.best_val_loss:
