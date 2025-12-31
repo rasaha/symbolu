@@ -289,7 +289,7 @@ class TrainingConfig:
     # Apply a "cooling factor" to attention params while keeping phase/MLP at full LR.
     # 0.5 is balanced; use 0.3 for "safety first" during instability
     attn_cooling_factor: float = 1.0  # Local/Quadratic attention LR multiplier (baseline, full LR)
-    phase_cooling_factor: float = 0.2  # Phase attention LR multiplier (sensitive, needs strong cooling)
+    phase_cooling_factor: float = 0.3  # Phase attention LR multiplier (0.3x = 1.2e-5 at base 4e-5)
 
     # Learning rate schedule
     lr_scheduler: str = "cosine"  # cosine, linear, constant
@@ -2498,8 +2498,8 @@ def parse_args() -> TrainingConfig:
                        help="Gradient clipping norm")
     parser.add_argument("--attn_cooling_factor", type=float, default=1.0,
                        help="Local/Quadratic attention LR multiplier (1.0 = baseline, full LR)")
-    parser.add_argument("--phase_cooling_factor", type=float, default=0.2,
-                       help="Phase attention LR multiplier (0.2 = 20%% of base LR, strong cooling)")
+    parser.add_argument("--phase_cooling_factor", type=float, default=0.3,
+                       help="Phase attention LR multiplier (0.3x = 1.2e-5 at base 4e-5)")
 
     # LR schedule
     parser.add_argument("--lr_scheduler", type=str, default="cosine",
