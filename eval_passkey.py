@@ -141,7 +141,24 @@ def extract_passkey_from_generation(generated_text: str) -> str:
     return ""
 
 
-def generate_completion(model, tokenizer, prompt: str, device: torch.device, max_new_tokens: int = 20):
+def sample_with_temperature(logits, temperature=0.8, top_p=0.9):
+    """Sample from logits with temperature and top-p (nucleus) sampling."""
+    logits = logits / temperature
+    probs = F.softmax(logits, dim=-1)
+
+    # Top-p (nucleus) sampling
+    sorted_probs, sorted_indices = torch.sort(probs, descending=True)
+    cumsum = torch.cumsum(sorted_probs, dim=-1)
+    mask = cumsum - sorted_probs > top_p
+    sorted_probs[mask] = 0
+    sorted_probs = sorted_probs / sorted_probs.sum(dim=-1, keepdim=True)
+
+    # Sample
+    idx = torch.multinomial(sorted_probs, 1)
+    return sorted_indices.gather(-1, idx)
+
+
+def generate_completion(model, tokenizer, prompt: str, device: torch.device, max_new_tokens: int = 20, temperature: float = 0.8):
     """Generate completion for the prompt."""
     tokens = tokenizer.encode(prompt, return_tensors="pt").to(device)
 
@@ -155,9 +172,20 @@ def generate_completion(model, tokenizer, prompt: str, device: torch.device, max
 
         for _ in range(max_new_tokens):
             outputs = model(generated)
-            logits = outputs if isinstance(outputs, torch.Tensor) else outputs[0]
+            # Handle different output formats: tensor, dict, or tuple
+            if isinstance(outputs, torch.Tensor):
+                logits = outputs
+            elif isinstance(outputs, dict):
+                logits = outputs['logits']
+            else:
+                logits = outputs[0]
             next_token_logits = logits[:, -1, :]
-            next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
+
+            # Use temperature sampling to avoid repetition loops
+            if temperature > 0:
+                next_token = sample_with_temperature(next_token_logits, temperature=temperature)
+            else:
+                next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
             generated = torch.cat([generated, next_token], dim=1)
 
             # Stop on newline or period after getting some tokens
