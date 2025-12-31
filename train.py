@@ -281,6 +281,11 @@ class TrainingConfig:
     eps: float = 1e-8
     max_grad_norm: float = 1.0
 
+    # LLRD: Layer-wise Learning Rate Decay (Attention Cooling)
+    # The Q, K, V projections in attention are sensitive to high LR (softmax saturation).
+    # Apply a "cooling factor" (0.8x) to attention params while keeping phase/MLP at full LR.
+    attn_cooling_factor: float = 0.8  # Multiply attention layer LR by this factor
+
     # Learning rate schedule
     lr_scheduler: str = "cosine"  # cosine, linear, constant
     min_lr_ratio: float = 0.1  # minimum LR as ratio of peak
@@ -662,31 +667,108 @@ def update_alpha_schedule(
 # =============================================================================
 
 def create_optimizer(model: nn.Module, config: TrainingConfig) -> AdamW:
-    """Create AdamW optimizer with weight decay."""
+    """
+    Create AdamW optimizer with LLRD (Layer-wise Learning Rate Decay).
 
-    # Separate parameters into decay and no-decay groups
-    decay_params = []
-    no_decay_params = []
+    Separates parameters into 4 groups:
+    1. Stable params with decay (embeddings, MLP, phase-specific params)
+    2. Stable params without decay (bias, norm)
+    3. Cooled attention params with decay (q_proj, k_proj, v_proj, o_proj, out_proj)
+    4. Cooled attention params without decay
+
+    The attention cooling factor (default 0.8x) dampens the "twitchy" Q/K/V projections
+    while keeping phase/MLP layers at full LR. This prevents softmax saturation spikes.
+    """
+
+    # Attention parameter patterns - these get cooled LR
+    ATTN_PATTERNS = ["q_proj", "k_proj", "v_proj", "o_proj", "out_proj"]
+
+    def is_attention_param(name: str) -> bool:
+        """Check if parameter is an attention projection (sensitive to high LR)."""
+        name_lower = name.lower()
+        return any(pattern in name_lower for pattern in ATTN_PATTERNS)
+
+    def is_no_decay_param(name: str) -> bool:
+        """Check if parameter should skip weight decay."""
+        return 'bias' in name or 'norm' in name or 'embed' in name
+
+    # Separate into 4 groups
+    stable_decay_params = []
+    stable_no_decay_params = []
+    cooled_decay_params = []
+    cooled_no_decay_params = []
+
+    # Track parameter counts for logging
+    stable_param_count = 0
+    cooled_param_count = 0
 
     for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
-        if 'bias' in name or 'norm' in name or 'embed' in name:
-            no_decay_params.append(param)
+
+        num_params = param.numel()
+
+        if is_attention_param(name):
+            # Attention parameters - apply cooling factor
+            cooled_param_count += num_params
+            if is_no_decay_param(name):
+                cooled_no_decay_params.append(param)
+            else:
+                cooled_decay_params.append(param)
         else:
-            decay_params.append(param)
+            # Stable parameters - full LR
+            stable_param_count += num_params
+            if is_no_decay_param(name):
+                stable_no_decay_params.append(param)
+            else:
+                stable_decay_params.append(param)
+
+    # Compute LRs
+    base_lr = config.learning_rate
+    cooled_lr = base_lr * config.attn_cooling_factor
 
     param_groups = [
-        {"params": decay_params, "weight_decay": config.weight_decay},
-        {"params": no_decay_params, "weight_decay": 0.0},
+        {
+            "params": stable_decay_params,
+            "lr": base_lr,
+            "weight_decay": config.weight_decay,
+            "name": "stable_context",
+        },
+        {
+            "params": stable_no_decay_params,
+            "lr": base_lr,
+            "weight_decay": 0.0,
+            "name": "stable_no_decay",
+        },
+        {
+            "params": cooled_decay_params,
+            "lr": cooled_lr,
+            "weight_decay": config.weight_decay,
+            "name": "cooled_attention",
+        },
+        {
+            "params": cooled_no_decay_params,
+            "lr": cooled_lr,
+            "weight_decay": 0.0,
+            "name": "cooled_attn_no_decay",
+        },
     ]
+
+    # Filter out empty groups
+    param_groups = [g for g in param_groups if len(g["params"]) > 0]
 
     optimizer = AdamW(
         param_groups,
-        lr=config.learning_rate,
+        lr=config.learning_rate,  # Default LR (overridden by group-specific LR)
         betas=(config.beta1, config.beta2),
         eps=config.eps,
     )
+
+    # Log the LLRD configuration
+    logger = logging.getLogger(__name__)
+    logger.info(f"LLRD Optimizer Groups:")
+    logger.info(f"  Stable context: {stable_param_count/1e6:.1f}M params @ LR {base_lr:.2e}")
+    logger.info(f"  Cooled attention: {cooled_param_count/1e6:.1f}M params @ LR {cooled_lr:.2e} ({config.attn_cooling_factor}x)")
 
     return optimizer
 
@@ -1765,10 +1847,16 @@ def train(config: TrainingConfig):
         )
 
         # Apply persistent lr_scale after scheduler updates LR
+        # LLRD-aware: preserve the cooling factor ratio between groups
         base_lr = scheduler.get_last_lr()[0]
-        scaled_lr = base_lr * state.lr_scale
         for param_group in optimizer.param_groups:
-            param_group['lr'] = scaled_lr
+            group_name = param_group.get('name', '')
+            # Cooled groups get base_lr * cooling_factor * lr_scale
+            # Stable groups get base_lr * lr_scale
+            if 'cooled' in group_name:
+                param_group['lr'] = base_lr * config.attn_cooling_factor * state.lr_scale
+            else:
+                param_group['lr'] = base_lr * state.lr_scale
 
         accumulation_step += 1
         running_loss += metrics["loss"]
@@ -1789,20 +1877,23 @@ def train(config: TrainingConfig):
                 elapsed = time.time() - step_start_time
                 tokens_per_sec = (config.log_every * config.batch_size * config.max_seq_len * config.gradient_accumulation) / elapsed
                 base_lr = scheduler.get_last_lr()[0]
-                actual_lr = base_lr * state.lr_scale  # Scaled LR
+                stable_lr = base_lr * state.lr_scale  # Stable (phase/MLP) LR
+                cooled_lr = stable_lr * config.attn_cooling_factor  # Attention LR
 
                 # Build log message with coherence metrics if available
                 log_msg = (
                     f"Step {state.step:>6} | "
                     f"Loss: {avg_loss:.4f} | "
                     f"PPL: {math.exp(avg_loss):.2f} | "
-                    f"LR: {actual_lr:.2e} | "
+                    f"LR: {stable_lr:.2e} | "
                     f"Tok/s: {tokens_per_sec:.0f}"
                 )
 
-                # Show lr_scale if not 1.0
+                # Show lr_scale and cooled LR if not at defaults
                 if state.lr_scale < 0.99:
                     log_msg += f" | LR_scale: {state.lr_scale:.2f}"
+                if config.attn_cooling_factor < 0.99:
+                    log_msg += f" | Attn_LR: {cooled_lr:.2e}"
 
                 # Add coherence metrics if enabled (S3, S1-S2, S5)
                 if config.use_coherence_loss and "entropy" in metrics:
@@ -1824,7 +1915,8 @@ def train(config: TrainingConfig):
                     log_dict = {
                         "train/loss": avg_loss,
                         "train/perplexity": math.exp(avg_loss),
-                        "train/learning_rate": actual_lr,
+                        "train/learning_rate": stable_lr,
+                        "train/attention_lr": cooled_lr,
                         "train/lr_scale": state.lr_scale,
                         "train/tokens_per_sec": tokens_per_sec,
                         "train/total_tokens": state.total_tokens,
@@ -1844,7 +1936,8 @@ def train(config: TrainingConfig):
                 if tb_writer is not None:
                     tb_writer.add_scalar("train/loss", avg_loss, state.step)
                     tb_writer.add_scalar("train/perplexity", math.exp(avg_loss), state.step)
-                    tb_writer.add_scalar("train/learning_rate", actual_lr, state.step)
+                    tb_writer.add_scalar("train/learning_rate", stable_lr, state.step)
+                    tb_writer.add_scalar("train/attention_lr", cooled_lr, state.step)
                     tb_writer.add_scalar("train/lr_scale", state.lr_scale, state.step)
                     tb_writer.add_scalar("train/tokens_per_sec", tokens_per_sec, state.step)
                     # Add coherence metrics
@@ -2169,6 +2262,8 @@ def parse_args() -> TrainingConfig:
                        help="Weight decay")
     parser.add_argument("--max_grad_norm", type=float, default=1.0,
                        help="Gradient clipping norm")
+    parser.add_argument("--attn_cooling_factor", type=float, default=0.8,
+                       help="LLRD cooling factor for attention layers (0.8 = 80%% of base LR)")
 
     # LR schedule
     parser.add_argument("--lr_scheduler", type=str, default="cosine",
@@ -2321,6 +2416,8 @@ if __name__ == "__main__":
     print(f"  Batch size: {config.batch_size} x {config.gradient_accumulation} accumulation")
     print(f"  Effective batch: {config.batch_size * config.gradient_accumulation * config.max_seq_len:,} tokens")
     print(f"  Learning rate: {config.learning_rate}")
+    if config.attn_cooling_factor < 1.0:
+        print(f"  LLRD Cooling: Attention @ {config.attn_cooling_factor}x ({config.learning_rate * config.attn_cooling_factor:.2e})")
     print(f"  Mixed precision: {config.mixed_precision}")
     print(f"  Loss type: {config.loss_type}", end="")
     if config.loss_type in ("contrastive", "infonce"):
