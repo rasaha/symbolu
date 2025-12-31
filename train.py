@@ -262,10 +262,13 @@ class TrainingConfig:
     alpha_local: float = 0.4  # Weight for local attention in hybrid layers (was 0.8)
     alpha_phase: float = 0.6  # Weight for phase attention in hybrid layers (was 0.2)
 
-    # Alpha decay schedule: Start high to force long-range learning, decay for fine-grained PPL
-    alpha_phase_start: float = 0.6  # Initial phase attention weight
-    alpha_phase_end: float = 0.4    # Final phase attention weight
-    alpha_decay_steps: int = 10000  # Steps over which to decay alpha
+    # Alpha FADE-IN schedule: "Training Wheels" for hybrid stability
+    # Start with phase OFF (0.0), gradually fade in to target (0.6)
+    # This forces Quadratic layers to learn basic patterns first,
+    # then Phase layers join in for long-range structure
+    alpha_phase_start: float = 0.0   # Initial: Phase attention OFF (training wheels)
+    alpha_phase_end: float = 0.6     # Final: Full phase attention
+    alpha_warmup_steps: int = 5000   # Steps to fade in phase attention
 
     # Training hyperparameters
     batch_size: int = 16
@@ -283,8 +286,9 @@ class TrainingConfig:
 
     # LLRD: Layer-wise Learning Rate Decay (Attention Cooling)
     # The Q, K, V projections in attention are sensitive to high LR (softmax saturation).
-    # Apply a "cooling factor" (0.8x) to attention params while keeping phase/MLP at full LR.
-    attn_cooling_factor: float = 0.8  # Multiply attention layer LR by this factor
+    # Apply a "cooling factor" to attention params while keeping phase/MLP at full LR.
+    # 0.5 is balanced; use 0.3 for "safety first" during instability
+    attn_cooling_factor: float = 0.5  # Multiply attention layer LR by this factor
 
     # Learning rate schedule
     lr_scheduler: str = "cosine"  # cosine, linear, constant
@@ -648,28 +652,41 @@ def update_alpha_schedule(
     config: TrainingConfig,
 ) -> float:
     """
-    Update alpha_phase across all hybrid layers based on training progress.
+    Update alpha_phase across all layers based on training progress.
 
-    Alpha decay schedule (from Gemini's recommendation):
-    - Start high (0.6) to force the model to use long-range Phase attention
-    - Decay to lower value (0.4) to allow local attention to sharpen PPL
+    "Training Wheels" FADE-IN schedule (per ChatGPT/Google analysis):
+    - Start with phase attention OFF (0.0) to let Quadratic layers learn first
+    - Gradually fade in phase attention to target (0.6) over alpha_warmup_steps
+    - This prevents "representation shear" where Phase distorts the residual stream
+      before Quadratic layers have learned stable manifolds
 
-    This prevents the "local shortcut" where the model ignores Phase layers.
+    The Coherence (Coh) metric should stay stable or improve with this schedule.
+    If Coh drops rapidly, phase is interfering too early.
     """
-    # Calculate current alpha based on linear decay
-    if step >= config.alpha_decay_steps:
+    # Calculate current alpha based on linear FADE-IN
+    if step >= config.alpha_warmup_steps:
         current_alpha = config.alpha_phase_end
     else:
-        frac = step / config.alpha_decay_steps
+        frac = step / config.alpha_warmup_steps
+        # Linear interpolation: 0.0 → 0.6 over warmup steps
         current_alpha = config.alpha_phase_start + frac * (config.alpha_phase_end - config.alpha_phase_start)
 
-    # Update all HybridAttentionLayer modules
+    # Update all attention layers that have alpha_phase
     for module in model.modules():
-        if hasattr(module, 'alpha_phase') and hasattr(module, 'alpha_local'):
-            # Update the parameters in-place
+        if hasattr(module, 'alpha_phase'):
             with torch.no_grad():
-                module.alpha_phase.fill_(current_alpha)
-                module.alpha_local.fill_(1.0 - current_alpha)
+                if hasattr(module.alpha_phase, 'fill_'):
+                    module.alpha_phase.fill_(current_alpha)
+                else:
+                    module.alpha_phase = current_alpha
+
+            # Also update alpha_local if present (hybrid layers)
+            if hasattr(module, 'alpha_local'):
+                with torch.no_grad():
+                    if hasattr(module.alpha_local, 'fill_'):
+                        module.alpha_local.fill_(1.0 - current_alpha)
+                    else:
+                        module.alpha_local = 1.0 - current_alpha
 
     return current_alpha
 
@@ -2368,13 +2385,13 @@ def parse_args() -> TrainingConfig:
     parser.add_argument("--alpha_phase", type=float, default=0.6,
                        help="Weight for phase attention in hybrid layers (was 0.2, now 0.6)")
 
-    # Alpha decay schedule (for phase attention)
-    parser.add_argument("--alpha_phase_start", type=float, default=0.6,
-                       help="Initial alpha_phase value (decays over time)")
-    parser.add_argument("--alpha_phase_end", type=float, default=0.4,
-                       help="Final alpha_phase value after decay")
-    parser.add_argument("--alpha_decay_steps", type=int, default=10000,
-                       help="Steps over which alpha_phase decays from start to end")
+    # Alpha FADE-IN schedule ("Training Wheels" for hybrid stability)
+    parser.add_argument("--alpha_phase_start", type=float, default=0.0,
+                       help="Initial alpha_phase (0.0 = phase OFF, training wheels)")
+    parser.add_argument("--alpha_phase_end", type=float, default=0.6,
+                       help="Final alpha_phase after fade-in")
+    parser.add_argument("--alpha_warmup_steps", type=int, default=5000,
+                       help="Steps to fade in phase attention (0→0.6)")
 
     # Training
     parser.add_argument("--batch_size", type=int, default=16,
@@ -2393,8 +2410,8 @@ def parse_args() -> TrainingConfig:
                        help="Weight decay")
     parser.add_argument("--max_grad_norm", type=float, default=1.0,
                        help="Gradient clipping norm")
-    parser.add_argument("--attn_cooling_factor", type=float, default=0.8,
-                       help="LLRD cooling factor for attention layers (0.8 = 80%% of base LR)")
+    parser.add_argument("--attn_cooling_factor", type=float, default=0.5,
+                       help="LLRD cooling factor for attention layers (0.5 = 50%% of base LR, 0.3 = safety first)")
 
     # LR schedule
     parser.add_argument("--lr_scheduler", type=str, default="cosine",
