@@ -1733,7 +1733,8 @@ def train(config: TrainingConfig):
                         tb_writer.add_scalar("train/entropy", metrics.get("entropy", 0), state.step)
                         tb_writer.add_scalar("train/coherence", metrics.get("coherence", 0), state.step)
 
-                step_start_time = time.time()
+                # Note: step_start_time reset moved to after eval/checkpoint blocks
+                # to exclude non-training time from throughput calculation
 
             # Evaluation
             if state.step % config.eval_every == 0:
@@ -1783,6 +1784,10 @@ def train(config: TrainingConfig):
                     model, optimizer, scheduler, scaler, state, config,
                     str(latest_path)
                 )
+
+            # Reset throughput timer AFTER eval/checkpoint to exclude their time
+            if state.step % config.log_every == 0:
+                step_start_time = time.time()
 
     # Final save
     final_path = checkpoint_dir / "final.pt"

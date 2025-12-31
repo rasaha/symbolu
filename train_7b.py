@@ -57,6 +57,16 @@ if not torch.cuda.is_available():
     print("WARNING: CUDA not available. 7B model requires GPU!")
     print("This script is designed for RunPod A100/H100")
 
+# =============================================================================
+# PERFORMANCE OPTIMIZATIONS
+# =============================================================================
+# TF32 for faster matrix multiplications on Ampere+ GPUs (A100, H100)
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
+# cuDNN autotuning for optimal convolution algorithms
+torch.backends.cudnn.benchmark = True
+
 
 # =============================================================================
 # 7B MODEL CONFIGURATION
@@ -432,7 +442,19 @@ def train_7b(args):
     # Dataset (dummy for testing)
     print("\nCreating dataset...")
     dataset = TextDataset(None, max_length=args.seq_len, num_samples=args.steps * args.batch_size)
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+
+    # DataLoader with performance optimizations
+    num_workers = 4
+    dataloader = DataLoader(
+        dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=True,
+        drop_last=True,
+        prefetch_factor=2 if num_workers > 0 else None,
+        persistent_workers=num_workers > 0,
+    )
 
     # Training
     print(f"\nStarting training...")
