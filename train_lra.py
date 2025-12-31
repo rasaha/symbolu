@@ -34,6 +34,7 @@ Date: December 2025
 """
 
 import argparse
+import collections
 import json
 import math
 import os
@@ -1119,6 +1120,8 @@ def train_lra(config: LRAConfig):
     # Training state
     global_step = 0
     best_val_acc = 0.0
+    best_loss = float('inf')
+    spike_count = 0
     train_iter = iter(train_loader)
 
     model.train()
@@ -1182,6 +1185,36 @@ def train_lra(config: LRAConfig):
 
             print(f"Step {global_step:>6} | Loss: {avg_loss:.4f} | "
                   f"Acc: {acc:.1f}% | LR: {lr:.2e}{mem_str}")
+
+            # Adaptive LR on loss spike
+            if avg_loss < best_loss:
+                best_loss = avg_loss
+            elif global_step > config.warmup_steps:
+                if avg_loss > best_loss * 2.0:
+                    # MAJOR SPIKE: 0.7x LR + momentum reset
+                    spike_count += 1
+                    old_lr = optimizer.param_groups[0]['lr']
+                    new_lr = old_lr * 0.7
+                    optimizer.state = collections.defaultdict(dict)
+                    for pg in optimizer.param_groups:
+                        pg['lr'] = new_lr
+                    print(f"  🚨 MAJOR spike ({avg_loss:.4f} > {best_loss:.4f}*2)! LR: {old_lr:.2e} → {new_lr:.2e} + momentum reset")
+                elif avg_loss > best_loss * 1.5:
+                    # MODERATE SPIKE: 0.7x LR + momentum reset
+                    spike_count += 1
+                    old_lr = optimizer.param_groups[0]['lr']
+                    new_lr = old_lr * 0.7
+                    optimizer.state = collections.defaultdict(dict)
+                    for pg in optimizer.param_groups:
+                        pg['lr'] = new_lr
+                    print(f"  ⚠️ Loss spike ({avg_loss:.4f} > {best_loss:.4f}*1.5)! LR: {old_lr:.2e} → {new_lr:.2e} + momentum reset")
+                elif avg_loss > best_loss * 1.3:
+                    # MINOR SPIKE: 0.85x LR only
+                    old_lr = optimizer.param_groups[0]['lr']
+                    new_lr = old_lr * 0.85
+                    for pg in optimizer.param_groups:
+                        pg['lr'] = new_lr
+                    print(f"  ⚡ Minor spike ({avg_loss:.4f} > {best_loss:.4f}*1.3). LR: {old_lr:.2e} → {new_lr:.2e}")
 
             running_loss = 0.0
             running_correct = 0

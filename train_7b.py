@@ -38,6 +38,7 @@ Architecture at 7B:
 """
 
 import argparse
+import collections
 import math
 import os
 import sys
@@ -468,6 +469,8 @@ def train_7b(args):
     start_time = time.time()
     total_loss = 0
     step = 0
+    best_loss = float('inf')
+    spike_count = 0
 
     for batch_idx, batch in enumerate(dataloader):
         if step >= args.steps:
@@ -507,6 +510,37 @@ def train_7b(args):
                 print(f"Step {step:5d} | Loss: {avg_loss:.4f} | "
                       f"Tok/s: {tokens_per_sec:.0f} | Mem: {mem:.1f}GB | "
                       f"Coh: {outputs['coherence'].mean():.3f}")
+
+                # Adaptive LR on loss spike
+                current_loss = loss.item() * args.gradient_accumulation
+                if current_loss < best_loss:
+                    best_loss = current_loss
+                elif step > 100:  # After warmup
+                    if current_loss > best_loss * 2.0:
+                        # MAJOR SPIKE: 0.7x LR + momentum reset
+                        spike_count += 1
+                        old_lr = optimizer.param_groups[0]['lr']
+                        new_lr = old_lr * 0.7
+                        optimizer.state = collections.defaultdict(dict)
+                        for pg in optimizer.param_groups:
+                            pg['lr'] = new_lr
+                        print(f"  🚨 MAJOR spike ({current_loss:.4f} > {best_loss:.4f}*2)! LR: {old_lr:.2e} → {new_lr:.2e} + momentum reset")
+                    elif current_loss > best_loss * 1.5:
+                        # MODERATE SPIKE: 0.7x LR + momentum reset
+                        spike_count += 1
+                        old_lr = optimizer.param_groups[0]['lr']
+                        new_lr = old_lr * 0.7
+                        optimizer.state = collections.defaultdict(dict)
+                        for pg in optimizer.param_groups:
+                            pg['lr'] = new_lr
+                        print(f"  ⚠️ PPL spike ({current_loss:.4f} > {best_loss:.4f}*1.5)! LR: {old_lr:.2e} → {new_lr:.2e} + momentum reset")
+                    elif current_loss > best_loss * 1.3:
+                        # MINOR SPIKE: 0.85x LR only
+                        old_lr = optimizer.param_groups[0]['lr']
+                        new_lr = old_lr * 0.85
+                        for pg in optimizer.param_groups:
+                            pg['lr'] = new_lr
+                        print(f"  ⚡ Minor spike ({current_loss:.4f} > {best_loss:.4f}*1.3). LR: {old_lr:.2e} → {new_lr:.2e}")
 
     # Summary
     elapsed = time.time() - start_time

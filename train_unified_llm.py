@@ -33,6 +33,7 @@ Date: December 2025
 """
 
 import argparse
+import collections
 import json
 import logging
 import math
@@ -510,6 +511,8 @@ def train(config: UnifiedTrainingConfig):
     # Training state
     global_step = 0
     best_val_loss = float("inf")
+    best_ppl = float("inf")
+    spike_count = 0
     train_losses = []
 
     # Checkpoint directory
@@ -628,7 +631,44 @@ def train(config: UnifiedTrainingConfig):
             # Evaluation
             if global_step % config.eval_every == 0:
                 val_loss, val_metrics = evaluate(model, val_loader, device, config, autocast_dtype)
-                print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_metrics['ppl']:.2f}")
+                val_ppl = val_metrics['ppl']
+                print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
+
+                # Adaptive LR on PPL spike
+                if val_ppl < best_ppl:
+                    best_ppl = val_ppl
+                elif global_step > config.warmup_steps:
+                    if val_ppl > best_ppl * 2.0:
+                        # MAJOR SPIKE: Backtrack + 0.7x LR + momentum reset
+                        spike_count += 1
+                        old_lr = optimizer.param_groups[0]['lr']
+                        new_lr = old_lr * 0.7
+                        # Try to load best checkpoint
+                        best_ckpt = ckpt_dir / "best.pt"
+                        if best_ckpt.exists():
+                            print(f"  🔄 MAJOR SPIKE! Backtracking to best checkpoint...")
+                            ckpt = torch.load(best_ckpt, map_location=device)
+                            model.load_state_dict(ckpt['model_state_dict'])
+                        optimizer.state = collections.defaultdict(dict)
+                        for pg in optimizer.param_groups:
+                            pg['lr'] = new_lr
+                        print(f"  🚨 MAJOR PPL spike ({val_ppl:.1f} > {best_ppl:.1f}*2)! Backtrack + LR: {old_lr:.2e} → {new_lr:.2e} + Momentum reset")
+                    elif val_ppl > best_ppl * 1.5:
+                        # MODERATE SPIKE: 0.7x LR + momentum reset
+                        spike_count += 1
+                        old_lr = optimizer.param_groups[0]['lr']
+                        new_lr = old_lr * 0.7
+                        optimizer.state = collections.defaultdict(dict)
+                        for pg in optimizer.param_groups:
+                            pg['lr'] = new_lr
+                        print(f"  ⚠️ PPL spike ({val_ppl:.1f} > {best_ppl:.1f}*1.5)! LR: {old_lr:.2e} → {new_lr:.2e} + Momentum reset")
+                    elif val_ppl > best_ppl * 1.3:
+                        # MINOR SPIKE: 0.85x LR only
+                        old_lr = optimizer.param_groups[0]['lr']
+                        new_lr = old_lr * 0.85
+                        for pg in optimizer.param_groups:
+                            pg['lr'] = new_lr
+                        print(f"  ⚡ Minor PPL increase ({val_ppl:.1f} > {best_ppl:.1f}*1.3). LR: {old_lr:.2e} → {new_lr:.2e}")
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
