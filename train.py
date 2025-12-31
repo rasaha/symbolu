@@ -1905,6 +1905,9 @@ def train(config: TrainingConfig):
 
                 if current_ppl < state.best_ppl:
                     state.best_ppl = current_ppl
+                    # CRITICAL: Reset EMA to current PPL when new best found
+                    # Otherwise EMA carries "ghost" of old high values
+                    state.ema_ppl = current_ppl
                 elif state.step > config.warmup_steps // 2:
                     # =================================================================
                     # HARD SAFETY LIMITS - Use EMA to avoid single-batch false positives
