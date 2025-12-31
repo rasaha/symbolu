@@ -142,6 +142,11 @@ class PhaseAttentionLayer(nn.Module):
         nn.init.zeros_(self.value_gate.weight)
         nn.init.constant_(self.value_gate.bias, 3.0)  # High gate = preserve local V
 
+        # Initialize out_proj to near-zero to prevent <unk> spikes at start
+        # Phase attention starts as identity, learns to contribute gradually
+        nn.init.zeros_(self.out_proj.weight)
+        nn.init.zeros_(self.out_proj.bias)
+
         self.dropout = nn.Dropout(dropout)
         self.norm = nn.LayerNorm(embed_dim)
 

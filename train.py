@@ -261,6 +261,11 @@ class TrainingConfig:
     alpha_local: float = 0.4  # Weight for local attention in hybrid layers (was 0.8)
     alpha_phase: float = 0.6  # Weight for phase attention in hybrid layers (was 0.2)
 
+    # Alpha decay schedule: Start high to force long-range learning, decay for fine-grained PPL
+    alpha_phase_start: float = 0.6  # Initial phase attention weight
+    alpha_phase_end: float = 0.4    # Final phase attention weight
+    alpha_decay_steps: int = 10000  # Steps over which to decay alpha
+
     # Training hyperparameters
     batch_size: int = 16
     gradient_accumulation: int = 1
@@ -617,6 +622,38 @@ def create_model(config: TrainingConfig) -> nn.Module:
 def count_parameters(model: nn.Module) -> int:
     """Count trainable parameters."""
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def update_alpha_schedule(
+    model: nn.Module,
+    step: int,
+    config: TrainingConfig,
+) -> float:
+    """
+    Update alpha_phase across all hybrid layers based on training progress.
+
+    Alpha decay schedule (from Gemini's recommendation):
+    - Start high (0.6) to force the model to use long-range Phase attention
+    - Decay to lower value (0.4) to allow local attention to sharpen PPL
+
+    This prevents the "local shortcut" where the model ignores Phase layers.
+    """
+    # Calculate current alpha based on linear decay
+    if step >= config.alpha_decay_steps:
+        current_alpha = config.alpha_phase_end
+    else:
+        frac = step / config.alpha_decay_steps
+        current_alpha = config.alpha_phase_start + frac * (config.alpha_phase_end - config.alpha_phase_start)
+
+    # Update all HybridAttentionLayer modules
+    for module in model.modules():
+        if hasattr(module, 'alpha_phase') and hasattr(module, 'alpha_local'):
+            # Update the parameters in-place
+            with torch.no_grad():
+                module.alpha_phase.fill_(current_alpha)
+                module.alpha_local.fill_(1.0 - current_alpha)
+
+    return current_alpha
 
 
 # =============================================================================
@@ -1680,6 +1717,9 @@ def train(config: TrainingConfig):
             state.train_losses.append(avg_loss)
             running_loss = 0.0
 
+            # Update alpha schedule (decay from 0.6 to 0.4 for Phase Attention)
+            current_alpha = update_alpha_schedule(model, state.step, config)
+
             # Logging
             if state.step % config.log_every == 0:
                 elapsed = time.time() - step_start_time
@@ -1705,6 +1745,9 @@ def train(config: TrainingConfig):
                     mem_used = torch.cuda.max_memory_allocated() / (1024**3)  # GB
                     log_msg += f" | VRAM: {mem_used:.1f}GB"
 
+                # Add alpha phase value (shows decay progress)
+                log_msg += f" | α_phase: {current_alpha:.2f}"
+
                 logger.info(log_msg)
 
                 # Wandb logging
@@ -1716,6 +1759,7 @@ def train(config: TrainingConfig):
                         "train/tokens_per_sec": tokens_per_sec,
                         "train/total_tokens": state.total_tokens,
                         "train/epoch": state.epoch,
+                        "train/alpha_phase": current_alpha,
                     }
                     # Add coherence metrics
                     if config.use_coherence_loss:
