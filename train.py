@@ -1795,6 +1795,14 @@ def train(config: TrainingConfig):
                     f"Val PPL: {val_metrics['val_perplexity']:.2f}"
                 )
 
+                # Save checkpoint at every eval for backtracking support
+                eval_ckpt_path = checkpoint_dir / f"step_{state.step}.pt"
+                if not eval_ckpt_path.exists():
+                    save_checkpoint(
+                        model, optimizer, scheduler, scaler, state, config,
+                        str(eval_ckpt_path)
+                    )
+
                 # Auto-reduce LR on PPL spike with adaptive response
                 # Track best PPL (initialize if not set)
                 if not hasattr(state, 'best_ppl'):
