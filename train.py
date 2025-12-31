@@ -251,11 +251,20 @@ class TrainingConfig:
     sync_lr: float = 0.1
 
     # Hybrid-specific parameters
-    local_layers: int = 4  # Number of early layers with local attention only
+    # NOTE: Updated defaults based on diagnostic findings:
+    # - 6/6 split works better than 4/8 for semantic feature extraction
+    # - Higher alpha_phase (0.6) forces the model to use long-range attention
+    # - Gate init changed to 0.95 to preserve memory (learn to forget, not remember)
+    local_layers: int = 6  # Number of early layers with local attention only (was 4)
     window_size: int = 256  # Local attention window size
     local_backend: str = "auto"  # LocalAttention backend: auto, flash, sdpa, unfold
-    alpha_local: float = 0.8  # Weight for local attention in hybrid layers
-    alpha_phase: float = 0.2  # Weight for phase attention in hybrid layers
+    alpha_local: float = 0.4  # Weight for local attention in hybrid layers (was 0.8)
+    alpha_phase: float = 0.6  # Weight for phase attention in hybrid layers (was 0.2)
+
+    # Alpha decay schedule: Start high to force long-range learning, decay for fine-grained PPL
+    alpha_phase_start: float = 0.6  # Initial phase attention weight
+    alpha_phase_end: float = 0.4    # Final phase attention weight
+    alpha_decay_steps: int = 10000  # Steps over which to decay alpha
 
     # Training hyperparameters
     batch_size: int = 16
@@ -613,6 +622,38 @@ def create_model(config: TrainingConfig) -> nn.Module:
 def count_parameters(model: nn.Module) -> int:
     """Count trainable parameters."""
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def update_alpha_schedule(
+    model: nn.Module,
+    step: int,
+    config: TrainingConfig,
+) -> float:
+    """
+    Update alpha_phase across all hybrid layers based on training progress.
+
+    Alpha decay schedule (from Gemini's recommendation):
+    - Start high (0.6) to force the model to use long-range Phase attention
+    - Decay to lower value (0.4) to allow local attention to sharpen PPL
+
+    This prevents the "local shortcut" where the model ignores Phase layers.
+    """
+    # Calculate current alpha based on linear decay
+    if step >= config.alpha_decay_steps:
+        current_alpha = config.alpha_phase_end
+    else:
+        frac = step / config.alpha_decay_steps
+        current_alpha = config.alpha_phase_start + frac * (config.alpha_phase_end - config.alpha_phase_start)
+
+    # Update all HybridAttentionLayer modules
+    for module in model.modules():
+        if hasattr(module, 'alpha_phase') and hasattr(module, 'alpha_local'):
+            # Update the parameters in-place
+            with torch.no_grad():
+                module.alpha_phase.fill_(current_alpha)
+                module.alpha_local.fill_(1.0 - current_alpha)
+
+    return current_alpha
 
 
 # =============================================================================
@@ -1676,6 +1717,9 @@ def train(config: TrainingConfig):
             state.train_losses.append(avg_loss)
             running_loss = 0.0
 
+            # Update alpha schedule (decay from 0.6 to 0.4 for Phase Attention)
+            current_alpha = update_alpha_schedule(model, state.step, config)
+
             # Logging
             if state.step % config.log_every == 0:
                 elapsed = time.time() - step_start_time
@@ -1701,6 +1745,9 @@ def train(config: TrainingConfig):
                     mem_used = torch.cuda.max_memory_allocated() / (1024**3)  # GB
                     log_msg += f" | VRAM: {mem_used:.1f}GB"
 
+                # Add alpha phase value (shows decay progress)
+                log_msg += f" | α_phase: {current_alpha:.2f}"
+
                 logger.info(log_msg)
 
                 # Wandb logging
@@ -1712,6 +1759,7 @@ def train(config: TrainingConfig):
                         "train/tokens_per_sec": tokens_per_sec,
                         "train/total_tokens": state.total_tokens,
                         "train/epoch": state.epoch,
+                        "train/alpha_phase": current_alpha,
                     }
                     # Add coherence metrics
                     if config.use_coherence_loss:
@@ -1851,18 +1899,18 @@ def parse_args() -> TrainingConfig:
     parser.add_argument("--sync_lr", type=float, default=0.1,
                        help="Phase synchronization learning rate")
 
-    # Hybrid parameters
-    parser.add_argument("--local_layers", type=int, default=4,
-                       help="Number of early layers with local attention only (hybrid mode)")
+    # Hybrid parameters (updated defaults for better long-range retrieval)
+    parser.add_argument("--local_layers", type=int, default=6,
+                       help="Number of early layers with local attention only (was 4, now 6)")
     parser.add_argument("--window_size", type=int, default=256,
                        help="Local attention window size (hybrid mode)")
     parser.add_argument("--local_backend", type=str, default="auto",
                        choices=["auto", "flash", "sdpa", "unfold"],
                        help="LocalAttention backend: flash (fastest), sdpa, unfold (fallback)")
-    parser.add_argument("--alpha_local", type=float, default=0.8,
-                       help="Weight for local attention in hybrid layers")
-    parser.add_argument("--alpha_phase", type=float, default=0.2,
-                       help="Weight for phase attention in hybrid layers")
+    parser.add_argument("--alpha_local", type=float, default=0.4,
+                       help="Weight for local attention in hybrid layers (was 0.8, now 0.4)")
+    parser.add_argument("--alpha_phase", type=float, default=0.6,
+                       help="Weight for phase attention in hybrid layers (was 0.2, now 0.6)")
 
     # Training
     parser.add_argument("--batch_size", type=int, default=16,
