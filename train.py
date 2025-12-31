@@ -731,6 +731,7 @@ class TrainingState:
     best_val_loss: float = float('inf')
     total_tokens: int = 0
     train_losses: list = field(default_factory=list)
+    ppl_history: list = field(default_factory=list)  # Track PPL for trend detection
 
 
 def compute_semantic_entropy(logits: torch.Tensor, max_positions: int = 1024) -> torch.Tensor:
@@ -1881,12 +1882,22 @@ def train(config: TrainingConfig):
                     state.spike_count = 0
                 if not hasattr(state, 'lr_scale'):
                     state.lr_scale = 1.0  # Persistent LR multiplier
+                if not hasattr(state, 'ppl_history'):
+                    state.ppl_history = []
 
                 current_ppl = val_metrics['val_perplexity']
+
+                # Track PPL history for trend detection (keep last 5)
+                state.ppl_history.append(current_ppl)
+                if len(state.ppl_history) > 5:
+                    state.ppl_history = state.ppl_history[-5:]
+
                 if current_ppl < state.best_ppl:
                     state.best_ppl = current_ppl
                 elif state.step > config.warmup_steps // 2:
-                    # Tiered spike response
+                    # =================================================================
+                    # HARD SAFETY LIMITS (catastrophic spikes - always trigger)
+                    # =================================================================
                     if current_ppl > state.best_ppl * 2.0:
                         # MAJOR SPIKE (>2x): Backtrack + 0.7x LR + Reset momentum
                         state.spike_count += 1
@@ -1934,17 +1945,47 @@ def train(config: TrainingConfig):
 
                         logger.info(f"  ⚠️ PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*1.5)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
 
-                    elif current_ppl > state.best_ppl * 1.3:
-                        # MINOR SPIKE (>1.3x): 0.85x LR only (no reset)
-                        old_scale = state.lr_scale
-                        state.lr_scale *= 0.85  # Persistent reduction
-                        logger.info(f"  ⚡ Minor PPL increase ({current_ppl:.1f} > {state.best_ppl:.1f}*1.3). LR scale: {old_scale:.3f} → {state.lr_scale:.3f}")
+                    # =================================================================
+                    # TREND-BASED ADAPTIVE LR (replaces fixed 1.2x/1.3x thresholds)
+                    # Uses rate of change instead of arbitrary multipliers
+                    # =================================================================
+                    elif len(state.ppl_history) >= 3:
+                        # Compute rate of change over last 3 evals
+                        delta_1 = state.ppl_history[-1] - state.ppl_history[-2]  # Most recent
+                        delta_2 = state.ppl_history[-2] - state.ppl_history[-3]  # Previous
 
-                    elif current_ppl > state.best_ppl * 1.2:
-                        # EARLY WARNING (>1.2x): 0.9x LR only (gentlest intervention)
-                        old_scale = state.lr_scale
-                        state.lr_scale *= 0.9  # Persistent reduction
-                        logger.info(f"  📉 Early warning ({current_ppl:.1f} > {state.best_ppl:.1f}*1.2). LR scale: {old_scale:.3f} → {state.lr_scale:.3f}")
+                        # Check if PPL is increasing (positive deltas)
+                        if delta_1 > 0:
+                            # Compute average rate of increase
+                            avg_delta = (delta_1 + max(0, delta_2)) / 2
+
+                            # Relative rate: how fast is PPL growing relative to current value
+                            relative_rate = avg_delta / current_ppl if current_ppl > 0 else 0
+
+                            # Is it accelerating? (getting worse faster)
+                            is_accelerating = delta_1 > delta_2 and delta_2 > 0
+
+                            if is_accelerating or relative_rate > 0.05:
+                                # Proportional reduction based on severity
+                                # relative_rate of 0.05 (5% growth) -> 0.95x LR
+                                # relative_rate of 0.10 (10% growth) -> 0.90x LR
+                                # relative_rate of 0.20 (20% growth) -> 0.80x LR
+                                reduction = 1.0 - min(0.20, relative_rate)  # Cap at 0.80x
+                                reduction = max(0.80, reduction)  # Floor at 0.80x
+
+                                # Extra penalty if accelerating
+                                if is_accelerating:
+                                    reduction *= 0.95  # Additional 5% reduction
+
+                                old_scale = state.lr_scale
+                                state.lr_scale *= reduction
+
+                                trend_type = "accelerating ⚠️" if is_accelerating else "increasing"
+                                logger.info(
+                                    f"  📈 PPL {trend_type}: Δ=[{delta_2:+.1f}, {delta_1:+.1f}], "
+                                    f"rate={relative_rate*100:.1f}%/eval. "
+                                    f"LR scale: {old_scale:.3f} → {state.lr_scale:.3f}"
+                                )
 
                 # Track best
                 if val_metrics['val_loss'] < state.best_val_loss:
