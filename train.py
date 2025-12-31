@@ -731,6 +731,9 @@ class TrainingState:
     best_val_loss: float = float('inf')
     total_tokens: int = 0
     train_losses: list = field(default_factory=list)
+    ppl_history: list = field(default_factory=list)  # Track PPL for trend detection
+    trend_patience: int = 0  # Patience counter for trend-based interventions
+    ema_ppl: float = 0.0  # Exponential moving average of PPL (smooths noise)
 
 
 def compute_semantic_entropy(logits: torch.Tensor, max_positions: int = 1024) -> torch.Tensor:
@@ -1554,6 +1557,56 @@ def save_checkpoint(
     torch.save(checkpoint, path)
 
 
+def save_checkpoint_light(
+    model: PhaseTransformer,
+    state: TrainingState,
+    config: TrainingConfig,
+    path: str,
+):
+    """
+    Save lightweight checkpoint (model only, no optimizer).
+
+    Used for eval-interval checkpoints to save disk space.
+    A 145M model saves ~550MB vs ~1.6GB with optimizer state.
+    """
+    checkpoint = {
+        "model": model.state_dict(),
+        "state": asdict(state),
+        "config": asdict(config),
+    }
+    torch.save(checkpoint, path)
+
+
+def cleanup_old_checkpoints(checkpoint_dir: Path, keep_last: int = 5):
+    """
+    Remove old step_*.pt checkpoints, keeping only the last N.
+
+    This prevents disk space exhaustion when saving at every eval interval.
+    Always preserves: best.pt, latest.pt, final.pt
+    """
+    import re
+
+    # Find all step_*.pt files
+    step_files = []
+    for f in checkpoint_dir.glob("step_*.pt"):
+        match = re.match(r"step_(\d+)\.pt", f.name)
+        if match:
+            step_num = int(match.group(1))
+            step_files.append((step_num, f))
+
+    # Sort by step number
+    step_files.sort(key=lambda x: x[0])
+
+    # Remove all but the last N
+    if len(step_files) > keep_last:
+        files_to_remove = step_files[:-keep_last]
+        for step_num, filepath in files_to_remove:
+            try:
+                filepath.unlink()
+            except OSError:
+                pass  # Ignore errors (file might be in use)
+
+
 def load_checkpoint(
     path: str,
     model: PhaseTransformer,
@@ -1812,13 +1865,16 @@ def train(config: TrainingConfig):
                     f"Val PPL: {val_metrics['val_perplexity']:.2f}"
                 )
 
-                # Save checkpoint at every eval for backtracking support
+                # Save lightweight checkpoint at every eval for backtracking support
+                # Uses model-only saves (~550MB vs ~1.6GB) to prevent disk exhaustion
                 eval_ckpt_path = checkpoint_dir / f"step_{state.step}.pt"
                 if not eval_ckpt_path.exists():
-                    save_checkpoint(
-                        model, optimizer, scheduler, scaler, state, config,
+                    save_checkpoint_light(
+                        model, state, config,
                         str(eval_ckpt_path)
                     )
+                    # Clean up old eval checkpoints, keep last 5 for backtracking
+                    cleanup_old_checkpoints(checkpoint_dir, keep_last=5)
 
                 # Auto-reduce LR on PPL spike with adaptive response
                 # Track best PPL (initialize if not set)
@@ -1828,17 +1884,44 @@ def train(config: TrainingConfig):
                     state.spike_count = 0
                 if not hasattr(state, 'lr_scale'):
                     state.lr_scale = 1.0  # Persistent LR multiplier
+                if not hasattr(state, 'ppl_history'):
+                    state.ppl_history = []
+                if not hasattr(state, 'ema_ppl'):
+                    state.ema_ppl = 0.0
 
                 current_ppl = val_metrics['val_perplexity']
+
+                # Update EMA PPL (smooths out single bad batches)
+                # EMA = 0.9 * old + 0.1 * new (responds to trends, ignores noise)
+                if state.ema_ppl == 0.0:
+                    state.ema_ppl = current_ppl  # Initialize with first value
+                else:
+                    state.ema_ppl = 0.9 * state.ema_ppl + 0.1 * current_ppl
+
+                # Track PPL history for trend detection (keep last 10 for smoother trends)
+                state.ppl_history.append(current_ppl)
+                if len(state.ppl_history) > 10:
+                    state.ppl_history = state.ppl_history[-10:]
+
                 if current_ppl < state.best_ppl:
                     state.best_ppl = current_ppl
+                    # CRITICAL: Reset EMA to current PPL when new best found
+                    # Otherwise EMA carries "ghost" of old high values
+                    state.ema_ppl = current_ppl
                 elif state.step > config.warmup_steps // 2:
-                    # Tiered spike response
+                    # =================================================================
+                    # HARD SAFETY LIMITS - Use RAW PPL (not EMA) for spike detection
+                    # EMA carries ghost values; raw PPL is more reliable
+                    # =================================================================
+
+                    # Minimum LR floor - never let lr_scale drop below 0.1 (10% of base LR)
+                    MIN_LR_SCALE = 0.1
+
                     if current_ppl > state.best_ppl * 2.0:
-                        # MAJOR SPIKE (>2x): Backtrack + 0.7x LR + Reset momentum
+                        # MAJOR SPIKE (>2x): Backtrack + 0.8x LR + Reset momentum
                         state.spike_count += 1
                         old_scale = state.lr_scale
-                        state.lr_scale *= 0.7  # Persistent reduction
+                        state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.8)
 
                         # Try to backtrack to best checkpoint
                         best_ckpt = checkpoint_dir / "best.pt"
@@ -1853,21 +1936,25 @@ def train(config: TrainingConfig):
                         logger.info(f"  🚨 MAJOR PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*2.0)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
 
                     elif current_ppl > state.best_ppl * 1.5:
-                        # MODERATE SPIKE (>1.5x): Backtrack 200 steps + 0.7x LR + Reset momentum
+                        # MODERATE SPIKE (>1.5x): Backtrack to oldest available + 0.85x LR + Reset momentum
                         state.spike_count += 1
                         old_scale = state.lr_scale
-                        state.lr_scale *= 0.7  # Persistent reduction
+                        state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.85)
 
-                        # Try to backtrack 200 steps (2 eval intervals)
-                        backtrack_steps = 200
-                        target_step = state.step - backtrack_steps
-                        backtrack_ckpt = checkpoint_dir / f"step_{target_step}.pt"
-                        if backtrack_ckpt.exists():
-                            logger.info(f"  🔄 MODERATE SPIKE! Backtracking to step {target_step}...")
+                        # Find oldest available step checkpoint (we keep last 5)
+                        # This gives us the most stable point to backtrack to
+                        backtrack_ckpt = None
+                        for f in sorted(checkpoint_dir.glob("step_*.pt")):
+                            # Take the oldest (first in sorted order)
+                            backtrack_ckpt = f
+                            break
+
+                        if backtrack_ckpt and backtrack_ckpt.exists():
+                            logger.info(f"  🔄 MODERATE SPIKE! Backtracking to {backtrack_ckpt.name}...")
                             ckpt = torch.load(backtrack_ckpt, map_location=device, weights_only=False)
                             model.load_state_dict(ckpt['model'])
                         elif (checkpoint_dir / "best.pt").exists():
-                            # Fall back to best checkpoint if 200-step checkpoint doesn't exist
+                            # Fall back to best checkpoint if no step checkpoints exist
                             logger.info(f"  🔄 MODERATE SPIKE! Backtracking to best checkpoint...")
                             ckpt = torch.load(checkpoint_dir / "best.pt", map_location=device, weights_only=False)
                             model.load_state_dict(ckpt['model'])
@@ -1877,17 +1964,67 @@ def train(config: TrainingConfig):
 
                         logger.info(f"  ⚠️ PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*1.5)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
 
-                    elif current_ppl > state.best_ppl * 1.3:
-                        # MINOR SPIKE (>1.3x): 0.85x LR only (no reset)
-                        old_scale = state.lr_scale
-                        state.lr_scale *= 0.85  # Persistent reduction
-                        logger.info(f"  ⚡ Minor PPL increase ({current_ppl:.1f} > {state.best_ppl:.1f}*1.3). LR scale: {old_scale:.3f} → {state.lr_scale:.3f}")
+                    # =================================================================
+                    # TREND-BASED ADAPTIVE LR with DAMPING (per Google's advice)
+                    # - Higher threshold (12%) to avoid triggering on noise
+                    # - Patience counter requires 2 consecutive bad evals
+                    # - Two-tier response: gentle vs aggressive
+                    # =================================================================
+                    elif len(state.ppl_history) >= 3:
+                        # Initialize patience if not present
+                        if not hasattr(state, 'trend_patience'):
+                            state.trend_patience = 0
 
-                    elif current_ppl > state.best_ppl * 1.2:
-                        # EARLY WARNING (>1.2x): 0.9x LR only (gentlest intervention)
-                        old_scale = state.lr_scale
-                        state.lr_scale *= 0.9  # Persistent reduction
-                        logger.info(f"  📉 Early warning ({current_ppl:.1f} > {state.best_ppl:.1f}*1.2). LR scale: {old_scale:.3f} → {state.lr_scale:.3f}")
+                        # Compute rate of change over last 3 evals
+                        delta_1 = state.ppl_history[-1] - state.ppl_history[-2]  # Most recent
+                        delta_2 = state.ppl_history[-2] - state.ppl_history[-3]  # Previous
+
+                        # Check if PPL is increasing (positive deltas)
+                        if delta_1 > 0:
+                            # Relative rate: how fast is PPL growing relative to current value
+                            relative_rate = delta_1 / current_ppl if current_ppl > 0 else 0
+
+                            # Is it accelerating? Requires SIGNIFICANT surge (1.2x, not just >)
+                            is_accelerating = delta_1 > (1.2 * delta_2) and delta_2 > 0
+
+                            # Determine if this is a concerning trend
+                            is_concerning = relative_rate > 0.12 or is_accelerating
+
+                            if is_concerning:
+                                state.trend_patience += 1
+                            else:
+                                state.trend_patience = 0  # Reset on good eval
+
+                            # TWO-TIER RESPONSE based on patience
+                            if state.trend_patience >= 2:
+                                # AGGRESSIVE: Confirmed trend (2 consecutive bad evals)
+                                # Reduce LR by 0.92x + reset momentum
+                                old_scale = state.lr_scale
+                                state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.92)
+
+                                # Reset momentum only on confirmed trends
+                                optimizer.state = collections.defaultdict(dict)
+
+                                logger.info(
+                                    f"  📈 PPL trend CONFIRMED: Δ=[{delta_2:+.1f}, {delta_1:+.1f}], "
+                                    f"rate={relative_rate*100:.1f}%/eval, patience={state.trend_patience}. "
+                                    f"LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + momentum reset"
+                                )
+                                state.trend_patience = 0  # Reset after intervention
+
+                            elif state.trend_patience == 1:
+                                # GENTLE: First warning, small nudge (no momentum reset)
+                                old_scale = state.lr_scale
+                                state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.98)
+
+                                logger.info(
+                                    f"  📊 PPL watching: Δ=[{delta_2:+.1f}, {delta_1:+.1f}], "
+                                    f"rate={relative_rate*100:.1f}%/eval. "
+                                    f"LR scale: {old_scale:.3f} → {state.lr_scale:.3f} (gentle, patience=1)"
+                                )
+                        else:
+                            # PPL decreased or stable - reset patience
+                            state.trend_patience = 0
 
                 # Track best
                 if val_metrics['val_loss'] < state.best_val_loss:
