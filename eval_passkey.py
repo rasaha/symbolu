@@ -155,7 +155,13 @@ def generate_completion(model, tokenizer, prompt: str, device: torch.device, max
 
         for _ in range(max_new_tokens):
             outputs = model(generated)
-            logits = outputs if isinstance(outputs, torch.Tensor) else outputs[0]
+            # Handle different output formats: tensor, dict, or tuple
+            if isinstance(outputs, torch.Tensor):
+                logits = outputs
+            elif isinstance(outputs, dict):
+                logits = outputs['logits']
+            else:
+                logits = outputs[0]
             next_token_logits = logits[:, -1, :]
             next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
             generated = torch.cat([generated, next_token], dim=1)
