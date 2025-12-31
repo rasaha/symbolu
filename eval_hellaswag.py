@@ -47,7 +47,7 @@ def load_model(checkpoint_path: str, device: torch.device):
 
     # Create and load model
     model = create_model(config)
-    model.load_state_dict(checkpoint['model'])
+    model.load_state_dict(checkpoint['model'], strict=False)
     model.to(device)
     model.eval()
 
