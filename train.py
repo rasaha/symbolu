@@ -768,6 +768,14 @@ class TrainingConfig:
     handshake_phase_lr: float = 2e-5  # Phase LR during handshake spike
     handshake_duration: int = 500  # Steps to maintain spike (3001-3500)
 
+    # V9.3.2: Recovery Mode - active LR reduction when frozen but still degrading
+    recovery_mode_enabled: bool = True  # Enable recovery mode after freeze
+    recovery_ppl_threshold: float = 0.05  # 5% PPL rise triggers LR cut
+    recovery_lr_cut_factor: float = 0.5  # Cut LR by 50% each time
+    recovery_max_cuts: int = 3  # Maximum number of LR cuts before giving up
+    recovery_exit_coh: float = 0.720  # Exit recovery when coherence > this
+    recovery_exit_ppl_drops: int = 2  # AND PPL drops for this many consecutive evals
+
     # Learning rate schedule
     lr_scheduler: str = "cosine"  # cosine, linear, constant
     min_lr_ratio: float = 0.1  # minimum LR as ratio of peak
@@ -2619,6 +2627,8 @@ def train(config: TrainingConfig):
         logger.info(f"  Lookahead: k={config.lookahead_k}, α={config.lookahead_alpha}")
         logger.info(f"  PPL-Guard: velocity_threshold={config.ppl_velocity_threshold}")
         logger.info(f"  Handshake Spike: {config.handshake_spike_factor}x LR at step {config.phase_delay_steps + 1}")
+        if config.recovery_mode_enabled:
+            logger.info(f"  V9.3.2 Recovery: cut={config.recovery_lr_cut_factor}x on PPL>{config.recovery_ppl_threshold*100:.0f}%, max_cuts={config.recovery_max_cuts}")
         logger.info("=" * 60)
 
         # Initialize PPL-Guard
@@ -2872,6 +2882,12 @@ def train(config: TrainingConfig):
                     else:
                         log_msg += f" | GSS: {gss:.3f}"
 
+                # V9.3.2: Show recovery mode status
+                if getattr(state, 'recovery_active', False):
+                    log_msg += f" | 🔻RECOVERY(cuts={state.recovery_lr_cuts})"
+                elif getattr(state, 'lr_frozen', False):
+                    log_msg += " | 🧊FROZEN"
+
                 logger.info(log_msg)
 
                 # Wandb logging
@@ -3026,6 +3042,77 @@ def train(config: TrainingConfig):
                                 f"Val PPL Δ={ppl_velocity:.0f} > 500 AND Coh={current_coh:.3f} < 0.700. "
                                 f"LR locked at {state.lr_frozen_value:.2e}"
                             )
+
+                # =================================================================
+                # V9.3.2: RECOVERY MODE - Active LR reduction when frozen but degrading
+                # If LR is frozen but PPL keeps rising, the frozen LR is still too high.
+                # We actively cut LR by 50% each time PPL rises > 5% from freeze point.
+                # Exit recovery when Coh > 0.720 AND PPL drops for 2 consecutive evals.
+                # =================================================================
+                if config.recovery_mode_enabled and getattr(state, 'lr_frozen', False):
+                    current_ppl = val_metrics['val_perplexity']
+                    current_coh = metrics.get('coherence', 1.0)
+
+                    # Initialize recovery state if not present
+                    if not hasattr(state, 'recovery_active'):
+                        state.recovery_active = False
+                        state.recovery_ppl_at_freeze = None
+                        state.recovery_lr_cuts = 0
+                        state.recovery_last_ppl = None
+                        state.recovery_consecutive_drops = 0
+
+                    # Record PPL at freeze point if not set
+                    if state.recovery_ppl_at_freeze is None:
+                        state.recovery_ppl_at_freeze = current_ppl
+                        state.recovery_last_ppl = current_ppl
+                        logger.info(f"📍 [Step {state.step}] Recovery baseline set: PPL={current_ppl:.2f}")
+
+                    # Check for recovery exit conditions
+                    if state.recovery_active:
+                        if current_ppl < state.recovery_last_ppl:
+                            state.recovery_consecutive_drops += 1
+                        else:
+                            state.recovery_consecutive_drops = 0
+
+                        # Exit recovery if coherence recovered AND PPL dropping steadily
+                        if (current_coh > config.recovery_exit_coh and
+                            state.recovery_consecutive_drops >= config.recovery_exit_ppl_drops):
+                            state.recovery_active = False
+                            logger.info(
+                                f"✅ [Step {state.step}] RECOVERY EXIT: "
+                                f"Coh={current_coh:.3f} > {config.recovery_exit_coh:.3f} AND "
+                                f"{state.recovery_consecutive_drops} consecutive PPL drops. "
+                                f"LR stabilized at {state.lr_frozen_value:.2e} after {state.recovery_lr_cuts} cuts"
+                            )
+                        state.recovery_last_ppl = current_ppl
+
+                    # Check if we need to enter recovery or cut LR further
+                    if not state.recovery_active or current_ppl > state.recovery_last_ppl:
+                        ppl_rise_ratio = (current_ppl - state.recovery_ppl_at_freeze) / state.recovery_ppl_at_freeze
+
+                        # If PPL rose > threshold from freeze point, cut LR
+                        if ppl_rise_ratio > config.recovery_ppl_threshold:
+                            if state.recovery_lr_cuts < config.recovery_max_cuts:
+                                old_lr = state.lr_frozen_value
+                                state.lr_frozen_value *= config.recovery_lr_cut_factor
+                                state.recovery_lr_cuts += 1
+                                state.recovery_active = True
+                                state.recovery_ppl_at_freeze = current_ppl  # Reset baseline after cut
+
+                                logger.warning(
+                                    f"🔻 [Step {state.step}] RECOVERY CUT #{state.recovery_lr_cuts}: "
+                                    f"PPL rose {ppl_rise_ratio*100:.1f}% > {config.recovery_ppl_threshold*100:.0f}% threshold. "
+                                    f"LR: {old_lr:.2e} → {state.lr_frozen_value:.2e} "
+                                    f"(Coh={current_coh:.3f})"
+                                )
+                            else:
+                                logger.error(
+                                    f"❌ [Step {state.step}] RECOVERY EXHAUSTED: "
+                                    f"Max {config.recovery_max_cuts} LR cuts reached but PPL still rising. "
+                                    f"Consider restarting from earlier checkpoint."
+                                )
+
+                    state.recovery_last_ppl = current_ppl
 
                 # Save lightweight checkpoint at every eval for backtracking support
                 # Uses model-only saves (~550MB vs ~1.6GB) to prevent disk exhaustion
@@ -3424,6 +3511,16 @@ def parse_args() -> TrainingConfig:
     parser.add_argument("--handshake_duration", type=int, default=500,
                        help="V9.3: Duration of handshake spike in steps")
 
+    # V9.3.2: Recovery Mode
+    parser.add_argument("--no_recovery_mode", action="store_true",
+                       help="V9.3.2: Disable recovery mode (active LR cuts when frozen)")
+    parser.add_argument("--recovery_ppl_threshold", type=float, default=0.05,
+                       help="V9.3.2: PPL rise ratio that triggers LR cut (default: 5%%)")
+    parser.add_argument("--recovery_lr_cut_factor", type=float, default=0.5,
+                       help="V9.3.2: LR multiplier on each recovery cut (default: 0.5 = 50%% cut)")
+    parser.add_argument("--recovery_max_cuts", type=int, default=3,
+                       help="V9.3.2: Maximum number of LR cuts before giving up")
+
     # LR schedule
     parser.add_argument("--lr_scheduler", type=str, default="cosine",
                        choices=["cosine", "linear", "constant"],
@@ -3565,9 +3662,12 @@ def parse_args() -> TrainingConfig:
         args.ppl_guard_enabled = False
         args.handshake_spike_enabled = False
 
+    # V9.3.2: Map --no_recovery_mode to recovery_mode_enabled (inverted)
+    args.recovery_mode_enabled = not getattr(args, 'no_recovery_mode', False)
+
     # Remove CLI-only flags that don't exist in TrainingConfig
     args_dict = vars(args)
-    for cli_only_arg in ['memory_guard', 'no_coherence_freeze', 'trinity']:
+    for cli_only_arg in ['memory_guard', 'no_coherence_freeze', 'trinity', 'no_recovery_mode']:
         args_dict.pop(cli_only_arg, None)
 
     # Create config from args
