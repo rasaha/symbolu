@@ -262,10 +262,13 @@ class TrainingConfig:
     alpha_local: float = 0.4  # Weight for local attention in hybrid layers (was 0.8)
     alpha_phase: float = 0.6  # Weight for phase attention in hybrid layers (was 0.2)
 
-    # Alpha decay schedule: Start high to force long-range learning, decay for fine-grained PPL
-    alpha_phase_start: float = 0.6  # Initial phase attention weight
-    alpha_phase_end: float = 0.4    # Final phase attention weight
-    alpha_decay_steps: int = 10000  # Steps over which to decay alpha
+    # Alpha FADE-IN schedule: "Training Wheels" for hybrid stability
+    # Start with phase OFF (0.0), gradually fade in to target (0.6)
+    # This forces Quadratic layers to learn basic patterns first,
+    # then Phase layers join in for long-range structure
+    alpha_phase_start: float = 0.0   # Initial: Phase attention OFF (training wheels)
+    alpha_phase_end: float = 0.6     # Final: Full phase attention
+    alpha_warmup_steps: int = 10000  # Steps to fade in phase attention (V8: extended runway)
 
     # Training hyperparameters
     batch_size: int = 16
@@ -280,6 +283,17 @@ class TrainingConfig:
     beta2: float = 0.95
     eps: float = 1e-8
     max_grad_norm: float = 1.0
+
+    # LLRD: Layer-wise Learning Rate Decay (Attention Cooling)
+    # The Q, K, V projections in attention are sensitive to high LR (softmax saturation).
+    # Apply a "cooling factor" to attention params while keeping phase/MLP at full LR.
+    # 0.5 is balanced; use 0.3 for "safety first" during instability
+    attn_cooling_factor: float = 1.0  # Local/Quadratic attention LR multiplier (baseline, full LR)
+    phase_cooling_factor: float = 0.25  # Phase attention MAX LR multiplier (V9: 0.25x = 1e-5 at base 4e-5)
+
+    # V9: Delayed Phase LR - Phase layers frozen until Quadratic builds foundation
+    phase_delay_steps: int = 3000  # Steps before Phase LR starts (frozen at 0)
+    phase_ramp_steps: int = 7000   # Steps to ramp Phase LR from 0 to phase_cooling_factor
 
     # Learning rate schedule
     lr_scheduler: str = "cosine"  # cosine, linear, constant
@@ -306,7 +320,11 @@ class TrainingConfig:
     tokenizer: str = "gpt2"  # gpt2, tiktoken, custom
 
     # Evaluation
-    eval_samples: int = 1000
+    # eval_samples = max sequences to evaluate (NOT tokens)
+    # With batch_size=32, eval_samples=256 means 8 batches = 256K tokens
+    # WikiText-103 val set is only 248K tokens (~7 batches), so 256 uses full set
+    # For larger datasets (C4), keep this reasonable to avoid slow evals
+    eval_samples: int = 256  # ~8 batches = 256K tokens at batch_size=32, seq_len=1024
 
     # Logging
     wandb: bool = False
@@ -350,6 +368,14 @@ class TrainingConfig:
 
     # Seed
     seed: int = 42
+
+    # Quality Sampling (periodic generation to monitor training quality)
+    sample_every: int = 500  # Generate samples every N steps (0 = disabled)
+    sample_prompts: tuple = (
+        "The history of the Roman Empire began when",
+        "In computer science, algorithms are",
+        "The weather today is expected to be",
+    )
 
 
 # Model size presets
@@ -631,30 +657,134 @@ def update_alpha_schedule(
     config: TrainingConfig,
 ) -> float:
     """
-    Update alpha_phase across all hybrid layers based on training progress.
+    Update alpha_phase across all layers based on training progress.
 
-    Alpha decay schedule (from Gemini's recommendation):
-    - Start high (0.6) to force the model to use long-range Phase attention
-    - Decay to lower value (0.4) to allow local attention to sharpen PPL
+    "Training Wheels" FADE-IN schedule (per ChatGPT/Google analysis):
+    - Start with phase attention OFF (0.0) to let Quadratic layers learn first
+    - Gradually fade in phase attention to target (0.6) over alpha_warmup_steps
+    - This prevents "representation shear" where Phase distorts the residual stream
+      before Quadratic layers have learned stable manifolds
 
-    This prevents the "local shortcut" where the model ignores Phase layers.
+    The Coherence (Coh) metric should stay stable or improve with this schedule.
+    If Coh drops rapidly, phase is interfering too early.
     """
-    # Calculate current alpha based on linear decay
-    if step >= config.alpha_decay_steps:
+    # Calculate current alpha based on linear FADE-IN
+    if step >= config.alpha_warmup_steps:
         current_alpha = config.alpha_phase_end
     else:
-        frac = step / config.alpha_decay_steps
+        frac = step / config.alpha_warmup_steps
+        # Linear interpolation: 0.0 → 0.6 over warmup steps
         current_alpha = config.alpha_phase_start + frac * (config.alpha_phase_end - config.alpha_phase_start)
 
-    # Update all HybridAttentionLayer modules
+    # Update all attention layers that have alpha_phase
     for module in model.modules():
-        if hasattr(module, 'alpha_phase') and hasattr(module, 'alpha_local'):
-            # Update the parameters in-place
+        if hasattr(module, 'alpha_phase'):
             with torch.no_grad():
-                module.alpha_phase.fill_(current_alpha)
-                module.alpha_local.fill_(1.0 - current_alpha)
+                if hasattr(module.alpha_phase, 'fill_'):
+                    module.alpha_phase.fill_(current_alpha)
+                else:
+                    module.alpha_phase = current_alpha
+
+            # Also update alpha_local if present (hybrid layers)
+            if hasattr(module, 'alpha_local'):
+                with torch.no_grad():
+                    if hasattr(module.alpha_local, 'fill_'):
+                        module.alpha_local.fill_(1.0 - current_alpha)
+                    else:
+                        module.alpha_local = 1.0 - current_alpha
 
     return current_alpha
+
+
+# =============================================================================
+# GRADIENT DIAGNOSTICS
+# =============================================================================
+
+def compute_tier_gradient_norms(model: nn.Module) -> dict:
+    """
+    Compute gradient norms per tier to verify all layers are learning.
+
+    Returns dict with:
+    - stable_grad_norm: Gradient norm for MLP/embed params
+    - local_attn_grad_norm: Gradient norm for Quadratic attention params
+    - phase_attn_grad_norm: Gradient norm for Phase attention params
+    - stable_grad_max: Max gradient in stable tier
+    - local_attn_grad_max: Max gradient in local tier
+    - phase_attn_grad_max: Max gradient in phase tier
+
+    If a tier has grad_norm ≈ 0, those layers are NOT learning.
+    """
+    ATTN_PATTERNS = ["q_proj", "k_proj", "v_proj", "o_proj", "out_proj"]
+
+    stable_grads = []
+    local_attn_grads = []
+    phase_attn_grads = []
+
+    for name, param in model.named_parameters():
+        if param.grad is None:
+            continue
+
+        grad_norm = param.grad.data.norm(2).item()
+        name_lower = name.lower()
+
+        # Classify into tier
+        is_attn = any(pattern in name_lower for pattern in ATTN_PATTERNS)
+
+        if not is_attn:
+            stable_grads.append(grad_norm)
+        elif 'phase_attn' in name_lower or 'phase_attention' in name_lower:
+            phase_attn_grads.append(grad_norm)
+        else:
+            local_attn_grads.append(grad_norm)
+
+    def safe_stats(grads):
+        if not grads:
+            return 0.0, 0.0
+        total_norm = (sum(g**2 for g in grads)) ** 0.5
+        max_norm = max(grads)
+        return total_norm, max_norm
+
+    stable_norm, stable_max = safe_stats(stable_grads)
+    local_norm, local_max = safe_stats(local_attn_grads)
+    phase_norm, phase_max = safe_stats(phase_attn_grads)
+
+    return {
+        'stable_grad_norm': stable_norm,
+        'local_attn_grad_norm': local_norm,
+        'phase_attn_grad_norm': phase_norm,
+        'stable_grad_max': stable_max,
+        'local_attn_grad_max': local_max,
+        'phase_attn_grad_max': phase_max,
+        'stable_param_count': len(stable_grads),
+        'local_attn_param_count': len(local_attn_grads),
+        'phase_attn_param_count': len(phase_attn_grads),
+    }
+
+
+def log_tier_gradients(model: nn.Module, step: int, logger) -> None:
+    """Log gradient norms per tier to verify learning health. (Legacy - computes at call time)"""
+    stats = compute_tier_gradient_norms(model)
+    log_tier_gradients_from_metrics(stats, step, logger)
+
+
+def log_tier_gradients_from_metrics(stats: dict, step: int, logger) -> None:
+    """Log gradient norms per tier using pre-computed stats from train_step."""
+    # Format: show norm and whether tier is "alive" (learning)
+    def status(norm):
+        if norm < 1e-8:
+            return "❌ DEAD"
+        elif norm < 1e-5:
+            return "⚠️ WEAK"
+        else:
+            return "✅"
+
+    logger.info(f"  📊 Gradient Health @ Step {step}:")
+    logger.info(f"     Stable ({stats['stable_param_count']} params):     "
+                f"norm={stats['stable_grad_norm']:.2e} {status(stats['stable_grad_norm'])}")
+    logger.info(f"     Local Attn ({stats['local_attn_param_count']} params): "
+                f"norm={stats['local_attn_grad_norm']:.2e} {status(stats['local_attn_grad_norm'])}")
+    logger.info(f"     Phase Attn ({stats['phase_attn_param_count']} params): "
+                f"norm={stats['phase_attn_grad_norm']:.2e} {status(stats['phase_attn_grad_norm'])}")
 
 
 # =============================================================================
@@ -662,31 +792,149 @@ def update_alpha_schedule(
 # =============================================================================
 
 def create_optimizer(model: nn.Module, config: TrainingConfig) -> AdamW:
-    """Create AdamW optimizer with weight decay."""
+    """
+    Create AdamW optimizer with TWO-TIER LLRD (Layer-wise Learning Rate Decay).
 
-    # Separate parameters into decay and no-decay groups
-    decay_params = []
-    no_decay_params = []
+    Separates parameters into 6 groups for hybrid Local+Phase architecture:
+    1. Stable params with decay (embeddings, MLP, non-attention params) - FULL LR (1.0x)
+    2. Stable params without decay (bias, norm) - FULL LR (1.0x)
+    3. Local/Quadratic attention params with decay - BASELINE LR (1.0x)
+    4. Local/Quadratic attention params without decay - BASELINE LR (1.0x)
+    5. Phase attention params with decay - STRONG cooling (0.2x)
+    6. Phase attention params without decay - STRONG cooling (0.2x)
+
+    The Two-Tier approach recognizes that:
+    - Local/Quadratic (O(n²)) layers are the "heavy lifters" - stable, can handle full LR
+    - Phase (O(n)) layers are "precision rotators" - sensitive, need strong cooling
+    """
+
+    # Attention parameter patterns
+    ATTN_PATTERNS = ["q_proj", "k_proj", "v_proj", "o_proj", "out_proj"]
+
+    def get_param_tier(name: str) -> str:
+        """
+        Classify parameter into tier: 'stable', 'local_attn', or 'phase_attn'.
+        """
+        name_lower = name.lower()
+
+        # Check if it's an attention parameter
+        is_attn = any(pattern in name_lower for pattern in ATTN_PATTERNS)
+        if not is_attn:
+            return 'stable'
+
+        # Distinguish between local_attn and phase_attn
+        if 'phase_attn' in name_lower or 'phase_attention' in name_lower:
+            return 'phase_attn'
+        elif 'local_attn' in name_lower or 'local_attention' in name_lower:
+            return 'local_attn'
+        else:
+            # Default attention params (e.g., in non-hybrid models) get local tier
+            return 'local_attn'
+
+    def is_no_decay_param(name: str) -> bool:
+        """Check if parameter should skip weight decay."""
+        return 'bias' in name or 'norm' in name or 'embed' in name
+
+    # Separate into 6 groups
+    stable_decay_params = []
+    stable_no_decay_params = []
+    local_attn_decay_params = []
+    local_attn_no_decay_params = []
+    phase_attn_decay_params = []
+    phase_attn_no_decay_params = []
+
+    # Track parameter counts for logging
+    stable_param_count = 0
+    local_attn_param_count = 0
+    phase_attn_param_count = 0
 
     for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
-        if 'bias' in name or 'norm' in name or 'embed' in name:
-            no_decay_params.append(param)
-        else:
-            decay_params.append(param)
+
+        num_params = param.numel()
+        tier = get_param_tier(name)
+        no_decay = is_no_decay_param(name)
+
+        if tier == 'stable':
+            stable_param_count += num_params
+            if no_decay:
+                stable_no_decay_params.append(param)
+            else:
+                stable_decay_params.append(param)
+        elif tier == 'local_attn':
+            local_attn_param_count += num_params
+            if no_decay:
+                local_attn_no_decay_params.append(param)
+            else:
+                local_attn_decay_params.append(param)
+        else:  # phase_attn
+            phase_attn_param_count += num_params
+            if no_decay:
+                phase_attn_no_decay_params.append(param)
+            else:
+                phase_attn_decay_params.append(param)
+
+    # Compute LRs for each tier
+    base_lr = config.learning_rate
+    local_lr = base_lr * config.attn_cooling_factor    # Mild cooling (0.5x)
+    phase_lr = base_lr * config.phase_cooling_factor   # Strong cooling (0.2x)
 
     param_groups = [
-        {"params": decay_params, "weight_decay": config.weight_decay},
-        {"params": no_decay_params, "weight_decay": 0.0},
+        {
+            "params": stable_decay_params,
+            "lr": base_lr,
+            "weight_decay": config.weight_decay,
+            "name": "stable_context",
+        },
+        {
+            "params": stable_no_decay_params,
+            "lr": base_lr,
+            "weight_decay": 0.0,
+            "name": "stable_no_decay",
+        },
+        {
+            "params": local_attn_decay_params,
+            "lr": local_lr,
+            "weight_decay": config.weight_decay,
+            "name": "local_attn",
+        },
+        {
+            "params": local_attn_no_decay_params,
+            "lr": local_lr,
+            "weight_decay": 0.0,
+            "name": "local_attn_no_decay",
+        },
+        {
+            "params": phase_attn_decay_params,
+            "lr": phase_lr,
+            "weight_decay": config.weight_decay,
+            "name": "phase_attn",
+        },
+        {
+            "params": phase_attn_no_decay_params,
+            "lr": phase_lr,
+            "weight_decay": 0.0,
+            "name": "phase_attn_no_decay",
+        },
     ]
+
+    # Filter out empty groups
+    param_groups = [g for g in param_groups if len(g["params"]) > 0]
 
     optimizer = AdamW(
         param_groups,
-        lr=config.learning_rate,
+        lr=config.learning_rate,  # Default LR (overridden by group-specific LR)
         betas=(config.beta1, config.beta2),
         eps=config.eps,
     )
+
+    # Log the Two-Tier LLRD configuration
+    logger = logging.getLogger(__name__)
+    logger.info(f"Two-Tier LLRD Optimizer Groups:")
+    logger.info(f"  Stable (MLP/embed): {stable_param_count/1e6:.1f}M params @ LR {base_lr:.2e} (1.0x)")
+    logger.info(f"  Local Attention:    {local_attn_param_count/1e6:.1f}M params @ LR {local_lr:.2e} ({config.attn_cooling_factor}x)")
+    logger.info(f"  Phase Attention:    {phase_attn_param_count/1e6:.1f}M params @ LR {phase_lr:.2e} ({config.phase_cooling_factor}x)")
 
     return optimizer
 
@@ -1491,6 +1739,10 @@ def train_step(
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
             optimizer.step()
 
+        # Capture gradient norms BEFORE zeroing (for diagnostics)
+        grad_stats = compute_tier_gradient_norms(model)
+        metrics.update(grad_stats)
+
         scheduler.step()
         optimizer.zero_grad()
 
@@ -1504,18 +1756,22 @@ def evaluate(
     config: TrainingConfig,
     device: torch.device,
 ) -> Dict[str, float]:
-    """Evaluate model on validation set."""
+    """
+    Evaluate model on validation set.
+
+    For small validation sets (like WikiText-103 with only 7 batches),
+    we use ALL available batches to maximize signal quality.
+    The noise comes from the inherent size of the dataset, not our sampling.
+    """
     model.eval()
 
     total_loss = 0.0
     total_tokens = 0
     num_batches = 0
-    max_batches = config.eval_samples // config.batch_size
 
+    # Use ALL validation batches for maximum signal (don't limit with eval_samples)
+    # Small val sets need every batch to reduce noise
     for batch in val_loader:
-        if num_batches >= max_batches:
-            break
-
         loss, _ = compute_loss(model, batch, device)
         total_loss += loss.item()
         total_tokens += batch[0].numel()
@@ -1531,6 +1787,114 @@ def evaluate(
         "val_perplexity": perplexity,
         "val_tokens": total_tokens,
     }
+
+
+@torch.no_grad()
+def generate_sample(
+    model: PhaseTransformer,
+    tokenizer,
+    prompt: str,
+    device: torch.device,
+    max_new_tokens: int = 50,
+    temperature: float = 0.8,
+    top_p: float = 0.9,
+) -> str:
+    """
+    Generate text from a prompt for quality monitoring.
+
+    Uses nucleus (top-p) sampling with temperature for diverse outputs.
+    """
+    model.eval()
+
+    # Encode prompt
+    input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+
+    # Generate tokens one by one
+    generated = input_ids.clone()
+
+    for _ in range(max_new_tokens):
+        # Forward pass
+        outputs = model(generated)
+
+        # Handle different output formats
+        if isinstance(outputs, dict):
+            logits = outputs['logits']
+        elif isinstance(outputs, torch.Tensor):
+            logits = outputs
+        else:
+            logits = outputs[0]
+
+        # Get next token logits
+        next_logits = logits[:, -1, :] / temperature
+
+        # Top-p (nucleus) sampling
+        sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
+        cumsum = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+        # Remove tokens with cumulative probability above threshold
+        sorted_indices_to_remove = cumsum > top_p
+        sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+        sorted_indices_to_remove[:, 0] = False
+
+        # Set removed tokens to -inf
+        indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+        next_logits[indices_to_remove] = float('-inf')
+
+        # Sample
+        probs = F.softmax(next_logits, dim=-1)
+        next_token = torch.multinomial(probs, num_samples=1)
+
+        # Append and check for EOS
+        generated = torch.cat([generated, next_token], dim=1)
+
+        # Stop on common end tokens
+        if next_token.item() in [tokenizer.eos_token_id, tokenizer.encode('\n')[0]]:
+            break
+
+    # Decode only the generated part
+    generated_text = tokenizer.decode(generated[0, input_ids.shape[1]:], skip_special_tokens=True)
+
+    model.train()
+    return generated_text
+
+
+def run_quality_samples(
+    model: PhaseTransformer,
+    tokenizer,
+    config: TrainingConfig,
+    device: torch.device,
+    step: int,
+    logger,
+):
+    """
+    Generate sample outputs to monitor training quality.
+
+    This provides a qualitative check that the model is learning
+    meaningful language patterns, not just minimizing perplexity.
+    """
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info(f"  📝 QUALITY SAMPLES (Step {step})")
+    logger.info("=" * 60)
+
+    for prompt in config.sample_prompts:
+        try:
+            generated = generate_sample(
+                model, tokenizer, prompt, device,
+                max_new_tokens=50,
+                temperature=0.8,
+                top_p=0.9,
+            )
+            # Clean up and truncate for display
+            generated = generated.strip().replace('\n', ' ')[:200]
+            logger.info(f"  Prompt: \"{prompt}\"")
+            logger.info(f"  Output: \"{generated}\"")
+            logger.info("")
+        except Exception as e:
+            logger.warning(f"  Sampling failed for prompt '{prompt[:30]}...': {e}")
+
+    logger.info("=" * 60)
+    logger.info("")
 
 
 def save_checkpoint(
@@ -1711,7 +2075,15 @@ def train(config: TrainingConfig):
     logger.info("Loading dataset...")
     train_loader, val_loader = create_dataloaders(config)
     logger.info(f"Train batches: {len(train_loader):,}")
-    logger.info(f"Val batches: {len(val_loader):,}")
+    val_batches = len(val_loader)
+    val_tokens = val_batches * config.batch_size * config.max_seq_len
+    logger.info(f"Val batches: {val_batches:,} ({val_tokens/1000:.0f}K tokens)")
+    if val_batches < 20:
+        logger.warning(f"  ⚠️ Small validation set! Only {val_batches} batches - metrics will be noisy.")
+        logger.warning(f"     Spike detection requires 2 consecutive regressions to reduce false alarms.")
+
+    # Load tokenizer for quality sampling
+    tokenizer = load_tokenizer(config) if config.sample_every > 0 else None
 
     # Wandb
     if config.wandb and WANDB_AVAILABLE:
@@ -1765,10 +2137,39 @@ def train(config: TrainingConfig):
         )
 
         # Apply persistent lr_scale after scheduler updates LR
+        # V9.1 Two-Tier LLRD with DELAYED Phase LR + DYNAMIC CLUTCH:
+        # - Stable/Local: normal LR from step 0
+        # - Phase: frozen (LR=0) until phase_delay_steps, then ramps with stability brake
         base_lr = scheduler.get_last_lr()[0]
-        scaled_lr = base_lr * state.lr_scale
+
+        # V9.1 Dynamic Clutch: Compute stability brake based on loss trend
+        # If loss spikes > 2%, slow down Phase engagement
+        if not hasattr(state, 'last_step_loss'):
+            state.last_step_loss = metrics["loss"]
+        loss_ratio = metrics["loss"] / max(state.last_step_loss, 1e-8)
+        stability_brake = 0.5 if loss_ratio > 1.02 else 1.0
+        state.last_step_loss = metrics["loss"]
+
+        # Compute dynamic Phase LR multiplier (V9: delayed start + slow ramp)
+        if state.step < config.phase_delay_steps:
+            # Phase frozen - no weight updates
+            phase_lr_mult = 0.0
+            stability_brake = 1.0  # Not applicable during freeze
+        else:
+            # Ramp from 0 to phase_cooling_factor over phase_ramp_steps
+            ramp_progress = min(1.0, (state.step - config.phase_delay_steps) / config.phase_ramp_steps)
+            # Apply stability brake to slow engagement if loss is spiking
+            phase_lr_mult = config.phase_cooling_factor * ramp_progress * stability_brake
+
         for param_group in optimizer.param_groups:
-            param_group['lr'] = scaled_lr
+            group_name = param_group.get('name', '')
+            # Three tiers: stable (1.0x), local_attn (1.0x), phase_attn (delayed ramp with clutch)
+            if 'phase_attn' in group_name:
+                param_group['lr'] = base_lr * phase_lr_mult * state.lr_scale
+            elif 'local_attn' in group_name:
+                param_group['lr'] = base_lr * config.attn_cooling_factor * state.lr_scale
+            else:
+                param_group['lr'] = base_lr * state.lr_scale
 
         accumulation_step += 1
         running_loss += metrics["loss"]
@@ -1789,25 +2190,57 @@ def train(config: TrainingConfig):
                 elapsed = time.time() - step_start_time
                 tokens_per_sec = (config.log_every * config.batch_size * config.max_seq_len * config.gradient_accumulation) / elapsed
                 base_lr = scheduler.get_last_lr()[0]
-                actual_lr = base_lr * state.lr_scale  # Scaled LR
+
+                # V9: Compute dynamic Phase LR for logging
+                # V9.1: Recompute stability brake for logging
+                if hasattr(state, 'last_step_loss') and state.step > 0:
+                    loss_ratio = avg_loss / max(state.last_step_loss, 1e-8)
+                    log_stability_brake = 0.5 if loss_ratio > 1.02 else 1.0
+                else:
+                    log_stability_brake = 1.0
+
+                if state.step < config.phase_delay_steps:
+                    phase_lr_mult = 0.0
+                    phase_status = "FROZEN"
+                else:
+                    ramp_progress = min(1.0, (state.step - config.phase_delay_steps) / config.phase_ramp_steps)
+                    phase_lr_mult = config.phase_cooling_factor * ramp_progress * log_stability_brake
+                    if log_stability_brake < 1.0:
+                        phase_status = f"{ramp_progress*100:.0f}%🔧"  # Clutch engaged
+                    else:
+                        phase_status = f"{ramp_progress*100:.0f}%"
+
+                stable_lr = base_lr * state.lr_scale
+                local_lr = stable_lr * config.attn_cooling_factor
+                phase_lr = stable_lr * phase_lr_mult
 
                 # Build log message with coherence metrics if available
                 log_msg = (
                     f"Step {state.step:>6} | "
                     f"Loss: {avg_loss:.4f} | "
                     f"PPL: {math.exp(avg_loss):.2f} | "
-                    f"LR: {actual_lr:.2e} | "
+                    f"LR: {stable_lr:.2e} | "
                     f"Tok/s: {tokens_per_sec:.0f}"
                 )
 
-                # Show lr_scale if not 1.0
+                # Show lr_scale and tier LRs if not at defaults
                 if state.lr_scale < 0.99:
                     log_msg += f" | LR_scale: {state.lr_scale:.2f}"
+                # Show local/phase LRs (V9: Phase shows FROZEN or ramp %)
+                log_msg += f" | Local: {local_lr:.1e} | Phase: {phase_lr:.1e} ({phase_status})"
 
                 # Add coherence metrics if enabled (S3, S1-S2, S5)
                 if config.use_coherence_loss and "entropy" in metrics:
-                    log_msg += f" | Ent: {metrics.get('entropy', 0):.2f}"
+                    ent_val = metrics.get('entropy', 0)
+                    log_msg += f" | Ent: {ent_val:.2f}"
                     log_msg += f" | Coh: {metrics.get('coherence', 0):.3f}"
+
+                    # Mode collapse warning: entropy dropping too low means model is
+                    # getting stuck on predictable patterns instead of learning
+                    if ent_val < 1.5:
+                        log_msg += " ⚠️ LOW_ENT"
+                    elif ent_val < 2.0:
+                        log_msg += " (ent↓)"
 
                 # Add GPU memory usage for scaling experiments
                 if device.type == "cuda":
@@ -1824,7 +2257,9 @@ def train(config: TrainingConfig):
                     log_dict = {
                         "train/loss": avg_loss,
                         "train/perplexity": math.exp(avg_loss),
-                        "train/learning_rate": actual_lr,
+                        "train/learning_rate": stable_lr,
+                        "train/local_attn_lr": local_lr,
+                        "train/phase_attn_lr": phase_lr,
                         "train/lr_scale": state.lr_scale,
                         "train/tokens_per_sec": tokens_per_sec,
                         "train/total_tokens": state.total_tokens,
@@ -1844,7 +2279,9 @@ def train(config: TrainingConfig):
                 if tb_writer is not None:
                     tb_writer.add_scalar("train/loss", avg_loss, state.step)
                     tb_writer.add_scalar("train/perplexity", math.exp(avg_loss), state.step)
-                    tb_writer.add_scalar("train/learning_rate", actual_lr, state.step)
+                    tb_writer.add_scalar("train/learning_rate", stable_lr, state.step)
+                    tb_writer.add_scalar("train/local_attn_lr", local_lr, state.step)
+                    tb_writer.add_scalar("train/phase_attn_lr", phase_lr, state.step)
                     tb_writer.add_scalar("train/lr_scale", state.lr_scale, state.step)
                     tb_writer.add_scalar("train/tokens_per_sec", tokens_per_sec, state.step)
                     # Add coherence metrics
@@ -1876,155 +2313,181 @@ def train(config: TrainingConfig):
                     # Clean up old eval checkpoints, keep last 5 for backtracking
                     cleanup_old_checkpoints(checkpoint_dir, keep_last=5)
 
-                # Auto-reduce LR on PPL spike with adaptive response
-                # Track best PPL (initialize if not set)
+                # =================================================================
+                # SPIKE DETECTION using LOSS DELTA (not PPL ratio)
+                # Per ChatGPT's analysis: PPL ratios are too sensitive (exponential)
+                # Loss deltas are more stable and require consecutive regressions
+                # =================================================================
+
+                # Initialize state variables (backwards compatibility)
+                if not hasattr(state, 'best_loss'):
+                    state.best_loss = float('inf')
                 if not hasattr(state, 'best_ppl'):
                     state.best_ppl = float('inf')
                 if not hasattr(state, 'spike_count'):
                     state.spike_count = 0
                 if not hasattr(state, 'lr_scale'):
-                    state.lr_scale = 1.0  # Persistent LR multiplier
-                if not hasattr(state, 'ppl_history'):
-                    state.ppl_history = []
-                if not hasattr(state, 'ema_ppl'):
-                    state.ema_ppl = 0.0
+                    state.lr_scale = 1.0
+                if not hasattr(state, 'consecutive_regressions'):
+                    state.consecutive_regressions = 0
+                if not hasattr(state, 'loss_history'):
+                    state.loss_history = []
 
+                current_loss = val_metrics['val_loss']
                 current_ppl = val_metrics['val_perplexity']
 
-                # Update EMA PPL (smooths out single bad batches)
-                # EMA = 0.9 * old + 0.1 * new (responds to trends, ignores noise)
-                if state.ema_ppl == 0.0:
-                    state.ema_ppl = current_ppl  # Initialize with first value
-                else:
-                    state.ema_ppl = 0.9 * state.ema_ppl + 0.1 * current_ppl
+                # Track loss history for trend detection
+                state.loss_history.append(current_loss)
+                if len(state.loss_history) > 10:
+                    state.loss_history = state.loss_history[-10:]
 
-                # Track PPL history for trend detection (keep last 10 for smoother trends)
-                state.ppl_history.append(current_ppl)
-                if len(state.ppl_history) > 10:
-                    state.ppl_history = state.ppl_history[-10:]
-
-                if current_ppl < state.best_ppl:
+                # Check for new best
+                if current_loss < state.best_loss:
+                    state.best_loss = current_loss
                     state.best_ppl = current_ppl
-                    # CRITICAL: Reset EMA to current PPL when new best found
-                    # Otherwise EMA carries "ghost" of old high values
-                    state.ema_ppl = current_ppl
-                elif state.step > config.warmup_steps // 2:
+                    state.consecutive_regressions = 0  # Reset on improvement
+                elif state.step >= config.alpha_warmup_steps:
                     # =================================================================
-                    # HARD SAFETY LIMITS - Use RAW PPL (not EMA) for spike detection
-                    # EMA carries ghost values; raw PPL is more reliable
+                    # V8 "LET IT COOK" STRATEGY:
+                    # Control logic DISABLED during alpha warmup phase.
+                    #
+                    # During alpha fade-in (0→0.6), the loss landscape is shifting as
+                    # Phase layers gradually take over from Quadratic layers. This
+                    # causes normal "coordinate drift" jitter that looks like spikes.
+                    #
+                    # Intervening during this phase causes:
+                    # - LR collapse (repeated 0.8x/0.85x scaling)
+                    # - Momentum destruction (repeated resets)
+                    # - Degenerate patterns ("ssssss", "the the the")
+                    #
+                    # After alpha is stable (step >= alpha_warmup_steps), control
+                    # logic re-enables for genuine instability detection.
+                    # =================================================================
+                    #
+                    # LOSS-BASED SPIKE DETECTION with CONSECUTIVE REGRESSION REQUIREMENT
+                    # - Use absolute loss delta (not PPL ratio)
+                    # - Require 2 consecutive regressions before backtracking
+                    # - This prevents thrashing on validation noise
                     # =================================================================
 
-                    # Minimum LR floor - never let lr_scale drop below 0.1 (10% of base LR)
                     MIN_LR_SCALE = 0.1
+                    loss_delta = current_loss - state.best_loss
 
-                    if current_ppl > state.best_ppl * 2.0:
-                        # MAJOR SPIKE (>2x): Backtrack + 0.8x LR + Reset momentum
-                        state.spike_count += 1
-                        old_scale = state.lr_scale
-                        state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.8)
+                    # Track consecutive regressions
+                    if loss_delta > 0.05:  # Any significant regression
+                        state.consecutive_regressions += 1
+                    else:
+                        state.consecutive_regressions = max(0, state.consecutive_regressions - 1)
 
-                        # Try to backtrack to best checkpoint
-                        best_ckpt = checkpoint_dir / "best.pt"
-                        if best_ckpt.exists():
-                            logger.info(f"  🔄 MAJOR SPIKE! Backtracking to best checkpoint...")
-                            ckpt = torch.load(best_ckpt, map_location=device, weights_only=False)
-                            model.load_state_dict(ckpt['model'])
+                    # Only act after 2 consecutive regressions (prevents noise-triggered rollback)
+                    if state.consecutive_regressions >= 2:
+                        if loss_delta > 0.25:
+                            # MAJOR SPIKE: loss increased by >0.25 for 2+ consecutive evals
+                            state.spike_count += 1
+                            old_scale = state.lr_scale
+                            state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.8)
 
-                        # Reset optimizer momentum (clear bad gradients)
-                        optimizer.state = collections.defaultdict(dict)
+                            best_ckpt = checkpoint_dir / "best.pt"
+                            if best_ckpt.exists():
+                                logger.info(f"  🔄 MAJOR SPIKE! Backtracking to best checkpoint...")
+                                ckpt = torch.load(best_ckpt, map_location=device, weights_only=False)
+                                model.load_state_dict(ckpt['model'])
 
-                        logger.info(f"  🚨 MAJOR PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*2.0)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
+                            optimizer.state = collections.defaultdict(dict)
+                            state.consecutive_regressions = 0  # Reset after action
 
-                    elif current_ppl > state.best_ppl * 1.5:
-                        # MODERATE SPIKE (>1.5x): Backtrack to oldest available + 0.85x LR + Reset momentum
-                        state.spike_count += 1
-                        old_scale = state.lr_scale
-                        state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.85)
+                            logger.info(f"  🚨 MAJOR loss spike (Δ={loss_delta:.3f} > 0.25)! Backtrack + LR: {old_scale:.3f} → {state.lr_scale:.3f}")
 
-                        # Find oldest available step checkpoint (we keep last 5)
-                        # This gives us the most stable point to backtrack to
-                        backtrack_ckpt = None
-                        for f in sorted(checkpoint_dir.glob("step_*.pt")):
-                            # Take the oldest (first in sorted order)
-                            backtrack_ckpt = f
-                            break
+                        elif loss_delta > 0.15:
+                            # MODERATE SPIKE: loss increased by >0.15 for 2+ consecutive evals
+                            state.spike_count += 1
+                            old_scale = state.lr_scale
+                            state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.85)
 
-                        if backtrack_ckpt and backtrack_ckpt.exists():
-                            logger.info(f"  🔄 MODERATE SPIKE! Backtracking to {backtrack_ckpt.name}...")
-                            ckpt = torch.load(backtrack_ckpt, map_location=device, weights_only=False)
-                            model.load_state_dict(ckpt['model'])
-                        elif (checkpoint_dir / "best.pt").exists():
-                            # Fall back to best checkpoint if no step checkpoints exist
-                            logger.info(f"  🔄 MODERATE SPIKE! Backtracking to best checkpoint...")
-                            ckpt = torch.load(checkpoint_dir / "best.pt", map_location=device, weights_only=False)
-                            model.load_state_dict(ckpt['model'])
+                            # Find oldest step checkpoint
+                            backtrack_ckpt = None
+                            for f in sorted(checkpoint_dir.glob("step_*.pt")):
+                                backtrack_ckpt = f
+                                break
 
-                        # Reset optimizer momentum
-                        optimizer.state = collections.defaultdict(dict)
+                            if backtrack_ckpt and backtrack_ckpt.exists():
+                                logger.info(f"  🔄 MODERATE SPIKE! Backtracking to {backtrack_ckpt.name}...")
+                                ckpt = torch.load(backtrack_ckpt, map_location=device, weights_only=False)
+                                model.load_state_dict(ckpt['model'])
+                            elif (checkpoint_dir / "best.pt").exists():
+                                logger.info(f"  🔄 MODERATE SPIKE! Backtracking to best checkpoint...")
+                                ckpt = torch.load(checkpoint_dir / "best.pt", map_location=device, weights_only=False)
+                                model.load_state_dict(ckpt['model'])
 
-                        logger.info(f"  ⚠️ PPL spike ({current_ppl:.1f} > {state.best_ppl:.1f}*1.5)! Backtrack + LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + Momentum reset")
+                            optimizer.state = collections.defaultdict(dict)
+                            state.consecutive_regressions = 0
+
+                            logger.info(f"  ⚠️ Loss spike (Δ={loss_delta:.3f} > 0.15)! Backtrack + LR: {old_scale:.3f} → {state.lr_scale:.3f}")
 
                     # =================================================================
-                    # TREND-BASED ADAPTIVE LR with DAMPING (per Google's advice)
-                    # - Higher threshold (12%) to avoid triggering on noise
-                    # - Patience counter requires 2 consecutive bad evals
-                    # - Two-tier response: gentle vs aggressive
+                    # TREND-BASED GENTLE LR ADJUSTMENT (single regression warning)
                     # =================================================================
-                    elif len(state.ppl_history) >= 3:
+                    elif len(state.loss_history) >= 3:
                         # Initialize patience if not present
                         if not hasattr(state, 'trend_patience'):
                             state.trend_patience = 0
 
-                        # Compute rate of change over last 3 evals
-                        delta_1 = state.ppl_history[-1] - state.ppl_history[-2]  # Most recent
-                        delta_2 = state.ppl_history[-2] - state.ppl_history[-3]  # Previous
+                        # Compute rate of change over last 3 evals (using LOSS, not PPL)
+                        loss_delta_1 = state.loss_history[-1] - state.loss_history[-2]
+                        loss_delta_2 = state.loss_history[-2] - state.loss_history[-3]
 
-                        # Check if PPL is increasing (positive deltas)
-                        if delta_1 > 0:
-                            # Relative rate: how fast is PPL growing relative to current value
-                            relative_rate = delta_1 / current_ppl if current_ppl > 0 else 0
-
-                            # Is it accelerating? Requires SIGNIFICANT surge (1.2x, not just >)
-                            is_accelerating = delta_1 > (1.2 * delta_2) and delta_2 > 0
+                        # Check if loss is increasing (positive deltas)
+                        if loss_delta_1 > 0.02:  # Small threshold to ignore noise
+                            # Is it accelerating?
+                            is_accelerating = loss_delta_1 > (1.2 * loss_delta_2) and loss_delta_2 > 0
 
                             # Determine if this is a concerning trend
-                            is_concerning = relative_rate > 0.12 or is_accelerating
+                            is_concerning = loss_delta_1 > 0.05 or is_accelerating
 
                             if is_concerning:
                                 state.trend_patience += 1
                             else:
-                                state.trend_patience = 0  # Reset on good eval
+                                state.trend_patience = 0
 
                             # TWO-TIER RESPONSE based on patience
                             if state.trend_patience >= 2:
                                 # AGGRESSIVE: Confirmed trend (2 consecutive bad evals)
-                                # Reduce LR by 0.92x + reset momentum
                                 old_scale = state.lr_scale
                                 state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.92)
-
-                                # Reset momentum only on confirmed trends
                                 optimizer.state = collections.defaultdict(dict)
 
                                 logger.info(
-                                    f"  📈 PPL trend CONFIRMED: Δ=[{delta_2:+.1f}, {delta_1:+.1f}], "
-                                    f"rate={relative_rate*100:.1f}%/eval, patience={state.trend_patience}. "
-                                    f"LR scale: {old_scale:.3f} → {state.lr_scale:.3f} + momentum reset"
+                                    f"  📈 Loss trend CONFIRMED: Δ=[{loss_delta_2:+.3f}, {loss_delta_1:+.3f}]. "
+                                    f"LR: {old_scale:.3f} → {state.lr_scale:.3f} + momentum reset"
                                 )
-                                state.trend_patience = 0  # Reset after intervention
+                                state.trend_patience = 0
 
                             elif state.trend_patience == 1:
-                                # GENTLE: First warning, small nudge (no momentum reset)
+                                # GENTLE: First warning, small nudge
                                 old_scale = state.lr_scale
                                 state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.98)
 
                                 logger.info(
-                                    f"  📊 PPL watching: Δ=[{delta_2:+.1f}, {delta_1:+.1f}], "
-                                    f"rate={relative_rate*100:.1f}%/eval. "
-                                    f"LR scale: {old_scale:.3f} → {state.lr_scale:.3f} (gentle, patience=1)"
+                                    f"  📊 Loss watching: Δ=[{loss_delta_2:+.3f}, {loss_delta_1:+.3f}]. "
+                                    f"LR: {old_scale:.3f} → {state.lr_scale:.3f} (gentle)"
                                 )
                         else:
-                            # PPL decreased or stable - reset patience
+                            # Loss stable or decreasing - reset patience
                             state.trend_patience = 0
+                else:
+                    # =================================================================
+                    # ALPHA WARMUP PHASE: Observation only, no intervention
+                    # During this phase, we just watch and log without taking action.
+                    # The model is migrating from Quadratic to hybrid representation.
+                    # =================================================================
+                    loss_delta = current_loss - state.best_loss
+                    steps_remaining = config.alpha_warmup_steps - state.step
+                    if loss_delta > 0.15:
+                        # Would have been a spike, but we're in observation mode
+                        logger.info(
+                            f"  🔍 [OBSERVE] Loss Δ={loss_delta:.3f} (would trigger control). "
+                            f"Alpha warmup: {steps_remaining} steps remaining. Letting it cook..."
+                        )
 
                 # Track best
                 if val_metrics['val_loss'] < state.best_val_loss:
@@ -2064,6 +2527,18 @@ def train(config: TrainingConfig):
                     model, optimizer, scheduler, scaler, state, config,
                     str(latest_path)
                 )
+
+            # Quality sampling - generate text to monitor training progress
+            if config.sample_every > 0 and state.step % config.sample_every == 0 and tokenizer is not None:
+                run_quality_samples(model, tokenizer, config, device, state.step, logger)
+
+            # Gradient health check - verify all tiers are learning
+            # Uses gradient stats captured in train_step BEFORE optimizer.zero_grad()
+            if config.sample_every > 0 and state.step % config.sample_every == 0:
+                if 'stable_grad_norm' in metrics:
+                    log_tier_gradients_from_metrics(metrics, state.step, logger)
+                else:
+                    logger.info(f"  📊 Gradient stats not available (check gradient_accumulation)")
 
             # Reset throughput timer AFTER eval/checkpoint to exclude their time
             if state.step % config.log_every == 0:
@@ -2144,13 +2619,13 @@ def parse_args() -> TrainingConfig:
     parser.add_argument("--alpha_phase", type=float, default=0.6,
                        help="Weight for phase attention in hybrid layers (was 0.2, now 0.6)")
 
-    # Alpha decay schedule (for phase attention)
-    parser.add_argument("--alpha_phase_start", type=float, default=0.6,
-                       help="Initial alpha_phase value (decays over time)")
-    parser.add_argument("--alpha_phase_end", type=float, default=0.4,
-                       help="Final alpha_phase value after decay")
-    parser.add_argument("--alpha_decay_steps", type=int, default=10000,
-                       help="Steps over which alpha_phase decays from start to end")
+    # Alpha FADE-IN schedule ("Training Wheels" for hybrid stability)
+    parser.add_argument("--alpha_phase_start", type=float, default=0.0,
+                       help="Initial alpha_phase (0.0 = phase OFF, training wheels)")
+    parser.add_argument("--alpha_phase_end", type=float, default=0.6,
+                       help="Final alpha_phase after fade-in")
+    parser.add_argument("--alpha_warmup_steps", type=int, default=10000,
+                       help="Steps to fade in phase attention (0→0.6)")
 
     # Training
     parser.add_argument("--batch_size", type=int, default=16,
@@ -2169,6 +2644,14 @@ def parse_args() -> TrainingConfig:
                        help="Weight decay")
     parser.add_argument("--max_grad_norm", type=float, default=1.0,
                        help="Gradient clipping norm")
+    parser.add_argument("--attn_cooling_factor", type=float, default=1.0,
+                       help="Local/Quadratic attention LR multiplier (1.0 = baseline, full LR)")
+    parser.add_argument("--phase_cooling_factor", type=float, default=0.25,
+                       help="Phase attention MAX LR multiplier (V9: 0.25x = 1e-5 at base 4e-5)")
+    parser.add_argument("--phase_delay_steps", type=int, default=3000,
+                       help="V9: Steps before Phase LR starts (frozen at 0)")
+    parser.add_argument("--phase_ramp_steps", type=int, default=7000,
+                       help="V9: Steps to ramp Phase LR from 0 to phase_cooling_factor")
 
     # LR schedule
     parser.add_argument("--lr_scheduler", type=str, default="cosine",
@@ -2200,6 +2683,8 @@ def parse_args() -> TrainingConfig:
                        help="Evaluate every N steps")
     parser.add_argument("--log_every", type=int, default=100,
                        help="Log every N steps")
+    parser.add_argument("--sample_every", type=int, default=500,
+                       help="Generate quality samples every N steps (0 = disabled)")
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext2",
@@ -2212,8 +2697,8 @@ def parse_args() -> TrainingConfig:
                        help="Tokenizer to use")
 
     # Evaluation
-    parser.add_argument("--eval_samples", type=int, default=1000,
-                       help="Number of evaluation samples")
+    parser.add_argument("--eval_samples", type=int, default=256,
+                       help="Max sequences to evaluate (256 = ~8 batches = 256K tokens)")
 
     # Logging
     parser.add_argument("--wandb", action="store_true",
@@ -2321,6 +2806,8 @@ if __name__ == "__main__":
     print(f"  Batch size: {config.batch_size} x {config.gradient_accumulation} accumulation")
     print(f"  Effective batch: {config.batch_size * config.gradient_accumulation * config.max_seq_len:,} tokens")
     print(f"  Learning rate: {config.learning_rate}")
+    if config.attn_cooling_factor < 1.0:
+        print(f"  LLRD Cooling: Attention @ {config.attn_cooling_factor}x ({config.learning_rate * config.attn_cooling_factor:.2e})")
     print(f"  Mixed precision: {config.mixed_precision}")
     print(f"  Loss type: {config.loss_type}", end="")
     if config.loss_type in ("contrastive", "infonce"):
