@@ -751,8 +751,8 @@ class TrainingConfig:
 
     # V9.2.1: Coherence-based LR freeze - abort warmup if model loses coherence
     coherence_freeze_enabled: bool = True  # Enable coherence monitoring
-    coherence_freeze_threshold: float = 0.650  # Freeze LR if coherence drops below this
-    coherence_warning_threshold: float = 0.700  # Log warning when coherence drops below this
+    coherence_freeze_threshold: float = 0.700  # Freeze LR if coherence drops below this
+    coherence_warning_threshold: float = 0.750  # Log warning when coherence drops below this
 
     # V9.3: Trinity Optimization - AGC, Lookahead, PPL-Guard, Handshake
     trinity_enabled: bool = False  # Enable V9.3 Trinity optimization suite
@@ -3401,9 +3401,9 @@ def parse_args() -> TrainingConfig:
     # V9.2.1: Coherence-based LR freeze
     parser.add_argument("--no_coherence_freeze", action="store_true",
                        help="V9.2.1: Disable coherence-based LR freeze")
-    parser.add_argument("--coherence_freeze_threshold", type=float, default=0.650,
+    parser.add_argument("--coherence_freeze_threshold", type=float, default=0.700,
                        help="V9.2.1: Freeze LR if coherence drops below this")
-    parser.add_argument("--coherence_warning_threshold", type=float, default=0.700,
+    parser.add_argument("--coherence_warning_threshold", type=float, default=0.750,
                        help="V9.2.1: Warn when coherence drops below this")
 
     # V9.3: Trinity Optimization
