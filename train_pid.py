@@ -502,9 +502,11 @@ class AuthorityPIDv2:
     def get_status_string(self) -> str:
         icon = self.get_status_icon()
         recovery_tag = " [RECOVERING]" if self.good_streak >= 1 else ""
+        # Show which signal is limiting: the one with lower value
+        limiter = "PPL" if self.A_ppl <= self.last_coh_gate else "COH"
         return (
-            f"PIDv2 {icon} | A: {self.A:.3f} (ppl:{self.A_ppl:.2f} coh:{self.last_coh_gate:.2f}) | "
-            f"PPL_vel: {self.last_v:+.1f}%{recovery_tag}"
+            f"GOV {icon} | Brake(PPL): {self.A_ppl:.2f} | Gate(Coh): {self.last_coh_gate:.2f} | "
+            f"Final_A: {self.A:.2f} [{limiter}] | vel: {self.last_v:+.1f}%{recovery_tag}"
         )
 
     def get_detailed_status(self) -> str:
