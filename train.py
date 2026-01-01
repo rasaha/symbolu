@@ -1505,6 +1505,9 @@ class TrainingState:
     ppl_history: list = field(default_factory=list)  # Track PPL for trend detection
     trend_patience: int = 0  # Patience counter for trend-based interventions
     ema_ppl: float = 0.0  # Exponential moving average of PPL (smooths noise)
+    # V9.3.5: PPL-Ratchet LR control - ensure Val PPL always drops
+    ppl_lr_factor: float = 1.0  # LR factor based on PPL trend (ratchets down on rise)
+    last_val_ppl: float = 0.0  # Track last validation PPL for comparison
 
 
 def compute_semantic_entropy(logits: torch.Tensor, max_positions: int = 1024) -> torch.Tensor:
@@ -2767,15 +2770,18 @@ def train(config: TrainingConfig):
             # This is "torque limiting during clutch engagement"
             authority_cap = 0.3 + 0.7 * current_alpha_for_cap
 
-            # V9.3.4+: Coherence-weighted adjustment
+            # V9.3.4: Coherence-weighted adjustment (health check)
             # When coherence drops below warning threshold, reduce LR cap proportionally
-            # This makes LR responsive to model health, not just α
             current_coh = metrics.get('coherence', 1.0)
             if current_coh < config.coherence_warning_threshold:  # 0.750
                 # Coh 0.75 → factor 1.0, Coh 0.70 → factor 0.85, Coh 0.65 → factor 0.70 (floor)
                 coh_factor = 0.7 + 0.3 * (current_coh - 0.65) / 0.10
                 coh_factor = max(0.7, min(1.0, coh_factor))
                 authority_cap *= coh_factor
+
+            # V9.3.5: PPL-Ratchet adjustment (learning velocity check)
+            # Stack on top of coherence - if PPL rising, further reduce LR
+            authority_cap *= state.ppl_lr_factor
 
             effective_lr_cap = config.learning_rate * authority_cap
 
@@ -2863,18 +2869,21 @@ def train(config: TrainingConfig):
                 if hasattr(state, 'lr_frozen') and state.lr_frozen and state.lr_frozen_value is not None:
                     base_lr = min(base_lr, state.lr_frozen_value)
 
-                # V9.3.4: Apply authority-weighted LR cap for accurate logging
+                # V9.3.5: Apply authority-weighted LR cap with coherence + PPL-Ratchet for logging
                 if state.step < config.alpha_warmup_steps:
                     alpha_frac = state.step / config.alpha_warmup_steps
                     current_alpha_for_cap = config.alpha_phase_start + alpha_frac * (config.alpha_phase_end - config.alpha_phase_start)
                     authority_cap = 0.3 + 0.7 * current_alpha_for_cap
 
-                    # V9.3.4+: Coherence-weighted adjustment for logging
+                    # V9.3.4: Coherence-weighted adjustment for logging
                     current_coh_for_log = metrics.get('coherence', 1.0)
                     if current_coh_for_log < config.coherence_warning_threshold:
                         coh_factor = 0.7 + 0.3 * (current_coh_for_log - 0.65) / 0.10
                         coh_factor = max(0.7, min(1.0, coh_factor))
                         authority_cap *= coh_factor
+
+                    # V9.3.5: PPL-Ratchet adjustment for logging
+                    authority_cap *= state.ppl_lr_factor
 
                     effective_lr_cap = config.learning_rate * authority_cap
                     base_lr = min(base_lr, effective_lr_cap)
@@ -2957,6 +2966,10 @@ def train(config: TrainingConfig):
                     remaining = config.alpha_warmup_steps - state.step
                     log_msg += f" | 🔓GATED({remaining})"
 
+                # V9.3.5: Show PPL-Ratchet factor when not at 1.0
+                if state.ppl_lr_factor < 0.99:
+                    log_msg += f" | 🎚️PPL-R: {state.ppl_lr_factor:.2f}"
+
                 logger.info(log_msg)
 
                 # Wandb logging
@@ -2968,6 +2981,7 @@ def train(config: TrainingConfig):
                         "train/local_attn_lr": local_lr,
                         "train/phase_attn_lr": phase_lr,
                         "train/lr_scale": state.lr_scale,
+                        "train/ppl_lr_factor": state.ppl_lr_factor,  # V9.3.5
                         "train/tokens_per_sec": tokens_per_sec,
                         "train/total_tokens": state.total_tokens,
                         "train/epoch": state.epoch,
@@ -2990,6 +3004,7 @@ def train(config: TrainingConfig):
                     tb_writer.add_scalar("train/local_attn_lr", local_lr, state.step)
                     tb_writer.add_scalar("train/phase_attn_lr", phase_lr, state.step)
                     tb_writer.add_scalar("train/lr_scale", state.lr_scale, state.step)
+                    tb_writer.add_scalar("train/ppl_lr_factor", state.ppl_lr_factor, state.step)  # V9.3.5
                     tb_writer.add_scalar("train/tokens_per_sec", tokens_per_sec, state.step)
                     # Add coherence metrics
                     if config.use_coherence_loss:
@@ -3046,6 +3061,47 @@ def train(config: TrainingConfig):
                     f"  Val Loss: {val_metrics['val_loss']:.4f} | "
                     f"Val PPL: {val_metrics['val_perplexity']:.2f}"
                 )
+
+                # =================================================================
+                # V9.3.5: PPL-RATCHET LR CONTROL
+                # Ensure Val PPL always drops by adjusting LR based on PPL trend.
+                # - PPL rose → cut ppl_lr_factor proportionally (ratchet down)
+                # - PPL dropped → slowly restore ppl_lr_factor (10% per eval)
+                # This ensures we don't push LR too high when learning stalls.
+                # =================================================================
+                current_val_ppl = val_metrics['val_perplexity']
+
+                if state.last_val_ppl > 0:  # Skip first eval (no baseline)
+                    ppl_delta = current_val_ppl - state.last_val_ppl
+
+                    if ppl_delta > 0:
+                        # PPL rose - learning went backwards, cut LR factor
+                        rise_ratio = ppl_delta / state.last_val_ppl
+                        # 5% rise → 75% factor, 10% rise → 50% factor (floor)
+                        cut_multiplier = max(0.5, 1.0 - rise_ratio * 5)
+                        old_factor = state.ppl_lr_factor
+                        state.ppl_lr_factor *= cut_multiplier
+                        state.ppl_lr_factor = max(0.1, state.ppl_lr_factor)  # Floor at 10%
+
+                        logger.warning(
+                            f"📉 [Step {state.step}] PPL-RATCHET: Val PPL rose {rise_ratio*100:.1f}% "
+                            f"({state.last_val_ppl:.1f} → {current_val_ppl:.1f}). "
+                            f"LR factor: {old_factor:.2f} → {state.ppl_lr_factor:.2f}"
+                        )
+                    else:
+                        # PPL dropped - learning is happening, slowly restore factor
+                        old_factor = state.ppl_lr_factor
+                        state.ppl_lr_factor = min(1.0, state.ppl_lr_factor * 1.1)
+
+                        if old_factor < 1.0:
+                            logger.info(
+                                f"📈 [Step {state.step}] PPL-RATCHET: Val PPL dropped "
+                                f"({state.last_val_ppl:.1f} → {current_val_ppl:.1f}). "
+                                f"LR factor: {old_factor:.2f} → {state.ppl_lr_factor:.2f}"
+                            )
+
+                # Update last_val_ppl for next comparison
+                state.last_val_ppl = current_val_ppl
 
                 # V9.3: PPL-Guard check - tighten AGC if PPL velocity + low coherence
                 if config.trinity_enabled and ppl_guard is not None:
