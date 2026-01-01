@@ -2973,6 +2973,29 @@ def train(config: TrainingConfig):
                         # Update config for train_step
                         config.agc_threshold = new_agc_threshold
 
+                    # V9.3: Early LR freeze if PPL Δ > 500 AND Coh < 0.700
+                    # Catches catastrophic divergence that coherence alone might miss
+                    if (ppl_guard.last_val_ppl is not None and
+                        not getattr(state, 'lr_frozen', False)):
+
+                        ppl_velocity = val_metrics['val_perplexity'] - ppl_guard.last_val_ppl
+                        if ppl_velocity > 500 and current_coh < 0.700:
+                            # Initialize freeze state if not present
+                            if not hasattr(state, 'lr_frozen'):
+                                state.lr_frozen = False
+                                state.lr_frozen_at_step = None
+                                state.lr_frozen_value = None
+
+                            state.lr_frozen = True
+                            state.lr_frozen_at_step = state.step
+                            state.lr_frozen_value = scheduler.get_last_lr()[0]
+
+                            logger.warning(
+                                f"🧊🔥 [Step {state.step}] EMERGENCY LR FREEZE: "
+                                f"Val PPL Δ={ppl_velocity:.0f} > 500 AND Coh={current_coh:.3f} < 0.700. "
+                                f"LR locked at {state.lr_frozen_value:.2e}"
+                            )
+
                 # Save lightweight checkpoint at every eval for backtracking support
                 # Uses model-only saves (~550MB vs ~1.6GB) to prevent disk exhaustion
                 eval_ckpt_path = checkpoint_dir / f"step_{state.step}.pt"
