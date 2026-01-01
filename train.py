@@ -331,6 +331,304 @@ class MemoryGuard:
         return base_lr * phase_mult
 
 
+# =============================================================================
+# V9.3 TRINITY OPTIMIZATION COMPONENTS
+# =============================================================================
+
+class Lookahead(torch.optim.Optimizer):
+    """
+    V9.3 Lookahead Optimizer wrapper.
+
+    Maintains "slow" weights that follow "fast" weights at a distance.
+    Acts as a low-pass filter to smooth out training vibrations.
+
+    Paper: "Lookahead Optimizer: k steps forward, 1 step back" (Zhang et al., 2019)
+
+    Args:
+        base_optimizer: The inner optimizer (e.g., AdamW)
+        k: Number of fast steps before slow weight update (default: 5)
+        alpha: Interpolation factor for slow weights (default: 0.5)
+    """
+
+    def __init__(self, base_optimizer, k=5, alpha=0.5):
+        self.base_optimizer = base_optimizer
+        self.k = k
+        self.alpha = alpha
+        self._step_count = 0
+
+        # Cache slow weights
+        self.slow_weights = []
+        for group in base_optimizer.param_groups:
+            slow_group = []
+            for p in group['params']:
+                if p.requires_grad:
+                    slow_group.append(p.data.clone())
+                else:
+                    slow_group.append(None)
+            self.slow_weights.append(slow_group)
+
+    @property
+    def param_groups(self):
+        return self.base_optimizer.param_groups
+
+    def state_dict(self):
+        return {
+            'base': self.base_optimizer.state_dict(),
+            'slow_weights': self.slow_weights,
+            'step_count': self._step_count
+        }
+
+    def load_state_dict(self, state_dict):
+        self.base_optimizer.load_state_dict(state_dict['base'])
+        self.slow_weights = state_dict.get('slow_weights', self.slow_weights)
+        self._step_count = state_dict.get('step_count', 0)
+
+    def zero_grad(self):
+        self.base_optimizer.zero_grad()
+
+    def step(self, closure=None):
+        # Fast step
+        loss = self.base_optimizer.step(closure)
+        self._step_count += 1
+
+        # Slow step every k iterations
+        if self._step_count % self.k == 0:
+            for group_idx, group in enumerate(self.base_optimizer.param_groups):
+                for param_idx, p in enumerate(group['params']):
+                    if p.requires_grad and self.slow_weights[group_idx][param_idx] is not None:
+                        slow = self.slow_weights[group_idx][param_idx]
+                        # Interpolate: slow = slow + alpha * (fast - slow)
+                        slow.add_(p.data - slow, alpha=self.alpha)
+                        # Update fast weights to slow position
+                        p.data.copy_(slow)
+
+        return loss
+
+    def sync_slow_weights(self):
+        """Force sync slow weights to current fast weights."""
+        for group_idx, group in enumerate(self.base_optimizer.param_groups):
+            for param_idx, p in enumerate(group['params']):
+                if p.requires_grad and self.slow_weights[group_idx][param_idx] is not None:
+                    self.slow_weights[group_idx][param_idx].copy_(p.data)
+
+
+def apply_agc(model: nn.Module, threshold: float = 0.01, eps: float = 1e-3) -> Dict[str, float]:
+    """
+    V9.3 Per-Layer Adaptive Gradient Clipping (AGC).
+
+    Clips gradients based on the ratio of gradient norm to weight norm per parameter.
+    This allows healthy layers to learn while throttling exploding gradients.
+
+    Args:
+        model: The model with computed gradients
+        threshold: Maximum allowed grad_norm / weight_norm ratio
+        eps: Small constant to avoid division by zero
+
+    Returns:
+        Dict with clipping statistics (for logging GSS)
+    """
+    stats = {
+        'total_params': 0,
+        'clipped_params': 0,
+        'max_ratio': 0.0,
+        'phase_max_ratio': 0.0,
+    }
+
+    for name, p in model.named_parameters():
+        if p.grad is None:
+            continue
+
+        stats['total_params'] += 1
+
+        # Compute norms
+        p_norm = torch.norm(p.data).clamp(min=eps)
+        g_norm = torch.norm(p.grad.data)
+
+        # Compute ratio (Gradient Spike Score per param)
+        ratio = (g_norm / p_norm).item()
+        stats['max_ratio'] = max(stats['max_ratio'], ratio)
+
+        # Track Phase-specific ratio
+        if 'phase' in name.lower():
+            stats['phase_max_ratio'] = max(stats['phase_max_ratio'], ratio)
+
+        # Clip if ratio exceeds threshold
+        max_grad = p_norm * threshold
+        if g_norm > max_grad:
+            p.grad.data.mul_(max_grad / (g_norm + 1e-6))
+            stats['clipped_params'] += 1
+
+    return stats
+
+
+class PPLGuard:
+    """
+    V9.3 PPL-Guard: Monitors Val PPL velocity alongside coherence.
+
+    When both Val PPL is spiking AND coherence is dropping, this indicates
+    the model is "accelerating into a wall" and needs intervention.
+    """
+
+    def __init__(
+        self,
+        ppl_velocity_threshold: float = 50.0,
+        coherence_threshold: float = 0.700,
+        agc_tighten_factor: float = 0.5,  # Multiply AGC threshold by this when triggered
+    ):
+        self.ppl_velocity_threshold = ppl_velocity_threshold
+        self.coherence_threshold = coherence_threshold
+        self.agc_tighten_factor = agc_tighten_factor
+        self.last_val_ppl = None
+        self.triggered = False
+        self.trigger_step = None
+
+    def check(
+        self,
+        val_ppl: float,
+        coherence: float,
+        step: int,
+        logger: Optional[logging.Logger] = None,
+    ) -> Tuple[bool, float]:
+        """
+        Check if PPL-Guard should trigger.
+
+        Returns:
+            (triggered: bool, recommended_agc_threshold: float)
+        """
+        if self.last_val_ppl is None:
+            self.last_val_ppl = val_ppl
+            return False, 0.01  # Default AGC threshold
+
+        ppl_velocity = val_ppl - self.last_val_ppl
+        self.last_val_ppl = val_ppl
+
+        # Check dual-threat condition
+        if ppl_velocity > self.ppl_velocity_threshold and coherence < self.coherence_threshold:
+            if not self.triggered:
+                self.triggered = True
+                self.trigger_step = step
+                if logger:
+                    logger.warning(
+                        f"🔥 [Step {step}] PPL-Guard TRIGGERED: "
+                        f"Val PPL Δ={ppl_velocity:.0f} > {self.ppl_velocity_threshold:.0f}, "
+                        f"Coh={coherence:.3f} < {self.coherence_threshold:.3f} - Tightening AGC"
+                    )
+            # Return tightened AGC threshold
+            return True, 0.01 * self.agc_tighten_factor
+
+        return False, 0.01  # Normal AGC threshold
+
+
+def trigger_handshake(
+    model: nn.Module,
+    config: 'TrainingConfig',
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+    logger: Optional[logging.Logger] = None,
+) -> torch.optim.Optimizer:
+    """
+    V9.3 Handshake Trigger: Rebuilds optimizer at step 3001 for Phase unfreeze.
+
+    This function:
+    1. Ensures all parameters have requires_grad=True
+    2. Rebuilds optimizer with WD exclusion groups
+    3. Applies Handshake Spike LR (6e-5 Quad, 2e-5 Phase)
+    4. Wraps in Lookahead
+
+    Args:
+        model: The model
+        config: Training config
+        optimizer: Current optimizer (will be replaced)
+        device: Training device
+        logger: Optional logger
+
+    Returns:
+        New optimizer wrapped in Lookahead
+    """
+    if logger:
+        logger.info("🚀 [V9.3] HANDSHAKE TRIGGER: Unfreezing Phase & Applying Spike LR...")
+
+    # 1. Ensure all parameters can receive gradients
+    unfrozen_count = 0
+    for p in model.parameters():
+        if not p.requires_grad:
+            p.requires_grad = True
+            unfrozen_count += 1
+
+    if logger and unfrozen_count > 0:
+        logger.info(f"   Unfroze {unfrozen_count} parameters")
+
+    # 2. Group parameters with WD exclusion
+    decay_params = []
+    no_decay_params = []
+    phase_params = []
+
+    no_decay_keywords = ["bias", "LayerNorm", "norm", "ln_"]
+    phase_keywords = ["phase", "Phase"]
+
+    for name, p in model.named_parameters():
+        if not p.requires_grad:
+            continue
+
+        # Check if this is a Phase parameter
+        is_phase = any(kw in name for kw in phase_keywords)
+        # Check if this should have no weight decay
+        is_no_decay = any(kw in name for kw in no_decay_keywords)
+
+        if is_phase:
+            phase_params.append(p)
+        elif is_no_decay:
+            no_decay_params.append(p)
+        else:
+            decay_params.append(p)
+
+    # 3. Build optimizer groups with Handshake Spike LRs
+    handshake_quad_lr = config.learning_rate * 1.5  # 4e-5 -> 6e-5
+    handshake_phase_lr = 2e-5  # Spike for fast integration
+
+    param_groups = [
+        {
+            "params": decay_params,
+            "lr": handshake_quad_lr,
+            "weight_decay": config.weight_decay,
+            "name": "stable_wd"
+        },
+        {
+            "params": no_decay_params,
+            "lr": handshake_quad_lr,
+            "weight_decay": 0.0,
+            "name": "stable_no_wd"
+        },
+        {
+            "params": phase_params,
+            "lr": handshake_phase_lr,
+            "weight_decay": 0.0,  # No WD for Phase (angular params)
+            "name": "phase_attn"
+        },
+    ]
+
+    if logger:
+        logger.info(f"   Quad LR: {handshake_quad_lr:.2e} (1.5x spike)")
+        logger.info(f"   Phase LR: {handshake_phase_lr:.2e} (fast integration)")
+        logger.info(f"   Params: {len(decay_params)} decay, {len(no_decay_params)} no-decay, {len(phase_params)} phase")
+
+    # 4. Create new AdamW optimizer
+    new_optimizer = AdamW(
+        param_groups,
+        betas=(config.beta1, config.beta2),
+        eps=config.eps,
+    )
+
+    # 5. Wrap in Lookahead for stability
+    lookahead_optimizer = Lookahead(new_optimizer, k=5, alpha=0.5)
+
+    if logger:
+        logger.info("   Wrapped in Lookahead (k=5, α=0.5)")
+        logger.info("🚀 Handshake complete - Phase layers now training!")
+
+    return lookahead_optimizer
+
+
 class MetricsLogger:
     """
     Unified logging to wandb and TensorBoard.
@@ -455,6 +753,20 @@ class TrainingConfig:
     coherence_freeze_enabled: bool = True  # Enable coherence monitoring
     coherence_freeze_threshold: float = 0.650  # Freeze LR if coherence drops below this
     coherence_warning_threshold: float = 0.700  # Log warning when coherence drops below this
+
+    # V9.3: Trinity Optimization - AGC, Lookahead, PPL-Guard, Handshake
+    trinity_enabled: bool = False  # Enable V9.3 Trinity optimization suite
+    agc_enabled: bool = True  # Enable Adaptive Gradient Clipping
+    agc_threshold: float = 0.01  # Max grad_norm / weight_norm ratio
+    lookahead_enabled: bool = True  # Enable Lookahead optimizer wrapper
+    lookahead_k: int = 5  # Steps between slow weight updates
+    lookahead_alpha: float = 0.5  # Interpolation factor for slow weights
+    ppl_guard_enabled: bool = True  # Enable PPL-Guard monitoring
+    ppl_velocity_threshold: float = 50.0  # PPL jump that triggers guard
+    handshake_spike_enabled: bool = True  # Enable LR spike at handshake
+    handshake_spike_factor: float = 1.5  # Multiply base LR by this at handshake
+    handshake_phase_lr: float = 2e-5  # Phase LR during handshake spike
+    handshake_duration: int = 500  # Steps to maintain spike (3001-3500)
 
     # Learning rate schedule
     lr_scheduler: str = "cosine"  # cosine, linear, constant
@@ -1934,6 +2246,17 @@ def train_step(
     if (accumulation_step + 1) % config.gradient_accumulation == 0:
         if scaler is not None:
             scaler.unscale_(optimizer)
+
+        # V9.3: Apply Adaptive Gradient Clipping (before optimizer.step)
+        # AGC clips based on grad_norm / weight_norm ratio per parameter
+        agc_stats = None
+        if config.trinity_enabled and config.agc_enabled:
+            agc_stats = apply_agc(model, threshold=config.agc_threshold)
+            metrics['agc_clipped'] = agc_stats['clipped_params']
+            metrics['agc_max_ratio'] = agc_stats['max_ratio']
+            metrics['agc_phase_ratio'] = agc_stats['phase_max_ratio']
+
+        if scaler is not None:
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
             scaler.step(optimizer)
             scaler.update()
@@ -2283,6 +2606,28 @@ def train(config: TrainingConfig):
     if config.memory_guard_enabled:
         logger.info(f"MemoryGuard ENABLED: target={config.vram_target_gb}GB, "
                     f"emergency={config.vram_emergency_gb}GB, crank@{config.crank_step}")
+
+    # V9.3: Initialize Trinity components
+    ppl_guard = None
+    agc_threshold = config.agc_threshold
+    handshake_triggered = False
+
+    if config.trinity_enabled:
+        logger.info("=" * 60)
+        logger.info("V9.3 TRINITY OPTIMIZATION ENABLED")
+        logger.info(f"  AGC: threshold={config.agc_threshold}")
+        logger.info(f"  Lookahead: k={config.lookahead_k}, α={config.lookahead_alpha}")
+        logger.info(f"  PPL-Guard: velocity_threshold={config.ppl_velocity_threshold}")
+        logger.info(f"  Handshake Spike: {config.handshake_spike_factor}x LR at step {config.phase_delay_steps + 1}")
+        logger.info("=" * 60)
+
+        # Initialize PPL-Guard
+        if config.ppl_guard_enabled:
+            ppl_guard = PPLGuard(
+                ppl_velocity_threshold=config.ppl_velocity_threshold,
+                coherence_threshold=config.coherence_warning_threshold,
+            )
+
     val_batches = len(val_loader)
     val_tokens = val_batches * config.batch_size * config.max_seq_len
     logger.info(f"Val batches: {val_batches:,} ({val_tokens/1000:.0f}K tokens)")
@@ -2402,6 +2747,34 @@ def train(config: TrainingConfig):
             # Update alpha schedule (decay from 0.6 to 0.4 for Phase Attention)
             current_alpha = update_alpha_schedule(model, state.step, config)
 
+            # V9.3: Handshake Trigger at step phase_delay_steps + 1 (e.g., step 3001)
+            # Rebuilds optimizer with WD exclusion, Lookahead, and Spike LR
+            if (config.trinity_enabled and
+                config.handshake_spike_enabled and
+                not handshake_triggered and
+                state.step == config.phase_delay_steps + 1):
+
+                optimizer = trigger_handshake(model, config, optimizer, device, logger)
+                handshake_triggered = True
+
+                # Update scheduler reference if needed (Lookahead wraps the optimizer)
+                # The LR is now managed by the new optimizer groups
+
+            # V9.3: End Handshake Spike after duration (e.g., step 3500)
+            # Drop LR back to normal levels
+            if (config.trinity_enabled and
+                handshake_triggered and
+                state.step == config.phase_delay_steps + 1 + config.handshake_duration):
+
+                # Reduce LR back from spike
+                for param_group in optimizer.param_groups:
+                    if 'phase' in param_group.get('name', ''):
+                        param_group['lr'] = config.phase_lr_cap  # Back to 1e-5
+                    else:
+                        param_group['lr'] = config.learning_rate  # Back to 4e-5
+
+                logger.info(f"🔧 [Step {state.step}] Handshake Spike ended - LR normalized")
+
             # V9.2: MemoryGuard check at configured interval
             if state.step % config.vram_check_interval == 0:
                 changed, action = memory_guard.check_and_adjust(state.step, logger)
@@ -2484,6 +2857,15 @@ def train(config: TrainingConfig):
 
                 # Add alpha phase value (shows decay progress)
                 log_msg += f" | α_phase: {current_alpha:.2f}"
+
+                # V9.3: Add GSS (Gradient Spike Score) when Trinity is enabled
+                if config.trinity_enabled and 'agc_max_ratio' in metrics:
+                    gss = metrics.get('agc_max_ratio', 0)
+                    clipped = metrics.get('agc_clipped', 0)
+                    if clipped > 0:
+                        log_msg += f" | GSS: {gss:.3f}⚡{clipped}"
+                    else:
+                        log_msg += f" | GSS: {gss:.3f}"
 
                 logger.info(log_msg)
 
@@ -2576,6 +2958,20 @@ def train(config: TrainingConfig):
                     f"  Val Loss: {val_metrics['val_loss']:.4f} | "
                     f"Val PPL: {val_metrics['val_perplexity']:.2f}"
                 )
+
+                # V9.3: PPL-Guard check - tighten AGC if PPL velocity + low coherence
+                if config.trinity_enabled and ppl_guard is not None:
+                    current_coh = metrics.get('coherence', 1.0)
+                    triggered, new_agc_threshold = ppl_guard.check(
+                        val_metrics['val_perplexity'],
+                        current_coh,
+                        state.step,
+                        logger
+                    )
+                    if triggered:
+                        agc_threshold = new_agc_threshold
+                        # Update config for train_step
+                        config.agc_threshold = new_agc_threshold
 
                 # Save lightweight checkpoint at every eval for backtracking support
                 # Uses model-only saves (~550MB vs ~1.6GB) to prevent disk exhaustion
@@ -2956,6 +3352,24 @@ def parse_args() -> TrainingConfig:
     parser.add_argument("--coherence_warning_threshold", type=float, default=0.700,
                        help="V9.2.1: Warn when coherence drops below this")
 
+    # V9.3: Trinity Optimization
+    parser.add_argument("--trinity", action="store_true",
+                       help="V9.3: Enable Trinity optimization (AGC + Lookahead + PPL-Guard + Handshake)")
+    parser.add_argument("--agc_threshold", type=float, default=0.01,
+                       help="V9.3: AGC max grad/weight ratio threshold")
+    parser.add_argument("--lookahead_k", type=int, default=5,
+                       help="V9.3: Lookahead slow weight update interval")
+    parser.add_argument("--lookahead_alpha", type=float, default=0.5,
+                       help="V9.3: Lookahead interpolation factor")
+    parser.add_argument("--ppl_velocity_threshold", type=float, default=50.0,
+                       help="V9.3: PPL-Guard velocity threshold")
+    parser.add_argument("--handshake_spike_factor", type=float, default=1.5,
+                       help="V9.3: LR multiplier during handshake spike")
+    parser.add_argument("--handshake_phase_lr", type=float, default=2e-5,
+                       help="V9.3: Phase LR during handshake spike")
+    parser.add_argument("--handshake_duration", type=int, default=500,
+                       help="V9.3: Duration of handshake spike in steps")
+
     # LR schedule
     parser.add_argument("--lr_scheduler", type=str, default="cosine",
                        choices=["cosine", "linear", "constant"],
@@ -3082,9 +3496,24 @@ def parse_args() -> TrainingConfig:
     # V9.2.1: Map --no_coherence_freeze to coherence_freeze_enabled (inverted)
     args.coherence_freeze_enabled = not getattr(args, 'no_coherence_freeze', False)
 
+    # V9.3: Map --trinity flag to trinity_enabled and set sub-flags
+    args.trinity_enabled = getattr(args, 'trinity', False)
+    if args.trinity_enabled:
+        # When Trinity is enabled, enable all sub-components
+        args.agc_enabled = True
+        args.lookahead_enabled = True
+        args.ppl_guard_enabled = True
+        args.handshake_spike_enabled = True
+    else:
+        # Default sub-component states when Trinity is disabled
+        args.agc_enabled = False
+        args.lookahead_enabled = False
+        args.ppl_guard_enabled = False
+        args.handshake_spike_enabled = False
+
     # Remove CLI-only flags that don't exist in TrainingConfig
     args_dict = vars(args)
-    for cli_only_arg in ['memory_guard', 'no_coherence_freeze']:
+    for cli_only_arg in ['memory_guard', 'no_coherence_freeze', 'trinity']:
         args_dict.pop(cli_only_arg, None)
 
     # Create config from args
