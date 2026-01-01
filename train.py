@@ -451,6 +451,11 @@ class TrainingConfig:
     crank_step: int = 10000  # Step after which ramp-up is allowed
     phase_lr_cap: float = 1e-5  # Maximum Phase LR during "crank" (prevents angular instability)
 
+    # V9.2.1: Coherence-based LR freeze - abort warmup if model loses coherence
+    coherence_freeze_enabled: bool = True  # Enable coherence monitoring
+    coherence_freeze_threshold: float = 0.650  # Freeze LR if coherence drops below this
+    coherence_warning_threshold: float = 0.700  # Log warning when coherence drops below this
+
     # Learning rate schedule
     lr_scheduler: str = "cosine"  # cosine, linear, constant
     min_lr_ratio: float = 0.1  # minimum LR as ratio of peak
@@ -2367,6 +2372,11 @@ def train(config: TrainingConfig):
         # V9.2: Combine state.lr_scale with memory_guard.lr_scale (crank multiplier)
         combined_lr_scale = state.lr_scale * memory_guard.lr_scale
 
+        # V9.2.1: Enforce LR freeze if coherence dropped below threshold
+        # Cap base_lr at frozen value to abort warmup
+        if hasattr(state, 'lr_frozen') and state.lr_frozen and state.lr_frozen_value is not None:
+            base_lr = min(base_lr, state.lr_frozen_value)
+
         for param_group in optimizer.param_groups:
             group_name = param_group.get('name', '')
             # Three tiers: stable (1.0x), local_attn (1.0x), phase_attn (delayed ramp with clutch)
@@ -2516,6 +2526,46 @@ def train(config: TrainingConfig):
 
                 # Note: step_start_time reset moved to after eval/checkpoint blocks
                 # to exclude non-training time from throughput calculation
+
+                # V9.2.1: Coherence-based LR freeze
+                # If coherence drops too low during warmup, freeze LR to prevent catapult
+                if config.coherence_freeze_enabled and config.use_coherence_loss:
+                    current_coh = metrics.get('coherence', 1.0)
+
+                    # Initialize freeze state if not present
+                    if not hasattr(state, 'lr_frozen'):
+                        state.lr_frozen = False
+                        state.lr_frozen_at_step = None
+                        state.lr_frozen_value = None
+
+                    # Check for freeze condition (only during warmup, before LR peaks)
+                    if (not state.lr_frozen and
+                        state.step < config.warmup_steps and
+                        current_coh < config.coherence_freeze_threshold):
+
+                        # Freeze LR at current value by setting lr_scale
+                        # This prevents further warmup increases
+                        current_lr_ratio = state.step / config.warmup_steps
+                        state.lr_frozen = True
+                        state.lr_frozen_at_step = state.step
+                        state.lr_frozen_value = stable_lr
+
+                        # Calculate the scale needed to keep LR at current level
+                        # as scheduler continues to increase base_lr
+                        # We'll handle this by tracking frozen state and capping in LR assignment
+
+                        logger.warning(
+                            f"🧊 [Step {state.step}] LR FROZEN: Coherence {current_coh:.3f} < {config.coherence_freeze_threshold:.3f} threshold. "
+                            f"LR locked at {stable_lr:.2e} (warmup aborted at {current_lr_ratio*100:.0f}%)"
+                        )
+
+                    # Warning when approaching threshold
+                    elif (not state.lr_frozen and
+                          current_coh < config.coherence_warning_threshold and
+                          state.step % 100 == 0):
+                        logger.warning(
+                            f"⚠️ [Step {state.step}] Coherence LOW: {current_coh:.3f} (freeze threshold: {config.coherence_freeze_threshold:.3f})"
+                        )
 
             # Evaluation
             if state.step % config.eval_every == 0:
@@ -2898,6 +2948,14 @@ def parse_args() -> TrainingConfig:
     parser.add_argument("--phase_lr_cap", type=float, default=1e-5,
                        help="V9.2: Maximum Phase LR during crank")
 
+    # V9.2.1: Coherence-based LR freeze
+    parser.add_argument("--no_coherence_freeze", action="store_true",
+                       help="V9.2.1: Disable coherence-based LR freeze")
+    parser.add_argument("--coherence_freeze_threshold", type=float, default=0.650,
+                       help="V9.2.1: Freeze LR if coherence drops below this")
+    parser.add_argument("--coherence_warning_threshold", type=float, default=0.700,
+                       help="V9.2.1: Warn when coherence drops below this")
+
     # LR schedule
     parser.add_argument("--lr_scheduler", type=str, default="cosine",
                        choices=["cosine", "linear", "constant"],
@@ -3020,6 +3078,9 @@ def parse_args() -> TrainingConfig:
 
     # V9.2: Map --memory_guard flag to memory_guard_enabled
     args.memory_guard_enabled = getattr(args, 'memory_guard', False)
+
+    # V9.2.1: Map --no_coherence_freeze to coherence_freeze_enabled (inverted)
+    args.coherence_freeze_enabled = not getattr(args, 'no_coherence_freeze', False)
 
     # Create config from args
     config = TrainingConfig(**vars(args))
