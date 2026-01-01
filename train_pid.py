@@ -986,8 +986,8 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
 
         # Forward/backward pass
         metrics = train_step(
-            model, batch, optimizer, scheduler, config, state, scaler,
-            agc_threshold=agc_threshold
+            model, batch, optimizer, scheduler, scaler,
+            config, device, accumulation_step
         )
 
         if metrics is None:
