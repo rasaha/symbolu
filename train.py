@@ -2770,18 +2770,21 @@ def train(config: TrainingConfig):
             # This is "torque limiting during clutch engagement"
             authority_cap = 0.3 + 0.7 * current_alpha_for_cap
 
-            # V9.3.4: Coherence-weighted adjustment (health check)
-            # When coherence drops below warning threshold, reduce LR cap proportionally
+            # V9.3.5: Coherence OR PPL-Ratchet adjustment (whichever is worse)
+            # Either signal being bad should cap LR - use min() for OR logic
+
+            # Coherence factor (health check)
             current_coh = metrics.get('coherence', 1.0)
             if current_coh < config.coherence_warning_threshold:  # 0.750
-                # Coh 0.75 → factor 1.0, Coh 0.70 → factor 0.85, Coh 0.65 → factor 0.70 (floor)
                 coh_factor = 0.7 + 0.3 * (current_coh - 0.65) / 0.10
                 coh_factor = max(0.7, min(1.0, coh_factor))
-                authority_cap *= coh_factor
+            else:
+                coh_factor = 1.0
 
-            # V9.3.5: PPL-Ratchet adjustment (learning velocity check)
-            # Stack on top of coherence - if PPL rising, further reduce LR
-            authority_cap *= state.ppl_lr_factor
+            # Take minimum (most conservative) - OR logic
+            # If coherence bad OR PPL rising → use the worse factor
+            combined_factor = min(coh_factor, state.ppl_lr_factor)
+            authority_cap *= combined_factor
 
             effective_lr_cap = config.learning_rate * authority_cap
 
@@ -2869,21 +2872,22 @@ def train(config: TrainingConfig):
                 if hasattr(state, 'lr_frozen') and state.lr_frozen and state.lr_frozen_value is not None:
                     base_lr = min(base_lr, state.lr_frozen_value)
 
-                # V9.3.5: Apply authority-weighted LR cap with coherence + PPL-Ratchet for logging
+                # V9.3.5: Apply authority-weighted LR cap with coherence OR PPL-Ratchet for logging
                 if state.step < config.alpha_warmup_steps:
                     alpha_frac = state.step / config.alpha_warmup_steps
                     current_alpha_for_cap = config.alpha_phase_start + alpha_frac * (config.alpha_phase_end - config.alpha_phase_start)
                     authority_cap = 0.3 + 0.7 * current_alpha_for_cap
 
-                    # V9.3.4: Coherence-weighted adjustment for logging
+                    # V9.3.5: Coherence OR PPL-Ratchet - use min() for OR logic
                     current_coh_for_log = metrics.get('coherence', 1.0)
                     if current_coh_for_log < config.coherence_warning_threshold:
                         coh_factor = 0.7 + 0.3 * (current_coh_for_log - 0.65) / 0.10
                         coh_factor = max(0.7, min(1.0, coh_factor))
-                        authority_cap *= coh_factor
+                    else:
+                        coh_factor = 1.0
 
-                    # V9.3.5: PPL-Ratchet adjustment for logging
-                    authority_cap *= state.ppl_lr_factor
+                    combined_factor = min(coh_factor, state.ppl_lr_factor)
+                    authority_cap *= combined_factor
 
                     effective_lr_cap = config.learning_rate * authority_cap
                     base_lr = min(base_lr, effective_lr_cap)
