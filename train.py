@@ -2629,6 +2629,7 @@ def train(config: TrainingConfig):
         logger.info(f"  Handshake Spike: {config.handshake_spike_factor}x LR at step {config.phase_delay_steps + 1}")
         if config.recovery_mode_enabled:
             logger.info(f"  V9.3.2 Recovery: cut={config.recovery_lr_cut_factor}x on PPL>{config.recovery_ppl_threshold*100:.0f}%, max_cuts={config.recovery_max_cuts}")
+        logger.info(f"  V9.3.3 GATED: Freeze/Cut/Recovery disabled until step {config.alpha_warmup_steps}")
         logger.info("=" * 60)
 
         # Initialize PPL-Guard
@@ -2886,11 +2887,15 @@ def train(config: TrainingConfig):
                     else:
                         log_msg += f" | GSS: {gss:.3f}"
 
-                # V9.3.2: Show recovery mode status
+                # V9.3.2/V9.3.3: Show intervention status
                 if getattr(state, 'recovery_active', False):
                     log_msg += f" | 🔻RECOVERY(cuts={state.recovery_lr_cuts})"
                 elif getattr(state, 'lr_frozen', False):
                     log_msg += " | 🧊FROZEN"
+                elif state.step < config.alpha_warmup_steps:
+                    # V9.3.3: Show that interventions are gated during alpha ramp
+                    remaining = config.alpha_warmup_steps - state.step
+                    log_msg += f" | 🔓GATED({remaining})"
 
                 logger.info(log_msg)
 
@@ -2935,7 +2940,7 @@ def train(config: TrainingConfig):
                 # to exclude non-training time from throughput calculation
 
                 # V9.2.1: Coherence-based LR freeze
-                # If coherence drops too low during warmup, freeze LR to prevent catapult
+                # V9.3.3: GATED until alpha_warmup_steps - during ramp, Coh drops are normal migration
                 if config.coherence_freeze_enabled and config.use_coherence_loss:
                     current_coh = metrics.get('coherence', 1.0)
 
@@ -2945,33 +2950,31 @@ def train(config: TrainingConfig):
                         state.lr_frozen_at_step = None
                         state.lr_frozen_value = None
 
-                    # Check for freeze condition (only during warmup, before LR peaks)
-                    if (not state.lr_frozen and
-                        state.step < config.warmup_steps and
+                    # V9.3.3: Only allow freeze AFTER alpha warmup complete
+                    # During ramp (0-10000), Coh drops are coordinate drift, not divergence
+                    interventions_enabled = state.step >= config.alpha_warmup_steps
+
+                    # Check for freeze condition (only after alpha warmup)
+                    if (interventions_enabled and
+                        not state.lr_frozen and
                         current_coh < config.coherence_freeze_threshold):
 
-                        # Freeze LR at current value by setting lr_scale
-                        # This prevents further warmup increases
-                        current_lr_ratio = state.step / config.warmup_steps
+                        # Freeze LR at current value
                         state.lr_frozen = True
                         state.lr_frozen_at_step = state.step
                         state.lr_frozen_value = stable_lr
 
-                        # Calculate the scale needed to keep LR at current level
-                        # as scheduler continues to increase base_lr
-                        # We'll handle this by tracking frozen state and capping in LR assignment
-
                         logger.warning(
                             f"🧊 [Step {state.step}] LR FROZEN: Coherence {current_coh:.3f} < {config.coherence_freeze_threshold:.3f} threshold. "
-                            f"LR locked at {stable_lr:.2e} (warmup aborted at {current_lr_ratio*100:.0f}%)"
+                            f"LR locked at {stable_lr:.2e}"
                         )
 
-                    # Warning when approaching threshold
-                    elif (not state.lr_frozen and
-                          current_coh < config.coherence_warning_threshold and
+                    # Warning when approaching threshold (logging only, no intervention)
+                    elif (current_coh < config.coherence_warning_threshold and
                           state.step % 100 == 0):
+                        gated_msg = " [GATED - interventions disabled during alpha ramp]" if not interventions_enabled else ""
                         logger.warning(
-                            f"⚠️ [Step {state.step}] Coherence LOW: {current_coh:.3f} (freeze threshold: {config.coherence_freeze_threshold:.3f})"
+                            f"⚠️ [Step {state.step}] Coherence LOW: {current_coh:.3f} (freeze threshold: {config.coherence_freeze_threshold:.3f}){gated_msg}"
                         )
 
             # Evaluation
@@ -3006,15 +3009,18 @@ def train(config: TrainingConfig):
                             logger.info(f"   Lookahead α: {old_alpha} → 0.3 for stability")
 
                     # V9.3 / V9.3.1: PPL-based LR intervention
+                    # V9.3.3: GATED until alpha_warmup_steps - PPL rises during ramp are normal
                     # Two-tier response based on PPL velocity + coherence
+                    interventions_enabled = state.step >= config.alpha_warmup_steps
+
                     if (ppl_guard.last_val_ppl is not None and
                         not getattr(state, 'lr_frozen', False)):
 
                         ppl_velocity = val_metrics['val_perplexity'] - ppl_guard.last_val_ppl
 
                         # V9.3.1 Tier 1: SAFETY BRAKE (PPL Δ > 200 + Coh < 0.700)
-                        # Hold LR steady - don't increase further during warmup
-                        if ppl_velocity > 200 and current_coh < 0.700:
+                        # V9.3.3: Only after alpha warmup
+                        if interventions_enabled and ppl_velocity > 200 and current_coh < 0.700:
                             if not hasattr(state, 'lr_braked'):
                                 state.lr_braked = False
                                 state.lr_brake_value = None
@@ -3029,8 +3035,8 @@ def train(config: TrainingConfig):
                                 )
 
                         # V9.3 Tier 2: EMERGENCY FREEZE (PPL Δ > 500 + Coh < 0.700)
-                        # Lock LR permanently
-                        if ppl_velocity > 500 and current_coh < 0.700:
+                        # V9.3.3: Only after alpha warmup
+                        if interventions_enabled and ppl_velocity > 500 and current_coh < 0.700:
                             # Initialize freeze state if not present
                             if not hasattr(state, 'lr_frozen'):
                                 state.lr_frozen = False
