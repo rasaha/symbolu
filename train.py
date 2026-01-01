@@ -2137,23 +2137,33 @@ def train(config: TrainingConfig):
         )
 
         # Apply persistent lr_scale after scheduler updates LR
-        # V9 Two-Tier LLRD with DELAYED Phase LR:
+        # V9.1 Two-Tier LLRD with DELAYED Phase LR + DYNAMIC CLUTCH:
         # - Stable/Local: normal LR from step 0
-        # - Phase: frozen (LR=0) until phase_delay_steps, then ramps to phase_cooling_factor
+        # - Phase: frozen (LR=0) until phase_delay_steps, then ramps with stability brake
         base_lr = scheduler.get_last_lr()[0]
+
+        # V9.1 Dynamic Clutch: Compute stability brake based on loss trend
+        # If loss spikes > 2%, slow down Phase engagement
+        if not hasattr(state, 'last_step_loss'):
+            state.last_step_loss = metrics["loss"]
+        loss_ratio = metrics["loss"] / max(state.last_step_loss, 1e-8)
+        stability_brake = 0.5 if loss_ratio > 1.02 else 1.0
+        state.last_step_loss = metrics["loss"]
 
         # Compute dynamic Phase LR multiplier (V9: delayed start + slow ramp)
         if state.step < config.phase_delay_steps:
             # Phase frozen - no weight updates
             phase_lr_mult = 0.0
+            stability_brake = 1.0  # Not applicable during freeze
         else:
             # Ramp from 0 to phase_cooling_factor over phase_ramp_steps
             ramp_progress = min(1.0, (state.step - config.phase_delay_steps) / config.phase_ramp_steps)
-            phase_lr_mult = config.phase_cooling_factor * ramp_progress
+            # Apply stability brake to slow engagement if loss is spiking
+            phase_lr_mult = config.phase_cooling_factor * ramp_progress * stability_brake
 
         for param_group in optimizer.param_groups:
             group_name = param_group.get('name', '')
-            # Three tiers: stable (1.0x), local_attn (1.0x), phase_attn (delayed ramp to 0.25x)
+            # Three tiers: stable (1.0x), local_attn (1.0x), phase_attn (delayed ramp with clutch)
             if 'phase_attn' in group_name:
                 param_group['lr'] = base_lr * phase_lr_mult * state.lr_scale
             elif 'local_attn' in group_name:
@@ -2182,13 +2192,23 @@ def train(config: TrainingConfig):
                 base_lr = scheduler.get_last_lr()[0]
 
                 # V9: Compute dynamic Phase LR for logging
+                # V9.1: Recompute stability brake for logging
+                if hasattr(state, 'last_step_loss') and state.step > 0:
+                    loss_ratio = avg_loss / max(state.last_step_loss, 1e-8)
+                    log_stability_brake = 0.5 if loss_ratio > 1.02 else 1.0
+                else:
+                    log_stability_brake = 1.0
+
                 if state.step < config.phase_delay_steps:
                     phase_lr_mult = 0.0
                     phase_status = "FROZEN"
                 else:
                     ramp_progress = min(1.0, (state.step - config.phase_delay_steps) / config.phase_ramp_steps)
-                    phase_lr_mult = config.phase_cooling_factor * ramp_progress
-                    phase_status = f"{ramp_progress*100:.0f}%"
+                    phase_lr_mult = config.phase_cooling_factor * ramp_progress * log_stability_brake
+                    if log_stability_brake < 1.0:
+                        phase_status = f"{ramp_progress*100:.0f}%🔧"  # Clutch engaged
+                    else:
+                        phase_status = f"{ramp_progress*100:.0f}%"
 
                 stable_lr = base_lr * state.lr_scale
                 local_lr = stable_lr * config.attn_cooling_factor
