@@ -289,7 +289,11 @@ class TrainingConfig:
     # Apply a "cooling factor" to attention params while keeping phase/MLP at full LR.
     # 0.5 is balanced; use 0.3 for "safety first" during instability
     attn_cooling_factor: float = 1.0  # Local/Quadratic attention LR multiplier (baseline, full LR)
-    phase_cooling_factor: float = 0.3  # Phase attention LR multiplier (0.3x = 1.2e-5 at base 4e-5)
+    phase_cooling_factor: float = 0.25  # Phase attention MAX LR multiplier (V9: 0.25x = 1e-5 at base 4e-5)
+
+    # V9: Delayed Phase LR - Phase layers frozen until Quadratic builds foundation
+    phase_delay_steps: int = 3000  # Steps before Phase LR starts (frozen at 0)
+    phase_ramp_steps: int = 7000   # Steps to ramp Phase LR from 0 to phase_cooling_factor
 
     # Learning rate schedule
     lr_scheduler: str = "cosine"  # cosine, linear, constant
@@ -2133,13 +2137,25 @@ def train(config: TrainingConfig):
         )
 
         # Apply persistent lr_scale after scheduler updates LR
-        # Two-Tier LLRD: preserve the cooling factor ratio between groups
+        # V9 Two-Tier LLRD with DELAYED Phase LR:
+        # - Stable/Local: normal LR from step 0
+        # - Phase: frozen (LR=0) until phase_delay_steps, then ramps to phase_cooling_factor
         base_lr = scheduler.get_last_lr()[0]
+
+        # Compute dynamic Phase LR multiplier (V9: delayed start + slow ramp)
+        if state.step < config.phase_delay_steps:
+            # Phase frozen - no weight updates
+            phase_lr_mult = 0.0
+        else:
+            # Ramp from 0 to phase_cooling_factor over phase_ramp_steps
+            ramp_progress = min(1.0, (state.step - config.phase_delay_steps) / config.phase_ramp_steps)
+            phase_lr_mult = config.phase_cooling_factor * ramp_progress
+
         for param_group in optimizer.param_groups:
             group_name = param_group.get('name', '')
-            # Three tiers: stable (1.0x), local_attn (0.5x), phase_attn (0.2x)
+            # Three tiers: stable (1.0x), local_attn (1.0x), phase_attn (delayed ramp to 0.25x)
             if 'phase_attn' in group_name:
-                param_group['lr'] = base_lr * config.phase_cooling_factor * state.lr_scale
+                param_group['lr'] = base_lr * phase_lr_mult * state.lr_scale
             elif 'local_attn' in group_name:
                 param_group['lr'] = base_lr * config.attn_cooling_factor * state.lr_scale
             else:
@@ -2164,10 +2180,19 @@ def train(config: TrainingConfig):
                 elapsed = time.time() - step_start_time
                 tokens_per_sec = (config.log_every * config.batch_size * config.max_seq_len * config.gradient_accumulation) / elapsed
                 base_lr = scheduler.get_last_lr()[0]
-                # Three-tier LRs: Stable (1.0x) > Local (0.5x) > Phase (0.2x)
+
+                # V9: Compute dynamic Phase LR for logging
+                if state.step < config.phase_delay_steps:
+                    phase_lr_mult = 0.0
+                    phase_status = "FROZEN"
+                else:
+                    ramp_progress = min(1.0, (state.step - config.phase_delay_steps) / config.phase_ramp_steps)
+                    phase_lr_mult = config.phase_cooling_factor * ramp_progress
+                    phase_status = f"{ramp_progress*100:.0f}%"
+
                 stable_lr = base_lr * state.lr_scale
                 local_lr = stable_lr * config.attn_cooling_factor
-                phase_lr = stable_lr * config.phase_cooling_factor
+                phase_lr = stable_lr * phase_lr_mult
 
                 # Build log message with coherence metrics if available
                 log_msg = (
@@ -2181,8 +2206,8 @@ def train(config: TrainingConfig):
                 # Show lr_scale and tier LRs if not at defaults
                 if state.lr_scale < 0.99:
                     log_msg += f" | LR_scale: {state.lr_scale:.2f}"
-                # Show local/phase LRs (Two-Tier Push)
-                log_msg += f" | Local: {local_lr:.1e} | Phase: {phase_lr:.1e}"
+                # Show local/phase LRs (V9: Phase shows FROZEN or ramp %)
+                log_msg += f" | Local: {local_lr:.1e} | Phase: {phase_lr:.1e} ({phase_status})"
 
                 # Add coherence metrics if enabled (S3, S1-S2, S5)
                 if config.use_coherence_loss and "entropy" in metrics:
@@ -2601,8 +2626,12 @@ def parse_args() -> TrainingConfig:
                        help="Gradient clipping norm")
     parser.add_argument("--attn_cooling_factor", type=float, default=1.0,
                        help="Local/Quadratic attention LR multiplier (1.0 = baseline, full LR)")
-    parser.add_argument("--phase_cooling_factor", type=float, default=0.3,
-                       help="Phase attention LR multiplier (0.3x = 1.2e-5 at base 4e-5)")
+    parser.add_argument("--phase_cooling_factor", type=float, default=0.25,
+                       help="Phase attention MAX LR multiplier (V9: 0.25x = 1e-5 at base 4e-5)")
+    parser.add_argument("--phase_delay_steps", type=int, default=3000,
+                       help="V9: Steps before Phase LR starts (frozen at 0)")
+    parser.add_argument("--phase_ramp_steps", type=int, default=7000,
+                       help="V9: Steps to ramp Phase LR from 0 to phase_cooling_factor")
 
     # LR schedule
     parser.add_argument("--lr_scheduler", type=str, default="cosine",
