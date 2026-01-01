@@ -154,15 +154,15 @@ class EmergencyPDConfig:
     # PPL baseline for normalization
     base_ppl: float = 1080.0   # Starting PPL for velocity normalization
 
-    # PD gains (aggressive for emergency response)
-    Kp: float = 1.5            # Proportional gain on coherence error
-    Kd: float = 0.4            # Derivative gain on PPL velocity
+    # PD gains (VIOLENT for crisis response - high sensitivity)
+    Kp: float = 2.5            # High sensitivity to coherence loss
+    Kd: float = 0.5            # Sensitivity to PPL acceleration
 
     # Decay multiplier
     decay_factor: float = 1.2  # Multiplier in exp(-decay_factor * u)
 
-    # Authority bounds
-    A_min: float = 0.35        # Minimum authority (aggressive floor)
+    # Authority bounds (allow very hard cuts during crisis)
+    A_min: float = 0.25        # Floor at 0.25x LR (violent defense)
     A_max: float = 1.00        # Maximum authority
 
     # Smoothing (optional but recommended)
@@ -1058,13 +1058,13 @@ def main():
     parser.add_argument("--pid_a_min", type=float, default=0.70,
                        help="PID minimum authority factor")
 
-    # Emergency PD settings (for emergency mode)
-    parser.add_argument("--pd_kp", type=float, default=1.5,
-                       help="Emergency PD proportional gain on coherence")
-    parser.add_argument("--pd_kd", type=float, default=0.4,
+    # Emergency PD settings (VIOLENT crisis response)
+    parser.add_argument("--pd_kp", type=float, default=2.5,
+                       help="Emergency PD proportional gain on coherence (high sensitivity)")
+    parser.add_argument("--pd_kd", type=float, default=0.5,
                        help="Emergency PD derivative gain on PPL velocity")
-    parser.add_argument("--pd_a_min", type=float, default=0.35,
-                       help="Emergency PD minimum authority factor")
+    parser.add_argument("--pd_a_min", type=float, default=0.25,
+                       help="Emergency PD minimum authority factor (violent floor)")
     parser.add_argument("--pd_target_coh", type=float, default=0.76,
                        help="Emergency PD target coherence")
 
