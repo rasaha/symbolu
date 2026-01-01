@@ -2814,6 +2814,10 @@ def train(config: TrainingConfig):
                 tokens_per_sec = (config.log_every * config.batch_size * config.max_seq_len * config.gradient_accumulation) / elapsed
                 base_lr = scheduler.get_last_lr()[0]
 
+                # V9.3.2: Apply frozen LR cap for accurate logging
+                if hasattr(state, 'lr_frozen') and state.lr_frozen and state.lr_frozen_value is not None:
+                    base_lr = min(base_lr, state.lr_frozen_value)
+
                 # V9: Compute dynamic Phase LR for logging
                 # V9.1: Recompute stability brake for logging
                 if hasattr(state, 'last_step_loss') and state.step > 0:
@@ -3067,9 +3071,12 @@ def train(config: TrainingConfig):
                         state.recovery_last_ppl = current_ppl
                         logger.info(f"📍 [Step {state.step}] Recovery baseline set: PPL={current_ppl:.2f}")
 
+                    # Save previous PPL before any updates (fixes bug where cut check saw updated value)
+                    previous_ppl = state.recovery_last_ppl
+
                     # Check for recovery exit conditions
                     if state.recovery_active:
-                        if current_ppl < state.recovery_last_ppl:
+                        if current_ppl < previous_ppl:
                             state.recovery_consecutive_drops += 1
                         else:
                             state.recovery_consecutive_drops = 0
@@ -3084,34 +3091,35 @@ def train(config: TrainingConfig):
                                 f"{state.recovery_consecutive_drops} consecutive PPL drops. "
                                 f"LR stabilized at {state.lr_frozen_value:.2e} after {state.recovery_lr_cuts} cuts"
                             )
-                        state.recovery_last_ppl = current_ppl
 
-                    # Check if we need to enter recovery or cut LR further
-                    if not state.recovery_active or current_ppl > state.recovery_last_ppl:
-                        ppl_rise_ratio = (current_ppl - state.recovery_ppl_at_freeze) / state.recovery_ppl_at_freeze
+                    # Check if we need to cut LR further (PPL still rising from baseline)
+                    ppl_rise_ratio = (current_ppl - state.recovery_ppl_at_freeze) / state.recovery_ppl_at_freeze
 
-                        # If PPL rose > threshold from freeze point, cut LR
-                        if ppl_rise_ratio > config.recovery_ppl_threshold:
-                            if state.recovery_lr_cuts < config.recovery_max_cuts:
-                                old_lr = state.lr_frozen_value
-                                state.lr_frozen_value *= config.recovery_lr_cut_factor
-                                state.recovery_lr_cuts += 1
-                                state.recovery_active = True
-                                state.recovery_ppl_at_freeze = current_ppl  # Reset baseline after cut
+                    # If PPL rose > threshold from baseline, cut LR
+                    if ppl_rise_ratio > config.recovery_ppl_threshold:
+                        if state.recovery_lr_cuts < config.recovery_max_cuts:
+                            old_lr = state.lr_frozen_value
+                            state.lr_frozen_value *= config.recovery_lr_cut_factor
+                            state.recovery_lr_cuts += 1
+                            state.recovery_active = True
+                            state.recovery_ppl_at_freeze = current_ppl  # Reset baseline after cut
+                            state.recovery_consecutive_drops = 0  # Reset drop counter
 
-                                logger.warning(
-                                    f"🔻 [Step {state.step}] RECOVERY CUT #{state.recovery_lr_cuts}: "
-                                    f"PPL rose {ppl_rise_ratio*100:.1f}% > {config.recovery_ppl_threshold*100:.0f}% threshold. "
-                                    f"LR: {old_lr:.2e} → {state.lr_frozen_value:.2e} "
-                                    f"(Coh={current_coh:.3f})"
-                                )
-                            else:
-                                logger.error(
-                                    f"❌ [Step {state.step}] RECOVERY EXHAUSTED: "
-                                    f"Max {config.recovery_max_cuts} LR cuts reached but PPL still rising. "
-                                    f"Consider restarting from earlier checkpoint."
-                                )
+                            logger.warning(
+                                f"🔻 [Step {state.step}] RECOVERY CUT #{state.recovery_lr_cuts}: "
+                                f"PPL rose {ppl_rise_ratio*100:.1f}% > {config.recovery_ppl_threshold*100:.0f}% threshold. "
+                                f"LR: {old_lr:.2e} → {state.lr_frozen_value:.2e} "
+                                f"(Coh={current_coh:.3f}, baseline reset)"
+                            )
+                        elif not getattr(state, 'recovery_exhausted_logged', False):
+                            state.recovery_exhausted_logged = True
+                            logger.error(
+                                f"❌ [Step {state.step}] RECOVERY EXHAUSTED: "
+                                f"Max {config.recovery_max_cuts} LR cuts reached but PPL still rising. "
+                                f"Consider V9.4 Elastic Handshake or restart from earlier checkpoint."
+                            )
 
+                    # Update last PPL for next iteration
                     state.recovery_last_ppl = current_ppl
 
                 # Save lightweight checkpoint at every eval for backtracking support
