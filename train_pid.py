@@ -105,6 +105,89 @@ except ImportError:
 
 
 # =============================================================================
+# SEMANTIC VALIDATION - Prompt-based PPL for PID Governor (V9.4.3)
+# =============================================================================
+
+@torch.no_grad()
+def compute_semantic_ppl(
+    model: nn.Module,
+    tokenizer,
+    prompts: tuple,
+    device: torch.device,
+    max_tokens: int = 30,
+) -> float:
+    """
+    Compute average perplexity on generated tokens from semantic prompts.
+
+    This measures how well the model "knows" the factual content of prompts
+    like "The history of the Roman Empire began when..." - not just fluency.
+
+    Returns:
+        Average perplexity across all prompts (lower = better knowledge)
+    """
+    model.eval()
+    total_ppl = 0.0
+    valid_prompts = 0
+
+    for prompt in prompts:
+        try:
+            # Encode prompt
+            input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+            prompt_len = input_ids.shape[1]
+
+            # Generate continuation
+            generated = input_ids.clone()
+            total_loss = 0.0
+            num_tokens = 0
+
+            for _ in range(max_tokens):
+                outputs = model(generated)
+
+                # Handle different output formats
+                if isinstance(outputs, dict):
+                    logits = outputs['logits']
+                elif isinstance(outputs, torch.Tensor):
+                    logits = outputs
+                else:
+                    logits = outputs[0]
+
+                # Get next token prediction
+                next_logits = logits[:, -1, :]
+
+                # Compute loss (cross-entropy with greedy next token)
+                next_token = next_logits.argmax(dim=-1, keepdim=True)
+
+                # Only count loss after prompt
+                if generated.shape[1] > prompt_len:
+                    log_probs = F.log_softmax(next_logits, dim=-1)
+                    token_loss = -log_probs.gather(1, next_token).item()
+                    total_loss += token_loss
+                    num_tokens += 1
+
+                generated = torch.cat([generated, next_token], dim=1)
+
+                # Stop on EOS
+                if hasattr(tokenizer, 'eos_token_id') and next_token.item() == tokenizer.eos_token_id:
+                    break
+
+            if num_tokens > 0:
+                avg_loss = total_loss / num_tokens
+                prompt_ppl = math.exp(min(avg_loss, 10.0))  # Cap to prevent overflow
+                total_ppl += prompt_ppl
+                valid_prompts += 1
+
+        except Exception:
+            continue  # Skip failed prompts silently
+
+    model.train()
+
+    if valid_prompts == 0:
+        return 100.0  # Default high PPL if all prompts failed
+
+    return total_ppl / valid_prompts
+
+
+# =============================================================================
 # AUTHORITY PID CONTROLLER
 # =============================================================================
 
@@ -346,6 +429,16 @@ class AuthorityPIDv2Config:
     recovery_streak: int = 3       # Good evals before recovery
     recovery_step: float = 0.02    # Restoration per good eval
 
+    # Semantic Validation Weight (V9.4.3)
+    # Higher W_s = Governor more sensitive to "Roman Knowledge" prompts
+    # Lower W_s = Governor focuses on general fluency
+    W_s: float = 0.30              # Semantic weight: 30% prompt-based, 70% general PPL
+    semantic_ppl_scale: float = 50.0  # Normalization scale for semantic PPL error
+
+    # Handshake D-term Dampening
+    # During phase ramp, dampen D term to prevent flutter
+    handshake_Kd_dampen: bool = True  # Enable D-term dampening during ramp
+
 
 class AuthorityPIDv2:
     """
@@ -391,9 +484,27 @@ class AuthorityPIDv2:
         self.last_volatility = 0.0  # PPL coefficient of variation
         self.last_Kp = self.config.Kp_base  # Dynamic Kp (SNR-adjusted)
 
-    def update(self, val_ppl: float, coherence: float) -> float:
+        # V9.4.3: Semantic Validation + Handshake Dampening
+        self.last_semantic_ppl = 0.0   # Semantic PPL from prompts
+        self.last_semantic_error = 0.0 # Normalized semantic error
+        self.last_effective_Kd = self.config.Kd  # Effective Kd (dampened during handshake)
+        self.last_ramp_frac = 0.0      # Handshake ramp fraction (0→1)
+
+    def update(
+        self,
+        val_ppl: float,
+        coherence: float,
+        semantic_ppl: float = 0.0,
+        step: int = 0,
+        phase_ramp_steps: int = 7000,
+    ) -> float:
         """
         Update authority factor using PPL-primary PID with coherence gate.
+
+        V9.4.3 additions:
+        - semantic_ppl: PPL on prompt-based generation (weighted by W_s)
+        - step: Current training step (for D-term dampening)
+        - phase_ramp_steps: Steps for phase ramp (for D-term dampening)
         """
         cfg = self.config
 
@@ -404,6 +515,33 @@ class AuthorityPIDv2:
             self.ppl_history = self.ppl_history[-10:]
         if len(self.coh_history) > 10:
             self.coh_history = self.coh_history[-10:]
+
+        # =====================================================================
+        # HANDSHAKE D-TERM DAMPENING (V9.4.3)
+        # =====================================================================
+        # During phase ramp, dampen D term to prevent flutter/oscillation
+        if cfg.handshake_Kd_dampen and phase_ramp_steps > 0:
+            ramp_frac = min(1.0, step / phase_ramp_steps)
+            effective_Kd = cfg.Kd * ramp_frac  # 0 → Kd over ramp
+        else:
+            ramp_frac = 1.0
+            effective_Kd = cfg.Kd
+        self.last_ramp_frac = ramp_frac
+        self.last_effective_Kd = effective_Kd
+
+        # =====================================================================
+        # SEMANTIC VALIDATION ERROR (V9.4.3)
+        # =====================================================================
+        # Compute normalized semantic error from prompt-based PPL
+        # Higher semantic_ppl = worse "Roman Knowledge" = higher error
+        self.last_semantic_ppl = semantic_ppl
+        if semantic_ppl > 0:
+            # Normalize: typical good semantic PPL ~20-50, bad ~100+
+            semantic_error = max(0.0, (semantic_ppl - 30.0) / cfg.semantic_ppl_scale)
+            semantic_error = min(1.0, semantic_error)  # Cap at 1.0
+        else:
+            semantic_error = 0.0
+        self.last_semantic_error = semantic_error
 
         # Need at least 6 evals for MA3 smoothing
         if len(self.ppl_history) < 6:
@@ -468,11 +606,21 @@ class AuthorityPIDv2:
 
         # ----- D term: Velocity acceleration (predictive) -----
         # Positive acceleration = situation getting worse faster
+        # Use DAMPENED Kd during handshake to prevent flutter
         D = max(0, a / cfg.V_scale_pct)
         self.last_D = D
 
-        # ----- Control signal (using DYNAMIC Kp) -----
-        u = dynamic_Kp * P + cfg.Ki * self.I + cfg.Kd * D
+        # ----- Control signal (using DYNAMIC Kp + DAMPENED Kd + SEMANTIC error) -----
+        # Base PID on PPL velocity
+        u_ppl = dynamic_Kp * P + cfg.Ki * self.I + effective_Kd * D
+
+        # Weighted combination with semantic error
+        # u_total = (1 - W_s) * u_ppl + W_s * semantic_error
+        # Higher W_s = Governor more sensitive to "Roman Knowledge"
+        if semantic_error > 0 and cfg.W_s > 0:
+            u = (1.0 - cfg.W_s) * u_ppl + cfg.W_s * semantic_error
+        else:
+            u = u_ppl
         self.last_u = u
 
         # ----- PID Authority Factor -----
@@ -542,10 +690,12 @@ class AuthorityPIDv2:
         )
 
     def get_detailed_status(self) -> str:
+        semantic_tag = f" | Sem_PPL={self.last_semantic_ppl:.1f}" if self.last_semantic_ppl > 0 else ""
         return (
             f"  v_norm={self.last_v_norm:.3f} a={self.last_a:+.1f} | "
             f"P={self.last_P:.3f} I={self.last_I:.3f} D={self.last_D:.3f} | "
-            f"u={self.last_u:.3f} | vol={self.last_volatility:.1%} Kp={self.last_Kp:.2f}"
+            f"u={self.last_u:.3f} | vol={self.last_volatility:.1%} Kp={self.last_Kp:.2f} "
+            f"Kd={self.last_effective_Kd:.2f} ramp={self.last_ramp_frac:.0%}{semantic_tag}"
         )
 
 
@@ -929,14 +1079,15 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
         controller_name = "PIDv2"
 
         logger.info("=" * 60)
-        logger.info("V9.4.1: PIDv2 CONTROLLER (Dynamic SNR-Adjusted Kp)")
+        logger.info("V9.4.3: PIDv2 CONTROLLER (Semantic Validation + Handshake Dampening)")
         logger.info("  Architecture: PPL velocity drives PID; Coherence gates authority")
         logger.info(f"  Dynamic Kp: [{pidv2_config.Kp_min}, {pidv2_config.Kp_max}] (sensitivity={pidv2_config.Kp_sensitivity})")
         logger.info(f"  Static Gains: Ki={pidv2_config.Ki}, Kd={pidv2_config.Kd}")
         logger.info(f"  Coherence gate: [{pidv2_config.C_floor}, {pidv2_config.C_good}]")
         logger.info(f"  PPL velocity: deadband={pidv2_config.V_dead_pct}%, scale={pidv2_config.V_scale_pct}%")
         logger.info(f"  Authority floor: {pidv2_config.A_min}")
-        logger.info("  Kp auto-softens during Handshake Shock, sharpens for recovery")
+        logger.info(f"  Semantic Weight W_s: {pidv2_config.W_s:.0%} (prompt-based PPL influence)")
+        logger.info(f"  Handshake Kd Dampening: {'ON' if pidv2_config.handshake_Kd_dampen else 'OFF'}")
         logger.info("=" * 60)
 
     else:  # pid (legacy)
@@ -1151,11 +1302,33 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                 )
 
                 # =============================================================
-                # PID CONTROLLER UPDATE
+                # PID CONTROLLER UPDATE (V9.4.3: with Semantic Validation)
                 # =============================================================
 
+                # Compute semantic PPL from prompts (if tokenizer available)
+                semantic_ppl = 0.0
+                # Check if semantic validation is enabled (W_s > 0 in PIDv2 controller)
+                semantic_enabled = (
+                    hasattr(authority_controller, 'config') and
+                    hasattr(authority_controller.config, 'W_s') and
+                    authority_controller.config.W_s > 0
+                )
+                if tokenizer is not None and hasattr(config, 'sample_prompts') and semantic_enabled:
+                    try:
+                        semantic_ppl = compute_semantic_ppl(
+                            model, tokenizer, config.sample_prompts, device, max_tokens=30
+                        )
+                    except Exception as e:
+                        logger.debug(f"Semantic PPL computation failed: {e}")
+
                 old_A = authority_controller.A
-                new_A = authority_controller.update(current_val_ppl, current_coh)
+                new_A = authority_controller.update(
+                    current_val_ppl,
+                    current_coh,
+                    semantic_ppl=semantic_ppl,
+                    step=state.step,
+                    phase_ramp_steps=config.phase_ramp_steps,
+                )
 
                 # Log PID status
                 logger.info(f"  {authority_controller.get_status_string()}")
@@ -1188,6 +1361,15 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                         tb_writer.add_scalar("ctrl/dynamic_Kp", authority_controller.last_Kp, state.step)
                     if hasattr(authority_controller, 'last_volatility'):
                         tb_writer.add_scalar("ctrl/ppl_volatility", authority_controller.last_volatility, state.step)
+                    # V9.4.3: Semantic validation + Handshake dampening metrics
+                    if hasattr(authority_controller, 'last_semantic_ppl'):
+                        tb_writer.add_scalar("ctrl/semantic_ppl", authority_controller.last_semantic_ppl, state.step)
+                    if hasattr(authority_controller, 'last_semantic_error'):
+                        tb_writer.add_scalar("ctrl/semantic_error", authority_controller.last_semantic_error, state.step)
+                    if hasattr(authority_controller, 'last_effective_Kd'):
+                        tb_writer.add_scalar("ctrl/effective_Kd", authority_controller.last_effective_Kd, state.step)
+                    if hasattr(authority_controller, 'last_ramp_frac'):
+                        tb_writer.add_scalar("ctrl/handshake_ramp", authority_controller.last_ramp_frac, state.step)
 
                 # PPL-Guard check (if enabled)
                 if config.trinity_enabled and ppl_guard is not None:
@@ -1360,6 +1542,16 @@ def main():
     parser.add_argument("--pidv2_c_good", type=float, default=0.76,
                        help="PIDv2 coherence threshold for full authority")
 
+    # V9.4.3: Semantic Validation + Handshake Dampening
+    parser.add_argument("--pidv2_w_s", type=float, default=0.30,
+                       help="Semantic weight: 0.30 = 30%% prompt-based, 70%% general PPL")
+    parser.add_argument("--pidv2_semantic_scale", type=float, default=50.0,
+                       help="Normalization scale for semantic PPL error")
+    parser.add_argument("--pidv2_handshake_dampen", action="store_true", default=True,
+                       help="Enable D-term dampening during handshake ramp")
+    parser.add_argument("--no_handshake_dampen", action="store_true",
+                       help="Disable D-term dampening during handshake")
+
     # Legacy PID Controller settings (mixes coherence into PID - not recommended)
     parser.add_argument("--pid_kp", type=float, default=0.20,
                        help="PID proportional gain (legacy)")
@@ -1431,6 +1623,9 @@ def main():
         )
         controller_mode = "EMERGENCY PD"
     elif controller_type == "pidv2":
+        # Handle --no_handshake_dampen flag
+        handshake_dampen = not args.no_handshake_dampen
+
         pidv2_config = AuthorityPIDv2Config(
             Kp_min=args.pidv2_kp_min,
             Kp_max=args.pidv2_kp_max,
@@ -1440,6 +1635,10 @@ def main():
             A_min=args.pidv2_a_min,
             C_floor=args.pidv2_c_floor,
             C_good=args.pidv2_c_good,
+            # V9.4.3: Semantic Validation + Handshake Dampening
+            W_s=args.pidv2_w_s,
+            semantic_ppl_scale=args.pidv2_semantic_scale,
+            handshake_Kd_dampen=handshake_dampen,
         )
         controller_mode = "PIDv2"
     else:  # pid (legacy)
@@ -1457,8 +1656,8 @@ def main():
         print("  SYMBOLU V9.3.6 - EMERGENCY PD TRAINING")
         print("  Phase Attention Transformer with Emergency PD Controller")
     elif controller_type == "pidv2":
-        print("  SYMBOLU V9.4.1 - PIDv2 TRAINING (Dynamic SNR-Adjusted Kp)")
-        print("  Phase Attention Transformer with Variance-Adjusted PID + Coherence Gate")
+        print("  SYMBOLU V9.4.3 - PIDv2 TRAINING (Semantic Validation + Handshake Dampening)")
+        print("  Phase Attention Transformer with Weighted Semantic PID + Coherence Gate")
     else:
         print("  SYMBOLU V9.3.5-PID TRAINING (LEGACY)")
         print("  Phase Attention Transformer with Authority PID Controller")
@@ -1476,12 +1675,13 @@ def main():
         print(f"  Target Coherence: {args.pd_target_coh}")
         print(f"  Authority floor: {args.pd_a_min}")
     elif controller_type == "pidv2":
-        print(f"  Controller: PIDv2 (Dynamic SNR-Adjusted Kp + Coherence Gate)")
+        print(f"  Controller: PIDv2 (Semantic Validation + Handshake Dampening)")
         print(f"  Dynamic Kp: [{args.pidv2_kp_min}, {args.pidv2_kp_max}] (sensitivity={args.pidv2_kp_sensitivity})")
         print(f"  Static Gains: Ki={args.pidv2_ki}, Kd={args.pidv2_kd}")
         print(f"  Coherence Gate: [{args.pidv2_c_floor}, {args.pidv2_c_good}]")
+        print(f"  Semantic Weight (W_s): {args.pidv2_w_s:.0%} ('Roman Knowledge' influence)")
+        print(f"  Handshake Kd Dampening: {'ON' if not args.no_handshake_dampen else 'OFF'}")
         print(f"  Authority floor: {args.pidv2_a_min}")
-        print("  Kp auto-adjusts: high volatility → conservative, low volatility → aggressive")
     else:
         print(f"  Controller: Full PID (legacy - mixes coherence into PID)")
         print(f"  PID Gains: Kp={args.pid_kp}, Ki={args.pid_ki}, Kd={args.pid_kd}")
