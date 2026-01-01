@@ -1198,12 +1198,6 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                         agc_threshold = new_agc
                         config.agc_threshold = new_agc
 
-                # Save lightweight checkpoint
-                eval_ckpt_path = checkpoint_dir / f"step_{state.step}.pt"
-                if not eval_ckpt_path.exists():
-                    save_checkpoint_light(model, state, config, str(eval_ckpt_path))
-                    cleanup_old_checkpoints(checkpoint_dir, keep_last=5)
-
                 # Save best model
                 if val_metrics['val_loss'] < state.best_val_loss:
                     state.best_val_loss = val_metrics['val_loss']
@@ -1318,8 +1312,8 @@ def main():
                        help="Only load model weights, reset optimizer")
     parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
-    parser.add_argument("--save_every", type=int, default=5000,
-                       help="Save checkpoint every N steps")
+    parser.add_argument("--save_every", type=int, default=500,
+                       help="Save full checkpoint every N steps")
     parser.add_argument("--log_every", type=int, default=10,
                        help="Log every N steps")
     parser.add_argument("--sample_every", type=int, default=500,
