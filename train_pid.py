@@ -320,8 +320,11 @@ class AuthorityPIDv2Config:
     V_dead_pct: float = 1.0   # Deadband in % - ignore velocity below this
     V_scale_pct: float = 5.0  # Normalization scale - 5% velocity = 1.0 error unit
 
-    # PID gains on PPL velocity (CONSERVATIVE - trust slow recovery over fast reaction)
-    Kp: float = 0.20         # Proportional: current velocity stress (conservative!)
+    # PID gains on PPL velocity (DYNAMIC Kp based on SNR)
+    Kp_base: float = 0.20    # Base Kp (used as reference, actual Kp is dynamic)
+    Kp_min: float = 0.10     # Floor when noisy (high volatility)
+    Kp_max: float = 0.30     # Ceiling when clean (low volatility)
+    Kp_sensitivity: float = 5.0  # How much volatility reduces Kp: Kp = Kp_max / (1 + vol * sens)
     Ki: float = 0.02         # Integral: accumulated velocity stress
     Kd: float = 0.10         # Derivative: velocity acceleration (reduced to prevent overshoot)
 
@@ -383,6 +386,8 @@ class AuthorityPIDv2:
         self.last_u = 0.0
         self.last_coh_gate = 1.0
         self.last_e_p = 0.0    # For compatibility
+        self.last_volatility = 0.0  # PPL coefficient of variation
+        self.last_Kp = self.config.Kp_base  # Dynamic Kp (SNR-adjusted)
 
     def update(self, val_ppl: float, coherence: float) -> float:
         """
@@ -401,6 +406,33 @@ class AuthorityPIDv2:
         # Need at least 6 evals for MA3 smoothing
         if len(self.ppl_history) < 6:
             return self.A
+
+        # =====================================================================
+        # DYNAMIC Kp: Variance-Adjusted Sensitivity (SNR-based)
+        # =====================================================================
+        # High volatility (noisy evals) → Kp scales down toward Kp_min
+        # Low volatility (clean trend) → Kp scales up toward Kp_max
+        # This auto-softens during "Handshake Shock" and sharpens for recovery
+
+        ppl_window = self.ppl_history[-6:]
+        ppl_mean = sum(ppl_window) / len(ppl_window)
+        ppl_variance = sum((x - ppl_mean) ** 2 for x in ppl_window) / len(ppl_window)
+        ppl_std = ppl_variance ** 0.5
+
+        # Coefficient of variation (relative volatility)
+        volatility = ppl_std / ppl_mean if ppl_mean > 0 else 0.0
+        self.last_volatility = volatility
+
+        # Dynamic Kp: inversely proportional to volatility
+        # Formula: Kp = Kp_max / (1 + volatility * sensitivity)
+        # - volatility=0.00 → Kp = 0.30 (aggressive, clean signal)
+        # - volatility=0.05 → Kp = 0.30 / 1.25 = 0.24
+        # - volatility=0.10 → Kp = 0.30 / 1.50 = 0.20
+        # - volatility=0.20 → Kp = 0.30 / 2.00 = 0.15
+        # - volatility=0.40 → Kp = 0.30 / 3.00 = 0.10 (conservative, noisy)
+        dynamic_Kp = cfg.Kp_max / (1.0 + volatility * cfg.Kp_sensitivity)
+        dynamic_Kp = max(cfg.Kp_min, min(cfg.Kp_max, dynamic_Kp))
+        self.last_Kp = dynamic_Kp
 
         # =====================================================================
         # PRIMARY PID LOOP: PPL VELOCITY (Percentage-based for scale invariance)
@@ -437,8 +469,8 @@ class AuthorityPIDv2:
         D = max(0, a / cfg.V_scale_pct)
         self.last_D = D
 
-        # ----- Control signal -----
-        u = cfg.Kp * P + cfg.Ki * self.I + cfg.Kd * D
+        # ----- Control signal (using DYNAMIC Kp) -----
+        u = dynamic_Kp * P + cfg.Ki * self.I + cfg.Kd * D
         self.last_u = u
 
         # ----- PID Authority Factor -----
@@ -503,14 +535,15 @@ class AuthorityPIDv2:
         limiter = "PPL" if self.A_ppl <= self.last_coh_gate else "COH"
         return (
             f"GOV {icon} | Brake(PPL): {self.A_ppl:.2f} | Gate(Coh): {self.last_coh_gate:.2f} | "
-            f"Final_A: {self.A:.2f} [{limiter}] | vel: {self.last_v:+.1f}%{recovery_tag}"
+            f"Final_A: {self.A:.2f} [{limiter}] | vel: {self.last_v:+.1f}% | "
+            f"Kp: {self.last_Kp:.2f}{recovery_tag}"
         )
 
     def get_detailed_status(self) -> str:
         return (
             f"  v_norm={self.last_v_norm:.3f} a={self.last_a:+.1f} | "
             f"P={self.last_P:.3f} I={self.last_I:.3f} D={self.last_D:.3f} | "
-            f"u={self.last_u:.3f}"
+            f"u={self.last_u:.3f} | vol={self.last_volatility:.1%} Kp={self.last_Kp:.2f}"
         )
 
 
@@ -881,13 +914,14 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
         controller_name = "PIDv2"
 
         logger.info("=" * 60)
-        logger.info("V9.4.0: PIDv2 CONTROLLER (Control-Systems Design)")
+        logger.info("V9.4.1: PIDv2 CONTROLLER (Dynamic SNR-Adjusted Kp)")
         logger.info("  Architecture: PPL velocity drives PID; Coherence gates authority")
-        logger.info(f"  PID Gains: Kp={pidv2_config.Kp}, Ki={pidv2_config.Ki}, Kd={pidv2_config.Kd}")
+        logger.info(f"  Dynamic Kp: [{pidv2_config.Kp_min}, {pidv2_config.Kp_max}] (sensitivity={pidv2_config.Kp_sensitivity})")
+        logger.info(f"  Static Gains: Ki={pidv2_config.Ki}, Kd={pidv2_config.Kd}")
         logger.info(f"  Coherence gate: [{pidv2_config.C_floor}, {pidv2_config.C_good}]")
         logger.info(f"  PPL velocity: deadband={pidv2_config.V_dead_pct}%, scale={pidv2_config.V_scale_pct}%")
         logger.info(f"  Authority floor: {pidv2_config.A_min}")
-        logger.info("  Key insight: PPL velocity is causal; Coherence is non-monotonic")
+        logger.info("  Kp auto-softens during Handshake Shock, sharpens for recovery")
         logger.info("=" * 60)
 
     else:  # pid (legacy)
@@ -1134,6 +1168,11 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                     # PD-specific metrics
                     if hasattr(authority_controller, 'last_e_d'):
                         tb_writer.add_scalar("ctrl/e_d", authority_controller.last_e_d, state.step)
+                    # PIDv2 dynamic Kp metrics
+                    if hasattr(authority_controller, 'last_Kp'):
+                        tb_writer.add_scalar("ctrl/dynamic_Kp", authority_controller.last_Kp, state.step)
+                    if hasattr(authority_controller, 'last_volatility'):
+                        tb_writer.add_scalar("ctrl/ppl_volatility", authority_controller.last_volatility, state.step)
 
                 # PPL-Guard check (if enabled)
                 if config.trinity_enabled and ppl_guard is not None:
@@ -1289,8 +1328,12 @@ def main():
                        help="DEPRECATED: Use --controller emergency_pd instead")
 
     # PIDv2 Controller settings (RECOMMENDED - follows control-systems theory)
-    parser.add_argument("--pidv2_kp", type=float, default=0.20,
-                       help="PIDv2 proportional gain on PPL velocity (conservative=0.20)")
+    parser.add_argument("--pidv2_kp_min", type=float, default=0.10,
+                       help="PIDv2 minimum Kp (when noisy/volatile)")
+    parser.add_argument("--pidv2_kp_max", type=float, default=0.30,
+                       help="PIDv2 maximum Kp (when clean signal)")
+    parser.add_argument("--pidv2_kp_sensitivity", type=float, default=5.0,
+                       help="PIDv2 volatility sensitivity for dynamic Kp")
     parser.add_argument("--pidv2_ki", type=float, default=0.02,
                        help="PIDv2 integral gain on PPL velocity")
     parser.add_argument("--pidv2_kd", type=float, default=0.10,
@@ -1373,7 +1416,9 @@ def main():
         controller_mode = "EMERGENCY PD"
     elif controller_type == "pidv2":
         pidv2_config = AuthorityPIDv2Config(
-            Kp=args.pidv2_kp,
+            Kp_min=args.pidv2_kp_min,
+            Kp_max=args.pidv2_kp_max,
+            Kp_sensitivity=args.pidv2_kp_sensitivity,
             Ki=args.pidv2_ki,
             Kd=args.pidv2_kd,
             A_min=args.pidv2_a_min,
@@ -1396,8 +1441,8 @@ def main():
         print("  SYMBOLU V9.3.6 - EMERGENCY PD TRAINING")
         print("  Phase Attention Transformer with Emergency PD Controller")
     elif controller_type == "pidv2":
-        print("  SYMBOLU V9.4.0 - PIDv2 TRAINING (Control-Systems Design)")
-        print("  Phase Attention Transformer with PPL-Primary PID + Coherence Gate")
+        print("  SYMBOLU V9.4.1 - PIDv2 TRAINING (Dynamic SNR-Adjusted Kp)")
+        print("  Phase Attention Transformer with Variance-Adjusted PID + Coherence Gate")
     else:
         print("  SYMBOLU V9.3.5-PID TRAINING (LEGACY)")
         print("  Phase Attention Transformer with Authority PID Controller")
@@ -1415,11 +1460,12 @@ def main():
         print(f"  Target Coherence: {args.pd_target_coh}")
         print(f"  Authority floor: {args.pd_a_min}")
     elif controller_type == "pidv2":
-        print(f"  Controller: PIDv2 (PPL-Primary PID + Coherence Gate)")
-        print(f"  PID Gains: Kp={args.pidv2_kp}, Ki={args.pidv2_ki}, Kd={args.pidv2_kd} (on PPL velocity)")
+        print(f"  Controller: PIDv2 (Dynamic SNR-Adjusted Kp + Coherence Gate)")
+        print(f"  Dynamic Kp: [{args.pidv2_kp_min}, {args.pidv2_kp_max}] (sensitivity={args.pidv2_kp_sensitivity})")
+        print(f"  Static Gains: Ki={args.pidv2_ki}, Kd={args.pidv2_kd}")
         print(f"  Coherence Gate: [{args.pidv2_c_floor}, {args.pidv2_c_good}]")
         print(f"  Authority floor: {args.pidv2_a_min}")
-        print("  Architecture: PPL velocity drives PID; Coherence only gates authority")
+        print("  Kp auto-adjusts: high volatility → conservative, low volatility → aggressive")
     else:
         print(f"  Controller: Full PID (legacy - mixes coherence into PID)")
         print(f"  PID Gains: Kp={args.pid_kp}, Ki={args.pid_ki}, Kd={args.pid_kd}")
