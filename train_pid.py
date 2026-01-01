@@ -86,6 +86,8 @@ from train import (
     update_alpha_schedule,
     create_scheduler,
     trigger_handshake,
+    load_tokenizer,
+    run_quality_samples,
 )
 
 # Optional imports
@@ -880,6 +882,15 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
     train_loader, val_loader, train_dataset = create_dataloaders(config)
     logger.info(f"Train batches: {len(train_loader):,}")
 
+    # Load tokenizer for quality sampling
+    tokenizer = None
+    if config.sample_every > 0:
+        try:
+            tokenizer = load_tokenizer(config)
+            logger.info(f"Tokenizer loaded for quality sampling (every {config.sample_every} steps)")
+        except Exception as e:
+            logger.warning(f"Could not load tokenizer for sampling: {e}")
+
     # Initialize MemoryGuard
     memory_guard = MemoryGuard(config, config.batch_size, config.gradient_accumulation)
     if config.memory_guard_enabled:
@@ -1203,6 +1214,10 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                     )
                     logger.info(f"  📦 New best! Saved to {best_path}")
 
+                # Quality sampling - generate text to monitor training progress
+                if config.sample_every > 0 and state.step % config.sample_every == 0 and tokenizer is not None:
+                    run_quality_samples(model, tokenizer, config, device, state.step, logger)
+
             # =================================================================
             # V9.3 HANDSHAKE TRIGGER
             # =================================================================
@@ -1307,6 +1322,8 @@ def main():
                        help="Save checkpoint every N steps")
     parser.add_argument("--log_every", type=int, default=10,
                        help="Log every N steps")
+    parser.add_argument("--sample_every", type=int, default=500,
+                       help="Generate quality samples every N steps (0 = disabled)")
 
     # Features
     parser.add_argument("--memory_guard", action="store_true",
@@ -1391,6 +1408,7 @@ def main():
         eval_every=args.eval_every,
         save_every=args.save_every,
         log_every=args.log_every,
+        sample_every=args.sample_every,
         memory_guard_enabled=args.memory_guard,
         trinity_enabled=args.trinity,
         wandb=args.wandb,
