@@ -824,6 +824,7 @@ class TrainingConfig:
 
     # Resume
     resume: Optional[str] = None
+    resume_weights_only: bool = False  # Only load model weights, skip optimizer state
 
     # Coherence Loss (S3, S1-S2, S8-S9)
     use_coherence_loss: bool = True  # Enable coherence-enhanced training
@@ -2511,16 +2512,27 @@ def load_checkpoint(
     scheduler: LambdaLR,
     scaler: Optional[GradScaler],
     device: torch.device,
+    weights_only: bool = False,
 ) -> TrainingState:
-    """Load training checkpoint."""
+    """Load training checkpoint.
+
+    Args:
+        weights_only: If True, only load model weights, skip optimizer/scheduler state.
+                     Useful when resuming with different optimizer config (e.g., Lookahead).
+    """
     checkpoint = torch.load(path, map_location=device)
 
     model.load_state_dict(checkpoint["model"])
-    optimizer.load_state_dict(checkpoint["optimizer"])
-    scheduler.load_state_dict(checkpoint["scheduler"])
 
-    if scaler is not None and "scaler" in checkpoint:
-        scaler.load_state_dict(checkpoint["scaler"])
+    if not weights_only:
+        try:
+            optimizer.load_state_dict(checkpoint["optimizer"])
+            scheduler.load_state_dict(checkpoint["scheduler"])
+            if scaler is not None and "scaler" in checkpoint:
+                scaler.load_state_dict(checkpoint["scaler"])
+        except (KeyError, ValueError) as e:
+            import logging
+            logging.warning(f"Could not load optimizer/scheduler state: {e}. Starting fresh optimizer.")
 
     state = TrainingState(**checkpoint["state"])
 
@@ -2600,9 +2612,13 @@ def train(config: TrainingConfig):
     if config.resume:
         logger.info(f"Resuming from {config.resume}")
         state = load_checkpoint(
-            config.resume, model, optimizer, scheduler, scaler, device
+            config.resume, model, optimizer, scheduler, scaler, device,
+            weights_only=config.resume_weights_only
         )
-        logger.info(f"Resumed at step {state.step}")
+        if config.resume_weights_only:
+            logger.info(f"Resumed model weights at step {state.step} (optimizer reset)")
+        else:
+            logger.info(f"Resumed at step {state.step}")
 
     # Create dataloaders
     logger.info("Loading dataset...")
@@ -3653,6 +3669,8 @@ def parse_args() -> TrainingConfig:
     # Resume
     parser.add_argument("--resume", type=str, default=None,
                        help="Resume from checkpoint")
+    parser.add_argument("--resume_weights_only", action="store_true",
+                       help="Only load model weights, skip optimizer/scheduler state (useful after config changes)")
 
     # Coherence Loss (S3, S1-S2, S8-S9)
     parser.add_argument("--use_coherence_loss", action="store_true", default=True,
