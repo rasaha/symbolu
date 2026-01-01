@@ -3082,8 +3082,13 @@ def parse_args() -> TrainingConfig:
     # V9.2.1: Map --no_coherence_freeze to coherence_freeze_enabled (inverted)
     args.coherence_freeze_enabled = not getattr(args, 'no_coherence_freeze', False)
 
+    # Remove CLI-only flags that don't exist in TrainingConfig
+    args_dict = vars(args)
+    for cli_only_arg in ['memory_guard', 'no_coherence_freeze']:
+        args_dict.pop(cli_only_arg, None)
+
     # Create config from args
-    config = TrainingConfig(**vars(args))
+    config = TrainingConfig(**args_dict)
 
     return config
 
