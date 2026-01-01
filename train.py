@@ -1505,9 +1505,9 @@ class TrainingState:
     ppl_history: list = field(default_factory=list)  # Track PPL for trend detection
     trend_patience: int = 0  # Patience counter for trend-based interventions
     ema_ppl: float = 0.0  # Exponential moving average of PPL (smooths noise)
-    # V9.3.5: PPL-Ratchet LR control - ensure Val PPL always drops
+    # V9.3.5: PPL-Ratchet LR control - smoothed, multi-eval signal
     ppl_lr_factor: float = 1.0  # LR factor based on PPL trend (ratchets down on rise)
-    last_val_ppl: float = 0.0  # Track last validation PPL for comparison
+    val_ppl_history: list = field(default_factory=list)  # Track Val PPL for smoothed velocity
 
 
 def compute_semantic_entropy(logits: torch.Tensor, max_positions: int = 1024) -> torch.Tensor:
@@ -3067,45 +3067,65 @@ def train(config: TrainingConfig):
                 )
 
                 # =================================================================
-                # V9.3.5: PPL-RATCHET LR CONTROL
-                # Ensure Val PPL always drops by adjusting LR based on PPL trend.
-                # - PPL rose → cut ppl_lr_factor proportionally (ratchet down)
-                # - PPL dropped → slowly restore ppl_lr_factor (10% per eval)
-                # This ensures we don't push LR too high when learning stalls.
+                # V9.3.5: PPL-RATCHET LR CONTROL (Smoothed, Multi-Eval)
+                # Use 3-eval moving average and velocity to detect "not improving".
+                # With only 7 val batches, single evals are noisy - need smoothing.
+                #
+                # Trigger conditions (after 6 evals):
+                #   - 3 consecutive PPL rises, OR
+                #   - Positive velocity: mean(last 3) > mean(prev 3)
+                #
+                # Action: Gentle reduction with floor at 0.7
                 # =================================================================
                 current_val_ppl = val_metrics['val_perplexity']
 
-                if state.last_val_ppl > 0:  # Skip first eval (no baseline)
-                    ppl_delta = current_val_ppl - state.last_val_ppl
+                # Track PPL history (keep last 10 for smoothing)
+                state.val_ppl_history.append(current_val_ppl)
+                if len(state.val_ppl_history) > 10:
+                    state.val_ppl_history = state.val_ppl_history[-10:]
 
-                    if ppl_delta > 0:
-                        # PPL rose - learning went backwards, cut LR factor
-                        rise_ratio = ppl_delta / state.last_val_ppl
-                        # 5% rise → 75% factor, 10% rise → 50% factor (floor)
-                        cut_multiplier = max(0.5, 1.0 - rise_ratio * 5)
-                        old_factor = state.ppl_lr_factor
-                        state.ppl_lr_factor *= cut_multiplier
-                        state.ppl_lr_factor = max(0.1, state.ppl_lr_factor)  # Floor at 10%
+                # Need at least 6 evals for smoothed comparison
+                if len(state.val_ppl_history) >= 6:
+                    # Compute 3-eval moving averages
+                    ppl_ma3 = sum(state.val_ppl_history[-3:]) / 3  # Last 3
+                    ppl_prev3 = sum(state.val_ppl_history[-6:-3]) / 3  # Previous 3
+                    ppl_vel = ppl_ma3 - ppl_prev3  # Positive = worsening
 
+                    # Check for 3 consecutive rises (very robust for noisy val)
+                    h = state.val_ppl_history
+                    three_consecutive_rises = (len(h) >= 3 and
+                                               h[-1] > h[-2] > h[-3])
+
+                    old_factor = state.ppl_lr_factor
+
+                    if three_consecutive_rises or ppl_vel > 50:
+                        # PPL persistently worsening - reduce LR factor
+                        # Gentle reduction: velocity-proportional with floor
+                        if ppl_vel > 0:
+                            # ppl_vel of 150 → full penalty (0.7), 50 → partial
+                            reduction = min(0.3, ppl_vel / 500)  # Max 30% reduction
+                            state.ppl_lr_factor = max(0.7, state.ppl_lr_factor - reduction)
+                        else:
+                            # 3 consecutive rises but negative velocity (edge case)
+                            state.ppl_lr_factor = max(0.7, state.ppl_lr_factor * 0.9)
+
+                        trigger = "3↑" if three_consecutive_rises else f"vel={ppl_vel:.0f}"
                         logger.warning(
-                            f"📉 [Step {state.step}] PPL-RATCHET: Val PPL rose {rise_ratio*100:.1f}% "
-                            f"({state.last_val_ppl:.1f} → {current_val_ppl:.1f}). "
+                            f"📉 [Step {state.step}] PPL-RATCHET: {trigger} | "
+                            f"MA3: {ppl_prev3:.1f} → {ppl_ma3:.1f} | "
                             f"LR factor: {old_factor:.2f} → {state.ppl_lr_factor:.2f}"
                         )
-                    else:
-                        # PPL dropped - learning is happening, slowly restore factor
-                        old_factor = state.ppl_lr_factor
-                        state.ppl_lr_factor = min(1.0, state.ppl_lr_factor * 1.1)
 
-                        if old_factor < 1.0:
+                    elif ppl_vel < -20:
+                        # PPL improving (negative velocity) - slowly restore
+                        state.ppl_lr_factor = min(1.0, state.ppl_lr_factor + 0.05)
+
+                        if old_factor < 0.99:
                             logger.info(
-                                f"📈 [Step {state.step}] PPL-RATCHET: Val PPL dropped "
-                                f"({state.last_val_ppl:.1f} → {current_val_ppl:.1f}). "
+                                f"📈 [Step {state.step}] PPL-RATCHET: Improving | "
+                                f"MA3: {ppl_prev3:.1f} → {ppl_ma3:.1f} | "
                                 f"LR factor: {old_factor:.2f} → {state.ppl_lr_factor:.2f}"
                             )
-
-                # Update last_val_ppl for next comparison
-                state.last_val_ppl = current_val_ppl
 
                 # V9.3: PPL-Guard check - tighten AGC if PPL velocity + low coherence
                 if config.trinity_enabled and ppl_guard is not None:
