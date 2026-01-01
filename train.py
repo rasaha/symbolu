@@ -758,9 +758,13 @@ def compute_tier_gradient_norms(model: nn.Module) -> dict:
 
 
 def log_tier_gradients(model: nn.Module, step: int, logger) -> None:
-    """Log gradient norms per tier to verify learning health."""
+    """Log gradient norms per tier to verify learning health. (Legacy - computes at call time)"""
     stats = compute_tier_gradient_norms(model)
+    log_tier_gradients_from_metrics(stats, step, logger)
 
+
+def log_tier_gradients_from_metrics(stats: dict, step: int, logger) -> None:
+    """Log gradient norms per tier using pre-computed stats from train_step."""
     # Format: show norm and whether tier is "alive" (learning)
     def status(norm):
         if norm < 1e-8:
@@ -1731,6 +1735,10 @@ def train_step(
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
             optimizer.step()
 
+        # Capture gradient norms BEFORE zeroing (for diagnostics)
+        grad_stats = compute_tier_gradient_norms(model)
+        metrics.update(grad_stats)
+
         scheduler.step()
         optimizer.zero_grad()
 
@@ -2480,9 +2488,12 @@ def train(config: TrainingConfig):
                 run_quality_samples(model, tokenizer, config, device, state.step, logger)
 
             # Gradient health check - verify all tiers are learning
-            # Runs at same frequency as quality sampling
+            # Uses gradient stats captured in train_step BEFORE optimizer.zero_grad()
             if config.sample_every > 0 and state.step % config.sample_every == 0:
-                log_tier_gradients(model, state.step, logger)
+                if 'stable_grad_norm' in metrics:
+                    log_tier_gradients_from_metrics(metrics, state.step, logger)
+                else:
+                    logger.info(f"  📊 Gradient stats not available (check gradient_accumulation)")
 
             # Reset throughput timer AFTER eval/checkpoint to exclude their time
             if state.step % config.log_every == 0:
