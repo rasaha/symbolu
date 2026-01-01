@@ -404,25 +404,26 @@ class AuthorityPIDv2:
             return self.A
 
         # =====================================================================
-        # PRIMARY PID LOOP: PPL VELOCITY
+        # PRIMARY PID LOOP: PPL VELOCITY (Percentage-based for scale invariance)
         # =====================================================================
 
-        # MA3 smoothed velocity
+        # MA3 smoothed velocity as PERCENTAGE change
         ppl_ma3 = sum(self.ppl_history[-3:]) / 3
         ppl_prev3 = sum(self.ppl_history[-6:-3]) / 3
-        v = ppl_ma3 - ppl_prev3  # Positive = worsening
-        self.last_v = v
+        v_pct = (ppl_ma3 - ppl_prev3) / ppl_prev3 * 100  # % change
+        self.last_v = v_pct  # Now in percentage units
 
-        # Normalize velocity with deadband
-        if v <= cfg.V_dead:
+        # Normalize: 5% velocity increase = 1.0 error unit
+        # Deadband at 1% to ignore noise
+        if v_pct <= 1.0:  # 1% deadband
             v_norm = 0.0
         else:
-            v_norm = min(1.0, (v - cfg.V_dead) / cfg.V_scale)
+            v_norm = min(1.0, (v_pct - 1.0) / 5.0)  # 5% scale
         self.last_v_norm = v_norm
 
-        # Acceleration (derivative of velocity)
-        a = v - self.v_prev
-        self.v_prev = v
+        # Acceleration (derivative of velocity in % units)
+        a = v_pct - self.v_prev
+        self.v_prev = v_pct
         self.last_a = a
 
         # ----- P term: Current velocity stress -----
@@ -435,7 +436,8 @@ class AuthorityPIDv2:
 
         # ----- D term: Velocity acceleration (predictive) -----
         # Positive acceleration = situation getting worse faster
-        D = max(0, a / cfg.V_scale)
+        # Normalize: 5% acceleration = 1.0 D term
+        D = max(0, a / 5.0)
         self.last_D = D
 
         # ----- Control signal -----
@@ -473,7 +475,7 @@ class AuthorityPIDv2:
         # =====================================================================
         # RECOVERY (Both signals must be healthy)
         # =====================================================================
-        ppl_healthy = v < -20 and v_norm == 0  # PPL dropping, no stress
+        ppl_healthy = v_pct < -2.0 and v_norm == 0  # PPL dropping >2%, no stress
         coh_healthy = coherence > cfg.C_good
 
         if ppl_healthy and coh_healthy:
@@ -502,7 +504,7 @@ class AuthorityPIDv2:
         recovery_tag = " [RECOVERING]" if self.good_streak >= 1 else ""
         return (
             f"PIDv2 {icon} | A: {self.A:.3f} (ppl:{self.A_ppl:.2f} coh:{self.last_coh_gate:.2f}) | "
-            f"PPL_vel: {self.last_v:+.1f}{recovery_tag}"
+            f"PPL_vel: {self.last_v:+.1f}%{recovery_tag}"
         )
 
     def get_detailed_status(self) -> str:
