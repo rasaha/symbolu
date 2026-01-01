@@ -140,6 +140,167 @@ class AuthorityPIDConfig:
     recovery_e_threshold: float = 0.2  # Error must be below this for recovery
 
 
+# =============================================================================
+# EMERGENCY PD CONTROLLER (Alternative - More Aggressive)
+# =============================================================================
+
+@dataclass
+class EmergencyPDConfig:
+    """Configuration for Emergency PD Controller (no Integral term)."""
+
+    # Coherence target (primary signal)
+    target_coh: float = 0.76   # "Gold standard" coherence
+
+    # PPL baseline for normalization
+    base_ppl: float = 1080.0   # Starting PPL for velocity normalization
+
+    # PD gains (aggressive for emergency response)
+    Kp: float = 1.5            # Proportional gain on coherence error
+    Kd: float = 0.4            # Derivative gain on PPL velocity
+
+    # Decay multiplier
+    decay_factor: float = 1.2  # Multiplier in exp(-decay_factor * u)
+
+    # Authority bounds
+    A_min: float = 0.35        # Minimum authority (aggressive floor)
+    A_max: float = 1.00        # Maximum authority
+
+    # Smoothing (optional but recommended)
+    use_smoothing: bool = True  # Use MA3 for PPL velocity
+
+
+class EmergencyPD:
+    """
+    Emergency PD Controller for Crisis Response.
+
+    No Integral term = no windup risk during massive errors.
+    Coherence as primary signal = more stable than PPL.
+    Aggressive gains = fast response to divergence.
+
+    Use this when the model is in crisis (PPL exploding, coherence tanking).
+    """
+
+    def __init__(self, config: EmergencyPDConfig = None):
+        self.config = config or EmergencyPDConfig()
+
+        # Controller state
+        self.A = 1.0
+        self.last_ppl = self.config.base_ppl
+        self.last_coh = 0.80
+
+        # History for smoothing
+        self.ppl_history: List[float] = []
+        self.coh_history: List[float] = []
+
+        # Telemetry
+        self.last_e_p = 0.0  # Coherence error
+        self.last_e_d = 0.0  # PPL velocity error
+        self.last_u = 0.0    # Control signal
+        self.last_v = 0.0    # Raw PPL velocity
+
+    def update(self, val_ppl: float, coherence: float) -> float:
+        """
+        Update authority factor based on current metrics.
+
+        Args:
+            val_ppl: Current validation perplexity
+            coherence: Current coherence metric
+
+        Returns:
+            A: Updated authority factor
+        """
+        cfg = self.config
+
+        # Track history
+        self.ppl_history.append(val_ppl)
+        self.coh_history.append(coherence)
+        if len(self.ppl_history) > 10:
+            self.ppl_history = self.ppl_history[-10:]
+        if len(self.coh_history) > 10:
+            self.coh_history = self.coh_history[-10:]
+
+        # =====================================================================
+        # PROPORTIONAL: Coherence Error (primary signal)
+        # =====================================================================
+        # If coh=0.65 and target=0.76, e_p = 0.11
+        e_p = max(0, cfg.target_coh - coherence)
+        self.last_e_p = e_p
+
+        # =====================================================================
+        # DERIVATIVE: PPL Velocity (brake signal)
+        # =====================================================================
+        if cfg.use_smoothing and len(self.ppl_history) >= 3:
+            # MA3 smoothing for noisy validation
+            if len(self.ppl_history) >= 6:
+                ppl_ma3 = sum(self.ppl_history[-3:]) / 3
+                ppl_prev3 = sum(self.ppl_history[-6:-3]) / 3
+                v = ppl_ma3 - ppl_prev3
+            else:
+                # Not enough history, use simple delta
+                v = val_ppl - self.last_ppl
+        else:
+            # Raw step-to-step velocity
+            v = val_ppl - self.last_ppl
+
+        self.last_v = v
+        self.last_ppl = val_ppl
+
+        # Normalize by base PPL for scale invariance
+        e_d = max(0, v / cfg.base_ppl)
+        self.last_e_d = e_d
+
+        # =====================================================================
+        # CONTROL SIGNAL (PD only, no I)
+        # =====================================================================
+        u = (cfg.Kp * e_p) + (cfg.Kd * e_d)
+        self.last_u = u
+
+        # =====================================================================
+        # AUTHORITY UPDATE (Aggressive Exponential Decay)
+        # =====================================================================
+        self.A = math.exp(-cfg.decay_factor * u)
+        self.A = max(cfg.A_min, min(cfg.A_max, self.A))
+
+        # =====================================================================
+        # RECOVERY (Simple: if both signals healthy, slowly restore)
+        # =====================================================================
+        if e_p < 0.02 and e_d < 0.01 and self.A < 0.95:
+            # Both signals healthy, restore slowly
+            self.A = min(cfg.A_max, self.A + 0.03)
+
+        return self.A
+
+    def get_status_icon(self) -> str:
+        """Get status icon based on authority level."""
+        if self.A > 0.90:
+            return "🟢"  # Healthy
+        elif self.A > 0.60:
+            return "🟡"  # Braking
+        else:
+            return "🔴"  # Emergency
+
+    def get_status_string(self) -> str:
+        """Get formatted status string for logging."""
+        icon = self.get_status_icon()
+        status = ""
+        if self.A < 0.60:
+            status = " [EMERGENCY]"
+        elif self.A < 0.90:
+            status = " [BRAKING]"
+
+        return (
+            f"PD {icon} | A: {self.A:.3f} | "
+            f"Coh_err: {self.last_e_p:.3f} | PPL_vel: {self.last_v:+.1f}{status}"
+        )
+
+    def get_detailed_status(self) -> str:
+        """Get detailed telemetry for debugging."""
+        return (
+            f"  e_p={self.last_e_p:.4f} e_d={self.last_e_d:.4f} | "
+            f"u={self.last_u:.4f}"
+        )
+
+
 class AuthorityPID:
     """
     PID-based Authority Controller for Phase Attention Training.
@@ -376,8 +537,9 @@ def create_optimizer_with_groups(model: nn.Module, config: TrainingConfig) -> Ad
 # MAIN TRAINING FUNCTION WITH PID
 # =============================================================================
 
-def train_with_pid(config: TrainingConfig):
-    """Main training function with Authority PID Controller."""
+def train_with_pid(config: TrainingConfig, use_emergency_pd: bool = False,
+                   pd_config: EmergencyPDConfig = None, pid_config: AuthorityPIDConfig = None):
+    """Main training function with Authority Controller (PID or Emergency PD)."""
 
     # Setup logging
     logger = setup_logging(config)
@@ -474,27 +636,38 @@ def train_with_pid(config: TrainingConfig):
         ppl_guard = PPLGuard(config.ppl_velocity_threshold)
 
     # =========================================================================
-    # INITIALIZE AUTHORITY PID CONTROLLER
+    # INITIALIZE AUTHORITY CONTROLLER (PID or Emergency PD)
     # =========================================================================
-    pid_config = AuthorityPIDConfig(
-        C_low=0.70,
-        C_high=0.78,
-        V_dead=30.0,
-        V_scale=300.0,
-        Kp=0.20,
-        Ki=0.03,
-        Kd=0.12,
-        A_min=0.70
-    )
-    authority_pid = AuthorityPID(pid_config)
+    if use_emergency_pd:
+        # Emergency PD mode - more aggressive, no Integral term
+        if pd_config is None:
+            pd_config = EmergencyPDConfig()
+        authority_controller = EmergencyPD(pd_config)
+        controller_name = "EMERGENCY PD"
 
-    logger.info("=" * 60)
-    logger.info("V9.3.5-PID: AUTHORITY PID CONTROLLER ENABLED")
-    logger.info(f"  Gains: Kp={pid_config.Kp}, Ki={pid_config.Ki}, Kd={pid_config.Kd}")
-    logger.info(f"  Coherence band: [{pid_config.C_low}, {pid_config.C_high}]")
-    logger.info(f"  PPL deadband: {pid_config.V_dead}, scale: {pid_config.V_scale}")
-    logger.info(f"  Authority floor: {pid_config.A_min}")
-    logger.info("=" * 60)
+        logger.info("=" * 60)
+        logger.info("V9.3.6: EMERGENCY PD CONTROLLER ENABLED")
+        logger.info(f"  Gains: Kp={pd_config.Kp} (Coh), Kd={pd_config.Kd} (PPL vel)")
+        logger.info(f"  Target coherence: {pd_config.target_coh}")
+        logger.info(f"  Base PPL: {pd_config.base_ppl}")
+        logger.info(f"  Decay factor: {pd_config.decay_factor}")
+        logger.info(f"  Authority floor: {pd_config.A_min}")
+        logger.info("  Mode: AGGRESSIVE (no Integral, coherence-primary)")
+        logger.info("=" * 60)
+    else:
+        # Full PID mode - conservative with Integral term
+        if pid_config is None:
+            pid_config = AuthorityPIDConfig()
+        authority_controller = AuthorityPID(pid_config)
+        controller_name = "PID"
+
+        logger.info("=" * 60)
+        logger.info("V9.3.5-PID: AUTHORITY PID CONTROLLER ENABLED")
+        logger.info(f"  Gains: Kp={pid_config.Kp}, Ki={pid_config.Ki}, Kd={pid_config.Kd}")
+        logger.info(f"  Coherence band: [{pid_config.C_low}, {pid_config.C_high}]")
+        logger.info(f"  PPL deadband: {pid_config.V_dead}, scale: {pid_config.V_scale}")
+        logger.info(f"  Authority floor: {pid_config.A_min}")
+        logger.info("=" * 60)
 
     # Initialize TensorBoard
     tb_writer = None
@@ -567,7 +740,7 @@ def train_with_pid(config: TrainingConfig):
         base_authority_cap = 0.3 + 0.7 * current_alpha
 
         # Apply PID authority factor
-        effective_authority_cap = base_authority_cap * authority_pid.A
+        effective_authority_cap = base_authority_cap * authority_controller.A
 
         # Compute effective LR cap
         effective_lr_cap = config.learning_rate * effective_authority_cap
@@ -646,7 +819,7 @@ def train_with_pid(config: TrainingConfig):
                     log_msg += f" | Coh: {metrics['coherence']:.3f}"
 
                 # Add alpha and PID authority
-                log_msg += f" | α: {current_alpha:.2f} | A: {authority_pid.A:.2f}"
+                log_msg += f" | α: {current_alpha:.2f} | A: {authority_controller.A:.2f}"
 
                 # Add GATED indicator
                 remaining = max(0, config.alpha_warmup_steps - state.step)
@@ -661,9 +834,7 @@ def train_with_pid(config: TrainingConfig):
                     tb_writer.add_scalar("train/perplexity", math.exp(avg_loss), state.step)
                     tb_writer.add_scalar("train/learning_rate", stable_lr, state.step)
                     tb_writer.add_scalar("train/alpha_phase", current_alpha, state.step)
-                    tb_writer.add_scalar("pid/authority_A", authority_pid.A, state.step)
-                    tb_writer.add_scalar("pid/pressure", authority_pid.last_e, state.step)
-                    tb_writer.add_scalar("pid/ppl_velocity", authority_pid.last_v, state.step)
+                    tb_writer.add_scalar("ctrl/authority_A", authority_controller.A, state.step)
                     if config.use_coherence_loss:
                         tb_writer.add_scalar("train/coherence", metrics.get("coherence", 0), state.step)
 
@@ -674,9 +845,7 @@ def train_with_pid(config: TrainingConfig):
                         "train/perplexity": math.exp(avg_loss),
                         "train/learning_rate": stable_lr,
                         "train/alpha_phase": current_alpha,
-                        "pid/authority_A": authority_pid.A,
-                        "pid/pressure": authority_pid.last_e,
-                        "pid/ppl_velocity": authority_pid.last_v,
+                        "ctrl/authority_A": authority_controller.A,
                     }, step=state.step)
 
             # =================================================================
@@ -699,26 +868,35 @@ def train_with_pid(config: TrainingConfig):
                 # PID CONTROLLER UPDATE
                 # =============================================================
 
-                old_A = authority_pid.A
-                new_A = authority_pid.update(current_val_ppl, current_coh)
+                old_A = authority_controller.A
+                new_A = authority_controller.update(current_val_ppl, current_coh)
 
                 # Log PID status
-                logger.info(f"  {authority_pid.get_status_string()}")
+                logger.info(f"  {authority_controller.get_status_string()}")
 
                 # Log detailed PID if authority changed significantly
                 if abs(new_A - old_A) > 0.01:
-                    logger.info(f"  {authority_pid.get_detailed_status()}")
+                    logger.info(f"  {authority_controller.get_detailed_status()}")
 
-                # TensorBoard PID metrics
+                # TensorBoard controller metrics
                 if tb_writer is not None:
-                    tb_writer.add_scalar("pid/authority_A", new_A, state.step)
-                    tb_writer.add_scalar("pid/pressure", authority_pid.last_e, state.step)
-                    tb_writer.add_scalar("pid/e_ppl", authority_pid.last_e_p, state.step)
-                    tb_writer.add_scalar("pid/e_coh", authority_pid.last_e_c, state.step)
-                    tb_writer.add_scalar("pid/ppl_velocity", authority_pid.last_v, state.step)
-                    tb_writer.add_scalar("pid/integral", authority_pid.last_I, state.step)
+                    tb_writer.add_scalar("ctrl/authority_A", new_A, state.step)
+                    tb_writer.add_scalar("ctrl/e_p", authority_controller.last_e_p, state.step)
+                    tb_writer.add_scalar("ctrl/ppl_velocity", authority_controller.last_v, state.step)
+                    tb_writer.add_scalar("ctrl/control_signal_u", authority_controller.last_u, state.step)
                     tb_writer.add_scalar("val/perplexity", current_val_ppl, state.step)
                     tb_writer.add_scalar("val/loss", val_metrics['val_loss'], state.step)
+
+                    # PID-specific metrics
+                    if hasattr(authority_controller, 'last_e'):
+                        tb_writer.add_scalar("ctrl/pressure_e", authority_controller.last_e, state.step)
+                    if hasattr(authority_controller, 'last_e_c'):
+                        tb_writer.add_scalar("ctrl/e_coh", authority_controller.last_e_c, state.step)
+                    if hasattr(authority_controller, 'last_I'):
+                        tb_writer.add_scalar("ctrl/integral_I", authority_controller.last_I, state.step)
+                    # PD-specific metrics
+                    if hasattr(authority_controller, 'last_e_d'):
+                        tb_writer.add_scalar("ctrl/e_d", authority_controller.last_e_d, state.step)
 
                 # PPL-Guard check (if enabled)
                 if config.trinity_enabled and ppl_guard is not None:
@@ -777,7 +955,7 @@ def train_with_pid(config: TrainingConfig):
     logger.info("Training complete!")
     logger.info(f"  Final step: {state.step}")
     logger.info(f"  Best val loss: {state.best_val_loss:.4f}")
-    logger.info(f"  Final PID Authority: {authority_pid.A:.3f}")
+    logger.info(f"  Final {controller_name} Authority: {authority_controller.A:.3f}")
     logger.info("=" * 60)
 
     # Cleanup
@@ -866,7 +1044,11 @@ def main():
     parser.add_argument("--tensorboard", action="store_true", default=True,
                        help="Enable TensorBoard logging")
 
-    # PID Controller settings (advanced)
+    # Controller settings
+    parser.add_argument("--use_emergency_pd", action="store_true",
+                       help="Use Emergency PD controller (more aggressive, no I term)")
+
+    # PID Controller settings (for full PID mode)
     parser.add_argument("--pid_kp", type=float, default=0.20,
                        help="PID proportional gain")
     parser.add_argument("--pid_ki", type=float, default=0.03,
@@ -875,6 +1057,16 @@ def main():
                        help="PID derivative gain")
     parser.add_argument("--pid_a_min", type=float, default=0.70,
                        help="PID minimum authority factor")
+
+    # Emergency PD settings (for emergency mode)
+    parser.add_argument("--pd_kp", type=float, default=1.5,
+                       help="Emergency PD proportional gain on coherence")
+    parser.add_argument("--pd_kd", type=float, default=0.4,
+                       help="Emergency PD derivative gain on PPL velocity")
+    parser.add_argument("--pd_a_min", type=float, default=0.35,
+                       help="Emergency PD minimum authority factor")
+    parser.add_argument("--pd_target_coh", type=float, default=0.76,
+                       help="Emergency PD target coherence")
 
     args = parser.parse_args()
 
@@ -906,10 +1098,34 @@ def main():
         tensorboard=args.tensorboard,
     )
 
+    # Build controller configuration
+    if args.use_emergency_pd:
+        pd_config = EmergencyPDConfig(
+            target_coh=args.pd_target_coh,
+            Kp=args.pd_kp,
+            Kd=args.pd_kd,
+            A_min=args.pd_a_min,
+        )
+        pid_config = None
+        controller_mode = "EMERGENCY PD"
+    else:
+        pid_config = AuthorityPIDConfig(
+            Kp=args.pid_kp,
+            Ki=args.pid_ki,
+            Kd=args.pid_kd,
+            A_min=args.pid_a_min,
+        )
+        pd_config = None
+        controller_mode = "PID"
+
     # Print banner
     print("=" * 70)
-    print("  SYMBOLU V9.3.5-PID TRAINING")
-    print("  Phase Attention Transformer with Authority PID Controller")
+    if args.use_emergency_pd:
+        print("  SYMBOLU V9.3.6 - EMERGENCY PD TRAINING")
+        print("  Phase Attention Transformer with Emergency PD Controller")
+    else:
+        print("  SYMBOLU V9.3.5-PID TRAINING")
+        print("  Phase Attention Transformer with Authority PID Controller")
     print("=" * 70)
     print()
     print(f"  Model: {args.model_size}")
@@ -918,13 +1134,25 @@ def main():
     print(f"  Batch size: {args.batch_size} x {args.gradient_accumulation} accumulation")
     print(f"  Learning rate: {args.learning_rate}")
     print()
-    print(f"  PID Gains: Kp={args.pid_kp}, Ki={args.pid_ki}, Kd={args.pid_kd}")
-    print(f"  Authority floor: {args.pid_a_min}")
+    if args.use_emergency_pd:
+        print(f"  Controller: EMERGENCY PD (Coherence-primary, no Integral)")
+        print(f"  PD Gains: Kp={args.pd_kp} (Coh), Kd={args.pd_kd} (PPL vel)")
+        print(f"  Target Coherence: {args.pd_target_coh}")
+        print(f"  Authority floor: {args.pd_a_min}")
+    else:
+        print(f"  Controller: Full PID")
+        print(f"  PID Gains: Kp={args.pid_kp}, Ki={args.pid_ki}, Kd={args.pid_kd}")
+        print(f"  Authority floor: {args.pid_a_min}")
     print()
 
     # Run training
     try:
-        train_with_pid(config)
+        train_with_pid(
+            config,
+            use_emergency_pd=args.use_emergency_pd,
+            pd_config=pd_config,
+            pid_config=pid_config
+        )
     except KeyboardInterrupt:
         print("\nTraining interrupted by user")
     except Exception as e:
