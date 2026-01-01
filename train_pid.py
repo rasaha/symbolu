@@ -1231,7 +1231,7 @@ def main():
     parser.add_argument("--dataset", type=str, default="wikitext103",
                        choices=["c4", "wikitext103", "wikitext2", "custom"],
                        help="Dataset to use")
-    parser.add_argument("--data_path", type=str, default=None,
+    parser.add_argument("--dataset_path", type=str, default=None,
                        help="Path to custom dataset")
 
     # Training hyperparameters
@@ -1332,7 +1332,7 @@ def main():
         model_size=args.model_size,
         model_type=args.model_type,
         dataset=args.dataset,
-        data_path=args.data_path,
+        dataset_path=args.dataset_path,
         learning_rate=args.learning_rate,
         batch_size=args.batch_size,
         gradient_accumulation=args.gradient_accumulation,
