@@ -320,10 +320,10 @@ class AuthorityPIDv2Config:
     V_dead_pct: float = 1.0   # Deadband in % - ignore velocity below this
     V_scale_pct: float = 5.0  # Normalization scale - 5% velocity = 1.0 error unit
 
-    # PID gains on PPL velocity
-    Kp: float = 0.25         # Proportional: current velocity stress
+    # PID gains on PPL velocity (CONSERVATIVE - trust slow recovery over fast reaction)
+    Kp: float = 0.20         # Proportional: current velocity stress (conservative!)
     Ki: float = 0.02         # Integral: accumulated velocity stress
-    Kd: float = 0.15         # Derivative: velocity acceleration
+    Kd: float = 0.10         # Derivative: velocity acceleration (reduced to prevent overshoot)
 
     # Integral anti-windup
     I_max: float = 5.0       # Maximum integral accumulation
@@ -1289,12 +1289,12 @@ def main():
                        help="DEPRECATED: Use --controller emergency_pd instead")
 
     # PIDv2 Controller settings (RECOMMENDED - follows control-systems theory)
-    parser.add_argument("--pidv2_kp", type=float, default=0.25,
-                       help="PIDv2 proportional gain on PPL velocity")
+    parser.add_argument("--pidv2_kp", type=float, default=0.20,
+                       help="PIDv2 proportional gain on PPL velocity (conservative=0.20)")
     parser.add_argument("--pidv2_ki", type=float, default=0.02,
                        help="PIDv2 integral gain on PPL velocity")
-    parser.add_argument("--pidv2_kd", type=float, default=0.15,
-                       help="PIDv2 derivative gain (velocity acceleration)")
+    parser.add_argument("--pidv2_kd", type=float, default=0.10,
+                       help="PIDv2 derivative gain (velocity acceleration, conservative=0.10)")
     parser.add_argument("--pidv2_a_min", type=float, default=0.30,
                        help="PIDv2 minimum authority factor")
     parser.add_argument("--pidv2_c_floor", type=float, default=0.68,
