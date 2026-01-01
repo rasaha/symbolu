@@ -871,6 +871,10 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
         else:
             logger.info(f"Resumed at step {state.step}")
 
+    # Initialize lr_scale if not present (not in TrainingState dataclass)
+    if not hasattr(state, 'lr_scale'):
+        state.lr_scale = 1.0
+
     # Create dataloaders
     logger.info("Loading dataset...")
     train_loader, val_loader, train_dataset = create_dataloaders(config)
