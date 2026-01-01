@@ -2750,6 +2750,17 @@ def train(config: TrainingConfig):
             # LR cap scales with alpha: at α=0 → 30% LR, at α=1 → 100% LR
             # This is "torque limiting during clutch engagement"
             authority_cap = 0.3 + 0.7 * current_alpha_for_cap
+
+            # V9.3.4+: Coherence-weighted adjustment
+            # When coherence drops below warning threshold, reduce LR cap proportionally
+            # This makes LR responsive to model health, not just α
+            current_coh = metrics.get('coherence', 1.0)
+            if current_coh < config.coherence_warning_threshold:  # 0.750
+                # Coh 0.75 → factor 1.0, Coh 0.70 → factor 0.85, Coh 0.65 → factor 0.70 (floor)
+                coh_factor = 0.7 + 0.3 * (current_coh - 0.65) / 0.10
+                coh_factor = max(0.7, min(1.0, coh_factor))
+                authority_cap *= coh_factor
+
             effective_lr_cap = config.learning_rate * authority_cap
 
             if base_lr > effective_lr_cap:
@@ -2841,6 +2852,14 @@ def train(config: TrainingConfig):
                     alpha_frac = state.step / config.alpha_warmup_steps
                     current_alpha_for_cap = config.alpha_phase_start + alpha_frac * (config.alpha_phase_end - config.alpha_phase_start)
                     authority_cap = 0.3 + 0.7 * current_alpha_for_cap
+
+                    # V9.3.4+: Coherence-weighted adjustment for logging
+                    current_coh_for_log = metrics.get('coherence', 1.0)
+                    if current_coh_for_log < config.coherence_warning_threshold:
+                        coh_factor = 0.7 + 0.3 * (current_coh_for_log - 0.65) / 0.10
+                        coh_factor = max(0.7, min(1.0, coh_factor))
+                        authority_cap *= coh_factor
+
                     effective_lr_cap = config.learning_rate * authority_cap
                     base_lr = min(base_lr, effective_lr_cap)
 
