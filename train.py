@@ -2722,6 +2722,11 @@ def train(config: TrainingConfig):
         if hasattr(state, 'lr_frozen') and state.lr_frozen and state.lr_frozen_value is not None:
             base_lr = min(base_lr, state.lr_frozen_value)
 
+        # V9.3.1: Enforce Safety Brake - hold LR steady during PPL spike
+        # Brake is softer than freeze - allows LR to drop but not increase
+        if hasattr(state, 'lr_braked') and state.lr_braked and state.lr_brake_value is not None:
+            base_lr = min(base_lr, state.lr_brake_value)
+
         for param_group in optimizer.param_groups:
             group_name = param_group.get('name', '')
             # Three tiers: stable (1.0x), local_attn (1.0x), phase_attn (delayed ramp with clutch)
@@ -2973,12 +2978,38 @@ def train(config: TrainingConfig):
                         # Update config for train_step
                         config.agc_threshold = new_agc_threshold
 
-                    # V9.3: Early LR freeze if PPL Δ > 500 AND Coh < 0.700
-                    # Catches catastrophic divergence that coherence alone might miss
+                        # V9.3.1: When PPL-Guard triggers, also reduce Lookahead alpha
+                        # Lower alpha = trust slow weights more = smoother recovery
+                        if config.lookahead_enabled and hasattr(optimizer, 'alpha'):
+                            old_alpha = optimizer.alpha
+                            optimizer.alpha = 0.3
+                            logger.info(f"   Lookahead α: {old_alpha} → 0.3 for stability")
+
+                    # V9.3 / V9.3.1: PPL-based LR intervention
+                    # Two-tier response based on PPL velocity + coherence
                     if (ppl_guard.last_val_ppl is not None and
                         not getattr(state, 'lr_frozen', False)):
 
                         ppl_velocity = val_metrics['val_perplexity'] - ppl_guard.last_val_ppl
+
+                        # V9.3.1 Tier 1: SAFETY BRAKE (PPL Δ > 200 + Coh < 0.700)
+                        # Hold LR steady - don't increase further during warmup
+                        if ppl_velocity > 200 and current_coh < 0.700:
+                            if not hasattr(state, 'lr_braked'):
+                                state.lr_braked = False
+                                state.lr_brake_value = None
+
+                            if not state.lr_braked:
+                                state.lr_braked = True
+                                state.lr_brake_value = scheduler.get_last_lr()[0]
+                                logger.warning(
+                                    f"🛑 [Step {state.step}] SAFETY BRAKE: "
+                                    f"Val PPL Δ={ppl_velocity:.0f} > 200 AND Coh={current_coh:.3f} < 0.700. "
+                                    f"LR held at {state.lr_brake_value:.2e} until stabilization"
+                                )
+
+                        # V9.3 Tier 2: EMERGENCY FREEZE (PPL Δ > 500 + Coh < 0.700)
+                        # Lock LR permanently
                         if ppl_velocity > 500 and current_coh < 0.700:
                             # Initialize freeze state if not present
                             if not hasattr(state, 'lr_frozen'):
