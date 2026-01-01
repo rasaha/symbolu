@@ -316,10 +316,9 @@ class AuthorityPIDv2Config:
     - Final authority = min(coh_gate, ppl_pid_factor) -- OR logic
     """
 
-    # PPL velocity processing (PRIMARY PID SIGNAL)
-    V_dead: float = 20.0     # Deadband - ignore noise below this
-    V_scale: float = 200.0   # Normalization scale for velocity
-    base_ppl: float = 1000.0 # Reference PPL for scale invariance
+    # PPL velocity processing (PRIMARY PID SIGNAL) - PERCENTAGE BASED
+    V_dead_pct: float = 1.0   # Deadband in % - ignore velocity below this
+    V_scale_pct: float = 5.0  # Normalization scale - 5% velocity = 1.0 error unit
 
     # PID gains on PPL velocity
     Kp: float = 0.25         # Proportional: current velocity stress
@@ -413,12 +412,11 @@ class AuthorityPIDv2:
         v_pct = (ppl_ma3 - ppl_prev3) / ppl_prev3 * 100  # % change
         self.last_v = v_pct  # Now in percentage units
 
-        # Normalize: 5% velocity increase = 1.0 error unit
-        # Deadband at 1% to ignore noise
-        if v_pct <= 1.0:  # 1% deadband
+        # Normalize velocity using configured deadband and scale
+        if v_pct <= cfg.V_dead_pct:
             v_norm = 0.0
         else:
-            v_norm = min(1.0, (v_pct - 1.0) / 5.0)  # 5% scale
+            v_norm = min(1.0, (v_pct - cfg.V_dead_pct) / cfg.V_scale_pct)
         self.last_v_norm = v_norm
 
         # Acceleration (derivative of velocity in % units)
@@ -436,8 +434,7 @@ class AuthorityPIDv2:
 
         # ----- D term: Velocity acceleration (predictive) -----
         # Positive acceleration = situation getting worse faster
-        # Normalize: 5% acceleration = 1.0 D term
-        D = max(0, a / 5.0)
+        D = max(0, a / cfg.V_scale_pct)
         self.last_D = D
 
         # ----- Control signal -----
@@ -888,7 +885,7 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
         logger.info("  Architecture: PPL velocity drives PID; Coherence gates authority")
         logger.info(f"  PID Gains: Kp={pidv2_config.Kp}, Ki={pidv2_config.Ki}, Kd={pidv2_config.Kd}")
         logger.info(f"  Coherence gate: [{pidv2_config.C_floor}, {pidv2_config.C_good}]")
-        logger.info(f"  PPL deadband: {pidv2_config.V_dead}, scale: {pidv2_config.V_scale}")
+        logger.info(f"  PPL velocity: deadband={pidv2_config.V_dead_pct}%, scale={pidv2_config.V_scale_pct}%")
         logger.info(f"  Authority floor: {pidv2_config.A_min}")
         logger.info("  Key insight: PPL velocity is causal; Coherence is non-monotonic")
         logger.info("=" * 60)
