@@ -2630,6 +2630,7 @@ def train(config: TrainingConfig):
         if config.recovery_mode_enabled:
             logger.info(f"  V9.3.2 Recovery: cut={config.recovery_lr_cut_factor}x on PPL>{config.recovery_ppl_threshold*100:.0f}%, max_cuts={config.recovery_max_cuts}")
         logger.info(f"  V9.3.3 GATED: Freeze/Cut/Recovery disabled until step {config.alpha_warmup_steps}")
+        logger.info(f"  V9.3.4 Authority LR: cap=0.3+0.7*α (30%→100% as α ramps)")
         logger.info("=" * 60)
 
         # Initialize PPL-Guard
@@ -2738,6 +2739,22 @@ def train(config: TrainingConfig):
         if hasattr(state, 'lr_braked') and state.lr_braked and state.lr_brake_value is not None:
             base_lr = min(base_lr, state.lr_brake_value)
 
+        # V9.3.4: Authority-weighted LR cap during alpha warmup
+        # Don't inject full LR until Phase has sufficient authority to stabilize
+        # This prevents "coupled-geometry overshoot" where Quad moves too fast for Phase
+        if state.step < config.alpha_warmup_steps:
+            # Compute current alpha (same formula as update_alpha_schedule)
+            alpha_frac = state.step / config.alpha_warmup_steps
+            current_alpha_for_cap = config.alpha_phase_start + alpha_frac * (config.alpha_phase_end - config.alpha_phase_start)
+
+            # LR cap scales with alpha: at α=0 → 30% LR, at α=1 → 100% LR
+            # This is "torque limiting during clutch engagement"
+            authority_cap = 0.3 + 0.7 * current_alpha_for_cap
+            effective_lr_cap = config.learning_rate * authority_cap
+
+            if base_lr > effective_lr_cap:
+                base_lr = effective_lr_cap
+
         for param_group in optimizer.param_groups:
             group_name = param_group.get('name', '')
             # Three tiers: stable (1.0x), local_attn (1.0x), phase_attn (delayed ramp with clutch)
@@ -2818,6 +2835,14 @@ def train(config: TrainingConfig):
                 # V9.3.2: Apply frozen LR cap for accurate logging
                 if hasattr(state, 'lr_frozen') and state.lr_frozen and state.lr_frozen_value is not None:
                     base_lr = min(base_lr, state.lr_frozen_value)
+
+                # V9.3.4: Apply authority-weighted LR cap for accurate logging
+                if state.step < config.alpha_warmup_steps:
+                    alpha_frac = state.step / config.alpha_warmup_steps
+                    current_alpha_for_cap = config.alpha_phase_start + alpha_frac * (config.alpha_phase_end - config.alpha_phase_start)
+                    authority_cap = 0.3 + 0.7 * current_alpha_for_cap
+                    effective_lr_cap = config.learning_rate * authority_cap
+                    base_lr = min(base_lr, effective_lr_cap)
 
                 # V9: Compute dynamic Phase LR for logging
                 # V9.1: Recompute stability brake for logging
