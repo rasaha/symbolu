@@ -3085,7 +3085,11 @@ def train(config: TrainingConfig):
                     state.val_ppl_history = state.val_ppl_history[-10:]
 
                 # Need at least 6 evals for smoothed comparison
-                if len(state.val_ppl_history) >= 6:
+                # Also gate by α_phase >= 0.05 - don't penalize before Phase has signal
+                alpha_frac = state.step / config.alpha_warmup_steps if config.alpha_warmup_steps > 0 else 1.0
+                current_alpha = config.alpha_phase_start + alpha_frac * (config.alpha_phase_end - config.alpha_phase_start)
+
+                if len(state.val_ppl_history) >= 6 and current_alpha >= 0.05:
                     # Compute 3-eval moving averages
                     ppl_ma3 = sum(state.val_ppl_history[-3:]) / 3  # Last 3
                     ppl_prev3 = sum(state.val_ppl_history[-6:-3]) / 3  # Previous 3
