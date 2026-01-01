@@ -1508,6 +1508,7 @@ class TrainingState:
     # V9.3.5: PPL-Ratchet LR control - smoothed, multi-eval signal
     ppl_lr_factor: float = 1.0  # LR factor based on PPL trend (ratchets down on rise)
     val_ppl_history: list = field(default_factory=list)  # Track Val PPL for smoothed velocity
+    coh_history: list = field(default_factory=list)  # Track coherence for recovery check
 
 
 def compute_semantic_entropy(logits: torch.Tensor, max_positions: int = 1024) -> torch.Tensor:
@@ -2773,11 +2774,12 @@ def train(config: TrainingConfig):
             # V9.3.5: Coherence OR PPL-Ratchet adjustment (whichever is worse)
             # Either signal being bad should cap LR - use min() for OR logic
 
-            # Coherence factor (health check)
+            # Coherence factor (discrete thresholds per ChatGPT spec)
             current_coh = metrics.get('coherence', 1.0)
-            if current_coh < config.coherence_warning_threshold:  # 0.750
-                coh_factor = 0.7 + 0.3 * (current_coh - 0.65) / 0.10
-                coh_factor = max(0.7, min(1.0, coh_factor))
+            if current_coh < 0.70:
+                coh_factor = 0.8
+            elif current_coh < 0.72:
+                coh_factor = 0.9
             else:
                 coh_factor = 1.0
 
@@ -2880,9 +2882,10 @@ def train(config: TrainingConfig):
 
                     # V9.3.5: Coherence OR PPL-Ratchet - use min() for OR logic
                     current_coh_for_log = metrics.get('coherence', 1.0)
-                    if current_coh_for_log < config.coherence_warning_threshold:
-                        coh_factor = 0.7 + 0.3 * (current_coh_for_log - 0.65) / 0.10
-                        coh_factor = max(0.7, min(1.0, coh_factor))
+                    if current_coh_for_log < 0.70:
+                        coh_factor = 0.8
+                    elif current_coh_for_log < 0.72:
+                        coh_factor = 0.9
                     else:
                         coh_factor = 1.0
 
@@ -3078,11 +3081,16 @@ def train(config: TrainingConfig):
                 # Action: Gentle reduction with floor at 0.7
                 # =================================================================
                 current_val_ppl = val_metrics['val_perplexity']
+                current_coh_eval = metrics.get('coherence', 1.0)
 
-                # Track PPL history (keep last 10 for smoothing)
+                # Track PPL and coherence history (keep last 10 for smoothing)
                 state.val_ppl_history.append(current_val_ppl)
                 if len(state.val_ppl_history) > 10:
                     state.val_ppl_history = state.val_ppl_history[-10:]
+
+                state.coh_history.append(current_coh_eval)
+                if len(state.coh_history) > 10:
+                    state.coh_history = state.coh_history[-10:]
 
                 # Need at least 6 evals for smoothed comparison
                 # Also gate by α_phase >= 0.05 - don't penalize before Phase has signal
@@ -3099,6 +3107,10 @@ def train(config: TrainingConfig):
                     h = state.val_ppl_history
                     three_consecutive_rises = (len(h) >= 3 and
                                                h[-1] > h[-2] > h[-3])
+
+                    # Check for coherence rising over last 2 evals (for recovery)
+                    ch = state.coh_history
+                    coh_rising = (len(ch) >= 2 and ch[-1] > ch[-2])
 
                     old_factor = state.ppl_lr_factor
 
@@ -3120,13 +3132,13 @@ def train(config: TrainingConfig):
                             f"LR factor: {old_factor:.2f} → {state.ppl_lr_factor:.2f}"
                         )
 
-                    elif ppl_vel < -20:
-                        # PPL improving (negative velocity) - slowly restore
+                    elif ppl_vel < -20 and coh_rising:
+                        # Recovery: PPL improving AND coherence rising
                         state.ppl_lr_factor = min(1.0, state.ppl_lr_factor + 0.05)
 
                         if old_factor < 0.99:
                             logger.info(
-                                f"📈 [Step {state.step}] PPL-RATCHET: Improving | "
+                                f"📈 [Step {state.step}] PPL-RATCHET: Recovering (vel={ppl_vel:.0f}, coh↑) | "
                                 f"MA3: {ppl_prev3:.1f} → {ppl_ma3:.1f} | "
                                 f"LR factor: {old_factor:.2f} → {state.ppl_lr_factor:.2f}"
                             )
