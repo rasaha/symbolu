@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-SymbolU V9.3.5-PID Training Script
+SymbolU V9.4.4-PID Training Script
 ===================================
 
 Phase Attention Transformer with Authority PID Controller.
+Includes V9.4.4 Stress Test Framework for Governor Resilience.
 
 The PID controller replaces ad-hoc threshold-based authority management
 with a proper control-theoretic approach:
@@ -1572,7 +1573,57 @@ def main():
     parser.add_argument("--pd_target_coh", type=float, default=0.76,
                        help="Emergency PD target coherence")
 
+    # =========================================================================
+    # STRESS TEST (V9.4.4) - Trial by Fire for Governor Resilience
+    # =========================================================================
+    parser.add_argument("--stress_test", action="store_true",
+                       help="Run stress test instead of training")
+    parser.add_argument("--stress_start", type=int, default=1000,
+                       help="Step to start corruption injection (default: 1000)")
+    parser.add_argument("--stress_duration", type=int, default=200,
+                       help="Steps to inject corruption (default: 200)")
+    parser.add_argument("--stress_recovery", type=int, default=200,
+                       help="Steps to monitor recovery (default: 200)")
+    parser.add_argument("--corruption_rate", type=float, default=0.10,
+                       help="Probability of corrupting each batch (default: 0.10)")
+    parser.add_argument("--corruption_intensity", type=float, default=0.50,
+                       help="Fraction of tokens to corrupt (default: 0.50)")
+    parser.add_argument("--corruption_mode", type=str, default="noise",
+                       choices=["noise", "label_flip", "repeat"],
+                       help="Type of corruption: noise, label_flip, repeat")
+    parser.add_argument("--ungoverned_baseline", action="store_true",
+                       help="Run stress test without PID (baseline comparison)")
+
     args = parser.parse_args()
+
+    # =========================================================================
+    # STRESS TEST MODE - Redirect to stress_test.py
+    # =========================================================================
+    if args.stress_test:
+        print("=" * 70)
+        print("  SYMBOLU V9.4.4 - STRESS TEST MODE")
+        print("  Redirecting to stress_test.py...")
+        print("=" * 70)
+
+        # Build stress test command
+        import subprocess
+        stress_cmd = [
+            sys.executable, "stress_test.py",
+            "--resume", args.resume or "",
+            "--stress_start", str(args.stress_start),
+            "--stress_duration", str(args.stress_duration),
+            "--recovery_steps", str(args.stress_recovery),
+            "--corruption_rate", str(args.corruption_rate),
+            "--corruption_intensity", str(args.corruption_intensity),
+            "--corruption_mode", args.corruption_mode,
+            "--checkpoint_dir", args.checkpoint_dir + "_stress_test",
+        ]
+        if args.ungoverned_baseline:
+            stress_cmd.append("--ungoverned_baseline")
+
+        print(f"\nRunning: {' '.join(stress_cmd)}\n")
+        result = subprocess.run(stress_cmd)
+        sys.exit(result.returncode)
 
     # Build config from args
     config = TrainingConfig(
