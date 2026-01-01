@@ -301,9 +301,224 @@ class EmergencyPD:
         )
 
 
+# =============================================================================
+# AUTHORITY PID v2 (Google's Control-Systems Architecture)
+# =============================================================================
+
+@dataclass
+class AuthorityPIDv2Config:
+    """
+    Configuration for Authority PID v2 - Clean Control-Systems Design.
+
+    Key insight from Google:
+    - PPL velocity is the PRIMARY PID signal (causal, monotonic, continuous)
+    - Coherence is ONLY a supervisory gate (not in PID math)
+    - Final authority = min(coh_gate, ppl_pid_factor) -- OR logic
+    """
+
+    # PPL velocity processing (PRIMARY PID SIGNAL)
+    V_dead: float = 20.0     # Deadband - ignore noise below this
+    V_scale: float = 200.0   # Normalization scale for velocity
+    base_ppl: float = 1000.0 # Reference PPL for scale invariance
+
+    # PID gains on PPL velocity
+    Kp: float = 0.25         # Proportional: current velocity stress
+    Ki: float = 0.02         # Integral: accumulated velocity stress
+    Kd: float = 0.15         # Derivative: velocity acceleration
+
+    # Integral anti-windup
+    I_max: float = 5.0       # Maximum integral accumulation
+
+    # Coherence gate (SUPERVISORY ONLY - not in PID)
+    C_floor: float = 0.68    # Below this = minimum gate (0.5)
+    C_good: float = 0.76     # Above this = full gate (1.0)
+    gate_min: float = 0.5    # Minimum coherence gate value
+
+    # Authority bounds
+    A_min: float = 0.30      # Floor (allows aggressive cuts)
+    A_max: float = 1.00      # Ceiling
+
+    # Recovery settings
+    recovery_streak: int = 3       # Good evals before recovery
+    recovery_step: float = 0.02    # Restoration per good eval
+
+
+class AuthorityPIDv2:
+    """
+    PID v2: Clean Control-Systems Architecture (per Google's recommendation).
+
+    Key principles:
+    1. PPL velocity is the ONLY PID input (causal, monotonic)
+    2. Coherence is a supervisory gate (not in PID math)
+    3. Final: authority = min(coh_gate, ppl_pid_factor)
+
+    Why this is better:
+    - PPL velocity directly measures divergence rate
+    - Coherence is non-monotonic (can drop during correct learning)
+    - PID requires causal signals; LR→PPL is direct, LR→Coh is indirect
+    """
+
+    def __init__(self, config: AuthorityPIDv2Config = None):
+        self.config = config or AuthorityPIDv2Config()
+
+        # PID state (on PPL velocity)
+        self.A_ppl = 1.0       # Authority from PID loop
+        self.I = 0.0           # Integral accumulator
+        self.v_prev = 0.0      # Previous velocity (for D term)
+        self.good_streak = 0   # Consecutive good evals
+
+        # History for smoothing
+        self.ppl_history: List[float] = []
+        self.coh_history: List[float] = []
+
+        # Final combined authority
+        self.A = 1.0
+
+        # Telemetry
+        self.last_v = 0.0      # PPL velocity
+        self.last_v_norm = 0.0 # Normalized velocity
+        self.last_a = 0.0      # Acceleration
+        self.last_P = 0.0
+        self.last_I = 0.0
+        self.last_D = 0.0
+        self.last_u = 0.0
+        self.last_coh_gate = 1.0
+        self.last_e_p = 0.0    # For compatibility
+
+    def update(self, val_ppl: float, coherence: float) -> float:
+        """
+        Update authority factor using PPL-primary PID with coherence gate.
+        """
+        cfg = self.config
+
+        # Track history
+        self.ppl_history.append(val_ppl)
+        self.coh_history.append(coherence)
+        if len(self.ppl_history) > 10:
+            self.ppl_history = self.ppl_history[-10:]
+        if len(self.coh_history) > 10:
+            self.coh_history = self.coh_history[-10:]
+
+        # Need at least 6 evals for MA3 smoothing
+        if len(self.ppl_history) < 6:
+            return self.A
+
+        # =====================================================================
+        # PRIMARY PID LOOP: PPL VELOCITY
+        # =====================================================================
+
+        # MA3 smoothed velocity
+        ppl_ma3 = sum(self.ppl_history[-3:]) / 3
+        ppl_prev3 = sum(self.ppl_history[-6:-3]) / 3
+        v = ppl_ma3 - ppl_prev3  # Positive = worsening
+        self.last_v = v
+
+        # Normalize velocity with deadband
+        if v <= cfg.V_dead:
+            v_norm = 0.0
+        else:
+            v_norm = min(1.0, (v - cfg.V_dead) / cfg.V_scale)
+        self.last_v_norm = v_norm
+
+        # Acceleration (derivative of velocity)
+        a = v - self.v_prev
+        self.v_prev = v
+        self.last_a = a
+
+        # ----- P term: Current velocity stress -----
+        P = v_norm
+        self.last_P = P
+
+        # ----- I term: Accumulated velocity stress (with anti-windup) -----
+        self.I = max(0.0, min(cfg.I_max, self.I + v_norm))
+        self.last_I = self.I
+
+        # ----- D term: Velocity acceleration (predictive) -----
+        # Positive acceleration = situation getting worse faster
+        D = max(0, a / cfg.V_scale)
+        self.last_D = D
+
+        # ----- Control signal -----
+        u = cfg.Kp * P + cfg.Ki * self.I + cfg.Kd * D
+        self.last_u = u
+
+        # ----- PID Authority Factor -----
+        # Exponential decay based on control signal
+        self.A_ppl = math.exp(-u)
+        self.A_ppl = max(cfg.A_min, min(cfg.A_max, self.A_ppl))
+
+        # =====================================================================
+        # SUPERVISORY GATE: COHERENCE (NOT in PID math)
+        # =====================================================================
+
+        # Simple linear interpolation for coherence gate
+        if coherence >= cfg.C_good:
+            coh_gate = 1.0
+        elif coherence <= cfg.C_floor:
+            coh_gate = cfg.gate_min
+        else:
+            # Linear interpolation between floor and good
+            coh_gate = cfg.gate_min + (1.0 - cfg.gate_min) * (
+                (coherence - cfg.C_floor) / (cfg.C_good - cfg.C_floor)
+            )
+        self.last_coh_gate = coh_gate
+        self.last_e_p = max(0, cfg.C_good - coherence)  # For compatibility
+
+        # =====================================================================
+        # COMBINE: OR logic with min()
+        # =====================================================================
+        # Either bad PPL OR bad coherence triggers reduction
+        self.A = min(coh_gate, self.A_ppl)
+
+        # =====================================================================
+        # RECOVERY (Both signals must be healthy)
+        # =====================================================================
+        ppl_healthy = v < -20 and v_norm == 0  # PPL dropping, no stress
+        coh_healthy = coherence > cfg.C_good
+
+        if ppl_healthy and coh_healthy:
+            self.good_streak += 1
+            # Slowly restore integral
+            self.I = max(0.0, self.I - 0.1)
+        else:
+            self.good_streak = 0
+
+        # Restore authority if streak is good
+        if self.good_streak >= cfg.recovery_streak and self.A < 0.95:
+            self.A = min(cfg.A_max, self.A + cfg.recovery_step)
+
+        return self.A
+
+    def get_status_icon(self) -> str:
+        if self.A > 0.85:
+            return "🟢"
+        elif self.A > 0.50:
+            return "🟡"
+        else:
+            return "🔴"
+
+    def get_status_string(self) -> str:
+        icon = self.get_status_icon()
+        recovery_tag = " [RECOVERING]" if self.good_streak >= 1 else ""
+        return (
+            f"PIDv2 {icon} | A: {self.A:.3f} (ppl:{self.A_ppl:.2f} coh:{self.last_coh_gate:.2f}) | "
+            f"PPL_vel: {self.last_v:+.1f}{recovery_tag}"
+        )
+
+    def get_detailed_status(self) -> str:
+        return (
+            f"  v_norm={self.last_v_norm:.3f} a={self.last_a:+.1f} | "
+            f"P={self.last_P:.3f} I={self.last_I:.3f} D={self.last_D:.3f} | "
+            f"u={self.last_u:.3f}"
+        )
+
+
 class AuthorityPID:
     """
     PID-based Authority Controller for Phase Attention Training.
+
+    NOTE: This is the original v1 implementation that mixes coherence into PID.
+    Prefer AuthorityPIDv2 which follows proper control-systems architecture.
 
     This controller operates on the evaluation cadence (every 100 steps),
     providing slow, bounded adjustments to the authority cap based on
@@ -537,9 +752,11 @@ def create_optimizer_with_groups(model: nn.Module, config: TrainingConfig) -> Ad
 # MAIN TRAINING FUNCTION WITH PID
 # =============================================================================
 
-def train_with_pid(config: TrainingConfig, use_emergency_pd: bool = False,
-                   pd_config: EmergencyPDConfig = None, pid_config: AuthorityPIDConfig = None):
-    """Main training function with Authority Controller (PID or Emergency PD)."""
+def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
+                   pd_config: EmergencyPDConfig = None,
+                   pid_config: AuthorityPIDConfig = None,
+                   pidv2_config: AuthorityPIDv2Config = None):
+    """Main training function with Authority Controller (PIDv2, PID, or Emergency PD)."""
 
     # Setup logging
     logger = setup_logging(config)
@@ -636,9 +853,9 @@ def train_with_pid(config: TrainingConfig, use_emergency_pd: bool = False,
         ppl_guard = PPLGuard(config.ppl_velocity_threshold)
 
     # =========================================================================
-    # INITIALIZE AUTHORITY CONTROLLER (PID or Emergency PD)
+    # INITIALIZE AUTHORITY CONTROLLER (PIDv2, PID legacy, or Emergency PD)
     # =========================================================================
-    if use_emergency_pd:
+    if controller_type == "emergency_pd":
         # Emergency PD mode - more aggressive, no Integral term
         if pd_config is None:
             pd_config = EmergencyPDConfig()
@@ -654,15 +871,34 @@ def train_with_pid(config: TrainingConfig, use_emergency_pd: bool = False,
         logger.info(f"  Authority floor: {pd_config.A_min}")
         logger.info("  Mode: AGGRESSIVE (no Integral, coherence-primary)")
         logger.info("=" * 60)
-    else:
-        # Full PID mode - conservative with Integral term
+
+    elif controller_type == "pidv2":
+        # PIDv2 mode - Clean control-systems architecture (RECOMMENDED)
+        if pidv2_config is None:
+            pidv2_config = AuthorityPIDv2Config()
+        authority_controller = AuthorityPIDv2(pidv2_config)
+        controller_name = "PIDv2"
+
+        logger.info("=" * 60)
+        logger.info("V9.4.0: PIDv2 CONTROLLER (Control-Systems Design)")
+        logger.info("  Architecture: PPL velocity drives PID; Coherence gates authority")
+        logger.info(f"  PID Gains: Kp={pidv2_config.Kp}, Ki={pidv2_config.Ki}, Kd={pidv2_config.Kd}")
+        logger.info(f"  Coherence gate: [{pidv2_config.C_floor}, {pidv2_config.C_good}]")
+        logger.info(f"  PPL deadband: {pidv2_config.V_dead}, scale: {pidv2_config.V_scale}")
+        logger.info(f"  Authority floor: {pidv2_config.A_min}")
+        logger.info("  Key insight: PPL velocity is causal; Coherence is non-monotonic")
+        logger.info("=" * 60)
+
+    else:  # pid (legacy)
+        # Legacy PID mode - mixes coherence into PID (not recommended)
         if pid_config is None:
             pid_config = AuthorityPIDConfig()
         authority_controller = AuthorityPID(pid_config)
-        controller_name = "PID"
+        controller_name = "PID (legacy)"
 
         logger.info("=" * 60)
-        logger.info("V9.3.5-PID: AUTHORITY PID CONTROLLER ENABLED")
+        logger.info("V9.3.5-PID: LEGACY AUTHORITY PID CONTROLLER")
+        logger.info("  WARNING: This mixes coherence into PID - use PIDv2 instead!")
         logger.info(f"  Gains: Kp={pid_config.Kp}, Ki={pid_config.Ki}, Kd={pid_config.Kd}")
         logger.info(f"  Coherence band: [{pid_config.C_low}, {pid_config.C_high}]")
         logger.info(f"  PPL deadband: {pid_config.V_dead}, scale: {pid_config.V_scale}")
@@ -1044,27 +1280,44 @@ def main():
     parser.add_argument("--tensorboard", action="store_true", default=True,
                        help="Enable TensorBoard logging")
 
-    # Controller settings
+    # Controller selection
+    parser.add_argument("--controller", type=str, default="pidv2",
+                       choices=["pid", "pidv2", "emergency_pd"],
+                       help="Controller type: pidv2 (recommended), pid (legacy), emergency_pd (crisis)")
     parser.add_argument("--use_emergency_pd", action="store_true",
-                       help="Use Emergency PD controller (more aggressive, no I term)")
+                       help="DEPRECATED: Use --controller emergency_pd instead")
 
-    # PID Controller settings (for full PID mode)
+    # PIDv2 Controller settings (RECOMMENDED - follows control-systems theory)
+    parser.add_argument("--pidv2_kp", type=float, default=0.25,
+                       help="PIDv2 proportional gain on PPL velocity")
+    parser.add_argument("--pidv2_ki", type=float, default=0.02,
+                       help="PIDv2 integral gain on PPL velocity")
+    parser.add_argument("--pidv2_kd", type=float, default=0.15,
+                       help="PIDv2 derivative gain (velocity acceleration)")
+    parser.add_argument("--pidv2_a_min", type=float, default=0.30,
+                       help="PIDv2 minimum authority factor")
+    parser.add_argument("--pidv2_c_floor", type=float, default=0.68,
+                       help="PIDv2 coherence floor for gate")
+    parser.add_argument("--pidv2_c_good", type=float, default=0.76,
+                       help="PIDv2 coherence threshold for full authority")
+
+    # Legacy PID Controller settings (mixes coherence into PID - not recommended)
     parser.add_argument("--pid_kp", type=float, default=0.20,
-                       help="PID proportional gain")
+                       help="PID proportional gain (legacy)")
     parser.add_argument("--pid_ki", type=float, default=0.03,
-                       help="PID integral gain")
+                       help="PID integral gain (legacy)")
     parser.add_argument("--pid_kd", type=float, default=0.12,
-                       help="PID derivative gain")
+                       help="PID derivative gain (legacy)")
     parser.add_argument("--pid_a_min", type=float, default=0.70,
-                       help="PID minimum authority factor")
+                       help="PID minimum authority factor (legacy)")
 
-    # Emergency PD settings (VIOLENT crisis response)
+    # Emergency PD settings (VIOLENT crisis response - coherence primary)
     parser.add_argument("--pd_kp", type=float, default=2.5,
-                       help="Emergency PD proportional gain on coherence (high sensitivity)")
+                       help="Emergency PD proportional gain on coherence")
     parser.add_argument("--pd_kd", type=float, default=0.5,
                        help="Emergency PD derivative gain on PPL velocity")
     parser.add_argument("--pd_a_min", type=float, default=0.25,
-                       help="Emergency PD minimum authority factor (violent floor)")
+                       help="Emergency PD minimum authority factor")
     parser.add_argument("--pd_target_coh", type=float, default=0.76,
                        help="Emergency PD target coherence")
 
@@ -1098,33 +1351,54 @@ def main():
         tensorboard=args.tensorboard,
     )
 
-    # Build controller configuration
+    # Determine controller type (--use_emergency_pd overrides --controller for backwards compat)
     if args.use_emergency_pd:
+        controller_type = "emergency_pd"
+    else:
+        controller_type = args.controller
+
+    # Build controller configuration based on type
+    pd_config = None
+    pid_config = None
+    pidv2_config = None
+
+    if controller_type == "emergency_pd":
         pd_config = EmergencyPDConfig(
             target_coh=args.pd_target_coh,
             Kp=args.pd_kp,
             Kd=args.pd_kd,
             A_min=args.pd_a_min,
         )
-        pid_config = None
         controller_mode = "EMERGENCY PD"
-    else:
+    elif controller_type == "pidv2":
+        pidv2_config = AuthorityPIDv2Config(
+            Kp=args.pidv2_kp,
+            Ki=args.pidv2_ki,
+            Kd=args.pidv2_kd,
+            A_min=args.pidv2_a_min,
+            C_floor=args.pidv2_c_floor,
+            C_good=args.pidv2_c_good,
+        )
+        controller_mode = "PIDv2"
+    else:  # pid (legacy)
         pid_config = AuthorityPIDConfig(
             Kp=args.pid_kp,
             Ki=args.pid_ki,
             Kd=args.pid_kd,
             A_min=args.pid_a_min,
         )
-        pd_config = None
-        controller_mode = "PID"
+        controller_mode = "PID (legacy)"
 
     # Print banner
     print("=" * 70)
-    if args.use_emergency_pd:
+    if controller_type == "emergency_pd":
         print("  SYMBOLU V9.3.6 - EMERGENCY PD TRAINING")
         print("  Phase Attention Transformer with Emergency PD Controller")
+    elif controller_type == "pidv2":
+        print("  SYMBOLU V9.4.0 - PIDv2 TRAINING (Control-Systems Design)")
+        print("  Phase Attention Transformer with PPL-Primary PID + Coherence Gate")
     else:
-        print("  SYMBOLU V9.3.5-PID TRAINING")
+        print("  SYMBOLU V9.3.5-PID TRAINING (LEGACY)")
         print("  Phase Attention Transformer with Authority PID Controller")
     print("=" * 70)
     print()
@@ -1134,13 +1408,19 @@ def main():
     print(f"  Batch size: {args.batch_size} x {args.gradient_accumulation} accumulation")
     print(f"  Learning rate: {args.learning_rate}")
     print()
-    if args.use_emergency_pd:
+    if controller_type == "emergency_pd":
         print(f"  Controller: EMERGENCY PD (Coherence-primary, no Integral)")
         print(f"  PD Gains: Kp={args.pd_kp} (Coh), Kd={args.pd_kd} (PPL vel)")
         print(f"  Target Coherence: {args.pd_target_coh}")
         print(f"  Authority floor: {args.pd_a_min}")
+    elif controller_type == "pidv2":
+        print(f"  Controller: PIDv2 (PPL-Primary PID + Coherence Gate)")
+        print(f"  PID Gains: Kp={args.pidv2_kp}, Ki={args.pidv2_ki}, Kd={args.pidv2_kd} (on PPL velocity)")
+        print(f"  Coherence Gate: [{args.pidv2_c_floor}, {args.pidv2_c_good}]")
+        print(f"  Authority floor: {args.pidv2_a_min}")
+        print("  Architecture: PPL velocity drives PID; Coherence only gates authority")
     else:
-        print(f"  Controller: Full PID")
+        print(f"  Controller: Full PID (legacy - mixes coherence into PID)")
         print(f"  PID Gains: Kp={args.pid_kp}, Ki={args.pid_ki}, Kd={args.pid_kd}")
         print(f"  Authority floor: {args.pid_a_min}")
     print()
@@ -1149,9 +1429,10 @@ def main():
     try:
         train_with_pid(
             config,
-            use_emergency_pd=args.use_emergency_pd,
+            controller_type=controller_type,
             pd_config=pd_config,
-            pid_config=pid_config
+            pid_config=pid_config,
+            pidv2_config=pidv2_config,
         )
     except KeyboardInterrupt:
         print("\nTraining interrupted by user")
