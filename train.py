@@ -189,6 +189,148 @@ class EntropyTracker:
 _entropy_tracker = EntropyTracker()
 
 
+class MemoryGuard:
+    """
+    V9.2 Dynamic VRAM-based batch scaling with state preservation.
+
+    Monitors GPU memory and adjusts batch_size/gradient_accumulation to:
+    - Downshift at step 3000 (Phase handshake) to prevent OOM
+    - Ramp up ("Crank") after step 10000 to maximize throughput
+
+    Key design decisions:
+    - Preserves effective_batch when downshifting (batch/2, accum*2)
+    - Doubles effective_batch when cranking (for faster convergence)
+    - Caps Phase LR at 1e-5 during crank to prevent angular instability
+    - Uses sqrt scaling for Quadratic LR when effective batch doubles
+    """
+
+    def __init__(
+        self,
+        config: 'TrainingConfig',
+        initial_batch_size: int,
+        initial_accum: int,
+    ):
+        self.config = config
+        self.batch_size = initial_batch_size
+        self.accum = initial_accum
+        self.effective_batch = initial_batch_size * initial_accum
+        self.lr_scale = 1.0  # Multiplier for base LR (sqrt scaling on crank)
+        self.cranked = False  # Only crank once
+        self.global_data_idx = 0  # Track position in dataset
+
+    def get_vram_gb(self) -> float:
+        """Get current reserved VRAM in GB."""
+        if not torch.cuda.is_available():
+            return 0.0
+        return torch.cuda.memory_reserved() / (1024**3)
+
+    def check_and_adjust(
+        self,
+        step: int,
+        logger: Optional[logging.Logger] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Check VRAM and adjust batch parameters if needed.
+
+        Returns:
+            (changed: bool, action: str or None)
+            - changed: True if batch_size/accum were modified
+            - action: "downshift", "crank", or None
+        """
+        if not self.config.memory_guard_enabled:
+            return False, None
+
+        vram_gb = self.get_vram_gb()
+
+        # 1. PROACTIVE HANDSHAKE DOWNSHIFT (step 2999 or 3000)
+        # Preemptively reduce batch size before Phase unfreezes
+        if step in (self.config.phase_delay_steps - 1, self.config.phase_delay_steps):
+            if self.batch_size > self.config.min_batch_size:
+                return self._downshift(step, vram_gb, "handshake", logger)
+
+        # 2. EMERGENCY DOWNSHIFT (VRAM pressure)
+        if vram_gb > self.config.vram_emergency_gb:
+            if self.batch_size > self.config.min_batch_size:
+                return self._downshift(step, vram_gb, "emergency", logger)
+
+        # 3. THE CRANK (ramp up after stability)
+        if (step >= self.config.crank_step and
+            not self.cranked and
+            vram_gb < self.config.vram_underutil_gb and
+            self.batch_size < self.config.max_batch_size):
+            return self._crank(step, vram_gb, logger)
+
+        return False, None
+
+    def _downshift(
+        self,
+        step: int,
+        vram_gb: float,
+        reason: str,
+        logger: Optional[logging.Logger] = None,
+    ) -> Tuple[bool, str]:
+        """Reduce batch size, increase accumulation to maintain effective batch."""
+        old_bs = self.batch_size
+        self.batch_size = max(self.config.min_batch_size, self.batch_size // 2)
+        self.accum = self.accum * 2
+        # Effective batch stays the same
+
+        if logger:
+            logger.info(
+                f"🔧 [Step {step}] DOWNSHIFT ({reason}): "
+                f"Batch {old_bs}→{self.batch_size}, Accum→{self.accum} "
+                f"(Eff={self.effective_batch}) | VRAM: {vram_gb:.1f}GB"
+            )
+
+        torch.cuda.empty_cache()
+        return True, "downshift"
+
+    def _crank(
+        self,
+        step: int,
+        vram_gb: float,
+        logger: Optional[logging.Logger] = None,
+    ) -> Tuple[bool, str]:
+        """Increase batch size to maximize throughput (effective batch doubles)."""
+        old_bs = self.batch_size
+        old_eff = self.effective_batch
+
+        self.batch_size = min(self.config.max_batch_size, self.batch_size * 2)
+        # Accum stays same - effective batch doubles
+        self.effective_batch = self.batch_size * self.accum
+
+        # Apply sqrt scaling to LR (quadratic layers only, Phase is capped)
+        self.lr_scale = 1.414  # sqrt(2)
+        self.cranked = True
+
+        if logger:
+            logger.info(
+                f"🚀 [Step {step}] CRANK: "
+                f"Batch {old_bs}→{self.batch_size}, Eff {old_eff}→{self.effective_batch} "
+                f"| LR×{self.lr_scale:.3f} (Phase capped at {self.config.phase_lr_cap:.1e}) "
+                f"| VRAM: {vram_gb:.1f}GB"
+            )
+
+        torch.cuda.empty_cache()
+        return True, "crank"
+
+    def update_data_position(self, batches_processed: int):
+        """Track position in dataset for state-preserving restarts."""
+        self.global_data_idx += batches_processed * self.batch_size
+
+    def get_phase_lr(self, base_lr: float, phase_mult: float) -> float:
+        """
+        Get Phase LR with crank cap applied.
+
+        During crank, Quadratic layers get lr_scale boost but Phase is capped
+        to prevent angular instability in the rotation layers.
+        """
+        if self.cranked:
+            # Phase LR is capped regardless of lr_scale
+            return min(base_lr * phase_mult * self.lr_scale, self.config.phase_lr_cap)
+        return base_lr * phase_mult
+
+
 class MetricsLogger:
     """
     Unified logging to wandb and TensorBoard.
@@ -294,6 +436,20 @@ class TrainingConfig:
     # V9: Delayed Phase LR - Phase layers frozen until Quadratic builds foundation
     phase_delay_steps: int = 3000  # Steps before Phase LR starts (frozen at 0)
     phase_ramp_steps: int = 7000   # Steps to ramp Phase LR from 0 to phase_cooling_factor
+
+    # V9.2: MemoryGuard - Dynamic VRAM-based batch scaling
+    # Automatically adjusts batch_size/gradient_accumulation based on GPU memory pressure
+    # - Downshift at step 3000 (Phase handshake) or when VRAM > emergency threshold
+    # - Ramp up ("Crank") after step 10000 when VRAM is underutilized
+    memory_guard_enabled: bool = False  # Enable dynamic batch scaling
+    vram_target_gb: float = 72.0  # Target VRAM usage for optimal throughput
+    vram_emergency_gb: float = 77.0  # Emergency downshift threshold (near OOM)
+    vram_underutil_gb: float = 55.0  # VRAM below this triggers ramp-up
+    vram_check_interval: int = 100  # Check VRAM every N steps
+    min_batch_size: int = 8  # Minimum batch size floor
+    max_batch_size: int = 64  # Maximum batch size ceiling
+    crank_step: int = 10000  # Step after which ramp-up is allowed
+    phase_lr_cap: float = 1e-5  # Maximum Phase LR during "crank" (prevents angular instability)
 
     # Learning rate schedule
     lr_scheduler: str = "cosine"  # cosine, linear, constant
@@ -553,8 +709,13 @@ def load_dataset_tokens(config: TrainingConfig, split: str = "train") -> torch.T
 
 def create_dataloaders(
     config: TrainingConfig,
-) -> Tuple[DataLoader, DataLoader]:
-    """Create train and validation dataloaders."""
+) -> Tuple[DataLoader, DataLoader, TextDataset]:
+    """Create train and validation dataloaders.
+
+    Returns:
+        train_loader, val_loader, train_dataset
+        (train_dataset is returned for V9.2 MemoryGuard dynamic rebuilding)
+    """
 
     # Load tokens
     train_tokens = load_dataset_tokens(config, "train")
@@ -589,7 +750,43 @@ def create_dataloaders(
         **dataloader_kwargs,
     )
 
-    return train_loader, val_loader
+    return train_loader, val_loader, train_dataset
+
+
+def rebuild_train_loader(
+    train_dataset: TextDataset,
+    config: TrainingConfig,
+    new_batch_size: int,
+    start_idx: int = 0,
+) -> DataLoader:
+    """
+    V9.2: Rebuild train DataLoader with new batch size from a specific position.
+
+    Used by MemoryGuard when dynamically adjusting batch_size during training.
+    The start_idx allows resuming from where we left off in the dataset.
+    """
+    # Create a subset starting from start_idx
+    if start_idx > 0 and start_idx < len(train_dataset):
+        # Wrap indices to handle epoch boundaries
+        indices = list(range(start_idx, len(train_dataset)))
+        subset = torch.utils.data.Subset(train_dataset, indices)
+    else:
+        subset = train_dataset
+
+    dataloader_kwargs = dict(
+        num_workers=config.num_workers,
+        pin_memory=config.pin_memory,
+        drop_last=True,
+        prefetch_factor=2 if config.num_workers > 0 else None,
+        persistent_workers=config.num_workers > 0,
+    )
+
+    return DataLoader(
+        subset,
+        batch_size=new_batch_size,
+        shuffle=False,  # Don't shuffle when resuming mid-epoch
+        **dataloader_kwargs,
+    )
 
 
 # =============================================================================
@@ -2073,8 +2270,14 @@ def train(config: TrainingConfig):
 
     # Create dataloaders
     logger.info("Loading dataset...")
-    train_loader, val_loader = create_dataloaders(config)
+    train_loader, val_loader, train_dataset = create_dataloaders(config)
     logger.info(f"Train batches: {len(train_loader):,}")
+
+    # V9.2: Initialize MemoryGuard for dynamic batch scaling
+    memory_guard = MemoryGuard(config, config.batch_size, config.gradient_accumulation)
+    if config.memory_guard_enabled:
+        logger.info(f"MemoryGuard ENABLED: target={config.vram_target_gb}GB, "
+                    f"emergency={config.vram_emergency_gb}GB, crank@{config.crank_step}")
     val_batches = len(val_loader)
     val_tokens = val_batches * config.batch_size * config.max_seq_len
     logger.info(f"Val batches: {val_batches:,} ({val_tokens/1000:.0f}K tokens)")
@@ -2161,15 +2364,19 @@ def train(config: TrainingConfig):
             # Apply stability brake to slow engagement if loss is spiking
             phase_lr_mult = config.phase_cooling_factor * ramp_progress * stability_brake
 
+        # V9.2: Combine state.lr_scale with memory_guard.lr_scale (crank multiplier)
+        combined_lr_scale = state.lr_scale * memory_guard.lr_scale
+
         for param_group in optimizer.param_groups:
             group_name = param_group.get('name', '')
             # Three tiers: stable (1.0x), local_attn (1.0x), phase_attn (delayed ramp with clutch)
             if 'phase_attn' in group_name:
-                param_group['lr'] = base_lr * phase_lr_mult * state.lr_scale
+                # V9.2: Use MemoryGuard's phase LR with cap during crank
+                param_group['lr'] = memory_guard.get_phase_lr(base_lr * state.lr_scale, phase_lr_mult)
             elif 'local_attn' in group_name:
-                param_group['lr'] = base_lr * config.attn_cooling_factor * state.lr_scale
+                param_group['lr'] = base_lr * config.attn_cooling_factor * combined_lr_scale
             else:
-                param_group['lr'] = base_lr * state.lr_scale
+                param_group['lr'] = base_lr * combined_lr_scale
 
         accumulation_step += 1
         running_loss += metrics["loss"]
@@ -2184,6 +2391,24 @@ def train(config: TrainingConfig):
 
             # Update alpha schedule (decay from 0.6 to 0.4 for Phase Attention)
             current_alpha = update_alpha_schedule(model, state.step, config)
+
+            # V9.2: MemoryGuard check at configured interval
+            if state.step % config.vram_check_interval == 0:
+                changed, action = memory_guard.check_and_adjust(state.step, logger)
+                if changed:
+                    # Rebuild DataLoader with new batch size
+                    # Track position: accumulation_step counts batches processed
+                    memory_guard.update_data_position(accumulation_step)
+                    train_loader = rebuild_train_loader(
+                        train_dataset, config,
+                        memory_guard.batch_size,
+                        memory_guard.global_data_idx % len(train_dataset)
+                    )
+                    train_iter = iter(train_loader)
+                    accumulation_step = 0
+                    # Update config for logging (batch_size used in throughput calc)
+                    config.batch_size = memory_guard.batch_size
+                    config.gradient_accumulation = memory_guard.accum
 
             # Logging
             if state.step % config.log_every == 0:
@@ -2653,6 +2878,26 @@ def parse_args() -> TrainingConfig:
     parser.add_argument("--phase_ramp_steps", type=int, default=7000,
                        help="V9: Steps to ramp Phase LR from 0 to phase_cooling_factor")
 
+    # V9.2: MemoryGuard - Dynamic batch scaling
+    parser.add_argument("--memory_guard", action="store_true",
+                       help="V9.2: Enable dynamic VRAM-based batch scaling")
+    parser.add_argument("--vram_target_gb", type=float, default=72.0,
+                       help="V9.2: Target VRAM usage in GB")
+    parser.add_argument("--vram_emergency_gb", type=float, default=77.0,
+                       help="V9.2: Emergency downshift threshold in GB")
+    parser.add_argument("--vram_underutil_gb", type=float, default=55.0,
+                       help="V9.2: VRAM below this triggers ramp-up")
+    parser.add_argument("--vram_check_interval", type=int, default=100,
+                       help="V9.2: Check VRAM every N steps")
+    parser.add_argument("--min_batch_size", type=int, default=8,
+                       help="V9.2: Minimum batch size floor")
+    parser.add_argument("--max_batch_size", type=int, default=64,
+                       help="V9.2: Maximum batch size ceiling")
+    parser.add_argument("--crank_step", type=int, default=10000,
+                       help="V9.2: Step after which ramp-up is allowed")
+    parser.add_argument("--phase_lr_cap", type=float, default=1e-5,
+                       help="V9.2: Maximum Phase LR during crank")
+
     # LR schedule
     parser.add_argument("--lr_scheduler", type=str, default="cosine",
                        choices=["cosine", "linear", "constant"],
@@ -2772,6 +3017,9 @@ def parse_args() -> TrainingConfig:
                        help="Random seed")
 
     args = parser.parse_args()
+
+    # V9.2: Map --memory_guard flag to memory_guard_enabled
+    args.memory_guard_enabled = getattr(args, 'memory_guard', False)
 
     # Create config from args
     config = TrainingConfig(**vars(args))
