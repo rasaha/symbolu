@@ -1419,6 +1419,9 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                 )
                 logger.info(f"Checkpoint saved to {ckpt_path}")
 
+                # Cleanup old checkpoints (keep last 5)
+                cleanup_old_checkpoints(checkpoint_dir, keep_last=5)
+
     # =========================================================================
     # TRAINING COMPLETE
     # =========================================================================
