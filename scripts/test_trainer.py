@@ -80,7 +80,7 @@ def main():
 
     model.eval()
     with torch.no_grad():
-        outputs = model(
+        token_logits, r_logits, s_logits, c_pred = model(
             dummy_batch["input_ids"],
             dummy_batch["c_signals"],
             dummy_batch["s_signals"],
@@ -88,10 +88,10 @@ def main():
             dummy_batch["g_states"],
         )
 
-    print(f"   Token logits shape: {outputs['token_logits'].shape}")
-    print(f"   R logits shape: {outputs['r_logits'].shape}")
-    print(f"   S logits shape: {outputs['s_logits'].shape}")
-    print(f"   C prediction shape: {outputs['c_pred'].shape}")
+    print(f"   Token logits shape: {token_logits.shape}")
+    print(f"   R logits shape: {r_logits.shape}")
+    print(f"   S logits shape: {s_logits.shape}")
+    print(f"   C prediction shape: {c_pred.shape}")
 
     print("\n" + "=" * 70)
     print("[PASS] Trainer initialized successfully!")
