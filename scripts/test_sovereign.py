@@ -190,31 +190,31 @@ def test_embedding():
 
 
 def test_loss():
-    """Test SovereignLoss computation."""
+    """Test MultiObjectiveLoss computation for training."""
     print("\n" + "=" * 70)
     print("SOVEREIGN LOSS - COMPUTATION TEST")
     print("=" * 70)
 
     try:
         import torch
-        from symbolu.sovereign.loss import SovereignLoss, SovereignLossConfig
+        from symbolu.sovereign.train_loss import MultiObjectiveLoss, TrainingLossConfig
     except ImportError as e:
         print(f"Import error: {e}")
         return False
 
-    config = SovereignLossConfig()
-    loss_fn = SovereignLoss(config)
+    config = TrainingLossConfig()
+    loss_fn = MultiObjectiveLoss(config)
 
-    # Create dummy tensors
+    # Create dummy tensors with gradient tracking
     B, Seq = 2, 10
     vocab_size = 50257
     r_classes = 12
     s_classes = 17
 
-    token_logits = torch.randn(B, Seq, vocab_size)
-    r_logits = torch.randn(B, Seq, r_classes)
-    s_logits = torch.randn(B, Seq, s_classes)
-    c_pred = torch.tanh(torch.randn(B, Seq, 32))
+    token_logits = torch.randn(B, Seq, vocab_size, requires_grad=True)
+    r_logits = torch.randn(B, Seq, r_classes, requires_grad=True)
+    s_logits = torch.randn(B, Seq, s_classes, requires_grad=True)
+    c_pred = torch.tanh(torch.randn(B, Seq, 32, requires_grad=True))
 
     target_tokens = torch.randint(0, vocab_size, (B, Seq))
     target_r = torch.randint(0, r_classes, (B, Seq))
