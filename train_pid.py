@@ -189,6 +189,113 @@ def compute_semantic_ppl(
 
 
 # =============================================================================
+# FRICTION MONITOR - Gradient Alignment Detection (V9.4.5)
+# =============================================================================
+# Detects when Local/Quadratic layers and Phase layers are "fighting"
+# (pushing gradients in opposite directions), which wastes optimization.
+#
+# Metrics:
+#   - Alignment (cosine similarity): +1.0 (synergy) to -1.0 (fighting)
+#   - Dominance (ratio): Phase magnitude / Local magnitude (target: ~1.0)
+# =============================================================================
+
+def measure_friction(
+    model: nn.Module,
+    local_layers: int = 6,
+) -> Tuple[float, float]:
+    """
+    Computes gradient friction between Quadratic and Phase layer groups.
+
+    In the Hybrid 6/6 architecture (12 layers total):
+    - Quadratic Group: Layers 0-5 (local/quadratic attention - "Memory")
+    - Phase Group: Layers 6-11 (phase attention - "Logic")
+
+    The gradient alignment tells us if the two groups are "cooperating" or "fighting."
+
+    Args:
+        model: The HybridPhaseTransformer model with gradients computed
+        local_layers: Number of quadratic layers (default 6 for 6/6 architecture)
+
+    Returns:
+        alignment: Cosine similarity of gradient vectors
+                   +1.0 = perfect synergy (both pushing same direction)
+                   0.0 = orthogonal (independent learning)
+                   -1.0 = fighting (canceling each other out)
+        dominance: Ratio of Phase gradient magnitude to Quadratic magnitude
+                   1.0 = balanced, >1.0 = Phase dominant, <1.0 = Quadratic dominant
+    """
+    quad_grads = []
+    phase_grads = []
+    quad_norms = []
+    phase_norms = []
+
+    for name, param in model.named_parameters():
+        if param.grad is None:
+            continue
+
+        # Identify layer group based on naming convention
+        # Typical patterns: "layers.0.", "transformer.h.5.", "blocks.3."
+        layer_idx = None
+        for pattern in ["layers.", "transformer.h.", "blocks.", "encoder.layer."]:
+            if pattern in name:
+                try:
+                    parts = name.split(pattern)
+                    layer_idx = int(parts[1].split(".")[0])
+                    break
+                except (IndexError, ValueError):
+                    continue
+
+        if layer_idx is None:
+            continue
+
+        grad_flat = param.grad.view(-1)
+        grad_norm = param.grad.norm().item()
+
+        # Quadratic Group (layers 0-5: "Memory" / local attention)
+        if layer_idx < local_layers:
+            quad_grads.append(grad_flat)
+            quad_norms.append(grad_norm)
+
+        # Phase Group (layers 6-11: "Logic" / phase attention)
+        else:
+            phase_grads.append(grad_flat)
+            phase_norms.append(grad_norm)
+
+    # Metric 1: Gradient Alignment (Cosine Similarity)
+    if quad_grads and phase_grads:
+        g_quad = torch.cat(quad_grads)
+        g_phase = torch.cat(phase_grads)
+
+        # Handle dimension mismatch by using the minimum length
+        min_len = min(len(g_quad), len(g_phase))
+        if min_len > 0:
+            alignment = F.cosine_similarity(
+                g_quad[:min_len].unsqueeze(0),
+                g_phase[:min_len].unsqueeze(0)
+            ).item()
+        else:
+            alignment = 0.0
+    else:
+        alignment = 0.0
+
+    # Metric 2: Update Dominance (Ratio of Norms)
+    avg_quad_norm = sum(quad_norms) / (len(quad_norms) + 1e-9)
+    avg_phase_norm = sum(phase_norms) / (len(phase_norms) + 1e-9)
+    dominance = avg_phase_norm / (avg_quad_norm + 1e-9)
+
+    return alignment, dominance
+
+
+@dataclass
+class FrictionMetrics:
+    """Container for friction monitoring metrics."""
+    alignment: float = 0.0      # Cosine similarity (-1 to +1)
+    dominance: float = 1.0      # Phase/Local gradient ratio
+    alignment_ema: float = 0.0  # Exponential moving average of alignment
+    friction_count: int = 0     # Count of friction events (alignment < -0.1)
+
+
+# =============================================================================
 # AUTHORITY PID CONTROLLER
 # =============================================================================
 
@@ -1331,8 +1438,20 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                     phase_ramp_steps=config.phase_ramp_steps,
                 )
 
-                # Log PID status
-                logger.info(f"  {authority_controller.get_status_string()}")
+                # Log PID status with friction metrics (V9.4.5)
+                friction_str = ""
+                if 'friction_alignment' in metrics:
+                    fric_align = metrics['friction_alignment']
+                    fric_dom = metrics['friction_dominance']
+                    # Color-code alignment: Green (+), Yellow (~0), Red (-)
+                    if fric_align > 0.1:
+                        align_indicator = "+"  # Synergy
+                    elif fric_align < -0.1:
+                        align_indicator = "!"  # Friction/Fighting
+                    else:
+                        align_indicator = "~"  # Neutral
+                    friction_str = f" | Align:{fric_align:+.2f}{align_indicator} Dom:{fric_dom:.2f}"
+                logger.info(f"  {authority_controller.get_status_string()}{friction_str}")
 
                 # Log detailed PID if authority changed significantly
                 if abs(new_A - old_A) > 0.01:
@@ -1371,6 +1490,11 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                         tb_writer.add_scalar("ctrl/effective_Kd", authority_controller.last_effective_Kd, state.step)
                     if hasattr(authority_controller, 'last_ramp_frac'):
                         tb_writer.add_scalar("ctrl/handshake_ramp", authority_controller.last_ramp_frac, state.step)
+
+                    # V9.4.5: Friction Monitor metrics
+                    if 'friction_alignment' in metrics:
+                        tb_writer.add_scalar("ctrl/friction_alignment", metrics['friction_alignment'], state.step)
+                        tb_writer.add_scalar("ctrl/friction_dominance", metrics['friction_dominance'], state.step)
 
                 # PPL-Guard check (if enabled)
                 if config.trinity_enabled and ppl_guard is not None:

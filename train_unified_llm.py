@@ -126,6 +126,7 @@ try:
         EmergencyPD,
         EmergencyPDConfig,
         compute_semantic_ppl,
+        measure_friction,  # V9.4.5: Friction Monitor
     )
     from train import cleanup_old_checkpoints
     PIDV2_AVAILABLE = True
@@ -753,6 +754,15 @@ def train(config: UnifiedTrainingConfig):
             else:
                 optimizer.step()
 
+            # V9.4.5: Measure friction between Quadratic (0-5) and Phase (6-11) layers
+            friction_alignment = 0.0
+            friction_dominance = 1.0
+            if PIDV2_AVAILABLE and global_step % 10 == 0:  # Every 10 steps to save compute
+                try:
+                    friction_alignment, friction_dominance = measure_friction(model, local_layers=6)
+                except Exception:
+                    pass
+
             optimizer.zero_grad()
 
             # Update scheduler after warmup
@@ -810,6 +820,17 @@ def train(config: UnifiedTrainingConfig):
                 if config.model_type in ("phase", "hybrid"):
                     log_msg += f" | α_phase: {current_alpha:.2f}"
 
+                # V9.4.5: Add friction metrics (for 6/6 hybrid architecture)
+                if friction_alignment != 0.0 or friction_dominance != 1.0:
+                    # Color-code alignment
+                    if friction_alignment > 0.1:
+                        align_ind = "+"  # Synergy
+                    elif friction_alignment < -0.1:
+                        align_ind = "!"  # Friction
+                    else:
+                        align_ind = "~"  # Neutral
+                    log_msg += f" | Align:{friction_alignment:+.2f}{align_ind} Dom:{friction_dominance:.2f}"
+
                 print(log_msg)
                 step_start_time = time.time()
 
@@ -839,6 +860,10 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("ctrl/ppl_velocity", authority_controller.last_v, global_step)
                         if hasattr(authority_controller, 'last_Kp'):
                             tb_writer.add_scalar("ctrl/dynamic_Kp", authority_controller.last_Kp, global_step)
+                        # V9.4.5: Friction Monitor metrics
+                        if friction_alignment != 0.0:
+                            tb_writer.add_scalar("ctrl/friction_alignment", friction_alignment, global_step)
+                            tb_writer.add_scalar("ctrl/friction_dominance", friction_dominance, global_step)
                 else:
                     print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
 
