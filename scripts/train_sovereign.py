@@ -41,6 +41,33 @@ DEFAULT_SAMPLE_PROMPTS = [
 ]
 
 
+def compute_guna_coherence_loss(g_states):
+    """
+    Compute Guna coherence loss - encourages smooth Guna state transitions.
+
+    Guna states (Sattva/Rajas/Tamas) represent attention quality at each position.
+    High coherence = consistent focus across sequence (low variance in transitions).
+    Low coherence = scattered/erratic attention shifts.
+
+    Args:
+        g_states: [B, Seq, 3] - raw Guna scores (Sattva, Rajas, Tamas)
+
+    Returns:
+        coherence_loss: scalar tensor (lower = more coherent/smoother)
+    """
+    # Normalize to probabilities
+    guna_probs = torch.softmax(g_states, dim=-1)  # [B, Seq, 3]
+
+    # Compute difference between adjacent positions
+    # Penalizes rapid Guna state changes
+    diffs = guna_probs[:, 1:, :] - guna_probs[:, :-1, :]  # [B, Seq-1, 3]
+
+    # L2 norm of differences (smooth transitions = low loss)
+    coherence_loss = (diffs ** 2).mean()
+
+    return coherence_loss
+
+
 @torch.no_grad()
 def compute_sovereign_metrics(r_logits, s_logits, target_r, target_s, g_states):
     """
@@ -594,6 +621,7 @@ Examples:
   python train_sovereign.py --model_size medium --dataset wikitext-103 --max_seq_len 1024
   python train_sovereign.py --model_size small --dataset tinystories --max_steps 10000
   python train_sovereign.py --model_size large --dataset c4 --gradient_checkpointing --gradient_accumulation 4
+  python train_sovereign.py --model_size medium --use_guna_coherence --lambda_guna 0.15
 """
     )
     # Model
@@ -624,8 +652,10 @@ Examples:
     # Optimizations
     parser.add_argument("--gradient_checkpointing", action="store_true",
                         help="Enable gradient checkpointing to save memory")
-    parser.add_argument("--use_coherence_loss", action="store_true",
-                        help="Add phase coherence loss term")
+    parser.add_argument("--use_guna_coherence", action="store_true",
+                        help="Add Guna coherence loss (smooth Sattva/Rajas/Tamas transitions)")
+    parser.add_argument("--lambda_guna", type=float, default=0.1,
+                        help="Weight for Guna coherence loss (default: 0.1)")
 
     # Output
     parser.add_argument("--save_dir", type=str, default="checkpoints/sovereign",
@@ -747,8 +777,8 @@ Examples:
     print(f"  Total steps: {total_steps} | LR: {args.lr}")
     if args.sample_every > 0:
         print(f"  Quality samples every {args.sample_every} steps")
-    if args.use_coherence_loss:
-        print(f"  Phase coherence loss: ENABLED")
+    if args.use_guna_coherence:
+        print(f"  Guna coherence loss: ENABLED (lambda={args.lambda_guna})")
     print("=" * 70)
 
     os.makedirs(args.save_dir, exist_ok=True)
@@ -802,8 +832,14 @@ Examples:
                 target_c=target_c,
             )
 
+            # Add Guna coherence loss if enabled
+            total_loss = loss_output.total
+            if args.use_guna_coherence:
+                guna_coh_loss = compute_guna_coherence_loss(g_states)
+                total_loss = total_loss + args.lambda_guna * guna_coh_loss
+
             # Scale loss for gradient accumulation
-            loss = loss_output.total / args.gradient_accumulation
+            loss = total_loss / args.gradient_accumulation
             loss.backward()
 
             # Compute metrics
@@ -812,6 +848,8 @@ Examples:
             accum_metrics["r_acc"] += sov_metrics["r_acc"]
             accum_metrics["s_acc"] += sov_metrics["s_acc"]
             accum_metrics["guna_entropy"] += sov_metrics["guna_entropy"]
+            if args.use_guna_coherence:
+                accum_metrics["guna_coh"] = accum_metrics.get("guna_coh", 0) + guna_coh_loss.item()
 
             # Gradient accumulation step
             if (batch_idx + 1) % args.gradient_accumulation == 0:
@@ -828,12 +866,16 @@ Examples:
                 token_ppl = math.exp(avg_loss) if avg_loss < 20 else float('inf')
 
                 # Update progress bar
-                pbar.set_postfix({
+                postfix = {
                     "step": global_step,
                     "PPL": f"{token_ppl:.1f}",
                     "R%": f"{avg_r_acc:.1f}",
                     "S%": f"{avg_s_acc:.1f}",
-                })
+                }
+                if args.use_guna_coherence:
+                    avg_guna_coh = accum_metrics.get("guna_coh", 0) / args.gradient_accumulation
+                    postfix["GC"] = f"{avg_guna_coh:.4f}"
+                pbar.set_postfix(postfix)
 
                 # Reset accumulators
                 accum_loss = 0
