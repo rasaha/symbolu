@@ -237,32 +237,46 @@ class PhaseAttentionLayer(nn.Module):
             }
 
         # =====================================================================
-        # O(n) Value Aggregation
+        # O(n) Value Aggregation - CAUSAL FIX (Von Mises Kernel + Cumsum)
         # =====================================================================
-        # Phase-based attention weights (soft alignment)
+        # CRITICAL: Cannot use F.softmax(..., dim=2) as it leaks future to past!
+        # Instead, use exponential kernel + cumulative sum normalization.
+        #
+        # Old (BROKEN - causality leak):
+        #   phase_weights = F.softmax(phase_weights.sum(dim=-1, keepdim=True), dim=2)
+        #
+        # New (FIXED - proper causal):
+        #   raw_weights = exp(cos(phases - phase_mean) / temperature)
+        #   Z_t = cumsum(raw_weights)  # Running denominator
+        #   H_t = cumsum(V * raw_weights)  # Running numerator
+        #   V_global = H_t / Z_t
+        # =====================================================================
+
+        # Map cosine similarity to positive space using Von Mises kernel
+        # cos() outputs [-1, 1], exp(cos/temp) outputs [exp(-1/temp), exp(1/temp)]
+        phase_similarity = torch.cos(phases - phase_mean)
+        raw_weights = torch.exp(phase_similarity / self.temperature)
+
+        # Reduce across head dimension to get per-position weight
+        # [B, H, N, head_dim] -> [B, H, N, 1]
+        weight_per_pos = raw_weights.mean(dim=-1, keepdim=True)
+
         if causal_mask:
-            # Each token attends to cumulative mean of previous tokens
-            phase_weights = torch.cos(phases - phase_mean)
+            # Causal: Cumulative sum normalization (no future leakage)
+            # Z_t = sum_{i=1}^{t} w_i (running denominator)
+            Z_t = torch.cumsum(weight_per_pos, dim=2) + 1e-8
+
+            # H_t = sum_{i=1}^{t} w_i * V_i (running weighted sum)
+            V_weighted = V * weight_per_pos
+            H_t = torch.cumsum(V_weighted, dim=2)
+
+            # Normalize: each position sees only past context
+            V_global = H_t / Z_t
         else:
-            phase_weights = torch.cos(phases - phases.mean(dim=2, keepdim=True))
-
-        # Apply temperature scaling for sharper attention (lower temp = sharper)
-        # This helps classification tasks that need to focus on specific tokens
-        phase_weights = phase_weights / self.temperature
-
-        # Normalize weights per head
-        phase_weights = F.softmax(phase_weights.sum(dim=-1, keepdim=True), dim=2)
-
-        # Global value context (O(n))
-        if causal_mask:
-            # Causal: cumulative weighted sum
-            V_weighted = V * phase_weights
-            V_cumsum = torch.cumsum(V_weighted, dim=2)
-            weight_cumsum = torch.cumsum(phase_weights, dim=2) + 1e-8
-            V_global = V_cumsum / weight_cumsum
-        else:
-            V_global = (V * phase_weights).sum(dim=2, keepdim=True)
-            V_global = V_global.expand(-1, -1, N, -1)
+            # Non-causal (bidirectional): Global normalization is OK
+            Z_global = weight_per_pos.sum(dim=2, keepdim=True) + 1e-8
+            H_global = (V * weight_per_pos).sum(dim=2, keepdim=True)
+            V_global = (H_global / Z_global).expand(-1, -1, N, -1)
 
         # Gate between local V and global context
         gate = torch.sigmoid(self.value_gate(Q))
