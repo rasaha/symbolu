@@ -218,6 +218,13 @@ class PhaseAttentionLayer(nn.Module):
         phi = phi.unsqueeze(-1)
         a = a.unsqueeze(-1)
 
+        # torch.polar doesn't support BFloat16 - cast to float32 for complex ops
+        orig_dtype = phi.dtype
+        if orig_dtype == torch.bfloat16:
+            phi = phi.float()
+            a = a.float()
+            v = v.float()
+
         # Create complex phasors using torch.polar(magnitude, angle)
         q_phasor = torch.polar(a, phi)      # [B, N, H, 1]
         k_phasor = torch.polar(a, -phi)     # [B, N, H, 1] (negative phase = conjugate)
@@ -242,6 +249,10 @@ class PhaseAttentionLayer(nn.Module):
         # =====================================================================
         # Out = Re(Q × State) = Σ_{j≤t} a_t * a_j * cos(φ_t - φ_j) * V_j
         sync_output = (q_phasor * global_state).real  # [B, N, H, D_h]
+
+        # Cast back to original dtype if we converted
+        if orig_dtype == torch.bfloat16:
+            sync_output = sync_output.to(orig_dtype)
 
         # =====================================================================
         # 6. Output Projection
