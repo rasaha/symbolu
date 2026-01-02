@@ -69,12 +69,13 @@ def main():
     # Test forward pass with dummy data
     print("\n4. Testing forward pass...")
     B, Seq = 2, 16
+    device = trainer.device
     dummy_batch = {
-        "input_ids": torch.randint(0, 50257, (B, Seq)),
-        "c_signals": torch.randn(B, Seq, 32),
-        "s_signals": torch.randint(0, 17, (B, Seq)),
-        "r_signals": torch.randint(0, 12, (B, Seq)),
-        "g_states": torch.softmax(torch.randn(B, Seq, 3), dim=-1),
+        "input_ids": torch.randint(0, 50257, (B, Seq)).to(device),
+        "c_signals": torch.randn(B, Seq, 32).to(device),
+        "s_signals": torch.randint(0, 17, (B, Seq)).to(device),
+        "r_signals": torch.randint(0, 12, (B, Seq)).to(device),
+        "g_states": torch.softmax(torch.randn(B, Seq, 3), dim=-1).to(device),
     }
 
     model.eval()
