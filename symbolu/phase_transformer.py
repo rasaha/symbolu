@@ -101,15 +101,24 @@ class TransformerConfig:
 
 class PhaseAttentionLayer(nn.Module):
     """
-    O(n) Phase-Based Attention Layer with LEARNED Phase Embeddings.
+    Learned Phase-Amplitude Attention (O(N) Complex Linear Attention)
 
-    V2 UPGRADE: Instead of fixed phase projection, we learn:
-    - φ = W_φ @ x  (what should synchronize)
-    - a = W_a @ x  (amplitude/gate - how much to participate)
-    - sim = a_i * a_j * cos(φ_i - φ_j)
+    V2 UPGRADE using Euler's Formula for cleaner math:
 
-    This makes Phase Attention expressive enough to actually learn
-    meaningful representations, rather than being a fixed cosine trick.
+    Mathematically:
+        Attn(i,j) = a_i * a_j * cos(φ_i - φ_j)
+
+    Using Euler's formula e^(iφ) = cos(φ) + i*sin(φ):
+        cos(φ_i - φ_j) = Re(e^(iφ_i) × e^(-iφ_j))
+
+    Implemented as:
+        Q = a * exp(i * φ)       # Query phasor
+        K = a * exp(-i * φ)      # Key phasor (conjugate)
+        State = CumSum(K * V)    # O(n) aggregation
+        Out = Re(Q * State)      # Readout
+
+    This is mathematically equivalent to amplitude-gated phase attention
+    but more elegant and numerically stable via complex arithmetic.
     """
 
     def __init__(
@@ -117,64 +126,51 @@ class PhaseAttentionLayer(nn.Module):
         embed_dim: int,
         num_heads: int,
         dropout: float = 0.1,
-        sync_steps: int = 3,
-        sync_lr: float = 0.1,
-        temperature: float = 1.0,  # Lower = sharper attention (for classification)
+        sync_steps: int = 3,      # Unused in V2 but kept for compatibility
+        sync_lr: float = 0.1,     # Unused in V2 but kept for compatibility
+        temperature: float = 1.0,  # Unused in V2 but kept for compatibility
+        aux_scale: float = 0.1,   # Output scaling for auxiliary path integration
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
+        self.aux_scale = aux_scale
+
+        # Legacy parameters kept for checkpoint compatibility
         self.sync_steps = sync_steps
-        self.temperature = temperature  # Controls attention sharpness
-
-        # Projections
-        self.q_proj = nn.Linear(embed_dim, embed_dim)
-        self.k_proj = nn.Linear(embed_dim, embed_dim)
-        self.v_proj = nn.Linear(embed_dim, embed_dim)
-        self.out_proj = nn.Linear(embed_dim, embed_dim)
-
-        # =====================================================================
-        # V2: LEARNED PHASE EMBEDDINGS
-        # =====================================================================
-        # Instead of: phases = sigmoid(phase_proj(Q)) * 2π  (fixed)
-        # Now:        phases = W_phase @ x  (learned angular embedding)
-        #             amps = sigmoid(W_amp @ x)  (learned participation gate)
-        # =====================================================================
-
-        # Learned phase projection: maps input to angular space per head
-        # Output is [B, N, num_heads] - one phase angle per head
-        self.phase_embed = nn.Linear(embed_dim, num_heads)
-
-        # Learned amplitude gate: controls how much each token participates
-        # Output is [B, N, num_heads] - one amplitude per head
-        self.amp_gate = nn.Linear(embed_dim, num_heads)
-
-        # Initialize amp_gate to start with moderate participation
-        # sigmoid(0) = 0.5, so all tokens start with equal contribution
-        nn.init.zeros_(self.amp_gate.weight)
-        nn.init.zeros_(self.amp_gate.bias)
-
-        # Legacy phase_proj kept for compatibility but not used in V2
-        self.phase_proj = nn.Linear(self.head_dim, self.head_dim)
+        self.temperature = temperature
         self.sync_lr = nn.Parameter(torch.tensor(sync_lr))
 
-        # Global aggregators for O(n)
+        # =====================================================================
+        # V2: LEARNED PHASE-AMPLITUDE PROJECTIONS (The "Brain" of Phase)
+        # =====================================================================
+        # Learn WHAT to sync (Phase) and HOW MUCH to sync (Amplitude)
+        self.W_phase = nn.Linear(embed_dim, num_heads, bias=False)
+        self.W_amp = nn.Linear(embed_dim, num_heads, bias=False)
+
+        # Value projection (content)
+        self.v_proj = nn.Linear(embed_dim, embed_dim, bias=False)
+
+        # Output projection
+        self.out_proj = nn.Linear(embed_dim, embed_dim, bias=False)
+
+        # Initialize out_proj to near-zero for gradual contribution
+        nn.init.zeros_(self.out_proj.weight)
+
+        # Layer normalization for stability
+        self.norm = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+
+        # Legacy projections kept for checkpoint compatibility
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.phase_proj = nn.Linear(self.head_dim, self.head_dim)
         self.key_gate = nn.Linear(self.head_dim, self.head_dim)
         self.value_gate = nn.Linear(self.head_dim, self.head_dim)
-
-        # Initialize value_gate bias to preserve memory (sigmoid(3) ≈ 0.95)
-        # This makes the model start as "perfect memory" and learn to incorporate global context
-        nn.init.zeros_(self.value_gate.weight)
-        nn.init.constant_(self.value_gate.bias, 3.0)  # High gate = preserve local V
-
-        # Initialize out_proj to near-zero to prevent <unk> spikes at start
-        # Phase attention starts as identity, learns to contribute gradually
-        nn.init.zeros_(self.out_proj.weight)
-        nn.init.zeros_(self.out_proj.bias)
-
-        self.dropout = nn.Dropout(dropout)
-        self.norm = nn.LayerNorm(embed_dim)
+        # Legacy V2 projections
+        self.phase_embed = nn.Linear(embed_dim, num_heads)
+        self.amp_gate = nn.Linear(embed_dim, num_heads)
 
     def forward(
         self,
@@ -183,172 +179,88 @@ class PhaseAttentionLayer(nn.Module):
         phase_context: Optional[Dict[str, torch.Tensor]] = None,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, Dict[str, torch.Tensor]]]:
         """
-        Forward pass with O(n) phase attention.
+        Forward pass with O(n) complex phase attention.
 
         Args:
             x: [B, N, D] input tensor
-            causal_mask: Apply causal masking for autoregressive
-            phase_context: Optional dict with 'phase_sum' and 'phase_count' for
-                          streaming across chunks. If provided, returns updated context.
+            causal_mask: Apply causal masking (always True for complex cumsum)
+            phase_context: Optional streaming context (not used in V2)
 
         Returns:
-            output: [B, N, D] or (output, updated_phase_context) if phase_context given
+            output: [B, N, D] or (output, None) if phase_context given
         """
         B, N, D = x.shape
         residual = x
 
-        # Project to Q, K, V
-        Q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim)
-        K = self.k_proj(x).view(B, N, self.num_heads, self.head_dim)
-        V = self.v_proj(x).view(B, N, self.num_heads, self.head_dim)
-
-        # [B, H, N, d]
-        Q = Q.transpose(1, 2)
-        K = K.transpose(1, 2)
-        V = V.transpose(1, 2)
+        # Pre-norm (standard for modern transformers)
+        x_norm = self.norm(x)
 
         # =====================================================================
-        # V2: LEARNED PHASE EMBEDDINGS
+        # 1. Project to Phase (φ) and Amplitude (a)
         # =====================================================================
-        # Compute phases directly from input x (not from Q)
-        # This allows the model to learn WHAT should synchronize
-        # phases: [B, N, H] -> [B, H, N, 1] for broadcasting with head_dim
-        phases_raw = self.phase_embed(x)  # [B, N, num_heads]
-        phases = phases_raw.transpose(1, 2).unsqueeze(-1)  # [B, H, N, 1]
-        phases = phases * (2 * math.pi)  # Map to angular space [0, 2π]
-
-        # Compute amplitudes (participation gates)
-        # High amplitude = this token strongly participates in phase sync
-        # Low amplitude = this token is "quiet" in phase space
-        # amps: [B, N, H] -> [B, H, N, 1]
-        amps = torch.sigmoid(self.amp_gate(x))  # [B, N, num_heads]
-        amps = amps.transpose(1, 2).unsqueeze(-1)  # [B, H, N, 1]
+        # φ: learned phase angle per head
+        # a: learned amplitude gate (how much this token participates)
+        phi = self.W_phase(x_norm)  # [B, N, H]
+        a = torch.sigmoid(self.W_amp(x_norm))  # [B, N, H], range (0, 1)
 
         # =====================================================================
-        # O(n) Mean-Field Phase Synchronization (U3-U4)
-        # With streaming support for cross-chunk global context
+        # 2. Project Values (content)
         # =====================================================================
-
-        # Initialize or use external phase context for streaming
-        if phase_context is not None:
-            # Streaming mode: incorporate phases from previous chunks
-            prev_phase_sum = phase_context.get('phase_sum', torch.zeros_like(phases[:, :, :1, :]))
-            prev_count = phase_context.get('phase_count', 0)
-        else:
-            prev_phase_sum = None
-            prev_count = 0
-
-        for _ in range(self.sync_steps):
-            # U3: ∂C/∂φᵢ ≈ -N × sin(φᵢ - φ_mean)
-            if causal_mask:
-                # Causal: only sync with previous tokens
-                # Cumulative mean for causal
-                cumsum = torch.cumsum(phases, dim=2)
-                counts = torch.arange(1, N + 1, device=phases.device).float()
-
-                # Add previous chunk context if streaming
-                if prev_phase_sum is not None and prev_count > 0:
-                    cumsum = cumsum + prev_phase_sum
-                    counts = counts + prev_count
-
-                phase_mean = cumsum / counts.view(1, 1, -1, 1)
-            else:
-                # Non-causal: use global mean including previous chunks
-                if prev_phase_sum is not None and prev_count > 0:
-                    total_sum = phases.sum(dim=2, keepdim=True) + prev_phase_sum
-                    total_count = N + prev_count
-                    phase_mean = total_sum / total_count
-                else:
-                    phase_mean = phases.mean(dim=2, keepdim=True)
-
-            # STABILITY: Don't multiply by N - coupling strength must be independent
-            # of sequence length to prevent gradient explosion (N=512 -> 51.2 rad jumps!)
-            gradient = -1.0 * torch.sin(phases - phase_mean)
-
-            # U4: Δφᵢ = α × ∂C/∂φᵢ
-            # Note: Don't use modulo (%) as it breaks gradients
-            # sin/cos are periodic, so phases outside [0, 2π] still work
-            phases = phases + self.sync_lr * gradient
-
-        # Update phase context for next chunk (if streaming)
-        new_phase_context = None
-        if phase_context is not None:
-            new_phase_context = {
-                'phase_sum': (prev_phase_sum if prev_phase_sum is not None else 0) + phases.sum(dim=2, keepdim=True),
-                'phase_count': prev_count + N,
-            }
+        v = self.v_proj(x_norm).view(B, N, self.num_heads, self.head_dim)  # [B, N, H, D_h]
 
         # =====================================================================
-        # O(n) Value Aggregation - V2 with LEARNED AMPLITUDE GATING
+        # 3. Form Complex Phasors using Euler's Formula
         # =====================================================================
-        # CRITICAL: Cannot use F.softmax(..., dim=2) as it leaks future to past!
-        # Instead, use exponential kernel + cumulative sum normalization.
-        #
-        # V2 UPGRADE: Weight = amplitude * exp(cos(phase - phase_mean) / temp)
-        # - amplitude gates participation (learned)
-        # - phase similarity determines who syncs (learned)
-        # - Still O(n) via cumsum
+        # Q = a * e^(iφ)   - Query phasor
+        # K = a * e^(-iφ)  - Key phasor (conjugate for cos(φ_i - φ_j))
+
+        # Reshape for broadcasting: [B, N, H] -> [B, N, H, 1]
+        phi = phi.unsqueeze(-1)
+        a = a.unsqueeze(-1)
+
+        # Create complex phasors using torch.polar(magnitude, angle)
+        q_phasor = torch.polar(a, phi)      # [B, N, H, 1]
+        k_phasor = torch.polar(a, -phi)     # [B, N, H, 1] (negative phase = conjugate)
+
         # =====================================================================
+        # 4. O(n) State Accumulation via Complex Cumsum
+        # =====================================================================
+        # KV = K * V (complex × real = complex)
+        # State_t = Σ_{j≤t} K_j * V_j
 
-        # Map cosine similarity to positive space using Von Mises kernel
-        # cos() outputs [-1, 1], exp(cos/temp) outputs [exp(-1/temp), exp(1/temp)]
-        # phases and phase_mean are now [B, H, N, 1] (learned, not head_dim)
-        phase_similarity = torch.cos(phases - phase_mean)
+        # Convert V to complex (real part only, imaginary = 0)
+        v_complex = torch.complex(v, torch.zeros_like(v))
 
-        # NUMERICAL STABILITY: Clamp exp input to prevent overflow/underflow
-        # exp(10) ≈ 22k, exp(-10) ≈ 0.00005 - safe range for BF16
-        exp_input = torch.clamp(phase_similarity / self.temperature, min=-10.0, max=10.0)
-        raw_weights = torch.exp(exp_input)
+        # KV product: [B, N, H, 1] × [B, N, H, D_h] -> [B, N, H, D_h]
+        kv_complex = k_phasor * v_complex
 
-        # Additional stability: handle any NaN/Inf that slipped through
-        raw_weights = torch.nan_to_num(raw_weights, nan=1.0, posinf=1e4, neginf=1e-4)
+        # O(n) Causal aggregation: cumulative sum along sequence dimension
+        global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
 
-        # V2: AMPLITUDE GATING
-        # weight = amplitude * exp(cos(phase - phase_mean) / temp)
-        # This lets the model learn which tokens should participate in sync
-        # amps is [B, H, N, 1], raw_weights is [B, H, N, 1]
-        weight_per_pos = amps * raw_weights
+        # =====================================================================
+        # 5. Readout: Synchronization via Q × State
+        # =====================================================================
+        # Out = Re(Q × State) = Σ_{j≤t} a_t * a_j * cos(φ_t - φ_j) * V_j
+        sync_output = (q_phasor * global_state).real  # [B, N, H, D_h]
 
-        # Ensure weights are positive and bounded
-        weight_per_pos = torch.clamp(weight_per_pos, min=1e-6, max=1e4)
-
-        if causal_mask:
-            # Causal: Cumulative sum normalization (no future leakage)
-            # Z_t = sum_{i=1}^{t} w_i (running denominator)
-            Z_t = torch.cumsum(weight_per_pos, dim=2) + 1e-6
-
-            # H_t = sum_{i=1}^{t} w_i * V_i (running weighted sum)
-            V_weighted = V * weight_per_pos
-            H_t = torch.cumsum(V_weighted, dim=2)
-
-            # Normalize: each position sees only past context
-            V_global = H_t / Z_t
-
-            # Clamp output to prevent explosion
-            V_global = torch.clamp(V_global, min=-100.0, max=100.0)
-        else:
-            # Non-causal (bidirectional): Global normalization is OK
-            Z_global = weight_per_pos.sum(dim=2, keepdim=True) + 1e-6
-            H_global = (V * weight_per_pos).sum(dim=2, keepdim=True)
-            V_global = (H_global / Z_global).expand(-1, -1, N, -1)
-
-        # Gate between local V and global context
-        gate = torch.sigmoid(self.value_gate(Q))
-        output = gate * V + (1 - gate) * V_global
-
-        # Reshape and project
-        output = output.transpose(1, 2).reshape(B, N, D)
-        output = self.out_proj(output)
+        # =====================================================================
+        # 6. Output Projection
+        # =====================================================================
+        sync_output = sync_output.reshape(B, N, D)
+        output = self.out_proj(sync_output)
         output = self.dropout(output)
 
-        # Residual + LayerNorm
-        result = self.norm(output + residual)
+        # Scale output for auxiliary path integration
+        # This prevents Phase from competing 50/50 with Quadratic attention
+        output = output * self.aux_scale
 
-        # Return with phase context if streaming
-        if new_phase_context is not None:
-            return result, new_phase_context
+        # Residual connection
+        result = output + residual
+
+        # Return with phase_context compatibility (not used in V2)
+        if phase_context is not None:
+            return result, None
         return result
-
 
 # =============================================================================
 # STANDARD ATTENTION (O(n²)) - For Comparison
