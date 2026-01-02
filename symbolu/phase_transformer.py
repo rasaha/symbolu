@@ -221,7 +221,9 @@ class PhaseAttentionLayer(nn.Module):
                 else:
                     phase_mean = phases.mean(dim=2, keepdim=True)
 
-            gradient = -N * torch.sin(phases - phase_mean)
+            # STABILITY: Don't multiply by N - coupling strength must be independent
+            # of sequence length to prevent gradient explosion (N=512 -> 51.2 rad jumps!)
+            gradient = -1.0 * torch.sin(phases - phase_mean)
 
             # U4: Δφᵢ = α × ∂C/∂φᵢ
             # Note: Don't use modulo (%) as it breaks gradients
