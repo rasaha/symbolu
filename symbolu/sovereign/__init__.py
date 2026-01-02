@@ -14,6 +14,7 @@ Architecture Overview:
 5. SovereignGunaComputer: Shannon entropy-based cognitive dynamics
 6. SovereignRouter: Dynamic nexus selection (Virtual Nexus)
 7. SovereignMonitor: Real-time telemetry dashboard
+8. InoculationTrainer: Self-supervised state learning
 
 State Layout (128D):
 -------------------
@@ -38,6 +39,11 @@ Phase 3 (Complete):
 - SovereignRouter: Dynamic nexus selection based on ontology
 - SovereignMonitor: Real-time state telemetry
 - COGNADE Export: Hardware bridge for PA-VPU
+
+Phase 4 (Complete):
+- InoculationTrainer: Self-supervised state learning with alpha decay
+- BankDisambiguationTest: Homonym disambiguation validation
+- AuthorityStressTest: PID Governor stress verification
 
 Reference: docs/hardware/SOVEREIGN_1_DESIGN_IMPLEMENTATION.md
 """
@@ -101,6 +107,21 @@ from symbolu.sovereign.cognade_export import (
     export_cognade_sdk,
 )
 
+# Phase 4: Training & Validation
+from symbolu.sovereign.training import (
+    InoculationTrainer,
+    InoculationConfig,
+    AlphaScheduler,
+    create_inoculation_trainer,
+    BankDisambiguationTest,
+    HomonymTestSuite,
+    DisambiguationResult,
+    run_bank_test,
+    AuthorityStressTest,
+    StressTestResult,
+    run_stress_test,
+)
+
 __all__ = [
     # Phase 1: Loss
     'SovereignLoss',
@@ -151,6 +172,23 @@ __all__ = [
     'pack_state_to_binary',
     'unpack_binary_to_state',
     'export_cognade_sdk',
+
+    # Phase 4: Training (Inoculation)
+    'InoculationTrainer',
+    'InoculationConfig',
+    'AlphaScheduler',
+    'create_inoculation_trainer',
+
+    # Phase 4: Validation
+    'BankDisambiguationTest',
+    'HomonymTestSuite',
+    'DisambiguationResult',
+    'run_bank_test',
+
+    # Phase 4: Stress Testing
+    'AuthorityStressTest',
+    'StressTestResult',
+    'run_stress_test',
 ]
 
-__version__ = '3.0.0'
+__version__ = '4.0.0'
