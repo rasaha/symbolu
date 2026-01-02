@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-SymbolU V9.3.5-PID Training Script
+SymbolU V9.4.4-PID Training Script
 ===================================
 
 Phase Attention Transformer with Authority PID Controller.
+Includes V9.4.4 Stress Test Framework for Governor Resilience.
 
 The PID controller replaces ad-hoc threshold-based authority management
 with a proper control-theoretic approach:
@@ -86,6 +87,8 @@ from train import (
     update_alpha_schedule,
     create_scheduler,
     trigger_handshake,
+    load_tokenizer,
+    run_quality_samples,
 )
 
 # Optional imports
@@ -100,6 +103,89 @@ try:
     TENSORBOARD_AVAILABLE = True
 except ImportError:
     TENSORBOARD_AVAILABLE = False
+
+
+# =============================================================================
+# SEMANTIC VALIDATION - Prompt-based PPL for PID Governor (V9.4.3)
+# =============================================================================
+
+@torch.no_grad()
+def compute_semantic_ppl(
+    model: nn.Module,
+    tokenizer,
+    prompts: tuple,
+    device: torch.device,
+    max_tokens: int = 30,
+) -> float:
+    """
+    Compute average perplexity on generated tokens from semantic prompts.
+
+    This measures how well the model "knows" the factual content of prompts
+    like "The history of the Roman Empire began when..." - not just fluency.
+
+    Returns:
+        Average perplexity across all prompts (lower = better knowledge)
+    """
+    model.eval()
+    total_ppl = 0.0
+    valid_prompts = 0
+
+    for prompt in prompts:
+        try:
+            # Encode prompt
+            input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+            prompt_len = input_ids.shape[1]
+
+            # Generate continuation
+            generated = input_ids.clone()
+            total_loss = 0.0
+            num_tokens = 0
+
+            for _ in range(max_tokens):
+                outputs = model(generated)
+
+                # Handle different output formats
+                if isinstance(outputs, dict):
+                    logits = outputs['logits']
+                elif isinstance(outputs, torch.Tensor):
+                    logits = outputs
+                else:
+                    logits = outputs[0]
+
+                # Get next token prediction
+                next_logits = logits[:, -1, :]
+
+                # Compute loss (cross-entropy with greedy next token)
+                next_token = next_logits.argmax(dim=-1, keepdim=True)
+
+                # Only count loss after prompt
+                if generated.shape[1] > prompt_len:
+                    log_probs = F.log_softmax(next_logits, dim=-1)
+                    token_loss = -log_probs.gather(1, next_token).item()
+                    total_loss += token_loss
+                    num_tokens += 1
+
+                generated = torch.cat([generated, next_token], dim=1)
+
+                # Stop on EOS
+                if hasattr(tokenizer, 'eos_token_id') and next_token.item() == tokenizer.eos_token_id:
+                    break
+
+            if num_tokens > 0:
+                avg_loss = total_loss / num_tokens
+                prompt_ppl = math.exp(min(avg_loss, 10.0))  # Cap to prevent overflow
+                total_ppl += prompt_ppl
+                valid_prompts += 1
+
+        except Exception:
+            continue  # Skip failed prompts silently
+
+    model.train()
+
+    if valid_prompts == 0:
+        return 100.0  # Default high PPL if all prompts failed
+
+    return total_ppl / valid_prompts
 
 
 # =============================================================================
@@ -320,10 +406,13 @@ class AuthorityPIDv2Config:
     V_dead_pct: float = 1.0   # Deadband in % - ignore velocity below this
     V_scale_pct: float = 5.0  # Normalization scale - 5% velocity = 1.0 error unit
 
-    # PID gains on PPL velocity
-    Kp: float = 0.25         # Proportional: current velocity stress
+    # PID gains on PPL velocity (DYNAMIC Kp based on SNR)
+    Kp_base: float = 0.20    # Base Kp (used as reference, actual Kp is dynamic)
+    Kp_min: float = 0.10     # Floor when noisy (high volatility)
+    Kp_max: float = 0.30     # Ceiling when clean (low volatility)
+    Kp_sensitivity: float = 5.0  # How much volatility reduces Kp: Kp = Kp_max / (1 + vol * sens)
     Ki: float = 0.02         # Integral: accumulated velocity stress
-    Kd: float = 0.15         # Derivative: velocity acceleration
+    Kd: float = 0.10         # Derivative: velocity acceleration (reduced to prevent overshoot)
 
     # Integral anti-windup
     I_max: float = 5.0       # Maximum integral accumulation
@@ -340,6 +429,16 @@ class AuthorityPIDv2Config:
     # Recovery settings
     recovery_streak: int = 3       # Good evals before recovery
     recovery_step: float = 0.02    # Restoration per good eval
+
+    # Semantic Validation Weight (V9.4.3)
+    # Higher W_s = Governor more sensitive to "Roman Knowledge" prompts
+    # Lower W_s = Governor focuses on general fluency
+    W_s: float = 0.30              # Semantic weight: 30% prompt-based, 70% general PPL
+    semantic_ppl_scale: float = 50.0  # Normalization scale for semantic PPL error
+
+    # Handshake D-term Dampening
+    # During phase ramp, dampen D term to prevent flutter
+    handshake_Kd_dampen: bool = True  # Enable D-term dampening during ramp
 
 
 class AuthorityPIDv2:
@@ -383,10 +482,30 @@ class AuthorityPIDv2:
         self.last_u = 0.0
         self.last_coh_gate = 1.0
         self.last_e_p = 0.0    # For compatibility
+        self.last_volatility = 0.0  # PPL coefficient of variation
+        self.last_Kp = self.config.Kp_base  # Dynamic Kp (SNR-adjusted)
 
-    def update(self, val_ppl: float, coherence: float) -> float:
+        # V9.4.3: Semantic Validation + Handshake Dampening
+        self.last_semantic_ppl = 0.0   # Semantic PPL from prompts
+        self.last_semantic_error = 0.0 # Normalized semantic error
+        self.last_effective_Kd = self.config.Kd  # Effective Kd (dampened during handshake)
+        self.last_ramp_frac = 0.0      # Handshake ramp fraction (0→1)
+
+    def update(
+        self,
+        val_ppl: float,
+        coherence: float,
+        semantic_ppl: float = 0.0,
+        step: int = 0,
+        phase_ramp_steps: int = 7000,
+    ) -> float:
         """
         Update authority factor using PPL-primary PID with coherence gate.
+
+        V9.4.3 additions:
+        - semantic_ppl: PPL on prompt-based generation (weighted by W_s)
+        - step: Current training step (for D-term dampening)
+        - phase_ramp_steps: Steps for phase ramp (for D-term dampening)
         """
         cfg = self.config
 
@@ -398,9 +517,63 @@ class AuthorityPIDv2:
         if len(self.coh_history) > 10:
             self.coh_history = self.coh_history[-10:]
 
+        # =====================================================================
+        # HANDSHAKE D-TERM DAMPENING (V9.4.3)
+        # =====================================================================
+        # During phase ramp, dampen D term to prevent flutter/oscillation
+        if cfg.handshake_Kd_dampen and phase_ramp_steps > 0:
+            ramp_frac = min(1.0, step / phase_ramp_steps)
+            effective_Kd = cfg.Kd * ramp_frac  # 0 → Kd over ramp
+        else:
+            ramp_frac = 1.0
+            effective_Kd = cfg.Kd
+        self.last_ramp_frac = ramp_frac
+        self.last_effective_Kd = effective_Kd
+
+        # =====================================================================
+        # SEMANTIC VALIDATION ERROR (V9.4.3)
+        # =====================================================================
+        # Compute normalized semantic error from prompt-based PPL
+        # Higher semantic_ppl = worse "Roman Knowledge" = higher error
+        self.last_semantic_ppl = semantic_ppl
+        if semantic_ppl > 0:
+            # Normalize: typical good semantic PPL ~20-50, bad ~100+
+            semantic_error = max(0.0, (semantic_ppl - 30.0) / cfg.semantic_ppl_scale)
+            semantic_error = min(1.0, semantic_error)  # Cap at 1.0
+        else:
+            semantic_error = 0.0
+        self.last_semantic_error = semantic_error
+
         # Need at least 6 evals for MA3 smoothing
         if len(self.ppl_history) < 6:
             return self.A
+
+        # =====================================================================
+        # DYNAMIC Kp: Variance-Adjusted Sensitivity (SNR-based)
+        # =====================================================================
+        # High volatility (noisy evals) → Kp scales down toward Kp_min
+        # Low volatility (clean trend) → Kp scales up toward Kp_max
+        # This auto-softens during "Handshake Shock" and sharpens for recovery
+
+        ppl_window = self.ppl_history[-6:]
+        ppl_mean = sum(ppl_window) / len(ppl_window)
+        ppl_variance = sum((x - ppl_mean) ** 2 for x in ppl_window) / len(ppl_window)
+        ppl_std = ppl_variance ** 0.5
+
+        # Coefficient of variation (relative volatility)
+        volatility = ppl_std / ppl_mean if ppl_mean > 0 else 0.0
+        self.last_volatility = volatility
+
+        # Dynamic Kp: inversely proportional to volatility
+        # Formula: Kp = Kp_max / (1 + volatility * sensitivity)
+        # - volatility=0.00 → Kp = 0.30 (aggressive, clean signal)
+        # - volatility=0.05 → Kp = 0.30 / 1.25 = 0.24
+        # - volatility=0.10 → Kp = 0.30 / 1.50 = 0.20
+        # - volatility=0.20 → Kp = 0.30 / 2.00 = 0.15
+        # - volatility=0.40 → Kp = 0.30 / 3.00 = 0.10 (conservative, noisy)
+        dynamic_Kp = cfg.Kp_max / (1.0 + volatility * cfg.Kp_sensitivity)
+        dynamic_Kp = max(cfg.Kp_min, min(cfg.Kp_max, dynamic_Kp))
+        self.last_Kp = dynamic_Kp
 
         # =====================================================================
         # PRIMARY PID LOOP: PPL VELOCITY (Percentage-based for scale invariance)
@@ -434,11 +607,21 @@ class AuthorityPIDv2:
 
         # ----- D term: Velocity acceleration (predictive) -----
         # Positive acceleration = situation getting worse faster
+        # Use DAMPENED Kd during handshake to prevent flutter
         D = max(0, a / cfg.V_scale_pct)
         self.last_D = D
 
-        # ----- Control signal -----
-        u = cfg.Kp * P + cfg.Ki * self.I + cfg.Kd * D
+        # ----- Control signal (using DYNAMIC Kp + DAMPENED Kd + SEMANTIC error) -----
+        # Base PID on PPL velocity
+        u_ppl = dynamic_Kp * P + cfg.Ki * self.I + effective_Kd * D
+
+        # Weighted combination with semantic error
+        # u_total = (1 - W_s) * u_ppl + W_s * semantic_error
+        # Higher W_s = Governor more sensitive to "Roman Knowledge"
+        if semantic_error > 0 and cfg.W_s > 0:
+            u = (1.0 - cfg.W_s) * u_ppl + cfg.W_s * semantic_error
+        else:
+            u = u_ppl
         self.last_u = u
 
         # ----- PID Authority Factor -----
@@ -503,14 +686,17 @@ class AuthorityPIDv2:
         limiter = "PPL" if self.A_ppl <= self.last_coh_gate else "COH"
         return (
             f"GOV {icon} | Brake(PPL): {self.A_ppl:.2f} | Gate(Coh): {self.last_coh_gate:.2f} | "
-            f"Final_A: {self.A:.2f} [{limiter}] | vel: {self.last_v:+.1f}%{recovery_tag}"
+            f"Final_A: {self.A:.2f} [{limiter}] | vel: {self.last_v:+.1f}% | "
+            f"Kp: {self.last_Kp:.2f}{recovery_tag}"
         )
 
     def get_detailed_status(self) -> str:
+        semantic_tag = f" | Sem_PPL={self.last_semantic_ppl:.1f}" if self.last_semantic_ppl > 0 else ""
         return (
             f"  v_norm={self.last_v_norm:.3f} a={self.last_a:+.1f} | "
             f"P={self.last_P:.3f} I={self.last_I:.3f} D={self.last_D:.3f} | "
-            f"u={self.last_u:.3f}"
+            f"u={self.last_u:.3f} | vol={self.last_volatility:.1%} Kp={self.last_Kp:.2f} "
+            f"Kd={self.last_effective_Kd:.2f} ramp={self.last_ramp_frac:.0%}{semantic_tag}"
         )
 
 
@@ -838,10 +1024,23 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
         else:
             logger.info(f"Resumed at step {state.step}")
 
+    # Initialize lr_scale if not present (not in TrainingState dataclass)
+    if not hasattr(state, 'lr_scale'):
+        state.lr_scale = 1.0
+
     # Create dataloaders
     logger.info("Loading dataset...")
     train_loader, val_loader, train_dataset = create_dataloaders(config)
     logger.info(f"Train batches: {len(train_loader):,}")
+
+    # Load tokenizer for quality sampling
+    tokenizer = None
+    if config.sample_every > 0:
+        try:
+            tokenizer = load_tokenizer(config)
+            logger.info(f"Tokenizer loaded for quality sampling (every {config.sample_every} steps)")
+        except Exception as e:
+            logger.warning(f"Could not load tokenizer for sampling: {e}")
 
     # Initialize MemoryGuard
     memory_guard = MemoryGuard(config, config.batch_size, config.gradient_accumulation)
@@ -881,13 +1080,15 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
         controller_name = "PIDv2"
 
         logger.info("=" * 60)
-        logger.info("V9.4.0: PIDv2 CONTROLLER (Control-Systems Design)")
+        logger.info("V9.4.3: PIDv2 CONTROLLER (Semantic Validation + Handshake Dampening)")
         logger.info("  Architecture: PPL velocity drives PID; Coherence gates authority")
-        logger.info(f"  PID Gains: Kp={pidv2_config.Kp}, Ki={pidv2_config.Ki}, Kd={pidv2_config.Kd}")
+        logger.info(f"  Dynamic Kp: [{pidv2_config.Kp_min}, {pidv2_config.Kp_max}] (sensitivity={pidv2_config.Kp_sensitivity})")
+        logger.info(f"  Static Gains: Ki={pidv2_config.Ki}, Kd={pidv2_config.Kd}")
         logger.info(f"  Coherence gate: [{pidv2_config.C_floor}, {pidv2_config.C_good}]")
         logger.info(f"  PPL velocity: deadband={pidv2_config.V_dead_pct}%, scale={pidv2_config.V_scale_pct}%")
         logger.info(f"  Authority floor: {pidv2_config.A_min}")
-        logger.info("  Key insight: PPL velocity is causal; Coherence is non-monotonic")
+        logger.info(f"  Semantic Weight W_s: {pidv2_config.W_s:.0%} (prompt-based PPL influence)")
+        logger.info(f"  Handshake Kd Dampening: {'ON' if pidv2_config.handshake_Kd_dampen else 'OFF'}")
         logger.info("=" * 60)
 
     else:  # pid (legacy)
@@ -952,8 +1153,8 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
 
         # Forward/backward pass
         metrics = train_step(
-            model, batch, optimizer, scheduler, config, state, scaler,
-            agc_threshold=agc_threshold
+            model, batch, optimizer, scheduler, scaler,
+            config, device, accumulation_step
         )
 
         if metrics is None:
@@ -1102,11 +1303,33 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                 )
 
                 # =============================================================
-                # PID CONTROLLER UPDATE
+                # PID CONTROLLER UPDATE (V9.4.3: with Semantic Validation)
                 # =============================================================
 
+                # Compute semantic PPL from prompts (if tokenizer available)
+                semantic_ppl = 0.0
+                # Check if semantic validation is enabled (W_s > 0 in PIDv2 controller)
+                semantic_enabled = (
+                    hasattr(authority_controller, 'config') and
+                    hasattr(authority_controller.config, 'W_s') and
+                    authority_controller.config.W_s > 0
+                )
+                if tokenizer is not None and hasattr(config, 'sample_prompts') and semantic_enabled:
+                    try:
+                        semantic_ppl = compute_semantic_ppl(
+                            model, tokenizer, config.sample_prompts, device, max_tokens=30
+                        )
+                    except Exception as e:
+                        logger.debug(f"Semantic PPL computation failed: {e}")
+
                 old_A = authority_controller.A
-                new_A = authority_controller.update(current_val_ppl, current_coh)
+                new_A = authority_controller.update(
+                    current_val_ppl,
+                    current_coh,
+                    semantic_ppl=semantic_ppl,
+                    step=state.step,
+                    phase_ramp_steps=config.phase_ramp_steps,
+                )
 
                 # Log PID status
                 logger.info(f"  {authority_controller.get_status_string()}")
@@ -1134,6 +1357,20 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                     # PD-specific metrics
                     if hasattr(authority_controller, 'last_e_d'):
                         tb_writer.add_scalar("ctrl/e_d", authority_controller.last_e_d, state.step)
+                    # PIDv2 dynamic Kp metrics
+                    if hasattr(authority_controller, 'last_Kp'):
+                        tb_writer.add_scalar("ctrl/dynamic_Kp", authority_controller.last_Kp, state.step)
+                    if hasattr(authority_controller, 'last_volatility'):
+                        tb_writer.add_scalar("ctrl/ppl_volatility", authority_controller.last_volatility, state.step)
+                    # V9.4.3: Semantic validation + Handshake dampening metrics
+                    if hasattr(authority_controller, 'last_semantic_ppl'):
+                        tb_writer.add_scalar("ctrl/semantic_ppl", authority_controller.last_semantic_ppl, state.step)
+                    if hasattr(authority_controller, 'last_semantic_error'):
+                        tb_writer.add_scalar("ctrl/semantic_error", authority_controller.last_semantic_error, state.step)
+                    if hasattr(authority_controller, 'last_effective_Kd'):
+                        tb_writer.add_scalar("ctrl/effective_Kd", authority_controller.last_effective_Kd, state.step)
+                    if hasattr(authority_controller, 'last_ramp_frac'):
+                        tb_writer.add_scalar("ctrl/handshake_ramp", authority_controller.last_ramp_frac, state.step)
 
                 # PPL-Guard check (if enabled)
                 if config.trinity_enabled and ppl_guard is not None:
@@ -1144,12 +1381,6 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                         agc_threshold = new_agc
                         config.agc_threshold = new_agc
 
-                # Save lightweight checkpoint
-                eval_ckpt_path = checkpoint_dir / f"step_{state.step}.pt"
-                if not eval_ckpt_path.exists():
-                    save_checkpoint_light(model, state, config, str(eval_ckpt_path))
-                    cleanup_old_checkpoints(checkpoint_dir, keep_last=5)
-
                 # Save best model
                 if val_metrics['val_loss'] < state.best_val_loss:
                     state.best_val_loss = val_metrics['val_loss']
@@ -1159,6 +1390,10 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                         str(best_path)
                     )
                     logger.info(f"  📦 New best! Saved to {best_path}")
+
+                # Quality sampling - generate text to monitor training progress
+                if config.sample_every > 0 and state.step % config.sample_every == 0 and tokenizer is not None:
+                    run_quality_samples(model, tokenizer, config, device, state.step, logger)
 
             # =================================================================
             # V9.3 HANDSHAKE TRIGGER
@@ -1183,6 +1418,9 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                     str(ckpt_path)
                 )
                 logger.info(f"Checkpoint saved to {ckpt_path}")
+
+                # Cleanup old checkpoints (keep last 5)
+                cleanup_old_checkpoints(checkpoint_dir, keep_last=5)
 
     # =========================================================================
     # TRAINING COMPLETE
@@ -1261,9 +1499,11 @@ def main():
     parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
     parser.add_argument("--save_every", type=int, default=5000,
-                       help="Save checkpoint every N steps")
+                       help="Save full checkpoint every N steps (for crash recovery)")
     parser.add_argument("--log_every", type=int, default=10,
                        help="Log every N steps")
+    parser.add_argument("--sample_every", type=int, default=500,
+                       help="Generate quality samples every N steps (0 = disabled)")
 
     # Features
     parser.add_argument("--memory_guard", action="store_true",
@@ -1289,18 +1529,32 @@ def main():
                        help="DEPRECATED: Use --controller emergency_pd instead")
 
     # PIDv2 Controller settings (RECOMMENDED - follows control-systems theory)
-    parser.add_argument("--pidv2_kp", type=float, default=0.25,
-                       help="PIDv2 proportional gain on PPL velocity")
+    parser.add_argument("--pidv2_kp_min", type=float, default=0.10,
+                       help="PIDv2 minimum Kp (when noisy/volatile)")
+    parser.add_argument("--pidv2_kp_max", type=float, default=0.30,
+                       help="PIDv2 maximum Kp (when clean signal)")
+    parser.add_argument("--pidv2_kp_sensitivity", type=float, default=5.0,
+                       help="PIDv2 volatility sensitivity for dynamic Kp")
     parser.add_argument("--pidv2_ki", type=float, default=0.02,
                        help="PIDv2 integral gain on PPL velocity")
-    parser.add_argument("--pidv2_kd", type=float, default=0.15,
-                       help="PIDv2 derivative gain (velocity acceleration)")
+    parser.add_argument("--pidv2_kd", type=float, default=0.10,
+                       help="PIDv2 derivative gain (velocity acceleration, conservative=0.10)")
     parser.add_argument("--pidv2_a_min", type=float, default=0.30,
                        help="PIDv2 minimum authority factor")
     parser.add_argument("--pidv2_c_floor", type=float, default=0.68,
                        help="PIDv2 coherence floor for gate")
     parser.add_argument("--pidv2_c_good", type=float, default=0.76,
                        help="PIDv2 coherence threshold for full authority")
+
+    # V9.4.3: Semantic Validation + Handshake Dampening
+    parser.add_argument("--pidv2_w_s", type=float, default=0.30,
+                       help="Semantic weight: 0.30 = 30%% prompt-based, 70%% general PPL")
+    parser.add_argument("--pidv2_semantic_scale", type=float, default=50.0,
+                       help="Normalization scale for semantic PPL error")
+    parser.add_argument("--pidv2_handshake_dampen", action="store_true", default=True,
+                       help="Enable D-term dampening during handshake ramp")
+    parser.add_argument("--no_handshake_dampen", action="store_true",
+                       help="Disable D-term dampening during handshake")
 
     # Legacy PID Controller settings (mixes coherence into PID - not recommended)
     parser.add_argument("--pid_kp", type=float, default=0.20,
@@ -1322,7 +1576,57 @@ def main():
     parser.add_argument("--pd_target_coh", type=float, default=0.76,
                        help="Emergency PD target coherence")
 
+    # =========================================================================
+    # STRESS TEST (V9.4.4) - Trial by Fire for Governor Resilience
+    # =========================================================================
+    parser.add_argument("--stress_test", action="store_true",
+                       help="Run stress test instead of training")
+    parser.add_argument("--stress_start", type=int, default=1000,
+                       help="Step to start corruption injection (default: 1000)")
+    parser.add_argument("--stress_duration", type=int, default=200,
+                       help="Steps to inject corruption (default: 200)")
+    parser.add_argument("--stress_recovery", type=int, default=200,
+                       help="Steps to monitor recovery (default: 200)")
+    parser.add_argument("--corruption_rate", type=float, default=0.10,
+                       help="Probability of corrupting each batch (default: 0.10)")
+    parser.add_argument("--corruption_intensity", type=float, default=0.50,
+                       help="Fraction of tokens to corrupt (default: 0.50)")
+    parser.add_argument("--corruption_mode", type=str, default="noise",
+                       choices=["noise", "label_flip", "repeat"],
+                       help="Type of corruption: noise, label_flip, repeat")
+    parser.add_argument("--ungoverned_baseline", action="store_true",
+                       help="Run stress test without PID (baseline comparison)")
+
     args = parser.parse_args()
+
+    # =========================================================================
+    # STRESS TEST MODE - Redirect to stress_test.py
+    # =========================================================================
+    if args.stress_test:
+        print("=" * 70)
+        print("  SYMBOLU V9.4.4 - STRESS TEST MODE")
+        print("  Redirecting to stress_test.py...")
+        print("=" * 70)
+
+        # Build stress test command
+        import subprocess
+        stress_cmd = [
+            sys.executable, "stress_test.py",
+            "--resume", args.resume or "",
+            "--stress_start", str(args.stress_start),
+            "--stress_duration", str(args.stress_duration),
+            "--recovery_steps", str(args.stress_recovery),
+            "--corruption_rate", str(args.corruption_rate),
+            "--corruption_intensity", str(args.corruption_intensity),
+            "--corruption_mode", args.corruption_mode,
+            "--checkpoint_dir", args.checkpoint_dir + "_stress_test",
+        ]
+        if args.ungoverned_baseline:
+            stress_cmd.append("--ungoverned_baseline")
+
+        print(f"\nRunning: {' '.join(stress_cmd)}\n")
+        result = subprocess.run(stress_cmd)
+        sys.exit(result.returncode)
 
     # Build config from args
     config = TrainingConfig(
@@ -1344,6 +1648,7 @@ def main():
         eval_every=args.eval_every,
         save_every=args.save_every,
         log_every=args.log_every,
+        sample_every=args.sample_every,
         memory_guard_enabled=args.memory_guard,
         trinity_enabled=args.trinity,
         wandb=args.wandb,
@@ -1372,13 +1677,22 @@ def main():
         )
         controller_mode = "EMERGENCY PD"
     elif controller_type == "pidv2":
+        # Handle --no_handshake_dampen flag
+        handshake_dampen = not args.no_handshake_dampen
+
         pidv2_config = AuthorityPIDv2Config(
-            Kp=args.pidv2_kp,
+            Kp_min=args.pidv2_kp_min,
+            Kp_max=args.pidv2_kp_max,
+            Kp_sensitivity=args.pidv2_kp_sensitivity,
             Ki=args.pidv2_ki,
             Kd=args.pidv2_kd,
             A_min=args.pidv2_a_min,
             C_floor=args.pidv2_c_floor,
             C_good=args.pidv2_c_good,
+            # V9.4.3: Semantic Validation + Handshake Dampening
+            W_s=args.pidv2_w_s,
+            semantic_ppl_scale=args.pidv2_semantic_scale,
+            handshake_Kd_dampen=handshake_dampen,
         )
         controller_mode = "PIDv2"
     else:  # pid (legacy)
@@ -1396,8 +1710,8 @@ def main():
         print("  SYMBOLU V9.3.6 - EMERGENCY PD TRAINING")
         print("  Phase Attention Transformer with Emergency PD Controller")
     elif controller_type == "pidv2":
-        print("  SYMBOLU V9.4.0 - PIDv2 TRAINING (Control-Systems Design)")
-        print("  Phase Attention Transformer with PPL-Primary PID + Coherence Gate")
+        print("  SYMBOLU V9.4.3 - PIDv2 TRAINING (Semantic Validation + Handshake Dampening)")
+        print("  Phase Attention Transformer with Weighted Semantic PID + Coherence Gate")
     else:
         print("  SYMBOLU V9.3.5-PID TRAINING (LEGACY)")
         print("  Phase Attention Transformer with Authority PID Controller")
@@ -1415,11 +1729,13 @@ def main():
         print(f"  Target Coherence: {args.pd_target_coh}")
         print(f"  Authority floor: {args.pd_a_min}")
     elif controller_type == "pidv2":
-        print(f"  Controller: PIDv2 (PPL-Primary PID + Coherence Gate)")
-        print(f"  PID Gains: Kp={args.pidv2_kp}, Ki={args.pidv2_ki}, Kd={args.pidv2_kd} (on PPL velocity)")
+        print(f"  Controller: PIDv2 (Semantic Validation + Handshake Dampening)")
+        print(f"  Dynamic Kp: [{args.pidv2_kp_min}, {args.pidv2_kp_max}] (sensitivity={args.pidv2_kp_sensitivity})")
+        print(f"  Static Gains: Ki={args.pidv2_ki}, Kd={args.pidv2_kd}")
         print(f"  Coherence Gate: [{args.pidv2_c_floor}, {args.pidv2_c_good}]")
+        print(f"  Semantic Weight (W_s): {args.pidv2_w_s:.0%} ('Roman Knowledge' influence)")
+        print(f"  Handshake Kd Dampening: {'ON' if not args.no_handshake_dampen else 'OFF'}")
         print(f"  Authority floor: {args.pidv2_a_min}")
-        print("  Architecture: PPL velocity drives PID; Coherence only gates authority")
     else:
         print(f"  Controller: Full PID (legacy - mixes coherence into PID)")
         print(f"  PID Gains: Kp={args.pid_kp}, Ki={args.pid_ki}, Kd={args.pid_kd}")

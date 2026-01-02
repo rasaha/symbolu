@@ -2481,17 +2481,19 @@ def save_checkpoint_light(
 
 def cleanup_old_checkpoints(checkpoint_dir: Path, keep_last: int = 5):
     """
-    Remove old step_*.pt checkpoints, keeping only the last N.
+    Remove old step checkpoints, keeping only the last N.
 
     This prevents disk space exhaustion when saving at every eval interval.
+    Handles both patterns: step_*.pt and checkpoint_step_*.pt
     Always preserves: best.pt, latest.pt, final.pt
     """
     import re
 
-    # Find all step_*.pt files
+    # Find all step checkpoint files (both naming patterns)
     step_files = []
-    for f in checkpoint_dir.glob("step_*.pt"):
-        match = re.match(r"step_(\d+)\.pt", f.name)
+    for f in checkpoint_dir.glob("*step_*.pt"):
+        # Match both: step_1000.pt and checkpoint_step_1000.pt
+        match = re.search(r"step_(\d+)\.pt$", f.name)
         if match:
             step_num = int(match.group(1))
             step_files.append((step_num, f))
