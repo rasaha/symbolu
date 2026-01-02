@@ -15,13 +15,13 @@ from symbolu.sovereign.trainer import SovereignTrainer, SovereignTrainerConfig
 class SovereignTransformer(nn.Module):
     """Simple Sovereign Transformer for testing."""
 
-    def __init__(self, config):
+    def __init__(self, config, n_heads=16):
         super().__init__()
         self.embedding = SovereignEmbedding(config)
         self.transformer = nn.TransformerEncoder(
             nn.TransformerEncoderLayer(
                 d_model=config.d_model,
-                nhead=config.n_heads,
+                nhead=n_heads,
                 dim_feedforward=config.d_model * 4,
                 batch_first=True,
             ),
@@ -44,7 +44,6 @@ def main():
     embed_config = SovereignEmbeddingConfig(
         vocab_size=50257,
         d_model=1024,
-        n_heads=16,
     )
 
     # Create model
