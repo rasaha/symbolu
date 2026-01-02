@@ -9,6 +9,182 @@ A paradigm shift from token-centric to meaning-centric training, enabling theore
 
 ---
 
+## Architecture Evolution
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                         │
+│  GENERATION 1: Flat Bhava (Original)                                    │
+│  ════════════════════════════════════                                   │
+│  - 12 ontological layers treated equally                                │
+│  - Real-valued embeddings                                               │
+│  - 144D relationship matrix (12×12)                                     │
+│  - Vedic aspect patterns (Drishti)                                      │
+│  - Status: PRODUCTION                                                   │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  GENERATION 2: Hierarchical Complex Bhava (NEW)                         │
+│  ══════════════════════════════════════════════                         │
+│  - 3-tier hierarchy (Intent → Abstract → Concrete)                      │
+│  - Complex-valued embeddings: z = r × e^{iθ}                           │
+│  - Phase rotation for top-down context setting                          │
+│  - Higher layers ORIENT lower layers via phase                          │
+│  - Status: EXPERIMENTAL                                                 │
+│  - Location: symbolu/ontological/hierarchical_complex_bhava.py          │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## NEW: Hierarchical Complex Phase Rotation
+
+### The Core Insight (from Neuroscience)
+
+Consciousness isn't just about "turning parts of the brain on or off" (Gating) or "making them louder" (Weighting). It is about **SYNCHRONIZATION and PHASE-ALIGNMENT**.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                         │
+│   THREE APPROACHES TO STATE MODULATION                                  │
+│                                                                         │
+│   ┌─────────────────────────────────────────────────────────────────┐  │
+│   │ A. WEIGHTED (Additive)                                           │  │
+│   │    state = Σ wₖ × zₖ                                             │  │
+│   │    ⚠️ Signal DILUTES over long context                           │  │
+│   └─────────────────────────────────────────────────────────────────┘  │
+│                                                                         │
+│   ┌─────────────────────────────────────────────────────────────────┐  │
+│   │ B. GATING (Multiplicative)                                       │  │
+│   │    state = σ(higher) × lower                                     │  │
+│   │    ⚠️ Too BINARY for nuanced state deltas                        │  │
+│   └─────────────────────────────────────────────────────────────────┘  │
+│                                                                         │
+│   ┌─────────────────────────────────────────────────────────────────┐  │
+│   │ C. PHASE ROTATION (Orientation) ← THE WINNER                     │  │
+│   │    z_lower' = z_lower × e^{iθ_higher}                            │  │
+│   │    ✓ Matches Phase-Amplitude Coupling in EEG                     │  │
+│   │    ✓ Same weights, different context via rotation                │  │
+│   │    ✓ Scales to unlimited context (orient, not search)            │  │
+│   └─────────────────────────────────────────────────────────────────┘  │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Complex-Valued State Representation
+
+Each Bhava layer is now represented as a **complex number**:
+
+```
+z = r × e^{iθ}
+
+Where:
+  r = magnitude = INTENSITY/CERTAINTY of the state
+  θ = phase = QUALITY/MODE of being
+```
+
+**State transitions become complex multiplication:**
+```
+z_new = z_old × Δz
+      = (r₁e^{iθ₁}) × (r₂e^{iθ₂})
+      = r₁r₂ × e^{i(θ₁+θ₂)}
+
+This means:
+  - Phase ADDS → states compose naturally
+  - Magnitude MULTIPLIES → certainty propagates
+  - Unit circle (|z|=1) → pure states
+```
+
+### The 3-Tier Bhava Hierarchy
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                         │
+│  LEVEL 3: TRANSCENDENT/INTENT (Sets the Context)                        │
+│  ═════════════════════════════════════════════════                      │
+│  Layers 9-11: O10_UNIFYING, O11_INTEGRATION, O12_ABSOLVING              │
+│  Bhava: Karma (Action), Labha (Gains), Moksha (Liberation)              │
+│                                                                         │
+│  → Extracts dominant phase θ₃                                           │
+│  → This phase ROTATES Level 2                                           │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  LEVEL 2: ABSTRACT/RELATIONAL (Mediates)                                │
+│  ════════════════════════════════════════                               │
+│  Layers 5-8: O6_AGENCY, O7_REASONING, O8_PURPOSE, O9_WITNESSES          │
+│  Bhava: Ripu (Obstacles), Kalatra (Partnership),                        │
+│         Randhra (Transformation), Dharma (Wisdom)                       │
+│                                                                         │
+│  → Receives rotation from Level 3: z₂' = z₂ × e^{iθ₃}                  │
+│  → Extracts its own phase θ₂'                                           │
+│  → This phase ROTATES Level 1                                           │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  LEVEL 1: CONCRETE/SENSORY (Receives Context)                           │
+│  ═════════════════════════════════════════════                          │
+│  Layers 0-4: O1_POTENTIAL, O2_IDENTITY, O3_EXECUTION,                   │
+│              O4_STRUCTURE, O5_COGNITION                                 │
+│  Bhava: Tanu (Self), Dhana (Wealth), Sahaja (Effort),                   │
+│         Sukha (Happiness), Putra (Intelligence)                         │
+│                                                                         │
+│  → Receives rotation from Level 2': z₁' = z₁ × e^{iθ₂'}                │
+│  → Final state carries context from BOTH higher levels                  │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### The Magic: Context-Dependent Interpretation
+
+```
+EXAMPLE: Same sensory input, different meaning
+
+Input: "The door is open"
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  SCENARIO A: Intent = "Enter building"                                  │
+│  ─────────────────────────────────────                                  │
+│  Level 3 phase θ₃ = 0° (aligned with entry)                             │
+│  Level 1 ("door open") rotated by θ₃                                    │
+│  → Interpretation: OPPORTUNITY, proceed through                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│  SCENARIO B: Intent = "Secure building"                                 │
+│  ─────────────────────────────────────                                  │
+│  Level 3 phase θ₃ = 180° (security mode)                                │
+│  Level 1 ("door open") rotated by θ₃                                    │
+│  → Interpretation: PROBLEM, need to close/investigate                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+SAME z₁ (raw perception) + DIFFERENT θ₃ (intent) = DIFFERENT z₁' (meaning)
+
+This is how consciousness works: same signal, context-dependent meaning.
+```
+
+### Why This Wins for Long Context (131K+)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                         │
+│  WEIGHTED ATTENTION:                                                    │
+│  → Signal DILUTES over 131K context                                     │
+│  → "Everyone talking, nobody heard"                                     │
+│                                                                         │
+│  GATING ATTENTION:                                                      │
+│  → Must IGNORE 99% of context to focus                                  │
+│  → "Picking one voice, losing the room"                                 │
+│                                                                         │
+│  PHASE ROTATION:                                                        │
+│  → ORIENT into the right state, context resonates                       │
+│  → "Tuning to the right frequency, all information available"           │
+│  → 131K context always present, phase determines what's in sync         │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Three-Tier Model Hierarchy
 
 ```
@@ -280,3 +456,92 @@ Ontological:     tokens → phonemes → MEANING → MEANING → phonemes → to
 ```
 
 **Tokens are no longer the thing being learned. State change is the thing being learned.**
+
+---
+
+## Usage: Hierarchical Complex Bhava
+
+### Basic Usage
+
+```python
+from symbolu.ontological.hierarchical_complex_bhava import (
+    HierarchicalComplexBhava,
+    HierarchicalBhavaUnifyingLayer,
+)
+
+# Standalone hierarchical Bhava
+bhava = HierarchicalComplexBhava(embed_dim=64)
+
+# Forward pass with ontological probabilities
+ontological_probs = torch.softmax(torch.randn(B, 12), dim=-1)
+output = bhava(ontological_probs)
+
+# Outputs:
+# - bhava_complex: [B, 12, embed_dim, 2] hierarchically-oriented states
+# - relationship_matrix: [B, 12, 12] inter-layer relationships
+# - coherence: [B] overall phase coherence
+# - level_coherences: [B, 3] per-level coherence
+# - level_phases: [B, 3, embed_dim] dominant phase per level
+```
+
+### Drop-in Replacement for BhavaUnifyingLayer
+
+```python
+# In SymbolU12LLMWithBhava, replace:
+#   self.unifying_layer = BhavaUnifyingLayer(config)
+# With:
+#   self.unifying_layer = HierarchicalBhavaUnifyingLayer(config)
+
+# All existing code continues to work with enhanced hierarchical processing
+```
+
+### Accessing Level States
+
+```python
+output = bhava(ontological_probs)
+
+# Level 3 (Intent): Sets the global context
+level_3_state = output['level_3_state']  # [B, 3, embed_dim, 2]
+
+# Level 2 (Abstract): Rotated by Level 3
+level_2_state = output['level_2_state']  # [B, 4, embed_dim, 2]
+
+# Level 1 (Concrete): Rotated by Level 2 (carries both contexts)
+level_1_state = output['level_1_state']  # [B, 5, embed_dim, 2]
+
+# Phase coherence per level
+coh_1, coh_2, coh_3 = output['level_coherences'].unbind(dim=1)
+```
+
+### Train with Hierarchical Bhava
+
+```bash
+# Use train_unified_llm.py with ontological model
+python train_unified_llm.py \
+    --model_type ontological \
+    --model_size small \
+    --dataset wikitext103 \
+    --max_steps 10000 \
+    --checkpoint_dir checkpoints_hierarchical
+```
+
+---
+
+## File Structure (Updated)
+
+```
+symbolu/
+├── phase_transformer.py              # Phase Attention (O(n))
+├── ontological/
+│   ├── symbolu12_bhava.py            # Gen 1: Flat Bhava (PRODUCTION)
+│   ├── bhava_relationships.py        # Vedic relationship logic
+│   ├── hierarchical_complex_bhava.py # Gen 2: Hierarchical Complex (EXPERIMENTAL)
+│   └── types.py                      # Layer names, indices
+│
+├── train_unified_llm.py              # Supports all architectures
+├── train_7b.py                       # Pure Phase 7B (no Bhava)
+│
+└── docs/
+    ├── STATE_DELTA_COGNITION_THEORY.md
+    └── ONTOLOGICAL_STATE_DELTA_DESIGN.md (this file)
+```

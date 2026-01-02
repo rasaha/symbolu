@@ -1,0 +1,252 @@
+/*
+ * Video Processing Pipeline Kernel
+ *
+ * End-to-end kernel for 4K video processing with unlimited temporal context.
+ * Demonstrates full PA-VPU pipeline: PEU → PAU → TCU → OPU → SDU
+ *
+ * Compile: coherac -arch pavpu10 -O3 -o video_processing.cbin video_processing.ckl
+ */
+
+#include <cohera_kernel.h>
+
+// 4K video parameters
+#define FRAME_WIDTH 3840
+#define FRAME_HEIGHT 2160
+#define PATCH_SIZE 16
+#define PATCHES_X (FRAME_WIDTH / PATCH_SIZE)   // 240
+#define PATCHES_Y (FRAME_HEIGHT / PATCH_SIZE)  // 135
+#define NUM_PATCHES (PATCHES_X * PATCHES_Y)    // 32,400
+
+#define EMBED_DIM 768
+#define NUM_HEADS 12
+#define HEAD_DIM (EMBED_DIM / NUM_HEADS)  // 64
+
+
+/*
+ * Patch Embedding Kernel (PEU)
+ *
+ * Converts image patches to embeddings.
+ * Input: RGBA frame [H, W, 4]
+ * Output: Patch embeddings [N_patches, EMBED_DIM]
+ */
+__phase_kernel__ void patch_embed(
+    const uint8* __restrict__ frame,         // [H, W, 4] RGBA
+    float16* __restrict__ embeddings,        // [N, EMBED_DIM]
+    const float16* __restrict__ patch_proj,  // [patch_sz*patch_sz*3, EMBED_DIM]
+    const float16* __restrict__ pos_embed    // [N, EMBED_DIM]
+) {
+    int patch_idx = __block_idx() * __block_dim() + __thread_idx();
+    if (patch_idx >= NUM_PATCHES) return;
+
+    // Compute patch location
+    int px = patch_idx % PATCHES_X;
+    int py = patch_idx / PATCHES_X;
+    int x0 = px * PATCH_SIZE;
+    int y0 = py * PATCH_SIZE;
+
+    // Flatten patch pixels
+    float patch[PATCH_SIZE * PATCH_SIZE * 3];
+    int idx = 0;
+    for (int dy = 0; dy < PATCH_SIZE; dy++) {
+        for (int dx = 0; dx < PATCH_SIZE; dx++) {
+            int pixel_idx = ((y0 + dy) * FRAME_WIDTH + (x0 + dx)) * 4;
+            // Normalize RGB to [0, 1]
+            patch[idx++] = (float)frame[pixel_idx + 0] / 255.0f;  // R
+            patch[idx++] = (float)frame[pixel_idx + 1] / 255.0f;  // G
+            patch[idx++] = (float)frame[pixel_idx + 2] / 255.0f;  // B
+        }
+    }
+
+    // Project to embedding dimension
+    float16* out = embeddings + patch_idx * EMBED_DIM;
+    for (int d = 0; d < EMBED_DIM; d++) {
+        float sum = 0.0f;
+        for (int i = 0; i < PATCH_SIZE * PATCH_SIZE * 3; i++) {
+            sum += patch[i] * (float)patch_proj[i * EMBED_DIM + d];
+        }
+        // Add positional embedding
+        sum += (float)pos_embed[patch_idx * EMBED_DIM + d];
+        out[d] = (float16)sum;
+    }
+}
+
+
+/*
+ * Full Frame Processing Pipeline
+ *
+ * Processes one video frame through the complete PA-VPU pipeline:
+ * 1. Patch embedding (PEU)
+ * 2. 12-layer phase attention (PAU)
+ * 3. Temporal context update (TCU)
+ * 4. Ontology projection (OPU)
+ * 5. State delta computation (SDU)
+ */
+__phase_kernel__ void process_frame(
+    const uint8* __restrict__ frame,
+    float16* __restrict__ cognitive_state,    // [124] output
+    float16* __restrict__ state_delta,        // [124] output
+    float* __restrict__ coherence,            // Scalar output
+    int* __restrict__ vritti,                 // Vritti state output
+    // Weight buffers (pre-loaded in HBM)
+    const float16* __restrict__ patch_weights,
+    const float16* __restrict__ pos_embed,
+    const float16* __restrict__ attn_weights,  // All 12 layers
+    const float16* __restrict__ proj_weights
+) {
+    // Shared memory for intermediate results
+    __shared__ float16 embeddings[NUM_PATCHES * EMBED_DIM];
+    __shared__ float16 hidden[NUM_PATCHES * EMBED_DIM];
+    __shared__ float layer_coherence[12];
+
+    // =========================================================================
+    // Stage 1: Patch Embedding (PEU)
+    // =========================================================================
+    patch_embed(frame, embeddings, patch_weights, pos_embed);
+    __syncthreads();
+
+    // Copy embeddings to hidden for first layer
+    int tid = __block_idx() * __block_dim() + __thread_idx();
+    if (tid < NUM_PATCHES * EMBED_DIM) {
+        hidden[tid] = embeddings[tid];
+    }
+    __syncthreads();
+
+    // =========================================================================
+    // Stage 2: 12-Layer Phase Attention (PAU)
+    // =========================================================================
+    for (int layer = 0; layer < 12; layer++) {
+        // Get layer-specific weights
+        const float16* w_q = attn_weights + layer * 4 * EMBED_DIM * EMBED_DIM;
+        const float16* w_k = w_q + EMBED_DIM * EMBED_DIM;
+        const float16* w_v = w_k + EMBED_DIM * EMBED_DIM;
+        const float16* w_o = w_v + EMBED_DIM * EMBED_DIM;
+
+        // Run phase attention for this layer
+        __phase_attention_layer(
+            hidden,           // Input/output
+            w_q, w_k, w_v, w_o,
+            NUM_PATCHES,
+            EMBED_DIM,
+            NUM_HEADS,
+            layer,            // Ontology layer (affects frequency/threshold)
+            &layer_coherence[layer]
+        );
+
+        // Cross-layer synchronization
+        __sync_ontology(1 << layer);
+    }
+
+    // =========================================================================
+    // Stage 3: Temporal Context Update (TCU)
+    // =========================================================================
+    // Accumulate phase context for cross-frame memory
+    // This is what enables "unlimited" temporal context with O(1) memory
+
+    __shared__ float phase_context[NUM_HEADS * HEAD_DIM];
+
+    // Read previous context
+    for (int h = 0; h < NUM_HEADS; h++) {
+        __tcu_read(h, HEAD_DIM, &phase_context[h * HEAD_DIM]);
+    }
+
+    // Compute current frame's phase contribution
+    float current_phases[NUM_HEADS * HEAD_DIM];
+    __extract_phases(hidden, current_phases, NUM_PATCHES, NUM_HEADS, HEAD_DIM);
+
+    // Accumulate with exponential moving average
+    float decay = 0.99f;
+    for (int i = 0; i < NUM_HEADS * HEAD_DIM; i++) {
+        phase_context[i] = decay * phase_context[i] + (1.0f - decay) * current_phases[i];
+    }
+
+    // Write back to TCU
+    for (int h = 0; h < NUM_HEADS; h++) {
+        __tcu_write(h, HEAD_DIM, &phase_context[h * HEAD_DIM]);
+    }
+
+    // =========================================================================
+    // Stage 4: Ontology Projection (OPU)
+    // =========================================================================
+    // Pool hidden states (mean pooling over sequence)
+    __shared__ float16 pooled[EMBED_DIM];
+
+    if (tid < EMBED_DIM) {
+        float sum = 0.0f;
+        for (int i = 0; i < NUM_PATCHES; i++) {
+            sum += (float)hidden[i * EMBED_DIM + tid];
+        }
+        pooled[tid] = (float16)(sum / (float)NUM_PATCHES);
+    }
+    __syncthreads();
+
+    // Project to 124-dim cognitive state
+    __ontology_project(pooled, cognitive_state, proj_weights);
+
+    // =========================================================================
+    // Stage 5: State Delta Computation (SDU)
+    // =========================================================================
+    // Get previous state from SDU register
+    __shared__ float16 prev_state[124];
+    __sdu_read_prev(prev_state);
+
+    // Compute delta
+    if (tid < 124) {
+        state_delta[tid] = (float16)((float)cognitive_state[tid] - (float)prev_state[tid]);
+    }
+
+    // Store current as previous for next frame
+    __sdu_write_prev(cognitive_state);
+
+    // =========================================================================
+    // Output metrics
+    // =========================================================================
+    if (tid == 0) {
+        // Average coherence across layers
+        float avg_coh = 0.0f;
+        for (int l = 0; l < 12; l++) {
+            avg_coh += layer_coherence[l];
+        }
+        *coherence = avg_coh / 12.0f;
+
+        // Detect Vritti state
+        float dummy;
+        __detect_vritti(cognitive_state, vritti, &dummy);
+    }
+
+    // Signal frame completion
+    __frame_done();
+}
+
+
+/*
+ * Video Stream Processing Entry Point
+ *
+ * Continuously processes frames with TCU maintaining temporal context.
+ * Call this kernel repeatedly for each frame in the stream.
+ */
+__phase_kernel__ void video_stream_step(
+    const uint8* __restrict__ frame,
+    float16* __restrict__ cognitive_state,
+    float16* __restrict__ state_delta,
+    float* __restrict__ coherence,
+    int* __restrict__ vritti,
+    const void* __restrict__ weights  // All weights packed
+) {
+    // Unpack weights (simplified)
+    const float16* patch_w = (const float16*)weights;
+    const float16* pos_w = patch_w + PATCH_SIZE * PATCH_SIZE * 3 * EMBED_DIM;
+    const float16* attn_w = pos_w + NUM_PATCHES * EMBED_DIM;
+    const float16* proj_w = attn_w + 12 * 4 * EMBED_DIM * EMBED_DIM;
+
+    process_frame(
+        frame,
+        cognitive_state,
+        state_delta,
+        coherence,
+        vritti,
+        patch_w,
+        pos_w,
+        attn_w,
+        proj_w
+    );
+}

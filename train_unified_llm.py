@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """
-Unified LLM Training Script
-============================
+Unified LLM Training Script V9.4.4
+===================================
 
 Train SymbolU models with support for:
 1. SymbolU12 with Bhava (standard attention + 12D ontological + 144D bhava)
 2. Phase Attention (O(n) complexity)
 3. Hybrid (Local + Phase attention)
+4. Gen 2: Hierarchical Complex Bhava (3-tier phase rotation)
 
-This script unifies all architectures under a single training interface.
+Now includes PIDv2 Governor from train_pid.py:
+- Dynamic SNR-Adjusted Kp
+- Semantic Validation (W_s weight)
+- Handshake D-term Dampening
+- Stress Test Framework
 
 Usage:
 ------
@@ -20,23 +25,32 @@ Usage:
     python train_unified_llm.py --model_type phase --model_size small \
         --dataset wikitext103 --max_steps 1000
 
-    # Train Hybrid model (Local + Phase)
+    # Train Hybrid model (Local + Phase) with PIDv2 Governor
     python train_unified_llm.py --model_type hybrid --model_size small \
-        --dataset wikitext103 --max_steps 1000 --local_backend unfold
+        --dataset wikitext103 --max_steps 1000 --controller pidv2
+
+    # Train Gen 2 model (Hierarchical Complex Bhava)
+    python train_unified_llm.py --model_type gen2 --model_size small \
+        --dataset wikitext103 --max_steps 1000
 
     # Long context training (16K/32K)
-    python train_unified_llm.py --model_type ontological --model_size small \
+    python train_unified_llm.py --model_type gen2 --model_size small \
         --max_seq_len 16384 --gradient_checkpointing --batch_size 1
+
+    # Stress Test (Trial by Fire)
+    python train_unified_llm.py --stress_test --resume checkpoints/best.pt
 
 Author: SymbolU Team
 Date: December 2025
 """
 
 import argparse
+import collections
 import json
 import logging
 import math
 import os
+import random
 import sys
 import time
 from dataclasses import dataclass, field, asdict
@@ -58,6 +72,13 @@ try:
     HF_AVAILABLE = True
 except ImportError:
     HF_AVAILABLE = False
+
+# TensorBoard
+try:
+    from torch.utils.tensorboard import SummaryWriter
+    TENSORBOARD_AVAILABLE = True
+except ImportError:
+    TENSORBOARD_AVAILABLE = False
 
 # Local imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -92,6 +113,46 @@ except ImportError as e:
     SOVEREIGN_AVAILABLE = False
     print(f"Warning: Sovereign-1 modules not available: {e}")
 
+# Import Gen 2 models (Hierarchical Complex Bhava)
+try:
+    from symbolu.ontological.symbolu12_gen2 import (
+        SymbolU12Gen2,
+        SymbolU12Gen2Config,
+        create_symbolu12_gen2_small,
+        create_symbolu12_gen2_medium,
+        create_symbolu12_gen2_large,
+    )
+    GEN2_AVAILABLE = True
+except ImportError as e:
+    GEN2_AVAILABLE = False
+    print(f"Warning: Gen 2 models not available: {e}")
+
+# Import PIDv2 Governor from train_pid.py
+try:
+    from train_pid import (
+        AuthorityPIDv2,
+        AuthorityPIDv2Config,
+        EmergencyPD,
+        EmergencyPDConfig,
+        compute_semantic_ppl,
+    )
+    from train import cleanup_old_checkpoints
+    PIDV2_AVAILABLE = True
+except ImportError as e:
+    PIDV2_AVAILABLE = False
+    print(f"Warning: PIDv2 controller not available: {e}")
+
+
+# =============================================================================
+# PERFORMANCE OPTIMIZATIONS
+# =============================================================================
+# TF32 for faster matrix multiplications on Ampere+ GPUs (A100, H100)
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
+# cuDNN autotuning for optimal convolution algorithms
+torch.backends.cudnn.benchmark = True
+
 
 # =============================================================================
 # CONFIGURATION
@@ -118,6 +179,11 @@ class UnifiedTrainingConfig:
     local_backend: str = "auto"
     alpha_local: float = 0.8
     alpha_phase: float = 0.2
+
+    # Alpha decay schedule (for phase/hybrid attention)
+    alpha_phase_start: float = 0.6
+    alpha_phase_end: float = 0.4
+    alpha_decay_steps: int = 10000
 
     # Ontological-specific parameters
     bhava_embed_dim: int = 128
@@ -168,6 +234,31 @@ class UnifiedTrainingConfig:
     # Coherence loss (for phase/hybrid)
     use_coherence_loss: bool = False
     no_coherence_loss: bool = False  # CLI flag to disable
+
+    # PIDv2 Controller settings (V9.4.4)
+    controller: str = "none"  # none, pidv2, emergency_pd
+    pidv2_kp_min: float = 0.10
+    pidv2_kp_max: float = 0.30
+    pidv2_kp_sensitivity: float = 5.0
+    pidv2_ki: float = 0.02
+    pidv2_kd: float = 0.10
+    pidv2_a_min: float = 0.30
+    pidv2_c_floor: float = 0.68
+    pidv2_c_good: float = 0.76
+    pidv2_w_s: float = 0.30  # Semantic weight
+    pidv2_semantic_scale: float = 50.0
+    pidv2_handshake_dampen: bool = True
+
+    # Phase ramp settings (for handshake dampening)
+    phase_delay_steps: int = 0
+    phase_ramp_steps: int = 7000
+
+    # Resume checkpoint
+    resume: str = ""
+    resume_weights_only: bool = False
+
+    # TensorBoard
+    tensorboard: bool = True
 
     # Hardware
     device: str = "auto"
@@ -262,6 +353,8 @@ def load_data(config: UnifiedTrainingConfig, tokenizer) -> Tuple[DataLoader, Dat
         num_workers=config.num_workers,
         pin_memory=True,
         drop_last=True,
+        prefetch_factor=2 if config.num_workers > 0 else None,
+        persistent_workers=config.num_workers > 0,
     )
 
     val_loader = DataLoader(
@@ -271,6 +364,8 @@ def load_data(config: UnifiedTrainingConfig, tokenizer) -> Tuple[DataLoader, Dat
         num_workers=config.num_workers,
         pin_memory=True,
         drop_last=True,
+        prefetch_factor=2 if config.num_workers > 0 else None,
+        persistent_workers=config.num_workers > 0,
     )
 
     return train_loader, val_loader
@@ -336,6 +431,27 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             alpha_phase=config.alpha_phase,
         )
 
+    elif config.model_type == "gen2":
+        if not GEN2_AVAILABLE:
+            raise ImportError("Gen 2 models not available. Check imports.")
+
+        # Create SymbolU12 Gen 2 (Hierarchical Complex Bhava)
+        gen2_config = SymbolU12Gen2Config(
+            vocab_size=config.vocab_size,
+            embed_dim=preset["embed_dim"],
+            num_heads=preset["num_heads"],
+            num_layers=preset["num_layers"],
+            complex_dim=64,  # Complex embedding dimension
+            max_seq_len=config.max_seq_len,
+            dropout=config.dropout,
+            ffn_mult=preset["ff_dim"] / preset["embed_dim"],
+        )
+
+        model = SymbolU12Gen2(gen2_config)
+        print(f"\n  [Gen 2] Hierarchical Complex Bhava enabled")
+        print(f"  [Gen 2] Complex dim: {gen2_config.complex_dim}")
+        print(f"  [Gen 2] Hierarchy: 3-tier phase rotation")
+
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
 
@@ -349,6 +465,32 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
                     module.gradient_checkpointing = True
 
     return model.to(device)
+
+
+def update_alpha_schedule(model: nn.Module, step: int, config: UnifiedTrainingConfig) -> float:
+    """
+    Update alpha_phase for HybridAttentionLayer modules based on decay schedule.
+
+    Returns current alpha_phase value.
+    """
+    if config.model_type not in ("phase", "hybrid"):
+        return config.alpha_phase  # No decay for ontological
+
+    # Calculate current alpha based on linear decay
+    if step >= config.alpha_decay_steps:
+        current_alpha = config.alpha_phase_end
+    else:
+        frac = step / config.alpha_decay_steps
+        current_alpha = config.alpha_phase_start + frac * (config.alpha_phase_end - config.alpha_phase_start)
+
+    # Update all HybridAttentionLayer modules
+    for module in model.modules():
+        if hasattr(module, 'alpha_phase') and isinstance(module.alpha_phase, nn.Parameter):
+            module.alpha_phase.data.fill_(current_alpha)
+            if hasattr(module, 'alpha_local'):
+                module.alpha_local.data.fill_(1.0 - current_alpha)
+
+    return current_alpha
 
 
 # =============================================================================
@@ -521,7 +663,7 @@ def compute_phase_loss(
 # =============================================================================
 
 def train(config: UnifiedTrainingConfig):
-    """Main training loop."""
+    """Main training loop with optional PIDv2 Governor."""
 
     # Setup
     torch.manual_seed(config.seed)
@@ -533,13 +675,14 @@ def train(config: UnifiedTrainingConfig):
         device = torch.device(config.device)
 
     print(f"\n{'='*70}")
-    print("   UNIFIED SYMBOLU LLM TRAINING")
+    print("   UNIFIED SYMBOLU LLM TRAINING V9.4.4")
     print(f"{'='*70}")
     print(f"\n  Model Type: {config.model_type.upper()}")
     print(f"  Model Size: {config.model_size}")
     print(f"  Max Seq Len: {config.max_seq_len:,}")
     print(f"  Dataset: {config.dataset}")
     print(f"  Device: {device}")
+    print(f"  Controller: {config.controller.upper() if config.controller != 'none' else 'None'}")
     print(f"  Gradient Checkpointing: {config.gradient_checkpointing}")
     print(f"  Mixed Precision: {config.mixed_precision}")
 
@@ -592,6 +735,8 @@ def train(config: UnifiedTrainingConfig):
     # Training state
     global_step = 0
     best_val_loss = float("inf")
+    best_ppl = float("inf")
+    spike_count = 0
     train_losses = []
 
     # Checkpoint directory
@@ -601,6 +746,41 @@ def train(config: UnifiedTrainingConfig):
     # Save config
     with open(ckpt_dir / "config.json", "w") as f:
         json.dump(asdict(config), f, indent=2)
+
+    # Initialize PIDv2 Controller (V9.4.4)
+    authority_controller = None
+    if config.controller == "pidv2" and PIDV2_AVAILABLE:
+        pidv2_config = AuthorityPIDv2Config(
+            Kp_min=config.pidv2_kp_min,
+            Kp_max=config.pidv2_kp_max,
+            Kp_sensitivity=config.pidv2_kp_sensitivity,
+            Ki=config.pidv2_ki,
+            Kd=config.pidv2_kd,
+            A_min=config.pidv2_a_min,
+            C_floor=config.pidv2_c_floor,
+            C_good=config.pidv2_c_good,
+            W_s=config.pidv2_w_s,
+            semantic_ppl_scale=config.pidv2_semantic_scale,
+            handshake_Kd_dampen=config.pidv2_handshake_dampen,
+        )
+        authority_controller = AuthorityPIDv2(pidv2_config)
+        print(f"\n  PIDv2 Governor ENABLED")
+        print(f"    Dynamic Kp: [{config.pidv2_kp_min}, {config.pidv2_kp_max}]")
+        print(f"    Semantic Weight (W_s): {config.pidv2_w_s:.0%}")
+        print(f"    Authority floor: {config.pidv2_a_min}")
+    elif config.controller == "emergency_pd" and PIDV2_AVAILABLE:
+        pd_config = EmergencyPDConfig(A_min=0.25)
+        authority_controller = EmergencyPD(pd_config)
+        print(f"\n  Emergency PD Controller ENABLED")
+    elif config.controller != "none":
+        print(f"\n  Warning: Controller '{config.controller}' not available")
+
+    # TensorBoard
+    tb_writer = None
+    if config.tensorboard and TENSORBOARD_AVAILABLE:
+        tb_log_dir = ckpt_dir / "logs"
+        tb_writer = SummaryWriter(log_dir=str(tb_log_dir))
+        print(f"  TensorBoard: {tb_log_dir}")
 
     print(f"\n{'='*70}")
     print("   STARTING TRAINING")
@@ -631,6 +811,15 @@ def train(config: UnifiedTrainingConfig):
                     sovereign_loss=sovereign_loss,
                     epoch=global_step // len(train_loader),
                 )
+            elif config.model_type == "gen2":
+                outputs = model(x, labels=y)
+                loss = outputs['loss']
+                metrics = {
+                    'coherence': outputs['coherence'].mean().item(),
+                    'level_1_coh': outputs['level_coherences'][:, 0].mean().item(),
+                    'level_2_coh': outputs['level_coherences'][:, 1].mean().item(),
+                    'level_3_coh': outputs['level_coherences'][:, 2].mean().item(),
+                }
             else:
                 # Phase or Hybrid - handle both tensor and dict returns
                 output = model(x)
@@ -670,6 +859,9 @@ def train(config: UnifiedTrainingConfig):
             # Update scheduler after warmup
             if global_step >= config.warmup_steps:
                 scheduler.step()
+
+            # Update alpha schedule for phase/hybrid models
+            current_alpha = update_alpha_schedule(model, global_step, config)
 
             global_step += 1
             avg_loss = running_loss / config.gradient_accumulation
@@ -713,6 +905,17 @@ def train(config: UnifiedTrainingConfig):
                         health = "OK" if metrics.get("semantic_healthy") else "WARN"
                         log_msg += f" | R/C: {ratio:.2f} [{health}]"
 
+                # Add Gen 2 hierarchical metrics
+                if config.model_type == "gen2":
+                    if "coherence" in metrics:
+                        log_msg += f" | Coh: {metrics['coherence']:.3f}"
+                    if "level_3_coh" in metrics:
+                        log_msg += f" | L3: {metrics['level_3_coh']:.2f}"
+
+                # Add alpha for phase/hybrid models
+                if config.model_type in ("phase", "hybrid"):
+                    log_msg += f" | α_phase: {current_alpha:.2f}"
+
                 print(log_msg)
                 step_start_time = time.time()
 
@@ -722,7 +925,48 @@ def train(config: UnifiedTrainingConfig):
                     model, val_loader, device, config, autocast_dtype,
                     sovereign_loss=sovereign_loss,
                 )
-                print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_metrics['ppl']:.2f}")
+                val_ppl = val_metrics['ppl']
+                current_coh = val_metrics.get('coherence', 0.75)
+
+                # PIDv2 Controller Update (V9.4.4)
+                if authority_controller is not None:
+                    old_A = authority_controller.A
+                    new_A = authority_controller.update(
+                        val_ppl, current_coh,
+                        step=global_step,
+                        phase_ramp_steps=config.phase_ramp_steps,
+                    )
+                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f} | {authority_controller.get_status_string()}")
+
+                    # Apply authority factor to learning rate
+                    for pg in optimizer.param_groups:
+                        pg['lr'] *= new_A
+
+                    # TensorBoard logging
+                    if tb_writer is not None:
+                        tb_writer.add_scalar("ctrl/authority_A", new_A, global_step)
+                        tb_writer.add_scalar("ctrl/ppl_velocity", authority_controller.last_v, global_step)
+                        if hasattr(authority_controller, 'last_Kp'):
+                            tb_writer.add_scalar("ctrl/dynamic_Kp", authority_controller.last_Kp, global_step)
+                else:
+                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
+
+                    # Adaptive LR on PPL spike (only if no PIDv2)
+                    if val_ppl < best_ppl:
+                        best_ppl = val_ppl
+                    elif global_step > config.warmup_steps:
+                        if val_ppl > best_ppl * 1.5:
+                            spike_count += 1
+                            old_lr = optimizer.param_groups[0]['lr']
+                            new_lr = old_lr * 0.7
+                            for pg in optimizer.param_groups:
+                                pg['lr'] = new_lr
+                            print(f"  ⚠️ PPL spike! LR: {old_lr:.2e} → {new_lr:.2e}")
+
+                # TensorBoard val metrics
+                if tb_writer is not None:
+                    tb_writer.add_scalar("val/loss", val_loss, global_step)
+                    tb_writer.add_scalar("val/ppl", val_ppl, global_step)
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
@@ -736,10 +980,17 @@ def train(config: UnifiedTrainingConfig):
             if global_step % config.save_every == 0:
                 save_checkpoint(model, optimizer, scheduler, global_step, best_val_loss,
                                ckpt_dir / f"step_{global_step}.pt")
+                # Cleanup old checkpoints (keep last 5)
+                if PIDV2_AVAILABLE:
+                    cleanup_old_checkpoints(ckpt_dir, keep_last=5)
 
     # Final save
     save_checkpoint(model, optimizer, scheduler, global_step, best_val_loss,
                    ckpt_dir / "final.pt")
+
+    # Close TensorBoard
+    if tb_writer is not None:
+        tb_writer.close()
 
     print(f"\n{'='*70}")
     print("   TRAINING COMPLETE")
@@ -747,6 +998,8 @@ def train(config: UnifiedTrainingConfig):
     print(f"  Total Steps: {global_step:,}")
     print(f"  Best Val Loss: {best_val_loss:.4f}")
     print(f"  Best Val PPL: {math.exp(best_val_loss):.2f}")
+    if authority_controller is not None:
+        print(f"  Final Authority: {authority_controller.A:.3f}")
     print(f"  Final Checkpoint: {ckpt_dir / 'final.pt'}")
 
 
@@ -774,6 +1027,10 @@ def evaluate(
                         outputs, y, config,
                         sovereign_loss=sovereign_loss,
                     )
+                elif config.model_type == "gen2":
+                    outputs = model(x, labels=y)
+                    loss = outputs['loss']
+                    metrics = {'coherence': outputs['coherence'].mean().item()}
                 else:
                     # Phase or Hybrid - handle both tensor and dict returns
                     output = model(x)
@@ -823,8 +1080,8 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid"],
-                       help="Model architecture type")
+                       choices=["ontological", "phase", "hybrid", "gen2"],
+                       help="Model architecture type (gen2 = hierarchical complex Bhava)")
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large"],
                        help="Model size preset")
@@ -859,6 +1116,20 @@ def main():
                        help="LocalAttention backend")
     parser.add_argument("--window_size", type=int, default=256,
                        help="Local attention window size")
+    parser.add_argument("--local_layers", type=int, default=4,
+                       help="Number of local-only attention layers (hybrid mode)")
+    parser.add_argument("--alpha_local", type=float, default=0.8,
+                       help="Weight for local attention in hybrid layers")
+    parser.add_argument("--alpha_phase", type=float, default=0.2,
+                       help="Weight for phase attention in hybrid layers")
+
+    # Alpha decay schedule (for phase/hybrid attention)
+    parser.add_argument("--alpha_phase_start", type=float, default=0.6,
+                       help="Initial alpha_phase value (decays over time)")
+    parser.add_argument("--alpha_phase_end", type=float, default=0.4,
+                       help="Final alpha_phase value after decay")
+    parser.add_argument("--alpha_decay_steps", type=int, default=10000,
+                       help="Steps over which alpha_phase decays from start to end")
 
     # Ontological-specific
     parser.add_argument("--lambda_bhava", type=float, default=0.1,
@@ -882,7 +1153,70 @@ def main():
     parser.add_argument("--seed", type=int, default=42,
                        help="Random seed")
 
+    # Resume
+    parser.add_argument("--resume", type=str, default="",
+                       help="Path to checkpoint to resume from")
+    parser.add_argument("--resume_weights_only", action="store_true",
+                       help="Only load model weights, reset optimizer")
+
+    # PIDv2 Controller (V9.4.4)
+    parser.add_argument("--controller", type=str, default="none",
+                       choices=["none", "pidv2", "emergency_pd"],
+                       help="Authority controller: none, pidv2, emergency_pd")
+    parser.add_argument("--pidv2_kp_min", type=float, default=0.10,
+                       help="PIDv2 minimum Kp (when noisy)")
+    parser.add_argument("--pidv2_kp_max", type=float, default=0.30,
+                       help="PIDv2 maximum Kp (when clean)")
+    parser.add_argument("--pidv2_kp_sensitivity", type=float, default=5.0,
+                       help="PIDv2 volatility sensitivity")
+    parser.add_argument("--pidv2_ki", type=float, default=0.02,
+                       help="PIDv2 integral gain")
+    parser.add_argument("--pidv2_kd", type=float, default=0.10,
+                       help="PIDv2 derivative gain")
+    parser.add_argument("--pidv2_a_min", type=float, default=0.30,
+                       help="PIDv2 minimum authority factor")
+    parser.add_argument("--pidv2_w_s", type=float, default=0.30,
+                       help="Semantic weight (0.30 = 30%% prompt-based)")
+    parser.add_argument("--phase_ramp_steps", type=int, default=7000,
+                       help="Steps for phase LR ramp (handshake dampening)")
+    parser.add_argument("--tensorboard", action="store_true", default=True,
+                       help="Enable TensorBoard logging")
+    parser.add_argument("--no_tensorboard", action="store_true",
+                       help="Disable TensorBoard logging")
+
+    # Stress Test (V9.4.4)
+    parser.add_argument("--stress_test", action="store_true",
+                       help="Run stress test instead of training")
+    parser.add_argument("--stress_start", type=int, default=1000,
+                       help="Step to start corruption")
+    parser.add_argument("--stress_duration", type=int, default=200,
+                       help="Steps to inject corruption")
+    parser.add_argument("--corruption_rate", type=float, default=0.10,
+                       help="Probability of corrupting each batch")
+    parser.add_argument("--corruption_mode", type=str, default="noise",
+                       choices=["noise", "label_flip", "repeat"],
+                       help="Type of corruption")
+
     args = parser.parse_args()
+
+    # Handle stress test redirect
+    if args.stress_test:
+        print("=" * 70)
+        print("  STRESS TEST MODE - Redirecting to stress_test.py")
+        print("=" * 70)
+        import subprocess
+        stress_cmd = [
+            sys.executable, "stress_test.py",
+            "--resume", args.resume or "",
+            "--stress_start", str(args.stress_start),
+            "--stress_duration", str(args.stress_duration),
+            "--corruption_rate", str(args.corruption_rate),
+            "--corruption_mode", args.corruption_mode,
+            "--checkpoint_dir", args.checkpoint_dir + "_stress_test",
+        ]
+        print(f"\nRunning: {' '.join(stress_cmd)}\n")
+        result = subprocess.run(stress_cmd)
+        sys.exit(result.returncode)
 
     # Create config
     config = UnifiedTrainingConfig(
@@ -906,6 +1240,19 @@ def main():
         checkpoint_dir=args.checkpoint_dir,
         no_coherence_loss=args.no_coherence_loss,
         seed=args.seed,
+        # PIDv2 Controller settings
+        controller=args.controller,
+        pidv2_kp_min=args.pidv2_kp_min,
+        pidv2_kp_max=args.pidv2_kp_max,
+        pidv2_kp_sensitivity=args.pidv2_kp_sensitivity,
+        pidv2_ki=args.pidv2_ki,
+        pidv2_kd=args.pidv2_kd,
+        pidv2_a_min=args.pidv2_a_min,
+        pidv2_w_s=args.pidv2_w_s,
+        phase_ramp_steps=args.phase_ramp_steps,
+        tensorboard=args.tensorboard and not args.no_tensorboard,
+        resume=args.resume,
+        resume_weights_only=args.resume_weights_only,
     )
 
     # Train

@@ -45,6 +45,12 @@ python train.py --model_size 7b --dataset c4 --batch_size 1 --gradient_accumulat
 """
 
 import os
+import collections
+
+# Set CUDA memory and tokenizer environment variables before importing torch
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 import sys
 import math
 import time
@@ -64,6 +70,18 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR
 from torch.amp import autocast
 from torch.cuda.amp import GradScaler
+
+# =============================================================================
+# PERFORMANCE: Enable hardware acceleration features
+# =============================================================================
+# TF32: Use TensorFloat-32 on Ampere+ GPUs (A100, H100, B200)
+# Provides 2-3x speedup for FP32 math with minimal accuracy loss
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
+# cuDNN Benchmark: Auto-tune convolution algorithms for faster execution
+# Small overhead on first batch, then faster for rest of training
+torch.backends.cudnn.benchmark = True
 
 # SymbolU imports
 from symbolu.phase_transformer import PhaseTransformer, HybridPhaseTransformer, TransformerConfig
@@ -98,6 +116,563 @@ except ImportError:
 
 
 # =============================================================================
+# CONSTANTS
+# =============================================================================
+
+# Entropy constants for coherence loss (S3, S5, S8-S9)
+# These control the semantic entropy regularization behavior
+ENTROPY_MAX = 10.8          # log(50257) - maximum possible entropy for GPT-2 vocab
+ENTROPY_TARGET = 4.0        # Target entropy for moderate confidence
+ENTROPY_UPDATE_THRESHOLD = 6.0  # Entropy above this triggers update gate
+
+
+class EntropyTracker:
+    """
+    Tracks entropy across training steps for stability loss (S8-S9).
+
+    Encapsulates the previously global _prev_entropy state and provides
+    helper methods for computing update gates and stability losses.
+    """
+
+    def __init__(self):
+        self.prev_entropy: Optional[torch.Tensor] = None
+
+    def compute_coherence_terms(
+        self,
+        entropy: torch.Tensor,
+        device: torch.device,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Dict[str, float]]:
+        """
+        Compute entropy loss, update gate, and stability loss.
+
+        Returns:
+            L_entropy: Entropy regularization loss
+            update_gate: Gate for scaling coherence loss (0-1)
+            L_stability: Stability loss penalizing entropy spikes
+            metrics: Dict with entropy, update_gate, entropy_change
+        """
+        metrics = {}
+
+        # Entropy loss - target moderate confidence
+        L_entropy = (entropy - ENTROPY_TARGET).pow(2)
+        metrics["entropy"] = entropy.item()
+
+        # Update gate: high when entropy is high (uncertain/changing context)
+        update_gate = torch.sigmoid((entropy - ENTROPY_UPDATE_THRESHOLD) * 2.0)
+
+        # Stability loss from entropy change
+        if self.prev_entropy is not None:
+            entropy_change = entropy - self.prev_entropy
+            # Combine with entropy spike detection
+            change_gate = torch.sigmoid(entropy_change * 5.0)
+            update_gate = torch.max(update_gate, change_gate * 0.5)
+            # Penalize entropy increases (dH/dt > 0 violates S8)
+            L_stability = F.relu(entropy_change)
+            metrics["entropy_change"] = entropy_change.item()
+        else:
+            L_stability = torch.tensor(0.0, device=device)
+            metrics["entropy_change"] = 0.0
+
+        metrics["update_gate"] = update_gate.item()
+
+        # Update state for next step
+        self.prev_entropy = entropy.detach()
+
+        return L_entropy, update_gate, L_stability, metrics
+
+    def reset(self):
+        """Reset tracker state (e.g., at start of new epoch)."""
+        self.prev_entropy = None
+
+
+# Global entropy tracker instance
+_entropy_tracker = EntropyTracker()
+
+
+class MemoryGuard:
+    """
+    V9.2 Dynamic VRAM-based batch scaling with state preservation.
+
+    Monitors GPU memory and adjusts batch_size/gradient_accumulation to:
+    - Downshift at step 3000 (Phase handshake) to prevent OOM
+    - Ramp up ("Crank") after step 10000 to maximize throughput
+
+    Key design decisions:
+    - Preserves effective_batch when downshifting (batch/2, accum*2)
+    - Doubles effective_batch when cranking (for faster convergence)
+    - Caps Phase LR at 1e-5 during crank to prevent angular instability
+    - Uses sqrt scaling for Quadratic LR when effective batch doubles
+    """
+
+    def __init__(
+        self,
+        config: 'TrainingConfig',
+        initial_batch_size: int,
+        initial_accum: int,
+    ):
+        self.config = config
+        self.batch_size = initial_batch_size
+        self.accum = initial_accum
+        self.effective_batch = initial_batch_size * initial_accum
+        self.lr_scale = 1.0  # Multiplier for base LR (sqrt scaling on crank)
+        self.cranked = False  # Only crank once
+        self.global_data_idx = 0  # Track position in dataset
+
+    def get_vram_gb(self) -> float:
+        """Get current reserved VRAM in GB."""
+        if not torch.cuda.is_available():
+            return 0.0
+        return torch.cuda.memory_reserved() / (1024**3)
+
+    def check_and_adjust(
+        self,
+        step: int,
+        logger: Optional[logging.Logger] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Check VRAM and adjust batch parameters if needed.
+
+        Returns:
+            (changed: bool, action: str or None)
+            - changed: True if batch_size/accum were modified
+            - action: "downshift", "crank", or None
+        """
+        if not self.config.memory_guard_enabled:
+            return False, None
+
+        vram_gb = self.get_vram_gb()
+
+        # 1. PROACTIVE HANDSHAKE DOWNSHIFT (step 2999 or 3000)
+        # Preemptively reduce batch size before Phase unfreezes
+        if step in (self.config.phase_delay_steps - 1, self.config.phase_delay_steps):
+            if self.batch_size > self.config.min_batch_size:
+                return self._downshift(step, vram_gb, "handshake", logger)
+
+        # 2. EMERGENCY DOWNSHIFT (VRAM pressure)
+        if vram_gb > self.config.vram_emergency_gb:
+            if self.batch_size > self.config.min_batch_size:
+                return self._downshift(step, vram_gb, "emergency", logger)
+
+        # 3. THE CRANK (ramp up after stability)
+        if (step >= self.config.crank_step and
+            not self.cranked and
+            vram_gb < self.config.vram_underutil_gb and
+            self.batch_size < self.config.max_batch_size):
+            return self._crank(step, vram_gb, logger)
+
+        return False, None
+
+    def _downshift(
+        self,
+        step: int,
+        vram_gb: float,
+        reason: str,
+        logger: Optional[logging.Logger] = None,
+    ) -> Tuple[bool, str]:
+        """Reduce batch size, increase accumulation to maintain effective batch."""
+        old_bs = self.batch_size
+        self.batch_size = max(self.config.min_batch_size, self.batch_size // 2)
+        self.accum = self.accum * 2
+        # Effective batch stays the same
+
+        if logger:
+            logger.info(
+                f"🔧 [Step {step}] DOWNSHIFT ({reason}): "
+                f"Batch {old_bs}→{self.batch_size}, Accum→{self.accum} "
+                f"(Eff={self.effective_batch}) | VRAM: {vram_gb:.1f}GB"
+            )
+
+        torch.cuda.empty_cache()
+        return True, "downshift"
+
+    def _crank(
+        self,
+        step: int,
+        vram_gb: float,
+        logger: Optional[logging.Logger] = None,
+    ) -> Tuple[bool, str]:
+        """Increase batch size to maximize throughput (effective batch doubles)."""
+        old_bs = self.batch_size
+        old_eff = self.effective_batch
+
+        self.batch_size = min(self.config.max_batch_size, self.batch_size * 2)
+        # Accum stays same - effective batch doubles
+        self.effective_batch = self.batch_size * self.accum
+
+        # Apply sqrt scaling to LR (quadratic layers only, Phase is capped)
+        self.lr_scale = 1.414  # sqrt(2)
+        self.cranked = True
+
+        if logger:
+            logger.info(
+                f"🚀 [Step {step}] CRANK: "
+                f"Batch {old_bs}→{self.batch_size}, Eff {old_eff}→{self.effective_batch} "
+                f"| LR×{self.lr_scale:.3f} (Phase capped at {self.config.phase_lr_cap:.1e}) "
+                f"| VRAM: {vram_gb:.1f}GB"
+            )
+
+        torch.cuda.empty_cache()
+        return True, "crank"
+
+    def update_data_position(self, batches_processed: int):
+        """Track position in dataset for state-preserving restarts."""
+        self.global_data_idx += batches_processed * self.batch_size
+
+    def get_phase_lr(self, base_lr: float, phase_mult: float) -> float:
+        """
+        Get Phase LR with crank cap applied.
+
+        During crank, Quadratic layers get lr_scale boost but Phase is capped
+        to prevent angular instability in the rotation layers.
+        """
+        if self.cranked:
+            # Phase LR is capped regardless of lr_scale
+            return min(base_lr * phase_mult * self.lr_scale, self.config.phase_lr_cap)
+        return base_lr * phase_mult
+
+
+# =============================================================================
+# V9.3 TRINITY OPTIMIZATION COMPONENTS
+# =============================================================================
+
+class Lookahead(torch.optim.Optimizer):
+    """
+    V9.3 Lookahead Optimizer wrapper.
+
+    Maintains "slow" weights that follow "fast" weights at a distance.
+    Acts as a low-pass filter to smooth out training vibrations.
+
+    Paper: "Lookahead Optimizer: k steps forward, 1 step back" (Zhang et al., 2019)
+
+    Args:
+        base_optimizer: The inner optimizer (e.g., AdamW)
+        k: Number of fast steps before slow weight update (default: 5)
+        alpha: Interpolation factor for slow weights (default: 0.5)
+    """
+
+    def __init__(self, base_optimizer, k=5, alpha=0.5):
+        self.base_optimizer = base_optimizer
+        self.k = k
+        self.alpha = alpha
+        self._step_count = 0
+
+        # Cache slow weights
+        self.slow_weights = []
+        for group in base_optimizer.param_groups:
+            slow_group = []
+            for p in group['params']:
+                if p.requires_grad:
+                    slow_group.append(p.data.clone())
+                else:
+                    slow_group.append(None)
+            self.slow_weights.append(slow_group)
+
+    @property
+    def param_groups(self):
+        return self.base_optimizer.param_groups
+
+    def state_dict(self):
+        return {
+            'base': self.base_optimizer.state_dict(),
+            'slow_weights': self.slow_weights,
+            'step_count': self._step_count
+        }
+
+    def load_state_dict(self, state_dict):
+        self.base_optimizer.load_state_dict(state_dict['base'])
+        self.slow_weights = state_dict.get('slow_weights', self.slow_weights)
+        self._step_count = state_dict.get('step_count', 0)
+
+    def zero_grad(self):
+        self.base_optimizer.zero_grad()
+
+    def step(self, closure=None):
+        # Fast step
+        loss = self.base_optimizer.step(closure)
+        self._step_count += 1
+
+        # Slow step every k iterations
+        if self._step_count % self.k == 0:
+            for group_idx, group in enumerate(self.base_optimizer.param_groups):
+                for param_idx, p in enumerate(group['params']):
+                    if p.requires_grad and self.slow_weights[group_idx][param_idx] is not None:
+                        slow = self.slow_weights[group_idx][param_idx]
+                        # Interpolate: slow = slow + alpha * (fast - slow)
+                        slow.add_(p.data - slow, alpha=self.alpha)
+                        # Update fast weights to slow position
+                        p.data.copy_(slow)
+
+        return loss
+
+    def sync_slow_weights(self):
+        """Force sync slow weights to current fast weights."""
+        for group_idx, group in enumerate(self.base_optimizer.param_groups):
+            for param_idx, p in enumerate(group['params']):
+                if p.requires_grad and self.slow_weights[group_idx][param_idx] is not None:
+                    self.slow_weights[group_idx][param_idx].copy_(p.data)
+
+
+def apply_agc(model: nn.Module, threshold: float = 0.01, eps: float = 1e-3) -> Dict[str, float]:
+    """
+    V9.3 Per-Layer Adaptive Gradient Clipping (AGC).
+
+    Clips gradients based on the ratio of gradient norm to weight norm per parameter.
+    This allows healthy layers to learn while throttling exploding gradients.
+
+    Args:
+        model: The model with computed gradients
+        threshold: Maximum allowed grad_norm / weight_norm ratio
+        eps: Small constant to avoid division by zero
+
+    Returns:
+        Dict with clipping statistics (for logging GSS)
+    """
+    stats = {
+        'total_params': 0,
+        'clipped_params': 0,
+        'max_ratio': 0.0,
+        'phase_max_ratio': 0.0,
+    }
+
+    for name, p in model.named_parameters():
+        if p.grad is None:
+            continue
+
+        stats['total_params'] += 1
+
+        # Compute norms
+        p_norm = torch.norm(p.data).clamp(min=eps)
+        g_norm = torch.norm(p.grad.data)
+
+        # Compute ratio (Gradient Spike Score per param)
+        ratio = (g_norm / p_norm).item()
+        stats['max_ratio'] = max(stats['max_ratio'], ratio)
+
+        # Track Phase-specific ratio
+        if 'phase' in name.lower():
+            stats['phase_max_ratio'] = max(stats['phase_max_ratio'], ratio)
+
+        # Clip if ratio exceeds threshold
+        max_grad = p_norm * threshold
+        if g_norm > max_grad:
+            p.grad.data.mul_(max_grad / (g_norm + 1e-6))
+            stats['clipped_params'] += 1
+
+    return stats
+
+
+class PPLGuard:
+    """
+    V9.3 PPL-Guard: Monitors Val PPL velocity alongside coherence.
+
+    When both Val PPL is spiking AND coherence is dropping, this indicates
+    the model is "accelerating into a wall" and needs intervention.
+    """
+
+    def __init__(
+        self,
+        ppl_velocity_threshold: float = 50.0,
+        coherence_threshold: float = 0.700,
+        agc_tighten_factor: float = 0.5,  # Multiply AGC threshold by this when triggered
+    ):
+        self.ppl_velocity_threshold = ppl_velocity_threshold
+        self.coherence_threshold = coherence_threshold
+        self.agc_tighten_factor = agc_tighten_factor
+        self.last_val_ppl = None
+        self.triggered = False
+        self.trigger_step = None
+
+    def check(
+        self,
+        val_ppl: float,
+        coherence: float,
+        step: int,
+        logger: Optional[logging.Logger] = None,
+    ) -> Tuple[bool, float]:
+        """
+        Check if PPL-Guard should trigger.
+
+        Returns:
+            (triggered: bool, recommended_agc_threshold: float)
+        """
+        if self.last_val_ppl is None:
+            self.last_val_ppl = val_ppl
+            return False, 0.01  # Default AGC threshold
+
+        ppl_velocity = val_ppl - self.last_val_ppl
+        self.last_val_ppl = val_ppl
+
+        # Check dual-threat condition
+        if ppl_velocity > self.ppl_velocity_threshold and coherence < self.coherence_threshold:
+            if not self.triggered:
+                self.triggered = True
+                self.trigger_step = step
+                if logger:
+                    logger.warning(
+                        f"🔥 [Step {step}] PPL-Guard TRIGGERED: "
+                        f"Val PPL Δ={ppl_velocity:.0f} > {self.ppl_velocity_threshold:.0f}, "
+                        f"Coh={coherence:.3f} < {self.coherence_threshold:.3f} - Tightening AGC"
+                    )
+            # Return tightened AGC threshold
+            return True, 0.01 * self.agc_tighten_factor
+
+        return False, 0.01  # Normal AGC threshold
+
+
+def trigger_handshake(
+    model: nn.Module,
+    config: 'TrainingConfig',
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+    logger: Optional[logging.Logger] = None,
+) -> torch.optim.Optimizer:
+    """
+    V9.3 Handshake Trigger: Rebuilds optimizer at step 3001 for Phase unfreeze.
+
+    This function:
+    1. Ensures all parameters have requires_grad=True
+    2. Rebuilds optimizer with WD exclusion groups
+    3. Applies Handshake Spike LR (6e-5 Quad, 2e-5 Phase)
+    4. Wraps in Lookahead
+
+    Args:
+        model: The model
+        config: Training config
+        optimizer: Current optimizer (will be replaced)
+        device: Training device
+        logger: Optional logger
+
+    Returns:
+        New optimizer wrapped in Lookahead
+    """
+    if logger:
+        logger.info("🚀 [V9.3] HANDSHAKE TRIGGER: Unfreezing Phase & Applying Spike LR...")
+
+    # 1. Ensure all parameters can receive gradients
+    unfrozen_count = 0
+    for p in model.parameters():
+        if not p.requires_grad:
+            p.requires_grad = True
+            unfrozen_count += 1
+
+    if logger and unfrozen_count > 0:
+        logger.info(f"   Unfroze {unfrozen_count} parameters")
+
+    # 2. Group parameters with WD exclusion
+    decay_params = []
+    no_decay_params = []
+    phase_params = []
+
+    no_decay_keywords = ["bias", "LayerNorm", "norm", "ln_"]
+    phase_keywords = ["phase", "Phase"]
+
+    for name, p in model.named_parameters():
+        if not p.requires_grad:
+            continue
+
+        # Check if this is a Phase parameter
+        is_phase = any(kw in name for kw in phase_keywords)
+        # Check if this should have no weight decay
+        is_no_decay = any(kw in name for kw in no_decay_keywords)
+
+        if is_phase:
+            phase_params.append(p)
+        elif is_no_decay:
+            no_decay_params.append(p)
+        else:
+            decay_params.append(p)
+
+    # 3. Build optimizer groups with Handshake Spike LRs
+    handshake_quad_lr = config.learning_rate * 1.5  # 4e-5 -> 6e-5
+    handshake_phase_lr = 2e-5  # Spike for fast integration
+
+    param_groups = [
+        {
+            "params": decay_params,
+            "lr": handshake_quad_lr,
+            "weight_decay": config.weight_decay,
+            "name": "stable_wd"
+        },
+        {
+            "params": no_decay_params,
+            "lr": handshake_quad_lr,
+            "weight_decay": 0.0,
+            "name": "stable_no_wd"
+        },
+        {
+            "params": phase_params,
+            "lr": handshake_phase_lr,
+            "weight_decay": 0.0,  # No WD for Phase (angular params)
+            "name": "phase_attn"
+        },
+    ]
+
+    if logger:
+        logger.info(f"   Quad LR: {handshake_quad_lr:.2e} (1.5x spike)")
+        logger.info(f"   Phase LR: {handshake_phase_lr:.2e} (fast integration)")
+        logger.info(f"   Params: {len(decay_params)} decay, {len(no_decay_params)} no-decay, {len(phase_params)} phase")
+
+    # 4. Create new AdamW optimizer
+    new_optimizer = AdamW(
+        param_groups,
+        betas=(config.beta1, config.beta2),
+        eps=config.eps,
+    )
+
+    # 5. Wrap in Lookahead for stability
+    lookahead_optimizer = Lookahead(new_optimizer, k=5, alpha=0.5)
+
+    if logger:
+        logger.info("   Wrapped in Lookahead (k=5, α=0.5)")
+        logger.info("🚀 Handshake complete - Phase layers now training!")
+
+    return lookahead_optimizer
+
+
+class MetricsLogger:
+    """
+    Unified logging to wandb and TensorBoard.
+
+    Reduces duplicated logging code throughout the training loop.
+    """
+
+    def __init__(
+        self,
+        config: 'TrainingConfig',
+        tb_writer: Optional['SummaryWriter'] = None
+    ):
+        self.config = config
+        self.tb_writer = tb_writer
+        self.wandb_enabled = config.wandb and WANDB_AVAILABLE
+
+    def log(self, metrics: Dict[str, float], step: int, prefix: str = "train"):
+        """
+        Log metrics to wandb and TensorBoard.
+
+        Args:
+            metrics: Dict of metric name -> value
+            step: Current training step
+            prefix: Prefix for metric names (e.g., "train", "val")
+        """
+        # Wandb logging
+        if self.wandb_enabled:
+            wandb_metrics = {f"{prefix}/{k}": v for k, v in metrics.items()}
+            wandb.log(wandb_metrics, step=step)
+
+        # TensorBoard logging
+        if self.tb_writer is not None:
+            for name, value in metrics.items():
+                self.tb_writer.add_scalar(f"{prefix}/{name}", value, step)
+
+    def close(self):
+        """Clean up logging resources."""
+        if self.wandb_enabled:
+            wandb.finish()
+        if self.tb_writer is not None:
+            self.tb_writer.close()
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -117,11 +692,23 @@ class TrainingConfig:
     sync_lr: float = 0.1
 
     # Hybrid-specific parameters
-    local_layers: int = 4  # Number of early layers with local attention only
+    # NOTE: Updated defaults based on diagnostic findings:
+    # - 6/6 split works better than 4/8 for semantic feature extraction
+    # - Higher alpha_phase (0.6) forces the model to use long-range attention
+    # - Gate init changed to 0.95 to preserve memory (learn to forget, not remember)
+    local_layers: int = 6  # Number of early layers with local attention only (was 4)
     window_size: int = 256  # Local attention window size
     local_backend: str = "auto"  # LocalAttention backend: auto, flash, sdpa, unfold
-    alpha_local: float = 0.8  # Weight for local attention in hybrid layers
-    alpha_phase: float = 0.2  # Weight for phase attention in hybrid layers
+    alpha_local: float = 0.4  # Weight for local attention in hybrid layers (was 0.8)
+    alpha_phase: float = 0.6  # Weight for phase attention in hybrid layers (was 0.2)
+
+    # Alpha FADE-IN schedule: "Training Wheels" for hybrid stability
+    # Start with phase OFF (0.0), gradually fade in to target (0.6)
+    # This forces Quadratic layers to learn basic patterns first,
+    # then Phase layers join in for long-range structure
+    alpha_phase_start: float = 0.0   # Initial: Phase attention OFF (training wheels)
+    alpha_phase_end: float = 0.6     # Final: Full phase attention
+    alpha_warmup_steps: int = 10000  # Steps to fade in phase attention (V8: extended runway)
 
     # Training hyperparameters
     batch_size: int = 16
@@ -136,6 +723,58 @@ class TrainingConfig:
     beta2: float = 0.95
     eps: float = 1e-8
     max_grad_norm: float = 1.0
+
+    # LLRD: Layer-wise Learning Rate Decay (Attention Cooling)
+    # The Q, K, V projections in attention are sensitive to high LR (softmax saturation).
+    # Apply a "cooling factor" to attention params while keeping phase/MLP at full LR.
+    # 0.5 is balanced; use 0.3 for "safety first" during instability
+    attn_cooling_factor: float = 1.0  # Local/Quadratic attention LR multiplier (baseline, full LR)
+    phase_cooling_factor: float = 0.25  # Phase attention MAX LR multiplier (V9: 0.25x = 1e-5 at base 4e-5)
+
+    # V9: Delayed Phase LR - Phase layers frozen until Quadratic builds foundation
+    phase_delay_steps: int = 3000  # Steps before Phase LR starts (frozen at 0)
+    phase_ramp_steps: int = 7000   # Steps to ramp Phase LR from 0 to phase_cooling_factor
+
+    # V9.2: MemoryGuard - Dynamic VRAM-based batch scaling
+    # Automatically adjusts batch_size/gradient_accumulation based on GPU memory pressure
+    # - Downshift at step 3000 (Phase handshake) or when VRAM > emergency threshold
+    # - Ramp up ("Crank") after step 10000 when VRAM is underutilized
+    memory_guard_enabled: bool = False  # Enable dynamic batch scaling
+    vram_target_gb: float = 72.0  # Target VRAM usage for optimal throughput
+    vram_emergency_gb: float = 77.0  # Emergency downshift threshold (near OOM)
+    vram_underutil_gb: float = 55.0  # VRAM below this triggers ramp-up
+    vram_check_interval: int = 100  # Check VRAM every N steps
+    min_batch_size: int = 8  # Minimum batch size floor
+    max_batch_size: int = 64  # Maximum batch size ceiling
+    crank_step: int = 10000  # Step after which ramp-up is allowed
+    phase_lr_cap: float = 1e-5  # Maximum Phase LR during "crank" (prevents angular instability)
+
+    # V9.2.1: Coherence-based LR freeze - abort warmup if model loses coherence
+    coherence_freeze_enabled: bool = True  # Enable coherence monitoring
+    coherence_freeze_threshold: float = 0.700  # Freeze LR if coherence drops below this
+    coherence_warning_threshold: float = 0.750  # Log warning when coherence drops below this
+
+    # V9.3: Trinity Optimization - AGC, Lookahead, PPL-Guard, Handshake
+    trinity_enabled: bool = False  # Enable V9.3 Trinity optimization suite
+    agc_enabled: bool = True  # Enable Adaptive Gradient Clipping
+    agc_threshold: float = 0.01  # Max grad_norm / weight_norm ratio
+    lookahead_enabled: bool = True  # Enable Lookahead optimizer wrapper
+    lookahead_k: int = 5  # Steps between slow weight updates
+    lookahead_alpha: float = 0.5  # Interpolation factor for slow weights
+    ppl_guard_enabled: bool = True  # Enable PPL-Guard monitoring
+    ppl_velocity_threshold: float = 50.0  # PPL jump that triggers guard
+    handshake_spike_enabled: bool = True  # Enable LR spike at handshake
+    handshake_spike_factor: float = 1.5  # Multiply base LR by this at handshake
+    handshake_phase_lr: float = 2e-5  # Phase LR during handshake spike
+    handshake_duration: int = 500  # Steps to maintain spike (3001-3500)
+
+    # V9.3.2: Recovery Mode - active LR reduction when frozen but still degrading
+    recovery_mode_enabled: bool = True  # Enable recovery mode after freeze
+    recovery_ppl_threshold: float = 0.05  # 5% PPL rise triggers LR cut
+    recovery_lr_cut_factor: float = 0.5  # Cut LR by 50% each time
+    recovery_max_cuts: int = 3  # Maximum number of LR cuts before giving up
+    recovery_exit_coh: float = 0.720  # Exit recovery when coherence > this
+    recovery_exit_ppl_drops: int = 2  # AND PPL drops for this many consecutive evals
 
     # Learning rate schedule
     lr_scheduler: str = "cosine"  # cosine, linear, constant
@@ -162,7 +801,11 @@ class TrainingConfig:
     tokenizer: str = "gpt2"  # gpt2, tiktoken, custom
 
     # Evaluation
-    eval_samples: int = 1000
+    # eval_samples = max sequences to evaluate (NOT tokens)
+    # With batch_size=32, eval_samples=256 means 8 batches = 256K tokens
+    # WikiText-103 val set is only 248K tokens (~7 batches), so 256 uses full set
+    # For larger datasets (C4), keep this reasonable to avoid slow evals
+    eval_samples: int = 256  # ~8 batches = 256K tokens at batch_size=32, seq_len=1024
 
     # Logging
     wandb: bool = False
@@ -175,8 +818,13 @@ class TrainingConfig:
     num_workers: int = 4
     pin_memory: bool = True
 
+    # Performance
+    use_compile: bool = False  # Use torch.compile for 10-30% speedup (requires PyTorch 2.0+)
+    compile_mode: str = "reduce-overhead"  # default, reduce-overhead, max-autotune
+
     # Resume
     resume: Optional[str] = None
+    resume_weights_only: bool = False  # Only load model weights, skip optimizer state
 
     # Coherence Loss (S3, S1-S2, S8-S9)
     use_coherence_loss: bool = True  # Enable coherence-enhanced training
@@ -202,6 +850,14 @@ class TrainingConfig:
 
     # Seed
     seed: int = 42
+
+    # Quality Sampling (periodic generation to monitor training quality)
+    sample_every: int = 500  # Generate samples every N steps (0 = disabled)
+    sample_prompts: tuple = (
+        "The history of the Roman Empire began when",
+        "In computer science, algorithms are",
+        "The weather today is expected to be",
+    )
 
 
 # Model size presets
@@ -379,8 +1035,13 @@ def load_dataset_tokens(config: TrainingConfig, split: str = "train") -> torch.T
 
 def create_dataloaders(
     config: TrainingConfig,
-) -> Tuple[DataLoader, DataLoader]:
-    """Create train and validation dataloaders."""
+) -> Tuple[DataLoader, DataLoader, TextDataset]:
+    """Create train and validation dataloaders.
+
+    Returns:
+        train_loader, val_loader, train_dataset
+        (train_dataset is returned for V9.2 MemoryGuard dynamic rebuilding)
+    """
 
     # Load tokens
     train_tokens = load_dataset_tokens(config, "train")
@@ -390,26 +1051,68 @@ def create_dataloaders(
     train_dataset = TextDataset(train_tokens, config.max_seq_len)
     val_dataset = TextDataset(val_tokens, config.max_seq_len)
 
-    # Create dataloaders
+    # Create dataloaders with performance optimizations
+    # - prefetch_factor: Prefetch 2 batches per worker to hide data loading latency
+    # - persistent_workers: Keep workers alive between epochs (avoids respawn overhead)
+    dataloader_kwargs = dict(
+        num_workers=config.num_workers,
+        pin_memory=config.pin_memory,
+        drop_last=True,
+        prefetch_factor=2 if config.num_workers > 0 else None,
+        persistent_workers=config.num_workers > 0,
+    )
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=config.batch_size,
         shuffle=True,
-        num_workers=config.num_workers,
-        pin_memory=config.pin_memory,
-        drop_last=True,
+        **dataloader_kwargs,
     )
 
     val_loader = DataLoader(
         val_dataset,
         batch_size=config.batch_size,
         shuffle=False,
+        **dataloader_kwargs,
+    )
+
+    return train_loader, val_loader, train_dataset
+
+
+def rebuild_train_loader(
+    train_dataset: TextDataset,
+    config: TrainingConfig,
+    new_batch_size: int,
+    start_idx: int = 0,
+) -> DataLoader:
+    """
+    V9.2: Rebuild train DataLoader with new batch size from a specific position.
+
+    Used by MemoryGuard when dynamically adjusting batch_size during training.
+    The start_idx allows resuming from where we left off in the dataset.
+    """
+    # Create a subset starting from start_idx
+    if start_idx > 0 and start_idx < len(train_dataset):
+        # Wrap indices to handle epoch boundaries
+        indices = list(range(start_idx, len(train_dataset)))
+        subset = torch.utils.data.Subset(train_dataset, indices)
+    else:
+        subset = train_dataset
+
+    dataloader_kwargs = dict(
         num_workers=config.num_workers,
         pin_memory=config.pin_memory,
         drop_last=True,
+        prefetch_factor=2 if config.num_workers > 0 else None,
+        persistent_workers=config.num_workers > 0,
     )
 
-    return train_loader, val_loader
+    return DataLoader(
+        subset,
+        batch_size=new_batch_size,
+        shuffle=False,  # Don't shuffle when resuming mid-epoch
+        **dataloader_kwargs,
+    )
 
 
 # =============================================================================
@@ -471,36 +1174,290 @@ def count_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
+def update_alpha_schedule(
+    model: nn.Module,
+    step: int,
+    config: TrainingConfig,
+) -> float:
+    """
+    Update alpha_phase across all layers based on training progress.
+
+    "Training Wheels" FADE-IN schedule (per ChatGPT/Google analysis):
+    - Start with phase attention OFF (0.0) to let Quadratic layers learn first
+    - Gradually fade in phase attention to target (0.6) over alpha_warmup_steps
+    - This prevents "representation shear" where Phase distorts the residual stream
+      before Quadratic layers have learned stable manifolds
+
+    The Coherence (Coh) metric should stay stable or improve with this schedule.
+    If Coh drops rapidly, phase is interfering too early.
+    """
+    # Calculate current alpha based on linear FADE-IN
+    if step >= config.alpha_warmup_steps:
+        current_alpha = config.alpha_phase_end
+    else:
+        frac = step / config.alpha_warmup_steps
+        # Linear interpolation: 0.0 → 0.6 over warmup steps
+        current_alpha = config.alpha_phase_start + frac * (config.alpha_phase_end - config.alpha_phase_start)
+
+    # Update all attention layers that have alpha_phase
+    for module in model.modules():
+        if hasattr(module, 'alpha_phase'):
+            with torch.no_grad():
+                if hasattr(module.alpha_phase, 'fill_'):
+                    module.alpha_phase.fill_(current_alpha)
+                else:
+                    module.alpha_phase = current_alpha
+
+            # Also update alpha_local if present (hybrid layers)
+            if hasattr(module, 'alpha_local'):
+                with torch.no_grad():
+                    if hasattr(module.alpha_local, 'fill_'):
+                        module.alpha_local.fill_(1.0 - current_alpha)
+                    else:
+                        module.alpha_local = 1.0 - current_alpha
+
+    return current_alpha
+
+
+# =============================================================================
+# GRADIENT DIAGNOSTICS
+# =============================================================================
+
+def compute_tier_gradient_norms(model: nn.Module) -> dict:
+    """
+    Compute gradient norms per tier to verify all layers are learning.
+
+    Returns dict with:
+    - stable_grad_norm: Gradient norm for MLP/embed params
+    - local_attn_grad_norm: Gradient norm for Quadratic attention params
+    - phase_attn_grad_norm: Gradient norm for Phase attention params
+    - stable_grad_max: Max gradient in stable tier
+    - local_attn_grad_max: Max gradient in local tier
+    - phase_attn_grad_max: Max gradient in phase tier
+
+    If a tier has grad_norm ≈ 0, those layers are NOT learning.
+    """
+    ATTN_PATTERNS = ["q_proj", "k_proj", "v_proj", "o_proj", "out_proj"]
+
+    stable_grads = []
+    local_attn_grads = []
+    phase_attn_grads = []
+
+    for name, param in model.named_parameters():
+        if param.grad is None:
+            continue
+
+        grad_norm = param.grad.data.norm(2).item()
+        name_lower = name.lower()
+
+        # Classify into tier
+        is_attn = any(pattern in name_lower for pattern in ATTN_PATTERNS)
+
+        if not is_attn:
+            stable_grads.append(grad_norm)
+        elif 'phase_attn' in name_lower or 'phase_attention' in name_lower:
+            phase_attn_grads.append(grad_norm)
+        else:
+            local_attn_grads.append(grad_norm)
+
+    def safe_stats(grads):
+        if not grads:
+            return 0.0, 0.0
+        total_norm = (sum(g**2 for g in grads)) ** 0.5
+        max_norm = max(grads)
+        return total_norm, max_norm
+
+    stable_norm, stable_max = safe_stats(stable_grads)
+    local_norm, local_max = safe_stats(local_attn_grads)
+    phase_norm, phase_max = safe_stats(phase_attn_grads)
+
+    return {
+        'stable_grad_norm': stable_norm,
+        'local_attn_grad_norm': local_norm,
+        'phase_attn_grad_norm': phase_norm,
+        'stable_grad_max': stable_max,
+        'local_attn_grad_max': local_max,
+        'phase_attn_grad_max': phase_max,
+        'stable_param_count': len(stable_grads),
+        'local_attn_param_count': len(local_attn_grads),
+        'phase_attn_param_count': len(phase_attn_grads),
+    }
+
+
+def log_tier_gradients(model: nn.Module, step: int, logger) -> None:
+    """Log gradient norms per tier to verify learning health. (Legacy - computes at call time)"""
+    stats = compute_tier_gradient_norms(model)
+    log_tier_gradients_from_metrics(stats, step, logger)
+
+
+def log_tier_gradients_from_metrics(stats: dict, step: int, logger) -> None:
+    """Log gradient norms per tier using pre-computed stats from train_step."""
+    # Format: show norm and whether tier is "alive" (learning)
+    def status(norm):
+        if norm < 1e-8:
+            return "❌ DEAD"
+        elif norm < 1e-5:
+            return "⚠️ WEAK"
+        else:
+            return "✅"
+
+    logger.info(f"  📊 Gradient Health @ Step {step}:")
+    logger.info(f"     Stable ({stats['stable_param_count']} params):     "
+                f"norm={stats['stable_grad_norm']:.2e} {status(stats['stable_grad_norm'])}")
+    logger.info(f"     Local Attn ({stats['local_attn_param_count']} params): "
+                f"norm={stats['local_attn_grad_norm']:.2e} {status(stats['local_attn_grad_norm'])}")
+    logger.info(f"     Phase Attn ({stats['phase_attn_param_count']} params): "
+                f"norm={stats['phase_attn_grad_norm']:.2e} {status(stats['phase_attn_grad_norm'])}")
+
+
 # =============================================================================
 # OPTIMIZER & SCHEDULER
 # =============================================================================
 
 def create_optimizer(model: nn.Module, config: TrainingConfig) -> AdamW:
-    """Create AdamW optimizer with weight decay."""
+    """
+    Create AdamW optimizer with TWO-TIER LLRD (Layer-wise Learning Rate Decay).
 
-    # Separate parameters into decay and no-decay groups
-    decay_params = []
-    no_decay_params = []
+    Separates parameters into 6 groups for hybrid Local+Phase architecture:
+    1. Stable params with decay (embeddings, MLP, non-attention params) - FULL LR (1.0x)
+    2. Stable params without decay (bias, norm) - FULL LR (1.0x)
+    3. Local/Quadratic attention params with decay - BASELINE LR (1.0x)
+    4. Local/Quadratic attention params without decay - BASELINE LR (1.0x)
+    5. Phase attention params with decay - STRONG cooling (0.2x)
+    6. Phase attention params without decay - STRONG cooling (0.2x)
+
+    The Two-Tier approach recognizes that:
+    - Local/Quadratic (O(n²)) layers are the "heavy lifters" - stable, can handle full LR
+    - Phase (O(n)) layers are "precision rotators" - sensitive, need strong cooling
+    """
+
+    # Attention parameter patterns
+    ATTN_PATTERNS = ["q_proj", "k_proj", "v_proj", "o_proj", "out_proj"]
+
+    def get_param_tier(name: str) -> str:
+        """
+        Classify parameter into tier: 'stable', 'local_attn', or 'phase_attn'.
+        """
+        name_lower = name.lower()
+
+        # Check if it's an attention parameter
+        is_attn = any(pattern in name_lower for pattern in ATTN_PATTERNS)
+        if not is_attn:
+            return 'stable'
+
+        # Distinguish between local_attn and phase_attn
+        if 'phase_attn' in name_lower or 'phase_attention' in name_lower:
+            return 'phase_attn'
+        elif 'local_attn' in name_lower or 'local_attention' in name_lower:
+            return 'local_attn'
+        else:
+            # Default attention params (e.g., in non-hybrid models) get local tier
+            return 'local_attn'
+
+    def is_no_decay_param(name: str) -> bool:
+        """Check if parameter should skip weight decay."""
+        return 'bias' in name or 'norm' in name or 'embed' in name
+
+    # Separate into 6 groups
+    stable_decay_params = []
+    stable_no_decay_params = []
+    local_attn_decay_params = []
+    local_attn_no_decay_params = []
+    phase_attn_decay_params = []
+    phase_attn_no_decay_params = []
+
+    # Track parameter counts for logging
+    stable_param_count = 0
+    local_attn_param_count = 0
+    phase_attn_param_count = 0
 
     for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
-        if 'bias' in name or 'norm' in name or 'embed' in name:
-            no_decay_params.append(param)
-        else:
-            decay_params.append(param)
+
+        num_params = param.numel()
+        tier = get_param_tier(name)
+        no_decay = is_no_decay_param(name)
+
+        if tier == 'stable':
+            stable_param_count += num_params
+            if no_decay:
+                stable_no_decay_params.append(param)
+            else:
+                stable_decay_params.append(param)
+        elif tier == 'local_attn':
+            local_attn_param_count += num_params
+            if no_decay:
+                local_attn_no_decay_params.append(param)
+            else:
+                local_attn_decay_params.append(param)
+        else:  # phase_attn
+            phase_attn_param_count += num_params
+            if no_decay:
+                phase_attn_no_decay_params.append(param)
+            else:
+                phase_attn_decay_params.append(param)
+
+    # Compute LRs for each tier
+    base_lr = config.learning_rate
+    local_lr = base_lr * config.attn_cooling_factor    # Mild cooling (0.5x)
+    phase_lr = base_lr * config.phase_cooling_factor   # Strong cooling (0.2x)
 
     param_groups = [
-        {"params": decay_params, "weight_decay": config.weight_decay},
-        {"params": no_decay_params, "weight_decay": 0.0},
+        {
+            "params": stable_decay_params,
+            "lr": base_lr,
+            "weight_decay": config.weight_decay,
+            "name": "stable_context",
+        },
+        {
+            "params": stable_no_decay_params,
+            "lr": base_lr,
+            "weight_decay": 0.0,
+            "name": "stable_no_decay",
+        },
+        {
+            "params": local_attn_decay_params,
+            "lr": local_lr,
+            "weight_decay": config.weight_decay,
+            "name": "local_attn",
+        },
+        {
+            "params": local_attn_no_decay_params,
+            "lr": local_lr,
+            "weight_decay": 0.0,
+            "name": "local_attn_no_decay",
+        },
+        {
+            "params": phase_attn_decay_params,
+            "lr": phase_lr,
+            "weight_decay": config.weight_decay,
+            "name": "phase_attn",
+        },
+        {
+            "params": phase_attn_no_decay_params,
+            "lr": phase_lr,
+            "weight_decay": 0.0,
+            "name": "phase_attn_no_decay",
+        },
     ]
+
+    # Filter out empty groups
+    param_groups = [g for g in param_groups if len(g["params"]) > 0]
 
     optimizer = AdamW(
         param_groups,
-        lr=config.learning_rate,
+        lr=config.learning_rate,  # Default LR (overridden by group-specific LR)
         betas=(config.beta1, config.beta2),
         eps=config.eps,
     )
+
+    # Log the Two-Tier LLRD configuration
+    logger = logging.getLogger(__name__)
+    logger.info(f"Two-Tier LLRD Optimizer Groups:")
+    logger.info(f"  Stable (MLP/embed): {stable_param_count/1e6:.1f}M params @ LR {base_lr:.2e} (1.0x)")
+    logger.info(f"  Local Attention:    {local_attn_param_count/1e6:.1f}M params @ LR {local_lr:.2e} ({config.attn_cooling_factor}x)")
+    logger.info(f"  Phase Attention:    {phase_attn_param_count/1e6:.1f}M params @ LR {phase_lr:.2e} ({config.phase_cooling_factor}x)")
 
     return optimizer
 
@@ -545,6 +1502,13 @@ class TrainingState:
     best_val_loss: float = float('inf')
     total_tokens: int = 0
     train_losses: list = field(default_factory=list)
+    ppl_history: list = field(default_factory=list)  # Track PPL for trend detection
+    trend_patience: int = 0  # Patience counter for trend-based interventions
+    ema_ppl: float = 0.0  # Exponential moving average of PPL (smooths noise)
+    # V9.3.5: PPL-Ratchet LR control - smoothed, multi-eval signal
+    ppl_lr_factor: float = 1.0  # LR factor based on PPL trend (ratchets down on rise)
+    val_ppl_history: list = field(default_factory=list)  # Track Val PPL for smoothed velocity
+    coh_history: list = field(default_factory=list)  # Track coherence for recovery check
 
 
 def compute_semantic_entropy(logits: torch.Tensor, max_positions: int = 1024) -> torch.Tensor:
@@ -816,11 +1780,7 @@ def compute_state_centric_loss(
     return total_loss, metrics
 
 
-# Global state for entropy stability tracking (S8-S9)
-_prev_entropy = None
-
-
-def compute_loss_chunked(
+def compute_loss_streaming(
     model: PhaseTransformer,
     batch: Tuple[torch.Tensor, torch.Tensor],
     device: torch.device,
@@ -1008,8 +1968,6 @@ def compute_loss(
     - L_coherence: Layer coherence (S1-S2)
     - L_stability: Entropy stability (S8)
     """
-    global _prev_entropy
-
     x, y = batch
     x = x.to(device)
     y = y.to(device)
@@ -1050,44 +2008,17 @@ def compute_loss(
     }
 
     if use_coherence_loss:
-        # S5: Semantic Entropy - target moderate entropy (not too high, not too low)
+        # Compute semantic entropy
         entropy = compute_semantic_entropy(logits)
-        target_entropy = 4.0  # ~moderate confidence
-        L_entropy = (entropy - target_entropy).pow(2)
-        metrics["entropy"] = entropy.item()
 
-        # =================================================================
-        # UPDATE GATE: Detect likely state changes/updates
-        # High entropy or entropy spike → reduce coherence penalty
-        # This allows the model to "update" information without being
-        # penalized for breaking coherence with earlier context
-        # =================================================================
+        # Use entropy tracker for update gate and stability (S5, S8-S9)
+        L_entropy, update_gate, L_stability, entropy_metrics = _entropy_tracker.compute_coherence_terms(
+            entropy, device
+        )
+        metrics.update(entropy_metrics)
 
-        # Normalize entropy to [0, 1] range (max entropy ~ log(vocab) ≈ 10.8)
-        max_entropy = 10.8  # log(50257)
-        normalized_entropy = torch.clamp(entropy / max_entropy, 0.0, 1.0)
-
-        # Update gate: high when entropy is high (uncertain/changing context)
-        # Using sigmoid to smooth the gate
-        # When entropy > 6.0 (moderately uncertain), gate starts activating
-        entropy_threshold = 6.0
-        update_gate = torch.sigmoid((entropy - entropy_threshold) * 2.0)
-
-        # Also consider entropy change (sudden spike = likely update)
-        if _prev_entropy is not None:
-            entropy_change = entropy - _prev_entropy
-            # Positive change (entropy increase) activates gate more
-            change_gate = torch.sigmoid(entropy_change * 5.0)
-            # Combine both signals
-            update_gate = torch.max(update_gate, change_gate * 0.5)
-
-        metrics["update_gate"] = update_gate.item()
-
-        # =================================================================
-        # CONDITIONAL COHERENCE: λ * (1 - g_update) * L_coh
-        # When update_gate is high, reduce coherence penalty
-        # =================================================================
-        coherence_scale = 1.0 - update_gate  # Reduce coherence loss during updates
+        # Reduce coherence loss during updates
+        coherence_scale = 1.0 - update_gate
 
         # S1-S2: Layer Coherence - maximize cross-layer alignment
         if hidden_states:
@@ -1098,20 +2029,7 @@ def compute_loss(
             L_coherence_term = torch.tensor(0.0, device=device)
             metrics["coherence"] = 0.0
 
-        # S8-S9: Stability Constraint - penalize entropy spikes
-        if _prev_entropy is not None:
-            entropy_change = entropy - _prev_entropy
-            # Penalize increases (dH/dt > 0 violates S8)
-            L_stability = F.relu(entropy_change)
-            metrics["entropy_change"] = entropy_change.item()
-        else:
-            L_stability = torch.tensor(0.0, device=device)
-            metrics["entropy_change"] = 0.0
-
-        _prev_entropy = entropy.detach()
-
         # Combined Coherence Loss (S3) with conditional gating
-        # Coherence and stability losses are scaled by (1 - update_gate)
         loss = (L_task +
                 lambda_entropy * L_entropy +
                 lambda_coherence * coherence_scale * L_coherence_term +
@@ -1124,7 +2042,7 @@ def compute_loss(
     return loss, metrics
 
 
-def compute_loss_chunked(
+def compute_loss_chunked_lm_head(
     model: PhaseTransformer,
     batch: Tuple[torch.Tensor, torch.Tensor],
     device: torch.device,
@@ -1157,8 +2075,6 @@ def compute_loss_chunked(
         use_coherence_loss: whether to compute coherence losses
         lambda_*: loss weights
     """
-    global _prev_entropy
-
     x, y = batch
     x = x.to(device)
     y = y.to(device)
@@ -1248,36 +2164,18 @@ def compute_loss_chunked(
         if entropy_samples > 0:
             entropy = entropy_sum / entropy_samples
         else:
-            entropy = torch.tensor(4.0, device=device)
+            entropy = torch.tensor(ENTROPY_TARGET, device=device)
 
-        target_entropy = 4.0
-        L_entropy = (entropy - target_entropy).pow(2)
-        metrics["entropy"] = entropy.item()
+        # Use entropy tracker for update gate and stability (S5, S8-S9)
+        L_entropy, update_gate, L_stability, entropy_metrics = _entropy_tracker.compute_coherence_terms(
+            entropy, device
+        )
+        metrics.update(entropy_metrics)
 
-        # Update gate for coherence scaling
-        max_entropy = 10.8
-        normalized_entropy = torch.clamp(entropy / max_entropy, 0.0, 1.0)
-        entropy_threshold = 6.0
-        update_gate = torch.sigmoid((entropy - entropy_threshold) * 2.0)
-
-        if _prev_entropy is not None:
-            entropy_change = entropy - _prev_entropy
-            change_gate = torch.sigmoid(entropy_change * 5.0)
-            update_gate = torch.max(update_gate, change_gate * 0.5)
-            L_stability = F.relu(entropy_change)
-            metrics["entropy_change"] = entropy_change.item()
-        else:
-            L_stability = torch.tensor(0.0, device=device)
-            metrics["entropy_change"] = 0.0
-
-        metrics["update_gate"] = update_gate.item()
         coherence_scale = 1.0 - update_gate
 
         # Skip layer coherence in chunked mode (would require re-running forward)
-        L_coherence_term = torch.tensor(0.0, device=device)
         metrics["coherence"] = 0.0
-
-        _prev_entropy = entropy.detach()
 
         # Combined loss
         loss = (L_task +
@@ -1325,10 +2223,10 @@ def train_step(
                 scaler.scale(loss).backward()
             else:
                 loss.backward()
-        # Use chunked processing for ultra-long sequences
+        # Use streaming chunked processing for ultra-long sequences
         elif config.chunk_size > 0:
-            # Chunked mode: backward already done per-chunk, returns None for loss
-            loss, metrics = compute_loss_chunked(
+            # Streaming mode: backward already done per-chunk, returns None for loss
+            loss, metrics = compute_loss_streaming(
                 model, batch, device,
                 chunk_size=config.chunk_size,
                 use_coherence_loss=config.use_coherence_loss,
@@ -1336,7 +2234,7 @@ def train_step(
                 lambda_coherence=config.lambda_coherence,
                 lambda_stability=config.lambda_stability,
             )
-            # loss is None - gradients already accumulated in compute_loss_chunked
+            # loss is None - gradients already accumulated in compute_loss_streaming
         else:
             loss, metrics = compute_loss(
                 model, batch, device,
@@ -1361,12 +2259,27 @@ def train_step(
     if (accumulation_step + 1) % config.gradient_accumulation == 0:
         if scaler is not None:
             scaler.unscale_(optimizer)
+
+        # V9.3: Apply Adaptive Gradient Clipping (before optimizer.step)
+        # AGC clips based on grad_norm / weight_norm ratio per parameter
+        agc_stats = None
+        if config.trinity_enabled and config.agc_enabled:
+            agc_stats = apply_agc(model, threshold=config.agc_threshold)
+            metrics['agc_clipped'] = agc_stats['clipped_params']
+            metrics['agc_max_ratio'] = agc_stats['max_ratio']
+            metrics['agc_phase_ratio'] = agc_stats['phase_max_ratio']
+
+        if scaler is not None:
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
             scaler.step(optimizer)
             scaler.update()
         else:
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
             optimizer.step()
+
+        # Capture gradient norms BEFORE zeroing (for diagnostics)
+        grad_stats = compute_tier_gradient_norms(model)
+        metrics.update(grad_stats)
 
         scheduler.step()
         optimizer.zero_grad()
@@ -1381,18 +2294,22 @@ def evaluate(
     config: TrainingConfig,
     device: torch.device,
 ) -> Dict[str, float]:
-    """Evaluate model on validation set."""
+    """
+    Evaluate model on validation set.
+
+    For small validation sets (like WikiText-103 with only 7 batches),
+    we use ALL available batches to maximize signal quality.
+    The noise comes from the inherent size of the dataset, not our sampling.
+    """
     model.eval()
 
     total_loss = 0.0
     total_tokens = 0
     num_batches = 0
-    max_batches = config.eval_samples // config.batch_size
 
+    # Use ALL validation batches for maximum signal (don't limit with eval_samples)
+    # Small val sets need every batch to reduce noise
     for batch in val_loader:
-        if num_batches >= max_batches:
-            break
-
         loss, _ = compute_loss(model, batch, device)
         total_loss += loss.item()
         total_tokens += batch[0].numel()
@@ -1408,6 +2325,114 @@ def evaluate(
         "val_perplexity": perplexity,
         "val_tokens": total_tokens,
     }
+
+
+@torch.no_grad()
+def generate_sample(
+    model: PhaseTransformer,
+    tokenizer,
+    prompt: str,
+    device: torch.device,
+    max_new_tokens: int = 50,
+    temperature: float = 0.8,
+    top_p: float = 0.9,
+) -> str:
+    """
+    Generate text from a prompt for quality monitoring.
+
+    Uses nucleus (top-p) sampling with temperature for diverse outputs.
+    """
+    model.eval()
+
+    # Encode prompt
+    input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+
+    # Generate tokens one by one
+    generated = input_ids.clone()
+
+    for _ in range(max_new_tokens):
+        # Forward pass
+        outputs = model(generated)
+
+        # Handle different output formats
+        if isinstance(outputs, dict):
+            logits = outputs['logits']
+        elif isinstance(outputs, torch.Tensor):
+            logits = outputs
+        else:
+            logits = outputs[0]
+
+        # Get next token logits
+        next_logits = logits[:, -1, :] / temperature
+
+        # Top-p (nucleus) sampling
+        sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
+        cumsum = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+        # Remove tokens with cumulative probability above threshold
+        sorted_indices_to_remove = cumsum > top_p
+        sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+        sorted_indices_to_remove[:, 0] = False
+
+        # Set removed tokens to -inf
+        indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+        next_logits[indices_to_remove] = float('-inf')
+
+        # Sample
+        probs = F.softmax(next_logits, dim=-1)
+        next_token = torch.multinomial(probs, num_samples=1)
+
+        # Append and check for EOS
+        generated = torch.cat([generated, next_token], dim=1)
+
+        # Stop on common end tokens
+        if next_token.item() in [tokenizer.eos_token_id, tokenizer.encode('\n')[0]]:
+            break
+
+    # Decode only the generated part
+    generated_text = tokenizer.decode(generated[0, input_ids.shape[1]:], skip_special_tokens=True)
+
+    model.train()
+    return generated_text
+
+
+def run_quality_samples(
+    model: PhaseTransformer,
+    tokenizer,
+    config: TrainingConfig,
+    device: torch.device,
+    step: int,
+    logger,
+):
+    """
+    Generate sample outputs to monitor training quality.
+
+    This provides a qualitative check that the model is learning
+    meaningful language patterns, not just minimizing perplexity.
+    """
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info(f"  📝 QUALITY SAMPLES (Step {step})")
+    logger.info("=" * 60)
+
+    for prompt in config.sample_prompts:
+        try:
+            generated = generate_sample(
+                model, tokenizer, prompt, device,
+                max_new_tokens=50,
+                temperature=0.8,
+                top_p=0.9,
+            )
+            # Clean up and truncate for display
+            generated = generated.strip().replace('\n', ' ')[:200]
+            logger.info(f"  Prompt: \"{prompt}\"")
+            logger.info(f"  Output: \"{generated}\"")
+            logger.info("")
+        except Exception as e:
+            logger.warning(f"  Sampling failed for prompt '{prompt[:30]}...': {e}")
+
+    logger.info("=" * 60)
+    logger.info("")
 
 
 def save_checkpoint(
@@ -1434,6 +2459,58 @@ def save_checkpoint(
     torch.save(checkpoint, path)
 
 
+def save_checkpoint_light(
+    model: PhaseTransformer,
+    state: TrainingState,
+    config: TrainingConfig,
+    path: str,
+):
+    """
+    Save lightweight checkpoint (model only, no optimizer).
+
+    Used for eval-interval checkpoints to save disk space.
+    A 145M model saves ~550MB vs ~1.6GB with optimizer state.
+    """
+    checkpoint = {
+        "model": model.state_dict(),
+        "state": asdict(state),
+        "config": asdict(config),
+    }
+    torch.save(checkpoint, path)
+
+
+def cleanup_old_checkpoints(checkpoint_dir: Path, keep_last: int = 5):
+    """
+    Remove old step checkpoints, keeping only the last N.
+
+    This prevents disk space exhaustion when saving at every eval interval.
+    Handles both patterns: step_*.pt and checkpoint_step_*.pt
+    Always preserves: best.pt, latest.pt, final.pt
+    """
+    import re
+
+    # Find all step checkpoint files (both naming patterns)
+    step_files = []
+    for f in checkpoint_dir.glob("*step_*.pt"):
+        # Match both: step_1000.pt and checkpoint_step_1000.pt
+        match = re.search(r"step_(\d+)\.pt$", f.name)
+        if match:
+            step_num = int(match.group(1))
+            step_files.append((step_num, f))
+
+    # Sort by step number
+    step_files.sort(key=lambda x: x[0])
+
+    # Remove all but the last N
+    if len(step_files) > keep_last:
+        files_to_remove = step_files[:-keep_last]
+        for step_num, filepath in files_to_remove:
+            try:
+                filepath.unlink()
+            except OSError:
+                pass  # Ignore errors (file might be in use)
+
+
 def load_checkpoint(
     path: str,
     model: PhaseTransformer,
@@ -1441,16 +2518,27 @@ def load_checkpoint(
     scheduler: LambdaLR,
     scaler: Optional[GradScaler],
     device: torch.device,
+    weights_only: bool = False,
 ) -> TrainingState:
-    """Load training checkpoint."""
+    """Load training checkpoint.
+
+    Args:
+        weights_only: If True, only load model weights, skip optimizer/scheduler state.
+                     Useful when resuming with different optimizer config (e.g., Lookahead).
+    """
     checkpoint = torch.load(path, map_location=device)
 
     model.load_state_dict(checkpoint["model"])
-    optimizer.load_state_dict(checkpoint["optimizer"])
-    scheduler.load_state_dict(checkpoint["scheduler"])
 
-    if scaler is not None and "scaler" in checkpoint:
-        scaler.load_state_dict(checkpoint["scaler"])
+    if not weights_only:
+        try:
+            optimizer.load_state_dict(checkpoint["optimizer"])
+            scheduler.load_state_dict(checkpoint["scheduler"])
+            if scaler is not None and "scaler" in checkpoint:
+                scaler.load_state_dict(checkpoint["scaler"])
+        except (KeyError, ValueError) as e:
+            import logging
+            logging.warning(f"Could not load optimizer/scheduler state: {e}. Starting fresh optimizer.")
 
     state = TrainingState(**checkpoint["state"])
 
@@ -1502,6 +2590,15 @@ def train(config: TrainingConfig):
     num_params = count_parameters(model)
     logger.info(f"Model parameters: {num_params:,} ({num_params/1e6:.1f}M)")
 
+    # torch.compile for 10-30% speedup (PyTorch 2.0+)
+    if config.use_compile:
+        try:
+            logger.info(f"Compiling model with mode='{config.compile_mode}'...")
+            model = torch.compile(model, mode=config.compile_mode)
+            logger.info("Model compiled successfully")
+        except Exception as e:
+            logger.warning(f"torch.compile failed (requires PyTorch 2.0+): {e}")
+
     # Create optimizer and scheduler
     optimizer = create_optimizer(model, config)
     scheduler = create_scheduler(optimizer, config)
@@ -1521,15 +2618,59 @@ def train(config: TrainingConfig):
     if config.resume:
         logger.info(f"Resuming from {config.resume}")
         state = load_checkpoint(
-            config.resume, model, optimizer, scheduler, scaler, device
+            config.resume, model, optimizer, scheduler, scaler, device,
+            weights_only=config.resume_weights_only
         )
-        logger.info(f"Resumed at step {state.step}")
+        if config.resume_weights_only:
+            logger.info(f"Resumed model weights at step {state.step} (optimizer reset)")
+        else:
+            logger.info(f"Resumed at step {state.step}")
 
     # Create dataloaders
     logger.info("Loading dataset...")
-    train_loader, val_loader = create_dataloaders(config)
+    train_loader, val_loader, train_dataset = create_dataloaders(config)
     logger.info(f"Train batches: {len(train_loader):,}")
-    logger.info(f"Val batches: {len(val_loader):,}")
+
+    # V9.2: Initialize MemoryGuard for dynamic batch scaling
+    memory_guard = MemoryGuard(config, config.batch_size, config.gradient_accumulation)
+    if config.memory_guard_enabled:
+        logger.info(f"MemoryGuard ENABLED: target={config.vram_target_gb}GB, "
+                    f"emergency={config.vram_emergency_gb}GB, crank@{config.crank_step}")
+
+    # V9.3: Initialize Trinity components
+    ppl_guard = None
+    agc_threshold = config.agc_threshold
+    handshake_triggered = False
+
+    if config.trinity_enabled:
+        logger.info("=" * 60)
+        logger.info("V9.3 TRINITY OPTIMIZATION ENABLED")
+        logger.info(f"  AGC: threshold={config.agc_threshold}")
+        logger.info(f"  Lookahead: k={config.lookahead_k}, α={config.lookahead_alpha}")
+        logger.info(f"  PPL-Guard: velocity_threshold={config.ppl_velocity_threshold}")
+        logger.info(f"  Handshake Spike: {config.handshake_spike_factor}x LR at step {config.phase_delay_steps + 1}")
+        if config.recovery_mode_enabled:
+            logger.info(f"  V9.3.2 Recovery: cut={config.recovery_lr_cut_factor}x on PPL>{config.recovery_ppl_threshold*100:.0f}%, max_cuts={config.recovery_max_cuts}")
+        logger.info(f"  V9.3.3 GATED: Freeze/Cut/Recovery disabled until step {config.alpha_warmup_steps}")
+        logger.info(f"  V9.3.4 Authority LR: cap=0.3+0.7*α (30%→100% as α ramps)")
+        logger.info("=" * 60)
+
+        # Initialize PPL-Guard
+        if config.ppl_guard_enabled:
+            ppl_guard = PPLGuard(
+                ppl_velocity_threshold=config.ppl_velocity_threshold,
+                coherence_threshold=config.coherence_warning_threshold,
+            )
+
+    val_batches = len(val_loader)
+    val_tokens = val_batches * config.batch_size * config.max_seq_len
+    logger.info(f"Val batches: {val_batches:,} ({val_tokens/1000:.0f}K tokens)")
+    if val_batches < 20:
+        logger.warning(f"  ⚠️ Small validation set! Only {val_batches} batches - metrics will be noisy.")
+        logger.warning(f"     Spike detection requires 2 consecutive regressions to reduce false alarms.")
+
+    # Load tokenizer for quality sampling
+    tokenizer = load_tokenizer(config) if config.sample_every > 0 else None
 
     # Wandb
     if config.wandb and WANDB_AVAILABLE:
@@ -1563,6 +2704,10 @@ def train(config: TrainingConfig):
     accumulation_step = 0
     running_loss = 0.0
 
+    # Initialize lr_scale if not present (for backwards compatibility)
+    if not hasattr(state, 'lr_scale'):
+        state.lr_scale = 1.0
+
     while state.step < config.max_steps:
         # Get batch (handle epoch boundaries)
         try:
@@ -1578,6 +2723,89 @@ def train(config: TrainingConfig):
             config, device, accumulation_step
         )
 
+        # Apply persistent lr_scale after scheduler updates LR
+        # V9.1 Two-Tier LLRD with DELAYED Phase LR + DYNAMIC CLUTCH:
+        # - Stable/Local: normal LR from step 0
+        # - Phase: frozen (LR=0) until phase_delay_steps, then ramps with stability brake
+        base_lr = scheduler.get_last_lr()[0]
+
+        # V9.1 Dynamic Clutch: Compute stability brake based on loss trend
+        # If loss spikes > 2%, slow down Phase engagement
+        if not hasattr(state, 'last_step_loss'):
+            state.last_step_loss = metrics["loss"]
+        loss_ratio = metrics["loss"] / max(state.last_step_loss, 1e-8)
+        stability_brake = 0.5 if loss_ratio > 1.02 else 1.0
+        state.last_step_loss = metrics["loss"]
+
+        # Compute dynamic Phase LR multiplier (V9: delayed start + slow ramp)
+        if state.step < config.phase_delay_steps:
+            # Phase frozen - no weight updates
+            phase_lr_mult = 0.0
+            stability_brake = 1.0  # Not applicable during freeze
+        else:
+            # Ramp from 0 to phase_cooling_factor over phase_ramp_steps
+            ramp_progress = min(1.0, (state.step - config.phase_delay_steps) / config.phase_ramp_steps)
+            # Apply stability brake to slow engagement if loss is spiking
+            phase_lr_mult = config.phase_cooling_factor * ramp_progress * stability_brake
+
+        # V9.2: Combine state.lr_scale with memory_guard.lr_scale (crank multiplier)
+        combined_lr_scale = state.lr_scale * memory_guard.lr_scale
+
+        # V9.2.1: Enforce LR freeze if coherence dropped below threshold
+        # Cap base_lr at frozen value to abort warmup
+        if hasattr(state, 'lr_frozen') and state.lr_frozen and state.lr_frozen_value is not None:
+            base_lr = min(base_lr, state.lr_frozen_value)
+
+        # V9.3.1: Enforce Safety Brake - hold LR steady during PPL spike
+        # Brake is softer than freeze - allows LR to drop but not increase
+        if hasattr(state, 'lr_braked') and state.lr_braked and state.lr_brake_value is not None:
+            base_lr = min(base_lr, state.lr_brake_value)
+
+        # V9.3.4: Authority-weighted LR cap during alpha warmup
+        # Don't inject full LR until Phase has sufficient authority to stabilize
+        # This prevents "coupled-geometry overshoot" where Quad moves too fast for Phase
+        if state.step < config.alpha_warmup_steps:
+            # Compute current alpha (same formula as update_alpha_schedule)
+            alpha_frac = state.step / config.alpha_warmup_steps
+            current_alpha_for_cap = config.alpha_phase_start + alpha_frac * (config.alpha_phase_end - config.alpha_phase_start)
+
+            # LR cap scales with alpha: at α=0 → 30% LR, at α=1 → 100% LR
+            # This is "torque limiting during clutch engagement"
+            authority_cap = 0.3 + 0.7 * current_alpha_for_cap
+
+            # V9.3.5: Coherence OR PPL-Ratchet adjustment (whichever is worse)
+            # Either signal being bad should cap LR - use min() for OR logic
+
+            # Coherence factor (discrete thresholds per ChatGPT spec)
+            current_coh = metrics.get('coherence', 1.0)
+            if current_coh < 0.70:
+                coh_factor = 0.8
+            elif current_coh < 0.72:
+                coh_factor = 0.9
+            else:
+                coh_factor = 1.0
+
+            # Take minimum (most conservative) - OR logic
+            # If coherence bad OR PPL rising → use the worse factor
+            combined_factor = min(coh_factor, state.ppl_lr_factor)
+            authority_cap *= combined_factor
+
+            effective_lr_cap = config.learning_rate * authority_cap
+
+            if base_lr > effective_lr_cap:
+                base_lr = effective_lr_cap
+
+        for param_group in optimizer.param_groups:
+            group_name = param_group.get('name', '')
+            # Three tiers: stable (1.0x), local_attn (1.0x), phase_attn (delayed ramp with clutch)
+            if 'phase_attn' in group_name:
+                # V9.2: Use MemoryGuard's phase LR with cap during crank
+                param_group['lr'] = memory_guard.get_phase_lr(base_lr * state.lr_scale, phase_lr_mult)
+            elif 'local_attn' in group_name:
+                param_group['lr'] = base_lr * config.attn_cooling_factor * combined_lr_scale
+            else:
+                param_group['lr'] = base_lr * combined_lr_scale
+
         accumulation_step += 1
         running_loss += metrics["loss"]
         state.total_tokens += batch[0].numel()
@@ -1589,30 +2817,167 @@ def train(config: TrainingConfig):
             state.train_losses.append(avg_loss)
             running_loss = 0.0
 
+            # Update alpha schedule (decay from 0.6 to 0.4 for Phase Attention)
+            current_alpha = update_alpha_schedule(model, state.step, config)
+
+            # V9.3: Handshake Trigger at step phase_delay_steps + 1 (e.g., step 3001)
+            # Rebuilds optimizer with WD exclusion, Lookahead, and Spike LR
+            if (config.trinity_enabled and
+                config.handshake_spike_enabled and
+                not handshake_triggered and
+                state.step == config.phase_delay_steps + 1):
+
+                optimizer = trigger_handshake(model, config, optimizer, device, logger)
+                handshake_triggered = True
+
+                # Update scheduler reference if needed (Lookahead wraps the optimizer)
+                # The LR is now managed by the new optimizer groups
+
+            # V9.3: End Handshake Spike after duration (e.g., step 3500)
+            # Drop LR back to normal levels
+            if (config.trinity_enabled and
+                handshake_triggered and
+                state.step == config.phase_delay_steps + 1 + config.handshake_duration):
+
+                # Reduce LR back from spike
+                for param_group in optimizer.param_groups:
+                    if 'phase' in param_group.get('name', ''):
+                        param_group['lr'] = config.phase_lr_cap  # Back to 1e-5
+                    else:
+                        param_group['lr'] = config.learning_rate  # Back to 4e-5
+
+                logger.info(f"🔧 [Step {state.step}] Handshake Spike ended - LR normalized")
+
+            # V9.2: MemoryGuard check at configured interval
+            if state.step % config.vram_check_interval == 0:
+                changed, action = memory_guard.check_and_adjust(state.step, logger)
+                if changed:
+                    # Rebuild DataLoader with new batch size
+                    # Track position: accumulation_step counts batches processed
+                    memory_guard.update_data_position(accumulation_step)
+                    train_loader = rebuild_train_loader(
+                        train_dataset, config,
+                        memory_guard.batch_size,
+                        memory_guard.global_data_idx % len(train_dataset)
+                    )
+                    train_iter = iter(train_loader)
+                    accumulation_step = 0
+                    # Update config for logging (batch_size used in throughput calc)
+                    config.batch_size = memory_guard.batch_size
+                    config.gradient_accumulation = memory_guard.accum
+
             # Logging
             if state.step % config.log_every == 0:
                 elapsed = time.time() - step_start_time
                 tokens_per_sec = (config.log_every * config.batch_size * config.max_seq_len * config.gradient_accumulation) / elapsed
-                lr = scheduler.get_last_lr()[0]
+                base_lr = scheduler.get_last_lr()[0]
+
+                # V9.3.2: Apply frozen LR cap for accurate logging
+                if hasattr(state, 'lr_frozen') and state.lr_frozen and state.lr_frozen_value is not None:
+                    base_lr = min(base_lr, state.lr_frozen_value)
+
+                # V9.3.5: Apply authority-weighted LR cap with coherence OR PPL-Ratchet for logging
+                if state.step < config.alpha_warmup_steps:
+                    alpha_frac = state.step / config.alpha_warmup_steps
+                    current_alpha_for_cap = config.alpha_phase_start + alpha_frac * (config.alpha_phase_end - config.alpha_phase_start)
+                    authority_cap = 0.3 + 0.7 * current_alpha_for_cap
+
+                    # V9.3.5: Coherence OR PPL-Ratchet - use min() for OR logic
+                    current_coh_for_log = metrics.get('coherence', 1.0)
+                    if current_coh_for_log < 0.70:
+                        coh_factor = 0.8
+                    elif current_coh_for_log < 0.72:
+                        coh_factor = 0.9
+                    else:
+                        coh_factor = 1.0
+
+                    combined_factor = min(coh_factor, state.ppl_lr_factor)
+                    authority_cap *= combined_factor
+
+                    effective_lr_cap = config.learning_rate * authority_cap
+                    base_lr = min(base_lr, effective_lr_cap)
+
+                # V9: Compute dynamic Phase LR for logging
+                # V9.1: Recompute stability brake for logging
+                if hasattr(state, 'last_step_loss') and state.step > 0:
+                    loss_ratio = avg_loss / max(state.last_step_loss, 1e-8)
+                    log_stability_brake = 0.5 if loss_ratio > 1.02 else 1.0
+                else:
+                    log_stability_brake = 1.0
+
+                if state.step < config.phase_delay_steps:
+                    phase_lr_mult = 0.0
+                    phase_status = "FROZEN"
+                else:
+                    ramp_progress = min(1.0, (state.step - config.phase_delay_steps) / config.phase_ramp_steps)
+                    phase_lr_mult = config.phase_cooling_factor * ramp_progress * log_stability_brake
+                    if log_stability_brake < 1.0:
+                        phase_status = f"{ramp_progress*100:.0f}%🔧"  # Clutch engaged
+                    else:
+                        phase_status = f"{ramp_progress*100:.0f}%"
+
+                stable_lr = base_lr * state.lr_scale
+                local_lr = stable_lr * config.attn_cooling_factor
+                phase_lr = stable_lr * phase_lr_mult
 
                 # Build log message with coherence metrics if available
                 log_msg = (
                     f"Step {state.step:>6} | "
                     f"Loss: {avg_loss:.4f} | "
                     f"PPL: {math.exp(avg_loss):.2f} | "
-                    f"LR: {lr:.2e} | "
+                    f"LR: {stable_lr:.2e} | "
                     f"Tok/s: {tokens_per_sec:.0f}"
                 )
 
+                # Show lr_scale and tier LRs if not at defaults
+                if state.lr_scale < 0.99:
+                    log_msg += f" | LR_scale: {state.lr_scale:.2f}"
+                # Show local/phase LRs (V9: Phase shows FROZEN or ramp %)
+                log_msg += f" | Local: {local_lr:.1e} | Phase: {phase_lr:.1e} ({phase_status})"
+
                 # Add coherence metrics if enabled (S3, S1-S2, S5)
                 if config.use_coherence_loss and "entropy" in metrics:
-                    log_msg += f" | Ent: {metrics.get('entropy', 0):.2f}"
+                    ent_val = metrics.get('entropy', 0)
+                    log_msg += f" | Ent: {ent_val:.2f}"
                     log_msg += f" | Coh: {metrics.get('coherence', 0):.3f}"
+
+                    # Mode collapse warning: entropy dropping too low means model is
+                    # getting stuck on predictable patterns instead of learning
+                    if ent_val < 1.5:
+                        log_msg += " ⚠️ LOW_ENT"
+                    elif ent_val < 2.0:
+                        log_msg += " (ent↓)"
 
                 # Add GPU memory usage for scaling experiments
                 if device.type == "cuda":
                     mem_used = torch.cuda.max_memory_allocated() / (1024**3)  # GB
                     log_msg += f" | VRAM: {mem_used:.1f}GB"
+
+                # Add alpha phase value (shows decay progress)
+                log_msg += f" | α_phase: {current_alpha:.2f}"
+
+                # V9.3: Add GSS (Gradient Spike Score) when Trinity is enabled
+                if config.trinity_enabled and 'agc_max_ratio' in metrics:
+                    gss = metrics.get('agc_max_ratio', 0)
+                    clipped = metrics.get('agc_clipped', 0)
+                    if clipped > 0:
+                        log_msg += f" | GSS: {gss:.3f}⚡{clipped}"
+                    else:
+                        log_msg += f" | GSS: {gss:.3f}"
+
+                # V9.3.2/V9.3.3: Show intervention status
+                if getattr(state, 'recovery_active', False):
+                    log_msg += f" | 🔻RECOVERY(cuts={state.recovery_lr_cuts})"
+                elif getattr(state, 'lr_frozen', False):
+                    log_msg += " | 🧊FROZEN"
+                elif state.step < config.alpha_warmup_steps:
+                    # V9.3.3: Show that interventions are gated during alpha ramp
+                    remaining = config.alpha_warmup_steps - state.step
+                    log_msg += f" | 🔓GATED({remaining})"
+
+                # V9.3.5: Show PPL-Ratchet factor when not at 1.0
+                if state.ppl_lr_factor < 0.99:
+                    log_msg += f" | 🎚️PPL-R: {state.ppl_lr_factor:.2f}"
 
                 logger.info(log_msg)
 
@@ -1621,10 +2986,15 @@ def train(config: TrainingConfig):
                     log_dict = {
                         "train/loss": avg_loss,
                         "train/perplexity": math.exp(avg_loss),
-                        "train/learning_rate": lr,
+                        "train/learning_rate": stable_lr,
+                        "train/local_attn_lr": local_lr,
+                        "train/phase_attn_lr": phase_lr,
+                        "train/lr_scale": state.lr_scale,
+                        "train/ppl_lr_factor": state.ppl_lr_factor,  # V9.3.5
                         "train/tokens_per_sec": tokens_per_sec,
                         "train/total_tokens": state.total_tokens,
                         "train/epoch": state.epoch,
+                        "train/alpha_phase": current_alpha,
                     }
                     # Add coherence metrics
                     if config.use_coherence_loss:
@@ -1639,14 +3009,57 @@ def train(config: TrainingConfig):
                 if tb_writer is not None:
                     tb_writer.add_scalar("train/loss", avg_loss, state.step)
                     tb_writer.add_scalar("train/perplexity", math.exp(avg_loss), state.step)
-                    tb_writer.add_scalar("train/learning_rate", lr, state.step)
+                    tb_writer.add_scalar("train/learning_rate", stable_lr, state.step)
+                    tb_writer.add_scalar("train/local_attn_lr", local_lr, state.step)
+                    tb_writer.add_scalar("train/phase_attn_lr", phase_lr, state.step)
+                    tb_writer.add_scalar("train/lr_scale", state.lr_scale, state.step)
+                    tb_writer.add_scalar("train/ppl_lr_factor", state.ppl_lr_factor, state.step)  # V9.3.5
                     tb_writer.add_scalar("train/tokens_per_sec", tokens_per_sec, state.step)
                     # Add coherence metrics
                     if config.use_coherence_loss:
                         tb_writer.add_scalar("train/entropy", metrics.get("entropy", 0), state.step)
                         tb_writer.add_scalar("train/coherence", metrics.get("coherence", 0), state.step)
 
-                step_start_time = time.time()
+                # Note: step_start_time reset moved to after eval/checkpoint blocks
+                # to exclude non-training time from throughput calculation
+
+                # V9.2.1: Coherence-based LR freeze
+                # V9.3.3: GATED until alpha_warmup_steps - during ramp, Coh drops are normal migration
+                if config.coherence_freeze_enabled and config.use_coherence_loss:
+                    current_coh = metrics.get('coherence', 1.0)
+
+                    # Initialize freeze state if not present
+                    if not hasattr(state, 'lr_frozen'):
+                        state.lr_frozen = False
+                        state.lr_frozen_at_step = None
+                        state.lr_frozen_value = None
+
+                    # V9.3.3: Only allow freeze AFTER alpha warmup complete
+                    # During ramp (0-10000), Coh drops are coordinate drift, not divergence
+                    interventions_enabled = state.step >= config.alpha_warmup_steps
+
+                    # Check for freeze condition (only after alpha warmup)
+                    if (interventions_enabled and
+                        not state.lr_frozen and
+                        current_coh < config.coherence_freeze_threshold):
+
+                        # Freeze LR at current value
+                        state.lr_frozen = True
+                        state.lr_frozen_at_step = state.step
+                        state.lr_frozen_value = stable_lr
+
+                        logger.warning(
+                            f"🧊 [Step {state.step}] LR FROZEN: Coherence {current_coh:.3f} < {config.coherence_freeze_threshold:.3f} threshold. "
+                            f"LR locked at {stable_lr:.2e}"
+                        )
+
+                    # Warning when approaching threshold (logging only, no intervention)
+                    elif (current_coh < config.coherence_warning_threshold and
+                          state.step % 100 == 0):
+                        gated_msg = " [GATED - interventions disabled during alpha ramp]" if not interventions_enabled else ""
+                        logger.warning(
+                            f"⚠️ [Step {state.step}] Coherence LOW: {current_coh:.3f} (freeze threshold: {config.coherence_freeze_threshold:.3f}){gated_msg}"
+                        )
 
             # Evaluation
             if state.step % config.eval_every == 0:
@@ -1657,6 +3070,408 @@ def train(config: TrainingConfig):
                     f"  Val Loss: {val_metrics['val_loss']:.4f} | "
                     f"Val PPL: {val_metrics['val_perplexity']:.2f}"
                 )
+
+                # =================================================================
+                # V9.3.5: PPL-RATCHET LR CONTROL (Smoothed, Multi-Eval)
+                # Use 3-eval moving average and velocity to detect "not improving".
+                # With only 7 val batches, single evals are noisy - need smoothing.
+                #
+                # Trigger conditions (after 6 evals):
+                #   - 3 consecutive PPL rises, OR
+                #   - Positive velocity: mean(last 3) > mean(prev 3)
+                #
+                # Action: Gentle reduction with floor at 0.7
+                # =================================================================
+                current_val_ppl = val_metrics['val_perplexity']
+                current_coh_eval = metrics.get('coherence', 1.0)
+
+                # Track PPL and coherence history (keep last 10 for smoothing)
+                state.val_ppl_history.append(current_val_ppl)
+                if len(state.val_ppl_history) > 10:
+                    state.val_ppl_history = state.val_ppl_history[-10:]
+
+                state.coh_history.append(current_coh_eval)
+                if len(state.coh_history) > 10:
+                    state.coh_history = state.coh_history[-10:]
+
+                # Need at least 6 evals for smoothed comparison
+                # Also gate by α_phase >= 0.05 - don't penalize before Phase has signal
+                alpha_frac = state.step / config.alpha_warmup_steps if config.alpha_warmup_steps > 0 else 1.0
+                current_alpha = config.alpha_phase_start + alpha_frac * (config.alpha_phase_end - config.alpha_phase_start)
+
+                if len(state.val_ppl_history) >= 6 and current_alpha >= 0.05:
+                    # Compute 3-eval moving averages
+                    ppl_ma3 = sum(state.val_ppl_history[-3:]) / 3  # Last 3
+                    ppl_prev3 = sum(state.val_ppl_history[-6:-3]) / 3  # Previous 3
+                    ppl_vel = ppl_ma3 - ppl_prev3  # Positive = worsening
+
+                    # Check for 3 consecutive rises (very robust for noisy val)
+                    h = state.val_ppl_history
+                    three_consecutive_rises = (len(h) >= 3 and
+                                               h[-1] > h[-2] > h[-3])
+
+                    # Check for coherence rising over last 2 evals (for recovery)
+                    ch = state.coh_history
+                    coh_rising = (len(ch) >= 2 and ch[-1] > ch[-2])
+
+                    old_factor = state.ppl_lr_factor
+
+                    if three_consecutive_rises or ppl_vel > 50:
+                        # PPL persistently worsening - reduce LR factor
+                        # Gentle reduction: velocity-proportional with floor
+                        if ppl_vel > 0:
+                            # ppl_vel of 150 → full penalty (0.7), 50 → partial
+                            reduction = min(0.3, ppl_vel / 500)  # Max 30% reduction
+                            state.ppl_lr_factor = max(0.7, state.ppl_lr_factor - reduction)
+                        else:
+                            # 3 consecutive rises but negative velocity (edge case)
+                            state.ppl_lr_factor = max(0.7, state.ppl_lr_factor * 0.9)
+
+                        trigger = "3↑" if three_consecutive_rises else f"vel={ppl_vel:.0f}"
+                        logger.warning(
+                            f"📉 [Step {state.step}] PPL-RATCHET: {trigger} | "
+                            f"MA3: {ppl_prev3:.1f} → {ppl_ma3:.1f} | "
+                            f"LR factor: {old_factor:.2f} → {state.ppl_lr_factor:.2f}"
+                        )
+
+                    elif ppl_vel < -20 and coh_rising:
+                        # Recovery: PPL improving AND coherence rising
+                        state.ppl_lr_factor = min(1.0, state.ppl_lr_factor + 0.05)
+
+                        if old_factor < 0.99:
+                            logger.info(
+                                f"📈 [Step {state.step}] PPL-RATCHET: Recovering (vel={ppl_vel:.0f}, coh↑) | "
+                                f"MA3: {ppl_prev3:.1f} → {ppl_ma3:.1f} | "
+                                f"LR factor: {old_factor:.2f} → {state.ppl_lr_factor:.2f}"
+                            )
+
+                # V9.3: PPL-Guard check - tighten AGC if PPL velocity + low coherence
+                if config.trinity_enabled and ppl_guard is not None:
+                    current_coh = metrics.get('coherence', 1.0)
+                    triggered, new_agc_threshold = ppl_guard.check(
+                        val_metrics['val_perplexity'],
+                        current_coh,
+                        state.step,
+                        logger
+                    )
+                    if triggered:
+                        agc_threshold = new_agc_threshold
+                        # Update config for train_step
+                        config.agc_threshold = new_agc_threshold
+
+                        # V9.3.1: When PPL-Guard triggers, also reduce Lookahead alpha
+                        # Lower alpha = trust slow weights more = smoother recovery
+                        if config.lookahead_enabled and hasattr(optimizer, 'alpha'):
+                            old_alpha = optimizer.alpha
+                            optimizer.alpha = 0.3
+                            logger.info(f"   Lookahead α: {old_alpha} → 0.3 for stability")
+
+                    # V9.3 / V9.3.1: PPL-based LR intervention
+                    # V9.3.3: GATED until alpha_warmup_steps - PPL rises during ramp are normal
+                    # Two-tier response based on PPL velocity + coherence
+                    interventions_enabled = state.step >= config.alpha_warmup_steps
+
+                    if (ppl_guard.last_val_ppl is not None and
+                        not getattr(state, 'lr_frozen', False)):
+
+                        ppl_velocity = val_metrics['val_perplexity'] - ppl_guard.last_val_ppl
+
+                        # V9.3.1 Tier 1: SAFETY BRAKE (PPL Δ > 200 + Coh < 0.700)
+                        # V9.3.3: Only after alpha warmup
+                        if interventions_enabled and ppl_velocity > 200 and current_coh < 0.700:
+                            if not hasattr(state, 'lr_braked'):
+                                state.lr_braked = False
+                                state.lr_brake_value = None
+
+                            if not state.lr_braked:
+                                state.lr_braked = True
+                                state.lr_brake_value = scheduler.get_last_lr()[0]
+                                logger.warning(
+                                    f"🛑 [Step {state.step}] SAFETY BRAKE: "
+                                    f"Val PPL Δ={ppl_velocity:.0f} > 200 AND Coh={current_coh:.3f} < 0.700. "
+                                    f"LR held at {state.lr_brake_value:.2e} until stabilization"
+                                )
+
+                        # V9.3 Tier 2: EMERGENCY FREEZE (PPL Δ > 500 + Coh < 0.700)
+                        # V9.3.3: Only after alpha warmup
+                        if interventions_enabled and ppl_velocity > 500 and current_coh < 0.700:
+                            # Initialize freeze state if not present
+                            if not hasattr(state, 'lr_frozen'):
+                                state.lr_frozen = False
+                                state.lr_frozen_at_step = None
+                                state.lr_frozen_value = None
+
+                            state.lr_frozen = True
+                            state.lr_frozen_at_step = state.step
+                            state.lr_frozen_value = scheduler.get_last_lr()[0]
+
+                            logger.warning(
+                                f"🧊🔥 [Step {state.step}] EMERGENCY LR FREEZE: "
+                                f"Val PPL Δ={ppl_velocity:.0f} > 500 AND Coh={current_coh:.3f} < 0.700. "
+                                f"LR locked at {state.lr_frozen_value:.2e}"
+                            )
+
+                # =================================================================
+                # V9.3.2: RECOVERY MODE - Active LR reduction when frozen but degrading
+                # If LR is frozen but PPL keeps rising, the frozen LR is still too high.
+                # We actively cut LR by 50% each time PPL rises > 5% from freeze point.
+                # Exit recovery when Coh > 0.720 AND PPL drops for 2 consecutive evals.
+                # =================================================================
+                if config.recovery_mode_enabled and getattr(state, 'lr_frozen', False):
+                    current_ppl = val_metrics['val_perplexity']
+                    current_coh = metrics.get('coherence', 1.0)
+
+                    # Initialize recovery state if not present
+                    if not hasattr(state, 'recovery_active'):
+                        state.recovery_active = False
+                        state.recovery_ppl_at_freeze = None
+                        state.recovery_lr_cuts = 0
+                        state.recovery_last_ppl = None
+                        state.recovery_consecutive_drops = 0
+
+                    # Record PPL at freeze point if not set
+                    if state.recovery_ppl_at_freeze is None:
+                        state.recovery_ppl_at_freeze = current_ppl
+                        state.recovery_last_ppl = current_ppl
+                        logger.info(f"📍 [Step {state.step}] Recovery baseline set: PPL={current_ppl:.2f}")
+
+                    # Save previous PPL before any updates (fixes bug where cut check saw updated value)
+                    previous_ppl = state.recovery_last_ppl
+
+                    # Check for recovery exit conditions
+                    if state.recovery_active:
+                        if current_ppl < previous_ppl:
+                            state.recovery_consecutive_drops += 1
+                        else:
+                            state.recovery_consecutive_drops = 0
+
+                        # Exit recovery if coherence recovered AND PPL dropping steadily
+                        if (current_coh > config.recovery_exit_coh and
+                            state.recovery_consecutive_drops >= config.recovery_exit_ppl_drops):
+                            state.recovery_active = False
+                            logger.info(
+                                f"✅ [Step {state.step}] RECOVERY EXIT: "
+                                f"Coh={current_coh:.3f} > {config.recovery_exit_coh:.3f} AND "
+                                f"{state.recovery_consecutive_drops} consecutive PPL drops. "
+                                f"LR stabilized at {state.lr_frozen_value:.2e} after {state.recovery_lr_cuts} cuts"
+                            )
+
+                    # Check if we need to cut LR further (PPL still rising from baseline)
+                    ppl_rise_ratio = (current_ppl - state.recovery_ppl_at_freeze) / state.recovery_ppl_at_freeze
+
+                    # If PPL rose > threshold from baseline, cut LR
+                    if ppl_rise_ratio > config.recovery_ppl_threshold:
+                        if state.recovery_lr_cuts < config.recovery_max_cuts:
+                            old_lr = state.lr_frozen_value
+                            state.lr_frozen_value *= config.recovery_lr_cut_factor
+                            state.recovery_lr_cuts += 1
+                            state.recovery_active = True
+                            state.recovery_ppl_at_freeze = current_ppl  # Reset baseline after cut
+                            state.recovery_consecutive_drops = 0  # Reset drop counter
+
+                            logger.warning(
+                                f"🔻 [Step {state.step}] RECOVERY CUT #{state.recovery_lr_cuts}: "
+                                f"PPL rose {ppl_rise_ratio*100:.1f}% > {config.recovery_ppl_threshold*100:.0f}% threshold. "
+                                f"LR: {old_lr:.2e} → {state.lr_frozen_value:.2e} "
+                                f"(Coh={current_coh:.3f}, baseline reset)"
+                            )
+                        elif not getattr(state, 'recovery_exhausted_logged', False):
+                            state.recovery_exhausted_logged = True
+                            logger.error(
+                                f"❌ [Step {state.step}] RECOVERY EXHAUSTED: "
+                                f"Max {config.recovery_max_cuts} LR cuts reached but PPL still rising. "
+                                f"Consider V9.4 Elastic Handshake or restart from earlier checkpoint."
+                            )
+
+                    # Update last PPL for next iteration
+                    state.recovery_last_ppl = current_ppl
+
+                # Save lightweight checkpoint at every eval for backtracking support
+                # Uses model-only saves (~550MB vs ~1.6GB) to prevent disk exhaustion
+                eval_ckpt_path = checkpoint_dir / f"step_{state.step}.pt"
+                if not eval_ckpt_path.exists():
+                    save_checkpoint_light(
+                        model, state, config,
+                        str(eval_ckpt_path)
+                    )
+                    # Clean up old eval checkpoints, keep last 5 for backtracking
+                    cleanup_old_checkpoints(checkpoint_dir, keep_last=5)
+
+                # =================================================================
+                # SPIKE DETECTION using LOSS DELTA (not PPL ratio)
+                # Per ChatGPT's analysis: PPL ratios are too sensitive (exponential)
+                # Loss deltas are more stable and require consecutive regressions
+                # =================================================================
+
+                # Initialize state variables (backwards compatibility)
+                if not hasattr(state, 'best_loss'):
+                    state.best_loss = float('inf')
+                if not hasattr(state, 'best_ppl'):
+                    state.best_ppl = float('inf')
+                if not hasattr(state, 'spike_count'):
+                    state.spike_count = 0
+                if not hasattr(state, 'lr_scale'):
+                    state.lr_scale = 1.0
+                if not hasattr(state, 'consecutive_regressions'):
+                    state.consecutive_regressions = 0
+                if not hasattr(state, 'loss_history'):
+                    state.loss_history = []
+
+                current_loss = val_metrics['val_loss']
+                current_ppl = val_metrics['val_perplexity']
+
+                # Track loss history for trend detection
+                state.loss_history.append(current_loss)
+                if len(state.loss_history) > 10:
+                    state.loss_history = state.loss_history[-10:]
+
+                # Check for new best
+                if current_loss < state.best_loss:
+                    state.best_loss = current_loss
+                    state.best_ppl = current_ppl
+                    state.consecutive_regressions = 0  # Reset on improvement
+                elif state.step >= config.alpha_warmup_steps:
+                    # =================================================================
+                    # V8 "LET IT COOK" STRATEGY:
+                    # Control logic DISABLED during alpha warmup phase.
+                    #
+                    # During alpha fade-in (0→0.6), the loss landscape is shifting as
+                    # Phase layers gradually take over from Quadratic layers. This
+                    # causes normal "coordinate drift" jitter that looks like spikes.
+                    #
+                    # Intervening during this phase causes:
+                    # - LR collapse (repeated 0.8x/0.85x scaling)
+                    # - Momentum destruction (repeated resets)
+                    # - Degenerate patterns ("ssssss", "the the the")
+                    #
+                    # After alpha is stable (step >= alpha_warmup_steps), control
+                    # logic re-enables for genuine instability detection.
+                    # =================================================================
+                    #
+                    # LOSS-BASED SPIKE DETECTION with CONSECUTIVE REGRESSION REQUIREMENT
+                    # - Use absolute loss delta (not PPL ratio)
+                    # - Require 2 consecutive regressions before backtracking
+                    # - This prevents thrashing on validation noise
+                    # =================================================================
+
+                    MIN_LR_SCALE = 0.1
+                    loss_delta = current_loss - state.best_loss
+
+                    # Track consecutive regressions
+                    if loss_delta > 0.05:  # Any significant regression
+                        state.consecutive_regressions += 1
+                    else:
+                        state.consecutive_regressions = max(0, state.consecutive_regressions - 1)
+
+                    # Only act after 2 consecutive regressions (prevents noise-triggered rollback)
+                    if state.consecutive_regressions >= 2:
+                        if loss_delta > 0.25:
+                            # MAJOR SPIKE: loss increased by >0.25 for 2+ consecutive evals
+                            state.spike_count += 1
+                            old_scale = state.lr_scale
+                            state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.8)
+
+                            best_ckpt = checkpoint_dir / "best.pt"
+                            if best_ckpt.exists():
+                                logger.info(f"  🔄 MAJOR SPIKE! Backtracking to best checkpoint...")
+                                ckpt = torch.load(best_ckpt, map_location=device, weights_only=False)
+                                model.load_state_dict(ckpt['model'])
+
+                            optimizer.state = collections.defaultdict(dict)
+                            state.consecutive_regressions = 0  # Reset after action
+
+                            logger.info(f"  🚨 MAJOR loss spike (Δ={loss_delta:.3f} > 0.25)! Backtrack + LR: {old_scale:.3f} → {state.lr_scale:.3f}")
+
+                        elif loss_delta > 0.15:
+                            # MODERATE SPIKE: loss increased by >0.15 for 2+ consecutive evals
+                            state.spike_count += 1
+                            old_scale = state.lr_scale
+                            state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.85)
+
+                            # Find oldest step checkpoint
+                            backtrack_ckpt = None
+                            for f in sorted(checkpoint_dir.glob("step_*.pt")):
+                                backtrack_ckpt = f
+                                break
+
+                            if backtrack_ckpt and backtrack_ckpt.exists():
+                                logger.info(f"  🔄 MODERATE SPIKE! Backtracking to {backtrack_ckpt.name}...")
+                                ckpt = torch.load(backtrack_ckpt, map_location=device, weights_only=False)
+                                model.load_state_dict(ckpt['model'])
+                            elif (checkpoint_dir / "best.pt").exists():
+                                logger.info(f"  🔄 MODERATE SPIKE! Backtracking to best checkpoint...")
+                                ckpt = torch.load(checkpoint_dir / "best.pt", map_location=device, weights_only=False)
+                                model.load_state_dict(ckpt['model'])
+
+                            optimizer.state = collections.defaultdict(dict)
+                            state.consecutive_regressions = 0
+
+                            logger.info(f"  ⚠️ Loss spike (Δ={loss_delta:.3f} > 0.15)! Backtrack + LR: {old_scale:.3f} → {state.lr_scale:.3f}")
+
+                    # =================================================================
+                    # TREND-BASED GENTLE LR ADJUSTMENT (single regression warning)
+                    # =================================================================
+                    elif len(state.loss_history) >= 3:
+                        # Initialize patience if not present
+                        if not hasattr(state, 'trend_patience'):
+                            state.trend_patience = 0
+
+                        # Compute rate of change over last 3 evals (using LOSS, not PPL)
+                        loss_delta_1 = state.loss_history[-1] - state.loss_history[-2]
+                        loss_delta_2 = state.loss_history[-2] - state.loss_history[-3]
+
+                        # Check if loss is increasing (positive deltas)
+                        if loss_delta_1 > 0.02:  # Small threshold to ignore noise
+                            # Is it accelerating?
+                            is_accelerating = loss_delta_1 > (1.2 * loss_delta_2) and loss_delta_2 > 0
+
+                            # Determine if this is a concerning trend
+                            is_concerning = loss_delta_1 > 0.05 or is_accelerating
+
+                            if is_concerning:
+                                state.trend_patience += 1
+                            else:
+                                state.trend_patience = 0
+
+                            # TWO-TIER RESPONSE based on patience
+                            if state.trend_patience >= 2:
+                                # AGGRESSIVE: Confirmed trend (2 consecutive bad evals)
+                                old_scale = state.lr_scale
+                                state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.92)
+                                optimizer.state = collections.defaultdict(dict)
+
+                                logger.info(
+                                    f"  📈 Loss trend CONFIRMED: Δ=[{loss_delta_2:+.3f}, {loss_delta_1:+.3f}]. "
+                                    f"LR: {old_scale:.3f} → {state.lr_scale:.3f} + momentum reset"
+                                )
+                                state.trend_patience = 0
+
+                            elif state.trend_patience == 1:
+                                # GENTLE: First warning, small nudge
+                                old_scale = state.lr_scale
+                                state.lr_scale = max(MIN_LR_SCALE, state.lr_scale * 0.98)
+
+                                logger.info(
+                                    f"  📊 Loss watching: Δ=[{loss_delta_2:+.3f}, {loss_delta_1:+.3f}]. "
+                                    f"LR: {old_scale:.3f} → {state.lr_scale:.3f} (gentle)"
+                                )
+                        else:
+                            # Loss stable or decreasing - reset patience
+                            state.trend_patience = 0
+                else:
+                    # =================================================================
+                    # ALPHA WARMUP PHASE: Observation only, no intervention
+                    # During this phase, we just watch and log without taking action.
+                    # The model is migrating from Quadratic to hybrid representation.
+                    # =================================================================
+                    loss_delta = current_loss - state.best_loss
+                    steps_remaining = config.alpha_warmup_steps - state.step
+                    if loss_delta > 0.15:
+                        # Would have been a spike, but we're in observation mode
+                        logger.info(
+                            f"  🔍 [OBSERVE] Loss Δ={loss_delta:.3f} (would trigger control). "
+                            f"Alpha warmup: {steps_remaining} steps remaining. Letting it cook..."
+                        )
 
                 # Track best
                 if val_metrics['val_loss'] < state.best_val_loss:
@@ -1696,6 +3511,22 @@ def train(config: TrainingConfig):
                     model, optimizer, scheduler, scaler, state, config,
                     str(latest_path)
                 )
+
+            # Quality sampling - generate text to monitor training progress
+            if config.sample_every > 0 and state.step % config.sample_every == 0 and tokenizer is not None:
+                run_quality_samples(model, tokenizer, config, device, state.step, logger)
+
+            # Gradient health check - verify all tiers are learning
+            # Uses gradient stats captured in train_step BEFORE optimizer.zero_grad()
+            if config.sample_every > 0 and state.step % config.sample_every == 0:
+                if 'stable_grad_norm' in metrics:
+                    log_tier_gradients_from_metrics(metrics, state.step, logger)
+                else:
+                    logger.info(f"  📊 Gradient stats not available (check gradient_accumulation)")
+
+            # Reset throughput timer AFTER eval/checkpoint to exclude their time
+            if state.step % config.log_every == 0:
+                step_start_time = time.time()
 
     # Final save
     final_path = checkpoint_dir / "final.pt"
@@ -1759,18 +3590,26 @@ def parse_args() -> TrainingConfig:
     parser.add_argument("--sync_lr", type=float, default=0.1,
                        help="Phase synchronization learning rate")
 
-    # Hybrid parameters
-    parser.add_argument("--local_layers", type=int, default=4,
-                       help="Number of early layers with local attention only (hybrid mode)")
+    # Hybrid parameters (updated defaults for better long-range retrieval)
+    parser.add_argument("--local_layers", type=int, default=6,
+                       help="Number of early layers with local attention only (was 4, now 6)")
     parser.add_argument("--window_size", type=int, default=256,
                        help="Local attention window size (hybrid mode)")
     parser.add_argument("--local_backend", type=str, default="auto",
                        choices=["auto", "flash", "sdpa", "unfold"],
                        help="LocalAttention backend: flash (fastest), sdpa, unfold (fallback)")
-    parser.add_argument("--alpha_local", type=float, default=0.8,
-                       help="Weight for local attention in hybrid layers")
-    parser.add_argument("--alpha_phase", type=float, default=0.2,
-                       help="Weight for phase attention in hybrid layers")
+    parser.add_argument("--alpha_local", type=float, default=0.4,
+                       help="Weight for local attention in hybrid layers (was 0.8, now 0.4)")
+    parser.add_argument("--alpha_phase", type=float, default=0.6,
+                       help="Weight for phase attention in hybrid layers (was 0.2, now 0.6)")
+
+    # Alpha FADE-IN schedule ("Training Wheels" for hybrid stability)
+    parser.add_argument("--alpha_phase_start", type=float, default=0.0,
+                       help="Initial alpha_phase (0.0 = phase OFF, training wheels)")
+    parser.add_argument("--alpha_phase_end", type=float, default=0.6,
+                       help="Final alpha_phase after fade-in")
+    parser.add_argument("--alpha_warmup_steps", type=int, default=10000,
+                       help="Steps to fade in phase attention (0→0.6)")
 
     # Training
     parser.add_argument("--batch_size", type=int, default=16,
@@ -1789,6 +3628,70 @@ def parse_args() -> TrainingConfig:
                        help="Weight decay")
     parser.add_argument("--max_grad_norm", type=float, default=1.0,
                        help="Gradient clipping norm")
+    parser.add_argument("--attn_cooling_factor", type=float, default=1.0,
+                       help="Local/Quadratic attention LR multiplier (1.0 = baseline, full LR)")
+    parser.add_argument("--phase_cooling_factor", type=float, default=0.25,
+                       help="Phase attention MAX LR multiplier (V9: 0.25x = 1e-5 at base 4e-5)")
+    parser.add_argument("--phase_delay_steps", type=int, default=3000,
+                       help="V9: Steps before Phase LR starts (frozen at 0)")
+    parser.add_argument("--phase_ramp_steps", type=int, default=7000,
+                       help="V9: Steps to ramp Phase LR from 0 to phase_cooling_factor")
+
+    # V9.2: MemoryGuard - Dynamic batch scaling
+    parser.add_argument("--memory_guard", action="store_true",
+                       help="V9.2: Enable dynamic VRAM-based batch scaling")
+    parser.add_argument("--vram_target_gb", type=float, default=72.0,
+                       help="V9.2: Target VRAM usage in GB")
+    parser.add_argument("--vram_emergency_gb", type=float, default=77.0,
+                       help="V9.2: Emergency downshift threshold in GB")
+    parser.add_argument("--vram_underutil_gb", type=float, default=55.0,
+                       help="V9.2: VRAM below this triggers ramp-up")
+    parser.add_argument("--vram_check_interval", type=int, default=100,
+                       help="V9.2: Check VRAM every N steps")
+    parser.add_argument("--min_batch_size", type=int, default=8,
+                       help="V9.2: Minimum batch size floor")
+    parser.add_argument("--max_batch_size", type=int, default=64,
+                       help="V9.2: Maximum batch size ceiling")
+    parser.add_argument("--crank_step", type=int, default=10000,
+                       help="V9.2: Step after which ramp-up is allowed")
+    parser.add_argument("--phase_lr_cap", type=float, default=1e-5,
+                       help="V9.2: Maximum Phase LR during crank")
+
+    # V9.2.1: Coherence-based LR freeze
+    parser.add_argument("--no_coherence_freeze", action="store_true",
+                       help="V9.2.1: Disable coherence-based LR freeze")
+    parser.add_argument("--coherence_freeze_threshold", type=float, default=0.700,
+                       help="V9.2.1: Freeze LR if coherence drops below this")
+    parser.add_argument("--coherence_warning_threshold", type=float, default=0.750,
+                       help="V9.2.1: Warn when coherence drops below this")
+
+    # V9.3: Trinity Optimization
+    parser.add_argument("--trinity", action="store_true",
+                       help="V9.3: Enable Trinity optimization (AGC + Lookahead + PPL-Guard + Handshake)")
+    parser.add_argument("--agc_threshold", type=float, default=0.01,
+                       help="V9.3: AGC max grad/weight ratio threshold")
+    parser.add_argument("--lookahead_k", type=int, default=5,
+                       help="V9.3: Lookahead slow weight update interval")
+    parser.add_argument("--lookahead_alpha", type=float, default=0.5,
+                       help="V9.3: Lookahead interpolation factor")
+    parser.add_argument("--ppl_velocity_threshold", type=float, default=50.0,
+                       help="V9.3: PPL-Guard velocity threshold")
+    parser.add_argument("--handshake_spike_factor", type=float, default=1.5,
+                       help="V9.3: LR multiplier during handshake spike")
+    parser.add_argument("--handshake_phase_lr", type=float, default=2e-5,
+                       help="V9.3: Phase LR during handshake spike")
+    parser.add_argument("--handshake_duration", type=int, default=500,
+                       help="V9.3: Duration of handshake spike in steps")
+
+    # V9.3.2: Recovery Mode
+    parser.add_argument("--no_recovery_mode", action="store_true",
+                       help="V9.3.2: Disable recovery mode (active LR cuts when frozen)")
+    parser.add_argument("--recovery_ppl_threshold", type=float, default=0.05,
+                       help="V9.3.2: PPL rise ratio that triggers LR cut (default: 5%%)")
+    parser.add_argument("--recovery_lr_cut_factor", type=float, default=0.5,
+                       help="V9.3.2: LR multiplier on each recovery cut (default: 0.5 = 50%% cut)")
+    parser.add_argument("--recovery_max_cuts", type=int, default=3,
+                       help="V9.3.2: Maximum number of LR cuts before giving up")
 
     # LR schedule
     parser.add_argument("--lr_scheduler", type=str, default="cosine",
@@ -1820,6 +3723,8 @@ def parse_args() -> TrainingConfig:
                        help="Evaluate every N steps")
     parser.add_argument("--log_every", type=int, default=100,
                        help="Log every N steps")
+    parser.add_argument("--sample_every", type=int, default=500,
+                       help="Generate quality samples every N steps (0 = disabled)")
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext2",
@@ -1832,8 +3737,8 @@ def parse_args() -> TrainingConfig:
                        help="Tokenizer to use")
 
     # Evaluation
-    parser.add_argument("--eval_samples", type=int, default=1000,
-                       help="Number of evaluation samples")
+    parser.add_argument("--eval_samples", type=int, default=256,
+                       help="Max sequences to evaluate (256 = ~8 batches = 256K tokens)")
 
     # Logging
     parser.add_argument("--wandb", action="store_true",
@@ -1852,9 +3757,18 @@ def parse_args() -> TrainingConfig:
     parser.add_argument("--num_workers", type=int, default=4,
                        help="DataLoader workers")
 
+    # Performance
+    parser.add_argument("--compile", action="store_true", dest="use_compile",
+                       help="Use torch.compile for 10-30%% speedup (PyTorch 2.0+)")
+    parser.add_argument("--compile_mode", type=str, default="reduce-overhead",
+                       choices=["default", "reduce-overhead", "max-autotune"],
+                       help="torch.compile mode: default, reduce-overhead (faster), max-autotune (best)")
+
     # Resume
     parser.add_argument("--resume", type=str, default=None,
                        help="Resume from checkpoint")
+    parser.add_argument("--resume_weights_only", action="store_true",
+                       help="Only load model weights, skip optimizer/scheduler state (useful after config changes)")
 
     # Coherence Loss (S3, S1-S2, S8-S9)
     parser.add_argument("--use_coherence_loss", action="store_true", default=True,
@@ -1901,8 +3815,37 @@ def parse_args() -> TrainingConfig:
 
     args = parser.parse_args()
 
+    # V9.2: Map --memory_guard flag to memory_guard_enabled
+    args.memory_guard_enabled = getattr(args, 'memory_guard', False)
+
+    # V9.2.1: Map --no_coherence_freeze to coherence_freeze_enabled (inverted)
+    args.coherence_freeze_enabled = not getattr(args, 'no_coherence_freeze', False)
+
+    # V9.3: Map --trinity flag to trinity_enabled and set sub-flags
+    args.trinity_enabled = getattr(args, 'trinity', False)
+    if args.trinity_enabled:
+        # When Trinity is enabled, enable all sub-components
+        args.agc_enabled = True
+        args.lookahead_enabled = True
+        args.ppl_guard_enabled = True
+        args.handshake_spike_enabled = True
+    else:
+        # Default sub-component states when Trinity is disabled
+        args.agc_enabled = False
+        args.lookahead_enabled = False
+        args.ppl_guard_enabled = False
+        args.handshake_spike_enabled = False
+
+    # V9.3.2: Map --no_recovery_mode to recovery_mode_enabled (inverted)
+    args.recovery_mode_enabled = not getattr(args, 'no_recovery_mode', False)
+
+    # Remove CLI-only flags that don't exist in TrainingConfig
+    args_dict = vars(args)
+    for cli_only_arg in ['memory_guard', 'no_coherence_freeze', 'trinity', 'no_recovery_mode']:
+        args_dict.pop(cli_only_arg, None)
+
     # Create config from args
-    config = TrainingConfig(**vars(args))
+    config = TrainingConfig(**args_dict)
 
     return config
 
@@ -1934,6 +3877,8 @@ if __name__ == "__main__":
     print(f"  Batch size: {config.batch_size} x {config.gradient_accumulation} accumulation")
     print(f"  Effective batch: {config.batch_size * config.gradient_accumulation * config.max_seq_len:,} tokens")
     print(f"  Learning rate: {config.learning_rate}")
+    if config.attn_cooling_factor < 1.0:
+        print(f"  LLRD Cooling: Attention @ {config.attn_cooling_factor}x ({config.learning_rate * config.attn_cooling_factor:.2e})")
     print(f"  Mixed precision: {config.mixed_precision}")
     print(f"  Loss type: {config.loss_type}", end="")
     if config.loss_type in ("contrastive", "infonce"):
