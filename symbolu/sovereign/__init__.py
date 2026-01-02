@@ -12,6 +12,8 @@ Architecture Overview:
 3. SovereignLoss: Decomposed loss preventing Signal Washing
 4. PIDGovernor: Control-theoretic gating with Vritti tuning
 5. SovereignGunaComputer: Shannon entropy-based cognitive dynamics
+6. SovereignRouter: Dynamic nexus selection (Virtual Nexus)
+7. SovereignMonitor: Real-time telemetry dashboard
 
 State Layout (128D):
 -------------------
@@ -25,12 +27,17 @@ Phase 1 (Complete):
 - SovereignObserver: State delta computation
 - BhavaTransitionPrior: Ontological transition validation
 
-Phase 2 (Current):
+Phase 2 (Complete):
 - PIDGovernor: Vritti-based control
 - SovereignTransformer: Hybrid architecture with virtual nexus
 - SovereignGunaComputer: Hardened entropy/variance/similarity
 - DeterministicPhonemeEncoder: Hash-based C-Signal
 - ReferentLookup: WORD_TO_REFERENT integration for S-Signal
+
+Phase 3 (Complete):
+- SovereignRouter: Dynamic nexus selection based on ontology
+- SovereignMonitor: Real-time state telemetry
+- COGNADE Export: Hardware bridge for PA-VPU
 
 Reference: docs/hardware/SOVEREIGN_1_DESIGN_IMPLEMENTATION.md
 """
@@ -67,6 +74,33 @@ from symbolu.sovereign.transformer import (
     AmbidextrousLayer,
 )
 
+# Phase 3: Transmission & Dashboard
+from symbolu.sovereign.router import (
+    SovereignRouter,
+    SovereignRoutingDecision,
+    NexusMode,
+    ONTOLOGY_TO_NEXUS,
+    get_optimal_nexus,
+    is_logic_heavy,
+    is_memory_heavy,
+)
+
+from symbolu.sovereign.telemetry import (
+    SovereignMonitor,
+    SovereignProfiler,
+    StateSnapshot,
+    create_monitor,
+)
+
+from symbolu.sovereign.cognade_export import (
+    generate_header,
+    generate_phoneme_impl,
+    serialize_referent_table,
+    pack_state_to_binary,
+    unpack_binary_to_state,
+    export_cognade_sdk,
+)
+
 __all__ = [
     # Phase 1: Loss
     'SovereignLoss',
@@ -94,6 +128,29 @@ __all__ = [
     'SovereignTransformer',
     'SovereignTransformerConfig',
     'AmbidextrousLayer',
+
+    # Phase 3: Router (Transmission)
+    'SovereignRouter',
+    'SovereignRoutingDecision',
+    'NexusMode',
+    'ONTOLOGY_TO_NEXUS',
+    'get_optimal_nexus',
+    'is_logic_heavy',
+    'is_memory_heavy',
+
+    # Phase 3: Telemetry (Dashboard)
+    'SovereignMonitor',
+    'SovereignProfiler',
+    'StateSnapshot',
+    'create_monitor',
+
+    # Phase 3: COGNADE Export (Hardware Bridge)
+    'generate_header',
+    'generate_phoneme_impl',
+    'serialize_referent_table',
+    'pack_state_to_binary',
+    'unpack_binary_to_state',
+    'export_cognade_sdk',
 ]
 
-__version__ = '2.0.0'
+__version__ = '3.0.0'

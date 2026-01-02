@@ -1,9 +1,9 @@
 # Sovereign-1: Design Implementation Document
 
-**Status**: PHASE 2 COMPLETE WITH UNIT TESTS
+**Status**: PHASE 3 COMPLETE (Transmission & Dashboard)
 **Date**: 2026-01-02 (Updated)
 **Purpose**: Evaluate existing Symbolu codebase against Sovereign-1 specification and define implementation path
-**Revision**: v2.3 - Phase 2 complete with unit tests for all modules (25 test cases)
+**Revision**: v3.0 - Phase 3 complete with Router, Telemetry, COGNADE Export, and Integration Tests
 
 ---
 
@@ -1961,8 +1961,11 @@ log_msg += f" | R/C: {metrics['onto_phoneme_ratio']:.2f} [{health}]"
 | SovereignGunaComputer | ✅ Ready | ✅ Implemented | 🔲 N/A |
 | DeterministicPhonemeEncoder | ✅ Ready | ✅ Implemented | 🔲 N/A |
 | ReferentLookup | ✅ Ready | ✅ Implemented | 🔲 N/A |
+| SovereignRouter | ✅ Ready | ✅ Implemented | 🔲 N/A |
+| SovereignMonitor | ✅ Ready | ✅ Implemented | 🔲 N/A |
+| COGNADE Export | ✅ Ready | ✅ Implemented | ✅ Ready |
 
-**Note:** Run `./scripts/run_phase2_tests.sh` to execute all unit tests.
+**Note:** Run `./scripts/run_phase2_tests.sh` for unit tests, `python -m pytest tests/integration/` for integration tests.
 
 ### 11.6 Implementation Steps Status
 
@@ -1981,10 +1984,221 @@ log_msg += f" | R/C: {metrics['onto_phoneme_ratio']:.2f} [{health}]"
 6. ✅ Virtual Nexus support (4/6/8 modes) - `transformer.py`
 7. ✅ Unit tests for all modules - Complete (`tests/test_sovereign_phase2.py`)
 
-**Phase 3** (Next):
-1. 🔲 Integration testing with training script
-2. 🔲 COGNADE SDK export utilities
-3. 🔲 Hardware routing optimization
+**Phase 3** (Complete):
+1. ✅ SovereignRouter (Virtual Nexus selection) - `router.py`
+2. ✅ SovereignMonitor (Telemetry Dashboard) - `telemetry.py`
+3. ✅ COGNADE SDK export utilities - `cognade_export.py`
+4. ✅ Integration tests - `tests/integration/test_sovereign_integration.py`
+
+**Phase 4** (Next):
+1. 🔲 Training script integration with Phase 3 components
+2. 🔲 Hardware routing optimization
+3. 🔲 Production deployment preparation
+
+---
+
+## PHASE 3 IMPLEMENTATION DETAILS (Transmission & Dashboard)
+
+### I. SovereignRouter (`symbolu/sovereign/router.py`)
+
+The SovereignRouter implements the "Transmission" - dynamic nexus selection based on query semantics.
+
+**ONTOLOGY_TO_NEXUS Mapping:**
+```python
+ONTOLOGY_TO_NEXUS = {
+    # Logic-Heavy: 4 Quadratic + 8 Phase
+    "O7_REASONING": 4,     # Logic, analysis
+    "O10_UNIFYING": 4,     # Synthesis, connection
+
+    # Balanced: 6 Quadratic + 6 Phase (default)
+    "O6_AGENCY": 6,        # Direction, control
+    "O9_WITNESSES": 6,     # Meta-observation
+
+    # Memory-Heavy: 8 Quadratic + 4 Phase
+    "O4_STRUCTURE": 8,     # Form, organization
+    "O5_COGNITION": 8,     # Perception
+}
+```
+
+**Key Methods:**
+```python
+class SovereignRouter(SemanticRouter):
+    def route_sovereign(self, query: str) -> SovereignRoutingDecision:
+        """
+        Route query with Nexus position selection.
+
+        Returns:
+            SovereignRoutingDecision with:
+            - model_type: Semantic model type
+            - nexus_position: Virtual Nexus (4, 6, or 8)
+            - nexus_mode: "4/8 (Logic-Heavy)", "6/6 (Balanced)", etc.
+            - confidence: Routing confidence
+            - dominant_layer: Ontological layer (e.g., "O7_REASONING")
+        """
+```
+
+**Usage:**
+```python
+from symbolu.sovereign import SovereignRouter
+
+router = SovereignRouter()
+decision = router.route_sovereign("Explain quantum entanglement")
+# decision.nexus_position = 4 (logic-heavy)
+
+outputs = transformer(tokens, nexus_position=decision.nexus_position)
+```
+
+---
+
+### J. SovereignMonitor (`symbolu/sovereign/telemetry.py`)
+
+The SovereignMonitor implements the "Dashboard" - real-time state visualization.
+
+**Heartbeat Log Format:**
+```
+[SOVEREIGN] Nexus: 6/6 | Auth: 0.92 | Vritti: PRAMANA | Guna: SATTVA (0.8)
+[TRACE] Locked Referent: NATURAL_BODY | Bhava: O4_STRUCTURE
+```
+
+**StateSnapshot Structure:**
+```python
+@dataclass
+class StateSnapshot:
+    timestamp: str
+    step: int
+
+    # Guna components (normalized, sum to 1.0)
+    sattva: float
+    rajas: float
+    tamas: float
+    dominant_guna: str
+
+    # Authority from PID Governor
+    authority: float
+
+    # Active signals
+    dominant_referent: str  # S-Signal
+    dominant_bhava: str     # R-Signal
+
+    # Vritti (cognitive mode)
+    vritti: str
+
+    # Nexus configuration
+    nexus_position: int
+    nexus_mode: str
+
+    # Emergency flags
+    is_emergency: bool
+    anomaly_type: Optional[str]
+```
+
+**Emergency Logging:**
+When `authority < 0.1`, the monitor dumps the full 128-D state:
+```json
+{
+  "type": "EMERGENCY",
+  "anomaly": "AUTHORITY_COLLAPSE",
+  "authority": 0.08,
+  "guna": {"sattva": 0.1, "rajas": 0.8, "tamas": 0.1},
+  "signals": {"referent": "UNKNOWN", "bhava": "O7_REASONING"},
+  "raw_state_128d": [...]
+}
+```
+
+---
+
+### K. COGNADE Export (`symbolu/sovereign/cognade_export.py`)
+
+Hardware bridge for PA-VPU (Phase Attention Vector Processing Unit).
+
+**C-Struct Definition (cognade_state.h):**
+```c
+typedef struct __attribute__((packed)) {
+    uint16_t guna_pulse;   /* Bits 0-15:   Guna Pulse */
+    uint32_t s_signal;     /* Bits 16-47:  S-Signal (Referent) */
+    uint64_t r_signal;     /* Bits 48-111: R-Signal (Ontology) */
+    uint32_t c_signal;     /* Bits 112-143: C-Signal (Phonemic) */
+} cognade_state_t;
+```
+
+**Export Functions:**
+```python
+from symbolu.sovereign import export_cognade_sdk
+
+files = export_cognade_sdk(
+    output_dir="./cognade_sdk",
+    word_to_referent=WORD_TO_REFERENT,
+    version="1.0.0"
+)
+# Returns:
+# - header: cognade_state.h
+# - phoneme_impl: cognade_phoneme.c
+# - referent_table: referent_table.bin (binary lookup)
+```
+
+**Binary State Packing:**
+```python
+from symbolu.sovereign import pack_state_to_binary
+
+# Pack 128-D float state to 16-byte binary
+binary = pack_state_to_binary(state_128d)
+
+# Unpack back (lossy due to quantization)
+state = unpack_binary_to_state(binary)
+```
+
+---
+
+## PHASE 3 INTEGRATION TESTS
+
+### Test File Location
+```
+tests/integration/test_sovereign_integration.py
+```
+
+### Running Tests
+```bash
+# Run all integration tests
+python -m pytest tests/integration/test_sovereign_integration.py -v
+
+# Run specific test case
+python -m pytest tests/integration/test_sovereign_integration.py::TestShifter -v
+```
+
+### Critical Test Cases
+
+#### Test A: The Dampener
+```python
+def test_dampening_reduces_magnitude(self):
+    """
+    Verify authority gating reduces output when authority < 0.7.
+
+    Scenario: High mismatch between R-Signal and prompt.
+    Expected: Authority drops, semantic body dampened by 0.1x.
+    """
+```
+
+#### Test B: The Shifter
+```python
+def test_different_nexus_produces_different_output(self):
+    """
+    CRITICAL: Verify Virtual Nexus reconfigures architecture.
+
+    Scenario A: Math problem → Nexus 4 (4Q + 8P)
+    Scenario B: Poem → Nexus 6 (6Q + 6P)
+    Expected: Different outputs for different nexus positions.
+    """
+```
+
+#### Test C: The Physics
+```python
+def test_guna_conservation(self):
+    """
+    CRITICAL: Verify Sattva + Rajas + Tamas = 1.0 always.
+
+    This is the fundamental conservation law of the cognitive model.
+    """
+```
 
 ---
 
@@ -2153,11 +2367,11 @@ Before implementation begins, confirm:
 
 ---
 
-**Document Status**: Phase 2 Complete with Unit Tests
-**Current Phase**: Phase 2 Complete - Engine modules and tests implemented
-**Next Step**: Run unit tests (`./scripts/run_phase2_tests.sh`), then begin Phase 3
-**Revision**: v2.3 - Added Phase 2 unit tests and test runner script
+**Document Status**: Phase 3 Complete (Transmission & Dashboard)
+**Current Phase**: Phase 3 Complete - Router, Telemetry, COGNADE Export, Integration Tests
+**Next Step**: Run integration tests, then begin Phase 4 (Training Integration)
+**Revision**: v3.0 - Added Phase 3 implementation (SovereignRouter, SovereignMonitor, COGNADE SDK)
 
 ---
 
-*Generated by Claude Code | Symbolu Sovereign-1 Design Implementation v2.3*
+*Generated by Claude Code | Symbolu Sovereign-1 Design Implementation v3.0*
