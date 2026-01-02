@@ -101,10 +101,15 @@ class TransformerConfig:
 
 class PhaseAttentionLayer(nn.Module):
     """
-    O(n) Phase-Based Attention Layer.
+    O(n) Phase-Based Attention Layer with LEARNED Phase Embeddings.
 
-    Standalone implementation with no external dependencies.
-    Implements U1-U4 formulas directly.
+    V2 UPGRADE: Instead of fixed phase projection, we learn:
+    - φ = W_φ @ x  (what should synchronize)
+    - a = W_a @ x  (amplitude/gate - how much to participate)
+    - sim = a_i * a_j * cos(φ_i - φ_j)
+
+    This makes Phase Attention expressive enough to actually learn
+    meaningful representations, rather than being a fixed cosine trick.
     """
 
     def __init__(
@@ -129,7 +134,28 @@ class PhaseAttentionLayer(nn.Module):
         self.v_proj = nn.Linear(embed_dim, embed_dim)
         self.out_proj = nn.Linear(embed_dim, embed_dim)
 
-        # Phase parameters
+        # =====================================================================
+        # V2: LEARNED PHASE EMBEDDINGS
+        # =====================================================================
+        # Instead of: phases = sigmoid(phase_proj(Q)) * 2π  (fixed)
+        # Now:        phases = W_phase @ x  (learned angular embedding)
+        #             amps = sigmoid(W_amp @ x)  (learned participation gate)
+        # =====================================================================
+
+        # Learned phase projection: maps input to angular space per head
+        # Output is [B, N, num_heads] - one phase angle per head
+        self.phase_embed = nn.Linear(embed_dim, num_heads)
+
+        # Learned amplitude gate: controls how much each token participates
+        # Output is [B, N, num_heads] - one amplitude per head
+        self.amp_gate = nn.Linear(embed_dim, num_heads)
+
+        # Initialize amp_gate to start with moderate participation
+        # sigmoid(0) = 0.5, so all tokens start with equal contribution
+        nn.init.zeros_(self.amp_gate.weight)
+        nn.init.zeros_(self.amp_gate.bias)
+
+        # Legacy phase_proj kept for compatibility but not used in V2
         self.phase_proj = nn.Linear(self.head_dim, self.head_dim)
         self.sync_lr = nn.Parameter(torch.tensor(sync_lr))
 
@@ -181,8 +207,22 @@ class PhaseAttentionLayer(nn.Module):
         K = K.transpose(1, 2)
         V = V.transpose(1, 2)
 
-        # Compute phases from Q (map to [0, 2π])
-        phases = torch.sigmoid(self.phase_proj(Q)) * (2 * math.pi)
+        # =====================================================================
+        # V2: LEARNED PHASE EMBEDDINGS
+        # =====================================================================
+        # Compute phases directly from input x (not from Q)
+        # This allows the model to learn WHAT should synchronize
+        # phases: [B, N, H] -> [B, H, N, 1] for broadcasting with head_dim
+        phases_raw = self.phase_embed(x)  # [B, N, num_heads]
+        phases = phases_raw.transpose(1, 2).unsqueeze(-1)  # [B, H, N, 1]
+        phases = phases * (2 * math.pi)  # Map to angular space [0, 2π]
+
+        # Compute amplitudes (participation gates)
+        # High amplitude = this token strongly participates in phase sync
+        # Low amplitude = this token is "quiet" in phase space
+        # amps: [B, N, H] -> [B, H, N, 1]
+        amps = torch.sigmoid(self.amp_gate(x))  # [B, N, num_heads]
+        amps = amps.transpose(1, 2).unsqueeze(-1)  # [B, H, N, 1]
 
         # =====================================================================
         # O(n) Mean-Field Phase Synchronization (U3-U4)
@@ -239,23 +279,20 @@ class PhaseAttentionLayer(nn.Module):
             }
 
         # =====================================================================
-        # O(n) Value Aggregation - CAUSAL FIX (Von Mises Kernel + Cumsum)
+        # O(n) Value Aggregation - V2 with LEARNED AMPLITUDE GATING
         # =====================================================================
         # CRITICAL: Cannot use F.softmax(..., dim=2) as it leaks future to past!
         # Instead, use exponential kernel + cumulative sum normalization.
         #
-        # Old (BROKEN - causality leak):
-        #   phase_weights = F.softmax(phase_weights.sum(dim=-1, keepdim=True), dim=2)
-        #
-        # New (FIXED - proper causal):
-        #   raw_weights = exp(cos(phases - phase_mean) / temperature)
-        #   Z_t = cumsum(raw_weights)  # Running denominator
-        #   H_t = cumsum(V * raw_weights)  # Running numerator
-        #   V_global = H_t / Z_t
+        # V2 UPGRADE: Weight = amplitude * exp(cos(phase - phase_mean) / temp)
+        # - amplitude gates participation (learned)
+        # - phase similarity determines who syncs (learned)
+        # - Still O(n) via cumsum
         # =====================================================================
 
         # Map cosine similarity to positive space using Von Mises kernel
         # cos() outputs [-1, 1], exp(cos/temp) outputs [exp(-1/temp), exp(1/temp)]
+        # phases and phase_mean are now [B, H, N, 1] (learned, not head_dim)
         phase_similarity = torch.cos(phases - phase_mean)
 
         # NUMERICAL STABILITY: Clamp exp input to prevent overflow/underflow
@@ -266,9 +303,11 @@ class PhaseAttentionLayer(nn.Module):
         # Additional stability: handle any NaN/Inf that slipped through
         raw_weights = torch.nan_to_num(raw_weights, nan=1.0, posinf=1e4, neginf=1e-4)
 
-        # Reduce across head dimension to get per-position weight
-        # [B, H, N, head_dim] -> [B, H, N, 1]
-        weight_per_pos = raw_weights.mean(dim=-1, keepdim=True)
+        # V2: AMPLITUDE GATING
+        # weight = amplitude * exp(cos(phase - phase_mean) / temp)
+        # This lets the model learn which tokens should participate in sync
+        # amps is [B, H, N, 1], raw_weights is [B, H, N, 1]
+        weight_per_pos = amps * raw_weights
 
         # Ensure weights are positive and bounded
         weight_per_pos = torch.clamp(weight_per_pos, min=1e-6, max=1e4)
