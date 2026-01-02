@@ -1298,7 +1298,11 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
         if state.step < config.phase_delay_steps:
             phase_lr_mult = 0.0
         else:
-            ramp_progress = min(1.0, (state.step - config.phase_delay_steps) / config.phase_ramp_steps)
+            # Handle phase_ramp_steps=0 (no ramp, immediate full LR)
+            if config.phase_ramp_steps <= 0:
+                ramp_progress = 1.0
+            else:
+                ramp_progress = min(1.0, (state.step - config.phase_delay_steps) / config.phase_ramp_steps)
             phase_lr_mult = config.phase_cooling_factor * ramp_progress
 
         # Update optimizer LRs
