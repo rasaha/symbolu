@@ -1362,6 +1362,539 @@ Implements the 12×12 transition mask for ontological validation:
 - get_transition_penalty(current_r, prev_r): Returns penalty [0.0=legal, 1.0=illegal]
 ```
 
+---
+
+## PHASE 2 IMPLEMENTATION DETAILS (For Developer Review)
+
+This section provides detailed implementation documentation for all Phase 2 components.
+
+#### D. PIDGovernor (`symbolu/sovereign/pid_governor.py`) - PHASE 2
+
+The PIDGovernor is the core control-theoretic gating mechanism at the nexus between quadratic and phase layers.
+
+**Architecture Overview:**
+```
+Input [B, N, 1024] → Extract State [128D] → Compute Error → Detect Vritti → Tune PID → Gate Output
+                                                    ↓
+                                            VRITTI_PID_TABLE lookup
+```
+
+**Vritti Logic Table (5 Cognitive Modes):**
+```python
+VRITTI_PID_TABLE = {
+    "pramana":   {"Kp": 0.90, "Ki": 0.05, "Kd": 0.05},  # Valid cognition - High stiffness
+    "viparyaya": {"Kp": 0.70, "Ki": 0.15, "Kd": 0.15},  # Misperception - Corrective
+    "vikalpa":   {"Kp": 0.30, "Ki": 0.10, "Kd": 0.60},  # Creative/branching - Fluid
+    "smrti":     {"Kp": 0.50, "Ki": 0.40, "Kd": 0.10},  # Memory recall - Integral-heavy
+    "nidra":     {"Kp": 0.20, "Ki": 0.70, "Kd": 0.10},  # Dormancy - Low proportional
+}
+```
+
+**Ontology→Vritti Mapping:**
+```python
+ONTOLOGY_VRITTI_MAP = {
+    0: "pramana",     # O1: FACTUAL → Valid cognition
+    1: "pramana",     # O2: ANALYTICAL → Valid cognition
+    2: "viparyaya",   # O3: EVALUATIVE → May contain bias (corrective mode)
+    3: "vikalpa",     # O4: NARRATIVE → Creative branching
+    4: "pramana",     # O5: ARGUMENTATIVE → Valid cognition
+    5: "pramana",     # O6: INSTRUCTIVE → Valid cognition
+    6: "pramana",     # O7: CERTAIN → High confidence
+    7: "vikalpa",     # O8: SPECULATIVE → Fluid/creative
+    8: "vikalpa",     # O9: QUESTIONING → Exploratory
+    9: "smrti",       # O10: POSITIVE → Memory associations
+    10: "smrti",      # O11: NEGATIVE → Memory associations
+    11: "nidra",      # O12: NEUTRAL → Dormant/idle
+}
+```
+
+**Key Methods:**
+
+```python
+class PIDGovernor(nn.Module):
+    def __init__(self, config: PIDGovernorConfig, embed_dim: int = 1024):
+        # Vritti detection MLP: [48D R-Signal] → [5D logits]
+        self.vritti_detector = nn.Sequential(
+            nn.Linear(config.state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 5),  # 5 Vritti types
+        )
+
+    def detect_vritti(self, r_signal: torch.Tensor) -> Tuple[str, torch.Tensor]:
+        """
+        Detect dominant Vritti from R-Signal (ontological state).
+
+        Args:
+            r_signal: [B, N, 48] - Ontological state vector
+        Returns:
+            vritti_name: Dominant Vritti type
+            vritti_probs: [B, N, 5] probabilities for logging
+        """
+
+    def forward(
+        self,
+        x: torch.Tensor,           # [B, N, 1024]
+        target_state: torch.Tensor, # [B, N, 128]
+        pid_state: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        """
+        Apply PID control with Vritti-tuned parameters.
+
+        Returns:
+            x_out: Gated hidden states [B, N, 1024]
+            authority: Authority scores [B, N] (for telemetry)
+            pid_state: (integral_error, prev_error) for streaming
+        """
+```
+
+**Authority Gating Mechanism:**
+```python
+# When authority < 0.7: Dampen semantic body by 0.1x
+damping_factor = torch.where(
+    authority.unsqueeze(-1) < 0.7,
+    torch.full_like(semantic_body, 0.1),  # Dampen hallucination
+    torch.ones_like(semantic_body)         # Pass through
+)
+semantic_body_gated = semantic_body * damping_factor
+```
+
+**Streaming Support:**
+```python
+# PID state is passed between forward calls for streaming inference
+pid_state = (integral_error, prev_error)  # Tuple of [B, N] tensors
+
+# Usage in streaming:
+output, authority, new_state = governor(x, target, prev_state)
+# ... process output ...
+output, authority, new_state = governor(next_x, target, new_state)
+```
+
+**EmergencyBrake Class:**
+```python
+class EmergencyBrake:
+    """
+    Monitors authority scores and triggers circuit breaker if needed.
+
+    Thresholds:
+    - low_authority_threshold: 0.3 (warning)
+    - critical_authority_threshold: 0.1 (emergency)
+    - consecutive_violations: 5 (trigger brake)
+
+    Actions:
+    - Warning: Log + increase PID Kp by 10%
+    - Emergency: Reset PID state + force nidra mode
+    """
+```
+
+---
+
+#### E. SovereignTransformer (`symbolu/sovereign/transformer.py`) - PHASE 2
+
+The SovereignTransformer implements the hybrid Quadratic+Phase architecture with Virtual Nexus.
+
+**Architecture Overview:**
+```
+Token IDs → Embedding [1024D] → [Quadratic Layers] → PID Governor → [Phase Layers] → LM Head → Logits
+                                      ↑                    ↓
+                              State Delta [128D]    Nexus Position (4/6/8)
+```
+
+**Configuration:**
+```python
+@dataclass
+class SovereignTransformerConfig:
+    vocab_size: int = 50257
+    embed_dim: int = 1024       # 896 semantic + 128 state
+    num_layers: int = 12
+    num_heads: int = 16
+    ff_dim: int = 4096
+    max_seq_len: int = 8192
+    dropout: float = 0.1
+
+    semantic_dim: int = 896     # Semantic body size
+    state_dim: int = 128        # State partition size
+
+    default_nexus: int = 6      # 6/6 mode by default
+    sync_steps: int = 3         # Phase attention synchronization
+    sync_lr: float = 0.1        # Phase attention learning rate
+```
+
+**AmbidextrousLayer (Dual-Mode Attention):**
+```python
+class AmbidextrousLayer(nn.Module):
+    """
+    Transformer layer that can operate in either Quadratic or Phase mode.
+    Enables Virtual Nexus - runtime switching of attention mechanism.
+    """
+
+    def _quadratic_attention(self, Q, K, V, causal_mask=True):
+        """
+        Standard O(n²) scaled dot-product attention.
+
+        scores = (Q @ K^T) / sqrt(d)
+        attn = softmax(mask(scores))
+        output = attn @ V
+        """
+
+    def _phase_attention(self, Q, K, V, causal_mask=True):
+        """
+        O(n) phase synchronization attention.
+
+        Key Innovation:
+        1. Compute phases from Q via learnable projection
+        2. Mean-field approximation for global phase
+        3. Iterative synchronization (Kuramoto-inspired)
+        4. Coherence-weighted value aggregation
+
+        phases = sigmoid(phase_proj(Q)) * 2π
+        for step in sync_steps:
+            phase_diff = phases - phase_mean
+            coupling = sin(phase_diff)
+            phases = phases + sync_lr * coupling
+        coherence = (1 + cos(phases - phase_mean)) / 2
+        output = coherence * V + (1 - coherence) * V_global
+        """
+
+    def forward(self, x, mode="quadratic", causal_mask=True):
+        # Pre-norm architecture
+        x = x + attention(norm1(x), mode=mode)
+        x = x + ff(norm2(x))
+        return x
+```
+
+**Virtual Nexus Mapping:**
+```python
+ONTOLOGY_TO_NEXUS = {
+    # Logic-heavy: More phase attention (earlier nexus)
+    "O7_REASONING": 4,   # 4Q + 8P
+    "O10_UNIFYING": 4,
+
+    # Balanced: Default creative mode
+    "O6_AGENCY": 6,      # 6Q + 6P
+    "O9_WITNESSES": 6,
+
+    # Memory-heavy: More quadratic attention (later nexus)
+    "O4_STRUCTURE": 8,   # 8Q + 4P
+    "O5_COGNITION": 8,
+
+    "default": 6
+}
+```
+
+**Embedding with State Partition:**
+```python
+def _embed(self, token_ids, state_delta=None):
+    """
+    Create 1024-D embeddings with state partition.
+
+    Args:
+        token_ids: [B, N] token indices
+        state_delta: [B, N, 128] from Observer (optional)
+
+    Returns:
+        [B, N, 1024] = [semantic 896D] + [state 128D]
+    """
+    semantic = token_embedding(token_ids) + position_embedding(positions)
+    state = state_delta if state_delta is not None else zeros(128)
+    return cat([semantic, state], dim=-1)
+```
+
+**Forward Pass:**
+```python
+def forward(
+    self,
+    token_ids: torch.Tensor,
+    state_delta: Optional[torch.Tensor] = None,
+    nexus_position: Optional[int] = None,
+    pid_state: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+    causal_mask: bool = True,
+) -> Dict[str, torch.Tensor]:
+    """
+    Returns:
+        logits: [B, N, V] - Output logits for language modeling
+        authority: [B, N] - Authority scores from PID (telemetry)
+        hidden_states: [B, N, 1024] - Final hidden states
+        pid_state: Updated PID state for streaming
+    """
+```
+
+**Generation with PID Control:**
+```python
+def generate(
+    self,
+    token_ids: torch.Tensor,
+    max_new_tokens: int = 100,
+    temperature: float = 1.0,
+    top_k: int = 50,
+    state_delta: Optional[torch.Tensor] = None,
+    nexus_position: Optional[int] = None,
+) -> torch.Tensor:
+    """
+    Autoregressive generation with PID control.
+    Maintains PID state across generation steps.
+    """
+```
+
+---
+
+#### F. SovereignGunaComputer (`symbolu/sovereign/guna.py`) - PHASE 2
+
+The SovereignGunaComputer derives the 16-D Guna Pulse using information-theoretic measures.
+
+**The Three Gunas:**
+| Guna | Meaning | Computation | Range |
+|------|---------|-------------|-------|
+| **Sattva** | Clarity | 1 - H(attention)/H_max | [0, 1] |
+| **Rajas** | Motion/Energy | Variance(head_outputs) | [0, 1] |
+| **Tamas** | Inertia | CosSim(hidden_t, hidden_{t-1}) | [0, 1] |
+
+**Conservation Property:**
+```python
+# Guna energy is conserved via softmax normalization
+guna_raw = stack([sattva, rajas, tamas], dim=-1)  # [B, 3]
+guna_3d = F.softmax(guna_raw / temperature, dim=-1)
+# Sum(Sattva + Rajas + Tamas) = 1.0 ALWAYS
+```
+
+**Sattva Computation (Shannon Entropy):**
+```python
+def compute_sattva(self, attention_weights: torch.Tensor) -> torch.Tensor:
+    """
+    Sattva = 1 - H(attention) / H_max
+
+    High Sattva = focused attention (low entropy)
+    Low Sattva = dispersed attention (high entropy)
+
+    Args:
+        attention_weights: [B, H, N, N] attention probability matrix
+    Returns:
+        [B] Sattva scores in [0, 1]
+    """
+    attn = attention_weights.clamp(min=1e-9)
+    entropy = -(attn * torch.log(attn)).sum(dim=-1)  # Shannon entropy
+    mean_entropy = entropy.mean(dim=[1, 2])
+    max_entropy = torch.log(torch.tensor(N, dtype=torch.float))
+    return 1.0 - (mean_entropy / max_entropy).clamp(0, 1)
+```
+
+**Rajas Computation (Head Variance):**
+```python
+def compute_rajas(self, head_outputs: torch.Tensor) -> torch.Tensor:
+    """
+    Rajas = σ²(head_outputs) normalized
+
+    High Rajas = high variance across heads (energetic)
+    Low Rajas = uniform head outputs (quiescent)
+
+    Args:
+        head_outputs: [B, H, N, d] per-head outputs before concat
+    Returns:
+        [B] Rajas scores in [0, 1]
+    """
+    mean_output = head_outputs.mean(dim=1, keepdim=True)
+    variance = ((head_outputs - mean_output) ** 2).mean(dim=1)
+    mean_variance = variance.mean(dim=[1, 2])
+    return torch.sigmoid(mean_variance * 2 - 1)  # Smooth [0, 1] mapping
+```
+
+**Tamas Computation (Cosine Similarity):**
+```python
+def compute_tamas(
+    self,
+    hidden_states: torch.Tensor,
+    prev_hidden_states: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    """
+    Tamas = CosSim(h_t, h_{t-1})
+
+    High Tamas = high similarity to previous (stable/inertial)
+    Low Tamas = large change from previous (dynamic)
+
+    Args:
+        hidden_states: [B, N, D] current hidden states
+        prev_hidden_states: [B, N, D] previous hidden states
+    Returns:
+        [B] Tamas scores in [0, 1]
+    """
+    if prev_hidden_states is None:
+        return torch.full((B,), 0.5, device=device)  # Neutral
+
+    curr_norm = F.normalize(hidden_states, p=2, dim=-1)
+    prev_norm = F.normalize(prev_hidden_states, p=2, dim=-1)
+    similarity = (curr_norm * prev_norm).sum(dim=-1).mean(dim=1)
+    return ((similarity + 1) / 2).clamp(0, 1)  # Map [-1, 1] → [0, 1]
+```
+
+**16-D Expansion:**
+```python
+# Expand 3D → 16D with structure-preserving projection
+self.guna_expand = nn.Linear(3, 16, bias=False)
+
+# Initialization preserves Guna structure:
+# Sattva → dims 0-4 (5 dims)
+# Rajas → dims 5-9 (5 dims)
+# Tamas → dims 10-15 (6 dims)
+expand_weight = torch.zeros(16, 3)
+expand_weight[0:5, 0] = 1.0 / 5   # Sattva
+expand_weight[5:10, 1] = 1.0 / 5  # Rajas
+expand_weight[10:16, 2] = 1.0 / 6 # Tamas
+```
+
+**GunaMonitor (Anomaly Detection):**
+```python
+class GunaMonitor:
+    """
+    Monitors Guna dynamics for training/inference health.
+
+    Anomaly Types:
+    - Collapse: One Guna > 0.9 (dominates all computation)
+    - Oscillation: Change > 0.3 between steps (unstable)
+    - Stagnation: < 0.05 total change over 10 steps (stuck)
+
+    Methods:
+    - update(guna_3d): Add reading, return anomaly flags
+    - get_dominant_guna(): Current dominant Guna name
+    - get_statistics(): Mean/std over history window
+    """
+```
+
+---
+
+#### G. DeterministicPhonemeEncoder (`symbolu/sovereign/observer.py`) - PHASE 2
+
+The DeterministicPhonemeEncoder generates consistent 32-D phonetic features using hash functions.
+
+**Key Design Decision: Determinism**
+```
+NO RANDOMNESS - Same token → Same features ALWAYS
+Uses SHA256 + MD5 hashing for reproducible feature extraction
+```
+
+**Feature Layout (32 dimensions):**
+```python
+# Feature Breakdown:
+# [0:8]   - SHA256 hash bytes (8 dims) - Primary signature
+# [8:12]  - Length features (4 dims) - log(len), char_count, etc.
+# [12:16] - Vowel/consonant patterns (4 dims) - ratios and positions
+# [16:24] - Bigram features (8 dims) - character pair hashes
+# [24:28] - First/last char hashes (4 dims) - boundary features
+# [28:32] - Pattern features (4 dims) - uppercase, digit, special char
+```
+
+**Hash-Based Feature Computation:**
+```python
+def _hash_token(self, token_str: str) -> List[float]:
+    """
+    Compute deterministic 32D features from token string.
+
+    Process:
+    1. SHA256 hash → first 8 bytes normalized to [0, 1]
+    2. Length features → log-scaled
+    3. Vowel/consonant analysis → ratio features
+    4. Bigram hashing → MD5 of consecutive pairs
+    5. Boundary characters → hash of first/last chars
+    6. Pattern detection → binary flags (uppercase, digit, etc.)
+    """
+    features = [0.0] * 32
+    clean_token = token_str.strip().lower()
+
+    # SHA256 for primary signature
+    sha_hash = hashlib.sha256(clean_token.encode()).digest()
+    for i in range(8):
+        features[i] = sha_hash[i] / 255.0
+
+    # Length features
+    length = len(clean_token)
+    features[8] = min(length / 20.0, 1.0)
+    features[9] = math.log1p(length) / math.log1p(50)
+    # ... etc.
+
+    return features
+```
+
+**Caching for Performance:**
+```python
+# LRU cache prevents recomputation
+self._token_cache: Dict[int, List[float]] = {}
+
+def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
+    """
+    Encode tokens to phoneme features with caching.
+
+    O(1) for cached tokens, O(hash) for new tokens.
+    Cache cleared on reset() or when size exceeds limit.
+    """
+```
+
+---
+
+#### H. ReferentLookup (`symbolu/sovereign/observer.py`) - PHASE 2
+
+The ReferentLookup maps tokens to semantic referent classes using the WORD_TO_REFERENT dictionary.
+
+**16 Referent Classes:**
+```python
+REFERENT_CLASSES = [
+    "luminous",       # Light-emitting objects (sun, lamp, fire)
+    "biological",     # Living things (plant, animal, person)
+    "role_bearer",    # Roles/occupations (teacher, doctor)
+    "artifact",       # Human-made objects (book, computer)
+    "natural_body",   # Natural phenomena (river, mountain)
+    "substance",      # Materials (water, metal, wood)
+    "process",        # Actions/events (running, thinking)
+    "abstract",       # Abstract concepts (freedom, justice)
+    "signal",         # Communication (word, message)
+    "temporal",       # Time-related (yesterday, future)
+    "spatial",        # Space-related (here, above)
+    "emotional",      # Emotions (happy, sad, fear)
+    "social",         # Social constructs (family, government)
+    "energy_source",  # Energy producers (battery, nuclear)
+    "phenomenon",     # Natural events (storm, earthquake)
+    "unknown",        # Default for unrecognized tokens
+]
+```
+
+**One-Hot Encoding (32D):**
+```python
+def _encode_referent_class(self, referent_class: str) -> torch.Tensor:
+    """
+    One-hot encode referent class to 32D vector.
+
+    First 16 dims: Primary class indicator
+    Last 16 dims: Reserved for confidence/secondary class
+    """
+    encoding = torch.zeros(32)
+    try:
+        idx = self.REFERENT_CLASSES.index(referent_class)
+        encoding[idx] = 1.0
+    except ValueError:
+        encoding[15] = 1.0  # Unknown
+    return encoding
+```
+
+**WORD_TO_REFERENT Integration:**
+```python
+def forward(self, tokens: List[str]) -> torch.Tensor:
+    """
+    Look up referent classes for tokens.
+
+    Uses WORD_TO_REFERENT dictionary from referent_classes.py.
+    Falls back to "unknown" for unrecognized tokens.
+
+    Returns:
+        [B, N, 32] S-Signal features
+    """
+```
+
+**Vocabulary Coverage:**
+```
+- 800+ words mapped in WORD_TO_REFERENT
+- Covers common nouns, verbs, adjectives
+- Unknown tokens default to index 15
+```
+
+---
+
 ### 11.3 Training Script Integration
 
 The `train_unified_llm.py` script has been updated with Sovereign-1 support:
