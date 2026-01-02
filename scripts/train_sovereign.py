@@ -79,11 +79,10 @@ class WikitextSovereignDataset(Dataset):
         text = self.texts[idx]
 
         # Process with SovereignTokenizer
+        # Note: padding and truncation are handled internally by process_batch
         batch = self.tokenizer.process_batch(
             [text],
             max_length=self.max_length,
-            padding=True,
-            truncation=True,
         )
 
         # Remove batch dimension
