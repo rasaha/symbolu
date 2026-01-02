@@ -16,6 +16,7 @@ import math
 import os
 import sys
 from pathlib import Path
+from typing import Dict, List, Tuple
 
 import torch
 import torch.nn as nn
@@ -33,6 +34,7 @@ from symbolu.sovereign.embedding import (
 from symbolu.sovereign.metrics import SovereignMetrics
 from symbolu.sovereign.tagger import SovereignTokenizer
 from symbolu.sovereign.train_loss import MultiObjectiveLoss, TrainingLossConfig
+from symbolu.sovereign.stitched_objective import VrittiGovernor, format_governor_log
 
 # Default quality sample prompts
 DEFAULT_SAMPLE_PROMPTS = [
@@ -188,6 +190,162 @@ def generate_sample(
 
     model.train()
     return generated_text
+
+
+def generate_with_governor(
+    model: nn.Module,
+    tokenizer: SovereignTokenizer,
+    prompt: str,
+    device: torch.device,
+    max_new_tokens: int = 50,
+    temperature: float = 0.8,
+    top_p: float = 0.9,
+    verbose: bool = False,
+) -> Tuple[str, List[Dict]]:
+    """
+    Generate text using the Vritti Governor with Stitched Objective.
+
+    This function applies the patent formulas [001]-[007] for penalized
+    token selection, preventing hallucination, repetition, and domain drift.
+
+    Args:
+        model: SovereignTransformer model
+        tokenizer: SovereignTokenizer
+        prompt: Input prompt
+        device: Torch device
+        max_new_tokens: Maximum tokens to generate
+        temperature: Sampling temperature
+        top_p: Nucleus sampling threshold
+        verbose: Print detailed Governor logs
+
+    Returns:
+        generated_text: The generated text
+        governor_log: List of step-by-step Governor actions
+    """
+    model.eval()
+    governor = VrittiGovernor(d_model=model.embedding.config.d_model)
+    governor.to(device)
+    governor.reset(1, device)
+
+    governor_log = []
+    vritti_names = ["PRAMANA", "VIPARYAYA", "VIKALPA", "SMRTI", "NIDRA"]
+
+    with torch.no_grad():
+        # Get initial encoding with signals
+        batch = tokenizer.process_batch([prompt], max_length=512)
+
+        input_ids = batch["input_ids"].to(device)
+        c_signals = batch["c_signals"].to(device)
+        s_signals = batch["s_signals"].to(device)
+        r_signals = batch["r_signals"].to(device)
+        g_states = batch["g_states"].to(device)
+        v_signals = batch.get("v_signals", torch.zeros_like(s_signals)).to(device)
+
+        if verbose:
+            print("\n" + "=" * 80)
+            print("  VRITTI GOVERNOR GENERATION")
+            print("=" * 80)
+            print(f"  {'Step':>4} {'Token':<15} {'Vritti':<10} {'Kp':>5} {'Ki':>5} {'Kd':>5} | "
+                  f"{'Red':>5} {'Dom':>5} {'Coup':>5} | Action")
+            print("-" * 80)
+
+        # Generate tokens one by one
+        for step in range(max_new_tokens):
+            # Forward pass - get hidden states and logits
+            token_logits, r_logits, s_logits, c_pred = model(
+                input_ids, c_signals, s_signals, r_signals, g_states
+            )
+
+            # Get hidden states from the model's transformer
+            # For now, use a simple approximation based on the embedding
+            hidden_states = model.embedding(
+                input_ids, c_signals, s_signals, r_signals, g_states
+            )
+
+            # Get next token logits (last position)
+            next_logits = token_logits[:, -1, :] / temperature
+
+            # Predict Vritti for current position
+            curr_vritti = v_signals[:, -1] if v_signals.size(1) > 0 else torch.tensor([4], device=device)
+
+            # Apply Governor
+            adjusted_logits, penalties = governor(
+                next_logits,
+                hidden_states,
+                curr_vritti,
+                c_signals[:, -1, :] if c_signals.dim() == 3 else None,
+            )
+
+            # Top-p (nucleus) sampling on adjusted logits
+            sorted_logits, sorted_indices = torch.sort(adjusted_logits, descending=True)
+            cumsum = torch.cumsum(torch.softmax(sorted_logits, dim=-1), dim=-1)
+
+            sorted_indices_to_remove = cumsum > top_p
+            sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+            sorted_indices_to_remove[:, 0] = False
+
+            indices_to_remove = sorted_indices_to_remove.scatter(
+                1, sorted_indices, sorted_indices_to_remove
+            )
+            adjusted_logits[indices_to_remove] = float("-inf")
+
+            # Sample next token
+            probs = torch.softmax(adjusted_logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+
+            # Decode the new token
+            new_token_str = tokenizer.tokenizer.decode(next_token[0])
+            new_batch = tokenizer.process_batch([new_token_str], max_length=16)
+
+            # Log step
+            token_display = new_token_str.replace("\n", "\\n").strip()[:15]
+            vritti_id = curr_vritti.item()
+            pid = penalties["pid_gains"]
+
+            log_entry = {
+                "step": step,
+                "token": new_token_str,
+                "vritti": vritti_names[vritti_id],
+                "kp": pid[0, 0].item(),
+                "ki": pid[0, 1].item(),
+                "kd": pid[0, 2].item(),
+                "redundancy": penalties["redundancy"].item(),
+                "domain_jump": penalties["domain_jump"].item(),
+                "coupling": penalties["coupling"].item(),
+                "reset_triggered": penalties["should_reset"].item(),
+            }
+            governor_log.append(log_entry)
+
+            if verbose:
+                action = "RESET" if log_entry["reset_triggered"] else "OK"
+                print(f"  {step:>4} {token_display:<15} {log_entry['vritti']:<10} "
+                      f"{log_entry['kp']:>5.2f} {log_entry['ki']:>5.2f} {log_entry['kd']:>5.2f} | "
+                      f"{log_entry['redundancy']:>5.3f} {log_entry['domain_jump']:>5.3f} "
+                      f"{log_entry['coupling']:>5.3f} | {action}")
+
+            # Append new token and its signals
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+            c_signals = torch.cat([c_signals, new_batch["c_signals"][:, :1].to(device)], dim=1)
+            s_signals = torch.cat([s_signals, new_batch["s_signals"][:, :1].to(device)], dim=1)
+            r_signals = torch.cat([r_signals, new_batch["r_signals"][:, :1].to(device)], dim=1)
+            g_states = torch.cat([g_states, new_batch["g_states"][:, :1].to(device)], dim=1)
+            new_v = new_batch.get("v_signals", torch.zeros(1, 1, dtype=torch.long))
+            v_signals = torch.cat([v_signals, new_v[:, :1].to(device)], dim=1)
+
+            # Stop at EOS
+            if next_token.item() == tokenizer.tokenizer.eos_token_id:
+                break
+
+        if verbose:
+            print("=" * 80 + "\n")
+
+    # Decode full sequence (skip prompt tokens)
+    prompt_len = batch["input_ids"].shape[1]
+    generated_ids = input_ids[0, prompt_len:]
+    generated_text = tokenizer.tokenizer.decode(generated_ids, skip_special_tokens=True)
+
+    model.train()
+    return generated_text, governor_log
 
 
 def run_quality_samples(

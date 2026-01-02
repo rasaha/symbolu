@@ -1,0 +1,95 @@
+{
+  "name": "Sovereign-1 Vritti Configuration",
+  "version": "1.0",
+  "description": "Configuration for Vritti-driven PID control and Stitched Objective optimization",
+
+  "vritti_definitions": {
+    "0": {"name": "PRAMANA", "description": "Truth/Logic - Strict factual mode"},
+    "1": {"name": "VIPARYAYA", "description": "Error/Reset - Correction mode"},
+    "2": {"name": "VIKALPA", "description": "Imagination - Creative/narrative mode"},
+    "3": {"name": "SMRTI", "description": "Memory - Contextual recall mode"},
+    "4": {"name": "NIDRA", "description": "Dormancy - Filler/transition mode"}
+  },
+
+  "pid_gains": {
+    "PRAMANA": {
+      "kp": 0.90, "ki": 0.01, "kd": 0.01,
+      "stiffness": "MAX",
+      "description": "High stiffness to prevent factual drift"
+    },
+    "VIPARYAYA": {
+      "kp": 0.70, "ki": 0.20, "kd": 0.20,
+      "stiffness": "CORRECTIVE",
+      "description": "Hard reset mode for error correction"
+    },
+    "VIKALPA": {
+      "kp": 0.30, "ki": 0.05, "kd": 0.60,
+      "stiffness": "FLUID",
+      "description": "Loose stiffness for creative overshoot"
+    },
+    "SMRTI": {
+      "kp": 0.50, "ki": 0.40, "kd": 0.10,
+      "stiffness": "INTEGRAL",
+      "description": "High integral gain to anchor to history"
+    },
+    "NIDRA": {
+      "kp": 0.20, "ki": 0.70, "kd": 0.01,
+      "stiffness": "INERTIAL",
+      "description": "Low stiffness for stable transitions"
+    }
+  },
+
+  "transition_matrix": {
+    "description": "Penalty matrix for Domain-Jump Penalty (Formula [005]). Higher = Illegal/High-Energy Jump.",
+    "rows": ["PRAMANA", "VIPARYAYA", "VIKALPA", "SMRTI", "NIDRA"],
+    "cols": ["PRAMANA", "VIPARYAYA", "VIKALPA", "SMRTI", "NIDRA"],
+    "matrix": [
+      [0.1, 0.8, 0.9, 0.2, 0.5],
+      [0.5, 0.1, 0.5, 0.5, 0.5],
+      [0.7, 0.5, 0.1, 0.3, 0.2],
+      [0.2, 0.4, 0.4, 0.1, 0.3],
+      [0.9, 0.8, 0.5, 0.2, 0.1]
+    ],
+    "logic_notes": {
+      "NIDRA_TO_PRAMANA": "Penalty 0.9. ILLEGAL. Must pass through SMRTI to wake up.",
+      "SMRTI_TO_PRAMANA": "Penalty 0.2. LEGAL. Memory serves as foundation for Truth.",
+      "VIKALPA_TO_PRAMANA": "Penalty 0.7. HIGH ENERGY. Hard shift from fiction to fact.",
+      "PRAMANA_TO_VIKALPA": "Penalty 0.9. ILLEGAL. Cannot jump from strict fact to imagination.",
+      "VIPARYAYA_TO_ANY": "Penalty 0.5. NEUTRAL. Error state can transition anywhere (reset complete)."
+    }
+  },
+
+  "stitched_objective": {
+    "description": "Penalized scoring function replacing simple argmax (Formula [007])",
+    "formula": "Score(w) = Relevance(w) - λ_red * Redundancy(w) - λ_dom * DomainJump(w)",
+    "weights": {
+      "lambda_relevance": 1.0,
+      "lambda_redundancy": 0.3,
+      "lambda_domain_jump": 0.5
+    },
+    "thresholds": {
+      "coupling_alert": 0.3,
+      "coupling_reset": 0.15,
+      "redundancy_window": 5,
+      "redundancy_threshold": 0.85
+    }
+  },
+
+  "context_vritti_coupling": {
+    "description": "Alignment measure between predicted Vritti and semantic context (Formula [002])",
+    "alert_threshold": 0.3,
+    "reset_threshold": 0.15,
+    "action_on_low_coupling": "TRIGGER_VIPARYAYA"
+  },
+
+  "aspect_weighting": {
+    "description": "C-Signal to Ontological Layer mapping (Formula [001])",
+    "phoneme_to_bhava_mapping": {
+      "vowels": [3, 4, 5],
+      "plosives": [0, 1, 2],
+      "fricatives": [6, 7],
+      "nasals": [8, 9],
+      "liquids": [10, 11]
+    }
+  }
+}
