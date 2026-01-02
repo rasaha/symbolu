@@ -255,16 +255,26 @@ class PhaseAttentionLayer(nn.Module):
         # Map cosine similarity to positive space using Von Mises kernel
         # cos() outputs [-1, 1], exp(cos/temp) outputs [exp(-1/temp), exp(1/temp)]
         phase_similarity = torch.cos(phases - phase_mean)
-        raw_weights = torch.exp(phase_similarity / self.temperature)
+
+        # NUMERICAL STABILITY: Clamp exp input to prevent overflow/underflow
+        # exp(10) ≈ 22k, exp(-10) ≈ 0.00005 - safe range for BF16
+        exp_input = torch.clamp(phase_similarity / self.temperature, min=-10.0, max=10.0)
+        raw_weights = torch.exp(exp_input)
+
+        # Additional stability: handle any NaN/Inf that slipped through
+        raw_weights = torch.nan_to_num(raw_weights, nan=1.0, posinf=1e4, neginf=1e-4)
 
         # Reduce across head dimension to get per-position weight
         # [B, H, N, head_dim] -> [B, H, N, 1]
         weight_per_pos = raw_weights.mean(dim=-1, keepdim=True)
 
+        # Ensure weights are positive and bounded
+        weight_per_pos = torch.clamp(weight_per_pos, min=1e-6, max=1e4)
+
         if causal_mask:
             # Causal: Cumulative sum normalization (no future leakage)
             # Z_t = sum_{i=1}^{t} w_i (running denominator)
-            Z_t = torch.cumsum(weight_per_pos, dim=2) + 1e-8
+            Z_t = torch.cumsum(weight_per_pos, dim=2) + 1e-6
 
             # H_t = sum_{i=1}^{t} w_i * V_i (running weighted sum)
             V_weighted = V * weight_per_pos
@@ -272,9 +282,12 @@ class PhaseAttentionLayer(nn.Module):
 
             # Normalize: each position sees only past context
             V_global = H_t / Z_t
+
+            # Clamp output to prevent explosion
+            V_global = torch.clamp(V_global, min=-100.0, max=100.0)
         else:
             # Non-causal (bidirectional): Global normalization is OK
-            Z_global = weight_per_pos.sum(dim=2, keepdim=True) + 1e-8
+            Z_global = weight_per_pos.sum(dim=2, keepdim=True) + 1e-6
             H_global = (V * weight_per_pos).sum(dim=2, keepdim=True)
             V_global = (H_global / Z_global).expand(-1, -1, N, -1)
 
