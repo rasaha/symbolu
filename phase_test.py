@@ -21,7 +21,7 @@ from torch.utils.data import Dataset, DataLoader
 from symbolu.phase_transformer import PhaseAttentionLayer
 
 # --- Configuration ---
-SEQ_LEN = 2048       # Length of the "Haystack"
+SEQ_LEN = 10000      # Length of the "Haystack" (10K stress test)
 NEEDLE_POS = 50      # Where we hide the needle (early in sequence)
 VOCAB_SIZE = 100     # Small vocab for clean signal
 D_MODEL = 128        # Embedding dimension
