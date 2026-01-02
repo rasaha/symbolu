@@ -12,6 +12,7 @@ This script:
 """
 
 import argparse
+import math
 import os
 import sys
 from pathlib import Path
@@ -357,11 +358,12 @@ def train_epoch(
         total_loss += loss_output.total.item()
         num_batches += 1
 
-        # Update progress bar
+        # Update progress bar with PPL
+        token_ppl = math.exp(loss_output.token) if loss_output.token < 20 else float('inf')
         pbar.set_postfix({
             "step": step,
             "loss": f"{loss_output.total.item():.4f}",
-            "token": f"{loss_output.token:.4f}",
+            "PPL": f"{token_ppl:.2f}",
             "r": f"{loss_output.r_signal:.4f}",
         })
 
@@ -369,7 +371,64 @@ def train_epoch(
         if sample_every > 0 and step % sample_every == 0 and tokenizer is not None:
             run_quality_samples(model, tokenizer, sample_prompts or DEFAULT_SAMPLE_PROMPTS, device, step)
 
-    return total_loss / num_batches, step
+    avg_loss = total_loss / num_batches
+    ppl = math.exp(avg_loss) if avg_loss < 20 else float('inf')
+    return avg_loss, ppl, step
+
+
+@torch.no_grad()
+def validate(model, dataloader, loss_fn, device):
+    """Run validation and compute perplexity."""
+    model.eval()
+    total_loss = 0
+    total_tokens = 0
+
+    for batch in tqdm(dataloader, desc="Validating", leave=False):
+        input_ids = batch["input_ids"].to(device)
+        c_signals = batch["c_signals"].to(device)
+        s_signals = batch["s_signals"].to(device)
+        r_signals = batch["r_signals"].to(device)
+        g_states = batch["g_states"].to(device)
+
+        # Shift for next-token prediction
+        target_tokens = input_ids[:, 1:].contiguous()
+        target_r = r_signals[:, 1:].contiguous()
+        target_s = s_signals[:, 1:].contiguous()
+        target_c = c_signals[:, 1:].contiguous()
+
+        input_ids = input_ids[:, :-1]
+        c_signals = c_signals[:, :-1]
+        s_signals = s_signals[:, :-1]
+        r_signals = r_signals[:, :-1]
+        g_states = g_states[:, :-1]
+
+        # Forward pass
+        token_logits, r_logits, s_logits, c_pred = model(
+            input_ids, c_signals, s_signals, r_signals, g_states
+        )
+
+        # Compute loss
+        loss_output = loss_fn(
+            token_logits=token_logits,
+            r_logits=r_logits,
+            s_logits=s_logits,
+            c_pred=c_pred,
+            target_tokens=target_tokens,
+            target_r=target_r,
+            target_s=target_s,
+            target_c=target_c,
+        )
+
+        # Accumulate token loss for PPL calculation
+        batch_size, seq_len = target_tokens.shape
+        total_loss += loss_output.token * batch_size * seq_len
+        total_tokens += batch_size * seq_len
+
+    model.train()
+
+    avg_loss = total_loss / total_tokens if total_tokens > 0 else float('inf')
+    ppl = math.exp(avg_loss) if avg_loss < 20 else float('inf')
+    return avg_loss, ppl
 
 
 def main():
@@ -402,22 +461,32 @@ def main():
     print("\n2. Creating SovereignTokenizer...")
     tokenizer = SovereignTokenizer()
 
-    # Load dataset
-    print("\n3. Loading dataset...")
+    # Load datasets
+    print("\n3. Loading datasets...")
     train_texts = load_wikitext("train", max_samples=args.max_samples)
+    val_texts = load_wikitext("validation", max_samples=args.max_samples // 10 if args.max_samples else None)
 
     # Create dataset and dataloader
-    print("\n4. Creating dataset...")
-    dataset = WikitextSovereignDataset(train_texts, tokenizer, max_length=args.max_length)
-    dataloader = DataLoader(
-        dataset,
+    print("\n4. Creating dataloaders...")
+    train_dataset = WikitextSovereignDataset(train_texts, tokenizer, max_length=args.max_length)
+    train_loader = DataLoader(
+        train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=0,  # NLTK not fork-safe
         drop_last=True,
         collate_fn=sovereign_collate_fn,
     )
-    print(f"   Batches per epoch: {len(dataloader)}")
+    val_dataset = WikitextSovereignDataset(val_texts, tokenizer, max_length=args.max_length)
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=0,
+        drop_last=False,
+        collate_fn=sovereign_collate_fn,
+    )
+    print(f"   Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
 
     # Create loss and optimizer
     print("\n5. Setting up training...")
@@ -430,7 +499,7 @@ def main():
     loss_fn = MultiObjectiveLoss(loss_config)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=args.epochs * len(dataloader)
+        optimizer, T_max=args.epochs * len(train_loader)
     )
 
     # Training loop
@@ -441,12 +510,13 @@ def main():
         print(f"Quality samples every {args.sample_every} steps")
 
     os.makedirs(args.save_dir, exist_ok=True)
-    best_loss = float("inf")
+    best_val_ppl = float("inf")
     global_step = 0
 
     for epoch in range(args.epochs):
-        avg_loss, global_step = train_epoch(
-            model, dataloader, optimizer, loss_fn, device, epoch,
+        # Train
+        train_loss, train_ppl, global_step = train_epoch(
+            model, train_loader, optimizer, loss_fn, device, epoch,
             tokenizer=tokenizer,
             sample_every=args.sample_every,
             sample_prompts=DEFAULT_SAMPLE_PROMPTS,
@@ -454,23 +524,34 @@ def main():
         )
         scheduler.step()
 
-        print(f"\nEpoch {epoch+1}/{args.epochs} - Avg Loss: {avg_loss:.4f} - Steps: {global_step}")
+        # Validate
+        val_loss, val_ppl = validate(model, val_loader, loss_fn, device)
 
-        # Save checkpoint
-        if avg_loss < best_loss:
-            best_loss = avg_loss
+        print(f"\n{'='*60}")
+        print(f"  Epoch {epoch+1}/{args.epochs} Complete")
+        print(f"  Train Loss: {train_loss:.4f} | Train PPL: {train_ppl:.2f}")
+        print(f"  Val Loss:   {val_loss:.4f} | Val PPL:   {val_ppl:.2f}")
+        print(f"  Steps: {global_step}")
+        print(f"{'='*60}")
+
+        # Save checkpoint based on val PPL
+        if val_ppl < best_val_ppl:
+            best_val_ppl = val_ppl
             checkpoint_path = os.path.join(args.save_dir, "best_model.pt")
             torch.save({
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
-                "loss": avg_loss,
+                "train_loss": train_loss,
+                "train_ppl": train_ppl,
+                "val_loss": val_loss,
+                "val_ppl": val_ppl,
             }, checkpoint_path)
-            print(f"   Saved best model to {checkpoint_path}")
+            print(f"  📦 New best! Val PPL: {val_ppl:.2f} → Saved to {checkpoint_path}")
 
     print("\n" + "=" * 70)
     print("TRAINING COMPLETE")
-    print(f"Best loss: {best_loss:.4f}")
+    print(f"Best Val PPL: {best_val_ppl:.2f}")
     print("=" * 70)
 
 
