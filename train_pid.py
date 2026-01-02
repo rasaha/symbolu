@@ -466,17 +466,16 @@ class FrictionController:
         # =====================================================================
         # V9.4.6: LOCK CORRECTION (Phase-Assist Mode)
         # =====================================================================
-        # When Phase is suppressed (Dom < 0.3) and velocity is rising,
-        # apply relative power correction: reduce Quad LR, boost Phase LR
+        # When Phase is suppressed (Dom < 0.3), apply relative power correction
+        # ChatGPT recommendation: LOCK persistence alone should trigger correction,
+        # as Dom < 0.3 is dangerous long-term (Phase cannot shape representation)
 
         if self.dom_ema < cfg.dom_low:
             # Phase is suppressed - increment LOCK streak
             self.lock_streak += 1
 
-            # Check trigger conditions: persistence AND rising velocity
-            velocity_trigger = (velocity is None or velocity > cfg.lock_velocity_trigger)
-
-            if self.lock_streak >= cfg.lock_persistence and velocity_trigger:
+            # Trigger on persistence alone (velocity used for intensity, not gating)
+            if self.lock_streak >= cfg.lock_persistence:
                 # Engage Phase-assist mode
                 if not self.lock_correction_active:
                     self.lock_correction_active = True
