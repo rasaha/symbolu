@@ -253,14 +253,20 @@ class SovereignOutputHead(nn.Module):
     - R-Signal logits (intent prediction)
     - S-Signal logits (referent prediction)
     - C-Signal reconstruction (phonetic structure)
+    - Vritti logits (cognitive mode prediction) - optional
     """
 
-    def __init__(self, config: Optional[SovereignEmbeddingConfig] = None):
+    def __init__(
+        self,
+        config: Optional[SovereignEmbeddingConfig] = None,
+        use_vritti: bool = False,
+    ):
         """
         Initialize output head.
 
         Args:
             config: Configuration object
+            use_vritti: Whether to include Vritti head for cognitive mode prediction
         """
         super().__init__()
 
@@ -268,6 +274,7 @@ class SovereignOutputHead(nn.Module):
             config = SovereignEmbeddingConfig()
 
         self.config = config
+        self.use_vritti = use_vritti
 
         # Token prediction (tied with body embedding)
         self.token_proj = nn.Linear(config.d_model, config.vocab_size, bias=False)
@@ -276,6 +283,17 @@ class SovereignOutputHead(nn.Module):
         self.r_head = nn.Linear(config.d_model, config.r_classes)
         self.s_head = nn.Linear(config.d_model, config.s_classes)
         self.c_head = nn.Linear(config.d_model, config.c_input)
+
+        # Vritti head (optional) - predicts cognitive mode from R-signal portion
+        if use_vritti:
+            # The R-signal occupies dims [body_dim : body_dim + r_dim] of the hidden state
+            # We extract this and predict Vritti from it
+            self.vritti_head = nn.Sequential(
+                nn.Linear(config.r_dim, config.r_dim // 2),
+                nn.ReLU(),
+                nn.Dropout(0.1),
+                nn.Linear(config.r_dim // 2, 5),  # 5 Vritti states
+            )
 
     def forward(
         self, hidden_states: torch.Tensor
@@ -299,6 +317,42 @@ class SovereignOutputHead(nn.Module):
         c_pred = torch.tanh(self.c_head(hidden_states))  # Bound to [-1, 1]
 
         return token_logits, r_logits, s_logits, c_pred
+
+    def forward_with_vritti(
+        self, hidden_states: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Compute output predictions including Vritti.
+
+        Args:
+            hidden_states: Transformer output [B, Seq, d_model]
+
+        Returns:
+            Tuple of:
+            - token_logits: [B, Seq, vocab_size]
+            - r_logits: [B, Seq, r_classes]
+            - s_logits: [B, Seq, s_classes]
+            - c_pred: [B, Seq, c_input]
+            - vritti_logits: [B, Seq, 5]
+        """
+        token_logits = self.token_proj(hidden_states)
+        r_logits = self.r_head(hidden_states)
+        s_logits = self.s_head(hidden_states)
+        c_pred = torch.tanh(self.c_head(hidden_states))
+
+        if self.use_vritti:
+            # Extract R-signal portion from hidden state
+            # R-signal is at dims [body_dim : body_dim + r_dim]
+            body_dim = self.config.body_dim
+            r_dim = self.config.r_dim
+            r_signal = hidden_states[:, :, body_dim : body_dim + r_dim]
+            vritti_logits = self.vritti_head(r_signal)
+        else:
+            # Return zeros if Vritti not enabled
+            B, Seq = hidden_states.shape[:2]
+            vritti_logits = torch.zeros(B, Seq, 5, device=hidden_states.device)
+
+        return token_logits, r_logits, s_logits, c_pred, vritti_logits
 
     def tie_weights(self, embedding: SovereignEmbedding):
         """Tie token projection weights with body embedding."""

@@ -101,6 +101,50 @@ S_SIGNAL_MAP: Dict[str, int] = {
     "tops": 0,
 }
 
+# Vritti Mapping (POS + Context → Cognitive Modes)
+# 0=Pramāṇa (Truth), 1=Viparyaya (Error), 2=Vikalpa (Imagination),
+# 3=Smṛti (Memory), 4=Nidrā (Dormancy)
+VRITTI_FROM_POS: Dict[str, int] = {
+    # Nouns → Pramāṇa (Truth/Facts)
+    "NN": 0, "NNS": 0, "NNP": 0, "NNPS": 0,
+    # Verbs of being/state → Pramāṇa
+    "VB": 3, "VBD": 3, "VBG": 2, "VBN": 0, "VBP": 3, "VBZ": 3,
+    # Adjectives → Vikalpa (Imagination/Quality)
+    "JJ": 2, "JJR": 2, "JJS": 2,
+    # Adverbs → Vikalpa (Modification/Creative)
+    "RB": 2, "RBR": 2, "RBS": 2,
+    # Connectors → Nidrā (Transition/Filler)
+    "IN": 4, "TO": 4, "CC": 4,
+    # Pronouns/Determiners → Smṛti (Memory/Reference)
+    "DT": 3, "PRP": 3, "PRP$": 3, "WP": 3, "WP$": 3, "WDT": 3, "WRB": 3,
+    # Numbers → Pramāṇa (Facts)
+    "CD": 0,
+    # Modals → Vikalpa (Hypothetical)
+    "MD": 2,
+    # Punctuation → Nidrā (Dormancy)
+    ".": 4, ",": 4, ":": 4, ";": 4, "!": 4, "?": 4,
+    # Default
+    "DEFAULT": 4,
+}
+
+# Words that indicate specific Vritti states (context override)
+VRITTI_KEYWORDS: Dict[str, int] = {
+    # Pramāṇa (Truth) indicators
+    "is": 0, "are": 0, "was": 0, "were": 0, "fact": 0, "true": 0,
+    "actually": 0, "indeed": 0, "certainly": 0, "definitely": 0,
+    # Viparyaya (Error/Correction) indicators
+    "not": 1, "never": 1, "wrong": 1, "incorrect": 1, "false": 1,
+    "but": 1, "however": 1, "although": 1, "mistake": 1,
+    # Vikalpa (Imagination) indicators
+    "imagine": 2, "perhaps": 2, "maybe": 2, "could": 2, "might": 2,
+    "would": 2, "should": 2, "dream": 2, "wish": 2, "if": 2,
+    # Smṛti (Memory) indicators
+    "remember": 3, "recall": 3, "before": 3, "previous": 3, "earlier": 3,
+    "he": 3, "she": 3, "it": 3, "they": 3, "this": 3, "that": 3,
+    # Nidrā (Dormancy) indicators - handled by punctuation
+}
+
+
 # R-Signal Mapping (POS Tags → Ontology Layers)
 R_SIGNAL_MAP: Dict[str, int] = {
     # Verbs → Execution layers
@@ -337,6 +381,64 @@ class SovereignTokenizer:
         except Exception:
             return 11, "O12_NEUTRAL"
 
+    def get_vritti_signal(
+        self, word: str, context_words: Optional[List[str]] = None
+    ) -> Tuple[int, str]:
+        """
+        Compute Vritti signal (cognitive mode).
+
+        Maps words to one of 5 cognitive states:
+        0 = Pramāṇa (Truth/Logic)
+        1 = Viparyaya (Error/Correction)
+        2 = Vikalpa (Imagination/Creative)
+        3 = Smṛti (Memory/Reference)
+        4 = Nidrā (Dormancy/Filler)
+
+        Args:
+            word: The word to classify
+            context_words: Surrounding words for context
+
+        Returns:
+            Tuple of (vritti_id, vritti_name)
+        """
+        word_lower = word.lower()
+
+        # Check keyword overrides first
+        if word_lower in VRITTI_KEYWORDS:
+            vritti = VRITTI_KEYWORDS[word_lower]
+        else:
+            # Fall back to POS-based mapping
+            if self._nltk_ready:
+                try:
+                    pos_tags = nltk.pos_tag([word])
+                    pos = pos_tags[0][1] if pos_tags else "DEFAULT"
+                except Exception:
+                    pos = "DEFAULT"
+            else:
+                pos = "DEFAULT"
+
+            vritti = VRITTI_FROM_POS.get(pos, VRITTI_FROM_POS["DEFAULT"])
+
+        # Context-aware adjustments
+        if context_words:
+            context_lower = [w.lower() for w in context_words]
+
+            # If negation nearby, shift toward Viparyaya
+            negation_words = {"not", "never", "no", "neither", "nor", "but"}
+            if any(neg in context_lower for neg in negation_words):
+                # Only shift if within window
+                if word_lower not in negation_words:
+                    vritti = max(vritti, 1)  # Lean toward Viparyaya
+
+            # If hypothetical words nearby, shift toward Vikalpa
+            hypothetical_words = {"if", "maybe", "perhaps", "could", "might", "imagine"}
+            if any(hyp in context_lower for hyp in hypothetical_words):
+                if word_lower not in hypothetical_words:
+                    vritti = 2  # Vikalpa
+
+        vritti_names = ["PRAMANA", "VIPARYAYA", "VIKALPA", "SMRITI", "NIDRA"]
+        return vritti, vritti_names[vritti]
+
     def get_guna_state(self, attention_entropy: float = 0.5) -> np.ndarray:
         """
         Compute Guna state from attention entropy.
@@ -404,6 +506,7 @@ class SovereignTokenizer:
         s_signals = torch.zeros(B, Seq, dtype=torch.long)
         r_signals = torch.zeros(B, Seq, dtype=torch.long)
         g_states = torch.zeros(B, Seq, 3, dtype=torch.float32)
+        v_signals = torch.zeros(B, Seq, dtype=torch.long)  # Vritti signals
 
         # Process each sequence
         for b in range(B):
@@ -431,6 +534,10 @@ class SovereignTokenizer:
                 r_signal, _ = self.get_r_signal(clean_word)
                 r_signals[b, i] = r_signal
 
+                # Vritti signal (cognitive mode)
+                vritti, _ = self.get_vritti_signal(clean_word, context_words)
+                v_signals[b, i] = vritti
+
                 # Guna state (position-based entropy estimate)
                 entropy = i / max(Seq - 1, 1)  # Simple positional entropy
                 g_states[b, i] = torch.tensor(self.get_guna_state(entropy))
@@ -442,6 +549,7 @@ class SovereignTokenizer:
             "s_signals": s_signals,
             "r_signals": r_signals,
             "g_states": g_states,
+            "v_signals": v_signals,  # Vritti cognitive modes
         }
 
     def analyze_sentence(self, sentence: str, verbose: bool = True) -> Dict[str, Any]:
