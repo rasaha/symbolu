@@ -318,8 +318,18 @@ class WikitextSovereignDataset(Dataset):
         }
 
 
-def load_wikitext(split="train", max_samples=None):
-    """Load Wikitext-2 dataset."""
+def load_dataset_texts(dataset_name, split="train", max_samples=None):
+    """
+    Load dataset texts from HuggingFace.
+
+    Supported datasets:
+    - wikitext-2: Wikitext-2-raw-v1
+    - wikitext-103: Wikitext-103-raw-v1
+    - openwebtext: OpenWebText
+    - c4: C4 (en subset)
+    - bookcorpus: BookCorpus
+    - pile: The Pile (subset)
+    """
     try:
         from datasets import load_dataset
     except ImportError:
@@ -327,16 +337,56 @@ def load_wikitext(split="train", max_samples=None):
         os.system("pip install datasets")
         from datasets import load_dataset
 
-    print(f"Loading Wikitext-2 ({split})...")
-    dataset = load_dataset("wikitext", "wikitext-2-raw-v1", split=split)
+    dataset_name = dataset_name.lower()
 
-    # Filter empty lines and short texts
-    texts = [t for t in dataset["text"] if len(t.strip()) > 50]
+    # Dataset configurations
+    DATASET_CONFIGS = {
+        "wikitext-2": ("wikitext", "wikitext-2-raw-v1", "text"),
+        "wikitext-103": ("wikitext", "wikitext-103-raw-v1", "text"),
+        "openwebtext": ("openwebtext", None, "text"),
+        "c4": ("allenai/c4", "en", "text"),
+        "bookcorpus": ("bookcorpus", None, "text"),
+        "pile": ("monology/pile-uncopyrighted", None, "text"),
+        "tinystories": ("roneneldan/TinyStories", None, "text"),
+    }
 
-    if max_samples:
-        texts = texts[:max_samples]
+    if dataset_name not in DATASET_CONFIGS:
+        available = ", ".join(DATASET_CONFIGS.keys())
+        raise ValueError(f"Unknown dataset: {dataset_name}. Available: {available}")
 
-    print(f"Loaded {len(texts)} samples")
+    repo, config, text_field = DATASET_CONFIGS[dataset_name]
+
+    print(f"Loading {dataset_name} ({split})...")
+
+    # Handle streaming for large datasets
+    if dataset_name in ["c4", "pile", "openwebtext"]:
+        print("  (Using streaming for large dataset)")
+        if config:
+            dataset = load_dataset(repo, config, split=split, streaming=True)
+        else:
+            dataset = load_dataset(repo, split=split, streaming=True)
+
+        texts = []
+        for i, item in enumerate(dataset):
+            text = item[text_field]
+            if len(text.strip()) > 50:
+                texts.append(text)
+            if max_samples and len(texts) >= max_samples:
+                break
+    else:
+        # Non-streaming for smaller datasets
+        if config:
+            dataset = load_dataset(repo, config, split=split)
+        else:
+            dataset = load_dataset(repo, split=split)
+
+        # Filter empty lines and short texts
+        texts = [t for t in dataset[text_field] if len(t.strip()) > 50]
+
+        if max_samples:
+            texts = texts[:max_samples]
+
+    print(f"Loaded {len(texts)} samples from {dataset_name}")
     return texts
 
 
@@ -518,15 +568,40 @@ def validate(model, dataloader, loss_fn, device):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train Sovereign Model on Wikitext")
+    parser = argparse.ArgumentParser(
+        description="Train Sovereign Model",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Supported datasets:
+  wikitext-2    Small Wikipedia subset (~2M tokens)
+  wikitext-103  Large Wikipedia subset (~100M tokens)
+  openwebtext   Web text corpus (streaming)
+  c4            Colossal Clean Crawled Corpus (streaming)
+  tinystories   Simple children's stories
+  bookcorpus    Book text corpus
+  pile          The Pile dataset (streaming)
+
+Examples:
+  python train_sovereign.py --dataset wikitext-2 --epochs 3
+  python train_sovereign.py --dataset tinystories --max_samples 10000 --sample_every 200
+  python train_sovereign.py --dataset c4 --max_samples 50000 --sample_every 500
+"""
+    )
+    # Dataset
+    parser.add_argument("--dataset", type=str, default="wikitext-2",
+                        help="Dataset to train on (default: wikitext-2)")
+    # Training
     parser.add_argument("--epochs", type=int, default=3, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size")
     parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
     parser.add_argument("--max_length", type=int, default=128, help="Max sequence length")
     parser.add_argument("--max_samples", type=int, default=None, help="Max training samples")
+    # Model
     parser.add_argument("--n_layers", type=int, default=6, help="Number of transformer layers")
+    # Output
     parser.add_argument("--save_dir", type=str, default="checkpoints/sovereign", help="Save directory")
-    parser.add_argument("--sample_every", type=int, default=100, help="Generate quality samples every N steps (0=disabled)")
+    parser.add_argument("--sample_every", type=int, default=100,
+                        help="Generate quality samples every N steps (0=disabled)")
     args = parser.parse_args()
 
     # Device
@@ -548,9 +623,19 @@ def main():
     tokenizer = SovereignTokenizer()
 
     # Load datasets
-    print("\n3. Loading datasets...")
-    train_texts = load_wikitext("train", max_samples=args.max_samples)
-    val_texts = load_wikitext("validation", max_samples=args.max_samples // 10 if args.max_samples else None)
+    print(f"\n3. Loading {args.dataset} dataset...")
+    train_texts = load_dataset_texts(args.dataset, split="train", max_samples=args.max_samples)
+
+    # Try to load validation split, fall back to using portion of train
+    val_max = args.max_samples // 10 if args.max_samples else 500
+    try:
+        val_texts = load_dataset_texts(args.dataset, split="validation", max_samples=val_max)
+    except Exception:
+        # Some datasets don't have validation split, use last portion of train
+        print("  No validation split, using 10% of train data")
+        split_idx = int(len(train_texts) * 0.9)
+        val_texts = train_texts[split_idx:]
+        train_texts = train_texts[:split_idx]
 
     # Create dataset and dataloader
     print("\n4. Creating dataloaders...")
