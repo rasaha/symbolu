@@ -200,6 +200,7 @@ def compute_semantic_ppl(
 #   - Dominance (ratio): Phase magnitude / Local magnitude (target: ~1.0)
 # =============================================================================
 
+@torch.no_grad()
 def measure_friction(
     model: nn.Module,
     local_layers: int = 6,
@@ -249,8 +250,8 @@ def measure_friction(
         if layer_idx is None:
             continue
 
-        grad_flat = param.grad.view(-1)
-        grad_norm = param.grad.norm().item()
+        grad_flat = param.grad.detach().view(-1)
+        grad_norm = param.grad.detach().norm().item()
 
         # Quadratic Group (layers 0-5: "Memory" / local attention)
         if layer_idx < local_layers:
@@ -1466,6 +1467,10 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
     handshake_triggered = False
     agc_threshold = config.agc_threshold if config.trinity_enabled else None
 
+    # V9.4.5: Persistent friction tracking (only measured on log intervals for performance)
+    fric_align, fric_dom = 0.0, 1.0
+    friction_penalty = 1.0
+
     # Infinite data iterator
     def infinite_loader(loader):
         while True:
@@ -1489,20 +1494,20 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
             continue
 
         # =====================================================================
-        # V9.4.5: FRICTION MEASUREMENT AND CORRECTION
+        # V9.4.5: FRICTION MEASUREMENT AND CORRECTION (on log intervals only)
         # =====================================================================
         # Measure gradient friction between Quadratic and Phase layer groups
         # and apply corrective action if persistent fighting is detected
+        # Performance: Skip expensive cosine similarity when not logging
 
-        fric_align, fric_dom = measure_friction(model, local_layers=6)
+        if state.step % config.log_every == 0:
+            fric_align, fric_dom = measure_friction(model, local_layers=6)
 
-        # Apply friction controller correction if enabled
-        if friction_controller is not None:
-            friction_penalty = friction_controller.update(fric_align, fric_dom)
-        else:
-            friction_penalty = 1.0  # No correction if disabled
+            # Apply friction controller correction if enabled
+            if friction_controller is not None:
+                friction_penalty = friction_controller.update(fric_align, fric_dom)
 
-        # Store in metrics for logging
+        # Store in metrics for logging (use last known values)
         metrics['friction_alignment'] = fric_align
         metrics['friction_dominance'] = fric_dom
         metrics['friction_penalty'] = friction_penalty
@@ -1927,8 +1932,8 @@ def main():
                        help="PIDv2 coherence threshold for full authority")
 
     # V9.4.3: Semantic Validation + Handshake Dampening
-    parser.add_argument("--pidv2_w_s", type=float, default=0.30,
-                       help="Semantic weight: 0.30 = 30%% prompt-based, 70%% general PPL")
+    parser.add_argument("--pidv2_w_s", type=float, default=0.25,
+                       help="Semantic weight: 0.25 = 25%% prompt-based, 75%% general PPL")
     parser.add_argument("--pidv2_semantic_scale", type=float, default=50.0,
                        help="Normalization scale for semantic PPL error")
     parser.add_argument("--pidv2_handshake_dampen", action="store_true", default=True,
@@ -1988,8 +1993,8 @@ def main():
                        help="Friction dominance low threshold (Memory lock) (default: 0.30)")
     parser.add_argument("--friction_dom_high", type=float, default=3.00,
                        help="Friction dominance high threshold (Phase riot) (default: 3.00)")
-    parser.add_argument("--friction_penalty_scale", type=float, default=0.15,
-                       help="Max authority cut from friction (default: 0.15 = 15%%)")
+    parser.add_argument("--friction_penalty_scale", type=float, default=0.30,
+                       help="Max authority cut from friction (default: 0.30 = 30%%)")
     parser.add_argument("--no_friction_controller", action="store_true",
                        help="Disable friction controller (monitoring only)")
 
