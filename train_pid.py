@@ -1591,6 +1591,8 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                 # Phase status
                 if state.step < config.phase_delay_steps:
                     phase_status = "FROZEN"
+                elif config.phase_ramp_steps <= 0:
+                    phase_status = "100%"  # No ramp = immediate full
                 else:
                     ramp_pct = min(100, int(100 * (state.step - config.phase_delay_steps) / config.phase_ramp_steps))
                     phase_status = f"{ramp_pct}%"
