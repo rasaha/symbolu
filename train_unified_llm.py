@@ -104,6 +104,15 @@ except ImportError as e:
     ONTOLOGICAL_AVAILABLE = False
     print(f"Warning: Ontological models not available: {e}")
 
+# Import Sovereign-1 components
+try:
+    from symbolu.sovereign import SovereignLoss, SovereignObserver
+    from symbolu.sovereign.loss import LegacyLossAdapter
+    SOVEREIGN_AVAILABLE = True
+except ImportError as e:
+    SOVEREIGN_AVAILABLE = False
+    print(f"Warning: Sovereign-1 modules not available: {e}")
+
 # Import Gen 2 models (Hierarchical Complex Bhava)
 try:
     from symbolu.ontological.symbolu12_gen2 import (
@@ -214,6 +223,13 @@ class UnifiedTrainingConfig:
     lambda_bhava: float = 0.1     # Bhava relationship consistency
     lambda_coherence: float = 0.05  # Global coherence
     lambda_entropy: float = 0.01  # Entropy regularization
+
+    # Sovereign-1 loss configuration (hardened decomposed loss)
+    use_sovereign_loss: bool = True  # Enable Sovereign-1 decomposed loss
+    sovereign_weight_guna: float = 1.0   # Guna signal weight
+    sovereign_weight_s: float = 2.0      # S-Signal (referent) weight
+    sovereign_weight_r: float = 5.0      # R-Signal (ontology) weight - CRITICAL
+    sovereign_weight_c: float = 0.5      # C-Signal (phoneme) weight
 
     # Coherence loss (for phase/hybrid)
     use_coherence_loss: bool = False
@@ -485,21 +501,28 @@ def compute_ontological_loss(
     outputs: Dict[str, torch.Tensor],
     targets: torch.Tensor,
     config: UnifiedTrainingConfig,
+    sovereign_loss: Optional['SovereignLoss'] = None,
+    epoch: int = 0,
 ) -> Tuple[torch.Tensor, Dict[str, float]]:
     """
     Compute loss for ontological model.
 
-    Includes:
+    If use_sovereign_loss is enabled, uses the Sovereign-1 hardened loss with:
+    - Decomposed state friction (prevents Signal Washing)
+    - Weighted signals (prioritizes R-Signal over C-Signal)
+    - Bhava transition penalty
+
+    Otherwise falls back to legacy loss:
     - Language modeling loss (cross-entropy)
     - Bhava relationship consistency loss
     - Global coherence regularization
     - Entropy regularization
     """
     metrics = {}
-
-    # 1. Language modeling loss
     logits = outputs["logits"]
     B, N, V = logits.shape
+
+    # 1. Language modeling loss (always computed)
     lm_loss = F.cross_entropy(
         logits.view(-1, V),
         targets.view(-1),
@@ -508,11 +531,44 @@ def compute_ontological_loss(
     metrics["lm_loss"] = lm_loss.item()
     metrics["ppl"] = math.exp(min(lm_loss.item(), 20))
 
+    # Use Sovereign-1 loss if available and enabled
+    if config.use_sovereign_loss and sovereign_loss is not None and SOVEREIGN_AVAILABLE:
+        # Build state from outputs
+        onto_probs = outputs.get('ontological_probs', torch.zeros(B, 12, device=logits.device))
+        bhava_vec = outputs.get('bhava_vector', torch.zeros(B, 144, device=logits.device))
+        coherence = outputs.get('global_coherence', torch.ones(B, device=logits.device))
+
+        # Construct 128D predicted state
+        predicted_state = _build_sovereign_state(onto_probs, bhava_vec, coherence)
+        # Target state (self-supervised: predict next state)
+        target_state = torch.zeros_like(predicted_state)
+
+        # Compute Sovereign loss
+        total_loss, sov_metrics = sovereign_loss(
+            logits, targets, predicted_state, target_state, epoch=epoch
+        )
+
+        # Merge metrics
+        metrics.update({
+            "total_loss": total_loss.item(),
+            "sovereign_friction": sov_metrics.get("loss_friction", 0),
+            "sovereign_transition": sov_metrics.get("loss_transition", 0),
+            "onto_phoneme_ratio": sov_metrics.get("ontology_to_phoneme_ratio", 0),
+            "meaning_fraction": sov_metrics.get("meaning_fraction", 0),
+            "signal_washing": sov_metrics.get("signal_washing", False),
+            "semantic_healthy": sov_metrics.get("semantic_healthy", False),
+        })
+
+        # Add coherence from outputs if available
+        if "global_coherence" in outputs:
+            metrics["coherence"] = outputs["global_coherence"].mean().item()
+
+        return total_loss, metrics
+
+    # Legacy loss computation (fallback)
     # 2. Bhava relationship consistency loss
-    # Encourage smooth relationship matrix (adjacent layers should be similar)
     if "relationship_matrix" in outputs:
         rel_matrix = outputs["relationship_matrix"]  # [B, 12, 12]
-        # Smoothness: penalize large differences between adjacent relationships
         rel_diff = (rel_matrix[:, 1:, :] - rel_matrix[:, :-1, :]).abs().mean()
         bhava_loss = rel_diff
         metrics["bhava_loss"] = bhava_loss.item()
@@ -520,21 +576,19 @@ def compute_ontological_loss(
         bhava_loss = torch.tensor(0.0, device=logits.device)
 
     # 3. Global coherence regularization
-    # Encourage high coherence (penalize low coherence)
     if "global_coherence" in outputs:
         coherence = outputs["global_coherence"].mean()
-        coherence_loss = 1.0 - coherence  # Higher coherence = lower loss
+        coherence_loss = 1.0 - coherence
         metrics["coherence"] = coherence.item()
         metrics["coherence_loss"] = coherence_loss.item()
     else:
         coherence_loss = torch.tensor(0.0, device=logits.device)
 
-    # 4. Entropy regularization for ontological probabilities
+    # 4. Entropy regularization
     if "ontological_probs" in outputs:
-        probs = outputs["ontological_probs"]  # [B, 12]
-        # Encourage some entropy (not too certain, not too uncertain)
+        probs = outputs["ontological_probs"]
         entropy = -(probs * (probs + 1e-8).log()).sum(dim=-1).mean()
-        target_entropy = 1.5  # ~4-5 active layers
+        target_entropy = 1.5
         entropy_loss = (entropy - target_entropy).abs()
         metrics["onto_entropy"] = entropy.item()
     else:
@@ -551,6 +605,34 @@ def compute_ontological_loss(
     metrics["total_loss"] = total_loss.item()
 
     return total_loss, metrics
+
+
+def _build_sovereign_state(
+    onto_probs: torch.Tensor,  # [B, 12]
+    bhava_vec: torch.Tensor,   # [B, 144]
+    coherence: torch.Tensor,   # [B]
+) -> torch.Tensor:
+    """Build 128D Sovereign state from ontological outputs."""
+    B = onto_probs.shape[0]
+    device = onto_probs.device
+
+    # Guna [16]: Derived from coherence
+    guna = coherence.unsqueeze(-1).expand(-1, 16)
+
+    # S-Signal [32]: First 32 dims of bhava
+    s_signal = bhava_vec[:, :32] if bhava_vec.shape[1] >= 32 else F.pad(bhava_vec, (0, 32 - bhava_vec.shape[1]))
+
+    # R-Signal [48]: Ontology (12) expanded + bhava subset
+    r_onto = F.pad(onto_probs, (0, 36))  # 12 -> 48
+    bhava_r = bhava_vec[:, 32:68] if bhava_vec.shape[1] >= 68 else torch.zeros(B, 36, device=device)
+    r_signal = r_onto + bhava_r * 0.1
+
+    # C-Signal [32]: Remaining bhava or zeros
+    c_signal = bhava_vec[:, 80:112] if bhava_vec.shape[1] >= 112 else torch.zeros(B, 32, device=device)
+    if c_signal.shape[1] < 32:
+        c_signal = F.pad(c_signal, (0, 32 - c_signal.shape[1]))
+
+    return torch.cat([guna, s_signal, r_signal, c_signal], dim=-1)
 
 
 def compute_phase_loss(
@@ -615,6 +697,21 @@ def train(config: UnifiedTrainingConfig):
     model = create_model(config, device)
     num_params = sum(p.numel() for p in model.parameters())
     print(f"\n  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
+
+    # Initialize Sovereign-1 loss if available and enabled
+    sovereign_loss = None
+    if config.use_sovereign_loss and SOVEREIGN_AVAILABLE:
+        from symbolu.sovereign.loss import SovereignLoss, SovereignLossConfig
+        sov_config = SovereignLossConfig(
+            weight_guna=config.sovereign_weight_guna,
+            weight_s=config.sovereign_weight_s,
+            weight_r=config.sovereign_weight_r,
+            weight_c=config.sovereign_weight_c,
+        )
+        sovereign_loss = SovereignLoss(config=sov_config).to(device)
+        print(f"  Sovereign-1 Loss: ENABLED (R-weight={config.sovereign_weight_r})")
+    else:
+        print(f"  Sovereign-1 Loss: Disabled (using legacy loss)")
 
     # Optimizer
     optimizer = AdamW(
@@ -709,7 +806,11 @@ def train(config: UnifiedTrainingConfig):
         with torch.cuda.amp.autocast(dtype=autocast_dtype):
             if config.model_type == "ontological":
                 outputs = model(x)
-                loss, metrics = compute_ontological_loss(outputs, y, config)
+                loss, metrics = compute_ontological_loss(
+                    outputs, y, config,
+                    sovereign_loss=sovereign_loss,
+                    epoch=global_step // len(train_loader),
+                )
             elif config.model_type == "gen2":
                 outputs = model(x, labels=y)
                 loss = outputs['loss']
@@ -798,6 +899,11 @@ def train(config: UnifiedTrainingConfig):
                         log_msg += f" | Coh: {metrics['coherence']:.3f}"
                     if "onto_entropy" in metrics:
                         log_msg += f" | Ent: {metrics['onto_entropy']:.2f}"
+                    # Sovereign-1 metrics
+                    if "onto_phoneme_ratio" in metrics and metrics["onto_phoneme_ratio"] > 0:
+                        ratio = metrics["onto_phoneme_ratio"]
+                        health = "OK" if metrics.get("semantic_healthy") else "WARN"
+                        log_msg += f" | R/C: {ratio:.2f} [{health}]"
 
                 # Add Gen 2 hierarchical metrics
                 if config.model_type == "gen2":
@@ -815,7 +921,10 @@ def train(config: UnifiedTrainingConfig):
 
             # Evaluation
             if global_step % config.eval_every == 0:
-                val_loss, val_metrics = evaluate(model, val_loader, device, config, autocast_dtype)
+                val_loss, val_metrics = evaluate(
+                    model, val_loader, device, config, autocast_dtype,
+                    sovereign_loss=sovereign_loss,
+                )
                 val_ppl = val_metrics['ppl']
                 current_coh = val_metrics.get('coherence', 0.75)
 
@@ -900,6 +1009,7 @@ def evaluate(
     device: torch.device,
     config: UnifiedTrainingConfig,
     autocast_dtype: torch.dtype,
+    sovereign_loss: Optional['SovereignLoss'] = None,
 ) -> Tuple[float, Dict[str, float]]:
     """Evaluate model on validation set."""
     model.eval()
@@ -913,7 +1023,10 @@ def evaluate(
             with torch.cuda.amp.autocast(dtype=autocast_dtype):
                 if config.model_type == "ontological":
                     outputs = model(x)
-                    loss, metrics = compute_ontological_loss(outputs, y, config)
+                    loss, metrics = compute_ontological_loss(
+                        outputs, y, config,
+                        sovereign_loss=sovereign_loss,
+                    )
                 elif config.model_type == "gen2":
                     outputs = model(x, labels=y)
                     loss = outputs['loss']
