@@ -745,6 +745,72 @@ def test_disambiguation():
 
 ---
 
-*Document Version: 1.0.0*
+## Appendix D: Phase Memory Integration
+
+### D.1 The Phase "Hippocampus"
+
+After the Sovereign foundation is stable, the Phase Memory system integrates with the Sovereign Header. Instead of learning random phase angles, the Phase layers "listen" to the Sovereign signals.
+
+**Key Integration Points:**
+
+| Signal | Phase Role | Effect |
+|--------|-----------|--------|
+| **R-Signal** | Phase Seeding | Intent-aligned words get aligned phases → constructive interference |
+| **S-Signal** | Amplitude Gating | High reality-lock words persist longer in memory |
+
+### D.2 SovereignPhaseAttention Architecture
+
+```
+R-Signal (Intent) ──→ Phase Angle φ ──→ Complex Rotation
+                                              │
+Input x ────────────────────────────────────→ ⊗ ──→ Output
+                                              │
+S-Signal (Reality) ──→ Amplitude Gate ────────┘
+```
+
+**Location:** `symbolu/sovereign/phase_attention.py`
+
+```python
+class SovereignPhaseAttention(nn.Module):
+    def __init__(self, d_model, n_heads, r_classes=12, s_classes=17):
+        # R-Signal → Phase angle mapping
+        self.r_to_phi = nn.Embedding(r_classes, n_heads)
+
+        # S-Signal → Amplitude gate
+        self.s_to_amplitude = nn.Embedding(s_classes, n_heads)
+```
+
+### D.3 Training Strategy
+
+**Phase 1: Sovereign Burn-In (Foundation)**
+1. Train pure Sovereign Transformer (no Phase layers)
+2. Success: Model generates coherent sentences that "stick" to topic
+3. Validate: If R-Signal drifts, loss spikes (PID catches it)
+
+**Phase 2: Phase Handshake (Memory)**
+1. Add `SovereignPhaseAttention` layers
+2. Phase layers have grounded signal to track over long distances
+3. Intent-aligned words naturally cluster via phase interference
+
+### D.4 Why This Works
+
+```
+Before (Hybrid):
+  - Phase layer guesses random angles
+  - Model must learn meaning from statistical noise
+  - Overwhelmed by competing signals
+
+After (Sovereign Phase):
+  - Phase angle seeded by R-Signal (Intent)
+  - Words with same intent → same phase → constructive interference
+  - Model "remembers" topics via phase alignment
+```
+
+**Key Insight:** The Sovereign Pre-Frontal Cortex (embedding) + Phase Hippocampus (memory) creates a system that doesn't guess—it constructs.
+
+---
+
+*Document Version: 1.1.0*
 *Created: 2026-01-02*
+*Updated: 2026-01-02 (Added Phase Integration)*
 *Authors: Symbol-U Development Team*
