@@ -32,6 +32,131 @@ from symbolu.sovereign.embedding import (
 from symbolu.sovereign.tagger import SovereignTokenizer
 from symbolu.sovereign.train_loss import MultiObjectiveLoss, TrainingLossConfig
 
+# Default quality sample prompts
+DEFAULT_SAMPLE_PROMPTS = [
+    "The history of the Roman Empire began when",
+    "In computer science, algorithms are",
+    "The weather today is expected to be",
+]
+
+
+def generate_sample(
+    model: nn.Module,
+    tokenizer: SovereignTokenizer,
+    prompt: str,
+    device: torch.device,
+    max_new_tokens: int = 50,
+    temperature: float = 0.8,
+    top_p: float = 0.9,
+) -> str:
+    """
+    Generate text from a prompt using the Sovereign model.
+
+    Uses nucleus (top-p) sampling with temperature for diverse outputs.
+    The SovereignTokenizer generates C/S/R/G signals for each token.
+    """
+    model.eval()
+
+    with torch.no_grad():
+        # Get initial encoding with signals
+        batch = tokenizer.process_batch([prompt], max_length=512)
+
+        input_ids = batch["input_ids"].to(device)
+        c_signals = batch["c_signals"].to(device)
+        s_signals = batch["s_signals"].to(device)
+        r_signals = batch["r_signals"].to(device)
+        g_states = batch["g_states"].to(device)
+
+        # Generate tokens one by one
+        for _ in range(max_new_tokens):
+            # Forward pass
+            token_logits, _, _, _ = model(
+                input_ids, c_signals, s_signals, r_signals, g_states
+            )
+
+            # Get next token logits (last position)
+            next_logits = token_logits[:, -1, :] / temperature
+
+            # Top-p (nucleus) sampling
+            sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
+            cumsum = torch.cumsum(torch.softmax(sorted_logits, dim=-1), dim=-1)
+
+            # Remove tokens with cumulative probability above threshold
+            sorted_indices_to_remove = cumsum > top_p
+            sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+            sorted_indices_to_remove[:, 0] = False
+
+            # Set removed tokens to -inf
+            indices_to_remove = sorted_indices_to_remove.scatter(
+                1, sorted_indices, sorted_indices_to_remove
+            )
+            next_logits[indices_to_remove] = float("-inf")
+
+            # Sample next token
+            probs = torch.softmax(next_logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+
+            # Decode the new token to get its signals
+            new_token_str = tokenizer.tokenizer.decode(next_token[0])
+            new_batch = tokenizer.process_batch([new_token_str], max_length=16)
+
+            # Append new token and its signals
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+            c_signals = torch.cat([c_signals, new_batch["c_signals"][:, :1].to(device)], dim=1)
+            s_signals = torch.cat([s_signals, new_batch["s_signals"][:, :1].to(device)], dim=1)
+            r_signals = torch.cat([r_signals, new_batch["r_signals"][:, :1].to(device)], dim=1)
+            g_states = torch.cat([g_states, new_batch["g_states"][:, :1].to(device)], dim=1)
+
+            # Stop at EOS
+            if next_token.item() == tokenizer.tokenizer.eos_token_id:
+                break
+
+    # Decode full sequence (skip prompt tokens)
+    prompt_len = batch["input_ids"].shape[1]
+    generated_ids = input_ids[0, prompt_len:]
+    generated_text = tokenizer.tokenizer.decode(generated_ids, skip_special_tokens=True)
+
+    model.train()
+    return generated_text
+
+
+def run_quality_samples(
+    model: nn.Module,
+    tokenizer: SovereignTokenizer,
+    prompts: list,
+    device: torch.device,
+    step: int,
+):
+    """
+    Generate sample outputs to monitor training quality.
+
+    This provides a qualitative check that the model is learning
+    meaningful language patterns, not just minimizing perplexity.
+    """
+    print("")
+    print("=" * 60)
+    print(f"  📝 QUALITY SAMPLES (Step {step})")
+    print("=" * 60)
+
+    for prompt in prompts:
+        try:
+            generated = generate_sample(
+                model, tokenizer, prompt, device,
+                max_new_tokens=50,
+                temperature=0.8,
+                top_p=0.9,
+            )
+            # Clean up and truncate for display
+            generated = generated.strip().replace("\n", " ")[:200]
+            print(f'  Prompt: "{prompt}"')
+            print(f'  Output: "{generated}"')
+            print("")
+        except Exception as e:
+            print(f"  Sampling failed for prompt '{prompt[:30]}...': {e}")
+
+    print("=" * 60)
+    print("")
+
 
 def sovereign_collate_fn(batch):
     """Custom collate function that pads tensors to the same length."""
@@ -173,14 +298,20 @@ def load_wikitext(split="train", max_samples=None):
     return texts
 
 
-def train_epoch(model, dataloader, optimizer, loss_fn, device, epoch):
-    """Train for one epoch."""
+def train_epoch(
+    model, dataloader, optimizer, loss_fn, device, epoch,
+    tokenizer=None, sample_every=0, sample_prompts=None, global_step=0
+):
+    """Train for one epoch with optional quality sampling."""
     model.train()
     total_loss = 0
     num_batches = 0
+    step = global_step
 
     pbar = tqdm(dataloader, desc=f"Epoch {epoch+1}")
     for batch in pbar:
+        step += 1
+
         # Move to device
         input_ids = batch["input_ids"].to(device)
         c_signals = batch["c_signals"].to(device)
@@ -228,12 +359,17 @@ def train_epoch(model, dataloader, optimizer, loss_fn, device, epoch):
 
         # Update progress bar
         pbar.set_postfix({
+            "step": step,
             "loss": f"{loss_output.total.item():.4f}",
             "token": f"{loss_output.token:.4f}",
             "r": f"{loss_output.r_signal:.4f}",
         })
 
-    return total_loss / num_batches
+        # Quality sampling
+        if sample_every > 0 and step % sample_every == 0 and tokenizer is not None:
+            run_quality_samples(model, tokenizer, sample_prompts or DEFAULT_SAMPLE_PROMPTS, device, step)
+
+    return total_loss / num_batches, step
 
 
 def main():
@@ -245,6 +381,7 @@ def main():
     parser.add_argument("--max_samples", type=int, default=None, help="Max training samples")
     parser.add_argument("--n_layers", type=int, default=6, help="Number of transformer layers")
     parser.add_argument("--save_dir", type=str, default="checkpoints/sovereign", help="Save directory")
+    parser.add_argument("--sample_every", type=int, default=100, help="Generate quality samples every N steps (0=disabled)")
     args = parser.parse_args()
 
     # Device
@@ -300,15 +437,24 @@ def main():
     print("\n" + "=" * 70)
     print("TRAINING")
     print("=" * 70)
+    if args.sample_every > 0:
+        print(f"Quality samples every {args.sample_every} steps")
 
     os.makedirs(args.save_dir, exist_ok=True)
     best_loss = float("inf")
+    global_step = 0
 
     for epoch in range(args.epochs):
-        avg_loss = train_epoch(model, dataloader, optimizer, loss_fn, device, epoch)
+        avg_loss, global_step = train_epoch(
+            model, dataloader, optimizer, loss_fn, device, epoch,
+            tokenizer=tokenizer,
+            sample_every=args.sample_every,
+            sample_prompts=DEFAULT_SAMPLE_PROMPTS,
+            global_step=global_step,
+        )
         scheduler.step()
 
-        print(f"\nEpoch {epoch+1}/{args.epochs} - Avg Loss: {avg_loss:.4f}")
+        print(f"\nEpoch {epoch+1}/{args.epochs} - Avg Loss: {avg_loss:.4f} - Steps: {global_step}")
 
         # Save checkpoint
         if avg_loss < best_loss:
