@@ -30,6 +30,7 @@ from symbolu.sovereign.embedding import (
     SovereignEmbeddingConfig,
     SovereignOutputHead,
 )
+from symbolu.sovereign.metrics import SovereignMetrics
 from symbolu.sovereign.tagger import SovereignTokenizer
 from symbolu.sovereign.train_loss import MultiObjectiveLoss, TrainingLossConfig
 
@@ -662,6 +663,8 @@ Examples:
                         help="Save directory")
     parser.add_argument("--sample_every", type=int, default=500,
                         help="Generate quality samples every N steps (0=disabled)")
+    parser.add_argument("--health_check_every", type=int, default=100,
+                        help="Print Sovereign health dashboard every N steps (0=disabled)")
     parser.add_argument("--save_every", type=int, default=1000,
                         help="Save checkpoint every N steps")
     parser.add_argument("--log_every", type=int, default=10,
@@ -777,6 +780,8 @@ Examples:
     print(f"  Total steps: {total_steps} | LR: {args.lr}")
     if args.sample_every > 0:
         print(f"  Quality samples every {args.sample_every} steps")
+    if args.health_check_every > 0:
+        print(f"  Health dashboard every {args.health_check_every} steps")
     if args.use_guna_coherence:
         print(f"  Guna coherence loss: ENABLED (lambda={args.lambda_guna})")
     print("=" * 70)
@@ -884,6 +889,19 @@ Examples:
                 # Quality sampling
                 if args.sample_every > 0 and global_step % args.sample_every == 0:
                     run_quality_samples(model, tokenizer, DEFAULT_SAMPLE_PROMPTS, device, global_step)
+
+                # Sovereign Health Check dashboard
+                if args.health_check_every > 0 and global_step % args.health_check_every == 0:
+                    health_stats = SovereignMetrics.get_health_stats(
+                        token_logits, r_logits, s_logits,
+                        target_tokens, target_r, target_s
+                    )
+                    guna_coherence = SovereignMetrics.get_guna_coherence(g_states)
+                    guna_state = SovereignMetrics.get_guna_state(g_states)
+                    dashboard = SovereignMetrics.format_health_check(
+                        global_step, health_stats, guna_state, guna_coherence, ppl=token_ppl
+                    )
+                    print(dashboard)
 
                 # Periodic checkpoint
                 if args.save_every > 0 and global_step % args.save_every == 0:
