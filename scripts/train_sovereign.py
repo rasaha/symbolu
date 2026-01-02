@@ -33,6 +33,61 @@ from symbolu.sovereign.tagger import SovereignTokenizer
 from symbolu.sovereign.train_loss import MultiObjectiveLoss, TrainingLossConfig
 
 
+def sovereign_collate_fn(batch):
+    """Custom collate function that pads tensors to the same length."""
+    # Find max sequence length in this batch
+    max_len = max(item["input_ids"].shape[0] for item in batch)
+
+    # Pad each tensor to max_len
+    padded_batch = {
+        "input_ids": [],
+        "c_signals": [],
+        "s_signals": [],
+        "r_signals": [],
+        "g_states": [],
+        "attention_mask": [],
+    }
+
+    for item in batch:
+        seq_len = item["input_ids"].shape[0]
+        pad_len = max_len - seq_len
+
+        # Pad input_ids with 0 (typically pad token)
+        padded_batch["input_ids"].append(
+            torch.nn.functional.pad(item["input_ids"], (0, pad_len), value=0)
+        )
+        # Pad c_signals [seq, 32] -> pad on seq dimension
+        padded_batch["c_signals"].append(
+            torch.nn.functional.pad(item["c_signals"], (0, 0, 0, pad_len), value=0)
+        )
+        # Pad s_signals [seq]
+        padded_batch["s_signals"].append(
+            torch.nn.functional.pad(item["s_signals"], (0, pad_len), value=0)
+        )
+        # Pad r_signals [seq]
+        padded_batch["r_signals"].append(
+            torch.nn.functional.pad(item["r_signals"], (0, pad_len), value=0)
+        )
+        # Pad g_states [seq, 3] -> pad on seq dimension
+        padded_batch["g_states"].append(
+            torch.nn.functional.pad(item["g_states"], (0, 0, 0, pad_len), value=0)
+        )
+        # Pad attention_mask [seq]
+        padded_batch["attention_mask"].append(
+            torch.nn.functional.pad(item["attention_mask"], (0, pad_len), value=0)
+        )
+
+    # Stack into batch tensors
+    return {
+        "input_ids": torch.stack(padded_batch["input_ids"]),
+        "c_signals": torch.stack(padded_batch["c_signals"]),
+        "s_signals": torch.stack(padded_batch["s_signals"]),
+        "r_signals": torch.stack(padded_batch["r_signals"]),
+        "g_states": torch.stack(padded_batch["g_states"]),
+        "attention_mask": torch.stack(padded_batch["attention_mask"]),
+    }
+
+
 class SovereignTransformer(nn.Module):
     """Sovereign Transformer for training."""
 
@@ -223,6 +278,7 @@ def main():
         shuffle=True,
         num_workers=0,  # NLTK not fork-safe
         drop_last=True,
+        collate_fn=sovereign_collate_fn,
     )
     print(f"   Batches per epoch: {len(dataloader)}")
 
