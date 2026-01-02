@@ -1,9 +1,9 @@
 # Sovereign-1: Design Implementation Document
 
-**Status**: COMPLETE - All specifications finalized, ready for implementation
-**Date**: 2026-01-02 (Final)
+**Status**: IMPLEMENTATION IN PROGRESS - Phase 1 complete (Loss, Observer, BhavaTransitionPrior)
+**Date**: 2026-01-02 (Updated)
 **Purpose**: Evaluate existing Symbolu codebase against Sovereign-1 specification and define implementation path
-**Revision**: v2.0 - Complete specification with Helper Classes, Resolved Questions, Training Loop, Sovereign Shift, and COGNADE SDK
+**Revision**: v2.1 - Added Section 11 (Implementation Notes) documenting actual code implementation
 
 ---
 
@@ -1290,7 +1290,163 @@ Combined, they provide both prevention and correction.
 
 ---
 
-## 11. Approval Checklist
+## 11. Implementation Notes (Software Reference)
+
+**Status**: Phase 1 Complete - Core modules implemented and integrated with training script.
+
+This section documents the actual implementation of Sovereign-1 components in the codebase.
+
+### 11.1 Package Structure (Implemented)
+
+```
+symbolu/sovereign/
+├── __init__.py          # Package exports: SovereignLoss, SovereignObserver, BhavaTransitionPrior
+├── loss.py              # SovereignLoss with decomposed state friction ✅
+└── observer.py          # SovereignObserver and BhavaTransitionPrior ✅
+
+(Pending implementation)
+├── embedding.py         # SovereignEmbedding [1024D]
+├── pid_governor.py      # PIDGovernor module
+├── transformer.py       # SovereignTransformer (hybrid)
+├── router.py            # SovereignRouter (Sovereign Shift)
+└── guna.py              # SovereignGunaComputer
+```
+
+### 11.2 Implemented Components
+
+#### A. SovereignLoss (`symbolu/sovereign/loss.py`)
+
+Implements the decomposed state friction loss to prevent Signal Washing:
+
+```python
+# Key Features:
+- DEFAULT_WEIGHTS = {"guna": 1.0, "s": 2.0, "r": 5.0, "c": 0.5}
+- Alpha decay from 1.0 → 0.2 over 3 epochs
+- Bhava transition penalty (β=0.5)
+- Diagnostic metrics: ontology_to_phoneme_ratio, meaning_fraction, signal_washing
+
+# State Layout:
+- Guna[0:16] | S-Signal[16:48] | R-Signal[48:96] | C-Signal[96:128]
+```
+
+Includes `LegacyLossAdapter` for bridging existing model outputs (12D ontology + 144D bhava) to Sovereign 128D state.
+
+#### B. SovereignObserver (`symbolu/sovereign/observer.py`)
+
+Computes the 128-D State Delta from token/attention/hidden state inputs:
+
+```python
+# Signals computed:
+- Guna Pulse [16D]: From attention entropy (Sattva), hidden variance (Rajas), token similarity (Tamas)
+- S-Signal [32D]: Referent class lookup from token_ids
+- R-Signal [48D]: Ontology projection via MLP (hidden_states → 48D)
+- C-Signal [32D]: Phoneme features from lookup table
+
+# Key Methods:
+- compute_guna(): Attention-based Guna derivation
+- compute_s_signal(): Referent lookup
+- compute_r_signal(): Ontology projection (learnable MLP)
+- compute_c_signal(): Phoneme lookup (static table)
+```
+
+#### C. BhavaTransitionPrior (`symbolu/sovereign/observer.py`)
+
+Implements the 12×12 transition mask for ontological validation:
+
+```python
+# BHAVA_TRANSITION_MASK: 12×12 matrix
+# Rows/Columns: FACTUAL, ANALYTICAL, EVALUATIVE, NARRATIVE, ARGUMENTATIVE,
+#               INSTRUCTIVE, CERTAIN, SPECULATIVE, QUESTIONING, POSITIVE, NEGATIVE, NEUTRAL
+
+# Key Method:
+- get_transition_penalty(current_r, prev_r): Returns penalty [0.0=legal, 1.0=illegal]
+```
+
+### 11.3 Training Script Integration
+
+The `train_unified_llm.py` script has been updated with Sovereign-1 support:
+
+#### Configuration Options Added:
+
+```python
+# UnifiedTrainingConfig dataclass
+use_sovereign_loss: bool = True    # Enable/disable Sovereign-1 loss
+sovereign_weight_guna: float = 1.0
+sovereign_weight_s: float = 2.0
+sovereign_weight_r: float = 5.0    # CRITICAL: Ontological weight
+sovereign_weight_c: float = 0.5
+```
+
+#### Loss Computation Flow:
+
+1. Model outputs: `logits`, `ontological_probs` [12D], `bhava_vector` [144D], `global_coherence`
+2. Build 128D state via `_build_sovereign_state()`:
+   - Guna [16]: Derived from coherence
+   - S-Signal [32]: First 32D of bhava
+   - R-Signal [48]: Ontology (12D padded) + bhava blend
+   - C-Signal [32]: Bhava[80:112]
+3. Compute loss via `SovereignLoss.forward()`
+4. Return metrics including R/C ratio health indicator
+
+#### Training Loop Changes:
+
+```python
+# Initialization
+sovereign_loss = SovereignLoss(config=SovereignLossConfig(...)).to(device)
+
+# Forward pass
+loss, metrics = compute_ontological_loss(
+    outputs, y, config,
+    sovereign_loss=sovereign_loss,
+    epoch=global_step // len(train_loader),
+)
+
+# Logging
+log_msg += f" | R/C: {metrics['onto_phoneme_ratio']:.2f} [{health}]"
+```
+
+### 11.4 Key Implementation Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| **Legacy Compatibility** | LegacyLossAdapter maps 156D → 128D | Allows gradual migration without breaking existing models |
+| **Phoneme Table** | Placeholder (random init) | Full CMU Dict integration deferred to Phase 2 |
+| **Referent Table** | Sparse zeros | Full WORD_TO_REFERENT integration deferred |
+| **Gradient Flow** | Observer runs `@torch.no_grad()` | Matches spec - Observer provides targets, not learned |
+| **Target State** | Zero tensor (self-supervised) | Next-state prediction implemented via loss decomposition |
+
+### 11.5 Validation Status
+
+| Component | Unit Tests | Integration | Hardware Ready |
+|-----------|------------|-------------|----------------|
+| SovereignLoss | ⚠️ Pending | ✅ Integrated | 🔲 N/A |
+| SovereignObserver | ⚠️ Pending | ✅ Integrated | 🔲 N/A |
+| BhavaTransitionPrior | ⚠️ Pending | ✅ Integrated | 🔲 N/A |
+| PIDGovernor | 🔲 Not Started | 🔲 Not Started | 🔲 Not Started |
+| SovereignTransformer | 🔲 Not Started | 🔲 Not Started | 🔲 Not Started |
+
+### 11.6 Next Implementation Steps
+
+**Phase 1 Completion** (Current):
+1. ✅ SovereignLoss - Complete
+2. ✅ SovereignObserver - Complete
+3. ✅ BhavaTransitionPrior - Complete
+4. ✅ Training script integration - Complete
+
+**Phase 2** (Next):
+1. 🔲 PIDGovernor with Vritti detection
+2. 🔲 SovereignGunaComputer (full attention-based)
+3. 🔲 PhonemeEncoder with CMU Dict
+4. 🔲 Unit tests for all modules
+
+**Phase 3** (Future):
+1. 🔲 SovereignTransformer (hybrid 6Q+6P)
+2. 🔲 Sovereign Shift (virtual nexus)
+3. 🔲 COGNADE SDK export
+
+---
+
+## 12. Approval Checklist
 
 Before implementation begins, confirm:
 
@@ -1310,9 +1466,10 @@ Before implementation begins, confirm:
 
 ---
 
-**Document Status**: Ready for Final Review
-**Next Step**: Obtain approval on open questions, then begin Phase 1 implementation
+**Document Status**: Implementation In Progress
+**Current Phase**: Phase 1 Complete - Core loss and observer modules implemented
+**Next Step**: Begin Phase 2 (PIDGovernor, SovereignGunaComputer, unit tests)
 
 ---
 
-*Generated by Claude Code | Symbolu Sovereign-1 Design Implementation*
+*Generated by Claude Code | Symbolu Sovereign-1 Design Implementation v2.1*
