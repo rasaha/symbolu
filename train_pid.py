@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-SymbolU V9.4.5-PID Training Script
+SymbolU V9.4.6-PID Training Script
 ===================================
 
 Phase Attention Transformer with Authority PID Controller.
 Includes V9.4.4 Stress Test Framework for Governor Resilience.
 Includes V9.4.5 Friction Controller with Corrective Actions.
+Includes V9.4.6 LOCK Correction (Phase-Assist Mode).
 
 The PID controller replaces ad-hoc threshold-based authority management
 with a proper control-theoretic approach:
@@ -200,6 +201,7 @@ def compute_semantic_ppl(
 #   - Dominance (ratio): Phase magnitude / Local magnitude (target: ~1.0)
 # =============================================================================
 
+@torch.no_grad()
 def measure_friction(
     model: nn.Module,
     local_layers: int = 6,
@@ -249,8 +251,8 @@ def measure_friction(
         if layer_idx is None:
             continue
 
-        grad_flat = param.grad.view(-1)
-        grad_norm = param.grad.norm().item()
+        grad_flat = param.grad.detach().view(-1)
+        grad_norm = param.grad.detach().norm().item()
 
         # Quadratic Group (layers 0-5: "Memory" / local attention)
         if layer_idx < local_layers:
@@ -298,7 +300,13 @@ class FrictionMetrics:
 
 @dataclass
 class FrictionControllerConfig:
-    """Configuration for Friction Controller with Corrective Actions (V9.4.5)."""
+    """Configuration for Friction Controller with Corrective Actions (V9.4.6).
+
+    V9.4.6 Changes:
+    - LOCK (Dom < 0.3) is now a corrective trigger, not just informational
+    - When LOCK persists + velocity rising: Phase-assist correction applied
+    - Phase-assist: Reduce Quad LR, boost Phase LR (relative power correction)
+    """
 
     # Alignment thresholds
     align_warning: float = -0.05   # Yellow zone: slight friction
@@ -323,25 +331,37 @@ class FrictionControllerConfig:
     # Recovery
     recovery_rate: float = 0.02        # Authority restoration per good step
 
+    # V9.4.6: LOCK as corrective trigger (Phase-assist mode)
+    lock_persistence: int = 2              # Consecutive evals with Dom < 0.3 before action
+    lock_release_threshold: float = 0.40   # Dom must exceed this to release LOCK correction
+    lock_quad_reduction: float = 0.70      # Reduce Quad LR to 70% during LOCK
+    lock_phase_boost: float = 1.50         # Boost Phase LR by 50% during LOCK
+    lock_velocity_trigger: float = 5.0     # Only act if velocity > +5%
+
 
 class FrictionController:
     """
-    Friction Controller with Corrective Actions (V9.4.5).
+    Friction Controller with Corrective Actions (V9.4.6).
 
     Detects gradient friction between Quadratic and Phase layer groups,
     and takes corrective action by reducing authority when persistent
     fighting or dominance imbalance is detected.
 
+    V9.4.6: LOCK is now a first-class corrective trigger.
+    When Phase is suppressed (Dom < 0.3), we apply Phase-assist:
+    - Reduce Quad LR (undo handshake spike)
+    - Boost Phase LR (help Phase catch up)
+
     Interpretation Table:
     =====================
-    | Alignment | Dominance | Interpretation    | Action                    |
-    |-----------|-----------|-------------------|---------------------------|
-    | > 0.2     | ~1.0      | Synergy           | Full authority            |
-    | 0 to 0.2  | ~1.0      | Normal            | Full authority            |
-    | -0.05 to 0| ~1.0      | Slight friction   | Monitor (yellow)          |
-    | < -0.10   | any       | Fighting (Red)    | Slash LR by align_penalty |
-    | any       | > 3.0     | Phase riot        | Reduce phase LR           |
-    | any       | < 0.3     | Memory lock       | Alert (phase not learning)|
+    | Alignment | Dominance | Interpretation    | Action                      |
+    |-----------|-----------|-------------------|-----------------------------|
+    | > 0.2     | ~1.0      | Synergy           | Full authority              |
+    | 0 to 0.2  | ~1.0      | Normal            | Full authority              |
+    | -0.05 to 0| ~1.0      | Slight friction   | Monitor (yellow)            |
+    | < -0.10   | any       | Fighting (Red)    | Slash LR by align_penalty   |
+    | any       | > 3.0     | Phase riot        | Reduce phase LR             |
+    | any       | < 0.3     | LOCK (V9.4.6)     | Phase-assist: boost Phase LR|
 
     The friction penalty multiplies with Authority:
         effective_A = base_A * friction_penalty
@@ -369,22 +389,35 @@ class FrictionController:
         self.correction_active = False
         self.correction_reason = ""
 
-    def update(self, alignment: float, dominance: float) -> float:
+        # V9.4.6: LOCK correction state (Phase-assist mode)
+        self.lock_streak = 0                # Consecutive evals with Dom < 0.3
+        self.lock_correction_active = False # Is Phase-assist currently engaged?
+        self.quad_lr_multiplier = 1.0       # Multiplier for Quadratic LR groups
+        self.phase_lr_multiplier = 1.0      # Multiplier for Phase LR groups
+        self.last_velocity = 0.0            # Track PPL velocity for LOCK trigger
+
+    def update(self, alignment: float, dominance: float, velocity: float = None) -> float:
         """
         Update friction penalty based on current alignment and dominance.
 
         Args:
             alignment: Cosine similarity between Quad and Phase gradients
             dominance: Ratio of Phase grad norm to Quad grad norm
+            velocity: PPL velocity (% change), used for LOCK trigger (V9.4.6)
 
         Returns:
             friction_penalty: Multiplier for authority (0.85 to 1.0)
+
+        Side effects (V9.4.6):
+            Updates quad_lr_multiplier and phase_lr_multiplier for Phase-assist
         """
         cfg = self.config
 
         # Store raw values
         self.last_alignment = alignment
         self.last_dominance = dominance
+        if velocity is not None:
+            self.last_velocity = velocity
 
         # Update EMAs
         self.align_ema = cfg.ema_alpha * alignment + (1 - cfg.ema_alpha) * self.align_ema
@@ -414,7 +447,7 @@ class FrictionController:
         self.last_align_penalty = align_penalty
 
         # =====================================================================
-        # DOMINANCE PENALTY (Phase Riot / Memory Lock Detection)
+        # DOMINANCE PENALTY (Phase Riot Detection)
         # =====================================================================
         dom_penalty = 0.0
 
@@ -424,16 +457,42 @@ class FrictionController:
             if self.dom_bad_streak >= cfg.persistence_threshold:
                 severity = (self.dom_ema - cfg.dom_high) / cfg.dom_high
                 dom_penalty = min(cfg.dom_penalty_scale, severity * 0.3)
-        elif self.dom_ema < cfg.dom_low:
-            # Memory lock: Phase barely learning
-            self.dom_bad_streak += 1
-            # Don't penalize - this is informational (Phase needs help, not restriction)
-            # Could add phase_lr_boost here if desired
         else:
-            # Healthy range
+            # Healthy or LOCK range - don't penalize dominance
             self.dom_bad_streak = max(0, self.dom_bad_streak - 1)
 
         self.last_dom_penalty = dom_penalty
+
+        # =====================================================================
+        # V9.4.6: LOCK CORRECTION (Phase-Assist Mode)
+        # =====================================================================
+        # When Phase is suppressed (Dom < 0.3), apply relative power correction
+        # ChatGPT recommendation: LOCK persistence alone should trigger correction,
+        # as Dom < 0.3 is dangerous long-term (Phase cannot shape representation)
+
+        if self.dom_ema < cfg.dom_low:
+            # Phase is suppressed - increment LOCK streak
+            self.lock_streak += 1
+
+            # Trigger on persistence alone (velocity used for intensity, not gating)
+            if self.lock_streak >= cfg.lock_persistence:
+                # Engage Phase-assist mode
+                if not self.lock_correction_active:
+                    self.lock_correction_active = True
+                    self.quad_lr_multiplier = cfg.lock_quad_reduction  # 0.70
+                    self.phase_lr_multiplier = cfg.lock_phase_boost    # 1.50
+        else:
+            # Check release condition with hysteresis (Dom >= 0.40)
+            if self.dom_ema >= cfg.lock_release_threshold:
+                self.lock_streak = 0
+                if self.lock_correction_active:
+                    # Gradually release (not instant)
+                    self.quad_lr_multiplier = min(1.0, self.quad_lr_multiplier + 0.1)
+                    self.phase_lr_multiplier = max(1.0, self.phase_lr_multiplier - 0.1)
+                    if self.quad_lr_multiplier >= 0.99 and self.phase_lr_multiplier <= 1.01:
+                        self.lock_correction_active = False
+                        self.quad_lr_multiplier = 1.0
+                        self.phase_lr_multiplier = 1.0
 
         # =====================================================================
         # COMBINED FRICTION PENALTY
@@ -462,7 +521,9 @@ class FrictionController:
 
     def get_status_icon(self) -> str:
         """Get status icon based on friction state."""
-        if self.correction_active:
+        if self.lock_correction_active:
+            return "🔓"  # Phase-assist active (LOCK correction)
+        elif self.correction_active:
             if self.last_align_penalty > 0.10 or self.last_dom_penalty > 0.05:
                 return "🔥"  # Active correction - severe
             else:
@@ -496,7 +557,10 @@ class FrictionController:
 
         base = f"FRIC {icon} | Align:{self.align_ema:+.2f}({align_label}) Dom:{self.dom_ema:.1f}({dom_label})"
 
-        if self.correction_active:
+        # V9.4.6: Show Phase-assist correction if active
+        if self.lock_correction_active:
+            return f"{base} | PHASE-ASSIST: Quad×{self.quad_lr_multiplier:.0%} Phase×{self.phase_lr_multiplier:.0%}"
+        elif self.correction_active:
             return f"{base} | Penalty:{1-self.friction_penalty:.0%} [{self.correction_reason}]"
         else:
             return base
@@ -1336,6 +1400,42 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
         )
         if config.resume_weights_only:
             logger.info(f"Resumed model weights at step {state.step} (optimizer reset)")
+
+            # =========================================================================
+            # RESUME-AWARE CONTROLLER (V9.4.6)
+            # =========================================================================
+            # When resuming weights-only, the model has already gone through warmup
+            # and phase ramp. Skip these phases to avoid re-freezing Phase layers.
+            logger.info("=" * 60)
+            logger.info("RESUME-AWARE MODE: Skipping warmup and phase ramp")
+            logger.info("=" * 60)
+
+            # Skip warmup - model is already warmed up
+            original_warmup = config.warmup_steps
+            config.warmup_steps = 0
+            logger.info(f"  Warmup: {original_warmup} → 0 (skipped)")
+
+            # Skip phase delay - Phase layers already active
+            original_phase_delay = config.phase_delay_steps
+            config.phase_delay_steps = 0
+            logger.info(f"  Phase delay: {original_phase_delay} → 0 (skipped)")
+
+            # Skip phase ramp - Phase layers at full LR immediately
+            original_phase_ramp = config.phase_ramp_steps
+            config.phase_ramp_steps = 0
+            logger.info(f"  Phase ramp: {original_phase_ramp} → 0 (immediate full LR)")
+
+            # Skip alpha warmup - model is already through alpha schedule
+            original_alpha_warmup = config.alpha_warmup_steps
+            config.alpha_warmup_steps = 0
+            logger.info(f"  Alpha warmup: {original_alpha_warmup} → 0 (skipped)")
+
+            # Recreate scheduler with updated config (warmup=0)
+            scheduler = create_scheduler(optimizer, config)
+            logger.info(f"  Scheduler: Recreated with warmup=0")
+
+            logger.info(f"  Controller mode: POST-PHASE (Phase-Assist ready)")
+            logger.info("=" * 60)
         else:
             logger.info(f"Resumed at step {state.step}")
 
@@ -1466,6 +1566,10 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
     handshake_triggered = False
     agc_threshold = config.agc_threshold if config.trinity_enabled else None
 
+    # V9.4.5: Persistent friction tracking (only measured on log intervals for performance)
+    fric_align, fric_dom = 0.0, 1.0
+    friction_penalty = 1.0
+
     # Infinite data iterator
     def infinite_loader(loader):
         while True:
@@ -1489,20 +1593,23 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
             continue
 
         # =====================================================================
-        # V9.4.5: FRICTION MEASUREMENT AND CORRECTION
+        # V9.4.5: FRICTION MEASUREMENT AND CORRECTION (on log intervals only)
         # =====================================================================
         # Measure gradient friction between Quadratic and Phase layer groups
         # and apply corrective action if persistent fighting is detected
+        # Performance: Skip expensive cosine similarity when not logging
 
-        fric_align, fric_dom = measure_friction(model, local_layers=6)
+        if state.step % config.log_every == 0:
+            fric_align, fric_dom = measure_friction(model, local_layers=6)
 
-        # Apply friction controller correction if enabled
-        if friction_controller is not None:
-            friction_penalty = friction_controller.update(fric_align, fric_dom)
-        else:
-            friction_penalty = 1.0  # No correction if disabled
+            # Apply friction controller correction if enabled
+            # V9.4.6: Pass velocity for LOCK trigger
+            if friction_controller is not None:
+                # Get PPL velocity from authority controller (if available)
+                ppl_velocity = getattr(authority_controller, 'last_v', 0.0) * 100  # Convert to %
+                friction_penalty = friction_controller.update(fric_align, fric_dom, velocity=ppl_velocity)
 
-        # Store in metrics for logging
+        # Store in metrics for logging (use last known values)
         metrics['friction_alignment'] = fric_align
         metrics['friction_dominance'] = fric_dom
         metrics['friction_penalty'] = friction_penalty
@@ -1549,13 +1656,22 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
         # Update optimizer LRs
         combined_lr_scale = state.lr_scale * memory_guard.lr_scale
 
+        # V9.4.6: Get Phase-assist LR multipliers from friction controller
+        quad_lr_mult = 1.0
+        phase_lr_boost = 1.0
+        if friction_controller is not None and friction_controller.lock_correction_active:
+            quad_lr_mult = friction_controller.quad_lr_multiplier
+            phase_lr_boost = friction_controller.phase_lr_multiplier
+
         for param_group in optimizer.param_groups:
             group_name = param_group.get('name', '')
 
             if 'phase_attn' in group_name:
-                param_group['lr'] = memory_guard.get_phase_lr(base_lr * state.lr_scale, phase_lr_mult)
+                # V9.4.6: Apply Phase-assist boost when LOCK detected
+                param_group['lr'] = memory_guard.get_phase_lr(base_lr * state.lr_scale, phase_lr_mult) * phase_lr_boost
             elif 'local_attn' in group_name:
-                param_group['lr'] = base_lr * config.attn_cooling_factor * combined_lr_scale
+                # V9.4.6: Apply Quad reduction when LOCK detected
+                param_group['lr'] = base_lr * config.attn_cooling_factor * combined_lr_scale * quad_lr_mult
             else:
                 param_group['lr'] = base_lr * combined_lr_scale
 
@@ -1927,8 +2043,8 @@ def main():
                        help="PIDv2 coherence threshold for full authority")
 
     # V9.4.3: Semantic Validation + Handshake Dampening
-    parser.add_argument("--pidv2_w_s", type=float, default=0.30,
-                       help="Semantic weight: 0.30 = 30%% prompt-based, 70%% general PPL")
+    parser.add_argument("--pidv2_w_s", type=float, default=0.25,
+                       help="Semantic weight: 0.25 = 25%% prompt-based, 75%% general PPL")
     parser.add_argument("--pidv2_semantic_scale", type=float, default=50.0,
                        help="Normalization scale for semantic PPL error")
     parser.add_argument("--pidv2_handshake_dampen", action="store_true", default=True,
@@ -1988,10 +2104,18 @@ def main():
                        help="Friction dominance low threshold (Memory lock) (default: 0.30)")
     parser.add_argument("--friction_dom_high", type=float, default=3.00,
                        help="Friction dominance high threshold (Phase riot) (default: 3.00)")
-    parser.add_argument("--friction_penalty_scale", type=float, default=0.15,
-                       help="Max authority cut from friction (default: 0.15 = 15%%)")
+    parser.add_argument("--friction_penalty_scale", type=float, default=0.30,
+                       help="Max authority cut from friction (default: 0.30 = 30%%)")
     parser.add_argument("--no_friction_controller", action="store_true",
                        help="Disable friction controller (monitoring only)")
+
+    # V9.4.6: LOCK correction (Phase-assist) settings
+    parser.add_argument("--lock_quad_reduction", type=float, default=0.70,
+                       help="V9.4.6: Reduce Quad LR to this fraction during LOCK (default: 0.70)")
+    parser.add_argument("--lock_phase_boost", type=float, default=1.50,
+                       help="V9.4.6: Boost Phase LR by this factor during LOCK (default: 1.50)")
+    parser.add_argument("--lock_velocity_trigger", type=float, default=5.0,
+                       help="V9.4.6: Only trigger LOCK correction if velocity > this %% (default: 5.0)")
 
     args = parser.parse_args()
 
@@ -2106,7 +2230,7 @@ def main():
         print("  SYMBOLU V9.4.5 - EMERGENCY PD TRAINING")
         print("  Phase Attention Transformer with Emergency PD Controller")
     elif controller_type == "pidv2":
-        print("  SYMBOLU V9.4.5 - PIDv2 TRAINING (Friction Controller + Corrective Actions)")
+        print("  SYMBOLU V9.4.6 - PIDv2 TRAINING (Phase-Assist LOCK Correction)")
         print("  Phase Attention Transformer with Weighted Semantic PID + Coherence Gate")
     else:
         print("  SYMBOLU V9.4.5 - PID TRAINING (LEGACY)")
@@ -2147,11 +2271,16 @@ def main():
             dom_low=args.friction_dom_low,
             dom_high=args.friction_dom_high,
             align_penalty_scale=args.friction_penalty_scale,
+            # V9.4.6: LOCK correction settings
+            lock_quad_reduction=args.lock_quad_reduction,
+            lock_phase_boost=args.lock_phase_boost,
+            lock_velocity_trigger=args.lock_velocity_trigger,
         )
-        print(f"  Friction Controller: ENABLED")
+        print(f"  Friction Controller: ENABLED (V9.4.6)")
         print(f"    Alignment thresholds: critical={args.friction_align_critical}, severe={args.friction_align_severe}")
         print(f"    Dominance range: [{args.friction_dom_low}, {args.friction_dom_high}]")
         print(f"    Penalty scale: {args.friction_penalty_scale:.0%}")
+        print(f"    LOCK correction: Quad×{args.lock_quad_reduction:.0%}, Phase×{args.lock_phase_boost:.0%} (vel>{args.lock_velocity_trigger}%)")
     else:
         print(f"  Friction Controller: DISABLED (monitoring only)")
     print()
