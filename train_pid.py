@@ -1400,6 +1400,42 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
         )
         if config.resume_weights_only:
             logger.info(f"Resumed model weights at step {state.step} (optimizer reset)")
+
+            # =========================================================================
+            # RESUME-AWARE CONTROLLER (V9.4.6)
+            # =========================================================================
+            # When resuming weights-only, the model has already gone through warmup
+            # and phase ramp. Skip these phases to avoid re-freezing Phase layers.
+            logger.info("=" * 60)
+            logger.info("RESUME-AWARE MODE: Skipping warmup and phase ramp")
+            logger.info("=" * 60)
+
+            # Skip warmup - model is already warmed up
+            original_warmup = config.warmup_steps
+            config.warmup_steps = 0
+            logger.info(f"  Warmup: {original_warmup} → 0 (skipped)")
+
+            # Skip phase delay - Phase layers already active
+            original_phase_delay = config.phase_delay_steps
+            config.phase_delay_steps = 0
+            logger.info(f"  Phase delay: {original_phase_delay} → 0 (skipped)")
+
+            # Skip phase ramp - Phase layers at full LR immediately
+            original_phase_ramp = config.phase_ramp_steps
+            config.phase_ramp_steps = 0
+            logger.info(f"  Phase ramp: {original_phase_ramp} → 0 (immediate full LR)")
+
+            # Skip alpha warmup - model is already through alpha schedule
+            original_alpha_warmup = config.alpha_warmup_steps
+            config.alpha_warmup_steps = 0
+            logger.info(f"  Alpha warmup: {original_alpha_warmup} → 0 (skipped)")
+
+            # Recreate scheduler with updated config (warmup=0)
+            scheduler = create_scheduler(optimizer, config)
+            logger.info(f"  Scheduler: Recreated with warmup=0")
+
+            logger.info(f"  Controller mode: POST-PHASE (Phase-Assist ready)")
+            logger.info("=" * 60)
         else:
             logger.info(f"Resumed at step {state.step}")
 
