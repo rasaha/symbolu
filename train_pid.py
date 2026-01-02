@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-SymbolU V9.4.4-PID Training Script
+SymbolU V9.4.5-PID Training Script
 ===================================
 
 Phase Attention Transformer with Authority PID Controller.
 Includes V9.4.4 Stress Test Framework for Governor Resilience.
+Includes V9.4.5 Friction Controller with Corrective Actions.
 
 The PID controller replaces ad-hoc threshold-based authority management
 with a proper control-theoretic approach:
@@ -186,6 +187,319 @@ def compute_semantic_ppl(
         return 100.0  # Default high PPL if all prompts failed
 
     return total_ppl / valid_prompts
+
+
+# =============================================================================
+# FRICTION MONITOR - Gradient Alignment Detection (V9.4.5)
+# =============================================================================
+# Detects when Local/Quadratic layers and Phase layers are "fighting"
+# (pushing gradients in opposite directions), which wastes optimization.
+#
+# Metrics:
+#   - Alignment (cosine similarity): +1.0 (synergy) to -1.0 (fighting)
+#   - Dominance (ratio): Phase magnitude / Local magnitude (target: ~1.0)
+# =============================================================================
+
+def measure_friction(
+    model: nn.Module,
+    local_layers: int = 6,
+) -> Tuple[float, float]:
+    """
+    Computes gradient friction between Quadratic and Phase layer groups.
+
+    In the Hybrid 6/6 architecture (12 layers total):
+    - Quadratic Group: Layers 0-5 (local/quadratic attention - "Memory")
+    - Phase Group: Layers 6-11 (phase attention - "Logic")
+
+    The gradient alignment tells us if the two groups are "cooperating" or "fighting."
+
+    Args:
+        model: The HybridPhaseTransformer model with gradients computed
+        local_layers: Number of quadratic layers (default 6 for 6/6 architecture)
+
+    Returns:
+        alignment: Cosine similarity of gradient vectors
+                   +1.0 = perfect synergy (both pushing same direction)
+                   0.0 = orthogonal (independent learning)
+                   -1.0 = fighting (canceling each other out)
+        dominance: Ratio of Phase gradient magnitude to Quadratic magnitude
+                   1.0 = balanced, >1.0 = Phase dominant, <1.0 = Quadratic dominant
+    """
+    quad_grads = []
+    phase_grads = []
+    quad_norms = []
+    phase_norms = []
+
+    for name, param in model.named_parameters():
+        if param.grad is None:
+            continue
+
+        # Identify layer group based on naming convention
+        # Typical patterns: "layers.0.", "transformer.h.5.", "blocks.3."
+        layer_idx = None
+        for pattern in ["layers.", "transformer.h.", "blocks.", "encoder.layer."]:
+            if pattern in name:
+                try:
+                    parts = name.split(pattern)
+                    layer_idx = int(parts[1].split(".")[0])
+                    break
+                except (IndexError, ValueError):
+                    continue
+
+        if layer_idx is None:
+            continue
+
+        grad_flat = param.grad.view(-1)
+        grad_norm = param.grad.norm().item()
+
+        # Quadratic Group (layers 0-5: "Memory" / local attention)
+        if layer_idx < local_layers:
+            quad_grads.append(grad_flat)
+            quad_norms.append(grad_norm)
+
+        # Phase Group (layers 6-11: "Logic" / phase attention)
+        else:
+            phase_grads.append(grad_flat)
+            phase_norms.append(grad_norm)
+
+    # Metric 1: Gradient Alignment (Cosine Similarity)
+    if quad_grads and phase_grads:
+        g_quad = torch.cat(quad_grads)
+        g_phase = torch.cat(phase_grads)
+
+        # Handle dimension mismatch by using the minimum length
+        min_len = min(len(g_quad), len(g_phase))
+        if min_len > 0:
+            alignment = F.cosine_similarity(
+                g_quad[:min_len].unsqueeze(0),
+                g_phase[:min_len].unsqueeze(0)
+            ).item()
+        else:
+            alignment = 0.0
+    else:
+        alignment = 0.0
+
+    # Metric 2: Update Dominance (Ratio of Norms)
+    avg_quad_norm = sum(quad_norms) / (len(quad_norms) + 1e-9)
+    avg_phase_norm = sum(phase_norms) / (len(phase_norms) + 1e-9)
+    dominance = avg_phase_norm / (avg_quad_norm + 1e-9)
+
+    return alignment, dominance
+
+
+@dataclass
+class FrictionMetrics:
+    """Container for friction monitoring metrics."""
+    alignment: float = 0.0      # Cosine similarity (-1 to +1)
+    dominance: float = 1.0      # Phase/Local gradient ratio
+    alignment_ema: float = 0.0  # Exponential moving average of alignment
+    friction_count: int = 0     # Count of friction events (alignment < -0.1)
+
+
+@dataclass
+class FrictionControllerConfig:
+    """Configuration for Friction Controller with Corrective Actions (V9.4.5)."""
+
+    # Alignment thresholds
+    align_warning: float = -0.05   # Yellow zone: slight friction
+    align_critical: float = -0.10  # Red zone: fighting → slash LR
+    align_severe: float = -0.25    # Severe fighting → aggressive cut
+
+    # Dominance thresholds
+    dom_low: float = 0.30          # Below this = Memory lock (Phase frozen)
+    dom_high: float = 3.00         # Above this = Phase riot (instability)
+    dom_target: float = 1.00       # Ideal balance
+
+    # EMA smoothing (prevents overreaction to single-step noise)
+    ema_alpha: float = 0.15        # EMA smoothing factor (higher = faster response)
+
+    # Corrective action strength
+    align_penalty_scale: float = 0.15   # Max authority cut from alignment friction
+    dom_penalty_scale: float = 0.10     # Max authority cut from dominance imbalance
+
+    # Persistence threshold (must persist N steps before action)
+    persistence_threshold: int = 3     # Consecutive bad steps before correction
+
+    # Recovery
+    recovery_rate: float = 0.02        # Authority restoration per good step
+
+
+class FrictionController:
+    """
+    Friction Controller with Corrective Actions (V9.4.5).
+
+    Detects gradient friction between Quadratic and Phase layer groups,
+    and takes corrective action by reducing authority when persistent
+    fighting or dominance imbalance is detected.
+
+    Interpretation Table:
+    =====================
+    | Alignment | Dominance | Interpretation    | Action                    |
+    |-----------|-----------|-------------------|---------------------------|
+    | > 0.2     | ~1.0      | Synergy           | Full authority            |
+    | 0 to 0.2  | ~1.0      | Normal            | Full authority            |
+    | -0.05 to 0| ~1.0      | Slight friction   | Monitor (yellow)          |
+    | < -0.10   | any       | Fighting (Red)    | Slash LR by align_penalty |
+    | any       | > 3.0     | Phase riot        | Reduce phase LR           |
+    | any       | < 0.3     | Memory lock       | Alert (phase not learning)|
+
+    The friction penalty multiplies with Authority:
+        effective_A = base_A * friction_penalty
+    """
+
+    def __init__(self, config: FrictionControllerConfig = None):
+        self.config = config or FrictionControllerConfig()
+
+        # EMA state
+        self.align_ema = 0.0
+        self.dom_ema = 1.0
+
+        # Persistence tracking
+        self.align_bad_streak = 0    # Consecutive steps with alignment < critical
+        self.dom_bad_streak = 0      # Consecutive steps with dominance out of range
+
+        # Output: friction penalty (0.0 to 1.0, multiplies authority)
+        self.friction_penalty = 1.0
+
+        # Telemetry
+        self.last_alignment = 0.0
+        self.last_dominance = 1.0
+        self.last_align_penalty = 0.0
+        self.last_dom_penalty = 0.0
+        self.correction_active = False
+        self.correction_reason = ""
+
+    def update(self, alignment: float, dominance: float) -> float:
+        """
+        Update friction penalty based on current alignment and dominance.
+
+        Args:
+            alignment: Cosine similarity between Quad and Phase gradients
+            dominance: Ratio of Phase grad norm to Quad grad norm
+
+        Returns:
+            friction_penalty: Multiplier for authority (0.85 to 1.0)
+        """
+        cfg = self.config
+
+        # Store raw values
+        self.last_alignment = alignment
+        self.last_dominance = dominance
+
+        # Update EMAs
+        self.align_ema = cfg.ema_alpha * alignment + (1 - cfg.ema_alpha) * self.align_ema
+        self.dom_ema = cfg.ema_alpha * dominance + (1 - cfg.ema_alpha) * self.dom_ema
+
+        # =====================================================================
+        # ALIGNMENT PENALTY (Fighting Detection)
+        # =====================================================================
+        align_penalty = 0.0
+
+        if self.align_ema < cfg.align_critical:
+            self.align_bad_streak += 1
+
+            if self.align_bad_streak >= cfg.persistence_threshold:
+                # Persistent fighting - apply penalty
+                # Stronger penalty for more negative alignment
+                severity = abs(min(0, self.align_ema - cfg.align_critical))
+                align_penalty = min(cfg.align_penalty_scale, severity * 0.5)
+
+                # Extra penalty for severe fighting
+                if self.align_ema < cfg.align_severe:
+                    align_penalty = cfg.align_penalty_scale  # Full cut
+        else:
+            # Reset streak if alignment improves
+            self.align_bad_streak = max(0, self.align_bad_streak - 1)
+
+        self.last_align_penalty = align_penalty
+
+        # =====================================================================
+        # DOMINANCE PENALTY (Phase Riot / Memory Lock Detection)
+        # =====================================================================
+        dom_penalty = 0.0
+
+        if self.dom_ema > cfg.dom_high:
+            # Phase riot: Phase gradients dominating
+            self.dom_bad_streak += 1
+            if self.dom_bad_streak >= cfg.persistence_threshold:
+                severity = (self.dom_ema - cfg.dom_high) / cfg.dom_high
+                dom_penalty = min(cfg.dom_penalty_scale, severity * 0.3)
+        elif self.dom_ema < cfg.dom_low:
+            # Memory lock: Phase barely learning
+            self.dom_bad_streak += 1
+            # Don't penalize - this is informational (Phase needs help, not restriction)
+            # Could add phase_lr_boost here if desired
+        else:
+            # Healthy range
+            self.dom_bad_streak = max(0, self.dom_bad_streak - 1)
+
+        self.last_dom_penalty = dom_penalty
+
+        # =====================================================================
+        # COMBINED FRICTION PENALTY
+        # =====================================================================
+        total_penalty = align_penalty + dom_penalty
+
+        if total_penalty > 0:
+            self.friction_penalty = max(0.70, 1.0 - total_penalty)
+            self.correction_active = True
+
+            # Build reason string
+            reasons = []
+            if align_penalty > 0:
+                reasons.append(f"fighting(align={self.align_ema:.2f})")
+            if dom_penalty > 0:
+                reasons.append(f"riot(dom={self.dom_ema:.1f})")
+            self.correction_reason = "+".join(reasons)
+        else:
+            # Recovery: slowly restore penalty
+            self.friction_penalty = min(1.0, self.friction_penalty + cfg.recovery_rate)
+            if self.friction_penalty >= 0.99:
+                self.correction_active = False
+                self.correction_reason = ""
+
+        return self.friction_penalty
+
+    def get_status_icon(self) -> str:
+        """Get status icon based on friction state."""
+        if self.correction_active:
+            if self.last_align_penalty > 0.10 or self.last_dom_penalty > 0.05:
+                return "🔥"  # Active correction - severe
+            else:
+                return "⚡"  # Active correction - moderate
+        elif self.align_ema < self.config.align_warning:
+            return "⚠️"  # Warning zone
+        else:
+            return "✓"   # Healthy
+
+    def get_status_string(self) -> str:
+        """Get formatted status string for logging."""
+        icon = self.get_status_icon()
+
+        # Alignment indicator
+        if self.align_ema > 0.1:
+            align_label = "sync"
+        elif self.align_ema > -0.05:
+            align_label = "ok"
+        elif self.align_ema > -0.10:
+            align_label = "warn"
+        else:
+            align_label = "FIGHT"
+
+        # Dominance indicator
+        if self.dom_ema < self.config.dom_low:
+            dom_label = "LOCK"
+        elif self.dom_ema > self.config.dom_high:
+            dom_label = "RIOT"
+        else:
+            dom_label = "bal"
+
+        base = f"FRIC {icon} | Align:{self.align_ema:+.2f}({align_label}) Dom:{self.dom_ema:.1f}({dom_label})"
+
+        if self.correction_active:
+            return f"{base} | Penalty:{1-self.friction_penalty:.0%} [{self.correction_reason}]"
+        else:
+            return base
 
 
 # =============================================================================
@@ -942,7 +1256,8 @@ def create_optimizer_with_groups(model: nn.Module, config: TrainingConfig) -> Ad
 def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                    pd_config: EmergencyPDConfig = None,
                    pid_config: AuthorityPIDConfig = None,
-                   pidv2_config: AuthorityPIDv2Config = None):
+                   pidv2_config: AuthorityPIDv2Config = None,
+                   friction_config: FrictionControllerConfig = None):
     """Main training function with Authority Controller (PIDv2, PID, or Emergency PD)."""
 
     # Setup logging
@@ -1107,6 +1422,19 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
         logger.info(f"  Authority floor: {pid_config.A_min}")
         logger.info("=" * 60)
 
+    # =========================================================================
+    # INITIALIZE FRICTION CONTROLLER (V9.4.5 - Corrective Actions)
+    # =========================================================================
+    if friction_config is not None:
+        friction_controller = FrictionController(friction_config)
+        logger.info("V9.4.5: Friction Controller ENABLED")
+        logger.info(f"  Alignment thresholds: warning={friction_controller.config.align_warning}, critical={friction_controller.config.align_critical}")
+        logger.info(f"  Dominance range: [{friction_controller.config.dom_low}, {friction_controller.config.dom_high}]")
+        logger.info(f"  Penalty scales: align={friction_controller.config.align_penalty_scale:.0%}, dom={friction_controller.config.dom_penalty_scale:.0%}")
+    else:
+        friction_controller = None
+        logger.info("V9.4.5: Friction Controller DISABLED (monitoring only)")
+
     # Initialize TensorBoard
     tb_writer = None
     if config.tensorboard and TENSORBOARD_AVAILABLE:
@@ -1161,7 +1489,26 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
             continue
 
         # =====================================================================
-        # COMPUTE LR WITH PID AUTHORITY
+        # V9.4.5: FRICTION MEASUREMENT AND CORRECTION
+        # =====================================================================
+        # Measure gradient friction between Quadratic and Phase layer groups
+        # and apply corrective action if persistent fighting is detected
+
+        fric_align, fric_dom = measure_friction(model, local_layers=6)
+
+        # Apply friction controller correction if enabled
+        if friction_controller is not None:
+            friction_penalty = friction_controller.update(fric_align, fric_dom)
+        else:
+            friction_penalty = 1.0  # No correction if disabled
+
+        # Store in metrics for logging
+        metrics['friction_alignment'] = fric_align
+        metrics['friction_dominance'] = fric_dom
+        metrics['friction_penalty'] = friction_penalty
+
+        # =====================================================================
+        # COMPUTE LR WITH PID AUTHORITY + FRICTION PENALTY
         # =====================================================================
 
         # Get base LR from scheduler
@@ -1177,8 +1524,9 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
         # Compute base authority cap
         base_authority_cap = 0.3 + 0.7 * current_alpha
 
-        # Apply PID authority factor
-        effective_authority_cap = base_authority_cap * authority_controller.A
+        # Apply PID authority factor AND friction penalty (V9.4.5)
+        # effective_A = base_cap * PID_A * friction_penalty
+        effective_authority_cap = base_authority_cap * authority_controller.A * friction_penalty
 
         # Compute effective LR cap
         effective_lr_cap = config.learning_rate * effective_authority_cap
@@ -1191,7 +1539,11 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
         if state.step < config.phase_delay_steps:
             phase_lr_mult = 0.0
         else:
-            ramp_progress = min(1.0, (state.step - config.phase_delay_steps) / config.phase_ramp_steps)
+            # Handle phase_ramp_steps=0 (no ramp, immediate full LR)
+            if config.phase_ramp_steps <= 0:
+                ramp_progress = 1.0
+            else:
+                ramp_progress = min(1.0, (state.step - config.phase_delay_steps) / config.phase_ramp_steps)
             phase_lr_mult = config.phase_cooling_factor * ramp_progress
 
         # Update optimizer LRs
@@ -1239,6 +1591,8 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                 # Phase status
                 if state.step < config.phase_delay_steps:
                     phase_status = "FROZEN"
+                elif config.phase_ramp_steps <= 0:
+                    phase_status = "100%"  # No ramp = immediate full
                 else:
                     ramp_pct = min(100, int(100 * (state.step - config.phase_delay_steps) / config.phase_ramp_steps))
                     phase_status = f"{ramp_pct}%"
@@ -1338,6 +1692,18 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                 if abs(new_A - old_A) > 0.01:
                     logger.info(f"  {authority_controller.get_detailed_status()}")
 
+                # V9.4.5: Log Friction Controller status (with corrective actions)
+                if friction_controller is not None:
+                    logger.info(f"  {friction_controller.get_status_string()}")
+                    if friction_controller.correction_active:
+                        logger.info(f"  ⚠️ FRICTION CORRECTION ACTIVE: LR reduced by {(1-friction_controller.friction_penalty)*100:.0f}%")
+                elif 'friction_alignment' in metrics:
+                    # Monitoring only - show raw metrics
+                    fric_align = metrics['friction_alignment']
+                    fric_dom = metrics['friction_dominance']
+                    align_ind = "+" if fric_align > 0.1 else ("!" if fric_align < -0.1 else "~")
+                    logger.info(f"  FRIC (monitor) | Align:{fric_align:+.2f}{align_ind} Dom:{fric_dom:.2f}")
+
                 # TensorBoard controller metrics
                 if tb_writer is not None:
                     tb_writer.add_scalar("ctrl/authority_A", new_A, state.step)
@@ -1371,6 +1737,20 @@ def train_with_pid(config: TrainingConfig, controller_type: str = "pidv2",
                         tb_writer.add_scalar("ctrl/effective_Kd", authority_controller.last_effective_Kd, state.step)
                     if hasattr(authority_controller, 'last_ramp_frac'):
                         tb_writer.add_scalar("ctrl/handshake_ramp", authority_controller.last_ramp_frac, state.step)
+
+                    # V9.4.5: Friction Controller metrics (with corrective actions)
+                    if friction_controller is not None:
+                        tb_writer.add_scalar("fric/alignment", friction_controller.align_ema, state.step)
+                        tb_writer.add_scalar("fric/dominance", friction_controller.dom_ema, state.step)
+                        tb_writer.add_scalar("fric/penalty", friction_controller.friction_penalty, state.step)
+                        tb_writer.add_scalar("fric/align_penalty", friction_controller.last_align_penalty, state.step)
+                        tb_writer.add_scalar("fric/dom_penalty", friction_controller.last_dom_penalty, state.step)
+                        tb_writer.add_scalar("fric/correction_active", 1.0 if friction_controller.correction_active else 0.0, state.step)
+
+                    # Raw friction metrics (always logged)
+                    if 'friction_alignment' in metrics:
+                        tb_writer.add_scalar("ctrl/friction_alignment", metrics['friction_alignment'], state.step)
+                        tb_writer.add_scalar("ctrl/friction_dominance", metrics['friction_dominance'], state.step)
 
                 # PPL-Guard check (if enabled)
                 if config.trinity_enabled and ppl_guard is not None:
@@ -1597,6 +1977,22 @@ def main():
     parser.add_argument("--ungoverned_baseline", action="store_true",
                        help="Run stress test without PID (baseline comparison)")
 
+    # =========================================================================
+    # FRICTION CONTROLLER (V9.4.5) - Corrective Actions for Gradient Friction
+    # =========================================================================
+    parser.add_argument("--friction_align_critical", type=float, default=-0.10,
+                       help="Friction alignment threshold for correction (default: -0.10)")
+    parser.add_argument("--friction_align_severe", type=float, default=-0.25,
+                       help="Friction alignment threshold for aggressive correction (default: -0.25)")
+    parser.add_argument("--friction_dom_low", type=float, default=0.30,
+                       help="Friction dominance low threshold (Memory lock) (default: 0.30)")
+    parser.add_argument("--friction_dom_high", type=float, default=3.00,
+                       help="Friction dominance high threshold (Phase riot) (default: 3.00)")
+    parser.add_argument("--friction_penalty_scale", type=float, default=0.15,
+                       help="Max authority cut from friction (default: 0.15 = 15%%)")
+    parser.add_argument("--no_friction_controller", action="store_true",
+                       help="Disable friction controller (monitoring only)")
+
     args = parser.parse_args()
 
     # =========================================================================
@@ -1707,13 +2103,13 @@ def main():
     # Print banner
     print("=" * 70)
     if controller_type == "emergency_pd":
-        print("  SYMBOLU V9.3.6 - EMERGENCY PD TRAINING")
+        print("  SYMBOLU V9.4.5 - EMERGENCY PD TRAINING")
         print("  Phase Attention Transformer with Emergency PD Controller")
     elif controller_type == "pidv2":
-        print("  SYMBOLU V9.4.3 - PIDv2 TRAINING (Semantic Validation + Handshake Dampening)")
+        print("  SYMBOLU V9.4.5 - PIDv2 TRAINING (Friction Controller + Corrective Actions)")
         print("  Phase Attention Transformer with Weighted Semantic PID + Coherence Gate")
     else:
-        print("  SYMBOLU V9.3.5-PID TRAINING (LEGACY)")
+        print("  SYMBOLU V9.4.5 - PID TRAINING (LEGACY)")
         print("  Phase Attention Transformer with Authority PID Controller")
     print("=" * 70)
     print()
@@ -1742,6 +2138,24 @@ def main():
         print(f"  Authority floor: {args.pid_a_min}")
     print()
 
+    # V9.4.5: Build Friction Controller configuration
+    friction_config = None
+    if not args.no_friction_controller:
+        friction_config = FrictionControllerConfig(
+            align_critical=args.friction_align_critical,
+            align_severe=args.friction_align_severe,
+            dom_low=args.friction_dom_low,
+            dom_high=args.friction_dom_high,
+            align_penalty_scale=args.friction_penalty_scale,
+        )
+        print(f"  Friction Controller: ENABLED")
+        print(f"    Alignment thresholds: critical={args.friction_align_critical}, severe={args.friction_align_severe}")
+        print(f"    Dominance range: [{args.friction_dom_low}, {args.friction_dom_high}]")
+        print(f"    Penalty scale: {args.friction_penalty_scale:.0%}")
+    else:
+        print(f"  Friction Controller: DISABLED (monitoring only)")
+    print()
+
     # Run training
     try:
         train_with_pid(
@@ -1750,6 +2164,7 @@ def main():
             pd_config=pd_config,
             pid_config=pid_config,
             pidv2_config=pidv2_config,
+            friction_config=friction_config,
         )
     except KeyboardInterrupt:
         print("\nTraining interrupted by user")

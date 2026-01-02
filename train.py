@@ -2281,6 +2281,16 @@ def train_step(
         grad_stats = compute_tier_gradient_norms(model)
         metrics.update(grad_stats)
 
+        # V9.4.5: Friction Monitor - Gradient Alignment between Quadratic and Phase layers
+        # Detects when the two halves of the 6/6 hybrid model are "fighting"
+        try:
+            from train_pid import measure_friction
+            fric_align, fric_dom = measure_friction(model, local_layers=6)
+            metrics['friction_alignment'] = fric_align
+            metrics['friction_dominance'] = fric_dom
+        except ImportError:
+            pass  # Friction monitor not available
+
         scheduler.step()
         optimizer.zero_grad()
 

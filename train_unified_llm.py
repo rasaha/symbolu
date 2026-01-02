@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unified LLM Training Script V9.4.4
+Unified LLM Training Script V9.4.5
 ===================================
 
 Train SymbolU models with support for:
@@ -14,6 +14,7 @@ Now includes PIDv2 Governor from train_pid.py:
 - Semantic Validation (W_s weight)
 - Handshake D-term Dampening
 - Stress Test Framework
+- V9.4.5: Friction Controller with Corrective Actions
 
 Usage:
 ------
@@ -135,6 +136,9 @@ try:
         EmergencyPD,
         EmergencyPDConfig,
         compute_semantic_ppl,
+        measure_friction,  # V9.4.5: Friction Monitor
+        FrictionController,  # V9.4.5: Friction Controller with Corrective Actions
+        FrictionControllerConfig,
     )
     from train import cleanup_old_checkpoints
     PIDV2_AVAILABLE = True
@@ -775,6 +779,14 @@ def train(config: UnifiedTrainingConfig):
     elif config.controller != "none":
         print(f"\n  Warning: Controller '{config.controller}' not available")
 
+    # V9.4.5: Initialize Friction Controller with Corrective Actions
+    friction_controller = None
+    if PIDV2_AVAILABLE and config.model_type == "hybrid":
+        friction_controller = FrictionController(FrictionControllerConfig())
+        print(f"\n  V9.4.5: Friction Controller ENABLED")
+        print(f"    Alignment thresholds: warn={friction_controller.config.align_warning}, crit={friction_controller.config.align_critical}")
+        print(f"    Dominance range: [{friction_controller.config.dom_low}, {friction_controller.config.dom_high}]")
+
     # TensorBoard
     tb_writer = None
     if config.tensorboard and TENSORBOARD_AVAILABLE:
@@ -854,6 +866,19 @@ def train(config: UnifiedTrainingConfig):
             else:
                 optimizer.step()
 
+            # V9.4.5: Measure friction and apply corrective actions
+            friction_alignment = 0.0
+            friction_dominance = 1.0
+            friction_penalty = 1.0
+            if PIDV2_AVAILABLE and global_step % 10 == 0:  # Every 10 steps to save compute
+                try:
+                    friction_alignment, friction_dominance = measure_friction(model, local_layers=6)
+                    # Update friction controller with corrective actions
+                    if friction_controller is not None:
+                        friction_penalty = friction_controller.update(friction_alignment, friction_dominance)
+                except Exception:
+                    pass
+
             optimizer.zero_grad()
 
             # Update scheduler after warmup
@@ -916,6 +941,17 @@ def train(config: UnifiedTrainingConfig):
                 if config.model_type in ("phase", "hybrid"):
                     log_msg += f" | α_phase: {current_alpha:.2f}"
 
+                # V9.4.5: Add friction metrics (for 6/6 hybrid architecture)
+                if friction_alignment != 0.0 or friction_dominance != 1.0:
+                    # Color-code alignment
+                    if friction_alignment > 0.1:
+                        align_ind = "+"  # Synergy
+                    elif friction_alignment < -0.1:
+                        align_ind = "!"  # Friction
+                    else:
+                        align_ind = "~"  # Neutral
+                    log_msg += f" | Align:{friction_alignment:+.2f}{align_ind} Dom:{friction_dominance:.2f}"
+
                 print(log_msg)
                 step_start_time = time.time()
 
@@ -938,9 +974,16 @@ def train(config: UnifiedTrainingConfig):
                     )
                     print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f} | {authority_controller.get_status_string()}")
 
-                    # Apply authority factor to learning rate
+                    # V9.4.5: Log Friction Controller status (with corrective actions)
+                    if friction_controller is not None:
+                        print(f"  --> {friction_controller.get_status_string()}")
+                        if friction_controller.correction_active:
+                            print(f"  ⚠️ FRICTION CORRECTION: LR reduced by {(1-friction_controller.friction_penalty)*100:.0f}%")
+
+                    # Apply authority factor AND friction penalty to learning rate
+                    effective_factor = new_A * friction_penalty
                     for pg in optimizer.param_groups:
-                        pg['lr'] *= new_A
+                        pg['lr'] *= effective_factor
 
                     # TensorBoard logging
                     if tb_writer is not None:
@@ -948,6 +991,16 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("ctrl/ppl_velocity", authority_controller.last_v, global_step)
                         if hasattr(authority_controller, 'last_Kp'):
                             tb_writer.add_scalar("ctrl/dynamic_Kp", authority_controller.last_Kp, global_step)
+                        # V9.4.5: Friction Controller metrics (with corrective actions)
+                        if friction_controller is not None:
+                            tb_writer.add_scalar("fric/alignment", friction_controller.align_ema, global_step)
+                            tb_writer.add_scalar("fric/dominance", friction_controller.dom_ema, global_step)
+                            tb_writer.add_scalar("fric/penalty", friction_controller.friction_penalty, global_step)
+                            tb_writer.add_scalar("fric/correction_active", 1.0 if friction_controller.correction_active else 0.0, global_step)
+                        elif friction_alignment != 0.0:
+                            # Legacy: raw metrics without controller
+                            tb_writer.add_scalar("ctrl/friction_alignment", friction_alignment, global_step)
+                            tb_writer.add_scalar("ctrl/friction_dominance", friction_dominance, global_step)
                 else:
                     print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
 
