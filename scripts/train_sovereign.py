@@ -41,6 +41,47 @@ DEFAULT_SAMPLE_PROMPTS = [
 ]
 
 
+@torch.no_grad()
+def compute_sovereign_metrics(r_logits, s_logits, target_r, target_s, g_states):
+    """
+    Compute Sovereign-specific metrics beyond PPL.
+
+    Returns:
+        dict with:
+        - r_acc: R-Signal (Intent/Ontology) accuracy
+        - s_acc: S-Signal (Reality-Lock) accuracy
+        - guna_entropy: Entropy of Guna state distribution
+        - guna_dist: [Sattva, Rajas, Tamas] distribution
+    """
+    # R-Accuracy: How well does model predict Intent layer?
+    r_preds = r_logits.argmax(dim=-1)  # [B, Seq]
+    r_correct = (r_preds == target_r).float()
+    r_acc = r_correct.mean().item() * 100
+
+    # S-Accuracy: How well does model predict Reality category?
+    s_preds = s_logits.argmax(dim=-1)  # [B, Seq]
+    s_correct = (s_preds == target_s).float()
+    s_acc = s_correct.mean().item() * 100
+
+    # Guna Distribution: Track S/R/T balance across sequence
+    # g_states is [B, Seq, 3] - average across batch and sequence
+    guna_mean = g_states.mean(dim=(0, 1))  # [3]
+    sattva, rajas, tamas = guna_mean[0].item(), guna_mean[1].item(), guna_mean[2].item()
+
+    # Guna Entropy: Higher entropy = more balanced/exploring, Lower = focused
+    guna_probs = torch.softmax(guna_mean, dim=0)
+    guna_entropy = -(guna_probs * torch.log(guna_probs + 1e-8)).sum().item()
+
+    return {
+        "r_acc": r_acc,
+        "s_acc": s_acc,
+        "guna_entropy": guna_entropy,
+        "sattva": sattva,
+        "rajas": rajas,
+        "tamas": tamas,
+    }
+
+
 def generate_sample(
     model: nn.Module,
     tokenizer: SovereignTokenizer,
@@ -306,6 +347,9 @@ def train_epoch(
     """Train for one epoch with optional quality sampling."""
     model.train()
     total_loss = 0
+    total_r_acc = 0
+    total_s_acc = 0
+    total_guna_entropy = 0
     num_batches = 0
     step = global_step
 
@@ -355,16 +399,24 @@ def train_epoch(
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
 
+        # Compute Sovereign metrics (R-Acc, S-Acc, Guna)
+        sov_metrics = compute_sovereign_metrics(
+            r_logits, s_logits, target_r, target_s, g_states
+        )
+
         total_loss += loss_output.total.item()
+        total_r_acc += sov_metrics["r_acc"]
+        total_s_acc += sov_metrics["s_acc"]
+        total_guna_entropy += sov_metrics["guna_entropy"]
         num_batches += 1
 
-        # Update progress bar with PPL
+        # Update progress bar with PPL and Sovereign metrics
         token_ppl = math.exp(loss_output.token) if loss_output.token < 20 else float('inf')
         pbar.set_postfix({
-            "step": step,
-            "loss": f"{loss_output.total.item():.4f}",
-            "PPL": f"{token_ppl:.2f}",
-            "r": f"{loss_output.r_signal:.4f}",
+            "PPL": f"{token_ppl:.1f}",
+            "R%": f"{sov_metrics['r_acc']:.1f}",
+            "S%": f"{sov_metrics['s_acc']:.1f}",
+            "G": f"S{sov_metrics['sattva']:.2f}/R{sov_metrics['rajas']:.2f}/T{sov_metrics['tamas']:.2f}",
         })
 
         # Quality sampling
@@ -372,16 +424,31 @@ def train_epoch(
             run_quality_samples(model, tokenizer, sample_prompts or DEFAULT_SAMPLE_PROMPTS, device, step)
 
     avg_loss = total_loss / num_batches
+    avg_r_acc = total_r_acc / num_batches
+    avg_s_acc = total_s_acc / num_batches
+    avg_guna_entropy = total_guna_entropy / num_batches
     ppl = math.exp(avg_loss) if avg_loss < 20 else float('inf')
-    return avg_loss, ppl, step
+
+    return {
+        "loss": avg_loss,
+        "ppl": ppl,
+        "r_acc": avg_r_acc,
+        "s_acc": avg_s_acc,
+        "guna_entropy": avg_guna_entropy,
+        "step": step,
+    }
 
 
 @torch.no_grad()
 def validate(model, dataloader, loss_fn, device):
-    """Run validation and compute perplexity."""
+    """Run validation and compute perplexity + Sovereign metrics."""
     model.eval()
     total_loss = 0
     total_tokens = 0
+    total_r_acc = 0
+    total_s_acc = 0
+    total_guna_entropy = 0
+    num_batches = 0
 
     for batch in tqdm(dataloader, desc="Validating", leave=False):
         input_ids = batch["input_ids"].to(device)
@@ -419,16 +486,35 @@ def validate(model, dataloader, loss_fn, device):
             target_c=target_c,
         )
 
-        # Accumulate token loss for PPL calculation
+        # Compute Sovereign metrics
+        sov_metrics = compute_sovereign_metrics(
+            r_logits, s_logits, target_r, target_s, g_states
+        )
+
+        # Accumulate
         batch_size, seq_len = target_tokens.shape
         total_loss += loss_output.token * batch_size * seq_len
         total_tokens += batch_size * seq_len
+        total_r_acc += sov_metrics["r_acc"]
+        total_s_acc += sov_metrics["s_acc"]
+        total_guna_entropy += sov_metrics["guna_entropy"]
+        num_batches += 1
 
     model.train()
 
     avg_loss = total_loss / total_tokens if total_tokens > 0 else float('inf')
     ppl = math.exp(avg_loss) if avg_loss < 20 else float('inf')
-    return avg_loss, ppl
+    avg_r_acc = total_r_acc / num_batches if num_batches > 0 else 0
+    avg_s_acc = total_s_acc / num_batches if num_batches > 0 else 0
+    avg_guna_entropy = total_guna_entropy / num_batches if num_batches > 0 else 0
+
+    return {
+        "loss": avg_loss,
+        "ppl": ppl,
+        "r_acc": avg_r_acc,
+        "s_acc": avg_s_acc,
+        "guna_entropy": avg_guna_entropy,
+    }
 
 
 def main():
@@ -515,26 +601,35 @@ def main():
 
     for epoch in range(args.epochs):
         # Train
-        train_loss, train_ppl, global_step = train_epoch(
+        train_metrics = train_epoch(
             model, train_loader, optimizer, loss_fn, device, epoch,
             tokenizer=tokenizer,
             sample_every=args.sample_every,
             sample_prompts=DEFAULT_SAMPLE_PROMPTS,
             global_step=global_step,
         )
+        global_step = train_metrics["step"]
         scheduler.step()
 
         # Validate
-        val_loss, val_ppl = validate(model, val_loader, loss_fn, device)
+        val_metrics = validate(model, val_loader, loss_fn, device)
 
-        print(f"\n{'='*60}")
-        print(f"  Epoch {epoch+1}/{args.epochs} Complete")
-        print(f"  Train Loss: {train_loss:.4f} | Train PPL: {train_ppl:.2f}")
-        print(f"  Val Loss:   {val_loss:.4f} | Val PPL:   {val_ppl:.2f}")
+        # Print comprehensive Sovereign metrics
+        print(f"\n{'='*70}")
+        print(f"  EPOCH {epoch+1}/{args.epochs} COMPLETE")
+        print(f"{'='*70}")
+        print(f"  {'Metric':<20} {'Train':>12} {'Val':>12}")
+        print(f"  {'-'*44}")
+        print(f"  {'PPL':<20} {train_metrics['ppl']:>12.2f} {val_metrics['ppl']:>12.2f}")
+        print(f"  {'R-Acc (Intent)':<20} {train_metrics['r_acc']:>11.1f}% {val_metrics['r_acc']:>11.1f}%")
+        print(f"  {'S-Acc (Reality)':<20} {train_metrics['s_acc']:>11.1f}% {val_metrics['s_acc']:>11.1f}%")
+        print(f"  {'Guna Entropy':<20} {train_metrics['guna_entropy']:>12.3f} {val_metrics['guna_entropy']:>12.3f}")
+        print(f"  {'-'*44}")
         print(f"  Steps: {global_step}")
-        print(f"{'='*60}")
+        print(f"{'='*70}")
 
         # Save checkpoint based on val PPL
+        val_ppl = val_metrics["ppl"]
         if val_ppl < best_val_ppl:
             best_val_ppl = val_ppl
             checkpoint_path = os.path.join(args.save_dir, "best_model.pt")
@@ -542,12 +637,11 @@ def main():
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
-                "train_loss": train_loss,
-                "train_ppl": train_ppl,
-                "val_loss": val_loss,
-                "val_ppl": val_ppl,
+                "train_metrics": train_metrics,
+                "val_metrics": val_metrics,
             }, checkpoint_path)
-            print(f"  📦 New best! Val PPL: {val_ppl:.2f} → Saved to {checkpoint_path}")
+            print(f"  📦 New best! Val PPL: {val_ppl:.2f} | R-Acc: {val_metrics['r_acc']:.1f}% | S-Acc: {val_metrics['s_acc']:.1f}%")
+            print(f"     Saved to {checkpoint_path}")
 
     print("\n" + "=" * 70)
     print("TRAINING COMPLETE")
