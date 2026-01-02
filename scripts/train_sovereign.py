@@ -567,54 +567,111 @@ def validate(model, dataloader, loss_fn, device):
     }
 
 
+# Model size configurations
+MODEL_SIZES = {
+    "small": {"d_model": 512, "n_layers": 4, "n_heads": 8},
+    "medium": {"d_model": 1024, "n_layers": 6, "n_heads": 16},
+    "large": {"d_model": 1536, "n_layers": 12, "n_heads": 16},
+    "xl": {"d_model": 2048, "n_layers": 24, "n_heads": 16},
+}
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Train Sovereign Model",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Model sizes:
+  small   ~25M params  (d=512, layers=4)
+  medium  ~85M params  (d=1024, layers=6)
+  large   ~300M params (d=1536, layers=12)
+  xl      ~800M params (d=2048, layers=24)
+
 Supported datasets:
-  wikitext-2    Small Wikipedia subset (~2M tokens)
-  wikitext-103  Large Wikipedia subset (~100M tokens)
-  openwebtext   Web text corpus (streaming)
-  c4            Colossal Clean Crawled Corpus (streaming)
-  tinystories   Simple children's stories
-  bookcorpus    Book text corpus
-  pile          The Pile dataset (streaming)
+  wikitext-2, wikitext-103, openwebtext, c4, tinystories, bookcorpus, pile
 
 Examples:
-  python train_sovereign.py --dataset wikitext-2 --epochs 3
-  python train_sovereign.py --dataset tinystories --max_samples 10000 --sample_every 200
-  python train_sovereign.py --dataset c4 --max_samples 50000 --sample_every 500
+  python train_sovereign.py --model_size medium --dataset wikitext-103 --max_seq_len 1024
+  python train_sovereign.py --model_size small --dataset tinystories --max_steps 10000
+  python train_sovereign.py --model_size large --dataset c4 --gradient_checkpointing --gradient_accumulation 4
 """
     )
+    # Model
+    parser.add_argument("--model_size", type=str, default="medium",
+                        choices=["small", "medium", "large", "xl"],
+                        help="Model size preset (default: medium)")
+    parser.add_argument("--n_layers", type=int, default=None,
+                        help="Override number of layers")
+
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext-2",
                         help="Dataset to train on (default: wikitext-2)")
+    parser.add_argument("--max_seq_len", type=int, default=512,
+                        help="Max sequence length (default: 512)")
+    parser.add_argument("--max_samples", type=int, default=None,
+                        help="Max training samples (None=all)")
+
     # Training
-    parser.add_argument("--epochs", type=int, default=3, help="Number of epochs")
+    parser.add_argument("--epochs", type=int, default=None,
+                        help="Number of epochs (use --max_steps instead for step-based)")
+    parser.add_argument("--max_steps", type=int, default=None,
+                        help="Max training steps (overrides --epochs)")
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size")
+    parser.add_argument("--gradient_accumulation", type=int, default=1,
+                        help="Gradient accumulation steps")
     parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
-    parser.add_argument("--max_length", type=int, default=128, help="Max sequence length")
-    parser.add_argument("--max_samples", type=int, default=None, help="Max training samples")
-    # Model
-    parser.add_argument("--n_layers", type=int, default=6, help="Number of transformer layers")
+
+    # Optimizations
+    parser.add_argument("--gradient_checkpointing", action="store_true",
+                        help="Enable gradient checkpointing to save memory")
+    parser.add_argument("--use_coherence_loss", action="store_true",
+                        help="Add phase coherence loss term")
+
     # Output
-    parser.add_argument("--save_dir", type=str, default="checkpoints/sovereign", help="Save directory")
-    parser.add_argument("--sample_every", type=int, default=100,
+    parser.add_argument("--save_dir", type=str, default="checkpoints/sovereign",
+                        help="Save directory")
+    parser.add_argument("--sample_every", type=int, default=500,
                         help="Generate quality samples every N steps (0=disabled)")
+    parser.add_argument("--save_every", type=int, default=1000,
+                        help="Save checkpoint every N steps")
+    parser.add_argument("--log_every", type=int, default=10,
+                        help="Log metrics every N steps")
+
     args = parser.parse_args()
+
+    # Set default epochs if neither epochs nor max_steps specified
+    if args.epochs is None and args.max_steps is None:
+        args.epochs = 3
 
     # Device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
+    # Get model config from size preset
+    size_config = MODEL_SIZES[args.model_size]
+    d_model = size_config["d_model"]
+    n_layers = args.n_layers if args.n_layers else size_config["n_layers"]
+    n_heads = size_config["n_heads"]
+
     # Create model
-    print("\n1. Creating model...")
+    print(f"\n1. Creating {args.model_size} model...")
+    print(f"   d_model={d_model}, n_layers={n_layers}, n_heads={n_heads}")
     embed_config = SovereignEmbeddingConfig(
         vocab_size=50257,
-        d_model=1024,
+        d_model=d_model,
     )
-    model = SovereignTransformer(embed_config, n_layers=args.n_layers)
+    model = SovereignTransformer(embed_config, n_heads=n_heads, n_layers=n_layers)
+
+    # Enable gradient checkpointing if requested
+    if args.gradient_checkpointing:
+        print("   Gradient checkpointing enabled")
+        if hasattr(model.transformer, 'gradient_checkpointing_enable'):
+            model.transformer.gradient_checkpointing_enable()
+        else:
+            # Manual checkpointing for nn.TransformerEncoder
+            from torch.utils.checkpoint import checkpoint_sequential
+            model._use_gradient_checkpointing = True
+
     model.to(device)
     print(f"   Parameters: {sum(p.numel() for p in model.parameters()):,}")
 
@@ -639,7 +696,7 @@ Examples:
 
     # Create dataset and dataloader
     print("\n4. Creating dataloaders...")
-    train_dataset = WikitextSovereignDataset(train_texts, tokenizer, max_length=args.max_length)
+    train_dataset = WikitextSovereignDataset(train_texts, tokenizer, max_length=args.max_seq_len)
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
@@ -648,7 +705,7 @@ Examples:
         drop_last=True,
         collate_fn=sovereign_collate_fn,
     )
-    val_dataset = WikitextSovereignDataset(val_texts, tokenizer, max_length=args.max_length)
+    val_dataset = WikitextSovereignDataset(val_texts, tokenizer, max_length=args.max_seq_len)
     val_loader = DataLoader(
         val_dataset,
         batch_size=args.batch_size,
@@ -658,6 +715,16 @@ Examples:
         collate_fn=sovereign_collate_fn,
     )
     print(f"   Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
+    print(f"   Effective batch size: {args.batch_size * args.gradient_accumulation}")
+
+    # Calculate total steps
+    steps_per_epoch = len(train_loader) // args.gradient_accumulation
+    if args.max_steps:
+        total_steps = args.max_steps
+        num_epochs = (total_steps // steps_per_epoch) + 1
+    else:
+        num_epochs = args.epochs
+        total_steps = num_epochs * steps_per_epoch
 
     # Create loss and optimizer
     print("\n5. Setting up training...")
@@ -669,48 +736,134 @@ Examples:
     )
     loss_fn = MultiObjectiveLoss(loss_config)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=args.epochs * len(train_loader)
-    )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps)
 
     # Training loop
     print("\n" + "=" * 70)
     print("TRAINING")
     print("=" * 70)
+    print(f"  Model: {args.model_size} | Dataset: {args.dataset}")
+    print(f"  Max seq len: {args.max_seq_len} | Batch: {args.batch_size} x {args.gradient_accumulation}")
+    print(f"  Total steps: {total_steps} | LR: {args.lr}")
     if args.sample_every > 0:
-        print(f"Quality samples every {args.sample_every} steps")
+        print(f"  Quality samples every {args.sample_every} steps")
+    if args.use_coherence_loss:
+        print(f"  Phase coherence loss: ENABLED")
+    print("=" * 70)
 
     os.makedirs(args.save_dir, exist_ok=True)
     best_val_ppl = float("inf")
     global_step = 0
+    accum_loss = 0
+    accum_metrics = {"r_acc": 0, "s_acc": 0, "guna_entropy": 0}
 
-    for epoch in range(args.epochs):
-        # Train
-        train_metrics = train_epoch(
-            model, train_loader, optimizer, loss_fn, device, epoch,
-            tokenizer=tokenizer,
-            sample_every=args.sample_every,
-            sample_prompts=DEFAULT_SAMPLE_PROMPTS,
-            global_step=global_step,
-        )
-        global_step = train_metrics["step"]
-        scheduler.step()
+    for epoch in range(num_epochs):
+        model.train()
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}")
+
+        for batch_idx, batch in enumerate(pbar):
+            # Check max_steps
+            if args.max_steps and global_step >= args.max_steps:
+                break
+
+            # Move to device
+            input_ids = batch["input_ids"].to(device)
+            c_signals = batch["c_signals"].to(device)
+            s_signals = batch["s_signals"].to(device)
+            r_signals = batch["r_signals"].to(device)
+            g_states = batch["g_states"].to(device)
+
+            # Shift for next-token prediction
+            target_tokens = input_ids[:, 1:].contiguous()
+            target_r = r_signals[:, 1:].contiguous()
+            target_s = s_signals[:, 1:].contiguous()
+            target_c = c_signals[:, 1:].contiguous()
+
+            input_ids = input_ids[:, :-1]
+            c_signals = c_signals[:, :-1]
+            s_signals = s_signals[:, :-1]
+            r_signals = r_signals[:, :-1]
+            g_states = g_states[:, :-1]
+
+            # Forward pass
+            token_logits, r_logits, s_logits, c_pred = model(
+                input_ids, c_signals, s_signals, r_signals, g_states
+            )
+
+            # Compute loss
+            loss_output = loss_fn(
+                token_logits=token_logits,
+                r_logits=r_logits,
+                s_logits=s_logits,
+                c_pred=c_pred,
+                target_tokens=target_tokens,
+                target_r=target_r,
+                target_s=target_s,
+                target_c=target_c,
+            )
+
+            # Scale loss for gradient accumulation
+            loss = loss_output.total / args.gradient_accumulation
+            loss.backward()
+
+            # Compute metrics
+            sov_metrics = compute_sovereign_metrics(r_logits, s_logits, target_r, target_s, g_states)
+            accum_loss += loss_output.total.item()
+            accum_metrics["r_acc"] += sov_metrics["r_acc"]
+            accum_metrics["s_acc"] += sov_metrics["s_acc"]
+            accum_metrics["guna_entropy"] += sov_metrics["guna_entropy"]
+
+            # Gradient accumulation step
+            if (batch_idx + 1) % args.gradient_accumulation == 0:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
+                global_step += 1
+
+                # Average accumulated metrics
+                avg_loss = accum_loss / args.gradient_accumulation
+                avg_r_acc = accum_metrics["r_acc"] / args.gradient_accumulation
+                avg_s_acc = accum_metrics["s_acc"] / args.gradient_accumulation
+                token_ppl = math.exp(avg_loss) if avg_loss < 20 else float('inf')
+
+                # Update progress bar
+                pbar.set_postfix({
+                    "step": global_step,
+                    "PPL": f"{token_ppl:.1f}",
+                    "R%": f"{avg_r_acc:.1f}",
+                    "S%": f"{avg_s_acc:.1f}",
+                })
+
+                # Reset accumulators
+                accum_loss = 0
+                accum_metrics = {"r_acc": 0, "s_acc": 0, "guna_entropy": 0}
+
+                # Quality sampling
+                if args.sample_every > 0 and global_step % args.sample_every == 0:
+                    run_quality_samples(model, tokenizer, DEFAULT_SAMPLE_PROMPTS, device, global_step)
+
+                # Periodic checkpoint
+                if args.save_every > 0 and global_step % args.save_every == 0:
+                    ckpt_path = os.path.join(args.save_dir, f"step_{global_step}.pt")
+                    torch.save({"step": global_step, "model_state_dict": model.state_dict()}, ckpt_path)
+                    print(f"  💾 Checkpoint saved: {ckpt_path}")
+
+        # Check max_steps at epoch end
+        if args.max_steps and global_step >= args.max_steps:
+            break
 
         # Validate
         val_metrics = validate(model, val_loader, loss_fn, device)
 
-        # Print comprehensive Sovereign metrics
+        # Print Sovereign metrics
         print(f"\n{'='*70}")
-        print(f"  EPOCH {epoch+1}/{args.epochs} COMPLETE")
+        print(f"  EPOCH {epoch+1}/{num_epochs} | Step {global_step}/{total_steps}")
         print(f"{'='*70}")
-        print(f"  {'Metric':<20} {'Train':>12} {'Val':>12}")
-        print(f"  {'-'*44}")
-        print(f"  {'PPL':<20} {train_metrics['ppl']:>12.2f} {val_metrics['ppl']:>12.2f}")
-        print(f"  {'R-Acc (Intent)':<20} {train_metrics['r_acc']:>11.1f}% {val_metrics['r_acc']:>11.1f}%")
-        print(f"  {'S-Acc (Reality)':<20} {train_metrics['s_acc']:>11.1f}% {val_metrics['s_acc']:>11.1f}%")
-        print(f"  {'Guna Entropy':<20} {train_metrics['guna_entropy']:>12.3f} {val_metrics['guna_entropy']:>12.3f}")
-        print(f"  {'-'*44}")
-        print(f"  Steps: {global_step}")
+        print(f"  Val PPL:        {val_metrics['ppl']:>10.2f}")
+        print(f"  Val R-Acc:      {val_metrics['r_acc']:>9.1f}%")
+        print(f"  Val S-Acc:      {val_metrics['s_acc']:>9.1f}%")
+        print(f"  Guna Entropy:   {val_metrics['guna_entropy']:>10.3f}")
         print(f"{'='*70}")
 
         # Save checkpoint based on val PPL
@@ -719,18 +872,21 @@ Examples:
             best_val_ppl = val_ppl
             checkpoint_path = os.path.join(args.save_dir, "best_model.pt")
             torch.save({
+                "step": global_step,
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
-                "train_metrics": train_metrics,
                 "val_metrics": val_metrics,
+                "args": vars(args),
             }, checkpoint_path)
             print(f"  📦 New best! Val PPL: {val_ppl:.2f} | R-Acc: {val_metrics['r_acc']:.1f}% | S-Acc: {val_metrics['s_acc']:.1f}%")
             print(f"     Saved to {checkpoint_path}")
 
+    # Final summary
     print("\n" + "=" * 70)
     print("TRAINING COMPLETE")
-    print(f"Best Val PPL: {best_val_ppl:.2f}")
+    print(f"  Total steps: {global_step}")
+    print(f"  Best Val PPL: {best_val_ppl:.2f}")
     print("=" * 70)
 
 
