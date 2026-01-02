@@ -1810,6 +1810,137 @@ class HybridPhaseTransformer(nn.Module):
         return input_ids
 
 
+class LocalOnlyTransformer(nn.Module):
+    """
+    Local-Only Transformer (Sliding Window Attention, NO Phase).
+
+    Baseline model to test if Phase attention is helping or hurting.
+    Uses only LocalTransformerBlock with sliding window attention O(n×w).
+    """
+
+    def __init__(
+        self,
+        vocab_size: int = 50257,
+        embed_dim: int = 768,
+        num_layers: int = 12,
+        num_heads: int = 12,
+        ff_dim: Optional[int] = None,
+        max_seq_len: int = 8192,
+        dropout: float = 0.1,
+        window_size: int = 256,
+        local_backend: str = 'auto',
+        # Unused but kept for compatibility with create_model()
+        sync_steps: int = 3,
+        sync_lr: float = 0.1,
+        local_layers: int = 4,
+        alpha_local: float = 0.8,
+        alpha_phase: float = 0.2,
+        temperature: float = 1.0,
+    ):
+        super().__init__()
+
+        config = TransformerConfig(
+            vocab_size=vocab_size,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            max_seq_len=max_seq_len,
+            dropout=dropout,
+        )
+        self.config = config
+        self.local_backend = local_backend
+
+        # Embeddings
+        self.token_embed = nn.Embedding(vocab_size, embed_dim)
+        self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
+        self.embed_dropout = nn.Dropout(dropout)
+
+        # ALL layers use LocalTransformerBlock (NO Phase)
+        self.blocks = nn.ModuleList([
+            LocalTransformerBlock(config, window_size=window_size, backend=local_backend)
+            for _ in range(num_layers)
+        ])
+
+        # Output
+        self.norm = nn.LayerNorm(embed_dim)
+        self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
+
+        # Tie weights
+        self.lm_head.weight = self.token_embed.weight
+
+        # Gradient checkpointing
+        self.gradient_checkpointing = False
+
+        # Initialize
+        self.apply(self._init_weights)
+
+    def gradient_checkpointing_enable(self):
+        self.gradient_checkpointing = True
+
+    def gradient_checkpointing_disable(self):
+        self.gradient_checkpointing = False
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        return_hidden: bool = False,
+    ) -> Dict[str, torch.Tensor]:
+        B, N = input_ids.shape
+
+        # Embeddings
+        positions = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.token_embed(input_ids) + self.pos_embed(positions)
+        x = self.embed_dropout(x)
+
+        # Transformer blocks (all local, no phase)
+        hidden_states = []
+        for block in self.blocks:
+            if self.gradient_checkpointing and self.training:
+                x = checkpoint(block, x, True, use_reentrant=False)
+            else:
+                x = block(x, causal_mask=True)
+            if return_hidden:
+                hidden_states.append(x)
+
+        # Output
+        x = self.norm(x)
+        logits = self.lm_head(x)
+
+        result = {'logits': logits}
+        if return_hidden:
+            result['hidden_states'] = hidden_states
+
+        return result
+
+    def generate(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 50,
+        temperature: float = 1.0,
+        top_k: int = 50,
+    ) -> torch.Tensor:
+        """Simple generation loop."""
+        for _ in range(max_new_tokens):
+            logits = self(input_ids)['logits'][:, -1, :]
+            logits = logits / temperature
+            if top_k > 0:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = float('-inf')
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+        return input_ids
+
+
 class StandardTransformer(nn.Module):
     """
     Standard O(n²) Transformer for comparison.
