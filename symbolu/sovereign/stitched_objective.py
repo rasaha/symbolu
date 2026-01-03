@@ -405,16 +405,24 @@ class StitchedObjective(nn.Module):
 
 class VrittiGovernor(nn.Module):
     """
-    The PID Mode-Switch Governor.
+    The Vectorized PID Mode-Switch Governor (Patent Formula [201]).
 
     Orchestrates all penalty components and manages Vritti state transitions.
     Acts as the "Central Control System" for the Sovereign model.
+
+    Key Features:
+    - Per-Vritti PID gains for gradient stiffness control
+    - Anomaly Score (S_drift) for hallucination detection (Formula [341])
+    - Guna-based Emergency Brake (Tamas detection)
+    - Transition Penalty enforcement (Formula [223])
     """
 
     def __init__(
         self,
         d_model: int = 1024,
         config_path: Optional[str] = None,
+        ema_alpha: float = 0.1,  # EMA decay for anomaly tracking
+        tamas_threshold: float = 0.6,  # Tamas level to trigger brake
     ):
         super().__init__()
 
@@ -424,11 +432,19 @@ class VrittiGovernor(nn.Module):
         else:
             self.config = StitchedConfig()
 
+        self.ema_alpha = ema_alpha
+        self.tamas_threshold = tamas_threshold
+
         # Core components
         self.stitched = StitchedObjective(d_model, self.config)
         self.aspect_weighting = AspectWeighting()
 
-        # PID gains (from vritti.py)
+        # PID gains (Patent Formula [201])
+        # Pramāṇa: Max stiffness for factual accuracy
+        # Viparyaya: Hard corrective stop
+        # Vikalpa: Under-damped for creative flow
+        # Smṛti: Integral-heavy for memory reliance
+        # Nidrā: High inertia for transitions
         self.register_buffer("kp_table", torch.tensor([0.9, 0.7, 0.3, 0.5, 0.2]))
         self.register_buffer("ki_table", torch.tensor([0.01, 0.2, 0.05, 0.4, 0.7]))
         self.register_buffer("kd_table", torch.tensor([0.01, 0.2, 0.6, 0.1, 0.01]))
@@ -438,6 +454,16 @@ class VrittiGovernor(nn.Module):
         self.error_integral = 0.0
         self.prev_error = 0.0
 
+        # Anomaly Score tracking (Formula [341])
+        # Exponential moving average of deviation from expected behavior
+        self.register_buffer("s_drift_ema", torch.tensor(0.0))
+        self.register_buffer("coupling_ema", torch.tensor(0.5))
+        self.register_buffer("guna_entropy_ema", torch.tensor(0.5))
+
+        # Telemetry history for visualization
+        self.telemetry_history: List[Dict] = []
+        self.max_history = 1000
+
     def get_pid_gains(self, vritti_id: torch.Tensor) -> torch.Tensor:
         """Get [Kp, Ki, Kd] for current Vritti state."""
         vritti_id = vritti_id.clamp(0, 4)
@@ -446,16 +472,142 @@ class VrittiGovernor(nn.Module):
         kd = self.kd_table[vritti_id]
         return torch.stack([kp, ki, kd], dim=-1)
 
+    def compute_guna_entropy(self, guna_states: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Compute Guna entropy and detect Tamas dominance (Formula [152]).
+
+        Args:
+            guna_states: [B, 3] or [B, Seq, 3] - [Sattva, Rajas, Tamas] values
+
+        Returns:
+            entropy: Guna entropy (high = scattered attention)
+            tamas_ratio: Proportion of Tamas (high = repetition/inertia)
+        """
+        if guna_states.dim() == 3:
+            guna_states = guna_states[:, -1, :]  # Last position
+
+        # Normalize to probabilities
+        guna_probs = F.softmax(guna_states, dim=-1)  # [B, 3]
+
+        # Entropy: H = -sum(p * log(p))
+        entropy = -(guna_probs * torch.log(guna_probs + 1e-8)).sum(dim=-1)  # [B]
+
+        # Tamas ratio (index 2)
+        tamas_ratio = guna_probs[:, 2]  # [B]
+
+        return entropy, tamas_ratio
+
+    def compute_anomaly_score(
+        self,
+        coupling: torch.Tensor,
+        redundancy: torch.Tensor,
+        domain_jump: torch.Tensor,
+        guna_entropy: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Compute Anomaly Score S_drift (Formula [341]).
+
+        High S_drift indicates the Governor is fighting a hallucination:
+        - Low coupling (wrong mental mode)
+        - High redundancy (repetition loop)
+        - High domain jump (ontological teleportation)
+        - High Guna entropy (scattered attention)
+
+        Args:
+            coupling: [B] - Context-Vritti coupling score
+            redundancy: [B] - Redundancy penalty
+            domain_jump: [B] - Domain jump penalty
+            guna_entropy: [B] - Guna entropy
+
+        Returns:
+            s_drift: [B] - Anomaly score (higher = more anomalous)
+        """
+        # Combine signals: low coupling and high penalties indicate drift
+        s_drift = (
+            0.4 * (1.0 - coupling)  # Inverse coupling
+            + 0.3 * redundancy
+            + 0.2 * domain_jump
+            + 0.1 * guna_entropy / math.log(3)  # Normalize by max entropy
+        )
+
+        # Update EMA
+        mean_drift = s_drift.mean()
+        self.s_drift_ema = (
+            self.ema_alpha * mean_drift
+            + (1 - self.ema_alpha) * self.s_drift_ema
+        )
+
+        return s_drift
+
     def apply_emergency_brake(
         self,
         should_reset: torch.Tensor,
-        learning_rate: float,
-    ) -> float:
-        """Apply emergency brake if reset triggered."""
+        tamas_ratio: Optional[torch.Tensor] = None,
+        learning_rate: float = 1.0,
+    ) -> Tuple[float, str]:
+        """
+        Apply emergency brake based on reset triggers or Tamas dominance.
+
+        Args:
+            should_reset: [B] - Boolean mask for reset triggers
+            tamas_ratio: [B] - Tamas dominance ratio
+            learning_rate: Current learning rate
+
+        Returns:
+            adjusted_lr: Dampened learning rate
+            brake_reason: Reason for brake activation (or "NONE")
+        """
+        brake_reason = "NONE"
+        adjusted_lr = learning_rate
+
+        # Priority 1: Viparyaya reset trigger
         if should_reset.any():
-            # Dampen learning rate by 0.1x during Viparyaya
-            return learning_rate * 0.1
-        return learning_rate
+            adjusted_lr = learning_rate * 0.1
+            brake_reason = "VIPARYAYA_RESET"
+
+        # Priority 2: High Tamas (repetition/inertia loop)
+        if tamas_ratio is not None and tamas_ratio.mean() > self.tamas_threshold:
+            adjusted_lr = min(adjusted_lr, learning_rate * 0.2)
+            brake_reason = "TAMAS_DOMINANCE" if brake_reason == "NONE" else brake_reason + "+TAMAS"
+
+        # Priority 3: High anomaly score (fighting hallucination)
+        if self.s_drift_ema > 0.7:
+            adjusted_lr = min(adjusted_lr, learning_rate * 0.3)
+            brake_reason = "HIGH_DRIFT" if brake_reason == "NONE" else brake_reason + "+DRIFT"
+
+        return adjusted_lr, brake_reason
+
+    def record_telemetry(
+        self,
+        step: int,
+        vritti: int,
+        pid_gains: torch.Tensor,
+        penalties: Dict[str, torch.Tensor],
+        guna_entropy: float,
+        tamas_ratio: float,
+        s_drift: float,
+        brake_reason: str,
+    ):
+        """Record telemetry for Sovereign Heartbeat visualization."""
+        entry = {
+            "step": step,
+            "vritti": vritti,
+            "kp": pid_gains[0].item() if pid_gains.dim() > 0 else pid_gains.item(),
+            "ki": pid_gains[1].item() if pid_gains.dim() > 0 else 0.0,
+            "kd": pid_gains[2].item() if pid_gains.dim() > 0 else 0.0,
+            "redundancy": penalties.get("redundancy", torch.tensor(0.0)).mean().item(),
+            "domain_jump": penalties.get("domain_jump", torch.tensor(0.0)).mean().item(),
+            "coupling": penalties.get("coupling", torch.tensor(0.5)).mean().item(),
+            "guna_entropy": guna_entropy,
+            "tamas_ratio": tamas_ratio,
+            "s_drift": s_drift,
+            "brake_reason": brake_reason,
+        }
+        self.telemetry_history.append(entry)
+
+        # Trim history if too long
+        if len(self.telemetry_history) > self.max_history:
+            self.telemetry_history = self.telemetry_history[-self.max_history:]
 
     def forward(
         self,
@@ -463,6 +615,9 @@ class VrittiGovernor(nn.Module):
         hidden_states: torch.Tensor,
         vritti_pred: torch.Tensor,
         c_signals: Optional[torch.Tensor] = None,
+        guna_states: Optional[torch.Tensor] = None,
+        step: Optional[int] = None,
+        record_telemetry: bool = False,
     ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
         Apply full Governor pipeline to token selection.
@@ -472,6 +627,9 @@ class VrittiGovernor(nn.Module):
             hidden_states: [B, Seq, d_model] - Hidden states
             vritti_pred: [B] - Predicted Vritti state
             c_signals: [B, 32] - Optional C-Signal for aspect weighting
+            guna_states: [B, 3] - Optional Guna states for entropy/brake
+            step: Current training step (for telemetry)
+            record_telemetry: Whether to record telemetry history
 
         Returns:
             adjusted_logits: [B, Vocab] - Governor-adjusted logits
@@ -503,6 +661,39 @@ class VrittiGovernor(nn.Module):
         else:
             aspect_weights = None
 
+        # Compute Guna entropy and Tamas ratio if provided
+        guna_entropy = torch.tensor(0.5, device=device)
+        tamas_ratio = torch.tensor(0.33, device=device)
+        if guna_states is not None:
+            guna_entropy, tamas_ratio = self.compute_guna_entropy(guna_states)
+
+        # Compute Anomaly Score (S_drift)
+        s_drift = self.compute_anomaly_score(
+            penalties["coupling"],
+            penalties["redundancy"],
+            penalties["domain_jump"],
+            guna_entropy,
+        )
+
+        # Determine brake activation
+        _, brake_reason = self.apply_emergency_brake(
+            penalties["should_reset"],
+            tamas_ratio,
+        )
+
+        # Record telemetry if requested
+        if record_telemetry and step is not None:
+            self.record_telemetry(
+                step=step,
+                vritti=vritti_pred[0].item() if vritti_pred.dim() > 0 else vritti_pred.item(),
+                pid_gains=pid_gains[0] if pid_gains.dim() > 1 else pid_gains,
+                penalties=penalties,
+                guna_entropy=guna_entropy.mean().item(),
+                tamas_ratio=tamas_ratio.mean().item(),
+                s_drift=s_drift.mean().item(),
+                brake_reason=brake_reason,
+            )
+
         # Update state
         self.prev_vritti = vritti_pred.clone()
 
@@ -511,6 +702,11 @@ class VrittiGovernor(nn.Module):
             "pid_gains": pid_gains,
             "aspect_weights": aspect_weights,
             "vritti_state": vritti_pred,
+            "guna_entropy": guna_entropy,
+            "tamas_ratio": tamas_ratio,
+            "s_drift": s_drift,
+            "s_drift_ema": self.s_drift_ema,
+            "brake_reason": brake_reason,
         }
 
         return adjusted_logits, info

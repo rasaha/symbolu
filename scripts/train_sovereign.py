@@ -33,8 +33,9 @@ from symbolu.sovereign.embedding import (
 )
 from symbolu.sovereign.metrics import SovereignMetrics
 from symbolu.sovereign.tagger import SovereignTokenizer
-from symbolu.sovereign.train_loss import MultiObjectiveLoss, TrainingLossConfig
+from symbolu.sovereign.train_loss import MultiObjectiveLoss, TrainingLossConfig, VrittiLoss, VrittiLossConfig
 from symbolu.sovereign.stitched_objective import VrittiGovernor, format_governor_log
+from symbolu.sovereign.heartbeat import SovereignHeartbeat, format_governor_telemetry
 
 # Default quality sample prompts
 DEFAULT_SAMPLE_PROMPTS = [
@@ -816,6 +817,14 @@ Examples:
     parser.add_argument("--lambda_guna", type=float, default=0.1,
                         help="Weight for Guna coherence loss (default: 0.1)")
 
+    # Vritti PID Governor
+    parser.add_argument("--use_vritti", action="store_true",
+                        help="Enable Vritti-driven PID Governor with stiffness multiplier")
+    parser.add_argument("--show_heartbeat", action="store_true",
+                        help="Show Sovereign Heartbeat visualization during training")
+    parser.add_argument("--heartbeat_every", type=int, default=50,
+                        help="Show heartbeat every N steps (default: 50)")
+
     # Output
     parser.add_argument("--save_dir", type=str, default="checkpoints/sovereign",
                         help="Save directory")
@@ -926,6 +935,24 @@ Examples:
         lambda_c=0.05,
     )
     loss_fn = MultiObjectiveLoss(loss_config)
+
+    # Vritti-driven loss (optional)
+    vritti_loss_fn = None
+    governor = None
+    heartbeat = None
+    if args.use_vritti:
+        vritti_loss_config = VrittiLossConfig(
+            lambda_token=1.0,
+            lambda_vritti=0.2,
+            transition_weight=0.5,
+        )
+        vritti_loss_fn = VrittiLoss(vritti_loss_config).to(device)
+        governor = VrittiGovernor(d_model=d_model).to(device)
+        print("  Vritti PID Governor: ENABLED")
+        if args.show_heartbeat:
+            heartbeat = SovereignHeartbeat()
+            print(f"  Sovereign Heartbeat: ENABLED (every {args.heartbeat_every} steps)")
+
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps)
 
@@ -942,6 +969,8 @@ Examples:
         print(f"  Health dashboard every {args.health_check_every} steps")
     if args.use_guna_coherence:
         print(f"  Guna coherence loss: ENABLED (lambda={args.lambda_guna})")
+    if args.use_vritti:
+        print(f"  Vritti PID Governor: ENABLED")
     print("=" * 70)
 
     os.makedirs(args.save_dir, exist_ok=True)
@@ -1001,6 +1030,47 @@ Examples:
                 guna_coh_loss = compute_guna_coherence_loss(g_states)
                 total_loss = total_loss + args.lambda_guna * guna_coh_loss
 
+            # Add Vritti-driven loss if enabled
+            vritti_info = None
+            if args.use_vritti and vritti_loss_fn is not None:
+                # Get Vritti signals from batch (use R-signals as proxy or dedicated v_signals)
+                v_signals = batch.get("v_signals", r_signals).to(device)
+                target_vritti = v_signals[:, 1:].contiguous()
+                v_signals_input = v_signals[:, :-1]
+                prev_vritti = torch.cat([
+                    torch.full((v_signals_input.size(0), 1), 4, device=device),  # Start with Nidrā
+                    v_signals_input[:, :-1]
+                ], dim=1)
+
+                # Compute Vritti prediction logits (use R-logits as proxy if no dedicated head)
+                vritti_logits = torch.zeros(r_logits.size(0), r_logits.size(1), 5, device=device)
+                vritti_logits[:, :, :min(5, r_logits.size(2))] = r_logits[:, :, :min(5, r_logits.size(2))]
+
+                # Compute VrittiLoss with stiffness multiplier
+                vritti_output = vritti_loss_fn(
+                    token_logits=token_logits,
+                    vritti_logits=vritti_logits,
+                    target_tokens=target_tokens,
+                    target_vritti=target_vritti,
+                    prev_vritti=prev_vritti,
+                )
+                total_loss = total_loss + vritti_output.total * 0.5  # Weight Vritti loss
+
+                # Apply Governor for telemetry (sample last position)
+                if governor is not None:
+                    hidden_states = model.embedding(
+                        input_ids, c_signals, s_signals, r_signals, g_states
+                    )
+                    _, vritti_info = governor(
+                        token_logits[:, -1, :],
+                        hidden_states,
+                        v_signals_input[:, -1],
+                        c_signals[:, -1, :] if c_signals.dim() == 3 else None,
+                        g_states[:, -1, :] if g_states.dim() == 3 else None,
+                        step=global_step,
+                        record_telemetry=True,
+                    )
+
             # Scale loss for gradient accumulation
             loss = total_loss / args.gradient_accumulation
             loss.backward()
@@ -1013,6 +1083,9 @@ Examples:
             accum_metrics["guna_entropy"] += sov_metrics["guna_entropy"]
             if args.use_guna_coherence:
                 accum_metrics["guna_coh"] = accum_metrics.get("guna_coh", 0) + guna_coh_loss.item()
+            if args.use_vritti and vritti_info is not None:
+                accum_metrics["s_drift"] = accum_metrics.get("s_drift", 0) + vritti_info["s_drift"].mean().item()
+                accum_metrics["stiffness"] = accum_metrics.get("stiffness", 0) + vritti_info["pid_gains"][:, 0].mean().item()
 
             # Gradient accumulation step
             if (batch_idx + 1) % args.gradient_accumulation == 0:
@@ -1038,11 +1111,22 @@ Examples:
                 if args.use_guna_coherence:
                     avg_guna_coh = accum_metrics.get("guna_coh", 0) / args.gradient_accumulation
                     postfix["GC"] = f"{avg_guna_coh:.4f}"
+                if args.use_vritti:
+                    avg_drift = accum_metrics.get("s_drift", 0) / args.gradient_accumulation
+                    avg_stiff = accum_metrics.get("stiffness", 0) / args.gradient_accumulation
+                    postfix["Drift"] = f"{avg_drift:.3f}"
+                    postfix["Kp"] = f"{avg_stiff:.2f}"
                 pbar.set_postfix(postfix)
 
                 # Reset accumulators
                 accum_loss = 0
                 accum_metrics = {"r_acc": 0, "s_acc": 0, "guna_entropy": 0}
+
+                # Sovereign Heartbeat visualization
+                if args.show_heartbeat and heartbeat is not None and governor is not None:
+                    if global_step % args.heartbeat_every == 0 and len(governor.telemetry_history) > 0:
+                        heartbeat.update(governor.telemetry_history[-1])
+                        print("\n" + heartbeat.render())
 
                 # Quality sampling
                 if args.sample_every > 0 and global_step % args.sample_every == 0:

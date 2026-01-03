@@ -7,8 +7,14 @@ Sovereign Header signals:
 
 - R-Signal → Phase Seeding: Intent-aligned words get aligned phases
 - S-Signal → Amplitude Gating: High reality-lock words persist longer
+- V-Signal (Vritti) → Phase Stiffness: PID-driven phase modulation
 
 This is the "Hippocampus" for the Sovereign "Pre-Frontal Cortex."
+
+Patent Formula [201]: Each Vritti state modulates the phase stiffness:
+- Pramāṇa: φ locked (high stiffness, factual anchor)
+- Vikalpa: φ fluid (low stiffness, creative drift allowed)
+- Nidrā: φ inertial (smooth transitions)
 
 Reference: SOVEREIGN_EMBEDDING_TRAINING_DESIGN.md
 """
@@ -50,8 +56,10 @@ class SovereignPhaseAttention(nn.Module):
         n_heads: int = 8,
         r_classes: int = 12,
         s_classes: int = 17,
+        v_classes: int = 5,  # 5 Vritti states
         dropout: float = 0.1,
         use_cumsum: bool = True,  # O(N) memory trick
+        use_vritti_phase: bool = True,  # Enable Vritti-driven phase stiffness
     ):
         """
         Initialize SovereignPhaseAttention.
@@ -61,8 +69,10 @@ class SovereignPhaseAttention(nn.Module):
             n_heads: Number of attention heads
             r_classes: Number of R-Signal classes (ontology layers)
             s_classes: Number of S-Signal classes (referent categories)
+            v_classes: Number of Vritti states (mental modes)
             dropout: Dropout probability
             use_cumsum: Use O(N) cumulative sum for phase (vs O(N²))
+            use_vritti_phase: Enable Vritti-driven phase stiffness modulation
         """
         super().__init__()
 
@@ -70,6 +80,7 @@ class SovereignPhaseAttention(nn.Module):
         self.n_heads = n_heads
         self.head_dim = d_model // n_heads
         self.use_cumsum = use_cumsum
+        self.use_vritti_phase = use_vritti_phase
 
         # R-Signal → Phase angle mapping
         # Each ontology class gets a learned phase offset per head
@@ -79,6 +90,19 @@ class SovereignPhaseAttention(nn.Module):
         # High reality-lock categories persist longer in memory
         self.s_to_amplitude = nn.Embedding(s_classes, n_heads)
 
+        # V-Signal (Vritti) → Phase stiffness modulation (Patent Formula [201])
+        # Stiffness controls how much the phase can drift from R-Signal seed
+        # Pramāṇa (0): High stiffness (locked phase, factual)
+        # Viparyaya (1): Medium-high (corrective mode)
+        # Vikalpa (2): Low stiffness (fluid, creative)
+        # Smṛti (3): Medium (memory anchored)
+        # Nidrā (4): Inertial (smooth transitions)
+        self.register_buffer(
+            "vritti_stiffness",
+            torch.tensor([0.9, 0.7, 0.3, 0.5, 0.2])  # Matches Kp from PID
+        )
+        self.v_to_stiffness = nn.Embedding(v_classes, n_heads)
+
         # Standard attention projections
         self.q_proj = nn.Linear(d_model, d_model)
         self.k_proj = nn.Linear(d_model, d_model)
@@ -87,6 +111,9 @@ class SovereignPhaseAttention(nn.Module):
 
         # Learned frequency parameters (per head)
         self.freq = nn.Parameter(torch.randn(n_heads) * 0.1)
+
+        # Phase noise (controlled by Vritti stiffness)
+        self.phase_noise_scale = nn.Parameter(torch.tensor(0.1))
 
         # Dropout
         self.dropout = nn.Dropout(dropout)
@@ -114,20 +141,33 @@ class SovereignPhaseAttention(nn.Module):
                 else:  # Abstract
                     self.s_to_amplitude.weight[i] = torch.ones(self.n_heads) * 0.8
 
+        # V-Signal (Vritti) stiffness: initialize from PID Kp values
+        # This controls phase lock/drift per mental mode
+        with torch.no_grad():
+            vritti_kp = [0.9, 0.7, 0.3, 0.5, 0.2]  # Pramāṇa to Nidrā
+            for i in range(self.v_to_stiffness.num_embeddings):
+                self.v_to_stiffness.weight[i] = torch.full(
+                    (self.n_heads,),
+                    vritti_kp[i]
+                )
+
     def forward(
         self,
         x: torch.Tensor,
         r_signals: torch.Tensor,
         s_signals: torch.Tensor,
+        v_signals: Optional[torch.Tensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Forward pass with R-Signal phase seeding and S-Signal amplitude gating.
+        Forward pass with R-Signal phase seeding, S-Signal amplitude gating,
+        and V-Signal (Vritti) phase stiffness modulation.
 
         Args:
             x: Input tensor [B, T, D]
             r_signals: R-Signal (intent) [B, T]
             s_signals: S-Signal (referent) [B, T]
+            v_signals: V-Signal (Vritti mental mode) [B, T] - optional
             attention_mask: Optional attention mask [B, T]
 
         Returns:
@@ -144,12 +184,30 @@ class SovereignPhaseAttention(nn.Module):
         # 2. Get Amplitude Gates from S-Signal
         amplitude = self.s_to_amplitude(s_signals)  # [B, T, H]
 
-        # 3. Compute phase evolution with position
+        # 3. Get Phase Stiffness from V-Signal (Vritti)
+        # High stiffness = phase locked to R-Signal seed
+        # Low stiffness = phase can drift (creative mode)
+        if v_signals is not None and self.use_vritti_phase:
+            stiffness = self.v_to_stiffness(v_signals)  # [B, T, H]
+        else:
+            # Default to medium stiffness
+            stiffness = torch.ones(B, T, H, device=x.device) * 0.5
+
+        # 4. Compute phase evolution with position
         positions = torch.arange(T, device=x.device).float().unsqueeze(0)  # [1, T]
         freq_expanded = self.freq.unsqueeze(0).unsqueeze(0)  # [1, 1, H]
         phase_evolution = positions.unsqueeze(-1) * freq_expanded  # [1, T, H]
 
-        # Total phase = R-Signal base + position evolution
+        # 5. Add controlled phase noise based on stiffness (Patent Formula [201])
+        # Low stiffness (Vikalpa) = more noise = creative drift
+        # High stiffness (Pramāṇa) = no noise = factual lock
+        if self.training and self.use_vritti_phase:
+            noise = torch.randn_like(phi_base) * self.phase_noise_scale
+            # Stiffness acts as noise suppressor: high stiffness = low noise
+            modulated_noise = noise * (1.0 - stiffness)
+            phase_evolution = phase_evolution + modulated_noise
+
+        # Total phase = R-Signal base + position evolution (with Vritti modulation)
         phi_total = phi_base + phase_evolution  # [B, T, H]
 
         # 4. Project Q, K, V
@@ -271,6 +329,7 @@ class SovereignPhaseTransformerLayer(nn.Module):
         x: torch.Tensor,
         r_signals: torch.Tensor,
         s_signals: torch.Tensor,
+        v_signals: Optional[torch.Tensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -280,6 +339,7 @@ class SovereignPhaseTransformerLayer(nn.Module):
             x: Input [B, T, D]
             r_signals: R-Signal (intent) [B, T]
             s_signals: S-Signal (referent) [B, T]
+            v_signals: V-Signal (Vritti mental mode) [B, T] - optional
             attention_mask: Optional mask [B, T]
 
         Returns:
@@ -288,7 +348,7 @@ class SovereignPhaseTransformerLayer(nn.Module):
         # Pre-norm attention
         normed = self.norm1(x)
         attn_out, attn_weights = self.attn(
-            normed, r_signals, s_signals, attention_mask
+            normed, r_signals, s_signals, v_signals, attention_mask
         )
         x = x + attn_out
 
@@ -299,7 +359,7 @@ class SovereignPhaseTransformerLayer(nn.Module):
 
 
 def test_sovereign_phase():
-    """Test SovereignPhaseAttention."""
+    """Test SovereignPhaseAttention with R-Signal and Vritti phase stiffness."""
     print("\n" + "=" * 70)
     print("SOVEREIGN PHASE ATTENTION TEST")
     print("=" * 70)
@@ -310,6 +370,8 @@ def test_sovereign_phase():
         n_heads=4,
         r_classes=12,
         s_classes=17,
+        v_classes=5,
+        use_vritti_phase=True,
     )
 
     # Create inputs
@@ -317,13 +379,15 @@ def test_sovereign_phase():
     x = torch.randn(B, T, D)
     r_signals = torch.randint(0, 12, (B, T))
     s_signals = torch.randint(0, 17, (B, T))
+    v_signals = torch.randint(0, 5, (B, T))
 
-    # Forward pass
-    output, attn_weights = layer(x, r_signals, s_signals)
+    # Forward pass with Vritti signals
+    output, attn_weights = layer(x, r_signals, s_signals, v_signals)
 
     print(f"\nInput shape: {x.shape}")
     print(f"R-signals shape: {r_signals.shape}")
     print(f"S-signals shape: {s_signals.shape}")
+    print(f"V-signals (Vritti) shape: {v_signals.shape}")
     print(f"Output shape: {output.shape}")
     print(f"Attention weights shape: {attn_weights.shape}")
 
@@ -339,8 +403,22 @@ def test_sovereign_phase():
     phi_diff = layer.r_to_phi(r_diff)
     print(f"Varying R-Signal phases: {phi_diff[0, :3, 0].tolist()}")
 
+    # Verify Vritti stiffness
+    print("\n--- Vritti Stiffness Test (Patent Formula [201]) ---")
+    vritti_names = ["PRAMANA", "VIPARYAYA", "VIKALPA", "SMRTI", "NIDRA"]
+    for v_id in range(5):
+        v_test = torch.full((1, 1), v_id, dtype=torch.long)
+        stiffness = layer.v_to_stiffness(v_test)
+        print(f"  {vritti_names[v_id]:<10}: Stiffness = {stiffness[0, 0, 0]:.2f}")
+
+    print("\n  Interpretation:")
+    print("  - High stiffness (Pramāṇa): Phase locked to R-Signal seed")
+    print("  - Low stiffness (Vikalpa): Phase can drift (creative mode)")
+    print("  - During training, noise is modulated by (1 - stiffness)")
+
     print("\n[PASS] SovereignPhaseAttention working!")
     print("Key: Same intent = Same phase = Constructive interference")
+    print("     Vritti controls phase stiffness for mental mode alignment")
     print("=" * 70 + "\n")
 
 
