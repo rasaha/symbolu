@@ -1609,6 +1609,10 @@ class UnifiedTrainingConfig:
     relaxation_ppl_spike_threshold: float = 0.20  # PPL spike % to trigger Viparyaya
     relaxation_recovery_steps: int = 100     # Steps to stay in recovery mode
 
+    # Weight Transfer (9:3 → 6:6)
+    enable_weight_transfer: bool = True      # Enable weight transfer during relaxation
+    guna_lock_steps: int = 50                # Steps to freeze W_q/W_k post-swap
+
     # Resume checkpoint
     resume: str = ""
     resume_weights_only: bool = False
@@ -2145,6 +2149,9 @@ def train(config: UnifiedTrainingConfig):
             thaw_warmup_steps=config.relaxation_thaw_steps,
             ppl_spike_threshold=config.relaxation_ppl_spike_threshold,
             recovery_steps=config.relaxation_recovery_steps,
+            # Weight Transfer settings
+            guna_lock_steps=config.guna_lock_steps,
+            enable_weight_transfer=config.enable_weight_transfer,
         )
 
     # Mixed precision
@@ -2806,6 +2813,12 @@ def main():
     parser.add_argument("--relaxation_recovery_steps", type=int, default=100,
                        help="Steps to stay in Viparyaya recovery before resuming")
 
+    # Weight Transfer (9:3 → 6:6 transition)
+    parser.add_argument("--enable_weight_transfer", action="store_true", default=True,
+                       help="Enable weight transfer from Authority to Sensory layers during relaxation")
+    parser.add_argument("--guna_lock_steps", type=int, default=50,
+                       help="Steps to freeze W_q/W_k after relaxation (Guna-Lock)")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -2895,6 +2908,9 @@ def main():
         relaxation_thaw_steps=args.relaxation_thaw_steps,
         relaxation_ppl_spike_threshold=args.relaxation_ppl_spike_threshold,
         relaxation_recovery_steps=args.relaxation_recovery_steps,
+        # Weight Transfer
+        enable_weight_transfer=args.enable_weight_transfer,
+        guna_lock_steps=args.guna_lock_steps,
     )
 
     # Train
