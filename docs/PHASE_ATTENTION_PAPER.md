@@ -389,4 +389,15 @@ $$\text{Output} = \text{Reshape}(\text{Out}) \cdot W_O \in \mathbb{R}^{B \times 
 ---
 
 *Implementation available at: symbolu/phase_transformer.py*
-*Test script: phase_test.py*
+*Test script: test_unified_llm.py*
+
+**Training Command:**
+```bash
+python train_unified_llm.py \
+    --model_type ontological \
+    --use_9_3_split \
+    --enable_sovereign_loss \
+    --lra_validate_every 1000 \
+    --lra_haystack_lengths 256,512,1024 \
+    --lra_num_samples 50
+```
