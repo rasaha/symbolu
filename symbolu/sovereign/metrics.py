@@ -1022,3 +1022,249 @@ class SovereignAlertMonitor:
         gc_indicator = "!" if gc < self.config.gc_danger else "~" if gc < self.config.gc_healthy else ""
 
         return f"S/A:{sa_ratio:.2f}{sa_indicator} | Coh:{gc:.3f}{gc_indicator} [{self.get_status_indicator()}]"
+
+
+# =============================================================================
+# SEMANTIC ENTROPY - Patent S5
+# =============================================================================
+
+@torch.no_grad()
+def compute_semantic_entropy(logits: torch.Tensor) -> float:
+    """
+    [Patent S5] Calculate Shannon Entropy of the token distribution.
+
+    Measures the "mental clarity" of the model:
+    - Low entropy (0.1-0.4): Crystal clarity, high confidence (ideal for code)
+    - Medium entropy (0.4-0.7): Balanced exploration (good for prose)
+    - High entropy (>0.7): Dissolution/Nidra - model is confused
+
+    Args:
+        logits: Model output logits [B, Seq, Vocab]
+
+    Returns:
+        Mean semantic entropy value (normalized to [0, 1])
+    """
+    # Compute softmax probabilities
+    probs = F.softmax(logits, dim=-1)
+
+    # Shannon entropy: H = -sum(p * log(p))
+    # Add epsilon to prevent log(0)
+    entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1)
+
+    # Normalize by max possible entropy (log(vocab_size))
+    vocab_size = logits.shape[-1]
+    max_entropy = math.log(vocab_size)
+    normalized_entropy = entropy / max_entropy
+
+    return normalized_entropy.mean().item()
+
+
+def get_entropy_status(entropy: float) -> Tuple[str, str]:
+    """
+    Get status indicator and description for entropy value.
+
+    Args:
+        entropy: Normalized entropy value (0-1)
+
+    Returns:
+        tuple: (emoji_indicator, status_name)
+    """
+    if entropy < 0.30:
+        return "🔵", "SATTVIC"  # Crystal clarity
+    elif entropy < 0.50:
+        return "🟢", "FOCUSED"  # High precision
+    elif entropy < 0.70:
+        return "🟡", "BALANCED"  # Creative exploration
+    elif entropy < 0.85:
+        return "🟠", "RAJASIC"  # Getting confused
+    else:
+        return "🔴", "NIDRA"  # Collapse/dissolution
+
+
+@dataclass
+class S8BrakeState:
+    """Tracks the S8 Stability Constraint brake state."""
+    brake_intensity: float = 1.0  # 1.0 = no brake, <1.0 = braking
+    entropy_history: List[float] = None
+    brake_active_steps: int = 0
+    last_delta_h: float = 0.0
+
+    def __post_init__(self):
+        if self.entropy_history is None:
+            self.entropy_history = []
+
+
+class S8StabilityHook:
+    """
+    [Patent S8] Stability Constraint Hook - The "Inertial Brake".
+
+    Monitors entropy rate (dH/dt) and applies corrective braking when
+    entropy rises, preventing Rajasic drift and Nidra collapse.
+
+    Usage:
+        hook = S8StabilityHook()
+
+        # In training loop:
+        brake_intensity = hook.update(current_entropy)
+        if brake_intensity < 1.0:
+            print(f"S8 Brake Active: {brake_intensity:.2f}")
+    """
+
+    def __init__(
+        self,
+        window_size: int = 5,
+        brake_sensitivity: float = 5.0,
+        max_brake: float = 0.5,  # Maximum braking (50% reduction)
+        recovery_rate: float = 0.1,  # How fast brake releases
+    ):
+        self.window_size = window_size
+        self.brake_sensitivity = brake_sensitivity
+        self.max_brake = max_brake
+        self.recovery_rate = recovery_rate
+        self.state = S8BrakeState()
+
+    def update(self, current_entropy: float) -> float:
+        """
+        Update brake state based on current entropy.
+
+        Args:
+            current_entropy: Current semantic entropy value
+
+        Returns:
+            brake_intensity: 1.0 = no brake, <1.0 = braking active
+        """
+        self.state.entropy_history.append(current_entropy)
+
+        # Keep only window_size entries
+        if len(self.state.entropy_history) > self.window_size:
+            self.state.entropy_history.pop(0)
+
+        # Need at least 2 values to compute delta
+        if len(self.state.entropy_history) < 2:
+            return self.state.brake_intensity
+
+        # Compute entropy rate (dH/dt)
+        prev_entropy = self.state.entropy_history[-2]
+        delta_h = current_entropy - prev_entropy
+        self.state.last_delta_h = delta_h
+
+        if delta_h > 0:
+            # Entropy rising - apply brake
+            brake_amount = min(delta_h * self.brake_sensitivity, self.max_brake)
+            self.state.brake_intensity = max(1.0 - self.max_brake, self.state.brake_intensity - brake_amount)
+            self.state.brake_active_steps += 1
+        else:
+            # Entropy stable/falling - release brake
+            self.state.brake_intensity = min(1.0, self.state.brake_intensity + self.recovery_rate)
+            if self.state.brake_intensity >= 0.99:
+                self.state.brake_active_steps = 0
+
+        return self.state.brake_intensity
+
+    def get_status(self) -> str:
+        """Get formatted status string for S8 brake."""
+        if self.state.brake_intensity >= 0.99:
+            return "STABLE"
+        elif self.state.brake_intensity >= 0.85:
+            return "LIGHT"
+        elif self.state.brake_intensity >= 0.70:
+            return "MODERATE"
+        else:
+            return "HEAVY"
+
+    def format_log(self) -> str:
+        """Format brake status for log line."""
+        ent_icon, ent_status = get_entropy_status(
+            self.state.entropy_history[-1] if self.state.entropy_history else 0.5
+        )
+        return (
+            f"Brake:{self.state.brake_intensity:.2f} [{self.get_status()}] | "
+            f"dH/dt:{self.state.last_delta_h:+.3f}"
+        )
+
+
+def format_sovereign_dashboard(
+    step: int,
+    loss: float,
+    ppl: float,
+    entropy: float,
+    coherence: float,
+    sa_ratio: float,
+    brake_intensity: float = 1.0,
+    kp: float = None,
+    alert_state: str = "STABLE",
+) -> str:
+    """
+    Format the complete Sovereign Dashboard log line.
+
+    Combines all patent metrics into a single high-density status line.
+
+    Args:
+        step: Training step
+        loss: Current loss value
+        ppl: Perplexity
+        entropy: Semantic entropy (S5)
+        coherence: Guna coherence (U1)
+        sa_ratio: Sensory/Authority ratio (1331)
+        brake_intensity: S8 brake value (1.0 = no brake)
+        kp: Optional PIDv2 Kp value
+        alert_state: Current alert state
+
+    Returns:
+        Formatted log string
+    """
+    # Get entropy status
+    ent_icon, ent_status = get_entropy_status(entropy)
+
+    # Get coherence status
+    if coherence > 0.85:
+        coh_status = "SATTVIC"
+    elif coherence > 0.65:
+        coh_status = "ALIGNED"
+    else:
+        coh_status = "RAJASIC"
+
+    # Get S/A status
+    if sa_ratio < 0.25:
+        sa_indicator = ""
+    elif sa_ratio < 0.40:
+        sa_indicator = "~"
+    elif sa_ratio < 0.55:
+        sa_indicator = "!"
+    else:
+        sa_indicator = "!!"
+
+    # Get brake status
+    if brake_intensity >= 0.99:
+        brake_status = ""
+    elif brake_intensity >= 0.85:
+        brake_status = " [LIGHT]"
+    elif brake_intensity >= 0.70:
+        brake_status = " [MODERATE]"
+    else:
+        brake_status = " [HEAVY]"
+
+    # Build the dashboard line
+    parts = [
+        f"Step {step:>5}",
+        f"Loss:{loss:.3f}",
+        f"PPL:{ppl:>6.1f}",
+        f"Ent:{entropy:.2f}{ent_icon}",
+        f"Coh:{coherence:.2f}[{coh_status}]",
+        f"S/A:{sa_ratio:.2f}{sa_indicator}",
+        f"Brake:{brake_intensity:.2f}{brake_status}",
+    ]
+
+    if kp is not None:
+        parts.append(f"Kp:{kp:.2f}")
+
+    # Add alert state indicator
+    alert_icons = {
+        "STABLE": "🟢",
+        "ALERT": "🟡",
+        "LOCKDOWN_ACTIVE": "🔴",
+        "RECOVERING": "🟠",
+    }
+    parts.append(f"[{alert_icons.get(alert_state, '')} {alert_state}]")
+
+    return " | ".join(parts)

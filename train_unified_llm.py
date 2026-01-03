@@ -2341,6 +2341,18 @@ def train(config: UnifiedTrainingConfig):
         alert_monitor = SovereignAlertMonitor(config=alert_config)
         print(f"  Sovereign Alert Monitor: ENABLED (Auto-Pivot)")
 
+    # Initialize S8 Stability Hook for entropy monitoring
+    s8_hook = None
+    if config.enable_sovereign_loss or config.enable_stability_constraint:
+        from symbolu.sovereign.metrics import S8StabilityHook, compute_semantic_entropy, format_sovereign_dashboard
+        s8_hook = S8StabilityHook(
+            window_size=5,
+            brake_sensitivity=5.0,
+            max_brake=0.5,
+            recovery_rate=0.1,
+        )
+        print(f"  S8 Stability Hook: ENABLED (Entropy Guard)")
+
     # Optimizer
     optimizer = AdamW(
         model.parameters(),
@@ -2743,6 +2755,24 @@ def train(config: UnifiedTrainingConfig):
                         state_map = {"STABLE": 0, "ALERT": 1, "LOCKDOWN_ACTIVE": 2, "RECOVERING": 3}
                         tb_writer.add_scalar("alert/state", state_map.get(alert_state, 0), global_step)
                         tb_writer.add_scalar("alert/lockdown_count", alert_monitor.lockdown_count, global_step)
+
+                # S8 Stability Hook - Entropy Guard
+                if s8_hook is not None:
+                    # Compute semantic entropy from validation outputs
+                    semantic_ent = val_metrics.get('entropy', 0.5)
+                    brake_intensity = s8_hook.update(semantic_ent)
+
+                    # Log S8 status
+                    if brake_intensity < 0.99:
+                        from symbolu.sovereign.metrics import get_entropy_status
+                        ent_icon, ent_status = get_entropy_status(semantic_ent)
+                        print(f"  --> [S8] Ent:{semantic_ent:.2f}{ent_icon} | {s8_hook.format_log()}")
+
+                    # TensorBoard logging for S8
+                    if tb_writer is not None:
+                        tb_writer.add_scalar("s8/entropy", semantic_ent, global_step)
+                        tb_writer.add_scalar("s8/brake_intensity", brake_intensity, global_step)
+                        tb_writer.add_scalar("s8/delta_h", s8_hook.state.last_delta_h, global_step)
 
                 # Dynamic Relaxation Controller Update
                 if relaxation_controller is not None:
