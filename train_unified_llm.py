@@ -947,6 +947,244 @@ class WeightTransfer:
 
 
 # =============================================================================
+# VRAM GOVERNOR: Dynamic Batch Scaling with Patent Compensation
+# =============================================================================
+
+class VRAMGovernor:
+    """
+    VRAM-Aware Dynamic Batch Governor.
+
+    Monitors GPU memory usage and dynamically scales batch size to prevent
+    OOM crashes. When batch size is reduced, increases λ_B1 (Consistency
+    Lagrangian) to compensate for noisier gradients.
+
+    Patent Integration:
+    - [B1] ConsistencyLagrangian: Scaled up when batch reduces (noisy batches
+      need stronger consistency enforcement)
+    - [S8] StabilityHook: Notified of batch changes to adjust entropy thresholds
+
+    Usage:
+        governor = VRAMGovernor(initial_batch_size=32)
+
+        # In training loop:
+        new_batch, actions = governor.check_and_resize(current_step)
+        if new_batch != current_batch:
+            train_loader = reinit_dataloader(new_batch)
+    """
+
+    def __init__(
+        self,
+        initial_batch_size: int = 32,
+        min_batch_size: int = 4,
+        vram_threshold: float = 0.92,  # Trigger at 92% usage
+        vram_critical: float = 0.97,   # Emergency at 97%
+        check_interval: int = 10,      # Check every N steps
+        b1_compensation_rate: float = 0.20,  # 20% λ_B1 increase per reduction
+        enable_accumulation_scaling: bool = True,
+        target_effective_batch: int = 32,  # Target effective batch via accumulation
+    ):
+        self.initial_batch_size = initial_batch_size
+        self.current_batch_size = initial_batch_size
+        self.min_batch_size = min_batch_size
+        self.vram_threshold = vram_threshold
+        self.vram_critical = vram_critical
+        self.check_interval = check_interval
+        self.b1_compensation_rate = b1_compensation_rate
+        self.enable_accumulation_scaling = enable_accumulation_scaling
+        self.target_effective_batch = target_effective_batch
+
+        # Tracking
+        self.b1_scale_factor = 1.0
+        self.accumulation_steps = 1
+        self.resize_count = 0
+        self.last_check_step = 0
+        self.vram_history = []
+
+        # State
+        self.in_recovery_mode = False
+        self.recovery_start_step = None
+
+    def get_vram_usage(self) -> Tuple[float, float, float]:
+        """
+        Get current VRAM usage statistics.
+
+        Returns:
+            (usage_fraction, used_gb, total_gb)
+        """
+        if not torch.cuda.is_available():
+            return 0.0, 0.0, 0.0
+
+        used = torch.cuda.memory_reserved()
+        total = torch.cuda.get_device_properties(0).total_memory
+        usage = used / total
+
+        used_gb = used / (1024 ** 3)
+        total_gb = total / (1024 ** 3)
+
+        return usage, used_gb, total_gb
+
+    def check_and_resize(
+        self,
+        current_step: int,
+        sovereign_engine: Optional[object] = None,
+        force_check: bool = False,
+    ) -> Tuple[int, List[str]]:
+        """
+        Check VRAM usage and resize batch if needed.
+
+        Args:
+            current_step: Current training step
+            sovereign_engine: Optional SovereignEngine for λ_B1 adjustment
+            force_check: Force check regardless of interval
+
+        Returns:
+            (new_batch_size, list of action strings)
+        """
+        actions = []
+
+        # Only check at intervals (or if forced)
+        if not force_check and (current_step - self.last_check_step) < self.check_interval:
+            return self.current_batch_size, actions
+
+        self.last_check_step = current_step
+
+        # Get VRAM usage
+        usage, used_gb, total_gb = self.get_vram_usage()
+        self.vram_history.append({"step": current_step, "usage": usage, "used_gb": used_gb})
+
+        # Keep history bounded
+        if len(self.vram_history) > 100:
+            self.vram_history = self.vram_history[-100:]
+
+        # Check for critical VRAM (emergency)
+        if usage > self.vram_critical:
+            actions.append(f"🚨 [VRAM CRITICAL] Usage at {usage:.1%} ({used_gb:.1f}GB/{total_gb:.1f}GB)")
+            actions.append("   Emergency cache purge initiated!")
+
+            # Emergency cleanup
+            import gc
+            gc.collect()
+            torch.cuda.empty_cache()
+
+            # Force batch reduction by 8 (two steps)
+            new_batch = max(self.min_batch_size, ((self.current_batch_size // 4) - 2) * 4)
+            if new_batch < self.current_batch_size:
+                self._apply_batch_reduction(new_batch, sovereign_engine, actions, emergency=True)
+
+        # Check for high VRAM (warning threshold)
+        elif usage > self.vram_threshold:
+            actions.append(f"⚠️  [VRAM ALERT] Usage at {usage:.1%} ({used_gb:.1f}GB/{total_gb:.1f}GB)")
+
+            # Clear cache first
+            torch.cuda.empty_cache()
+
+            # Reduce batch by 4
+            new_batch = max(self.min_batch_size, ((self.current_batch_size // 4) - 1) * 4)
+            if new_batch < self.current_batch_size:
+                self._apply_batch_reduction(new_batch, sovereign_engine, actions, emergency=False)
+
+        # Check if we can recover (increase batch) after being in recovery mode
+        elif self.in_recovery_mode and usage < (self.vram_threshold - 0.15):
+            # VRAM is now 15% below threshold - safe to try increasing
+            steps_in_recovery = current_step - self.recovery_start_step
+            if steps_in_recovery > 200:  # Wait at least 200 steps
+                # Try increasing batch by 4
+                new_batch = min(self.initial_batch_size, self.current_batch_size + 4)
+                if new_batch > self.current_batch_size:
+                    self._apply_batch_increase(new_batch, sovereign_engine, actions)
+
+        return self.current_batch_size, actions
+
+    def _apply_batch_reduction(
+        self,
+        new_batch: int,
+        sovereign_engine: Optional[object],
+        actions: List[str],
+        emergency: bool = False,
+    ):
+        """Apply batch size reduction with patent compensation."""
+        old_batch = self.current_batch_size
+        self.current_batch_size = new_batch
+        self.resize_count += 1
+
+        # Enter recovery mode
+        self.in_recovery_mode = True
+        self.recovery_start_step = self.last_check_step
+
+        # [B1] Increase λ_B1 to compensate for noisier gradients
+        compensation = self.b1_compensation_rate * (1.5 if emergency else 1.0)
+        self.b1_scale_factor = min(2.0, self.b1_scale_factor * (1.0 + compensation))
+
+        if sovereign_engine is not None and hasattr(sovereign_engine, 'config'):
+            # Apply the compensation to the engine
+            sovereign_engine.config.lambda_b1 *= (1.0 + compensation)
+            actions.append(f"   λ_B1 scaled: {sovereign_engine.config.lambda_b1 / (1 + compensation):.2f} → {sovereign_engine.config.lambda_b1:.2f} (noise compensation)")
+
+        # Auto-scale gradient accumulation if batch gets too small
+        if self.enable_accumulation_scaling and new_batch < self.target_effective_batch:
+            new_accum = max(1, self.target_effective_batch // new_batch)
+            if new_accum != self.accumulation_steps:
+                old_accum = self.accumulation_steps
+                self.accumulation_steps = new_accum
+                effective = new_batch * new_accum
+                actions.append(f"   Gradient accumulation: {old_accum} → {new_accum} (effective batch: {effective})")
+
+        mode = "EMERGENCY" if emergency else "RESIZE"
+        actions.append(f"   🛠️  [{mode}] Batch: {old_batch} → {new_batch} | Total resizes: {self.resize_count}")
+
+    def _apply_batch_increase(
+        self,
+        new_batch: int,
+        sovereign_engine: Optional[object],
+        actions: List[str],
+    ):
+        """Apply batch size increase (recovery)."""
+        old_batch = self.current_batch_size
+        self.current_batch_size = new_batch
+
+        # Reduce λ_B1 compensation (partial - keep some stability)
+        reduction = self.b1_compensation_rate * 0.5  # Only reduce by half
+        self.b1_scale_factor = max(1.0, self.b1_scale_factor / (1.0 + reduction))
+
+        if sovereign_engine is not None and hasattr(sovereign_engine, 'config'):
+            old_b1 = sovereign_engine.config.lambda_b1
+            sovereign_engine.config.lambda_b1 /= (1.0 + reduction)
+            actions.append(f"   λ_B1 relaxed: {old_b1:.2f} → {sovereign_engine.config.lambda_b1:.2f}")
+
+        # Adjust accumulation steps
+        if self.enable_accumulation_scaling:
+            new_accum = max(1, self.target_effective_batch // new_batch)
+            if new_accum != self.accumulation_steps:
+                self.accumulation_steps = new_accum
+
+        # Check if fully recovered
+        if new_batch >= self.initial_batch_size:
+            self.in_recovery_mode = False
+            actions.append(f"   ✅ [RECOVERED] Batch restored to {new_batch}")
+        else:
+            actions.append(f"   📈 [RECOVERING] Batch: {old_batch} → {new_batch}")
+
+    def get_status_string(self) -> str:
+        """Get formatted status string."""
+        usage, used_gb, total_gb = self.get_vram_usage()
+        mode = "RECOVERY" if self.in_recovery_mode else "NORMAL"
+        return (
+            f"VRAM:{usage:.0%}({used_gb:.1f}GB) | "
+            f"Batch:{self.current_batch_size} | "
+            f"λ_B1×{self.b1_scale_factor:.2f} | "
+            f"[{mode}]"
+        )
+
+    def get_dataloader_config(self) -> Dict[str, int]:
+        """Get current DataLoader configuration."""
+        return {
+            "batch_size": self.current_batch_size,
+            "accumulation_steps": self.accumulation_steps,
+            "effective_batch": self.current_batch_size * self.accumulation_steps,
+        }
+
+
+# =============================================================================
 # DYNAMIC RELAXATION CONTROLLER: 9:3 → 6:6 TRANSITION
 # =============================================================================
 
@@ -2405,6 +2643,19 @@ def train(config: UnifiedTrainingConfig):
         )
         print(f"  S8 Stability Hook: ENABLED (Entropy Guard)")
 
+    # VRAM Governor for dynamic batch scaling
+    vram_governor = VRAMGovernor(
+        initial_batch_size=config.batch_size,
+        min_batch_size=4,
+        vram_threshold=0.92,
+        vram_critical=0.97,
+        check_interval=10,
+        b1_compensation_rate=0.20,
+        enable_accumulation_scaling=True,
+        target_effective_batch=config.batch_size,
+    )
+    print(f"  VRAM Governor: ENABLED (threshold=92%, compensation=20%)")
+
     # Optimizer
     optimizer = AdamW(
         model.parameters(),
@@ -2653,6 +2904,35 @@ def train(config: UnifiedTrainingConfig):
             # Periodic CUDA memory cleanup to prevent fragmentation
             if device.type == "cuda" and global_step % 500 == 0:
                 torch.cuda.empty_cache()
+
+            # VRAM Governor - Check and resize batch if needed
+            if vram_governor is not None:
+                old_batch = vram_governor.current_batch_size
+                new_batch, vram_actions = vram_governor.check_and_resize(
+                    global_step,
+                    sovereign_engine=sovereign_engine,
+                )
+                # Print any VRAM actions
+                for action in vram_actions:
+                    print(action)
+
+                # Reinitialize DataLoader if batch size changed
+                if new_batch != old_batch:
+                    print(f"  🔄 Reinitializing DataLoader with batch_size={new_batch}")
+                    train_loader = DataLoader(
+                        train_dataset,
+                        batch_size=new_batch,
+                        shuffle=True,
+                        num_workers=4,
+                        pin_memory=True,
+                        drop_last=True,
+                    )
+                    train_iter = iter(train_loader)
+                    # Update config for logging
+                    config.batch_size = new_batch
+                    # Update gradient accumulation if needed
+                    if vram_governor.accumulation_steps != config.gradient_accumulation:
+                        config.gradient_accumulation = vram_governor.accumulation_steps
 
             # Logging
             if global_step % config.log_every == 0:
