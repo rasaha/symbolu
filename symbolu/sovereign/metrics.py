@@ -644,6 +644,11 @@ class SovereignEngine:
         # Normalize logits and r_signal for proper cosine similarity
         logits_norm = F.normalize(logits, p=2, dim=-1)
 
+        # Handle r_signal shape: expand [B, D] to [B, Seq, D] if needed
+        if r_signal.dim() == 2:
+            # r_signal is [B, D], expand to [B, Seq, D]
+            r_signal = r_signal.unsqueeze(1).expand(-1, Seq, -1)
+
         # R-signal may have different dimension, project if needed
         if r_signal.shape[-1] != Vocab:
             # Project R-signal to vocab space or use as-is for similarity
