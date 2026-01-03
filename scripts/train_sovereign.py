@@ -1203,26 +1203,33 @@ Examples:
             # Add Vritti-driven loss if enabled
             vritti_info = None
             if args.use_vritti and vritti_loss_fn is not None:
-                # Get Vritti signals from batch (use R-signals as proxy or dedicated v_signals)
-                v_signals = batch.get("v_signals", r_signals).to(device)
-                target_vritti = v_signals[:, 1:].contiguous()  # [B, N-1] shifted target
-                v_signals_input = v_signals[:, :-1]  # [B, N-1] input
+                # Get Vritti signals from ORIGINAL batch (before r_signals was sliced above)
+                # Use target_r as vritti target since it's already shifted to [:, 1:]
+                if "v_signals" in batch:
+                    v_signals_full = batch["v_signals"].to(device)
+                    target_vritti = v_signals_full[:, 1:].contiguous()  # [B, N-1]
+                else:
+                    # Use target_r (already shifted r_signals[:, 1:]) as Vritti proxy
+                    target_vritti = target_r.clamp(0, 4).contiguous()  # [B, N-1]
+
+                # prev_vritti: for each position, what was the previous vritti state
+                # Shift target_vritti right by 1, pad with Nidrā (4) at start
                 prev_vritti = torch.cat([
-                    torch.full((v_signals_input.size(0), 1), 4, device=device),  # Start with Nidrā
-                    v_signals_input[:, :-1]
+                    torch.full((target_vritti.size(0), 1), 4, device=device, dtype=target_vritti.dtype),
+                    target_vritti[:, :-1]
                 ], dim=1)  # [B, N-1]
 
                 # Compute Vritti prediction logits (use R-logits as proxy if no dedicated head)
-                # Slice to [:, :-1, :] to match shifted targets
-                vritti_logits = torch.zeros(r_logits.size(0), r_logits.size(1) - 1, 5, device=device)
-                vritti_logits[:, :, :min(5, r_logits.size(2))] = r_logits[:, :-1, :min(5, r_logits.size(2))]
+                # r_logits is already [B, N-1, r_classes] matching target shape
+                vritti_logits = torch.zeros(r_logits.size(0), r_logits.size(1), 5, device=device)
+                vritti_logits[:, :, :min(5, r_logits.size(2))] = r_logits[:, :, :min(5, r_logits.size(2))]
 
-                # Slice token_logits to match target_tokens shape for VrittiLoss
-                token_logits_shifted = token_logits[:, :-1, :].contiguous()  # [B, N-1, V]
+                # token_logits is already [B, N-1, V] matching target_tokens shape
+                # No slicing needed!
 
                 # Compute VrittiLoss with stiffness multiplier
                 vritti_output = vritti_loss_fn(
-                    token_logits=token_logits_shifted,
+                    token_logits=token_logits,
                     vritti_logits=vritti_logits,
                     target_tokens=target_tokens,
                     target_vritti=target_vritti,
