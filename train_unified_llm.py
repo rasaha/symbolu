@@ -1397,9 +1397,12 @@ def _build_sovereign_state(
     r_signal = r_onto + bhava_r * 0.1
 
     # C-Signal [32]: Remaining bhava or zeros
-    c_signal = bhava_vec[:, 80:112] if bhava_vec.shape[1] >= 112 else torch.zeros(B, 32, device=device)
-    if c_signal.shape[1] < 32:
-        c_signal = F.pad(c_signal, (0, 32 - c_signal.shape[1]))
+    if bhava_vec.shape[1] >= 112:
+        c_signal = bhava_vec[:, 80:112]  # 32 dims
+    elif bhava_vec.shape[1] > 80:
+        c_signal = F.pad(bhava_vec[:, 80:], (0, 112 - bhava_vec.shape[1]))  # Pad to 32
+    else:
+        c_signal = torch.zeros(B, 32, device=device)
 
     return torch.cat([guna, s_signal, r_signal, c_signal], dim=-1)
 
