@@ -225,9 +225,26 @@ class HierarchicalGradientScaler:
 
     def _get_layers(self) -> nn.ModuleList:
         """Get the layer ModuleList from model."""
+        all_layers = []
+
+        # SymbolU12 special case: layers_1_8 + individual layers (witness, unifying, etc.)
+        if hasattr(self.model, 'layers_1_8'):
+            layers_1_8 = getattr(self.model, 'layers_1_8')
+            if isinstance(layers_1_8, nn.ModuleList):
+                all_layers.extend(list(layers_1_8))
+
+            # Collect individual layers in order (witness, unifying, integration, absolving)
+            for layer_name in ['witness_layer', 'unifying_layer', 'integration_layer', 'absolving_layer']:
+                if hasattr(self.model, layer_name):
+                    layer = getattr(self.model, layer_name)
+                    if layer is not None:
+                        all_layers.append(layer)
+
+            if len(all_layers) >= 12:
+                return nn.ModuleList(all_layers)
+
         # Try common attribute names
-        for attr in [self.layer_attr, "layers", "blocks", "transformer.blocks",
-                     "layers_1_8", "model.layers"]:
+        for attr in [self.layer_attr, "layers", "blocks", "transformer.blocks", "model.layers"]:
             if "." in attr:
                 # Handle nested attributes
                 obj = self.model
@@ -247,8 +264,13 @@ class HierarchicalGradientScaler:
         for name, module in self.model.named_children():
             if 'layer' in name.lower() or 'block' in name.lower():
                 if isinstance(module, nn.ModuleList):
-                    return module
-                layer_modules.append(module)
+                    all_layers.extend(list(module))
+                else:
+                    layer_modules.append(module)
+
+        if all_layers:
+            all_layers.extend(layer_modules)
+            return nn.ModuleList(all_layers)
 
         if layer_modules:
             return nn.ModuleList(layer_modules)
