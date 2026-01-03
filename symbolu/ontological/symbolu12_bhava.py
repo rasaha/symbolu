@@ -474,9 +474,11 @@ class BhavaUnifyingLayer(nn.Module):
 
         # Global coherence J
         mask = torch.triu(torch.ones(12, 12, device=device), diagonal=1)
-        J = (C_prime * mask).sum(dim=(1, 2)) / (mask.sum() + 1e-8)
+        J_raw = (C_prime * mask).sum(dim=(1, 2)) / (mask.sum() + 1e-8)
+        # Fix: Scale J from [-1, 1] to [0, 1] since S (cosine similarity) can be negative
+        J = (J_raw + 1.0) / 2.0
 
-        # Combined coherence with Bhava
+        # Combined coherence with Bhava (bhava_coherence now also scaled [0,1])
         global_coherence = 0.5 * J + 0.5 * bhava_coherence
 
         # Detect violations

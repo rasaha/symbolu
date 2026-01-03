@@ -114,6 +114,27 @@ python train_unified_llm.py \
 | `--lambda_coherence` | float | 0.05 | Coherence loss weight |
 | `--no_coherence_loss` | flag | False | Disable coherence loss |
 
+### Sovereign-Lagrangian Loss (Patent B1/S3)
+
+The Sovereign-Lagrangian Loss combines standard task loss with patent-derived consistency and coherence penalties:
+
+```
+L = L_task + λ_B1 * L_consistency + μ_S3 * L_align
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--enable_sovereign_loss` | flag | False | Enable Sovereign-Lagrangian loss (B1+S3) |
+| `--lambda_b1` | float | 0.5 | Consistency Lagrangian weight [B1] (forward/backward alignment) |
+| `--mu_s3` | float | 0.2 | Global Coherence weight [S3] (phase-lock penalty) |
+| `--enable_stability_constraint` | flag | False | Enable S8 Stability Constraint (entropy anchoring) |
+| `--gc_floor` | float | 0.65 | Minimum Guna Coherence before PIDv2 intervention |
+
+**Loss Components:**
+- **L_task**: Standard cross-entropy for next-token prediction
+- **L_consistency [B1]**: `(1-sf)² + (1-sb)² + (sf-sb)²` where sf=forward confidence, sb=backward R-Signal alignment
+- **L_align [S3]**: `1 - GC` penalty for low phase coherence
+
 ### Logging & Checkpointing
 
 | Flag | Type | Default | Description |
@@ -248,7 +269,26 @@ python train_unified_llm.py \
     --max_steps 50000
 ```
 
-### 4. Stress Testing
+### 4. Sovereign-Lagrangian Training (Patent B1/S3)
+
+```bash
+python train_unified_llm.py \
+    --model_type ontological \
+    --model_size medium \
+    --use_9_3_split \
+    --controller pidv2 \
+    --enable_sovereign_loss \
+    --lambda_b1 0.5 \
+    --mu_s3 0.2 \
+    --enable_stability_constraint \
+    --enable_dynamic_relaxation \
+    --gradient_checkpointing \
+    --tensorboard \
+    --dataset wikitext103 \
+    --max_steps 20000
+```
+
+### 5. Stress Testing
 
 ```bash
 python train_unified_llm.py \
@@ -279,6 +319,26 @@ The core metric for training stability:
 | Early (1K-5K) | < 10,000 |
 | Mid (5K-15K) | < 1,000 |
 | Late (15K+) | < 100 |
+
+### Sovereign-Lagrangian Metrics (when `--enable_sovereign_loss`)
+
+| Metric | Interpretation |
+|--------|----------------|
+| **GC (Guna Coherence)** | Phase-lock strength across layers. Goal: > 0.65 |
+| **L_consistency** | Forward/backward alignment. Should approach 0 as training matures |
+| **sf_mean** | Forward confidence (token probability). Goal: increasing over time |
+| **sb_mean** | Backward alignment (R-Signal resonance). Goal: > 0.5 |
+| **Inertial Brake** | [S8] Activated when entropy rises (prevents Rajasic drift) |
+
+**GC Status Interpretation:**
+- **GC > 0.85**: SATTVIC - Perfect phase alignment
+- **GC 0.65-0.85**: ALIGNED - Healthy training
+- **GC < 0.65**: RAJASIC - PIDv2 will increase μ_S3 to stiffen logic
+
+**S-Drift Status:**
+- **< 0.1**: NULL - Intent and output in perfect phase-alignment
+- **0.1-0.3**: LOW - Acceptable drift
+- **> 0.3**: HIGH - Model may be "lying" (output doesn't match intent)
 
 ## Troubleshooting
 

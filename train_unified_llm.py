@@ -947,6 +947,244 @@ class WeightTransfer:
 
 
 # =============================================================================
+# VRAM GOVERNOR: Dynamic Batch Scaling with Patent Compensation
+# =============================================================================
+
+class VRAMGovernor:
+    """
+    VRAM-Aware Dynamic Batch Governor.
+
+    Monitors GPU memory usage and dynamically scales batch size to prevent
+    OOM crashes. When batch size is reduced, increases λ_B1 (Consistency
+    Lagrangian) to compensate for noisier gradients.
+
+    Patent Integration:
+    - [B1] ConsistencyLagrangian: Scaled up when batch reduces (noisy batches
+      need stronger consistency enforcement)
+    - [S8] StabilityHook: Notified of batch changes to adjust entropy thresholds
+
+    Usage:
+        governor = VRAMGovernor(initial_batch_size=32)
+
+        # In training loop:
+        new_batch, actions = governor.check_and_resize(current_step)
+        if new_batch != current_batch:
+            train_loader = reinit_dataloader(new_batch)
+    """
+
+    def __init__(
+        self,
+        initial_batch_size: int = 32,
+        min_batch_size: int = 4,
+        vram_threshold: float = 0.92,  # Trigger at 92% usage
+        vram_critical: float = 0.97,   # Emergency at 97%
+        check_interval: int = 10,      # Check every N steps
+        b1_compensation_rate: float = 0.20,  # 20% λ_B1 increase per reduction
+        enable_accumulation_scaling: bool = True,
+        target_effective_batch: int = 32,  # Target effective batch via accumulation
+    ):
+        self.initial_batch_size = initial_batch_size
+        self.current_batch_size = initial_batch_size
+        self.min_batch_size = min_batch_size
+        self.vram_threshold = vram_threshold
+        self.vram_critical = vram_critical
+        self.check_interval = check_interval
+        self.b1_compensation_rate = b1_compensation_rate
+        self.enable_accumulation_scaling = enable_accumulation_scaling
+        self.target_effective_batch = target_effective_batch
+
+        # Tracking
+        self.b1_scale_factor = 1.0
+        self.accumulation_steps = 1
+        self.resize_count = 0
+        self.last_check_step = 0
+        self.vram_history = []
+
+        # State
+        self.in_recovery_mode = False
+        self.recovery_start_step = None
+
+    def get_vram_usage(self) -> Tuple[float, float, float]:
+        """
+        Get current VRAM usage statistics.
+
+        Returns:
+            (usage_fraction, used_gb, total_gb)
+        """
+        if not torch.cuda.is_available():
+            return 0.0, 0.0, 0.0
+
+        used = torch.cuda.memory_reserved()
+        total = torch.cuda.get_device_properties(0).total_memory
+        usage = used / total
+
+        used_gb = used / (1024 ** 3)
+        total_gb = total / (1024 ** 3)
+
+        return usage, used_gb, total_gb
+
+    def check_and_resize(
+        self,
+        current_step: int,
+        sovereign_engine: Optional[object] = None,
+        force_check: bool = False,
+    ) -> Tuple[int, List[str]]:
+        """
+        Check VRAM usage and resize batch if needed.
+
+        Args:
+            current_step: Current training step
+            sovereign_engine: Optional SovereignEngine for λ_B1 adjustment
+            force_check: Force check regardless of interval
+
+        Returns:
+            (new_batch_size, list of action strings)
+        """
+        actions = []
+
+        # Only check at intervals (or if forced)
+        if not force_check and (current_step - self.last_check_step) < self.check_interval:
+            return self.current_batch_size, actions
+
+        self.last_check_step = current_step
+
+        # Get VRAM usage
+        usage, used_gb, total_gb = self.get_vram_usage()
+        self.vram_history.append({"step": current_step, "usage": usage, "used_gb": used_gb})
+
+        # Keep history bounded
+        if len(self.vram_history) > 100:
+            self.vram_history = self.vram_history[-100:]
+
+        # Check for critical VRAM (emergency)
+        if usage > self.vram_critical:
+            actions.append(f"🚨 [VRAM CRITICAL] Usage at {usage:.1%} ({used_gb:.1f}GB/{total_gb:.1f}GB)")
+            actions.append("   Emergency cache purge initiated!")
+
+            # Emergency cleanup
+            import gc
+            gc.collect()
+            torch.cuda.empty_cache()
+
+            # Force batch reduction by 8 (two steps)
+            new_batch = max(self.min_batch_size, ((self.current_batch_size // 4) - 2) * 4)
+            if new_batch < self.current_batch_size:
+                self._apply_batch_reduction(new_batch, sovereign_engine, actions, emergency=True)
+
+        # Check for high VRAM (warning threshold)
+        elif usage > self.vram_threshold:
+            actions.append(f"⚠️  [VRAM ALERT] Usage at {usage:.1%} ({used_gb:.1f}GB/{total_gb:.1f}GB)")
+
+            # Clear cache first
+            torch.cuda.empty_cache()
+
+            # Reduce batch by 4
+            new_batch = max(self.min_batch_size, ((self.current_batch_size // 4) - 1) * 4)
+            if new_batch < self.current_batch_size:
+                self._apply_batch_reduction(new_batch, sovereign_engine, actions, emergency=False)
+
+        # Check if we can recover (increase batch) after being in recovery mode
+        elif self.in_recovery_mode and usage < (self.vram_threshold - 0.15):
+            # VRAM is now 15% below threshold - safe to try increasing
+            steps_in_recovery = current_step - self.recovery_start_step
+            if steps_in_recovery > 200:  # Wait at least 200 steps
+                # Try increasing batch by 4
+                new_batch = min(self.initial_batch_size, self.current_batch_size + 4)
+                if new_batch > self.current_batch_size:
+                    self._apply_batch_increase(new_batch, sovereign_engine, actions)
+
+        return self.current_batch_size, actions
+
+    def _apply_batch_reduction(
+        self,
+        new_batch: int,
+        sovereign_engine: Optional[object],
+        actions: List[str],
+        emergency: bool = False,
+    ):
+        """Apply batch size reduction with patent compensation."""
+        old_batch = self.current_batch_size
+        self.current_batch_size = new_batch
+        self.resize_count += 1
+
+        # Enter recovery mode
+        self.in_recovery_mode = True
+        self.recovery_start_step = self.last_check_step
+
+        # [B1] Increase λ_B1 to compensate for noisier gradients
+        compensation = self.b1_compensation_rate * (1.5 if emergency else 1.0)
+        self.b1_scale_factor = min(2.0, self.b1_scale_factor * (1.0 + compensation))
+
+        if sovereign_engine is not None and hasattr(sovereign_engine, 'config'):
+            # Apply the compensation to the engine
+            sovereign_engine.config.lambda_b1 *= (1.0 + compensation)
+            actions.append(f"   λ_B1 scaled: {sovereign_engine.config.lambda_b1 / (1 + compensation):.2f} → {sovereign_engine.config.lambda_b1:.2f} (noise compensation)")
+
+        # Auto-scale gradient accumulation if batch gets too small
+        if self.enable_accumulation_scaling and new_batch < self.target_effective_batch:
+            new_accum = max(1, self.target_effective_batch // new_batch)
+            if new_accum != self.accumulation_steps:
+                old_accum = self.accumulation_steps
+                self.accumulation_steps = new_accum
+                effective = new_batch * new_accum
+                actions.append(f"   Gradient accumulation: {old_accum} → {new_accum} (effective batch: {effective})")
+
+        mode = "EMERGENCY" if emergency else "RESIZE"
+        actions.append(f"   🛠️  [{mode}] Batch: {old_batch} → {new_batch} | Total resizes: {self.resize_count}")
+
+    def _apply_batch_increase(
+        self,
+        new_batch: int,
+        sovereign_engine: Optional[object],
+        actions: List[str],
+    ):
+        """Apply batch size increase (recovery)."""
+        old_batch = self.current_batch_size
+        self.current_batch_size = new_batch
+
+        # Reduce λ_B1 compensation (partial - keep some stability)
+        reduction = self.b1_compensation_rate * 0.5  # Only reduce by half
+        self.b1_scale_factor = max(1.0, self.b1_scale_factor / (1.0 + reduction))
+
+        if sovereign_engine is not None and hasattr(sovereign_engine, 'config'):
+            old_b1 = sovereign_engine.config.lambda_b1
+            sovereign_engine.config.lambda_b1 /= (1.0 + reduction)
+            actions.append(f"   λ_B1 relaxed: {old_b1:.2f} → {sovereign_engine.config.lambda_b1:.2f}")
+
+        # Adjust accumulation steps
+        if self.enable_accumulation_scaling:
+            new_accum = max(1, self.target_effective_batch // new_batch)
+            if new_accum != self.accumulation_steps:
+                self.accumulation_steps = new_accum
+
+        # Check if fully recovered
+        if new_batch >= self.initial_batch_size:
+            self.in_recovery_mode = False
+            actions.append(f"   ✅ [RECOVERED] Batch restored to {new_batch}")
+        else:
+            actions.append(f"   📈 [RECOVERING] Batch: {old_batch} → {new_batch}")
+
+    def get_status_string(self) -> str:
+        """Get formatted status string."""
+        usage, used_gb, total_gb = self.get_vram_usage()
+        mode = "RECOVERY" if self.in_recovery_mode else "NORMAL"
+        return (
+            f"VRAM:{usage:.0%}({used_gb:.1f}GB) | "
+            f"Batch:{self.current_batch_size} | "
+            f"λ_B1×{self.b1_scale_factor:.2f} | "
+            f"[{mode}]"
+        )
+
+    def get_dataloader_config(self) -> Dict[str, int]:
+        """Get current DataLoader configuration."""
+        return {
+            "batch_size": self.current_batch_size,
+            "accumulation_steps": self.accumulation_steps,
+            "effective_batch": self.current_batch_size * self.accumulation_steps,
+        }
+
+
+# =============================================================================
 # DYNAMIC RELAXATION CONTROLLER: 9:3 → 6:6 TRANSITION
 # =============================================================================
 
@@ -1021,8 +1259,8 @@ class DynamicRelaxationController:
         self.recovery_steps = recovery_steps
 
         # Validate mode
-        if self.mode not in ("consecutive", "average"):
-            raise ValueError(f"relaxation_mode must be 'consecutive' or 'average', got '{mode}'")
+        if self.mode not in ("consecutive", "average", "sa_ratio"):
+            raise ValueError(f"relaxation_mode must be 'consecutive', 'average', or 'sa_ratio', got '{mode}'")
 
         # Split configurations
         self.authority_split = authority_split
@@ -1039,6 +1277,11 @@ class DynamicRelaxationController:
         # Weight Transfer for 9:3 → 6:6 transition
         self.enable_weight_transfer = enable_weight_transfer
         self.guna_lock_steps = guna_lock_steps
+
+        # [S5] Entropy Gate: Block relaxation if entropy too high
+        self.entropy_gate_threshold = 0.50  # Must be below this to relax
+        self.entropy_gate_blocked = False   # Track if we blocked due to entropy
+        self.last_entropy = None            # For logging
         if enable_weight_transfer:
             # Layers 6, 7, 8 become Sensory in 6:6 split
             # Layer 5 becomes the new Witness
@@ -1056,6 +1299,7 @@ class DynamicRelaxationController:
         self.stability_streak = 0
         self.stability_history = []
         self.ssi_rolling_window = []  # For average mode
+        self.sa_rolling_window = []   # For sa_ratio mode
         self.max_history = 1000
 
         # PPL tracking for recovery
@@ -1114,13 +1358,14 @@ class DynamicRelaxationController:
         )
         return max(0.0, min(1.0, stability))
 
-    def _check_relaxation_ready(self, stability_index: float) -> bool:
+    def _check_relaxation_ready(self, stability_index: float, sa_ratio: float = None) -> bool:
         """
         Check if relaxation should trigger based on current mode.
 
         Modes:
         - consecutive: Requires SSI >= threshold for N consecutive steps
         - average: Requires average SSI >= threshold over rolling N-step window
+        - sa_ratio: Requires average S/A ratio >= threshold over rolling N-step window
         """
         if self.mode == "consecutive":
             # Consecutive mode: reset on any dip
@@ -1131,7 +1376,24 @@ class DynamicRelaxationController:
                 self.stability_streak = 0
                 return False
 
-        else:  # average mode
+        elif self.mode == "sa_ratio":
+            # S/A Ratio mode: rolling window mean of S/A ratio
+            if sa_ratio is None:
+                return False
+
+            self.sa_rolling_window.append(sa_ratio)
+            if len(self.sa_rolling_window) > self.stability_window:
+                self.sa_rolling_window.pop(0)
+
+            if len(self.sa_rolling_window) >= self.stability_window:
+                avg_sa = sum(self.sa_rolling_window) / len(self.sa_rolling_window)
+                self.stability_streak = len(self.sa_rolling_window)  # For display
+                return avg_sa >= self.stability_threshold
+
+            self.stability_streak = len(self.sa_rolling_window)
+            return False
+
+        else:  # average mode (SSI-based)
             # Average mode: rolling window mean
             self.ssi_rolling_window.append(stability_index)
             if len(self.ssi_rolling_window) > self.stability_window:
@@ -1194,6 +1456,8 @@ class DynamicRelaxationController:
         s_drift_ema: float,
         val_ppl: float,
         global_step: int,
+        sa_ratio: float = None,
+        entropy: float = None,
     ) -> Tuple[bool, str]:
         """
         Update controller state based on current metrics.
@@ -1201,8 +1465,15 @@ class DynamicRelaxationController:
         Returns:
             (state_changed, action): Whether state changed and what action to take
             action can be: "NONE", "RELAX", "RECOVER", "RESUME"
+
+        [S5] Entropy Gate:
+            Relaxation is blocked if entropy > entropy_gate_threshold (0.50).
+            This prevents the model from gaining sensory freedom while confused.
         """
         stability_index = self.compute_stability_index(guna_coherence, s_drift_ema)
+
+        # Track entropy for gating
+        self.last_entropy = entropy
 
         # Track history
         self.stability_history.append({
@@ -1212,6 +1483,8 @@ class DynamicRelaxationController:
             "drift": s_drift_ema,
             "ppl": val_ppl,
             "state": self.state,
+            "sa_ratio": sa_ratio,
+            "entropy": entropy,
         })
         if len(self.stability_history) > self.max_history:
             self.stability_history = self.stability_history[-self.max_history:]
@@ -1221,7 +1494,21 @@ class DynamicRelaxationController:
         # State machine
         if self.state == self.STATE_AUTHORITY:
             # Check if we should trigger relaxation (mode-dependent)
-            if self._check_relaxation_ready(stability_index):
+            stability_ready = self._check_relaxation_ready(stability_index, sa_ratio=sa_ratio)
+
+            # [S5] Entropy Gate: Block relaxation if entropy too high
+            entropy_clear = True
+            if entropy is not None and entropy > self.entropy_gate_threshold:
+                entropy_clear = False
+                if stability_ready and not self.entropy_gate_blocked:
+                    # Log that we're blocking due to entropy
+                    print(f"\n  🔒 [S5 ENTROPY GATE] Relaxation BLOCKED - Ent:{entropy:.2f} > {self.entropy_gate_threshold}")
+                    print(f"      Model must achieve clarity (Ent < {self.entropy_gate_threshold}) before 6:6 thaw")
+                    self.entropy_gate_blocked = True
+            else:
+                self.entropy_gate_blocked = False
+
+            if stability_ready and entropy_clear:
                 # Ready to relax!
                 self.state = self.STATE_RELAXING
                 self.pre_relaxation_ppl = val_ppl
@@ -1697,6 +1984,13 @@ class UnifiedTrainingConfig:
     use_coherence_loss: bool = False
     no_coherence_loss: bool = False  # CLI flag to disable
 
+    # Sovereign-Lagrangian Loss [Patent B1/S3]
+    enable_sovereign_loss: bool = False   # Enable Sovereign-Lagrangian loss
+    lambda_b1: float = 0.5                # Consistency Lagrangian weight [B1]
+    mu_s3: float = 0.2                    # Global Coherence weight [S3]
+    enable_stability_constraint: bool = False  # Enable S8 entropy anchoring
+    gc_floor: float = 0.65                # Minimum GC for PIDv2 intervention
+
     # PIDv2 Controller settings (V9.4.4)
     controller: str = "none"  # none, pidv2, emergency_pd
     pidv2_kp_min: float = 0.10
@@ -1725,8 +2019,8 @@ class UnifiedTrainingConfig:
 
     # Dynamic Relaxation: 9:3 → 6:6 transition
     enable_dynamic_relaxation: bool = False  # Enable automatic 9:3 → 6:6 transition
-    relaxation_mode: str = "average"         # "consecutive" or "average"
-    relaxation_stability_threshold: float = 0.50  # StabilityIndex threshold (lowered from 0.78)
+    relaxation_mode: str = "sa_ratio"        # "sa_ratio" (recommended), "consecutive", or "average"
+    relaxation_stability_threshold: float = 0.50  # S/A ratio threshold for trigger
     relaxation_stability_window: int = 500   # Steps for stability check (rolling window)
     relaxation_streak_target: int = 5        # Consecutive stable evals (for consecutive mode)
     relaxation_target_authority: int = 6     # Target authority layers after relaxation
@@ -2007,17 +2301,29 @@ def compute_ontological_loss(
     targets: torch.Tensor,
     config: UnifiedTrainingConfig,
     sovereign_loss: Optional['SovereignLoss'] = None,
+    sovereign_engine: Optional['SovereignEngine'] = None,
+    phase_angles: Optional[List[torch.Tensor]] = None,
     epoch: int = 0,
 ) -> Tuple[torch.Tensor, Dict[str, float]]:
     """
     Compute loss for ontological model.
 
-    If use_sovereign_loss is enabled, uses the Sovereign-1 hardened loss with:
+    Priority order:
+    1. Sovereign-Lagrangian Loss (Patent B1/S3) - if enable_sovereign_loss
+    2. Sovereign-1 hardened loss - if use_sovereign_loss
+    3. Legacy loss (fallback)
+
+    Sovereign-Lagrangian Loss combines:
+    - L_task: Standard cross-entropy
+    - L_consistency [B1]: Forward/Backward feasibility alignment
+    - L_align [S3]: Global coherence penalty
+
+    Sovereign-1 hardened loss uses:
     - Decomposed state friction (prevents Signal Washing)
     - Weighted signals (prioritizes R-Signal over C-Signal)
     - Bhava transition penalty
 
-    Otherwise falls back to legacy loss:
+    Legacy loss uses:
     - Language modeling loss (cross-entropy)
     - Bhava relationship consistency loss
     - Global coherence regularization
@@ -2027,7 +2333,15 @@ def compute_ontological_loss(
     logits = outputs["logits"]
     B, N, V = logits.shape
 
-    # 1. Language modeling loss (always computed)
+    # Compute semantic entropy [S5] for all code paths
+    with torch.no_grad():
+        probs = F.softmax(logits, dim=-1)
+        entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1)
+        max_entropy = math.log(V)
+        onto_entropy = (entropy / max_entropy).mean().item()
+    metrics["onto_entropy"] = onto_entropy
+
+    # 1. Language modeling loss (always computed for PPL tracking)
     lm_loss = F.cross_entropy(
         logits.view(-1, V),
         targets.view(-1),
@@ -2036,7 +2350,63 @@ def compute_ontological_loss(
     metrics["lm_loss"] = lm_loss.item()
     metrics["ppl"] = math.exp(min(lm_loss.item(), 20))
 
-    # Use Sovereign-1 loss if available and enabled
+    # Priority 1: Sovereign-Lagrangian Loss (Patent B1/S3)
+    if config.enable_sovereign_loss and sovereign_engine is not None:
+        # Get R-Signal from outputs (the Authority's intent)
+        r_signal = outputs.get('r_signal', None)
+        if r_signal is None:
+            # Fall back to ontological_probs expanded to 48D
+            onto_probs = outputs.get('ontological_probs', torch.zeros(B, N, 12, device=logits.device))
+            if onto_probs.dim() == 2:
+                onto_probs = onto_probs.unsqueeze(1).expand(-1, N, -1)
+            # Expand 12D to 48D by repeating
+            r_signal = onto_probs.repeat(1, 1, 4)
+
+        # Get Guna Coherence from outputs if available
+        gc = outputs.get('global_coherence', None)
+        if gc is not None and isinstance(gc, torch.Tensor):
+            gc = gc.mean()
+
+        # [S5/B1] Scale lambda_b1 based on entropy - higher entropy = stronger consistency
+        b1_scale = 1.0
+        if onto_entropy > 0.60:
+            # Scale up to 1.5x when entropy is very high (Rajasic state)
+            excess = (onto_entropy - 0.60) / 0.40  # Scale 0.60-1.0 to 0-1
+            b1_scale = 1.0 + excess * 0.5  # 1.0 to 1.5
+            # Temporarily boost lambda_b1
+            original_lambda_b1 = sovereign_engine.config.lambda_b1
+            sovereign_engine.config.lambda_b1 = original_lambda_b1 * b1_scale
+
+        # Compute Sovereign-Lagrangian loss
+        total_loss, sov_metrics = sovereign_engine.sovereign_loss(
+            logits, targets, r_signal,
+            phase_angles=phase_angles,
+            guna_coherence=gc,
+        )
+
+        # Restore original lambda_b1 if scaled
+        if b1_scale > 1.0:
+            sovereign_engine.config.lambda_b1 = original_lambda_b1
+
+        # Merge metrics
+        metrics.update({
+            "total_loss": total_loss.item(),
+            "l_task": sov_metrics["l_task"],
+            "l_consistency": sov_metrics["l_consistency"],
+            "l_align": sov_metrics["l_align"],
+            "gc": sov_metrics["gc"],
+            "sf_mean": sov_metrics["sf_mean"],
+            "sb_mean": sov_metrics["sb_mean"],
+            "b1_scale": b1_scale,  # Track the scaling factor
+        })
+
+        # Add coherence from outputs if available
+        if "global_coherence" in outputs:
+            metrics["coherence"] = outputs["global_coherence"].mean().item()
+
+        return total_loss, metrics
+
+    # Priority 2: Sovereign-1 hardened loss
     if config.use_sovereign_loss and sovereign_loss is not None and SOVEREIGN_AVAILABLE:
         # Build state from outputs
         onto_probs = outputs.get('ontological_probs', torch.zeros(B, 12, device=logits.device))
@@ -2230,6 +2600,62 @@ def train(config: UnifiedTrainingConfig):
     else:
         print(f"  Sovereign-1 Loss: Disabled (using legacy loss)")
 
+    # Initialize Sovereign Engine for Patent B1/S3 loss
+    sovereign_engine = None
+    stability_state = None
+    if config.enable_sovereign_loss:
+        from symbolu.sovereign.metrics import SovereignEngine, SovereignLossConfig as SovEngineConfig, StabilityState
+        sov_engine_config = SovEngineConfig(
+            lambda_b1=config.lambda_b1,
+            mu_s3=config.mu_s3,
+            gc_floor=config.gc_floor,
+        )
+        sovereign_engine = SovereignEngine(config=sov_engine_config)
+        print(f"  Sovereign-Lagrangian Loss: ENABLED (λ_B1={config.lambda_b1}, μ_S3={config.mu_s3})")
+        if config.enable_stability_constraint:
+            stability_state = StabilityState(window_size=5)
+            print(f"  Stability Constraint [S8]: ENABLED (entropy anchoring)")
+    else:
+        print(f"  Sovereign-Lagrangian Loss: Disabled")
+
+    # Initialize Sovereign Alert Monitor for auto-pivot logic
+    alert_monitor = None
+    if config.enable_sovereign_loss or config.use_9_3_split:
+        from symbolu.sovereign.metrics import SovereignAlertMonitor, AlertConfig
+        alert_config = AlertConfig(
+            sa_ratio_danger=0.55,
+            gc_danger=0.25,
+            # gc_floor is used by SovereignEngine, not AlertConfig
+            # AlertConfig uses gc_healthy (0.80) for recovery detection
+        )
+        alert_monitor = SovereignAlertMonitor(config=alert_config)
+        print(f"  Sovereign Alert Monitor: ENABLED (Auto-Pivot)")
+
+    # Initialize S8 Stability Hook for entropy monitoring
+    s8_hook = None
+    if config.enable_sovereign_loss or config.enable_stability_constraint:
+        from symbolu.sovereign.metrics import S8StabilityHook, compute_semantic_entropy, format_sovereign_dashboard
+        s8_hook = S8StabilityHook(
+            window_size=5,
+            brake_sensitivity=5.0,
+            max_brake=0.5,
+            recovery_rate=0.1,
+        )
+        print(f"  S8 Stability Hook: ENABLED (Entropy Guard)")
+
+    # VRAM Governor for dynamic batch scaling
+    vram_governor = VRAMGovernor(
+        initial_batch_size=config.batch_size,
+        min_batch_size=4,
+        vram_threshold=0.92,
+        vram_critical=0.97,
+        check_interval=10,
+        b1_compensation_rate=0.20,
+        enable_accumulation_scaling=True,
+        target_effective_batch=config.batch_size,
+    )
+    print(f"  VRAM Governor: ENABLED (threshold=92%, compensation=20%)")
+
     # Optimizer
     optimizer = AdamW(
         model.parameters(),
@@ -2301,6 +2727,7 @@ def train(config: UnifiedTrainingConfig):
     best_ppl = float("inf")
     spike_count = 0
     train_losses = []
+    current_sa_ratio = 0.0  # Track S/A ratio for relaxation controller
 
     # Checkpoint directory
     ckpt_dir = Path(config.checkpoint_dir)
@@ -2381,9 +2808,13 @@ def train(config: UnifiedTrainingConfig):
         with torch.amp.autocast('cuda', dtype=autocast_dtype):
             if config.model_type == "ontological":
                 outputs = model(x)
+                # Extract phase angles if available (for U1/U2 coherence)
+                phase_angles = outputs.get('phase_angles', None)
                 loss, metrics = compute_ontological_loss(
                     outputs, y, config,
                     sovereign_loss=sovereign_loss,
+                    sovereign_engine=sovereign_engine,
+                    phase_angles=phase_angles,
                     epoch=global_step // len(train_loader),
                 )
             elif config.model_type == "gen2":
@@ -2474,6 +2905,35 @@ def train(config: UnifiedTrainingConfig):
             if device.type == "cuda" and global_step % 500 == 0:
                 torch.cuda.empty_cache()
 
+            # VRAM Governor - Check and resize batch if needed
+            if vram_governor is not None:
+                old_batch = vram_governor.current_batch_size
+                new_batch, vram_actions = vram_governor.check_and_resize(
+                    global_step,
+                    sovereign_engine=sovereign_engine,
+                )
+                # Print any VRAM actions
+                for action in vram_actions:
+                    print(action)
+
+                # Reinitialize DataLoader if batch size changed
+                if new_batch != old_batch:
+                    print(f"  🔄 Reinitializing DataLoader with batch_size={new_batch}")
+                    train_loader = DataLoader(
+                        train_dataset,
+                        batch_size=new_batch,
+                        shuffle=True,
+                        num_workers=4,
+                        pin_memory=True,
+                        drop_last=True,
+                    )
+                    train_iter = iter(train_loader)
+                    # Update config for logging
+                    config.batch_size = new_batch
+                    # Update gradient accumulation if needed
+                    if vram_governor.accumulation_steps != config.gradient_accumulation:
+                        config.gradient_accumulation = vram_governor.accumulation_steps
+
             # Logging
             if global_step % config.log_every == 0:
                 elapsed = time.time() - step_start_time
@@ -2535,16 +2995,16 @@ def train(config: UnifiedTrainingConfig):
 
                 # Formula [1331]: 9:3 Split metrics
                 if hgs_metrics:
-                    s_a_ratio = hgs_metrics.get("s_a_ratio", 0.0)
+                    current_sa_ratio = hgs_metrics.get("s_a_ratio", 0.0)
                     alpha_sens = hgs_metrics.get("alpha_sens", 0.0)
                     # Color-code S/A ratio (< 0.5 is good, Authority dominating)
-                    if s_a_ratio < 0.3:
+                    if current_sa_ratio < 0.3:
                         sa_ind = "+"  # Authority strongly dominant
-                    elif s_a_ratio < 0.5:
+                    elif current_sa_ratio < 0.5:
                         sa_ind = "~"  # Balanced
                     else:
                         sa_ind = "!"  # Sensory may be overriding
-                    log_msg += f" | S/A:{s_a_ratio:.2f}{sa_ind} α_s:{alpha_sens:.2f}"
+                    log_msg += f" | S/A:{current_sa_ratio:.2f}{sa_ind} α_s:{alpha_sens:.2f}"
 
                 print(log_msg)
                 step_start_time = time.time()
@@ -2554,6 +3014,7 @@ def train(config: UnifiedTrainingConfig):
                 val_loss, val_metrics = evaluate(
                     model, val_loader, device, config, autocast_dtype,
                     sovereign_loss=sovereign_loss,
+                    sovereign_engine=sovereign_engine,
                 )
                 val_ppl = val_metrics['ppl']
                 current_coh = val_metrics.get('coherence', 0.75)
@@ -2598,6 +3059,62 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
 
+                # Sovereign Alert Monitor - Auto-Pivot Logic
+                if alert_monitor is not None:
+                    # Build metrics dict for alert check
+                    alert_metrics = {
+                        'sa_ratio': current_sa_ratio,
+                        'guna_coherence': val_metrics.get('coherence', val_metrics.get('gc', 0.5)),
+                        'gc': val_metrics.get('gc', val_metrics.get('coherence', 0.5)),
+                        'l_consistency': val_metrics.get('l_consistency', 0.0),
+                        'entropy': val_metrics.get('entropy', 0.0),
+                    }
+
+                    # Check for alerts and apply corrections
+                    alert_state, actions = alert_monitor.check(
+                        metrics=alert_metrics,
+                        step=global_step,
+                        controller=authority_controller,
+                        gradient_scaler=gradient_scaler_hgs,
+                    )
+
+                    # Log any actions taken
+                    for action_msg in actions:
+                        print(f"  {action_msg}")
+
+                    # TensorBoard logging for alerts
+                    if tb_writer is not None:
+                        state_map = {"STABLE": 0, "ALERT": 1, "LOCKDOWN_ACTIVE": 2, "RECOVERING": 3}
+                        tb_writer.add_scalar("alert/state", state_map.get(alert_state, 0), global_step)
+                        tb_writer.add_scalar("alert/lockdown_count", alert_monitor.lockdown_count, global_step)
+
+                # S8 Stability Hook - Entropy Guard
+                if s8_hook is not None:
+                    # Compute semantic entropy from validation outputs
+                    semantic_ent = val_metrics.get('entropy', val_metrics.get('onto_entropy', 0.5))
+                    brake_intensity = s8_hook.update(semantic_ent)
+
+                    # [S5/S8] Apply alpha_sens adjustment based on entropy state
+                    alpha_sens_factor = s8_hook.get_alpha_sens_adjustment(semantic_ent)
+                    if alpha_sens_factor < 1.0 and gradient_scaler_hgs is not None:
+                        # Temporarily reduce alpha_sens_max to dampen sensory learning
+                        old_alpha = gradient_scaler_hgs.alpha_sens_max
+                        gradient_scaler_hgs.alpha_sens_max = old_alpha * alpha_sens_factor
+                        print(f"  --> [S5] Entropy rising - α_sens reduced: {old_alpha:.2f} → {gradient_scaler_hgs.alpha_sens_max:.2f}")
+
+                    # Log S8 status (always log when brake active or entropy high)
+                    if brake_intensity < 0.99 or semantic_ent > 0.60:
+                        from symbolu.sovereign.metrics import get_entropy_status
+                        ent_icon, ent_status = get_entropy_status(semantic_ent)
+                        print(f"  --> [S8] Ent:{semantic_ent:.2f}{ent_icon} | {s8_hook.format_log()}")
+
+                    # TensorBoard logging for S8
+                    if tb_writer is not None:
+                        tb_writer.add_scalar("s8/entropy", semantic_ent, global_step)
+                        tb_writer.add_scalar("s8/brake_intensity", brake_intensity, global_step)
+                        tb_writer.add_scalar("s8/delta_h", s8_hook.state.last_delta_h, global_step)
+                        tb_writer.add_scalar("s8/alpha_sens_factor", alpha_sens_factor, global_step)
+
                 # Dynamic Relaxation Controller Update
                 if relaxation_controller is not None:
                     # Get Guna Coherence from metrics (or default)
@@ -2616,12 +3133,17 @@ def train(config: UnifiedTrainingConfig):
                         else:
                             s_drift_ema = 0.5
 
-                    # Update relaxation controller
+                    # Get entropy for gating (from S8 hook or val_metrics)
+                    current_entropy = val_metrics.get('entropy', val_metrics.get('onto_entropy', 0.5))
+
+                    # Update relaxation controller with entropy gate
                     state_changed, action = relaxation_controller.update(
                         guna_coherence=guna_coherence,
                         s_drift_ema=s_drift_ema,
                         val_ppl=val_ppl,
                         global_step=global_step,
+                        sa_ratio=current_sa_ratio,
+                        entropy=current_entropy,
                     )
 
                     # Execute actions
@@ -2683,17 +3205,14 @@ def train(config: UnifiedTrainingConfig):
 
                 model.train()
 
-            # Save checkpoint
+            # Save checkpoint (overwrites last.pt each time)
             if global_step % config.save_every == 0:
                 save_checkpoint(
                     model, optimizer, scheduler, global_step, best_val_loss,
-                    ckpt_dir / f"step_{global_step}.pt",
+                    ckpt_dir / "last.pt",
                     hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
                     drc_state=relaxation_controller.get_state() if relaxation_controller else None,
                 )
-                # Cleanup old checkpoints (keep last 5)
-                if PIDV2_AVAILABLE:
-                    cleanup_old_checkpoints(ckpt_dir, keep_last=5)
 
     # Final save
     save_checkpoint(
@@ -2725,6 +3244,7 @@ def evaluate(
     config: UnifiedTrainingConfig,
     autocast_dtype: torch.dtype,
     sovereign_loss: Optional['SovereignLoss'] = None,
+    sovereign_engine: Optional['SovereignEngine'] = None,
 ) -> Tuple[float, Dict[str, float]]:
     """Evaluate model on validation set."""
     model.eval()
@@ -2738,9 +3258,12 @@ def evaluate(
             with torch.amp.autocast('cuda', dtype=autocast_dtype):
                 if config.model_type == "ontological":
                     outputs = model(x)
+                    phase_angles = outputs.get('phase_angles', None)
                     loss, metrics = compute_ontological_loss(
                         outputs, y, config,
                         sovereign_loss=sovereign_loss,
+                        sovereign_engine=sovereign_engine,
+                        phase_angles=phase_angles,
                     )
                 elif config.model_type == "gen2":
                     outputs = model(x, labels=y)
@@ -2871,6 +3394,18 @@ def main():
     parser.add_argument("--lambda_coherence", type=float, default=0.05,
                        help="Coherence loss weight")
 
+    # Sovereign-Lagrangian Loss [Patent B1/S3]
+    parser.add_argument("--lambda_b1", type=float, default=0.5,
+                       help="Consistency Lagrangian weight [B1] (forward/backward alignment)")
+    parser.add_argument("--mu_s3", type=float, default=0.2,
+                       help="Global Coherence weight [S3] (phase-lock penalty)")
+    parser.add_argument("--enable_sovereign_loss", action="store_true",
+                       help="Enable Sovereign-Lagrangian loss (B1+S3) instead of standard CE")
+    parser.add_argument("--enable_stability_constraint", action="store_true",
+                       help="Enable S8 Stability Constraint (entropy-based anchoring)")
+    parser.add_argument("--gc_floor", type=float, default=0.65,
+                       help="Minimum Guna Coherence before PIDv2 intervention")
+
     # Logging
     parser.add_argument("--log_every", type=int, default=10,
                        help="Log every N steps")
@@ -2939,9 +3474,9 @@ def main():
     # Dynamic Relaxation: 9:3 → 6:6 transition
     parser.add_argument("--enable_dynamic_relaxation", action="store_true",
                        help="Enable automatic 9:3 → 6:6 split transition based on stability")
-    parser.add_argument("--relaxation_mode", type=str, default="average",
-                       choices=["consecutive", "average"],
-                       help="Stability check mode: 'consecutive' (reset on dip) or 'average' (rolling mean)")
+    parser.add_argument("--relaxation_mode", type=str, default="sa_ratio",
+                       choices=["consecutive", "average", "sa_ratio"],
+                       help="Trigger mode: 'sa_ratio' (S/A ratio, recommended), 'average' (SSI rolling mean), 'consecutive' (SSI streak)")
     parser.add_argument("--relaxation_stability_threshold", type=float, default=0.50,
                        help="S/A ratio threshold to trigger 9:3 → 6:6 relaxation")
     parser.add_argument("--relaxation_stability_window", type=int, default=500,
@@ -3023,6 +3558,12 @@ def main():
         checkpoint_dir=args.checkpoint_dir,
         no_coherence_loss=args.no_coherence_loss,
         seed=args.seed,
+        # Sovereign-Lagrangian Loss [Patent B1/S3]
+        enable_sovereign_loss=args.enable_sovereign_loss,
+        lambda_b1=args.lambda_b1,
+        mu_s3=args.mu_s3,
+        enable_stability_constraint=args.enable_stability_constraint,
+        gc_floor=args.gc_floor,
         # PIDv2 Controller settings
         controller=args.controller,
         pidv2_kp_min=args.pidv2_kp_min,
