@@ -183,9 +183,21 @@ class HierarchicalGradientScaler:
         Layers 0-8:  Authority (State-Delta) - Full gradients (α = 1.0)
         Layers 9-11: Sensory (Quadratic)     - Dampened gradients (α = 0.1→0.5)
 
+    Phase Attention Protection:
+        During 'Thaw' (9:3 → 6:6 transition), Phase-Attention weights in Authority
+        layers receive EXTRA protection via reduced gradient scaling (α_phase = 0.5).
+        This ensures the complex O(n) attention matrices (W_phase, W_amp) remain
+        stable while the Sensory layers are being relaxed.
+
     The warmup schedule allows Authority layers to establish stable
     ontological foundations before Sensory layers begin contributing.
     """
+
+    # Parameter name patterns for Phase Attention weights (need protection during Thaw)
+    PHASE_ATTENTION_PATTERNS = [
+        'W_phase', 'W_amp', 'phase_proj', 'phase_embed', 'amp_gate',
+        'attn.W_phase', 'attn.W_amp', 'attn.phase',  # Nested patterns
+    ]
 
     def __init__(
         self,
@@ -196,6 +208,8 @@ class HierarchicalGradientScaler:
         alpha_sens_max: float = 0.5,    # Moderate dampening after warmup
         warmup_steps: int = 500,        # Ramp period
         layer_attr: str = "blocks",     # Attribute name for layers
+        alpha_phase_protection: float = 0.5,  # Protection factor for Phase Attention weights
+        protect_phase_during_thaw: bool = True,  # Enable Phase Attention protection
     ):
         self.model = model
         self.authority_layers = authority_layers
@@ -204,24 +218,42 @@ class HierarchicalGradientScaler:
         self.alpha_sens_max = alpha_sens_max
         self.warmup_steps = warmup_steps
         self.layer_attr = layer_attr
+        self.alpha_phase_protection = alpha_phase_protection
+        self.protect_phase_during_thaw = protect_phase_during_thaw
 
         self.current_step = 0
         self.hooks = []
         self.hooks_registered = False  # Track if hooks are active
+        self.in_thaw_mode = False  # Set to True during 9:3 → 6:6 transition
 
         # Use bounded deques to prevent memory accumulation over long training
         self._authority_grad_norms = collections.deque(maxlen=1000)
         self._sensory_grad_norms = collections.deque(maxlen=1000)
+        self._phase_grad_norms = collections.deque(maxlen=1000)  # Track Phase Attention grads
 
         self.gradient_stats = {
             "authority_grad_norm": 0.0,
             "sensory_grad_norm": 0.0,
+            "phase_grad_norm": 0.0,
             "sensory_scale": alpha_sens_min,
             "sensory_authority_ratio": 0.0,
         }
 
         # Register hooks
         self._register_hooks()
+
+    def _is_phase_attention_param(self, param_name: str) -> bool:
+        """Check if parameter is a Phase Attention weight that needs protection."""
+        for pattern in self.PHASE_ATTENTION_PATTERNS:
+            if pattern in param_name:
+                return True
+        return False
+
+    def set_thaw_mode(self, in_thaw: bool):
+        """Enable/disable Thaw mode for Phase Attention protection."""
+        self.in_thaw_mode = in_thaw
+        if in_thaw:
+            print(f"  [Formula 1331] Thaw mode ENABLED - Phase Attention weights protected (α={self.alpha_phase_protection})")
 
     def _get_layers(self) -> nn.ModuleList:
         """Get the layer ModuleList from model."""
@@ -288,8 +320,17 @@ class HierarchicalGradientScaler:
 
         return alpha
 
-    def _create_grad_hook(self, layer_idx: int, is_sensory: bool):
-        """Create a gradient scaling hook for a specific layer."""
+    def _create_grad_hook(self, layer_idx: int, is_sensory: bool, param_name: str = ""):
+        """
+        Create a gradient scaling hook for a specific layer parameter.
+
+        Phase Attention Protection:
+        During Thaw mode, Phase Attention weights (W_phase, W_amp, etc.) in Authority
+        layers receive extra gradient dampening to maintain stability of the complex
+        O(n) attention mechanism while Sensory layers are being relaxed.
+        """
+        is_phase_param = self._is_phase_attention_param(param_name)
+
         def hook(grad):
             if grad is None:
                 return grad
@@ -305,8 +346,20 @@ class HierarchicalGradientScaler:
 
                 return scaled_grad
             else:
-                # Authority layers get full gradient
-                self._authority_grad_norms.append(grad.norm().item())
+                # Authority layers
+                grad_norm = grad.norm().item()
+
+                # Special handling for Phase Attention weights during Thaw
+                if is_phase_param and self.in_thaw_mode and self.protect_phase_during_thaw:
+                    # Apply protection factor to Phase Attention weights
+                    # This prevents the complex attention matrices from destabilizing
+                    # during the 9:3 → 6:6 transition
+                    scaled_grad = grad * self.alpha_phase_protection
+                    self._phase_grad_norms.append(grad_norm)
+                    return scaled_grad
+
+                # Normal authority layers get full gradient
+                self._authority_grad_norms.append(grad_norm)
                 return grad
 
         return hook
@@ -331,18 +384,28 @@ class HierarchicalGradientScaler:
         print(f"    Authority layers: 0-{sensory_start - 1} (α = 1.0)")
         print(f"    Sensory layers: {sensory_start}-{total_layers - 1} (α = {self.alpha_sens_min}→{self.alpha_sens_max})")
         print(f"    Warmup: {self.warmup_steps} steps")
+        if self.protect_phase_during_thaw:
+            print(f"    Phase Attention Protection: ENABLED (α_phase = {self.alpha_phase_protection} during Thaw)")
 
         hook_count = 0
+        phase_param_count = 0
         for layer_idx, layer in enumerate(layers):
             is_sensory = layer_idx >= sensory_start
 
             for name, param in layer.named_parameters():
                 if param.requires_grad:
-                    hook = param.register_hook(self._create_grad_hook(layer_idx, is_sensory))
+                    # Pass parameter name for Phase Attention identification
+                    hook = param.register_hook(self._create_grad_hook(layer_idx, is_sensory, name))
                     self.hooks.append(hook)
                     hook_count += 1
 
+                    # Count Phase Attention parameters
+                    if not is_sensory and self._is_phase_attention_param(name):
+                        phase_param_count += 1
+
         print(f"    Registered {hook_count} gradient hooks")
+        if phase_param_count > 0:
+            print(f"    Phase Attention parameters detected: {phase_param_count}")
         self.hooks_registered = True
 
     def step(self, global_step: Optional[int] = None) -> dict:
@@ -353,7 +416,7 @@ class HierarchicalGradientScaler:
             global_step: Optional step to set. If not provided, increments internal counter.
 
         Returns:
-            Dict with gradient metrics (s_grad_norm, a_grad_norm, s_a_ratio, alpha_sens)
+            Dict with gradient metrics (s_grad_norm, a_grad_norm, s_a_ratio, alpha_sens, phase_grad_norm)
         """
         if global_step is not None:
             self.current_step = global_step
@@ -363,10 +426,12 @@ class HierarchicalGradientScaler:
         # Compute accumulated norms from deques
         a_norm = sum(self._authority_grad_norms) if self._authority_grad_norms else 0.0
         s_norm = sum(self._sensory_grad_norms) if self._sensory_grad_norms else 0.0
+        p_norm = sum(self._phase_grad_norms) if self._phase_grad_norms else 0.0
         s_a_ratio = s_norm / a_norm if a_norm > 0 else 0.0
 
         self.gradient_stats["authority_grad_norm"] = a_norm
         self.gradient_stats["sensory_grad_norm"] = s_norm
+        self.gradient_stats["phase_grad_norm"] = p_norm
         self.gradient_stats["sensory_authority_ratio"] = s_a_ratio
         self.gradient_stats["sensory_scale"] = self._compute_alpha_sens()
 
@@ -374,14 +439,17 @@ class HierarchicalGradientScaler:
         metrics = {
             "s_grad_norm": s_norm,
             "a_grad_norm": a_norm,
+            "phase_grad_norm": p_norm,
             "s_a_ratio": s_a_ratio,
             "alpha_sens": self._compute_alpha_sens(),
             "step": self.current_step,
+            "in_thaw_mode": self.in_thaw_mode,
         }
 
         # Clear deques for next step
         self._authority_grad_norms.clear()
         self._sensory_grad_norms.clear()
+        self._phase_grad_norms.clear()
 
         return metrics
 
@@ -399,6 +467,10 @@ class HierarchicalGradientScaler:
             "warmup_steps": self.warmup_steps,
             "current_step": self.current_step,
             "gradient_stats": self.gradient_stats.copy(),
+            # Phase Attention protection state
+            "alpha_phase_protection": self.alpha_phase_protection,
+            "protect_phase_during_thaw": self.protect_phase_during_thaw,
+            "in_thaw_mode": self.in_thaw_mode,
         }
 
     def set_state(self, state: dict):
@@ -411,6 +483,10 @@ class HierarchicalGradientScaler:
         self.current_step = state.get("current_step", self.current_step)
         if "gradient_stats" in state:
             self.gradient_stats.update(state["gradient_stats"])
+        # Phase Attention protection state
+        self.alpha_phase_protection = state.get("alpha_phase_protection", self.alpha_phase_protection)
+        self.protect_phase_during_thaw = state.get("protect_phase_during_thaw", self.protect_phase_during_thaw)
+        self.in_thaw_mode = state.get("in_thaw_mode", self.in_thaw_mode)
 
     def get_status_string(self) -> str:
         """Get human-readable status string for logging."""
@@ -831,8 +907,16 @@ class DynamicRelaxationController:
 
         The newly added sensory layers (6-8) start with very low α (0.05)
         and ramp up slowly to prevent Rajasic override.
+
+        Phase Attention Protection:
+        During Thaw, Phase-Attention weights in Authority layers receive
+        extra gradient dampening to maintain stability of the complex O(n)
+        attention mechanism.
         """
         print(f"\n  ⚡ [DynamicRelaxation] RELAXATION: {self.authority_split} → {self.balanced_split}")
+
+        # Enable Thaw mode for Phase Attention protection
+        self.gradient_scaler.set_thaw_mode(True)
 
         # Reconfigure the gradient scaler
         self.gradient_scaler.reconfigure(
@@ -845,6 +929,7 @@ class DynamicRelaxationController:
 
         self.current_split = self.balanced_split
         print(f"    Dampened Thaw: α = {self.thaw_alpha_start} → {self.balanced_alpha_max} over {self.thaw_warmup_steps} steps")
+        print(f"    Phase Attention: Protected during Thaw")
 
     def execute_recovery(self):
         """
@@ -853,6 +938,9 @@ class DynamicRelaxationController:
         This 're-stiffens' the model by returning to Authority-heavy configuration.
         """
         print(f"\n  🔄 [DynamicRelaxation] VIPARYAYA RECOVERY: Reverting to {self.authority_split}")
+
+        # Disable Thaw mode - Phase Attention can learn normally in Authority mode
+        self.gradient_scaler.set_thaw_mode(False)
 
         # Reconfigure back to authority-heavy split
         self.gradient_scaler.reconfigure(
