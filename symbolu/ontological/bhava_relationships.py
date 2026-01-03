@@ -496,7 +496,9 @@ if PYTORCH_AVAILABLE:
             # Compute final coherence
             mask = 1.0 - torch.eye(12, device=device).unsqueeze(0)
             off_diag = (relationship_matrix.abs() * mask).sum(dim=(1, 2)) / (12 * 11)
-            coherence = 0.5 * c_base + 0.5 * off_diag
+            # Fix: Scale c_base from [-1, 1] to [0, 1] since cosine similarity can be negative
+            c_base_scaled = (c_base + 1.0) / 2.0
+            coherence = 0.5 * c_base_scaled + 0.5 * off_diag
 
             return {
                 'relationship_matrix': relationship_matrix,
