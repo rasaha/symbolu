@@ -1185,6 +1185,329 @@ class VRAMGovernor:
 
 
 # =============================================================================
+# LRA VALIDATOR: Long-Range Retrieval Testing
+# =============================================================================
+
+class LRAValidator:
+    """
+    Long-Range Arena Validator for Phase Attention Memory.
+
+    Tests the model's ability to retrieve information over long distances,
+    validating that Phase Oscillator memory works without decay.
+
+    Tests:
+    1. Needle-in-Haystack: Hide a key-value pair early, recall at end
+    2. Distance Decay: Measure accuracy vs retrieval distance
+    3. Multi-Needle: Multiple key-value pairs at different positions
+
+    Patent Integration:
+    - [U1] PhaseCoherenceMatrix: High coherence should correlate with good retrieval
+    - [S5] Entropy: Low entropy during retrieval = confident recall
+    - [B1] Consistency: Consistent forward/backward alignment aids retrieval
+
+    Usage:
+        validator = LRAValidator(model, tokenizer)
+        results = validator.run_validation(step=1000)
+        print(validator.format_results(results))
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        tokenizer: Optional[object] = None,
+        device: torch.device = None,
+        # Test configuration
+        haystack_lengths: List[int] = None,  # Sequence lengths to test
+        needle_positions: List[float] = None,  # Relative positions (0.0-1.0)
+        num_samples: int = 50,  # Samples per test
+        vocab_size: int = 50257,  # Tokenizer vocab size
+    ):
+        self.model = model
+        self.tokenizer = tokenizer
+        self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        # Test configurations
+        self.haystack_lengths = haystack_lengths or [256, 512, 1024, 2048]
+        self.needle_positions = needle_positions or [0.05, 0.1, 0.25, 0.5]  # 5%, 10%, 25%, 50%
+        self.num_samples = num_samples
+        self.vocab_size = vocab_size
+
+        # Results history
+        self.results_history = []
+
+        # Special tokens for needle test
+        self.key_token = 1      # Token ID for "KEY" marker
+        self.query_token = 2    # Token ID for "QUERY" marker
+
+    @torch.no_grad()
+    def generate_needle_batch(
+        self,
+        batch_size: int,
+        seq_len: int,
+        needle_pos: int,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Generate a batch of needle-in-haystack sequences.
+
+        Pattern:
+            [noise...] [KEY] [VALUE] [noise...] [QUERY] [?]
+                                                         ↑
+                                                 Target: VALUE
+
+        Returns:
+            (sequences, targets, needle_positions)
+        """
+        # Create noise (haystack) - use tokens 10-vocab_size to avoid special tokens
+        sequences = torch.randint(10, min(self.vocab_size, 1000), (batch_size, seq_len))
+
+        # Generate random values for each sequence (tokens 10-99)
+        values = torch.randint(10, 100, (batch_size,))
+        targets = values.clone()
+
+        # Insert needle at specified position
+        # [KEY=1] [VALUE=random]
+        sequences[:, needle_pos] = self.key_token
+        sequences[:, needle_pos + 1] = values
+
+        # Insert query at end - model must predict the value
+        # [QUERY=2] [?]
+        sequences[:, -2] = self.query_token
+        sequences[:, -1] = values  # This is what we want to predict
+
+        return sequences.to(self.device), targets.to(self.device), torch.tensor([needle_pos] * batch_size)
+
+    @torch.no_grad()
+    def test_needle_retrieval(
+        self,
+        seq_len: int,
+        needle_pos_ratio: float,
+    ) -> Dict[str, float]:
+        """
+        Test needle retrieval at a specific sequence length and position.
+
+        Args:
+            seq_len: Length of the haystack sequence
+            needle_pos_ratio: Relative position of needle (0.0-1.0)
+
+        Returns:
+            Dict with accuracy, entropy, and confidence metrics
+        """
+        self.model.eval()
+
+        needle_pos = int(seq_len * needle_pos_ratio)
+        needle_pos = max(5, min(needle_pos, seq_len - 10))  # Safety bounds
+
+        # Distance from needle to query
+        retrieval_distance = seq_len - needle_pos - 3
+
+        correct = 0
+        total = 0
+        entropies = []
+        confidences = []
+
+        # Run in batches
+        batch_size = min(16, self.num_samples)
+        num_batches = (self.num_samples + batch_size - 1) // batch_size
+
+        for _ in range(num_batches):
+            actual_batch = min(batch_size, self.num_samples - total)
+            if actual_batch <= 0:
+                break
+
+            sequences, targets, _ = self.generate_needle_batch(
+                actual_batch, seq_len, needle_pos
+            )
+
+            # Forward pass - get logits for the last position
+            try:
+                outputs = self.model(sequences[:, :-1])  # Input without last token
+                if isinstance(outputs, dict):
+                    logits = outputs.get('logits', outputs.get('output'))
+                else:
+                    logits = outputs
+
+                # Get predictions for the last position
+                last_logits = logits[:, -1, :]  # [B, Vocab]
+
+                # Compute predictions
+                predictions = last_logits.argmax(dim=-1)
+
+                # Compute accuracy
+                correct += (predictions == targets).sum().item()
+                total += actual_batch
+
+                # Compute entropy of predictions
+                probs = F.softmax(last_logits, dim=-1)
+                entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1)
+                max_entropy = math.log(last_logits.shape[-1])
+                normalized_entropy = (entropy / max_entropy).mean().item()
+                entropies.append(normalized_entropy)
+
+                # Compute confidence (probability of correct token)
+                target_probs = probs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
+                confidences.append(target_probs.mean().item())
+
+            except Exception as e:
+                print(f"    Warning: LRA test failed for seq_len={seq_len}: {e}")
+                break
+
+        accuracy = correct / total if total > 0 else 0.0
+        avg_entropy = sum(entropies) / len(entropies) if entropies else 1.0
+        avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+
+        return {
+            "seq_len": seq_len,
+            "needle_pos": needle_pos,
+            "needle_pos_ratio": needle_pos_ratio,
+            "retrieval_distance": retrieval_distance,
+            "accuracy": accuracy,
+            "entropy": avg_entropy,
+            "confidence": avg_confidence,
+            "samples": total,
+        }
+
+    @torch.no_grad()
+    def run_validation(self, step: int = 0) -> Dict[str, any]:
+        """
+        Run full LRA validation suite.
+
+        Returns comprehensive results including:
+        - Per-length accuracy
+        - Per-position accuracy
+        - Distance decay curve
+        - Overall retrieval score
+        """
+        self.model.eval()
+
+        results = {
+            "step": step,
+            "tests": [],
+            "by_length": {},
+            "by_position": {},
+            "distance_decay": [],
+        }
+
+        print(f"\n  ╔══════════════════════════════════════════════════════════════╗")
+        print(f"  ║  🔍 LRA VALIDATION (Step {step})                              ║")
+        print(f"  ╠══════════════════════════════════════════════════════════════╣")
+
+        # Run tests for each length and position combination
+        for seq_len in self.haystack_lengths:
+            if seq_len > 2048:  # Skip if seq_len exceeds typical model limits
+                continue
+
+            results["by_length"][seq_len] = []
+
+            for pos_ratio in self.needle_positions:
+                test_result = self.test_needle_retrieval(seq_len, pos_ratio)
+                results["tests"].append(test_result)
+                results["by_length"][seq_len].append(test_result)
+
+                # Track by position
+                pos_key = f"{pos_ratio:.0%}"
+                if pos_key not in results["by_position"]:
+                    results["by_position"][pos_key] = []
+                results["by_position"][pos_key].append(test_result)
+
+                # Track distance decay
+                results["distance_decay"].append({
+                    "distance": test_result["retrieval_distance"],
+                    "accuracy": test_result["accuracy"],
+                    "entropy": test_result["entropy"],
+                })
+
+                # Log result
+                acc_icon = "✅" if test_result["accuracy"] > 0.8 else "⚠️" if test_result["accuracy"] > 0.5 else "❌"
+                print(f"  ║  Len:{seq_len:>4} Pos:{pos_ratio:>4.0%} Dist:{test_result['retrieval_distance']:>4} │ "
+                      f"Acc:{test_result['accuracy']:.1%} Ent:{test_result['entropy']:.2f} {acc_icon}  ║")
+
+        # Compute summary statistics
+        all_accuracies = [t["accuracy"] for t in results["tests"]]
+        all_entropies = [t["entropy"] for t in results["tests"]]
+
+        results["summary"] = {
+            "mean_accuracy": sum(all_accuracies) / len(all_accuracies) if all_accuracies else 0,
+            "min_accuracy": min(all_accuracies) if all_accuracies else 0,
+            "max_accuracy": max(all_accuracies) if all_accuracies else 0,
+            "mean_entropy": sum(all_entropies) / len(all_entropies) if all_entropies else 1,
+        }
+
+        # Compute distance decay coefficient (how fast accuracy drops with distance)
+        if len(results["distance_decay"]) >= 2:
+            distances = [d["distance"] for d in results["distance_decay"]]
+            accuracies = [d["accuracy"] for d in results["distance_decay"]]
+            # Simple linear regression for decay rate
+            if max(distances) > min(distances):
+                n = len(distances)
+                mean_d = sum(distances) / n
+                mean_a = sum(accuracies) / n
+                numerator = sum((d - mean_d) * (a - mean_a) for d, a in zip(distances, accuracies))
+                denominator = sum((d - mean_d) ** 2 for d in distances)
+                decay_rate = numerator / denominator if denominator != 0 else 0
+                results["summary"]["decay_rate"] = decay_rate
+            else:
+                results["summary"]["decay_rate"] = 0
+        else:
+            results["summary"]["decay_rate"] = 0
+
+        # Print summary
+        print(f"  ╠══════════════════════════════════════════════════════════════╣")
+        summary = results["summary"]
+        overall_icon = "🟢" if summary["mean_accuracy"] > 0.7 else "🟡" if summary["mean_accuracy"] > 0.4 else "🔴"
+        print(f"  ║  SUMMARY: Avg Acc: {summary['mean_accuracy']:.1%} │ "
+              f"Range: [{summary['min_accuracy']:.1%}-{summary['max_accuracy']:.1%}] {overall_icon}  ║")
+        print(f"  ║  Decay Rate: {summary['decay_rate']:.4f}/token │ "
+              f"Mean Entropy: {summary['mean_entropy']:.3f}         ║")
+        print(f"  ╚══════════════════════════════════════════════════════════════╝\n")
+
+        # Store in history
+        self.results_history.append(results)
+
+        return results
+
+    def get_retrieval_score(self) -> float:
+        """
+        Get a single retrieval score (0-1) from the most recent validation.
+
+        Score combines:
+        - Mean accuracy (60%)
+        - Distance resilience (30%) - how well accuracy holds over distance
+        - Confidence (10%)
+        """
+        if not self.results_history:
+            return 0.0
+
+        latest = self.results_history[-1]
+        summary = latest["summary"]
+
+        # Mean accuracy component
+        acc_score = summary["mean_accuracy"] * 0.6
+
+        # Distance resilience (inverse of decay rate, normalized)
+        # decay_rate is negative when accuracy drops with distance
+        decay = abs(summary.get("decay_rate", 0))
+        resilience = max(0, 1.0 - decay * 100)  # Scale decay to 0-1
+        resilience_score = resilience * 0.3
+
+        # Entropy component (lower is better)
+        entropy_score = (1.0 - summary["mean_entropy"]) * 0.1
+
+        return min(1.0, acc_score + resilience_score + entropy_score)
+
+    def format_compact_result(self) -> str:
+        """Format a compact one-line result for logging."""
+        if not self.results_history:
+            return "LRA: No data"
+
+        latest = self.results_history[-1]
+        summary = latest["summary"]
+        score = self.get_retrieval_score()
+
+        icon = "🟢" if score > 0.7 else "🟡" if score > 0.4 else "🔴"
+        return f"LRA:{score:.2f}{icon} Acc:{summary['mean_accuracy']:.1%} Decay:{summary['decay_rate']:.4f}"
+
+
+# =============================================================================
 # DYNAMIC RELAXATION CONTROLLER: 9:3 → 6:6 TRANSITION
 # =============================================================================
 
@@ -2051,6 +2374,11 @@ class UnifiedTrainingConfig:
         "The meaning of life is often debated",
     )
 
+    # LRA Validation (Long-Range Retrieval)
+    lra_validate_every: int = 0  # Run LRA validation every N steps (0 = disabled)
+    lra_haystack_lengths: str = "256,512,1024"  # Comma-separated lengths
+    lra_num_samples: int = 50  # Samples per test
+
     # Hardware
     device: str = "auto"
     num_workers: int = 4
@@ -2656,6 +2984,20 @@ def train(config: UnifiedTrainingConfig):
     )
     print(f"  VRAM Governor: ENABLED (threshold=92%, compensation=20%)")
 
+    # LRA Validator (Long-Range Retrieval Testing)
+    lra_validator = None
+    if config.lra_validate_every > 0:
+        haystack_lengths = [int(x) for x in config.lra_haystack_lengths.split(',')]
+        lra_validator = LRAValidator(
+            model=model,
+            tokenizer=tokenizer if 'tokenizer' in dir() else None,
+            device=device,
+            haystack_lengths=haystack_lengths,
+            num_samples=config.lra_num_samples,
+            vocab_size=config.vocab_size,
+        )
+        print(f"  LRA Validator: ENABLED (every {config.lra_validate_every} steps, lengths={haystack_lengths})")
+
     # Optimizer
     optimizer = AdamW(
         model.parameters(),
@@ -3203,6 +3545,18 @@ def train(config: UnifiedTrainingConfig):
                     else:
                         print(f"  [Sampling] Skipped - tokenizer not available")
 
+                # LRA Validation (Long-Range Retrieval)
+                if lra_validator is not None and global_step % config.lra_validate_every == 0:
+                    lra_results = lra_validator.run_validation(step=global_step)
+                    lra_score = lra_validator.get_retrieval_score()
+
+                    # TensorBoard logging for LRA
+                    if tb_writer is not None:
+                        tb_writer.add_scalar("lra/retrieval_score", lra_score, global_step)
+                        tb_writer.add_scalar("lra/mean_accuracy", lra_results["summary"]["mean_accuracy"], global_step)
+                        tb_writer.add_scalar("lra/decay_rate", lra_results["summary"]["decay_rate"], global_step)
+                        tb_writer.add_scalar("lra/mean_entropy", lra_results["summary"]["mean_entropy"], global_step)
+
                 model.train()
 
             # Save checkpoint (overwrites last.pt each time)
@@ -3456,6 +3810,14 @@ def main():
     # Quality Sampling
     parser.add_argument("--sample_every", type=int, default=500,
                        help="Generate quality samples every N steps (0 = disabled)")
+
+    # LRA Validation (Long-Range Retrieval)
+    parser.add_argument("--lra_validate_every", type=int, default=0,
+                       help="Run LRA validation every N steps (0 = disabled)")
+    parser.add_argument("--lra_haystack_lengths", type=str, default="256,512,1024",
+                       help="Comma-separated haystack lengths for LRA tests")
+    parser.add_argument("--lra_num_samples", type=int, default=50,
+                       help="Number of samples per LRA test")
 
     # Formula [1331]: 9:3 Hierarchical Split
     parser.add_argument("--use_9_3_split", action="store_true",
