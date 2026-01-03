@@ -1897,29 +1897,7 @@ def train(config: UnifiedTrainingConfig):
                     tb_writer.add_scalar("val/loss", val_loss, global_step)
                     tb_writer.add_scalar("val/ppl", val_ppl, global_step)
 
-                # Dynamic Relaxation Controller update (9:3 → 6:6)
-                if relaxation_controller is not None:
-                    # Compute S-drift from state delta (using coherence as proxy if no state available)
-                    s_drift = 1.0 - current_coh  # Lower coherence = higher drift (approximation)
-
-                    relaxed, drc_metrics = relaxation_controller.update(
-                        guna_coherence=current_coh,
-                        s_drift=s_drift,
-                        current_ppl=val_ppl,
-                        step=global_step,
-                    )
-
-                    print(f"  --> {relaxation_controller.get_status_string()}")
-
-                    # TensorBoard logging for DRC
-                    if tb_writer is not None:
-                        tb_writer.add_scalar("drc/stability_avg", drc_metrics["stability_avg"], global_step)
-                        tb_writer.add_scalar("drc/alpha_sens", drc_metrics["alpha_sens"], global_step)
-                        tb_writer.add_scalar("drc/relaxation_triggered", drc_metrics["relaxation_triggered"], global_step)
-                        if drc_metrics["relaxation_triggered"]:
-                            tb_writer.add_scalar("drc/thaw_progress", drc_metrics["thaw_progress"], global_step)
-
-                # Log HGS status
+                # Log HGS status (only if relaxation controller not active, to avoid duplicate logging)
                 if gradient_scaler_hgs is not None and relaxation_controller is None:
                     print(f"  --> {gradient_scaler_hgs.get_status_string()}")
 
