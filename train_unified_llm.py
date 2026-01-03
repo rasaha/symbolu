@@ -582,6 +582,371 @@ class HierarchicalGradientScaler:
 
 
 # =============================================================================
+# WEIGHT TRANSFER FOR 9:3 → 6:6 TRANSITION
+# =============================================================================
+
+class WeightTransfer:
+    """
+    Manages weight transfer during 9:3 → 6:6 dynamic relaxation.
+
+    When the relaxation trigger fires, this class:
+    1. Captures weights from Layers 6, 7, 8 (StateDeltaPhaseBlocks)
+    2. Initializes new QuadraticAttentionWithPhaseBias blocks using pre-trained weights
+    3. Re-anchors R_to_phase_bias projection to Layer 5 (new Witness)
+    4. Implements Guna-Lock: freezes W_q, W_k for first 50 steps post-swap
+
+    Weight Mapping (StateDeltaPhaseBlock → QuadraticAttentionWithPhaseBias):
+        Phase Attention v_proj → Quadratic v_proj
+        Phase Attention out_proj → Quadratic out_proj
+        norm1 → norm1
+        ffn → ffn
+        norm2 → norm2
+        r_signal_proj → r_to_phase_bias (dimension-adjusted)
+
+    Guna-Lock prevents 'Rajasic' noise from destroying inherited ontological logic
+    by freezing query/key matrices while allowing values and phase-bias to train.
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        guna_lock_steps: int = 50,       # Steps to freeze W_q/W_k post-swap
+        anchor_layer_idx: int = 5,        # New Witness layer index after 6:6
+        transferred_layers: Tuple[int, int, int] = (6, 7, 8),  # Layers to transfer
+    ):
+        self.model = model
+        self.guna_lock_steps = guna_lock_steps
+        self.anchor_layer_idx = anchor_layer_idx
+        self.transferred_layers = transferred_layers
+
+        # State tracking
+        self.captured_weights = {}
+        self.captured_r_anchor = None
+        self.guna_lock_active = False
+        self.guna_lock_start_step = None
+        self.frozen_params = []
+
+        # Track new Quadratic layers for Guna-Lock
+        self.new_quadratic_layers = []
+
+    def capture_state(self) -> Dict[str, Any]:
+        """
+        Capture current weights from Layers 6, 7, 8 (StateDeltaPhaseBlocks).
+
+        Returns dict with captured weight tensors for each layer.
+        """
+        self.captured_weights = {}
+
+        # Get the layers from model
+        layers = self._get_model_layers()
+        if layers is None:
+            print("  ⚠️  [WeightTransfer] Could not find model layers")
+            return {}
+
+        for layer_idx in self.transferred_layers:
+            if layer_idx >= len(layers):
+                continue
+
+            layer = layers[layer_idx]
+            layer_weights = {}
+
+            # Capture attention weights
+            if hasattr(layer, 'attn'):
+                attn = layer.attn
+                # PhaseAttentionLayer weights
+                if hasattr(attn, 'v_proj'):
+                    layer_weights['v_proj'] = attn.v_proj.weight.data.clone()
+                    if attn.v_proj.bias is not None:
+                        layer_weights['v_proj_bias'] = attn.v_proj.bias.data.clone()
+                if hasattr(attn, 'out_proj'):
+                    layer_weights['out_proj'] = attn.out_proj.weight.data.clone()
+                    if attn.out_proj.bias is not None:
+                        layer_weights['out_proj_bias'] = attn.out_proj.bias.data.clone()
+                # Phase-specific weights for reference
+                if hasattr(attn, 'W_phase'):
+                    layer_weights['W_phase'] = attn.W_phase.weight.data.clone()
+                if hasattr(attn, 'W_amp'):
+                    layer_weights['W_amp'] = attn.W_amp.weight.data.clone()
+
+            # Capture norm1
+            if hasattr(layer, 'norm1'):
+                layer_weights['norm1_weight'] = layer.norm1.weight.data.clone()
+                layer_weights['norm1_bias'] = layer.norm1.bias.data.clone()
+
+            # Capture FFN
+            if hasattr(layer, 'ffn'):
+                ffn = layer.ffn
+                if isinstance(ffn, nn.Sequential):
+                    for i, module in enumerate(ffn):
+                        if isinstance(module, nn.Linear):
+                            layer_weights[f'ffn_{i}_weight'] = module.weight.data.clone()
+                            if module.bias is not None:
+                                layer_weights[f'ffn_{i}_bias'] = module.bias.data.clone()
+
+            # Capture norm2
+            if hasattr(layer, 'norm2'):
+                layer_weights['norm2_weight'] = layer.norm2.weight.data.clone()
+                layer_weights['norm2_bias'] = layer.norm2.bias.data.clone()
+
+            # Capture R-Signal projection (for re-anchoring)
+            if hasattr(layer, 'r_signal_proj'):
+                layer_weights['r_signal_proj'] = layer.r_signal_proj.weight.data.clone()
+                if layer.r_signal_proj.bias is not None:
+                    layer_weights['r_signal_proj_bias'] = layer.r_signal_proj.bias.data.clone()
+
+            self.captured_weights[layer_idx] = layer_weights
+
+        # Capture the R-Signal anchor from the new Witness (Layer 5 in 6:6)
+        if self.anchor_layer_idx < len(layers):
+            anchor_layer = layers[self.anchor_layer_idx]
+            if hasattr(anchor_layer, 'r_signal_proj'):
+                self.captured_r_anchor = {
+                    'weight': anchor_layer.r_signal_proj.weight.data.clone(),
+                    'bias': anchor_layer.r_signal_proj.bias.data.clone() if anchor_layer.r_signal_proj.bias is not None else None
+                }
+
+        print(f"  📦 [WeightTransfer] Captured weights from layers {self.transferred_layers}")
+        print(f"    R-Signal anchor captured from layer {self.anchor_layer_idx}")
+
+        return self.captured_weights
+
+    def transfer_weights(
+        self,
+        new_layers: List[nn.Module],
+        r_signal_dim: int = 48,
+    ) -> bool:
+        """
+        Transfer captured weights to new QuadraticAttentionWithPhaseBias blocks.
+
+        Args:
+            new_layers: List of new QuadraticAttentionWithPhaseBias modules
+            r_signal_dim: Dimension of R-Signal for phase bias
+
+        Returns:
+            True if transfer successful
+        """
+        if not self.captured_weights:
+            print("  ⚠️  [WeightTransfer] No weights captured, skipping transfer")
+            return False
+
+        self.new_quadratic_layers = new_layers
+
+        for i, new_layer in enumerate(new_layers):
+            layer_idx = self.transferred_layers[i] if i < len(self.transferred_layers) else None
+            if layer_idx is None or layer_idx not in self.captured_weights:
+                continue
+
+            weights = self.captured_weights[layer_idx]
+
+            # Transfer v_proj
+            if 'v_proj' in weights and hasattr(new_layer, 'v_proj'):
+                new_layer.v_proj.weight.data.copy_(weights['v_proj'])
+                if 'v_proj_bias' in weights and new_layer.v_proj.bias is not None:
+                    new_layer.v_proj.bias.data.copy_(weights['v_proj_bias'])
+
+            # Transfer out_proj
+            if 'out_proj' in weights and hasattr(new_layer, 'out_proj'):
+                new_layer.out_proj.weight.data.copy_(weights['out_proj'])
+                if 'out_proj_bias' in weights and new_layer.out_proj.bias is not None:
+                    new_layer.out_proj.bias.data.copy_(weights['out_proj_bias'])
+
+            # Initialize Q, K from V (State-Inference: inherit value-based attention)
+            # This preserves the learned "what to attend to" logic
+            if 'v_proj' in weights:
+                if hasattr(new_layer, 'q_proj'):
+                    new_layer.q_proj.weight.data.copy_(weights['v_proj'])
+                    if 'v_proj_bias' in weights and new_layer.q_proj.bias is not None:
+                        new_layer.q_proj.bias.data.copy_(weights['v_proj_bias'])
+                if hasattr(new_layer, 'k_proj'):
+                    new_layer.k_proj.weight.data.copy_(weights['v_proj'])
+                    if 'v_proj_bias' in weights and new_layer.k_proj.bias is not None:
+                        new_layer.k_proj.bias.data.copy_(weights['v_proj_bias'])
+
+            # Transfer norm1
+            if 'norm1_weight' in weights and hasattr(new_layer, 'norm1'):
+                new_layer.norm1.weight.data.copy_(weights['norm1_weight'])
+                new_layer.norm1.bias.data.copy_(weights['norm1_bias'])
+
+            # Transfer FFN
+            if hasattr(new_layer, 'ffn') and isinstance(new_layer.ffn, nn.Sequential):
+                for j, module in enumerate(new_layer.ffn):
+                    if isinstance(module, nn.Linear):
+                        weight_key = f'ffn_{j}_weight'
+                        bias_key = f'ffn_{j}_bias'
+                        if weight_key in weights:
+                            module.weight.data.copy_(weights[weight_key])
+                        if bias_key in weights and module.bias is not None:
+                            module.bias.data.copy_(weights[bias_key])
+
+            # Transfer norm2
+            if 'norm2_weight' in weights and hasattr(new_layer, 'norm2'):
+                new_layer.norm2.weight.data.copy_(weights['norm2_weight'])
+                new_layer.norm2.bias.data.copy_(weights['norm2_bias'])
+
+            # Initialize r_to_phase_bias from r_signal_proj (48D Anchor)
+            if 'r_signal_proj' in weights and hasattr(new_layer, 'r_to_phase_bias'):
+                # r_signal_proj: [embed_dim, r_signal_dim]
+                # r_to_phase_bias: Sequential([Linear(r_signal_dim, embed_dim), Tanh])
+                for module in new_layer.r_to_phase_bias:
+                    if isinstance(module, nn.Linear):
+                        # Transpose to match dimensions: [r_signal_dim, embed_dim] → [embed_dim, r_signal_dim]
+                        source_weight = weights['r_signal_proj']
+                        if source_weight.shape[0] == module.weight.shape[1]:
+                            # Direct transpose copy
+                            module.weight.data.copy_(source_weight.T)
+                        else:
+                            # Dimension mismatch, initialize with scaled version
+                            nn.init.xavier_uniform_(module.weight)
+                            # Scale down for stability
+                            module.weight.data *= 0.1
+                        break
+
+        print(f"  ✓ [WeightTransfer] Transferred weights to {len(new_layers)} new layers")
+        return True
+
+    def anchor_r_signal(self, new_witness_layer: nn.Module) -> bool:
+        """
+        Re-anchor R_to_phase_bias projection to Layer 5 (new Witness).
+
+        The 48D R-Signal anchor ensures continuity of the Authority → Sensory
+        nerve signal after the layer split changes.
+        """
+        if self.captured_r_anchor is None:
+            print("  ⚠️  [WeightTransfer] No R-Signal anchor captured")
+            return False
+
+        # Update the new witness layer's R-Signal projection
+        if hasattr(new_witness_layer, 'r_signal_proj'):
+            new_witness_layer.r_signal_proj.weight.data.copy_(self.captured_r_anchor['weight'])
+            if self.captured_r_anchor['bias'] is not None and new_witness_layer.r_signal_proj.bias is not None:
+                new_witness_layer.r_signal_proj.bias.data.copy_(self.captured_r_anchor['bias'])
+
+        # Also update witness_r_proj in the main model if it exists
+        if hasattr(self.model, 'witness_r_proj'):
+            if self.model.witness_r_proj.weight.shape == self.captured_r_anchor['weight'].shape:
+                self.model.witness_r_proj.weight.data.copy_(self.captured_r_anchor['weight'])
+                if self.captured_r_anchor['bias'] is not None and self.model.witness_r_proj.bias is not None:
+                    self.model.witness_r_proj.bias.data.copy_(self.captured_r_anchor['bias'])
+
+        print(f"  ⚓ [WeightTransfer] R-Signal anchored to layer {self.anchor_layer_idx}")
+        return True
+
+    def activate_guna_lock(self, current_step: int):
+        """
+        Activate Guna-Lock: freeze W_q and W_k matrices of new layers.
+
+        For the first 50 steps post-swap, only W_v and Phase-Bias can train.
+        This prevents 'Rajasic' noise from destroying inherited logic.
+        """
+        self.guna_lock_active = True
+        self.guna_lock_start_step = current_step
+        self.frozen_params = []
+
+        for layer in self.new_quadratic_layers:
+            # Freeze Q and K projections
+            if hasattr(layer, 'q_proj'):
+                layer.q_proj.weight.requires_grad = False
+                if layer.q_proj.bias is not None:
+                    layer.q_proj.bias.requires_grad = False
+                self.frozen_params.append(layer.q_proj)
+
+            if hasattr(layer, 'k_proj'):
+                layer.k_proj.weight.requires_grad = False
+                if layer.k_proj.bias is not None:
+                    layer.k_proj.bias.requires_grad = False
+                self.frozen_params.append(layer.k_proj)
+
+        print(f"  🔒 [WeightTransfer] Guna-Lock ACTIVATED at step {current_step}")
+        print(f"    Frozen: W_q, W_k for {len(self.new_quadratic_layers)} layers")
+        print(f"    Active: W_v, Phase-Bias, FFN")
+        print(f"    Duration: {self.guna_lock_steps} steps")
+
+    def update_guna_lock(self, current_step: int) -> bool:
+        """
+        Check and update Guna-Lock status.
+
+        Returns True if lock was just released.
+        """
+        if not self.guna_lock_active:
+            return False
+
+        if self.guna_lock_start_step is None:
+            return False
+
+        elapsed = current_step - self.guna_lock_start_step
+
+        if elapsed >= self.guna_lock_steps:
+            # Release the lock
+            return self.release_guna_lock()
+
+        return False
+
+    def release_guna_lock(self) -> bool:
+        """
+        Release Guna-Lock: unfreeze W_q and W_k matrices.
+
+        Called automatically after guna_lock_steps or manually for early release.
+        """
+        if not self.guna_lock_active:
+            return False
+
+        for layer in self.new_quadratic_layers:
+            if hasattr(layer, 'q_proj'):
+                layer.q_proj.weight.requires_grad = True
+                if layer.q_proj.bias is not None:
+                    layer.q_proj.bias.requires_grad = True
+
+            if hasattr(layer, 'k_proj'):
+                layer.k_proj.weight.requires_grad = True
+                if layer.k_proj.bias is not None:
+                    layer.k_proj.bias.requires_grad = True
+
+        self.guna_lock_active = False
+        self.frozen_params = []
+
+        print(f"  🔓 [WeightTransfer] Guna-Lock RELEASED")
+        print(f"    All parameters now trainable")
+        return True
+
+    def _get_model_layers(self) -> Optional[nn.ModuleList]:
+        """Get the layer ModuleList from model."""
+        # SymbolU12 special case
+        if hasattr(self.model, 'layers_1_8'):
+            layers = list(self.model.layers_1_8)
+            # Add witness, unifying, integration, absolving
+            for layer_name in ['witness_layer', 'unifying_layer', 'integration_layer', 'absolving_layer']:
+                if hasattr(self.model, layer_name):
+                    layer = getattr(self.model, layer_name)
+                    if layer is not None:
+                        layers.append(layer)
+            return nn.ModuleList(layers)
+
+        # Try common attribute names
+        for attr in ['layers', 'blocks', 'transformer.blocks']:
+            if hasattr(self.model, attr):
+                layers = getattr(self.model, attr)
+                if isinstance(layers, nn.ModuleList):
+                    return layers
+
+        return None
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get current status of weight transfer and Guna-Lock."""
+        return {
+            "weights_captured": bool(self.captured_weights),
+            "layers_captured": list(self.captured_weights.keys()),
+            "r_anchor_captured": self.captured_r_anchor is not None,
+            "guna_lock_active": self.guna_lock_active,
+            "guna_lock_start_step": self.guna_lock_start_step,
+            "guna_lock_remaining": (
+                self.guna_lock_steps - (self.guna_lock_start_step or 0)
+                if self.guna_lock_active else 0
+            ),
+            "new_layers_count": len(self.new_quadratic_layers),
+        }
+
+
+# =============================================================================
 # DYNAMIC RELAXATION CONTROLLER: 9:3 → 6:6 TRANSITION
 # =============================================================================
 
@@ -603,13 +968,13 @@ class DynamicRelaxationController:
     StabilityIndex = 0.7 * GC + 0.3 * (1 - S_Drift_EMA)
 
     Usage:
-        controller = DynamicRelaxationController(gradient_scaler, config)
+        controller = DynamicRelaxationController(gradient_scaler, model, config)
         # In training loop:
         should_relax, action = controller.update(guna_coherence, s_drift_ema, val_ppl, step)
         if action == "RELAX":
-            controller.execute_relaxation()
+            controller.execute_relaxation(current_step=step)  # Triggers WeightTransfer + Guna-Lock
         elif action == "RECOVER":
-            controller.execute_recovery()
+            controller.execute_recovery()  # Releases Guna-Lock
     """
 
     # Controller states
@@ -641,6 +1006,9 @@ class DynamicRelaxationController:
         # Monitoring
         guna_coherence_weight: float = 0.7,
         s_drift_weight: float = 0.3,
+        # Weight Transfer settings
+        guna_lock_steps: int = 50,           # Steps to freeze W_q/W_k post-swap
+        enable_weight_transfer: bool = True,  # Enable weight transfer during relaxation
     ):
         self.gradient_scaler = gradient_scaler
         self.model = model
@@ -667,6 +1035,21 @@ class DynamicRelaxationController:
         # Weights for StabilityIndex
         self.guna_coherence_weight = guna_coherence_weight
         self.s_drift_weight = s_drift_weight
+
+        # Weight Transfer for 9:3 → 6:6 transition
+        self.enable_weight_transfer = enable_weight_transfer
+        self.guna_lock_steps = guna_lock_steps
+        if enable_weight_transfer:
+            # Layers 6, 7, 8 become Sensory in 6:6 split
+            # Layer 5 becomes the new Witness
+            self.weight_transfer = WeightTransfer(
+                model=model,
+                guna_lock_steps=guna_lock_steps,
+                anchor_layer_idx=balanced_split[0] - 1,  # New Witness is layer 5 in 6:6
+                transferred_layers=(6, 7, 8),  # These layers change from Authority to Sensory
+            )
+        else:
+            self.weight_transfer = None
 
         # State tracking
         self.state = self.STATE_AUTHORITY
@@ -695,6 +1078,9 @@ class DynamicRelaxationController:
         print(f"    Target split: {balanced_split[0]}:{balanced_split[1]}")
         print(f"    Stability threshold: {stability_threshold}")
         print(f"    Stability window: {stability_window} steps")
+        if enable_weight_transfer:
+            print(f"    Weight Transfer: ENABLED")
+            print(f"    Guna-Lock: {guna_lock_steps} steps post-swap")
 
     def compute_stability_index(
         self,
@@ -859,6 +1245,9 @@ class DynamicRelaxationController:
             self.post_relaxation_ppl_samples = []
 
         elif self.state == self.STATE_BALANCED:
+            # Update Guna-Lock status (release after guna_lock_steps)
+            self.update_guna_lock(global_step)
+
             # Track Integration Tax for first N steps
             if not self.integration_tax_logged:
                 self._log_integration_tax(val_ppl, global_step)
@@ -901,12 +1290,18 @@ class DynamicRelaxationController:
 
         return (action != "NONE"), action
 
-    def execute_relaxation(self):
+    def execute_relaxation(self, current_step: int = 0):
         """
-        Execute the 9:3 → 6:6 transition with Dampened Thaw.
+        Execute the 9:3 → 6:6 transition with Dampened Thaw and Weight Transfer.
 
         The newly added sensory layers (6-8) start with very low α (0.05)
         and ramp up slowly to prevent Rajasic override.
+
+        Weight Transfer Process:
+        1. Capture weights from Layers 6, 7, 8 (StateDeltaPhaseBlocks)
+        2. Transfer to new QuadraticAttentionWithPhaseBias blocks
+        3. Re-anchor R-Signal to Layer 5 (new Witness)
+        4. Activate Guna-Lock: freeze W_q, W_k for 50 steps
 
         Phase Attention Protection:
         During Thaw, Phase-Attention weights in Authority layers receive
@@ -914,6 +1309,40 @@ class DynamicRelaxationController:
         attention mechanism.
         """
         print(f"\n  ⚡ [DynamicRelaxation] RELAXATION: {self.authority_split} → {self.balanced_split}")
+
+        # =====================================================================
+        # WEIGHT TRANSFER: State-Inference + 48D Anchor + Guna-Lock
+        # =====================================================================
+        if self.weight_transfer is not None and self.enable_weight_transfer:
+            print(f"\n  📤 [WeightTransfer] Beginning weight transfer...")
+
+            # Step 1: Capture weights from Layers 6, 7, 8 (before they become Sensory)
+            self.weight_transfer.capture_state()
+
+            # Step 2: Get the new Quadratic layers (will be created after reconfigure)
+            # For now, we capture the layers that will become Sensory
+            layers = self.weight_transfer._get_model_layers()
+            if layers is not None:
+                # Layers 6, 7, 8 in the original indexing become Sensory layers
+                new_sensory_layers = []
+                for idx in self.weight_transfer.transferred_layers:
+                    if idx < len(layers):
+                        new_sensory_layers.append(layers[idx])
+
+                # Step 3: Transfer weights (State-Inference)
+                # Initialize Q, K from V to preserve learned attention patterns
+                self.weight_transfer.transfer_weights(
+                    new_layers=new_sensory_layers,
+                    r_signal_dim=48,  # Standard R-Signal dimension
+                )
+
+                # Step 4: Re-anchor R-Signal to Layer 5 (new Witness)
+                if self.weight_transfer.anchor_layer_idx < len(layers):
+                    new_witness = layers[self.weight_transfer.anchor_layer_idx]
+                    self.weight_transfer.anchor_r_signal(new_witness)
+
+                # Step 5: Activate Guna-Lock (freeze W_q, W_k for 50 steps)
+                self.weight_transfer.activate_guna_lock(current_step)
 
         # Enable Thaw mode for Phase Attention protection
         self.gradient_scaler.set_thaw_mode(True)
@@ -930,14 +1359,22 @@ class DynamicRelaxationController:
         self.current_split = self.balanced_split
         print(f"    Dampened Thaw: α = {self.thaw_alpha_start} → {self.balanced_alpha_max} over {self.thaw_warmup_steps} steps")
         print(f"    Phase Attention: Protected during Thaw")
+        if self.weight_transfer is not None:
+            print(f"    Guna-Lock: W_q, W_k frozen for {self.guna_lock_steps} steps")
 
     def execute_recovery(self):
         """
         Execute Viparyaya recovery: revert to 9:3 split.
 
         This 're-stiffens' the model by returning to Authority-heavy configuration.
+        Also releases Guna-Lock if active, as the layer structure is changing.
         """
         print(f"\n  🔄 [DynamicRelaxation] VIPARYAYA RECOVERY: Reverting to {self.authority_split}")
+
+        # Release Guna-Lock if active (layer structure is changing)
+        if self.weight_transfer is not None and self.weight_transfer.guna_lock_active:
+            self.weight_transfer.release_guna_lock()
+            print("    Guna-Lock released due to recovery")
 
         # Disable Thaw mode - Phase Attention can learn normally in Authority mode
         self.gradient_scaler.set_thaw_mode(False)
@@ -953,35 +1390,65 @@ class DynamicRelaxationController:
 
         self.current_split = self.authority_split
 
+    def update_guna_lock(self, current_step: int) -> bool:
+        """
+        Update Guna-Lock status. Call this each training step after relaxation.
+
+        Returns True if Guna-Lock was just released.
+        """
+        if self.weight_transfer is None:
+            return False
+
+        released = self.weight_transfer.update_guna_lock(current_step)
+        if released:
+            print(f"\n  🔓 [DynamicRelaxation] Guna-Lock released at step {current_step}")
+            print("    W_q, W_k now trainable")
+        return released
+
+    def is_guna_locked(self) -> bool:
+        """Check if Guna-Lock is currently active."""
+        if self.weight_transfer is None:
+            return False
+        return self.weight_transfer.guna_lock_active
+
     def get_status_string(self) -> str:
         """Get formatted status string for logging."""
         split_str = f"{self.current_split[0]}:{self.current_split[1]}"
         streak_str = f"{self.stability_streak}/{self.stability_window}" if self.state == self.STATE_AUTHORITY else "—"
+        lock_str = " 🔒" if self.is_guna_locked() else ""
 
         if self.state == self.STATE_RECOVERY:
-            return f"Split:{split_str} State:RECOVERY Streak:{streak_str}"
+            return f"Split:{split_str} State:RECOVERY Streak:{streak_str}{lock_str}"
         elif self.state == self.STATE_BALANCED:
-            return f"Split:{split_str} State:BALANCED ✓"
+            return f"Split:{split_str} State:BALANCED ✓{lock_str}"
         else:
-            return f"Split:{split_str} State:{self.state} Streak:{streak_str}"
+            return f"Split:{split_str} State:{self.state} Streak:{streak_str}{lock_str}"
 
     def get_telemetry(self) -> Dict[str, Any]:
         """Get telemetry data for logging/visualization."""
         recent_stability = [h["stability"] for h in self.stability_history[-100:]]
         avg_stability = sum(recent_stability) / len(recent_stability) if recent_stability else 0.0
 
-        return {
+        telemetry = {
             "state": self.state,
             "current_split": f"{self.current_split[0]}:{self.current_split[1]}",
             "stability_streak": self.stability_streak,
             "avg_stability_100": avg_stability,
             "transitions": len(self.transitions),
             "is_balanced": self.state == self.STATE_BALANCED,
+            "guna_lock_active": self.is_guna_locked(),
         }
+
+        # Add weight transfer status if available
+        if self.weight_transfer is not None:
+            wt_status = self.weight_transfer.get_status()
+            telemetry["weight_transfer"] = wt_status
+
+        return telemetry
 
     def get_state(self) -> Dict[str, Any]:
         """Get full state for checkpointing."""
-        return {
+        state = {
             "state": self.state,
             "current_split": self.current_split,
             "stability_streak": self.stability_streak,
@@ -992,6 +1459,15 @@ class DynamicRelaxationController:
             "integration_tax_logged": self.integration_tax_logged,
             "transitions": self.transitions,
         }
+
+        # Add weight transfer state
+        if self.weight_transfer is not None:
+            state["weight_transfer"] = {
+                "guna_lock_active": self.weight_transfer.guna_lock_active,
+                "guna_lock_start_step": self.weight_transfer.guna_lock_start_step,
+            }
+
+        return state
 
     def set_state(self, state: Dict[str, Any]):
         """Restore state from checkpoint."""
@@ -1004,6 +1480,12 @@ class DynamicRelaxationController:
         self.recovery_start_step = state.get("recovery_start_step", None)
         self.integration_tax_logged = state.get("integration_tax_logged", False)
         self.transitions = state.get("transitions", [])
+
+        # Restore weight transfer state
+        if self.weight_transfer is not None and "weight_transfer" in state:
+            wt_state = state["weight_transfer"]
+            self.weight_transfer.guna_lock_active = wt_state.get("guna_lock_active", False)
+            self.weight_transfer.guna_lock_start_step = wt_state.get("guna_lock_start_step", None)
 
 
 # =============================================================================
