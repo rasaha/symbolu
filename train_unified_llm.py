@@ -2067,6 +2067,14 @@ def compute_ontological_loss(
     logits = outputs["logits"]
     B, N, V = logits.shape
 
+    # Compute semantic entropy [S5] for all code paths
+    with torch.no_grad():
+        probs = F.softmax(logits, dim=-1)
+        entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1)
+        max_entropy = math.log(V)
+        onto_entropy = (entropy / max_entropy).mean().item()
+    metrics["onto_entropy"] = onto_entropy
+
     # 1. Language modeling loss (always computed for PPL tracking)
     lm_loss = F.cross_entropy(
         logits.view(-1, V),
