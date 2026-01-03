@@ -1021,8 +1021,8 @@ class DynamicRelaxationController:
         self.recovery_steps = recovery_steps
 
         # Validate mode
-        if self.mode not in ("consecutive", "average"):
-            raise ValueError(f"relaxation_mode must be 'consecutive' or 'average', got '{mode}'")
+        if self.mode not in ("consecutive", "average", "sa_ratio"):
+            raise ValueError(f"relaxation_mode must be 'consecutive', 'average', or 'sa_ratio', got '{mode}'")
 
         # Split configurations
         self.authority_split = authority_split
@@ -1056,6 +1056,7 @@ class DynamicRelaxationController:
         self.stability_streak = 0
         self.stability_history = []
         self.ssi_rolling_window = []  # For average mode
+        self.sa_rolling_window = []   # For sa_ratio mode
         self.max_history = 1000
 
         # PPL tracking for recovery
@@ -1114,13 +1115,14 @@ class DynamicRelaxationController:
         )
         return max(0.0, min(1.0, stability))
 
-    def _check_relaxation_ready(self, stability_index: float) -> bool:
+    def _check_relaxation_ready(self, stability_index: float, sa_ratio: float = None) -> bool:
         """
         Check if relaxation should trigger based on current mode.
 
         Modes:
         - consecutive: Requires SSI >= threshold for N consecutive steps
         - average: Requires average SSI >= threshold over rolling N-step window
+        - sa_ratio: Requires average S/A ratio >= threshold over rolling N-step window
         """
         if self.mode == "consecutive":
             # Consecutive mode: reset on any dip
@@ -1131,7 +1133,24 @@ class DynamicRelaxationController:
                 self.stability_streak = 0
                 return False
 
-        else:  # average mode
+        elif self.mode == "sa_ratio":
+            # S/A Ratio mode: rolling window mean of S/A ratio
+            if sa_ratio is None:
+                return False
+
+            self.sa_rolling_window.append(sa_ratio)
+            if len(self.sa_rolling_window) > self.stability_window:
+                self.sa_rolling_window.pop(0)
+
+            if len(self.sa_rolling_window) >= self.stability_window:
+                avg_sa = sum(self.sa_rolling_window) / len(self.sa_rolling_window)
+                self.stability_streak = len(self.sa_rolling_window)  # For display
+                return avg_sa >= self.stability_threshold
+
+            self.stability_streak = len(self.sa_rolling_window)
+            return False
+
+        else:  # average mode (SSI-based)
             # Average mode: rolling window mean
             self.ssi_rolling_window.append(stability_index)
             if len(self.ssi_rolling_window) > self.stability_window:
@@ -1194,6 +1213,7 @@ class DynamicRelaxationController:
         s_drift_ema: float,
         val_ppl: float,
         global_step: int,
+        sa_ratio: float = None,
     ) -> Tuple[bool, str]:
         """
         Update controller state based on current metrics.
@@ -1212,6 +1232,7 @@ class DynamicRelaxationController:
             "drift": s_drift_ema,
             "ppl": val_ppl,
             "state": self.state,
+            "sa_ratio": sa_ratio,
         })
         if len(self.stability_history) > self.max_history:
             self.stability_history = self.stability_history[-self.max_history:]
@@ -1221,7 +1242,7 @@ class DynamicRelaxationController:
         # State machine
         if self.state == self.STATE_AUTHORITY:
             # Check if we should trigger relaxation (mode-dependent)
-            if self._check_relaxation_ready(stability_index):
+            if self._check_relaxation_ready(stability_index, sa_ratio=sa_ratio):
                 # Ready to relax!
                 self.state = self.STATE_RELAXING
                 self.pre_relaxation_ppl = val_ppl
@@ -1725,8 +1746,8 @@ class UnifiedTrainingConfig:
 
     # Dynamic Relaxation: 9:3 → 6:6 transition
     enable_dynamic_relaxation: bool = False  # Enable automatic 9:3 → 6:6 transition
-    relaxation_mode: str = "average"         # "consecutive" or "average"
-    relaxation_stability_threshold: float = 0.50  # StabilityIndex threshold (lowered from 0.78)
+    relaxation_mode: str = "sa_ratio"        # "sa_ratio" (recommended), "consecutive", or "average"
+    relaxation_stability_threshold: float = 0.50  # S/A ratio threshold for trigger
     relaxation_stability_window: int = 500   # Steps for stability check (rolling window)
     relaxation_streak_target: int = 5        # Consecutive stable evals (for consecutive mode)
     relaxation_target_authority: int = 6     # Target authority layers after relaxation
@@ -2301,6 +2322,7 @@ def train(config: UnifiedTrainingConfig):
     best_ppl = float("inf")
     spike_count = 0
     train_losses = []
+    current_sa_ratio = 0.0  # Track S/A ratio for relaxation controller
 
     # Checkpoint directory
     ckpt_dir = Path(config.checkpoint_dir)
@@ -2535,16 +2557,16 @@ def train(config: UnifiedTrainingConfig):
 
                 # Formula [1331]: 9:3 Split metrics
                 if hgs_metrics:
-                    s_a_ratio = hgs_metrics.get("s_a_ratio", 0.0)
+                    current_sa_ratio = hgs_metrics.get("s_a_ratio", 0.0)
                     alpha_sens = hgs_metrics.get("alpha_sens", 0.0)
                     # Color-code S/A ratio (< 0.5 is good, Authority dominating)
-                    if s_a_ratio < 0.3:
+                    if current_sa_ratio < 0.3:
                         sa_ind = "+"  # Authority strongly dominant
-                    elif s_a_ratio < 0.5:
+                    elif current_sa_ratio < 0.5:
                         sa_ind = "~"  # Balanced
                     else:
                         sa_ind = "!"  # Sensory may be overriding
-                    log_msg += f" | S/A:{s_a_ratio:.2f}{sa_ind} α_s:{alpha_sens:.2f}"
+                    log_msg += f" | S/A:{current_sa_ratio:.2f}{sa_ind} α_s:{alpha_sens:.2f}"
 
                 print(log_msg)
                 step_start_time = time.time()
@@ -2622,6 +2644,7 @@ def train(config: UnifiedTrainingConfig):
                         s_drift_ema=s_drift_ema,
                         val_ppl=val_ppl,
                         global_step=global_step,
+                        sa_ratio=current_sa_ratio,
                     )
 
                     # Execute actions
@@ -2939,9 +2962,9 @@ def main():
     # Dynamic Relaxation: 9:3 → 6:6 transition
     parser.add_argument("--enable_dynamic_relaxation", action="store_true",
                        help="Enable automatic 9:3 → 6:6 split transition based on stability")
-    parser.add_argument("--relaxation_mode", type=str, default="average",
-                       choices=["consecutive", "average"],
-                       help="Stability check mode: 'consecutive' (reset on dip) or 'average' (rolling mean)")
+    parser.add_argument("--relaxation_mode", type=str, default="sa_ratio",
+                       choices=["consecutive", "average", "sa_ratio"],
+                       help="Trigger mode: 'sa_ratio' (S/A ratio, recommended), 'average' (SSI rolling mean), 'consecutive' (SSI streak)")
     parser.add_argument("--relaxation_stability_threshold", type=float, default=0.50,
                        help="S/A ratio threshold to trigger 9:3 → 6:6 relaxation")
     parser.add_argument("--relaxation_stability_window", type=int, default=500,
