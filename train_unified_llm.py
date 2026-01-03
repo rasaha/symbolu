@@ -1489,6 +1489,133 @@ class DynamicRelaxationController:
 
 
 # =============================================================================
+# QUALITY SAMPLING - Text Generation for Training Monitoring
+# =============================================================================
+
+@torch.no_grad()
+def generate_sample(
+    model: nn.Module,
+    tokenizer,
+    prompt: str,
+    device: torch.device,
+    max_new_tokens: int = 50,
+    temperature: float = 0.8,
+    top_p: float = 0.9,
+) -> str:
+    """
+    Generate text from a prompt for quality monitoring.
+
+    Uses nucleus (top-p) sampling with temperature for diverse outputs.
+    Works with SymbolU12, PhaseTransformer, and HybridPhaseTransformer models.
+    """
+    model.eval()
+
+    # Encode prompt
+    input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+
+    # Generate tokens one by one
+    generated = input_ids.clone()
+
+    for _ in range(max_new_tokens):
+        # Forward pass
+        outputs = model(generated)
+
+        # Handle different output formats (dict with 'logits', tuple, or tensor)
+        if isinstance(outputs, dict):
+            logits = outputs.get('logits', outputs.get('output', None))
+            if logits is None:
+                # Try to find logits-like tensor in dict
+                for key in ['logits', 'output', 'lm_logits']:
+                    if key in outputs:
+                        logits = outputs[key]
+                        break
+        elif isinstance(outputs, (tuple, list)):
+            logits = outputs[0]
+        else:
+            logits = outputs
+
+        if logits is None:
+            break
+
+        # Get next token logits
+        next_logits = logits[:, -1, :] / temperature
+
+        # Top-p (nucleus) sampling
+        sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
+        cumsum = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+        # Remove tokens with cumulative probability above threshold
+        sorted_indices_to_remove = cumsum > top_p
+        sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+        sorted_indices_to_remove[:, 0] = False
+
+        # Set removed tokens to -inf
+        indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+        next_logits[indices_to_remove] = float('-inf')
+
+        # Sample next token
+        probs = F.softmax(next_logits, dim=-1)
+        next_token = torch.multinomial(probs, num_samples=1)
+
+        # Append to sequence
+        generated = torch.cat([generated, next_token], dim=1)
+
+        # Check for EOS
+        if next_token.item() == tokenizer.eos_token_id:
+            break
+
+    # Decode and return
+    return tokenizer.decode(generated[0], skip_special_tokens=True)
+
+
+def run_quality_samples(
+    model: nn.Module,
+    tokenizer,
+    config: 'UnifiedTrainingConfig',
+    device: torch.device,
+    step: int,
+    logger=None,
+):
+    """
+    Generate sample outputs to monitor training quality.
+
+    This provides a qualitative check that the model is learning
+    meaningful language patterns, not just minimizing perplexity.
+
+    Samples are logged with prompts and generated completions.
+    """
+    def log(msg):
+        if logger:
+            logger.info(msg)
+        else:
+            print(msg)
+
+    log("")
+    log("=" * 60)
+    log(f"  📝 QUALITY SAMPLES (Step {step})")
+    log("=" * 60)
+
+    for prompt in config.sample_prompts:
+        try:
+            generated = generate_sample(
+                model, tokenizer, prompt, device,
+                max_new_tokens=50,
+                temperature=0.8,
+                top_p=0.9,
+            )
+            # Clean up and truncate for display
+            generated = generated.strip().replace('\n', ' ')[:200]
+            log(f"  Prompt: \"{prompt}\"")
+            log(f"  Output: \"{generated}\"")
+            log("")
+        except Exception as e:
+            log(f"  ⚠️ Sampling failed for prompt '{prompt[:30]}...': {e}")
+
+    log("=" * 60)
+    log("")
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -1619,6 +1746,16 @@ class UnifiedTrainingConfig:
 
     # TensorBoard
     tensorboard: bool = True
+
+    # Quality Sampling
+    sample_every: int = 500  # Generate samples every N steps (0 = disabled)
+    sample_prompts: tuple = (
+        "The history of the Roman Empire began when",
+        "In computer science, algorithms are",
+        "The weather today is expected to be",
+        "Once upon a time in a small village",
+        "The meaning of life is often debated",
+    )
 
     # Hardware
     device: str = "auto"
@@ -2537,6 +2674,13 @@ def train(config: UnifiedTrainingConfig):
                     )
                     print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}")
 
+                # Quality Sampling
+                if config.sample_every > 0 and global_step % config.sample_every == 0:
+                    if tokenizer is not None:
+                        run_quality_samples(model, tokenizer, config, device, global_step)
+                    else:
+                        print(f"  [Sampling] Skipped - tokenizer not available")
+
                 model.train()
 
             # Save checkpoint
@@ -2774,6 +2918,10 @@ def main():
     parser.add_argument("--no_tensorboard", action="store_true",
                        help="Disable TensorBoard logging")
 
+    # Quality Sampling
+    parser.add_argument("--sample_every", type=int, default=500,
+                       help="Generate quality samples every N steps (0 = disabled)")
+
     # Formula [1331]: 9:3 Hierarchical Split
     parser.add_argument("--use_9_3_split", action="store_true",
                        help="Enable 9:3 Authority/Sensory gradient scaling")
@@ -2886,6 +3034,7 @@ def main():
         pidv2_w_s=args.pidv2_w_s,
         phase_ramp_steps=args.phase_ramp_steps,
         tensorboard=args.tensorboard and not args.no_tensorboard,
+        sample_every=args.sample_every,
         resume=args.resume,
         resume_weights_only=args.resume_weights_only,
         # Formula [1331]: 9:3 Hierarchical Split
