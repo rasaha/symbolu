@@ -1205,20 +1205,24 @@ Examples:
             if args.use_vritti and vritti_loss_fn is not None:
                 # Get Vritti signals from batch (use R-signals as proxy or dedicated v_signals)
                 v_signals = batch.get("v_signals", r_signals).to(device)
-                target_vritti = v_signals[:, 1:].contiguous()
-                v_signals_input = v_signals[:, :-1]
+                target_vritti = v_signals[:, 1:].contiguous()  # [B, N-1] shifted target
+                v_signals_input = v_signals[:, :-1]  # [B, N-1] input
                 prev_vritti = torch.cat([
                     torch.full((v_signals_input.size(0), 1), 4, device=device),  # Start with Nidrā
                     v_signals_input[:, :-1]
-                ], dim=1)
+                ], dim=1)  # [B, N-1]
 
                 # Compute Vritti prediction logits (use R-logits as proxy if no dedicated head)
-                vritti_logits = torch.zeros(r_logits.size(0), r_logits.size(1), 5, device=device)
-                vritti_logits[:, :, :min(5, r_logits.size(2))] = r_logits[:, :, :min(5, r_logits.size(2))]
+                # Slice to [:, :-1, :] to match shifted targets
+                vritti_logits = torch.zeros(r_logits.size(0), r_logits.size(1) - 1, 5, device=device)
+                vritti_logits[:, :, :min(5, r_logits.size(2))] = r_logits[:, :-1, :min(5, r_logits.size(2))]
+
+                # Slice token_logits to match target_tokens shape for VrittiLoss
+                token_logits_shifted = token_logits[:, :-1, :].contiguous()  # [B, N-1, V]
 
                 # Compute VrittiLoss with stiffness multiplier
                 vritti_output = vritti_loss_fn(
-                    token_logits=token_logits,
+                    token_logits=token_logits_shifted,
                     vritti_logits=vritti_logits,
                     target_tokens=target_tokens,
                     target_vritti=target_vritti,
