@@ -1355,7 +1355,7 @@ def train(config: UnifiedTrainingConfig):
             model=model,
             authority_layers=config.authority_layers,
             sensory_layers=config.sensory_layers,
-            alpha_sens_min=config.alpha_sens_min,
+            alpha_sens_min=config.alpha_sens_initial,
             alpha_sens_max=config.alpha_sens_max,
             warmup_steps=config.gradient_warmup_steps,
             layer_attr="blocks",  # Common attribute name for transformer layers
