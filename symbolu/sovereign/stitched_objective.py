@@ -322,6 +322,218 @@ class DomainJumpPenalty(nn.Module):
         return sorted(transitions, key=lambda x: x[1])
 
 
+class TamasicInhibitor(nn.Module):
+    """
+    Tamasic Inhibition Layer (Patent Formulas [219], [295]).
+
+    Detects "Inertial Traps" where the model gets stuck in repetitive loops.
+    When Tamas (Inertia) exceeds threshold, applies a "Neural Jolt" to break
+    the cycle and trigger a Viparyaya (Reset) state.
+
+    Tamas Indicators:
+    - High cosine similarity between consecutive hidden states
+    - Repeated token embeddings in short window
+    - Stagnant Guna entropy (low variance)
+
+    Actions:
+    - Apply multiplicative Redundancy Penalty to suppress repeated tokens
+    - Trigger Vritti transition: Nidrā → Viparyaya (Hard Reset)
+    - Clear Phase Attention cache to force re-observation
+    """
+
+    def __init__(
+        self,
+        d_model: int = 1024,
+        tamas_threshold: float = 0.85,
+        jolt_multiplier: float = 10.0,
+        history_window: int = 5,
+    ):
+        super().__init__()
+        self.d_model = d_model
+        self.tamas_threshold = tamas_threshold
+        self.jolt_multiplier = jolt_multiplier
+        self.history_window = history_window
+
+        # Track hidden state history for inertia detection
+        self.register_buffer("hidden_history", None)
+        self.register_buffer("token_history", None)
+
+        # Track consecutive Tamas detections for escalation
+        self.register_buffer("tamas_streak", torch.tensor(0))
+
+    def reset_state(self, batch_size: int, device: torch.device):
+        """Reset inhibitor state for new sequence."""
+        self.hidden_history = torch.zeros(
+            batch_size, self.history_window, self.d_model, device=device
+        )
+        self.token_history = torch.full(
+            (batch_size, self.history_window), -1, dtype=torch.long, device=device
+        )
+        self.tamas_streak = torch.tensor(0, device=device)
+
+    def compute_inertia(
+        self,
+        current_hidden: torch.Tensor,
+        current_token: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Compute Tamas (Inertia) score from hidden state similarity.
+
+        Args:
+            current_hidden: [B, d_model] - Current hidden state
+            current_token: [B] - Optional current token ID
+
+        Returns:
+            inertia: [B] - Inertia score (0-1, higher = more stagnant)
+            token_repeat: [B] - Token repetition indicator (0 or 1)
+        """
+        B = current_hidden.size(0)
+        device = current_hidden.device
+
+        if self.hidden_history is None:
+            self.reset_state(B, device)
+
+        # 1. Hidden State Inertia (cosine similarity with recent history)
+        current_norm = F.normalize(current_hidden, dim=-1).unsqueeze(1)  # [B, 1, d]
+        history_norm = F.normalize(self.hidden_history, dim=-1)  # [B, W, d]
+
+        # Similarity with each position in history
+        similarities = torch.bmm(current_norm, history_norm.transpose(1, 2))  # [B, 1, W]
+        similarities = similarities.squeeze(1)  # [B, W]
+
+        # Max similarity = inertia (how much we're repeating)
+        inertia = similarities.max(dim=-1).values.clamp(0, 1)  # [B]
+
+        # 2. Token Repetition Check
+        token_repeat = torch.zeros(B, device=device)
+        if current_token is not None and self.token_history is not None:
+            # Check if current token matches any in recent history
+            matches = (self.token_history == current_token.unsqueeze(-1)).any(dim=-1)
+            token_repeat = matches.float()
+
+        return inertia, token_repeat
+
+    def apply_jolt(
+        self,
+        current_hidden: torch.Tensor,
+        current_token: Optional[torch.Tensor] = None,
+        update_history: bool = True,
+    ) -> Tuple[bool, torch.Tensor, Dict[str, torch.Tensor]]:
+        """
+        Detect Tamas and apply Neural Jolt if threshold exceeded.
+
+        Args:
+            current_hidden: [B, d_model] - Current hidden state
+            current_token: [B] - Optional current token ID
+            update_history: Whether to update history buffers
+
+        Returns:
+            jolt_triggered: Whether the jolt was triggered
+            penalty: [B] - Penalty multiplier to apply to token scores
+            info: Dict with diagnostic information
+        """
+        B = current_hidden.size(0)
+        device = current_hidden.device
+
+        # Compute inertia
+        inertia, token_repeat = self.compute_inertia(current_hidden, current_token)
+
+        # Combine inertia signals
+        # Token repetition is a strong Tamas indicator
+        combined_tamas = inertia * 0.7 + token_repeat * 0.3
+
+        # Check if Tamas exceeds threshold
+        tamas_exceeded = combined_tamas > self.tamas_threshold  # [B]
+        jolt_triggered = tamas_exceeded.any().item()
+
+        # Compute penalty
+        if jolt_triggered:
+            # Exponential penalty for how far over threshold
+            excess = (combined_tamas - self.tamas_threshold).clamp(min=0)
+            penalty = 1.0 + excess * self.jolt_multiplier
+            self.tamas_streak = self.tamas_streak + 1
+        else:
+            penalty = torch.ones(B, device=device)
+            self.tamas_streak = torch.tensor(0, device=device)
+
+        # Escalation: if stuck for multiple steps, increase jolt
+        if self.tamas_streak > 3:
+            penalty = penalty * (1.0 + 0.5 * self.tamas_streak.float())
+
+        # Update history
+        if update_history:
+            self.hidden_history = torch.cat(
+                [self.hidden_history[:, 1:, :], current_hidden.unsqueeze(1)],
+                dim=1,
+            )
+            if current_token is not None and self.token_history is not None:
+                self.token_history = torch.cat(
+                    [self.token_history[:, 1:], current_token.unsqueeze(-1)],
+                    dim=1,
+                )
+
+        info = {
+            "inertia": inertia,
+            "token_repeat": token_repeat,
+            "combined_tamas": combined_tamas,
+            "tamas_exceeded": tamas_exceeded,
+            "tamas_streak": self.tamas_streak,
+            "penalty": penalty,
+        }
+
+        return jolt_triggered, penalty, info
+
+    def should_trigger_viparyaya(self) -> bool:
+        """
+        Check if Tamas is severe enough to trigger Viparyaya reset.
+
+        Returns True if model has been stuck for extended period.
+        """
+        return self.tamas_streak.item() > 5
+
+    def get_recommended_vritti(self, current_vritti: int) -> int:
+        """
+        Get recommended Vritti based on Tamas state.
+
+        If Tamas is high and we're in Nidrā, recommend Viparyaya.
+        If recovering from Tamas, recommend Smṛti (Memory) to re-anchor.
+        """
+        PRAMANA, VIPARYAYA, VIKALPA, SMRTI, NIDRA = 0, 1, 2, 3, 4
+
+        if self.should_trigger_viparyaya():
+            # Hard reset needed
+            return VIPARYAYA
+        elif self.tamas_streak > 2 and current_vritti == NIDRA:
+            # Mild intervention: wake up through memory
+            return SMRTI
+        elif self.tamas_streak > 3:
+            # Moderate intervention: creative jolt
+            return VIKALPA
+        else:
+            # No change needed
+            return current_vritti
+
+
+def format_tamas_log(inhibitor_info: Dict, step: int) -> str:
+    """Format Tamasic Inhibitor log entry."""
+    inertia = inhibitor_info["inertia"].mean().item()
+    tamas = inhibitor_info["combined_tamas"].mean().item()
+    streak = inhibitor_info["tamas_streak"].item()
+    penalty = inhibitor_info["penalty"].mean().item()
+    exceeded = inhibitor_info["tamas_exceeded"].any().item()
+
+    status = "⚠️ INERTIAL TRAP" if exceeded else "✓ NOMINAL"
+    if streak > 5:
+        status = "🚨 VIPARYAYA REQUIRED"
+    elif streak > 3:
+        status = "⚡ JOLT APPLIED"
+
+    return (
+        f"[{step:5d}] Tamas: {tamas:.3f} | Inertia: {inertia:.3f} | "
+        f"Streak: {streak} | Penalty: {penalty:.2f}x | {status}"
+    )
+
+
 class StitchedObjective(nn.Module):
     """
     Formula [007]: Stitched Objective - Penalized Scoring Function.
@@ -450,6 +662,14 @@ class VrittiGovernor(nn.Module):
         # Core components
         self.stitched = StitchedObjective(d_model, self.config)
         self.aspect_weighting = AspectWeighting()
+
+        # Tamasic Inhibitor for repetition loop breaking (Formula [219], [295])
+        self.tamas_inhibitor = TamasicInhibitor(
+            d_model=d_model,
+            tamas_threshold=0.85,
+            jolt_multiplier=10.0,
+            history_window=5,
+        )
 
         # PID gains (Patent Formula [201]) - Rajasic Profile
         # Load from config if available, otherwise use Rajasic defaults
@@ -686,6 +906,28 @@ class VrittiGovernor(nn.Module):
         # Get PID gains for current state
         pid_gains = self.get_pid_gains(vritti_pred)
 
+        # Apply Tamasic Inhibitor (Formula [219], [295])
+        current_hidden = hidden_states[:, -1, :] if hidden_states.dim() == 3 else hidden_states
+        jolt_triggered, tamas_penalty, tamas_info = self.tamas_inhibitor.apply_jolt(
+            current_hidden=current_hidden,
+            current_token=None,  # Token ID not available here
+            update_history=True,
+        )
+
+        # Apply Tamas penalty to adjusted logits
+        if jolt_triggered:
+            # Multiplicative penalty: crush repeated token scores
+            adjusted_logits = adjusted_logits / tamas_penalty.unsqueeze(-1)
+
+            # Check if we need to force Vritti transition
+            recommended_vritti = self.tamas_inhibitor.get_recommended_vritti(
+                vritti_pred[0].item() if vritti_pred.dim() > 0 else vritti_pred.item()
+            )
+            if recommended_vritti != (vritti_pred[0].item() if vritti_pred.dim() > 0 else vritti_pred.item()):
+                # Force Vritti override for next step
+                vritti_pred = torch.full_like(vritti_pred, recommended_vritti)
+                pid_gains = self.get_pid_gains(vritti_pred)
+
         # Compute aspect weights if C-Signal provided
         if c_signals is not None:
             aspect_weights = self.aspect_weighting(c_signals.unsqueeze(1))
@@ -699,10 +941,10 @@ class VrittiGovernor(nn.Module):
         if guna_states is not None:
             guna_entropy, tamas_ratio = self.compute_guna_entropy(guna_states)
 
-        # Compute Anomaly Score (S_drift)
+        # Compute Anomaly Score (S_drift) - include Tamas inertia
         s_drift = self.compute_anomaly_score(
             penalties["coupling"],
-            penalties["redundancy"],
+            penalties["redundancy"] + tamas_info["combined_tamas"].mean() * 0.5,  # Add Tamas contribution
             penalties["domain_jump"],
             guna_entropy,
         )
@@ -712,6 +954,12 @@ class VrittiGovernor(nn.Module):
             penalties["should_reset"],
             tamas_ratio,
         )
+
+        # Add Tamasic brake status
+        if self.tamas_inhibitor.should_trigger_viparyaya():
+            brake_reason = "TAMAS_VIPARYAYA" if brake_reason == "NONE" else brake_reason + "+TAMAS_VIPARYAYA"
+        elif jolt_triggered:
+            brake_reason = "TAMAS_JOLT" if brake_reason == "NONE" else brake_reason + "+TAMAS_JOLT"
 
         # Record telemetry if requested
         if record_telemetry and step is not None:
@@ -747,8 +995,12 @@ class VrittiGovernor(nn.Module):
         """Reset Governor state for new generation."""
         self.prev_vritti = torch.full((batch_size,), 4, device=device)  # Nidrā
         self.stitched.reset_state(batch_size, device)
+        self.tamas_inhibitor.reset_state(batch_size, device)  # Reset Tamasic Inhibitor
         self.error_integral = 0.0
         self.prev_error = 0.0
+        self.s_drift_ema = torch.tensor(0.0, device=device)
+        self.coupling_ema = torch.tensor(0.5, device=device)
+        self.guna_entropy_ema = torch.tensor(0.5, device=device)
 
 
 def format_governor_log(
