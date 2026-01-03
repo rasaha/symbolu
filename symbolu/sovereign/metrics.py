@@ -3,10 +3,32 @@ Sovereign Metrics Module - The "Nervous System" of Sovereign-1.
 
 Provides real-time health monitoring for the Sovereign training process.
 Calculates alignment between model's high-level intent and low-level output.
+
+Patent Formulas Implemented:
+- [B1] ConsistencyLagrangian: S-Drift measurement via forward/backward alignment
+- [U1/U2] PhaseCoherenceMatrix: Pairwise phase angle coherence across 12 layers
+- [S8] StabilityConstraint: Entropy rate tracking with Inertial Brake
 """
 
 import torch
 import torch.nn.functional as F
+from typing import Dict, Tuple, Optional, List
+from dataclasses import dataclass
+import math
+
+
+@dataclass
+class StabilityState:
+    """Tracks entropy history for S8 StabilityConstraint."""
+    entropy_history: List[float]
+    inertial_brake_active: bool = False
+    brake_trigger_step: int = -1
+
+    def __init__(self, window_size: int = 5):
+        self.entropy_history = []
+        self.window_size = window_size
+        self.inertial_brake_active = False
+        self.brake_trigger_step = -1
 
 
 class SovereignMetrics:
@@ -187,3 +209,294 @@ class SovereignMetrics:
         ])
 
         return "\n".join(lines)
+
+    # =========================================================================
+    # PATENT FORMULAS
+    # =========================================================================
+
+    @staticmethod
+    @torch.no_grad()
+    def compute_consistency_lagrangian(
+        logits_tok: torch.Tensor,
+        logits_r: torch.Tensor,
+        targets_r: torch.Tensor,
+        layer_hidden_states: Optional[List[torch.Tensor]] = None,
+    ) -> Dict[str, float]:
+        """
+        [Formula B1] ConsistencyLagrangian - S-Drift Measurement.
+
+        Measures alignment between model's forward predictions (sf) and
+        backward goal alignment (sb) via R-Signal consistency.
+
+        S-Drift = 1 - (sf · sb) / (||sf|| × ||sb||)
+
+        Where:
+            sf = Forward token probability distribution (softmax of logits)
+            sb = Backward goal alignment (R-Signal prediction confidence)
+
+        Args:
+            logits_tok: Token prediction logits [B, Seq, Vocab]
+            logits_r: R-Signal logits [B, Seq, 12]
+            targets_r: Target R-Signal categories [B, Seq]
+            layer_hidden_states: Optional list of hidden states per layer
+
+        Returns:
+            dict with:
+                - s_drift: Semantic drift value (0 = aligned, 1 = drifted)
+                - forward_confidence: Mean forward prediction confidence
+                - backward_alignment: Mean backward goal alignment
+                - consistency_score: Overall consistency (1 - s_drift)
+        """
+        # sf: Forward confidence (max probability per position)
+        p_tok = F.softmax(logits_tok, dim=-1)
+        sf = p_tok.max(dim=-1).values  # [B, Seq]
+
+        # sb: Backward alignment (R-Signal prediction confidence for correct class)
+        p_r = F.softmax(logits_r, dim=-1)  # [B, Seq, 12]
+        B, Seq, _ = p_r.shape
+
+        # Gather probability of correct R-Signal class
+        targets_r_expanded = targets_r.unsqueeze(-1)  # [B, Seq, 1]
+        sb = p_r.gather(dim=-1, index=targets_r_expanded).squeeze(-1)  # [B, Seq]
+
+        # Compute S-Drift via cosine similarity between sf and sb
+        # Flatten to vectors for cosine sim
+        sf_flat = sf.reshape(-1)
+        sb_flat = sb.reshape(-1)
+
+        # Cosine similarity
+        dot_product = (sf_flat * sb_flat).sum()
+        norm_sf = torch.norm(sf_flat)
+        norm_sb = torch.norm(sb_flat)
+
+        if norm_sf > 1e-8 and norm_sb > 1e-8:
+            cosine_sim = dot_product / (norm_sf * norm_sb)
+            s_drift = (1.0 - cosine_sim.item()) / 2.0  # Scale to [0, 1]
+        else:
+            s_drift = 0.5  # Neutral when norms are too small
+
+        # Additional metrics
+        forward_confidence = sf.mean().item()
+        backward_alignment = sb.mean().item()
+        consistency_score = 1.0 - s_drift
+
+        return {
+            "s_drift": s_drift,
+            "forward_confidence": forward_confidence,
+            "backward_alignment": backward_alignment,
+            "consistency_score": consistency_score,
+        }
+
+    @staticmethod
+    @torch.no_grad()
+    def compute_phase_coherence_matrix(
+        phase_angles: torch.Tensor,
+    ) -> Dict[str, float]:
+        """
+        [Formula U1/U2] PhaseCoherenceMatrix - Guna Coherence Calculation.
+
+        Computes pairwise phase angle coherence across all 12 layers using
+        cosine similarity of complex phase representations.
+
+        U1: Cij = cos(θi - θj) = Re(e^(i(θi-θj)))
+        U2: GC = (2 / (n(n-1))) × Σi<j Cij
+
+        Args:
+            phase_angles: Phase angles per layer [B, Seq, 12] or [B, 12]
+
+        Returns:
+            dict with:
+                - guna_coherence: Global coherence score [0, 1]
+                - coherence_matrix: Flattened 12x12 coherence values
+                - mean_pairwise: Mean of all pairwise coherences
+                - min_coherence: Minimum pairwise coherence
+                - max_coherence: Maximum pairwise coherence
+        """
+        # Handle different input shapes
+        if phase_angles.dim() == 3:
+            # [B, Seq, 12] -> average over sequence
+            angles = phase_angles.mean(dim=1)  # [B, 12]
+        else:
+            angles = phase_angles  # [B, 12]
+
+        B, n_layers = angles.shape
+        assert n_layers == 12, f"Expected 12 layers, got {n_layers}"
+
+        # Compute pairwise phase coherence matrix
+        # Cij = cos(θi - θj)
+        # Expand for pairwise computation
+        angles_i = angles.unsqueeze(2)  # [B, 12, 1]
+        angles_j = angles.unsqueeze(1)  # [B, 1, 12]
+
+        # Phase difference coherence
+        phase_diff = angles_i - angles_j  # [B, 12, 12]
+        coherence_matrix = torch.cos(phase_diff)  # [B, 12, 12]
+
+        # Average over batch
+        C = coherence_matrix.mean(dim=0)  # [12, 12]
+
+        # Scale from [-1, 1] to [0, 1]
+        C_scaled = (C + 1.0) / 2.0
+
+        # U2: Global coherence from upper triangle (excluding diagonal)
+        mask = torch.triu(torch.ones(12, 12, device=angles.device), diagonal=1)
+        n_pairs = mask.sum().item()  # 66 pairs for 12 layers
+
+        if n_pairs > 0:
+            guna_coherence = (C_scaled * mask).sum().item() / n_pairs
+        else:
+            guna_coherence = 0.5
+
+        # Additional statistics
+        upper_values = C_scaled[mask.bool()]
+        mean_pairwise = upper_values.mean().item() if len(upper_values) > 0 else 0.5
+        min_coherence = upper_values.min().item() if len(upper_values) > 0 else 0.0
+        max_coherence = upper_values.max().item() if len(upper_values) > 0 else 1.0
+
+        return {
+            "guna_coherence": guna_coherence,
+            "coherence_matrix": C_scaled.flatten().tolist(),
+            "mean_pairwise": mean_pairwise,
+            "min_coherence": min_coherence,
+            "max_coherence": max_coherence,
+        }
+
+    @staticmethod
+    def check_stability_constraint(
+        current_entropy: float,
+        stability_state: 'StabilityState',
+        current_step: int,
+        brake_duration: int = 100,
+    ) -> Tuple[bool, 'StabilityState']:
+        """
+        [Formula S8] StabilityConstraint - Entropy Rate with Inertial Brake.
+
+        Monitors entropy rate (dH/dt) and triggers Inertial Brake if entropy
+        increases consistently over the window period.
+
+        Constraint: dH/dt <= 0 (entropy should not increase)
+
+        If violated for `window_size` consecutive steps, activate brake which:
+        - Signals PIDv2 to reduce sensory gradient scaling
+        - Prevents Rajasic (chaotic) drift
+
+        Args:
+            current_entropy: Current semantic entropy value
+            stability_state: StabilityState tracking object
+            current_step: Current training step
+            brake_duration: Steps to keep brake active after trigger
+
+        Returns:
+            tuple: (brake_active: bool, updated_state: StabilityState)
+        """
+        # Add current entropy to history
+        stability_state.entropy_history.append(current_entropy)
+
+        # Keep only window_size entries
+        if len(stability_state.entropy_history) > stability_state.window_size:
+            stability_state.entropy_history.pop(0)
+
+        # Check if brake is already active and should remain so
+        if stability_state.inertial_brake_active:
+            steps_since_trigger = current_step - stability_state.brake_trigger_step
+            if steps_since_trigger < brake_duration:
+                # Brake still active
+                return True, stability_state
+            else:
+                # Brake duration expired, deactivate
+                stability_state.inertial_brake_active = False
+                stability_state.brake_trigger_step = -1
+
+        # Need full window to evaluate
+        if len(stability_state.entropy_history) < stability_state.window_size:
+            return False, stability_state
+
+        # Compute entropy rate (dH/dt) over window
+        # Check if entropy is consistently increasing
+        history = stability_state.entropy_history
+        increasing_count = 0
+
+        for i in range(1, len(history)):
+            if history[i] > history[i - 1]:
+                increasing_count += 1
+
+        # If entropy increased in majority of steps, trigger brake
+        threshold = (stability_state.window_size - 1) * 0.6  # 60% of transitions
+
+        if increasing_count >= threshold:
+            # Trigger Inertial Brake
+            stability_state.inertial_brake_active = True
+            stability_state.brake_trigger_step = current_step
+            return True, stability_state
+
+        return False, stability_state
+
+    @staticmethod
+    @torch.no_grad()
+    def compute_full_sovereign_metrics(
+        logits_tok: torch.Tensor,
+        logits_r: torch.Tensor,
+        logits_s: torch.Tensor,
+        targets_tok: torch.Tensor,
+        targets_r: torch.Tensor,
+        targets_s: torch.Tensor,
+        g_states: Optional[torch.Tensor] = None,
+        phase_angles: Optional[torch.Tensor] = None,
+        stability_state: Optional['StabilityState'] = None,
+        current_step: int = 0,
+    ) -> Dict:
+        """
+        Compute all Sovereign metrics including patent formulas.
+
+        Combines:
+            - Basic health stats (R-Acc, S-Acc, Entropy, Drift)
+            - Guna state and coherence
+            - [B1] ConsistencyLagrangian (S-Drift)
+            - [U1/U2] PhaseCoherenceMatrix (if phase_angles provided)
+            - [S8] StabilityConstraint (if stability_state provided)
+
+        Returns:
+            Complete metrics dictionary for logging/monitoring
+        """
+        # Basic health stats
+        stats = SovereignMetrics.get_health_stats(
+            logits_tok, logits_r, logits_s,
+            targets_tok, targets_r, targets_s
+        )
+
+        # Guna metrics
+        guna_coherence = SovereignMetrics.get_guna_coherence(g_states)
+        guna_state, guna_dist = SovereignMetrics.get_guna_state(g_states)
+
+        # [B1] ConsistencyLagrangian
+        lagrangian = SovereignMetrics.compute_consistency_lagrangian(
+            logits_tok, logits_r, targets_r
+        )
+
+        result = {
+            **stats,
+            "guna_coherence": guna_coherence,
+            "guna_state": guna_state,
+            "guna_dist": guna_dist,
+            "s_drift_b1": lagrangian["s_drift"],
+            "consistency_score": lagrangian["consistency_score"],
+            "forward_confidence": lagrangian["forward_confidence"],
+            "backward_alignment": lagrangian["backward_alignment"],
+        }
+
+        # [U1/U2] PhaseCoherenceMatrix (if available)
+        if phase_angles is not None:
+            phase_metrics = SovereignMetrics.compute_phase_coherence_matrix(phase_angles)
+            result["guna_coherence_u2"] = phase_metrics["guna_coherence"]
+            result["phase_coherence_min"] = phase_metrics["min_coherence"]
+            result["phase_coherence_max"] = phase_metrics["max_coherence"]
+
+        # [S8] StabilityConstraint (if tracking)
+        if stability_state is not None:
+            brake_active, updated_state = SovereignMetrics.check_stability_constraint(
+                stats["entropy"], stability_state, current_step
+            )
+            result["inertial_brake_active"] = brake_active
+            result["stability_state"] = updated_state
+
+        return result
