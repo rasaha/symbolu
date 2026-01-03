@@ -1497,9 +1497,9 @@ def train(config: UnifiedTrainingConfig):
     )
 
     # Formula [1331]: 9:3 Hierarchical Gradient Scaling
-    gradient_scaler_9_3 = None
+    gradient_scaler_hgs = None
     if config.use_9_3_split:
-        gradient_scaler_9_3 = HierarchicalGradientScaler(
+        gradient_scaler_hgs = HierarchicalGradientScaler(
             model=model,
             authority_layers=config.authority_layers,
             sensory_layers=config.sensory_layers,
@@ -1511,9 +1511,9 @@ def train(config: UnifiedTrainingConfig):
 
     # Dynamic Relaxation Controller: 9:3 → 6:6 transition
     relaxation_controller = None
-    if config.enable_dynamic_relaxation and gradient_scaler_9_3 is not None:
+    if config.enable_dynamic_relaxation and gradient_scaler_hgs is not None:
         relaxation_controller = DynamicRelaxationController(
-            gradient_scaler=gradient_scaler_9_3,
+            gradient_scaler=gradient_scaler_hgs,
             model=model,
             stability_threshold=config.relaxation_stability_threshold,
             stability_window=config.relaxation_stability_window,
@@ -1582,50 +1582,6 @@ def train(config: UnifiedTrainingConfig):
         print(f"\n  V9.4.5: Friction Controller ENABLED")
         print(f"    Alignment thresholds: warn={friction_controller.config.align_warning}, crit={friction_controller.config.align_critical}")
         print(f"    Dominance range: [{friction_controller.config.dom_low}, {friction_controller.config.dom_high}]")
-
-    # Formula [1331] 9:3 Hierarchical Gradient Scaler (uses gradient hooks)
-    gradient_scaler_hgs = None
-    relaxation_controller = None
-    if config.use_9_3_split and HGS_AVAILABLE:
-        hgs_config = HierarchicalGradientScalerConfig(
-            total_layers=MODEL_PRESETS[config.model_size]["num_layers"],
-            authority_layers=config.authority_layers,
-            sensory_layers=config.sensory_layers,
-            alpha_sens_initial=config.alpha_sens_initial,
-            alpha_sens_max=config.alpha_sens_max,
-            warmup_steps=500,  # Ramp α_sens over 500 steps
-        )
-        # Pass model to register gradient hooks
-        gradient_scaler_hgs = HierarchicalGradientScaler(model, hgs_config)
-        print(f"\n  Formula [1331] 9:3 Split ENABLED (Gradient Hooks)")
-        print(f"    Authority layers: 0-{config.authority_layers - 1} (α=1.0)")
-        print(f"    Sensory layers: {config.authority_layers}-{config.authority_layers + config.sensory_layers - 1} (α={config.alpha_sens_initial} → {config.alpha_sens_max})")
-        print(f"    Warmup: 500 steps")
-
-        # Dynamic Relaxation Controller (9:3 → 6:6)
-        if config.enable_dynamic_relaxation:
-            drc_config = DynamicRelaxationConfig(
-                stability_threshold=config.relaxation_stability_threshold,
-                window_size=500,  # 500-step rolling window
-                mode=config.relaxation_mode,
-                consecutive_target=config.relaxation_streak_target,
-                initial_authority=config.authority_layers,
-                initial_sensory=config.sensory_layers,
-                target_authority=config.relaxation_target_authority,
-                target_sensory=config.relaxation_target_sensory,
-                thaw_alpha_initial=0.05,  # Dampened Thaw starts at 0.05
-                thaw_alpha_max=config.alpha_sens_max,
-                thaw_ramp_steps=500,
-            )
-            relaxation_controller = DynamicRelaxationController(
-                gradient_scaler=gradient_scaler_hgs,
-                config=drc_config,
-            )
-            print(f"  Dynamic Relaxation ENABLED")
-            print(f"    Mode: {config.relaxation_mode} (window=500)")
-            print(f"    SSI threshold: {config.relaxation_stability_threshold}")
-            print(f"    Target: {config.relaxation_target_authority}:{config.relaxation_target_sensory}")
-            print(f"    Dampened Thaw: α=0.05 → {config.alpha_sens_max}")
 
     # Track previous state for S-drift computation
     previous_state = None
