@@ -2292,7 +2292,7 @@ def train(config: UnifiedTrainingConfig):
         )
 
     # Mixed precision
-    scaler = torch.cuda.amp.GradScaler() if config.mixed_precision != "none" else None
+    scaler = torch.amp.GradScaler('cuda') if config.mixed_precision != "none" else None
     autocast_dtype = torch.bfloat16 if config.mixed_precision == "bf16" else torch.float16
 
     # Training state
@@ -2378,7 +2378,7 @@ def train(config: UnifiedTrainingConfig):
         x, y = x.to(device), y.to(device)
 
         # Forward pass
-        with torch.cuda.amp.autocast(dtype=autocast_dtype):
+        with torch.amp.autocast('cuda', dtype=autocast_dtype):
             if config.model_type == "ontological":
                 outputs = model(x)
                 loss, metrics = compute_ontological_loss(
@@ -2735,7 +2735,7 @@ def evaluate(
         for x, y in val_loader:
             x, y = x.to(device), y.to(device)
 
-            with torch.cuda.amp.autocast(dtype=autocast_dtype):
+            with torch.amp.autocast('cuda', dtype=autocast_dtype):
                 if config.model_type == "ontological":
                     outputs = model(x)
                     loss, metrics = compute_ontological_loss(
