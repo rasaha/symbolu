@@ -146,6 +146,20 @@ except ImportError as e:
     PIDV2_AVAILABLE = False
     print(f"Warning: PIDv2 controller not available: {e}")
 
+# Import Hierarchical Gradient Scaler (Formula [1331])
+try:
+    from symbolu.sovereign.hierarchical_gradient_scaler import (
+        HierarchicalGradientScaler,
+        HierarchicalGradientScalerConfig,
+        DynamicRelaxationController,
+        DynamicRelaxationConfig,
+        compute_s_drift,
+    )
+    HGS_AVAILABLE = True
+except ImportError as e:
+    HGS_AVAILABLE = False
+    print(f"Warning: Hierarchical Gradient Scaler not available: {e}")
+
 
 # =============================================================================
 # PERFORMANCE OPTIMIZATIONS
@@ -256,6 +270,21 @@ class UnifiedTrainingConfig:
     # Phase ramp settings (for handshake dampening)
     phase_delay_steps: int = 0
     phase_ramp_steps: int = 7000
+
+    # Formula [1331] 9:3 Hierarchical Gradient Scaling
+    use_9_3_split: bool = False  # Enable 9:3 authority/sensory split
+    authority_layers: int = 9    # Number of authority-focused layers
+    sensory_layers: int = 3      # Number of sensory-focused layers
+    alpha_sens_initial: float = 0.3   # Initial sensory gradient multiplier
+    alpha_sens_max: float = 0.7       # Maximum sensory gradient (relaxation target)
+
+    # Dynamic Relaxation Controller (9:3 → 6:6 transition)
+    enable_dynamic_relaxation: bool = False
+    relaxation_mode: str = "average"  # "consecutive" or "average"
+    relaxation_stability_threshold: float = 0.78  # StabilityIndex threshold
+    relaxation_streak_target: int = 5  # Stable evals before relaxation
+    relaxation_target_authority: int = 6  # Target authority layers
+    relaxation_target_sensory: int = 6    # Target sensory layers
 
     # Resume checkpoint
     resume: str = ""
@@ -787,6 +816,54 @@ def train(config: UnifiedTrainingConfig):
         print(f"    Alignment thresholds: warn={friction_controller.config.align_warning}, crit={friction_controller.config.align_critical}")
         print(f"    Dominance range: [{friction_controller.config.dom_low}, {friction_controller.config.dom_high}]")
 
+    # Formula [1331] 9:3 Hierarchical Gradient Scaler (uses gradient hooks)
+    gradient_scaler_hgs = None
+    relaxation_controller = None
+    if config.use_9_3_split and HGS_AVAILABLE:
+        hgs_config = HierarchicalGradientScalerConfig(
+            total_layers=MODEL_PRESETS[config.model_size]["num_layers"],
+            authority_layers=config.authority_layers,
+            sensory_layers=config.sensory_layers,
+            alpha_sens_initial=config.alpha_sens_initial,
+            alpha_sens_max=config.alpha_sens_max,
+            warmup_steps=500,  # Ramp α_sens over 500 steps
+        )
+        # Pass model to register gradient hooks
+        gradient_scaler_hgs = HierarchicalGradientScaler(model, hgs_config)
+        print(f"\n  Formula [1331] 9:3 Split ENABLED (Gradient Hooks)")
+        print(f"    Authority layers: 0-{config.authority_layers - 1} (α=1.0)")
+        print(f"    Sensory layers: {config.authority_layers}-{config.authority_layers + config.sensory_layers - 1} (α={config.alpha_sens_initial} → {config.alpha_sens_max})")
+        print(f"    Warmup: 500 steps")
+
+        # Dynamic Relaxation Controller (9:3 → 6:6)
+        if config.enable_dynamic_relaxation:
+            drc_config = DynamicRelaxationConfig(
+                stability_threshold=config.relaxation_stability_threshold,
+                window_size=500,  # 500-step rolling window
+                mode=config.relaxation_mode,
+                consecutive_target=config.relaxation_streak_target,
+                initial_authority=config.authority_layers,
+                initial_sensory=config.sensory_layers,
+                target_authority=config.relaxation_target_authority,
+                target_sensory=config.relaxation_target_sensory,
+                thaw_alpha_initial=0.05,  # Dampened Thaw starts at 0.05
+                thaw_alpha_max=config.alpha_sens_max,
+                thaw_ramp_steps=500,
+            )
+            relaxation_controller = DynamicRelaxationController(
+                gradient_scaler=gradient_scaler_hgs,
+                config=drc_config,
+            )
+            print(f"  Dynamic Relaxation ENABLED")
+            print(f"    Mode: {config.relaxation_mode} (window=500)")
+            print(f"    SSI threshold: {config.relaxation_stability_threshold}")
+            print(f"    Target: {config.relaxation_target_authority}:{config.relaxation_target_sensory}")
+            print(f"    Dampened Thaw: α=0.05 → {config.alpha_sens_max}")
+
+    # Track previous state for S-drift computation
+    previous_state = None
+    current_s_drift = 0.0
+
     # TensorBoard
     tb_writer = None
     if config.tensorboard and TENSORBOARD_AVAILABLE:
@@ -858,6 +935,9 @@ def train(config: UnifiedTrainingConfig):
             if scaler is not None:
                 scaler.unscale_(optimizer)
 
+            # Note: Gradient scaling via hooks happens automatically during backward()
+            # We'll call step() after optimizer.step() to update warmup schedule
+
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
 
             if scaler is not None:
@@ -865,6 +945,11 @@ def train(config: UnifiedTrainingConfig):
                 scaler.update()
             else:
                 optimizer.step()
+
+            # Formula [1331] 9:3 Split: Update gradient scaler warmup schedule
+            hgs_metrics = {}
+            if gradient_scaler_hgs is not None:
+                hgs_metrics = gradient_scaler_hgs.step()
 
             # V9.4.5: Measure friction and apply corrective actions
             friction_alignment = 0.0
@@ -952,6 +1037,12 @@ def train(config: UnifiedTrainingConfig):
                         align_ind = "~"  # Neutral
                     log_msg += f" | Align:{friction_alignment:+.2f}{align_ind} Dom:{friction_dominance:.2f}"
 
+                # Formula [1331] 9:3 Split metrics
+                if hgs_metrics:
+                    s_a_ratio = hgs_metrics.get("s_a_ratio", 0.0)
+                    alpha_sens = hgs_metrics.get("alpha_sens", 0.0)
+                    log_msg += f" | S/A: {s_a_ratio:.2f} α_s: {alpha_sens:.2f}"
+
                 print(log_msg)
                 step_start_time = time.time()
 
@@ -1020,6 +1111,32 @@ def train(config: UnifiedTrainingConfig):
                 if tb_writer is not None:
                     tb_writer.add_scalar("val/loss", val_loss, global_step)
                     tb_writer.add_scalar("val/ppl", val_ppl, global_step)
+
+                # Dynamic Relaxation Controller update (9:3 → 6:6)
+                if relaxation_controller is not None:
+                    # Compute S-drift from state delta (using coherence as proxy if no state available)
+                    s_drift = 1.0 - current_coh  # Lower coherence = higher drift (approximation)
+
+                    relaxed, drc_metrics = relaxation_controller.update(
+                        guna_coherence=current_coh,
+                        s_drift=s_drift,
+                        current_ppl=val_ppl,
+                        step=global_step,
+                    )
+
+                    print(f"  --> {relaxation_controller.get_status_string()}")
+
+                    # TensorBoard logging for DRC
+                    if tb_writer is not None:
+                        tb_writer.add_scalar("drc/stability_avg", drc_metrics["stability_avg"], global_step)
+                        tb_writer.add_scalar("drc/alpha_sens", drc_metrics["alpha_sens"], global_step)
+                        tb_writer.add_scalar("drc/relaxation_triggered", drc_metrics["relaxation_triggered"], global_step)
+                        if drc_metrics["relaxation_triggered"]:
+                            tb_writer.add_scalar("drc/thaw_progress", drc_metrics["thaw_progress"], global_step)
+
+                # Log HGS status
+                if gradient_scaler_hgs is not None and relaxation_controller is None:
+                    print(f"  --> {gradient_scaler_hgs.get_status_string()}")
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
@@ -1237,6 +1354,33 @@ def main():
     parser.add_argument("--no_tensorboard", action="store_true",
                        help="Disable TensorBoard logging")
 
+    # Formula [1331] 9:3 Hierarchical Gradient Scaling
+    parser.add_argument("--use_9_3_split", action="store_true",
+                       help="Enable 9:3 Authority/Sensory gradient split")
+    parser.add_argument("--authority_layers", type=int, default=9,
+                       help="Number of authority-focused layers (R-Signal)")
+    parser.add_argument("--sensory_layers", type=int, default=3,
+                       help="Number of sensory-focused layers (S-Signal)")
+    parser.add_argument("--alpha_sens_initial", type=float, default=0.3,
+                       help="Initial sensory gradient multiplier")
+    parser.add_argument("--alpha_sens_max", type=float, default=0.7,
+                       help="Maximum sensory gradient (relaxation target)")
+
+    # Dynamic Relaxation Controller (9:3 → 6:6 transition)
+    parser.add_argument("--enable_dynamic_relaxation", action="store_true",
+                       help="Enable dynamic relaxation (9:3 → 6:6)")
+    parser.add_argument("--relaxation_mode", type=str, default="average",
+                       choices=["consecutive", "average"],
+                       help="Stability tracking mode")
+    parser.add_argument("--relaxation_stability_threshold", type=float, default=0.78,
+                       help="StabilityIndex threshold for relaxation")
+    parser.add_argument("--relaxation_streak_target", type=int, default=5,
+                       help="Number of stable evals before relaxation")
+    parser.add_argument("--relaxation_target_authority", type=int, default=6,
+                       help="Target authority layers after relaxation")
+    parser.add_argument("--relaxation_target_sensory", type=int, default=6,
+                       help="Target sensory layers after relaxation")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -1306,6 +1450,19 @@ def main():
         tensorboard=args.tensorboard and not args.no_tensorboard,
         resume=args.resume,
         resume_weights_only=args.resume_weights_only,
+        # Formula [1331] 9:3 Split settings
+        use_9_3_split=args.use_9_3_split,
+        authority_layers=args.authority_layers,
+        sensory_layers=args.sensory_layers,
+        alpha_sens_initial=args.alpha_sens_initial,
+        alpha_sens_max=args.alpha_sens_max,
+        # Dynamic Relaxation settings
+        enable_dynamic_relaxation=args.enable_dynamic_relaxation,
+        relaxation_mode=args.relaxation_mode,
+        relaxation_stability_threshold=args.relaxation_stability_threshold,
+        relaxation_streak_target=args.relaxation_streak_target,
+        relaxation_target_authority=args.relaxation_target_authority,
+        relaxation_target_sensory=args.relaxation_target_sensory,
     )
 
     # Train
