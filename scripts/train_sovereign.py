@@ -43,6 +43,7 @@ from symbolu.sovereign.stitched_objective import (
     EntropyConfidence,
 )
 from symbolu.sovereign.heartbeat import SovereignHeartbeat, format_governor_telemetry
+from symbolu.sovereign.insight_gate import InsightGate, InsightGateConfig, format_gate_log
 
 # Default quality sample prompts
 DEFAULT_SAMPLE_PROMPTS = [
@@ -1123,6 +1124,18 @@ Examples:
             heartbeat = SovereignHeartbeat()
             print(f"  Sovereign Heartbeat: ENABLED (every {args.heartbeat_every} steps)")
 
+    # Initialize Insight Gate for epistemic stability control
+    insight_gate = None
+    if args.use_vritti:
+        gate_config = InsightGateConfig(
+            stability_threshold=0.78,
+            risk_threshold=0.25,
+            r_acc_min=0.92,
+            s_acc_min=0.85,
+        )
+        insight_gate = InsightGate(gate_config).to(device)
+        print("  Insight Gate: ENABLED (STAB>=0.78, RISK<=0.25)")
+
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps)
 
@@ -1237,6 +1250,9 @@ Examples:
                 )
                 total_loss = total_loss + vritti_output.total * 0.5  # Weight Vritti loss
 
+                # Compute metrics early (needed for InsightGate)
+                sov_metrics = compute_sovereign_metrics(r_logits, s_logits, target_r, target_s, g_states)
+
                 # Apply Governor for telemetry (sample last position)
                 if governor is not None:
                     hidden_states = model.embedding(
@@ -1254,12 +1270,47 @@ Examples:
                         record_telemetry=True,
                     )
 
+                    # Apply Insight Gate for epistemic stability control
+                    if insight_gate is not None:
+                        # Extract 128-D biological header from hidden states
+                        # Header is at positions body_dim: (G|S|R|C in last 128 dims)
+                        biological_header = hidden_states[:, -1, body_dim:]  # [B, 128]
+
+                        # Gather metrics for gate
+                        gate_metrics = {
+                            "r_acc": sov_metrics["r_acc"] / 100.0,  # Convert to 0-1
+                            "s_acc": sov_metrics["s_acc"] / 100.0,
+                            "gc": 1.0 - sov_metrics["guna_entropy"],  # Coherence = 1 - entropy
+                            "drift": vritti_info["s_drift"].mean(),
+                            "vritti": vritti_pred,
+                            "authority": 1.0 - vritti_info.get("tamas_ratio", torch.tensor(0.33)).mean(),
+                        }
+
+                        # Run gate check
+                        gate_output = insight_gate(biological_header, gate_metrics)
+
+                        # Compute token entropy for surfacing penalty
+                        token_probs = torch.softmax(token_logits[:, -1, :], dim=-1)
+                        token_entropy = -(token_probs * torch.log(token_probs + 1e-8)).sum(dim=-1)
+
+                        # Apply surfacing penalty if trying to be creative without stability
+                        surfacing_penalty = insight_gate.get_surfacing_penalty(
+                            gate_output, token_entropy, lambda_insight=0.3
+                        )
+                        total_loss = total_loss + surfacing_penalty.mean()
+
+                        # Store gate info for logging
+                        vritti_info["gate_stab"] = gate_output["stab_score"]
+                        vritti_info["gate_risk"] = gate_output["risk_score"]
+                        vritti_info["gate_released"] = gate_output["can_release"]
+
             # Scale loss for gradient accumulation
             loss = total_loss / args.gradient_accumulation
             loss.backward()
 
-            # Compute metrics
-            sov_metrics = compute_sovereign_metrics(r_logits, s_logits, target_r, target_s, g_states)
+            # Use previously computed metrics (sov_metrics already computed above if use_vritti)
+            if not args.use_vritti:
+                sov_metrics = compute_sovereign_metrics(r_logits, s_logits, target_r, target_s, g_states)
             accum_loss += loss_output.total.item()
             accum_metrics["r_acc"] += sov_metrics["r_acc"]
             accum_metrics["s_acc"] += sov_metrics["s_acc"]
@@ -1269,6 +1320,11 @@ Examples:
             if args.use_vritti and vritti_info is not None:
                 accum_metrics["s_drift"] = accum_metrics.get("s_drift", 0) + vritti_info["s_drift"].mean().item()
                 accum_metrics["stiffness"] = accum_metrics.get("stiffness", 0) + vritti_info["pid_gains"][:, 0].mean().item()
+                # Track InsightGate metrics
+                if "gate_stab" in vritti_info:
+                    accum_metrics["gate_stab"] = accum_metrics.get("gate_stab", 0) + vritti_info["gate_stab"].mean().item()
+                    accum_metrics["gate_risk"] = accum_metrics.get("gate_risk", 0) + vritti_info["gate_risk"].mean().item()
+                    accum_metrics["gate_released"] = accum_metrics.get("gate_released", 0) + vritti_info["gate_released"].any().float().item()
 
             # Gradient accumulation step
             if (batch_idx + 1) % args.gradient_accumulation == 0:
@@ -1299,6 +1355,12 @@ Examples:
                     avg_stiff = accum_metrics.get("stiffness", 0) / args.gradient_accumulation
                     postfix["Drift"] = f"{avg_drift:.3f}"
                     postfix["Kp"] = f"{avg_stiff:.2f}"
+                    # Add InsightGate metrics
+                    if "gate_stab" in accum_metrics:
+                        avg_stab = accum_metrics.get("gate_stab", 0) / args.gradient_accumulation
+                        avg_risk = accum_metrics.get("gate_risk", 0) / args.gradient_accumulation
+                        postfix["STAB"] = f"{avg_stab:.2f}"
+                        postfix["RISK"] = f"{avg_risk:.2f}"
                 pbar.set_postfix(postfix)
 
                 # Reset accumulators
