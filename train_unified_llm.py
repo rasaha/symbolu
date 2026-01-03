@@ -1521,7 +1521,7 @@ def train(config: UnifiedTrainingConfig):
             authority_split=(config.authority_layers, config.sensory_layers),
             balanced_split=(config.relaxation_target_authority, config.relaxation_target_sensory),
             authority_alpha_max=config.alpha_sens_max,
-            balanced_alpha_max=config.relaxation_alpha_max,
+            balanced_alpha_max=config.alpha_sens_max,  # Same ceiling for balanced phase
             thaw_alpha_start=config.relaxation_thaw_alpha,
             thaw_warmup_steps=config.relaxation_thaw_steps,
             ppl_spike_threshold=config.relaxation_ppl_spike_threshold,
