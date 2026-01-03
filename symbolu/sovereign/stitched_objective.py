@@ -28,10 +28,10 @@ import torch.nn.functional as F
 class StitchedConfig:
     """Configuration for Stitched Objective optimization."""
 
-    # Penalty weights
+    # Penalty weights (Rajasic defaults)
     lambda_relevance: float = 1.0
-    lambda_redundancy: float = 0.3
-    lambda_domain_jump: float = 0.5
+    lambda_redundancy: float = 0.65  # Rajasic: harsher redundancy penalty
+    lambda_domain_jump: float = 0.45  # Rajasic: adjusted domain jump
 
     # Context-Vritti Coupling thresholds
     coupling_alert: float = 0.3
@@ -39,7 +39,13 @@ class StitchedConfig:
 
     # Redundancy detection
     redundancy_window: int = 5
-    redundancy_threshold: float = 0.85
+    redundancy_threshold: float = 0.80  # Rajasic: stricter threshold
+
+    # Rajasic complexity parameter
+    theta_complexity: float = 1.2
+
+    # PID gains per Vritti (Rajasic profile)
+    pid_gains: Optional[Dict[str, Dict[str, float]]] = None
 
     @classmethod
     def from_json(cls, path: str) -> "StitchedConfig":
@@ -50,15 +56,21 @@ class StitchedConfig:
         obj = data.get("stitched_objective", {})
         weights = obj.get("weights", {})
         thresholds = obj.get("thresholds", {})
+        rajasic = obj.get("rajasic_params", {})
+
+        # Load PID gains if present
+        pid_gains = data.get("pid_gains", None)
 
         return cls(
             lambda_relevance=weights.get("lambda_relevance", 1.0),
-            lambda_redundancy=weights.get("lambda_redundancy", 0.3),
-            lambda_domain_jump=weights.get("lambda_domain_jump", 0.5),
+            lambda_redundancy=weights.get("lambda_redundancy", 0.65),
+            lambda_domain_jump=weights.get("lambda_domain_jump", 0.45),
             coupling_alert=thresholds.get("coupling_alert", 0.3),
             coupling_reset=thresholds.get("coupling_reset", 0.15),
             redundancy_window=thresholds.get("redundancy_window", 5),
-            redundancy_threshold=thresholds.get("redundancy_threshold", 0.85),
+            redundancy_threshold=thresholds.get("redundancy_threshold", 0.80),
+            theta_complexity=rajasic.get("theta_complexity", 1.2),
+            pid_gains=pid_gains,
         )
 
 
@@ -439,15 +451,35 @@ class VrittiGovernor(nn.Module):
         self.stitched = StitchedObjective(d_model, self.config)
         self.aspect_weighting = AspectWeighting()
 
-        # PID gains (Patent Formula [201])
-        # Pramāṇa: Max stiffness for factual accuracy
-        # Viparyaya: Hard corrective stop
-        # Vikalpa: Under-damped for creative flow
-        # Smṛti: Integral-heavy for memory reliance
-        # Nidrā: High inertia for transitions
-        self.register_buffer("kp_table", torch.tensor([0.9, 0.7, 0.3, 0.5, 0.2]))
-        self.register_buffer("ki_table", torch.tensor([0.01, 0.2, 0.05, 0.4, 0.7]))
-        self.register_buffer("kd_table", torch.tensor([0.01, 0.2, 0.6, 0.1, 0.01]))
+        # PID gains (Patent Formula [201]) - Rajasic Profile
+        # Load from config if available, otherwise use Rajasic defaults
+        if self.config.pid_gains:
+            # Load from config
+            gains = self.config.pid_gains
+            kp = [gains.get("PRAMANA", {}).get("kp", 0.95),
+                  gains.get("VIPARYAYA", {}).get("kp", 0.85),
+                  gains.get("VIKALPA", {}).get("kp", 0.40),
+                  gains.get("SMRTI", {}).get("kp", 0.60),
+                  gains.get("NIDRA", {}).get("kp", 0.30)]
+            ki = [gains.get("PRAMANA", {}).get("ki", 0.005),
+                  gains.get("VIPARYAYA", {}).get("ki", 0.10),
+                  gains.get("VIKALPA", {}).get("ki", 0.02),
+                  gains.get("SMRTI", {}).get("ki", 0.20),
+                  gains.get("NIDRA", {}).get("ki", 0.50)]
+            kd = [gains.get("PRAMANA", {}).get("kd", 0.02),
+                  gains.get("VIPARYAYA", {}).get("kd", 0.30),
+                  gains.get("VIKALPA", {}).get("kd", 0.80),
+                  gains.get("SMRTI", {}).get("kd", 0.20),
+                  gains.get("NIDRA", {}).get("kd", 0.05)]
+        else:
+            # Rajasic defaults (higher Kp/Kd, lower Ki for active learning)
+            kp = [0.95, 0.85, 0.40, 0.60, 0.30]  # Reinforced stiffness
+            ki = [0.005, 0.10, 0.02, 0.20, 0.50]  # Reduced integral
+            kd = [0.02, 0.30, 0.80, 0.20, 0.05]  # High derivative for motion
+
+        self.register_buffer("kp_table", torch.tensor(kp))
+        self.register_buffer("ki_table", torch.tensor(ki))
+        self.register_buffer("kd_table", torch.tensor(kd))
 
         # State tracking
         self.prev_vritti: Optional[torch.Tensor] = None

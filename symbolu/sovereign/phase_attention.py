@@ -91,15 +91,15 @@ class SovereignPhaseAttention(nn.Module):
         self.s_to_amplitude = nn.Embedding(s_classes, n_heads)
 
         # V-Signal (Vritti) → Phase stiffness modulation (Patent Formula [201])
-        # Stiffness controls how much the phase can drift from R-Signal seed
-        # Pramāṇa (0): High stiffness (locked phase, factual)
-        # Viparyaya (1): Medium-high (corrective mode)
-        # Vikalpa (2): Low stiffness (fluid, creative)
-        # Smṛti (3): Medium (memory anchored)
-        # Nidrā (4): Inertial (smooth transitions)
+        # RAJASIC PROFILE: Stiffness controls how much the phase can drift
+        # Pramāṇa (0): REINFORCED stiffness (locked phase, factual)
+        # Viparyaya (1): HIGH stiffness (hard reset, corrective)
+        # Vikalpa (2): MODERATE stiffness (high derivative = creative motion)
+        # Smṛti (3): ACTIVE stiffness (balanced recall)
+        # Nidrā (4): TRANSITIONAL (controlled transitions)
         self.register_buffer(
             "vritti_stiffness",
-            torch.tensor([0.9, 0.7, 0.3, 0.5, 0.2])  # Matches Kp from PID
+            torch.tensor([0.95, 0.85, 0.40, 0.60, 0.30])  # Rajasic Kp values
         )
         self.v_to_stiffness = nn.Embedding(v_classes, n_heads)
 
@@ -141,10 +141,10 @@ class SovereignPhaseAttention(nn.Module):
                 else:  # Abstract
                     self.s_to_amplitude.weight[i] = torch.ones(self.n_heads) * 0.8
 
-        # V-Signal (Vritti) stiffness: initialize from PID Kp values
+        # V-Signal (Vritti) stiffness: initialize from RAJASIC PID Kp values
         # This controls phase lock/drift per mental mode
         with torch.no_grad():
-            vritti_kp = [0.9, 0.7, 0.3, 0.5, 0.2]  # Pramāṇa to Nidrā
+            vritti_kp = [0.95, 0.85, 0.40, 0.60, 0.30]  # Rajasic profile
             for i in range(self.v_to_stiffness.num_embeddings):
                 self.v_to_stiffness.weight[i] = torch.full(
                     (self.n_heads,),
