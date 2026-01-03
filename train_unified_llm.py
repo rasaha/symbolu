@@ -404,7 +404,8 @@ class DynamicRelaxationController:
         model: nn.Module,
         # Stability thresholds
         stability_threshold: float = 0.82,
-        stability_window: int = 500,        # Consecutive steps required
+        stability_window: int = 500,        # Steps for stability check
+        mode: str = "consecutive",          # "consecutive" or "average"
         # Split configurations
         authority_split: Tuple[int, int] = (9, 3),  # Initial 9:3
         balanced_split: Tuple[int, int] = (6, 6),   # Target 6:6
@@ -426,8 +427,13 @@ class DynamicRelaxationController:
         # Thresholds
         self.stability_threshold = stability_threshold
         self.stability_window = stability_window
+        self.mode = mode.lower()
         self.ppl_spike_threshold = ppl_spike_threshold
         self.recovery_steps = recovery_steps
+
+        # Validate mode
+        if self.mode not in ("consecutive", "average"):
+            raise ValueError(f"relaxation_mode must be 'consecutive' or 'average', got '{mode}'")
 
         # Split configurations
         self.authority_split = authority_split
@@ -445,6 +451,7 @@ class DynamicRelaxationController:
         self.state = self.STATE_AUTHORITY
         self.stability_streak = 0
         self.stability_history = []
+        self.ssi_rolling_window = []  # For average mode
         self.max_history = 1000
 
         # PPL tracking for recovery
@@ -452,15 +459,21 @@ class DynamicRelaxationController:
         self.recovery_start_step = None
         self.relaxation_step = None
 
+        # Integration Tax tracking (Jolt Log)
+        self.integration_tax_logged = False
+        self.post_relaxation_ppl_samples = []
+        self.integration_tax_sample_count = 10  # Steps to wait before measuring
+
         # Telemetry
         self.transitions = []
         self.current_split = authority_split
 
         print(f"\n  [DynamicRelaxation] Controller initialized:")
+        print(f"    Mode: {self.mode.upper()}")
         print(f"    Initial split: {authority_split[0]}:{authority_split[1]}")
         print(f"    Target split: {balanced_split[0]}:{balanced_split[1]}")
         print(f"    Stability threshold: {stability_threshold}")
-        print(f"    Required stability window: {stability_window} steps")
+        print(f"    Stability window: {stability_window} steps")
 
     def compute_stability_index(
         self,
@@ -481,6 +494,80 @@ class DynamicRelaxationController:
             self.s_drift_weight * (1.0 - s_drift_ema)
         )
         return max(0.0, min(1.0, stability))
+
+    def _check_relaxation_ready(self, stability_index: float) -> bool:
+        """
+        Check if relaxation should trigger based on current mode.
+
+        Modes:
+        - consecutive: Requires SSI >= threshold for N consecutive steps
+        - average: Requires average SSI >= threshold over rolling N-step window
+        """
+        if self.mode == "consecutive":
+            # Consecutive mode: reset on any dip
+            if stability_index >= self.stability_threshold:
+                self.stability_streak += 1
+                return self.stability_streak >= self.stability_window
+            else:
+                self.stability_streak = 0
+                return False
+
+        else:  # average mode
+            # Average mode: rolling window mean
+            self.ssi_rolling_window.append(stability_index)
+            if len(self.ssi_rolling_window) > self.stability_window:
+                self.ssi_rolling_window.pop(0)
+
+            if len(self.ssi_rolling_window) >= self.stability_window:
+                avg_ssi = sum(self.ssi_rolling_window) / len(self.ssi_rolling_window)
+                return avg_ssi >= self.stability_threshold
+
+            return False
+
+    def _log_integration_tax(self, current_ppl: float, global_step: int):
+        """
+        Log the Integration Tax: PPL difference after relaxation.
+
+        This measures the "cost" of adding new sensory layers.
+        Called for the first N steps after relaxation.
+        """
+        if self.integration_tax_logged:
+            return
+
+        self.post_relaxation_ppl_samples.append(current_ppl)
+
+        if len(self.post_relaxation_ppl_samples) >= self.integration_tax_sample_count:
+            # Calculate Integration Tax
+            avg_post_ppl = sum(self.post_relaxation_ppl_samples) / len(self.post_relaxation_ppl_samples)
+            ppl_delta = avg_post_ppl - self.pre_relaxation_ppl
+            ppl_percent = (ppl_delta / self.pre_relaxation_ppl) * 100
+
+            # Log the Jolt
+            print(f"\n  ╔══════════════════════════════════════════════════════════════╗")
+            print(f"  ║  📊 INTEGRATION TAX REPORT (Jolt Log)                        ║")
+            print(f"  ╠══════════════════════════════════════════════════════════════╣")
+            print(f"  ║  Pre-Relaxation PPL:  {self.pre_relaxation_ppl:>10.2f}                        ║")
+            print(f"  ║  Post-Relaxation PPL: {avg_post_ppl:>10.2f} (avg over {self.integration_tax_sample_count} steps)        ║")
+            print(f"  ║  ─────────────────────────────────────────────────────────── ║")
+            print(f"  ║  Integration Tax:     {ppl_delta:>+10.2f} ({ppl_percent:+.1f}%)                   ║")
+            print(f"  ║                                                              ║")
+            if ppl_percent <= 5.0:
+                print(f"  ║  Status: ✅ SMOOTH INTEGRATION (Tax < 5%)                   ║")
+            elif ppl_percent <= 15.0:
+                print(f"  ║  Status: ⚠️  MODERATE TAX (5-15%) - Thaw in progress        ║")
+            else:
+                print(f"  ║  Status: 🔥 HIGH TAX (>15%) - Monitor for Viparyaya         ║")
+            print(f"  ╚══════════════════════════════════════════════════════════════╝\n")
+
+            self.integration_tax_logged = True
+
+            # Store in telemetry
+            self.transitions[-1]["integration_tax"] = {
+                "pre_ppl": self.pre_relaxation_ppl,
+                "post_ppl": avg_post_ppl,
+                "delta": ppl_delta,
+                "percent": ppl_percent,
+            }
 
     def update(
         self,
@@ -514,31 +601,35 @@ class DynamicRelaxationController:
 
         # State machine
         if self.state == self.STATE_AUTHORITY:
-            # Check if we should start monitoring for transition
-            if stability_index >= self.stability_threshold:
-                self.stability_streak += 1
-                if self.stability_streak >= self.stability_window:
-                    # Ready to relax!
-                    self.state = self.STATE_RELAXING
-                    self.pre_relaxation_ppl = val_ppl
-                    self.relaxation_step = global_step
-                    action = "RELAX"
-                    self.transitions.append({
-                        "step": global_step,
-                        "from": "AUTHORITY",
-                        "to": "BALANCED",
-                        "stability": stability_index,
-                        "ppl": val_ppl,
-                    })
-            else:
-                self.stability_streak = 0
+            # Check if we should trigger relaxation (mode-dependent)
+            if self._check_relaxation_ready(stability_index):
+                # Ready to relax!
+                self.state = self.STATE_RELAXING
+                self.pre_relaxation_ppl = val_ppl
+                self.relaxation_step = global_step
+                action = "RELAX"
+                self.transitions.append({
+                    "step": global_step,
+                    "from": "AUTHORITY",
+                    "to": "BALANCED",
+                    "stability": stability_index,
+                    "ppl": val_ppl,
+                    "mode": self.mode,
+                })
 
         elif self.state == self.STATE_RELAXING:
             # Transition in progress, move to balanced
             self.state = self.STATE_BALANCED
             self.current_split = self.balanced_split
+            # Reset Integration Tax tracking for new relaxation
+            self.integration_tax_logged = False
+            self.post_relaxation_ppl_samples = []
 
         elif self.state == self.STATE_BALANCED:
+            # Track Integration Tax for first N steps
+            if not self.integration_tax_logged:
+                self._log_integration_tax(val_ppl, global_step)
+
             # Monitor for PPL spike (Viparyaya trigger)
             if self.pre_relaxation_ppl is not None:
                 ppl_increase = (val_ppl - self.pre_relaxation_ppl) / self.pre_relaxation_ppl
@@ -753,8 +844,9 @@ class UnifiedTrainingConfig:
 
     # Dynamic Relaxation: 9:3 → 6:6 transition
     enable_dynamic_relaxation: bool = False  # Enable automatic 9:3 → 6:6 transition
+    relaxation_mode: str = "consecutive"     # "consecutive" or "average"
     relaxation_stability_threshold: float = 0.82  # StabilityIndex threshold
-    relaxation_stability_window: int = 500   # Consecutive steps above threshold
+    relaxation_stability_window: int = 500   # Steps for stability check
     relaxation_target_authority: int = 6     # Target authority layers after relaxation
     relaxation_target_sensory: int = 6       # Target sensory layers after relaxation
     relaxation_alpha_max: float = 0.7        # α ceiling after relaxation
@@ -1263,6 +1355,7 @@ def train(config: UnifiedTrainingConfig):
             model=model,
             stability_threshold=config.relaxation_stability_threshold,
             stability_window=config.relaxation_stability_window,
+            mode=config.relaxation_mode,
             authority_split=(config.authority_layers, config.sensory_layers),
             balanced_split=(config.relaxation_target_authority, config.relaxation_target_sensory),
             authority_alpha_max=config.alpha_sens_max,
@@ -1858,6 +1951,9 @@ def main():
     # Dynamic Relaxation: 9:3 → 6:6 transition
     parser.add_argument("--enable_dynamic_relaxation", action="store_true",
                        help="Enable automatic 9:3 → 6:6 split transition based on stability")
+    parser.add_argument("--relaxation_mode", type=str, default="consecutive",
+                       choices=["consecutive", "average"],
+                       help="Stability check mode: 'consecutive' (reset on dip) or 'average' (rolling mean)")
     parser.add_argument("--relaxation_stability_threshold", type=float, default=0.82,
                        help="StabilityIndex threshold to trigger relaxation")
     parser.add_argument("--relaxation_stability_window", type=int, default=500,
@@ -1955,6 +2051,7 @@ def main():
         gradient_warmup_steps=args.gradient_warmup_steps,
         # Dynamic Relaxation: 9:3 → 6:6 transition
         enable_dynamic_relaxation=args.enable_dynamic_relaxation,
+        relaxation_mode=args.relaxation_mode,
         relaxation_stability_threshold=args.relaxation_stability_threshold,
         relaxation_stability_window=args.relaxation_stability_window,
         relaxation_target_authority=args.relaxation_target_authority,
