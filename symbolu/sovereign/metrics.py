@@ -780,3 +780,245 @@ class SovereignEngine:
             f"GC={gc:.3f} [{gc_status}] | "
             f"S-Drift={s_drift:.3f} [{drift_status}]"
         )
+
+
+# =============================================================================
+# SOVEREIGN ALERT MONITOR - Auto-Pivot Logic
+# =============================================================================
+
+@dataclass
+class AlertConfig:
+    """Configuration for Sovereign Alert thresholds."""
+    sa_ratio_danger: float = 0.55       # S/A ratio above this triggers alert
+    gc_danger: float = 0.25             # GC below this triggers alert
+    consistency_danger: float = 0.45    # L_consistency above this triggers alert
+    entropy_spike_threshold: float = 0.15  # Entropy increase % that triggers alert
+
+    # Recovery targets (Sattvic state)
+    sa_ratio_healthy_min: float = 0.25
+    sa_ratio_healthy_max: float = 0.40
+    gc_healthy: float = 0.80
+    consistency_healthy: float = 0.10
+
+    # Correction parameters
+    brake_factor: float = 0.85          # Inertial brake strength
+    alpha_decay: float = 0.90           # Alpha reduction per alert
+    alpha_min: float = 0.30             # Minimum alpha floor
+    kp_boost: float = 0.05              # PID Kp increase per alert
+
+
+class SovereignAlertMonitor:
+    """
+    Sovereign Alert & Auto-Pivot Logic.
+
+    Monitors training stability using Patent Formulas B1, U1, S8.
+    Triggers "Ontological Lockdown" when Rajasic drift is detected.
+
+    States:
+        - STABLE: Normal training, metrics within healthy range
+        - ALERT: Warning threshold crossed, monitoring closely
+        - LOCKDOWN_ACTIVE: Emergency corrections applied
+        - RECOVERING: After lockdown, metrics improving
+
+    Usage:
+        monitor = SovereignAlertMonitor()
+
+        # In training loop:
+        state, actions = monitor.check(metrics, step)
+        if actions:
+            for action in actions:
+                print(f"  🛠️  {action}")
+    """
+
+    def __init__(self, config: Optional[AlertConfig] = None):
+        self.config = config or AlertConfig()
+        self.state = "STABLE"
+        self.lockdown_step = -1
+        self.lockdown_count = 0
+        self.prev_entropy = None
+        self.recovery_streak = 0
+        self.alert_history: List[Dict] = []
+
+    def check(
+        self,
+        metrics: Dict[str, float],
+        step: int,
+        controller: Optional[object] = None,  # PIDv2 controller
+        gradient_scaler: Optional[object] = None,  # HierarchicalGradientScaler
+    ) -> Tuple[str, List[str]]:
+        """
+        Check metrics and trigger alerts/corrections as needed.
+
+        Args:
+            metrics: Dict with keys:
+                - sa_ratio: Sensory/Authority gradient ratio
+                - guna_coherence or gc: Global coherence score
+                - l_consistency: Consistency Lagrangian value
+                - entropy: Token entropy
+            step: Current training step
+            controller: Optional PIDv2 controller for Kp adjustment
+            gradient_scaler: Optional HGS for alpha adjustment
+
+        Returns:
+            tuple: (state, list of action strings)
+        """
+        actions = []
+
+        # Extract metrics with defaults
+        sa_ratio = metrics.get('sa_ratio', metrics.get('s_a_ratio', 0.35))
+        gc = metrics.get('guna_coherence', metrics.get('gc', metrics.get('coherence', 0.5)))
+        consistency = metrics.get('l_consistency', 0.0)
+        entropy = metrics.get('entropy', 0.0)
+
+        # Check for Rajasic spike conditions
+        is_sa_danger = sa_ratio > self.config.sa_ratio_danger
+        is_gc_danger = gc < self.config.gc_danger
+        is_consistency_danger = consistency > self.config.consistency_danger
+
+        # Check entropy spike
+        is_entropy_spike = False
+        if self.prev_entropy is not None and self.prev_entropy > 0:
+            entropy_change = (entropy - self.prev_entropy) / self.prev_entropy
+            is_entropy_spike = entropy_change > self.config.entropy_spike_threshold
+        self.prev_entropy = entropy
+
+        # Determine if lockdown is needed
+        danger_count = sum([is_sa_danger, is_gc_danger, is_consistency_danger, is_entropy_spike])
+
+        if danger_count >= 2 or (is_sa_danger and is_gc_danger):
+            # TRIGGER LOCKDOWN
+            if self.state != "LOCKDOWN_ACTIVE":
+                self.state = "LOCKDOWN_ACTIVE"
+                self.lockdown_step = step
+                self.lockdown_count += 1
+
+                # Log the alert
+                alert_info = {
+                    "step": step,
+                    "sa_ratio": sa_ratio,
+                    "gc": gc,
+                    "consistency": consistency,
+                    "entropy": entropy,
+                    "triggers": {
+                        "sa_danger": is_sa_danger,
+                        "gc_danger": is_gc_danger,
+                        "consistency_danger": is_consistency_danger,
+                        "entropy_spike": is_entropy_spike,
+                    }
+                }
+                self.alert_history.append(alert_info)
+
+                actions.append(
+                    f"⚠️  [SOVEREIGN ALERT] Logic Drift Detected! "
+                    f"S/A: {sa_ratio:.2f} | GC: {gc:.2f} | L_cons: {consistency:.3f}"
+                )
+
+                # Action 1: Apply S8 Inertial Brake via controller
+                if controller is not None and hasattr(controller, 'apply_brake'):
+                    controller.apply_brake(self.config.brake_factor)
+                    actions.append(f"ACTION: Applying S8 Brake (factor={self.config.brake_factor})")
+
+                # Action 2: Reduce alpha_sens_max to restore Authority dominance
+                if gradient_scaler is not None and hasattr(gradient_scaler, 'alpha_sens_max'):
+                    old_alpha = gradient_scaler.alpha_sens_max
+                    new_alpha = max(old_alpha * self.config.alpha_decay, self.config.alpha_min)
+                    gradient_scaler.alpha_sens_max = new_alpha
+                    actions.append(f"ACTION: Alpha_Max {old_alpha:.2f} -> {new_alpha:.2f}")
+
+                # Action 3: Increase PID Kp to stiffen the "Spine"
+                if controller is not None and hasattr(controller, 'Kp'):
+                    old_kp = controller.Kp
+                    controller.Kp = min(old_kp + self.config.kp_boost, 0.50)
+                    actions.append(f"ACTION: Kp {old_kp:.2f} -> {controller.Kp:.2f}")
+
+            self.recovery_streak = 0
+
+        elif self.state == "LOCKDOWN_ACTIVE":
+            # Check if we're recovering
+            is_recovering = (
+                sa_ratio <= self.config.sa_ratio_healthy_max and
+                gc >= self.config.gc_danger * 1.5  # At least 50% better than danger
+            )
+
+            if is_recovering:
+                self.recovery_streak += 1
+                if self.recovery_streak >= 5:
+                    self.state = "RECOVERING"
+                    actions.append(f"📈 [RECOVERING] Metrics improving after lockdown")
+            else:
+                self.recovery_streak = 0
+
+        elif self.state == "RECOVERING":
+            # Check if fully recovered to Sattvic state
+            is_sattvic = (
+                self.config.sa_ratio_healthy_min <= sa_ratio <= self.config.sa_ratio_healthy_max and
+                gc >= self.config.gc_healthy and
+                consistency <= self.config.consistency_healthy
+            )
+
+            if is_sattvic:
+                self.state = "STABLE"
+                actions.append(f"✅ [STABLE] Sattvic state restored at step {step}")
+            elif danger_count >= 2:
+                # Relapse back to lockdown
+                self.state = "LOCKDOWN_ACTIVE"
+                self.lockdown_step = step
+                self.lockdown_count += 1
+                actions.append(f"⚠️  [RELAPSE] Returning to lockdown mode")
+
+        elif danger_count == 1:
+            # Single danger indicator - just alert
+            if self.state == "STABLE":
+                self.state = "ALERT"
+                trigger = (
+                    "S/A" if is_sa_danger else
+                    "GC" if is_gc_danger else
+                    "Consistency" if is_consistency_danger else
+                    "Entropy"
+                )
+                actions.append(f"⚡ [ALERT] {trigger} approaching danger zone")
+        else:
+            # All metrics healthy
+            if self.state == "ALERT":
+                self.state = "STABLE"
+
+        return self.state, actions
+
+    def get_status_indicator(self) -> str:
+        """Get emoji/text indicator for current state."""
+        indicators = {
+            "STABLE": "🟢 STABLE",
+            "ALERT": "🟡 ALERT",
+            "LOCKDOWN_ACTIVE": "🔴 LOCKDOWN",
+            "RECOVERING": "🟠 RECOVERING",
+        }
+        return indicators.get(self.state, self.state)
+
+    def get_summary(self) -> str:
+        """Get summary of alert history."""
+        return (
+            f"Sovereign Alert Summary:\n"
+            f"  Current State: {self.get_status_indicator()}\n"
+            f"  Total Lockdowns: {self.lockdown_count}\n"
+            f"  Alerts Logged: {len(self.alert_history)}"
+        )
+
+    def format_log_line(
+        self,
+        step: int,
+        metrics: Dict[str, float],
+    ) -> str:
+        """
+        Format a log line with Sovereign Alert indicators.
+
+        Returns formatted string like:
+            "Step 1530 | ... | S/A:0.67! | Coh: 0.243 [🔴 LOCKDOWN]"
+        """
+        sa_ratio = metrics.get('sa_ratio', metrics.get('s_a_ratio', 0.35))
+        gc = metrics.get('guna_coherence', metrics.get('gc', metrics.get('coherence', 0.5)))
+
+        # Add warning indicators
+        sa_indicator = "!" if sa_ratio > self.config.sa_ratio_danger else "~" if sa_ratio > self.config.sa_ratio_healthy_max else ""
+        gc_indicator = "!" if gc < self.config.gc_danger else "~" if gc < self.config.gc_healthy else ""
+
+        return f"S/A:{sa_ratio:.2f}{sa_indicator} | Coh:{gc:.3f}{gc_indicator} [{self.get_status_indicator()}]"

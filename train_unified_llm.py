@@ -2329,6 +2329,18 @@ def train(config: UnifiedTrainingConfig):
     else:
         print(f"  Sovereign-Lagrangian Loss: Disabled")
 
+    # Initialize Sovereign Alert Monitor for auto-pivot logic
+    alert_monitor = None
+    if config.enable_sovereign_loss or config.use_9_3_split:
+        from symbolu.sovereign.metrics import SovereignAlertMonitor, AlertConfig
+        alert_config = AlertConfig(
+            sa_ratio_danger=0.55,
+            gc_danger=0.25,
+            gc_floor=config.gc_floor,
+        )
+        alert_monitor = SovereignAlertMonitor(config=alert_config)
+        print(f"  Sovereign Alert Monitor: ENABLED (Auto-Pivot)")
+
     # Optimizer
     optimizer = AdamW(
         model.parameters(),
@@ -2702,6 +2714,35 @@ def train(config: UnifiedTrainingConfig):
                             tb_writer.add_scalar("ctrl/friction_dominance", friction_dominance, global_step)
                 else:
                     print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
+
+                # Sovereign Alert Monitor - Auto-Pivot Logic
+                if alert_monitor is not None:
+                    # Build metrics dict for alert check
+                    alert_metrics = {
+                        'sa_ratio': current_sa_ratio,
+                        'guna_coherence': val_metrics.get('coherence', val_metrics.get('gc', 0.5)),
+                        'gc': val_metrics.get('gc', val_metrics.get('coherence', 0.5)),
+                        'l_consistency': val_metrics.get('l_consistency', 0.0),
+                        'entropy': val_metrics.get('entropy', 0.0),
+                    }
+
+                    # Check for alerts and apply corrections
+                    alert_state, actions = alert_monitor.check(
+                        metrics=alert_metrics,
+                        step=global_step,
+                        controller=authority_controller,
+                        gradient_scaler=gradient_scaler_hgs,
+                    )
+
+                    # Log any actions taken
+                    for action_msg in actions:
+                        print(f"  {action_msg}")
+
+                    # TensorBoard logging for alerts
+                    if tb_writer is not None:
+                        state_map = {"STABLE": 0, "ALERT": 1, "LOCKDOWN_ACTIVE": 2, "RECOVERING": 3}
+                        tb_writer.add_scalar("alert/state", state_map.get(alert_state, 0), global_step)
+                        tb_writer.add_scalar("alert/lockdown_count", alert_monitor.lockdown_count, global_step)
 
                 # Dynamic Relaxation Controller Update
                 if relaxation_controller is not None:

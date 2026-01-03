@@ -1077,6 +1077,20 @@ class AuthorityPIDv2:
             f"Kd={self.last_effective_Kd:.2f} ramp={self.last_ramp_frac:.0%}{semantic_tag}"
         )
 
+    def apply_brake(self, factor: float = 0.85):
+        """
+        [Patent S8] Apply Inertial Brake for Sovereign Alert system.
+
+        Reduces authority factor to dampen Rajasic (chaotic) dynamics.
+
+        Args:
+            factor: Brake strength (0.85 = reduce by 15%)
+        """
+        self.A = max(self.config.A_min, self.A * factor)
+        self.A_ppl = max(self.config.A_min, self.A_ppl * factor)
+        # Increase integral to maintain brake effect
+        self.I = min(self.I + 0.2, 1.0)
+
 
 class AuthorityPID:
     """
