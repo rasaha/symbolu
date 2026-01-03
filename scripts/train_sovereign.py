@@ -34,7 +34,14 @@ from symbolu.sovereign.embedding import (
 from symbolu.sovereign.metrics import SovereignMetrics
 from symbolu.sovereign.tagger import SovereignTokenizer
 from symbolu.sovereign.train_loss import MultiObjectiveLoss, TrainingLossConfig, VrittiLoss, VrittiLossConfig
-from symbolu.sovereign.stitched_objective import VrittiGovernor, format_governor_log
+from symbolu.sovereign.stitched_objective import (
+    VrittiGovernor,
+    format_governor_log,
+    StitchedScorer,
+    ScorerConfig,
+    VrittiAspectCoupling,
+    EntropyConfidence,
+)
 from symbolu.sovereign.heartbeat import SovereignHeartbeat, format_governor_telemetry
 
 # Default quality sample prompts
@@ -347,6 +354,160 @@ def generate_with_governor(
 
     model.train()
     return generated_text, governor_log
+
+
+def generate_with_stitched_scorer(
+    model: nn.Module,
+    tokenizer: SovereignTokenizer,
+    prompt: str,
+    device: torch.device,
+    max_new_tokens: int = 50,
+    verbose: bool = False,
+) -> Tuple[str, List[Dict]]:
+    """
+    Generate text using the StitchedScorer with full patent formulas.
+
+    This uses the complete multi-factor relevance (Formula [214]),
+    redundancy penalty (Formula [220]), domain-jump penalty (Formula [223]),
+    and stitched objective (Formula [226]) for token selection.
+
+    Args:
+        model: SovereignTransformer model
+        tokenizer: SovereignTokenizer
+        prompt: Input prompt
+        device: Torch device
+        max_new_tokens: Maximum tokens to generate
+        verbose: Print detailed scoring logs
+
+    Returns:
+        generated_text: The generated text
+        scorer_log: List of step-by-step scoring details
+    """
+    model.eval()
+
+    # Initialize StitchedScorer with patent formulas
+    scorer_config = ScorerConfig(
+        theta1=0.3,   # Aspect weight exponent
+        theta2=0.25,  # Vritti-Aspect coupling exponent
+        theta3=0.2,   # Domain fit exponent
+        theta4=0.15,  # Template fit exponent
+        theta5=0.1,   # Confidence coefficient exponent
+        lambda1=0.3,  # Redundancy weight
+        lambda2=0.5,  # Domain-jump weight
+    )
+    scorer = StitchedScorer(
+        d_model=model.embedding.config.d_model,
+        n_aspects=12,
+        config=scorer_config,
+    ).to(device)
+
+    scorer_log = []
+    vritti_names = ["PRAMANA", "VIPARYAYA", "VIKALPA", "SMRTI", "NIDRA"]
+
+    with torch.no_grad():
+        # Get initial encoding with signals
+        batch = tokenizer.process_batch([prompt], max_length=512)
+
+        input_ids = batch["input_ids"].to(device)
+        c_signals = batch["c_signals"].to(device)
+        s_signals = batch["s_signals"].to(device)
+        r_signals = batch["r_signals"].to(device)
+        g_states = batch["g_states"].to(device)
+        v_signals = batch.get("v_signals", torch.zeros_like(s_signals)).to(device)
+
+        if verbose:
+            print("\n" + "=" * 90)
+            print("  STITCHED SCORER GENERATION (Patent Formulas [214]-[226])")
+            print("=" * 90)
+            print(f"  {'Step':>4} {'Token':<15} {'Vritti':<10} | "
+                  f"{'Relevance':>8} {'Redundancy':>10} {'DomainJump':>10} | {'Score':>8}")
+            print("-" * 90)
+
+        # Generate tokens one by one
+        for step in range(max_new_tokens):
+            # Forward pass
+            token_logits, r_logits, s_logits, c_pred = model(
+                input_ids, c_signals, s_signals, r_signals, g_states
+            )
+
+            # Get hidden states
+            hidden_states = model.embedding(
+                input_ids, c_signals, s_signals, r_signals, g_states
+            )
+
+            # Get current position signals
+            current_hidden = hidden_states[:, -1, :]  # [B, d_model]
+            current_vritti = v_signals[:, -1]  # [B]
+            current_guna = g_states[:, -1, :] if g_states.dim() == 3 else g_states[:, -1].unsqueeze(-1).expand(-1, 3)
+
+            # Create Vritti logits (use R-logits as proxy)
+            vritti_logits = torch.zeros(1, 5, device=device)
+            vritti_logits[0, :min(5, r_logits.size(2))] = r_logits[0, -1, :min(5, r_logits.size(2))]
+
+            # Use StitchedScorer for token selection (Formula [226])
+            selected_token, info = scorer.select_next_token(
+                logits=token_logits[:, -1, :],
+                hidden_state=current_hidden,
+                vritti_logits=vritti_logits,
+                guna_states=current_guna,
+            )
+
+            # Decode the new token
+            new_token_str = tokenizer.tokenizer.decode(selected_token)
+            new_batch = tokenizer.process_batch([new_token_str], max_length=16)
+
+            # Log step
+            token_display = new_token_str.replace("\n", "\\n").strip()[:15]
+            vritti_id = current_vritti.item() if current_vritti.dim() == 0 else current_vritti[0].item()
+
+            log_entry = {
+                "step": step,
+                "token": new_token_str,
+                "vritti": vritti_names[vritti_id] if 0 <= vritti_id <= 4 else "UNKNOWN",
+                "relevance": info["relevance"].item(),
+                "redundancy": info["redundancy"].item(),
+                "domain_jump": info["domain_jump"].item(),
+                "entropy_conf": info["entropy_conf"].item(),
+                "vritti_coupling": info["vritti_coupling"].item(),
+                "selected_score": info["selected_score"].item(),
+            }
+            scorer_log.append(log_entry)
+
+            if verbose:
+                print(f"  {step:>4} {token_display:<15} {log_entry['vritti']:<10} | "
+                      f"{log_entry['relevance']:>8.4f} {log_entry['redundancy']:>10.4f} "
+                      f"{log_entry['domain_jump']:>10.4f} | {log_entry['selected_score']:>8.4f}")
+
+            # Append new token and its signals
+            input_ids = torch.cat([input_ids, selected_token.unsqueeze(0)], dim=1)
+            c_signals = torch.cat([c_signals, new_batch["c_signals"][:, :1].to(device)], dim=1)
+            s_signals = torch.cat([s_signals, new_batch["s_signals"][:, :1].to(device)], dim=1)
+            r_signals = torch.cat([r_signals, new_batch["r_signals"][:, :1].to(device)], dim=1)
+            g_states = torch.cat([g_states, new_batch["g_states"][:, :1].to(device)], dim=1)
+            new_v = new_batch.get("v_signals", torch.zeros(1, 1, dtype=torch.long))
+            v_signals = torch.cat([v_signals, new_v[:, :1].to(device)], dim=1)
+
+            # Stop at EOS
+            if selected_token.item() == tokenizer.tokenizer.eos_token_id:
+                break
+
+        if verbose:
+            print("=" * 90)
+            # Summary statistics
+            avg_relevance = sum(e["relevance"] for e in scorer_log) / len(scorer_log)
+            avg_redundancy = sum(e["redundancy"] for e in scorer_log) / len(scorer_log)
+            avg_domain_jump = sum(e["domain_jump"] for e in scorer_log) / len(scorer_log)
+            print(f"  Summary: Avg Relevance={avg_relevance:.4f} | "
+                  f"Avg Redundancy={avg_redundancy:.4f} | Avg DomainJump={avg_domain_jump:.4f}")
+            print("=" * 90 + "\n")
+
+    # Decode full sequence (skip prompt tokens)
+    prompt_len = batch["input_ids"].shape[1]
+    generated_ids = input_ids[0, prompt_len:]
+    generated_text = tokenizer.tokenizer.decode(generated_ids, skip_special_tokens=True)
+
+    model.train()
+    return generated_text, scorer_log
 
 
 def run_quality_samples(
