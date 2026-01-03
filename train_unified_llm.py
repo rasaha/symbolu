@@ -1039,6 +1039,11 @@ class DynamicRelaxationController:
         # Weight Transfer for 9:3 → 6:6 transition
         self.enable_weight_transfer = enable_weight_transfer
         self.guna_lock_steps = guna_lock_steps
+
+        # [S5] Entropy Gate: Block relaxation if entropy too high
+        self.entropy_gate_threshold = 0.50  # Must be below this to relax
+        self.entropy_gate_blocked = False   # Track if we blocked due to entropy
+        self.last_entropy = None            # For logging
         if enable_weight_transfer:
             # Layers 6, 7, 8 become Sensory in 6:6 split
             # Layer 5 becomes the new Witness
@@ -1214,6 +1219,7 @@ class DynamicRelaxationController:
         val_ppl: float,
         global_step: int,
         sa_ratio: float = None,
+        entropy: float = None,
     ) -> Tuple[bool, str]:
         """
         Update controller state based on current metrics.
@@ -1221,8 +1227,15 @@ class DynamicRelaxationController:
         Returns:
             (state_changed, action): Whether state changed and what action to take
             action can be: "NONE", "RELAX", "RECOVER", "RESUME"
+
+        [S5] Entropy Gate:
+            Relaxation is blocked if entropy > entropy_gate_threshold (0.50).
+            This prevents the model from gaining sensory freedom while confused.
         """
         stability_index = self.compute_stability_index(guna_coherence, s_drift_ema)
+
+        # Track entropy for gating
+        self.last_entropy = entropy
 
         # Track history
         self.stability_history.append({
@@ -1233,6 +1246,7 @@ class DynamicRelaxationController:
             "ppl": val_ppl,
             "state": self.state,
             "sa_ratio": sa_ratio,
+            "entropy": entropy,
         })
         if len(self.stability_history) > self.max_history:
             self.stability_history = self.stability_history[-self.max_history:]
@@ -1242,7 +1256,21 @@ class DynamicRelaxationController:
         # State machine
         if self.state == self.STATE_AUTHORITY:
             # Check if we should trigger relaxation (mode-dependent)
-            if self._check_relaxation_ready(stability_index, sa_ratio=sa_ratio):
+            stability_ready = self._check_relaxation_ready(stability_index, sa_ratio=sa_ratio)
+
+            # [S5] Entropy Gate: Block relaxation if entropy too high
+            entropy_clear = True
+            if entropy is not None and entropy > self.entropy_gate_threshold:
+                entropy_clear = False
+                if stability_ready and not self.entropy_gate_blocked:
+                    # Log that we're blocking due to entropy
+                    print(f"\n  🔒 [S5 ENTROPY GATE] Relaxation BLOCKED - Ent:{entropy:.2f} > {self.entropy_gate_threshold}")
+                    print(f"      Model must achieve clarity (Ent < {self.entropy_gate_threshold}) before 6:6 thaw")
+                    self.entropy_gate_blocked = True
+            else:
+                self.entropy_gate_blocked = False
+
+            if stability_ready and entropy_clear:
                 # Ready to relax!
                 self.state = self.STATE_RELAXING
                 self.pre_relaxation_ppl = val_ppl
@@ -2101,12 +2129,26 @@ def compute_ontological_loss(
         if gc is not None and isinstance(gc, torch.Tensor):
             gc = gc.mean()
 
+        # [S5/B1] Scale lambda_b1 based on entropy - higher entropy = stronger consistency
+        b1_scale = 1.0
+        if onto_entropy > 0.60:
+            # Scale up to 1.5x when entropy is very high (Rajasic state)
+            excess = (onto_entropy - 0.60) / 0.40  # Scale 0.60-1.0 to 0-1
+            b1_scale = 1.0 + excess * 0.5  # 1.0 to 1.5
+            # Temporarily boost lambda_b1
+            original_lambda_b1 = sovereign_engine.config.lambda_b1
+            sovereign_engine.config.lambda_b1 = original_lambda_b1 * b1_scale
+
         # Compute Sovereign-Lagrangian loss
         total_loss, sov_metrics = sovereign_engine.sovereign_loss(
             logits, targets, r_signal,
             phase_angles=phase_angles,
             guna_coherence=gc,
         )
+
+        # Restore original lambda_b1 if scaled
+        if b1_scale > 1.0:
+            sovereign_engine.config.lambda_b1 = original_lambda_b1
 
         # Merge metrics
         metrics.update({
@@ -2117,6 +2159,7 @@ def compute_ontological_loss(
             "gc": sov_metrics["gc"],
             "sf_mean": sov_metrics["sf_mean"],
             "sb_mean": sov_metrics["sb_mean"],
+            "b1_scale": b1_scale,  # Track the scaling factor
         })
 
         # Add coherence from outputs if available
@@ -2768,11 +2811,19 @@ def train(config: UnifiedTrainingConfig):
                 # S8 Stability Hook - Entropy Guard
                 if s8_hook is not None:
                     # Compute semantic entropy from validation outputs
-                    semantic_ent = val_metrics.get('entropy', 0.5)
+                    semantic_ent = val_metrics.get('entropy', val_metrics.get('onto_entropy', 0.5))
                     brake_intensity = s8_hook.update(semantic_ent)
 
-                    # Log S8 status
-                    if brake_intensity < 0.99:
+                    # [S5/S8] Apply alpha_sens adjustment based on entropy state
+                    alpha_sens_factor = s8_hook.get_alpha_sens_adjustment(semantic_ent)
+                    if alpha_sens_factor < 1.0 and gradient_scaler_hgs is not None:
+                        # Temporarily reduce alpha_sens_max to dampen sensory learning
+                        old_alpha = gradient_scaler_hgs.alpha_sens_max
+                        gradient_scaler_hgs.alpha_sens_max = old_alpha * alpha_sens_factor
+                        print(f"  --> [S5] Entropy rising - α_sens reduced: {old_alpha:.2f} → {gradient_scaler_hgs.alpha_sens_max:.2f}")
+
+                    # Log S8 status (always log when brake active or entropy high)
+                    if brake_intensity < 0.99 or semantic_ent > 0.60:
                         from symbolu.sovereign.metrics import get_entropy_status
                         ent_icon, ent_status = get_entropy_status(semantic_ent)
                         print(f"  --> [S8] Ent:{semantic_ent:.2f}{ent_icon} | {s8_hook.format_log()}")
@@ -2782,6 +2833,7 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("s8/entropy", semantic_ent, global_step)
                         tb_writer.add_scalar("s8/brake_intensity", brake_intensity, global_step)
                         tb_writer.add_scalar("s8/delta_h", s8_hook.state.last_delta_h, global_step)
+                        tb_writer.add_scalar("s8/alpha_sens_factor", alpha_sens_factor, global_step)
 
                 # Dynamic Relaxation Controller Update
                 if relaxation_controller is not None:
@@ -2801,13 +2853,17 @@ def train(config: UnifiedTrainingConfig):
                         else:
                             s_drift_ema = 0.5
 
-                    # Update relaxation controller
+                    # Get entropy for gating (from S8 hook or val_metrics)
+                    current_entropy = val_metrics.get('entropy', val_metrics.get('onto_entropy', 0.5))
+
+                    # Update relaxation controller with entropy gate
                     state_changed, action = relaxation_controller.update(
                         guna_coherence=guna_coherence,
                         s_drift_ema=s_drift_ema,
                         val_ppl=val_ppl,
                         global_step=global_step,
                         sa_ratio=current_sa_ratio,
+                        entropy=current_entropy,
                     )
 
                     # Execute actions

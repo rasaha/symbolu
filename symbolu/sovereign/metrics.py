@@ -1187,6 +1187,53 @@ class S8StabilityHook:
             f"dH/dt:{self.state.last_delta_h:+.3f}"
         )
 
+    def get_alpha_sens_adjustment(self, current_entropy: float) -> float:
+        """
+        [S5/S8] Get alpha_sens adjustment factor based on entropy state.
+
+        When entropy rises (dH/dt > 0), reduce sensory layer learning rate
+        to prevent Rajasic override of Authority.
+
+        Returns:
+            alpha_factor: Multiplier for alpha_sens (1.0 = no change, <1.0 = reduce)
+        """
+        # Check for consecutive rising entropy
+        if len(self.state.entropy_history) >= 2:
+            rising_count = sum(
+                1 for i in range(1, len(self.state.entropy_history))
+                if self.state.entropy_history[i] > self.state.entropy_history[i-1]
+            )
+
+            # If entropy rising for 2+ steps, reduce alpha_sens
+            if rising_count >= 2:
+                # Reduce by 10% per consecutive rise (max 30%)
+                reduction = min(0.3, rising_count * 0.1)
+                return 1.0 - reduction
+
+        # Also reduce if current entropy is very high (Rajasic threshold)
+        if current_entropy > 0.65:
+            # High entropy penalty: reduce by up to 20%
+            excess = (current_entropy - 0.65) / 0.35  # Scale 0.65-1.0 to 0-1
+            return max(0.8, 1.0 - excess * 0.2)
+
+        return 1.0
+
+    def get_b1_weight_scale(self, current_entropy: float) -> float:
+        """
+        [S5/B1] Get scaling factor for B1 Lagrangian weight based on entropy.
+
+        When entropy > 0.60, increase consistency loss weight to force
+        model back toward Authority alignment.
+
+        Returns:
+            scale: Multiplier for lambda_b1 (1.0 = normal, >1.0 = increase)
+        """
+        if current_entropy > 0.60:
+            # Scale up to 1.5x when entropy is very high
+            excess = (current_entropy - 0.60) / 0.40  # Scale 0.60-1.0 to 0-1
+            return 1.0 + excess * 0.5  # 1.0 to 1.5
+        return 1.0
+
 
 def format_sovereign_dashboard(
     step: int,
