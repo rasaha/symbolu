@@ -159,6 +159,583 @@ torch.backends.cudnn.benchmark = True
 
 
 # =============================================================================
+# FORMULA [1331]: HIERARCHICAL GRADIENT SCALING FOR 9:3 SPLIT
+# =============================================================================
+
+class HierarchicalGradientScaler:
+    """
+    Implements Formula [1331]: Gradient dampening for 9:3 layer split.
+
+    Prevents 3 Quadratic (Sensory) layers from becoming too Rajasic
+    by scaling their gradients relative to the 9 Authority layers.
+
+    Architecture:
+        Layers 0-8:  Authority (State-Delta) - Full gradients (α = 1.0)
+        Layers 9-11: Sensory (Quadratic)     - Dampened gradients (α = 0.1→0.5)
+
+    The warmup schedule allows Authority layers to establish stable
+    ontological foundations before Sensory layers begin contributing.
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        authority_layers: int = 9,      # Layers 0-8
+        sensory_layers: int = 3,        # Layers 9-11
+        alpha_sens_min: float = 0.1,    # Heavy dampening at start
+        alpha_sens_max: float = 0.5,    # Moderate dampening after warmup
+        warmup_steps: int = 500,        # Ramp period
+        layer_attr: str = "blocks",     # Attribute name for layers
+    ):
+        self.model = model
+        self.authority_layers = authority_layers
+        self.sensory_layers = sensory_layers
+        self.alpha_sens_min = alpha_sens_min
+        self.alpha_sens_max = alpha_sens_max
+        self.warmup_steps = warmup_steps
+        self.layer_attr = layer_attr
+
+        self.current_step = 0
+        self.hooks = []
+        self.gradient_stats = {
+            "authority_grad_norm": 0.0,
+            "sensory_grad_norm": 0.0,
+            "sensory_scale": alpha_sens_min,
+            "sensory_authority_ratio": 0.0,
+        }
+
+        # Register hooks
+        self._register_hooks()
+
+    def _get_layers(self) -> nn.ModuleList:
+        """Get the layer ModuleList from model."""
+        # Try common attribute names
+        for attr in [self.layer_attr, "layers", "blocks", "transformer.blocks",
+                     "layers_1_8", "model.layers"]:
+            if "." in attr:
+                # Handle nested attributes
+                obj = self.model
+                for part in attr.split("."):
+                    obj = getattr(obj, part, None)
+                    if obj is None:
+                        break
+                if obj is not None and isinstance(obj, nn.ModuleList):
+                    return obj
+            elif hasattr(self.model, attr):
+                layers = getattr(self.model, attr)
+                if isinstance(layers, nn.ModuleList):
+                    return layers
+
+        # Fallback: collect all named children that look like layers
+        layer_modules = []
+        for name, module in self.model.named_children():
+            if 'layer' in name.lower() or 'block' in name.lower():
+                if isinstance(module, nn.ModuleList):
+                    return module
+                layer_modules.append(module)
+
+        if layer_modules:
+            return nn.ModuleList(layer_modules)
+
+        raise ValueError(f"Could not find layers in model. Tried: {self.layer_attr}")
+
+    def _compute_alpha_sens(self) -> float:
+        """Compute current sensory gradient scale based on warmup progress."""
+        if self.current_step >= self.warmup_steps:
+            return self.alpha_sens_max
+
+        # Linear ramp from min to max
+        progress = self.current_step / self.warmup_steps
+        alpha = self.alpha_sens_min + (self.alpha_sens_max - self.alpha_sens_min) * progress
+
+        return alpha
+
+    def _create_grad_hook(self, layer_idx: int, is_sensory: bool):
+        """Create a gradient scaling hook for a specific layer."""
+        def hook(grad):
+            if grad is None:
+                return grad
+
+            if is_sensory:
+                # Apply dampening to sensory layers
+                alpha = self._compute_alpha_sens()
+                scaled_grad = grad * alpha
+
+                # Track stats (accumulate norms)
+                self.gradient_stats["sensory_grad_norm"] += grad.norm().item()
+                self.gradient_stats["sensory_scale"] = alpha
+
+                return scaled_grad
+            else:
+                # Authority layers get full gradient
+                self.gradient_stats["authority_grad_norm"] += grad.norm().item()
+                return grad
+
+        return hook
+
+    def _register_hooks(self):
+        """Register gradient hooks on all layer parameters."""
+        try:
+            layers = self._get_layers()
+        except ValueError as e:
+            print(f"  [Formula 1331] Warning: {e}")
+            print(f"  [Formula 1331] Gradient scaling disabled - could not find layers")
+            return
+
+        total_layers = len(layers)
+
+        # Determine sensory layer indices (last N in 9:3 split)
+        sensory_start = max(0, total_layers - self.sensory_layers)
+
+        print(f"\n  [Formula 1331] Hierarchical Gradient Scaler ENABLED:")
+        print(f"    Total layers detected: {total_layers}")
+        print(f"    Authority layers: 0-{sensory_start - 1} (α = 1.0)")
+        print(f"    Sensory layers: {sensory_start}-{total_layers - 1} (α = {self.alpha_sens_min}→{self.alpha_sens_max})")
+        print(f"    Warmup: {self.warmup_steps} steps")
+
+        hook_count = 0
+        for layer_idx, layer in enumerate(layers):
+            is_sensory = layer_idx >= sensory_start
+
+            for name, param in layer.named_parameters():
+                if param.requires_grad:
+                    hook = param.register_hook(self._create_grad_hook(layer_idx, is_sensory))
+                    self.hooks.append(hook)
+                    hook_count += 1
+
+        print(f"    Registered {hook_count} gradient hooks")
+
+    def step(self, global_step: int):
+        """Update current step and reset gradient stats."""
+        self.current_step = global_step
+
+        # Compute ratio before resetting
+        if self.gradient_stats["authority_grad_norm"] > 0:
+            ratio = self.gradient_stats["sensory_grad_norm"] / self.gradient_stats["authority_grad_norm"]
+            self.gradient_stats["sensory_authority_ratio"] = ratio
+
+        # Reset accumulators for next step
+        self.gradient_stats["authority_grad_norm"] = 0.0
+        self.gradient_stats["sensory_grad_norm"] = 0.0
+        self.gradient_stats["sensory_scale"] = self._compute_alpha_sens()
+
+    def get_stats(self) -> dict:
+        """Get gradient statistics for logging."""
+        return self.gradient_stats.copy()
+
+    def remove_hooks(self):
+        """Remove all registered hooks."""
+        for hook in self.hooks:
+            hook.remove()
+        self.hooks = []
+        print("  [Formula 1331] Gradient hooks removed")
+
+    def reconfigure(
+        self,
+        new_authority_layers: int,
+        new_sensory_layers: int,
+        new_alpha_min: float,
+        new_alpha_max: float,
+        new_warmup_steps: int,
+    ):
+        """
+        Reconfigure the scaler for a new split configuration.
+        Used for dynamic 9:3 → 6:6 transitions.
+        """
+        # Remove existing hooks
+        self.remove_hooks()
+
+        # Update configuration
+        self.authority_layers = new_authority_layers
+        self.sensory_layers = new_sensory_layers
+        self.alpha_sens_min = new_alpha_min
+        self.alpha_sens_max = new_alpha_max
+        self.warmup_steps = new_warmup_steps
+        self.current_step = 0  # Reset warmup counter
+
+        # Re-register hooks with new configuration
+        self._register_hooks()
+
+        print(f"  [Formula 1331] Reconfigured: {new_authority_layers}:{new_sensory_layers} split")
+        print(f"    New α range: {new_alpha_min} → {new_alpha_max} over {new_warmup_steps} steps")
+
+
+# =============================================================================
+# DYNAMIC RELAXATION CONTROLLER: 9:3 → 6:6 TRANSITION
+# =============================================================================
+
+class DynamicRelaxationController:
+    """
+    Manages dynamic transition from 9:3 (Authority-heavy) to 6:6 (Balanced) split.
+
+    The controller monitors a StabilityIndex and triggers relaxation when the
+    model has achieved sufficient "Sattvic Plateau" - meaning the Authority
+    layers have firmly imprinted ontological structure.
+
+    Phases:
+    1. AUTHORITY (9:3): Heavy dampening, ontological imprinting
+    2. MONITORING: Track StabilityIndex over rolling window
+    3. RELAXATION: Transition to 6:6 with Dampened Thaw
+    4. BALANCED (6:6): Increased sensory expressivity
+    5. RECOVERY: Viparyaya reset if PPL spikes after relaxation
+
+    StabilityIndex = 0.7 * GC + 0.3 * (1 - S_Drift_EMA)
+
+    Usage:
+        controller = DynamicRelaxationController(gradient_scaler, config)
+        # In training loop:
+        should_relax, action = controller.update(guna_coherence, s_drift_ema, val_ppl, step)
+        if action == "RELAX":
+            controller.execute_relaxation()
+        elif action == "RECOVER":
+            controller.execute_recovery()
+    """
+
+    # Controller states
+    STATE_AUTHORITY = "AUTHORITY"       # 9:3 split, heavy dampening
+    STATE_MONITORING = "MONITORING"     # Tracking stability for transition
+    STATE_RELAXING = "RELAXING"         # Transitioning to 6:6
+    STATE_BALANCED = "BALANCED"         # 6:6 split, balanced learning
+    STATE_RECOVERY = "RECOVERY"         # Viparyaya reset, back to 9:3
+
+    def __init__(
+        self,
+        gradient_scaler: HierarchicalGradientScaler,
+        model: nn.Module,
+        # Stability thresholds
+        stability_threshold: float = 0.82,
+        stability_window: int = 500,        # Steps for stability check
+        mode: str = "consecutive",          # "consecutive" or "average"
+        # Split configurations
+        authority_split: Tuple[int, int] = (9, 3),  # Initial 9:3
+        balanced_split: Tuple[int, int] = (6, 6),   # Target 6:6
+        # Dampening configurations
+        authority_alpha_max: float = 0.5,    # α ceiling for 9:3
+        balanced_alpha_max: float = 0.7,     # α ceiling for 6:6
+        thaw_alpha_start: float = 0.05,      # Dampened Thaw start for new layers
+        thaw_warmup_steps: int = 250,        # Steps to ramp new layers
+        # Recovery settings
+        ppl_spike_threshold: float = 0.20,   # 20% PPL increase triggers recovery
+        recovery_steps: int = 200,           # Steps to stay in recovery
+        # Monitoring
+        guna_coherence_weight: float = 0.7,
+        s_drift_weight: float = 0.3,
+    ):
+        self.gradient_scaler = gradient_scaler
+        self.model = model
+
+        # Thresholds
+        self.stability_threshold = stability_threshold
+        self.stability_window = stability_window
+        self.mode = mode.lower()
+        self.ppl_spike_threshold = ppl_spike_threshold
+        self.recovery_steps = recovery_steps
+
+        # Validate mode
+        if self.mode not in ("consecutive", "average"):
+            raise ValueError(f"relaxation_mode must be 'consecutive' or 'average', got '{mode}'")
+
+        # Split configurations
+        self.authority_split = authority_split
+        self.balanced_split = balanced_split
+        self.authority_alpha_max = authority_alpha_max
+        self.balanced_alpha_max = balanced_alpha_max
+        self.thaw_alpha_start = thaw_alpha_start
+        self.thaw_warmup_steps = thaw_warmup_steps
+
+        # Weights for StabilityIndex
+        self.guna_coherence_weight = guna_coherence_weight
+        self.s_drift_weight = s_drift_weight
+
+        # State tracking
+        self.state = self.STATE_AUTHORITY
+        self.stability_streak = 0
+        self.stability_history = []
+        self.ssi_rolling_window = []  # For average mode
+        self.max_history = 1000
+
+        # PPL tracking for recovery
+        self.pre_relaxation_ppl = None
+        self.recovery_start_step = None
+        self.relaxation_step = None
+
+        # Integration Tax tracking (Jolt Log)
+        self.integration_tax_logged = False
+        self.post_relaxation_ppl_samples = []
+        self.integration_tax_sample_count = 10  # Steps to wait before measuring
+
+        # Telemetry
+        self.transitions = []
+        self.current_split = authority_split
+
+        print(f"\n  [DynamicRelaxation] Controller initialized:")
+        print(f"    Mode: {self.mode.upper()}")
+        print(f"    Initial split: {authority_split[0]}:{authority_split[1]}")
+        print(f"    Target split: {balanced_split[0]}:{balanced_split[1]}")
+        print(f"    Stability threshold: {stability_threshold}")
+        print(f"    Stability window: {stability_window} steps")
+
+    def compute_stability_index(
+        self,
+        guna_coherence: float,
+        s_drift_ema: float,
+    ) -> float:
+        """
+        Compute the Sattvic Stability Index.
+
+        StabilityIndex = w_gc * GC + w_drift * (1 - S_Drift_EMA)
+
+        High values indicate:
+        - GC high: Authority layers have locked global phase rotation
+        - S_Drift low: Reality signal aligned with ontological intent
+        """
+        stability = (
+            self.guna_coherence_weight * guna_coherence +
+            self.s_drift_weight * (1.0 - s_drift_ema)
+        )
+        return max(0.0, min(1.0, stability))
+
+    def _check_relaxation_ready(self, stability_index: float) -> bool:
+        """
+        Check if relaxation should trigger based on current mode.
+
+        Modes:
+        - consecutive: Requires SSI >= threshold for N consecutive steps
+        - average: Requires average SSI >= threshold over rolling N-step window
+        """
+        if self.mode == "consecutive":
+            # Consecutive mode: reset on any dip
+            if stability_index >= self.stability_threshold:
+                self.stability_streak += 1
+                return self.stability_streak >= self.stability_window
+            else:
+                self.stability_streak = 0
+                return False
+
+        else:  # average mode
+            # Average mode: rolling window mean
+            self.ssi_rolling_window.append(stability_index)
+            if len(self.ssi_rolling_window) > self.stability_window:
+                self.ssi_rolling_window.pop(0)
+
+            if len(self.ssi_rolling_window) >= self.stability_window:
+                avg_ssi = sum(self.ssi_rolling_window) / len(self.ssi_rolling_window)
+                return avg_ssi >= self.stability_threshold
+
+            return False
+
+    def _log_integration_tax(self, current_ppl: float, global_step: int):
+        """
+        Log the Integration Tax: PPL difference after relaxation.
+
+        This measures the "cost" of adding new sensory layers.
+        Called for the first N steps after relaxation.
+        """
+        if self.integration_tax_logged:
+            return
+
+        self.post_relaxation_ppl_samples.append(current_ppl)
+
+        if len(self.post_relaxation_ppl_samples) >= self.integration_tax_sample_count:
+            # Calculate Integration Tax
+            avg_post_ppl = sum(self.post_relaxation_ppl_samples) / len(self.post_relaxation_ppl_samples)
+            ppl_delta = avg_post_ppl - self.pre_relaxation_ppl
+            ppl_percent = (ppl_delta / self.pre_relaxation_ppl) * 100
+
+            # Log the Jolt
+            print(f"\n  ╔══════════════════════════════════════════════════════════════╗")
+            print(f"  ║  📊 INTEGRATION TAX REPORT (Jolt Log)                        ║")
+            print(f"  ╠══════════════════════════════════════════════════════════════╣")
+            print(f"  ║  Pre-Relaxation PPL:  {self.pre_relaxation_ppl:>10.2f}                        ║")
+            print(f"  ║  Post-Relaxation PPL: {avg_post_ppl:>10.2f} (avg over {self.integration_tax_sample_count} steps)        ║")
+            print(f"  ║  ─────────────────────────────────────────────────────────── ║")
+            print(f"  ║  Integration Tax:     {ppl_delta:>+10.2f} ({ppl_percent:+.1f}%)                   ║")
+            print(f"  ║                                                              ║")
+            if ppl_percent <= 5.0:
+                print(f"  ║  Status: ✅ SMOOTH INTEGRATION (Tax < 5%)                   ║")
+            elif ppl_percent <= 15.0:
+                print(f"  ║  Status: ⚠️  MODERATE TAX (5-15%) - Thaw in progress        ║")
+            else:
+                print(f"  ║  Status: 🔥 HIGH TAX (>15%) - Monitor for Viparyaya         ║")
+            print(f"  ╚══════════════════════════════════════════════════════════════╝\n")
+
+            self.integration_tax_logged = True
+
+            # Store in telemetry
+            self.transitions[-1]["integration_tax"] = {
+                "pre_ppl": self.pre_relaxation_ppl,
+                "post_ppl": avg_post_ppl,
+                "delta": ppl_delta,
+                "percent": ppl_percent,
+            }
+
+    def update(
+        self,
+        guna_coherence: float,
+        s_drift_ema: float,
+        val_ppl: float,
+        global_step: int,
+    ) -> Tuple[bool, str]:
+        """
+        Update controller state based on current metrics.
+
+        Returns:
+            (state_changed, action): Whether state changed and what action to take
+            action can be: "NONE", "RELAX", "RECOVER", "RESUME"
+        """
+        stability_index = self.compute_stability_index(guna_coherence, s_drift_ema)
+
+        # Track history
+        self.stability_history.append({
+            "step": global_step,
+            "stability": stability_index,
+            "gc": guna_coherence,
+            "drift": s_drift_ema,
+            "ppl": val_ppl,
+            "state": self.state,
+        })
+        if len(self.stability_history) > self.max_history:
+            self.stability_history = self.stability_history[-self.max_history:]
+
+        action = "NONE"
+
+        # State machine
+        if self.state == self.STATE_AUTHORITY:
+            # Check if we should trigger relaxation (mode-dependent)
+            if self._check_relaxation_ready(stability_index):
+                # Ready to relax!
+                self.state = self.STATE_RELAXING
+                self.pre_relaxation_ppl = val_ppl
+                self.relaxation_step = global_step
+                action = "RELAX"
+                self.transitions.append({
+                    "step": global_step,
+                    "from": "AUTHORITY",
+                    "to": "BALANCED",
+                    "stability": stability_index,
+                    "ppl": val_ppl,
+                    "mode": self.mode,
+                })
+
+        elif self.state == self.STATE_RELAXING:
+            # Transition in progress, move to balanced
+            self.state = self.STATE_BALANCED
+            self.current_split = self.balanced_split
+            # Reset Integration Tax tracking for new relaxation
+            self.integration_tax_logged = False
+            self.post_relaxation_ppl_samples = []
+
+        elif self.state == self.STATE_BALANCED:
+            # Track Integration Tax for first N steps
+            if not self.integration_tax_logged:
+                self._log_integration_tax(val_ppl, global_step)
+
+            # Monitor for PPL spike (Viparyaya trigger)
+            if self.pre_relaxation_ppl is not None:
+                ppl_increase = (val_ppl - self.pre_relaxation_ppl) / self.pre_relaxation_ppl
+                if ppl_increase > self.ppl_spike_threshold:
+                    # PPL spiked! Trigger Viparyaya recovery
+                    self.state = self.STATE_RECOVERY
+                    self.recovery_start_step = global_step
+                    action = "RECOVER"
+                    self.transitions.append({
+                        "step": global_step,
+                        "from": "BALANCED",
+                        "to": "RECOVERY",
+                        "ppl_increase": ppl_increase,
+                        "ppl": val_ppl,
+                    })
+                    print(f"\n  ⚠️ [DynamicRelaxation] VIPARYAYA TRIGGERED!")
+                    print(f"    PPL spike: {ppl_increase*100:.1f}% (threshold: {self.ppl_spike_threshold*100:.0f}%)")
+                    print(f"    Reverting to {self.authority_split[0]}:{self.authority_split[1]} for {self.recovery_steps} steps")
+
+        elif self.state == self.STATE_RECOVERY:
+            # Check if recovery period is complete
+            steps_in_recovery = global_step - self.recovery_start_step
+            if steps_in_recovery >= self.recovery_steps:
+                # Resume monitoring for re-relaxation
+                self.state = self.STATE_AUTHORITY
+                self.stability_streak = 0
+                self.pre_relaxation_ppl = None
+                action = "RESUME"
+                self.transitions.append({
+                    "step": global_step,
+                    "from": "RECOVERY",
+                    "to": "AUTHORITY",
+                    "stability": stability_index,
+                })
+                print(f"\n  ✓ [DynamicRelaxation] Recovery complete. Resuming Authority phase.")
+
+        return (action != "NONE"), action
+
+    def execute_relaxation(self):
+        """
+        Execute the 9:3 → 6:6 transition with Dampened Thaw.
+
+        The newly added sensory layers (6-8) start with very low α (0.05)
+        and ramp up slowly to prevent Rajasic override.
+        """
+        print(f"\n  ⚡ [DynamicRelaxation] RELAXATION: {self.authority_split} → {self.balanced_split}")
+
+        # Reconfigure the gradient scaler
+        self.gradient_scaler.reconfigure(
+            new_authority_layers=self.balanced_split[0],
+            new_sensory_layers=self.balanced_split[1],
+            new_alpha_min=self.thaw_alpha_start,  # Start very low for dampened thaw
+            new_alpha_max=self.balanced_alpha_max,
+            new_warmup_steps=self.thaw_warmup_steps,
+        )
+
+        self.current_split = self.balanced_split
+        print(f"    Dampened Thaw: α = {self.thaw_alpha_start} → {self.balanced_alpha_max} over {self.thaw_warmup_steps} steps")
+
+    def execute_recovery(self):
+        """
+        Execute Viparyaya recovery: revert to 9:3 split.
+
+        This 're-stiffens' the model by returning to Authority-heavy configuration.
+        """
+        print(f"\n  🔄 [DynamicRelaxation] VIPARYAYA RECOVERY: Reverting to {self.authority_split}")
+
+        # Reconfigure back to authority-heavy split
+        self.gradient_scaler.reconfigure(
+            new_authority_layers=self.authority_split[0],
+            new_sensory_layers=self.authority_split[1],
+            new_alpha_min=0.1,  # Heavy dampening
+            new_alpha_max=self.authority_alpha_max,
+            new_warmup_steps=100,  # Quick stabilization
+        )
+
+        self.current_split = self.authority_split
+
+    def get_status_string(self) -> str:
+        """Get formatted status string for logging."""
+        split_str = f"{self.current_split[0]}:{self.current_split[1]}"
+        streak_str = f"{self.stability_streak}/{self.stability_window}" if self.state == self.STATE_AUTHORITY else "—"
+
+        if self.state == self.STATE_RECOVERY:
+            return f"Split:{split_str} State:RECOVERY Streak:{streak_str}"
+        elif self.state == self.STATE_BALANCED:
+            return f"Split:{split_str} State:BALANCED ✓"
+        else:
+            return f"Split:{split_str} State:{self.state} Streak:{streak_str}"
+
+    def get_telemetry(self) -> Dict[str, Any]:
+        """Get telemetry data for logging/visualization."""
+        recent_stability = [h["stability"] for h in self.stability_history[-100:]]
+        avg_stability = sum(recent_stability) / len(recent_stability) if recent_stability else 0.0
+
+        return {
+            "state": self.state,
+            "current_split": f"{self.current_split[0]}:{self.current_split[1]}",
+            "stability_streak": self.stability_streak,
+            "avg_stability_100": avg_stability,
+            "transitions": len(self.transitions),
+            "is_balanced": self.state == self.STATE_BALANCED,
+        }
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -256,6 +833,27 @@ class UnifiedTrainingConfig:
     # Phase ramp settings (for handshake dampening)
     phase_delay_steps: int = 0
     phase_ramp_steps: int = 7000
+
+    # Formula [1331]: 9:3 Hierarchical Split Configuration
+    use_9_3_split: bool = False           # Enable 9:3 Authority/Sensory gradient scaling
+    authority_layers: int = 9             # Number of Authority (State-Delta) layers
+    sensory_layers: int = 3               # Number of Sensory (Quadratic) layers
+    alpha_sens_min: float = 0.1           # Heavy gradient dampening at start
+    alpha_sens_max: float = 0.5           # Moderate dampening after warmup
+    gradient_warmup_steps: int = 500      # Steps to ramp α_sens from min to max
+
+    # Dynamic Relaxation: 9:3 → 6:6 transition
+    enable_dynamic_relaxation: bool = False  # Enable automatic 9:3 → 6:6 transition
+    relaxation_mode: str = "consecutive"     # "consecutive" or "average"
+    relaxation_stability_threshold: float = 0.82  # StabilityIndex threshold
+    relaxation_stability_window: int = 500   # Steps for stability check
+    relaxation_target_authority: int = 6     # Target authority layers after relaxation
+    relaxation_target_sensory: int = 6       # Target sensory layers after relaxation
+    relaxation_alpha_max: float = 0.7        # α ceiling after relaxation
+    relaxation_thaw_alpha: float = 0.05      # Dampened Thaw starting α
+    relaxation_thaw_steps: int = 250         # Steps for Dampened Thaw warmup
+    relaxation_ppl_spike_threshold: float = 0.20  # PPL spike % to trigger Viparyaya
+    relaxation_recovery_steps: int = 200     # Steps to stay in recovery
 
     # Resume checkpoint
     resume: str = ""
@@ -689,6 +1287,10 @@ def train(config: UnifiedTrainingConfig):
     print(f"  Controller: {config.controller.upper() if config.controller != 'none' else 'None'}")
     print(f"  Gradient Checkpointing: {config.gradient_checkpointing}")
     print(f"  Mixed Precision: {config.mixed_precision}")
+    print(f"  9:3 Hierarchical Split: {'ENABLED' if config.use_9_3_split else 'Disabled'}")
+    if config.enable_dynamic_relaxation:
+        print(f"  Dynamic Relaxation: ENABLED ({config.authority_layers}:{config.sensory_layers} → {config.relaxation_target_authority}:{config.relaxation_target_sensory})")
+        print(f"    Stability Threshold: {config.relaxation_stability_threshold} for {config.relaxation_stability_window} steps")
 
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
@@ -731,6 +1333,38 @@ def train(config: UnifiedTrainingConfig):
         T_max=config.max_steps - config.warmup_steps,
         eta_min=config.learning_rate * 0.1,
     )
+
+    # Formula [1331]: 9:3 Hierarchical Gradient Scaling
+    gradient_scaler_9_3 = None
+    if config.use_9_3_split:
+        gradient_scaler_9_3 = HierarchicalGradientScaler(
+            model=model,
+            authority_layers=config.authority_layers,
+            sensory_layers=config.sensory_layers,
+            alpha_sens_min=config.alpha_sens_min,
+            alpha_sens_max=config.alpha_sens_max,
+            warmup_steps=config.gradient_warmup_steps,
+            layer_attr="blocks",  # Common attribute name for transformer layers
+        )
+
+    # Dynamic Relaxation Controller: 9:3 → 6:6 transition
+    relaxation_controller = None
+    if config.enable_dynamic_relaxation and gradient_scaler_9_3 is not None:
+        relaxation_controller = DynamicRelaxationController(
+            gradient_scaler=gradient_scaler_9_3,
+            model=model,
+            stability_threshold=config.relaxation_stability_threshold,
+            stability_window=config.relaxation_stability_window,
+            mode=config.relaxation_mode,
+            authority_split=(config.authority_layers, config.sensory_layers),
+            balanced_split=(config.relaxation_target_authority, config.relaxation_target_sensory),
+            authority_alpha_max=config.alpha_sens_max,
+            balanced_alpha_max=config.relaxation_alpha_max,
+            thaw_alpha_start=config.relaxation_thaw_alpha,
+            thaw_warmup_steps=config.relaxation_thaw_steps,
+            ppl_spike_threshold=config.relaxation_ppl_spike_threshold,
+            recovery_steps=config.relaxation_recovery_steps,
+        )
 
     # Mixed precision
     scaler = torch.cuda.amp.GradScaler() if config.mixed_precision != "none" else None
@@ -858,6 +1492,10 @@ def train(config: UnifiedTrainingConfig):
             if scaler is not None:
                 scaler.unscale_(optimizer)
 
+            # Formula [1331]: Update gradient scaler step (hooks already applied during backward)
+            if gradient_scaler_9_3 is not None:
+                gradient_scaler_9_3.step(global_step)
+
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
 
             if scaler is not None:
@@ -952,6 +1590,20 @@ def train(config: UnifiedTrainingConfig):
                         align_ind = "~"  # Neutral
                     log_msg += f" | Align:{friction_alignment:+.2f}{align_ind} Dom:{friction_dominance:.2f}"
 
+                # Formula [1331]: Add 9:3 gradient scaling metrics
+                if gradient_scaler_9_3 is not None:
+                    gs_stats = gradient_scaler_9_3.get_stats()
+                    alpha_sens = gs_stats["sensory_scale"]
+                    sa_ratio = gs_stats["sensory_authority_ratio"]
+                    # Color-code S/A ratio (< 0.5 is good, Authority dominating)
+                    if sa_ratio < 0.3:
+                        sa_ind = "✓"  # Authority strongly dominant
+                    elif sa_ratio < 0.5:
+                        sa_ind = "~"  # Balanced
+                    else:
+                        sa_ind = "!"  # Sensory may be overriding
+                    log_msg += f" | α_sens:{alpha_sens:.2f} S/A:{sa_ratio:.2f}{sa_ind}"
+
                 print(log_msg)
                 step_start_time = time.time()
 
@@ -1003,6 +1655,51 @@ def train(config: UnifiedTrainingConfig):
                             tb_writer.add_scalar("ctrl/friction_dominance", friction_dominance, global_step)
                 else:
                     print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
+
+                # Dynamic Relaxation Controller Update
+                if relaxation_controller is not None:
+                    # Get Guna Coherence from metrics (or default)
+                    guna_coherence = val_metrics.get('coherence', 0.75)
+
+                    # Get S-Drift EMA from metrics (or estimate from PPL stability)
+                    # If not available, estimate from recent PPL variance
+                    s_drift_ema = val_metrics.get('s_drift_ema', 0.3)
+                    if 's_drift_ema' not in val_metrics:
+                        # Fallback: estimate drift from PPL stability
+                        # Lower PPL variance = lower drift
+                        recent_losses = train_losses[-50:] if len(train_losses) >= 50 else train_losses
+                        if len(recent_losses) > 1:
+                            loss_std = torch.tensor(recent_losses).std().item()
+                            s_drift_ema = min(1.0, loss_std * 2.0)  # Scale to [0, 1]
+                        else:
+                            s_drift_ema = 0.5
+
+                    # Update relaxation controller
+                    state_changed, action = relaxation_controller.update(
+                        guna_coherence=guna_coherence,
+                        s_drift_ema=s_drift_ema,
+                        val_ppl=val_ppl,
+                        global_step=global_step,
+                    )
+
+                    # Execute actions
+                    if action == "RELAX":
+                        relaxation_controller.execute_relaxation()
+                        print(f"  🎯 StabilityIndex achieved! Transitioning to balanced mode.")
+                    elif action == "RECOVER":
+                        relaxation_controller.execute_recovery()
+
+                    # Log status
+                    print(f"  --> [Relaxation] {relaxation_controller.get_status_string()}")
+
+                    # TensorBoard logging for relaxation
+                    if tb_writer is not None:
+                        stability = relaxation_controller.compute_stability_index(guna_coherence, s_drift_ema)
+                        tb_writer.add_scalar("relax/stability_index", stability, global_step)
+                        tb_writer.add_scalar("relax/stability_streak", relaxation_controller.stability_streak, global_step)
+                        tb_writer.add_scalar("relax/is_balanced", 1.0 if relaxation_controller.state == "BALANCED" else 0.0, global_step)
+                        tb_writer.add_scalar("relax/guna_coherence", guna_coherence, global_step)
+                        tb_writer.add_scalar("relax/s_drift_ema", s_drift_ema, global_step)
 
                     # Adaptive LR on PPL spike (only if no PIDv2)
                     if val_ppl < best_ppl:
@@ -1237,6 +1934,45 @@ def main():
     parser.add_argument("--no_tensorboard", action="store_true",
                        help="Disable TensorBoard logging")
 
+    # Formula [1331]: 9:3 Hierarchical Split
+    parser.add_argument("--use_9_3_split", action="store_true",
+                       help="Enable 9:3 Authority/Sensory gradient scaling")
+    parser.add_argument("--authority_layers", type=int, default=9,
+                       help="Number of Authority (State-Delta) layers")
+    parser.add_argument("--sensory_layers", type=int, default=3,
+                       help="Number of Sensory (Quadratic) layers")
+    parser.add_argument("--alpha_sens_min", type=float, default=0.1,
+                       help="Minimum sensory gradient scale (heavy dampening at start)")
+    parser.add_argument("--alpha_sens_max", type=float, default=0.5,
+                       help="Maximum sensory gradient scale (after warmup)")
+    parser.add_argument("--gradient_warmup_steps", type=int, default=500,
+                       help="Steps to ramp sensory gradient scale from min to max")
+
+    # Dynamic Relaxation: 9:3 → 6:6 transition
+    parser.add_argument("--enable_dynamic_relaxation", action="store_true",
+                       help="Enable automatic 9:3 → 6:6 split transition based on stability")
+    parser.add_argument("--relaxation_mode", type=str, default="consecutive",
+                       choices=["consecutive", "average"],
+                       help="Stability check mode: 'consecutive' (reset on dip) or 'average' (rolling mean)")
+    parser.add_argument("--relaxation_stability_threshold", type=float, default=0.82,
+                       help="StabilityIndex threshold to trigger relaxation")
+    parser.add_argument("--relaxation_stability_window", type=int, default=500,
+                       help="Consecutive steps above threshold required")
+    parser.add_argument("--relaxation_target_authority", type=int, default=6,
+                       help="Target authority layers after relaxation")
+    parser.add_argument("--relaxation_target_sensory", type=int, default=6,
+                       help="Target sensory layers after relaxation")
+    parser.add_argument("--relaxation_alpha_max", type=float, default=0.7,
+                       help="α ceiling after relaxation (higher = more sensory freedom)")
+    parser.add_argument("--relaxation_thaw_alpha", type=float, default=0.05,
+                       help="Dampened Thaw starting α for new sensory layers")
+    parser.add_argument("--relaxation_thaw_steps", type=int, default=250,
+                       help="Steps to ramp new sensory layers during Dampened Thaw")
+    parser.add_argument("--relaxation_ppl_spike_threshold", type=float, default=0.20,
+                       help="PPL increase %% to trigger Viparyaya recovery")
+    parser.add_argument("--relaxation_recovery_steps", type=int, default=200,
+                       help="Steps to stay in Viparyaya recovery before resuming")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -1306,6 +2042,25 @@ def main():
         tensorboard=args.tensorboard and not args.no_tensorboard,
         resume=args.resume,
         resume_weights_only=args.resume_weights_only,
+        # Formula [1331]: 9:3 Hierarchical Split
+        use_9_3_split=args.use_9_3_split,
+        authority_layers=args.authority_layers,
+        sensory_layers=args.sensory_layers,
+        alpha_sens_min=args.alpha_sens_min,
+        alpha_sens_max=args.alpha_sens_max,
+        gradient_warmup_steps=args.gradient_warmup_steps,
+        # Dynamic Relaxation: 9:3 → 6:6 transition
+        enable_dynamic_relaxation=args.enable_dynamic_relaxation,
+        relaxation_mode=args.relaxation_mode,
+        relaxation_stability_threshold=args.relaxation_stability_threshold,
+        relaxation_stability_window=args.relaxation_stability_window,
+        relaxation_target_authority=args.relaxation_target_authority,
+        relaxation_target_sensory=args.relaxation_target_sensory,
+        relaxation_alpha_max=args.relaxation_alpha_max,
+        relaxation_thaw_alpha=args.relaxation_thaw_alpha,
+        relaxation_thaw_steps=args.relaxation_thaw_steps,
+        relaxation_ppl_spike_threshold=args.relaxation_ppl_spike_threshold,
+        relaxation_recovery_steps=args.relaxation_recovery_steps,
     )
 
     # Train
