@@ -2861,17 +2861,14 @@ def train(config: UnifiedTrainingConfig):
 
                 model.train()
 
-            # Save checkpoint
+            # Save checkpoint (overwrites last.pt each time)
             if global_step % config.save_every == 0:
                 save_checkpoint(
                     model, optimizer, scheduler, global_step, best_val_loss,
-                    ckpt_dir / f"step_{global_step}.pt",
+                    ckpt_dir / "last.pt",
                     hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
                     drc_state=relaxation_controller.get_state() if relaxation_controller else None,
                 )
-                # Cleanup old checkpoints (keep last 5)
-                if PIDV2_AVAILABLE:
-                    cleanup_old_checkpoints(ckpt_dir, keep_last=5)
 
     # Final save
     save_checkpoint(
