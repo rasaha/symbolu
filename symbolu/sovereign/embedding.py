@@ -73,17 +73,17 @@ class SovereignEmbedding(nn.Module):
              │
              ▼
     ┌────────────────────────────────────────────────────────────────┐
-    │ HEADER (Enforced)                                               │
-    │   R: nn.Embedding(12, 48)  → [B, Seq, 48]                      │
-    │   C: nn.Linear(32, 32)     → [B, Seq, 32]                      │
-    │   S: nn.Embedding(17, 32)  → [B, Seq, 32]                      │
-    │   G: nn.Linear(3, 16)      → [B, Seq, 16]                      │
+    │ HEADER (Enforced) - Patent Spec Order                          │
+    │   G: nn.Linear(3, 16)      → [B, Seq, 16]  dims 0-15  (Vitals) │
+    │   S: nn.Embedding(17, 32)  → [B, Seq, 32]  dims 16-47 (Lock)   │
+    │   R: nn.Embedding(12, 48)  → [B, Seq, 48]  dims 48-95 (Nerve)  │
+    │   C: nn.Linear(32, 32)     → [B, Seq, 32]  dims 96-127 (Body)  │
     └────────────────────────────────────────────────────────────────┘
              │
              ▼
     ┌────────────────────────────────────────────────────────────────┐
     │ CONCATENATION                                                   │
-    │   Full = [Body | R | C | S | G] → [B, Seq, 1024]               │
+    │   Full = [Body(896) | G|S|R|C(128)] → [B, Seq, 1024]           │
     └────────────────────────────────────────────────────────────────┘
     ```
     """
@@ -177,17 +177,18 @@ class SovereignEmbedding(nn.Module):
         body = self.body_embed(input_ids)  # [B, Seq, 896]
         body = self.body_norm(body)
 
-        # Header construction
-        header_r = self.r_embed(r_signals)  # [B, Seq, 48]
-        header_c = self.c_proj(c_signals)  # [B, Seq, 32]
-        header_s = self.s_embed(s_signals)  # [B, Seq, 32]
-        header_g = self.g_proj(g_states)  # [B, Seq, 16]
+        # Header construction (ORDER MATTERS - must match state layout spec)
+        # State Layout: Guna[0:16] | S-Signal[16:48] | R-Signal[48:96] | C-Signal[96:128]
+        header_g = self.g_proj(g_states)  # [B, Seq, 16]  - dims 0-15
+        header_s = self.s_embed(s_signals)  # [B, Seq, 32] - dims 16-47
+        header_r = self.r_embed(r_signals)  # [B, Seq, 48] - dims 48-95
+        header_c = self.c_proj(c_signals)  # [B, Seq, 32]  - dims 96-127
 
-        # Concatenate header components
-        header = torch.cat([header_r, header_c, header_s, header_g], dim=-1)
+        # Concatenate header components in SPEC ORDER: G|S|R|C
+        header = torch.cat([header_g, header_s, header_r, header_c], dim=-1)
         header = self.header_norm(header)  # [B, Seq, 128]
 
-        # Full embedding = Body | Header
+        # Full embedding = Body | Header (body first for semantic processing)
         full_embed = torch.cat([body, header], dim=-1)  # [B, Seq, 1024]
 
         # Add position embeddings if provided
@@ -215,12 +216,13 @@ class SovereignEmbedding(nn.Module):
         g_states: torch.Tensor,
     ) -> torch.Tensor:
         """Get only the header (enforced structure) embedding."""
-        header_r = self.r_embed(r_signals)
-        header_c = self.c_proj(c_signals)
-        header_s = self.s_embed(s_signals)
-        header_g = self.g_proj(g_states)
+        # SPEC ORDER: Guna[0:16] | S-Signal[16:48] | R-Signal[48:96] | C-Signal[96:128]
+        header_g = self.g_proj(g_states)    # dims 0-15
+        header_s = self.s_embed(s_signals)  # dims 16-47
+        header_r = self.r_embed(r_signals)  # dims 48-95
+        header_c = self.c_proj(c_signals)   # dims 96-127
 
-        header = torch.cat([header_r, header_c, header_s, header_g], dim=-1)
+        header = torch.cat([header_g, header_s, header_r, header_c], dim=-1)
         return self.header_norm(header)
 
     @property
