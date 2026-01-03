@@ -12,6 +12,18 @@ Key Additions:
 - Vedic aspect patterns (Conjunction, Opposition, Trine, etc.)
 - Bhava significances (Tanu, Dhana, Sahaja, etc.)
 
+Formula [1331]: 9:3 Hierarchical Split
+--------------------------------------
+When `use_9_3_split=True`, the 12 layers are divided into:
+
+| Tier       | Layers | Role                           | Guna Tendency    |
+|------------|--------|--------------------------------|------------------|
+| Authority  | 0-8    | State-Delta (ontological)      | Sattva-dominant  |
+| Sensory    | 9-11   | Quadratic (token grounding)    | Rajas-prone      |
+
+The HierarchicalGradientScaler in train_unified_llm.py dampens gradients
+for Sensory layers (α = 0.1→0.5 over 500 steps) to prevent Rajasic override.
+
 This ensures consistency across all Symbol-U engines:
 - MiniLM V2 ✓ Has Bhava
 - SymbolU12 LLM ✓ Now has Bhava
@@ -33,6 +45,9 @@ Usage:
     # Optimized with Bhava (CPU-friendly)
     model_opt = SymbolU12OptimizedWithBhava()
     outputs = model_opt(input_ids)
+
+    # Training with 9:3 split (use CLI flag):
+    # python train_unified_llm.py --use_9_3_split --gradient_warmup_steps 500
 """
 
 import math
@@ -88,6 +103,14 @@ class SymbolU12BhavaConfig:
     # Thresholds
     activation_threshold: float = 0.1
     coherence_threshold: float = 0.7
+
+    # Formula [1331]: 9:3 Hierarchical Split Configuration
+    # When enabled, layers are divided into Authority (State-Delta) and Sensory (Quadratic)
+    # - Authority layers (0-8): High stiffness, Sattva-dominant, control Guna Coherence
+    # - Sensory layers (9-11): Dampened gradients, Rajas-prone, grounding in tokens
+    use_9_3_split: bool = False
+    authority_layers: int = 9   # Layers 0-8: State-Delta Authority
+    sensory_layers: int = 3     # Layers 9-11: Quadratic Sensory Buffer
 
     # Harmonic ratios
     HARMONIC_RATIOS: Dict[int, int] = None

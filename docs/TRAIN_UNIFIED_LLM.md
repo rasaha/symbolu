@@ -1,261 +1,406 @@
-# Unified LLM Training Script V9.5
+# Unified LLM Training Module
 
 ## Overview
 
-The `train_unified_llm.py` script provides comprehensive training for Sovereign-1 models with support for:
+`train_unified_llm.py` is the primary training script for Sovereign-1 models implementing the State-Delta Architecture with Vritti system, Guna Coherence, and hierarchical gradient control.
 
-- **SymbolU12 with Bhava**: Standard attention + 12D ontological + 144D Bhava
-- **Phase Attention**: O(n) complexity attention mechanism
-- **Hybrid Models**: Local + Phase attention combination
-- **Gen 2**: Hierarchical Complex Bhava (3-tier phase rotation)
+## Quick Start
 
-## Key Features (V9.5)
+```bash
+# Basic training with ontological model
+python train_unified_llm.py --model_type ontological --model_size small
 
-### Formula [1331] 9:3 Hierarchical Gradient Scaling
+# Training with 9:3 hierarchical split and PIDv2 controller
+python train_unified_llm.py \
+    --model_type ontological \
+    --model_size medium \
+    --use_9_3_split \
+    --controller pidv2 \
+    --enable_dynamic_relaxation
 
-Prevents sensory over-dampening (S/A ratio = 0.00 issue) by applying differentiated gradient scaling:
-
-- **Authority Layers (0-8)**: α = 1.0 (full gradient)
-- **Sensory Layers (9-11)**: α = 0.1 → 0.7 (warmup over 500 steps)
-
-Uses `register_hook` on parameters to ensure gradients are scaled BEFORE the optimizer sees them.
-
-### Dynamic Relaxation Controller (9:3 → 6:6)
-
-Monitors training stability and automatically relaxes the layer boundary:
-
-```
-StabilityIndex (SSI) = 0.7 × GC + 0.3 × (1 - Drift)
+# Resume from checkpoint
+python train_unified_llm.py --resume checkpoints_unified/step_5000.pt
 ```
 
-Where:
-- **GC**: Guna Coherence (from dims 0-15 of 128D header)
-- **Drift**: S-Signal drift magnitude
+---
 
-**Trigger Condition**: When 500-step rolling average of SSI ≥ 0.78
+## CLI Arguments Reference
 
-**Dampened Thaw**: Newly relaxed layers (6-8) start at α = 0.05 and ramp to 0.7 over 500 steps to prevent Rajasic Crash.
+### Model Architecture
 
-## Usage Examples
+| Argument | Type | Default | Choices | Description |
+|----------|------|---------|---------|-------------|
+| `--model_type` | str | `ontological` | `ontological`, `phase`, `hybrid`, `gen2` | Model architecture type. `gen2` = hierarchical complex Bhava |
+| `--model_size` | str | `small` | `tiny`, `small`, `medium`, `large` | Model size preset (see [Model Size Presets](#model-size-presets)) |
+| `--max_seq_len` | int | `2048` | - | Maximum sequence length |
+
+### Training Hyperparameters
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--batch_size` | int | `8` | Batch size per GPU |
+| `--gradient_accumulation` | int | `1` | Gradient accumulation steps |
+| `--max_steps` | int | `10000` | Maximum training steps |
+| `--learning_rate` | float | `3e-4` | Peak learning rate |
+| `--seed` | int | `42` | Random seed |
+
+### Dataset
+
+| Argument | Type | Default | Choices | Description |
+|----------|------|---------|---------|-------------|
+| `--dataset` | str | `wikitext103` | `wikitext103`, `wikitext2` | Training dataset |
+
+### Memory Optimization
+
+| Argument | Type | Default | Choices | Description |
+|----------|------|---------|---------|-------------|
+| `--gradient_checkpointing` | flag | `False` | - | Enable gradient checkpointing to save memory |
+| `--mixed_precision` | str | `bf16` | `none`, `fp16`, `bf16` | Mixed precision training mode |
+
+### Hybrid Model Configuration
+
+These options apply when `--model_type hybrid` is used:
+
+| Argument | Type | Default | Choices | Description |
+|----------|------|---------|---------|-------------|
+| `--local_backend` | str | `auto` | `auto`, `flash`, `sdpa`, `unfold` | LocalAttention backend implementation |
+| `--window_size` | int | `256` | - | Local attention window size |
+| `--local_layers` | int | `4` | - | Number of local-only attention layers |
+| `--alpha_local` | float | `0.8` | - | Weight for local attention in hybrid layers |
+| `--alpha_phase` | float | `0.2` | - | Weight for phase attention in hybrid layers |
+
+### Alpha Decay Schedule
+
+Controls the decay of phase attention weight over training (for phase/hybrid models):
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--alpha_phase_start` | float | `0.6` | Initial alpha_phase value |
+| `--alpha_phase_end` | float | `0.4` | Final alpha_phase value after decay |
+| `--alpha_decay_steps` | int | `10000` | Steps over which alpha_phase decays |
+
+### Ontological Loss Weights
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--lambda_bhava` | float | `0.1` | Bhava relationship consistency loss weight |
+| `--lambda_coherence` | float | `0.05` | Global coherence loss weight |
+| `--no_coherence_loss` | flag | `False` | Disable coherence loss entirely |
+
+### Logging & Checkpointing
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--log_every` | int | `10` | Log metrics every N steps |
+| `--eval_every` | int | `100` | Run validation every N steps |
+| `--save_every` | int | `1000` | Save checkpoint every N steps |
+| `--checkpoint_dir` | str | `checkpoints_unified` | Directory for saving checkpoints |
+| `--tensorboard` | flag | `True` | Enable TensorBoard logging |
+| `--no_tensorboard` | flag | `False` | Disable TensorBoard logging |
+
+### Resume Training
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--resume` | str | `""` | Path to checkpoint to resume from |
+| `--resume_weights_only` | flag | `False` | Only load model weights, reset optimizer state |
+
+---
+
+## PIDv2 Controller (V9.4.4)
+
+The PIDv2 controller implements adaptive authority scaling based on training stability metrics.
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--controller` | str | `none` | `none`, `pidv2`, `emergency_pd` - Authority controller type |
+| `--pidv2_kp_min` | float | `0.10` | Minimum Kp (proportional gain) when noisy |
+| `--pidv2_kp_max` | float | `0.30` | Maximum Kp when training is clean/stable |
+| `--pidv2_kp_sensitivity` | float | `5.0` | Volatility sensitivity for Kp adaptation |
+| `--pidv2_ki` | float | `0.02` | Integral gain for accumulated error |
+| `--pidv2_kd` | float | `0.10` | Derivative gain for rate of change |
+| `--pidv2_a_min` | float | `0.30` | Minimum authority factor floor |
+| `--pidv2_w_s` | float | `0.30` | Semantic weight (0.30 = 30% prompt-based) |
+| `--phase_ramp_steps` | int | `7000` | Steps for phase LR ramp (handshake dampening) |
+
+### Controller Modes
+
+- **`none`**: No adaptive control, fixed learning rate
+- **`pidv2`**: Full PID controller with adaptive Kp based on training stability
+- **`emergency_pd`**: PD-only controller for emergency recovery scenarios
+
+---
+
+## Formula [1331]: 9:3 Hierarchical Split
+
+Implements gradient dampening for Authority/Sensory layer split. The first N layers (Authority) receive full gradients while the last M layers (Sensory) receive dampened gradients.
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--use_9_3_split` | flag | `False` | Enable 9:3 Authority/Sensory gradient scaling |
+| `--authority_layers` | int | `9` | Number of Authority (State-Delta) layers |
+| `--sensory_layers` | int | `3` | Number of Sensory (Quadratic) layers |
+| `--alpha_sens_min` | float | `0.1` | Minimum sensory gradient scale (heavy dampening) |
+| `--alpha_sens_max` | float | `0.5` | Maximum sensory gradient scale (after warmup) |
+| `--gradient_warmup_steps` | int | `500` | Steps to ramp α_sens from min to max |
+
+### How It Works
+
+```
+Layer 0-8  (Authority): α = 1.0 (full gradients)
+Layer 9-11 (Sensory):   α = 0.1 → 0.5 over 500 steps
+```
+
+This prevents Rajasic override from the sensory layers during early training.
+
+---
+
+## Dynamic Relaxation Controller
+
+Automatically transitions from 9:3 (Authority-heavy) to 6:6 (Balanced) split based on training stability.
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--enable_dynamic_relaxation` | flag | `False` | Enable automatic 9:3 → 6:6 transition |
+| `--relaxation_mode` | str | `consecutive` | `consecutive` or `average` stability check mode |
+| `--relaxation_stability_threshold` | float | `0.82` | StabilityIndex threshold to trigger relaxation |
+| `--relaxation_stability_window` | int | `500` | Steps for stability verification |
+| `--relaxation_target_authority` | int | `6` | Target authority layers after relaxation |
+| `--relaxation_target_sensory` | int | `6` | Target sensory layers after relaxation |
+| `--relaxation_alpha_max` | float | `0.7` | α ceiling after relaxation |
+| `--relaxation_thaw_alpha` | float | `0.05` | Dampened Thaw starting α for new sensory layers |
+| `--relaxation_thaw_steps` | int | `250` | Steps to ramp new sensory layers |
+| `--relaxation_ppl_spike_threshold` | float | `0.20` | PPL increase % to trigger Viparyaya recovery |
+| `--relaxation_recovery_steps` | int | `200` | Steps to stay in recovery mode |
+
+### Relaxation Modes
+
+- **`consecutive`** (Default): Requires StabilityIndex ≥ threshold for N consecutive steps. Resets on any dip.
+- **`average`**: Requires average StabilityIndex ≥ threshold over rolling N-step window. More tolerant of temporary dips.
+
+### State Machine
+
+```
+AUTHORITY (9:3) → MONITORING → RELAXING → BALANCED (6:6)
+                                   ↓
+                              RECOVERY (Viparyaya)
+                                   ↓
+                              AUTHORITY (9:3)
+```
+
+### StabilityIndex Formula
+
+```
+SSI = 0.7 * GunaCoherence + 0.3 * (1 - S_Drift_EMA)
+```
+
+---
+
+## Stress Test Mode
+
+Run controlled stress tests with data corruption injection.
+
+| Argument | Type | Default | Choices | Description |
+|----------|------|---------|---------|-------------|
+| `--stress_test` | flag | `False` | - | Run stress test instead of training |
+| `--stress_start` | int | `1000` | - | Step to start corruption injection |
+| `--stress_duration` | int | `200` | - | Steps to inject corruption |
+| `--corruption_rate` | float | `0.10` | - | Probability of corrupting each batch |
+| `--corruption_mode` | str | `noise` | `noise`, `label_flip`, `repeat` | Type of corruption to inject |
+
+---
+
+## Hidden Defaults (Not Exposed via CLI)
+
+These parameters are set in `UnifiedTrainingConfig` but not accessible via CLI:
+
+### Model Architecture
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `vocab_size` | `50257` | Vocabulary size (GPT-2 tokenizer) |
+| `dropout` | `0.1` | Dropout probability |
+| `sync_steps` | `3` | Phase synchronization steps |
+| `sync_lr` | `0.1` | Phase synchronization learning rate |
+| `bhava_embed_dim` | `128` | Bhava embedding dimension |
+| `num_drishti_heads` | `4` | Number of Drishti attention heads |
+
+### Optimizer
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `warmup_steps` | `500` | LR warmup steps |
+| `weight_decay` | `0.1` | AdamW weight decay |
+| `beta1` | `0.9` | Adam beta1 |
+| `beta2` | `0.95` | Adam beta2 |
+| `max_grad_norm` | `1.0` | Gradient clipping norm |
+
+### Loss Weights
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `lambda_lm` | `1.0` | Language modeling loss weight |
+| `lambda_entropy` | `0.01` | Entropy regularization weight |
+
+### Sovereign-1 Loss (Hardened Decomposed Loss)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `use_sovereign_loss` | `True` | Enable Sovereign-1 decomposed loss |
+| `sovereign_weight_guna` | `1.0` | Guna signal weight |
+| `sovereign_weight_s` | `2.0` | S-Signal (referent) weight |
+| `sovereign_weight_r` | `5.0` | R-Signal (ontology) weight - CRITICAL |
+| `sovereign_weight_c` | `0.5` | C-Signal (phoneme) weight |
+
+### PIDv2 Hidden Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `pidv2_c_floor` | `0.68` | Coherence floor for Kp adaptation |
+| `pidv2_c_good` | `0.76` | Coherence target for "good" training |
+| `pidv2_semantic_scale` | `50.0` | Semantic loss scaling factor |
+| `pidv2_handshake_dampen` | `True` | Enable handshake dampening |
+| `phase_delay_steps` | `0` | Steps to delay phase activation |
+
+### Hardware
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `device` | `auto` | Device selection (auto-detects CUDA) |
+| `num_workers` | `4` | DataLoader workers |
+| `tokenizer` | `gpt2` | Tokenizer to use |
+
+---
+
+## Model Size Presets
+
+| Size | embed_dim | num_layers | num_heads | ff_dim | ~Params |
+|------|-----------|------------|-----------|--------|---------|
+| `tiny` | 256 | 6 | 4 | 1024 | ~15M |
+| `small` | 512 | 8 | 8 | 2048 | ~50M |
+| `medium` | 768 | 12 | 12 | 3072 | ~125M |
+| `large` | 1024 | 16 | 16 | 4096 | ~350M |
+
+---
+
+## Example Configurations
 
 ### Basic Ontological Training
+
 ```bash
 python train_unified_llm.py \
     --model_type ontological \
     --model_size small \
-    --dataset wikitext103 \
-    --max_steps 10000
-```
-
-### Training with 9:3 Split
-```bash
-python train_unified_llm.py \
-    --model_type ontological \
-    --model_size large \
-    --use_9_3_split \
-    --authority_layers 9 \
-    --sensory_layers 3 \
-    --alpha_sens_initial 0.1 \
-    --alpha_sens_max 0.7 \
-    --controller pidv2 \
-    --learning_rate 1e-4 \
+    --max_steps 10000 \
     --batch_size 8 \
-    --max_seq_len 2048 \
-    --gradient_checkpointing \
-    --dataset wikitext103 \
-    --max_steps 20000
+    --learning_rate 3e-4
 ```
 
-### Training with Dynamic Relaxation (9:3 → 6:6)
+### Full Sovereign-1 with All Controllers
+
 ```bash
 python train_unified_llm.py \
     --model_type ontological \
-    --model_size large \
+    --model_size medium \
+    --max_steps 50000 \
+    --batch_size 16 \
+    --gradient_accumulation 2 \
+    --learning_rate 1e-4 \
     --use_9_3_split \
-    --authority_layers 9 \
-    --sensory_layers 3 \
+    --controller pidv2 \
     --enable_dynamic_relaxation \
     --relaxation_mode average \
-    --relaxation_stability_threshold 0.78 \
-    --relaxation_target_authority 6 \
-    --relaxation_target_sensory 6 \
-    --controller pidv2 \
-    --learning_rate 1e-4 \
-    --batch_size 8 \
-    --max_seq_len 2048 \
     --gradient_checkpointing \
-    --dataset wikitext103 \
-    --max_steps 20000
+    --mixed_precision bf16
 ```
 
-### Hybrid Model with Friction Controller
+### Memory-Efficient Large Model
+
+```bash
+python train_unified_llm.py \
+    --model_type ontological \
+    --model_size large \
+    --batch_size 4 \
+    --gradient_accumulation 8 \
+    --gradient_checkpointing \
+    --mixed_precision bf16 \
+    --use_9_3_split
+```
+
+### Hybrid Model with Local Attention
+
 ```bash
 python train_unified_llm.py \
     --model_type hybrid \
     --model_size medium \
+    --local_backend flash \
+    --window_size 512 \
     --local_layers 6 \
-    --controller pidv2 \
-    --dataset wikitext103 \
-    --max_steps 10000
+    --alpha_local 0.7 \
+    --alpha_phase 0.3
 ```
 
-## CLI Arguments
+---
 
-### Model Configuration
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--model_type` | ontological | Model type: ontological, phase, hybrid, gen2 |
-| `--model_size` | small | Model size: tiny, small, medium, large |
-| `--max_seq_len` | 2048 | Maximum sequence length |
+## TensorBoard Metrics
 
-### Formula [1331] 9:3 Split
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--use_9_3_split` | False | Enable 9:3 Authority/Sensory gradient split |
-| `--authority_layers` | 9 | Number of authority layers (R-Signal focus) |
-| `--sensory_layers` | 3 | Number of sensory layers (S-Signal focus) |
-| `--alpha_sens_initial` | 0.1 | Initial sensory gradient multiplier |
-| `--alpha_sens_max` | 0.7 | Maximum sensory gradient after warmup |
+When `--tensorboard` is enabled (default), the following metrics are logged:
 
-### Dynamic Relaxation
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--enable_dynamic_relaxation` | False | Enable 9:3 → 6:6 transition |
-| `--relaxation_mode` | average | Stability tracking: consecutive or average |
-| `--relaxation_stability_threshold` | 0.78 | SSI threshold for relaxation |
-| `--relaxation_streak_target` | 5 | Consecutive stable evals for consecutive mode |
-| `--relaxation_target_authority` | 6 | Target authority layers after relaxation |
-| `--relaxation_target_sensory` | 6 | Target sensory layers after relaxation |
+### Training Metrics
+- `train/loss` - Total training loss
+- `train/lm_loss` - Language modeling loss
+- `train/ppl` - Training perplexity
+- `train/lr` - Current learning rate
 
-### PIDv2 Controller
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--controller` | none | Controller: none, pidv2, emergency_pd |
-| `--pidv2_kp_min` | 0.10 | Minimum Kp (when noisy) |
-| `--pidv2_kp_max` | 0.30 | Maximum Kp (when clean) |
-| `--pidv2_a_min` | 0.30 | Minimum authority factor |
-| `--pidv2_w_s` | 0.30 | Semantic weight (30% prompt-based) |
+### Validation Metrics
+- `val/loss` - Validation loss
+- `val/ppl` - Validation perplexity
 
-### Training
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--batch_size` | 8 | Batch size per GPU |
-| `--learning_rate` | 3e-4 | Peak learning rate |
-| `--max_steps` | 10000 | Maximum training steps |
-| `--gradient_checkpointing` | False | Enable gradient checkpointing |
-| `--mixed_precision` | bf16 | Mixed precision: none, fp16, bf16 |
+### Sovereign-1 Metrics
+- `sovereign/guna_coherence` - Guna Coherence (GC)
+- `sovereign/s_drift_ema` - S-Drift exponential moving average
+- `sovereign/stability_index` - Sattvic Stability Index (SSI)
 
-## Telemetry Output
+### Controller Metrics (when `--controller pidv2`)
+- `pid/kp` - Current proportional gain
+- `pid/authority_factor` - Current authority factor
+- `pid/semantic_weight` - Current semantic weight
 
-The training script outputs detailed telemetry including:
+### Gradient Metrics (when `--use_9_3_split`)
+- `gradient/authority_norm` - Authority layer gradient norm
+- `gradient/sensory_norm` - Sensory layer gradient norm
+- `gradient/sensory_scale` - Current α_sens value
+
+---
+
+## Output Files
 
 ```
-Step   1000 | Loss: 4.2345 | PPL: 68.89 | LR: 3.00e-04 | Tok/s: 45678 | VRAM: 24.5GB | S/A: 0.35 α_s: 0.45
-  --> Val Loss: 4.1234 | Val PPL: 61.89 | PIDv2: A=0.85 Kp=0.22 v=-0.12
-  --> DRC: SSI_avg=0.81 | Split=9:3
+checkpoints_unified/
+├── step_1000.pt          # Full checkpoint (model, optimizer, scheduler, step)
+├── step_2000.pt
+├── ...
+├── best_model.pt         # Best validation loss checkpoint
+└── config.json           # Training configuration
 ```
 
-Key metrics:
-- **S/A**: Sensory/Authority gradient ratio (should be > 0)
-- **α_s**: Current sensory gradient multiplier
-- **SSI_avg**: Stability Index rolling average
-- **Split**: Current Authority:Sensory layer split
+---
 
-## Troubleshooting
+## Environment Variables
 
-### Issue: S/A ratio = 0.00
-**Cause**: Sensory layers receiving no gradients (over-dampened)
-**Solution**: Enable 9:3 split with `--use_9_3_split`
+| Variable | Description |
+|----------|-------------|
+| `CUDA_VISIBLE_DEVICES` | GPU device selection |
+| `TOKENIZERS_PARALLELISM` | Set to `false` to suppress tokenizer warnings |
 
-### Issue: PPL stuck at high values (>50,000)
-**Causes**:
-1. Incorrect layer classification
-2. Gradient explosion in authority layers
-3. Insufficient learning rate
+---
 
-**Solutions**:
-1. Verify model architecture matches layer pattern
-2. Use `--controller pidv2` for adaptive control
-3. Try `--learning_rate 1e-4` with warmup
+## Notes
 
-### Issue: Relaxation streak keeps resetting
-**Cause**: Stability Index fluctuating below threshold
-**Solutions**:
-1. Use `--relaxation_mode average` instead of consecutive
-2. Lower threshold: `--relaxation_stability_threshold 0.75`
-3. Increase window size (modify in code if needed)
+1. **9:3 Split Requires Correct Layer Count**: Ensure `authority_layers + sensory_layers` matches your model's total layers. Default 9:3 works with 12-layer models (`small`, `medium`).
 
-### Issue: VRAM underutilized
-**Solution**: Increase batch size or sequence length:
-```bash
---batch_size 16 --max_seq_len 4096 --gradient_checkpointing
-```
+2. **Dynamic Relaxation Requires 9:3 Split**: `--enable_dynamic_relaxation` is only active when `--use_9_3_split` is also enabled.
 
-## Architecture
+3. **PIDv2 Controller**: The controller monitors Guna Coherence and adjusts training dynamics. Works independently of 9:3 split.
 
-### Layer Classification
-```
-Layers 0-8 (Authority): Focus on R-Signal (dims 48-95)
-  - Higher gradient weight (α = 1.0)
-  - Learn "what things mean"
-
-Layers 9-11 (Sensory): Focus on S-Signal (dims 16-47)
-  - Lower initial gradient (α = 0.1)
-  - Learn "what things are"
-
-Embeddings: Classified as Sensory (grounding)
-LM Head: Classified as Authority (meaning output)
-```
-
-### Gradient Hook Mechanism
-```python
-# Hooks are registered on all parameters
-def hook(grad):
-    if layer_type == "authority":
-        return grad * 1.0
-    elif layer_type == "sensory":
-        return grad * alpha_sens  # Dynamically updated
-    return grad
-```
-
-### Dampened Thaw (on 9:3 → 6:6 transition)
-```
-1. Relaxation triggered at SSI_avg >= 0.78
-2. Layers 6-8 reclassified: Authority → Sensory
-3. These layers start at α = 0.05 (very dampened)
-4. α ramps to 0.7 over 500 steps
-5. Prevents "Rajasic Crash" (volatility spike)
-```
-
-## Integration with PIDv2 Controller
-
-The 9:3 split integrates seamlessly with PIDv2:
-
-1. **Authority factor** from PIDv2 multiplies learning rate
-2. **Gradient hooks** scale gradients before optimizer
-3. **DRC** updates independently during evaluation
-4. **Viparyaya safety valve** triggers on PPL spike >20%
-
-Combined control flow:
-```
-loss.backward()
-  ↓
-Gradient Hooks (9:3 scaling)
-  ↓
-optimizer.step()
-  ↓
-HGS.step() (warmup update)
-  ↓
-evaluation
-  ↓
-DRC.update() (stability check)
-  ↓
-PIDv2.update() (authority adjustment)
-```
-
-## References
-
-- Patent Formula [1331]: Hierarchical Gradient Scaling
-- Patent Formula [201]: Vritti-Driven Phase Stiffness
-- Patent Formula [259]: InsightGate Epistemic Stability Control
-- SOVEREIGN_1_DESIGN_IMPLEMENTATION.md: Full architecture specification
+4. **Stress Test Redirect**: When `--stress_test` is used, the script redirects to `stress_test.py` with the specified parameters.
