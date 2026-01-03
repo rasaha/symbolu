@@ -1017,9 +1017,18 @@ Examples:
     # Create model
     print(f"\n1. Creating {args.model_size} model...")
     print(f"   d_model={d_model}, n_layers={n_layers}, n_heads={n_heads}")
+
+    # Calculate body_dim based on d_model
+    # Header is always 128 dims: r_dim(48) + c_dim(32) + s_dim(32) + g_dim(16)
+    header_dim = 48 + 32 + 32 + 16  # 128
+    body_dim = d_model - header_dim
+    if body_dim < 64:
+        raise ValueError(f"d_model={d_model} too small. Need at least {header_dim + 64}=192 for header+body")
+
     embed_config = SovereignEmbeddingConfig(
         vocab_size=50257,
         d_model=d_model,
+        body_dim=body_dim,
     )
     model = SovereignTransformer(embed_config, n_heads=n_heads, n_layers=n_layers)
 
