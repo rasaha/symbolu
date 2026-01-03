@@ -2336,7 +2336,8 @@ def train(config: UnifiedTrainingConfig):
         alert_config = AlertConfig(
             sa_ratio_danger=0.55,
             gc_danger=0.25,
-            gc_floor=config.gc_floor,
+            # gc_floor is used by SovereignEngine, not AlertConfig
+            # AlertConfig uses gc_healthy (0.80) for recovery detection
         )
         alert_monitor = SovereignAlertMonitor(config=alert_config)
         print(f"  Sovereign Alert Monitor: ENABLED (Auto-Pivot)")
