@@ -159,6 +159,179 @@ torch.backends.cudnn.benchmark = True
 
 
 # =============================================================================
+# FORMULA [1331]: HIERARCHICAL GRADIENT SCALING FOR 9:3 SPLIT
+# =============================================================================
+
+class HierarchicalGradientScaler:
+    """
+    Implements Formula [1331]: Gradient dampening for 9:3 layer split.
+
+    Prevents 3 Quadratic (Sensory) layers from becoming too Rajasic
+    by scaling their gradients relative to the 9 Authority layers.
+
+    Architecture:
+        Layers 0-8:  Authority (State-Delta) - Full gradients (α = 1.0)
+        Layers 9-11: Sensory (Quadratic)     - Dampened gradients (α = 0.1→0.5)
+
+    The warmup schedule allows Authority layers to establish stable
+    ontological foundations before Sensory layers begin contributing.
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        authority_layers: int = 9,      # Layers 0-8
+        sensory_layers: int = 3,        # Layers 9-11
+        alpha_sens_min: float = 0.1,    # Heavy dampening at start
+        alpha_sens_max: float = 0.5,    # Moderate dampening after warmup
+        warmup_steps: int = 500,        # Ramp period
+        layer_attr: str = "blocks",     # Attribute name for layers
+    ):
+        self.model = model
+        self.authority_layers = authority_layers
+        self.sensory_layers = sensory_layers
+        self.alpha_sens_min = alpha_sens_min
+        self.alpha_sens_max = alpha_sens_max
+        self.warmup_steps = warmup_steps
+        self.layer_attr = layer_attr
+
+        self.current_step = 0
+        self.hooks = []
+        self.gradient_stats = {
+            "authority_grad_norm": 0.0,
+            "sensory_grad_norm": 0.0,
+            "sensory_scale": alpha_sens_min,
+            "sensory_authority_ratio": 0.0,
+        }
+
+        # Register hooks
+        self._register_hooks()
+
+    def _get_layers(self) -> nn.ModuleList:
+        """Get the layer ModuleList from model."""
+        # Try common attribute names
+        for attr in [self.layer_attr, "layers", "blocks", "transformer.blocks",
+                     "layers_1_8", "model.layers"]:
+            if "." in attr:
+                # Handle nested attributes
+                obj = self.model
+                for part in attr.split("."):
+                    obj = getattr(obj, part, None)
+                    if obj is None:
+                        break
+                if obj is not None and isinstance(obj, nn.ModuleList):
+                    return obj
+            elif hasattr(self.model, attr):
+                layers = getattr(self.model, attr)
+                if isinstance(layers, nn.ModuleList):
+                    return layers
+
+        # Fallback: collect all named children that look like layers
+        layer_modules = []
+        for name, module in self.model.named_children():
+            if 'layer' in name.lower() or 'block' in name.lower():
+                if isinstance(module, nn.ModuleList):
+                    return module
+                layer_modules.append(module)
+
+        if layer_modules:
+            return nn.ModuleList(layer_modules)
+
+        raise ValueError(f"Could not find layers in model. Tried: {self.layer_attr}")
+
+    def _compute_alpha_sens(self) -> float:
+        """Compute current sensory gradient scale based on warmup progress."""
+        if self.current_step >= self.warmup_steps:
+            return self.alpha_sens_max
+
+        # Linear ramp from min to max
+        progress = self.current_step / self.warmup_steps
+        alpha = self.alpha_sens_min + (self.alpha_sens_max - self.alpha_sens_min) * progress
+
+        return alpha
+
+    def _create_grad_hook(self, layer_idx: int, is_sensory: bool):
+        """Create a gradient scaling hook for a specific layer."""
+        def hook(grad):
+            if grad is None:
+                return grad
+
+            if is_sensory:
+                # Apply dampening to sensory layers
+                alpha = self._compute_alpha_sens()
+                scaled_grad = grad * alpha
+
+                # Track stats (accumulate norms)
+                self.gradient_stats["sensory_grad_norm"] += grad.norm().item()
+                self.gradient_stats["sensory_scale"] = alpha
+
+                return scaled_grad
+            else:
+                # Authority layers get full gradient
+                self.gradient_stats["authority_grad_norm"] += grad.norm().item()
+                return grad
+
+        return hook
+
+    def _register_hooks(self):
+        """Register gradient hooks on all layer parameters."""
+        try:
+            layers = self._get_layers()
+        except ValueError as e:
+            print(f"  [Formula 1331] Warning: {e}")
+            print(f"  [Formula 1331] Gradient scaling disabled - could not find layers")
+            return
+
+        total_layers = len(layers)
+
+        # Determine sensory layer indices (last N in 9:3 split)
+        sensory_start = max(0, total_layers - self.sensory_layers)
+
+        print(f"\n  [Formula 1331] Hierarchical Gradient Scaler ENABLED:")
+        print(f"    Total layers detected: {total_layers}")
+        print(f"    Authority layers: 0-{sensory_start - 1} (α = 1.0)")
+        print(f"    Sensory layers: {sensory_start}-{total_layers - 1} (α = {self.alpha_sens_min}→{self.alpha_sens_max})")
+        print(f"    Warmup: {self.warmup_steps} steps")
+
+        hook_count = 0
+        for layer_idx, layer in enumerate(layers):
+            is_sensory = layer_idx >= sensory_start
+
+            for name, param in layer.named_parameters():
+                if param.requires_grad:
+                    hook = param.register_hook(self._create_grad_hook(layer_idx, is_sensory))
+                    self.hooks.append(hook)
+                    hook_count += 1
+
+        print(f"    Registered {hook_count} gradient hooks")
+
+    def step(self, global_step: int):
+        """Update current step and reset gradient stats."""
+        self.current_step = global_step
+
+        # Compute ratio before resetting
+        if self.gradient_stats["authority_grad_norm"] > 0:
+            ratio = self.gradient_stats["sensory_grad_norm"] / self.gradient_stats["authority_grad_norm"]
+            self.gradient_stats["sensory_authority_ratio"] = ratio
+
+        # Reset accumulators for next step
+        self.gradient_stats["authority_grad_norm"] = 0.0
+        self.gradient_stats["sensory_grad_norm"] = 0.0
+        self.gradient_stats["sensory_scale"] = self._compute_alpha_sens()
+
+    def get_stats(self) -> dict:
+        """Get gradient statistics for logging."""
+        return self.gradient_stats.copy()
+
+    def remove_hooks(self):
+        """Remove all registered hooks."""
+        for hook in self.hooks:
+            hook.remove()
+        self.hooks = []
+        print("  [Formula 1331] Gradient hooks removed")
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -256,6 +429,14 @@ class UnifiedTrainingConfig:
     # Phase ramp settings (for handshake dampening)
     phase_delay_steps: int = 0
     phase_ramp_steps: int = 7000
+
+    # Formula [1331]: 9:3 Hierarchical Split Configuration
+    use_9_3_split: bool = False           # Enable 9:3 Authority/Sensory gradient scaling
+    authority_layers: int = 9             # Number of Authority (State-Delta) layers
+    sensory_layers: int = 3               # Number of Sensory (Quadratic) layers
+    alpha_sens_min: float = 0.1           # Heavy gradient dampening at start
+    alpha_sens_max: float = 0.5           # Moderate dampening after warmup
+    gradient_warmup_steps: int = 500      # Steps to ramp α_sens from min to max
 
     # Resume checkpoint
     resume: str = ""
@@ -689,6 +870,7 @@ def train(config: UnifiedTrainingConfig):
     print(f"  Controller: {config.controller.upper() if config.controller != 'none' else 'None'}")
     print(f"  Gradient Checkpointing: {config.gradient_checkpointing}")
     print(f"  Mixed Precision: {config.mixed_precision}")
+    print(f"  9:3 Hierarchical Split: {'ENABLED' if config.use_9_3_split else 'Disabled'}")
 
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
@@ -731,6 +913,19 @@ def train(config: UnifiedTrainingConfig):
         T_max=config.max_steps - config.warmup_steps,
         eta_min=config.learning_rate * 0.1,
     )
+
+    # Formula [1331]: 9:3 Hierarchical Gradient Scaling
+    gradient_scaler_9_3 = None
+    if config.use_9_3_split:
+        gradient_scaler_9_3 = HierarchicalGradientScaler(
+            model=model,
+            authority_layers=config.authority_layers,
+            sensory_layers=config.sensory_layers,
+            alpha_sens_min=config.alpha_sens_min,
+            alpha_sens_max=config.alpha_sens_max,
+            warmup_steps=config.gradient_warmup_steps,
+            layer_attr="blocks",  # Common attribute name for transformer layers
+        )
 
     # Mixed precision
     scaler = torch.cuda.amp.GradScaler() if config.mixed_precision != "none" else None
@@ -858,6 +1053,10 @@ def train(config: UnifiedTrainingConfig):
             if scaler is not None:
                 scaler.unscale_(optimizer)
 
+            # Formula [1331]: Update gradient scaler step (hooks already applied during backward)
+            if gradient_scaler_9_3 is not None:
+                gradient_scaler_9_3.step(global_step)
+
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
 
             if scaler is not None:
@@ -951,6 +1150,20 @@ def train(config: UnifiedTrainingConfig):
                     else:
                         align_ind = "~"  # Neutral
                     log_msg += f" | Align:{friction_alignment:+.2f}{align_ind} Dom:{friction_dominance:.2f}"
+
+                # Formula [1331]: Add 9:3 gradient scaling metrics
+                if gradient_scaler_9_3 is not None:
+                    gs_stats = gradient_scaler_9_3.get_stats()
+                    alpha_sens = gs_stats["sensory_scale"]
+                    sa_ratio = gs_stats["sensory_authority_ratio"]
+                    # Color-code S/A ratio (< 0.5 is good, Authority dominating)
+                    if sa_ratio < 0.3:
+                        sa_ind = "✓"  # Authority strongly dominant
+                    elif sa_ratio < 0.5:
+                        sa_ind = "~"  # Balanced
+                    else:
+                        sa_ind = "!"  # Sensory may be overriding
+                    log_msg += f" | α_sens:{alpha_sens:.2f} S/A:{sa_ratio:.2f}{sa_ind}"
 
                 print(log_msg)
                 step_start_time = time.time()
@@ -1237,6 +1450,20 @@ def main():
     parser.add_argument("--no_tensorboard", action="store_true",
                        help="Disable TensorBoard logging")
 
+    # Formula [1331]: 9:3 Hierarchical Split
+    parser.add_argument("--use_9_3_split", action="store_true",
+                       help="Enable 9:3 Authority/Sensory gradient scaling")
+    parser.add_argument("--authority_layers", type=int, default=9,
+                       help="Number of Authority (State-Delta) layers")
+    parser.add_argument("--sensory_layers", type=int, default=3,
+                       help="Number of Sensory (Quadratic) layers")
+    parser.add_argument("--alpha_sens_min", type=float, default=0.1,
+                       help="Minimum sensory gradient scale (heavy dampening at start)")
+    parser.add_argument("--alpha_sens_max", type=float, default=0.5,
+                       help="Maximum sensory gradient scale (after warmup)")
+    parser.add_argument("--gradient_warmup_steps", type=int, default=500,
+                       help="Steps to ramp sensory gradient scale from min to max")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -1306,6 +1533,13 @@ def main():
         tensorboard=args.tensorboard and not args.no_tensorboard,
         resume=args.resume,
         resume_weights_only=args.resume_weights_only,
+        # Formula [1331]: 9:3 Hierarchical Split
+        use_9_3_split=args.use_9_3_split,
+        authority_layers=args.authority_layers,
+        sensory_layers=args.sensory_layers,
+        alpha_sens_min=args.alpha_sens_min,
+        alpha_sens_max=args.alpha_sens_max,
+        gradient_warmup_steps=args.gradient_warmup_steps,
     )
 
     # Train
