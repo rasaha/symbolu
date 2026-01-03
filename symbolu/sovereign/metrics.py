@@ -8,6 +8,7 @@ Patent Formulas Implemented:
 - [B1] ConsistencyLagrangian: S-Drift measurement via forward/backward alignment
 - [U1/U2] PhaseCoherenceMatrix: Pairwise phase angle coherence across 12 layers
 - [S8] StabilityConstraint: Entropy rate tracking with Inertial Brake
+- [S3] SovereignLoss: Combined task + consistency + coherence loss
 """
 
 import torch
@@ -500,3 +501,282 @@ class SovereignMetrics:
             result["stability_state"] = updated_state
 
         return result
+
+
+# =============================================================================
+# SOVEREIGN ENGINE - Trainable Loss Functions
+# =============================================================================
+
+@dataclass
+class SovereignLossConfig:
+    """Configuration for Sovereign-Lagrangian Loss."""
+    lambda_b1: float = 0.5      # Consistency Lagrangian weight [B1]
+    mu_s3: float = 0.2          # Global Coherence weight [S3]
+    lambda_bhava: float = 0.1   # Bhava loss weight (existing)
+    gc_floor: float = 0.65      # Minimum GC before PIDv2 intervention
+    s_drift_ceiling: float = 0.3  # Maximum S-Drift before warning
+
+
+class SovereignEngine:
+    """
+    The Sovereign Logic Engine - Trainable loss functions for Sovereign-1.
+
+    Implements Patent Formulas for training:
+    - [B1] ConsistencyLagrangian: Forward/Backward feasibility alignment
+    - [U1/U2] Phase-Lock Matrix: Exact pairwise phase coherence
+    - [S3] SovereignLoss: Combined objective function
+    - [S8] StabilityConstraint: Entropy-based hidden state anchoring
+
+    Usage:
+        config = SovereignLossConfig(lambda_b1=0.5, mu_s3=0.2)
+        engine = SovereignEngine(config)
+
+        # In training loop:
+        loss, metrics = engine.sovereign_loss(
+            logits, targets, r_signal, phase_angles
+        )
+    """
+
+    def __init__(self, config: Optional[SovereignLossConfig] = None):
+        self.config = config or SovereignLossConfig()
+        self.prev_entropy: Optional[float] = None
+
+    @staticmethod
+    def compute_guna_coherence_exact(phase_angles: List[torch.Tensor]) -> torch.Tensor:
+        """
+        [Patent U1/U2] Exact Pairwise Phase-Lock Matrix.
+
+        Computes mean cosine of phase differences across all layer pairs.
+        This version is differentiable for backpropagation.
+
+        Args:
+            phase_angles: List of phase angle tensors per layer
+                          Each tensor: [B, Heads, Seq, Dim] or [B, Seq, Dim]
+
+        Returns:
+            gc: Global coherence tensor (scalar, differentiable)
+
+        Result interpretation:
+            gc ≈ 1.0: Perfect Phase Alignment (Sattvic)
+            gc ≈ 0.5: Uncorrelated Noise (Rajasic)
+            gc ≈ 0.0: Anti-Aligned / Conflict (Viparyaya)
+        """
+        num_layers = len(phase_angles)
+        if num_layers < 2:
+            return torch.tensor(1.0, device=phase_angles[0].device)
+
+        total_coherence = torch.tensor(0.0, device=phase_angles[0].device)
+        pairs = 0
+
+        for i in range(num_layers):
+            for j in range(i + 1, num_layers):
+                # Get phase angles, flatten to comparable shapes
+                phi_i = phase_angles[i]
+                phi_j = phase_angles[j]
+
+                # Handle different tensor shapes
+                if phi_i.dim() > 2:
+                    phi_i = phi_i.mean(dim=tuple(range(1, phi_i.dim() - 1)))
+                if phi_j.dim() > 2:
+                    phi_j = phi_j.mean(dim=tuple(range(1, phi_j.dim() - 1)))
+
+                # Ensure same shape
+                if phi_i.shape != phi_j.shape:
+                    min_size = min(phi_i.shape[-1], phi_j.shape[-1])
+                    phi_i = phi_i[..., :min_size]
+                    phi_j = phi_j[..., :min_size]
+
+                # cos(phi_i - phi_j) measures alignment stiffness
+                cos_diff = torch.cos(phi_i - phi_j)
+                layer_pair_coh = cos_diff.mean()
+                total_coherence = total_coherence + layer_pair_coh
+                pairs += 1
+
+        # Scale from [-1, 1] to [0, 1]
+        gc = (total_coherence / pairs + 1.0) / 2.0
+        return gc
+
+    def sovereign_loss(
+        self,
+        logits: torch.Tensor,
+        targets: torch.Tensor,
+        r_signal: torch.Tensor,
+        phase_angles: Optional[List[torch.Tensor]] = None,
+        guna_coherence: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """
+        [Patent B1/S3] Sovereign-Lagrangian Loss Function.
+
+        Combines:
+        - L_task: Standard cross-entropy for next-token prediction
+        - L_consistency [B1]: Forward/Backward feasibility alignment
+        - L_align [S3]: Global coherence penalty
+
+        Formula:
+            L = L_task + λ_B1 * L_consistency + μ_S3 * L_align
+
+        Args:
+            logits: Model output logits [B, Seq, Vocab]
+            targets: Target token IDs [B, Seq]
+            r_signal: R-Signal from Authority layers [B, Seq, 48] or [B, Seq, D]
+            phase_angles: Optional list of phase angles per layer for U1/U2
+            guna_coherence: Optional pre-computed GC value
+
+        Returns:
+            total_loss: Combined Sovereign loss (differentiable)
+            metrics: Dict with component losses and metrics
+        """
+        device = logits.device
+        B, Seq, Vocab = logits.shape
+
+        # 1. L_task: Standard Cross-Entropy
+        logits_flat = logits.view(-1, Vocab)
+        targets_flat = targets.view(-1)
+        l_task = F.cross_entropy(logits_flat, targets_flat)
+
+        # 2. L_consistency [B1]: Forward/Backward Feasibility
+        # sf: Token probability for correct class (forward confidence)
+        probs = F.softmax(logits, dim=-1)
+        targets_expanded = targets.unsqueeze(-1)  # [B, Seq, 1]
+        sf = probs.gather(-1, targets_expanded).squeeze(-1)  # [B, Seq]
+
+        # sb: Backward alignment with R-Signal (cosine similarity)
+        # Normalize logits and r_signal for proper cosine similarity
+        logits_norm = F.normalize(logits, p=2, dim=-1)
+
+        # R-signal may have different dimension, project if needed
+        if r_signal.shape[-1] != Vocab:
+            # Project R-signal to vocab space or use as-is for similarity
+            # Use the first min(Vocab, r_dim) dimensions
+            r_dim = r_signal.shape[-1]
+            if r_dim < Vocab:
+                # Pad r_signal
+                r_padded = torch.zeros(B, Seq, Vocab, device=device)
+                r_padded[..., :r_dim] = r_signal
+                r_signal_use = r_padded
+            else:
+                r_signal_use = r_signal[..., :Vocab]
+        else:
+            r_signal_use = r_signal
+
+        r_signal_norm = F.normalize(r_signal_use.detach(), p=2, dim=-1)
+        sb = (logits_norm * r_signal_norm).sum(dim=-1)  # [B, Seq]
+        sb = (sb + 1.0) / 2.0  # Scale from [-1, 1] to [0, 1]
+
+        # Consistency Lagrangian: (1-sf)² + (1-sb)² + (sf-sb)²
+        l_consistency = torch.mean(
+            (1 - sf) ** 2 + (1 - sb) ** 2 + (sf - sb) ** 2
+        )
+
+        # 3. L_align [S3]: Global Coherence Penalty
+        if guna_coherence is not None:
+            gc = guna_coherence
+        elif phase_angles is not None and len(phase_angles) > 0:
+            gc = self.compute_guna_coherence_exact(phase_angles)
+        else:
+            gc = torch.tensor(0.5, device=device)
+
+        # Ensure gc is a tensor
+        if not isinstance(gc, torch.Tensor):
+            gc = torch.tensor(gc, device=device)
+
+        l_align = 1.0 - gc
+
+        # 4. Total Sovereign Loss [S3]
+        total_loss = (
+            l_task
+            + self.config.lambda_b1 * l_consistency
+            + self.config.mu_s3 * l_align
+        )
+
+        # Metrics for logging
+        metrics = {
+            "l_task": l_task.item(),
+            "l_consistency": l_consistency.item(),
+            "l_align": l_align.item() if isinstance(l_align, torch.Tensor) else l_align,
+            "gc": gc.item() if isinstance(gc, torch.Tensor) else gc,
+            "sf_mean": sf.mean().item(),
+            "sb_mean": sb.mean().item(),
+            "total_loss": total_loss.item(),
+        }
+
+        return total_loss, metrics
+
+    def apply_stability_constraint(
+        self,
+        current_entropy: float,
+        r_signal: torch.Tensor,
+        hidden_states: torch.Tensor,
+        stiffness_scale: float = 5.0,
+        max_stiffness: float = 0.9,
+    ) -> torch.Tensor:
+        """
+        [Patent S8] Stability Constraint - Entropy-based Hidden State Anchoring.
+
+        If entropy is rising (confusion/hallucination risk), increase the
+        weight of the R-Signal anchor to force hidden states back toward
+        the Ontological Authority.
+
+        Args:
+            current_entropy: Current semantic entropy value
+            r_signal: R-Signal from Authority layers [B, Seq, D]
+            hidden_states: Current hidden states [B, Seq, D]
+            stiffness_scale: Multiplier for entropy delta
+            max_stiffness: Maximum correction strength
+
+        Returns:
+            Corrected hidden states (same shape as input)
+        """
+        if self.prev_entropy is None:
+            self.prev_entropy = current_entropy
+            return hidden_states
+
+        delta_h = current_entropy - self.prev_entropy
+        self.prev_entropy = current_entropy
+
+        if delta_h > 0:
+            # Entropy rising - apply Tamasic brake
+            stiffness = min(delta_h * stiffness_scale, max_stiffness)
+            stiffness = max(0.0, stiffness)
+
+            # Project r_signal to match hidden_states dimension if needed
+            if r_signal.shape[-1] != hidden_states.shape[-1]:
+                # Simple linear interpolation/padding
+                r_dim = r_signal.shape[-1]
+                h_dim = hidden_states.shape[-1]
+                if r_dim < h_dim:
+                    # Repeat r_signal to match
+                    repeats = (h_dim + r_dim - 1) // r_dim
+                    r_expanded = r_signal.repeat(1, 1, repeats)[..., :h_dim]
+                else:
+                    r_expanded = r_signal[..., :h_dim]
+            else:
+                r_expanded = r_signal
+
+            # Force hidden states toward R-Signal anchor
+            hidden_states = (1 - stiffness) * hidden_states + stiffness * r_expanded.detach()
+
+        return hidden_states
+
+    def get_loss_status(self, metrics: Dict[str, float]) -> str:
+        """
+        Get formatted status string for Sovereign loss components.
+
+        Args:
+            metrics: Dict from sovereign_loss()
+
+        Returns:
+            Formatted status string
+        """
+        gc = metrics.get("gc", 0.5)
+        s_drift = 1.0 - metrics.get("sf_mean", 0.5)  # Approximate drift
+
+        gc_status = "SATTVIC" if gc > 0.85 else "ALIGNED" if gc > self.config.gc_floor else "RAJASIC"
+        drift_status = "NULL" if s_drift < 0.1 else "LOW" if s_drift < self.config.s_drift_ceiling else "HIGH"
+
+        return (
+            f"L_task={metrics.get('l_task', 0):.4f} | "
+            f"L_cons={metrics.get('l_consistency', 0):.4f} | "
+            f"GC={gc:.3f} [{gc_status}] | "
+            f"S-Drift={s_drift:.3f} [{drift_status}]"
+        )

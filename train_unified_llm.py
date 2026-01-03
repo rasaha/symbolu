@@ -1718,6 +1718,13 @@ class UnifiedTrainingConfig:
     use_coherence_loss: bool = False
     no_coherence_loss: bool = False  # CLI flag to disable
 
+    # Sovereign-Lagrangian Loss [Patent B1/S3]
+    enable_sovereign_loss: bool = False   # Enable Sovereign-Lagrangian loss
+    lambda_b1: float = 0.5                # Consistency Lagrangian weight [B1]
+    mu_s3: float = 0.2                    # Global Coherence weight [S3]
+    enable_stability_constraint: bool = False  # Enable S8 entropy anchoring
+    gc_floor: float = 0.65                # Minimum GC for PIDv2 intervention
+
     # PIDv2 Controller settings (V9.4.4)
     controller: str = "none"  # none, pidv2, emergency_pd
     pidv2_kp_min: float = 0.10
@@ -2028,17 +2035,29 @@ def compute_ontological_loss(
     targets: torch.Tensor,
     config: UnifiedTrainingConfig,
     sovereign_loss: Optional['SovereignLoss'] = None,
+    sovereign_engine: Optional['SovereignEngine'] = None,
+    phase_angles: Optional[List[torch.Tensor]] = None,
     epoch: int = 0,
 ) -> Tuple[torch.Tensor, Dict[str, float]]:
     """
     Compute loss for ontological model.
 
-    If use_sovereign_loss is enabled, uses the Sovereign-1 hardened loss with:
+    Priority order:
+    1. Sovereign-Lagrangian Loss (Patent B1/S3) - if enable_sovereign_loss
+    2. Sovereign-1 hardened loss - if use_sovereign_loss
+    3. Legacy loss (fallback)
+
+    Sovereign-Lagrangian Loss combines:
+    - L_task: Standard cross-entropy
+    - L_consistency [B1]: Forward/Backward feasibility alignment
+    - L_align [S3]: Global coherence penalty
+
+    Sovereign-1 hardened loss uses:
     - Decomposed state friction (prevents Signal Washing)
     - Weighted signals (prioritizes R-Signal over C-Signal)
     - Bhava transition penalty
 
-    Otherwise falls back to legacy loss:
+    Legacy loss uses:
     - Language modeling loss (cross-entropy)
     - Bhava relationship consistency loss
     - Global coherence regularization
@@ -2048,7 +2067,7 @@ def compute_ontological_loss(
     logits = outputs["logits"]
     B, N, V = logits.shape
 
-    # 1. Language modeling loss (always computed)
+    # 1. Language modeling loss (always computed for PPL tracking)
     lm_loss = F.cross_entropy(
         logits.view(-1, V),
         targets.view(-1),
@@ -2057,7 +2076,48 @@ def compute_ontological_loss(
     metrics["lm_loss"] = lm_loss.item()
     metrics["ppl"] = math.exp(min(lm_loss.item(), 20))
 
-    # Use Sovereign-1 loss if available and enabled
+    # Priority 1: Sovereign-Lagrangian Loss (Patent B1/S3)
+    if config.enable_sovereign_loss and sovereign_engine is not None:
+        # Get R-Signal from outputs (the Authority's intent)
+        r_signal = outputs.get('r_signal', None)
+        if r_signal is None:
+            # Fall back to ontological_probs expanded to 48D
+            onto_probs = outputs.get('ontological_probs', torch.zeros(B, N, 12, device=logits.device))
+            if onto_probs.dim() == 2:
+                onto_probs = onto_probs.unsqueeze(1).expand(-1, N, -1)
+            # Expand 12D to 48D by repeating
+            r_signal = onto_probs.repeat(1, 1, 4)
+
+        # Get Guna Coherence from outputs if available
+        gc = outputs.get('global_coherence', None)
+        if gc is not None and isinstance(gc, torch.Tensor):
+            gc = gc.mean()
+
+        # Compute Sovereign-Lagrangian loss
+        total_loss, sov_metrics = sovereign_engine.sovereign_loss(
+            logits, targets, r_signal,
+            phase_angles=phase_angles,
+            guna_coherence=gc,
+        )
+
+        # Merge metrics
+        metrics.update({
+            "total_loss": total_loss.item(),
+            "l_task": sov_metrics["l_task"],
+            "l_consistency": sov_metrics["l_consistency"],
+            "l_align": sov_metrics["l_align"],
+            "gc": sov_metrics["gc"],
+            "sf_mean": sov_metrics["sf_mean"],
+            "sb_mean": sov_metrics["sb_mean"],
+        })
+
+        # Add coherence from outputs if available
+        if "global_coherence" in outputs:
+            metrics["coherence"] = outputs["global_coherence"].mean().item()
+
+        return total_loss, metrics
+
+    # Priority 2: Sovereign-1 hardened loss
     if config.use_sovereign_loss and sovereign_loss is not None and SOVEREIGN_AVAILABLE:
         # Build state from outputs
         onto_probs = outputs.get('ontological_probs', torch.zeros(B, 12, device=logits.device))
@@ -2251,6 +2311,24 @@ def train(config: UnifiedTrainingConfig):
     else:
         print(f"  Sovereign-1 Loss: Disabled (using legacy loss)")
 
+    # Initialize Sovereign Engine for Patent B1/S3 loss
+    sovereign_engine = None
+    stability_state = None
+    if config.enable_sovereign_loss:
+        from symbolu.sovereign.metrics import SovereignEngine, SovereignLossConfig as SovEngineConfig, StabilityState
+        sov_engine_config = SovEngineConfig(
+            lambda_b1=config.lambda_b1,
+            mu_s3=config.mu_s3,
+            gc_floor=config.gc_floor,
+        )
+        sovereign_engine = SovereignEngine(config=sov_engine_config)
+        print(f"  Sovereign-Lagrangian Loss: ENABLED (λ_B1={config.lambda_b1}, μ_S3={config.mu_s3})")
+        if config.enable_stability_constraint:
+            stability_state = StabilityState(window_size=5)
+            print(f"  Stability Constraint [S8]: ENABLED (entropy anchoring)")
+    else:
+        print(f"  Sovereign-Lagrangian Loss: Disabled")
+
     # Optimizer
     optimizer = AdamW(
         model.parameters(),
@@ -2403,9 +2481,13 @@ def train(config: UnifiedTrainingConfig):
         with torch.amp.autocast('cuda', dtype=autocast_dtype):
             if config.model_type == "ontological":
                 outputs = model(x)
+                # Extract phase angles if available (for U1/U2 coherence)
+                phase_angles = outputs.get('phase_angles', None)
                 loss, metrics = compute_ontological_loss(
                     outputs, y, config,
                     sovereign_loss=sovereign_loss,
+                    sovereign_engine=sovereign_engine,
+                    phase_angles=phase_angles,
                     epoch=global_step // len(train_loader),
                 )
             elif config.model_type == "gen2":
@@ -2576,6 +2658,7 @@ def train(config: UnifiedTrainingConfig):
                 val_loss, val_metrics = evaluate(
                     model, val_loader, device, config, autocast_dtype,
                     sovereign_loss=sovereign_loss,
+                    sovereign_engine=sovereign_engine,
                 )
                 val_ppl = val_metrics['ppl']
                 current_coh = val_metrics.get('coherence', 0.75)
@@ -2748,6 +2831,7 @@ def evaluate(
     config: UnifiedTrainingConfig,
     autocast_dtype: torch.dtype,
     sovereign_loss: Optional['SovereignLoss'] = None,
+    sovereign_engine: Optional['SovereignEngine'] = None,
 ) -> Tuple[float, Dict[str, float]]:
     """Evaluate model on validation set."""
     model.eval()
@@ -2761,9 +2845,12 @@ def evaluate(
             with torch.amp.autocast('cuda', dtype=autocast_dtype):
                 if config.model_type == "ontological":
                     outputs = model(x)
+                    phase_angles = outputs.get('phase_angles', None)
                     loss, metrics = compute_ontological_loss(
                         outputs, y, config,
                         sovereign_loss=sovereign_loss,
+                        sovereign_engine=sovereign_engine,
+                        phase_angles=phase_angles,
                     )
                 elif config.model_type == "gen2":
                     outputs = model(x, labels=y)
@@ -2893,6 +2980,18 @@ def main():
                        help="Bhava relationship loss weight")
     parser.add_argument("--lambda_coherence", type=float, default=0.05,
                        help="Coherence loss weight")
+
+    # Sovereign-Lagrangian Loss [Patent B1/S3]
+    parser.add_argument("--lambda_b1", type=float, default=0.5,
+                       help="Consistency Lagrangian weight [B1] (forward/backward alignment)")
+    parser.add_argument("--mu_s3", type=float, default=0.2,
+                       help="Global Coherence weight [S3] (phase-lock penalty)")
+    parser.add_argument("--enable_sovereign_loss", action="store_true",
+                       help="Enable Sovereign-Lagrangian loss (B1+S3) instead of standard CE")
+    parser.add_argument("--enable_stability_constraint", action="store_true",
+                       help="Enable S8 Stability Constraint (entropy-based anchoring)")
+    parser.add_argument("--gc_floor", type=float, default=0.65,
+                       help="Minimum Guna Coherence before PIDv2 intervention")
 
     # Logging
     parser.add_argument("--log_every", type=int, default=10,
@@ -3046,6 +3145,12 @@ def main():
         checkpoint_dir=args.checkpoint_dir,
         no_coherence_loss=args.no_coherence_loss,
         seed=args.seed,
+        # Sovereign-Lagrangian Loss [Patent B1/S3]
+        enable_sovereign_loss=args.enable_sovereign_loss,
+        lambda_b1=args.lambda_b1,
+        mu_s3=args.mu_s3,
+        enable_stability_constraint=args.enable_stability_constraint,
+        gc_floor=args.gc_floor,
         # PIDv2 Controller settings
         controller=args.controller,
         pidv2_kp_min=args.pidv2_kp_min,
