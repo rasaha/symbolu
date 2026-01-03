@@ -1242,10 +1242,12 @@ Examples:
                     hidden_states = model.embedding(
                         input_ids, c_signals, s_signals, r_signals, g_states
                     )
+                    # Use predicted Vritti from logits for Governor
+                    vritti_pred = vritti_logits.argmax(dim=-1)[:, -1]  # [B]
                     _, vritti_info = governor(
                         token_logits[:, -1, :],
                         hidden_states,
-                        v_signals_input[:, -1],
+                        vritti_pred,
                         c_signals[:, -1, :] if c_signals.dim() == 3 else None,
                         g_states[:, -1, :] if g_states.dim() == 3 else None,
                         step=global_step,
