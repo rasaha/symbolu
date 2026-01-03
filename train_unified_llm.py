@@ -1704,7 +1704,7 @@ class UnifiedTrainingConfig:
     pidv2_kp_sensitivity: float = 5.0
     pidv2_ki: float = 0.02
     pidv2_kd: float = 0.10
-    pidv2_a_min: float = 0.30
+    pidv2_a_min: float = 0.40  # Raised from 0.30 to boost sensory floor
     pidv2_c_floor: float = 0.68
     pidv2_c_good: float = 0.76
     pidv2_w_s: float = 0.30  # Semantic weight
@@ -1726,7 +1726,7 @@ class UnifiedTrainingConfig:
     # Dynamic Relaxation: 9:3 → 6:6 transition
     enable_dynamic_relaxation: bool = False  # Enable automatic 9:3 → 6:6 transition
     relaxation_mode: str = "average"         # "consecutive" or "average"
-    relaxation_stability_threshold: float = 0.78  # StabilityIndex threshold
+    relaxation_stability_threshold: float = 0.50  # StabilityIndex threshold (lowered from 0.78)
     relaxation_stability_window: int = 500   # Steps for stability check (rolling window)
     relaxation_streak_target: int = 5        # Consecutive stable evals (for consecutive mode)
     relaxation_target_authority: int = 6     # Target authority layers after relaxation
@@ -2907,8 +2907,8 @@ def main():
                        help="PIDv2 integral gain")
     parser.add_argument("--pidv2_kd", type=float, default=0.10,
                        help="PIDv2 derivative gain")
-    parser.add_argument("--pidv2_a_min", type=float, default=0.30,
-                       help="PIDv2 minimum authority factor")
+    parser.add_argument("--pidv2_a_min", type=float, default=0.40,
+                       help="PIDv2 minimum authority factor (sensory floor)")
     parser.add_argument("--pidv2_w_s", type=float, default=0.30,
                        help="Semantic weight (0.30 = 30%% prompt-based)")
     parser.add_argument("--phase_ramp_steps", type=int, default=7000,
@@ -2942,8 +2942,8 @@ def main():
     parser.add_argument("--relaxation_mode", type=str, default="average",
                        choices=["consecutive", "average"],
                        help="Stability check mode: 'consecutive' (reset on dip) or 'average' (rolling mean)")
-    parser.add_argument("--relaxation_stability_threshold", type=float, default=0.78,
-                       help="StabilityIndex threshold to trigger relaxation")
+    parser.add_argument("--relaxation_stability_threshold", type=float, default=0.50,
+                       help="S/A ratio threshold to trigger 9:3 → 6:6 relaxation")
     parser.add_argument("--relaxation_stability_window", type=int, default=500,
                        help="Rolling window size for stability check")
     parser.add_argument("--relaxation_streak_target", type=int, default=5,

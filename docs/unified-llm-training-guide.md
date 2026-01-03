@@ -162,7 +162,7 @@ Quality samples use these default prompts:
 |------|------|---------|-------------|
 | `--enable_dynamic_relaxation` | flag | False | Enable dynamic relaxation controller |
 | `--relaxation_mode` | str | average | Stability metric: `average`, `min`, `median` |
-| `--relaxation_stability_threshold` | float | 0.78 | S/A threshold to trigger relaxation |
+| `--relaxation_stability_threshold` | float | 0.50 | S/A threshold to trigger relaxation |
 | `--relaxation_stability_window` | int | 500 | Window size for stability averaging |
 | `--relaxation_streak_target` | int | 5 | Consecutive windows above threshold |
 | `--relaxation_target_authority` | int | 6 | Target Authority layers after relaxation |
@@ -195,7 +195,7 @@ Quality samples use these default prompts:
 | `--pidv2_kp_sensitivity` | float | 5.0 | Kp sensitivity to error magnitude |
 | `--pidv2_ki` | float | 0.02 | Integral gain |
 | `--pidv2_kd` | float | 0.10 | Derivative gain |
-| `--pidv2_a_min` | float | 0.30 | Minimum sensory gradient scale |
+| `--pidv2_a_min` | float | 0.40 | Minimum sensory gradient scale |
 | `--pidv2_w_s` | float | 0.30 | Sattvic weight in S/A calculation |
 | `--phase_ramp_steps` | int | 7000 | Steps to ramp phase attention weight |
 
@@ -241,7 +241,6 @@ python train_unified_llm.py \
     --use_9_3_split \
     --controller pidv2 \
     --enable_dynamic_relaxation \
-    --relaxation_stability_threshold 0.78 \
     --enable_weight_transfer \
     --guna_lock_steps 50 \
     --gradient_checkpointing \
