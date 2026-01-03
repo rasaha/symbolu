@@ -74,6 +74,14 @@ from symbolu.ontological.bhava_relationships import (
 )
 from symbolu.ontological.types import LAYER_NAMES, LAYER_INDEX
 
+# Import LRA-optimized Phase Attention for O(n) complex attention
+try:
+    from symbolu.phase_transformer import PhaseAttentionLayer
+    PHASE_ATTENTION_AVAILABLE = True
+except ImportError:
+    PHASE_ATTENTION_AVAILABLE = False
+    PhaseAttentionLayer = None
+
 
 # =============================================================================
 # CONFIGURATION
@@ -112,6 +120,13 @@ class SymbolU12BhavaConfig:
     authority_layers: int = 9   # Layers 0-8: State-Delta Authority
     sensory_layers: int = 3     # Layers 9-11: Quadratic Sensory Buffer
 
+    # LRA-Optimized Phase Attention Configuration
+    # Uses complex-valued O(n) attention via Euler's formula for Authority layers
+    use_phase_attention: bool = True  # Enable Phase Attention for Authority layers
+    phase_sync_steps: int = 3         # Synchronization iterations (legacy, kept for compat)
+    phase_sync_lr: float = 0.1        # Phase update learning rate
+    r_signal_dim: int = 48            # R-Signal dimension for phase bias projection
+
     # Harmonic ratios
     HARMONIC_RATIOS: Dict[int, int] = None
 
@@ -122,6 +137,213 @@ class SymbolU12BhavaConfig:
                 5: 5000, 6: 2000, 7: 1000, 8: 400,
                 9: 100, 10: 50, 11: 10, 12: 1
             }
+
+
+# =============================================================================
+# PHASE ATTENTION BLOCKS (LRA-OPTIMIZED O(N) COMPLEX ATTENTION)
+# =============================================================================
+
+class StateDeltaPhaseBlock(nn.Module):
+    """
+    Authority Layer Block with LRA-Optimized Phase Attention.
+
+    Uses complex-valued O(n) attention via Euler's formula:
+        Q = a × e^(iφ)      - Query phasor
+        K = a × e^(-iφ)     - Key phasor (conjugate)
+        State = CumSum(K × V)  - O(n) aggregation
+        Out = Re(Q × State)    - Readout
+
+    This replaces nn.MultiheadAttention for layers 0-8 (Authority/State-Delta)
+    to provide cleaner PID controller signals via synchronized phases.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        config: 'SymbolU12BhavaConfig',
+        layer_idx: int = 0,
+    ):
+        super().__init__()
+        self.layer_idx = layer_idx
+        self.embed_dim = embed_dim
+
+        # LRA-Optimized Phase Attention (complex O(n) via Euler)
+        if PHASE_ATTENTION_AVAILABLE:
+            self.attn = PhaseAttentionLayer(
+                embed_dim=embed_dim,
+                num_heads=num_heads,
+                dropout=0.1,
+                sync_steps=config.phase_sync_steps,
+                sync_lr=config.phase_sync_lr,
+            )
+            self.use_phase = True
+        else:
+            # Fallback to standard attention if PhaseAttentionLayer not available
+            self.attn = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
+            self.use_phase = False
+
+        self.norm1 = nn.LayerNorm(embed_dim)
+        self.ffn = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim * 4),
+            nn.GELU(),
+            nn.Linear(embed_dim * 4, embed_dim),
+        )
+        self.norm2 = nn.LayerNorm(embed_dim)
+
+        # R-Signal accumulator (for projection to sensory layers)
+        # Layers 0-7 accumulate; Layer 8 produces the final R-Signal
+        self.r_signal_proj = nn.Linear(embed_dim, config.r_signal_dim)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        accumulated_r_signal: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Forward pass through Phase Attention block.
+
+        Args:
+            x: [B, N, D] input tensor
+            accumulated_r_signal: [B, R] accumulated R-Signal from previous layers
+
+        Returns:
+            output: [B, N, D] transformed tensor
+            r_signal: [B, R] updated R-Signal accumulation
+        """
+        # Phase Attention
+        if self.use_phase:
+            attn_out = self.attn(x)
+        else:
+            attn_out, _ = self.attn(x, x, x)
+
+        x = self.norm1(x + attn_out)
+        ffn_out = self.ffn(x)
+        x = self.norm2(x + ffn_out)
+
+        # Compute layer's R-Signal contribution (mean-pooled, projected)
+        layer_r = self.r_signal_proj(x.mean(dim=1))  # [B, R]
+
+        # Accumulate R-Signal (exponential moving average style)
+        if accumulated_r_signal is not None:
+            # Layers closer to witness (layer 8) contribute more
+            layer_weight = 0.1 + 0.1 * self.layer_idx  # 0.1 → 0.8 across layers 0-7
+            r_signal = accumulated_r_signal * (1 - layer_weight) + layer_r * layer_weight
+        else:
+            r_signal = layer_r
+
+        return x, r_signal
+
+
+class QuadraticAttentionWithPhaseBias(nn.Module):
+    """
+    Quadratic Attention (O(n²)) with R-Signal Phase Bias.
+
+    For Sensory layers (9-11), we use standard quadratic attention BUT
+    inject the R-Signal from Layer 8 as a phase bias to guide attention.
+
+    The R-Signal acts as a "Nerve" from the Authority layers, telling
+    the Sensory layers WHERE to focus their quadratic attention.
+
+    Phase Bias Injection:
+        attention_weights = softmax(QK^T/√d + R_bias)
+
+    Where R_bias is derived from the R-Signal via a learnable projection.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        config: 'SymbolU12BhavaConfig',
+        layer_idx: int = 9,  # 9, 10, or 11 for sensory layers
+    ):
+        super().__init__()
+        self.layer_idx = layer_idx
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+
+        # Standard attention projections
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        # R-Signal → Phase Bias projection
+        # Projects R-Signal to per-head bias that modulates attention
+        self.r_to_phase_bias = nn.Sequential(
+            nn.Linear(config.r_signal_dim, embed_dim),
+            nn.Tanh(),  # Bound the bias to [-1, 1] range
+        )
+
+        self.norm1 = nn.LayerNorm(embed_dim)
+        self.ffn = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim * 4),
+            nn.GELU(),
+            nn.Linear(embed_dim * 4, embed_dim),
+        )
+        self.norm2 = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(0.1)
+
+        self.scale = self.head_dim ** -0.5
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        r_signal: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Forward pass with R-Signal phase bias injection.
+
+        Args:
+            x: [B, N, D] input tensor
+            r_signal: [B, R] R-Signal from Layer 8 (Witness)
+            attention_mask: Optional attention mask
+
+        Returns:
+            output: [B, N, D] transformed tensor
+        """
+        B, N, D = x.shape
+        H = self.num_heads
+
+        # Project to Q, K, V
+        q = self.q_proj(x).view(B, N, H, self.head_dim).transpose(1, 2)  # [B, H, N, D_h]
+        k = self.k_proj(x).view(B, N, H, self.head_dim).transpose(1, 2)
+        v = self.v_proj(x).view(B, N, H, self.head_dim).transpose(1, 2)
+
+        # Compute standard attention scores
+        attn_scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale  # [B, H, N, N]
+
+        # R-Signal Phase Bias Injection
+        # Project R-Signal to per-head bias: [B, R] → [B, D] → [B, H, 1, 1]
+        phase_bias = self.r_to_phase_bias(r_signal)  # [B, D]
+        phase_bias = phase_bias.view(B, H, self.head_dim).mean(dim=-1)  # [B, H]
+        phase_bias = phase_bias.unsqueeze(-1).unsqueeze(-1)  # [B, H, 1, 1]
+
+        # Add phase bias to attention scores (broadcasts across N×N)
+        # This shifts attention patterns based on R-Signal from Authority layers
+        attn_scores = attn_scores + phase_bias
+
+        # Apply causal mask if needed
+        if attention_mask is not None:
+            attn_scores = attn_scores + attention_mask
+
+        # Softmax and attend
+        attn_weights = F.softmax(attn_scores, dim=-1)
+        attn_weights = self.dropout(attn_weights)
+
+        attn_out = torch.matmul(attn_weights, v)  # [B, H, N, D_h]
+        attn_out = attn_out.transpose(1, 2).contiguous().view(B, N, D)  # [B, N, D]
+        attn_out = self.out_proj(attn_out)
+
+        # Residual + Norm + FFN
+        x = self.norm1(x + attn_out)
+        ffn_out = self.ffn(x)
+        x = self.norm2(x + ffn_out)
+
+        return x
 
 
 # =============================================================================
@@ -324,13 +546,25 @@ class SymbolU12LLMWithBhava(nn.Module):
         self.embed = nn.Embedding(self.config.vocab_size, dim)
         self.pos_embed = nn.Embedding(self.config.max_seq_len, dim)
 
-        # Layers 1-8: Standard ontological processing
-        self.layers_1_8 = nn.ModuleList([
-            self._create_layer_block(dim, i) for i in range(8)
-        ])
+        # Layers 1-8: Authority (State-Delta) with Phase Attention
+        # Uses LRA-optimized O(n) complex attention when use_phase_attention=True
+        if self.config.use_phase_attention and PHASE_ATTENTION_AVAILABLE:
+            self.layers_1_8 = nn.ModuleList([
+                StateDeltaPhaseBlock(dim, self.config.num_heads, self.config, layer_idx=i)
+                for i in range(8)
+            ])
+            self._use_phase_blocks = True
+        else:
+            self.layers_1_8 = nn.ModuleList([
+                self._create_legacy_layer_block(dim, i) for i in range(8)
+            ])
+            self._use_phase_blocks = False
 
-        # Layer 9: Witness (meta-cognition)
+        # Layer 9: Witness (meta-cognition) - produces final R-Signal
         self.witness_layer = WitnessLayerWithBhava(self.config)
+
+        # R-Signal projection from Witness layer output
+        self.witness_r_proj = nn.Linear(dim, self.config.r_signal_dim)
 
         # Layer 10: Unifying with Bhava
         self.unifying_layer = BhavaUnifyingLayer(self.config)
@@ -350,8 +584,8 @@ class SymbolU12LLMWithBhava(nn.Module):
         # Master phase
         self.master_phase = nn.Parameter(torch.zeros(1))
 
-    def _create_layer_block(self, dim: int, layer_idx: int) -> nn.Module:
-        """Create a standard transformer block for layers 1-8."""
+    def _create_legacy_layer_block(self, dim: int, layer_idx: int) -> nn.Module:
+        """Create a legacy transformer block (fallback when Phase Attention unavailable)."""
         return nn.ModuleDict({
             'attn': nn.MultiheadAttention(dim, self.config.num_heads, batch_first=True),
             'norm1': nn.LayerNorm(dim),
@@ -361,15 +595,32 @@ class SymbolU12LLMWithBhava(nn.Module):
                 nn.Linear(dim * 4, dim),
             ),
             'norm2': nn.LayerNorm(dim),
+            # Add R-Signal projection for legacy mode
+            'r_proj': nn.Linear(dim, self.config.r_signal_dim),
         })
 
-    def _forward_layer_block(self, block: nn.ModuleDict, x: torch.Tensor) -> torch.Tensor:
-        """Forward through a standard layer block."""
+    def _forward_legacy_layer_block(
+        self,
+        block: nn.ModuleDict,
+        x: torch.Tensor,
+        accumulated_r_signal: Optional[torch.Tensor],
+        layer_idx: int,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Forward through a legacy layer block with R-Signal accumulation."""
         attn_out, _ = block['attn'](x, x, x)
         x = block['norm1'](x + attn_out)
         ffn_out = block['ffn'](x)
         x = block['norm2'](x + ffn_out)
-        return x
+
+        # R-Signal accumulation (same logic as StateDeltaPhaseBlock)
+        layer_r = block['r_proj'](x.mean(dim=1))
+        if accumulated_r_signal is not None:
+            layer_weight = 0.1 + 0.1 * layer_idx
+            r_signal = accumulated_r_signal * (1 - layer_weight) + layer_r * layer_weight
+        else:
+            r_signal = layer_r
+
+        return x, r_signal
 
     def get_layer_phase(self, layer_idx: int) -> torch.Tensor:
         return self.config.HARMONIC_RATIOS[layer_idx] * self.master_phase
@@ -381,6 +632,12 @@ class SymbolU12LLMWithBhava(nn.Module):
     ) -> Dict[str, Any]:
         """
         Forward pass through all 12 ontological layers with Bhava.
+
+        Architecture with Phase Attention and R-Signal:
+        - Layers 0-7: Authority (State-Delta) with O(n) Phase Attention
+          → Accumulates R-Signal (48D) progressively
+        - Layer 8 (Witness): Meta-cognition, produces final R-Signal
+        - Layers 9-11: Sensory (Quadratic) receives R-Signal as phase bias
         """
         B, seq_len = input_ids.shape
         device = input_ids.device
@@ -392,14 +649,30 @@ class SymbolU12LLMWithBhava(nn.Module):
         # Layer embeddings storage
         layer_embeddings = []
 
-        # Layers 1-8: Standard processing
+        # R-Signal accumulation through Authority layers
+        r_signal = None  # Will be accumulated through layers 0-7
+
+        # Layers 1-8: Authority processing with Phase Attention and R-Signal accumulation
         for i, block in enumerate(self.layers_1_8):
-            x = self._forward_layer_block(block, x)
+            if self._use_phase_blocks:
+                # StateDeltaPhaseBlock with R-Signal accumulation
+                x, r_signal = block(x, accumulated_r_signal=r_signal)
+            else:
+                # Legacy mode with R-Signal accumulation
+                x, r_signal = self._forward_legacy_layer_block(block, x, r_signal, i)
             layer_embeddings.append(x.mean(dim=1))
 
-        # Layer 9: Witness
+        # Layer 9: Witness - produces final R-Signal from witness state
         x, state, confidence = self.witness_layer(x)
         layer_embeddings.append(state)
+
+        # Finalize R-Signal: combine accumulated R-Signal with Witness state
+        witness_r = self.witness_r_proj(state)  # [B, R]
+        if r_signal is not None:
+            # Witness has highest weight (0.9) in final R-Signal
+            r_signal = r_signal * 0.1 + witness_r * 0.9
+        else:
+            r_signal = witness_r
 
         # Compute ontological probs from layer embeddings
         stacked = torch.stack(layer_embeddings, dim=1)  # [B, 9, dim]
@@ -446,6 +719,9 @@ class SymbolU12LLMWithBhava(nn.Module):
             'bhava_vector': unify_output['bhava_vector'],  # 144D
             'relationship_matrix': unify_output['relationship_matrix'],  # 12x12
             'aspect_modulated': unify_output['aspect_modulated'],
+
+            # R-Signal (Authority → Sensory nerve signal)
+            'r_signal': r_signal,  # [B, 48] - Phase bias for Sensory layers
 
             # Coherence
             'coherence_matrix': unify_output['C_prime'],

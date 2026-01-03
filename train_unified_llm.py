@@ -146,19 +146,15 @@ except ImportError as e:
     PIDV2_AVAILABLE = False
     print(f"Warning: PIDv2 controller not available: {e}")
 
-# Import Hierarchical Gradient Scaler (Formula [1331])
+# Import utilities from hierarchical_gradient_scaler module
+# Note: Main classes (HierarchicalGradientScaler, DynamicRelaxationController) are
+# defined locally below for direct integration with training loop
 try:
-    from symbolu.sovereign.hierarchical_gradient_scaler import (
-        HierarchicalGradientScaler,
-        HierarchicalGradientScalerConfig,
-        DynamicRelaxationController,
-        DynamicRelaxationConfig,
-        compute_s_drift,
-    )
-    HGS_AVAILABLE = True
-except ImportError as e:
-    HGS_AVAILABLE = False
-    print(f"Warning: Hierarchical Gradient Scaler not available: {e}")
+    from symbolu.sovereign.hierarchical_gradient_scaler import compute_s_drift
+    COMPUTE_S_DRIFT_AVAILABLE = True
+except ImportError:
+    COMPUTE_S_DRIFT_AVAILABLE = False
+    compute_s_drift = None
 
 
 # =============================================================================
@@ -187,9 +183,21 @@ class HierarchicalGradientScaler:
         Layers 0-8:  Authority (State-Delta) - Full gradients (α = 1.0)
         Layers 9-11: Sensory (Quadratic)     - Dampened gradients (α = 0.1→0.5)
 
+    Phase Attention Protection:
+        During 'Thaw' (9:3 → 6:6 transition), Phase-Attention weights in Authority
+        layers receive EXTRA protection via reduced gradient scaling (α_phase = 0.5).
+        This ensures the complex O(n) attention matrices (W_phase, W_amp) remain
+        stable while the Sensory layers are being relaxed.
+
     The warmup schedule allows Authority layers to establish stable
     ontological foundations before Sensory layers begin contributing.
     """
+
+    # Parameter name patterns for Phase Attention weights (need protection during Thaw)
+    PHASE_ATTENTION_PATTERNS = [
+        'W_phase', 'W_amp', 'phase_proj', 'phase_embed', 'amp_gate',
+        'attn.W_phase', 'attn.W_amp', 'attn.phase',  # Nested patterns
+    ]
 
     def __init__(
         self,
@@ -200,6 +208,8 @@ class HierarchicalGradientScaler:
         alpha_sens_max: float = 0.5,    # Moderate dampening after warmup
         warmup_steps: int = 500,        # Ramp period
         layer_attr: str = "blocks",     # Attribute name for layers
+        alpha_phase_protection: float = 0.5,  # Protection factor for Phase Attention weights
+        protect_phase_during_thaw: bool = True,  # Enable Phase Attention protection
     ):
         self.model = model
         self.authority_layers = authority_layers
@@ -208,12 +218,23 @@ class HierarchicalGradientScaler:
         self.alpha_sens_max = alpha_sens_max
         self.warmup_steps = warmup_steps
         self.layer_attr = layer_attr
+        self.alpha_phase_protection = alpha_phase_protection
+        self.protect_phase_during_thaw = protect_phase_during_thaw
 
         self.current_step = 0
         self.hooks = []
+        self.hooks_registered = False  # Track if hooks are active
+        self.in_thaw_mode = False  # Set to True during 9:3 → 6:6 transition
+
+        # Use bounded deques to prevent memory accumulation over long training
+        self._authority_grad_norms = collections.deque(maxlen=1000)
+        self._sensory_grad_norms = collections.deque(maxlen=1000)
+        self._phase_grad_norms = collections.deque(maxlen=1000)  # Track Phase Attention grads
+
         self.gradient_stats = {
             "authority_grad_norm": 0.0,
             "sensory_grad_norm": 0.0,
+            "phase_grad_norm": 0.0,
             "sensory_scale": alpha_sens_min,
             "sensory_authority_ratio": 0.0,
         }
@@ -221,11 +242,41 @@ class HierarchicalGradientScaler:
         # Register hooks
         self._register_hooks()
 
+    def _is_phase_attention_param(self, param_name: str) -> bool:
+        """Check if parameter is a Phase Attention weight that needs protection."""
+        for pattern in self.PHASE_ATTENTION_PATTERNS:
+            if pattern in param_name:
+                return True
+        return False
+
+    def set_thaw_mode(self, in_thaw: bool):
+        """Enable/disable Thaw mode for Phase Attention protection."""
+        self.in_thaw_mode = in_thaw
+        if in_thaw:
+            print(f"  [Formula 1331] Thaw mode ENABLED - Phase Attention weights protected (α={self.alpha_phase_protection})")
+
     def _get_layers(self) -> nn.ModuleList:
         """Get the layer ModuleList from model."""
+        all_layers = []
+
+        # SymbolU12 special case: layers_1_8 + individual layers (witness, unifying, etc.)
+        if hasattr(self.model, 'layers_1_8'):
+            layers_1_8 = getattr(self.model, 'layers_1_8')
+            if isinstance(layers_1_8, nn.ModuleList):
+                all_layers.extend(list(layers_1_8))
+
+            # Collect individual layers in order (witness, unifying, integration, absolving)
+            for layer_name in ['witness_layer', 'unifying_layer', 'integration_layer', 'absolving_layer']:
+                if hasattr(self.model, layer_name):
+                    layer = getattr(self.model, layer_name)
+                    if layer is not None:
+                        all_layers.append(layer)
+
+            if len(all_layers) >= 12:
+                return nn.ModuleList(all_layers)
+
         # Try common attribute names
-        for attr in [self.layer_attr, "layers", "blocks", "transformer.blocks",
-                     "layers_1_8", "model.layers"]:
+        for attr in [self.layer_attr, "layers", "blocks", "transformer.blocks", "model.layers"]:
             if "." in attr:
                 # Handle nested attributes
                 obj = self.model
@@ -245,8 +296,13 @@ class HierarchicalGradientScaler:
         for name, module in self.model.named_children():
             if 'layer' in name.lower() or 'block' in name.lower():
                 if isinstance(module, nn.ModuleList):
-                    return module
-                layer_modules.append(module)
+                    all_layers.extend(list(module))
+                else:
+                    layer_modules.append(module)
+
+        if all_layers:
+            all_layers.extend(layer_modules)
+            return nn.ModuleList(all_layers)
 
         if layer_modules:
             return nn.ModuleList(layer_modules)
@@ -264,8 +320,17 @@ class HierarchicalGradientScaler:
 
         return alpha
 
-    def _create_grad_hook(self, layer_idx: int, is_sensory: bool):
-        """Create a gradient scaling hook for a specific layer."""
+    def _create_grad_hook(self, layer_idx: int, is_sensory: bool, param_name: str = ""):
+        """
+        Create a gradient scaling hook for a specific layer parameter.
+
+        Phase Attention Protection:
+        During Thaw mode, Phase Attention weights (W_phase, W_amp, etc.) in Authority
+        layers receive extra gradient dampening to maintain stability of the complex
+        O(n) attention mechanism while Sensory layers are being relaxed.
+        """
+        is_phase_param = self._is_phase_attention_param(param_name)
+
         def hook(grad):
             if grad is None:
                 return grad
@@ -275,14 +340,26 @@ class HierarchicalGradientScaler:
                 alpha = self._compute_alpha_sens()
                 scaled_grad = grad * alpha
 
-                # Track stats (accumulate norms)
-                self.gradient_stats["sensory_grad_norm"] += grad.norm().item()
+                # Track stats using bounded deques
+                self._sensory_grad_norms.append(grad.norm().item())
                 self.gradient_stats["sensory_scale"] = alpha
 
                 return scaled_grad
             else:
-                # Authority layers get full gradient
-                self.gradient_stats["authority_grad_norm"] += grad.norm().item()
+                # Authority layers
+                grad_norm = grad.norm().item()
+
+                # Special handling for Phase Attention weights during Thaw
+                if is_phase_param and self.in_thaw_mode and self.protect_phase_during_thaw:
+                    # Apply protection factor to Phase Attention weights
+                    # This prevents the complex attention matrices from destabilizing
+                    # during the 9:3 → 6:6 transition
+                    scaled_grad = grad * self.alpha_phase_protection
+                    self._phase_grad_norms.append(grad_norm)
+                    return scaled_grad
+
+                # Normal authority layers get full gradient
+                self._authority_grad_norms.append(grad_norm)
                 return grad
 
         return hook
@@ -294,6 +371,7 @@ class HierarchicalGradientScaler:
         except ValueError as e:
             print(f"  [Formula 1331] Warning: {e}")
             print(f"  [Formula 1331] Gradient scaling disabled - could not find layers")
+            self.hooks_registered = False
             return
 
         total_layers = len(layers)
@@ -306,36 +384,165 @@ class HierarchicalGradientScaler:
         print(f"    Authority layers: 0-{sensory_start - 1} (α = 1.0)")
         print(f"    Sensory layers: {sensory_start}-{total_layers - 1} (α = {self.alpha_sens_min}→{self.alpha_sens_max})")
         print(f"    Warmup: {self.warmup_steps} steps")
+        if self.protect_phase_during_thaw:
+            print(f"    Phase Attention Protection: ENABLED (α_phase = {self.alpha_phase_protection} during Thaw)")
 
         hook_count = 0
+        phase_param_count = 0
         for layer_idx, layer in enumerate(layers):
             is_sensory = layer_idx >= sensory_start
 
             for name, param in layer.named_parameters():
                 if param.requires_grad:
-                    hook = param.register_hook(self._create_grad_hook(layer_idx, is_sensory))
+                    # Pass parameter name for Phase Attention identification
+                    hook = param.register_hook(self._create_grad_hook(layer_idx, is_sensory, name))
                     self.hooks.append(hook)
                     hook_count += 1
 
+                    # Count Phase Attention parameters
+                    if not is_sensory and self._is_phase_attention_param(name):
+                        phase_param_count += 1
+
         print(f"    Registered {hook_count} gradient hooks")
+        if phase_param_count > 0:
+            print(f"    Phase Attention parameters detected: {phase_param_count}")
+        self.hooks_registered = True
 
-    def step(self, global_step: int):
-        """Update current step and reset gradient stats."""
-        self.current_step = global_step
+    def step(self, global_step: Optional[int] = None) -> dict:
+        """
+        Update current step, compute metrics, and reset gradient accumulators.
 
-        # Compute ratio before resetting
-        if self.gradient_stats["authority_grad_norm"] > 0:
-            ratio = self.gradient_stats["sensory_grad_norm"] / self.gradient_stats["authority_grad_norm"]
-            self.gradient_stats["sensory_authority_ratio"] = ratio
+        Args:
+            global_step: Optional step to set. If not provided, increments internal counter.
 
-        # Reset accumulators for next step
-        self.gradient_stats["authority_grad_norm"] = 0.0
-        self.gradient_stats["sensory_grad_norm"] = 0.0
+        Returns:
+            Dict with gradient metrics (s_grad_norm, a_grad_norm, s_a_ratio, alpha_sens, phase_grad_norm)
+        """
+        if global_step is not None:
+            self.current_step = global_step
+        else:
+            self.current_step += 1
+
+        # Compute accumulated norms from deques
+        a_norm = sum(self._authority_grad_norms) if self._authority_grad_norms else 0.0
+        s_norm = sum(self._sensory_grad_norms) if self._sensory_grad_norms else 0.0
+        p_norm = sum(self._phase_grad_norms) if self._phase_grad_norms else 0.0
+        s_a_ratio = s_norm / a_norm if a_norm > 0 else 0.0
+
+        self.gradient_stats["authority_grad_norm"] = a_norm
+        self.gradient_stats["sensory_grad_norm"] = s_norm
+        self.gradient_stats["phase_grad_norm"] = p_norm
+        self.gradient_stats["sensory_authority_ratio"] = s_a_ratio
         self.gradient_stats["sensory_scale"] = self._compute_alpha_sens()
+
+        # Prepare metrics for return
+        metrics = {
+            "s_grad_norm": s_norm,
+            "a_grad_norm": a_norm,
+            "phase_grad_norm": p_norm,
+            "s_a_ratio": s_a_ratio,
+            "alpha_sens": self._compute_alpha_sens(),
+            "step": self.current_step,
+            "in_thaw_mode": self.in_thaw_mode,
+        }
+
+        # Clear deques for next step
+        self._authority_grad_norms.clear()
+        self._sensory_grad_norms.clear()
+        self._phase_grad_norms.clear()
+
+        return metrics
 
     def get_stats(self) -> dict:
         """Get gradient statistics for logging."""
         return self.gradient_stats.copy()
+
+    def get_state(self) -> dict:
+        """Get full state for checkpointing."""
+        return {
+            "authority_layers": self.authority_layers,
+            "sensory_layers": self.sensory_layers,
+            "alpha_sens_min": self.alpha_sens_min,
+            "alpha_sens_max": self.alpha_sens_max,
+            "warmup_steps": self.warmup_steps,
+            "current_step": self.current_step,
+            "gradient_stats": self.gradient_stats.copy(),
+            # Phase Attention protection state
+            "alpha_phase_protection": self.alpha_phase_protection,
+            "protect_phase_during_thaw": self.protect_phase_during_thaw,
+            "in_thaw_mode": self.in_thaw_mode,
+        }
+
+    def set_state(self, state: dict):
+        """Restore state from checkpoint."""
+        self.authority_layers = state.get("authority_layers", self.authority_layers)
+        self.sensory_layers = state.get("sensory_layers", self.sensory_layers)
+        self.alpha_sens_min = state.get("alpha_sens_min", self.alpha_sens_min)
+        self.alpha_sens_max = state.get("alpha_sens_max", self.alpha_sens_max)
+        self.warmup_steps = state.get("warmup_steps", self.warmup_steps)
+        self.current_step = state.get("current_step", self.current_step)
+        if "gradient_stats" in state:
+            self.gradient_stats.update(state["gradient_stats"])
+        # Phase Attention protection state
+        self.alpha_phase_protection = state.get("alpha_phase_protection", self.alpha_phase_protection)
+        self.protect_phase_during_thaw = state.get("protect_phase_during_thaw", self.protect_phase_during_thaw)
+        self.in_thaw_mode = state.get("in_thaw_mode", self.in_thaw_mode)
+
+    def get_status_string(self) -> str:
+        """Get human-readable status string for logging."""
+        s_a_ratio = self.gradient_stats.get("sensory_authority_ratio", 0.0)
+        alpha = self._compute_alpha_sens()
+        return (
+            f"HGS: S/A={s_a_ratio:.3f} | "
+            f"α_sens={alpha:.2f} | "
+            f"split={self.authority_layers}:{self.sensory_layers}"
+        )
+
+    def clip_grad_norm_by_layer(self, max_norm: float = 1.0) -> Tuple[float, float]:
+        """
+        Clip gradients separately for authority and sensory layer groups.
+
+        This respects the 9:3 design intent by preventing cross-contamination
+        of gradient norms between layer types.
+
+        Args:
+            max_norm: Maximum gradient norm for each layer group.
+
+        Returns:
+            Tuple of (authority_grad_norm, sensory_grad_norm) after clipping.
+        """
+        try:
+            layers = self._get_layers()
+        except ValueError:
+            return 0.0, 0.0
+
+        total_layers = len(layers)
+        sensory_start = max(0, total_layers - self.sensory_layers)
+
+        # Collect parameters by layer type
+        auth_params = []
+        sens_params = []
+
+        for layer_idx, layer in enumerate(layers):
+            is_sensory = layer_idx >= sensory_start
+            for param in layer.parameters():
+                if param.requires_grad and param.grad is not None:
+                    if is_sensory:
+                        sens_params.append(param)
+                    else:
+                        auth_params.append(param)
+
+        # Clip each group separately
+        auth_norm = 0.0
+        sens_norm = 0.0
+
+        if auth_params:
+            auth_norm = torch.nn.utils.clip_grad_norm_(auth_params, max_norm).item()
+
+        if sens_params:
+            sens_norm = torch.nn.utils.clip_grad_norm_(sens_params, max_norm).item()
+
+        return auth_norm, sens_norm
 
     def remove_hooks(self):
         """Remove all registered hooks."""
@@ -375,6 +582,371 @@ class HierarchicalGradientScaler:
 
 
 # =============================================================================
+# WEIGHT TRANSFER FOR 9:3 → 6:6 TRANSITION
+# =============================================================================
+
+class WeightTransfer:
+    """
+    Manages weight transfer during 9:3 → 6:6 dynamic relaxation.
+
+    When the relaxation trigger fires, this class:
+    1. Captures weights from Layers 6, 7, 8 (StateDeltaPhaseBlocks)
+    2. Initializes new QuadraticAttentionWithPhaseBias blocks using pre-trained weights
+    3. Re-anchors R_to_phase_bias projection to Layer 5 (new Witness)
+    4. Implements Guna-Lock: freezes W_q, W_k for first 50 steps post-swap
+
+    Weight Mapping (StateDeltaPhaseBlock → QuadraticAttentionWithPhaseBias):
+        Phase Attention v_proj → Quadratic v_proj
+        Phase Attention out_proj → Quadratic out_proj
+        norm1 → norm1
+        ffn → ffn
+        norm2 → norm2
+        r_signal_proj → r_to_phase_bias (dimension-adjusted)
+
+    Guna-Lock prevents 'Rajasic' noise from destroying inherited ontological logic
+    by freezing query/key matrices while allowing values and phase-bias to train.
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        guna_lock_steps: int = 50,       # Steps to freeze W_q/W_k post-swap
+        anchor_layer_idx: int = 5,        # New Witness layer index after 6:6
+        transferred_layers: Tuple[int, int, int] = (6, 7, 8),  # Layers to transfer
+    ):
+        self.model = model
+        self.guna_lock_steps = guna_lock_steps
+        self.anchor_layer_idx = anchor_layer_idx
+        self.transferred_layers = transferred_layers
+
+        # State tracking
+        self.captured_weights = {}
+        self.captured_r_anchor = None
+        self.guna_lock_active = False
+        self.guna_lock_start_step = None
+        self.frozen_params = []
+
+        # Track new Quadratic layers for Guna-Lock
+        self.new_quadratic_layers = []
+
+    def capture_state(self) -> Dict[str, Any]:
+        """
+        Capture current weights from Layers 6, 7, 8 (StateDeltaPhaseBlocks).
+
+        Returns dict with captured weight tensors for each layer.
+        """
+        self.captured_weights = {}
+
+        # Get the layers from model
+        layers = self._get_model_layers()
+        if layers is None:
+            print("  ⚠️  [WeightTransfer] Could not find model layers")
+            return {}
+
+        for layer_idx in self.transferred_layers:
+            if layer_idx >= len(layers):
+                continue
+
+            layer = layers[layer_idx]
+            layer_weights = {}
+
+            # Capture attention weights
+            if hasattr(layer, 'attn'):
+                attn = layer.attn
+                # PhaseAttentionLayer weights
+                if hasattr(attn, 'v_proj'):
+                    layer_weights['v_proj'] = attn.v_proj.weight.data.clone()
+                    if attn.v_proj.bias is not None:
+                        layer_weights['v_proj_bias'] = attn.v_proj.bias.data.clone()
+                if hasattr(attn, 'out_proj'):
+                    layer_weights['out_proj'] = attn.out_proj.weight.data.clone()
+                    if attn.out_proj.bias is not None:
+                        layer_weights['out_proj_bias'] = attn.out_proj.bias.data.clone()
+                # Phase-specific weights for reference
+                if hasattr(attn, 'W_phase'):
+                    layer_weights['W_phase'] = attn.W_phase.weight.data.clone()
+                if hasattr(attn, 'W_amp'):
+                    layer_weights['W_amp'] = attn.W_amp.weight.data.clone()
+
+            # Capture norm1
+            if hasattr(layer, 'norm1'):
+                layer_weights['norm1_weight'] = layer.norm1.weight.data.clone()
+                layer_weights['norm1_bias'] = layer.norm1.bias.data.clone()
+
+            # Capture FFN
+            if hasattr(layer, 'ffn'):
+                ffn = layer.ffn
+                if isinstance(ffn, nn.Sequential):
+                    for i, module in enumerate(ffn):
+                        if isinstance(module, nn.Linear):
+                            layer_weights[f'ffn_{i}_weight'] = module.weight.data.clone()
+                            if module.bias is not None:
+                                layer_weights[f'ffn_{i}_bias'] = module.bias.data.clone()
+
+            # Capture norm2
+            if hasattr(layer, 'norm2'):
+                layer_weights['norm2_weight'] = layer.norm2.weight.data.clone()
+                layer_weights['norm2_bias'] = layer.norm2.bias.data.clone()
+
+            # Capture R-Signal projection (for re-anchoring)
+            if hasattr(layer, 'r_signal_proj'):
+                layer_weights['r_signal_proj'] = layer.r_signal_proj.weight.data.clone()
+                if layer.r_signal_proj.bias is not None:
+                    layer_weights['r_signal_proj_bias'] = layer.r_signal_proj.bias.data.clone()
+
+            self.captured_weights[layer_idx] = layer_weights
+
+        # Capture the R-Signal anchor from the new Witness (Layer 5 in 6:6)
+        if self.anchor_layer_idx < len(layers):
+            anchor_layer = layers[self.anchor_layer_idx]
+            if hasattr(anchor_layer, 'r_signal_proj'):
+                self.captured_r_anchor = {
+                    'weight': anchor_layer.r_signal_proj.weight.data.clone(),
+                    'bias': anchor_layer.r_signal_proj.bias.data.clone() if anchor_layer.r_signal_proj.bias is not None else None
+                }
+
+        print(f"  📦 [WeightTransfer] Captured weights from layers {self.transferred_layers}")
+        print(f"    R-Signal anchor captured from layer {self.anchor_layer_idx}")
+
+        return self.captured_weights
+
+    def transfer_weights(
+        self,
+        new_layers: List[nn.Module],
+        r_signal_dim: int = 48,
+    ) -> bool:
+        """
+        Transfer captured weights to new QuadraticAttentionWithPhaseBias blocks.
+
+        Args:
+            new_layers: List of new QuadraticAttentionWithPhaseBias modules
+            r_signal_dim: Dimension of R-Signal for phase bias
+
+        Returns:
+            True if transfer successful
+        """
+        if not self.captured_weights:
+            print("  ⚠️  [WeightTransfer] No weights captured, skipping transfer")
+            return False
+
+        self.new_quadratic_layers = new_layers
+
+        for i, new_layer in enumerate(new_layers):
+            layer_idx = self.transferred_layers[i] if i < len(self.transferred_layers) else None
+            if layer_idx is None or layer_idx not in self.captured_weights:
+                continue
+
+            weights = self.captured_weights[layer_idx]
+
+            # Transfer v_proj
+            if 'v_proj' in weights and hasattr(new_layer, 'v_proj'):
+                new_layer.v_proj.weight.data.copy_(weights['v_proj'])
+                if 'v_proj_bias' in weights and new_layer.v_proj.bias is not None:
+                    new_layer.v_proj.bias.data.copy_(weights['v_proj_bias'])
+
+            # Transfer out_proj
+            if 'out_proj' in weights and hasattr(new_layer, 'out_proj'):
+                new_layer.out_proj.weight.data.copy_(weights['out_proj'])
+                if 'out_proj_bias' in weights and new_layer.out_proj.bias is not None:
+                    new_layer.out_proj.bias.data.copy_(weights['out_proj_bias'])
+
+            # Initialize Q, K from V (State-Inference: inherit value-based attention)
+            # This preserves the learned "what to attend to" logic
+            if 'v_proj' in weights:
+                if hasattr(new_layer, 'q_proj'):
+                    new_layer.q_proj.weight.data.copy_(weights['v_proj'])
+                    if 'v_proj_bias' in weights and new_layer.q_proj.bias is not None:
+                        new_layer.q_proj.bias.data.copy_(weights['v_proj_bias'])
+                if hasattr(new_layer, 'k_proj'):
+                    new_layer.k_proj.weight.data.copy_(weights['v_proj'])
+                    if 'v_proj_bias' in weights and new_layer.k_proj.bias is not None:
+                        new_layer.k_proj.bias.data.copy_(weights['v_proj_bias'])
+
+            # Transfer norm1
+            if 'norm1_weight' in weights and hasattr(new_layer, 'norm1'):
+                new_layer.norm1.weight.data.copy_(weights['norm1_weight'])
+                new_layer.norm1.bias.data.copy_(weights['norm1_bias'])
+
+            # Transfer FFN
+            if hasattr(new_layer, 'ffn') and isinstance(new_layer.ffn, nn.Sequential):
+                for j, module in enumerate(new_layer.ffn):
+                    if isinstance(module, nn.Linear):
+                        weight_key = f'ffn_{j}_weight'
+                        bias_key = f'ffn_{j}_bias'
+                        if weight_key in weights:
+                            module.weight.data.copy_(weights[weight_key])
+                        if bias_key in weights and module.bias is not None:
+                            module.bias.data.copy_(weights[bias_key])
+
+            # Transfer norm2
+            if 'norm2_weight' in weights and hasattr(new_layer, 'norm2'):
+                new_layer.norm2.weight.data.copy_(weights['norm2_weight'])
+                new_layer.norm2.bias.data.copy_(weights['norm2_bias'])
+
+            # Initialize r_to_phase_bias from r_signal_proj (48D Anchor)
+            if 'r_signal_proj' in weights and hasattr(new_layer, 'r_to_phase_bias'):
+                # r_signal_proj: [embed_dim, r_signal_dim]
+                # r_to_phase_bias: Sequential([Linear(r_signal_dim, embed_dim), Tanh])
+                for module in new_layer.r_to_phase_bias:
+                    if isinstance(module, nn.Linear):
+                        # Transpose to match dimensions: [r_signal_dim, embed_dim] → [embed_dim, r_signal_dim]
+                        source_weight = weights['r_signal_proj']
+                        if source_weight.shape[0] == module.weight.shape[1]:
+                            # Direct transpose copy
+                            module.weight.data.copy_(source_weight.T)
+                        else:
+                            # Dimension mismatch, initialize with scaled version
+                            nn.init.xavier_uniform_(module.weight)
+                            # Scale down for stability
+                            module.weight.data *= 0.1
+                        break
+
+        print(f"  ✓ [WeightTransfer] Transferred weights to {len(new_layers)} new layers")
+        return True
+
+    def anchor_r_signal(self, new_witness_layer: nn.Module) -> bool:
+        """
+        Re-anchor R_to_phase_bias projection to Layer 5 (new Witness).
+
+        The 48D R-Signal anchor ensures continuity of the Authority → Sensory
+        nerve signal after the layer split changes.
+        """
+        if self.captured_r_anchor is None:
+            print("  ⚠️  [WeightTransfer] No R-Signal anchor captured")
+            return False
+
+        # Update the new witness layer's R-Signal projection
+        if hasattr(new_witness_layer, 'r_signal_proj'):
+            new_witness_layer.r_signal_proj.weight.data.copy_(self.captured_r_anchor['weight'])
+            if self.captured_r_anchor['bias'] is not None and new_witness_layer.r_signal_proj.bias is not None:
+                new_witness_layer.r_signal_proj.bias.data.copy_(self.captured_r_anchor['bias'])
+
+        # Also update witness_r_proj in the main model if it exists
+        if hasattr(self.model, 'witness_r_proj'):
+            if self.model.witness_r_proj.weight.shape == self.captured_r_anchor['weight'].shape:
+                self.model.witness_r_proj.weight.data.copy_(self.captured_r_anchor['weight'])
+                if self.captured_r_anchor['bias'] is not None and self.model.witness_r_proj.bias is not None:
+                    self.model.witness_r_proj.bias.data.copy_(self.captured_r_anchor['bias'])
+
+        print(f"  ⚓ [WeightTransfer] R-Signal anchored to layer {self.anchor_layer_idx}")
+        return True
+
+    def activate_guna_lock(self, current_step: int):
+        """
+        Activate Guna-Lock: freeze W_q and W_k matrices of new layers.
+
+        For the first 50 steps post-swap, only W_v and Phase-Bias can train.
+        This prevents 'Rajasic' noise from destroying inherited logic.
+        """
+        self.guna_lock_active = True
+        self.guna_lock_start_step = current_step
+        self.frozen_params = []
+
+        for layer in self.new_quadratic_layers:
+            # Freeze Q and K projections
+            if hasattr(layer, 'q_proj'):
+                layer.q_proj.weight.requires_grad = False
+                if layer.q_proj.bias is not None:
+                    layer.q_proj.bias.requires_grad = False
+                self.frozen_params.append(layer.q_proj)
+
+            if hasattr(layer, 'k_proj'):
+                layer.k_proj.weight.requires_grad = False
+                if layer.k_proj.bias is not None:
+                    layer.k_proj.bias.requires_grad = False
+                self.frozen_params.append(layer.k_proj)
+
+        print(f"  🔒 [WeightTransfer] Guna-Lock ACTIVATED at step {current_step}")
+        print(f"    Frozen: W_q, W_k for {len(self.new_quadratic_layers)} layers")
+        print(f"    Active: W_v, Phase-Bias, FFN")
+        print(f"    Duration: {self.guna_lock_steps} steps")
+
+    def update_guna_lock(self, current_step: int) -> bool:
+        """
+        Check and update Guna-Lock status.
+
+        Returns True if lock was just released.
+        """
+        if not self.guna_lock_active:
+            return False
+
+        if self.guna_lock_start_step is None:
+            return False
+
+        elapsed = current_step - self.guna_lock_start_step
+
+        if elapsed >= self.guna_lock_steps:
+            # Release the lock
+            return self.release_guna_lock()
+
+        return False
+
+    def release_guna_lock(self) -> bool:
+        """
+        Release Guna-Lock: unfreeze W_q and W_k matrices.
+
+        Called automatically after guna_lock_steps or manually for early release.
+        """
+        if not self.guna_lock_active:
+            return False
+
+        for layer in self.new_quadratic_layers:
+            if hasattr(layer, 'q_proj'):
+                layer.q_proj.weight.requires_grad = True
+                if layer.q_proj.bias is not None:
+                    layer.q_proj.bias.requires_grad = True
+
+            if hasattr(layer, 'k_proj'):
+                layer.k_proj.weight.requires_grad = True
+                if layer.k_proj.bias is not None:
+                    layer.k_proj.bias.requires_grad = True
+
+        self.guna_lock_active = False
+        self.frozen_params = []
+
+        print(f"  🔓 [WeightTransfer] Guna-Lock RELEASED")
+        print(f"    All parameters now trainable")
+        return True
+
+    def _get_model_layers(self) -> Optional[nn.ModuleList]:
+        """Get the layer ModuleList from model."""
+        # SymbolU12 special case
+        if hasattr(self.model, 'layers_1_8'):
+            layers = list(self.model.layers_1_8)
+            # Add witness, unifying, integration, absolving
+            for layer_name in ['witness_layer', 'unifying_layer', 'integration_layer', 'absolving_layer']:
+                if hasattr(self.model, layer_name):
+                    layer = getattr(self.model, layer_name)
+                    if layer is not None:
+                        layers.append(layer)
+            return nn.ModuleList(layers)
+
+        # Try common attribute names
+        for attr in ['layers', 'blocks', 'transformer.blocks']:
+            if hasattr(self.model, attr):
+                layers = getattr(self.model, attr)
+                if isinstance(layers, nn.ModuleList):
+                    return layers
+
+        return None
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get current status of weight transfer and Guna-Lock."""
+        return {
+            "weights_captured": bool(self.captured_weights),
+            "layers_captured": list(self.captured_weights.keys()),
+            "r_anchor_captured": self.captured_r_anchor is not None,
+            "guna_lock_active": self.guna_lock_active,
+            "guna_lock_start_step": self.guna_lock_start_step,
+            "guna_lock_remaining": (
+                self.guna_lock_steps - (self.guna_lock_start_step or 0)
+                if self.guna_lock_active else 0
+            ),
+            "new_layers_count": len(self.new_quadratic_layers),
+        }
+
+
+# =============================================================================
 # DYNAMIC RELAXATION CONTROLLER: 9:3 → 6:6 TRANSITION
 # =============================================================================
 
@@ -396,13 +968,13 @@ class DynamicRelaxationController:
     StabilityIndex = 0.7 * GC + 0.3 * (1 - S_Drift_EMA)
 
     Usage:
-        controller = DynamicRelaxationController(gradient_scaler, config)
+        controller = DynamicRelaxationController(gradient_scaler, model, config)
         # In training loop:
         should_relax, action = controller.update(guna_coherence, s_drift_ema, val_ppl, step)
         if action == "RELAX":
-            controller.execute_relaxation()
+            controller.execute_relaxation(current_step=step)  # Triggers WeightTransfer + Guna-Lock
         elif action == "RECOVER":
-            controller.execute_recovery()
+            controller.execute_recovery()  # Releases Guna-Lock
     """
 
     # Controller states
@@ -434,6 +1006,9 @@ class DynamicRelaxationController:
         # Monitoring
         guna_coherence_weight: float = 0.7,
         s_drift_weight: float = 0.3,
+        # Weight Transfer settings
+        guna_lock_steps: int = 50,           # Steps to freeze W_q/W_k post-swap
+        enable_weight_transfer: bool = True,  # Enable weight transfer during relaxation
     ):
         self.gradient_scaler = gradient_scaler
         self.model = model
@@ -460,6 +1035,21 @@ class DynamicRelaxationController:
         # Weights for StabilityIndex
         self.guna_coherence_weight = guna_coherence_weight
         self.s_drift_weight = s_drift_weight
+
+        # Weight Transfer for 9:3 → 6:6 transition
+        self.enable_weight_transfer = enable_weight_transfer
+        self.guna_lock_steps = guna_lock_steps
+        if enable_weight_transfer:
+            # Layers 6, 7, 8 become Sensory in 6:6 split
+            # Layer 5 becomes the new Witness
+            self.weight_transfer = WeightTransfer(
+                model=model,
+                guna_lock_steps=guna_lock_steps,
+                anchor_layer_idx=balanced_split[0] - 1,  # New Witness is layer 5 in 6:6
+                transferred_layers=(6, 7, 8),  # These layers change from Authority to Sensory
+            )
+        else:
+            self.weight_transfer = None
 
         # State tracking
         self.state = self.STATE_AUTHORITY
@@ -488,6 +1078,9 @@ class DynamicRelaxationController:
         print(f"    Target split: {balanced_split[0]}:{balanced_split[1]}")
         print(f"    Stability threshold: {stability_threshold}")
         print(f"    Stability window: {stability_window} steps")
+        if enable_weight_transfer:
+            print(f"    Weight Transfer: ENABLED")
+            print(f"    Guna-Lock: {guna_lock_steps} steps post-swap")
 
     def compute_stability_index(
         self,
@@ -503,6 +1096,18 @@ class DynamicRelaxationController:
         - GC high: Authority layers have locked global phase rotation
         - S_Drift low: Reality signal aligned with ontological intent
         """
+        # Input validation - clamp and warn on out-of-bounds values
+        if not (0.0 <= guna_coherence <= 1.0):
+            guna_coherence = max(0.0, min(1.0, guna_coherence))
+        if not (0.0 <= s_drift_ema <= 1.0):
+            s_drift_ema = max(0.0, min(1.0, s_drift_ema))
+
+        # Handle NaN/Inf gracefully
+        if math.isnan(guna_coherence) or math.isinf(guna_coherence):
+            guna_coherence = 0.5
+        if math.isnan(s_drift_ema) or math.isinf(s_drift_ema):
+            s_drift_ema = 0.5
+
         stability = (
             self.guna_coherence_weight * guna_coherence +
             self.s_drift_weight * (1.0 - s_drift_ema)
@@ -640,6 +1245,9 @@ class DynamicRelaxationController:
             self.post_relaxation_ppl_samples = []
 
         elif self.state == self.STATE_BALANCED:
+            # Update Guna-Lock status (release after guna_lock_steps)
+            self.update_guna_lock(global_step)
+
             # Track Integration Tax for first N steps
             if not self.integration_tax_logged:
                 self._log_integration_tax(val_ppl, global_step)
@@ -682,14 +1290,62 @@ class DynamicRelaxationController:
 
         return (action != "NONE"), action
 
-    def execute_relaxation(self):
+    def execute_relaxation(self, current_step: int = 0):
         """
-        Execute the 9:3 → 6:6 transition with Dampened Thaw.
+        Execute the 9:3 → 6:6 transition with Dampened Thaw and Weight Transfer.
 
         The newly added sensory layers (6-8) start with very low α (0.05)
         and ramp up slowly to prevent Rajasic override.
+
+        Weight Transfer Process:
+        1. Capture weights from Layers 6, 7, 8 (StateDeltaPhaseBlocks)
+        2. Transfer to new QuadraticAttentionWithPhaseBias blocks
+        3. Re-anchor R-Signal to Layer 5 (new Witness)
+        4. Activate Guna-Lock: freeze W_q, W_k for 50 steps
+
+        Phase Attention Protection:
+        During Thaw, Phase-Attention weights in Authority layers receive
+        extra gradient dampening to maintain stability of the complex O(n)
+        attention mechanism.
         """
         print(f"\n  ⚡ [DynamicRelaxation] RELAXATION: {self.authority_split} → {self.balanced_split}")
+
+        # =====================================================================
+        # WEIGHT TRANSFER: State-Inference + 48D Anchor + Guna-Lock
+        # =====================================================================
+        if self.weight_transfer is not None and self.enable_weight_transfer:
+            print(f"\n  📤 [WeightTransfer] Beginning weight transfer...")
+
+            # Step 1: Capture weights from Layers 6, 7, 8 (before they become Sensory)
+            self.weight_transfer.capture_state()
+
+            # Step 2: Get the new Quadratic layers (will be created after reconfigure)
+            # For now, we capture the layers that will become Sensory
+            layers = self.weight_transfer._get_model_layers()
+            if layers is not None:
+                # Layers 6, 7, 8 in the original indexing become Sensory layers
+                new_sensory_layers = []
+                for idx in self.weight_transfer.transferred_layers:
+                    if idx < len(layers):
+                        new_sensory_layers.append(layers[idx])
+
+                # Step 3: Transfer weights (State-Inference)
+                # Initialize Q, K from V to preserve learned attention patterns
+                self.weight_transfer.transfer_weights(
+                    new_layers=new_sensory_layers,
+                    r_signal_dim=48,  # Standard R-Signal dimension
+                )
+
+                # Step 4: Re-anchor R-Signal to Layer 5 (new Witness)
+                if self.weight_transfer.anchor_layer_idx < len(layers):
+                    new_witness = layers[self.weight_transfer.anchor_layer_idx]
+                    self.weight_transfer.anchor_r_signal(new_witness)
+
+                # Step 5: Activate Guna-Lock (freeze W_q, W_k for 50 steps)
+                self.weight_transfer.activate_guna_lock(current_step)
+
+        # Enable Thaw mode for Phase Attention protection
+        self.gradient_scaler.set_thaw_mode(True)
 
         # Reconfigure the gradient scaler
         self.gradient_scaler.reconfigure(
@@ -702,14 +1358,26 @@ class DynamicRelaxationController:
 
         self.current_split = self.balanced_split
         print(f"    Dampened Thaw: α = {self.thaw_alpha_start} → {self.balanced_alpha_max} over {self.thaw_warmup_steps} steps")
+        print(f"    Phase Attention: Protected during Thaw")
+        if self.weight_transfer is not None:
+            print(f"    Guna-Lock: W_q, W_k frozen for {self.guna_lock_steps} steps")
 
     def execute_recovery(self):
         """
         Execute Viparyaya recovery: revert to 9:3 split.
 
         This 're-stiffens' the model by returning to Authority-heavy configuration.
+        Also releases Guna-Lock if active, as the layer structure is changing.
         """
         print(f"\n  🔄 [DynamicRelaxation] VIPARYAYA RECOVERY: Reverting to {self.authority_split}")
+
+        # Release Guna-Lock if active (layer structure is changing)
+        if self.weight_transfer is not None and self.weight_transfer.guna_lock_active:
+            self.weight_transfer.release_guna_lock()
+            print("    Guna-Lock released due to recovery")
+
+        # Disable Thaw mode - Phase Attention can learn normally in Authority mode
+        self.gradient_scaler.set_thaw_mode(False)
 
         # Reconfigure back to authority-heavy split
         self.gradient_scaler.reconfigure(
@@ -722,31 +1390,229 @@ class DynamicRelaxationController:
 
         self.current_split = self.authority_split
 
+    def update_guna_lock(self, current_step: int) -> bool:
+        """
+        Update Guna-Lock status. Call this each training step after relaxation.
+
+        Returns True if Guna-Lock was just released.
+        """
+        if self.weight_transfer is None:
+            return False
+
+        released = self.weight_transfer.update_guna_lock(current_step)
+        if released:
+            print(f"\n  🔓 [DynamicRelaxation] Guna-Lock released at step {current_step}")
+            print("    W_q, W_k now trainable")
+        return released
+
+    def is_guna_locked(self) -> bool:
+        """Check if Guna-Lock is currently active."""
+        if self.weight_transfer is None:
+            return False
+        return self.weight_transfer.guna_lock_active
+
     def get_status_string(self) -> str:
         """Get formatted status string for logging."""
         split_str = f"{self.current_split[0]}:{self.current_split[1]}"
         streak_str = f"{self.stability_streak}/{self.stability_window}" if self.state == self.STATE_AUTHORITY else "—"
+        lock_str = " 🔒" if self.is_guna_locked() else ""
 
         if self.state == self.STATE_RECOVERY:
-            return f"Split:{split_str} State:RECOVERY Streak:{streak_str}"
+            return f"Split:{split_str} State:RECOVERY Streak:{streak_str}{lock_str}"
         elif self.state == self.STATE_BALANCED:
-            return f"Split:{split_str} State:BALANCED ✓"
+            return f"Split:{split_str} State:BALANCED ✓{lock_str}"
         else:
-            return f"Split:{split_str} State:{self.state} Streak:{streak_str}"
+            return f"Split:{split_str} State:{self.state} Streak:{streak_str}{lock_str}"
 
     def get_telemetry(self) -> Dict[str, Any]:
         """Get telemetry data for logging/visualization."""
         recent_stability = [h["stability"] for h in self.stability_history[-100:]]
         avg_stability = sum(recent_stability) / len(recent_stability) if recent_stability else 0.0
 
-        return {
+        telemetry = {
             "state": self.state,
             "current_split": f"{self.current_split[0]}:{self.current_split[1]}",
             "stability_streak": self.stability_streak,
             "avg_stability_100": avg_stability,
             "transitions": len(self.transitions),
             "is_balanced": self.state == self.STATE_BALANCED,
+            "guna_lock_active": self.is_guna_locked(),
         }
+
+        # Add weight transfer status if available
+        if self.weight_transfer is not None:
+            wt_status = self.weight_transfer.get_status()
+            telemetry["weight_transfer"] = wt_status
+
+        return telemetry
+
+    def get_state(self) -> Dict[str, Any]:
+        """Get full state for checkpointing."""
+        state = {
+            "state": self.state,
+            "current_split": self.current_split,
+            "stability_streak": self.stability_streak,
+            "ssi_rolling_window": list(self.ssi_rolling_window),
+            "pre_relaxation_ppl": self.pre_relaxation_ppl,
+            "relaxation_step": self.relaxation_step,
+            "recovery_start_step": self.recovery_start_step,
+            "integration_tax_logged": self.integration_tax_logged,
+            "transitions": self.transitions,
+        }
+
+        # Add weight transfer state
+        if self.weight_transfer is not None:
+            state["weight_transfer"] = {
+                "guna_lock_active": self.weight_transfer.guna_lock_active,
+                "guna_lock_start_step": self.weight_transfer.guna_lock_start_step,
+            }
+
+        return state
+
+    def set_state(self, state: Dict[str, Any]):
+        """Restore state from checkpoint."""
+        self.state = state.get("state", self.STATE_AUTHORITY)
+        self.current_split = state.get("current_split", self.authority_split)
+        self.stability_streak = state.get("stability_streak", 0)
+        self.ssi_rolling_window = state.get("ssi_rolling_window", [])
+        self.pre_relaxation_ppl = state.get("pre_relaxation_ppl", None)
+        self.relaxation_step = state.get("relaxation_step", None)
+        self.recovery_start_step = state.get("recovery_start_step", None)
+        self.integration_tax_logged = state.get("integration_tax_logged", False)
+        self.transitions = state.get("transitions", [])
+
+        # Restore weight transfer state
+        if self.weight_transfer is not None and "weight_transfer" in state:
+            wt_state = state["weight_transfer"]
+            self.weight_transfer.guna_lock_active = wt_state.get("guna_lock_active", False)
+            self.weight_transfer.guna_lock_start_step = wt_state.get("guna_lock_start_step", None)
+
+
+# =============================================================================
+# QUALITY SAMPLING - Text Generation for Training Monitoring
+# =============================================================================
+
+@torch.no_grad()
+def generate_sample(
+    model: nn.Module,
+    tokenizer,
+    prompt: str,
+    device: torch.device,
+    max_new_tokens: int = 50,
+    temperature: float = 0.8,
+    top_p: float = 0.9,
+) -> str:
+    """
+    Generate text from a prompt for quality monitoring.
+
+    Uses nucleus (top-p) sampling with temperature for diverse outputs.
+    Works with SymbolU12, PhaseTransformer, and HybridPhaseTransformer models.
+    """
+    model.eval()
+
+    # Encode prompt
+    input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+
+    # Generate tokens one by one
+    generated = input_ids.clone()
+
+    for _ in range(max_new_tokens):
+        # Forward pass
+        outputs = model(generated)
+
+        # Handle different output formats (dict with 'logits', tuple, or tensor)
+        if isinstance(outputs, dict):
+            logits = outputs.get('logits', outputs.get('output', None))
+            if logits is None:
+                # Try to find logits-like tensor in dict
+                for key in ['logits', 'output', 'lm_logits']:
+                    if key in outputs:
+                        logits = outputs[key]
+                        break
+        elif isinstance(outputs, (tuple, list)):
+            logits = outputs[0]
+        else:
+            logits = outputs
+
+        if logits is None:
+            break
+
+        # Get next token logits
+        next_logits = logits[:, -1, :] / temperature
+
+        # Top-p (nucleus) sampling
+        sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
+        cumsum = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+        # Remove tokens with cumulative probability above threshold
+        sorted_indices_to_remove = cumsum > top_p
+        sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+        sorted_indices_to_remove[:, 0] = False
+
+        # Set removed tokens to -inf
+        indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+        next_logits[indices_to_remove] = float('-inf')
+
+        # Sample next token
+        probs = F.softmax(next_logits, dim=-1)
+        next_token = torch.multinomial(probs, num_samples=1)
+
+        # Append to sequence
+        generated = torch.cat([generated, next_token], dim=1)
+
+        # Check for EOS
+        if next_token.item() == tokenizer.eos_token_id:
+            break
+
+    # Decode and return
+    return tokenizer.decode(generated[0], skip_special_tokens=True)
+
+
+def run_quality_samples(
+    model: nn.Module,
+    tokenizer,
+    config: 'UnifiedTrainingConfig',
+    device: torch.device,
+    step: int,
+    logger=None,
+):
+    """
+    Generate sample outputs to monitor training quality.
+
+    This provides a qualitative check that the model is learning
+    meaningful language patterns, not just minimizing perplexity.
+
+    Samples are logged with prompts and generated completions.
+    """
+    def log(msg):
+        if logger:
+            logger.info(msg)
+        else:
+            print(msg)
+
+    log("")
+    log("=" * 60)
+    log(f"  📝 QUALITY SAMPLES (Step {step})")
+    log("=" * 60)
+
+    for prompt in config.sample_prompts:
+        try:
+            generated = generate_sample(
+                model, tokenizer, prompt, device,
+                max_new_tokens=50,
+                temperature=0.8,
+                top_p=0.9,
+            )
+            # Clean up and truncate for display
+            generated = generated.strip().replace('\n', ' ')[:200]
+            log(f"  Prompt: \"{prompt}\"")
+            log(f"  Output: \"{generated}\"")
+            log("")
+        except Exception as e:
+            log(f"  ⚠️ Sampling failed for prompt '{prompt[:30]}...': {e}")
+
+    log("=" * 60)
+    log("")
 
 
 # =============================================================================
@@ -796,6 +1662,7 @@ class UnifiedTrainingConfig:
     beta1: float = 0.9
     beta2: float = 0.95
     max_grad_norm: float = 1.0
+    use_per_layer_clipping: bool = False  # Clip auth/sens layers separately
 
     # Mixed precision
     mixed_precision: str = "bf16"
@@ -837,7 +1704,7 @@ class UnifiedTrainingConfig:
     pidv2_kp_sensitivity: float = 5.0
     pidv2_ki: float = 0.02
     pidv2_kd: float = 0.10
-    pidv2_a_min: float = 0.30
+    pidv2_a_min: float = 0.40  # Raised from 0.30 to boost sensory floor
     pidv2_c_floor: float = 0.68
     pidv2_c_good: float = 0.76
     pidv2_w_s: float = 0.30  # Semantic weight
@@ -859,7 +1726,7 @@ class UnifiedTrainingConfig:
     # Dynamic Relaxation: 9:3 → 6:6 transition
     enable_dynamic_relaxation: bool = False  # Enable automatic 9:3 → 6:6 transition
     relaxation_mode: str = "average"         # "consecutive" or "average"
-    relaxation_stability_threshold: float = 0.78  # StabilityIndex threshold
+    relaxation_stability_threshold: float = 0.50  # StabilityIndex threshold (lowered from 0.78)
     relaxation_stability_window: int = 500   # Steps for stability check (rolling window)
     relaxation_streak_target: int = 5        # Consecutive stable evals (for consecutive mode)
     relaxation_target_authority: int = 6     # Target authority layers after relaxation
@@ -869,12 +1736,26 @@ class UnifiedTrainingConfig:
     relaxation_ppl_spike_threshold: float = 0.20  # PPL spike % to trigger Viparyaya
     relaxation_recovery_steps: int = 100     # Steps to stay in recovery mode
 
+    # Weight Transfer (9:3 → 6:6)
+    enable_weight_transfer: bool = True      # Enable weight transfer during relaxation
+    guna_lock_steps: int = 50                # Steps to freeze W_q/W_k post-swap
+
     # Resume checkpoint
     resume: str = ""
     resume_weights_only: bool = False
 
     # TensorBoard
     tensorboard: bool = True
+
+    # Quality Sampling
+    sample_every: int = 500  # Generate samples every N steps (0 = disabled)
+    sample_prompts: tuple = (
+        "The history of the Roman Empire began when",
+        "In computer science, algorithms are",
+        "The weather today is expected to be",
+        "Once upon a time in a small village",
+        "The meaning of life is often debated",
+    )
 
     # Hardware
     device: str = "auto"
@@ -1051,12 +1932,19 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         if not GEN2_AVAILABLE:
             raise ImportError("Gen 2 models not available. Check imports.")
 
+        # Determine num_layers: use 12 for 9:3 split, otherwise preset
+        # 9:3 split requires exactly (authority_layers + sensory_layers) = 12 layers
+        if config.use_9_3_split:
+            gen2_num_layers = config.authority_layers + config.sensory_layers
+        else:
+            gen2_num_layers = preset["num_layers"]
+
         # Create SymbolU12 Gen 2 (Hierarchical Complex Bhava)
         gen2_config = SymbolU12Gen2Config(
             vocab_size=config.vocab_size,
             embed_dim=preset["embed_dim"],
             num_heads=preset["num_heads"],
-            num_layers=preset["num_layers"],
+            num_layers=gen2_num_layers,
             complex_dim=64,  # Complex embedding dimension
             max_seq_len=config.max_seq_len,
             dropout=config.dropout,
@@ -1066,6 +1954,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         model = SymbolU12Gen2(gen2_config)
         print(f"\n  [Gen 2] Hierarchical Complex Bhava enabled")
         print(f"  [Gen 2] Complex dim: {gen2_config.complex_dim}")
+        print(f"  [Gen 2] Num layers: {gen2_num_layers} (9:3 split: {config.use_9_3_split})")
         print(f"  [Gen 2] Hierarchy: 3-tier phase rotation")
 
     else:
@@ -1240,13 +2129,21 @@ def _build_sovereign_state(
 
     # R-Signal [48]: Ontology (12) expanded + bhava subset
     r_onto = F.pad(onto_probs, (0, 36))  # 12 -> 48
-    bhava_r = bhava_vec[:, 32:68] if bhava_vec.shape[1] >= 68 else torch.zeros(B, 36, device=device)
+    if bhava_vec.shape[1] >= 80:
+        bhava_r = bhava_vec[:, 32:80]  # 48 dims
+    elif bhava_vec.shape[1] > 32:
+        bhava_r = F.pad(bhava_vec[:, 32:], (0, 80 - bhava_vec.shape[1]))  # Pad to 48
+    else:
+        bhava_r = torch.zeros(B, 48, device=device)
     r_signal = r_onto + bhava_r * 0.1
 
     # C-Signal [32]: Remaining bhava or zeros
-    c_signal = bhava_vec[:, 80:112] if bhava_vec.shape[1] >= 112 else torch.zeros(B, 32, device=device)
-    if c_signal.shape[1] < 32:
-        c_signal = F.pad(c_signal, (0, 32 - c_signal.shape[1]))
+    if bhava_vec.shape[1] >= 112:
+        c_signal = bhava_vec[:, 80:112]  # 32 dims
+    elif bhava_vec.shape[1] > 80:
+        c_signal = F.pad(bhava_vec[:, 80:], (0, 112 - bhava_vec.shape[1]))  # Pad to 32
+    else:
+        c_signal = torch.zeros(B, 32, device=device)
 
     return torch.cat([guna, s_signal, r_signal, c_signal], dim=-1)
 
@@ -1349,23 +2246,34 @@ def train(config: UnifiedTrainingConfig):
     )
 
     # Formula [1331]: 9:3 Hierarchical Gradient Scaling
-    gradient_scaler_9_3 = None
+    gradient_scaler_hgs = None
     if config.use_9_3_split:
-        gradient_scaler_9_3 = HierarchicalGradientScaler(
+        gradient_scaler_hgs = HierarchicalGradientScaler(
             model=model,
             authority_layers=config.authority_layers,
             sensory_layers=config.sensory_layers,
-            alpha_sens_min=config.alpha_sens_min,
+            alpha_sens_min=config.alpha_sens_initial,
             alpha_sens_max=config.alpha_sens_max,
             warmup_steps=config.gradient_warmup_steps,
             layer_attr="blocks",  # Common attribute name for transformer layers
         )
+        # Validate layer count matches configuration
+        expected_layers = config.authority_layers + config.sensory_layers
+        try:
+            found_layers = len(gradient_scaler_hgs._get_layers())
+            if found_layers < expected_layers:
+                print(f"  ⚠️  WARNING: Found {found_layers} layers but 9:3 split expects {expected_layers}")
+                print(f"      This may cause incorrect gradient scaling behavior!")
+            else:
+                print(f"  ✓ Layer count validation passed: {found_layers} layers for {config.authority_layers}:{config.sensory_layers} split")
+        except Exception as e:
+            print(f"  ⚠️  Could not validate layer count: {e}")
 
     # Dynamic Relaxation Controller: 9:3 → 6:6 transition
     relaxation_controller = None
-    if config.enable_dynamic_relaxation and gradient_scaler_9_3 is not None:
+    if config.enable_dynamic_relaxation and gradient_scaler_hgs is not None:
         relaxation_controller = DynamicRelaxationController(
-            gradient_scaler=gradient_scaler_9_3,
+            gradient_scaler=gradient_scaler_hgs,
             model=model,
             stability_threshold=config.relaxation_stability_threshold,
             stability_window=config.relaxation_stability_window,
@@ -1373,15 +2281,18 @@ def train(config: UnifiedTrainingConfig):
             authority_split=(config.authority_layers, config.sensory_layers),
             balanced_split=(config.relaxation_target_authority, config.relaxation_target_sensory),
             authority_alpha_max=config.alpha_sens_max,
-            balanced_alpha_max=config.relaxation_alpha_max,
+            balanced_alpha_max=config.alpha_sens_max,  # Same ceiling for balanced phase
             thaw_alpha_start=config.relaxation_thaw_alpha,
             thaw_warmup_steps=config.relaxation_thaw_steps,
             ppl_spike_threshold=config.relaxation_ppl_spike_threshold,
             recovery_steps=config.relaxation_recovery_steps,
+            # Weight Transfer settings
+            guna_lock_steps=config.guna_lock_steps,
+            enable_weight_transfer=config.enable_weight_transfer,
         )
 
     # Mixed precision
-    scaler = torch.cuda.amp.GradScaler() if config.mixed_precision != "none" else None
+    scaler = torch.amp.GradScaler('cuda') if config.mixed_precision != "none" else None
     autocast_dtype = torch.bfloat16 if config.mixed_precision == "bf16" else torch.float16
 
     # Training state
@@ -1435,50 +2346,6 @@ def train(config: UnifiedTrainingConfig):
         print(f"    Alignment thresholds: warn={friction_controller.config.align_warning}, crit={friction_controller.config.align_critical}")
         print(f"    Dominance range: [{friction_controller.config.dom_low}, {friction_controller.config.dom_high}]")
 
-    # Formula [1331] 9:3 Hierarchical Gradient Scaler (uses gradient hooks)
-    gradient_scaler_hgs = None
-    relaxation_controller = None
-    if config.use_9_3_split and HGS_AVAILABLE:
-        hgs_config = HierarchicalGradientScalerConfig(
-            total_layers=MODEL_PRESETS[config.model_size]["num_layers"],
-            authority_layers=config.authority_layers,
-            sensory_layers=config.sensory_layers,
-            alpha_sens_initial=config.alpha_sens_initial,
-            alpha_sens_max=config.alpha_sens_max,
-            warmup_steps=500,  # Ramp α_sens over 500 steps
-        )
-        # Pass model to register gradient hooks
-        gradient_scaler_hgs = HierarchicalGradientScaler(model, hgs_config)
-        print(f"\n  Formula [1331] 9:3 Split ENABLED (Gradient Hooks)")
-        print(f"    Authority layers: 0-{config.authority_layers - 1} (α=1.0)")
-        print(f"    Sensory layers: {config.authority_layers}-{config.authority_layers + config.sensory_layers - 1} (α={config.alpha_sens_initial} → {config.alpha_sens_max})")
-        print(f"    Warmup: 500 steps")
-
-        # Dynamic Relaxation Controller (9:3 → 6:6)
-        if config.enable_dynamic_relaxation:
-            drc_config = DynamicRelaxationConfig(
-                stability_threshold=config.relaxation_stability_threshold,
-                window_size=500,  # 500-step rolling window
-                mode=config.relaxation_mode,
-                consecutive_target=config.relaxation_streak_target,
-                initial_authority=config.authority_layers,
-                initial_sensory=config.sensory_layers,
-                target_authority=config.relaxation_target_authority,
-                target_sensory=config.relaxation_target_sensory,
-                thaw_alpha_initial=0.05,  # Dampened Thaw starts at 0.05
-                thaw_alpha_max=config.alpha_sens_max,
-                thaw_ramp_steps=500,
-            )
-            relaxation_controller = DynamicRelaxationController(
-                gradient_scaler=gradient_scaler_hgs,
-                config=drc_config,
-            )
-            print(f"  Dynamic Relaxation ENABLED")
-            print(f"    Mode: {config.relaxation_mode} (window=500)")
-            print(f"    SSI threshold: {config.relaxation_stability_threshold}")
-            print(f"    Target: {config.relaxation_target_authority}:{config.relaxation_target_sensory}")
-            print(f"    Dampened Thaw: α=0.05 → {config.alpha_sens_max}")
-
     # Track previous state for S-drift computation
     previous_state = None
     current_s_drift = 0.0
@@ -1511,7 +2378,7 @@ def train(config: UnifiedTrainingConfig):
         x, y = x.to(device), y.to(device)
 
         # Forward pass
-        with torch.cuda.amp.autocast(dtype=autocast_dtype):
+        with torch.amp.autocast('cuda', dtype=autocast_dtype):
             if config.model_type == "ontological":
                 outputs = model(x)
                 loss, metrics = compute_ontological_loss(
@@ -1557,7 +2424,12 @@ def train(config: UnifiedTrainingConfig):
             # Note: Gradient scaling via hooks happens automatically during backward()
             # We'll call step() after optimizer.step() to update warmup schedule
 
-            torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
+            # Gradient clipping: per-layer or global
+            if config.use_per_layer_clipping and gradient_scaler_hgs is not None:
+                # Clip authority and sensory layers separately to respect 9:3 design
+                gradient_scaler_hgs.clip_grad_norm_by_layer(config.max_grad_norm)
+            else:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
 
             if scaler is not None:
                 scaler.step(optimizer)
@@ -1580,8 +2452,9 @@ def train(config: UnifiedTrainingConfig):
                     # Update friction controller with corrective actions
                     if friction_controller is not None:
                         friction_penalty = friction_controller.update(friction_alignment, friction_dominance)
-                except Exception:
-                    pass
+                except Exception as e:
+                    if global_step % 100 == 0:  # Log warning every 100 steps to avoid spam
+                        print(f"  Warning: Friction measurement failed at step {global_step}: {e}")
 
             optimizer.zero_grad()
 
@@ -1596,6 +2469,10 @@ def train(config: UnifiedTrainingConfig):
             avg_loss = running_loss / config.gradient_accumulation
             train_losses.append(avg_loss)
             running_loss = 0.0
+
+            # Periodic CUDA memory cleanup to prevent fragmentation
+            if device.type == "cuda" and global_step % 500 == 0:
+                torch.cuda.empty_cache()
 
             # Logging
             if global_step % config.log_every == 0:
@@ -1783,51 +2660,48 @@ def train(config: UnifiedTrainingConfig):
                     tb_writer.add_scalar("val/loss", val_loss, global_step)
                     tb_writer.add_scalar("val/ppl", val_ppl, global_step)
 
-                # Dynamic Relaxation Controller update (9:3 → 6:6)
-                if relaxation_controller is not None:
-                    # Compute S-drift from state delta (using coherence as proxy if no state available)
-                    s_drift = 1.0 - current_coh  # Lower coherence = higher drift (approximation)
-
-                    relaxed, drc_metrics = relaxation_controller.update(
-                        guna_coherence=current_coh,
-                        s_drift=s_drift,
-                        current_ppl=val_ppl,
-                        step=global_step,
-                    )
-
-                    print(f"  --> {relaxation_controller.get_status_string()}")
-
-                    # TensorBoard logging for DRC
-                    if tb_writer is not None:
-                        tb_writer.add_scalar("drc/stability_avg", drc_metrics["stability_avg"], global_step)
-                        tb_writer.add_scalar("drc/alpha_sens", drc_metrics["alpha_sens"], global_step)
-                        tb_writer.add_scalar("drc/relaxation_triggered", drc_metrics["relaxation_triggered"], global_step)
-                        if drc_metrics["relaxation_triggered"]:
-                            tb_writer.add_scalar("drc/thaw_progress", drc_metrics["thaw_progress"], global_step)
-
-                # Log HGS status
+                # Log HGS status (only if relaxation controller not active, to avoid duplicate logging)
                 if gradient_scaler_hgs is not None and relaxation_controller is None:
                     print(f"  --> {gradient_scaler_hgs.get_status_string()}")
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
-                    save_checkpoint(model, optimizer, scheduler, global_step, best_val_loss,
-                                   ckpt_dir / "best.pt")
+                    save_checkpoint(
+                        model, optimizer, scheduler, global_step, best_val_loss,
+                        ckpt_dir / "best.pt",
+                        hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
+                        drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+                    )
                     print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}")
+
+                # Quality Sampling
+                if config.sample_every > 0 and global_step % config.sample_every == 0:
+                    if tokenizer is not None:
+                        run_quality_samples(model, tokenizer, config, device, global_step)
+                    else:
+                        print(f"  [Sampling] Skipped - tokenizer not available")
 
                 model.train()
 
             # Save checkpoint
             if global_step % config.save_every == 0:
-                save_checkpoint(model, optimizer, scheduler, global_step, best_val_loss,
-                               ckpt_dir / f"step_{global_step}.pt")
+                save_checkpoint(
+                    model, optimizer, scheduler, global_step, best_val_loss,
+                    ckpt_dir / f"step_{global_step}.pt",
+                    hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
+                    drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+                )
                 # Cleanup old checkpoints (keep last 5)
                 if PIDV2_AVAILABLE:
                     cleanup_old_checkpoints(ckpt_dir, keep_last=5)
 
     # Final save
-    save_checkpoint(model, optimizer, scheduler, global_step, best_val_loss,
-                   ckpt_dir / "final.pt")
+    save_checkpoint(
+        model, optimizer, scheduler, global_step, best_val_loss,
+        ckpt_dir / "final.pt",
+        hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
+        drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+    )
 
     # Close TensorBoard
     if tb_writer is not None:
@@ -1861,7 +2735,7 @@ def evaluate(
         for x, y in val_loader:
             x, y = x.to(device), y.to(device)
 
-            with torch.cuda.amp.autocast(dtype=autocast_dtype):
+            with torch.amp.autocast('cuda', dtype=autocast_dtype):
                 if config.model_type == "ontological":
                     outputs = model(x)
                     loss, metrics = compute_ontological_loss(
@@ -1898,15 +2772,32 @@ def save_checkpoint(
     step: int,
     best_val_loss: float,
     path: Path,
+    hgs_state: Optional[dict] = None,
+    drc_state: Optional[dict] = None,
 ):
-    """Save training checkpoint."""
-    torch.save({
+    """Save training checkpoint with optional HGS/DRC state."""
+    checkpoint = {
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
         "scheduler": scheduler.state_dict(),
         "step": step,
         "best_val_loss": best_val_loss,
-    }, path)
+        "rng_state": torch.get_rng_state(),
+    }
+
+    # Add CUDA RNG state if available
+    if torch.cuda.is_available():
+        checkpoint["cuda_rng_state"] = torch.cuda.get_rng_state()
+
+    # Add HGS state if provided
+    if hgs_state is not None:
+        checkpoint["hgs_state"] = hgs_state
+
+    # Add DRC state if provided
+    if drc_state is not None:
+        checkpoint["drc_state"] = drc_state
+
+    torch.save(checkpoint, path)
 
 
 # =============================================================================
@@ -1938,6 +2829,8 @@ def main():
                        help="Maximum training steps")
     parser.add_argument("--learning_rate", type=float, default=3e-4,
                        help="Peak learning rate")
+    parser.add_argument("--use_per_layer_clipping", action="store_true",
+                       help="Clip authority/sensory gradients separately (respects 9:3 design)")
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext103",
@@ -2014,8 +2907,8 @@ def main():
                        help="PIDv2 integral gain")
     parser.add_argument("--pidv2_kd", type=float, default=0.10,
                        help="PIDv2 derivative gain")
-    parser.add_argument("--pidv2_a_min", type=float, default=0.30,
-                       help="PIDv2 minimum authority factor")
+    parser.add_argument("--pidv2_a_min", type=float, default=0.40,
+                       help="PIDv2 minimum authority factor (sensory floor)")
     parser.add_argument("--pidv2_w_s", type=float, default=0.30,
                        help="Semantic weight (0.30 = 30%% prompt-based)")
     parser.add_argument("--phase_ramp_steps", type=int, default=7000,
@@ -2024,6 +2917,10 @@ def main():
                        help="Enable TensorBoard logging")
     parser.add_argument("--no_tensorboard", action="store_true",
                        help="Disable TensorBoard logging")
+
+    # Quality Sampling
+    parser.add_argument("--sample_every", type=int, default=500,
+                       help="Generate quality samples every N steps (0 = disabled)")
 
     # Formula [1331]: 9:3 Hierarchical Split
     parser.add_argument("--use_9_3_split", action="store_true",
@@ -2045,8 +2942,8 @@ def main():
     parser.add_argument("--relaxation_mode", type=str, default="average",
                        choices=["consecutive", "average"],
                        help="Stability check mode: 'consecutive' (reset on dip) or 'average' (rolling mean)")
-    parser.add_argument("--relaxation_stability_threshold", type=float, default=0.78,
-                       help="StabilityIndex threshold to trigger relaxation")
+    parser.add_argument("--relaxation_stability_threshold", type=float, default=0.50,
+                       help="S/A ratio threshold to trigger 9:3 → 6:6 relaxation")
     parser.add_argument("--relaxation_stability_window", type=int, default=500,
                        help="Rolling window size for stability check")
     parser.add_argument("--relaxation_streak_target", type=int, default=5,
@@ -2063,6 +2960,12 @@ def main():
                        help="PPL increase %% to trigger Viparyaya recovery")
     parser.add_argument("--relaxation_recovery_steps", type=int, default=100,
                        help="Steps to stay in Viparyaya recovery before resuming")
+
+    # Weight Transfer (9:3 → 6:6 transition)
+    parser.add_argument("--enable_weight_transfer", action="store_true", default=True,
+                       help="Enable weight transfer from Authority to Sensory layers during relaxation")
+    parser.add_argument("--guna_lock_steps", type=int, default=50,
+                       help="Steps to freeze W_q/W_k after relaxation (Guna-Lock)")
 
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
@@ -2131,6 +3034,7 @@ def main():
         pidv2_w_s=args.pidv2_w_s,
         phase_ramp_steps=args.phase_ramp_steps,
         tensorboard=args.tensorboard and not args.no_tensorboard,
+        sample_every=args.sample_every,
         resume=args.resume,
         resume_weights_only=args.resume_weights_only,
         # Formula [1331]: 9:3 Hierarchical Split
@@ -2140,6 +3044,7 @@ def main():
         alpha_sens_initial=args.alpha_sens_initial,
         alpha_sens_max=args.alpha_sens_max,
         gradient_warmup_steps=args.gradient_warmup_steps,
+        use_per_layer_clipping=args.use_per_layer_clipping,
         # Dynamic Relaxation: 9:3 → 6:6 transition
         enable_dynamic_relaxation=args.enable_dynamic_relaxation,
         relaxation_mode=args.relaxation_mode,
@@ -2152,6 +3057,9 @@ def main():
         relaxation_thaw_steps=args.relaxation_thaw_steps,
         relaxation_ppl_spike_threshold=args.relaxation_ppl_spike_threshold,
         relaxation_recovery_steps=args.relaxation_recovery_steps,
+        # Weight Transfer
+        enable_weight_transfer=args.enable_weight_transfer,
+        guna_lock_steps=args.guna_lock_steps,
     )
 
     # Train
