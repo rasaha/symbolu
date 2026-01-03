@@ -146,19 +146,15 @@ except ImportError as e:
     PIDV2_AVAILABLE = False
     print(f"Warning: PIDv2 controller not available: {e}")
 
-# Import Hierarchical Gradient Scaler (Formula [1331])
+# Import utilities from hierarchical_gradient_scaler module
+# Note: Main classes (HierarchicalGradientScaler, DynamicRelaxationController) are
+# defined locally below for direct integration with training loop
 try:
-    from symbolu.sovereign.hierarchical_gradient_scaler import (
-        HierarchicalGradientScaler,
-        HierarchicalGradientScalerConfig,
-        DynamicRelaxationController,
-        DynamicRelaxationConfig,
-        compute_s_drift,
-    )
-    HGS_AVAILABLE = True
-except ImportError as e:
-    HGS_AVAILABLE = False
-    print(f"Warning: Hierarchical Gradient Scaler not available: {e}")
+    from symbolu.sovereign.hierarchical_gradient_scaler import compute_s_drift
+    COMPUTE_S_DRIFT_AVAILABLE = True
+except ImportError:
+    COMPUTE_S_DRIFT_AVAILABLE = False
+    compute_s_drift = None
 
 
 # =============================================================================
@@ -211,6 +207,12 @@ class HierarchicalGradientScaler:
 
         self.current_step = 0
         self.hooks = []
+        self.hooks_registered = False  # Track if hooks are active
+
+        # Use bounded deques to prevent memory accumulation over long training
+        self._authority_grad_norms = collections.deque(maxlen=1000)
+        self._sensory_grad_norms = collections.deque(maxlen=1000)
+
         self.gradient_stats = {
             "authority_grad_norm": 0.0,
             "sensory_grad_norm": 0.0,
@@ -275,14 +277,14 @@ class HierarchicalGradientScaler:
                 alpha = self._compute_alpha_sens()
                 scaled_grad = grad * alpha
 
-                # Track stats (accumulate norms)
-                self.gradient_stats["sensory_grad_norm"] += grad.norm().item()
+                # Track stats using bounded deques
+                self._sensory_grad_norms.append(grad.norm().item())
                 self.gradient_stats["sensory_scale"] = alpha
 
                 return scaled_grad
             else:
                 # Authority layers get full gradient
-                self.gradient_stats["authority_grad_norm"] += grad.norm().item()
+                self._authority_grad_norms.append(grad.norm().item())
                 return grad
 
         return hook
@@ -294,6 +296,7 @@ class HierarchicalGradientScaler:
         except ValueError as e:
             print(f"  [Formula 1331] Warning: {e}")
             print(f"  [Formula 1331] Gradient scaling disabled - could not find layers")
+            self.hooks_registered = False
             return
 
         total_layers = len(layers)
@@ -318,24 +321,130 @@ class HierarchicalGradientScaler:
                     hook_count += 1
 
         print(f"    Registered {hook_count} gradient hooks")
+        self.hooks_registered = True
 
-    def step(self, global_step: int):
-        """Update current step and reset gradient stats."""
-        self.current_step = global_step
+    def step(self, global_step: Optional[int] = None) -> dict:
+        """
+        Update current step, compute metrics, and reset gradient accumulators.
 
-        # Compute ratio before resetting
-        if self.gradient_stats["authority_grad_norm"] > 0:
-            ratio = self.gradient_stats["sensory_grad_norm"] / self.gradient_stats["authority_grad_norm"]
-            self.gradient_stats["sensory_authority_ratio"] = ratio
+        Args:
+            global_step: Optional step to set. If not provided, increments internal counter.
 
-        # Reset accumulators for next step
-        self.gradient_stats["authority_grad_norm"] = 0.0
-        self.gradient_stats["sensory_grad_norm"] = 0.0
+        Returns:
+            Dict with gradient metrics (s_grad_norm, a_grad_norm, s_a_ratio, alpha_sens)
+        """
+        if global_step is not None:
+            self.current_step = global_step
+        else:
+            self.current_step += 1
+
+        # Compute accumulated norms from deques
+        a_norm = sum(self._authority_grad_norms) if self._authority_grad_norms else 0.0
+        s_norm = sum(self._sensory_grad_norms) if self._sensory_grad_norms else 0.0
+        s_a_ratio = s_norm / a_norm if a_norm > 0 else 0.0
+
+        self.gradient_stats["authority_grad_norm"] = a_norm
+        self.gradient_stats["sensory_grad_norm"] = s_norm
+        self.gradient_stats["sensory_authority_ratio"] = s_a_ratio
         self.gradient_stats["sensory_scale"] = self._compute_alpha_sens()
+
+        # Prepare metrics for return
+        metrics = {
+            "s_grad_norm": s_norm,
+            "a_grad_norm": a_norm,
+            "s_a_ratio": s_a_ratio,
+            "alpha_sens": self._compute_alpha_sens(),
+            "step": self.current_step,
+        }
+
+        # Clear deques for next step
+        self._authority_grad_norms.clear()
+        self._sensory_grad_norms.clear()
+
+        return metrics
 
     def get_stats(self) -> dict:
         """Get gradient statistics for logging."""
         return self.gradient_stats.copy()
+
+    def get_state(self) -> dict:
+        """Get full state for checkpointing."""
+        return {
+            "authority_layers": self.authority_layers,
+            "sensory_layers": self.sensory_layers,
+            "alpha_sens_min": self.alpha_sens_min,
+            "alpha_sens_max": self.alpha_sens_max,
+            "warmup_steps": self.warmup_steps,
+            "current_step": self.current_step,
+            "gradient_stats": self.gradient_stats.copy(),
+        }
+
+    def set_state(self, state: dict):
+        """Restore state from checkpoint."""
+        self.authority_layers = state.get("authority_layers", self.authority_layers)
+        self.sensory_layers = state.get("sensory_layers", self.sensory_layers)
+        self.alpha_sens_min = state.get("alpha_sens_min", self.alpha_sens_min)
+        self.alpha_sens_max = state.get("alpha_sens_max", self.alpha_sens_max)
+        self.warmup_steps = state.get("warmup_steps", self.warmup_steps)
+        self.current_step = state.get("current_step", self.current_step)
+        if "gradient_stats" in state:
+            self.gradient_stats.update(state["gradient_stats"])
+
+    def get_status_string(self) -> str:
+        """Get human-readable status string for logging."""
+        s_a_ratio = self.gradient_stats.get("sensory_authority_ratio", 0.0)
+        alpha = self._compute_alpha_sens()
+        return (
+            f"HGS: S/A={s_a_ratio:.3f} | "
+            f"α_sens={alpha:.2f} | "
+            f"split={self.authority_layers}:{self.sensory_layers}"
+        )
+
+    def clip_grad_norm_by_layer(self, max_norm: float = 1.0) -> Tuple[float, float]:
+        """
+        Clip gradients separately for authority and sensory layer groups.
+
+        This respects the 9:3 design intent by preventing cross-contamination
+        of gradient norms between layer types.
+
+        Args:
+            max_norm: Maximum gradient norm for each layer group.
+
+        Returns:
+            Tuple of (authority_grad_norm, sensory_grad_norm) after clipping.
+        """
+        try:
+            layers = self._get_layers()
+        except ValueError:
+            return 0.0, 0.0
+
+        total_layers = len(layers)
+        sensory_start = max(0, total_layers - self.sensory_layers)
+
+        # Collect parameters by layer type
+        auth_params = []
+        sens_params = []
+
+        for layer_idx, layer in enumerate(layers):
+            is_sensory = layer_idx >= sensory_start
+            for param in layer.parameters():
+                if param.requires_grad and param.grad is not None:
+                    if is_sensory:
+                        sens_params.append(param)
+                    else:
+                        auth_params.append(param)
+
+        # Clip each group separately
+        auth_norm = 0.0
+        sens_norm = 0.0
+
+        if auth_params:
+            auth_norm = torch.nn.utils.clip_grad_norm_(auth_params, max_norm).item()
+
+        if sens_params:
+            sens_norm = torch.nn.utils.clip_grad_norm_(sens_params, max_norm).item()
+
+        return auth_norm, sens_norm
 
     def remove_hooks(self):
         """Remove all registered hooks."""
@@ -503,6 +612,18 @@ class DynamicRelaxationController:
         - GC high: Authority layers have locked global phase rotation
         - S_Drift low: Reality signal aligned with ontological intent
         """
+        # Input validation - clamp and warn on out-of-bounds values
+        if not (0.0 <= guna_coherence <= 1.0):
+            guna_coherence = max(0.0, min(1.0, guna_coherence))
+        if not (0.0 <= s_drift_ema <= 1.0):
+            s_drift_ema = max(0.0, min(1.0, s_drift_ema))
+
+        # Handle NaN/Inf gracefully
+        if math.isnan(guna_coherence) or math.isinf(guna_coherence):
+            guna_coherence = 0.5
+        if math.isnan(s_drift_ema) or math.isinf(s_drift_ema):
+            s_drift_ema = 0.5
+
         stability = (
             self.guna_coherence_weight * guna_coherence +
             self.s_drift_weight * (1.0 - s_drift_ema)
@@ -748,6 +869,32 @@ class DynamicRelaxationController:
             "is_balanced": self.state == self.STATE_BALANCED,
         }
 
+    def get_state(self) -> Dict[str, Any]:
+        """Get full state for checkpointing."""
+        return {
+            "state": self.state,
+            "current_split": self.current_split,
+            "stability_streak": self.stability_streak,
+            "ssi_rolling_window": list(self.ssi_rolling_window),
+            "pre_relaxation_ppl": self.pre_relaxation_ppl,
+            "relaxation_step": self.relaxation_step,
+            "recovery_start_step": self.recovery_start_step,
+            "integration_tax_logged": self.integration_tax_logged,
+            "transitions": self.transitions,
+        }
+
+    def set_state(self, state: Dict[str, Any]):
+        """Restore state from checkpoint."""
+        self.state = state.get("state", self.STATE_AUTHORITY)
+        self.current_split = state.get("current_split", self.authority_split)
+        self.stability_streak = state.get("stability_streak", 0)
+        self.ssi_rolling_window = state.get("ssi_rolling_window", [])
+        self.pre_relaxation_ppl = state.get("pre_relaxation_ppl", None)
+        self.relaxation_step = state.get("relaxation_step", None)
+        self.recovery_start_step = state.get("recovery_start_step", None)
+        self.integration_tax_logged = state.get("integration_tax_logged", False)
+        self.transitions = state.get("transitions", [])
+
 
 # =============================================================================
 # CONFIGURATION
@@ -796,6 +943,7 @@ class UnifiedTrainingConfig:
     beta1: float = 0.9
     beta2: float = 0.95
     max_grad_norm: float = 1.0
+    use_per_layer_clipping: bool = False  # Clip auth/sens layers separately
 
     # Mixed precision
     mixed_precision: str = "bf16"
@@ -1557,7 +1705,12 @@ def train(config: UnifiedTrainingConfig):
             # Note: Gradient scaling via hooks happens automatically during backward()
             # We'll call step() after optimizer.step() to update warmup schedule
 
-            torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
+            # Gradient clipping: per-layer or global
+            if config.use_per_layer_clipping and gradient_scaler_hgs is not None:
+                # Clip authority and sensory layers separately to respect 9:3 design
+                gradient_scaler_hgs.clip_grad_norm_by_layer(config.max_grad_norm)
+            else:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
 
             if scaler is not None:
                 scaler.step(optimizer)
@@ -1580,8 +1733,9 @@ def train(config: UnifiedTrainingConfig):
                     # Update friction controller with corrective actions
                     if friction_controller is not None:
                         friction_penalty = friction_controller.update(friction_alignment, friction_dominance)
-                except Exception:
-                    pass
+                except Exception as e:
+                    if global_step % 100 == 0:  # Log warning every 100 steps to avoid spam
+                        print(f"  Warning: Friction measurement failed at step {global_step}: {e}")
 
             optimizer.zero_grad()
 
@@ -1596,6 +1750,10 @@ def train(config: UnifiedTrainingConfig):
             avg_loss = running_loss / config.gradient_accumulation
             train_losses.append(avg_loss)
             running_loss = 0.0
+
+            # Periodic CUDA memory cleanup to prevent fragmentation
+            if device.type == "cuda" and global_step % 500 == 0:
+                torch.cuda.empty_cache()
 
             # Logging
             if global_step % config.log_every == 0:
@@ -1811,23 +1969,35 @@ def train(config: UnifiedTrainingConfig):
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
-                    save_checkpoint(model, optimizer, scheduler, global_step, best_val_loss,
-                                   ckpt_dir / "best.pt")
+                    save_checkpoint(
+                        model, optimizer, scheduler, global_step, best_val_loss,
+                        ckpt_dir / "best.pt",
+                        hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
+                        drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+                    )
                     print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}")
 
                 model.train()
 
             # Save checkpoint
             if global_step % config.save_every == 0:
-                save_checkpoint(model, optimizer, scheduler, global_step, best_val_loss,
-                               ckpt_dir / f"step_{global_step}.pt")
+                save_checkpoint(
+                    model, optimizer, scheduler, global_step, best_val_loss,
+                    ckpt_dir / f"step_{global_step}.pt",
+                    hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
+                    drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+                )
                 # Cleanup old checkpoints (keep last 5)
                 if PIDV2_AVAILABLE:
                     cleanup_old_checkpoints(ckpt_dir, keep_last=5)
 
     # Final save
-    save_checkpoint(model, optimizer, scheduler, global_step, best_val_loss,
-                   ckpt_dir / "final.pt")
+    save_checkpoint(
+        model, optimizer, scheduler, global_step, best_val_loss,
+        ckpt_dir / "final.pt",
+        hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
+        drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+    )
 
     # Close TensorBoard
     if tb_writer is not None:
@@ -1898,15 +2068,32 @@ def save_checkpoint(
     step: int,
     best_val_loss: float,
     path: Path,
+    hgs_state: Optional[dict] = None,
+    drc_state: Optional[dict] = None,
 ):
-    """Save training checkpoint."""
-    torch.save({
+    """Save training checkpoint with optional HGS/DRC state."""
+    checkpoint = {
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
         "scheduler": scheduler.state_dict(),
         "step": step,
         "best_val_loss": best_val_loss,
-    }, path)
+        "rng_state": torch.get_rng_state(),
+    }
+
+    # Add CUDA RNG state if available
+    if torch.cuda.is_available():
+        checkpoint["cuda_rng_state"] = torch.cuda.get_rng_state()
+
+    # Add HGS state if provided
+    if hgs_state is not None:
+        checkpoint["hgs_state"] = hgs_state
+
+    # Add DRC state if provided
+    if drc_state is not None:
+        checkpoint["drc_state"] = drc_state
+
+    torch.save(checkpoint, path)
 
 
 # =============================================================================
@@ -1938,6 +2125,8 @@ def main():
                        help="Maximum training steps")
     parser.add_argument("--learning_rate", type=float, default=3e-4,
                        help="Peak learning rate")
+    parser.add_argument("--use_per_layer_clipping", action="store_true",
+                       help="Clip authority/sensory gradients separately (respects 9:3 design)")
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext103",
@@ -2140,6 +2329,7 @@ def main():
         alpha_sens_initial=args.alpha_sens_initial,
         alpha_sens_max=args.alpha_sens_max,
         gradient_warmup_steps=args.gradient_warmup_steps,
+        use_per_layer_clipping=args.use_per_layer_clipping,
         # Dynamic Relaxation: 9:3 → 6:6 transition
         enable_dynamic_relaxation=args.enable_dynamic_relaxation,
         relaxation_mode=args.relaxation_mode,
