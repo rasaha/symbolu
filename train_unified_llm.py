@@ -1388,7 +1388,12 @@ def _build_sovereign_state(
 
     # R-Signal [48]: Ontology (12) expanded + bhava subset
     r_onto = F.pad(onto_probs, (0, 36))  # 12 -> 48
-    bhava_r = bhava_vec[:, 32:68] if bhava_vec.shape[1] >= 68 else torch.zeros(B, 36, device=device)
+    if bhava_vec.shape[1] >= 80:
+        bhava_r = bhava_vec[:, 32:80]  # 48 dims
+    elif bhava_vec.shape[1] > 32:
+        bhava_r = F.pad(bhava_vec[:, 32:], (0, 80 - bhava_vec.shape[1]))  # Pad to 48
+    else:
+        bhava_r = torch.zeros(B, 48, device=device)
     r_signal = r_onto + bhava_r * 0.1
 
     # C-Signal [32]: Remaining bhava or zeros
