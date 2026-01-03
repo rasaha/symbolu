@@ -1221,12 +1221,19 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         if not GEN2_AVAILABLE:
             raise ImportError("Gen 2 models not available. Check imports.")
 
+        # Determine num_layers: use 12 for 9:3 split, otherwise preset
+        # 9:3 split requires exactly (authority_layers + sensory_layers) = 12 layers
+        if config.use_9_3_split:
+            gen2_num_layers = config.authority_layers + config.sensory_layers
+        else:
+            gen2_num_layers = preset["num_layers"]
+
         # Create SymbolU12 Gen 2 (Hierarchical Complex Bhava)
         gen2_config = SymbolU12Gen2Config(
             vocab_size=config.vocab_size,
             embed_dim=preset["embed_dim"],
             num_heads=preset["num_heads"],
-            num_layers=preset["num_layers"],
+            num_layers=gen2_num_layers,
             complex_dim=64,  # Complex embedding dimension
             max_seq_len=config.max_seq_len,
             dropout=config.dropout,
@@ -1236,6 +1243,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         model = SymbolU12Gen2(gen2_config)
         print(f"\n  [Gen 2] Hierarchical Complex Bhava enabled")
         print(f"  [Gen 2] Complex dim: {gen2_config.complex_dim}")
+        print(f"  [Gen 2] Num layers: {gen2_num_layers} (9:3 split: {config.use_9_3_split})")
         print(f"  [Gen 2] Hierarchy: 3-tier phase rotation")
 
     else:
@@ -1538,6 +1546,17 @@ def train(config: UnifiedTrainingConfig):
             warmup_steps=config.gradient_warmup_steps,
             layer_attr="blocks",  # Common attribute name for transformer layers
         )
+        # Validate layer count matches configuration
+        expected_layers = config.authority_layers + config.sensory_layers
+        try:
+            found_layers = len(gradient_scaler_hgs._get_layers())
+            if found_layers < expected_layers:
+                print(f"  ⚠️  WARNING: Found {found_layers} layers but 9:3 split expects {expected_layers}")
+                print(f"      This may cause incorrect gradient scaling behavior!")
+            else:
+                print(f"  ✓ Layer count validation passed: {found_layers} layers for {config.authority_layers}:{config.sensory_layers} split")
+        except Exception as e:
+            print(f"  ⚠️  Could not validate layer count: {e}")
 
     # Dynamic Relaxation Controller: 9:3 → 6:6 transition
     relaxation_controller = None
