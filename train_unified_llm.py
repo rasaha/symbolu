@@ -6433,6 +6433,28 @@ def main():
     parser.add_argument("--toroidal_coherence_threshold", type=float, default=0.3,
                        help="Alarm threshold for cognitive discontinuity")
 
+    # Evolutionary Flow System (Phase 2-5)
+    parser.add_argument("--enable_evolutionary_flow", action="store_true", default=True,
+                       help="Enable Evolutionary Flow System (default: True)")
+    parser.add_argument("--disable_evolutionary_flow", action="store_true",
+                       help="Disable Evolutionary Flow System")
+    parser.add_argument("--evo_lambda", type=float, default=0.1,
+                       help="Overall evolutionary loss weight")
+    parser.add_argument("--evo_micro_weight", type=float, default=0.3,
+                       help="Weight for per-gate coherence loss")
+    parser.add_argument("--evo_meso_weight", type=float, default=0.3,
+                       help="Weight for cluster coherence loss (Auth/Sens)")
+    parser.add_argument("--evo_macro_weight", type=float, default=0.4,
+                       help="Weight for toroidal coherence loss")
+    parser.add_argument("--evo_resonance_alpha", type=float, default=0.1,
+                       help="Strength of O12→O1 delayed resonance injection")
+    parser.add_argument("--evo_lr_modulation", action="store_true", default=True,
+                       help="Enable metacognitive LR adjustment")
+    parser.add_argument("--evo_lr_slowdown", type=float, default=0.5,
+                       help="LR multiplier when SLOW_DOWN/BRAKE")
+    parser.add_argument("--evo_lr_accelerate", type=float, default=1.2,
+                       help="LR multiplier when ACCELERATE")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -6540,6 +6562,16 @@ def main():
         toroidal_use_gating=args.toroidal_use_gating,
         toroidal_truncated_bptt=args.toroidal_truncated_bptt,
         toroidal_coherence_threshold=args.toroidal_coherence_threshold,
+        # Evolutionary Flow System
+        enable_evolutionary_flow=args.enable_evolutionary_flow and not args.disable_evolutionary_flow,
+        evo_lambda=args.evo_lambda,
+        evo_micro_weight=args.evo_micro_weight,
+        evo_meso_weight=args.evo_meso_weight,
+        evo_macro_weight=args.evo_macro_weight,
+        evo_resonance_alpha=args.evo_resonance_alpha,
+        evo_lr_modulation=args.evo_lr_modulation,
+        evo_lr_slowdown=args.evo_lr_slowdown,
+        evo_lr_accelerate=args.evo_lr_accelerate,
     )
 
     # Train
