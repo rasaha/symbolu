@@ -2832,7 +2832,8 @@ class AutoBatchSizer:
         Find optimal batch size using binary search.
 
         Args:
-            target_effective_batch: Desired effective batch size (for grad accum calculation)
+            target_effective_batch: Desired effective batch size (for grad accum calculation).
+                                   If 0, just finds max batch that fits and sets accum=1.
             verbose: Print progress
 
         Returns:
@@ -2841,7 +2842,9 @@ class AutoBatchSizer:
         if not torch.cuda.is_available():
             if verbose:
                 print("  ⚠️  No CUDA available, using default batch size")
-            return self.min_batch_size, target_effective_batch // self.min_batch_size
+            if target_effective_batch > 0:
+                return self.min_batch_size, target_effective_batch // self.min_batch_size
+            return self.min_batch_size, 1
 
         # Get total memory
         total_mem = torch.cuda.get_device_properties(self.device).total_memory
@@ -2855,12 +2858,18 @@ class AutoBatchSizer:
             print(f"  Total VRAM: {self.total_memory_gb:.1f} GB")
             print(f"  Target Utilization: {self.target_utilization:.0%} (effective: {self.effective_target:.0%})")
             print(f"  Sequence Length: {self.seq_len:,}")
-            print(f"  Target Effective Batch: {target_effective_batch}")
+            if target_effective_batch > 0:
+                print(f"  Target Effective Batch: {target_effective_batch}")
+            else:
+                print(f"  Mode: Find maximum batch (no accumulation target)")
             print(f"  {'─'*60}")
 
         # Build list of candidate batch sizes (multiples of 8 for Tensor Core efficiency)
         alignment = 8
-        max_candidate = min(self.max_batch_size, target_effective_batch)
+        if target_effective_batch > 0:
+            max_candidate = min(self.max_batch_size, target_effective_batch)
+        else:
+            max_candidate = self.max_batch_size
         candidates = [b for b in range(alignment, max_candidate + 1, alignment)]
         if not candidates:
             candidates = [alignment]  # Minimum fallback
@@ -2920,7 +2929,7 @@ class AutoBatchSizer:
                     break
 
         # Calculate gradient accumulation
-        if optimal_batch >= target_effective_batch:
+        if target_effective_batch <= 0 or optimal_batch >= target_effective_batch:
             grad_accum = 1
         else:
             grad_accum = max(1, target_effective_batch // optimal_batch)
@@ -5375,7 +5384,7 @@ class UnifiedTrainingConfig:
     enable_auto_batch: bool = False          # Enable automatic batch size detection at startup
     auto_batch_target_utilization: float = 0.80  # Target VRAM utilization (80%)
     auto_batch_safety_margin: float = 0.05   # Extra headroom (5%)
-    auto_batch_target_effective: int = 32    # Target effective batch size
+    auto_batch_target_effective: int = 0     # Target effective batch (0 = just find max, no accum)
 
     # Resume checkpoint
     resume: str = ""
@@ -7498,8 +7507,8 @@ def main():
                        help="Target VRAM utilization for auto batch sizing (0.80 = 80%%)")
     parser.add_argument("--auto_batch_safety_margin", type=float, default=0.05,
                        help="Extra VRAM headroom below target (0.05 = 5%%)")
-    parser.add_argument("--auto_batch_target_effective", type=int, default=32,
-                       help="Target effective batch size (batch_size * gradient_accumulation)")
+    parser.add_argument("--auto_batch_target_effective", type=int, default=0,
+                       help="Target effective batch size (0 = just find max batch, no accumulation)")
 
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
