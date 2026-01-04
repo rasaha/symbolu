@@ -2670,6 +2670,272 @@ class VRAMGovernor:
 
 
 # =============================================================================
+# AUTO BATCH SIZER: VRAM-Based Startup Probing
+# =============================================================================
+
+class AutoBatchSizer:
+    """
+    VRAM-Aware Automatic Batch Size Detector.
+
+    At training startup, probes GPU memory to find the optimal batch size
+    that utilizes a target percentage of VRAM (default 80%). Uses binary
+    search for efficiency.
+
+    This runs ONCE at startup, before training begins. The determined
+    batch size remains fixed throughout training (VRAMGovernor handles
+    dynamic adjustments during training if needed).
+
+    Usage:
+        sizer = AutoBatchSizer(model, seq_len=2048, target_utilization=0.80)
+        batch_size, grad_accum = sizer.find_optimal_batch(target_effective=32)
+
+        # Use these to configure your dataloader
+        config.batch_size = batch_size
+        config.gradient_accumulation = grad_accum
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        seq_len: int = 2048,
+        vocab_size: int = 50257,
+        target_utilization: float = 0.80,
+        min_batch_size: int = 1,
+        max_batch_size: int = 128,
+        safety_margin: float = 0.05,  # Extra headroom below target
+        device: Optional[torch.device] = None,
+    ):
+        """
+        Args:
+            model: The model to probe (should be on GPU)
+            seq_len: Maximum sequence length for probing
+            vocab_size: Vocabulary size for dummy inputs
+            target_utilization: Target VRAM utilization (0.80 = 80%)
+            min_batch_size: Minimum batch size to try
+            max_batch_size: Maximum batch size to try
+            safety_margin: Extra margin below target (0.05 = 5% headroom)
+            device: Device to probe (defaults to cuda:0)
+        """
+        self.model = model
+        self.seq_len = seq_len
+        self.vocab_size = vocab_size
+        self.target_utilization = target_utilization
+        self.effective_target = target_utilization - safety_margin
+        self.min_batch_size = min_batch_size
+        self.max_batch_size = max_batch_size
+        self.device = device or torch.device("cuda:0")
+
+        # Results
+        self.probed_batch_size: Optional[int] = None
+        self.peak_memory_gb: float = 0.0
+        self.total_memory_gb: float = 0.0
+
+    def _get_memory_info(self) -> Tuple[float, float, float]:
+        """Get current VRAM usage."""
+        if not torch.cuda.is_available():
+            return 0.0, 0.0, 0.0
+
+        torch.cuda.synchronize()
+        allocated = torch.cuda.memory_allocated(self.device)
+        reserved = torch.cuda.memory_reserved(self.device)
+        total = torch.cuda.get_device_properties(self.device).total_memory
+
+        return allocated / total, reserved / (1024**3), total / (1024**3)
+
+    def _clear_memory(self):
+        """Aggressively clear GPU memory."""
+        import gc
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
+    def _probe_batch_size(self, batch_size: int) -> Tuple[bool, float]:
+        """
+        Probe if a given batch size fits in memory.
+
+        Returns:
+            (success, peak_utilization)
+        """
+        self._clear_memory()
+
+        try:
+            # Create dummy batch
+            dummy_input = torch.randint(
+                0, self.vocab_size,
+                (batch_size, self.seq_len),
+                device=self.device,
+                dtype=torch.long
+            )
+            dummy_target = torch.randint(
+                0, self.vocab_size,
+                (batch_size, self.seq_len),
+                device=self.device,
+                dtype=torch.long
+            )
+
+            # Forward pass
+            self.model.train()
+            with torch.amp.autocast('cuda', dtype=torch.bfloat16):
+                outputs = self.model(dummy_input)
+
+                # Handle different output formats
+                if isinstance(outputs, tuple):
+                    logits = outputs[0]
+                elif hasattr(outputs, 'logits'):
+                    logits = outputs.logits
+                else:
+                    logits = outputs
+
+                # Compute loss (simulates full training step memory)
+                loss = F.cross_entropy(
+                    logits.view(-1, logits.size(-1)),
+                    dummy_target.view(-1),
+                    ignore_index=-100
+                )
+
+            # Backward pass (this is where most memory is used)
+            loss.backward()
+
+            # Check peak memory
+            torch.cuda.synchronize()
+            peak_allocated = torch.cuda.max_memory_allocated(self.device)
+            total = torch.cuda.get_device_properties(self.device).total_memory
+            peak_utilization = peak_allocated / total
+
+            # Cleanup
+            del dummy_input, dummy_target, outputs, logits, loss
+            self.model.zero_grad(set_to_none=True)
+            self._clear_memory()
+            torch.cuda.reset_peak_memory_stats()
+
+            return True, peak_utilization
+
+        except RuntimeError as e:
+            if "out of memory" in str(e).lower() or "CUDA" in str(e):
+                # OOM - this batch size is too large
+                self.model.zero_grad(set_to_none=True)
+                self._clear_memory()
+                torch.cuda.reset_peak_memory_stats()
+                return False, 1.0
+            else:
+                raise
+
+    def find_optimal_batch(
+        self,
+        target_effective_batch: int = 32,
+        verbose: bool = True
+    ) -> Tuple[int, int]:
+        """
+        Find optimal batch size using binary search.
+
+        Args:
+            target_effective_batch: Desired effective batch size (for grad accum calculation)
+            verbose: Print progress
+
+        Returns:
+            (batch_size, gradient_accumulation_steps)
+        """
+        if not torch.cuda.is_available():
+            if verbose:
+                print("  ⚠️  No CUDA available, using default batch size")
+            return self.min_batch_size, target_effective_batch // self.min_batch_size
+
+        # Get total memory
+        total_mem = torch.cuda.get_device_properties(self.device).total_memory
+        self.total_memory_gb = total_mem / (1024**3)
+
+        if verbose:
+            print(f"\n  {'='*60}")
+            print(f"  AUTO BATCH SIZER: Probing optimal batch size")
+            print(f"  {'='*60}")
+            print(f"  GPU: {torch.cuda.get_device_name(self.device)}")
+            print(f"  Total VRAM: {self.total_memory_gb:.1f} GB")
+            print(f"  Target Utilization: {self.target_utilization:.0%} (effective: {self.effective_target:.0%})")
+            print(f"  Sequence Length: {self.seq_len:,}")
+            print(f"  Target Effective Batch: {target_effective_batch}")
+            print(f"  {'─'*60}")
+
+        # Binary search for optimal batch size
+        low = self.min_batch_size
+        high = min(self.max_batch_size, target_effective_batch)
+        optimal_batch = low
+        optimal_utilization = 0.0
+
+        # First, find the maximum that fits
+        if verbose:
+            print(f"  Phase 1: Finding maximum batch size that fits...")
+
+        while low <= high:
+            mid = (low + high) // 2
+            if verbose:
+                print(f"    Probing batch_size={mid}...", end=" ", flush=True)
+
+            success, utilization = self._probe_batch_size(mid)
+
+            if success:
+                if verbose:
+                    print(f"✓ ({utilization:.1%} VRAM)")
+
+                if utilization <= self.effective_target:
+                    # Fits within target, try larger
+                    optimal_batch = mid
+                    optimal_utilization = utilization
+                    low = mid + 1
+                else:
+                    # Exceeds target but doesn't OOM, this is close
+                    optimal_batch = mid
+                    optimal_utilization = utilization
+                    high = mid - 1
+            else:
+                if verbose:
+                    print(f"✗ OOM")
+                high = mid - 1
+
+        # If we're over target, step down
+        while optimal_batch > self.min_batch_size:
+            success, utilization = self._probe_batch_size(optimal_batch)
+            if success and utilization <= self.effective_target:
+                optimal_utilization = utilization
+                break
+            optimal_batch -= 1
+            if verbose:
+                print(f"    Stepping down to batch_size={optimal_batch}...")
+
+        # Calculate gradient accumulation
+        if optimal_batch >= target_effective_batch:
+            grad_accum = 1
+        else:
+            grad_accum = max(1, target_effective_batch // optimal_batch)
+
+        effective_batch = optimal_batch * grad_accum
+
+        # Store results
+        self.probed_batch_size = optimal_batch
+        self.peak_memory_gb = optimal_utilization * self.total_memory_gb
+
+        if verbose:
+            print(f"  {'─'*60}")
+            print(f"  ✓ OPTIMAL CONFIGURATION FOUND:")
+            print(f"    Batch Size: {optimal_batch}")
+            print(f"    Gradient Accumulation: {grad_accum}")
+            print(f"    Effective Batch: {effective_batch}")
+            print(f"    Peak VRAM: {self.peak_memory_gb:.1f} GB ({optimal_utilization:.1%})")
+            print(f"  {'='*60}\n")
+
+        return optimal_batch, grad_accum
+
+    def get_summary(self) -> Dict[str, any]:
+        """Get summary of probing results."""
+        return {
+            "batch_size": self.probed_batch_size,
+            "total_vram_gb": self.total_memory_gb,
+            "peak_vram_gb": self.peak_memory_gb,
+            "target_utilization": self.target_utilization,
+            "seq_len": self.seq_len,
+        }
+
+
+# =============================================================================
 # V2.7 TRAINING STATE TRACKER: Knowledge State Evolution
 # =============================================================================
 
@@ -5087,6 +5353,12 @@ class UnifiedTrainingConfig:
     adaptive_plateau_threshold: float = 1.0  # Min improvement % to avoid plateau detection
     adaptive_min_interval: int = 200         # Min steps between adjustments
 
+    # Auto Batch Sizing (VRAM-based startup probing)
+    enable_auto_batch: bool = False          # Enable automatic batch size detection at startup
+    auto_batch_target_utilization: float = 0.80  # Target VRAM utilization (80%)
+    auto_batch_safety_margin: float = 0.05   # Extra headroom (5%)
+    auto_batch_target_effective: int = 32    # Target effective batch size
+
     # Resume checkpoint
     resume: str = ""
     resume_weights_only: bool = False
@@ -5635,13 +5907,41 @@ def train(config: UnifiedTrainingConfig):
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
     tokenizer.model_max_length = int(1e12)
 
-    # Load data
-    train_loader, val_loader = load_data(config, tokenizer)
-
-    # Create model
+    # Create model BEFORE data loading (needed for AutoBatchSizer)
     model = create_model(config, device)
     num_params = sum(p.numel() for p in model.parameters())
     print(f"\n  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
+
+    # Auto Batch Sizing: Probe VRAM at startup to find optimal batch size
+    if config.enable_auto_batch:
+        print(f"\n  Auto Batch Sizing: ENABLED")
+        auto_sizer = AutoBatchSizer(
+            model=model,
+            seq_len=config.max_seq_len,
+            vocab_size=config.vocab_size,
+            target_utilization=config.auto_batch_target_utilization,
+            safety_margin=config.auto_batch_safety_margin,
+            min_batch_size=1,
+            max_batch_size=128,
+            device=device,
+        )
+
+        probed_batch, probed_accum = auto_sizer.find_optimal_batch(
+            target_effective_batch=config.auto_batch_target_effective,
+            verbose=True,
+        )
+
+        # Update config with probed values
+        old_batch = config.batch_size
+        old_accum = config.gradient_accumulation
+        config.batch_size = probed_batch
+        config.gradient_accumulation = probed_accum
+
+        print(f"  Auto Batch: {old_batch}×{old_accum} → {probed_batch}×{probed_accum}")
+        print(f"  Effective Batch: {probed_batch * probed_accum}")
+
+    # Load data (using potentially updated batch_size from AutoBatchSizer)
+    train_loader, val_loader = load_data(config, tokenizer)
 
     # Initialize Sovereign-1 loss if available and enabled
     sovereign_loss = None
@@ -7164,6 +7464,16 @@ def main():
     parser.add_argument("--adaptive_min_interval", type=int, default=200,
                        help="Minimum steps between adaptive adjustments")
 
+    # Auto Batch Sizing (VRAM-based startup probing)
+    parser.add_argument("--enable_auto_batch", action="store_true",
+                       help="Enable automatic batch size detection at startup based on VRAM")
+    parser.add_argument("--auto_batch_target_utilization", type=float, default=0.80,
+                       help="Target VRAM utilization for auto batch sizing (0.80 = 80%%)")
+    parser.add_argument("--auto_batch_safety_margin", type=float, default=0.05,
+                       help="Extra VRAM headroom below target (0.05 = 5%%)")
+    parser.add_argument("--auto_batch_target_effective", type=int, default=32,
+                       help="Target effective batch size (batch_size * gradient_accumulation)")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -7303,6 +7613,11 @@ def main():
         adaptive_plateau_window=args.adaptive_plateau_window,
         adaptive_plateau_threshold=args.adaptive_plateau_threshold,
         adaptive_min_interval=args.adaptive_min_interval,
+        # Auto Batch Sizing
+        enable_auto_batch=args.enable_auto_batch,
+        auto_batch_target_utilization=args.auto_batch_target_utilization,
+        auto_batch_safety_margin=args.auto_batch_safety_margin,
+        auto_batch_target_effective=args.auto_batch_target_effective,
     )
 
     # Train
