@@ -673,15 +673,52 @@ class MetacognitiveTracker:
         return assessment
 
     def _get_recommendation(self) -> str:
-        """Generate metacognitive recommendation based on current state."""
+        """
+        Generate metacognitive recommendation based on current state and Gunas.
+
+        Recommendation Hierarchy:
+        - BRAKE: High Viparyaya (error) detected, protect the dormant seed
+        - SLOW_DOWN: Coherence alarm, reduce LR
+        - RECOVER: High Tamas (stagnation), need to break out
+        - ACCELERATE: High Sattva + improving coherence, push forward
+        - STABILIZE: Balanced state, maintain course
+        - CONTINUE: Default state
+        """
+        # Get current Guna state if available
+        s, r, t = 0.33, 0.33, 0.34
+        if self.guna_history:
+            s, r, t = self.guna_history[-1]
+
+        # Priority 1: Check for high error rate (Viparyaya indicator)
+        # When coherence is critically low AND dropping, brake hard
+        if self.coherence_alarm and len(self.coherence_history) >= 3:
+            recent_trend = self.coherence_history[-1] - self.coherence_history[-3]
+            if recent_trend < -0.15:  # Rapid degradation
+                return "BRAKE"  # Protect dormant seed from corruption
+
+        # Priority 2: Coherence alarm (but not critical)
         if self.coherence_alarm:
-            return "SLOW_DOWN"  # Reduce learning rate, increase attention to O7
-        elif len(self.coherence_history) >= 5:
+            return "SLOW_DOWN"
+
+        # Priority 3: Check for Tamas stagnation (high inertia, plateau)
+        if t > 0.5 and len(self.coherence_history) >= 10:
+            # Check if coherence has been flat
+            std = (sum((c - sum(self.coherence_history[-10:])/10)**2 for c in self.coherence_history[-10:]) / 10) ** 0.5
+            if std < 0.02:  # Very flat coherence = stagnation
+                return "RECOVER"  # Need to break out of local minimum
+
+        # Priority 4: Check for positive evolution
+        if len(self.coherence_history) >= 5:
             trend = self.coherence_history[-1] - self.coherence_history[-5]
-            if trend > 0.1:
-                return "ACCELERATE"  # Cognitive flow is improving
-            elif trend < -0.1:
-                return "STABILIZE"  # Cognitive flow is degrading
+
+            # High Sattva + improving = green light
+            if s > 0.4 and trend > 0.05:
+                return "ACCELERATE"
+
+            # Declining coherence = stabilize
+            if trend < -0.05:
+                return "STABILIZE"
+
         return "CONTINUE"
 
     def get_status(self) -> str:
@@ -690,16 +727,32 @@ class MetacognitiveTracker:
             return "Meta:--"
 
         rec = self._get_recommendation()
-        if rec == "SLOW_DOWN":
-            icon = "🐢"
-        elif rec == "ACCELERATE":
-            icon = "🚀"
-        elif rec == "STABILIZE":
-            icon = "⚓"
-        else:
-            icon = "➡️"
+        icons = {
+            "BRAKE": "🛑",
+            "SLOW_DOWN": "🐢",
+            "RECOVER": "🔄",
+            "ACCELERATE": "🚀",
+            "STABILIZE": "⚓",
+            "CONTINUE": "➡️",
+        }
+        icon = icons.get(rec, "➡️")
 
         return f"Meta:{rec[:4]}{icon}"
+
+    def get_detailed_status(self) -> Dict[str, Any]:
+        """Get detailed metacognitive status for logging/TensorBoard."""
+        rec = self._get_recommendation()
+        s, r, t = self.guna_history[-1] if self.guna_history else (0.33, 0.33, 0.34)
+
+        return {
+            "recommendation": rec,
+            "coherence_current": self.coherence_history[-1] if self.coherence_history else 0.0,
+            "coherence_mean": sum(self.coherence_history) / len(self.coherence_history) if self.coherence_history else 0.0,
+            "coherence_alarm": self.coherence_alarm,
+            "guna_sattva": s,
+            "guna_rajas": r,
+            "guna_tamas": t,
+        }
 
 
 # =============================================================================
@@ -966,9 +1019,16 @@ class EvolutionaryFlowNetwork(nn.Module):
         if len(self.macro_coherence) > 100:
             self.macro_coherence = self.macro_coherence[-100:]
 
-        # Meso-coherence: Authority (0-8) and Sensory (9-11) clusters
+        # Meso-coherence: 9:3 Split Alignment
+        # Authority gates: 0-7 (O1→O2 through O8→O9) = 8 gates between 9 Authority layers
+        # Sensory gates: 8-10 (O9→O10 through O11→O12) = 3 gates transitioning to 3 Sensory layers
+        # This matches the 9:3 Hierarchical Split where:
+        #   - Authority (O1-O9): "Senior Architect" layers, State-Delta
+        #   - Sensory (O10-O12): "Junior Coder" layers, Quadratic attention
         if len(gate_coherences) >= 9:
+            # Authority coherence: gates 0-7 (8 gates = O1→O2 through O8→O9)
             authority_coh = sum(gate_coherences[:8]) / 8
+            # Sensory coherence: gates 8-10 (3 gates = O9→O10 through O11→O12)
             sensory_coh = sum(gate_coherences[8:]) / max(1, len(gate_coherences) - 8)
             self.meso_coherence["authority"].append(authority_coh)
             self.meso_coherence["sensory"].append(sensory_coh)
@@ -1165,19 +1225,27 @@ class EvolutionaryIntelligenceEngine:
 
     Orchestrates:
     - Layer state extraction from model
-    - Evolutionary flow processing
-    - Loss computation
-    - Metacognitive assessment
+    - Evolutionary flow processing with DELAYED RESONANCE
+    - Loss computation (micro/meso/macro scales)
+    - Metacognitive assessment with Guna integration
     - Adaptive learning rate based on evolutionary health
 
     This is the "brain" that makes the 12 ontological layers
     into a living, evolving cognitive system.
+
+    DELAYED RESONANCE:
+    To enable the "Recursive Intelligence" bridge (O12→O1) without
+    a 2x compute penalty, we inject the previous step's higher-order
+    intelligence into the current step's base layer.
 
     Args:
         dim: Model hidden dimension
         num_layers: Number of ontological layers
         enable_backward_resonance: Allow top-down information flow
         learning_rate_modulation: Adjust LR based on evolutionary health
+        resonance_alpha: Strength of delayed resonance injection (0.0-1.0)
+        lr_slowdown_factor: LR multiplier when SLOW_DOWN/BRAKE
+        lr_accelerate_factor: LR multiplier when ACCELERATE
     """
 
     def __init__(
@@ -1186,11 +1254,17 @@ class EvolutionaryIntelligenceEngine:
         num_layers: int = 12,
         enable_backward_resonance: bool = True,
         learning_rate_modulation: bool = True,
+        resonance_alpha: float = 0.1,
+        lr_slowdown_factor: float = 0.5,
+        lr_accelerate_factor: float = 1.2,
         device: torch.device = None,
     ):
         self.dim = dim
         self.num_layers = num_layers
         self.learning_rate_modulation = learning_rate_modulation
+        self.resonance_alpha = resonance_alpha
+        self.lr_slowdown_factor = lr_slowdown_factor
+        self.lr_accelerate_factor = lr_accelerate_factor
         self.device = device or torch.device('cpu')
 
         # Core components
@@ -1207,22 +1281,81 @@ class EvolutionaryIntelligenceEngine:
             coherence_alarm_threshold=0.3,
         )
 
+        # DELAYED RESONANCE BUFFER
+        # Stores detached hidden states from previous forward pass
+        # to inject O12 (Authority) intelligence into O1 (Sensory) of next step
+        self.resonance_buffer: Optional[List[torch.Tensor]] = None
+
+        # Current Guna state for metacognitive decisions
+        self.current_gunas: Tuple[float, float, float] = (0.33, 0.33, 0.34)
+
         # Evolutionary history
         self.evolution_history: List[Dict[str, float]] = []
+
+    def apply_delayed_resonance(
+        self,
+        current_states: List[torch.Tensor],
+    ) -> List[torch.Tensor]:
+        """
+        Apply delayed resonance: inject previous step's O12 (Authority/Integration)
+        into current step's O1 (Potential/Sensory).
+
+        This creates the Toroidal 12→1 bridge without 2x compute penalty.
+
+        Args:
+            current_states: Hidden states from current forward pass
+
+        Returns:
+            Modified states with resonance injection at O1
+        """
+        if self.resonance_buffer is None or len(self.resonance_buffer) == 0:
+            return current_states
+
+        # Inject Layer 11 (O12 - Authority/Integration) into Layer 0 (O1 - Potential)
+        if len(self.resonance_buffer) >= 12 and len(current_states) >= 1:
+            o12_prev = self.resonance_buffer[11]  # Previous O12 state
+            o1_current = current_states[0]  # Current O1 state
+
+            # Ensure shape compatibility
+            if o12_prev.shape == o1_current.shape:
+                # Resonant injection: O1' = O1 + α * O12_prev
+                current_states[0] = o1_current + (self.resonance_alpha * o12_prev)
+            elif o12_prev.shape[-1] == o1_current.shape[-1]:
+                # Handle sequence length mismatch by averaging
+                if o12_prev.dim() == 3 and o1_current.dim() == 3:
+                    o12_avg = o12_prev.mean(dim=1, keepdim=True).expand_as(o1_current)
+                    current_states[0] = o1_current + (self.resonance_alpha * o12_avg)
+
+        return current_states
+
+    def update_resonance_buffer(self, current_states: List[torch.Tensor]):
+        """
+        Update resonance buffer with current states for next step.
+
+        States are detached to prevent gradient flow across steps
+        (this is the 'Delayed' in Delayed Resonance).
+        """
+        self.resonance_buffer = [s.detach().clone() for s in current_states]
+
+    def update_gunas(self, s: float, r: float, t: float):
+        """Update current Guna state for metacognitive decisions."""
+        self.current_gunas = (s, r, t)
 
     def process(
         self,
         layer_states: List[torch.Tensor],
         compute_loss: bool = True,
         return_resonance: bool = False,
+        apply_resonance: bool = True,
     ) -> Dict[str, Any]:
         """
-        Process layer states through the evolutionary system.
+        Process layer states through the evolutionary system with DELAYED RESONANCE.
 
         Args:
             layer_states: Hidden states from each model layer
             compute_loss: Whether to compute evolutionary loss
             return_resonance: Whether to return backward resonance
+            apply_resonance: Whether to apply delayed resonance from previous step
 
         Returns:
             Dict with flow results, loss, metrics, and recommendations
@@ -1235,6 +1368,10 @@ class EvolutionaryIntelligenceEngine:
         elif len(layer_states) > self.num_layers:
             # Take first num_layers
             layer_states = layer_states[:self.num_layers]
+
+        # DELAYED RESONANCE: Inject previous O12 into current O1
+        if apply_resonance:
+            layer_states = self.apply_delayed_resonance(layer_states)
 
         # Process through flow network
         flow_result = self.flow_network(
@@ -1253,29 +1390,55 @@ class EvolutionaryIntelligenceEngine:
             result["loss"] = loss
             result["loss_metrics"] = loss_metrics
 
-        # Metacognitive assessment
+        # Metacognitive assessment with Guna integration
         macro_coherence = flow_result["toroidal_coherence"]
         meta_assessment = self.metacognitive.update(
             coherence=macro_coherence,
+            gunas=self.current_gunas,  # Pass current Guna state
         )
         result["metacognitive"] = meta_assessment
 
-        # Learning rate modulation recommendation
+        # Learning rate modulation based on recommendation and Gunas
         if self.learning_rate_modulation:
-            if meta_assessment["recommendation"] == "SLOW_DOWN":
-                result["lr_multiplier"] = 0.7
-            elif meta_assessment["recommendation"] == "ACCELERATE":
-                result["lr_multiplier"] = 1.1
-            elif meta_assessment["recommendation"] == "STABILIZE":
-                result["lr_multiplier"] = 0.9
-            else:
+            rec = meta_assessment["recommendation"]
+            s, r, t = self.current_gunas
+
+            if rec == "SLOW_DOWN":
+                # Slow down - use configured factor
+                result["lr_multiplier"] = self.lr_slowdown_factor * 1.4  # 0.7 default
+            elif rec == "BRAKE":
+                # Full brake - high Viparyaya detected
+                result["lr_multiplier"] = self.lr_slowdown_factor  # 0.5 default
+            elif rec == "ACCELERATE":
+                # Accelerate - Sattva dominant, coherence climbing
+                result["lr_multiplier"] = self.lr_accelerate_factor  # 1.2 default
+            elif rec == "STABILIZE":
+                # Stabilize - hold steady
                 result["lr_multiplier"] = 1.0
+            elif rec == "RECOVER":
+                # Recovery from Tamas stagnation - slight boost
+                result["lr_multiplier"] = 1.05
+            else:
+                # CONTINUE
+                result["lr_multiplier"] = 1.0
+
+            # Guna-based micro-adjustment
+            if s > 0.5:  # High Sattva - can push slightly harder
+                result["lr_multiplier"] *= 1.05
+            elif t > 0.5:  # High Tamas - need to be more conservative
+                result["lr_multiplier"] *= 0.95
+
+        # Update resonance buffer for next step
+        self.update_resonance_buffer(layer_states)
 
         # Store in history
         self.evolution_history.append({
             "micro_coherence": flow_result["micro_coherence_mean"],
+            "meso_authority": flow_result["authority_coherence"],
+            "meso_sensory": flow_result["sensory_coherence"],
             "macro_coherence": macro_coherence,
             "recommendation": meta_assessment["recommendation"],
+            "gunas": self.current_gunas,
         })
         if len(self.evolution_history) > 1000:
             self.evolution_history = self.evolution_history[-1000:]
@@ -4353,6 +4516,21 @@ class UnifiedTrainingConfig:
     toroidal_truncated_bptt: int = 0         # Steps of gradient flow (0 = full detach)
     toroidal_coherence_threshold: float = 0.3  # Alarm threshold for cognitive discontinuity
 
+    # Full Evolutionary Flow System (Phase 2: All Layer Transitions)
+    # Extends Toroidal Bridge to ALL layer transitions with Delayed Resonance
+    enable_evolutionary_flow: bool = True    # Master switch for evolutionary intelligence
+    evo_lambda: float = 0.1                  # Overall evolutionary loss weight
+    evo_micro_weight: float = 0.3            # Weight for per-gate coherence loss
+    evo_meso_weight: float = 0.3             # Weight for cluster coherence loss (Auth/Sens)
+    evo_macro_weight: float = 0.4            # Weight for toroidal coherence loss
+    evo_dropout: float = 0.1                 # Dropout in evolutionary gates
+    evo_use_rmatrix: bool = True             # Use R-Matrix for evolutionary weights
+    evo_coherence_window: int = 100          # Steps for coherence history tracking
+    evo_resonance_alpha: float = 0.1         # Strength of O12→O1 delayed resonance injection
+    evo_lr_modulation: bool = True           # Enable metacognitive LR adjustment
+    evo_lr_slowdown: float = 0.5             # LR multiplier when SLOW_DOWN/BRAKE
+    evo_lr_accelerate: float = 1.2           # LR multiplier when ACCELERATE
+
     # Resume checkpoint
     resume: str = ""
     resume_weights_only: bool = False
@@ -5042,6 +5220,34 @@ def train(config: UnifiedTrainingConfig):
         print(f"  Toroidal Bridge: ENABLED (λ={config.toroidal_lambda}, gate={config.toroidal_use_gating})")
         print(f"    → O12 (Absolving) feeds O1 (Potential) for recursive intelligence")
 
+    # Full Evolutionary Flow System (Phase 2: All Layer Transitions with Delayed Resonance)
+    evolutionary_engine = None
+    if config.enable_evolutionary_flow:
+        # Get model dimension
+        model_dim = getattr(model, 'embed_dim', None) or getattr(model, 'd_model', 512)
+        evolutionary_engine = EvolutionaryIntelligenceEngine(
+            dim=model_dim,
+            num_layers=12,
+            enable_backward_resonance=True,
+            learning_rate_modulation=config.evo_lr_modulation,
+            resonance_alpha=config.evo_resonance_alpha,
+            lr_slowdown_factor=config.evo_lr_slowdown,
+            lr_accelerate_factor=config.evo_lr_accelerate,
+            device=device,
+        )
+        # Update flow loss weights
+        evolutionary_engine.flow_loss.lambda_micro = config.evo_micro_weight
+        evolutionary_engine.flow_loss.lambda_meso = config.evo_meso_weight
+        evolutionary_engine.flow_loss.lambda_macro = config.evo_macro_weight
+        evolutionary_engine.flow_loss.min_coherence = config.toroidal_coherence_threshold
+
+        print(f"  Evolutionary Flow: ENABLED (λ={config.evo_lambda})")
+        print(f"    → Micro:{config.evo_micro_weight} Meso:{config.evo_meso_weight} Macro:{config.evo_macro_weight}")
+        print(f"    → Delayed Resonance α={config.evo_resonance_alpha}")
+        print(f"    → LR Modulation: SLOW={config.evo_lr_slowdown}x ACCEL={config.evo_lr_accelerate}x")
+        if config.enable_toroidal_bridge:
+            print(f"    ⚠️  Note: Toroidal Bridge superseded by Evolutionary Flow")
+
     # Optimizer
     optimizer = AdamW(
         model.parameters(),
@@ -5272,6 +5478,48 @@ def train(config: UnifiedTrainingConfig):
                     evolutionary_bridge.store_harvest(o12_state)
                     toroidal_seed = evolutionary_bridge.get_seed()
 
+            # Full Evolutionary Flow System: All Layer Transitions with Delayed Resonance
+            evo_result = None
+            evo_lr_multiplier = 1.0
+            if evolutionary_engine is not None:
+                # Extract hidden states from model output
+                hidden_states = None
+                if isinstance(outputs, dict):
+                    hidden_states = outputs.get('hidden_states', outputs.get('all_hidden_states'))
+                    if hidden_states is None and 'last_hidden_state' in outputs:
+                        # Fall back to last hidden state (create list for compatibility)
+                        hidden_states = [outputs['last_hidden_state']]
+
+                if hidden_states is not None:
+                    # Convert to list if tuple
+                    if isinstance(hidden_states, tuple):
+                        hidden_states = list(hidden_states)
+
+                    # Update Gunas in engine for metacognitive decisions
+                    evolutionary_engine.update_gunas(guna_s, guna_r, guna_t)
+
+                    # Process through evolutionary system with delayed resonance
+                    evo_result = evolutionary_engine.process(
+                        layer_states=hidden_states,
+                        compute_loss=True,
+                        apply_resonance=True,
+                    )
+
+                    # Add evolutionary loss to total
+                    if 'loss' in evo_result:
+                        evo_loss = config.evo_lambda * evo_result['loss']
+                        loss = loss + evo_loss
+
+                    # Get LR multiplier from metacognitive assessment
+                    evo_lr_multiplier = evo_result.get('lr_multiplier', 1.0)
+
+                    # Store metrics for logging
+                    metrics['evo_micro'] = evo_result['flow_result']['micro_coherence_mean']
+                    metrics['evo_auth'] = evo_result['flow_result']['authority_coherence']
+                    metrics['evo_sens'] = evo_result['flow_result']['sensory_coherence']
+                    metrics['evo_toroid'] = evo_result['flow_result']['toroidal_coherence']
+                    metrics['evo_rec'] = evo_result['metacognitive']['recommendation']
+
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
 
@@ -5351,6 +5599,14 @@ def train(config: UnifiedTrainingConfig):
                     # Apply graduated LR reduction based on confidence
                     for pg in optimizer.param_groups:
                         pg['lr'] *= sattvic_lr_mult
+
+            # =====================================================================
+            # EVOLUTIONARY FLOW: Apply metacognitive LR modulation
+            # =====================================================================
+            if evolutionary_engine is not None and config.evo_lr_modulation:
+                if evo_result is not None and evo_lr_multiplier != 1.0:
+                    for pg in optimizer.param_groups:
+                        pg['lr'] *= evo_lr_multiplier
 
             # =====================================================================
             # v2.7 TRAINING STATE TRACKER: Update knowledge state EMA
@@ -5555,6 +5811,34 @@ def train(config: UnifiedTrainingConfig):
                         if metacognitive_tracker is not None:
                             log_msg += f" {metacognitive_tracker.get_status()}"
 
+                    # Full Evolutionary Flow: Multi-scale coherence and metacognitive status
+                    if evolutionary_engine is not None and evo_result is not None:
+                        evo_micro = metrics.get('evo_micro', 0.0)
+                        evo_auth = metrics.get('evo_auth', 0.0)
+                        evo_sens = metrics.get('evo_sens', 0.0)
+                        evo_toroid = metrics.get('evo_toroid', 0.0)
+                        evo_rec = metrics.get('evo_rec', 'CONTINUE')
+
+                        # Metacognitive status icon
+                        evo_icons = {
+                            "BRAKE": "🛑", "SLOW_DOWN": "🐢", "RECOVER": "🔄",
+                            "ACCELERATE": "🚀", "STABILIZE": "⚓", "CONTINUE": "➡️",
+                        }
+                        evo_icon = evo_icons.get(evo_rec, "➡️")
+
+                        # Meso-scale delta indicator (Authority should be >= Sensory)
+                        meso_delta = evo_auth - evo_sens
+                        if meso_delta > 0.1:
+                            meso_ind = "+"  # Authority dominant (good for 9:3)
+                        elif meso_delta < -0.1:
+                            meso_ind = "!"  # Sensory dominant (warning)
+                        else:
+                            meso_ind = "~"  # Balanced
+
+                        log_msg += f"\n    --> [EvoFlow] Micro:{evo_micro:.2f} | Auth:{evo_auth:.2f} Sens:{evo_sens:.2f}{meso_ind} | Toroid:{evo_toroid:.2f} | {evo_rec[:4]}{evo_icon}"
+                        if evo_lr_multiplier != 1.0:
+                            log_msg += f" [LR×{evo_lr_multiplier:.2f}]"
+
                 print(log_msg)
                 step_start_time = time.time()
 
@@ -5611,6 +5895,43 @@ def train(config: UnifiedTrainingConfig):
                             tb_writer.add_scalar("toroid/loss", toroidal_loss_value, global_step)
                             if metacognitive_tracker is not None:
                                 tb_writer.add_scalar("toroid/velocity", metacognitive_tracker.coherence_history[-1] - metacognitive_tracker.coherence_history[-2] if len(metacognitive_tracker.coherence_history) >= 2 else 0.0, global_step)
+
+                        # Full Evolutionary Flow metrics
+                        if evolutionary_engine is not None and evo_result is not None:
+                            # Multi-scale coherence
+                            tb_writer.add_scalar("evo/coherence_micro", metrics.get('evo_micro', 0.0), global_step)
+                            tb_writer.add_scalar("evo/coherence_authority", metrics.get('evo_auth', 0.0), global_step)
+                            tb_writer.add_scalar("evo/coherence_sensory", metrics.get('evo_sens', 0.0), global_step)
+                            tb_writer.add_scalar("evo/coherence_toroidal", metrics.get('evo_toroid', 0.0), global_step)
+
+                            # Meso-scale delta (Authority - Sensory)
+                            meso_delta = metrics.get('evo_auth', 0.0) - metrics.get('evo_sens', 0.0)
+                            tb_writer.add_scalar("evo/meso_delta", meso_delta, global_step)
+
+                            # Metacognitive recommendation as numeric
+                            rec_map = {"BRAKE": 0, "SLOW_DOWN": 1, "RECOVER": 2, "STABILIZE": 3, "CONTINUE": 4, "ACCELERATE": 5}
+                            rec_num = rec_map.get(metrics.get('evo_rec', 'CONTINUE'), 4)
+                            tb_writer.add_scalar("evo/metacog_state", rec_num, global_step)
+
+                            # LR multiplier from evolutionary engine
+                            tb_writer.add_scalar("evo/lr_multiplier", evo_lr_multiplier, global_step)
+
+                            # Loss components
+                            if 'loss_metrics' in evo_result:
+                                loss_m = evo_result['loss_metrics']
+                                tb_writer.add_scalar("evo/loss_total", loss_m.get('evo_loss_total', 0.0), global_step)
+                                tb_writer.add_scalar("evo/loss_micro", loss_m.get('evo_loss_micro', 0.0), global_step)
+                                tb_writer.add_scalar("evo/loss_meso", loss_m.get('evo_loss_meso', 0.0), global_step)
+                                tb_writer.add_scalar("evo/loss_macro", loss_m.get('evo_loss_macro', 0.0), global_step)
+
+                            # Coherence heatmap (for TensorBoard visualization)
+                            # Log gate-level coherence as histogram every 100 evals
+                            if global_step % (config.eval_every * 10) == 0:
+                                coherence_summary = evo_result.get('coherence_summary', {})
+                                if 'gate_coherences' in coherence_summary:
+                                    gate_coh = coherence_summary['gate_coherences']
+                                    if len(gate_coh) > 0:
+                                        tb_writer.add_histogram("evo/gate_coherence_dist", torch.tensor(gate_coh), global_step)
                 else:
                     print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
 
