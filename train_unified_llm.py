@@ -5344,8 +5344,14 @@ def train(config: UnifiedTrainingConfig):
     toroidal_loss_fn = None
     metacognitive_tracker = None
     if config.enable_toroidal_bridge:
-        # Get model dimension
-        model_dim = getattr(model, 'embed_dim', None) or getattr(model, 'd_model', 512)
+        # Get model dimension - check multiple possible attribute locations
+        model_dim = (
+            getattr(model, 'embed_dim', None) or
+            getattr(model, 'd_model', None) or
+            getattr(getattr(model, 'config', None), 'embed_dim', None) or
+            getattr(getattr(model, 'config', None), 'd_model', None) or
+            512  # Fallback default
+        )
         evolutionary_bridge = EvolutionaryBridge(
             dim=model_dim,
             num_layers=12,
@@ -5367,8 +5373,14 @@ def train(config: UnifiedTrainingConfig):
     evolutionary_engine = None
     hidden_state_extractor = None
     if config.enable_evolutionary_flow:
-        # Get model dimension
-        model_dim = getattr(model, 'embed_dim', None) or getattr(model, 'd_model', 512)
+        # Get model dimension - check multiple possible attribute locations
+        model_dim = (
+            getattr(model, 'embed_dim', None) or
+            getattr(model, 'd_model', None) or
+            getattr(getattr(model, 'config', None), 'embed_dim', None) or
+            getattr(getattr(model, 'config', None), 'd_model', None) or
+            512  # Fallback default
+        )
         evolutionary_engine = EvolutionaryIntelligenceEngine(
             dim=model_dim,
             num_layers=12,
@@ -5385,7 +5397,7 @@ def train(config: UnifiedTrainingConfig):
         evolutionary_engine.flow_loss.lambda_macro = config.evo_macro_weight
         evolutionary_engine.flow_loss.min_coherence = config.toroidal_coherence_threshold
 
-        print(f"  Evolutionary Flow: ENABLED (λ={config.evo_lambda})")
+        print(f"  Evolutionary Flow: ENABLED (λ={config.evo_lambda}, dim={model_dim})")
         print(f"    → Micro:{config.evo_micro_weight} Meso:{config.evo_meso_weight} Macro:{config.evo_macro_weight}")
         print(f"    → Delayed Resonance α={config.evo_resonance_alpha}")
         print(f"    → LR Modulation: SLOW={config.evo_lr_slowdown}x ACCEL={config.evo_lr_accelerate}x")
@@ -5535,6 +5547,9 @@ def train(config: UnifiedTrainingConfig):
     toroidal_coherence = 0.5  # Neutral initial coherence
     toroidal_loss_value = 0.0
     toroidal_seed = None  # Will be populated after first forward pass
+
+    # Training Gunas: Initialize before loop (used by Evolutionary Flow and Metacognitive Tracker)
+    guna_s, guna_r, guna_t = 0.33, 0.33, 0.34  # Default balanced state
 
     while global_step < config.max_steps:
         # Get batch

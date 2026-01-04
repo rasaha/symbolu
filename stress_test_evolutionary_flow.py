@@ -740,7 +740,14 @@ class EvolutionaryFlowStressTest:
                     max_seq_len=self.config.max_seq_len,
                 )
                 model = create_model(model_config, device)
-                model_dim = getattr(model, 'embed_dim', None) or getattr(model, 'd_model', 512)
+                # Get model dimension - check multiple possible attribute locations
+                model_dim = (
+                    getattr(model, 'embed_dim', None) or
+                    getattr(model, 'd_model', None) or
+                    getattr(getattr(model, 'config', None), 'embed_dim', None) or
+                    getattr(getattr(model, 'config', None), 'd_model', None) or
+                    512  # Fallback default
+                )
                 print(f"  ✓ Loaded real ontological model (dim={model_dim})")
             except Exception as e:
                 print(f"  Warning: Could not create real model: {e}")
