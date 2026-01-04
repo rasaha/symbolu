@@ -5574,12 +5574,19 @@ def train(config: UnifiedTrainingConfig):
                 }
             else:
                 # Phase or Hybrid - handle both tensor and dict returns
-                output = model(x)
-                if isinstance(output, dict):
-                    logits = output.get('logits', output.get('output', output.get('last_hidden_state')))
+                outputs = model(x)  # Use 'outputs' consistently for hidden_state_extractor
+                if isinstance(outputs, dict):
+                    logits = outputs.get('logits', outputs.get('output', outputs.get('last_hidden_state')))
                 else:
-                    logits = output
+                    logits = outputs
                 loss, metrics = compute_phase_loss(logits, y, config)
+
+            # Initialize default guna values for first iteration
+            # (actual values computed later in the loop, but needed here for evolutionary bridge)
+            try:
+                _ = guna_s
+            except NameError:
+                guna_s, guna_r, guna_t = 0.33, 0.33, 0.34
 
             # Toroidal Evolutionary Bridge: O12 → O1 state carryover
             if evolutionary_bridge is not None:
@@ -5630,12 +5637,7 @@ def train(config: UnifiedTrainingConfig):
             # Full Evolutionary Flow System: All Layer Transitions with Delayed Resonance
             evo_result = None
             evo_lr_multiplier = 1.0
-            # Use default guna values for evolutionary engine (actual computation happens later in loop)
-            # After first iteration, guna_s/r/t will have values from previous step
-            try:
-                _ = guna_s  # Check if defined from previous iteration
-            except NameError:
-                guna_s, guna_r, guna_t = 0.33, 0.33, 0.34  # First iteration defaults
+            # Note: guna_s/r/t initialized earlier in the loop (before evolutionary_bridge section)
             if evolutionary_engine is not None and hidden_state_extractor is not None:
                 # Extract hidden states using HiddenStateExtractor (handles models without hidden_states output)
                 # Note: clear() was called before forward pass, hooks captured states during model(x)
