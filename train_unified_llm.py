@@ -158,26 +158,29 @@ except ImportError:
 
 
 # =============================================================================
-# SOVEREIGN R[v,a] MATRIX: Vṛtti-Aspect Probability Target
+# SOVEREIGN R[v,a] MATRIX: Vṛtti-Layer Probability Target
 # =============================================================================
-# The "Brain" of Sovereign-1: Defines how each Aspect (layer) should prioritize
+# The "Brain" of Sovereign-1: Defines how each Ontological Layer should prioritize
 # each Vṛtti (cognitive modality). This is the philosophical ground truth that
 # guides loss weighting and confidence scoring.
 #
-# Columns (12 Aspects): [Dormant, Karma, ID, Body, Mind, Ego, Intellect, Soul,
-#                        Witness, Atman, Brahman, Integration]
+# Columns (12 Ontological Layers):
+#   O1_POTENTIAL, O2_IDENTITY, O3_EXECUTION, O4_STRUCTURE, O5_COGNITION, O6_AGENCY,
+#   O7_REASONING, O8_PURPOSE, O9_WITNESSES, O10_UNIFYING, O11_INTEGRATION, O12_ABSOLVING
+#
 # Rows (5 Vṛttis): [Pramāṇa (Truth), Vikalpa (Fancy), Viparyaya (Error),
 #                   Nidrā (Sleep/Void), Smṛti (Memory)]
 #
 # Key design choices:
-# - Layer 0 (Dormant Guard): High Nidrā (0.7) for denoising
-# - Layer 6 (Intellect): Peak Pramāṇa (0.9) for truth discrimination
-# - Layer 11 (Integration): High Pramāṇa (0.9) + Smṛti (0.8) for coherence
-# - All rows normalized to avoid Viparyaya (Error) dominance
+# - O1_POTENTIAL: High Nidrā (0.7) for denoising dormant capacity
+# - O7_REASONING: Peak Pramāṇa (0.9) for truth discrimination
+# - O12_ABSOLVING: High Pramāṇa (0.9) + Smṛti (0.8) for coherence/release
+# - All rows balanced to avoid Viparyaya (Error) dominance
 # =============================================================================
 
 SOVEREIGN_R_MATRIX = torch.tensor([
-    #  Dormant Karma  ID   Body  Mind  Ego  Intell Soul  Witn  Atman Brahm Integ
+    # O1    O2    O3    O4    O5    O6    O7    O8    O9   O10   O11   O12
+    # POT  IDEN  EXEC  STRC  COGN  AGEN  REAS  PURP  WITN  UNIF  INTG  ABSL
     [0.1, 0.5, 0.7, 0.7, 0.8, 0.6, 0.9, 0.8, 0.6, 0.7, 0.5, 0.9],  # Pramāṇa (Truth)
     [0.1, 0.2, 0.2, 0.4, 0.4, 0.4, 0.1, 0.1, 0.2, 0.2, 0.2, 0.3],  # Vikalpa (Fancy)
     [0.1, 0.2, 0.4, 0.4, 0.2, 0.3, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0],  # Viparyaya (Error)
@@ -188,10 +191,20 @@ SOVEREIGN_R_MATRIX = torch.tensor([
 # Vṛtti names for logging/debugging
 VRTTI_NAMES = ["Pramāṇa", "Vikalpa", "Viparyaya", "Nidrā", "Smṛti"]
 
-# Aspect names (12 layers in Sovereign-1)
-ASPECT_NAMES = [
-    "Dormant", "Karma", "ID", "Body", "Mind", "Ego",
-    "Intellect", "Soul", "Witness", "Atman", "Brahman", "Integration"
+# 12 Ontological Layer names (patent-exact sequence)
+ONTOLOGICAL_LAYER_NAMES = [
+    "O1_POTENTIAL",    # Dormant capacity, latent possibility
+    "O2_IDENTITY",     # Classificatory marking, role assignment
+    "O3_EXECUTION",    # Immediate somatic initiation, karma
+    "O4_STRUCTURE",    # Shaping force, embodiment
+    "O5_COGNITION",    # Mental processing, understanding
+    "O6_AGENCY",       # Self-direction, ego function
+    "O7_REASONING",    # Intellect, truth discrimination
+    "O8_PURPOSE",      # Soul intention, meaning
+    "O9_WITNESSES",    # Observer awareness
+    "O10_UNIFYING",    # Atman, self-integration
+    "O11_INTEGRATION", # Brahman, cosmic unity
+    "O12_ABSOLVING",   # Release, resolution, coherence
 ]
 
 
