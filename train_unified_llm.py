@@ -171,6 +171,24 @@ except ImportError as e:
     CSR_AVAILABLE = False
     print(f"Warning: CSR Phoneme Provider not available: {e}")
 
+# Import SGP (Stochastic Gradient Persistence) and Sattvic Controller
+try:
+    from symbolu.resonance.sgp import (
+        SGPController,
+        SGPConfig,
+        create_sgp_controller,
+        create_synchronized_controllers,
+    )
+    from symbolu.resonance.controller import (
+        SattvicController,
+        SattvicConfig,
+        create_sattvic_controller,
+    )
+    SGP_AVAILABLE = True
+except ImportError as e:
+    SGP_AVAILABLE = False
+    print(f"Warning: SGP Controller not available: {e}")
+
 
 # =============================================================================
 # SOVEREIGN R[v,a] MATRIX: Vṛtti-Layer Probability Target
@@ -4693,6 +4711,19 @@ class UnifiedTrainingConfig:
     csr_use_entropy_sink: bool = True        # Apply Layer 0 entropy floor
     csr_use_synthesis_gate: bool = True      # Apply Layer 11 synthesis reconciliation
 
+    # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
+    enable_sgp: bool = True                  # Enable SGP synchronized with Sattvic Controller
+    sgp_base_rate: int = 25                  # Base SGP rate (Toroidal Refresh Rate)
+    sgp_stagnation_rate: int = 12            # Rate when stagnation detected (HALVED for more frequent hammering)
+    sgp_gamma: float = 0.3                   # Persistence coefficient: θ ← θ - η(∇θ + γ∇θ_persisted)
+
+    # Sattvic Controller (Dynamic λ_csr regulation)
+    sattvic_initial_lambda: float = 0.5      # Initial λ_csr during warmup
+    sattvic_floor_lambda: float = 0.1        # Minimum λ_csr after decay
+    sattvic_warmup_steps: int = 500          # Steps for warmup phase
+    sattvic_variance_window: int = 50        # Window for entropy variance detection
+    sattvic_variance_threshold: float = 0.001  # Variance threshold for stagnation
+
     # Resume checkpoint
     resume: str = ""
     resume_weights_only: bool = False
@@ -5328,6 +5359,50 @@ def train(config: UnifiedTrainingConfig):
     else:
         print(f"  CSR Phoneme Grounding: Disabled")
 
+    # Initialize SGP (Stochastic Gradient Persistence) and Sattvic Controller
+    sattvic_controller = None
+    sgp_controller = None
+    if config.enable_sgp and SGP_AVAILABLE:
+        # Create Sattvic Controller for dynamic λ_csr regulation
+        sattvic_config = SattvicConfig(
+            initial_lambda=config.sattvic_initial_lambda,
+            floor_lambda=config.sattvic_floor_lambda,
+            warmup_steps=config.sattvic_warmup_steps,
+            variance_window=config.sattvic_variance_window,
+            variance_threshold=config.sattvic_variance_threshold,
+        )
+        sattvic_controller = SattvicController(sattvic_config)
+
+        # Create SGP Controller synchronized with Sattvic
+        sgp_config = SGPConfig(
+            base_rate=config.sgp_base_rate,
+            stagnation_rate=config.sgp_stagnation_rate,
+            gamma=config.sgp_gamma,
+        )
+        sgp_controller = SGPController(sgp_config)
+        sgp_controller.attach_sattvic_controller(sattvic_controller)
+
+        # Register Authority layer parameters (layers 0-8) for gradient persistence
+        authority_params = []
+        for name, param in model.named_parameters():
+            # Match layers 0-8 (Authority layers)
+            layer_match = False
+            for i in range(9):  # 0-8
+                if f"layers.{i}." in name or f"layer.{i}." in name:
+                    layer_match = True
+                    break
+            if layer_match and param.requires_grad:
+                authority_params.append(param)
+        sgp_controller.register_authority_params(authority_params)
+
+        print(f"  SGP Controller: ENABLED (base_rate={config.sgp_base_rate}, stagnation_rate={config.sgp_stagnation_rate}, γ={config.sgp_gamma})")
+        print(f"    → Sattvic Controller: λ_init={config.sattvic_initial_lambda}, λ_floor={config.sattvic_floor_lambda}")
+        print(f"    → Authority Params Registered: {len(authority_params)}")
+    elif config.enable_sgp and not SGP_AVAILABLE:
+        print(f"  SGP Controller: Disabled (module not available)")
+    else:
+        print(f"  SGP Controller: Disabled")
+
     # VRAM Governor for dynamic batch scaling
     vram_governor = VRAMGovernor(
         initial_batch_size=config.batch_size,
@@ -5890,6 +5965,26 @@ def train(config: UnifiedTrainingConfig):
                 # Update TrainingStateTracker with Gunas (semantic bridge)
                 if training_state_tracker is not None and training_state_tracker.enabled:
                     training_state_tracker.update_with_gunas(guna_s, guna_r, guna_t, global_step)
+
+            # SGP Metabolic Step and Sattvic Controller Update
+            if sattvic_controller is not None and sgp_controller is not None:
+                # Update Sattvic Controller with current entropy
+                knowledge = float(metrics.get('coherence', 0.5))  # Use coherence as knowledge proxy
+                lambda_csr = sattvic_controller.update(global_step, {
+                    'ent': entropy,
+                    'know': knowledge,
+                })
+
+                # SGP Metabolic Step: Inject persisted gradients to Authority layers
+                pulse_applied = sgp_controller.sgp_metabolic_step({
+                    'entropy': entropy,
+                    'variance': sattvic_controller.entropy_variance,
+                })
+
+                # Log SGP status periodically
+                if global_step % 500 == 0:
+                    status = sgp_controller.get_status()
+                    print(f"  🔨 [SGP] step={global_step} rate={status['rate']} λ_csr={lambda_csr:.3f} stag={'Y' if status['stagnation_active'] else 'N'}")
 
             # Periodic CUDA memory cleanup to prevent fragmentation
             if device.type == "cuda" and global_step % 500 == 0:
@@ -6713,6 +6808,30 @@ def main():
     parser.add_argument("--csr_use_synthesis_gate", action="store_true", default=True,
                        help="Apply Layer 11 synthesis reconciliation")
 
+    # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
+    parser.add_argument("--enable_sgp", action="store_true", default=True,
+                       help="Enable SGP synchronized with Sattvic Controller")
+    parser.add_argument("--disable_sgp", action="store_true",
+                       help="Disable SGP")
+    parser.add_argument("--sgp_base_rate", type=int, default=25,
+                       help="SGP base rate (Toroidal Refresh Rate)")
+    parser.add_argument("--sgp_stagnation_rate", type=int, default=12,
+                       help="SGP rate when stagnation detected (HALVED for more frequent hammering)")
+    parser.add_argument("--sgp_gamma", type=float, default=0.3,
+                       help="SGP persistence coefficient (gamma) for gradient injection")
+
+    # Sattvic Controller (Dynamic λ_csr regulation)
+    parser.add_argument("--sattvic_initial_lambda", type=float, default=0.5,
+                       help="Initial λ_csr during warmup")
+    parser.add_argument("--sattvic_floor_lambda", type=float, default=0.1,
+                       help="Minimum λ_csr after decay")
+    parser.add_argument("--sattvic_warmup_steps", type=int, default=500,
+                       help="Steps for warmup phase")
+    parser.add_argument("--sattvic_variance_window", type=int, default=50,
+                       help="Window for entropy variance detection")
+    parser.add_argument("--sattvic_variance_threshold", type=float, default=0.001,
+                       help="Variance threshold for stagnation")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -6837,6 +6956,17 @@ def main():
         csr_trainable=args.csr_trainable,
         csr_use_entropy_sink=args.csr_use_entropy_sink,
         csr_use_synthesis_gate=args.csr_use_synthesis_gate,
+        # SGP (Stochastic Gradient Persistence)
+        enable_sgp=args.enable_sgp and not args.disable_sgp,
+        sgp_base_rate=args.sgp_base_rate,
+        sgp_stagnation_rate=args.sgp_stagnation_rate,
+        sgp_gamma=args.sgp_gamma,
+        # Sattvic Controller
+        sattvic_initial_lambda=args.sattvic_initial_lambda,
+        sattvic_floor_lambda=args.sattvic_floor_lambda,
+        sattvic_warmup_steps=args.sattvic_warmup_steps,
+        sattvic_variance_window=args.sattvic_variance_window,
+        sattvic_variance_threshold=args.sattvic_variance_threshold,
     )
 
     # Train
