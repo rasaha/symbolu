@@ -82,8 +82,12 @@ from symbolu.guna_modulation.v27_config import (
     TIER_ENTERPRISE_2,
     TIER_CONSUMER,
     get_alpha_for_tier,
-    # Alpha 2.7: Bayesian imports
+    # Update modes
     UpdateMode,
+    # Fast mode (lightweight inference)
+    FastConfig,
+    DEFAULT_FAST_CONFIG,
+    # Bayesian mode (full posterior)
     BayesianConfig,
     BayesianPosterior,
     BayesianStateRegister,
@@ -150,10 +154,18 @@ class StateUpdateAudit:
     tier: str = "enterprise_tier_2"
     half_life_updates: float = 14.0
 
-    # Alpha 2.7: Update mode info
-    update_mode: str = "ema"  # "ema" or "bayesian"
+    # Update mode info
+    update_mode: str = "ema"  # "ema", "fast", or "bayesian"
     bayesian_confidence: Optional[float] = None  # Overall confidence (Bayesian mode)
     bayesian_uncertainty: Optional[dict] = None  # Per-param uncertainty (Bayesian mode)
+    fast_confidence: Optional[float] = None  # Variance-based confidence (Fast mode)
+
+    @property
+    def confidence(self) -> Optional[float]:
+        """Get confidence regardless of mode (convenience accessor)."""
+        if self.fast_confidence is not None:
+            return self.fast_confidence
+        return self.bayesian_confidence
 
     @property
     def explanation(self) -> str:
@@ -251,6 +263,15 @@ class StateEvolutionEngine:
         else:
             self._bayesian_state = None
 
+        # Fast mode: Initialize observable history for variance tracking
+        if self._config.is_fast:
+            window = self._config.fast_config.variance_window
+            self._observable_history: List[Tuple[float, float, float]] = []
+            self._fast_confidence = 0.5  # Start neutral
+        else:
+            self._observable_history = []
+            self._fast_confidence = None
+
     @property
     def config(self) -> V27Config:
         """Current configuration."""
@@ -304,6 +325,95 @@ class StateEvolutionEngine:
         """Current update mode as string."""
         return self._config.update_mode.value
 
+    # Fast mode properties (lightweight confidence)
+    @property
+    def is_fast(self) -> bool:
+        """Whether using Fast update mode (lightweight confidence)."""
+        return self._config.is_fast
+
+    @property
+    def fast_confidence(self) -> Optional[float]:
+        """
+        Confidence from observable variance (None if not in Fast mode).
+
+        Confidence = 1 - variance(s, r, t observables)
+        Same approach as SattvicBrake in training.
+        """
+        return self._fast_confidence
+
+    def _compute_observable_variance(self, observables: Observables) -> float:
+        """
+        Compute variance of observable signals for confidence estimation.
+
+        Uses a rolling window of (s, r, t) tuples.
+
+        Returns:
+            Variance in [0, 1] range (higher = less confident)
+        """
+        # Add current observation to history
+        self._observable_history.append((observables.s, observables.r, observables.t))
+
+        # Trim to window size
+        window = self._config.fast_config.variance_window
+        if len(self._observable_history) > window:
+            self._observable_history = self._observable_history[-window:]
+
+        if len(self._observable_history) < 2:
+            return 0.5  # Not enough data, return neutral
+
+        # Compute variance across the window
+        s_vals = [obs[0] for obs in self._observable_history]
+        r_vals = [obs[1] for obs in self._observable_history]
+        t_vals = [obs[2] for obs in self._observable_history]
+
+        # Simple variance calculation
+        def variance(vals):
+            if len(vals) < 2:
+                return 0.0
+            mean = sum(vals) / len(vals)
+            return sum((v - mean) ** 2 for v in vals) / len(vals)
+
+        # Average variance across s, r, t
+        avg_variance = (variance(s_vals) + variance(r_vals) + variance(t_vals)) / 3.0
+
+        # Normalize to [0, 1] - empirical scaling (max theoretical variance is 0.25)
+        normalized_variance = min(1.0, avg_variance / 0.25)
+
+        return normalized_variance
+
+    def get_confidence(self) -> float:
+        """
+        Get current confidence level (works in any mode).
+
+        - EMA mode: Returns 0.5 (neutral, no confidence tracking)
+        - Fast mode: Returns phase variance confidence
+        - Bayesian mode: Returns posterior confidence
+
+        Returns:
+            Confidence in [0, 1] range
+        """
+        if self._config.is_fast:
+            return self._fast_confidence or 0.5
+        elif self._config.is_bayesian and self._bayesian_state:
+            return self._bayesian_state.overall_confidence
+        else:
+            return 0.5  # EMA mode - no confidence tracking
+
+    def should_hedge(self) -> bool:
+        """
+        Check if response should include hedging language.
+
+        Only applies in Fast mode with hedging enabled.
+
+        Returns:
+            True if confidence is below threshold
+        """
+        if not self._config.is_fast:
+            return False
+        if not self._config.fast_config.hedging_enabled:
+            return False
+        return self.get_confidence() < self._config.fast_config.confidence_threshold
+
     def update(self, observables: Observables) -> StateUpdateAudit:
         """
         Perform one state update step.
@@ -311,7 +421,8 @@ class StateEvolutionEngine:
         If v2.7 is disabled, returns audit showing no change (v2.6 stateless mode).
         If v2.7 is enabled:
             - EMA mode: applies deterministic EMA update equation
-            - Bayesian mode (Alpha 2.7): applies Bayesian posterior update
+            - Fast mode: applies EMA + tracks phase variance confidence
+            - Bayesian mode: applies Bayesian posterior update
 
         Args:
             observables: Observable signals from pipeline
@@ -343,15 +454,16 @@ class StateEvolutionEngine:
 
         state_before = self._state
 
-        # Alpha 2.7: Bayesian state tracking
+        # Confidence tracking (mode-specific)
         bayesian_confidence = None
         bayesian_uncertainty = None
+        fast_confidence = None
 
         if not self._config.v2_7_enabled:
             # v2.6 behavior: state remains constant (stateless)
             state_after = state_before
         elif self._config.is_bayesian:
-            # Alpha 2.7 Bayesian mode: apply Bayesian update
+            # Bayesian mode: apply Bayesian update with full posterior tracking
             state_after = self._apply_bayesian_update(state_before, target_state, observables)
             self._state = state_after
             self._update_count += 1
@@ -360,8 +472,18 @@ class StateEvolutionEngine:
             if self._bayesian_state:
                 bayesian_confidence = self._bayesian_state.overall_confidence
                 bayesian_uncertainty = self._bayesian_state.uncertainty_summary
+        elif self._config.is_fast:
+            # Fast mode: apply EMA + track phase variance confidence
+            state_after = self._apply_update(state_before, target_state)
+            self._state = state_after
+            self._update_count += 1
+
+            # Compute lightweight confidence from observable variance
+            variance = self._compute_observable_variance(observables)
+            self._fast_confidence = 1.0 - variance
+            fast_confidence = self._fast_confidence
         else:
-            # v2.7 EMA mode: apply EMA update equation (bounded temporal memory)
+            # EMA mode: apply EMA update equation (bounded temporal memory)
             state_after = self._apply_update(state_before, target_state)
             self._state = state_after
             self._update_count += 1
@@ -387,6 +509,7 @@ class StateEvolutionEngine:
             update_mode=self._config.update_mode.value,
             bayesian_confidence=bayesian_confidence,
             bayesian_uncertainty=bayesian_uncertainty,
+            fast_confidence=fast_confidence,
         )
 
     def _apply_update(
@@ -734,6 +857,58 @@ def create_bayesian_engine_for_tier(
     return create_bayesian_engine(
         tier=tier,
         prior_strength=prior_strength,
+        initial_state=initial_state,
+    )
+
+
+# =============================================================================
+# Fast Mode Factory Functions (Lightweight Inference)
+# =============================================================================
+
+def create_fast_engine(
+    tier: str = TIER_ENTERPRISE_2,
+    confidence_threshold: float = 0.5,
+    initial_state: Optional[StateRegister] = None,
+) -> StateEvolutionEngine:
+    """
+    Create state evolution engine with Fast update mode (lightweight inference).
+
+    Uses phase variance as confidence proxy instead of full Bayesian.
+    Same approach as SattvicBrake in training.
+
+    Cost: ~0.1% compute, 0% extra memory
+
+    Args:
+        tier: Tier for alpha (learning rate)
+        confidence_threshold: Threshold below which to hedge responses
+        initial_state: Initial state (defaults to DEFAULT_STATE)
+
+    Returns:
+        StateEvolutionEngine with Fast mode enabled
+    """
+    config = V27Config.fast(tier=tier, confidence_threshold=confidence_threshold)
+    return StateEvolutionEngine(config=config, initial_state=initial_state)
+
+
+def create_fast_engine_for_tier(
+    tier: str,
+    confidence_threshold: float = 0.5,
+    initial_state: Optional[StateRegister] = None,
+) -> StateEvolutionEngine:
+    """
+    Create Fast engine for a specific tier.
+
+    Args:
+        tier: "enterprise_tier_1", "enterprise_tier_2", or "consumer"
+        confidence_threshold: Threshold for hedging
+        initial_state: Initial state
+
+    Returns:
+        StateEvolutionEngine with Fast mode and tier-specific settings
+    """
+    return create_fast_engine(
+        tier=tier,
+        confidence_threshold=confidence_threshold,
         initial_state=initial_state,
     )
 
