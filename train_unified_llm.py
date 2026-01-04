@@ -1403,6 +1403,346 @@ class TrainingStateTracker:
             f"Stab:{self.state['stability']:.2f}"
         )
 
+    def update_with_gunas(self, s: float, r: float, t: float, step: int) -> dict:
+        """
+        Update knowledge state with Training Gunas.
+
+        This bridges training physics (gradients/loss) with cognitive philosophy
+        (Sattva/Rajas/Tamas), enabling the tracker to become a Guna-Aware Governor.
+
+        Args:
+            s: Sattva (clarity) - coherence × (1 - entropy)
+            r: Rajas (action) - normalized gradient activity
+            t: Tamas (inertia) - stability/stagnation measure
+
+        Returns:
+            Dict with Guna state and update info
+        """
+        if not self.enabled:
+            return {"enabled": False}
+
+        # Normalize to ensure sum = 1.0
+        total = s + r + t
+        if total > 0:
+            s, r, t = s / total, r / total, t / total
+        else:
+            s, r, t = 0.33, 0.33, 0.34
+
+        # Store Guna state
+        if "gunas" not in self.state:
+            self.state["gunas"] = {"s": 0.33, "r": 0.33, "t": 0.34}
+
+        # EMA update for Gunas
+        alpha = self.alpha
+        self.state["gunas"]["s"] = (1 - alpha) * self.state["gunas"]["s"] + alpha * s
+        self.state["gunas"]["r"] = (1 - alpha) * self.state["gunas"]["r"] + alpha * r
+        self.state["gunas"]["t"] = (1 - alpha) * self.state["gunas"]["t"] + alpha * t
+
+        # Map Gunas to cognitive state updates
+        # High Sattva → increase cognitive_state
+        # High Rajas → decrease stability (but may increase learning)
+        # High Tamas → decrease confidence (stuck)
+        guna_cognitive = 0.5 * s + 0.3 * (1 - t) + 0.2 * (1 - r * 0.5)
+        guna_confidence = s * (1 - t)
+        guna_stability = (1 - r) * (1 - t * 0.5)
+
+        # Blend with existing state computation
+        self.state["cognitive_state"] = (1 - alpha) * self.state["cognitive_state"] + alpha * guna_cognitive
+        self.state["confidence"] = (1 - alpha) * self.state["confidence"] + alpha * guna_confidence
+        self.state["stability"] = (1 - alpha) * self.state["stability"] + alpha * guna_stability
+        self.state["step_count"] = step
+
+        # Determine dominant Guna for logging
+        gunas = self.state["gunas"]
+        if gunas["s"] > gunas["r"] and gunas["s"] > gunas["t"]:
+            dominant = "Sattva"
+        elif gunas["r"] > gunas["t"]:
+            dominant = "Rajas"
+        else:
+            dominant = "Tamas"
+
+        return {
+            "gunas": self.state["gunas"].copy(),
+            "dominant": dominant,
+            "cognitive_state": self.state["cognitive_state"],
+            "confidence": self.state["confidence"],
+            "stability": self.state["stability"],
+        }
+
+    def get_guna_status(self) -> str:
+        """Format Guna state for logging."""
+        if "gunas" not in self.state:
+            return "Gunas:N/A"
+
+        g = self.state["gunas"]
+        # Determine dominant and icon
+        if g["s"] > g["r"] and g["s"] > g["t"]:
+            icon = "☀️"  # Sattva - clarity
+        elif g["r"] > g["t"]:
+            icon = "🔥"  # Rajas - action
+        else:
+            icon = "🌙"  # Tamas - inertia
+
+        return f"S:{g['s']:.2f} R:{g['r']:.2f} T:{g['t']:.2f}{icon}"
+
+
+# =============================================================================
+# TRAINING GUNAS: Bridge Training Physics to Cognitive Philosophy
+# =============================================================================
+
+class GradNormEMA:
+    """
+    Exponential Moving Average tracker for gradient norms.
+
+    Used to establish a baseline for Rajas (metabolic effort) computation.
+    Handles first-step initialization safely to avoid division by zero.
+
+    Usage:
+        grad_ema = GradNormEMA(alpha=0.1)
+        baseline = grad_ema.update(grad_norm)  # Returns EMA
+        rajas = grad_norm / grad_ema.get_baseline()  # Safe division
+    """
+
+    def __init__(self, alpha: float = 0.1, min_baseline: float = 1e-8):
+        """
+        Initialize gradient norm EMA tracker.
+
+        Args:
+            alpha: EMA smoothing factor (higher = faster adaptation)
+            min_baseline: Minimum baseline to prevent division by zero
+        """
+        self.alpha = alpha
+        self.min_baseline = min_baseline
+        self.ema: Optional[float] = None
+        self.step_count = 0
+        self.max_observed = 0.0
+
+    def update(self, grad_norm: float) -> float:
+        """
+        Update EMA with new gradient norm observation.
+
+        Args:
+            grad_norm: Current gradient norm
+
+        Returns:
+            Updated EMA value
+        """
+        self.step_count += 1
+        self.max_observed = max(self.max_observed, grad_norm)
+
+        if self.ema is None:
+            # First observation: initialize to observed value
+            self.ema = grad_norm
+        else:
+            # Standard EMA update
+            self.ema = (1 - self.alpha) * self.ema + self.alpha * grad_norm
+
+        return self.ema
+
+    def get_baseline(self) -> float:
+        """
+        Get safe baseline for Rajas computation.
+
+        Never returns zero or very small values that would cause
+        division issues.
+
+        Returns:
+            Baseline value >= min_baseline
+        """
+        if self.ema is None or self.ema < self.min_baseline:
+            return 1.0  # Neutral baseline before enough data
+        return self.ema
+
+    def get_normalized(self, grad_norm: float) -> float:
+        """
+        Get normalized gradient activity (grad_norm / baseline).
+
+        Clamped to [0, 2] to prevent extreme values.
+
+        Args:
+            grad_norm: Current gradient norm
+
+        Returns:
+            Normalized value in [0, 2] range
+        """
+        baseline = self.get_baseline()
+        return min(2.0, grad_norm / baseline)
+
+
+class TrainingGunas:
+    """
+    Training Gunas - Map training dynamics to Sattva/Rajas/Tamas.
+
+    Bridges the gap between:
+    - Training physics (gradients, loss, entropy)
+    - Cognitive philosophy (Sattva=clarity, Rajas=action, Tamas=inertia)
+
+    This enables semantic interpretation of training dynamics:
+    - High Sattva: Model is learning well (lock in)
+    - High Rajas: High gradient activity (may need braking)
+    - High Tamas: Stagnation/plateau (may need boost)
+
+    Usage:
+        gunas = TrainingGunas()
+
+        # Each training step:
+        s, r, t = gunas.compute(
+            coherence=0.8,
+            entropy=0.3,
+            grad_norm=5.0,
+            loss=2.5,
+            prev_loss=2.6
+        )
+
+        # Feed to TrainingStateTracker
+        tracker.update_with_gunas(s, r, t, step)
+    """
+
+    def __init__(
+        self,
+        grad_ema_alpha: float = 0.1,
+        loss_ema_alpha: float = 0.05,
+    ):
+        """
+        Initialize Training Gunas computer.
+
+        Args:
+            grad_ema_alpha: EMA alpha for gradient norm baseline
+            loss_ema_alpha: EMA alpha for loss velocity tracking
+        """
+        self.grad_ema = GradNormEMA(alpha=grad_ema_alpha)
+        self.loss_ema: Optional[float] = None
+        self.loss_ema_alpha = loss_ema_alpha
+        self.prev_loss: Optional[float] = None
+
+    def compute(
+        self,
+        coherence: float,
+        entropy: float,
+        grad_norm: float,
+        loss: float,
+        prev_loss: Optional[float] = None,
+    ) -> Tuple[float, float, float]:
+        """
+        Compute Training Gunas from training metrics.
+
+        Args:
+            coherence: Model coherence [0, 1]
+            entropy: Model entropy [0, 1]
+            grad_norm: Current gradient norm
+            loss: Current loss value
+            prev_loss: Previous loss value (optional, uses tracked if None)
+
+        Returns:
+            (sattva, rajas, tamas) tuple, each in [0, 1], normalized to sum=1
+        """
+        # Update gradient baseline
+        self.grad_ema.update(grad_norm)
+
+        # Track loss for velocity
+        if prev_loss is None:
+            prev_loss = self.prev_loss if self.prev_loss is not None else loss
+        self.prev_loss = loss
+
+        # Compute raw Gunas
+        s_raw = self._compute_sattva(coherence, entropy)
+        r_raw = self._compute_rajas(grad_norm)
+        t_raw = self._compute_tamas(loss, prev_loss, grad_norm)
+
+        # Normalize to sum = 1.0
+        total = s_raw + r_raw + t_raw
+        if total > 0:
+            s, r, t = s_raw / total, r_raw / total, t_raw / total
+        else:
+            s, r, t = 0.33, 0.33, 0.34
+
+        return s, r, t
+
+    def _compute_sattva(self, coherence: float, entropy: float) -> float:
+        """
+        Compute Sattva (clarity/quality of knowledge).
+
+        Sattva = coherence × (1 - entropy)
+
+        High coherence + low entropy = model is learning clearly.
+        """
+        # Clamp inputs
+        coherence = max(0.0, min(1.0, float(coherence)))
+        entropy = max(0.0, min(1.0, float(entropy)))
+
+        return coherence * (1.0 - entropy)
+
+    def _compute_rajas(self, grad_norm: float) -> float:
+        """
+        Compute Rajas (metabolic effort/action).
+
+        Rajas = grad_norm / baseline_norm (clamped to [0, 1])
+
+        High gradient activity relative to baseline = high action.
+        """
+        normalized = self.grad_ema.get_normalized(grad_norm)
+
+        # Map [0, 2] to [0, 1] with 1.0 baseline at 0.5
+        return min(1.0, normalized / 2.0)
+
+    def _compute_tamas(
+        self,
+        loss: float,
+        prev_loss: float,
+        grad_norm: float,
+    ) -> float:
+        """
+        Compute Tamas (inertia/stagnation) directly.
+
+        NOT computed as residual (1 - s - r), but measured directly:
+        - Low loss change = high inertia
+        - Low gradient norm = high inertia
+
+        Tamas = (1 - |loss_change|) × (1 - grad_activity)
+        """
+        # Loss velocity: how much is loss changing?
+        loss_change = abs(loss - prev_loss)
+        loss_velocity = min(1.0, loss_change / 0.5)  # Normalize, 0.5 = significant change
+
+        # Gradient activity
+        grad_activity = min(1.0, self.grad_ema.get_normalized(grad_norm) / 2.0)
+
+        # Tamas: high when both loss and gradients are stable/flat
+        tamas = (1.0 - loss_velocity) * (1.0 - grad_activity * 0.5)
+
+        return max(0.0, min(1.0, tamas))
+
+    def get_status(self, s: float, r: float, t: float) -> str:
+        """Format Guna status for logging."""
+        # Determine dominant
+        if s > r and s > t:
+            icon = "☀️"  # Sattva
+            state = "Learning"
+        elif r > t:
+            icon = "🔥"  # Rajas
+            state = "Active"
+        else:
+            icon = "🌙"  # Tamas
+            state = "Plateau"
+
+        return f"Gunas[{state}]: S:{s:.2f} R:{r:.2f} T:{t:.2f} {icon}"
+
+    def get_action_recommendation(self, s: float, r: float, t: float) -> str:
+        """
+        Get action recommendation based on Guna state.
+
+        Returns:
+            Action recommendation string
+        """
+        if s > 0.5:
+            return "CONSERVE"  # Learning well, lock in
+        elif r > 0.5:
+            return "BRAKE"     # High activity, may need to slow down
+        elif t > 0.5:
+            return "BOOST"     # Stagnant, may need to increase K_p
+        else:
+            return "CONTINUE"  # Balanced, keep going
+
 
 # =============================================================================
 # SATTVIC BRAKE: Lightweight Confidence via Phase Angle Variance
@@ -3448,6 +3788,13 @@ def train(config: UnifiedTrainingConfig):
     )
     print(f"  Sattvic Brake: ENABLED (threshold=0.5, LR×0.8)")
 
+    # Training Gunas (Bridge Training Physics to Cognitive Philosophy)
+    training_gunas = TrainingGunas(
+        grad_ema_alpha=0.1,  # Gradient norm EMA smoothing
+        loss_ema_alpha=0.05,  # Loss velocity tracking
+    )
+    print(f"  Training Gunas: ENABLED (S/R/T tracking)")
+
     # Optimizer
     optimizer = AdamW(
         model.parameters(),
@@ -3721,6 +4068,39 @@ def train(config: UnifiedTrainingConfig):
                 }
                 training_state_tracker.update(state_metrics, global_step)
 
+            # =====================================================================
+            # TRAINING GUNAS: Compute Sattva/Rajas/Tamas from training dynamics
+            # Bridges training physics to cognitive philosophy
+            # =====================================================================
+            guna_s, guna_r, guna_t = 0.33, 0.33, 0.34  # Default balanced
+            guna_action = "CONTINUE"
+            if training_gunas is not None:
+                # Get gradient norm from HGS metrics or compute from model
+                if hgs_metrics:
+                    grad_norm = hgs_metrics.get('a_grad_norm', 0.0) + hgs_metrics.get('s_grad_norm', 0.0)
+                else:
+                    # Fallback: compute total gradient norm
+                    grad_norm = sum(p.grad.norm().item() for p in model.parameters() if p.grad is not None)
+
+                # Get coherence and entropy from metrics
+                coherence = float(metrics.get('coherence', metrics.get('gc', 0.5)))
+                entropy = float(metrics.get('onto_entropy', metrics.get('entropy', 0.5)))
+
+                # Compute Training Gunas
+                guna_s, guna_r, guna_t = training_gunas.compute(
+                    coherence=coherence,
+                    entropy=entropy,
+                    grad_norm=grad_norm,
+                    loss=avg_loss,
+                )
+
+                # Get action recommendation
+                guna_action = training_gunas.get_action_recommendation(guna_s, guna_r, guna_t)
+
+                # Update TrainingStateTracker with Gunas (semantic bridge)
+                if training_state_tracker is not None and training_state_tracker.enabled:
+                    training_state_tracker.update_with_gunas(guna_s, guna_r, guna_t, global_step)
+
             # Periodic CUDA memory cleanup to prevent fragmentation
             if device.type == "cuda" and global_step % 500 == 0:
                 torch.cuda.empty_cache()
@@ -3837,6 +4217,17 @@ def train(config: UnifiedTrainingConfig):
                 if training_state_tracker is not None and training_state_tracker.enabled:
                     know_state = training_state_tracker.state['cognitive_state']
                     log_msg += f" | Know:{know_state:.2f}"
+
+                # Training Gunas: S/R/T with dominant state icon
+                if training_gunas is not None:
+                    # Determine dominant Guna and icon
+                    if guna_s > guna_r and guna_s > guna_t:
+                        guna_icon = "☀️"  # Sattva - clarity/learning
+                    elif guna_r > guna_t:
+                        guna_icon = "🔥"  # Rajas - action/activity
+                    else:
+                        guna_icon = "🌙"  # Tamas - inertia/plateau
+                    log_msg += f" | S:{guna_s:.2f} R:{guna_r:.2f} T:{guna_t:.2f}{guna_icon}"
 
                 print(log_msg)
                 step_start_time = time.time()
