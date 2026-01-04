@@ -6281,7 +6281,7 @@ def train(config: UnifiedTrainingConfig):
                 )
                 # v2.7 Training State Tracker: Save state on checkpoint
                 if training_state_tracker is not None and training_state_tracker.enabled:
-                    training_state_tracker.save()
+                    training_state_tracker.save_state()
 
     # Final save
     save_checkpoint(
@@ -6292,7 +6292,7 @@ def train(config: UnifiedTrainingConfig):
     )
     # v2.7 Training State Tracker: Save final state
     if training_state_tracker is not None and training_state_tracker.enabled:
-        training_state_tracker.save()
+        training_state_tracker.save_state()
 
     # Close TensorBoard
     if tb_writer is not None:
