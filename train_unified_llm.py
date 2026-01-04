@@ -6598,11 +6598,11 @@ def main():
     parser.add_argument("--toroidal_coherence_threshold", type=float, default=0.3,
                        help="Alarm threshold for cognitive discontinuity")
 
-    # Evolutionary Flow System (Phase 2-5)
+    # Full Evolutionary Flow System (Phase 2-5)
     parser.add_argument("--enable_evolutionary_flow", action="store_true", default=True,
-                       help="Enable Evolutionary Flow System (default: True)")
+                       help="Enable full evolutionary flow across all layer transitions")
     parser.add_argument("--disable_evolutionary_flow", action="store_true",
-                       help="Disable Evolutionary Flow System")
+                       help="Disable evolutionary flow system")
     parser.add_argument("--evo_lambda", type=float, default=0.1,
                        help="Overall evolutionary loss weight")
     parser.add_argument("--evo_micro_weight", type=float, default=0.3,
@@ -6611,6 +6611,12 @@ def main():
                        help="Weight for cluster coherence loss (Auth/Sens)")
     parser.add_argument("--evo_macro_weight", type=float, default=0.4,
                        help="Weight for toroidal coherence loss")
+    parser.add_argument("--evo_dropout", type=float, default=0.1,
+                       help="Dropout in evolutionary gates")
+    parser.add_argument("--evo_use_rmatrix", action="store_true", default=True,
+                       help="Use R-Matrix for evolutionary weights")
+    parser.add_argument("--evo_coherence_window", type=int, default=100,
+                       help="Steps for coherence history tracking")
     parser.add_argument("--evo_resonance_alpha", type=float, default=0.1,
                        help="Strength of O12→O1 delayed resonance injection")
     parser.add_argument("--evo_lr_modulation", action="store_true", default=True,
@@ -6727,12 +6733,15 @@ def main():
         toroidal_use_gating=args.toroidal_use_gating,
         toroidal_truncated_bptt=args.toroidal_truncated_bptt,
         toroidal_coherence_threshold=args.toroidal_coherence_threshold,
-        # Evolutionary Flow System
+        # Full Evolutionary Flow System (Phase 2-5)
         enable_evolutionary_flow=args.enable_evolutionary_flow and not args.disable_evolutionary_flow,
         evo_lambda=args.evo_lambda,
         evo_micro_weight=args.evo_micro_weight,
         evo_meso_weight=args.evo_meso_weight,
         evo_macro_weight=args.evo_macro_weight,
+        evo_dropout=args.evo_dropout,
+        evo_use_rmatrix=args.evo_use_rmatrix,
+        evo_coherence_window=args.evo_coherence_window,
         evo_resonance_alpha=args.evo_resonance_alpha,
         evo_lr_modulation=args.evo_lr_modulation,
         evo_lr_slowdown=args.evo_lr_slowdown,
