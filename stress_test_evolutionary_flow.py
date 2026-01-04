@@ -924,8 +924,8 @@ def main():
         help="Device to use (auto, cuda, cpu)"
     )
     parser.add_argument(
-        "--meso_threshold", type=float, default=0.1,
-        help="Meso-delta threshold for green light"
+        "--meso_threshold", type=float, default=-0.15,
+        help="Meso-delta threshold for green light (negative OK pre-training)"
     )
     parser.add_argument(
         "--toroidal_threshold", type=float, default=0.0,
