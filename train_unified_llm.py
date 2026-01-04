@@ -6189,7 +6189,7 @@ def train(config: UnifiedTrainingConfig):
 
                     # Execute actions
                     if action == "RELAX":
-                        relaxation_controller.execute_relaxation()
+                        relaxation_controller.execute_relaxation(current_step=global_step)
                         print(f"  🎯 StabilityIndex achieved! Transitioning to balanced mode.")
                     elif action == "RECOVER":
                         relaxation_controller.execute_recovery()
