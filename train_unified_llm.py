@@ -6714,6 +6714,29 @@ def train(config: UnifiedTrainingConfig):
                 if training_state_tracker is not None and training_state_tracker.enabled:
                     training_state_tracker.update_with_gunas(guna_s, guna_r, guna_t, global_step)
 
+            # Per-step Saturation Gate check (V9.4.7 fix: check every step, not just at validation)
+            if relaxation_controller is not None and relaxation_controller.enable_saturation_gate:
+                # Compute sensory_flow when EvoFlow is disabled
+                # Use S/A ratio: when S/A < 0.3, sensory is "saturated" (flow = 1.0)
+                if evolutionary_engine is None or evo_result is None:
+                    sa_ratio = hgs_metrics.get("s_a_ratio", 0.5) if hgs_metrics else 0.5
+                    # Map S/A ratio to sensory flow: S/A=0 -> flow=1.0, S/A=0.5 -> flow=0.5
+                    step_sensory_flow = max(0.0, min(1.0, 1.0 - sa_ratio))
+                    last_sensory_flow = step_sensory_flow
+
+                # Check saturation gate every step
+                current_coherence = metrics.get('coherence', 0.75)
+                if relaxation_controller._check_saturation_gate(
+                    coherence=current_coherence,
+                    sensory_flow=last_sensory_flow,
+                    global_step=global_step,
+                ):
+                    # Saturation triggered! Execute relaxation
+                    print(f"\n  🎯 [SATURATION] Coherence saturated at {current_coherence:.2f} - triggering relaxation")
+                    print(f"      Sensory Flow: {last_sensory_flow:.3f} (flat for {relaxation_controller.saturation_patience} steps)")
+                    relaxation_controller.execute_relaxation(current_step=global_step)
+                    print(f"  🔄 [RELAXATION] 9:3 → 6:6 transition initiated")
+
             # Periodic CUDA memory cleanup to prevent fragmentation
             if device.type == "cuda" and global_step % 500 == 0:
                 torch.cuda.empty_cache()
