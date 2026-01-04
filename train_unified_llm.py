@@ -4504,6 +4504,14 @@ class DynamicRelaxationController:
         self.metabolic_vram_safety = 0.90  # Don't flip if VRAM > 90%
         self._current_target_streak = 500  # Dynamic target (50 or 500 based on entropy)
 
+        # V9.5.1 Multi-Stage Granular Evolution: 9:3 → 6:6 → 5:7 → 4:8 → 3:9
+        self.evolution_stages = [(9, 3), (6, 6), (5, 7), (4, 8), (3, 9)]
+        self.current_stage_idx = 0  # Start at 9:3
+        self.evolution_streak = 0   # Steps meeting evolution criteria
+        self.evolution_patience = 200  # Steps needed to trigger next stage
+        self.evolution_entropy_floor = 0.42  # Abort if entropy drops below this
+        self.evolution_coherence_min = 0.82  # Must maintain high coherence
+
         # [S5] Entropy Gate: Block relaxation if entropy too high
         self.entropy_gate_threshold = 0.50  # Must be below this to relax
         self.entropy_gate_blocked = False   # Track if we blocked due to entropy
@@ -4749,6 +4757,83 @@ class DynamicRelaxationController:
         # Store current target for status display
         self._current_target_streak = target_streak
         return "WAITING"
+
+    def check_granular_evolution(
+        self,
+        metrics: Dict[str, float],
+        vram_usage: float,
+        global_step: int,
+    ) -> str:
+        """
+        V9.5.1 Granular Evolution: Check for multi-stage transitions.
+
+        After 6:6, can evolve to 5:7 → 4:8 → 3:9 based on:
+        - Coherence > 0.82 (stability)
+        - Entropy > 0.42 (diversity floor - prevent repetition curse)
+        - VRAM < 90% (safety)
+
+        Triggers when criteria met for evolution_patience steps (200).
+        """
+        # Only check if we're past the initial 6:6 stage
+        if self.current_stage_idx < 1:
+            return "NOT_READY"
+
+        # Already at final stage (3:9)
+        if self.current_stage_idx >= len(self.evolution_stages) - 1:
+            return "FINAL_STAGE"
+
+        coherence = metrics.get('coherence', 0.0)
+        entropy = metrics.get('entropy', 1.0)
+
+        # Evolution criteria (different from initial flip)
+        is_stable = coherence > self.evolution_coherence_min  # 0.82
+        is_diverse = entropy > self.evolution_entropy_floor   # 0.42 - MUST have diversity
+        is_safe = vram_usage < self.metabolic_vram_safety     # 0.90
+
+        # Key insight: We want to evolve when STIFF (low entropy) but stable
+        # This breaks the repetition curse by adding sensory capacity
+        wants_evolution = entropy < 0.45 and coherence > 0.85  # Stiff but stable
+
+        if is_stable and is_safe and (is_diverse or wants_evolution):
+            self.evolution_streak += 1
+        else:
+            self.evolution_streak = 0  # Hard reset
+
+        # Trigger evolution when patience reached
+        if self.evolution_streak >= self.evolution_patience:
+            next_stage = self.evolution_stages[self.current_stage_idx + 1]
+            return f"EVOLVE_TO_{next_stage[0]}_{next_stage[1]}"
+
+        return "WAITING"
+
+    def execute_granular_evolution(self, global_step: int) -> Tuple[int, int]:
+        """
+        Execute transition to next evolution stage.
+
+        Returns the new (authority, sensory) split.
+        """
+        if self.current_stage_idx >= len(self.evolution_stages) - 1:
+            return self.current_split
+
+        # Advance to next stage
+        self.current_stage_idx += 1
+        new_split = self.evolution_stages[self.current_stage_idx]
+
+        # Reset evolution streak for next stage
+        self.evolution_streak = 0
+
+        # Update current split
+        self.current_split = new_split
+
+        # Print evolution message
+        prev_split = self.evolution_stages[self.current_stage_idx - 1]
+        print(f"\n  🌀 [GRANULAR EVOLUTION] Step {global_step}")
+        print(f"      {prev_split[0]}:{prev_split[1]} → {new_split[0]}:{new_split[1]}")
+        print(f"      Authority layers: 0-{new_split[0]-1}")
+        print(f"      Sensory layers: {new_split[0]}-11")
+        print(f"      Transitional layer: {new_split[0]} (newly sensory)")
+
+        return new_split
 
     def update_stability_per_step(self, coherence: float, sa_ratio: float = None) -> None:
         """
@@ -5490,6 +5575,14 @@ class UnifiedTrainingConfig:
     lambda_bhava: float = 0.1     # Bhava relationship consistency
     lambda_coherence: float = 0.05  # Global coherence
     lambda_entropy: float = 0.01  # Entropy regularization
+
+    # V9.5.1 Entropy Floor (prevents repetition curse)
+    enable_entropy_floor: bool = False  # Enable entropy floor penalty
+    entropy_floor: float = 0.48  # Minimum entropy target
+    entropy_floor_weight: float = 0.1  # Weight for floor penalty
+
+    # V9.5.1 Force Evolution (manual intervention)
+    force_evolution_stage: int = None  # Force to stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9
 
     # Sovereign-1 loss configuration (hardened decomposed loss)
     use_sovereign_loss: bool = True  # Enable Sovereign-1 decomposed loss
@@ -6490,6 +6583,18 @@ def train(config: UnifiedTrainingConfig):
             saturation_thaw_steps=config.saturation_thaw_steps,
         )
 
+        # V9.5.1 Force Evolution: Manual intervention to specific stage
+        if config.force_evolution_stage is not None:
+            target_stage = config.force_evolution_stage
+            if 1 <= target_stage <= 4:
+                relaxation_controller.current_stage_idx = target_stage
+                new_split = relaxation_controller.evolution_stages[target_stage]
+                relaxation_controller.current_split = new_split
+                relaxation_controller.saturation_triggered = True  # Skip 9:3→6:6 check
+                relaxation_controller.state = relaxation_controller.STATE_BALANCED
+                print(f"\n  🔧 [FORCE EVOLUTION] Manually set to stage {target_stage}: {new_split[0]}:{new_split[1]}")
+                print(f"      Stages: 0=9:3, 1=6:6, 2=5:7, 3=4:8, 4=3:9")
+
     # Adaptive Training Controller (dynamic hyperparameter tuning)
     adaptive_controller = None
     if config.enable_adaptive_training:
@@ -6770,6 +6875,16 @@ def train(config: UnifiedTrainingConfig):
                     metrics['evo_toroid'] = evo_result['flow_result']['toroidal_coherence']
                     metrics['evo_rec'] = evo_result['metacognitive']['recommendation']
 
+            # V9.5.1 Entropy Floor Penalty (breaks repetition curse)
+            if config.enable_entropy_floor and 'onto_entropy' in metrics:
+                current_entropy = metrics['onto_entropy']
+                if current_entropy < config.entropy_floor:
+                    # Penalize low entropy to encourage diversity
+                    entropy_deficit = config.entropy_floor - current_entropy
+                    entropy_floor_loss = config.entropy_floor_weight * entropy_deficit
+                    loss = loss + entropy_floor_loss
+                    metrics['entropy_floor_penalty'] = entropy_floor_loss
+
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
 
@@ -6935,7 +7050,27 @@ def train(config: UnifiedTrainingConfig):
                     if flip_result == "TRIGGER_FLIP":
                         # Metabolic flip triggered! Execute 9:3 → 6:6 relaxation
                         relaxation_controller.execute_relaxation(current_step=global_step)
+                        relaxation_controller.current_stage_idx = 1  # Now at 6:6
                         print(f"  🔄 [RELAXATION] 9:3 → 6:6 transition initiated")
+
+                    # V9.5.1 Granular Evolution: Check for further evolution (6:6 → 5:7 → 4:8 → 3:9)
+                    evolution_result = relaxation_controller.check_granular_evolution(
+                        metrics=metrics,
+                        vram_usage=vram_usage,
+                        global_step=global_step,
+                    )
+
+                    if evolution_result.startswith("EVOLVE_TO_"):
+                        # Execute granular evolution
+                        new_split = relaxation_controller.execute_granular_evolution(global_step)
+                        # Reconfigure gradient scaler for new split
+                        if gradient_scaler_hgs is not None:
+                            gradient_scaler_hgs.reconfigure(
+                                new_authority_layers=new_split[0],
+                                new_sensory_layers=new_split[1],
+                                alpha_range=(0.05, 0.70),
+                            )
+                            print(f"  ✓ [HGS] Reconfigured for {new_split[0]}:{new_split[1]} split")
 
             # Periodic CUDA memory cleanup to prevent fragmentation
             if device.type == "cuda" and global_step % 500 == 0:
@@ -7681,6 +7816,18 @@ def main():
     parser.add_argument("--gc_floor", type=float, default=0.65,
                        help="Minimum Guna Coherence before PIDv2 intervention")
 
+    # V9.5.1 Entropy Floor (breaks repetition curse)
+    parser.add_argument("--enable_entropy_floor", action="store_true",
+                       help="Enable entropy floor penalty (prevents stiffness)")
+    parser.add_argument("--entropy_floor", type=float, default=0.48,
+                       help="Minimum entropy target (default 0.48)")
+    parser.add_argument("--entropy_floor_weight", type=float, default=0.1,
+                       help="Weight for entropy floor penalty")
+
+    # V9.5.1 Force Evolution (manual intervention)
+    parser.add_argument("--force_evolution_stage", type=int, default=None,
+                       help="Force evolution to specific stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9")
+
     # Logging
     parser.add_argument("--log_every", type=int, default=10,
                        help="Log every N steps")
@@ -7949,6 +8096,12 @@ def main():
         mu_s3=args.mu_s3,
         enable_stability_constraint=args.enable_stability_constraint,
         gc_floor=args.gc_floor,
+        # V9.5.1 Entropy Floor
+        enable_entropy_floor=args.enable_entropy_floor,
+        entropy_floor=args.entropy_floor,
+        entropy_floor_weight=args.entropy_floor_weight,
+        # V9.5.1 Force Evolution
+        force_evolution_stage=args.force_evolution_stage,
         # PIDv2 Controller settings
         controller=args.controller,
         pidv2_kp_min=args.pidv2_kp_min,
