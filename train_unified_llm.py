@@ -366,12 +366,19 @@ class EvolutionaryBridge(nn.Module):
         bridge_dropout: float = 0.1,
         use_gating: bool = True,
         truncated_bptt_steps: int = 0,
+        enable_sgp: bool = False,
+        sgp_rate: int = 100,
     ):
         super().__init__()
         self.dim = dim
         self.num_layers = num_layers
         self.truncated_bptt_steps = truncated_bptt_steps
         self.step_count = 0
+
+        # V9.4.7: Stochastic Gradient Persistence (SGP)
+        self.enable_sgp = enable_sgp
+        self.sgp_rate = sgp_rate
+        self.last_sgp_step: Optional[int] = None  # Track last SGP pulse
 
         # Seed Projection: W_seed maps O12 → O1
         # Uses SwiGLU-style gating for selective information flow
@@ -417,12 +424,20 @@ class EvolutionaryBridge(nn.Module):
         seed = self.seed_norm(seed)
         return seed
 
-    def store_harvest(self, harvest: torch.Tensor) -> None:
+    def store_harvest(self, harvest: torch.Tensor, global_step: int = 0) -> bool:
         """
         Store the Harvest (O12 final state) for the next cycle.
 
+        V9.4.7 Hybrid Logic:
+        - SMA (Sattvic): active_projection always retains gradients for meta-learning
+        - SGP (High-Rajas): karma_buffer keeps gradients only on "heavy steps"
+
         Args:
             harvest: Final hidden state from O12_ABSOLVING layer [B, dim] or [B, N, dim]
+            global_step: Current training step for SGP rate calculation
+
+        Returns:
+            bool: True if this was an SGP heavy step (gradients flow through karma_buffer)
         """
         # Take mean across sequence if needed (distill to essence)
         if harvest.dim() == 3:
@@ -432,19 +447,32 @@ class EvolutionaryBridge(nn.Module):
         seed = self._compute_seed(harvest)
 
         # V9.4.6: Keep active projection with gradients for SMA meta-learning
-        # This allows gradients to flow back to seed_proj/seed_gate weights
+        # This allows gradients to flow back to seed_proj/seed_gate weights (runs every step)
         self.active_projection = seed  # Retains gradient path
 
-        # Handle gradient flow based on truncated BPTT setting
+        # V9.4.7: SGP Hybrid Logic - determine if this is a "heavy step"
         self.step_count += 1
-        if self.truncated_bptt_steps > 0 and self.step_count % self.truncated_bptt_steps != 0:
-            # Allow gradient flow for truncated BPTT
+        is_sgp_heavy_step = False
+
+        if self.enable_sgp and self.sgp_rate > 0 and global_step > 0:
+            # SGP: Keep gradients only at capped rate (e.g., every 100 steps)
+            if global_step % self.sgp_rate == 0:
+                # High-Rajas: Main graph remains connected for recursive evolution
+                self.karma_buffer = seed
+                is_sgp_heavy_step = True
+                self.last_sgp_step = global_step
+            else:
+                # Sattvic: Detach to maintain high throughput
+                self.karma_buffer = seed.detach()
+        elif self.truncated_bptt_steps > 0 and self.step_count % self.truncated_bptt_steps != 0:
+            # Legacy truncated BPTT mode (if SGP not enabled)
             self.karma_buffer = seed
         else:
-            # Detach to prevent infinite gradient chains for O1 initialization
+            # Default: Detach to prevent infinite gradient chains
             self.karma_buffer = seed.detach()
 
         self.bridge_active = True
+        return is_sgp_heavy_step
 
     def get_seed(self) -> Optional[torch.Tensor]:
         """
@@ -5375,6 +5403,11 @@ class UnifiedTrainingConfig:
     toroidal_truncated_bptt: int = 0         # Steps of gradient flow (0 = full detach)
     toroidal_coherence_threshold: float = 0.3  # Alarm threshold for cognitive discontinuity
 
+    # V9.4.7: Stochastic Gradient Persistence (SGP) - High-Rajas recursive learning
+    # Allows gradients to flow through bridge at a capped rate for stability
+    enable_sgp: bool = False                 # Enable SGP (off by default, H200 recommended)
+    sgp_rate: int = 100                      # SGP pulse every N steps (1% rule: 100 = 1%)
+
     # Full Evolutionary Flow System (Phase 2: All Layer Transitions)
     # Extends Toroidal Bridge to ALL layer transitions with Delayed Resonance
     enable_evolutionary_flow: bool = True    # Master switch for evolutionary intelligence
@@ -6133,6 +6166,8 @@ def train(config: UnifiedTrainingConfig):
             bridge_dropout=config.toroidal_dropout,
             use_gating=config.toroidal_use_gating,
             truncated_bptt_steps=config.toroidal_truncated_bptt,
+            enable_sgp=config.enable_sgp,
+            sgp_rate=config.sgp_rate,
         ).to(device)
         toroidal_loss_fn = ToroidalConsistencyLoss(
             lambda_toroid=config.toroidal_lambda,
@@ -6142,6 +6177,8 @@ def train(config: UnifiedTrainingConfig):
             coherence_alarm_threshold=config.toroidal_coherence_threshold,
         )
         print(f"  Toroidal Bridge: ENABLED (λ={config.toroidal_lambda}, gate={config.toroidal_use_gating})")
+        if config.enable_sgp:
+            print(f"    → SGP (Stochastic Gradient Persistence): ENABLED (rate=1/{config.sgp_rate})")
         print(f"    → O12 (Absolving) feeds O1 (Potential) for recursive intelligence")
 
     # Full Evolutionary Flow System (Phase 2: All Layer Transitions with Delayed Resonance)
@@ -6471,8 +6508,14 @@ def train(config: UnifiedTrainingConfig):
                             )
 
                     # Store harvest for next cycle (becomes next seed)
-                    evolutionary_bridge.store_harvest(o12_state)
+                    # V9.4.7: Pass global_step for SGP rate calculation
+                    is_sgp_heavy_step = evolutionary_bridge.store_harvest(o12_state, global_step=global_step)
                     toroidal_seed = evolutionary_bridge.get_seed()
+
+                    # Log SGP heavy step (recursive gradient pulse)
+                    if is_sgp_heavy_step and global_step % config.log_every == 0:
+                        print(f"  🌀 [SGP-HEAVY] Recursive Gradient Pulse at Step {global_step}")
+                    metrics['sgp_heavy_step'] = is_sgp_heavy_step
 
             # Full Evolutionary Flow System: All Layer Transitions with Delayed Resonance
             evo_result = None
@@ -6928,6 +6971,9 @@ def train(config: UnifiedTrainingConfig):
                             # V9.4.6: Shadow Mirror Alignment loss
                             if 'sma_loss' in metrics:
                                 tb_writer.add_scalar("toroid/sma_loss", metrics['sma_loss'], global_step)
+                            # V9.4.7: Stochastic Gradient Persistence tracking
+                            if 'sgp_heavy_step' in metrics:
+                                tb_writer.add_scalar("toroid/sgp_active", 1.0 if metrics['sgp_heavy_step'] else 0.0, global_step)
                             if metacognitive_tracker is not None:
                                 tb_writer.add_scalar("toroid/velocity", metacognitive_tracker.coherence_history[-1] - metacognitive_tracker.coherence_history[-2] if len(metacognitive_tracker.coherence_history) >= 2 else 0.0, global_step)
 
@@ -7531,6 +7577,12 @@ def main():
     parser.add_argument("--toroidal_coherence_threshold", type=float, default=0.3,
                        help="Alarm threshold for cognitive discontinuity")
 
+    # V9.4.7: Stochastic Gradient Persistence (SGP)
+    parser.add_argument("--enable_sgp", action="store_true",
+                       help="Enable SGP recursive gradient pulses (H200 recommended)")
+    parser.add_argument("--sgp_rate", type=int, default=100,
+                       help="SGP pulse every N steps (default 100 = 1%% rule)")
+
     # Full Evolutionary Flow System (Phase 2-5)
     parser.add_argument("--enable_evolutionary_flow", action="store_true", default=True,
                        help="Enable full evolutionary flow across all layer transitions")
@@ -7708,6 +7760,9 @@ def main():
         toroidal_use_gating=args.toroidal_use_gating,
         toroidal_truncated_bptt=args.toroidal_truncated_bptt,
         toroidal_coherence_threshold=args.toroidal_coherence_threshold,
+        # V9.4.7: Stochastic Gradient Persistence (SGP)
+        enable_sgp=args.enable_sgp,
+        sgp_rate=args.sgp_rate,
         # Full Evolutionary Flow System (Phase 2-5)
         enable_evolutionary_flow=args.enable_evolutionary_flow and not args.disable_evolutionary_flow,
         evo_lambda=args.evo_lambda,

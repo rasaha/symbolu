@@ -272,10 +272,79 @@ if metrics.get("onto_entropy", 1.0) < entropy_floor:
 
 ## Implementation Checklist
 
-- [ ] #1 Elastic Resonance - implement after H200 migration
-- [ ] #2 PIDv2 Relaxation Sensitivity - implement after H200 migration
-- [ ] #3 Stochastic Gradient Persistence - **H200 ONLY** (OOM on A100)
-- [ ] #4 Sensory Noise Injection - implement after H200 migration
+- [x] #1 Elastic Resonance - ✅ IMPLEMENTED (A100 safe)
+- [x] #2 PIDv2 Relaxation Sensitivity - ✅ IMPLEMENTED (A100 safe)
+- [x] #3b Shadow Mirror Alignment (SMA) - ✅ IMPLEMENTED (A100 safe, lite alternative)
+- [x] #3 Stochastic Gradient Persistence (SGP) - ✅ IMPLEMENTED V9.4.7 (capped rate)
+- [x] #4 Sensory Noise Injection - ✅ IMPLEMENTED (A100 safe)
+
+---
+
+## V9.4.7: Stochastic Gradient Persistence (SGP) - Capped Rate ✅ IMPLEMENTED
+
+**File**: `train_unified_llm.py`
+**Location**: EvolutionaryBridge class + Training loop
+**Risk**: Low (with capped rate)
+**Reward**: Deep recursive learning via occasional gradient pulses
+
+### The Hybrid System (Dual Threshold)
+
+V9.4.7 introduces a **Sattvic/Rajas** hybrid where:
+- **SMA (Sattvic)**: Runs every step, keeps bridge "tuned" via prediction
+- **SGP (High-Rajas)**: Runs at capped rate (e.g., 1% = every 100 steps), allows deep gradient flow
+
+### Why Capping is "Sovereign" Logic
+
+1. **Metabolic Efficiency**: If gradients persist every step, the model becomes "heavy" and slow.
+   Capping to 1% provides "Long-Term Memory" pulses without constant overhead.
+
+2. **VRAM Safety**: Even on H200, persistent gradient graphs are expensive.
+   At 1% rate, 99% of training runs at maximum throughput.
+
+3. **Gradient Over-Fitting Prevention**: Too-frequent gradient flow through the bridge
+   can cause the model to over-fit to recursive patterns vs. current sensory data.
+
+### CLI Arguments
+
+```bash
+--enable_sgp              # Enable SGP (off by default)
+--sgp_rate 100            # Pulse every 100 steps (1% rule)
+```
+
+### Implementation
+
+**EvolutionaryBridge.store_harvest():**
+```python
+def store_harvest(self, harvest: torch.Tensor, global_step: int = 0) -> bool:
+    seed = self._compute_seed(harvest)
+
+    # SMA: active_projection always keeps gradients (runs every step)
+    self.active_projection = seed
+
+    # SGP: karma_buffer keeps gradients only on heavy steps
+    if self.enable_sgp and global_step % self.sgp_rate == 0:
+        # High-Rajas: Recursive gradient pulse
+        self.karma_buffer = seed
+        return True  # Heavy step
+    else:
+        # Sattvic: Detach for high throughput
+        self.karma_buffer = seed.detach()
+        return False
+```
+
+### Monitoring
+
+- Console: `🌀 [SGP-HEAVY] Recursive Gradient Pulse at Step N`
+- TensorBoard: `toroid/sgp_active` (1.0 on heavy steps, 0.0 otherwise)
+- VRAM: Expect brief spike (~5-10GB) on heavy steps
+
+### Recommended Settings
+
+| Hardware | enable_sgp | sgp_rate | Notes |
+|----------|------------|----------|-------|
+| A100 80GB | false | - | Use SMA only |
+| H100 80GB | true | 200 | Conservative 0.5% |
+| H200 141GB | true | 100 | Full 1% rate |
 
 ---
 
