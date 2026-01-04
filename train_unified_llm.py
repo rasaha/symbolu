@@ -4498,10 +4498,11 @@ class DynamicRelaxationController:
         self.saturation_triggered = False  # Track if saturation gate fired
         self.saturation_thaw_step = None  # Step when thaw started
 
-        # V9.4.9 Metabolic Flip: Simpler, more robust criteria
-        self.metabolic_step_counter = 0   # Consecutive steps meeting ALL criteria
-        self.metabolic_entropy_threshold = 0.45  # Flip BEFORE loops get bad
+        # V9.5.0 Dynamic Streak Controller: Entropy-triggered flip
+        self.metabolic_step_counter = 0   # Consecutive steps meeting validity criteria
+        self.metabolic_entropy_threshold = 0.45  # Below this = looping, need fast escape
         self.metabolic_vram_safety = 0.90  # Don't flip if VRAM > 90%
+        self._current_target_streak = 500  # Dynamic target (50 or 500 based on entropy)
 
         # [S5] Entropy Gate: Block relaxation if entropy too high
         self.entropy_gate_threshold = 0.50  # Must be below this to relax
@@ -4697,15 +4698,18 @@ class DynamicRelaxationController:
         global_step: int,
     ) -> str:
         """
-        V9.4.9 Metabolic Flip: Simpler, more robust 9:3 → 6:6 trigger.
+        V9.5.0 Dynamic Streak Controller: Entropy-triggered 9:3 → 6:6 flip.
 
-        Three clear criteria (ALL must pass for patience steps):
+        Key insight: Entropy determines streak LENGTH, VRAM determines streak VALIDITY.
+        - Low entropy (<0.45) = looping = SHORT streak (50) to escape quickly
+        - High entropy (>0.45) = learning = LONG streak (500) to solidify
+
+        Validity criteria (must pass every step):
         1. Coherence > 0.74 (Sattvic stability)
-        2. Entropy < 0.45 (catch loops BEFORE they get bad)
-        3. VRAM < 90% (safety gate)
+        2. VRAM < 90% (safety gate)
 
-        If ANY condition fails, counter resets to 0.
-        Returns "TRIGGER_FLIP" when criteria met for patience steps.
+        If validity fails, counter resets to 0.
+        Returns "TRIGGER_FLIP" when dynamic target reached.
         """
         if self.saturation_triggered:
             return "ALREADY_FLIPPED"
@@ -4713,27 +4717,37 @@ class DynamicRelaxationController:
         coherence = metrics.get('coherence', 0.0)
         entropy = metrics.get('entropy', 1.0)
 
-        # 1. Define "Sattvic" Stability Criteria
+        # 1. Validity Criteria (must pass to increment counter)
         is_stable = coherence > self.saturation_coherence_threshold  # 0.74
-        is_saturated = entropy < self.metabolic_entropy_threshold     # 0.45
         is_safe = vram_usage < self.metabolic_vram_safety            # 0.90
 
-        # 2. Increment or Reset Step Counter
-        if is_stable and is_saturated and is_safe:
+        # 2. Dynamic Streak Target based on Entropy
+        # Low entropy = looping/repetition = need SHORT streak to escape
+        # High entropy = still learning = need LONG streak to solidify
+        if entropy < self.metabolic_entropy_threshold:  # 0.45
+            target_streak = 50   # Emergency "Escape" Mode - break loops fast
+        else:
+            target_streak = 500  # Standard "Sattvic" Mode - let authority crystallize
+
+        # 3. Increment or Reset Counter (based on validity, not entropy)
+        if is_stable and is_safe:
             self.metabolic_step_counter += 1
         else:
-            self.metabolic_step_counter = 0  # Hard reset if ANY condition fails
+            self.metabolic_step_counter = 0  # Hard reset if validity fails
 
-        # 3. Execute Flip when patience reached
-        if self.metabolic_step_counter >= self.saturation_patience:
+        # 4. Execute Flip when dynamic target reached
+        if self.metabolic_step_counter >= target_streak:
             self.saturation_triggered = True
             self.saturation_thaw_step = global_step
-            print(f"\n  🚀 [METABOLIC FLIP] Step {global_step}: Criteria met for {self.saturation_patience} steps")
+            mode = "ESCAPE" if entropy < self.metabolic_entropy_threshold else "SATTVIC"
+            print(f"\n  🚀 [DYNAMIC FLIP] Step {global_step}: {mode} mode - target {target_streak} reached")
             print(f"      Coherence: {coherence:.3f} > 0.74 ✓")
-            print(f"      Entropy:   {entropy:.3f} < 0.45 ✓")
+            print(f"      Entropy:   {entropy:.3f} {'< 0.45 (looping)' if entropy < 0.45 else '>= 0.45 (learning)'}")
             print(f"      VRAM:      {vram_usage*100:.1f}% < 90% ✓")
             return "TRIGGER_FLIP"
 
+        # Store current target for status display
+        self._current_target_streak = target_streak
         return "WAITING"
 
     def update_stability_per_step(self, coherence: float, sa_ratio: float = None) -> None:
@@ -5124,13 +5138,15 @@ class DynamicRelaxationController:
         streak_str = f"{self.stability_streak}/{self.stability_window}" if self.state == self.STATE_AUTHORITY else "—"
         lock_str = " 🔒" if self.is_guna_locked() else ""
 
-        # V9.4.9 Metabolic Flip progress (if enabled and not yet triggered)
+        # V9.5.0 Dynamic Streak progress (if enabled and not yet triggered)
         sat_str = ""
         if self.enable_saturation_gate and self.state == self.STATE_AUTHORITY:
             if self.saturation_triggered:
                 sat_str = " 🚀FLIP"
             elif self.metabolic_step_counter > 0:
-                sat_str = f" Met:{self.metabolic_step_counter}/{self.saturation_patience}"
+                # Show dynamic target: 50 (escape) or 500 (sattvic)
+                mode = "⚡" if self._current_target_streak == 50 else "🧘"
+                sat_str = f" {mode}Met:{self.metabolic_step_counter}/{self._current_target_streak}"
 
         if self.state == self.STATE_RECOVERY:
             return f"Split:{split_str} State:RECOVERY Streak:{streak_str}{lock_str}"
