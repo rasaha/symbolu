@@ -2858,18 +2858,29 @@ class AutoBatchSizer:
             print(f"  Target Effective Batch: {target_effective_batch}")
             print(f"  {'─'*60}")
 
+        # Build list of candidate batch sizes (multiples of 8 for Tensor Core efficiency)
+        alignment = 8
+        max_candidate = min(self.max_batch_size, target_effective_batch)
+        candidates = [b for b in range(alignment, max_candidate + 1, alignment)]
+        if not candidates:
+            candidates = [alignment]  # Minimum fallback
+
+        if verbose:
+            print(f"  Candidates (multiples of {alignment}): {candidates}")
+
         # Binary search for optimal batch size
-        low = self.min_batch_size
-        high = min(self.max_batch_size, target_effective_batch)
-        optimal_batch = low
+        low_idx = 0
+        high_idx = len(candidates) - 1
+        optimal_batch = candidates[0]
         optimal_utilization = 0.0
 
         # First, find the maximum that fits
         if verbose:
             print(f"  Phase 1: Finding maximum batch size that fits...")
 
-        while low <= high:
-            mid = (low + high) // 2
+        while low_idx <= high_idx:
+            mid_idx = (low_idx + high_idx) // 2
+            mid = candidates[mid_idx]
             if verbose:
                 print(f"    Probing batch_size={mid}...", end=" ", flush=True)
 
@@ -2883,26 +2894,30 @@ class AutoBatchSizer:
                     # Fits within target, try larger
                     optimal_batch = mid
                     optimal_utilization = utilization
-                    low = mid + 1
+                    low_idx = mid_idx + 1
                 else:
                     # Exceeds target but doesn't OOM, this is close
                     optimal_batch = mid
                     optimal_utilization = utilization
-                    high = mid - 1
+                    high_idx = mid_idx - 1
             else:
                 if verbose:
                     print(f"✗ OOM")
-                high = mid - 1
+                high_idx = mid_idx - 1
 
-        # If we're over target, step down
-        while optimal_batch > self.min_batch_size:
-            success, utilization = self._probe_batch_size(optimal_batch)
-            if success and utilization <= self.effective_target:
-                optimal_utilization = utilization
-                break
-            optimal_batch -= 1
-            if verbose:
-                print(f"    Stepping down to batch_size={optimal_batch}...")
+        # Verify final choice fits within target
+        if optimal_utilization > self.effective_target:
+            # Step down to previous candidate
+            current_idx = candidates.index(optimal_batch)
+            while current_idx > 0:
+                current_idx -= 1
+                optimal_batch = candidates[current_idx]
+                success, utilization = self._probe_batch_size(optimal_batch)
+                if success and utilization <= self.effective_target:
+                    optimal_utilization = utilization
+                    if verbose:
+                        print(f"    Stepping down to batch_size={optimal_batch}... ✓ ({utilization:.1%} VRAM)")
+                    break
 
         # Calculate gradient accumulation
         if optimal_batch >= target_effective_batch:
