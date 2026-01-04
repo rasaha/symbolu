@@ -903,7 +903,10 @@ class CSRDecayScheduler:
 
         # Apply mode collapse boost if needed
         if self.boost_active:
-            self.current_lambda = min(self.lambda_max, base_lambda * self.entropy_boost_factor)
+            # Emergency boost can exceed lambda_max (up to 1.0) to shatter the loop
+            self.current_lambda = min(1.0, self.current_lambda * self.entropy_boost_factor)
+            print(f"  🔥 [BOOST] Entropy {entropy:.3f} < {self.entropy_floor}. "
+                  f"Lambda increased to {self.current_lambda:.2f}")
         else:
             self.current_lambda = base_lambda
 
