@@ -4498,6 +4498,11 @@ class DynamicRelaxationController:
         self.saturation_triggered = False  # Track if saturation gate fired
         self.saturation_thaw_step = None  # Step when thaw started
 
+        # V9.4.9 Metabolic Flip: Simpler, more robust criteria
+        self.metabolic_step_counter = 0   # Consecutive steps meeting ALL criteria
+        self.metabolic_entropy_threshold = 0.45  # Flip BEFORE loops get bad
+        self.metabolic_vram_safety = 0.90  # Don't flip if VRAM > 90%
+
         # [S5] Entropy Gate: Block relaxation if entropy too high
         self.entropy_gate_threshold = 0.50  # Must be below this to relax
         self.entropy_gate_blocked = False   # Track if we blocked due to entropy
@@ -4684,6 +4689,52 @@ class DynamicRelaxationController:
             return True
 
         return False
+
+    def check_metabolic_flip(
+        self,
+        metrics: Dict[str, float],
+        vram_usage: float,
+        global_step: int,
+    ) -> str:
+        """
+        V9.4.9 Metabolic Flip: Simpler, more robust 9:3 → 6:6 trigger.
+
+        Three clear criteria (ALL must pass for patience steps):
+        1. Coherence > 0.74 (Sattvic stability)
+        2. Entropy < 0.45 (catch loops BEFORE they get bad)
+        3. VRAM < 90% (safety gate)
+
+        If ANY condition fails, counter resets to 0.
+        Returns "TRIGGER_FLIP" when criteria met for patience steps.
+        """
+        if self.saturation_triggered:
+            return "ALREADY_FLIPPED"
+
+        coherence = metrics.get('coherence', 0.0)
+        entropy = metrics.get('entropy', 1.0)
+
+        # 1. Define "Sattvic" Stability Criteria
+        is_stable = coherence > self.saturation_coherence_threshold  # 0.74
+        is_saturated = entropy < self.metabolic_entropy_threshold     # 0.45
+        is_safe = vram_usage < self.metabolic_vram_safety            # 0.90
+
+        # 2. Increment or Reset Step Counter
+        if is_stable and is_saturated and is_safe:
+            self.metabolic_step_counter += 1
+        else:
+            self.metabolic_step_counter = 0  # Hard reset if ANY condition fails
+
+        # 3. Execute Flip when patience reached
+        if self.metabolic_step_counter >= self.saturation_patience:
+            self.saturation_triggered = True
+            self.saturation_thaw_step = global_step
+            print(f"\n  🚀 [METABOLIC FLIP] Step {global_step}: Criteria met for {self.saturation_patience} steps")
+            print(f"      Coherence: {coherence:.3f} > 0.74 ✓")
+            print(f"      Entropy:   {entropy:.3f} < 0.45 ✓")
+            print(f"      VRAM:      {vram_usage*100:.1f}% < 90% ✓")
+            return "TRIGGER_FLIP"
+
+        return "WAITING"
 
     def get_saturation_thaw_alpha(self, global_step: int) -> float:
         """
@@ -5043,13 +5094,13 @@ class DynamicRelaxationController:
         streak_str = f"{self.stability_streak}/{self.stability_window}" if self.state == self.STATE_AUTHORITY else "—"
         lock_str = " 🔒" if self.is_guna_locked() else ""
 
-        # Saturation Gate progress (if enabled and not yet triggered)
+        # V9.4.9 Metabolic Flip progress (if enabled and not yet triggered)
         sat_str = ""
         if self.enable_saturation_gate and self.state == self.STATE_AUTHORITY:
             if self.saturation_triggered:
-                sat_str = " 🎯SAT"
-            elif self.saturation_flat_count > 0:
-                sat_str = f" Sat:{self.saturation_flat_count}/{self.saturation_patience}"
+                sat_str = " 🚀FLIP"
+            elif self.metabolic_step_counter > 0:
+                sat_str = f" Met:{self.metabolic_step_counter}/{self.saturation_patience}"
 
         if self.state == self.STATE_RECOVERY:
             return f"Split:{split_str} State:RECOVERY Streak:{streak_str}{lock_str}"
@@ -6734,26 +6785,25 @@ def train(config: UnifiedTrainingConfig):
                 if training_state_tracker is not None and training_state_tracker.enabled:
                     training_state_tracker.update_with_gunas(guna_s, guna_r, guna_t, global_step)
 
-            # Per-step Saturation Gate check (V9.4.7 fix: check every step, not just at validation)
+            # V9.4.9 Metabolic Flip: Per-step check with simpler, robust criteria
             if relaxation_controller is not None and relaxation_controller.enable_saturation_gate:
-                # Compute sensory_flow when EvoFlow is disabled
-                # Use S/A ratio: when S/A < 0.3, sensory is "saturated" (flow = 1.0)
-                if evolutionary_engine is None or evo_result is None:
-                    sa_ratio = hgs_metrics.get("s_a_ratio", 0.5) if hgs_metrics else 0.5
-                    # Map S/A ratio to sensory flow: S/A=0 -> flow=1.0, S/A=0.5 -> flow=0.5
-                    step_sensory_flow = max(0.0, min(1.0, 1.0 - sa_ratio))
-                    last_sensory_flow = step_sensory_flow
+                # Get current VRAM usage (0.0 to 1.0)
+                if device.type == "cuda":
+                    vram_used = torch.cuda.memory_allocated(device)
+                    vram_total = torch.cuda.get_device_properties(device).total_memory
+                    vram_usage = vram_used / vram_total
+                else:
+                    vram_usage = 0.0
 
-                # Check saturation gate every step
-                current_coherence = metrics.get('coherence', 0.75)
-                if relaxation_controller._check_saturation_gate(
-                    coherence=current_coherence,
-                    sensory_flow=last_sensory_flow,
+                # Check metabolic flip criteria every step
+                flip_result = relaxation_controller.check_metabolic_flip(
+                    metrics=metrics,
+                    vram_usage=vram_usage,
                     global_step=global_step,
-                ):
-                    # Saturation triggered! Execute relaxation
-                    print(f"\n  🎯 [SATURATION] Coherence saturated at {current_coherence:.2f} - triggering relaxation")
-                    print(f"      Sensory Flow: {last_sensory_flow:.3f} (flat for {relaxation_controller.saturation_patience} steps)")
+                )
+
+                if flip_result == "TRIGGER_FLIP":
+                    # Metabolic flip triggered! Execute 9:3 → 6:6 relaxation
                     relaxation_controller.execute_relaxation(current_step=global_step)
                     print(f"  🔄 [RELAXATION] 9:3 → 6:6 transition initiated")
 
