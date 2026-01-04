@@ -6271,6 +6271,26 @@ def train(config: UnifiedTrainingConfig):
     # Dynamic Relaxation Controller: 9:3 → 6:6 transition
     relaxation_controller = None
     if config.enable_dynamic_relaxation and gradient_scaler_hgs is not None:
+        # V9.4.7: Auto-scale saturation_patience based on GPU VRAM
+        # Larger VRAM → larger batches → faster convergence → lower patience needed
+        # H200 (141GB+): 50 steps | H100 (80GB): 200 steps | A100 (40GB): 400 steps
+        auto_saturation_patience = config.saturation_patience  # Default from CLI
+        if device.type == "cuda":
+            total_vram_gb = torch.cuda.get_device_properties(device).total_memory / 1e9
+            if total_vram_gb >= 140:      # H200 class (141GB+)
+                auto_saturation_patience = 50
+            elif total_vram_gb >= 90:     # 96GB class
+                auto_saturation_patience = 100
+            elif total_vram_gb >= 70:     # H100/A100-80GB class
+                auto_saturation_patience = 200
+            elif total_vram_gb >= 35:     # A100-40GB class
+                auto_saturation_patience = 400
+            else:                          # Smaller GPUs
+                auto_saturation_patience = 500
+
+            if auto_saturation_patience != config.saturation_patience:
+                print(f"  📊 [VRAM-AUTO] Saturation patience scaled: {config.saturation_patience} → {auto_saturation_patience} (based on {total_vram_gb:.0f}GB VRAM)")
+
         relaxation_controller = DynamicRelaxationController(
             gradient_scaler=gradient_scaler_hgs,
             model=model,
@@ -6293,7 +6313,7 @@ def train(config: UnifiedTrainingConfig):
             # Sovereign Saturation Gate
             enable_saturation_gate=config.enable_saturation_gate,
             saturation_coherence_threshold=config.saturation_coherence_threshold,
-            saturation_patience=config.saturation_patience,
+            saturation_patience=auto_saturation_patience,
             saturation_thaw_start=config.saturation_thaw_start,
             saturation_thaw_end=config.saturation_thaw_end,
             saturation_thaw_steps=config.saturation_thaw_steps,
