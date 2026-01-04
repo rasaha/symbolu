@@ -5565,25 +5565,43 @@ def generate_sample(
     tokenizer,
     prompt: str,
     device: torch.device,
-    max_new_tokens: int = 50,
-    temperature: float = 0.8,
-    top_p: float = 0.9,
+    max_new_tokens: int = 128,
+    temperature: float = 0.9,
+    top_p: float = 0.95,
+    top_k: int = 50,
+    repetition_penalty: float = 1.15,
+    no_repeat_ngram_size: int = 3,
 ) -> str:
     """
     Generate text from a prompt for quality monitoring.
 
     Uses nucleus (top-p) sampling with temperature for diverse outputs.
-    Works with SymbolU12, PhaseTransformer, and HybridPhaseTransformer models.
+    ChatGPT recommendations for breaking repetition:
+    - temperature = 0.8-1.0
+    - top_p = 0.95
+    - top_k = 50
+    - repetition_penalty = 1.1-1.2
+    - no_repeat_ngram_size = 3
+    - max_new_tokens = 128-192
     """
     model.eval()
 
     # Encode prompt
     input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+    prompt_len = input_ids.shape[1]
 
     # Generate tokens one by one
     generated = input_ids.clone()
 
-    for _ in range(max_new_tokens):
+    # Track generated n-grams for no_repeat_ngram blocking
+    def get_ngrams(seq, n):
+        """Extract n-grams from a sequence."""
+        ngrams = set()
+        for i in range(len(seq) - n + 1):
+            ngrams.add(tuple(seq[i:i+n].tolist()))
+        return ngrams
+
+    for step in range(max_new_tokens):
         # Forward pass
         outputs = model(generated)
 
@@ -5605,7 +5623,36 @@ def generate_sample(
             break
 
         # Get next token logits
-        next_logits = logits[:, -1, :] / temperature
+        next_logits = logits[:, -1, :].clone()
+
+        # Apply repetition penalty to previously generated tokens
+        if repetition_penalty != 1.0:
+            for token_id in set(generated[0, prompt_len:].tolist()):
+                if next_logits[0, token_id] > 0:
+                    next_logits[0, token_id] /= repetition_penalty
+                else:
+                    next_logits[0, token_id] *= repetition_penalty
+
+        # Apply no_repeat_ngram blocking
+        if no_repeat_ngram_size > 0 and generated.shape[1] >= no_repeat_ngram_size:
+            # Get the last (n-1) tokens as the prefix
+            prefix = tuple(generated[0, -(no_repeat_ngram_size - 1):].tolist())
+            # Get all existing n-grams
+            existing_ngrams = get_ngrams(generated[0], no_repeat_ngram_size)
+            # Block tokens that would create a repeated n-gram
+            for ngram in existing_ngrams:
+                if ngram[:-1] == prefix:
+                    # This token would complete a repeated n-gram
+                    next_logits[0, ngram[-1]] = float('-inf')
+
+        # Apply temperature
+        next_logits = next_logits / temperature
+
+        # Top-k filtering (optional, applied before top-p)
+        if top_k > 0:
+            top_k_vals, _ = torch.topk(next_logits, min(top_k, next_logits.size(-1)))
+            threshold = top_k_vals[0, -1]
+            next_logits[next_logits < threshold] = float('-inf')
 
         # Top-p (nucleus) sampling
         sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
@@ -5704,11 +5751,17 @@ def run_quality_samples(
 
     for prompt in config.sample_prompts:
         try:
+            # ChatGPT recommendations for quality samples:
+            # temperature=0.9, top_p=0.95, top_k=50
+            # repetition_penalty=1.15, no_repeat_ngram_size=3
             generated = generate_sample(
                 model, tokenizer, prompt, device,
-                max_new_tokens=50,
-                temperature=0.8,
-                top_p=0.9,
+                max_new_tokens=128,
+                temperature=0.9,
+                top_p=0.95,
+                top_k=50,
+                repetition_penalty=1.15,
+                no_repeat_ngram_size=3,
             )
             # Clean up and truncate for display
             generated = generated.strip().replace('\n', ' ')[:200]
