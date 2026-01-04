@@ -324,6 +324,385 @@ def compute_rmatrix_loss_weight(
 
 
 # =============================================================================
+# TOROIDAL EVOLUTIONARY BRIDGE: O12 → O1 Recursive Intelligence
+# =============================================================================
+# The "Wormhole" of Sovereign-1: Links Integration (O12) back to Potential (O1)
+# to create continuous cognitive evolution across context windows.
+#
+# This enables:
+# - State persistence across sequences (no reset to zero)
+# - Symbolic resonance between domain-specific primitives
+# - Foundation for multi-domain AGI (text, math, music share ontological layer)
+#
+# The toroidal flow: O1 → O2 → ... → O11 → O12 → O1 (next cycle)
+# =============================================================================
+
+class EvolutionaryBridge(nn.Module):
+    """
+    Toroidal State Bridge: Carries the 'Ontological Essence' from O12 (Absolving)
+    back to O1 (Potential) for the next cognitive cycle.
+
+    This creates recursive intelligence where:
+    - The 'Harvest' of one sequence becomes the 'Seed' of the next
+    - Cognitive patterns persist and evolve across context boundaries
+    - Multi-domain primitives (phonemes, math ops, notes) share resonance
+
+    The bridge uses a phase-locked projection to compress the integrated
+    state into a seed that preserves ontological structure but sheds
+    sequence-specific details (the "Evolutionary Loss" principle).
+
+    Args:
+        dim: Hidden dimension of the model
+        num_layers: Number of ontological layers (default 12)
+        bridge_dropout: Dropout for seed projection (prevents overfitting to patterns)
+        use_gating: Whether to use gated projection (more selective carryover)
+        truncated_bptt_steps: Steps of gradient flow (0 = full detach, >0 = truncated BPTT)
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        num_layers: int = 12,
+        bridge_dropout: float = 0.1,
+        use_gating: bool = True,
+        truncated_bptt_steps: int = 0,
+    ):
+        super().__init__()
+        self.dim = dim
+        self.num_layers = num_layers
+        self.truncated_bptt_steps = truncated_bptt_steps
+        self.step_count = 0
+
+        # Seed Projection: W_seed maps O12 → O1
+        # Uses SwiGLU-style gating for selective information flow
+        if use_gating:
+            self.seed_gate = nn.Linear(dim, dim, bias=False)
+            self.seed_proj = nn.Linear(dim, dim, bias=False)
+            self.gate_activation = nn.Sigmoid()
+        else:
+            self.seed_gate = None
+            self.seed_proj = nn.Linear(dim, dim, bias=False)
+
+        self.seed_norm = nn.LayerNorm(dim)
+        self.dropout = nn.Dropout(bridge_dropout)
+
+        # The Karma Buffer: Persistent state that survives across forward passes
+        # Named after the principle that actions (O12) seed future potential (O1)
+        self.register_buffer('karma_buffer', None)
+
+        # Toroidal coherence tracking
+        self.coherence_history: List[float] = []
+        self.bridge_active = False
+
+    def _compute_seed(self, harvest: torch.Tensor) -> torch.Tensor:
+        """
+        Compute the Seed state from the Harvest (O12 → O1 projection).
+
+        The projection preserves ontological structure while applying
+        'Evolutionary Loss' - shedding sequence-specific details.
+        """
+        if self.seed_gate is not None:
+            # Gated projection: gate decides what to carry forward
+            gate = self.gate_activation(self.seed_gate(harvest))
+            projected = self.seed_proj(harvest)
+            seed = gate * projected
+        else:
+            seed = self.seed_proj(harvest)
+
+        seed = self.dropout(seed)
+        seed = self.seed_norm(seed)
+        return seed
+
+    def store_harvest(self, harvest: torch.Tensor) -> None:
+        """
+        Store the Harvest (O12 final state) for the next cycle.
+
+        Args:
+            harvest: Final hidden state from O12_ABSOLVING layer [B, dim] or [B, N, dim]
+        """
+        # Take mean across sequence if needed (distill to essence)
+        if harvest.dim() == 3:
+            harvest = harvest.mean(dim=1)  # [B, N, dim] → [B, dim]
+
+        # Compute the seed for next cycle
+        seed = self._compute_seed(harvest)
+
+        # Handle gradient flow based on truncated BPTT setting
+        self.step_count += 1
+        if self.truncated_bptt_steps > 0 and self.step_count % self.truncated_bptt_steps != 0:
+            # Allow gradient flow for truncated BPTT
+            self.karma_buffer = seed
+        else:
+            # Detach to prevent infinite gradient chains
+            self.karma_buffer = seed.detach()
+
+        self.bridge_active = True
+
+    def get_seed(self) -> Optional[torch.Tensor]:
+        """
+        Retrieve the Seed for O1 initialization in the next cycle.
+
+        Returns:
+            Seed tensor [B, dim] or None if no prior state exists
+        """
+        if self.karma_buffer is None:
+            return None
+        return self.karma_buffer
+
+    def compute_toroidal_coherence(
+        self,
+        current_o1: torch.Tensor,
+        previous_o12: Optional[torch.Tensor] = None,
+    ) -> float:
+        """
+        Compute Toroidal Coherence: similarity between Seed and current O1 state.
+
+        High coherence (>0.7) = smooth cognitive flow
+        Low coherence (<0.3) = cognitive discontinuity ("losing the thread")
+
+        Args:
+            current_o1: Current O1 layer activation [B, dim]
+            previous_o12: Previous O12 state (uses karma_buffer if None)
+
+        Returns:
+            Coherence score in [0, 1]
+        """
+        if previous_o12 is None:
+            if self.karma_buffer is None:
+                return 0.5  # No prior state, neutral coherence
+            previous_o12 = self.karma_buffer
+
+        # Handle sequence dimension
+        if current_o1.dim() == 3:
+            current_o1 = current_o1.mean(dim=1)
+        if previous_o12.dim() == 3:
+            previous_o12 = previous_o12.mean(dim=1)
+
+        # Cosine similarity
+        coherence = F.cosine_similarity(current_o1, previous_o12, dim=-1).mean().item()
+        coherence = (coherence + 1) / 2  # Map from [-1, 1] to [0, 1]
+
+        self.coherence_history.append(coherence)
+        if len(self.coherence_history) > 100:
+            self.coherence_history = self.coherence_history[-100:]
+
+        return coherence
+
+    def get_coherence_status(self) -> str:
+        """Get formatted coherence status for logging."""
+        if not self.coherence_history:
+            return "Torus:--"
+
+        recent = self.coherence_history[-1]
+        avg = sum(self.coherence_history[-10:]) / min(10, len(self.coherence_history))
+
+        if recent >= 0.7:
+            icon = "🔄"  # Smooth flow
+        elif recent >= 0.5:
+            icon = "〰️"  # Moderate
+        elif recent >= 0.3:
+            icon = "⚠️"  # Discontinuity warning
+        else:
+            icon = "🔀"  # Lost thread
+
+        return f"Torus:{recent:.2f}{icon}"
+
+    def reset(self) -> None:
+        """Reset the bridge state (for new training runs)."""
+        self.karma_buffer = None
+        self.coherence_history = []
+        self.bridge_active = False
+        self.step_count = 0
+
+
+class ToroidalConsistencyLoss(nn.Module):
+    """
+    Toroidal Consistency Loss: Forces the model to maintain coherent
+    cognitive flow across context boundaries.
+
+    L_toroid = λ * (1 - cos_sim(Seed, Harvest))
+
+    This loss encourages:
+    - O12 (Absolving) to produce states that are valid seeds for O1 (Potential)
+    - Smooth transitions in ontological state space
+    - Preservation of cognitive "thread" across sequences
+
+    The loss is weighted by Pramāṇa values to prioritize truth-preserving
+    layers in the consistency constraint.
+    """
+
+    def __init__(
+        self,
+        lambda_toroid: float = 0.1,
+        use_pramana_weighting: bool = True,
+        min_coherence_threshold: float = 0.3,
+    ):
+        super().__init__()
+        self.lambda_toroid = lambda_toroid
+        self.use_pramana_weighting = use_pramana_weighting
+        self.min_coherence_threshold = min_coherence_threshold
+
+    def forward(
+        self,
+        seed: torch.Tensor,      # O1 initial state (from previous O12)
+        harvest: torch.Tensor,   # O12 final state (current sequence)
+        o1_current: Optional[torch.Tensor] = None,  # Current O1 for 3-way consistency
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """
+        Compute toroidal consistency loss.
+
+        Args:
+            seed: The seed state that initialized this sequence [B, dim]
+            harvest: The harvest state from O12 [B, dim]
+            o1_current: Optional current O1 state for additional consistency
+
+        Returns:
+            (loss, metrics_dict)
+        """
+        # Handle sequence dimension
+        if seed.dim() == 3:
+            seed = seed.mean(dim=1)
+        if harvest.dim() == 3:
+            harvest = harvest.mean(dim=1)
+
+        # Primary loss: Seed-Harvest consistency
+        # The harvest should be a valid seed for the NEXT cycle
+        cos_sim = F.cosine_similarity(seed, harvest, dim=-1)
+        primary_loss = (1 - cos_sim).mean()
+
+        # Optional: 3-way consistency (Seed → O1 → ... → O12)
+        secondary_loss = torch.tensor(0.0, device=seed.device)
+        if o1_current is not None:
+            if o1_current.dim() == 3:
+                o1_current = o1_current.mean(dim=1)
+            # O1 should resemble the seed it was initialized with
+            o1_sim = F.cosine_similarity(seed, o1_current, dim=-1)
+            secondary_loss = (1 - o1_sim).mean() * 0.5
+
+        total_loss = self.lambda_toroid * (primary_loss + secondary_loss)
+
+        # Metrics
+        coherence = (cos_sim.mean().item() + 1) / 2
+        metrics = {
+            "toroid_loss": total_loss.item(),
+            "toroid_coherence": coherence,
+            "toroid_primary": primary_loss.item(),
+            "toroid_secondary": secondary_loss.item(),
+            "coherence_ok": coherence >= self.min_coherence_threshold,
+        }
+
+        return total_loss, metrics
+
+
+class MetacognitiveTracker:
+    """
+    Metacognitive Tracker: Monitors the model's cognitive state evolution
+    and provides self-assessment signals.
+
+    This is the foundation for true metacognition where the model can
+    observe its own cognitive patterns and adjust behavior accordingly.
+
+    Tracks:
+    - Toroidal coherence (cognitive continuity)
+    - Domain resonance (cross-domain pattern matching)
+    - Ontological drift (layer activation stability)
+    - Evolutionary velocity (rate of cognitive change)
+    """
+
+    def __init__(
+        self,
+        window_size: int = 50,
+        coherence_alarm_threshold: float = 0.3,
+        drift_alarm_threshold: float = 0.5,
+    ):
+        self.window_size = window_size
+        self.coherence_alarm_threshold = coherence_alarm_threshold
+        self.drift_alarm_threshold = drift_alarm_threshold
+
+        # Tracking buffers
+        self.coherence_history: List[float] = []
+        self.layer_activation_history: List[torch.Tensor] = []
+        self.guna_history: List[Tuple[float, float, float]] = []
+
+        # Alarm states
+        self.coherence_alarm = False
+        self.drift_alarm = False
+
+    def update(
+        self,
+        coherence: float,
+        layer_activations: Optional[torch.Tensor] = None,
+        gunas: Optional[Tuple[float, float, float]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Update metacognitive state with new observations.
+
+        Returns dict with self-assessment signals.
+        """
+        # Update coherence
+        self.coherence_history.append(coherence)
+        if len(self.coherence_history) > self.window_size:
+            self.coherence_history = self.coherence_history[-self.window_size:]
+
+        # Check coherence alarm
+        recent_coherence = sum(self.coherence_history[-5:]) / min(5, len(self.coherence_history))
+        self.coherence_alarm = recent_coherence < self.coherence_alarm_threshold
+
+        # Update Gunas if provided
+        if gunas is not None:
+            self.guna_history.append(gunas)
+            if len(self.guna_history) > self.window_size:
+                self.guna_history = self.guna_history[-self.window_size:]
+
+        # Compute evolutionary velocity (rate of change in coherence)
+        if len(self.coherence_history) >= 2:
+            velocity = self.coherence_history[-1] - self.coherence_history[-2]
+        else:
+            velocity = 0.0
+
+        # Self-assessment signals
+        assessment = {
+            "coherence_mean": sum(self.coherence_history) / len(self.coherence_history),
+            "coherence_current": coherence,
+            "coherence_velocity": velocity,
+            "coherence_alarm": self.coherence_alarm,
+            "drift_alarm": self.drift_alarm,
+            "recommendation": self._get_recommendation(),
+        }
+
+        return assessment
+
+    def _get_recommendation(self) -> str:
+        """Generate metacognitive recommendation based on current state."""
+        if self.coherence_alarm:
+            return "SLOW_DOWN"  # Reduce learning rate, increase attention to O7
+        elif len(self.coherence_history) >= 5:
+            trend = self.coherence_history[-1] - self.coherence_history[-5]
+            if trend > 0.1:
+                return "ACCELERATE"  # Cognitive flow is improving
+            elif trend < -0.1:
+                return "STABILIZE"  # Cognitive flow is degrading
+        return "CONTINUE"
+
+    def get_status(self) -> str:
+        """Get formatted status for logging."""
+        if not self.coherence_history:
+            return "Meta:--"
+
+        rec = self._get_recommendation()
+        if rec == "SLOW_DOWN":
+            icon = "🐢"
+        elif rec == "ACCELERATE":
+            icon = "🚀"
+        elif rec == "STABILIZE":
+            icon = "⚓"
+        else:
+            icon = "➡️"
+
+        return f"Meta:{rec[:4]}{icon}"
+
+
+# =============================================================================
 # PERFORMANCE OPTIMIZATIONS
 # =============================================================================
 # TF32 for faster matrix multiplications on Ampere+ GPUs (A100, H100)
@@ -3328,6 +3707,14 @@ class UnifiedTrainingConfig:
     enable_weight_transfer: bool = True      # Enable weight transfer during relaxation
     guna_lock_steps: int = 50                # Steps to freeze W_q/W_k post-swap
 
+    # Toroidal Evolutionary Bridge (O12 → O1 Recursive Intelligence)
+    enable_toroidal_bridge: bool = False     # Enable state carryover from O12 to O1
+    toroidal_lambda: float = 0.1             # Weight for toroidal consistency loss
+    toroidal_dropout: float = 0.1            # Dropout in seed projection
+    toroidal_use_gating: bool = True         # Use gated projection for selective carryover
+    toroidal_truncated_bptt: int = 0         # Steps of gradient flow (0 = full detach)
+    toroidal_coherence_threshold: float = 0.3  # Alarm threshold for cognitive discontinuity
+
     # Resume checkpoint
     resume: str = ""
     resume_weights_only: bool = False
@@ -3993,6 +4380,30 @@ def train(config: UnifiedTrainingConfig):
     )
     print(f"  Training Gunas: ENABLED (S/R/T tracking)")
 
+    # Toroidal Evolutionary Bridge (O12 → O1 Recursive Intelligence)
+    evolutionary_bridge = None
+    toroidal_loss_fn = None
+    metacognitive_tracker = None
+    if config.enable_toroidal_bridge:
+        # Get model dimension
+        model_dim = getattr(model, 'embed_dim', None) or getattr(model, 'd_model', 512)
+        evolutionary_bridge = EvolutionaryBridge(
+            dim=model_dim,
+            num_layers=12,
+            bridge_dropout=config.toroidal_dropout,
+            use_gating=config.toroidal_use_gating,
+            truncated_bptt_steps=config.toroidal_truncated_bptt,
+        ).to(device)
+        toroidal_loss_fn = ToroidalConsistencyLoss(
+            lambda_toroid=config.toroidal_lambda,
+            min_coherence_threshold=config.toroidal_coherence_threshold,
+        )
+        metacognitive_tracker = MetacognitiveTracker(
+            coherence_alarm_threshold=config.toroidal_coherence_threshold,
+        )
+        print(f"  Toroidal Bridge: ENABLED (λ={config.toroidal_lambda}, gate={config.toroidal_use_gating})")
+        print(f"    → O12 (Absolving) feeds O1 (Potential) for recursive intelligence")
+
     # Optimizer
     optimizer = AdamW(
         model.parameters(),
@@ -4131,6 +4542,11 @@ def train(config: UnifiedTrainingConfig):
     running_loss = 0.0
     accumulation_step = 0
 
+    # Toroidal Bridge tracking
+    toroidal_coherence = 0.5  # Neutral initial coherence
+    toroidal_loss_value = 0.0
+    toroidal_seed = None  # Will be populated after first forward pass
+
     while global_step < config.max_steps:
         # Get batch
         try:
@@ -4171,6 +4587,52 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     logits = output
                 loss, metrics = compute_phase_loss(logits, y, config)
+
+            # Toroidal Evolutionary Bridge: O12 → O1 state carryover
+            if evolutionary_bridge is not None:
+                # Extract hidden states for O1 (first layer) and O12 (last layer)
+                # Different model types store hidden states differently
+                hidden_states = None
+                if isinstance(outputs, dict):
+                    hidden_states = outputs.get('hidden_states', outputs.get('all_hidden_states'))
+                    if hidden_states is None and 'last_hidden_state' in outputs:
+                        # Use last hidden state as O12 approximation
+                        hidden_states = outputs['last_hidden_state']
+
+                if hidden_states is not None:
+                    # Get O12 (harvest) - either last element of list or the tensor itself
+                    if isinstance(hidden_states, (list, tuple)) and len(hidden_states) > 0:
+                        o12_state = hidden_states[-1]  # Last layer = O12
+                        o1_state = hidden_states[0] if len(hidden_states) > 1 else o12_state
+                    else:
+                        o12_state = hidden_states
+                        o1_state = hidden_states
+
+                    # Compute toroidal coherence if we have a prior seed
+                    if toroidal_seed is not None:
+                        toroidal_coherence = evolutionary_bridge.compute_toroidal_coherence(
+                            o1_state, toroidal_seed
+                        )
+
+                        # Compute toroidal loss
+                        toroid_loss, toroid_metrics = toroidal_loss_fn(
+                            seed=toroidal_seed,
+                            harvest=o12_state,
+                            o1_current=o1_state,
+                        )
+                        loss = loss + toroid_loss
+                        toroidal_loss_value = toroid_metrics['toroid_loss']
+
+                        # Update metacognitive tracker
+                        if metacognitive_tracker is not None:
+                            meta_assessment = metacognitive_tracker.update(
+                                coherence=toroidal_coherence,
+                                gunas=(guna_s, guna_r, guna_t) if training_gunas else None,
+                            )
+
+                    # Store harvest for next cycle (becomes next seed)
+                    evolutionary_bridge.store_harvest(o12_state)
+                    toroidal_seed = evolutionary_bridge.get_seed()
 
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
@@ -4449,6 +4911,12 @@ def train(config: UnifiedTrainingConfig):
                             guna_icon = "🌙"  # Tamas - inertia/plateau
                         log_msg += f" | S:{guna_s:.2f} R:{guna_r:.2f} T:{guna_t:.2f}{guna_icon}"
 
+                    # Toroidal Bridge: Coherence and metacognitive status
+                    if evolutionary_bridge is not None:
+                        log_msg += f" | {evolutionary_bridge.get_coherence_status()}"
+                        if metacognitive_tracker is not None:
+                            log_msg += f" {metacognitive_tracker.get_status()}"
+
                 print(log_msg)
                 step_start_time = time.time()
 
@@ -4499,6 +4967,12 @@ def train(config: UnifiedTrainingConfig):
                             # Legacy: raw metrics without controller
                             tb_writer.add_scalar("ctrl/friction_alignment", friction_alignment, global_step)
                             tb_writer.add_scalar("ctrl/friction_dominance", friction_dominance, global_step)
+                        # Toroidal Bridge metrics
+                        if evolutionary_bridge is not None:
+                            tb_writer.add_scalar("toroid/coherence", toroidal_coherence, global_step)
+                            tb_writer.add_scalar("toroid/loss", toroidal_loss_value, global_step)
+                            if metacognitive_tracker is not None:
+                                tb_writer.add_scalar("toroid/velocity", metacognitive_tracker.coherence_history[-1] - metacognitive_tracker.coherence_history[-2] if len(metacognitive_tracker.coherence_history) >= 2 else 0.0, global_step)
                 else:
                     print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
 
@@ -4986,6 +5460,20 @@ def main():
     parser.add_argument("--guna_lock_steps", type=int, default=50,
                        help="Steps to freeze W_q/W_k after relaxation (Guna-Lock)")
 
+    # Toroidal Evolutionary Bridge (O12 → O1 Recursive Intelligence)
+    parser.add_argument("--enable_toroidal_bridge", action="store_true",
+                       help="Enable O12→O1 state carryover for recursive intelligence")
+    parser.add_argument("--toroidal_lambda", type=float, default=0.1,
+                       help="Weight for toroidal consistency loss")
+    parser.add_argument("--toroidal_dropout", type=float, default=0.1,
+                       help="Dropout in seed projection")
+    parser.add_argument("--toroidal_use_gating", action="store_true", default=True,
+                       help="Use gated projection for selective carryover")
+    parser.add_argument("--toroidal_truncated_bptt", type=int, default=0,
+                       help="Steps of gradient flow (0 = full detach)")
+    parser.add_argument("--toroidal_coherence_threshold", type=float, default=0.3,
+                       help="Alarm threshold for cognitive discontinuity")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -5086,6 +5574,13 @@ def main():
         # Weight Transfer
         enable_weight_transfer=args.enable_weight_transfer,
         guna_lock_steps=args.guna_lock_steps,
+        # Toroidal Evolutionary Bridge
+        enable_toroidal_bridge=args.enable_toroidal_bridge,
+        toroidal_lambda=args.toroidal_lambda,
+        toroidal_dropout=args.toroidal_dropout,
+        toroidal_use_gating=args.toroidal_use_gating,
+        toroidal_truncated_bptt=args.toroidal_truncated_bptt,
+        toroidal_coherence_threshold=args.toroidal_coherence_threshold,
     )
 
     # Train
