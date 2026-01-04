@@ -687,7 +687,7 @@ class V27Config:
         persistence_config: State storage configuration
     """
     v2_7_enabled: bool = False
-    update_mode: UpdateMode = UpdateMode.EMA
+    update_mode: UpdateMode = UpdateMode.FAST  # Default: lightweight confidence tracking
     alpha_config: AlphaConfig = field(default_factory=lambda: DEFAULT_ALPHA_CONFIG)
     fast_config: FastConfig = field(default_factory=lambda: DEFAULT_FAST_CONFIG)
     bayesian_config: BayesianConfig = field(default_factory=lambda: DEFAULT_BAYESIAN_CONFIG)
