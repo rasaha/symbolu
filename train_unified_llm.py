@@ -4512,6 +4512,19 @@ class DynamicRelaxationController:
         self.evolution_entropy_floor = 0.42  # Abort if entropy drops below this
         self.evolution_coherence_min = 0.82  # Must maintain high coherence
 
+        # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
+        self.stress_probe_active = False  # Currently in stress-probe mode
+        self.stress_probe_start_step = None  # When stress-probe started
+        self.stress_probe_degeneracy_streak = 0  # Consecutive evals of degeneracy detection
+        self.stress_probe_exit_streak = 0  # Consecutive evals meeting exit criteria
+        self.pre_stress_probe_split = None  # Split before stress-probe (to restore)
+        self.pre_stress_probe_lr = None  # LR before stress-probe (to restore)
+        self.stress_probe_steps_in = 0  # Steps spent in stress-probe
+        # Gradual LR restore tracking (ChatGPT guardrail)
+        self.stress_probe_lr_restoring = False  # Currently restoring LR
+        self.stress_probe_lr_restore_start_step = None  # When LR restore started
+        self.stress_probe_reduced_lr = None  # The reduced LR during stress-probe
+
         # [S5] Entropy Gate: Block relaxation if entropy too high
         self.entropy_gate_threshold = 0.50  # Must be below this to relax
         self.entropy_gate_blocked = False   # Track if we blocked due to entropy
@@ -4834,6 +4847,241 @@ class DynamicRelaxationController:
         print(f"      Transitional layer: {new_split[0]} (newly sensory)")
 
         return new_split
+
+    def check_stress_probe(
+        self,
+        metrics: Dict[str, float],
+        config,
+        global_step: int,
+    ) -> str:
+        """
+        V9.5.2 Emergency Stress-Probe Detection.
+
+        ChatGPT Guardrails: Compound trigger confirmation
+        - Low entropy (< 0.42) is REQUIRED
+        - AND at least ONE of: REP-3 > 0.18, UTR < 0.55, DRS > 12
+        - Must hold for 2 consecutive evals
+
+        Gemini Protocol: Freeze Authority, flood with Sensory to break stiffness.
+        """
+        if not config.enable_stress_probe:
+            return "DISABLED"
+
+        # Don't trigger if already in stress-probe
+        if self.stress_probe_active:
+            return "ALREADY_ACTIVE"
+
+        coherence = metrics.get('coherence', 0.0)
+        entropy = metrics.get('entropy', 1.0)
+        rep3 = metrics.get('rep3', 0.0)  # REP-3 from quality metrics
+        utr = metrics.get('utr', 1.0)  # Unique Token Ratio
+        drs = metrics.get('drs', 0.0)  # Degeneracy Repetition Score
+
+        # ChatGPT Guardrails: Conservative compound trigger
+        # Requirement 1: Model must be stiff (high coherence)
+        is_stiff = coherence > config.stress_probe_coherence_min  # 0.80
+
+        # Requirement 2: Low entropy (REQUIRED)
+        is_low_entropy = entropy < config.stress_probe_entropy_trigger  # 0.42
+
+        # Requirement 3: At least ONE degeneracy signal
+        has_high_rep3 = rep3 > config.stress_probe_rep3_trigger  # 0.18
+        has_low_utr = utr < config.stress_probe_utr_trigger  # 0.55
+        has_high_drs = drs > config.stress_probe_drs_trigger  # 12
+
+        has_degeneracy_signal = has_high_rep3 or has_low_utr or has_high_drs
+
+        # Compound trigger: stiff AND low_entropy AND at_least_one_signal
+        is_degenerate = is_stiff and is_low_entropy and has_degeneracy_signal
+
+        if is_degenerate:
+            self.stress_probe_degeneracy_streak += 1
+            # Log degeneracy detection for debugging
+            if self.stress_probe_degeneracy_streak == 1:
+                signals = []
+                if has_high_rep3:
+                    signals.append(f"REP-3={rep3:.3f}>{config.stress_probe_rep3_trigger}")
+                if has_low_utr:
+                    signals.append(f"UTR={utr:.3f}<{config.stress_probe_utr_trigger}")
+                if has_high_drs:
+                    signals.append(f"DRS={drs:.1f}>{config.stress_probe_drs_trigger}")
+                print(f"  ⚠️ [STRESS-PROBE] Degeneracy detected: Ent={entropy:.3f}, {', '.join(signals)}")
+        else:
+            self.stress_probe_degeneracy_streak = 0
+
+        # Trigger after patience consecutive evals of degeneracy (ChatGPT: 2)
+        if self.stress_probe_degeneracy_streak >= config.stress_probe_patience:
+            return "TRIGGER_STRESS_PROBE"
+
+        return "MONITORING"
+
+    def execute_stress_probe(
+        self,
+        config,
+        current_lr: float,
+        global_step: int,
+    ) -> Tuple[Tuple[int, int], float]:
+        """
+        Execute transition to 3:9 stress-probe mode.
+
+        Returns: (new_split, new_lr)
+        - Jumps to 3:9 split (nearly all Sensory)
+        - Reduces LR to stress_probe_lr_factor (65%)
+        - Records pre-stress-probe state for restoration
+        """
+        # Save current state for restoration
+        self.pre_stress_probe_split = self.current_split
+        self.pre_stress_probe_lr = current_lr
+
+        # Activate stress-probe
+        self.stress_probe_active = True
+        self.stress_probe_start_step = global_step
+        self.stress_probe_steps_in = 0
+        self.stress_probe_degeneracy_streak = 0  # Reset
+
+        # Jump to 3:9 (Phase A: Rajas)
+        new_split = (3, 9)
+        self.current_split = new_split
+
+        # Also update stage index to reflect 3:9
+        self.current_stage_idx = len(self.evolution_stages) - 1  # Final stage
+
+        # Reduce LR
+        new_lr = current_lr * config.stress_probe_lr_factor
+
+        print(f"\n  🚨 [STRESS-PROBE] EMERGENCY ACTIVATION - Step {global_step}")
+        print(f"      {self.pre_stress_probe_split[0]}:{self.pre_stress_probe_split[1]} → 3:9 (Phase A: Rajas)")
+        print(f"      Authority Scale: {config.stress_probe_authority_scale} (nearly frozen)")
+        print(f"      LR: {current_lr:.6f} → {new_lr:.6f} ({config.stress_probe_lr_factor*100:.0f}%)")
+        print(f"      Exit Criteria: Ent > {config.stress_probe_exit_entropy} OR REP-3 < {config.stress_probe_exit_rep3}")
+        print(f"      Max Steps: {config.stress_probe_max_steps}")
+
+        return new_split, new_lr
+
+    def check_stress_probe_exit(
+        self,
+        metrics: Dict[str, float],
+        config,
+        global_step: int,
+    ) -> str:
+        """
+        Check if stress-probe should exit.
+
+        ChatGPT Guardrails:
+        - Minimum 100 steps (don't exit early)
+        - Exit when Entropy > 0.55 for 2 consecutive evals
+        - Maximum 300 steps (forced exit)
+        """
+        if not self.stress_probe_active:
+            return "NOT_ACTIVE"
+
+        self.stress_probe_steps_in += 1
+
+        entropy = metrics.get('entropy', 0.0)
+        rep3 = metrics.get('rep3', 1.0)
+
+        # ChatGPT Guardrail: Enforce minimum steps
+        if self.stress_probe_steps_in < config.stress_probe_min_steps:
+            return "CONTINUE"
+
+        # Success criteria: diversity restored
+        entropy_ok = entropy > config.stress_probe_exit_entropy  # 0.55
+        rep3_ok = rep3 < config.stress_probe_exit_rep3  # 0.12
+
+        # ChatGPT Guardrail: Require 2 consecutive evals meeting exit criteria
+        if entropy_ok:
+            self.stress_probe_exit_streak += 1
+        else:
+            self.stress_probe_exit_streak = 0
+
+        # Forced exit: max steps reached
+        max_reached = self.stress_probe_steps_in >= config.stress_probe_max_steps
+
+        # Exit success: 2 consecutive good evals (ChatGPT: entropy > 0.55 for 2 evals)
+        if self.stress_probe_exit_streak >= 2 and rep3_ok:
+            return "EXIT_SUCCESS"
+        elif max_reached:
+            return "EXIT_FORCED"
+
+        # Log progress every 50 steps during stress-probe
+        if self.stress_probe_steps_in % 50 == 0:
+            print(f"  📊 [STRESS-PROBE] Step {self.stress_probe_steps_in}/{config.stress_probe_max_steps}: "
+                  f"Ent={entropy:.3f}, REP-3={rep3:.3f}, exit_streak={self.stress_probe_exit_streak}")
+
+        return "CONTINUE"
+
+    def exit_stress_probe(
+        self,
+        global_step: int,
+        exit_reason: str,
+        config,
+    ) -> Tuple[Tuple[int, int], float]:
+        """
+        Exit stress-probe and return to 6:6 (Sattva).
+
+        ChatGPT Guardrails:
+        - Return to 6:6, not 9:3
+        - Gradual LR restore over ~50 steps
+        - Re-enable adaptive LR after 100 steps
+
+        Returns: (new_split, initial_lr_for_restore)
+        """
+        # Return to 6:6 (not pre-stress-probe split - we want balanced digestion)
+        new_split = (6, 6)
+        self.current_split = new_split
+        self.current_stage_idx = 1  # 6:6 stage
+
+        # Record stress-probe statistics
+        duration = self.stress_probe_steps_in
+
+        # Deactivate stress-probe but setup gradual LR restore
+        self.stress_probe_active = False
+        self.stress_probe_steps_in = 0
+        self.stress_probe_exit_streak = 0
+
+        # ChatGPT Guardrail: Gradual LR restore over ~50 steps
+        self.stress_probe_lr_restoring = True
+        self.stress_probe_lr_restore_start_step = global_step
+        self.stress_probe_reduced_lr = self.pre_stress_probe_lr * config.stress_probe_lr_factor
+
+        print(f"\n  ✅ [STRESS-PROBE] EXIT - Step {global_step}")
+        print(f"      Reason: {exit_reason}")
+        print(f"      Duration: {duration} steps")
+        print(f"      3:9 → 6:6 (Phase B: Sattva - Digestion)")
+        print(f"      LR Restore: {self.stress_probe_reduced_lr:.6f} → {self.pre_stress_probe_lr:.6f}")
+        print(f"      Restore Steps: {config.stress_probe_lr_restore_steps}")
+
+        # Return reduced LR (gradual restore will ramp up)
+        return new_split, self.stress_probe_reduced_lr
+
+    def get_stress_probe_restore_lr(
+        self,
+        global_step: int,
+        config,
+    ) -> float:
+        """
+        Compute LR during gradual restore period after stress-probe exit.
+
+        ChatGPT Guardrail: Restore LR gradually over ~50 steps.
+        """
+        if not self.stress_probe_lr_restoring:
+            return self.pre_stress_probe_lr
+
+        steps_since_exit = global_step - self.stress_probe_lr_restore_start_step
+
+        # Check if restore complete
+        if steps_since_exit >= config.stress_probe_lr_restore_steps:
+            self.stress_probe_lr_restoring = False
+            print(f"  ✓ [STRESS-PROBE] LR restore complete: {self.pre_stress_probe_lr:.6f}")
+            return self.pre_stress_probe_lr
+
+        # Linear ramp from reduced_lr to pre_stress_probe_lr
+        progress = steps_since_exit / config.stress_probe_lr_restore_steps
+        current_lr = self.stress_probe_reduced_lr + progress * (
+            self.pre_stress_probe_lr - self.stress_probe_reduced_lr
+        )
+
+        return current_lr
 
     def update_stability_per_step(self, coherence: float, sa_ratio: float = None) -> None:
         """
@@ -5584,6 +5832,25 @@ class UnifiedTrainingConfig:
     # V9.5.1 Force Evolution (manual intervention)
     force_evolution_stage: int = None  # Force to stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9
 
+    # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
+    # Gemini Protocol: Freeze Authority, flood with Sensory to break stiffness
+    # ChatGPT Guardrails: Compound trigger, strict duration, gradual LR restore
+    enable_stress_probe: bool = False  # Enable automatic stress-probe detection
+    stress_probe_entropy_trigger: float = 0.42  # Trigger when entropy drops below this (ChatGPT: 0.42)
+    stress_probe_rep3_trigger: float = 0.18  # Trigger when REP-3 exceeds this (ChatGPT: 0.18)
+    stress_probe_utr_trigger: float = 0.55  # Trigger when UTR drops below this (ChatGPT: 0.55)
+    stress_probe_drs_trigger: float = 12.0  # Trigger when DRS exceeds this (ChatGPT: 12)
+    stress_probe_coherence_min: float = 0.80  # Only trigger if coherence is high (stiff, not dying)
+    stress_probe_patience: int = 2  # Consecutive evals of degeneracy before triggering (ChatGPT: 2)
+    stress_probe_authority_scale: float = 0.05  # Nearly freeze Authority layers
+    stress_probe_lr_factor: float = 0.60  # Reduce LR to 60% during stress-probe (ChatGPT: 0.6)
+    stress_probe_exit_entropy: float = 0.55  # Exit when entropy exceeds this for 2 evals
+    stress_probe_exit_rep3: float = 0.12  # Exit when REP-3 drops below this
+    stress_probe_min_steps: int = 100  # Minimum steps in stress-probe (ChatGPT: 100)
+    stress_probe_max_steps: int = 300  # Maximum steps in stress-probe (ChatGPT: 300)
+    stress_probe_lr_restore_steps: int = 50  # Steps to gradually restore LR after exit
+    force_stress_probe: bool = False  # Force immediate stress-probe activation
+
     # Sovereign-1 loss configuration (hardened decomposed loss)
     use_sovereign_loss: bool = True  # Enable Sovereign-1 decomposed loss
     sovereign_weight_guna: float = 1.0   # Guna signal weight
@@ -6234,7 +6501,7 @@ def train(config: UnifiedTrainingConfig):
         device = torch.device(config.device)
 
     print(f"\n{'='*70}")
-    print("   UNIFIED SYMBOLU LLM TRAINING V9.4.4")
+    print("   UNIFIED SYMBOLU LLM TRAINING V9.5.2")
     print(f"{'='*70}")
     print(f"\n  Model Type: {config.model_type.upper()}")
     print(f"  Model Size: {config.model_size}")
@@ -6666,6 +6933,22 @@ def train(config: UnifiedTrainingConfig):
         print(f"    Alignment thresholds: warn={friction_controller.config.align_warning}, crit={friction_controller.config.align_critical}")
         print(f"    Dominance range: [{friction_controller.config.dom_low}, {friction_controller.config.dom_high}]")
 
+    # V9.5.2 Emergency Stress-Probe configuration display (ChatGPT Guardrails)
+    if config.enable_stress_probe:
+        print(f"\n  V9.5.2: Emergency Stress-Probe ENABLED (ChatGPT Guardrails)")
+        print(f"    Compound Trigger (2 consecutive evals):")
+        print(f"      Ent < {config.stress_probe_entropy_trigger} AND (REP-3 > {config.stress_probe_rep3_trigger} OR UTR < {config.stress_probe_utr_trigger} OR DRS > {config.stress_probe_drs_trigger})")
+        print(f"    Safety: Coherence > {config.stress_probe_coherence_min} (stiff, not dying)")
+        print(f"    Patience: {config.stress_probe_patience} consecutive evals")
+        print(f"    Authority Scale: {config.stress_probe_authority_scale} (nearly frozen)")
+        print(f"    LR Factor: {config.stress_probe_lr_factor*100:.0f}%")
+        print(f"    Duration: {config.stress_probe_min_steps}-{config.stress_probe_max_steps} steps")
+        print(f"    Exit: Ent > {config.stress_probe_exit_entropy} for 2 evals AND REP-3 < {config.stress_probe_exit_rep3}")
+        print(f"    LR Restore: Gradual over {config.stress_probe_lr_restore_steps} steps")
+
+    if config.force_stress_probe:
+        print(f"\n  ⚡ FORCE STRESS-PROBE: Activated at first step")
+
     # Track previous state for S-drift computation
     previous_state = None
     current_s_drift = 0.0
@@ -7071,6 +7354,77 @@ def train(config: UnifiedTrainingConfig):
                                 alpha_range=(0.05, 0.70),
                             )
                             print(f"  ✓ [HGS] Reconfigured for {new_split[0]}:{new_split[1]} split")
+
+                    # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
+                    if relaxation_controller.stress_probe_active:
+                        # Already in stress-probe: check for exit
+                        exit_result = relaxation_controller.check_stress_probe_exit(
+                            metrics=metrics,
+                            config=config,
+                            global_step=global_step,
+                        )
+
+                        if exit_result in ("EXIT_SUCCESS", "EXIT_FORCED"):
+                            # Exit stress-probe (starts gradual LR restore)
+                            new_split, initial_lr = relaxation_controller.exit_stress_probe(
+                                global_step=global_step,
+                                exit_reason=exit_result,
+                                config=config,
+                            )
+                            # Set initial LR (will be gradually restored)
+                            for param_group in optimizer.param_groups:
+                                param_group['lr'] = initial_lr
+                            # Reconfigure gradient scaler for 6:6
+                            if gradient_scaler_hgs is not None:
+                                gradient_scaler_hgs.reconfigure(
+                                    new_authority_layers=new_split[0],
+                                    new_sensory_layers=new_split[1],
+                                    alpha_range=(0.05, 0.70),
+                                )
+                                print(f"  ✓ [HGS] Reconfigured for {new_split[0]}:{new_split[1]} split")
+
+                    # ChatGPT Guardrail: Gradual LR restore after stress-probe exit
+                    if relaxation_controller.stress_probe_lr_restoring:
+                        restore_lr = relaxation_controller.get_stress_probe_restore_lr(
+                            global_step=global_step,
+                            config=config,
+                        )
+                        for param_group in optimizer.param_groups:
+                            param_group['lr'] = restore_lr
+
+                    if not relaxation_controller.stress_probe_active:
+                        # Not in stress-probe: check for trigger
+                        stress_result = relaxation_controller.check_stress_probe(
+                            metrics=metrics,
+                            config=config,
+                            global_step=global_step,
+                        )
+
+                        # Also check for force_stress_probe CLI flag
+                        if config.force_stress_probe and not relaxation_controller.stress_probe_active:
+                            stress_result = "TRIGGER_STRESS_PROBE"
+                            config.force_stress_probe = False  # Only trigger once
+
+                        if stress_result == "TRIGGER_STRESS_PROBE":
+                            # Get current LR
+                            current_lr = optimizer.param_groups[0]['lr']
+                            # Execute stress-probe
+                            new_split, new_lr = relaxation_controller.execute_stress_probe(
+                                config=config,
+                                current_lr=current_lr,
+                                global_step=global_step,
+                            )
+                            # Update optimizer LR
+                            for param_group in optimizer.param_groups:
+                                param_group['lr'] = new_lr
+                            # Reconfigure gradient scaler for 3:9 with frozen authority
+                            if gradient_scaler_hgs is not None:
+                                gradient_scaler_hgs.reconfigure(
+                                    new_authority_layers=new_split[0],
+                                    new_sensory_layers=new_split[1],
+                                    alpha_range=(config.stress_probe_authority_scale, 0.70),
+                                )
+                                print(f"  ✓ [HGS] Reconfigured for 3:9 stress-probe (α_authority={config.stress_probe_authority_scale})")
 
             # Periodic CUDA memory cleanup to prevent fragmentation
             if device.type == "cuda" and global_step % 500 == 0:
@@ -7828,6 +8182,39 @@ def main():
     parser.add_argument("--force_evolution_stage", type=int, default=None,
                        help="Force evolution to specific stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9")
 
+    # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
+    # ChatGPT Guardrails: Compound trigger, strict duration, gradual LR restore
+    parser.add_argument("--enable_stress_probe", action="store_true",
+                       help="Enable automatic stress-probe detection for stiffness")
+    parser.add_argument("--stress_probe_entropy_trigger", type=float, default=0.42,
+                       help="Trigger when entropy < this (ChatGPT: 0.42)")
+    parser.add_argument("--stress_probe_rep3_trigger", type=float, default=0.18,
+                       help="Trigger when REP-3 > this (ChatGPT: 0.18)")
+    parser.add_argument("--stress_probe_utr_trigger", type=float, default=0.55,
+                       help="Trigger when UTR < this (ChatGPT: 0.55)")
+    parser.add_argument("--stress_probe_drs_trigger", type=float, default=12.0,
+                       help="Trigger when DRS > this (ChatGPT: 12)")
+    parser.add_argument("--stress_probe_coherence_min", type=float, default=0.80,
+                       help="Only trigger if coherence > this (stiff, not dying)")
+    parser.add_argument("--stress_probe_patience", type=int, default=2,
+                       help="Consecutive evals of degeneracy before triggering (ChatGPT: 2)")
+    parser.add_argument("--stress_probe_authority_scale", type=float, default=0.05,
+                       help="Authority layer gradient scale during stress-probe (nearly frozen)")
+    parser.add_argument("--stress_probe_lr_factor", type=float, default=0.60,
+                       help="LR reduction factor during stress-probe (ChatGPT: 0.6)")
+    parser.add_argument("--stress_probe_exit_entropy", type=float, default=0.55,
+                       help="Exit when entropy > this for 2 consecutive evals")
+    parser.add_argument("--stress_probe_exit_rep3", type=float, default=0.12,
+                       help="Exit when REP-3 < this")
+    parser.add_argument("--stress_probe_min_steps", type=int, default=100,
+                       help="Minimum steps in stress-probe (ChatGPT: 100)")
+    parser.add_argument("--stress_probe_max_steps", type=int, default=300,
+                       help="Maximum steps in stress-probe (ChatGPT: 300)")
+    parser.add_argument("--stress_probe_lr_restore_steps", type=int, default=50,
+                       help="Steps to gradually restore LR after exit (ChatGPT: 50)")
+    parser.add_argument("--force_stress_probe", action="store_true",
+                       help="Force immediate stress-probe activation")
+
     # Logging
     parser.add_argument("--log_every", type=int, default=10,
                        help="Log every N steps")
@@ -8102,6 +8489,22 @@ def main():
         entropy_floor_weight=args.entropy_floor_weight,
         # V9.5.1 Force Evolution
         force_evolution_stage=args.force_evolution_stage,
+        # V9.5.2 Emergency Stress-Probe (ChatGPT Guardrails)
+        enable_stress_probe=args.enable_stress_probe,
+        stress_probe_entropy_trigger=args.stress_probe_entropy_trigger,
+        stress_probe_rep3_trigger=args.stress_probe_rep3_trigger,
+        stress_probe_utr_trigger=args.stress_probe_utr_trigger,
+        stress_probe_drs_trigger=args.stress_probe_drs_trigger,
+        stress_probe_coherence_min=args.stress_probe_coherence_min,
+        stress_probe_patience=args.stress_probe_patience,
+        stress_probe_authority_scale=args.stress_probe_authority_scale,
+        stress_probe_lr_factor=args.stress_probe_lr_factor,
+        stress_probe_exit_entropy=args.stress_probe_exit_entropy,
+        stress_probe_exit_rep3=args.stress_probe_exit_rep3,
+        stress_probe_min_steps=args.stress_probe_min_steps,
+        stress_probe_max_steps=args.stress_probe_max_steps,
+        stress_probe_lr_restore_steps=args.stress_probe_lr_restore_steps,
+        force_stress_probe=args.force_stress_probe,
         # PIDv2 Controller settings
         controller=args.controller,
         pidv2_kp_min=args.pidv2_kp_min,
