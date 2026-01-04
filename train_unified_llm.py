@@ -2779,7 +2779,10 @@ class AutoBatchSizer:
                 outputs = self.model(dummy_input)
 
                 # Handle different output formats
-                if isinstance(outputs, tuple):
+                if isinstance(outputs, dict):
+                    # Ontological models return dict with 'logits' key
+                    logits = outputs.get('logits', outputs.get('output', list(outputs.values())[0]))
+                elif isinstance(outputs, tuple):
                     logits = outputs[0]
                 elif hasattr(outputs, 'logits'):
                     logits = outputs.logits
