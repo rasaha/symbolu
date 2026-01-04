@@ -1185,6 +1185,392 @@ class VRAMGovernor:
 
 
 # =============================================================================
+# V2.7 TRAINING STATE TRACKER: Knowledge State Evolution
+# =============================================================================
+
+class TrainingStateTracker:
+    """
+    v2.7 Training State Tracker - Track "knowledge state" across training runs.
+
+    Maps training metrics to v2.7 Observables and uses bounded EMA state
+    evolution to track the model's learning progress with persistence.
+
+    Features:
+    - Maps training metrics (loss, PPL, coherence, entropy) to Observables
+    - Bounded EMA state evolution: θ_{t+1} = (1-α)·θ_t + α·θ*
+    - Saves/loads state to training_state.json for cross-run continuity
+    - Detects regression (model getting worse)
+    - Provides confidence-based LR modifier
+
+    Usage:
+        tracker = TrainingStateTracker(state_path="checkpoints/training_state.json")
+        knowledge = tracker.update(metrics, step=1000)
+        if tracker.detect_regression():
+            print("Model regressing!")
+    """
+
+    def __init__(
+        self,
+        state_path: str = "training_state.json",
+        alpha: float = 0.1,  # EMA learning rate
+        enabled: bool = True,
+    ):
+        self.state_path = state_path
+        self.alpha = alpha
+        self.enabled = enabled
+
+        # State register θ_t (bounded [0, 1])
+        self.state = {
+            "cognitive_state": 0.5,    # Overall knowledge quality
+            "confidence": 0.5,          # Model confidence
+            "stability": 0.5,           # Training stability
+            "tone_ema": 0.5,            # Tone (positive = good learning)
+            "step_count": 0,
+        }
+
+        # History for regression detection
+        self.history = []
+        self.max_history = 100
+
+        # Try to load existing state
+        if enabled:
+            self.load_state()
+
+    def metrics_to_observables(self, metrics: dict) -> dict:
+        """
+        Convert training metrics to v2.7-style Observables.
+
+        Mapping:
+        - S (Salience): Inverse of loss (lower loss = higher salience)
+        - R (Reliability): Coherence (how consistent the model is)
+        - T (Tone): 1 - Entropy (low entropy = positive tone)
+        - H (Hesitation): PPL normalized (high PPL = hesitation)
+        - C_contr (Contradiction): S/A ratio deviation from ideal (0.35)
+        """
+        loss = metrics.get('loss', metrics.get('total_loss', 5.0))
+        ppl = metrics.get('ppl', 100.0)
+        coherence = metrics.get('coherence', metrics.get('gc', 0.5))
+        entropy = metrics.get('onto_entropy', metrics.get('entropy', 0.5))
+        sa_ratio = metrics.get('sa_ratio', 0.35)
+
+        return {
+            "S": max(0, min(1, 1.0 - loss / 10.0)),      # Salience: inverse loss
+            "R": float(coherence) if coherence else 0.5, # Reliability: coherence
+            "T": 1.0 - float(entropy),                   # Tone: inverse entropy
+            "H": min(1, ppl / 500.0),                    # Hesitation: normalized PPL
+            "C_contr": abs(sa_ratio - 0.35) * 2,         # Contradiction: S/A deviation
+        }
+
+    def compute_target_state(self, observables: dict) -> dict:
+        """
+        Compute target state θ* from observables.
+
+        Target state represents "where we should be" based on current signals.
+        """
+        S, R, T, H, C = (
+            observables["S"],
+            observables["R"],
+            observables["T"],
+            observables["H"],
+            observables["C_contr"],
+        )
+
+        # Cognitive state: weighted combination favoring reliability and salience
+        cognitive_target = 0.4 * S + 0.3 * R + 0.2 * T + 0.1 * (1 - H)
+
+        # Confidence: based on consistency (low contradiction, high reliability)
+        confidence_target = R * (1 - C) * (1 - H)
+
+        # Stability: based on low hesitation and contradiction
+        stability_target = (1 - H) * (1 - C)
+
+        # Tone: direct from observables
+        tone_target = T
+
+        return {
+            "cognitive_state": max(0, min(1, cognitive_target)),
+            "confidence": max(0, min(1, confidence_target)),
+            "stability": max(0, min(1, stability_target)),
+            "tone_ema": max(0, min(1, tone_target)),
+        }
+
+    def update(self, metrics: dict, step: int) -> dict:
+        """
+        Update knowledge state based on training metrics.
+
+        Applies v2.7 EMA update: θ_{t+1} = (1-α)·θ_t + α·θ*
+
+        Returns:
+            Dict with current state and update info
+        """
+        if not self.enabled:
+            return {"enabled": False}
+
+        # Convert metrics to observables
+        observables = self.metrics_to_observables(metrics)
+
+        # Compute target state
+        target = self.compute_target_state(observables)
+
+        # Apply EMA update: θ_{t+1} = (1-α)·θ_t + α·θ*
+        for key in ["cognitive_state", "confidence", "stability", "tone_ema"]:
+            self.state[key] = (1 - self.alpha) * self.state[key] + self.alpha * target[key]
+
+        self.state["step_count"] = step
+
+        # Track history
+        self.history.append({
+            "step": step,
+            "cognitive_state": self.state["cognitive_state"],
+            "confidence": self.state["confidence"],
+        })
+        if len(self.history) > self.max_history:
+            self.history = self.history[-self.max_history:]
+
+        return {
+            "cognitive_state": self.state["cognitive_state"],
+            "confidence": self.state["confidence"],
+            "stability": self.state["stability"],
+            "tone": self.state["tone_ema"],
+            "observables": observables,
+        }
+
+    def detect_regression(self, window: int = 20) -> bool:
+        """
+        Detect if model is regressing (knowledge declining).
+
+        Compares recent cognitive_state to earlier values.
+        """
+        if len(self.history) < window * 2:
+            return False
+
+        recent = self.history[-window:]
+        earlier = self.history[-(window * 2):-window]
+
+        recent_avg = sum(h["cognitive_state"] for h in recent) / len(recent)
+        earlier_avg = sum(h["cognitive_state"] for h in earlier) / len(earlier)
+
+        # Regression if recent is significantly lower than earlier
+        return recent_avg < earlier_avg - 0.1
+
+    def get_lr_modifier(self) -> float:
+        """
+        Get learning rate modifier based on confidence.
+
+        Low confidence → reduce LR (be more careful)
+        High confidence → normal LR
+        """
+        if not self.enabled:
+            return 1.0
+
+        confidence = self.state["confidence"]
+        if confidence < 0.3:
+            return 0.6  # Very low confidence: 60% LR
+        elif confidence < 0.5:
+            return 0.8  # Low confidence: 80% LR
+        return 1.0      # Normal confidence: 100% LR
+
+    def save_state(self):
+        """Persist state to disk for cross-run continuity."""
+        if not self.enabled:
+            return
+
+        try:
+            import json
+            with open(self.state_path, 'w') as f:
+                json.dump(self.state, f, indent=2)
+        except Exception as e:
+            print(f"  Warning: Could not save training state: {e}")
+
+    def load_state(self):
+        """Load persisted state from previous run."""
+        try:
+            import json
+            with open(self.state_path, 'r') as f:
+                loaded = json.load(f)
+                self.state.update(loaded)
+            print(f"  📂 Loaded v2.7 training state from step {self.state['step_count']}")
+        except FileNotFoundError:
+            print(f"  🆕 Starting fresh v2.7 training state")
+        except Exception as e:
+            print(f"  Warning: Could not load training state: {e}")
+
+    def format_status(self) -> str:
+        """Format current state for logging."""
+        return (
+            f"Know:{self.state['cognitive_state']:.2f} "
+            f"Conf:{self.state['confidence']:.2f} "
+            f"Stab:{self.state['stability']:.2f}"
+        )
+
+
+# =============================================================================
+# SATTVIC BRAKE: Lightweight Confidence via Phase Angle Variance
+# =============================================================================
+
+class SattvicBrake:
+    """
+    Sattvic Brake - Lightweight Confidence Estimation via Phase Angle Variance.
+
+    Instead of full Bayesian inference, measure the "agreement" of Phase Attention
+    heads in Authority layers (0-8). High agreement = high confidence.
+
+    Cost: ~0.1% compute (variance calculation), 0% extra memory
+
+    Usage:
+        brake = SattvicBrake(model, authority_layers=9)
+        confidence = brake.compute_confidence()
+        if confidence < 0.5:
+            lr *= 0.8  # Apply brake
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        authority_layers: int = 9,
+        confidence_threshold: float = 0.5,
+        lr_reduction: float = 0.8,
+    ):
+        self.model = model
+        self.authority_layers = authority_layers
+        self.confidence_threshold = confidence_threshold
+        self.lr_reduction = lr_reduction
+
+        # History tracking
+        self.confidence_history = []
+        self.brake_applied_count = 0
+
+    @torch.no_grad()
+    def compute_phase_variance(self) -> Tuple[float, List[float]]:
+        """
+        Compute variance of phase angles across Authority layers.
+
+        Returns:
+            (average_variance, per_layer_variances)
+        """
+        variances = []
+
+        # Get model layers
+        layers = None
+        if hasattr(self.model, 'layers'):
+            layers = self.model.layers
+        elif hasattr(self.model, 'transformer') and hasattr(self.model.transformer, 'layers'):
+            layers = self.model.transformer.layers
+        elif hasattr(self.model, 'blocks'):
+            layers = self.model.blocks
+
+        if layers is None:
+            return 0.5, []  # Default if can't access layers
+
+        # Check Authority layers (0 to authority_layers-1)
+        for idx in range(min(self.authority_layers, len(layers))):
+            layer = layers[idx]
+            variance = self._get_layer_phase_variance(layer)
+            if variance is not None:
+                variances.append(variance)
+
+        if not variances:
+            return 0.5, []
+
+        avg_variance = sum(variances) / len(variances)
+        return avg_variance, variances
+
+    def _get_layer_phase_variance(self, layer) -> Optional[float]:
+        """Extract phase variance from a single layer."""
+        # Try different attribute names for phase attention
+        phase_attn = None
+        for attr in ['phase_attention', 'attention', 'self_attn', 'attn']:
+            if hasattr(layer, attr):
+                phase_attn = getattr(layer, attr)
+                break
+
+        if phase_attn is None:
+            return None
+
+        # Try to get phase angles
+        if hasattr(phase_attn, 'phase') and phase_attn.phase is not None:
+            phase = phase_attn.phase
+            if isinstance(phase, torch.Tensor):
+                # Compute circular variance: 1 - |mean(e^{i*theta})|
+                if phase.numel() > 1:
+                    complex_phase = torch.exp(1j * phase.float())
+                    mean_phase = torch.mean(complex_phase)
+                    variance = 1.0 - torch.abs(mean_phase).item()
+                    return variance
+
+        # Fallback: use weight variance as proxy
+        if hasattr(phase_attn, 'q_proj') and hasattr(phase_attn.q_proj, 'weight'):
+            weight = phase_attn.q_proj.weight
+            variance = weight.var().item()
+            # Normalize to [0, 1] range (empirical scaling)
+            return min(1.0, variance * 10)
+
+        return None
+
+    def compute_confidence(self) -> float:
+        """
+        Compute confidence score from phase variance.
+
+        Confidence = 1 - variance (high variance = low confidence)
+        """
+        variance, _ = self.compute_phase_variance()
+        confidence = 1.0 - variance
+
+        # Track history
+        self.confidence_history.append(confidence)
+        if len(self.confidence_history) > 100:
+            self.confidence_history = self.confidence_history[-100:]
+
+        return max(0.0, min(1.0, confidence))
+
+    def should_brake(self, confidence: float = None) -> Tuple[bool, float]:
+        """
+        Check if brake should be applied.
+
+        Returns:
+            (should_apply, lr_multiplier)
+        """
+        if confidence is None:
+            confidence = self.compute_confidence()
+
+        if confidence < self.confidence_threshold:
+            self.brake_applied_count += 1
+            # Graduated braking: lower confidence = stronger brake
+            if confidence < 0.3:
+                lr_mult = 0.6
+            elif confidence < 0.4:
+                lr_mult = 0.7
+            else:
+                lr_mult = self.lr_reduction
+            return True, lr_mult
+
+        return False, 1.0
+
+    def get_status_icon(self, confidence: float) -> str:
+        """Get status icon for confidence level."""
+        if confidence >= 0.7:
+            return "🟢"
+        elif confidence >= 0.5:
+            return "🟡"
+        elif confidence >= 0.3:
+            return "🟠"
+        else:
+            return "🔴"
+
+    def format_status(self, confidence: float = None) -> str:
+        """Format status for logging."""
+        if confidence is None:
+            confidence = self.compute_confidence()
+
+        icon = self.get_status_icon(confidence)
+        brake, lr_mult = self.should_brake(confidence)
+
+        if brake:
+            return f"Conf:{confidence:.2f}{icon} LR×{lr_mult:.2f} [BRAKE]"
+        return f"Conf:{confidence:.2f}{icon}"
+
+
+# =============================================================================
 # LRA VALIDATOR: Long-Range Retrieval Testing
 # =============================================================================
 
@@ -2998,6 +3384,23 @@ def train(config: UnifiedTrainingConfig):
         )
         print(f"  LRA Validator: ENABLED (every {config.lra_validate_every} steps, lengths={haystack_lengths})")
 
+    # v2.7 Training State Tracker (Knowledge State Evolution)
+    training_state_tracker = TrainingStateTracker(
+        state_path=str(ckpt_dir / "training_state.json"),
+        alpha=0.1,  # EMA learning rate
+        enabled=True,
+    )
+    print(f"  v2.7 State Tracker: ENABLED (EMA α=0.1)")
+
+    # Sattvic Brake (Lightweight Confidence via Phase Variance)
+    sattvic_brake = SattvicBrake(
+        model=model,
+        authority_layers=config.authority_layers if hasattr(config, 'authority_layers') else 9,
+        confidence_threshold=0.5,
+        lr_reduction=0.8,
+    )
+    print(f"  Sattvic Brake: ENABLED (threshold=0.5, LR×0.8)")
+
     # Optimizer
     optimizer = AdamW(
         model.parameters(),
@@ -3243,6 +3646,34 @@ def train(config: UnifiedTrainingConfig):
             train_losses.append(avg_loss)
             running_loss = 0.0
 
+            # =====================================================================
+            # SATTVIC BRAKE: Lightweight Confidence via Phase Variance
+            # Apply LR modulation if confidence < threshold
+            # =====================================================================
+            sattvic_confidence = 0.5
+            sattvic_lr_mult = 1.0
+            if sattvic_brake is not None:
+                sattvic_confidence = sattvic_brake.compute_confidence()
+                brake_active, sattvic_lr_mult = sattvic_brake.should_brake(sattvic_confidence)
+                if brake_active:
+                    # Apply graduated LR reduction based on confidence
+                    for pg in optimizer.param_groups:
+                        pg['lr'] *= sattvic_lr_mult
+
+            # =====================================================================
+            # v2.7 TRAINING STATE TRACKER: Update knowledge state EMA
+            # Maps current metrics to observables and evolves state
+            # =====================================================================
+            if training_state_tracker is not None and training_state_tracker.enabled:
+                state_metrics = {
+                    'loss': avg_loss,
+                    'coherence': metrics.get('coherence', 0.5),
+                    'entropy': metrics.get('onto_entropy', metrics.get('entropy', 0.5)),
+                    'ppl': metrics.get('ppl', math.exp(avg_loss)),
+                    'sa_deviation': abs(current_sa_ratio - 0.15) if current_sa_ratio > 0 else 0.0,
+                }
+                training_state_tracker.update(state_metrics, global_step)
+
             # Periodic CUDA memory cleanup to prevent fragmentation
             if device.type == "cuda" and global_step % 500 == 0:
                 torch.cuda.empty_cache()
@@ -3347,6 +3778,18 @@ def train(config: UnifiedTrainingConfig):
                     else:
                         sa_ind = "!"  # Sensory may be overriding
                     log_msg += f" | S/A:{current_sa_ratio:.2f}{sa_ind} α_s:{alpha_sens:.2f}"
+
+                # Sattvic Brake: Confidence score with status icon
+                if sattvic_brake is not None:
+                    conf_icon = sattvic_brake.get_status_icon(sattvic_confidence)
+                    log_msg += f" | Conf:{sattvic_confidence:.2f}{conf_icon}"
+                    if sattvic_lr_mult < 1.0:
+                        log_msg += f" [BRAKE×{sattvic_lr_mult:.2f}]"
+
+                # v2.7 Training State Tracker: Knowledge state
+                if training_state_tracker is not None and training_state_tracker.enabled:
+                    know_state = training_state_tracker.state['cognitive_state']
+                    log_msg += f" | Know:{know_state:.2f}"
 
                 print(log_msg)
                 step_start_time = time.time()
@@ -3524,6 +3967,19 @@ def train(config: UnifiedTrainingConfig):
                     tb_writer.add_scalar("val/loss", val_loss, global_step)
                     tb_writer.add_scalar("val/ppl", val_ppl, global_step)
 
+                    # Sattvic Brake metrics
+                    if sattvic_brake is not None:
+                        tb_writer.add_scalar("sattvic/confidence", sattvic_confidence, global_step)
+                        tb_writer.add_scalar("sattvic/lr_mult", sattvic_lr_mult, global_step)
+                        tb_writer.add_scalar("sattvic/brake_count", sattvic_brake.brake_applied_count, global_step)
+
+                    # v2.7 Training State Tracker metrics
+                    if training_state_tracker is not None and training_state_tracker.enabled:
+                        tb_writer.add_scalar("v27/cognitive_state", training_state_tracker.state['cognitive_state'], global_step)
+                        tb_writer.add_scalar("v27/confidence", training_state_tracker.state['confidence'], global_step)
+                        tb_writer.add_scalar("v27/stability", training_state_tracker.state['stability'], global_step)
+                        tb_writer.add_scalar("v27/tone_ema", training_state_tracker.state['tone_ema'], global_step)
+
                 # Log HGS status (only if relaxation controller not active, to avoid duplicate logging)
                 if gradient_scaler_hgs is not None and relaxation_controller is None:
                     print(f"  --> {gradient_scaler_hgs.get_status_string()}")
@@ -3567,6 +4023,9 @@ def train(config: UnifiedTrainingConfig):
                     hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
                     drc_state=relaxation_controller.get_state() if relaxation_controller else None,
                 )
+                # v2.7 Training State Tracker: Save state on checkpoint
+                if training_state_tracker is not None and training_state_tracker.enabled:
+                    training_state_tracker.save()
 
     # Final save
     save_checkpoint(
@@ -3575,6 +4034,9 @@ def train(config: UnifiedTrainingConfig):
         hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
         drc_state=relaxation_controller.get_state() if relaxation_controller else None,
     )
+    # v2.7 Training State Tracker: Save final state
+    if training_state_tracker is not None and training_state_tracker.enabled:
+        training_state_tracker.save()
 
     # Close TensorBoard
     if tb_writer is not None:
