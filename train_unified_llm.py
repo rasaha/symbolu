@@ -158,6 +158,159 @@ except ImportError:
 
 
 # =============================================================================
+# SOVEREIGN R[v,a] MATRIX: Vṛtti-Aspect Probability Target
+# =============================================================================
+# The "Brain" of Sovereign-1: Defines how each Aspect (layer) should prioritize
+# each Vṛtti (cognitive modality). This is the philosophical ground truth that
+# guides loss weighting and confidence scoring.
+#
+# Columns (12 Aspects): [Dormant, Karma, ID, Body, Mind, Ego, Intellect, Soul,
+#                        Witness, Atman, Brahman, Integration]
+# Rows (5 Vṛttis): [Pramāṇa (Truth), Vikalpa (Fancy), Viparyaya (Error),
+#                   Nidrā (Sleep/Void), Smṛti (Memory)]
+#
+# Key design choices:
+# - Layer 0 (Dormant Guard): High Nidrā (0.7) for denoising
+# - Layer 6 (Intellect): Peak Pramāṇa (0.9) for truth discrimination
+# - Layer 11 (Integration): High Pramāṇa (0.9) + Smṛti (0.8) for coherence
+# - All rows normalized to avoid Viparyaya (Error) dominance
+# =============================================================================
+
+SOVEREIGN_R_MATRIX = torch.tensor([
+    #  Dormant Karma  ID   Body  Mind  Ego  Intell Soul  Witn  Atman Brahm Integ
+    [0.1, 0.5, 0.7, 0.7, 0.8, 0.6, 0.9, 0.8, 0.6, 0.7, 0.5, 0.9],  # Pramāṇa (Truth)
+    [0.1, 0.2, 0.2, 0.4, 0.4, 0.4, 0.1, 0.1, 0.2, 0.2, 0.2, 0.3],  # Vikalpa (Fancy)
+    [0.1, 0.2, 0.4, 0.4, 0.2, 0.3, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0],  # Viparyaya (Error)
+    [0.7, 0.1, 0.1, 0.3, 0.1, 0.1, 0.0, 0.0, 0.3, 0.3, 0.4, 0.1],  # Nidrā (Sleep)
+    [0.1, 0.1, 0.3, 0.3, 0.2, 0.2, 0.1, 0.0, 0.2, 0.2, 0.2, 0.8],  # Smṛti (Memory)
+], dtype=torch.float32)
+
+# Vṛtti names for logging/debugging
+VRTTI_NAMES = ["Pramāṇa", "Vikalpa", "Viparyaya", "Nidrā", "Smṛti"]
+
+# Aspect names (12 layers in Sovereign-1)
+ASPECT_NAMES = [
+    "Dormant", "Karma", "ID", "Body", "Mind", "Ego",
+    "Intellect", "Soul", "Witness", "Atman", "Brahman", "Integration"
+]
+
+
+def get_layer_vrtti_weights(layer_idx: int, device: torch.device = None) -> torch.Tensor:
+    """
+    Get the Vṛtti probability weights for a specific layer (Aspect).
+
+    Args:
+        layer_idx: Layer index (0-11)
+        device: Target device for the tensor
+
+    Returns:
+        Tensor of shape (5,) with Vṛtti weights for this layer
+    """
+    layer_idx = min(layer_idx, 11)  # Clamp to 12 Aspects
+    weights = SOVEREIGN_R_MATRIX[:, layer_idx]
+    if device is not None:
+        weights = weights.to(device)
+    return weights
+
+
+def get_pramana_weights(device: torch.device = None) -> torch.Tensor:
+    """
+    Get the Pramāṇa (Truth) row for confidence scoring.
+
+    The Pramāṇa row indicates how much each layer should prioritize
+    truth discrimination. Used by Sattvic Brake to assess model confidence.
+
+    Returns:
+        Tensor of shape (12,) with Pramāṇa weights per layer
+    """
+    weights = SOVEREIGN_R_MATRIX[0, :]  # Row 0 = Pramāṇa
+    if device is not None:
+        weights = weights.to(device)
+    return weights
+
+
+def get_layer_gradient_scale(layer_idx: int, mode: str = "truth") -> float:
+    """
+    Get gradient scale factor for a layer based on R-Matrix Vṛtti targets.
+
+    This allows HierarchicalGradientScaler to apply Vṛtti-aware scaling:
+    - "truth" mode: Scale by Pramāṇa (higher = more important for truth)
+    - "stability" mode: Scale by 1 - Viparyaya (avoid error-prone layers)
+    - "memory" mode: Scale by Smṛti (prioritize context retention)
+
+    Args:
+        layer_idx: Layer index (0-11)
+        mode: Weighting mode ("truth", "stability", "memory")
+
+    Returns:
+        Scale factor in [0.1, 1.0] range
+    """
+    layer_idx = min(layer_idx, 11)
+
+    if mode == "truth":
+        # Pramāṇa row (index 0)
+        return float(SOVEREIGN_R_MATRIX[0, layer_idx])
+    elif mode == "stability":
+        # 1 - Viparyaya (index 2): lower error tendency = higher scale
+        return float(1.0 - SOVEREIGN_R_MATRIX[2, layer_idx])
+    elif mode == "memory":
+        # Smṛti row (index 4)
+        return float(SOVEREIGN_R_MATRIX[4, layer_idx])
+    else:
+        # Default: average of Pramāṇa and Smṛti
+        pramana = SOVEREIGN_R_MATRIX[0, layer_idx]
+        smriti = SOVEREIGN_R_MATRIX[4, layer_idx]
+        return float((pramana + smriti) / 2)
+
+
+def get_dominant_vrtti(layer_idx: int) -> Tuple[int, str, float]:
+    """
+    Get the dominant Vṛtti for a layer based on R-Matrix.
+
+    Returns:
+        (vrtti_index, vrtti_name, weight)
+    """
+    layer_idx = min(layer_idx, 11)
+    vrtti_weights = SOVEREIGN_R_MATRIX[:, layer_idx]
+    dominant_idx = torch.argmax(vrtti_weights).item()
+    return (
+        dominant_idx,
+        VRTTI_NAMES[dominant_idx],
+        float(vrtti_weights[dominant_idx])
+    )
+
+
+def compute_rmatrix_loss_weight(
+    layer_losses: torch.Tensor,
+    num_layers: int = 12,
+    device: torch.device = None,
+) -> torch.Tensor:
+    """
+    Compute Vṛtti-aware loss weights for per-layer losses.
+
+    Weights layers based on their Pramāṇa (Truth) values:
+    - Intellect (0.9) and Integration (0.9) get highest weights
+    - Dormant (0.1) gets lowest weight
+
+    Args:
+        layer_losses: Per-layer loss tensor [num_layers] or [batch, num_layers]
+        num_layers: Number of layers (clamped to 12 Aspects)
+        device: Target device
+
+    Returns:
+        Weighted loss tensor of same shape
+    """
+    pramana = get_pramana_weights(device)[:num_layers]
+    # Normalize to sum=1 for weighting
+    pramana = pramana / pramana.sum()
+
+    if layer_losses.dim() == 1:
+        return layer_losses * pramana
+    else:
+        return layer_losses * pramana.unsqueeze(0)
+
+
+# =============================================================================
 # PERFORMANCE OPTIMIZATIONS
 # =============================================================================
 # TF32 for faster matrix multiplications on Ampere+ GPUs (A100, H100)
@@ -1766,6 +1919,11 @@ class SattvicBrake:
     Instead of full Bayesian inference, measure the "agreement" of Phase Attention
     heads in Authority layers (0-8). High agreement = high confidence.
 
+    Now enhanced with R-Matrix Pramāṇa weighting:
+    - Each layer's variance is weighted by its Pramāṇa (Truth) value from the R-Matrix
+    - Intellect (layer 6) with Pramāṇa=0.9 contributes most to confidence
+    - Dormant (layer 0) with Pramāṇa=0.1 contributes least
+
     Uses shared VarianceConfidence for braking logic and status formatting.
 
     Cost: ~0.1% compute (variance calculation), 0% extra memory
@@ -1784,11 +1942,17 @@ class SattvicBrake:
         confidence_threshold: float = 0.5,
         lr_reduction: float = 0.8,
         window_size: int = 10,
+        use_pramana_weighting: bool = True,  # Enable R-Matrix Pramāṇa weighting
     ):
         self.model = model
         self.authority_layers = authority_layers
         self.confidence_threshold = confidence_threshold
         self.lr_reduction = lr_reduction
+        self.use_pramana_weighting = use_pramana_weighting
+
+        # R-Matrix Pramāṇa weights for confidence weighting
+        # Row 0 of R-Matrix = Pramāṇa (Truth) values per Aspect (layer)
+        self._pramana_weights = get_pramana_weights()
 
         # Use shared VarianceConfidence for braking logic
         if VARIANCE_CONFIDENCE_AVAILABLE:
@@ -1807,6 +1971,12 @@ class SattvicBrake:
     def compute_phase_variance(self) -> Tuple[float, List[float]]:
         """
         Compute variance of phase angles across Authority layers.
+
+        With Pramāṇa weighting enabled, each layer's variance is weighted by
+        its Pramāṇa (Truth) value from the R-Matrix:
+        - weighted_variance = sum(var_i * pramana_i) / sum(pramana_i)
+        - Intellect (0.9) and Integration (0.9) dominate the score
+        - Dormant (0.1) has minimal influence
 
         Returns:
             (average_variance, per_layer_variances)
@@ -1835,7 +2005,19 @@ class SattvicBrake:
         if not variances:
             return 0.5, []
 
-        avg_variance = sum(variances) / len(variances)
+        # Compute weighted or unweighted average
+        if self.use_pramana_weighting and len(variances) > 0:
+            # Pramāṇa-weighted variance: sum(var_i * pramana_i) / sum(pramana_i)
+            weighted_sum = 0.0
+            weight_sum = 0.0
+            for idx, var in enumerate(variances):
+                pramana = self._pramana_weights[min(idx, 11)].item()
+                weighted_sum += var * pramana
+                weight_sum += pramana
+            avg_variance = weighted_sum / max(weight_sum, 1e-8)
+        else:
+            avg_variance = sum(variances) / len(variances)
+
         return avg_variance, variances
 
     def _get_layer_phase_variance(self, layer) -> Optional[float]:
@@ -3059,6 +3241,9 @@ class UnifiedTrainingConfig:
     eval_every: int = 100
     log_every: int = 10
 
+    # Logging verbosity
+    quiet: bool = False  # Quiet mode: only print Critical 5 (Loss, PPL, S/A, GC, Conf)
+
     # Dataset
     dataset: str = "wikitext103"
     tokenizer: str = "gpt2"
@@ -4143,91 +4328,113 @@ def train(config: UnifiedTrainingConfig):
                 ) / elapsed
                 lr = optimizer.param_groups[0]["lr"]
 
-                # Memory usage
-                if device.type == "cuda":
-                    mem_used = torch.cuda.max_memory_allocated() / (1024**3)
-                    mem_str = f" | VRAM: {mem_used:.1f}GB"
+                # Quiet mode: Only print Critical 5 (Loss, PPL, S/A, GC, Conf)
+                if config.quiet:
+                    # Extract Critical 5 metrics
+                    sa_ratio = hgs_metrics.get("s_a_ratio", 0.0) if hgs_metrics else 0.0
+                    gc = metrics.get('coherence', 0.0)
+                    conf = sattvic_confidence if sattvic_brake is not None else 0.0
+
+                    # Status indicators
+                    sa_ind = "+" if sa_ratio < 0.3 else ("~" if sa_ratio < 0.5 else "!")
+                    gc_ind = "+" if gc > 0.76 else ("~" if gc > 0.68 else "!")
+                    conf_icon = sattvic_brake.get_status_icon(conf) if sattvic_brake else ""
+
+                    log_msg = (
+                        f"Step {global_step:>6} | "
+                        f"Loss:{avg_loss:.4f} | "
+                        f"PPL:{metrics['ppl']:.1f} | "
+                        f"S/A:{sa_ratio:.2f}{sa_ind} | "
+                        f"GC:{gc:.2f}{gc_ind} | "
+                        f"Conf:{conf:.2f}{conf_icon}"
+                    )
                 else:
-                    mem_str = ""
-
-                # Log message
-                log_msg = (
-                    f"Step {global_step:>6} | "
-                    f"Loss: {avg_loss:.4f} | "
-                    f"PPL: {metrics['ppl']:.2f} | "
-                    f"LR: {lr:.2e} | "
-                    f"Tok/s: {tokens_per_sec:.0f}{mem_str}"
-                )
-
-                # Add ontological metrics
-                if config.model_type == "ontological":
-                    if "coherence" in metrics:
-                        log_msg += f" | Coh: {metrics['coherence']:.3f}"
-                    if "onto_entropy" in metrics:
-                        log_msg += f" | Ent: {metrics['onto_entropy']:.2f}"
-                    # Sovereign-1 metrics
-                    if "onto_phoneme_ratio" in metrics and metrics["onto_phoneme_ratio"] > 0:
-                        ratio = metrics["onto_phoneme_ratio"]
-                        health = "OK" if metrics.get("semantic_healthy") else "WARN"
-                        log_msg += f" | R/C: {ratio:.2f} [{health}]"
-
-                # Add Gen 2 hierarchical metrics
-                if config.model_type == "gen2":
-                    if "coherence" in metrics:
-                        log_msg += f" | Coh: {metrics['coherence']:.3f}"
-                    if "level_3_coh" in metrics:
-                        log_msg += f" | L3: {metrics['level_3_coh']:.2f}"
-
-                # Add alpha for phase/hybrid models
-                if config.model_type in ("phase", "hybrid"):
-                    log_msg += f" | α_phase: {current_alpha:.2f}"
-
-                # V9.4.5: Add friction metrics (for 6/6 hybrid architecture)
-                if friction_alignment != 0.0 or friction_dominance != 1.0:
-                    # Color-code alignment
-                    if friction_alignment > 0.1:
-                        align_ind = "+"  # Synergy
-                    elif friction_alignment < -0.1:
-                        align_ind = "!"  # Friction
+                    # Verbose mode: Full logging (default)
+                    # Memory usage
+                    if device.type == "cuda":
+                        mem_used = torch.cuda.max_memory_allocated() / (1024**3)
+                        mem_str = f" | VRAM: {mem_used:.1f}GB"
                     else:
-                        align_ind = "~"  # Neutral
-                    log_msg += f" | Align:{friction_alignment:+.2f}{align_ind} Dom:{friction_dominance:.2f}"
+                        mem_str = ""
 
-                # Formula [1331]: 9:3 Split metrics
-                if hgs_metrics:
-                    current_sa_ratio = hgs_metrics.get("s_a_ratio", 0.0)
-                    alpha_sens = hgs_metrics.get("alpha_sens", 0.0)
-                    # Color-code S/A ratio (< 0.5 is good, Authority dominating)
-                    if current_sa_ratio < 0.3:
-                        sa_ind = "+"  # Authority strongly dominant
-                    elif current_sa_ratio < 0.5:
-                        sa_ind = "~"  # Balanced
-                    else:
-                        sa_ind = "!"  # Sensory may be overriding
-                    log_msg += f" | S/A:{current_sa_ratio:.2f}{sa_ind} α_s:{alpha_sens:.2f}"
+                    # Log message
+                    log_msg = (
+                        f"Step {global_step:>6} | "
+                        f"Loss: {avg_loss:.4f} | "
+                        f"PPL: {metrics['ppl']:.2f} | "
+                        f"LR: {lr:.2e} | "
+                        f"Tok/s: {tokens_per_sec:.0f}{mem_str}"
+                    )
 
-                # Sattvic Brake: Confidence score with status icon
-                if sattvic_brake is not None:
-                    conf_icon = sattvic_brake.get_status_icon(sattvic_confidence)
-                    log_msg += f" | Conf:{sattvic_confidence:.2f}{conf_icon}"
-                    if sattvic_lr_mult < 1.0:
-                        log_msg += f" [BRAKE×{sattvic_lr_mult:.2f}]"
+                    # Add ontological metrics
+                    if config.model_type == "ontological":
+                        if "coherence" in metrics:
+                            log_msg += f" | Coh: {metrics['coherence']:.3f}"
+                        if "onto_entropy" in metrics:
+                            log_msg += f" | Ent: {metrics['onto_entropy']:.2f}"
+                        # Sovereign-1 metrics
+                        if "onto_phoneme_ratio" in metrics and metrics["onto_phoneme_ratio"] > 0:
+                            ratio = metrics["onto_phoneme_ratio"]
+                            health = "OK" if metrics.get("semantic_healthy") else "WARN"
+                            log_msg += f" | R/C: {ratio:.2f} [{health}]"
 
-                # v2.7 Training State Tracker: Knowledge state
-                if training_state_tracker is not None and training_state_tracker.enabled:
-                    know_state = training_state_tracker.state['cognitive_state']
-                    log_msg += f" | Know:{know_state:.2f}"
+                    # Add Gen 2 hierarchical metrics
+                    if config.model_type == "gen2":
+                        if "coherence" in metrics:
+                            log_msg += f" | Coh: {metrics['coherence']:.3f}"
+                        if "level_3_coh" in metrics:
+                            log_msg += f" | L3: {metrics['level_3_coh']:.2f}"
 
-                # Training Gunas: S/R/T with dominant state icon
-                if training_gunas is not None:
-                    # Determine dominant Guna and icon
-                    if guna_s > guna_r and guna_s > guna_t:
-                        guna_icon = "☀️"  # Sattva - clarity/learning
-                    elif guna_r > guna_t:
-                        guna_icon = "🔥"  # Rajas - action/activity
-                    else:
-                        guna_icon = "🌙"  # Tamas - inertia/plateau
-                    log_msg += f" | S:{guna_s:.2f} R:{guna_r:.2f} T:{guna_t:.2f}{guna_icon}"
+                    # Add alpha for phase/hybrid models
+                    if config.model_type in ("phase", "hybrid"):
+                        log_msg += f" | α_phase: {current_alpha:.2f}"
+
+                    # V9.4.5: Add friction metrics (for 6/6 hybrid architecture)
+                    if friction_alignment != 0.0 or friction_dominance != 1.0:
+                        # Color-code alignment
+                        if friction_alignment > 0.1:
+                            align_ind = "+"  # Synergy
+                        elif friction_alignment < -0.1:
+                            align_ind = "!"  # Friction
+                        else:
+                            align_ind = "~"  # Neutral
+                        log_msg += f" | Align:{friction_alignment:+.2f}{align_ind} Dom:{friction_dominance:.2f}"
+
+                    # Formula [1331]: 9:3 Split metrics
+                    if hgs_metrics:
+                        current_sa_ratio = hgs_metrics.get("s_a_ratio", 0.0)
+                        alpha_sens = hgs_metrics.get("alpha_sens", 0.0)
+                        # Color-code S/A ratio (< 0.5 is good, Authority dominating)
+                        if current_sa_ratio < 0.3:
+                            sa_ind = "+"  # Authority strongly dominant
+                        elif current_sa_ratio < 0.5:
+                            sa_ind = "~"  # Balanced
+                        else:
+                            sa_ind = "!"  # Sensory may be overriding
+                        log_msg += f" | S/A:{current_sa_ratio:.2f}{sa_ind} α_s:{alpha_sens:.2f}"
+
+                    # Sattvic Brake: Confidence score with status icon
+                    if sattvic_brake is not None:
+                        conf_icon = sattvic_brake.get_status_icon(sattvic_confidence)
+                        log_msg += f" | Conf:{sattvic_confidence:.2f}{conf_icon}"
+                        if sattvic_lr_mult < 1.0:
+                            log_msg += f" [BRAKE×{sattvic_lr_mult:.2f}]"
+
+                    # v2.7 Training State Tracker: Knowledge state
+                    if training_state_tracker is not None and training_state_tracker.enabled:
+                        know_state = training_state_tracker.state['cognitive_state']
+                        log_msg += f" | Know:{know_state:.2f}"
+
+                    # Training Gunas: S/R/T with dominant state icon
+                    if training_gunas is not None:
+                        # Determine dominant Guna and icon
+                        if guna_s > guna_r and guna_s > guna_t:
+                            guna_icon = "☀️"  # Sattva - clarity/learning
+                        elif guna_r > guna_t:
+                            guna_icon = "🔥"  # Rajas - action/activity
+                        else:
+                            guna_icon = "🌙"  # Tamas - inertia/plateau
+                        log_msg += f" | S:{guna_s:.2f} R:{guna_r:.2f} T:{guna_t:.2f}{guna_icon}"
 
                 print(log_msg)
                 step_start_time = time.time()
@@ -4663,6 +4870,8 @@ def main():
     # Logging
     parser.add_argument("--log_every", type=int, default=10,
                        help="Log every N steps")
+    parser.add_argument("--quiet", action="store_true",
+                       help="Quiet mode: only print Critical 5 (Loss, PPL, S/A, GC, Conf)")
     parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
     parser.add_argument("--save_every", type=int, default=1000,
@@ -4815,6 +5024,7 @@ def main():
         lambda_bhava=args.lambda_bhava,
         lambda_coherence=args.lambda_coherence,
         log_every=args.log_every,
+        quiet=args.quiet,
         eval_every=args.eval_every,
         save_every=args.save_every,
         checkpoint_dir=args.checkpoint_dir,
