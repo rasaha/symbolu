@@ -156,6 +156,21 @@ except ImportError:
     COMPUTE_S_DRIFT_AVAILABLE = False
     compute_s_drift = None
 
+# Import CSR Phoneme Provider for phoneme-ontological grounding
+try:
+    from csr_phoneme_provider import (
+        CSREmbeddingProvider,
+        CSRConfig,
+        EntropySink,
+        SynthesisGate,
+        create_csr_for_training,
+        integrate_csr_into_forward,
+    )
+    CSR_AVAILABLE = True
+except ImportError as e:
+    CSR_AVAILABLE = False
+    print(f"Warning: CSR Phoneme Provider not available: {e}")
+
 
 # =============================================================================
 # SOVEREIGN R[v,a] MATRIX: Vṛtti-Layer Probability Target
@@ -4670,6 +4685,14 @@ class UnifiedTrainingConfig:
     evo_lr_slowdown: float = 0.5             # LR multiplier when SLOW_DOWN/BRAKE
     evo_lr_accelerate: float = 1.2           # LR multiplier when ACCELERATE
 
+    # CSR Phoneme-Ontological Grounding
+    enable_csr: bool = True                  # Enable CSR phoneme grounding
+    csr_lambda: float = 0.1                  # CSR injection strength
+    csr_use_phase_gating: bool = True        # Gate Phase Attention with CSR confidence
+    csr_trainable: bool = True               # Allow CSR projection to train
+    csr_use_entropy_sink: bool = True        # Apply Layer 0 entropy floor
+    csr_use_synthesis_gate: bool = True      # Apply Layer 11 synthesis reconciliation
+
     # Resume checkpoint
     resume: str = ""
     resume_weights_only: bool = False
@@ -5284,6 +5307,27 @@ def train(config: UnifiedTrainingConfig):
         )
         print(f"  S8 Stability Hook: ENABLED (Entropy Guard)")
 
+    # Initialize CSR Phoneme-Ontological Grounding
+    csr_provider = None
+    csr_entropy_sink = None
+    csr_synthesis_gate = None
+    if config.enable_csr and CSR_AVAILABLE:
+        csr_provider, csr_entropy_sink, csr_synthesis_gate = create_csr_for_training(
+            model_config=model.config if hasattr(model, 'config') else type('Config', (), {'d_model': 512})(),
+            tokenizer=tokenizer,
+            lambda_csr=config.csr_lambda,
+            use_phase_gating=config.csr_use_phase_gating,
+            trainable=config.csr_trainable,
+        )
+        csr_provider = csr_provider.to(device)
+        csr_entropy_sink = csr_entropy_sink.to(device) if config.csr_use_entropy_sink else None
+        csr_synthesis_gate = csr_synthesis_gate.to(device) if config.csr_use_synthesis_gate else None
+        print(f"  CSR Phoneme Grounding: ENABLED (λ_csr={config.csr_lambda})")
+    elif config.enable_csr and not CSR_AVAILABLE:
+        print(f"  CSR Phoneme Grounding: Disabled (module not available)")
+    else:
+        print(f"  CSR Phoneme Grounding: Disabled")
+
     # VRAM Governor for dynamic batch scaling
     vram_governor = VRAMGovernor(
         initial_batch_size=config.batch_size,
@@ -5580,6 +5624,48 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     logits = outputs
                 loss, metrics = compute_phase_loss(logits, y, config)
+
+            # CSR Phoneme-Ontological Grounding Integration
+            csr_metrics = {}
+            if csr_provider is not None:
+                # Decode tokens for phoneme extraction
+                token_strings = None
+                if tokenizer is not None:
+                    try:
+                        token_strings = [[tokenizer.decode([tid.item()]) for tid in batch] for batch in x]
+                    except Exception:
+                        token_strings = None
+
+                # Compute CSR embeddings
+                csr_output = csr_provider(x, token_strings=token_strings)
+                csr_emb = csr_output['csr_emb']
+                csr_affinity = csr_output['csr_affinity']
+                csr_confidence = csr_output['csr_confidence']
+
+                # Get hidden states for CSR alignment (if available)
+                csr_hidden = None
+                if isinstance(outputs, dict):
+                    csr_hidden = outputs.get('last_hidden_state', outputs.get('logits'))
+                elif isinstance(outputs, torch.Tensor):
+                    csr_hidden = outputs
+
+                if csr_hidden is not None and csr_hidden.shape[-1] == csr_emb.shape[-1]:
+                    # CSR alignment loss: encourage hidden states to correlate with CSR embeddings
+                    # Use cosine similarity weighted by confidence
+                    csr_hidden_norm = torch.nn.functional.normalize(csr_hidden, dim=-1)
+                    csr_emb_norm = torch.nn.functional.normalize(csr_emb, dim=-1)
+                    csr_similarity = (csr_hidden_norm * csr_emb_norm).sum(dim=-1)
+                    csr_alignment_loss = (1 - csr_similarity) * csr_confidence.squeeze(-1)
+                    csr_loss = csr_alignment_loss.mean() * config.csr_lambda
+
+                    # Add CSR loss to total loss
+                    loss = loss + csr_loss
+                    csr_metrics['csr_loss'] = csr_loss.item()
+                    csr_metrics['csr_confidence'] = csr_confidence.mean().item()
+                    csr_metrics['csr_similarity'] = csr_similarity.mean().item()
+                else:
+                    csr_metrics['csr_loss'] = 0.0
+                    csr_metrics['csr_confidence'] = csr_confidence.mean().item() if csr_confidence is not None else 0.0
 
             # Initialize default guna values for first iteration
             # (actual values computed later in the loop, but needed here for evolutionary bridge)
@@ -6082,6 +6168,12 @@ def train(config: UnifiedTrainingConfig):
                                     gate_coh = coherence_summary['gate_coherences']
                                     if len(gate_coh) > 0:
                                         tb_writer.add_histogram("evo/gate_coherence_dist", torch.tensor(gate_coh), global_step)
+
+                        # CSR Phoneme-Ontological Metrics
+                        if csr_metrics:
+                            tb_writer.add_scalar("csr/loss", csr_metrics.get('csr_loss', 0.0), global_step)
+                            tb_writer.add_scalar("csr/confidence", csr_metrics.get('csr_confidence', 0.0), global_step)
+                            tb_writer.add_scalar("csr/similarity", csr_metrics.get('csr_similarity', 0.0), global_step)
                 else:
                     print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
 
@@ -6605,6 +6697,22 @@ def main():
     parser.add_argument("--evo_lr_accelerate", type=float, default=1.2,
                        help="LR multiplier when ACCELERATE")
 
+    # CSR Phoneme-Ontological Grounding
+    parser.add_argument("--enable_csr", action="store_true", default=True,
+                       help="Enable CSR phoneme grounding")
+    parser.add_argument("--disable_csr", action="store_true",
+                       help="Disable CSR phoneme grounding")
+    parser.add_argument("--csr_lambda", type=float, default=0.1,
+                       help="CSR injection strength")
+    parser.add_argument("--csr_use_phase_gating", action="store_true", default=True,
+                       help="Gate Phase Attention with CSR confidence")
+    parser.add_argument("--csr_trainable", action="store_true", default=True,
+                       help="Allow CSR projection to train")
+    parser.add_argument("--csr_use_entropy_sink", action="store_true", default=True,
+                       help="Apply Layer 0 entropy floor")
+    parser.add_argument("--csr_use_synthesis_gate", action="store_true", default=True,
+                       help="Apply Layer 11 synthesis reconciliation")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -6722,6 +6830,13 @@ def main():
         evo_lr_modulation=args.evo_lr_modulation,
         evo_lr_slowdown=args.evo_lr_slowdown,
         evo_lr_accelerate=args.evo_lr_accelerate,
+        # CSR Phoneme-Ontological Grounding
+        enable_csr=args.enable_csr and not args.disable_csr,
+        csr_lambda=args.csr_lambda,
+        csr_use_phase_gating=args.csr_use_phase_gating,
+        csr_trainable=args.csr_trainable,
+        csr_use_entropy_sink=args.csr_use_entropy_sink,
+        csr_use_synthesis_gate=args.csr_use_synthesis_gate,
     )
 
     # Train

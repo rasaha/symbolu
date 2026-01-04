@@ -7,7 +7,7 @@ Grounds the 6:6 Hybrid LLM in phoneme-invariant ontological states.
 
 The CSR Provider creates a deterministic bridge between:
 - Phonetic articulation patterns (ARPABET)
-- Sanskrit vibrational calibration
+- Sanskrit vibrational calibration (Varna Bridge Map)
 - 12-dimensional ontological space
 
 This ensures the neural network learns WITH ontological structure,
@@ -15,6 +15,11 @@ not against it - providing Semantic Authority through phonemic grounding.
 
 Architecture:
     Input IDs → Phonemes → 12D Affinity → Projection → Model Integration
+
+Varna Integration (v2.0):
+    - Uses varna_bridge_map_v1.json for Sanskrit-native 12D mappings
+    - Consonants have explicit layer annotations (O1-O12)
+    - Vowels mapped to primary ontological layers
 
 Author: Sovereign-1 Training Initiative
 Date: January 2026
@@ -26,6 +31,8 @@ import torch.nn.functional as F
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 import math
+import json
+from pathlib import Path
 
 # =============================================================================
 # ONTOLOGICAL LAYER DEFINITIONS (for reference)
@@ -248,6 +255,229 @@ CHAR_TO_PHONEME: Dict[str, str] = {
     'u': 'UH', 'v': 'V', 'w': 'W', 'x': 'K', 'y': 'Y',
     'z': 'Z',
 }
+
+
+# =============================================================================
+# VARNA CSR BRIDGE: Sanskrit Varṇa → 12D Ontological Vectors
+# =============================================================================
+# Maps Sanskrit varṇas from varna_bridge_map_v1.json to numeric 12D vectors.
+# Consonants have explicit layer annotations; vowels map to primary layers.
+
+# Layer name to index mapping
+LAYER_NAME_TO_IDX: Dict[str, int] = {
+    "O1_POTENTIAL": 0, "O1": 0,
+    "O2_IDENTITY": 1, "O2": 1,
+    "O3_EXECUTION": 2, "O3": 2,
+    "O4_STRUCTURE": 3, "O4": 3,
+    "O5_COGNITION": 4, "O5": 4,
+    "O6_AGENCY": 5, "O6": 5,
+    "O7_REASONING": 6, "O7": 6,
+    "O8_PURPOSE": 7, "O8": 7,
+    "O9_WITNESSES": 8, "O9": 8,
+    "O10_UNIFYING": 9, "O10": 9,
+    "O11_INTEGRATION": 10, "O11": 10,
+    "O12_ABSOLVING": 11, "O12": 11,
+}
+
+# Vowel bridge_meaning → primary layer mapping
+VOWEL_BRIDGE_TO_LAYER: Dict[str, int] = {
+    "birth_of_cognition": 0,      # O1_Potential
+    "expansion_continuity": 1,     # O2_Identity
+    "self_doing": 1,              # O2_Identity (I-ness)
+    "specialized_identity": 3,     # O4_Structure
+    "contraction_focus": 4,        # O5_Cognition
+    "sustained_hold": 5,           # O6_Agency
+    "practical_cognition": 6,      # O7_Reasoning
+    "integrative_understanding": 7, # O8_Purpose
+    "closure_completion": 8,       # O9_Witnesses
+    "surrender_transition": 11,    # O12_Absolving
+    "purgative_repulsion": 9,      # O10_Unifying (aṁ)
+    "dissolutive_attraction": 11,  # O12_Absolving (aha)
+}
+
+# Keywords in layer descriptions → weight boosts
+LAYER_KEYWORD_WEIGHTS: Dict[str, float] = {
+    "activation": 0.8,
+    "classification": 0.6,
+    "shaping force": 0.7,
+    "pattern bias": 0.6,
+    "toward": 0.5,
+    "sequencing": 0.6,
+    "orientation vector": 0.7,
+    "tracking": 0.5,
+    "coherence": 0.7,
+    "integration": 0.8,
+    "dissolution": 0.6,
+    "termination": 0.5,
+    "threshold": 0.4,
+}
+
+
+class VarnaCSRBridge:
+    """
+    Bridge between Sanskrit Varṇa system and CSR 12D ontological vectors.
+
+    Loads varna_bridge_map_v1.json and converts:
+    - Consonant layer annotations → numeric 12D vectors
+    - Vowel bridge_meanings → primary layer affinities
+    """
+
+    def __init__(self, json_path: Optional[Path] = None):
+        """
+        Initialize VarnaCSRBridge.
+
+        Args:
+            json_path: Path to varna_bridge_map_v1.json. Auto-discovers if None.
+        """
+        self._json_path = json_path
+        self._data: Dict[str, Any] = {}
+        self._varna_vectors: Dict[str, List[float]] = {}
+        self._loaded = False
+
+        # Auto-discover JSON path
+        if self._json_path is None:
+            possible_paths = [
+                Path(__file__).parent / "symbolu" / "formulas" / "data" / "varna_bridge_map_v1.json",
+                Path(__file__).parent / "docs" / "data" / "varna_bridge_map_v1.json",
+                Path(__file__).parent.parent / "docs" / "data" / "varna_bridge_map_v1.json",
+            ]
+            for p in possible_paths:
+                if p.exists():
+                    self._json_path = p
+                    break
+
+    def load(self) -> bool:
+        """Load and parse the varna_bridge_map JSON."""
+        if self._loaded:
+            return True
+
+        if self._json_path is None or not self._json_path.exists():
+            print(f"  [VarnaCSRBridge] JSON not found, using ARPABET fallback")
+            return False
+
+        try:
+            with open(self._json_path, 'r', encoding='utf-8') as f:
+                self._data = json.load(f)
+        except Exception as e:
+            print(f"  [VarnaCSRBridge] Failed to load JSON: {e}")
+            return False
+
+        # Parse vowels
+        for varna, info in self._data.get("vowels", {}).items():
+            bridge_meaning = info.get("bridge_meaning", "")
+            self._varna_vectors[varna] = self._vowel_to_vector(bridge_meaning)
+
+        # Parse consonants
+        for varna, info in self._data.get("consonants", {}).items():
+            layers = info.get("layers", {})
+            if layers:
+                self._varna_vectors[varna] = self._consonant_layers_to_vector(layers)
+            else:
+                # Fallback to bridge_meaning
+                bridge_meaning = info.get("bridge_meaning", "")
+                self._varna_vectors[varna] = self._consonant_bridge_to_vector(bridge_meaning)
+
+        self._loaded = True
+        print(f"  [VarnaCSRBridge] Loaded {len(self._varna_vectors)} varṇas from {self._json_path.name}")
+        return True
+
+    def _vowel_to_vector(self, bridge_meaning: str) -> List[float]:
+        """Convert vowel bridge_meaning to 12D vector."""
+        vector = [0.1] * 12  # Base activation
+
+        # Get primary layer from mapping
+        primary_idx = VOWEL_BRIDGE_TO_LAYER.get(bridge_meaning, 0)
+        vector[primary_idx] = 0.9  # Primary affinity
+
+        # Add secondary affinities for adjacent layers
+        if primary_idx > 0:
+            vector[primary_idx - 1] = 0.4
+        if primary_idx < 11:
+            vector[primary_idx + 1] = 0.4
+
+        return vector
+
+    def _consonant_layers_to_vector(self, layers: Dict[str, str]) -> List[float]:
+        """Convert consonant layer annotations to 12D vector."""
+        vector = [0.1] * 12  # Base activation
+
+        for layer_name, description in layers.items():
+            # Get layer index
+            idx = LAYER_NAME_TO_IDX.get(layer_name, -1)
+            if idx < 0:
+                continue
+
+            # Parse description for keywords
+            desc_lower = description.lower()
+            weight = 0.3  # Base weight for having any description
+
+            for keyword, kw_weight in LAYER_KEYWORD_WEIGHTS.items():
+                if keyword in desc_lower:
+                    weight = max(weight, kw_weight)
+
+            # Boost if description contains activation/dominant patterns
+            if "activation" in desc_lower:
+                weight = min(weight + 0.2, 0.9)
+            if "dominant" in desc_lower or "primary" in desc_lower:
+                weight = min(weight + 0.3, 0.95)
+
+            vector[idx] = max(vector[idx], weight)
+
+        return vector
+
+    def _consonant_bridge_to_vector(self, bridge_meaning: str) -> List[float]:
+        """Fallback: Convert consonant bridge_meaning to 12D vector."""
+        vector = [0.2] * 12  # Slightly higher base for consonants
+
+        # Map common bridge_meaning patterns to layers
+        meaning_lower = bridge_meaning.lower()
+
+        if "pressure" in meaning_lower:
+            vector[2] = 0.7  # O3_Execution
+            vector[5] = 0.6  # O6_Agency
+        if "activation" in meaning_lower:
+            vector[1] = 0.6  # O2_Identity
+            vector[2] = 0.8  # O3_Execution
+        if "integration" in meaning_lower or "coherence" in meaning_lower:
+            vector[9] = 0.7   # O10_Unifying
+            vector[10] = 0.6  # O11_Integration
+        if "dissolution" in meaning_lower or "termination" in meaning_lower:
+            vector[11] = 0.7  # O12_Absolving
+
+        return vector
+
+    def get_vector(self, varna: str) -> Optional[List[float]]:
+        """Get 12D vector for a varṇa."""
+        if not self._loaded:
+            self.load()
+        return self._varna_vectors.get(varna)
+
+    def has_varna(self, varna: str) -> bool:
+        """Check if varṇa is in the bridge map."""
+        if not self._loaded:
+            self.load()
+        return varna in self._varna_vectors
+
+    @property
+    def all_varnas(self) -> List[str]:
+        """Get all available varṇas."""
+        if not self._loaded:
+            self.load()
+        return list(self._varna_vectors.keys())
+
+    def to_tensor(self, device: torch.device = None) -> torch.Tensor:
+        """Build tensor of all varṇa vectors."""
+        if not self._loaded:
+            self.load()
+
+        varnas = self.all_varnas
+        vectors = [self._varna_vectors[v] for v in varnas]
+
+        tensor = torch.tensor(vectors, dtype=torch.float32)
+        if device is not None:
+            tensor = tensor.to(device)
+
+        return tensor
 
 
 # =============================================================================
@@ -857,8 +1087,140 @@ def main():
     synthesized, synth_metrics = synthesis_gate(fake_hidden, output['csr_emb'], output['csr_affinity'])
     print(f"    Synthesis Gate: gate_mean={synth_metrics['gate_mean']:.4f}")
 
+    # Test VarnaCSRBridge
+    print(f"\n  VarnaCSRBridge Test:")
+    varna_bridge = VarnaCSRBridge()
+    if varna_bridge.load():
+        print(f"    Loaded varṇas: {len(varna_bridge.all_varnas)}")
+        # Test some varṇas
+        test_varnas = ["a", "ka", "sa", "ma"]
+        for v in test_varnas:
+            vec = varna_bridge.get_vector(v)
+            if vec:
+                max_idx = vec.index(max(vec))
+                print(f"    '{v}' → primary layer O{max_idx+1} ({max(vec):.2f})")
+    else:
+        print("    Varna bridge not available (JSON not found)")
+
     print("\n  ✅ All tests passed!")
     print("="*60)
+
+
+# =============================================================================
+# TRAINING INTEGRATION HELPER
+# =============================================================================
+
+def create_csr_for_training(
+    model_config: Any,
+    tokenizer: Any = None,
+    lambda_csr: float = 0.1,
+    use_phase_gating: bool = True,
+    trainable: bool = True,
+) -> Tuple[CSREmbeddingProvider, EntropySink, SynthesisGate]:
+    """
+    Create CSR components for training integration.
+
+    Args:
+        model_config: Model configuration with d_model attribute
+        tokenizer: Tokenizer for token decoding (optional)
+        lambda_csr: CSR injection strength (default 0.1)
+        use_phase_gating: Enable phase attention gating
+        trainable: Allow CSR projection to train
+
+    Returns:
+        Tuple of (CSREmbeddingProvider, EntropySink, SynthesisGate)
+    """
+    # Get model dimension
+    d_model = getattr(model_config, 'd_model', 512)
+    if hasattr(model_config, 'hidden_size'):
+        d_model = model_config.hidden_size
+
+    # Create CSR config
+    csr_config = CSRConfig(
+        d_model=d_model,
+        num_layers=12,
+        lambda_csr=lambda_csr,
+        use_phase_gating=use_phase_gating,
+        trainable_projection=trainable,
+    )
+
+    # Create components
+    csr_provider = CSREmbeddingProvider(csr_config, tokenizer=tokenizer)
+    entropy_sink = EntropySink(d_model)
+    synthesis_gate = SynthesisGate(d_model)
+
+    print(f"  [CSR] Created components: d_model={d_model}, λ_csr={lambda_csr}")
+
+    return csr_provider, entropy_sink, synthesis_gate
+
+
+def integrate_csr_into_forward(
+    hidden_states: torch.Tensor,
+    csr_emb: torch.Tensor,
+    layer_idx: int,
+    csr_provider: CSREmbeddingProvider,
+    entropy_sink: Optional[EntropySink] = None,
+    synthesis_gate: Optional[SynthesisGate] = None,
+    csr_affinity: Optional[torch.Tensor] = None,
+) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    """
+    Integrate CSR embeddings into model forward pass.
+
+    Args:
+        hidden_states: Current hidden states [B, T, d_model]
+        csr_emb: CSR embeddings [B, T, d_model]
+        layer_idx: Current layer index (0-11)
+        csr_provider: CSREmbeddingProvider instance
+        entropy_sink: Optional EntropySink for Layer 0
+        synthesis_gate: Optional SynthesisGate for Layer 11
+        csr_affinity: Optional 12D affinities for safety layers
+
+    Returns:
+        Tuple of (modified_hidden_states, metrics_dict)
+    """
+    metrics = {}
+
+    # Layer 0: Apply entropy sink
+    if layer_idx == 0 and entropy_sink is not None:
+        hidden_states, sink_metrics = entropy_sink(hidden_states, csr_affinity)
+        metrics.update({f"entropy_sink_{k}": v for k, v in sink_metrics.items()})
+
+    # Inject CSR into hidden states
+    hidden_states = csr_provider.inject_into_hidden(hidden_states, csr_emb, layer_idx)
+
+    # Layer 11: Apply synthesis gate
+    if layer_idx == 11 and synthesis_gate is not None:
+        hidden_states, gate_metrics = synthesis_gate(hidden_states, csr_emb, csr_affinity)
+        metrics.update({f"synthesis_gate_{k}": v for k, v in gate_metrics.items()})
+
+    return hidden_states, metrics
+
+
+# =============================================================================
+# PUBLIC EXPORTS
+# =============================================================================
+
+__all__ = [
+    # Config
+    "CSRConfig",
+    "AblationConfig",
+    # Main classes
+    "CSREmbeddingProvider",
+    "VarnaCSRBridge",
+    "EntropySink",
+    "SynthesisGate",
+    "CSRAblationTester",
+    # Constants
+    "PHONEME_MAP_ARPABET",
+    "SANSKRIT_VOWEL_CALIBRATION",
+    "SIMPLE_G2P",
+    "CHAR_TO_PHONEME",
+    "ONTOLOGICAL_LAYERS",
+    "LAYER_NAME_TO_IDX",
+    # Helper functions
+    "create_csr_for_training",
+    "integrate_csr_into_forward",
+]
 
 
 if __name__ == "__main__":
