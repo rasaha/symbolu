@@ -5630,6 +5630,12 @@ def train(config: UnifiedTrainingConfig):
             # Full Evolutionary Flow System: All Layer Transitions with Delayed Resonance
             evo_result = None
             evo_lr_multiplier = 1.0
+            # Use default guna values for evolutionary engine (actual computation happens later in loop)
+            # After first iteration, guna_s/r/t will have values from previous step
+            try:
+                _ = guna_s  # Check if defined from previous iteration
+            except NameError:
+                guna_s, guna_r, guna_t = 0.33, 0.33, 0.34  # First iteration defaults
             if evolutionary_engine is not None and hidden_state_extractor is not None:
                 # Extract hidden states using HiddenStateExtractor (handles models without hidden_states output)
                 # Note: clear() was called before forward pass, hooks captured states during model(x)
