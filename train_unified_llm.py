@@ -5172,6 +5172,10 @@ def train(config: UnifiedTrainingConfig):
         )
         print(f"  LRA Validator: ENABLED (every {config.lra_validate_every} steps, lengths={haystack_lengths})")
 
+    # Checkpoint directory (needed for state tracker)
+    ckpt_dir = Path(config.checkpoint_dir)
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+
     # v2.7 Training State Tracker (Knowledge State Evolution)
     training_state_tracker = TrainingStateTracker(
         state_path=str(ckpt_dir / "training_state.json"),
@@ -5321,11 +5325,7 @@ def train(config: UnifiedTrainingConfig):
     train_losses = []
     current_sa_ratio = 0.0  # Track S/A ratio for relaxation controller
 
-    # Checkpoint directory
-    ckpt_dir = Path(config.checkpoint_dir)
-    ckpt_dir.mkdir(parents=True, exist_ok=True)
-
-    # Save config
+    # Save config (ckpt_dir already created above)
     with open(ckpt_dir / "config.json", "w") as f:
         json.dump(asdict(config), f, indent=2)
 
