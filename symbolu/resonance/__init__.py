@@ -87,6 +87,14 @@ from symbolu.resonance.controller import (
     compute_alpha_effective,
 )
 
+from symbolu.resonance.sgp import (
+    SGPConfig,
+    SGPController,
+    create_sgp_controller,
+    create_synchronized_controllers,
+    apply_sgp_to_optimizer,
+)
+
 __all__ = [
     # Types
     "PhonemeCategory",
@@ -140,4 +148,10 @@ __all__ = [
     "SattvicController",
     "create_sattvic_controller",
     "compute_alpha_effective",
+    # SGP (Stochastic Gradient Persistence)
+    "SGPConfig",
+    "SGPController",
+    "create_sgp_controller",
+    "create_synchronized_controllers",
+    "apply_sgp_to_optimizer",
 ]
