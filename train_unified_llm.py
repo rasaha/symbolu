@@ -4498,6 +4498,11 @@ class DynamicRelaxationController:
         self.saturation_triggered = False  # Track if saturation gate fired
         self.saturation_thaw_step = None  # Step when thaw started
 
+        # V9.4.9 Metabolic Flip: Simpler, more robust criteria
+        self.metabolic_step_counter = 0   # Consecutive steps meeting ALL criteria
+        self.metabolic_entropy_threshold = 0.45  # Flip BEFORE loops get bad
+        self.metabolic_vram_safety = 0.90  # Don't flip if VRAM > 90%
+
         # [S5] Entropy Gate: Block relaxation if entropy too high
         self.entropy_gate_threshold = 0.50  # Must be below this to relax
         self.entropy_gate_blocked = False   # Track if we blocked due to entropy
@@ -4684,6 +4689,82 @@ class DynamicRelaxationController:
             return True
 
         return False
+
+    def check_metabolic_flip(
+        self,
+        metrics: Dict[str, float],
+        vram_usage: float,
+        global_step: int,
+    ) -> str:
+        """
+        V9.4.9 Metabolic Flip: Simpler, more robust 9:3 → 6:6 trigger.
+
+        Three clear criteria (ALL must pass for patience steps):
+        1. Coherence > 0.74 (Sattvic stability)
+        2. Entropy < 0.45 (catch loops BEFORE they get bad)
+        3. VRAM < 90% (safety gate)
+
+        If ANY condition fails, counter resets to 0.
+        Returns "TRIGGER_FLIP" when criteria met for patience steps.
+        """
+        if self.saturation_triggered:
+            return "ALREADY_FLIPPED"
+
+        coherence = metrics.get('coherence', 0.0)
+        entropy = metrics.get('entropy', 1.0)
+
+        # 1. Define "Sattvic" Stability Criteria
+        is_stable = coherence > self.saturation_coherence_threshold  # 0.74
+        is_saturated = entropy < self.metabolic_entropy_threshold     # 0.45
+        is_safe = vram_usage < self.metabolic_vram_safety            # 0.90
+
+        # 2. Increment or Reset Step Counter
+        if is_stable and is_saturated and is_safe:
+            self.metabolic_step_counter += 1
+        else:
+            self.metabolic_step_counter = 0  # Hard reset if ANY condition fails
+
+        # 3. Execute Flip when patience reached
+        if self.metabolic_step_counter >= self.saturation_patience:
+            self.saturation_triggered = True
+            self.saturation_thaw_step = global_step
+            print(f"\n  🚀 [METABOLIC FLIP] Step {global_step}: Criteria met for {self.saturation_patience} steps")
+            print(f"      Coherence: {coherence:.3f} > 0.74 ✓")
+            print(f"      Entropy:   {entropy:.3f} < 0.45 ✓")
+            print(f"      VRAM:      {vram_usage*100:.1f}% < 90% ✓")
+            return "TRIGGER_FLIP"
+
+        return "WAITING"
+
+    def update_stability_per_step(self, coherence: float, sa_ratio: float = None) -> None:
+        """
+        V9.4.9: Update stability streak every gradient step (not just at validation).
+
+        This ensures the streak counter reflects actual gradient steps, not log intervals.
+        """
+        if self.state != self.STATE_AUTHORITY:
+            return  # Only track during authority phase
+
+        if self.mode == "consecutive":
+            # Consecutive mode: streak of coherence >= threshold
+            stability = coherence  # Use raw coherence for simplicity
+            if stability >= self.stability_threshold:
+                self.stability_streak += 1
+            else:
+                self.stability_streak = 0  # Hard reset
+
+        elif self.mode == "sa_ratio" and sa_ratio is not None:
+            # S/A ratio mode: rolling window
+            self.sa_rolling_window.append(sa_ratio)
+            if len(self.sa_rolling_window) > self.stability_window:
+                self.sa_rolling_window.pop(0)
+            self.stability_streak = len(self.sa_rolling_window)
+
+        else:  # average mode
+            self.ssi_rolling_window.append(coherence)
+            if len(self.ssi_rolling_window) > self.stability_window:
+                self.ssi_rolling_window.pop(0)
+            self.stability_streak = len(self.ssi_rolling_window)
 
     def get_saturation_thaw_alpha(self, global_step: int) -> float:
         """
@@ -5043,13 +5124,13 @@ class DynamicRelaxationController:
         streak_str = f"{self.stability_streak}/{self.stability_window}" if self.state == self.STATE_AUTHORITY else "—"
         lock_str = " 🔒" if self.is_guna_locked() else ""
 
-        # Saturation Gate progress (if enabled and not yet triggered)
+        # V9.4.9 Metabolic Flip progress (if enabled and not yet triggered)
         sat_str = ""
         if self.enable_saturation_gate and self.state == self.STATE_AUTHORITY:
             if self.saturation_triggered:
-                sat_str = " 🎯SAT"
-            elif self.saturation_flat_count > 0:
-                sat_str = f" Sat:{self.saturation_flat_count}/{self.saturation_patience}"
+                sat_str = " 🚀FLIP"
+            elif self.metabolic_step_counter > 0:
+                sat_str = f" Met:{self.metabolic_step_counter}/{self.saturation_patience}"
 
         if self.state == self.STATE_RECOVERY:
             return f"Split:{split_str} State:RECOVERY Streak:{streak_str}{lock_str}"
@@ -5999,10 +6080,18 @@ def train(config: UnifiedTrainingConfig):
         print(f"\n  Auto Batch Sizing: ENABLED")
 
         # Sovereign loss requires (B, Seq, Vocab) tensors - massive overhead
-        # Reduce max_batch_size aggressively when sovereign loss is enabled
+        # Scale max_batch based on available VRAM (conservative to allow SGP headroom)
         if config.enable_sovereign_loss:
-            auto_max_batch = 24  # Conservative for sovereign loss overhead
-            print(f"  ⚠️  Sovereign Loss detected: capping max_batch to {auto_max_batch}")
+            total_vram_gb = torch.cuda.get_device_properties(device).total_memory / 1e9
+            if total_vram_gb >= 140:  # H200 class (141GB+)
+                auto_max_batch = 32  # Conservative - use gradient accumulation
+            elif total_vram_gb >= 90:  # 96GB class
+                auto_max_batch = 32
+            elif total_vram_gb >= 70:  # A100 80GB class
+                auto_max_batch = 24
+            else:  # Smaller GPUs
+                auto_max_batch = 16
+            print(f"  ⚠️  Sovereign Loss detected: capping max_batch to {auto_max_batch} (VRAM: {total_vram_gb:.0f}GB)")
         else:
             auto_max_batch = 128
 
@@ -6263,6 +6352,26 @@ def train(config: UnifiedTrainingConfig):
     # Dynamic Relaxation Controller: 9:3 → 6:6 transition
     relaxation_controller = None
     if config.enable_dynamic_relaxation and gradient_scaler_hgs is not None:
+        # V9.4.7: Auto-scale saturation_patience based on GPU VRAM
+        # Larger VRAM → larger batches → faster convergence → lower patience needed
+        # H200 (141GB+): 50 steps | H100 (80GB): 200 steps | A100 (40GB): 400 steps
+        auto_saturation_patience = config.saturation_patience  # Default from CLI
+        if device.type == "cuda":
+            total_vram_gb = torch.cuda.get_device_properties(device).total_memory / 1e9
+            if total_vram_gb >= 140:      # H200 class (141GB+)
+                auto_saturation_patience = 50
+            elif total_vram_gb >= 90:     # 96GB class
+                auto_saturation_patience = 100
+            elif total_vram_gb >= 70:     # H100/A100-80GB class
+                auto_saturation_patience = 200
+            elif total_vram_gb >= 35:     # A100-40GB class
+                auto_saturation_patience = 400
+            else:                          # Smaller GPUs
+                auto_saturation_patience = 500
+
+            if auto_saturation_patience != config.saturation_patience:
+                print(f"  📊 [VRAM-AUTO] Saturation patience scaled: {config.saturation_patience} → {auto_saturation_patience} (based on {total_vram_gb:.0f}GB VRAM)")
+
         relaxation_controller = DynamicRelaxationController(
             gradient_scaler=gradient_scaler_hgs,
             model=model,
@@ -6285,7 +6394,7 @@ def train(config: UnifiedTrainingConfig):
             # Sovereign Saturation Gate
             enable_saturation_gate=config.enable_saturation_gate,
             saturation_coherence_threshold=config.saturation_coherence_threshold,
-            saturation_patience=config.saturation_patience,
+            saturation_patience=auto_saturation_patience,
             saturation_thaw_start=config.saturation_thaw_start,
             saturation_thaw_end=config.saturation_thaw_end,
             saturation_thaw_steps=config.saturation_thaw_steps,
@@ -6705,6 +6814,38 @@ def train(config: UnifiedTrainingConfig):
                 # Update TrainingStateTracker with Gunas (semantic bridge)
                 if training_state_tracker is not None and training_state_tracker.enabled:
                     training_state_tracker.update_with_gunas(guna_s, guna_r, guna_t, global_step)
+
+            # V9.4.9 Per-step updates: Both metabolic flip AND stability streak count every gradient step
+            if relaxation_controller is not None:
+                # Update stability streak every step (not just at validation)
+                current_coherence = metrics.get('coherence', 0.75)
+                sa_ratio = hgs_metrics.get("s_a_ratio", 0.5) if hgs_metrics else 0.5
+                relaxation_controller.update_stability_per_step(
+                    coherence=current_coherence,
+                    sa_ratio=sa_ratio,
+                )
+
+                # Metabolic Flip check (when saturation gate is enabled)
+                if relaxation_controller.enable_saturation_gate:
+                    # Get current VRAM usage (0.0 to 1.0)
+                    if device.type == "cuda":
+                        vram_used = torch.cuda.memory_allocated(device)
+                        vram_total = torch.cuda.get_device_properties(device).total_memory
+                        vram_usage = vram_used / vram_total
+                    else:
+                        vram_usage = 0.0
+
+                    # Check metabolic flip criteria every step
+                    flip_result = relaxation_controller.check_metabolic_flip(
+                        metrics=metrics,
+                        vram_usage=vram_usage,
+                        global_step=global_step,
+                    )
+
+                    if flip_result == "TRIGGER_FLIP":
+                        # Metabolic flip triggered! Execute 9:3 → 6:6 relaxation
+                        relaxation_controller.execute_relaxation(current_step=global_step)
+                        print(f"  🔄 [RELAXATION] 9:3 → 6:6 transition initiated")
 
             # Periodic CUDA memory cleanup to prevent fragmentation
             if device.type == "cuda" and global_step % 500 == 0:
