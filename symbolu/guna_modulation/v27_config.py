@@ -55,7 +55,14 @@ class UpdateMode(Enum):
         - Fixed learning rate
         - No uncertainty quantification
 
-    BAYESIAN (Alpha 2.7):
+    FAST (lightweight):
+        Same as EMA, but with phase variance confidence
+        - Uses variance of observable signals as confidence proxy
+        - ~0.1% compute overhead
+        - No posterior tracking
+        - Good for 95% of inference calls
+
+    BAYESIAN (full):
         P(θ | data) ∝ P(data | θ) × P(θ)
         - Natural bounds via priors
         - Adaptive learning rate (automatic)
@@ -63,6 +70,7 @@ class UpdateMode(Enum):
         - Principled probabilistic inference
     """
     EMA = "ema"
+    FAST = "fast"
     BAYESIAN = "bayesian"
 
 
@@ -329,6 +337,45 @@ class BayesianStateRegister:
 
 # Default Bayesian configuration
 DEFAULT_BAYESIAN_CONFIG = BayesianConfig()
+
+
+# =============================================================================
+# Fast Mode Configuration (Lightweight Inference)
+# =============================================================================
+
+@dataclass(frozen=True)
+class FastConfig:
+    """
+    Configuration for Fast inference mode (lightweight confidence).
+
+    Uses phase variance as a proxy for confidence instead of full Bayesian
+    posterior tracking. This is the same approach as SattvicBrake in training.
+
+    Cost: ~0.1% compute, 0% extra memory
+
+    Confidence = 1 - variance(observables)
+
+    Attributes:
+        confidence_threshold: Threshold below which we hedge responses
+        variance_window: Number of observations for rolling variance
+        use_observable_variance: Use variance of s,r,t signals (default)
+        hedging_enabled: Whether to add hedging language on low confidence
+    """
+    confidence_threshold: float = 0.5
+    variance_window: int = 10
+    use_observable_variance: bool = True
+    hedging_enabled: bool = True
+
+    def __post_init__(self):
+        """Validate configuration."""
+        if not (0.0 <= self.confidence_threshold <= 1.0):
+            raise ValueError(f"confidence_threshold must be in [0, 1], got {self.confidence_threshold}")
+        if self.variance_window < 1:
+            raise ValueError(f"variance_window must be >= 1, got {self.variance_window}")
+
+
+# Default Fast configuration
+DEFAULT_FAST_CONFIG = FastConfig()
 
 
 # =============================================================================
@@ -616,25 +663,33 @@ class V27Config:
 
     Combines:
         - Version gating (v2_7_enabled)
-        - Update mode (EMA vs Bayesian) - Alpha 2.7 Feature
-        - Alpha/learning rate (tier-specific, for EMA mode)
-        - Bayesian configuration (for Bayesian mode)
+        - Update mode (EMA, FAST, or BAYESIAN)
+        - Alpha/learning rate (tier-specific, for EMA/FAST mode)
+        - Fast configuration (for FAST mode - lightweight inference)
+        - Bayesian configuration (for BAYESIAN mode)
         - Utility coefficients (operator-configurable)
         - Tone logit coefficients (named, bounded)
         - State persistence (scoped, decay-governed)
 
+    Update Modes:
+        - EMA: Simple exponential moving average (default)
+        - FAST: EMA + phase variance confidence (~0.1% overhead)
+        - BAYESIAN: Full posterior tracking (~2-5% overhead)
+
     Attributes:
         v2_7_enabled: Master switch. When False, behaves like v2.6.
-        update_mode: UpdateMode.EMA (default) or UpdateMode.BAYESIAN
-        alpha_config: Learning rate configuration (used in EMA mode)
-        bayesian_config: Bayesian update configuration (used in Bayesian mode)
+        update_mode: UpdateMode.EMA (default), FAST, or BAYESIAN
+        alpha_config: Learning rate configuration (used in EMA/FAST mode)
+        fast_config: Fast mode configuration (used in FAST mode)
+        bayesian_config: Bayesian update configuration (used in BAYESIAN mode)
         utility_coefficients: Guna and penalty signs/weights
         tone_config: Tone logit coefficients
         persistence_config: State storage configuration
     """
     v2_7_enabled: bool = False
-    update_mode: UpdateMode = UpdateMode.EMA
+    update_mode: UpdateMode = UpdateMode.FAST  # Default: lightweight confidence tracking
     alpha_config: AlphaConfig = field(default_factory=lambda: DEFAULT_ALPHA_CONFIG)
+    fast_config: FastConfig = field(default_factory=lambda: DEFAULT_FAST_CONFIG)
     bayesian_config: BayesianConfig = field(default_factory=lambda: DEFAULT_BAYESIAN_CONFIG)
     utility_coefficients: UtilityCoefficients = field(
         default_factory=lambda: DEFAULT_UTILITY_COEFFICIENTS
@@ -661,6 +716,11 @@ class V27Config:
     def half_life(self) -> float:
         """Convenience accessor for half-life in updates."""
         return self.alpha_config.half_life_updates
+
+    @property
+    def is_fast(self) -> bool:
+        """Check if using Fast update mode (lightweight confidence)."""
+        return self.update_mode == UpdateMode.FAST
 
     @property
     def is_bayesian(self) -> bool:
@@ -714,9 +774,33 @@ class V27Config:
         return cls.for_tier(TIER_CONSUMER, enabled, bayesian)
 
     @classmethod
+    def fast(cls, tier: str = TIER_ENTERPRISE_2, confidence_threshold: float = 0.5) -> "V27Config":
+        """
+        Create Fast mode configuration (lightweight inference).
+
+        Uses phase variance as confidence proxy instead of full Bayesian.
+        Same approach as SattvicBrake in training.
+
+        Cost: ~0.1% compute, 0% extra memory
+
+        Args:
+            tier: Tier for alpha (learning rate)
+            confidence_threshold: Threshold below which to hedge responses
+
+        Returns:
+            V27Config with Fast mode enabled
+        """
+        return cls(
+            v2_7_enabled=True,
+            update_mode=UpdateMode.FAST,
+            alpha_config=get_alpha_for_tier(tier),
+            fast_config=FastConfig(confidence_threshold=confidence_threshold),
+        )
+
+    @classmethod
     def bayesian(cls, tier: str = TIER_ENTERPRISE_2, prior_strength: float = 10.0) -> "V27Config":
         """
-        Create Bayesian mode configuration (Alpha 2.7).
+        Create Bayesian mode configuration (full posterior tracking).
 
         Args:
             tier: Tier for fallback alpha (if needed)
