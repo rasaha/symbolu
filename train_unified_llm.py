@@ -5302,6 +5302,40 @@ def generate_sample(
     return tokenizer.decode(generated[0], skip_special_tokens=True)
 
 
+def compute_sample_metrics(text: str) -> Dict[str, float]:
+    """
+    Compute quality metrics for generated text (ChatGPT recommendation).
+
+    Returns:
+        - completion_rate: 1.0 if ends with punctuation, 0.0 otherwise
+        - repetition_score: n-gram repetition rate (lower is better)
+        - unique_ratio: ratio of unique tokens to total tokens
+    """
+    words = text.split()
+    if len(words) < 2:
+        return {"completion": 0.0, "repetition": 1.0, "unique_ratio": 0.0}
+
+    # Completion rate: ends with sentence-ending punctuation
+    completion = 1.0 if text.rstrip()[-1:] in '.!?' else 0.0
+
+    # Repetition score: bigram repetition rate
+    bigrams = [f"{words[i]} {words[i+1]}" for i in range(len(words)-1)]
+    if bigrams:
+        unique_bigrams = len(set(bigrams))
+        repetition = 1.0 - (unique_bigrams / len(bigrams))
+    else:
+        repetition = 0.0
+
+    # Unique token ratio
+    unique_ratio = len(set(words)) / len(words) if words else 0.0
+
+    return {
+        "completion": completion,
+        "repetition": repetition,
+        "unique_ratio": unique_ratio,
+    }
+
+
 def run_quality_samples(
     model: nn.Module,
     tokenizer,
@@ -5316,7 +5350,7 @@ def run_quality_samples(
     This provides a qualitative check that the model is learning
     meaningful language patterns, not just minimizing perplexity.
 
-    Samples are logged with prompts and generated completions.
+    Samples are logged with prompts, generated completions, and quality metrics.
     """
     def log(msg):
         if logger:
@@ -5329,6 +5363,12 @@ def run_quality_samples(
     log(f"  📝 QUALITY SAMPLES (Step {step})")
     log("=" * 60)
 
+    # Aggregate metrics across all samples
+    total_completion = 0.0
+    total_repetition = 0.0
+    total_unique = 0.0
+    sample_count = 0
+
     for prompt in config.sample_prompts:
         try:
             generated = generate_sample(
@@ -5339,11 +5379,39 @@ def run_quality_samples(
             )
             # Clean up and truncate for display
             generated = generated.strip().replace('\n', ' ')[:200]
+
+            # Compute quality metrics
+            metrics = compute_sample_metrics(generated)
+            total_completion += metrics["completion"]
+            total_repetition += metrics["repetition"]
+            total_unique += metrics["unique_ratio"]
+            sample_count += 1
+
             log(f"  Prompt: \"{prompt}\"")
             log(f"  Output: \"{generated}\"")
             log("")
         except Exception as e:
             log(f"  ⚠️ Sampling failed for prompt '{prompt[:30]}...': {e}")
+
+    # Log aggregate quality metrics
+    if sample_count > 0:
+        avg_completion = total_completion / sample_count
+        avg_repetition = total_repetition / sample_count
+        avg_unique = total_unique / sample_count
+
+        log("  ────────────────────────────────────────────────────────")
+        log(f"  📊 SAMPLE QUALITY METRICS (n={sample_count})")
+        log(f"     Completion Rate: {avg_completion*100:.0f}% (ends with punctuation)")
+        log(f"     Repetition Score: {avg_repetition*100:.1f}% (lower is better)")
+        log(f"     Unique Token Ratio: {avg_unique*100:.1f}%")
+
+        # Quality indicator
+        if avg_repetition < 0.3 and avg_unique > 0.6:
+            log("     Quality: 🟢 GOOD")
+        elif avg_repetition < 0.5 and avg_unique > 0.4:
+            log("     Quality: 🟡 IMPROVING")
+        else:
+            log("     Quality: 🔴 NEEDS WORK (expect improvement by step 2k-6k)")
 
     log("=" * 60)
     log("")
@@ -5548,11 +5616,17 @@ class UnifiedTrainingConfig:
     # Quality Sampling
     sample_every: int = 500  # Generate samples every N steps (0 = disabled)
     sample_prompts: tuple = (
+        # Original open-ended prompts
         "The history of the Roman Empire began when",
         "In computer science, algorithms are",
-        "The weather today is expected to be",
-        "Once upon a time in a small village",
-        "The meaning of life is often debated",
+        # Targeted probes for factual continuity (ChatGPT recommendation)
+        "The Roman Empire began when Julius Caesar",
+        "An algorithm is a step-by-step procedure that",
+        # Syntax closure probes
+        "A triangle has three sides, therefore",
+        "If A implies B and A is true, then",
+        # Causal reasoning probe
+        "Water boils at 100 degrees Celsius because",
     )
 
     # LRA Validation (Long-Range Retrieval)
