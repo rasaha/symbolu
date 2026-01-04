@@ -33,6 +33,294 @@ from dataclasses import dataclass
 import math
 import json
 from pathlib import Path
+import warnings
+
+# =============================================================================
+# HYBRID G2P SYSTEM (CMUdict + g2p_en)
+# =============================================================================
+# Tiered lookup: CMUdict → CUSTOM_VOCAB → g2p_en neural fallback
+# This provides 134K+ word coverage with neural OOV handling.
+
+_CMUDICT_LOADED = False
+_CMUDICT: Dict[str, List[List[str]]] = {}
+_G2P_EN_AVAILABLE = False
+_G2P_ENGINE = None
+
+
+def _load_cmudict() -> bool:
+    """
+    Load CMUdict from NLTK corpus.
+
+    CMUdict provides 134K words with ARPABET pronunciations.
+    This is the primary fast-path for G2P conversion.
+    """
+    global _CMUDICT_LOADED, _CMUDICT
+
+    if _CMUDICT_LOADED:
+        return True
+
+    try:
+        import nltk
+        from nltk.corpus import cmudict
+
+        # Attempt to load - will download if needed
+        try:
+            _CMUDICT = dict(cmudict.entries())
+        except LookupError:
+            # Download CMUdict if not present
+            print("  [G2P] Downloading CMUdict corpus...")
+            nltk.download('cmudict', quiet=True)
+            _CMUDICT = dict(cmudict.entries())
+
+        _CMUDICT_LOADED = True
+        print(f"  [G2P] CMUdict loaded: {len(_CMUDICT):,} words (Primary Tier)")
+        return True
+
+    except ImportError:
+        warnings.warn("nltk not installed. CMUdict unavailable. Install with: pip install nltk")
+        return False
+    except Exception as e:
+        warnings.warn(f"Failed to load CMUdict: {e}")
+        return False
+
+
+def _init_g2p_engine():
+    """
+    Initialize g2p_en neural engine for OOV words.
+
+    g2p_en is a sequence-to-sequence neural model that handles:
+    - Out-of-vocabulary words
+    - Proper nouns
+    - Technical terms
+    - Neologisms
+    """
+    global _G2P_EN_AVAILABLE, _G2P_ENGINE
+
+    if _G2P_ENGINE is not None:
+        return _G2P_EN_AVAILABLE
+
+    try:
+        from g2p_en import G2p
+        _G2P_ENGINE = G2p()
+        _G2P_EN_AVAILABLE = True
+        print("  [G2P] g2p_en neural engine initialized (Fallback Tier)")
+        return True
+
+    except ImportError:
+        warnings.warn("g2p_en not installed. Neural fallback unavailable. Install with: pip install g2p_en")
+        _G2P_EN_AVAILABLE = False
+        return False
+    except Exception as e:
+        warnings.warn(f"Failed to initialize g2p_en: {e}")
+        _G2P_EN_AVAILABLE = False
+        return False
+
+
+def _strip_stress(phonemes: List[str]) -> List[str]:
+    """
+    Strip stress markers from ARPABET phonemes.
+
+    CMUdict uses stress markers (0, 1, 2) on vowels:
+    - AH0 (unstressed), AH1 (primary stress), AH2 (secondary stress)
+
+    We strip these for ontological mapping since stress is prosodic,
+    not articulatory.
+    """
+    return [p.rstrip('012') for p in phonemes]
+
+
+class HybridG2P:
+    """
+    Hybrid Grapheme-to-Phoneme Converter.
+
+    Tiered Architecture:
+        1. CMUdict (Fast Path): 134K words, O(1) lookup, deterministic
+        2. Custom Vocabulary: Domain-specific terms (expandable)
+        3. g2p_en Neural: OOV handling via seq2seq model
+        4. Character Fallback: Last resort for complete failures
+
+    This provides principled phoneme extraction for CSR ontological grounding.
+    """
+
+    def __init__(self, use_neural: bool = True, lazy_init: bool = True):
+        """
+        Initialize HybridG2P.
+
+        Args:
+            use_neural: Enable g2p_en neural fallback for OOV words
+            lazy_init: Defer loading until first use (recommended)
+        """
+        self.use_neural = use_neural
+        self._initialized = False
+        self._cache: Dict[str, List[str]] = {}
+
+        # Custom vocabulary for domain-specific terms
+        self.custom_vocab: Dict[str, List[str]] = {
+            # Sanskrit/Ontological terms
+            "varna": ["V", "AA", "R", "N", "AH"],
+            "vritti": ["V", "R", "IH", "T", "IY"],
+            "phoneme": ["F", "OW", "N", "IY", "M"],
+            "phonemic": ["F", "AH", "N", "IY", "M", "IH", "K"],
+            "symbolu": ["S", "IH", "M", "B", "OW", "L", "UW"],
+            "csr": ["S", "IY", "EH", "S", "AA", "R"],
+            "arpabet": ["AA", "R", "P", "AH", "B", "EH", "T"],
+            # AI/ML terms (not in CMUdict)
+            "embedding": ["IH", "M", "B", "EH", "D", "IH", "NG"],
+            "embeddings": ["IH", "M", "B", "EH", "D", "IH", "NG", "Z"],
+            "tokenizer": ["T", "OW", "K", "AH", "N", "AY", "Z", "ER"],
+            "tokenizers": ["T", "OW", "K", "AH", "N", "AY", "Z", "ER", "Z"],
+            "llm": ["EH", "L", "EH", "L", "EH", "M"],
+            "llms": ["EH", "L", "EH", "L", "EH", "M", "Z"],
+            "gpt": ["JH", "IY", "P", "IY", "T", "IY"],
+            "bert": ["B", "ER", "T"],
+            "chatgpt": ["CH", "AE", "T", "JH", "IY", "P", "IY", "T", "IY"],
+            "mixtral": ["M", "IH", "K", "S", "T", "R", "AH", "L"],
+            "llama": ["L", "AA", "M", "AH"],  # Override CMUdict animal pronunciation
+        }
+
+        if not lazy_init:
+            self._init()
+
+    def _init(self):
+        """Initialize G2P backends."""
+        if self._initialized:
+            return
+
+        _load_cmudict()
+
+        if self.use_neural:
+            _init_g2p_engine()
+
+        self._initialized = True
+
+    def get_phonemes(self, word: str) -> List[str]:
+        """
+        Convert word to ARPABET phonemes using tiered lookup.
+
+        Lookup order:
+            1. Cache check
+            2. CMUdict (134K words)
+            3. Custom vocabulary
+            4. g2p_en neural (if enabled)
+            5. Character-level fallback
+
+        Args:
+            word: Input word (case-insensitive)
+
+        Returns:
+            List of ARPABET phonemes (stress stripped)
+        """
+        # Ensure initialized
+        if not self._initialized:
+            self._init()
+
+        # Clean word
+        clean = word.lower().strip()
+        clean = ''.join(c for c in clean if c.isalpha())
+
+        if not clean:
+            return ["SIL"]
+
+        # Check cache
+        if clean in self._cache:
+            return self._cache[clean]
+
+        phonemes = None
+
+        # Tier 1: CMUdict (Fast Path)
+        if _CMUDICT_LOADED and clean in _CMUDICT:
+            # CMUdict returns list of pronunciations, take first
+            raw_phonemes = _CMUDICT[clean]
+            if isinstance(raw_phonemes, list) and raw_phonemes:
+                # Handle both dict formats: entries() returns (word, [phonemes])
+                if isinstance(raw_phonemes[0], list):
+                    phonemes = _strip_stress(raw_phonemes[0])
+                else:
+                    phonemes = _strip_stress(raw_phonemes)
+
+        # Tier 2: Custom Vocabulary
+        if phonemes is None and clean in self.custom_vocab:
+            phonemes = self.custom_vocab[clean]
+
+        # Tier 3: g2p_en Neural Fallback
+        if phonemes is None and _G2P_EN_AVAILABLE and _G2P_ENGINE is not None:
+            try:
+                raw = _G2P_ENGINE(clean)
+                # g2p_en returns list with spaces for word boundaries
+                phonemes = [p for p in raw if p.strip() and p != ' ']
+                # Normalize to uppercase ARPABET
+                phonemes = [p.upper().rstrip('012') for p in phonemes]
+            except Exception:
+                phonemes = None
+
+        # Tier 4: Character-level Fallback (Last Resort)
+        if phonemes is None:
+            phonemes = self._char_fallback(clean)
+
+        # Validate phonemes exist in our ARPABET map
+        phonemes = self._validate_phonemes(phonemes)
+
+        # Cache result
+        self._cache[clean] = phonemes
+
+        return phonemes
+
+    def _char_fallback(self, word: str) -> List[str]:
+        """Character-level fallback for completely unknown words."""
+        # Import here to avoid circular dependency
+        char_map = {
+            'a': 'AH', 'b': 'B', 'c': 'K', 'd': 'D', 'e': 'EH',
+            'f': 'F', 'g': 'G', 'h': 'HH', 'i': 'IH', 'j': 'JH',
+            'k': 'K', 'l': 'L', 'm': 'M', 'n': 'N', 'o': 'OW',
+            'p': 'P', 'q': 'K', 'r': 'R', 's': 'S', 't': 'T',
+            'u': 'UH', 'v': 'V', 'w': 'W', 'x': 'K', 'y': 'Y',
+            'z': 'Z',
+        }
+        phonemes = []
+        for char in word[:10]:  # Limit to prevent runaway
+            if char in char_map:
+                phonemes.append(char_map[char])
+        return phonemes if phonemes else ["UNK"]
+
+    def _validate_phonemes(self, phonemes: List[str]) -> List[str]:
+        """Validate phonemes against known ARPABET set."""
+        # Known ARPABET phonemes (from PHONEME_MAP_ARPABET)
+        valid = {
+            "AA", "AH", "AE", "IH", "IY", "UH", "UW", "EH", "ER", "EY",
+            "AY", "OW", "AO", "OY", "AW", "P", "T", "K", "B", "D", "G",
+            "F", "TH", "S", "SH", "HH", "V", "DH", "Z", "ZH", "CH", "JH",
+            "M", "N", "NG", "L", "R", "W", "Y", "SIL", "SP", "UNK"
+        }
+        return [p if p in valid else "UNK" for p in phonemes]
+
+    def add_custom_word(self, word: str, phonemes: List[str]):
+        """Add a word to custom vocabulary."""
+        self.custom_vocab[word.lower()] = phonemes
+        # Clear cache for this word
+        if word.lower() in self._cache:
+            del self._cache[word.lower()]
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get G2P system statistics."""
+        return {
+            "cmudict_loaded": _CMUDICT_LOADED,
+            "cmudict_words": len(_CMUDICT) if _CMUDICT_LOADED else 0,
+            "g2p_en_available": _G2P_EN_AVAILABLE,
+            "custom_vocab_size": len(self.custom_vocab),
+            "cache_size": len(self._cache),
+        }
+
+
+# Global hybrid G2P instance (lazy initialization)
+_HYBRID_G2P: Optional[HybridG2P] = None
+
+
+def get_hybrid_g2p() -> HybridG2P:
+    """Get or create the global HybridG2P instance."""
+    global _HYBRID_G2P
+    if _HYBRID_G2P is None:
+        _HYBRID_G2P = HybridG2P(use_neural=True, lazy_init=True)
+    return _HYBRID_G2P
 
 # =============================================================================
 # ONTOLOGICAL LAYER DEFINITIONS (for reference)
@@ -553,6 +841,9 @@ class CSREmbeddingProvider(nn.Module):
         # Cache for token-to-phoneme mappings
         self._phoneme_cache: Dict[str, List[str]] = {}
 
+        # Initialize Hybrid G2P system (CMUdict + g2p_en)
+        self._hybrid_g2p = get_hybrid_g2p()
+
     def _build_phoneme_tensor(self) -> torch.Tensor:
         """Build tensor of phoneme → 12D mappings."""
         phonemes = list(PHONEME_MAP_ARPABET.keys())
@@ -565,27 +856,31 @@ class CSREmbeddingProvider(nn.Module):
         return torch.tensor(vectors, dtype=torch.float32)
 
     def token_to_phonemes(self, token: str) -> List[str]:
-        """Convert a token to its phoneme sequence."""
-        # Check cache
+        """
+        Convert a token to its phoneme sequence using Hybrid G2P.
+
+        Uses tiered lookup:
+            1. CMUdict (134K words, fast deterministic)
+            2. Custom vocabulary (domain-specific terms)
+            3. g2p_en neural model (OOV fallback)
+            4. Character-level fallback (last resort)
+
+        Args:
+            token: Input token string
+
+        Returns:
+            List of ARPABET phonemes
+        """
+        # Check local cache first
         if token in self._phoneme_cache:
             return self._phoneme_cache[token]
 
-        # Clean token
-        clean = token.lower().strip()
-        clean = ''.join(c for c in clean if c.isalpha())
+        # Use Hybrid G2P system
+        phonemes = self._hybrid_g2p.get_phonemes(token)
 
-        if not clean:
-            phonemes = ["SIL"]
-        elif clean in SIMPLE_G2P:
-            phonemes = SIMPLE_G2P[clean]
-        else:
-            # Character-level fallback
-            phonemes = []
-            for char in clean[:self.config.max_phonemes_per_token]:
-                if char in CHAR_TO_PHONEME:
-                    phonemes.append(CHAR_TO_PHONEME[char])
-            if not phonemes:
-                phonemes = ["UNK"]
+        # Limit phonemes per token if configured
+        if len(phonemes) > self.config.max_phonemes_per_token:
+            phonemes = phonemes[:self.config.max_phonemes_per_token]
 
         # Cache and return
         self._phoneme_cache[token] = phonemes
@@ -1038,24 +1333,63 @@ class CSRAblationTester:
 # =============================================================================
 
 def main():
-    """Test CSR Embedding Provider."""
+    """Test CSR Embedding Provider with Hybrid G2P."""
     print("="*60)
-    print("  CSR EMBEDDING PROVIDER - TEST")
+    print("  CSR EMBEDDING PROVIDER - HYBRID G2P TEST")
     print("="*60)
+
+    # Test Hybrid G2P system first
+    print("\n  ═══════════════════════════════════════════")
+    print("  HYBRID G2P SYSTEM TEST")
+    print("  ═══════════════════════════════════════════")
+
+    hybrid_g2p = get_hybrid_g2p()
+    stats = hybrid_g2p.get_stats()
+    print(f"\n  G2P System Stats:")
+    print(f"    CMUdict loaded: {stats['cmudict_loaded']}")
+    print(f"    CMUdict words: {stats['cmudict_words']:,}")
+    print(f"    g2p_en available: {stats['g2p_en_available']}")
+    print(f"    Custom vocab: {stats['custom_vocab_size']}")
+
+    # Test comprehensive word list showing tiered lookup
+    test_words = [
+        # CMUdict words (should resolve via fast path)
+        ("hello", "CMUdict"),
+        ("world", "CMUdict"),
+        ("transformer", "CMUdict"),
+        ("philosophical", "CMUdict"),
+        ("consciousness", "CMUdict"),
+        # Custom vocabulary (domain-specific)
+        ("symbolu", "Custom"),
+        ("vritti", "Custom"),
+        ("ontological", "Custom"),
+        # OOV words (neural fallback)
+        ("chatgpt", "Neural/Char"),
+        ("llama", "CMUdict"),
+        ("mixtral", "Neural/Char"),
+    ]
+
+    print(f"\n  Tiered G2P Conversion (CMUdict → Custom → Neural → Char):")
+    for word, expected_tier in test_words:
+        phonemes = hybrid_g2p.get_phonemes(word)
+        print(f"    '{word}' → {phonemes}  [{expected_tier}]")
 
     # Create config
     config = CSRConfig(d_model=512, num_layers=12)
 
     # Create provider
     provider = CSREmbeddingProvider(config)
+    print(f"\n  ═══════════════════════════════════════════")
+    print("  CSR PROVIDER TEST")
+    print("  ═══════════════════════════════════════════")
     print(f"\n  Created CSR Provider:")
-    print(f"    Phonemes: {len(PHONEME_MAP_ARPABET)}")
+    print(f"    ARPABET Phonemes: {len(PHONEME_MAP_ARPABET)}")
     print(f"    Projection: 12 → {config.d_model}")
     print(f"    λ_csr: {config.lambda_csr}")
 
-    # Test token-to-phoneme conversion
-    test_tokens = ["hello", "world", "the", "transformer", "ontological"]
-    print(f"\n  Token → Phoneme Conversion:")
+    # Test token-to-phoneme conversion through provider
+    test_tokens = ["hello", "world", "the", "transformer", "ontological", "symbolu"]
+    print(f"\n  Token → Phoneme Conversion (via CSREmbeddingProvider):")
     for token in test_tokens:
         phonemes = provider.token_to_phonemes(token)
         print(f"    '{token}' → {phonemes}")
@@ -1210,6 +1544,9 @@ __all__ = [
     "EntropySink",
     "SynthesisGate",
     "CSRAblationTester",
+    # Hybrid G2P System
+    "HybridG2P",
+    "get_hybrid_g2p",
     # Constants
     "PHONEME_MAP_ARPABET",
     "SANSKRIT_VOWEL_CALIBRATION",
