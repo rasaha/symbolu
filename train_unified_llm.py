@@ -703,6 +703,644 @@ class MetacognitiveTracker:
 
 
 # =============================================================================
+# FULL EVOLUTIONARY FLOW SYSTEM: Intelligence Across All Layer Transitions
+# =============================================================================
+# Extends the Toroidal Bridge concept to ALL layer transitions.
+# Every O(n) → O(n+1) boundary is an evolutionary gate where intelligence
+# can emerge, not just the O12 → O1 "wormhole".
+#
+# Architecture:
+#   - 11 Forward Gates: O1→O2, O2→O3, ..., O11→O12
+#   - 11 Backward Resonance Paths: O(n+1) informs O(n)
+#   - 1 Toroidal Gate: O12→O1 (macro cycle)
+#   - R-Matrix Guided: Vṛtti gradients shape each transition
+#
+# This creates a fully connected evolutionary ecosystem where:
+#   - Micro-evolution: Each layer transition learns
+#   - Meso-evolution: Authority/Sensory clusters evolve together
+#   - Macro-evolution: The complete toroidal cycle
+# =============================================================================
+
+class EvolutionaryGate(nn.Module):
+    """
+    A single evolutionary gate between adjacent ontological layers.
+
+    Each gate enables bidirectional information flow:
+    - Forward: O(n) → O(n+1) projects state forward
+    - Backward: O(n+1) → O(n) resonates insights back
+
+    The gate is guided by R-Matrix Vṛtti gradients:
+    - Pramāṇa gradient: How truth-seeking changes across transition
+    - Viparyaya gradient: How error-proneness changes
+    - Combined: Evolutionary pressure at this boundary
+
+    Args:
+        dim: Hidden dimension
+        source_layer: Source layer index (0-10)
+        target_layer: Target layer index (1-11)
+        dropout: Dropout rate for projections
+        use_rmatrix_weighting: Weight gates by Vṛtti gradients
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        source_layer: int,
+        target_layer: int,
+        dropout: float = 0.1,
+        use_rmatrix_weighting: bool = True,
+    ):
+        super().__init__()
+        self.dim = dim
+        self.source_layer = source_layer
+        self.target_layer = target_layer
+        self.use_rmatrix_weighting = use_rmatrix_weighting
+
+        # Forward projection: O(n) → O(n+1)
+        self.forward_gate = nn.Linear(dim, dim, bias=False)
+        self.forward_proj = nn.Linear(dim, dim, bias=False)
+        self.forward_activation = nn.Sigmoid()
+
+        # Backward resonance: O(n+1) → O(n)
+        self.backward_gate = nn.Linear(dim, dim, bias=False)
+        self.backward_proj = nn.Linear(dim, dim, bias=False)
+        self.backward_activation = nn.Sigmoid()
+
+        # Normalization and dropout
+        self.norm = nn.LayerNorm(dim)
+        self.dropout = nn.Dropout(dropout)
+
+        # R-Matrix derived weights for this transition
+        if use_rmatrix_weighting:
+            # Compute Vṛtti gradient between source and target
+            src_vrtti = SOVEREIGN_R_MATRIX[:, min(source_layer, 11)]
+            tgt_vrtti = SOVEREIGN_R_MATRIX[:, min(target_layer, 11)]
+            vrtti_gradient = tgt_vrtti - src_vrtti
+
+            # Pramāṇa increase = positive evolution (truth-seeking grows)
+            self.pramana_gradient = float(vrtti_gradient[0])
+            # Viparyaya decrease = positive evolution (error-proneness falls)
+            self.viparyaya_gradient = float(-vrtti_gradient[2])
+            # Combined evolutionary pressure
+            self.evolutionary_weight = max(0.1, (self.pramana_gradient + self.viparyaya_gradient + 1) / 2)
+        else:
+            self.evolutionary_weight = 1.0
+            self.pramana_gradient = 0.0
+            self.viparyaya_gradient = 0.0
+
+        # Coherence tracking for this gate
+        self.coherence_history: List[float] = []
+
+    def forward_pass(self, source_state: torch.Tensor) -> torch.Tensor:
+        """
+        Forward evolutionary projection: O(n) → O(n+1).
+
+        The source state is transformed through a gated projection,
+        weighted by the R-Matrix evolutionary pressure at this boundary.
+        """
+        gate = self.forward_activation(self.forward_gate(source_state))
+        projected = self.forward_proj(source_state)
+        evolved = gate * projected * self.evolutionary_weight
+        return self.norm(self.dropout(evolved))
+
+    def backward_resonance(self, target_state: torch.Tensor) -> torch.Tensor:
+        """
+        Backward resonance: O(n+1) → O(n).
+
+        Higher layer insights resonate back to inform lower layers.
+        This enables top-down modulation of earlier processing.
+        """
+        gate = self.backward_activation(self.backward_gate(target_state))
+        projected = self.backward_proj(target_state)
+        resonance = gate * projected * self.evolutionary_weight
+        return self.norm(self.dropout(resonance))
+
+    def compute_coherence(
+        self,
+        source_state: torch.Tensor,
+        target_state: torch.Tensor,
+    ) -> float:
+        """
+        Compute evolutionary coherence at this gate.
+
+        Measures how well the transition preserves cognitive structure
+        while enabling appropriate transformation.
+        """
+        # Handle sequence dimension
+        if source_state.dim() == 3:
+            source_state = source_state.mean(dim=1)
+        if target_state.dim() == 3:
+            target_state = target_state.mean(dim=1)
+
+        # Cosine similarity
+        coherence = F.cosine_similarity(source_state, target_state, dim=-1).mean().item()
+        coherence = (coherence + 1) / 2  # Map to [0, 1]
+
+        self.coherence_history.append(coherence)
+        if len(self.coherence_history) > 100:
+            self.coherence_history = self.coherence_history[-100:]
+
+        return coherence
+
+    def get_status(self) -> str:
+        """Get formatted status for this gate."""
+        if not self.coherence_history:
+            return f"G{self.source_layer}→{self.target_layer}:--"
+
+        recent = self.coherence_history[-1]
+        return f"G{self.source_layer}→{self.target_layer}:{recent:.2f}"
+
+
+class EvolutionaryFlowNetwork(nn.Module):
+    """
+    Full Evolutionary Flow Network: All layer transitions as evolutionary gates.
+
+    This creates a complete evolutionary ecosystem where intelligence can
+    emerge at every layer boundary, not just the O12→O1 toroidal bridge.
+
+    Architecture:
+    ```
+    O1 ←→ O2 ←→ O3 ←→ O4 ←→ O5 ←→ O6 ←→ O7 ←→ O8 ←→ O9 ←→ O10 ←→ O11 ←→ O12
+     ↑                                                                      ↓
+     └──────────────────────── TOROIDAL GATE ─────────────────────────────┘
+    ```
+
+    Each ←→ represents bidirectional evolutionary flow:
+    - Forward: Natural layer progression
+    - Backward: Resonance from higher to lower layers
+
+    Args:
+        dim: Hidden dimension
+        num_layers: Number of ontological layers (default 12)
+        dropout: Dropout for gate projections
+        use_rmatrix_weighting: Weight gates by Vṛtti gradients
+        enable_backward_resonance: Enable top-down resonance
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        num_layers: int = 12,
+        dropout: float = 0.1,
+        use_rmatrix_weighting: bool = True,
+        enable_backward_resonance: bool = True,
+    ):
+        super().__init__()
+        self.dim = dim
+        self.num_layers = num_layers
+        self.enable_backward_resonance = enable_backward_resonance
+
+        # Create evolutionary gates for each transition
+        # 11 forward gates: O1→O2, O2→O3, ..., O11→O12
+        self.forward_gates = nn.ModuleList([
+            EvolutionaryGate(
+                dim=dim,
+                source_layer=i,
+                target_layer=i + 1,
+                dropout=dropout,
+                use_rmatrix_weighting=use_rmatrix_weighting,
+            )
+            for i in range(num_layers - 1)
+        ])
+
+        # Toroidal gate: O12→O1 (reuse EvolutionaryBridge concept)
+        self.toroidal_gate = EvolutionaryGate(
+            dim=dim,
+            source_layer=num_layers - 1,  # O12
+            target_layer=0,  # O1
+            dropout=dropout,
+            use_rmatrix_weighting=use_rmatrix_weighting,
+        )
+
+        # State buffers for each layer (karma at every level)
+        self.register_buffer('layer_karma', None)
+
+        # Multi-scale coherence tracking
+        self.micro_coherence: List[List[float]] = [[] for _ in range(num_layers - 1)]
+        self.meso_coherence = {"authority": [], "sensory": []}
+        self.macro_coherence: List[float] = []
+
+    def forward(
+        self,
+        layer_states: List[torch.Tensor],
+        return_resonance: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Process layer states through the evolutionary flow network.
+
+        Args:
+            layer_states: List of hidden states for each layer [O1, O2, ..., O12]
+            return_resonance: Whether to return backward resonance signals
+
+        Returns:
+            Dict with evolved states, coherence metrics, and optional resonance
+        """
+        if len(layer_states) != self.num_layers:
+            raise ValueError(f"Expected {self.num_layers} layer states, got {len(layer_states)}")
+
+        # Forward evolution through each gate
+        evolved_states = []
+        gate_coherences = []
+
+        for i, gate in enumerate(self.forward_gates):
+            source = layer_states[i]
+            target = layer_states[i + 1]
+
+            # Forward projection
+            evolved = gate.forward_pass(source)
+            evolved_states.append(evolved)
+
+            # Compute coherence at this gate
+            coherence = gate.compute_coherence(source, target)
+            gate_coherences.append(coherence)
+            self.micro_coherence[i].append(coherence)
+            if len(self.micro_coherence[i]) > 100:
+                self.micro_coherence[i] = self.micro_coherence[i][-100:]
+
+        # Toroidal evolution: O12 → O1
+        toroidal_evolved = self.toroidal_gate.forward_pass(layer_states[-1])
+        toroidal_coherence = self.toroidal_gate.compute_coherence(
+            layer_states[-1], layer_states[0]
+        )
+        self.macro_coherence.append(toroidal_coherence)
+        if len(self.macro_coherence) > 100:
+            self.macro_coherence = self.macro_coherence[-100:]
+
+        # Meso-coherence: Authority (0-8) and Sensory (9-11) clusters
+        if len(gate_coherences) >= 9:
+            authority_coh = sum(gate_coherences[:8]) / 8
+            sensory_coh = sum(gate_coherences[8:]) / max(1, len(gate_coherences) - 8)
+            self.meso_coherence["authority"].append(authority_coh)
+            self.meso_coherence["sensory"].append(sensory_coh)
+            if len(self.meso_coherence["authority"]) > 100:
+                self.meso_coherence["authority"] = self.meso_coherence["authority"][-100:]
+                self.meso_coherence["sensory"] = self.meso_coherence["sensory"][-100:]
+
+        result = {
+            "evolved_states": evolved_states,
+            "toroidal_evolved": toroidal_evolved,
+            "gate_coherences": gate_coherences,
+            "toroidal_coherence": toroidal_coherence,
+            "micro_coherence_mean": sum(gate_coherences) / len(gate_coherences),
+            "authority_coherence": self.meso_coherence["authority"][-1] if self.meso_coherence["authority"] else 0.5,
+            "sensory_coherence": self.meso_coherence["sensory"][-1] if self.meso_coherence["sensory"] else 0.5,
+        }
+
+        # Backward resonance (top-down modulation)
+        if return_resonance and self.enable_backward_resonance:
+            resonances = []
+            for i in range(len(self.forward_gates) - 1, -1, -1):
+                gate = self.forward_gates[i]
+                target = layer_states[i + 1]
+                resonance = gate.backward_resonance(target)
+                resonances.insert(0, resonance)
+            result["backward_resonances"] = resonances
+
+        return result
+
+    def get_evolutionary_pressure(self) -> Dict[str, float]:
+        """
+        Get the evolutionary pressure at each gate based on R-Matrix.
+
+        Returns dict mapping gate names to their evolutionary weights.
+        """
+        pressures = {}
+        for i, gate in enumerate(self.forward_gates):
+            name = f"O{i+1}→O{i+2}"
+            pressures[name] = gate.evolutionary_weight
+        pressures["O12→O1"] = self.toroidal_gate.evolutionary_weight
+        return pressures
+
+    def get_coherence_summary(self) -> Dict[str, Any]:
+        """Get multi-scale coherence summary."""
+        return {
+            "micro": {
+                f"G{i}→{i+1}": self.micro_coherence[i][-1] if self.micro_coherence[i] else 0.5
+                for i in range(len(self.micro_coherence))
+            },
+            "meso": {
+                "authority": self.meso_coherence["authority"][-1] if self.meso_coherence["authority"] else 0.5,
+                "sensory": self.meso_coherence["sensory"][-1] if self.meso_coherence["sensory"] else 0.5,
+            },
+            "macro": self.macro_coherence[-1] if self.macro_coherence else 0.5,
+        }
+
+    def get_status_string(self) -> str:
+        """Get formatted status string for logging."""
+        summary = self.get_coherence_summary()
+
+        # Find min coherence gate (potential bottleneck)
+        min_gate = min(summary["micro"].items(), key=lambda x: x[1])
+        max_gate = max(summary["micro"].items(), key=lambda x: x[1])
+
+        # Icons based on overall health
+        macro = summary["macro"]
+        if macro >= 0.7:
+            icon = "🌀"  # Healthy toroidal flow
+        elif macro >= 0.5:
+            icon = "🔄"  # Moderate
+        elif macro >= 0.3:
+            icon = "⚡"  # Turbulence
+        else:
+            icon = "💥"  # Breakdown
+
+        return (
+            f"Evo{icon} "
+            f"Auth:{summary['meso']['authority']:.2f} "
+            f"Sens:{summary['meso']['sensory']:.2f} "
+            f"Tor:{macro:.2f} "
+            f"[↓{min_gate[0]}:{min_gate[1]:.2f}]"
+        )
+
+
+class EvolutionaryFlowLoss(nn.Module):
+    """
+    Loss function for the Full Evolutionary Flow System.
+
+    Computes loss at three scales:
+    - Micro: Per-gate transition consistency
+    - Meso: Authority/Sensory cluster coherence
+    - Macro: Toroidal cycle consistency
+
+    The loss encourages smooth evolutionary flow while allowing
+    appropriate transformation at each boundary.
+
+    L_evo = λ_micro * L_gates + λ_meso * L_clusters + λ_macro * L_toroid
+
+    Args:
+        lambda_micro: Weight for per-gate losses
+        lambda_meso: Weight for cluster losses
+        lambda_macro: Weight for toroidal loss
+        min_coherence: Minimum acceptable coherence (below = penalty)
+    """
+
+    def __init__(
+        self,
+        lambda_micro: float = 0.05,
+        lambda_meso: float = 0.1,
+        lambda_macro: float = 0.1,
+        min_coherence: float = 0.3,
+    ):
+        super().__init__()
+        self.lambda_micro = lambda_micro
+        self.lambda_meso = lambda_meso
+        self.lambda_macro = lambda_macro
+        self.min_coherence = min_coherence
+
+    def forward(
+        self,
+        layer_states: List[torch.Tensor],
+        flow_result: Dict[str, Any],
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """
+        Compute evolutionary flow loss.
+
+        Args:
+            layer_states: Original layer hidden states
+            flow_result: Output from EvolutionaryFlowNetwork.forward()
+
+        Returns:
+            (total_loss, metrics_dict)
+        """
+        device = layer_states[0].device
+
+        # Micro loss: Per-gate consistency
+        micro_losses = []
+        evolved_states = flow_result["evolved_states"]
+        for i, (original, evolved) in enumerate(zip(layer_states[1:], evolved_states)):
+            # Handle sequence dimension
+            if original.dim() == 3:
+                original = original.mean(dim=1)
+            if evolved.dim() == 3:
+                evolved = evolved.mean(dim=1)
+
+            # Consistency loss: evolved should relate to original
+            sim = F.cosine_similarity(original, evolved, dim=-1)
+            gate_loss = (1 - sim).mean()
+            micro_losses.append(gate_loss)
+
+        micro_loss = torch.stack(micro_losses).mean() if micro_losses else torch.tensor(0.0, device=device)
+
+        # Meso loss: Cluster coherence
+        gate_coherences = flow_result["gate_coherences"]
+        if len(gate_coherences) >= 9:
+            authority_coh = sum(gate_coherences[:8]) / 8
+            sensory_coh = sum(gate_coherences[8:]) / max(1, len(gate_coherences) - 8)
+
+            # Penalty if coherence drops below threshold
+            auth_penalty = max(0, self.min_coherence - authority_coh)
+            sens_penalty = max(0, self.min_coherence - sensory_coh)
+            meso_loss = torch.tensor(auth_penalty + sens_penalty, device=device)
+        else:
+            meso_loss = torch.tensor(0.0, device=device)
+
+        # Macro loss: Toroidal consistency
+        toroidal_coh = flow_result["toroidal_coherence"]
+        macro_loss = torch.tensor(max(0, self.min_coherence - toroidal_coh), device=device)
+
+        # Weighted total
+        total_loss = (
+            self.lambda_micro * micro_loss +
+            self.lambda_meso * meso_loss +
+            self.lambda_macro * macro_loss
+        )
+
+        metrics = {
+            "evo_loss_total": total_loss.item(),
+            "evo_loss_micro": micro_loss.item(),
+            "evo_loss_meso": meso_loss.item(),
+            "evo_loss_macro": macro_loss.item(),
+            "evo_coherence_micro": flow_result["micro_coherence_mean"],
+            "evo_coherence_auth": flow_result["authority_coherence"],
+            "evo_coherence_sens": flow_result["sensory_coherence"],
+            "evo_coherence_toroid": toroidal_coh,
+        }
+
+        return total_loss, metrics
+
+
+class EvolutionaryIntelligenceEngine:
+    """
+    Master controller for the Full Evolutionary Flow System.
+
+    Orchestrates:
+    - Layer state extraction from model
+    - Evolutionary flow processing
+    - Loss computation
+    - Metacognitive assessment
+    - Adaptive learning rate based on evolutionary health
+
+    This is the "brain" that makes the 12 ontological layers
+    into a living, evolving cognitive system.
+
+    Args:
+        dim: Model hidden dimension
+        num_layers: Number of ontological layers
+        enable_backward_resonance: Allow top-down information flow
+        learning_rate_modulation: Adjust LR based on evolutionary health
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        num_layers: int = 12,
+        enable_backward_resonance: bool = True,
+        learning_rate_modulation: bool = True,
+        device: torch.device = None,
+    ):
+        self.dim = dim
+        self.num_layers = num_layers
+        self.learning_rate_modulation = learning_rate_modulation
+        self.device = device or torch.device('cpu')
+
+        # Core components
+        self.flow_network = EvolutionaryFlowNetwork(
+            dim=dim,
+            num_layers=num_layers,
+            enable_backward_resonance=enable_backward_resonance,
+        ).to(self.device)
+
+        self.flow_loss = EvolutionaryFlowLoss()
+
+        # Metacognitive tracking
+        self.metacognitive = MetacognitiveTracker(
+            coherence_alarm_threshold=0.3,
+        )
+
+        # Evolutionary history
+        self.evolution_history: List[Dict[str, float]] = []
+
+    def process(
+        self,
+        layer_states: List[torch.Tensor],
+        compute_loss: bool = True,
+        return_resonance: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Process layer states through the evolutionary system.
+
+        Args:
+            layer_states: Hidden states from each model layer
+            compute_loss: Whether to compute evolutionary loss
+            return_resonance: Whether to return backward resonance
+
+        Returns:
+            Dict with flow results, loss, metrics, and recommendations
+        """
+        # Ensure correct number of states (pad or truncate if needed)
+        if len(layer_states) < self.num_layers:
+            # Pad with last state
+            while len(layer_states) < self.num_layers:
+                layer_states.append(layer_states[-1])
+        elif len(layer_states) > self.num_layers:
+            # Take first num_layers
+            layer_states = layer_states[:self.num_layers]
+
+        # Process through flow network
+        flow_result = self.flow_network(
+            layer_states,
+            return_resonance=return_resonance,
+        )
+
+        result = {
+            "flow_result": flow_result,
+            "coherence_summary": self.flow_network.get_coherence_summary(),
+        }
+
+        # Compute loss if requested
+        if compute_loss:
+            loss, loss_metrics = self.flow_loss(layer_states, flow_result)
+            result["loss"] = loss
+            result["loss_metrics"] = loss_metrics
+
+        # Metacognitive assessment
+        macro_coherence = flow_result["toroidal_coherence"]
+        meta_assessment = self.metacognitive.update(
+            coherence=macro_coherence,
+        )
+        result["metacognitive"] = meta_assessment
+
+        # Learning rate modulation recommendation
+        if self.learning_rate_modulation:
+            if meta_assessment["recommendation"] == "SLOW_DOWN":
+                result["lr_multiplier"] = 0.7
+            elif meta_assessment["recommendation"] == "ACCELERATE":
+                result["lr_multiplier"] = 1.1
+            elif meta_assessment["recommendation"] == "STABILIZE":
+                result["lr_multiplier"] = 0.9
+            else:
+                result["lr_multiplier"] = 1.0
+
+        # Store in history
+        self.evolution_history.append({
+            "micro_coherence": flow_result["micro_coherence_mean"],
+            "macro_coherence": macro_coherence,
+            "recommendation": meta_assessment["recommendation"],
+        })
+        if len(self.evolution_history) > 1000:
+            self.evolution_history = self.evolution_history[-1000:]
+
+        return result
+
+    def get_status(self) -> str:
+        """Get formatted status string."""
+        return self.flow_network.get_status_string()
+
+    def get_evolutionary_health(self) -> Dict[str, Any]:
+        """
+        Compute overall evolutionary health metrics.
+
+        Returns assessment of the system's cognitive vitality.
+        """
+        if not self.evolution_history:
+            return {"health": "UNKNOWN", "score": 0.5}
+
+        recent = self.evolution_history[-10:]
+
+        micro_avg = sum(h["micro_coherence"] for h in recent) / len(recent)
+        macro_avg = sum(h["macro_coherence"] for h in recent) / len(recent)
+
+        # Overall health score
+        score = (micro_avg + macro_avg) / 2
+
+        if score >= 0.7:
+            health = "THRIVING"
+        elif score >= 0.5:
+            health = "HEALTHY"
+        elif score >= 0.3:
+            health = "STRESSED"
+        else:
+            health = "CRITICAL"
+
+        return {
+            "health": health,
+            "score": score,
+            "micro_coherence": micro_avg,
+            "macro_coherence": macro_avg,
+            "trend": self._compute_trend(),
+        }
+
+    def _compute_trend(self) -> str:
+        """Compute evolutionary trend from history."""
+        if len(self.evolution_history) < 10:
+            return "ESTABLISHING"
+
+        early = self.evolution_history[-20:-10]
+        late = self.evolution_history[-10:]
+
+        early_score = sum(h["macro_coherence"] for h in early) / len(early)
+        late_score = sum(h["macro_coherence"] for h in late) / len(late)
+
+        diff = late_score - early_score
+        if diff > 0.05:
+            return "ASCENDING"
+        elif diff < -0.05:
+            return "DESCENDING"
+        else:
+            return "STABLE"
+
+
+# =============================================================================
 # PERFORMANCE OPTIMIZATIONS
 # =============================================================================
 # TF32 for faster matrix multiplications on Ampere+ GPUs (A100, H100)
