@@ -3857,6 +3857,8 @@ class DynamicRelaxationController:
         # Weight Transfer settings
         guna_lock_steps: int = 50,           # Steps to freeze W_q/W_k post-swap
         enable_weight_transfer: bool = True,  # Enable weight transfer during relaxation
+        # Force relaxation at specific step (bypasses stability check)
+        force_relaxation_step: int = None,   # If set, force 9:3→6:6 at this step
     ):
         self.gradient_scaler = gradient_scaler
         self.model = model
@@ -3887,6 +3889,10 @@ class DynamicRelaxationController:
         # Weight Transfer for 9:3 → 6:6 transition
         self.enable_weight_transfer = enable_weight_transfer
         self.guna_lock_steps = guna_lock_steps
+
+        # Force relaxation at specific step
+        self.force_relaxation_step = force_relaxation_step
+        self.force_relaxation_triggered = False  # Track if we've already forced
 
         # [S5] Entropy Gate: Block relaxation if entropy too high
         self.entropy_gate_threshold = 0.50  # Must be below this to relax
@@ -3935,6 +3941,8 @@ class DynamicRelaxationController:
         if enable_weight_transfer:
             print(f"    Weight Transfer: ENABLED")
             print(f"    Guna-Lock: {guna_lock_steps} steps post-swap")
+        if force_relaxation_step is not None:
+            print(f"    ⚡ Force Relaxation: Step {force_relaxation_step} (bypasses stability check)")
 
     def compute_stability_index(
         self,
@@ -4103,12 +4111,22 @@ class DynamicRelaxationController:
 
         # State machine
         if self.state == self.STATE_AUTHORITY:
+            # Check for force relaxation at specific step (bypasses all checks)
+            force_triggered = False
+            if (self.force_relaxation_step is not None and
+                global_step >= self.force_relaxation_step and
+                not self.force_relaxation_triggered):
+                force_triggered = True
+                self.force_relaxation_triggered = True
+                print(f"\n  ⚡ [FORCE RELAXATION] Step {global_step} >= {self.force_relaxation_step}")
+                print(f"      Triggering 9:3 → 6:6 transition (bypassing stability check)")
+
             # Check if we should trigger relaxation (mode-dependent)
             stability_ready = self._check_relaxation_ready(stability_index, sa_ratio=sa_ratio)
 
-            # [S5] Entropy Gate: Block relaxation if entropy too high
+            # [S5] Entropy Gate: Block relaxation if entropy too high (skipped for force trigger)
             entropy_clear = True
-            if entropy is not None and entropy > self.entropy_gate_threshold:
+            if not force_triggered and entropy is not None and entropy > self.entropy_gate_threshold:
                 entropy_clear = False
                 if stability_ready and not self.entropy_gate_blocked:
                     # Log that we're blocking due to entropy
@@ -4118,7 +4136,7 @@ class DynamicRelaxationController:
             else:
                 self.entropy_gate_blocked = False
 
-            if stability_ready and entropy_clear:
+            if force_triggered or (stability_ready and entropy_clear):
                 # Ready to relax!
                 self.state = self.STATE_RELAXING
                 self.pre_relaxation_ppl = val_ppl
@@ -4130,7 +4148,8 @@ class DynamicRelaxationController:
                     "to": "BALANCED",
                     "stability": stability_index,
                     "ppl": val_ppl,
-                    "mode": self.mode,
+                    "mode": self.mode if not force_triggered else "FORCED",
+                    "forced": force_triggered,
                 })
 
         elif self.state == self.STATE_RELAXING:
@@ -4636,6 +4655,7 @@ class UnifiedTrainingConfig:
     relaxation_stability_threshold: float = 0.50  # S/A ratio threshold for trigger
     relaxation_stability_window: int = 500   # Steps for stability check (rolling window)
     relaxation_streak_target: int = 5        # Consecutive stable evals (for consecutive mode)
+    force_relaxation_step: int = None        # Force 9:3→6:6 at this step (bypasses stability check)
     relaxation_target_authority: int = 6     # Target authority layers after relaxation
     relaxation_target_sensory: int = 6       # Target sensory layers after relaxation
     relaxation_thaw_alpha: float = 0.05      # Dampened Thaw starting α for new sensory layers
@@ -5468,6 +5488,8 @@ def train(config: UnifiedTrainingConfig):
             # Weight Transfer settings
             guna_lock_steps=config.guna_lock_steps,
             enable_weight_transfer=config.enable_weight_transfer,
+            # Force relaxation at specific step
+            force_relaxation_step=config.force_relaxation_step,
         )
 
     # Mixed precision
@@ -6574,6 +6596,8 @@ def main():
                        help="Rolling window size for stability check")
     parser.add_argument("--relaxation_streak_target", type=int, default=5,
                        help="Consecutive stable evals for 'consecutive' mode")
+    parser.add_argument("--force_relaxation_step", type=int, default=None,
+                       help="Force 9:3→6:6 swap at this step (bypasses stability check)")
     parser.add_argument("--relaxation_target_authority", type=int, default=6,
                        help="Target authority layers after relaxation")
     parser.add_argument("--relaxation_target_sensory", type=int, default=6,
@@ -6726,6 +6750,7 @@ def main():
         relaxation_stability_threshold=args.relaxation_stability_threshold,
         relaxation_stability_window=args.relaxation_stability_window,
         relaxation_streak_target=args.relaxation_streak_target,
+        force_relaxation_step=args.force_relaxation_step,
         relaxation_target_authority=args.relaxation_target_authority,
         relaxation_target_sensory=args.relaxation_target_sensory,
         relaxation_thaw_alpha=args.relaxation_thaw_alpha,
