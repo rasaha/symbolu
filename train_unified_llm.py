@@ -1408,12 +1408,25 @@ class TrainingStateTracker:
 # SATTVIC BRAKE: Lightweight Confidence via Phase Angle Variance
 # =============================================================================
 
+# Import shared variance confidence utility
+try:
+    from symbolu.guna_modulation.variance_confidence import (
+        VarianceConfidence,
+        VarianceConfidenceConfig,
+    )
+    VARIANCE_CONFIDENCE_AVAILABLE = True
+except ImportError:
+    VARIANCE_CONFIDENCE_AVAILABLE = False
+
+
 class SattvicBrake:
     """
     Sattvic Brake - Lightweight Confidence Estimation via Phase Angle Variance.
 
     Instead of full Bayesian inference, measure the "agreement" of Phase Attention
     heads in Authority layers (0-8). High agreement = high confidence.
+
+    Uses shared VarianceConfidence for braking logic and status formatting.
 
     Cost: ~0.1% compute (variance calculation), 0% extra memory
 
@@ -1430,13 +1443,23 @@ class SattvicBrake:
         authority_layers: int = 9,
         confidence_threshold: float = 0.5,
         lr_reduction: float = 0.8,
+        window_size: int = 10,
     ):
         self.model = model
         self.authority_layers = authority_layers
         self.confidence_threshold = confidence_threshold
         self.lr_reduction = lr_reduction
 
-        # History tracking
+        # Use shared VarianceConfidence for braking logic
+        if VARIANCE_CONFIDENCE_AVAILABLE:
+            self._variance_confidence = VarianceConfidence(
+                window_size=window_size,
+                confidence_threshold=confidence_threshold,
+            )
+        else:
+            self._variance_confidence = None
+
+        # Fallback history tracking (if shared class unavailable)
         self.confidence_history = []
         self.brake_applied_count = 0
 
@@ -1513,8 +1536,13 @@ class SattvicBrake:
 
         Confidence = 1 - variance (high variance = low confidence)
         """
-        variance, _ = self.compute_phase_variance()
+        variance, layer_variances = self.compute_phase_variance()
         confidence = 1.0 - variance
+
+        # Update shared variance confidence with layer variances
+        if self._variance_confidence is not None and layer_variances:
+            # Feed layer variances as observation tuple
+            self._variance_confidence.update(tuple(layer_variances))
 
         # Track history
         self.confidence_history.append(confidence)
@@ -1533,6 +1561,16 @@ class SattvicBrake:
         if confidence is None:
             confidence = self.compute_confidence()
 
+        # Use shared VarianceConfidence if available
+        if self._variance_confidence is not None:
+            # Override the confidence in shared tracker
+            self._variance_confidence._confidence = confidence
+            should_apply, mult = self._variance_confidence.should_brake(confidence)
+            if should_apply:
+                self.brake_applied_count += 1
+            return should_apply, mult
+
+        # Fallback: inline braking logic
         if confidence < self.confidence_threshold:
             self.brake_applied_count += 1
             # Graduated braking: lower confidence = stronger brake
@@ -1548,6 +1586,10 @@ class SattvicBrake:
 
     def get_status_icon(self, confidence: float) -> str:
         """Get status icon for confidence level."""
+        if self._variance_confidence is not None:
+            return self._variance_confidence.get_status_icon(confidence)
+
+        # Fallback
         if confidence >= 0.7:
             return "🟢"
         elif confidence >= 0.5:
@@ -1562,6 +1604,11 @@ class SattvicBrake:
         if confidence is None:
             confidence = self.compute_confidence()
 
+        if self._variance_confidence is not None:
+            self._variance_confidence._confidence = confidence
+            return self._variance_confidence.format_status(confidence)
+
+        # Fallback
         icon = self.get_status_icon(confidence)
         brake, lr_mult = self.should_brake(confidence)
 

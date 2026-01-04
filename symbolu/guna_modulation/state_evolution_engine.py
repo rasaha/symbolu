@@ -98,6 +98,12 @@ from symbolu.guna_modulation.v27_config import (
     BAYESIAN_CONSUMER,
 )
 
+# Import shared variance confidence utility
+from symbolu.guna_modulation.variance_confidence import (
+    VarianceConfidence,
+    VarianceConfidenceConfig,
+)
+
 
 # =============================================================================
 # Audit Types
@@ -263,14 +269,14 @@ class StateEvolutionEngine:
         else:
             self._bayesian_state = None
 
-        # Fast mode: Initialize observable history for variance tracking
+        # Fast mode: Use shared VarianceConfidence for lightweight confidence tracking
         if self._config.is_fast:
-            window = self._config.fast_config.variance_window
-            self._observable_history: List[Tuple[float, float, float]] = []
-            self._fast_confidence = 0.5  # Start neutral
+            self._variance_confidence = VarianceConfidence(
+                window_size=self._config.fast_config.variance_window,
+                confidence_threshold=self._config.fast_config.confidence_threshold,
+            )
         else:
-            self._observable_history = []
-            self._fast_confidence = None
+            self._variance_confidence = None
 
     @property
     def config(self) -> V27Config:
@@ -337,63 +343,41 @@ class StateEvolutionEngine:
         Confidence from observable variance (None if not in Fast mode).
 
         Confidence = 1 - variance(s, r, t observables)
-        Same approach as SattvicBrake in training.
+        Uses shared VarianceConfidence class (same as SattvicBrake in training).
         """
-        return self._fast_confidence
+        if self._variance_confidence is not None:
+            return self._variance_confidence.confidence
+        return None
 
-    def _compute_observable_variance(self, observables: Observables) -> float:
+    def _update_fast_confidence(self, observables: Observables) -> float:
         """
-        Compute variance of observable signals for confidence estimation.
+        Update fast confidence using shared VarianceConfidence.
 
-        Uses a rolling window of (s, r, t) tuples.
+        Args:
+            observables: Current observable signals
 
         Returns:
-            Variance in [0, 1] range (higher = less confident)
+            Updated confidence [0, 1]
         """
-        # Add current observation to history
-        self._observable_history.append((observables.s, observables.r, observables.t))
+        if self._variance_confidence is None:
+            return 0.5
 
-        # Trim to window size
-        window = self._config.fast_config.variance_window
-        if len(self._observable_history) > window:
-            self._observable_history = self._observable_history[-window:]
-
-        if len(self._observable_history) < 2:
-            return 0.5  # Not enough data, return neutral
-
-        # Compute variance across the window
-        s_vals = [obs[0] for obs in self._observable_history]
-        r_vals = [obs[1] for obs in self._observable_history]
-        t_vals = [obs[2] for obs in self._observable_history]
-
-        # Simple variance calculation
-        def variance(vals):
-            if len(vals) < 2:
-                return 0.0
-            mean = sum(vals) / len(vals)
-            return sum((v - mean) ** 2 for v in vals) / len(vals)
-
-        # Average variance across s, r, t
-        avg_variance = (variance(s_vals) + variance(r_vals) + variance(t_vals)) / 3.0
-
-        # Normalize to [0, 1] - empirical scaling (max theoretical variance is 0.25)
-        normalized_variance = min(1.0, avg_variance / 0.25)
-
-        return normalized_variance
+        # Feed (s, r, t) as observation tuple to shared tracker
+        return self._variance_confidence.update((observables.s, observables.r, observables.t))
 
     def get_confidence(self) -> float:
         """
         Get current confidence level (works in any mode).
 
         - EMA mode: Returns 0.5 (neutral, no confidence tracking)
-        - Fast mode: Returns phase variance confidence
+        - Fast mode: Returns variance-based confidence (shared with SattvicBrake)
         - Bayesian mode: Returns posterior confidence
 
         Returns:
             Confidence in [0, 1] range
         """
-        if self._config.is_fast:
-            return self._fast_confidence or 0.5
+        if self._config.is_fast and self._variance_confidence is not None:
+            return self._variance_confidence.confidence
         elif self._config.is_bayesian and self._bayesian_state:
             return self._bayesian_state.overall_confidence
         else:
@@ -404,6 +388,7 @@ class StateEvolutionEngine:
         Check if response should include hedging language.
 
         Only applies in Fast mode with hedging enabled.
+        Uses shared VarianceConfidence braking logic.
 
         Returns:
             True if confidence is below threshold
@@ -412,7 +397,28 @@ class StateEvolutionEngine:
             return False
         if not self._config.fast_config.hedging_enabled:
             return False
-        return self.get_confidence() < self._config.fast_config.confidence_threshold
+        if self._variance_confidence is None:
+            return False
+
+        should_brake, _ = self._variance_confidence.should_brake()
+        return should_brake
+
+    def get_confidence_status(self) -> str:
+        """
+        Get formatted confidence status for logging.
+
+        Uses shared VarianceConfidence formatting (consistent with SattvicBrake).
+
+        Returns:
+            Formatted string like "Conf:0.75🟢" or "Conf:0.35🟠 [BRAKE×0.70]"
+        """
+        if self._variance_confidence is not None:
+            return self._variance_confidence.format_status()
+        elif self._bayesian_state is not None:
+            conf = self._bayesian_state.overall_confidence
+            return f"Conf:{conf:.2f} (Bayesian)"
+        else:
+            return "Conf:0.50 (EMA)"
 
     def update(self, observables: Observables) -> StateUpdateAudit:
         """
@@ -473,15 +479,13 @@ class StateEvolutionEngine:
                 bayesian_confidence = self._bayesian_state.overall_confidence
                 bayesian_uncertainty = self._bayesian_state.uncertainty_summary
         elif self._config.is_fast:
-            # Fast mode: apply EMA + track phase variance confidence
+            # Fast mode: apply EMA + track variance confidence (shared with SattvicBrake)
             state_after = self._apply_update(state_before, target_state)
             self._state = state_after
             self._update_count += 1
 
-            # Compute lightweight confidence from observable variance
-            variance = self._compute_observable_variance(observables)
-            self._fast_confidence = 1.0 - variance
-            fast_confidence = self._fast_confidence
+            # Update shared VarianceConfidence with observables
+            fast_confidence = self._update_fast_confidence(observables)
         else:
             # EMA mode: apply EMA update equation (bounded temporal memory)
             state_after = self._apply_update(state_before, target_state)
