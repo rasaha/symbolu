@@ -143,20 +143,40 @@ as a "Shadow Learner" that learns to predict the optimal O1 state.
 | Logic | Learns via feedback | Learns via prediction |
 | OOM Risk | High | **Zero** |
 
-### Implementation (DONE)
+### Implementation (DONE - WITH GRADIENT FIX)
+
+**Key Insight**: The `karma_buffer` is detached in `store_harvest()`, so gradients won't flow
+back to bridge weights if we use `toroidal_seed` directly. Solution: Add `active_projection`
+attribute that retains the gradient path.
+
+**EvolutionaryBridge Changes**:
+```python
+# In __init__:
+self.active_projection: Optional[torch.Tensor] = None
+
+# In store_harvest():
+seed = self._compute_seed(harvest)
+self.active_projection = seed  # Retains gradient path for SMA
+self.karma_buffer = seed.detach()  # Detached for O1 initialization
+```
+
+**Training Loop**:
 ```python
 # V9.4.6: Shadow Mirror Alignment (SMA) - Lite Meta-Learning
+# Uses active_projection (non-detached) for proper gradient flow to bridge
 sma_weight = 0.05
 o1_target = o1_state.detach()  # Don't backprop through model
 if o1_target.dim() == 3:
     o1_target = o1_target.mean(dim=1)
-if toroidal_seed.dim() == 3:
-    seed_for_sma = toroidal_seed.mean(dim=1)
-else:
-    seed_for_sma = toroidal_seed
-# MSE loss: bridge learns to project O12 → O1 accurately
-sma_loss = F.mse_loss(seed_for_sma, o1_target) * sma_weight
-loss = loss + sma_loss
+
+# Use active_projection for gradient flow (not detached toroidal_seed)
+seed_for_sma = evolutionary_bridge.active_projection
+if seed_for_sma is not None:
+    if seed_for_sma.dim() == 3:
+        seed_for_sma = seed_for_sma.mean(dim=1)
+    # MSE loss: bridge learns to project O12 → O1 accurately
+    sma_loss = F.mse_loss(seed_for_sma, o1_target) * sma_weight
+    loss = loss + sma_loss
 ```
 
 ### Monitoring

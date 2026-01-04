@@ -394,6 +394,10 @@ class EvolutionaryBridge(nn.Module):
         self.coherence_history: List[float] = []
         self.bridge_active = False
 
+        # V9.4.6: Active projection for SMA gradient flow
+        # Keeps non-detached seed for meta-learning while karma_buffer remains detached
+        self.active_projection: Optional[torch.Tensor] = None
+
     def _compute_seed(self, harvest: torch.Tensor) -> torch.Tensor:
         """
         Compute the Seed state from the Harvest (O12 → O1 projection).
@@ -427,13 +431,17 @@ class EvolutionaryBridge(nn.Module):
         # Compute the seed for next cycle
         seed = self._compute_seed(harvest)
 
+        # V9.4.6: Keep active projection with gradients for SMA meta-learning
+        # This allows gradients to flow back to seed_proj/seed_gate weights
+        self.active_projection = seed  # Retains gradient path
+
         # Handle gradient flow based on truncated BPTT setting
         self.step_count += 1
         if self.truncated_bptt_steps > 0 and self.step_count % self.truncated_bptt_steps != 0:
             # Allow gradient flow for truncated BPTT
             self.karma_buffer = seed
         else:
-            # Detach to prevent infinite gradient chains
+            # Detach to prevent infinite gradient chains for O1 initialization
             self.karma_buffer = seed.detach()
 
         self.bridge_active = True
@@ -6438,19 +6446,22 @@ def train(config: UnifiedTrainingConfig):
 
                         # V9.4.6: Shadow Mirror Alignment (SMA) - Lite Meta-Learning
                         # Trains bridge weights (seed_proj, seed_gate) to predict actual O1 state
+                        # Uses active_projection (non-detached) for proper gradient flow to bridge
                         # Zero VRAM overhead, achieves meta-learning without BPTT risks
                         sma_weight = 0.05
                         o1_target = o1_state.detach()  # Don't backprop through model
                         if o1_target.dim() == 3:
                             o1_target = o1_target.mean(dim=1)  # [B, N, dim] → [B, dim]
-                        if toroidal_seed.dim() == 3:
-                            seed_for_sma = toroidal_seed.mean(dim=1)
-                        else:
-                            seed_for_sma = toroidal_seed
-                        # MSE loss: bridge learns to project O12 → O1 accurately
-                        sma_loss = F.mse_loss(seed_for_sma, o1_target) * sma_weight
-                        loss = loss + sma_loss
-                        metrics['sma_loss'] = sma_loss.item()
+
+                        # Use active_projection for gradient flow (not detached toroidal_seed)
+                        seed_for_sma = evolutionary_bridge.active_projection
+                        if seed_for_sma is not None:
+                            if seed_for_sma.dim() == 3:
+                                seed_for_sma = seed_for_sma.mean(dim=1)
+                            # MSE loss: bridge learns to project O12 → O1 accurately
+                            sma_loss = F.mse_loss(seed_for_sma, o1_target) * sma_weight
+                            loss = loss + sma_loss
+                            metrics['sma_loss'] = sma_loss.item()
 
                         # Update metacognitive tracker
                         if metacognitive_tracker is not None:
