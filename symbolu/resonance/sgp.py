@@ -35,11 +35,13 @@ Why SGP is Essential:
        - SGP ensures "memory" of the 0.5 phase remains in weights
 
 Key Dynamics:
-    - When stagnation detected: SGP rate INCREASES (cement hardens)
-    - During Sattvic Release: SGP rate can decrease (fluid learning)
-    - The SGP Rate (20-25) serves as "Toroidal Refresh Rate"
+    - When stagnation detected: SGP rate HALVES (25→12) for MORE FREQUENT hammering
+    - This increases the frequency of the "Ontological Hammer," forcing
+      the model to break the repetition basin faster
+    - The SGP Rate (25 default) serves as "Toroidal Refresh Rate"
+    - Persistence buffer stores running average of gradients with gamma coefficient
 
-Version: 1.0
+Version: 2.0
 Date: 2026-01-04
 """
 
@@ -66,28 +68,28 @@ except ImportError:
 class SGPConfig:
     """Configuration for Stochastic Gradient Persistence."""
 
-    # Base persistence rate (steps to accumulate gradients)
-    base_rate: int = 20              # Default SGP rate
+    # Base persistence rate (steps between gradient pulses)
+    base_rate: int = 25              # Default SGP rate (Toroidal Refresh Rate)
+
+    # Stagnation rate (HALVED for MORE FREQUENT hammering)
+    stagnation_rate: int = 12        # Rate when stagnation detected (25→12)
 
     # Rate bounds
-    min_rate: int = 10               # Minimum rate (high-velocity learning)
-    max_rate: int = 50               # Maximum rate (heavy cement during collapse)
+    min_rate: int = 8                # Minimum rate (very high-velocity)
+    max_rate: int = 50               # Maximum rate (slow cement)
 
-    # Stagnation response
-    stagnation_boost: float = 1.5    # Multiply rate when stagnation detected
-    collapse_boost: float = 2.0      # Multiply rate during mode collapse
-
-    # Decay settings
-    decay_enabled: bool = True       # Allow rate to decay during Sattvic Release
-    decay_factor: float = 0.9        # Rate multiplier per decay step
+    # Persistence buffer coefficient
+    gamma: float = 0.3               # Coefficient for persisted gradients: θ ← θ - η(∇θ + γ∇θ_persisted)
 
     # Gradient momentum
     momentum: float = 0.9            # EMA factor for gradient persistence
     momentum_floor: float = 0.7      # Minimum momentum during release
 
-    # Layer-specific persistence
-    authority_multiplier: float = 1.5  # Extra persistence for Authority layers (0-5)
-    sensory_multiplier: float = 1.0    # Normal persistence for Sensory layers (6-11)
+    # Layer-specific persistence (Authority = 0-8, Sensory = 9-11)
+    authority_layers: tuple = (0, 1, 2, 3, 4, 5, 6, 7, 8)  # Authority layers get special treatment
+    sensory_layers: tuple = (9, 10, 11)                     # Sensory layers
+    authority_multiplier: float = 1.2  # Extra persistence for Authority layers (0-8)
+    sensory_multiplier: float = 1.0    # Normal persistence for Sensory layers (9-11)
 
     # Integration with CSR
     csr_gradient_weight: float = 1.0   # Weight for CSR-derived gradients
@@ -135,9 +137,9 @@ if HAS_TORCH:
 
             # Apply layer-specific multiplier
             if layer_idx is not None:
-                if layer_idx < 6:  # Authority layers
+                if layer_idx in self.config.authority_layers:  # Authority layers (0-8)
                     rate = int(rate * self.config.authority_multiplier)
-                else:  # Sensory layers
+                else:  # Sensory layers (9-11)
                     rate = int(rate * self.config.sensory_multiplier)
 
             # Clamp rate
@@ -202,32 +204,43 @@ class SGPController:
     Stochastic Gradient Persistence Controller.
 
     Manages the SGP rate based on training state and SattvicController signals.
-    Implements the "cement" that hardens when the "blueprint" (CSR) detects failure.
+    Implements the "cement" that locks the phonetic "blueprint" (CSR) into weights.
 
-    The SGP rate determines how long gradients persist before being applied,
+    The SGP rate determines how frequently gradient pulses are applied,
     forcing the model to internalize structural constraints.
 
     Integration with SattvicController:
-        - Stagnation detected → SGP rate INCREASES (cement hardens)
-        - Mode collapse → SGP rate MAXIMIZES (emergency intervention)
-        - Sattvic Release → SGP rate can DECREASE (fluid learning)
+        - Stagnation detected → SGP rate HALVES (25→12) for MORE FREQUENT hammering
+        - Mode collapse → SGP rate HALVES (forces faster intervention)
+        - Normal operation → SGP rate = 25 (standard Toroidal Refresh Rate)
+
+    Persistence Buffer:
+        - Stores running average of gradients for Authority Layers (0-8)
+        - Formula: θ ← θ - η(∇θ + γ∇θ_persisted)
+        - γ (gamma) = coefficient for persisted gradient contribution
     """
 
     def __init__(self, config: Optional[SGPConfig] = None):
         self.config = config or SGPConfig()
 
         # Current state
-        self.current_rate = self.config.base_rate
+        self.current_rate = self.config.base_rate  # 25 default
         self.current_momentum = self.config.momentum
-        self.current_step = 0
+        self.step_count = 0
 
         # External controller reference
         self._sattvic_controller = None
 
+        # Persistence buffer for Authority Layers (0-8)
+        # Maps parameter -> running average of gradients
+        self.persistence_buffer: Dict[Any, Any] = {}  # param -> tensor
+        self.authority_params: List[Any] = []  # List of tracked authority parameters
+        self.gamma = self.config.gamma  # Persistence coefficient
+
         # History tracking
         self.rate_history: List[Dict[str, Any]] = []
-        self.boost_active = False
-        self.boost_reason: Optional[str] = None
+        self.stagnation_active = False
+        self.last_pulse_step = 0
 
         # Gradient buffer (if torch available)
         if HAS_TORCH:
@@ -239,6 +252,136 @@ class SGPController:
         """Attach SattvicController for synchronized updates."""
         self._sattvic_controller = controller
 
+    def register_authority_params(self, params: List[Any]):
+        """
+        Register parameters from Authority Layers (0-8) for gradient persistence.
+
+        These parameters will have their gradients persisted and injected
+        during SGP pulses.
+
+        Args:
+            params: List of torch parameters from layers 0-8
+        """
+        self.authority_params = list(params)
+        if HAS_TORCH:
+            import torch
+            for p in self.authority_params:
+                if p not in self.persistence_buffer:
+                    self.persistence_buffer[p] = torch.zeros_like(p.data)
+
+    def update_persistence_buffer(self):
+        """
+        Update the persistence buffer with current gradients.
+
+        Called every step to maintain running average of gradients
+        for Authority layers.
+        """
+        if not HAS_TORCH or not self.authority_params:
+            return
+
+        for p in self.authority_params:
+            if p.grad is not None:
+                # Running average with momentum
+                self.persistence_buffer[p] = (
+                    self.config.momentum * self.persistence_buffer[p] +
+                    (1 - self.config.momentum) * p.grad.data.clone()
+                )
+
+    def sgp_metabolic_step(self, metrics: Optional[Dict[str, float]] = None) -> bool:
+        """
+        Perform SGP metabolic step with dynamic rate based on Sattvic Controller.
+
+        This is the main training loop integration point. Call this every step.
+
+        The metabolic step:
+            1. Determines dynamic rate (12 if stagnation, else 25)
+            2. Checks for persistence pulse (step_count % rate == 0)
+            3. Injects persisted gradients into Authority layers
+            4. Synchronizes Toroidal Bridge
+
+        Args:
+            metrics: Optional dict with 'entropy', 'variance', 'knowledge'
+
+        Returns:
+            True if a persistence pulse was applied, False otherwise
+        """
+        self.step_count += 1
+
+        # 1. Determine Dynamic Rate based on Sattvic Controller
+        if self._sattvic_controller is not None:
+            status = self._sattvic_controller.get_status()
+            stagnation = status.get('stagnation_detected', False)
+            collapse = status.get('mode_collapse_detected', False)
+        else:
+            # Infer from provided metrics
+            if metrics:
+                variance = metrics.get('variance', 1.0)
+                entropy = metrics.get('entropy', 1.0)
+                stagnation = variance < 0.001
+                collapse = entropy < 0.4
+            else:
+                stagnation = False
+                collapse = False
+
+        # Stagnation or collapse: HALVE rate for MORE FREQUENT hammering
+        if stagnation or collapse:
+            self.current_rate = self.config.stagnation_rate  # 12
+            self.stagnation_active = True
+            if collapse:
+                print(f"  🔨 [SGP] Mode collapse → Rate halved to {self.current_rate} (FREQUENT HAMMERING)")
+            elif stagnation:
+                print(f"  🔨 [SGP] Stagnation → Rate halved to {self.current_rate} (FREQUENT HAMMERING)")
+        else:
+            self.current_rate = self.config.base_rate  # 25
+            self.stagnation_active = False
+
+        # Update persistence buffer every step
+        self.update_persistence_buffer()
+
+        # 2. Check for Persistence Pulse
+        if self.step_count % self.current_rate == 0:
+            # 3. Inject Persisted Gradients into Authority Layers (0-8)
+            if HAS_TORCH and self.authority_params:
+                for p in self.authority_params:
+                    if p.grad is not None and p in self.persistence_buffer:
+                        # θ ← θ - η(∇θ + γ∇θ_persisted)
+                        # We add γ * persisted gradient to current gradient
+                        p.grad.data.add_(self.persistence_buffer[p], alpha=self.gamma)
+
+            # 4. Synchronize Toroidal Bridge
+            self.toroidal_sync()
+
+            self.last_pulse_step = self.step_count
+
+            # Record history
+            self.rate_history.append({
+                "step": self.step_count,
+                "rate": self.current_rate,
+                "pulse": True,
+                "stagnation_active": self.stagnation_active,
+            })
+
+            return True  # Pulse applied
+
+        return False  # No pulse this step
+
+    def toroidal_sync(self):
+        """
+        Synchronize the Toroidal Bridge between Authority and Sensory layers.
+
+        Called every SGP pulse to ensure coherent information flow between
+        the structural (Authority: 0-8) and perceptual (Sensory: 9-11) layers.
+
+        This maintains the "circular flow" of the toroidal architecture.
+        """
+        if self._sattvic_controller is not None:
+            # Get current CSR state from Sattvic Controller
+            status = self._sattvic_controller.get_status()
+            lambda_csr = status.get('lambda_csr', 0.5)
+
+            # Log sync event
+            print(f"  🔄 [SGP] Toroidal sync at step {self.step_count} (λ={lambda_csr:.3f})")
+
     def update(
         self,
         step: int,
@@ -247,73 +390,38 @@ class SGPController:
         knowledge: Optional[float] = None,
     ) -> int:
         """
-        Update SGP rate based on current training state.
+        Legacy update method for backwards compatibility.
 
-        Can be called directly with metrics or will pull from attached
-        SattvicController if available.
+        Prefer using sgp_metabolic_step() for new code.
 
         Args:
             step: Current training step
-            entropy: Current entropy (optional if controller attached)
-            variance: Entropy variance (optional if controller attached)
-            knowledge: Knowledge score (optional if controller attached)
+            entropy: Current entropy
+            variance: Entropy variance
+            knowledge: Knowledge score
 
         Returns:
             Updated SGP rate
         """
-        self.current_step = step
+        self.step_count = step
 
         # Pull from SattvicController if attached
         if self._sattvic_controller is not None:
             status = self._sattvic_controller.get_status()
             stagnation = status.get('stagnation_detected', False)
             collapse = status.get('mode_collapse_detected', False)
-            boost_active = status.get('boost_active', False)
-            current_lambda = status.get('lambda_csr', 0.5)
         else:
             # Infer from provided metrics
             stagnation = variance is not None and variance < 0.001
             collapse = entropy is not None and entropy < 0.4
-            boost_active = stagnation or collapse
-            current_lambda = 0.5  # Default
 
-        # Compute rate based on state
-        if collapse:
-            # Mode collapse: Maximum cement
-            self.current_rate = int(self.config.base_rate * self.config.collapse_boost)
-            self.boost_active = True
-            self.boost_reason = "MODE_COLLAPSE"
-            print(f"  🧱 [SGP] Mode collapse: Rate increased to {self.current_rate}")
-
-        elif stagnation:
-            # Stagnation: Heavy cement
-            self.current_rate = int(self.config.base_rate * self.config.stagnation_boost)
-            self.boost_active = True
-            self.boost_reason = "STAGNATION"
-            print(f"  🧱 [SGP] Stagnation: Rate increased to {self.current_rate}")
-
-        elif self.config.decay_enabled and not boost_active:
-            # Sattvic Release: Can reduce rate based on lambda
-            if current_lambda < 0.3:
-                # Low guidance = allow faster learning
-                self.current_rate = int(self.config.base_rate * 0.7)
-                self.current_momentum = max(
-                    self.config.momentum_floor,
-                    self.config.momentum * 0.9
-                )
-            else:
-                # Normal operation
-                self.current_rate = self.config.base_rate
-                self.current_momentum = self.config.momentum
-
-            self.boost_active = False
-            self.boost_reason = None
-
+        # Stagnation or collapse: HALVE rate for MORE FREQUENT hammering
+        if stagnation or collapse:
+            self.current_rate = self.config.stagnation_rate  # 12
+            self.stagnation_active = True
         else:
-            # Default
-            self.current_rate = self.config.base_rate
-            self.boost_active = False
-            self.boost_reason = None
+            self.current_rate = self.config.base_rate  # 25
+            self.stagnation_active = False
 
         # Clamp rate
         self.current_rate = max(
@@ -321,34 +429,21 @@ class SGPController:
             min(self.config.max_rate, self.current_rate)
         )
 
-        # Update gradient buffer momentum if available
-        if self.gradient_buffer is not None:
-            self.gradient_buffer.config.momentum = self.current_momentum
-
-        # Record history
-        self.rate_history.append({
-            "step": step,
-            "rate": self.current_rate,
-            "momentum": self.current_momentum,
-            "boost_active": self.boost_active,
-            "boost_reason": self.boost_reason,
-        })
-
         return self.current_rate
 
     def get_effective_rate(self, layer_idx: Optional[int] = None) -> int:
         """
         Get effective SGP rate for a specific layer.
 
-        Authority layers (0-5) get higher persistence to lock structure.
-        Sensory layers (6-11) get normal persistence.
+        Authority layers (0-8) get higher persistence to lock structure.
+        Sensory layers (9-11) get normal persistence.
         """
         rate = self.current_rate
 
         if layer_idx is not None:
-            if layer_idx < 6:  # Authority layers
+            if layer_idx in self.config.authority_layers:  # Authority (0-8)
                 rate = int(rate * self.config.authority_multiplier)
-            else:  # Sensory layers
+            else:  # Sensory (9-11)
                 rate = int(rate * self.config.sensory_multiplier)
 
         return max(self.config.min_rate, min(self.config.max_rate, rate))
@@ -356,30 +451,37 @@ class SGPController:
     def get_status(self) -> Dict[str, Any]:
         """Get current SGP status."""
         return {
-            "step": self.current_step,
+            "step": self.step_count,
             "rate": self.current_rate,
+            "base_rate": self.config.base_rate,
+            "stagnation_rate": self.config.stagnation_rate,
             "momentum": self.current_momentum,
-            "boost_active": self.boost_active,
-            "boost_reason": self.boost_reason,
+            "gamma": self.gamma,
+            "stagnation_active": self.stagnation_active,
             "authority_rate": self.get_effective_rate(0),
-            "sensory_rate": self.get_effective_rate(6),
+            "sensory_rate": self.get_effective_rate(9),
             "sattvic_attached": self._sattvic_controller is not None,
+            "authority_params_count": len(self.authority_params),
+            "last_pulse_step": self.last_pulse_step,
         }
 
     def print_status(self):
         """Print current SGP status."""
         status = self.get_status()
-        print(f"\n  ╔══════════════════════════════════════════════════╗")
-        print(f"  ║           SGP CONTROLLER STATUS                  ║")
-        print(f"  ╠══════════════════════════════════════════════════╣")
-        print(f"  ║  Step:           {status['step']:>20}         ║")
-        print(f"  ║  Base Rate:      {status['rate']:>20}         ║")
-        print(f"  ║  Authority Rate: {status['authority_rate']:>20}         ║")
-        print(f"  ║  Sensory Rate:   {status['sensory_rate']:>20}         ║")
-        print(f"  ║  Momentum:       {status['momentum']:>20.3f}         ║")
-        print(f"  ║  Boost Active:   {'YES' if status['boost_active'] else 'NO':>20}         ║")
-        print(f"  ║  Boost Reason:   {status['boost_reason'] or 'NONE':>20}         ║")
-        print(f"  ╚══════════════════════════════════════════════════╝")
+        print(f"\n  ╔═══════════════════════════════════════════════════════════════╗")
+        print(f"  ║               SGP CONTROLLER STATUS                           ║")
+        print(f"  ╠═══════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Step:             {status['step']:>20}             ║")
+        print(f"  ║  Current Rate:     {status['rate']:>20}             ║")
+        print(f"  ║  Base Rate:        {status['base_rate']:>20}             ║")
+        print(f"  ║  Stagnation Rate:  {status['stagnation_rate']:>20}             ║")
+        print(f"  ║  Gamma (γ):        {status['gamma']:>20.3f}             ║")
+        print(f"  ║  Authority Rate:   {status['authority_rate']:>20}             ║")
+        print(f"  ║  Sensory Rate:     {status['sensory_rate']:>20}             ║")
+        print(f"  ║  Stagnation Mode:  {'YES' if status['stagnation_active'] else 'NO':>20}             ║")
+        print(f"  ║  Authority Params: {status['authority_params_count']:>20}             ║")
+        print(f"  ║  Last Pulse Step:  {status['last_pulse_step']:>20}             ║")
+        print(f"  ╚═══════════════════════════════════════════════════════════════╝")
 
     def should_apply_gradients(self, accumulated_steps: int) -> bool:
         """Check if gradients should be applied (persistence threshold met)."""
@@ -391,18 +493,18 @@ class SGPController:
 # =============================================================================
 
 def create_sgp_controller(
-    base_rate: int = 20,
-    stagnation_boost: float = 1.5,
-    collapse_boost: float = 2.0,
+    base_rate: int = 25,
+    stagnation_rate: int = 12,
+    gamma: float = 0.3,
     momentum: float = 0.9,
 ) -> SGPController:
     """
     Create an SGP Controller with custom settings.
 
     Args:
-        base_rate: Default SGP rate (steps before gradient application)
-        stagnation_boost: Rate multiplier during stagnation
-        collapse_boost: Rate multiplier during mode collapse
+        base_rate: Default SGP rate (25 = Toroidal Refresh Rate)
+        stagnation_rate: Rate when stagnation detected (12 = halved)
+        gamma: Persistence coefficient for gradient injection
         momentum: Gradient momentum factor
 
     Returns:
@@ -410,8 +512,8 @@ def create_sgp_controller(
     """
     config = SGPConfig(
         base_rate=base_rate,
-        stagnation_boost=stagnation_boost,
-        collapse_boost=collapse_boost,
+        stagnation_rate=stagnation_rate,
+        gamma=gamma,
         momentum=momentum,
     )
     return SGPController(config)
@@ -470,12 +572,14 @@ def apply_sgp_to_optimizer(
     Returns:
         True if gradients were applied, False if still accumulating
     """
-    # Update SGP rate
-    sgp_controller.update(step, entropy=entropy, knowledge=knowledge)
+    # Use the new metabolic step
+    pulse_applied = sgp_controller.sgp_metabolic_step({
+        'entropy': entropy,
+        'knowledge': knowledge,
+    })
 
     # Check if we should apply gradients
-    accumulated = step % sgp_controller.current_rate
-    if accumulated == 0:
+    if pulse_applied:
         optimizer.step()
         optimizer.zero_grad()
         return True
@@ -508,7 +612,7 @@ if HAS_TORCH:
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("  SGP CONTROLLER TEST")
+    print("  SGP CONTROLLER TEST (v2.0)")
     print("=" * 60)
 
     # Create synchronized controllers
@@ -519,6 +623,9 @@ if __name__ == "__main__":
     sgp.attach_sattvic_controller(sattvic)
 
     print("\n  Controllers synchronized.")
+    print(f"  Base Rate: {sgp.config.base_rate}")
+    print(f"  Stagnation Rate: {sgp.config.stagnation_rate}")
+    print(f"  Gamma: {sgp.gamma}")
 
     # Simulate training
     print("\n  Simulating training with SGP...")
@@ -540,8 +647,8 @@ if __name__ == "__main__":
 
         # Determine event
         event = ""
-        if sgp.boost_active:
-            event = f"🧱 {sgp.boost_reason}"
+        if sgp.stagnation_active:
+            event = f"🔨 HALVED (12)"
 
         print(f"  {step:<8} {entropy:<10.2f} {sgp_rate:<10} {lambda_csr:<12.3f} {event}")
 
