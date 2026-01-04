@@ -5918,6 +5918,15 @@ def train(config: UnifiedTrainingConfig):
     # Auto Batch Sizing: Probe VRAM at startup to find optimal batch size
     if config.enable_auto_batch:
         print(f"\n  Auto Batch Sizing: ENABLED")
+
+        # Sovereign loss requires (B, Seq, Vocab) tensors - massive overhead
+        # Reduce max_batch_size aggressively when sovereign loss is enabled
+        if config.enable_sovereign_loss:
+            auto_max_batch = 24  # Conservative for sovereign loss overhead
+            print(f"  ⚠️  Sovereign Loss detected: capping max_batch to {auto_max_batch}")
+        else:
+            auto_max_batch = 128
+
         auto_sizer = AutoBatchSizer(
             model=model,
             seq_len=config.max_seq_len,
@@ -5925,7 +5934,7 @@ def train(config: UnifiedTrainingConfig):
             target_utilization=config.auto_batch_target_utilization,
             safety_margin=config.auto_batch_safety_margin,
             min_batch_size=1,
-            max_batch_size=128,
+            max_batch_size=auto_max_batch,
             device=device,
         )
 
