@@ -80,6 +80,13 @@ from symbolu.resonance.varna_bridge import (
     ENGLISH_TO_VARNA,
 )
 
+from symbolu.resonance.controller import (
+    SattvicConfig,
+    SattvicController,
+    create_sattvic_controller,
+    compute_alpha_effective,
+)
+
 __all__ = [
     # Types
     "PhonemeCategory",
@@ -128,4 +135,9 @@ __all__ = [
     "get_bridge_meaning",
     "list_varnas",
     "ENGLISH_TO_VARNA",
+    # Sattvic Controller
+    "SattvicConfig",
+    "SattvicController",
+    "create_sattvic_controller",
+    "compute_alpha_effective",
 ]
