@@ -1431,15 +1431,22 @@ class EvolutionaryIntelligenceEngine:
         # Evolutionary history
         self.evolution_history: List[Dict[str, float]] = []
 
+        # V9.4.6: Elastic Resonance tracking
+        self.last_dynamic_alpha: float = self.resonance_alpha
+
     def apply_delayed_resonance(
         self,
         current_states: List[torch.Tensor],
     ) -> List[torch.Tensor]:
         """
+        V9.4.6: Elastic Resonance - Guna-scaled alpha.
+
         Apply delayed resonance: inject previous step's O12 (Authority/Integration)
         into current step's O1 (Potential/Sensory).
 
-        This creates the Toroidal 12→1 bridge without 2x compute penalty.
+        Dynamic alpha based on Guna state:
+        - High Sattva (clarity) → increase retention (up to 0.25)
+        - High Rajas (error/heat) → reduce retention (down to 0.05)
 
         Args:
             current_states: Hidden states from current forward pass
@@ -1450,6 +1457,13 @@ class EvolutionaryIntelligenceEngine:
         if self.resonance_buffer is None or len(self.resonance_buffer) == 0:
             return current_states
 
+        # V9.4.6: Compute dynamic alpha based on Gunas
+        s, r, t = self.current_gunas
+        # Base is resonance_alpha (0.1); range is [0.05, 0.25]
+        dynamic_alpha = self.resonance_alpha * (1.0 + (s * 1.5) - (r * 0.5))
+        dynamic_alpha = max(0.05, min(0.25, dynamic_alpha))
+        self.last_dynamic_alpha = dynamic_alpha
+
         # Inject Layer 11 (O12 - Authority/Integration) into Layer 0 (O1 - Potential)
         if len(self.resonance_buffer) >= 12 and len(current_states) >= 1:
             o12_prev = self.resonance_buffer[11]  # Previous O12 state
@@ -1457,13 +1471,13 @@ class EvolutionaryIntelligenceEngine:
 
             # Ensure shape compatibility
             if o12_prev.shape == o1_current.shape:
-                # Resonant injection: O1' = O1 + α * O12_prev
-                current_states[0] = o1_current + (self.resonance_alpha * o12_prev)
+                # Resonant injection: O1' = O1 + α * O12_prev (using dynamic alpha)
+                current_states[0] = o1_current + (dynamic_alpha * o12_prev)
             elif o12_prev.shape[-1] == o1_current.shape[-1]:
                 # Handle sequence length mismatch by averaging
                 if o12_prev.dim() == 3 and o1_current.dim() == 3:
                     o12_avg = o12_prev.mean(dim=1, keepdim=True).expand_as(o1_current)
-                    current_states[0] = o1_current + (self.resonance_alpha * o12_avg)
+                    current_states[0] = o1_current + (dynamic_alpha * o12_avg)
 
         return current_states
 
@@ -6444,6 +6458,24 @@ def train(config: UnifiedTrainingConfig):
 
                 if hidden_states is not None and len(hidden_states) > 0:
 
+                    # V9.4.6: Sensory Noise Injection (SNI)
+                    # Break repetitive loops by injecting tiny noise into sensory layers
+                    # when entropy drops below floor (signaling "city of the city" patterns)
+                    sni_entropy_floor = 0.30
+                    sni_noise_scale = 1e-4
+                    current_entropy = metrics.get("onto_entropy", 1.0)
+
+                    if current_entropy < sni_entropy_floor:
+                        # Inject noise into sensory layers (O10-O12 = indices 9, 10, 11)
+                        sensory_indices = [9, 10, 11]
+                        for idx in sensory_indices:
+                            if idx < len(hidden_states):
+                                hidden_states[idx] = hidden_states[idx] + \
+                                    torch.randn_like(hidden_states[idx]) * sni_noise_scale
+                        metrics['sni_triggered'] = True
+                    else:
+                        metrics['sni_triggered'] = False
+
                     # Update Gunas in engine for metacognitive decisions
                     evolutionary_engine.update_gunas(guna_s, guna_r, guna_t)
 
@@ -6791,6 +6823,10 @@ def train(config: UnifiedTrainingConfig):
                         if evo_lr_multiplier != 1.0:
                             log_msg += f" [LR×{evo_lr_multiplier:.2f}]"
 
+                # V9.4.6: Log SNI activation
+                if metrics.get('sni_triggered', False):
+                    log_msg += f"\n    --> [SNI] Low entropy ({metrics.get('onto_entropy', 0):.2f}) - injecting sensory noise"
+
                 print(log_msg)
                 step_start_time = time.time()
 
@@ -6812,7 +6848,24 @@ def train(config: UnifiedTrainingConfig):
                         step=global_step,
                         phase_ramp_steps=config.phase_ramp_steps,
                     )
-                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f} | {authority_controller.get_status_string()}")
+
+                    # V9.4.6: PIDv2 Relaxation Sensitivity
+                    # Dampen Kp during post-relaxation recovery to let sensory layers stabilize
+                    relaxation_dampening_active = False
+                    if relaxation_controller is not None and relaxation_controller.relaxation_step is not None:
+                        steps_since_relaxation = global_step - relaxation_controller.relaxation_step
+                        ppl_derivative = getattr(authority_controller, 'last_v', 0.0)
+                        # If within 100 steps of swap AND PPL is rising, dampen authority
+                        if 0 < steps_since_relaxation <= 100 and ppl_derivative > 0:
+                            # Force minimum authority to let sensory layers re-anchor
+                            new_A = config.pidv2_a_min
+                            relaxation_dampening_active = True
+
+                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f} | {authority_controller.get_status_string()}", end="")
+                    if relaxation_dampening_active:
+                        print(f" [RELAX_DAMP]")
+                    else:
+                        print()
 
                     # V9.4.5: Log Friction Controller status (with corrective actions)
                     if friction_controller is not None:
