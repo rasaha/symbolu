@@ -5999,13 +5999,13 @@ def train(config: UnifiedTrainingConfig):
         print(f"\n  Auto Batch Sizing: ENABLED")
 
         # Sovereign loss requires (B, Seq, Vocab) tensors - massive overhead
-        # Scale max_batch based on available VRAM
+        # Scale max_batch based on available VRAM (conservative to allow SGP headroom)
         if config.enable_sovereign_loss:
             total_vram_gb = torch.cuda.get_device_properties(device).total_memory / 1e9
             if total_vram_gb >= 140:  # H200 class (141GB+)
-                auto_max_batch = 64
+                auto_max_batch = 32  # Conservative - use gradient accumulation
             elif total_vram_gb >= 90:  # 96GB class
-                auto_max_batch = 48
+                auto_max_batch = 32
             elif total_vram_gb >= 70:  # A100 80GB class
                 auto_max_batch = 24
             else:  # Smaller GPUs
