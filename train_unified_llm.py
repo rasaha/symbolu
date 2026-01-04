@@ -3859,6 +3859,13 @@ class DynamicRelaxationController:
         enable_weight_transfer: bool = True,  # Enable weight transfer during relaxation
         # Force relaxation at specific step (bypasses stability check)
         force_relaxation_step: int = None,   # If set, force 9:3→6:6 at this step
+        # Sovereign Saturation Gate (automatic detection)
+        enable_saturation_gate: bool = True,  # Enable automatic saturation detection
+        saturation_coherence_threshold: float = 0.74,  # Coherence threshold for trigger
+        saturation_patience: int = 50,        # Steps where sensory derivative must be flat
+        saturation_thaw_start: float = 0.3,   # New sensory layers start at this α
+        saturation_thaw_end: float = 0.7,     # Ramp to this α
+        saturation_thaw_steps: int = 100,     # Steps to ramp new layers
     ):
         self.gradient_scaler = gradient_scaler
         self.model = model
@@ -3893,6 +3900,19 @@ class DynamicRelaxationController:
         # Force relaxation at specific step
         self.force_relaxation_step = force_relaxation_step
         self.force_relaxation_triggered = False  # Track if we've already forced
+
+        # Sovereign Saturation Gate
+        self.enable_saturation_gate = enable_saturation_gate
+        self.saturation_coherence_threshold = saturation_coherence_threshold
+        self.saturation_patience = saturation_patience
+        self.saturation_thaw_start = saturation_thaw_start
+        self.saturation_thaw_end = saturation_thaw_end
+        self.saturation_thaw_steps = saturation_thaw_steps
+        # Saturation tracking
+        self.sensory_flow_history = []  # Track sensory flow for derivative
+        self.saturation_flat_count = 0  # Count of steps with flat derivative
+        self.saturation_triggered = False  # Track if saturation gate fired
+        self.saturation_thaw_step = None  # Step when thaw started
 
         # [S5] Entropy Gate: Block relaxation if entropy too high
         self.entropy_gate_threshold = 0.50  # Must be below this to relax
@@ -3943,6 +3963,11 @@ class DynamicRelaxationController:
             print(f"    Guna-Lock: {guna_lock_steps} steps post-swap")
         if force_relaxation_step is not None:
             print(f"    ⚡ Force Relaxation: Step {force_relaxation_step} (bypasses stability check)")
+        if enable_saturation_gate:
+            print(f"    🎯 Saturation Gate: ENABLED")
+            print(f"       Coherence threshold: {saturation_coherence_threshold}")
+            print(f"       Patience: {saturation_patience} steps flat derivative")
+            print(f"       Dampened Thaw: α {saturation_thaw_start}→{saturation_thaw_end} over {saturation_thaw_steps} steps")
 
     def compute_stability_index(
         self,
@@ -4023,6 +4048,78 @@ class DynamicRelaxationController:
 
             return False
 
+    def _check_saturation_gate(
+        self,
+        coherence: float,
+        sensory_flow: float,
+        global_step: int,
+    ) -> bool:
+        """
+        Sovereign Saturation Gate: Detect when sensory layers are saturated.
+
+        Triggers when:
+        1. Coherence >= saturation_coherence_threshold (0.74)
+        2. Sensory flow derivative is flat for saturation_patience steps (50)
+
+        Returns True if saturation detected and relaxation should trigger.
+        """
+        if not self.enable_saturation_gate or self.saturation_triggered:
+            return False
+
+        # Check coherence threshold first
+        if coherence < self.saturation_coherence_threshold:
+            self.saturation_flat_count = 0  # Reset if coherence drops
+            return False
+
+        # Track sensory flow history
+        self.sensory_flow_history.append(sensory_flow)
+        if len(self.sensory_flow_history) > self.saturation_patience + 10:
+            self.sensory_flow_history.pop(0)
+
+        # Need enough history to compute derivative
+        if len(self.sensory_flow_history) < 10:
+            return False
+
+        # Compute derivative (change over last 10 steps)
+        recent = self.sensory_flow_history[-10:]
+        derivative = abs(recent[-1] - recent[0]) / 10.0
+
+        # Check if derivative is "flat" (< 0.001 change per step)
+        # Sensory flow at 1.00 means it's saturated
+        is_saturated = sensory_flow >= 0.99 or derivative < 0.001
+
+        if is_saturated:
+            self.saturation_flat_count += 1
+        else:
+            self.saturation_flat_count = max(0, self.saturation_flat_count - 1)
+
+        # Trigger if flat for patience steps
+        if self.saturation_flat_count >= self.saturation_patience:
+            self.saturation_triggered = True
+            self.saturation_thaw_step = global_step
+            return True
+
+        return False
+
+    def get_saturation_thaw_alpha(self, global_step: int) -> float:
+        """
+        Compute the Dampened Thaw alpha for newly sensory layers (6, 7, 8).
+
+        During thaw, α ramps from saturation_thaw_start (0.3) to saturation_thaw_end (0.7)
+        over saturation_thaw_steps (100) steps.
+        """
+        if self.saturation_thaw_step is None:
+            return self.saturation_thaw_start
+
+        steps_since_thaw = global_step - self.saturation_thaw_step
+        if steps_since_thaw >= self.saturation_thaw_steps:
+            return self.saturation_thaw_end
+
+        # Linear ramp
+        progress = steps_since_thaw / self.saturation_thaw_steps
+        alpha = self.saturation_thaw_start + progress * (self.saturation_thaw_end - self.saturation_thaw_start)
+        return alpha
+
     def _log_integration_tax(self, current_ppl: float, global_step: int):
         """
         Log the Integration Tax: PPL difference after relaxation.
@@ -4076,6 +4173,7 @@ class DynamicRelaxationController:
         global_step: int,
         sa_ratio: float = None,
         entropy: float = None,
+        sensory_flow: float = None,
     ) -> Tuple[bool, str]:
         """
         Update controller state based on current metrics.
@@ -4087,6 +4185,10 @@ class DynamicRelaxationController:
         [S5] Entropy Gate:
             Relaxation is blocked if entropy > entropy_gate_threshold (0.50).
             This prevents the model from gaining sensory freedom while confused.
+
+        Sovereign Saturation Gate:
+            Triggers relaxation when coherence >= 0.74 AND sensory flow derivative
+            is flat for 50 steps (sensory layers saturated).
         """
         stability_index = self.compute_stability_index(guna_coherence, s_drift_ema)
 
@@ -4121,12 +4223,26 @@ class DynamicRelaxationController:
                 print(f"\n  ⚡ [FORCE RELAXATION] Step {global_step} >= {self.force_relaxation_step}")
                 print(f"      Triggering 9:3 → 6:6 transition (bypassing stability check)")
 
+            # Sovereign Saturation Gate: Check if sensory layers are saturated
+            saturation_triggered = False
+            if not force_triggered and sensory_flow is not None:
+                saturation_triggered = self._check_saturation_gate(
+                    coherence=guna_coherence,
+                    sensory_flow=sensory_flow,
+                    global_step=global_step,
+                )
+                if saturation_triggered:
+                    print(f"\n  --> [RELAXATION] SATURATION REACHED. PIVOTING TO 6:6.")
+                    print(f"      Coherence: {guna_coherence:.3f} >= {self.saturation_coherence_threshold}")
+                    print(f"      Sensory Flow: {sensory_flow:.3f} (flat for {self.saturation_patience} steps)")
+                    print(f"      Dampened Thaw: α {self.saturation_thaw_start}→{self.saturation_thaw_end} over {self.saturation_thaw_steps} steps")
+
             # Check if we should trigger relaxation (mode-dependent)
             stability_ready = self._check_relaxation_ready(stability_index, sa_ratio=sa_ratio)
 
-            # [S5] Entropy Gate: Block relaxation if entropy too high (skipped for force trigger)
+            # [S5] Entropy Gate: Block relaxation if entropy too high (skipped for force/saturation trigger)
             entropy_clear = True
-            if not force_triggered and entropy is not None and entropy > self.entropy_gate_threshold:
+            if not force_triggered and not saturation_triggered and entropy is not None and entropy > self.entropy_gate_threshold:
                 entropy_clear = False
                 if stability_ready and not self.entropy_gate_blocked:
                     # Log that we're blocking due to entropy
@@ -4136,20 +4252,30 @@ class DynamicRelaxationController:
             else:
                 self.entropy_gate_blocked = False
 
-            if force_triggered or (stability_ready and entropy_clear):
+            if force_triggered or saturation_triggered or (stability_ready and entropy_clear):
                 # Ready to relax!
                 self.state = self.STATE_RELAXING
                 self.pre_relaxation_ppl = val_ppl
                 self.relaxation_step = global_step
                 action = "RELAX"
+
+                # Determine trigger mode for logging
+                if force_triggered:
+                    trigger_mode = "FORCED"
+                elif saturation_triggered:
+                    trigger_mode = "SATURATION"
+                else:
+                    trigger_mode = self.mode
+
                 self.transitions.append({
                     "step": global_step,
                     "from": "AUTHORITY",
                     "to": "BALANCED",
                     "stability": stability_index,
                     "ppl": val_ppl,
-                    "mode": self.mode if not force_triggered else "FORCED",
+                    "mode": trigger_mode,
                     "forced": force_triggered,
+                    "saturation": saturation_triggered,
                 })
 
         elif self.state == self.STATE_RELAXING:
@@ -4333,12 +4459,23 @@ class DynamicRelaxationController:
         streak_str = f"{self.stability_streak}/{self.stability_window}" if self.state == self.STATE_AUTHORITY else "—"
         lock_str = " 🔒" if self.is_guna_locked() else ""
 
+        # Saturation Gate progress (if enabled and not yet triggered)
+        sat_str = ""
+        if self.enable_saturation_gate and self.state == self.STATE_AUTHORITY:
+            if self.saturation_triggered:
+                sat_str = " 🎯SAT"
+            elif self.saturation_flat_count > 0:
+                sat_str = f" Sat:{self.saturation_flat_count}/{self.saturation_patience}"
+
         if self.state == self.STATE_RECOVERY:
             return f"Split:{split_str} State:RECOVERY Streak:{streak_str}{lock_str}"
         elif self.state == self.STATE_BALANCED:
-            return f"Split:{split_str} State:BALANCED ✓{lock_str}"
+            thaw_str = ""
+            if self.saturation_thaw_step is not None:
+                thaw_str = " (Thaw)"
+            return f"Split:{split_str} State:BALANCED ✓{lock_str}{thaw_str}"
         else:
-            return f"Split:{split_str} State:{self.state} Streak:{streak_str}{lock_str}"
+            return f"Split:{split_str} State:{self.state} Streak:{streak_str}{sat_str}{lock_str}"
 
     def get_telemetry(self) -> Dict[str, Any]:
         """Get telemetry data for logging/visualization."""
@@ -4656,6 +4793,13 @@ class UnifiedTrainingConfig:
     relaxation_stability_window: int = 500   # Steps for stability check (rolling window)
     relaxation_streak_target: int = 5        # Consecutive stable evals (for consecutive mode)
     force_relaxation_step: int = None        # Force 9:3→6:6 at this step (bypasses stability check)
+    # Sovereign Saturation Gate (automatic detection)
+    enable_saturation_gate: bool = True      # Enable automatic saturation detection
+    saturation_coherence_threshold: float = 0.74  # Coherence threshold for trigger
+    saturation_patience: int = 50            # Steps where sensory derivative must be flat
+    saturation_thaw_start: float = 0.3       # New sensory layers start at this α
+    saturation_thaw_end: float = 0.7         # Ramp to this α
+    saturation_thaw_steps: int = 100         # Steps to ramp new layers
     relaxation_target_authority: int = 6     # Target authority layers after relaxation
     relaxation_target_sensory: int = 6       # Target sensory layers after relaxation
     relaxation_thaw_alpha: float = 0.05      # Dampened Thaw starting α for new sensory layers
@@ -5490,6 +5634,13 @@ def train(config: UnifiedTrainingConfig):
             enable_weight_transfer=config.enable_weight_transfer,
             # Force relaxation at specific step
             force_relaxation_step=config.force_relaxation_step,
+            # Sovereign Saturation Gate
+            enable_saturation_gate=config.enable_saturation_gate,
+            saturation_coherence_threshold=config.saturation_coherence_threshold,
+            saturation_patience=config.saturation_patience,
+            saturation_thaw_start=config.saturation_thaw_start,
+            saturation_thaw_end=config.saturation_thaw_end,
+            saturation_thaw_steps=config.saturation_thaw_steps,
         )
 
     # Mixed precision
@@ -5572,6 +5723,9 @@ def train(config: UnifiedTrainingConfig):
 
     # Training Gunas: Initialize before loop (used by Evolutionary Flow and Metacognitive Tracker)
     guna_s, guna_r, guna_t = 0.33, 0.33, 0.34  # Default balanced state
+
+    # Sensory flow tracking for Saturation Gate (used by DynamicRelaxationController)
+    last_sensory_flow = 0.5  # Default value, updated each step from EvoFlow
 
     while global_step < config.max_steps:
         # Get batch
@@ -6006,6 +6160,9 @@ def train(config: UnifiedTrainingConfig):
                         evo_toroid = metrics.get('evo_toroid', 0.0)
                         evo_rec = metrics.get('evo_rec', 'CONTINUE')
 
+                        # Update last_sensory_flow for Saturation Gate
+                        last_sensory_flow = evo_sens
+
                         # Metacognitive status icon
                         evo_icons = {
                             "BRAKE": "🛑", "SLOW_DOWN": "🐢", "RECOVER": "🔄",
@@ -6199,7 +6356,7 @@ def train(config: UnifiedTrainingConfig):
                     # Get entropy for gating (from S8 hook or val_metrics)
                     current_entropy = val_metrics.get('entropy', val_metrics.get('onto_entropy', 0.5))
 
-                    # Update relaxation controller with entropy gate
+                    # Update relaxation controller with entropy gate and saturation gate
                     state_changed, action = relaxation_controller.update(
                         guna_coherence=guna_coherence,
                         s_drift_ema=s_drift_ema,
@@ -6207,6 +6364,7 @@ def train(config: UnifiedTrainingConfig):
                         global_step=global_step,
                         sa_ratio=current_sa_ratio,
                         entropy=current_entropy,
+                        sensory_flow=last_sensory_flow,  # For Saturation Gate
                     )
 
                     # Execute actions
@@ -6227,6 +6385,10 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("relax/is_balanced", 1.0 if relaxation_controller.state == "BALANCED" else 0.0, global_step)
                         tb_writer.add_scalar("relax/guna_coherence", guna_coherence, global_step)
                         tb_writer.add_scalar("relax/s_drift_ema", s_drift_ema, global_step)
+                        # Saturation Gate metrics
+                        tb_writer.add_scalar("relax/sensory_flow", last_sensory_flow, global_step)
+                        tb_writer.add_scalar("relax/saturation_flat_count", relaxation_controller.saturation_flat_count, global_step)
+                        tb_writer.add_scalar("relax/saturation_triggered", 1.0 if relaxation_controller.saturation_triggered else 0.0, global_step)
 
                     # Adaptive LR on PPL spike (only if no PIDv2)
                     if val_ppl < best_ppl:
@@ -6598,6 +6760,21 @@ def main():
                        help="Consecutive stable evals for 'consecutive' mode")
     parser.add_argument("--force_relaxation_step", type=int, default=None,
                        help="Force 9:3→6:6 swap at this step (bypasses stability check)")
+    # Sovereign Saturation Gate
+    parser.add_argument("--enable_saturation_gate", action="store_true", default=True,
+                       help="Enable automatic saturation detection for 9:3→6:6 transition")
+    parser.add_argument("--disable_saturation_gate", action="store_true",
+                       help="Disable automatic saturation gate")
+    parser.add_argument("--saturation_coherence_threshold", type=float, default=0.74,
+                       help="Coherence threshold for saturation gate trigger")
+    parser.add_argument("--saturation_patience", type=int, default=50,
+                       help="Steps where sensory derivative must be flat to trigger")
+    parser.add_argument("--saturation_thaw_start", type=float, default=0.3,
+                       help="Starting α for new sensory layers during Dampened Thaw")
+    parser.add_argument("--saturation_thaw_end", type=float, default=0.7,
+                       help="Ending α for new sensory layers during Dampened Thaw")
+    parser.add_argument("--saturation_thaw_steps", type=int, default=100,
+                       help="Steps to ramp new sensory layers from start to end α")
     parser.add_argument("--relaxation_target_authority", type=int, default=6,
                        help="Target authority layers after relaxation")
     parser.add_argument("--relaxation_target_sensory", type=int, default=6,
@@ -6751,6 +6928,13 @@ def main():
         relaxation_stability_window=args.relaxation_stability_window,
         relaxation_streak_target=args.relaxation_streak_target,
         force_relaxation_step=args.force_relaxation_step,
+        # Sovereign Saturation Gate
+        enable_saturation_gate=args.enable_saturation_gate and not args.disable_saturation_gate,
+        saturation_coherence_threshold=args.saturation_coherence_threshold,
+        saturation_patience=args.saturation_patience,
+        saturation_thaw_start=args.saturation_thaw_start,
+        saturation_thaw_end=args.saturation_thaw_end,
+        saturation_thaw_steps=args.saturation_thaw_steps,
         relaxation_target_authority=args.relaxation_target_authority,
         relaxation_target_sensory=args.relaxation_target_sensory,
         relaxation_thaw_alpha=args.relaxation_thaw_alpha,
