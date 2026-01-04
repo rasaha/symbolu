@@ -7012,14 +7012,20 @@ def train(config: UnifiedTrainingConfig):
                     else:
                         mem_str = ""
 
-                    # Log message
+                    # Timestamp for each log line
+                    timestamp = datetime.now().strftime("%H:%M:%S")
+
+                    # Log message with timestamp
                     log_msg = (
-                        f"Step {global_step:>6} | "
+                        f"[{timestamp}] Step {global_step:>6} | "
                         f"Loss: {avg_loss:.4f} | "
                         f"PPL: {metrics['ppl']:.2f} | "
                         f"LR: {lr:.2e} | "
                         f"Tok/s: {tokens_per_sec:.0f}{mem_str}"
                     )
+
+                    # Check if this is a validation step (show verbose metrics)
+                    is_verbose_step = (global_step % config.eval_every == 0)
 
                     # Add ontological metrics
                     if config.model_type == "ontological":
@@ -7068,15 +7074,15 @@ def train(config: UnifiedTrainingConfig):
                             sa_ind = "!"  # Sensory may be overriding
                         log_msg += f" | S/A:{current_sa_ratio:.2f}{sa_ind} α_s:{alpha_sens:.2f}"
 
-                    # Sattvic Brake: Confidence score with status icon
-                    if sattvic_brake is not None:
+                    # Sattvic Brake: Confidence score with status icon (only every 100 steps)
+                    if sattvic_brake is not None and is_verbose_step:
                         conf_icon = sattvic_brake.get_status_icon(sattvic_confidence)
                         log_msg += f" | Conf:{sattvic_confidence:.2f}{conf_icon}"
                         if sattvic_lr_mult < 1.0:
                             log_msg += f" [BRAKE×{sattvic_lr_mult:.2f}]"
 
-                    # v2.7 Training State Tracker: Knowledge state
-                    if training_state_tracker is not None and training_state_tracker.enabled:
+                    # v2.7 Training State Tracker: Knowledge state (only every 100 steps)
+                    if training_state_tracker is not None and training_state_tracker.enabled and is_verbose_step:
                         know_state = training_state_tracker.state['cognitive_state']
                         log_msg += f" | Know:{know_state:.2f}"
 
@@ -7091,8 +7097,8 @@ def train(config: UnifiedTrainingConfig):
                             guna_icon = "🌙"  # Tamas - inertia/plateau
                         log_msg += f" | S:{guna_s:.2f} R:{guna_r:.2f} T:{guna_t:.2f}{guna_icon}"
 
-                    # Toroidal Bridge: Coherence and metacognitive status
-                    if evolutionary_bridge is not None:
+                    # Toroidal Bridge: Coherence and metacognitive status (only every 100 steps)
+                    if evolutionary_bridge is not None and is_verbose_step:
                         log_msg += f" | {evolutionary_bridge.get_coherence_status()}"
                         if metacognitive_tracker is not None:
                             log_msg += f" {metacognitive_tracker.get_status()}"
