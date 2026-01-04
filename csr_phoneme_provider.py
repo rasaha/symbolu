@@ -777,12 +777,258 @@ class CSRConfig:
     """Configuration for CSR Embedding Provider."""
     d_model: int = 512              # Model hidden dimension
     num_layers: int = 12            # Number of ontological layers
-    lambda_csr: float = 0.1         # CSR injection strength
+    lambda_csr: float = 0.5         # CSR injection strength (Strong Guidance default)
+    lambda_csr_min: float = 0.1     # Minimum λ_csr after decay
     position_weights: Tuple[float, ...] = (1.5, 1.25, 1.0)  # First 3 phoneme weights
     max_phonemes_per_token: int = 5  # Max phonemes to consider per token
     use_phase_gating: bool = True   # Gate Phase Attention with CSR confidence
     trainable_projection: bool = True  # Allow projection to train
     dropout: float = 0.1
+    use_decay_scheduler: bool = True  # Enable Knowledge-based λ decay
+
+
+# =============================================================================
+# CSR DECAY SCHEDULER (Knowledge-Based)
+# =============================================================================
+
+class CSRDecayScheduler:
+    """
+    Knowledge-Based λ_csr Decay Scheduler.
+
+    Reduces CSR guidance strength as the model develops its own fluency,
+    measured by the Knowledge (Know) metric from the Evolutionary Flow.
+
+    Decay Strategy:
+        λ_csr(t) = λ_max * decay_factor + λ_min * (1 - decay_factor)
+
+        where decay_factor = max(0, 1 - Know / know_threshold)
+
+    When Know = 0:     λ_csr = λ_max (full guidance, breaking mode collapse)
+    When Know ≥ thresh: λ_csr = λ_min (model has learned, reduce constraint)
+
+    The scheduler implements a "Sattvic Release" pattern:
+        - Strong guidance initially (break entropy collapse basins)
+        - Gradual release as model develops Knowledge
+        - Maintain minimum floor to prevent regression
+
+    Integration with Mode Collapse Detection:
+        If entropy drops below threshold, scheduler can BOOST λ_csr
+        temporarily to break the collapse pattern.
+    """
+
+    def __init__(
+        self,
+        lambda_max: float = 0.5,
+        lambda_min: float = 0.1,
+        know_threshold: float = 0.7,
+        entropy_floor: float = 0.4,
+        entropy_boost_factor: float = 1.5,
+        warmup_steps: int = 500,
+        decay_type: str = "linear",  # linear, cosine, exponential
+    ):
+        """
+        Initialize CSR Decay Scheduler.
+
+        Args:
+            lambda_max: Maximum λ_csr (strong guidance phase)
+            lambda_min: Minimum λ_csr (after decay floor)
+            know_threshold: Knowledge score at which decay completes
+            entropy_floor: Entropy below which triggers mode collapse boost
+            entropy_boost_factor: Multiplier for λ when entropy is low
+            warmup_steps: Steps before decay begins
+            decay_type: Decay curve shape (linear, cosine, exponential)
+        """
+        self.lambda_max = lambda_max
+        self.lambda_min = lambda_min
+        self.know_threshold = know_threshold
+        self.entropy_floor = entropy_floor
+        self.entropy_boost_factor = entropy_boost_factor
+        self.warmup_steps = warmup_steps
+        self.decay_type = decay_type
+
+        # State tracking
+        self.current_step = 0
+        self.current_lambda = lambda_max
+        self.current_know = 0.0
+        self.current_entropy = 1.0
+        self.mode_collapse_detected = False
+        self.boost_active = False
+
+        # History for analysis
+        self.history: List[Dict[str, float]] = []
+
+    def step(
+        self,
+        know_score: float,
+        entropy: float,
+        step: Optional[int] = None,
+    ) -> float:
+        """
+        Compute λ_csr for current training state.
+
+        Args:
+            know_score: Current Knowledge metric (0.0 to 1.0)
+            entropy: Current entropy metric
+            step: Optional explicit step number
+
+        Returns:
+            Computed λ_csr value for this step
+        """
+        if step is not None:
+            self.current_step = step
+        else:
+            self.current_step += 1
+
+        self.current_know = know_score
+        self.current_entropy = entropy
+
+        # Check for mode collapse (entropy below floor)
+        if entropy < self.entropy_floor:
+            self.mode_collapse_detected = True
+            self.boost_active = True
+        else:
+            self.mode_collapse_detected = False
+            # Gradually release boost
+            if self.boost_active and entropy > self.entropy_floor * 1.2:
+                self.boost_active = False
+
+        # Compute base λ from decay schedule
+        if self.current_step < self.warmup_steps:
+            # Warmup: full guidance
+            base_lambda = self.lambda_max
+        else:
+            # Decay based on Knowledge
+            decay_factor = self._compute_decay_factor(know_score)
+            base_lambda = self.lambda_max * decay_factor + self.lambda_min * (1 - decay_factor)
+
+        # Apply mode collapse boost if needed
+        if self.boost_active:
+            self.current_lambda = min(self.lambda_max, base_lambda * self.entropy_boost_factor)
+        else:
+            self.current_lambda = base_lambda
+
+        # Record history
+        self.history.append({
+            "step": self.current_step,
+            "lambda_csr": self.current_lambda,
+            "know_score": know_score,
+            "entropy": entropy,
+            "boost_active": self.boost_active,
+        })
+
+        return self.current_lambda
+
+    def _compute_decay_factor(self, know_score: float) -> float:
+        """Compute decay factor based on Knowledge score."""
+        # Clamp know_score to valid range
+        know_score = max(0.0, min(1.0, know_score))
+
+        # Progress toward threshold (0 = no knowledge, 1 = at/above threshold)
+        progress = know_score / self.know_threshold
+        progress = min(1.0, progress)
+
+        if self.decay_type == "linear":
+            # Linear decay: 1 → 0 as knowledge increases
+            return 1.0 - progress
+
+        elif self.decay_type == "cosine":
+            # Cosine decay: smoother transition
+            return 0.5 * (1.0 + math.cos(math.pi * progress))
+
+        elif self.decay_type == "exponential":
+            # Exponential decay: faster initial decay
+            return math.exp(-3.0 * progress)
+
+        else:
+            return 1.0 - progress  # Default to linear
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get current scheduler status."""
+        return {
+            "current_step": self.current_step,
+            "current_lambda": self.current_lambda,
+            "current_know": self.current_know,
+            "current_entropy": self.current_entropy,
+            "mode_collapse_detected": self.mode_collapse_detected,
+            "boost_active": self.boost_active,
+            "decay_type": self.decay_type,
+            "lambda_range": (self.lambda_min, self.lambda_max),
+        }
+
+    def print_status(self):
+        """Print current scheduler status."""
+        status = self.get_status()
+        print(f"\n  ╔══════════════════════════════════════════╗")
+        print(f"  ║      CSR DECAY SCHEDULER STATUS          ║")
+        print(f"  ╠══════════════════════════════════════════╣")
+        print(f"  ║  Step:        {status['current_step']:>6}                    ║")
+        print(f"  ║  λ_csr:       {status['current_lambda']:>6.3f}                    ║")
+        print(f"  ║  Knowledge:   {status['current_know']:>6.3f}                    ║")
+        print(f"  ║  Entropy:     {status['current_entropy']:>6.3f}                    ║")
+        print(f"  ║  Boost:       {'ACTIVE' if status['boost_active'] else 'OFF':>6}                    ║")
+        print(f"  ╚══════════════════════════════════════════╝")
+
+    def should_increase_guidance(self) -> bool:
+        """Check if guidance should be increased (mode collapse detected)."""
+        return self.boost_active
+
+    def get_metric_targets(self) -> Dict[str, Tuple[float, float]]:
+        """
+        Get expected metric ranges for current λ_csr.
+
+        Returns target ranges for monitoring training health.
+        """
+        λ = self.current_lambda
+
+        # Targets vary with λ_csr strength
+        if λ >= 0.4:
+            # Strong guidance phase
+            return {
+                "entropy": (0.52, 0.60),
+                "coherence": (0.82, 0.88),
+                "sa_ratio": (0.5, 0.7),
+            }
+        elif λ >= 0.2:
+            # Moderate guidance
+            return {
+                "entropy": (0.48, 0.58),
+                "coherence": (0.78, 0.85),
+                "sa_ratio": (0.45, 0.65),
+            }
+        else:
+            # Light guidance (high knowledge)
+            return {
+                "entropy": (0.45, 0.55),
+                "coherence": (0.75, 0.82),
+                "sa_ratio": (0.4, 0.6),
+            }
+
+
+def create_csr_decay_scheduler(
+    config: CSRConfig,
+    know_threshold: float = 0.7,
+    warmup_steps: int = 500,
+    decay_type: str = "cosine",
+) -> CSRDecayScheduler:
+    """
+    Create a CSR Decay Scheduler from CSRConfig.
+
+    Args:
+        config: CSRConfig with lambda settings
+        know_threshold: Knowledge score for decay completion
+        warmup_steps: Steps before decay begins
+        decay_type: Decay curve (linear, cosine, exponential)
+
+    Returns:
+        Configured CSRDecayScheduler
+    """
+    return CSRDecayScheduler(
+        lambda_max=config.lambda_csr,
+        lambda_min=config.lambda_csr_min,
+        know_threshold=know_threshold,
+        warmup_steps=warmup_steps,
+        decay_type=decay_type,
+    )
 
 
 class CSREmbeddingProvider(nn.Module):
@@ -1544,6 +1790,9 @@ __all__ = [
     "EntropySink",
     "SynthesisGate",
     "CSRAblationTester",
+    # Decay Scheduler
+    "CSRDecayScheduler",
+    "create_csr_decay_scheduler",
     # Hybrid G2P System
     "HybridG2P",
     "get_hybrid_g2p",
