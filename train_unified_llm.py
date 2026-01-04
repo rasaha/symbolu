@@ -6724,13 +6724,17 @@ def train(config: UnifiedTrainingConfig):
                 # Reinitialize DataLoader if batch size changed
                 if new_batch != old_batch:
                     print(f"  🔄 Reinitializing DataLoader with batch_size={new_batch}")
+                    # Get dataset from existing DataLoader (train_dataset may not be in scope)
+                    dataset = train_loader.dataset
                     train_loader = DataLoader(
-                        train_dataset,
+                        dataset,
                         batch_size=new_batch,
                         shuffle=True,
-                        num_workers=4,
+                        num_workers=config.num_workers,
                         pin_memory=True,
                         drop_last=True,
+                        prefetch_factor=2 if config.num_workers > 0 else None,
+                        persistent_workers=config.num_workers > 0,
                     )
                     train_iter = iter(train_loader)
                     # Update config for logging
