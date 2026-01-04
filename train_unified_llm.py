@@ -6370,7 +6370,11 @@ def save_checkpoint(
     hgs_state: Optional[dict] = None,
     drc_state: Optional[dict] = None,
 ):
-    """Save training checkpoint with optional HGS/DRC state."""
+    """Save training checkpoint with optional HGS/DRC state.
+
+    For last.pt checkpoints, explicitly removes old file before saving new one
+    to ensure clean replacement and avoid potential corruption.
+    """
     checkpoint = {
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
@@ -6391,6 +6395,11 @@ def save_checkpoint(
     # Add DRC state if provided
     if drc_state is not None:
         checkpoint["drc_state"] = drc_state
+
+    # Explicitly remove old checkpoint before saving (especially for last.pt)
+    # This ensures clean replacement and frees disk space before writing
+    if path.exists():
+        path.unlink()
 
     torch.save(checkpoint, path)
 
