@@ -3795,6 +3795,247 @@ class LRAValidator:
 
 
 # =============================================================================
+# ADAPTIVE TRAINING CONTROLLER: Dynamic Hyperparameter Tuning
+# =============================================================================
+
+class AdaptiveTrainingController:
+    """
+    Dynamically adjusts training hyperparameters based on observed metrics.
+
+    Instead of manual tuning, this controller:
+    1. Monitors PPL velocity, coherence, and loss stability
+    2. Adjusts learning rate when training is too slow or unstable
+    3. Modulates PIDv2 Kp based on train/val gap
+    4. Logs all adjustments for transparency
+
+    Philosophy:
+    - If model is learning slowly (low velocity) → increase LR
+    - If model is unstable (high variance) → decrease LR
+    - If train >> val (overfitting) → decrease Kp
+    - If train ≈ val (underfitting) → increase Kp
+
+    Usage:
+        controller = AdaptiveTrainingController(optimizer, config)
+        # In training loop after validation:
+        controller.update(train_loss, val_loss, val_ppl, coherence, step)
+    """
+
+    def __init__(
+        self,
+        optimizer: torch.optim.Optimizer,
+        # LR adaptation
+        base_lr: float = 3e-4,
+        lr_min: float = 1e-5,
+        lr_max: float = 1e-3,
+        lr_boost_factor: float = 1.5,
+        lr_decay_factor: float = 0.7,
+        # PPL velocity thresholds
+        velocity_slow_threshold: float = -2.0,   # % per eval, below this = too slow
+        velocity_spike_threshold: float = 10.0,  # % per eval, above this = unstable
+        # Plateau detection
+        plateau_window: int = 5,                 # Evals to check for plateau
+        plateau_threshold: float = 1.0,          # % improvement threshold
+        # Kp adaptation
+        kp_base: float = 0.20,
+        kp_min: float = 0.10,
+        kp_max: float = 0.50,
+        # Stability
+        min_steps_between_adjustments: int = 200,
+    ):
+        self.optimizer = optimizer
+        self.base_lr = base_lr
+        self.lr_min = lr_min
+        self.lr_max = lr_max
+        self.lr_boost_factor = lr_boost_factor
+        self.lr_decay_factor = lr_decay_factor
+
+        self.velocity_slow_threshold = velocity_slow_threshold
+        self.velocity_spike_threshold = velocity_spike_threshold
+
+        self.plateau_window = plateau_window
+        self.plateau_threshold = plateau_threshold
+
+        self.kp_base = kp_base
+        self.kp_min = kp_min
+        self.kp_max = kp_max
+        self.current_kp = kp_base
+
+        self.min_steps_between_adjustments = min_steps_between_adjustments
+        self.last_adjustment_step = 0
+
+        # History tracking
+        self.val_ppl_history = []
+        self.train_loss_history = []
+        self.val_loss_history = []
+        self.coherence_history = []
+        self.adjustment_log = []
+
+        # State
+        self.current_lr_multiplier = 1.0
+        self.boost_count = 0
+        self.decay_count = 0
+        self.plateau_count = 0
+
+        print(f"\n  [AdaptiveTraining] Controller initialized:")
+        print(f"    Base LR: {base_lr:.2e} (range: {lr_min:.2e} - {lr_max:.2e})")
+        print(f"    Velocity thresholds: slow < {velocity_slow_threshold}%, spike > {velocity_spike_threshold}%")
+        print(f"    Kp range: {kp_min} - {kp_max} (base: {kp_base})")
+        print(f"    Plateau detection: {plateau_window} evals, {plateau_threshold}% threshold")
+
+    def _compute_velocity(self) -> float:
+        """Compute PPL velocity (% change per eval)."""
+        if len(self.val_ppl_history) < 2:
+            return 0.0
+        current = self.val_ppl_history[-1]
+        previous = self.val_ppl_history[-2]
+        if previous == 0:
+            return 0.0
+        return ((current - previous) / previous) * 100
+
+    def _detect_plateau(self) -> bool:
+        """Detect if PPL has plateaued (< threshold improvement over window)."""
+        if len(self.val_ppl_history) < self.plateau_window:
+            return False
+        recent = self.val_ppl_history[-self.plateau_window:]
+        first = recent[0]
+        last = recent[-1]
+        if first == 0:
+            return False
+        improvement = ((first - last) / first) * 100
+        return improvement < self.plateau_threshold
+
+    def _compute_train_val_gap(self) -> float:
+        """Compute gap between train and val loss (overfitting indicator)."""
+        if not self.train_loss_history or not self.val_loss_history:
+            return 0.0
+        train = self.train_loss_history[-1]
+        val = self.val_loss_history[-1]
+        if val == 0:
+            return 0.0
+        return ((val - train) / val) * 100  # Positive = val > train = normal
+
+    def update(
+        self,
+        train_loss: float,
+        val_loss: float,
+        val_ppl: float,
+        coherence: float,
+        global_step: int,
+        authority_controller=None,  # PIDv2 controller reference
+    ) -> Dict[str, Any]:
+        """
+        Update controller with current metrics and adjust hyperparameters.
+
+        Returns dict of adjustments made.
+        """
+        # Record history
+        self.val_ppl_history.append(val_ppl)
+        self.train_loss_history.append(train_loss)
+        self.val_loss_history.append(val_loss)
+        self.coherence_history.append(coherence)
+
+        # Keep history bounded
+        max_history = 50
+        if len(self.val_ppl_history) > max_history:
+            self.val_ppl_history = self.val_ppl_history[-max_history:]
+            self.train_loss_history = self.train_loss_history[-max_history:]
+            self.val_loss_history = self.val_loss_history[-max_history:]
+            self.coherence_history = self.coherence_history[-max_history:]
+
+        adjustments = {"step": global_step, "actions": []}
+
+        # Check if we can make adjustments
+        if global_step - self.last_adjustment_step < self.min_steps_between_adjustments:
+            return adjustments
+
+        velocity = self._compute_velocity()
+        is_plateau = self._detect_plateau()
+        train_val_gap = self._compute_train_val_gap()
+
+        # === LR Adaptation ===
+        current_lr = self.optimizer.param_groups[0]['lr']
+
+        # Case 1: PPL spiking (unstable) → decay LR
+        if velocity > self.velocity_spike_threshold:
+            new_lr = max(self.lr_min, current_lr * self.lr_decay_factor)
+            if new_lr != current_lr:
+                for pg in self.optimizer.param_groups:
+                    pg['lr'] = new_lr
+                self.decay_count += 1
+                adjustments["actions"].append(f"LR_DECAY: {current_lr:.2e}→{new_lr:.2e} (spike: {velocity:+.1f}%)")
+                print(f"\n  🔻 [AdaptiveTraining] LR DECAY: {current_lr:.2e} → {new_lr:.2e} (PPL spike: {velocity:+.1f}%)")
+                self.last_adjustment_step = global_step
+
+        # Case 2: Learning too slow or plateau → boost LR
+        elif velocity > self.velocity_slow_threshold or is_plateau:
+            if is_plateau:
+                self.plateau_count += 1
+
+            # Only boost if we're not already at max
+            new_lr = min(self.lr_max, current_lr * self.lr_boost_factor)
+            if new_lr != current_lr and new_lr > current_lr:
+                for pg in self.optimizer.param_groups:
+                    pg['lr'] = new_lr
+                self.boost_count += 1
+                reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
+                adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
+                print(f"\n  🔺 [AdaptiveTraining] LR BOOST: {current_lr:.2e} → {new_lr:.2e} ({reason})")
+                self.last_adjustment_step = global_step
+
+        # === Kp Adaptation (if PIDv2 controller provided) ===
+        if authority_controller is not None and hasattr(authority_controller, 'Kp_min'):
+            # Adjust Kp based on train/val gap
+            # Large positive gap (val >> train) = overfitting → lower Kp
+            # Small or negative gap = underfitting → higher Kp
+
+            if train_val_gap > 20:  # Significant overfitting
+                new_kp_min = max(self.kp_min, authority_controller.Kp_min * 0.8)
+                new_kp_max = max(self.kp_min, authority_controller.Kp_max * 0.8)
+                if new_kp_min != authority_controller.Kp_min:
+                    authority_controller.Kp_min = new_kp_min
+                    authority_controller.Kp_max = new_kp_max
+                    adjustments["actions"].append(f"Kp_REDUCE: gap={train_val_gap:.1f}%")
+                    print(f"\n  📉 [AdaptiveTraining] Kp REDUCED (train/val gap: {train_val_gap:.1f}%)")
+                    self.last_adjustment_step = global_step
+
+            elif train_val_gap < 5 and velocity > self.velocity_slow_threshold:
+                # Underfitting and slow → increase Kp
+                new_kp_min = min(self.kp_max, authority_controller.Kp_min * 1.2)
+                new_kp_max = min(self.kp_max, authority_controller.Kp_max * 1.2)
+                if new_kp_max != authority_controller.Kp_max:
+                    authority_controller.Kp_min = new_kp_min
+                    authority_controller.Kp_max = new_kp_max
+                    adjustments["actions"].append(f"Kp_BOOST: gap={train_val_gap:.1f}%")
+                    print(f"\n  📈 [AdaptiveTraining] Kp BOOSTED (underfitting, gap: {train_val_gap:.1f}%)")
+                    self.last_adjustment_step = global_step
+
+        if adjustments["actions"]:
+            self.adjustment_log.append(adjustments)
+
+        return adjustments
+
+    def get_status_string(self) -> str:
+        """Get formatted status string."""
+        velocity = self._compute_velocity() if len(self.val_ppl_history) >= 2 else 0.0
+        plateau = "PLATEAU" if self._detect_plateau() else "OK"
+        current_lr = self.optimizer.param_groups[0]['lr']
+        return f"AdaptLR:{current_lr:.2e} vel:{velocity:+.1f}% [{plateau}] boosts:{self.boost_count} decays:{self.decay_count}"
+
+    def get_telemetry(self) -> Dict[str, Any]:
+        """Get telemetry for logging."""
+        return {
+            "current_lr": self.optimizer.param_groups[0]['lr'],
+            "velocity": self._compute_velocity() if len(self.val_ppl_history) >= 2 else 0.0,
+            "is_plateau": self._detect_plateau(),
+            "train_val_gap": self._compute_train_val_gap(),
+            "boost_count": self.boost_count,
+            "decay_count": self.decay_count,
+            "plateau_count": self.plateau_count,
+            "adjustment_log": self.adjustment_log[-10:],  # Last 10 adjustments
+        }
+
+
+# =============================================================================
 # DYNAMIC RELAXATION CONTROLLER: 9:3 → 6:6 TRANSITION
 # =============================================================================
 
@@ -4834,6 +5075,18 @@ class UnifiedTrainingConfig:
     evo_lr_slowdown: float = 0.5             # LR multiplier when SLOW_DOWN/BRAKE
     evo_lr_accelerate: float = 1.2           # LR multiplier when ACCELERATE
 
+    # Adaptive Training Controller (dynamic hyperparameter tuning)
+    enable_adaptive_training: bool = True    # Enable automatic LR/Kp adjustment
+    adaptive_lr_min: float = 1e-5            # Minimum learning rate floor
+    adaptive_lr_max: float = 1e-3            # Maximum learning rate ceiling
+    adaptive_lr_boost: float = 1.5           # LR boost multiplier when plateau/slow
+    adaptive_lr_decay: float = 0.7           # LR decay multiplier when spike
+    adaptive_velocity_slow: float = -2.0     # PPL velocity threshold for "too slow" (%)
+    adaptive_velocity_spike: float = 10.0    # PPL velocity threshold for "spike" (%)
+    adaptive_plateau_window: int = 5         # Evals to check for plateau
+    adaptive_plateau_threshold: float = 1.0  # Min improvement % to avoid plateau detection
+    adaptive_min_interval: int = 200         # Min steps between adjustments
+
     # Resume checkpoint
     resume: str = ""
     resume_weights_only: bool = False
@@ -5643,6 +5896,25 @@ def train(config: UnifiedTrainingConfig):
             saturation_thaw_steps=config.saturation_thaw_steps,
         )
 
+    # Adaptive Training Controller (dynamic hyperparameter tuning)
+    adaptive_controller = None
+    if config.enable_adaptive_training:
+        adaptive_controller = AdaptiveTrainingController(
+            optimizer=optimizer,
+            base_lr=config.learning_rate,
+            lr_min=config.adaptive_lr_min,
+            lr_max=config.adaptive_lr_max,
+            lr_boost_factor=config.adaptive_lr_boost,
+            lr_decay_factor=config.adaptive_lr_decay,
+            velocity_slow_threshold=config.adaptive_velocity_slow,
+            velocity_spike_threshold=config.adaptive_velocity_spike,
+            plateau_window=config.adaptive_plateau_window,
+            plateau_threshold=config.adaptive_plateau_threshold,
+            kp_min=config.pidv2_kp_min,
+            kp_max=config.pidv2_kp_max,
+            min_steps_between_adjustments=config.adaptive_min_interval,
+        )
+
     # Mixed precision
     scaler = torch.amp.GradScaler('cuda') if config.mixed_precision != "none" else None
     autocast_dtype = torch.bfloat16 if config.mixed_precision == "bf16" else torch.float16
@@ -6390,7 +6662,35 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("relax/saturation_flat_count", relaxation_controller.saturation_flat_count, global_step)
                         tb_writer.add_scalar("relax/saturation_triggered", 1.0 if relaxation_controller.saturation_triggered else 0.0, global_step)
 
-                    # Adaptive LR on PPL spike (only if no PIDv2)
+                # Adaptive Training Controller (dynamic LR/Kp adjustment)
+                if adaptive_controller is not None:
+                    # Get recent train loss (average of last 10 steps)
+                    recent_train_loss = sum(train_losses[-10:]) / len(train_losses[-10:]) if train_losses else 0.0
+
+                    adaptive_adjustments = adaptive_controller.update(
+                        train_loss=recent_train_loss,
+                        val_loss=val_loss,
+                        val_ppl=val_ppl,
+                        coherence=val_metrics.get('coherence', 0.75),
+                        global_step=global_step,
+                        authority_controller=authority_controller,  # Pass PIDv2 for Kp adjustment
+                    )
+
+                    # Log adaptive controller status
+                    if adaptive_adjustments.get("actions"):
+                        # Already logged by the controller
+                        pass
+
+                    # TensorBoard logging for adaptive controller
+                    if tb_writer is not None:
+                        telemetry = adaptive_controller.get_telemetry()
+                        tb_writer.add_scalar("adaptive/lr", telemetry["current_lr"], global_step)
+                        tb_writer.add_scalar("adaptive/velocity", telemetry["velocity"], global_step)
+                        tb_writer.add_scalar("adaptive/boost_count", telemetry["boost_count"], global_step)
+                        tb_writer.add_scalar("adaptive/decay_count", telemetry["decay_count"], global_step)
+                        tb_writer.add_scalar("adaptive/plateau_count", telemetry["plateau_count"], global_step)
+                else:
+                    # Legacy: Adaptive LR on PPL spike (only if no adaptive controller)
                     if val_ppl < best_ppl:
                         best_ppl = val_ppl
                     elif global_step > config.warmup_steps:
@@ -6423,6 +6723,10 @@ def train(config: UnifiedTrainingConfig):
                 # Log HGS status (only if relaxation controller not active, to avoid duplicate logging)
                 if gradient_scaler_hgs is not None and relaxation_controller is None:
                     print(f"  --> {gradient_scaler_hgs.get_status_string()}")
+
+                # Log Adaptive Training Controller status
+                if adaptive_controller is not None and len(adaptive_controller.val_ppl_history) >= 2:
+                    print(f"  --> {adaptive_controller.get_status_string()}")
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
@@ -6836,6 +7140,30 @@ def main():
     parser.add_argument("--evo_lr_accelerate", type=float, default=1.2,
                        help="LR multiplier when ACCELERATE")
 
+    # Adaptive Training Controller (dynamic hyperparameter tuning)
+    parser.add_argument("--enable_adaptive_training", action="store_true", default=True,
+                       help="Enable automatic LR/Kp adjustment based on training dynamics")
+    parser.add_argument("--disable_adaptive_training", action="store_true",
+                       help="Disable adaptive training controller")
+    parser.add_argument("--adaptive_lr_min", type=float, default=1e-5,
+                       help="Minimum learning rate floor for adaptive adjustment")
+    parser.add_argument("--adaptive_lr_max", type=float, default=1e-3,
+                       help="Maximum learning rate ceiling for adaptive adjustment")
+    parser.add_argument("--adaptive_lr_boost", type=float, default=1.5,
+                       help="LR boost multiplier when plateau or slow learning detected")
+    parser.add_argument("--adaptive_lr_decay", type=float, default=0.7,
+                       help="LR decay multiplier when PPL spike detected")
+    parser.add_argument("--adaptive_velocity_slow", type=float, default=-2.0,
+                       help="PPL velocity threshold (%) for 'too slow' detection")
+    parser.add_argument("--adaptive_velocity_spike", type=float, default=10.0,
+                       help="PPL velocity threshold (%) for 'spike' detection")
+    parser.add_argument("--adaptive_plateau_window", type=int, default=5,
+                       help="Number of evaluations to check for plateau")
+    parser.add_argument("--adaptive_plateau_threshold", type=float, default=1.0,
+                       help="Minimum improvement (%) to avoid plateau detection")
+    parser.add_argument("--adaptive_min_interval", type=int, default=200,
+                       help="Minimum steps between adaptive adjustments")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -6964,6 +7292,17 @@ def main():
         evo_lr_modulation=args.evo_lr_modulation,
         evo_lr_slowdown=args.evo_lr_slowdown,
         evo_lr_accelerate=args.evo_lr_accelerate,
+        # Adaptive Training Controller
+        enable_adaptive_training=args.enable_adaptive_training and not args.disable_adaptive_training,
+        adaptive_lr_min=args.adaptive_lr_min,
+        adaptive_lr_max=args.adaptive_lr_max,
+        adaptive_lr_boost=args.adaptive_lr_boost,
+        adaptive_lr_decay=args.adaptive_lr_decay,
+        adaptive_velocity_slow=args.adaptive_velocity_slow,
+        adaptive_velocity_spike=args.adaptive_velocity_spike,
+        adaptive_plateau_window=args.adaptive_plateau_window,
+        adaptive_plateau_threshold=args.adaptive_plateau_threshold,
+        adaptive_min_interval=args.adaptive_min_interval,
     )
 
     # Train
