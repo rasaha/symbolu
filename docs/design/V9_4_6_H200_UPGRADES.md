@@ -111,7 +111,7 @@ def compute_authority_factor(self, coherence, snr, global_step, relaxation_contr
 
 ---
 
-## Upgrade #3: Stochastic Gradient Persistence
+## Upgrade #3a: Stochastic Gradient Persistence (H200 ONLY)
 
 **File**: `train_unified_llm.py`
 **Location**: `EvolutionaryIntelligenceEngine.update_resonance_buffer()` (~Line 1470)
@@ -121,6 +121,51 @@ def compute_authority_factor(self, coherence, snr, global_step, relaxation_contr
 ### Requirements
 - **H200 141GB required** - A100 80GB will OOM on persistence steps
 - Expected VRAM spike: ~10-15GB every 50 steps
+
+---
+
+## Upgrade #3b: Shadow Mirror Alignment (SMA) - LITE ALTERNATIVE ✅ IMPLEMENTED
+
+**File**: `train_unified_llm.py`
+**Location**: Training loop, toroidal bridge section (~Line 6439)
+**Risk**: Zero (no VRAM overhead)
+**Reward**: Meta-learning for bridge weights without BPTT risks
+**Status**: ✅ IMPLEMENTED (A100 safe)
+
+### Rationale
+Instead of backpropagating through the model (BPTT), SMA treats the EvolutionaryBridge
+as a "Shadow Learner" that learns to predict the optimal O1 state.
+
+| Feature | Stochastic Persistence | Shadow Mirror (SMA) |
+|---------|------------------------|---------------------|
+| VRAM Spike | ~10GB+ | **Zero** |
+| Stability | Risky | **Ultra-Stable** |
+| Logic | Learns via feedback | Learns via prediction |
+| OOM Risk | High | **Zero** |
+
+### Implementation (DONE)
+```python
+# V9.4.6: Shadow Mirror Alignment (SMA) - Lite Meta-Learning
+sma_weight = 0.05
+o1_target = o1_state.detach()  # Don't backprop through model
+if o1_target.dim() == 3:
+    o1_target = o1_target.mean(dim=1)
+if toroidal_seed.dim() == 3:
+    seed_for_sma = toroidal_seed.mean(dim=1)
+else:
+    seed_for_sma = toroidal_seed
+# MSE loss: bridge learns to project O12 → O1 accurately
+sma_loss = F.mse_loss(seed_for_sma, o1_target) * sma_weight
+loss = loss + sma_loss
+```
+
+### Monitoring
+- TensorBoard: `toroid/sma_loss` - should decrease over time
+- Toroidal Coherence: should climb from ~0.75 toward 0.82+
+
+---
+
+## Upgrade #3 (Original): Stochastic Gradient Persistence (H200 ONLY)
 
 ### Current Behavior
 ```python

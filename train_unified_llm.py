@@ -6436,6 +6436,22 @@ def train(config: UnifiedTrainingConfig):
                         loss = loss + toroid_loss
                         toroidal_loss_value = toroid_metrics['toroid_loss']
 
+                        # V9.4.6: Shadow Mirror Alignment (SMA) - Lite Meta-Learning
+                        # Trains bridge weights (seed_proj, seed_gate) to predict actual O1 state
+                        # Zero VRAM overhead, achieves meta-learning without BPTT risks
+                        sma_weight = 0.05
+                        o1_target = o1_state.detach()  # Don't backprop through model
+                        if o1_target.dim() == 3:
+                            o1_target = o1_target.mean(dim=1)  # [B, N, dim] → [B, dim]
+                        if toroidal_seed.dim() == 3:
+                            seed_for_sma = toroidal_seed.mean(dim=1)
+                        else:
+                            seed_for_sma = toroidal_seed
+                        # MSE loss: bridge learns to project O12 → O1 accurately
+                        sma_loss = F.mse_loss(seed_for_sma, o1_target) * sma_weight
+                        loss = loss + sma_loss
+                        metrics['sma_loss'] = sma_loss.item()
+
                         # Update metacognitive tracker
                         if metacognitive_tracker is not None:
                             meta_assessment = metacognitive_tracker.update(
@@ -6898,6 +6914,9 @@ def train(config: UnifiedTrainingConfig):
                         if evolutionary_bridge is not None:
                             tb_writer.add_scalar("toroid/coherence", toroidal_coherence, global_step)
                             tb_writer.add_scalar("toroid/loss", toroidal_loss_value, global_step)
+                            # V9.4.6: Shadow Mirror Alignment loss
+                            if 'sma_loss' in metrics:
+                                tb_writer.add_scalar("toroid/sma_loss", metrics['sma_loss'], global_step)
                             if metacognitive_tracker is not None:
                                 tb_writer.add_scalar("toroid/velocity", metacognitive_tracker.coherence_history[-1] - metacognitive_tracker.coherence_history[-2] if len(metacognitive_tracker.coherence_history) >= 2 else 0.0, global_step)
 
