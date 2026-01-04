@@ -4736,6 +4736,36 @@ class DynamicRelaxationController:
 
         return "WAITING"
 
+    def update_stability_per_step(self, coherence: float, sa_ratio: float = None) -> None:
+        """
+        V9.4.9: Update stability streak every gradient step (not just at validation).
+
+        This ensures the streak counter reflects actual gradient steps, not log intervals.
+        """
+        if self.state != self.STATE_AUTHORITY:
+            return  # Only track during authority phase
+
+        if self.mode == "consecutive":
+            # Consecutive mode: streak of coherence >= threshold
+            stability = coherence  # Use raw coherence for simplicity
+            if stability >= self.stability_threshold:
+                self.stability_streak += 1
+            else:
+                self.stability_streak = 0  # Hard reset
+
+        elif self.mode == "sa_ratio" and sa_ratio is not None:
+            # S/A ratio mode: rolling window
+            self.sa_rolling_window.append(sa_ratio)
+            if len(self.sa_rolling_window) > self.stability_window:
+                self.sa_rolling_window.pop(0)
+            self.stability_streak = len(self.sa_rolling_window)
+
+        else:  # average mode
+            self.ssi_rolling_window.append(coherence)
+            if len(self.ssi_rolling_window) > self.stability_window:
+                self.ssi_rolling_window.pop(0)
+            self.stability_streak = len(self.ssi_rolling_window)
+
     def get_saturation_thaw_alpha(self, global_step: int) -> float:
         """
         Compute the Dampened Thaw alpha for newly sensory layers (6, 7, 8).
@@ -6785,27 +6815,37 @@ def train(config: UnifiedTrainingConfig):
                 if training_state_tracker is not None and training_state_tracker.enabled:
                     training_state_tracker.update_with_gunas(guna_s, guna_r, guna_t, global_step)
 
-            # V9.4.9 Metabolic Flip: Per-step check with simpler, robust criteria
-            if relaxation_controller is not None and relaxation_controller.enable_saturation_gate:
-                # Get current VRAM usage (0.0 to 1.0)
-                if device.type == "cuda":
-                    vram_used = torch.cuda.memory_allocated(device)
-                    vram_total = torch.cuda.get_device_properties(device).total_memory
-                    vram_usage = vram_used / vram_total
-                else:
-                    vram_usage = 0.0
-
-                # Check metabolic flip criteria every step
-                flip_result = relaxation_controller.check_metabolic_flip(
-                    metrics=metrics,
-                    vram_usage=vram_usage,
-                    global_step=global_step,
+            # V9.4.9 Per-step updates: Both metabolic flip AND stability streak count every gradient step
+            if relaxation_controller is not None:
+                # Update stability streak every step (not just at validation)
+                current_coherence = metrics.get('coherence', 0.75)
+                sa_ratio = hgs_metrics.get("s_a_ratio", 0.5) if hgs_metrics else 0.5
+                relaxation_controller.update_stability_per_step(
+                    coherence=current_coherence,
+                    sa_ratio=sa_ratio,
                 )
 
-                if flip_result == "TRIGGER_FLIP":
-                    # Metabolic flip triggered! Execute 9:3 → 6:6 relaxation
-                    relaxation_controller.execute_relaxation(current_step=global_step)
-                    print(f"  🔄 [RELAXATION] 9:3 → 6:6 transition initiated")
+                # Metabolic Flip check (when saturation gate is enabled)
+                if relaxation_controller.enable_saturation_gate:
+                    # Get current VRAM usage (0.0 to 1.0)
+                    if device.type == "cuda":
+                        vram_used = torch.cuda.memory_allocated(device)
+                        vram_total = torch.cuda.get_device_properties(device).total_memory
+                        vram_usage = vram_used / vram_total
+                    else:
+                        vram_usage = 0.0
+
+                    # Check metabolic flip criteria every step
+                    flip_result = relaxation_controller.check_metabolic_flip(
+                        metrics=metrics,
+                        vram_usage=vram_usage,
+                        global_step=global_step,
+                    )
+
+                    if flip_result == "TRIGGER_FLIP":
+                        # Metabolic flip triggered! Execute 9:3 → 6:6 relaxation
+                        relaxation_controller.execute_relaxation(current_step=global_step)
+                        print(f"  🔄 [RELAXATION] 9:3 → 6:6 transition initiated")
 
             # Periodic CUDA memory cleanup to prevent fragmentation
             if device.type == "cuda" and global_step % 500 == 0:
