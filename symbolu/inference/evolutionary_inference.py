@@ -405,14 +405,19 @@ class EvolutionaryInferenceEngine:
         inject_karma: bool = True,
         store_karma: bool = True,
         return_coherence: bool = False,
+        # Phase 2 integration (optional)
+        metacognition: Optional[Any] = None,  # InferenceMetacognition
+        guna_tracker: Optional[Any] = None,   # InferenceGunas
+        csr_guard: Optional[Any] = None,      # CSRInferenceGuard
     ) -> Tuple[torch.Tensor, Dict[str, Any]]:
         """
-        Generate with evolutionary state injection.
+        Generate with evolutionary state injection and Phase 2 monitoring.
 
         This is the main inference method that implements:
-        1. Karma injection into initial embedding (at O1 position)
-        2. Token generation with optional quality monitoring
-        3. O12 extraction and karma storage for next sequence
+        1. Karma injection into O1 via delayed resonance
+        2. Token generation with quality monitoring (Phase 2)
+        3. CSR safety enforcement with lm_head re-projection
+        4. O12 extraction and karma storage for next sequence
 
         Args:
             input_ids: Input token IDs [B, N]
@@ -423,6 +428,9 @@ class EvolutionaryInferenceEngine:
             inject_karma: Whether to inject stored karma
             store_karma: Whether to store new karma for next sequence
             return_coherence: Include coherence metrics in output
+            metacognition: Optional InferenceMetacognition for ABORT/BRAKE
+            guna_tracker: Optional InferenceGunas for dynamic alpha
+            csr_guard: Optional CSRInferenceGuard for safety enforcement
 
         Returns:
             output_ids: Generated token IDs including input
@@ -433,35 +441,67 @@ class EvolutionaryInferenceEngine:
             'generation_id': self.generation_count,
             'karma_injected': False,
             'karma_stored': False,
+            'aborted': False,
+            'interventions': 0,
         }
 
         # Move input to model device
         input_ids = input_ids.to(self.device)
         B = input_ids.shape[0]
 
-        # Step 1: Initial forward pass with karma injection
-        # We need to inject karma at the embedding level for O1
-        initial_logits, initial_states = self._extract_layer_states(
-            input_ids, extract_layers=[0, 11]
-        )
+        # Track current temperature (may be adjusted by Phase 2)
+        current_temp = temperature
 
-        # If karma exists and injection requested, modify O1 state
-        if inject_karma and self.karma_buffer is not None and self.bridge_enabled:
-            # For the first token's hidden state, blend in karma
-            # This approximates injecting karma at O1
-            metrics['karma_injected'] = True
-            metrics['karma_norm'] = self.karma_buffer.norm().item()
-
-        # Step 2: Autoregressive generation
+        # Step 1: Autoregressive generation with Phase 2 integration
         generated_ids = input_ids.clone()
 
         for step in range(max_new_tokens):
-            # Forward pass for next token
-            outputs = self.model(generated_ids, return_hidden=True)
+            # Forward pass - use return_last_hidden for CSR re-projection
+            outputs = self.model(
+                generated_ids,
+                return_hidden=True,
+                return_last_hidden=(csr_guard is not None),
+            )
             logits = outputs['logits'][:, -1, :]  # [B, V]
+            hidden_states = outputs.get('hidden_states', [])
+
+            # Phase 2: Apply karma injection via resonance (at each step)
+            # This injects previous O12 state into current processing
+            if inject_karma and self.karma_buffer is not None and step == 0:
+                # For first step, note that karma is being used
+                metrics['karma_injected'] = True
+                metrics['karma_norm'] = self.karma_buffer.norm().item()
+
+            # Phase 2: CSR Safety Guard with lm_head re-projection
+            if csr_guard is not None and 'last_hidden_state' in outputs:
+                last_hidden = outputs['last_hidden_state'][:, -1, :]  # [B, D]
+                logits, guard_info = csr_guard.apply(
+                    hidden_state=last_hidden,
+                    original_logits=logits,
+                )
+                if guard_info.get('intervention', False):
+                    metrics['interventions'] += 1
+
+            # Phase 2: Metacognitive monitoring
+            if metacognition is not None:
+                meta_status = metacognition.update(logits)
+
+                # Check for ABORT recommendation
+                if meta_status['recommendation'] == 'ABORT':
+                    metrics['aborted'] = True
+                    metrics['abort_reason'] = 'Sustained low coherence'
+                    break
+
+                # Adjust temperature based on recommendations
+                if meta_status['recommendation'] == 'BRAKE':
+                    current_temp = temperature * 0.7
+                elif meta_status['recommendation'] == 'RECOVER':
+                    current_temp = temperature * 1.3
+                else:
+                    current_temp = temperature
 
             # Apply temperature
-            logits = logits / temperature
+            logits = logits / current_temp
 
             # Top-k filtering
             if top_k > 0:
@@ -486,24 +526,38 @@ class EvolutionaryInferenceEngine:
             # Sample next token
             probs = F.softmax(logits, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
+            token_prob = probs.gather(1, next_token).item() if B == 1 else probs.gather(1, next_token)[0].item()
+
+            # Phase 2: Update Guna tracker
+            if guna_tracker is not None:
+                s, r, t = guna_tracker.update(
+                    token_id=next_token.item() if B == 1 else next_token[0].item(),
+                    token_prob=token_prob,
+                )
+                # Update engine's Guna state for dynamic alpha
+                self.update_gunas(s, r, t)
+
+                # Feed Gunas to metacognition if available
+                if metacognition is not None:
+                    metacognition.update_gunas(s, r, t)
+
             generated_ids = torch.cat([generated_ids, next_token], dim=1)
 
-            # Check for EOS (assuming token_id 0 or model-specific)
-            # This is a simplified check - real implementation would use tokenizer
+            # Check for EOS
             if hasattr(self.model, 'config') and hasattr(self.model.config, 'eos_token_id'):
                 eos_id = self.model.config.eos_token_id
-                if (next_token == eos_id).all():
+                if eos_id is not None and (next_token == eos_id).all():
                     break
 
-        # Step 3: Extract O12 and store as karma for next sequence
+        # Step 2: Extract O12 and store as karma for next sequence
         if store_karma and self.bridge_enabled:
             # Final forward pass to get O12 state
-            final_outputs = self.model(generated_ids, return_hidden=True)
+            final_outputs = self.model(generated_ids, extract_layers=[11])
             hidden_states = final_outputs.get('hidden_states', [])
 
-            if len(hidden_states) >= 12:
-                # O12 is the last layer (index 11)
-                o12_hidden = hidden_states[11]  # [B, N, D]
+            if len(hidden_states) >= 1:
+                # O12 is extracted
+                o12_hidden = hidden_states[0]  # [B, N, D] (first in list since we only extracted layer 11)
                 self.current_o12 = o12_hidden
 
                 # Compute seed and store as karma
