@@ -4498,10 +4498,32 @@ class DynamicRelaxationController:
         self.saturation_triggered = False  # Track if saturation gate fired
         self.saturation_thaw_step = None  # Step when thaw started
 
-        # V9.4.9 Metabolic Flip: Simpler, more robust criteria
-        self.metabolic_step_counter = 0   # Consecutive steps meeting ALL criteria
-        self.metabolic_entropy_threshold = 0.45  # Flip BEFORE loops get bad
+        # V9.5.0 Dynamic Streak Controller: Entropy-triggered flip
+        self.metabolic_step_counter = 0   # Consecutive steps meeting validity criteria
+        self.metabolic_entropy_threshold = 0.45  # Below this = looping, need fast escape
         self.metabolic_vram_safety = 0.90  # Don't flip if VRAM > 90%
+        self._current_target_streak = 500  # Dynamic target (50 or 500 based on entropy)
+
+        # V9.5.1 Multi-Stage Granular Evolution: 9:3 → 6:6 → 5:7 → 4:8 → 3:9
+        self.evolution_stages = [(9, 3), (6, 6), (5, 7), (4, 8), (3, 9)]
+        self.current_stage_idx = 0  # Start at 9:3
+        self.evolution_streak = 0   # Steps meeting evolution criteria
+        self.evolution_patience = 200  # Steps needed to trigger next stage
+        self.evolution_entropy_floor = 0.42  # Abort if entropy drops below this
+        self.evolution_coherence_min = 0.82  # Must maintain high coherence
+
+        # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
+        self.stress_probe_active = False  # Currently in stress-probe mode
+        self.stress_probe_start_step = None  # When stress-probe started
+        self.stress_probe_degeneracy_streak = 0  # Consecutive evals of degeneracy detection
+        self.stress_probe_exit_streak = 0  # Consecutive evals meeting exit criteria
+        self.pre_stress_probe_split = None  # Split before stress-probe (to restore)
+        self.pre_stress_probe_lr = None  # LR before stress-probe (to restore)
+        self.stress_probe_steps_in = 0  # Steps spent in stress-probe
+        # Gradual LR restore tracking (ChatGPT guardrail)
+        self.stress_probe_lr_restoring = False  # Currently restoring LR
+        self.stress_probe_lr_restore_start_step = None  # When LR restore started
+        self.stress_probe_reduced_lr = None  # The reduced LR during stress-probe
 
         # [S5] Entropy Gate: Block relaxation if entropy too high
         self.entropy_gate_threshold = 0.50  # Must be below this to relax
@@ -4697,15 +4719,18 @@ class DynamicRelaxationController:
         global_step: int,
     ) -> str:
         """
-        V9.4.9 Metabolic Flip: Simpler, more robust 9:3 → 6:6 trigger.
+        V9.5.0 Dynamic Streak Controller: Entropy-triggered 9:3 → 6:6 flip.
 
-        Three clear criteria (ALL must pass for patience steps):
+        Key insight: Entropy determines streak LENGTH, VRAM determines streak VALIDITY.
+        - Low entropy (<0.45) = looping = SHORT streak (50) to escape quickly
+        - High entropy (>0.45) = learning = LONG streak (500) to solidify
+
+        Validity criteria (must pass every step):
         1. Coherence > 0.74 (Sattvic stability)
-        2. Entropy < 0.45 (catch loops BEFORE they get bad)
-        3. VRAM < 90% (safety gate)
+        2. VRAM < 90% (safety gate)
 
-        If ANY condition fails, counter resets to 0.
-        Returns "TRIGGER_FLIP" when criteria met for patience steps.
+        If validity fails, counter resets to 0.
+        Returns "TRIGGER_FLIP" when dynamic target reached.
         """
         if self.saturation_triggered:
             return "ALREADY_FLIPPED"
@@ -4713,28 +4738,350 @@ class DynamicRelaxationController:
         coherence = metrics.get('coherence', 0.0)
         entropy = metrics.get('entropy', 1.0)
 
-        # 1. Define "Sattvic" Stability Criteria
+        # 1. Validity Criteria (must pass to increment counter)
         is_stable = coherence > self.saturation_coherence_threshold  # 0.74
-        is_saturated = entropy < self.metabolic_entropy_threshold     # 0.45
         is_safe = vram_usage < self.metabolic_vram_safety            # 0.90
 
-        # 2. Increment or Reset Step Counter
-        if is_stable and is_saturated and is_safe:
+        # 2. Dynamic Streak Target based on Entropy
+        # Low entropy = looping/repetition = need SHORT streak to escape
+        # High entropy = still learning = need LONG streak to solidify
+        if entropy < self.metabolic_entropy_threshold:  # 0.45
+            target_streak = 50   # Emergency "Escape" Mode - break loops fast
+        else:
+            target_streak = 500  # Standard "Sattvic" Mode - let authority crystallize
+
+        # 3. Increment or Reset Counter (based on validity, not entropy)
+        if is_stable and is_safe:
             self.metabolic_step_counter += 1
         else:
-            self.metabolic_step_counter = 0  # Hard reset if ANY condition fails
+            self.metabolic_step_counter = 0  # Hard reset if validity fails
 
-        # 3. Execute Flip when patience reached
-        if self.metabolic_step_counter >= self.saturation_patience:
+        # 4. Execute Flip when dynamic target reached
+        if self.metabolic_step_counter >= target_streak:
             self.saturation_triggered = True
             self.saturation_thaw_step = global_step
-            print(f"\n  🚀 [METABOLIC FLIP] Step {global_step}: Criteria met for {self.saturation_patience} steps")
+            mode = "ESCAPE" if entropy < self.metabolic_entropy_threshold else "SATTVIC"
+            print(f"\n  🚀 [DYNAMIC FLIP] Step {global_step}: {mode} mode - target {target_streak} reached")
             print(f"      Coherence: {coherence:.3f} > 0.74 ✓")
-            print(f"      Entropy:   {entropy:.3f} < 0.45 ✓")
+            print(f"      Entropy:   {entropy:.3f} {'< 0.45 (looping)' if entropy < 0.45 else '>= 0.45 (learning)'}")
             print(f"      VRAM:      {vram_usage*100:.1f}% < 90% ✓")
             return "TRIGGER_FLIP"
 
+        # Store current target for status display
+        self._current_target_streak = target_streak
         return "WAITING"
+
+    def check_granular_evolution(
+        self,
+        metrics: Dict[str, float],
+        vram_usage: float,
+        global_step: int,
+    ) -> str:
+        """
+        V9.5.1 Granular Evolution: Check for multi-stage transitions.
+
+        After 6:6, can evolve to 5:7 → 4:8 → 3:9 based on:
+        - Coherence > 0.82 (stability)
+        - Entropy > 0.42 (diversity floor - prevent repetition curse)
+        - VRAM < 90% (safety)
+
+        Triggers when criteria met for evolution_patience steps (200).
+        """
+        # Only check if we're past the initial 6:6 stage
+        if self.current_stage_idx < 1:
+            return "NOT_READY"
+
+        # Already at final stage (3:9)
+        if self.current_stage_idx >= len(self.evolution_stages) - 1:
+            return "FINAL_STAGE"
+
+        coherence = metrics.get('coherence', 0.0)
+        entropy = metrics.get('entropy', 1.0)
+
+        # Evolution criteria (different from initial flip)
+        is_stable = coherence > self.evolution_coherence_min  # 0.82
+        is_diverse = entropy > self.evolution_entropy_floor   # 0.42 - MUST have diversity
+        is_safe = vram_usage < self.metabolic_vram_safety     # 0.90
+
+        # Key insight: We want to evolve when STIFF (low entropy) but stable
+        # This breaks the repetition curse by adding sensory capacity
+        wants_evolution = entropy < 0.45 and coherence > 0.85  # Stiff but stable
+
+        if is_stable and is_safe and (is_diverse or wants_evolution):
+            self.evolution_streak += 1
+        else:
+            self.evolution_streak = 0  # Hard reset
+
+        # Trigger evolution when patience reached
+        if self.evolution_streak >= self.evolution_patience:
+            next_stage = self.evolution_stages[self.current_stage_idx + 1]
+            return f"EVOLVE_TO_{next_stage[0]}_{next_stage[1]}"
+
+        return "WAITING"
+
+    def execute_granular_evolution(self, global_step: int) -> Tuple[int, int]:
+        """
+        Execute transition to next evolution stage.
+
+        Returns the new (authority, sensory) split.
+        """
+        if self.current_stage_idx >= len(self.evolution_stages) - 1:
+            return self.current_split
+
+        # Advance to next stage
+        self.current_stage_idx += 1
+        new_split = self.evolution_stages[self.current_stage_idx]
+
+        # Reset evolution streak for next stage
+        self.evolution_streak = 0
+
+        # Update current split
+        self.current_split = new_split
+
+        # Print evolution message
+        prev_split = self.evolution_stages[self.current_stage_idx - 1]
+        print(f"\n  🌀 [GRANULAR EVOLUTION] Step {global_step}")
+        print(f"      {prev_split[0]}:{prev_split[1]} → {new_split[0]}:{new_split[1]}")
+        print(f"      Authority layers: 0-{new_split[0]-1}")
+        print(f"      Sensory layers: {new_split[0]}-11")
+        print(f"      Transitional layer: {new_split[0]} (newly sensory)")
+
+        return new_split
+
+    def check_stress_probe(
+        self,
+        metrics: Dict[str, float],
+        config,
+        global_step: int,
+    ) -> str:
+        """
+        V9.5.2 Emergency Stress-Probe Detection.
+
+        ChatGPT Guardrails: Compound trigger confirmation
+        - Low entropy (< 0.42) is REQUIRED
+        - AND at least ONE of: REP-3 > 0.18, UTR < 0.55, DRS > 12
+        - Must hold for 2 consecutive evals
+
+        Gemini Protocol: Freeze Authority, flood with Sensory to break stiffness.
+        """
+        if not config.enable_stress_probe:
+            return "DISABLED"
+
+        # Don't trigger if already in stress-probe
+        if self.stress_probe_active:
+            return "ALREADY_ACTIVE"
+
+        coherence = metrics.get('coherence', 0.0)
+        entropy = metrics.get('entropy', 1.0)
+        rep3 = metrics.get('rep3', 0.0)  # REP-3 from quality metrics
+        utr = metrics.get('utr', 1.0)  # Unique Token Ratio
+        drs = metrics.get('drs', 0.0)  # Degeneracy Repetition Score
+
+        # ChatGPT Guardrails: Conservative compound trigger
+        # Requirement 1: Model must be stiff (high coherence)
+        is_stiff = coherence > config.stress_probe_coherence_min  # 0.80
+
+        # Requirement 2: Low entropy (REQUIRED)
+        is_low_entropy = entropy < config.stress_probe_entropy_trigger  # 0.42
+
+        # Requirement 3: At least ONE degeneracy signal
+        has_high_rep3 = rep3 > config.stress_probe_rep3_trigger  # 0.18
+        has_low_utr = utr < config.stress_probe_utr_trigger  # 0.55
+        has_high_drs = drs > config.stress_probe_drs_trigger  # 12
+
+        has_degeneracy_signal = has_high_rep3 or has_low_utr or has_high_drs
+
+        # Compound trigger: stiff AND low_entropy AND at_least_one_signal
+        is_degenerate = is_stiff and is_low_entropy and has_degeneracy_signal
+
+        if is_degenerate:
+            self.stress_probe_degeneracy_streak += 1
+            # Log degeneracy detection for debugging
+            if self.stress_probe_degeneracy_streak == 1:
+                signals = []
+                if has_high_rep3:
+                    signals.append(f"REP-3={rep3:.3f}>{config.stress_probe_rep3_trigger}")
+                if has_low_utr:
+                    signals.append(f"UTR={utr:.3f}<{config.stress_probe_utr_trigger}")
+                if has_high_drs:
+                    signals.append(f"DRS={drs:.1f}>{config.stress_probe_drs_trigger}")
+                print(f"  ⚠️ [STRESS-PROBE] Degeneracy detected: Ent={entropy:.3f}, {', '.join(signals)}")
+        else:
+            self.stress_probe_degeneracy_streak = 0
+
+        # Trigger after patience consecutive evals of degeneracy (ChatGPT: 2)
+        if self.stress_probe_degeneracy_streak >= config.stress_probe_patience:
+            return "TRIGGER_STRESS_PROBE"
+
+        return "MONITORING"
+
+    def execute_stress_probe(
+        self,
+        config,
+        current_lr: float,
+        global_step: int,
+    ) -> Tuple[Tuple[int, int], float]:
+        """
+        Execute transition to 3:9 stress-probe mode.
+
+        Returns: (new_split, new_lr)
+        - Jumps to 3:9 split (nearly all Sensory)
+        - Reduces LR to stress_probe_lr_factor (65%)
+        - Records pre-stress-probe state for restoration
+        """
+        # Save current state for restoration
+        self.pre_stress_probe_split = self.current_split
+        self.pre_stress_probe_lr = current_lr
+
+        # Activate stress-probe
+        self.stress_probe_active = True
+        self.stress_probe_start_step = global_step
+        self.stress_probe_steps_in = 0
+        self.stress_probe_degeneracy_streak = 0  # Reset
+
+        # Jump to 3:9 (Phase A: Rajas)
+        new_split = (3, 9)
+        self.current_split = new_split
+
+        # Also update stage index to reflect 3:9
+        self.current_stage_idx = len(self.evolution_stages) - 1  # Final stage
+
+        # Reduce LR
+        new_lr = current_lr * config.stress_probe_lr_factor
+
+        print(f"\n  🚨 [STRESS-PROBE] EMERGENCY ACTIVATION - Step {global_step}")
+        print(f"      {self.pre_stress_probe_split[0]}:{self.pre_stress_probe_split[1]} → 3:9 (Phase A: Rajas)")
+        print(f"      Authority Scale: {config.stress_probe_authority_scale} (nearly frozen)")
+        print(f"      LR: {current_lr:.6f} → {new_lr:.6f} ({config.stress_probe_lr_factor*100:.0f}%)")
+        print(f"      Exit Criteria: Ent > {config.stress_probe_exit_entropy} OR REP-3 < {config.stress_probe_exit_rep3}")
+        print(f"      Max Steps: {config.stress_probe_max_steps}")
+
+        return new_split, new_lr
+
+    def check_stress_probe_exit(
+        self,
+        metrics: Dict[str, float],
+        config,
+        global_step: int,
+    ) -> str:
+        """
+        Check if stress-probe should exit.
+
+        ChatGPT Guardrails:
+        - Minimum 100 steps (don't exit early)
+        - Exit when Entropy > 0.55 for 2 consecutive evals
+        - Maximum 300 steps (forced exit)
+        """
+        if not self.stress_probe_active:
+            return "NOT_ACTIVE"
+
+        self.stress_probe_steps_in += 1
+
+        entropy = metrics.get('entropy', 0.0)
+        rep3 = metrics.get('rep3', 1.0)
+
+        # ChatGPT Guardrail: Enforce minimum steps
+        if self.stress_probe_steps_in < config.stress_probe_min_steps:
+            return "CONTINUE"
+
+        # Success criteria: diversity restored
+        entropy_ok = entropy > config.stress_probe_exit_entropy  # 0.55
+        rep3_ok = rep3 < config.stress_probe_exit_rep3  # 0.12
+
+        # ChatGPT Guardrail: Require 2 consecutive evals meeting exit criteria
+        if entropy_ok:
+            self.stress_probe_exit_streak += 1
+        else:
+            self.stress_probe_exit_streak = 0
+
+        # Forced exit: max steps reached
+        max_reached = self.stress_probe_steps_in >= config.stress_probe_max_steps
+
+        # Exit success: 2 consecutive good evals (ChatGPT: entropy > 0.55 for 2 evals)
+        if self.stress_probe_exit_streak >= 2 and rep3_ok:
+            return "EXIT_SUCCESS"
+        elif max_reached:
+            return "EXIT_FORCED"
+
+        # Log progress every 50 steps during stress-probe
+        if self.stress_probe_steps_in % 50 == 0:
+            print(f"  📊 [STRESS-PROBE] Step {self.stress_probe_steps_in}/{config.stress_probe_max_steps}: "
+                  f"Ent={entropy:.3f}, REP-3={rep3:.3f}, exit_streak={self.stress_probe_exit_streak}")
+
+        return "CONTINUE"
+
+    def exit_stress_probe(
+        self,
+        global_step: int,
+        exit_reason: str,
+        config,
+    ) -> Tuple[Tuple[int, int], float]:
+        """
+        Exit stress-probe and return to 6:6 (Sattva).
+
+        ChatGPT Guardrails:
+        - Return to 6:6, not 9:3
+        - Gradual LR restore over ~50 steps
+        - Re-enable adaptive LR after 100 steps
+
+        Returns: (new_split, initial_lr_for_restore)
+        """
+        # Return to 6:6 (not pre-stress-probe split - we want balanced digestion)
+        new_split = (6, 6)
+        self.current_split = new_split
+        self.current_stage_idx = 1  # 6:6 stage
+
+        # Record stress-probe statistics
+        duration = self.stress_probe_steps_in
+
+        # Deactivate stress-probe but setup gradual LR restore
+        self.stress_probe_active = False
+        self.stress_probe_steps_in = 0
+        self.stress_probe_exit_streak = 0
+
+        # ChatGPT Guardrail: Gradual LR restore over ~50 steps
+        self.stress_probe_lr_restoring = True
+        self.stress_probe_lr_restore_start_step = global_step
+        self.stress_probe_reduced_lr = self.pre_stress_probe_lr * config.stress_probe_lr_factor
+
+        print(f"\n  ✅ [STRESS-PROBE] EXIT - Step {global_step}")
+        print(f"      Reason: {exit_reason}")
+        print(f"      Duration: {duration} steps")
+        print(f"      3:9 → 6:6 (Phase B: Sattva - Digestion)")
+        print(f"      LR Restore: {self.stress_probe_reduced_lr:.6f} → {self.pre_stress_probe_lr:.6f}")
+        print(f"      Restore Steps: {config.stress_probe_lr_restore_steps}")
+
+        # Return reduced LR (gradual restore will ramp up)
+        return new_split, self.stress_probe_reduced_lr
+
+    def get_stress_probe_restore_lr(
+        self,
+        global_step: int,
+        config,
+    ) -> float:
+        """
+        Compute LR during gradual restore period after stress-probe exit.
+
+        ChatGPT Guardrail: Restore LR gradually over ~50 steps.
+        """
+        if not self.stress_probe_lr_restoring:
+            return self.pre_stress_probe_lr
+
+        steps_since_exit = global_step - self.stress_probe_lr_restore_start_step
+
+        # Check if restore complete
+        if steps_since_exit >= config.stress_probe_lr_restore_steps:
+            self.stress_probe_lr_restoring = False
+            print(f"  ✓ [STRESS-PROBE] LR restore complete: {self.pre_stress_probe_lr:.6f}")
+            return self.pre_stress_probe_lr
+
+        # Linear ramp from reduced_lr to pre_stress_probe_lr
+        progress = steps_since_exit / config.stress_probe_lr_restore_steps
+        current_lr = self.stress_probe_reduced_lr + progress * (
+            self.pre_stress_probe_lr - self.stress_probe_reduced_lr
+        )
+
+        return current_lr
 
     def update_stability_per_step(self, coherence: float, sa_ratio: float = None) -> None:
         """
@@ -5124,13 +5471,15 @@ class DynamicRelaxationController:
         streak_str = f"{self.stability_streak}/{self.stability_window}" if self.state == self.STATE_AUTHORITY else "—"
         lock_str = " 🔒" if self.is_guna_locked() else ""
 
-        # V9.4.9 Metabolic Flip progress (if enabled and not yet triggered)
+        # V9.5.0 Dynamic Streak progress (if enabled and not yet triggered)
         sat_str = ""
         if self.enable_saturation_gate and self.state == self.STATE_AUTHORITY:
             if self.saturation_triggered:
                 sat_str = " 🚀FLIP"
             elif self.metabolic_step_counter > 0:
-                sat_str = f" Met:{self.metabolic_step_counter}/{self.saturation_patience}"
+                # Show dynamic target: 50 (escape) or 500 (sattvic)
+                mode = "⚡" if self._current_target_streak == 50 else "🧘"
+                sat_str = f" {mode}Met:{self.metabolic_step_counter}/{self._current_target_streak}"
 
         if self.state == self.STATE_RECOVERY:
             return f"Split:{split_str} State:RECOVERY Streak:{streak_str}{lock_str}"
@@ -5216,25 +5565,43 @@ def generate_sample(
     tokenizer,
     prompt: str,
     device: torch.device,
-    max_new_tokens: int = 50,
-    temperature: float = 0.8,
-    top_p: float = 0.9,
+    max_new_tokens: int = 128,
+    temperature: float = 0.9,
+    top_p: float = 0.95,
+    top_k: int = 50,
+    repetition_penalty: float = 1.15,
+    no_repeat_ngram_size: int = 3,
 ) -> str:
     """
     Generate text from a prompt for quality monitoring.
 
     Uses nucleus (top-p) sampling with temperature for diverse outputs.
-    Works with SymbolU12, PhaseTransformer, and HybridPhaseTransformer models.
+    ChatGPT recommendations for breaking repetition:
+    - temperature = 0.8-1.0
+    - top_p = 0.95
+    - top_k = 50
+    - repetition_penalty = 1.1-1.2
+    - no_repeat_ngram_size = 3
+    - max_new_tokens = 128-192
     """
     model.eval()
 
     # Encode prompt
     input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+    prompt_len = input_ids.shape[1]
 
     # Generate tokens one by one
     generated = input_ids.clone()
 
-    for _ in range(max_new_tokens):
+    # Track generated n-grams for no_repeat_ngram blocking
+    def get_ngrams(seq, n):
+        """Extract n-grams from a sequence."""
+        ngrams = set()
+        for i in range(len(seq) - n + 1):
+            ngrams.add(tuple(seq[i:i+n].tolist()))
+        return ngrams
+
+    for step in range(max_new_tokens):
         # Forward pass
         outputs = model(generated)
 
@@ -5256,7 +5623,36 @@ def generate_sample(
             break
 
         # Get next token logits
-        next_logits = logits[:, -1, :] / temperature
+        next_logits = logits[:, -1, :].clone()
+
+        # Apply repetition penalty to previously generated tokens
+        if repetition_penalty != 1.0:
+            for token_id in set(generated[0, prompt_len:].tolist()):
+                if next_logits[0, token_id] > 0:
+                    next_logits[0, token_id] /= repetition_penalty
+                else:
+                    next_logits[0, token_id] *= repetition_penalty
+
+        # Apply no_repeat_ngram blocking
+        if no_repeat_ngram_size > 0 and generated.shape[1] >= no_repeat_ngram_size:
+            # Get the last (n-1) tokens as the prefix
+            prefix = tuple(generated[0, -(no_repeat_ngram_size - 1):].tolist())
+            # Get all existing n-grams
+            existing_ngrams = get_ngrams(generated[0], no_repeat_ngram_size)
+            # Block tokens that would create a repeated n-gram
+            for ngram in existing_ngrams:
+                if ngram[:-1] == prefix:
+                    # This token would complete a repeated n-gram
+                    next_logits[0, ngram[-1]] = float('-inf')
+
+        # Apply temperature
+        next_logits = next_logits / temperature
+
+        # Top-k filtering (optional, applied before top-p)
+        if top_k > 0:
+            top_k_vals, _ = torch.topk(next_logits, min(top_k, next_logits.size(-1)))
+            threshold = top_k_vals[0, -1]
+            next_logits[next_logits < threshold] = float('-inf')
 
         # Top-p (nucleus) sampling
         sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
@@ -5286,6 +5682,40 @@ def generate_sample(
     return tokenizer.decode(generated[0], skip_special_tokens=True)
 
 
+def compute_sample_metrics(text: str) -> Dict[str, float]:
+    """
+    Compute quality metrics for generated text (ChatGPT recommendation).
+
+    Returns:
+        - completion_rate: 1.0 if ends with punctuation, 0.0 otherwise
+        - repetition_score: n-gram repetition rate (lower is better)
+        - unique_ratio: ratio of unique tokens to total tokens
+    """
+    words = text.split()
+    if len(words) < 2:
+        return {"completion": 0.0, "repetition": 1.0, "unique_ratio": 0.0}
+
+    # Completion rate: ends with sentence-ending punctuation
+    completion = 1.0 if text.rstrip()[-1:] in '.!?' else 0.0
+
+    # Repetition score: bigram repetition rate
+    bigrams = [f"{words[i]} {words[i+1]}" for i in range(len(words)-1)]
+    if bigrams:
+        unique_bigrams = len(set(bigrams))
+        repetition = 1.0 - (unique_bigrams / len(bigrams))
+    else:
+        repetition = 0.0
+
+    # Unique token ratio
+    unique_ratio = len(set(words)) / len(words) if words else 0.0
+
+    return {
+        "completion": completion,
+        "repetition": repetition,
+        "unique_ratio": unique_ratio,
+    }
+
+
 def run_quality_samples(
     model: nn.Module,
     tokenizer,
@@ -5300,7 +5730,7 @@ def run_quality_samples(
     This provides a qualitative check that the model is learning
     meaningful language patterns, not just minimizing perplexity.
 
-    Samples are logged with prompts and generated completions.
+    Samples are logged with prompts, generated completions, and quality metrics.
     """
     def log(msg):
         if logger:
@@ -5313,21 +5743,61 @@ def run_quality_samples(
     log(f"  📝 QUALITY SAMPLES (Step {step})")
     log("=" * 60)
 
+    # Aggregate metrics across all samples
+    total_completion = 0.0
+    total_repetition = 0.0
+    total_unique = 0.0
+    sample_count = 0
+
     for prompt in config.sample_prompts:
         try:
+            # ChatGPT recommendations for quality samples:
+            # temperature=0.9, top_p=0.95, top_k=50
+            # repetition_penalty=1.15, no_repeat_ngram_size=3
             generated = generate_sample(
                 model, tokenizer, prompt, device,
-                max_new_tokens=50,
-                temperature=0.8,
-                top_p=0.9,
+                max_new_tokens=128,
+                temperature=0.9,
+                top_p=0.95,
+                top_k=50,
+                repetition_penalty=1.15,
+                no_repeat_ngram_size=3,
             )
             # Clean up and truncate for display
             generated = generated.strip().replace('\n', ' ')[:200]
+
+            # Compute quality metrics
+            metrics = compute_sample_metrics(generated)
+            total_completion += metrics["completion"]
+            total_repetition += metrics["repetition"]
+            total_unique += metrics["unique_ratio"]
+            sample_count += 1
+
             log(f"  Prompt: \"{prompt}\"")
             log(f"  Output: \"{generated}\"")
             log("")
         except Exception as e:
             log(f"  ⚠️ Sampling failed for prompt '{prompt[:30]}...': {e}")
+
+    # Log aggregate quality metrics
+    if sample_count > 0:
+        avg_completion = total_completion / sample_count
+        avg_repetition = total_repetition / sample_count
+        avg_unique = total_unique / sample_count
+
+        log("  ────────────────────────────────────────────────────────")
+        log(f"  📊 SAMPLE QUALITY METRICS (n={sample_count})")
+        log(f"     Completion Rate: {avg_completion*100:.0f}% (ends with punctuation)")
+        log(f"     Repetition Score: {avg_repetition*100:.1f}% (lower is better)")
+        log(f"     Unique Token Ratio: {avg_unique*100:.1f}%")
+
+        # Quality indicator
+        if avg_repetition < 0.3 and avg_unique > 0.6:
+            log("     Quality: 🟢 GOOD")
+        elif avg_repetition < 0.5 and avg_unique > 0.4:
+            log("     Quality: 🟡 IMPROVING")
+        else:
+            log("     Quality: 🔴 NEEDS WORK (expect improvement by step 2k-6k)")
 
     log("=" * 60)
     log("")
@@ -5406,6 +5876,33 @@ class UnifiedTrainingConfig:
     lambda_bhava: float = 0.1     # Bhava relationship consistency
     lambda_coherence: float = 0.05  # Global coherence
     lambda_entropy: float = 0.01  # Entropy regularization
+
+    # V9.5.1 Entropy Floor (prevents repetition curse)
+    enable_entropy_floor: bool = False  # Enable entropy floor penalty
+    entropy_floor: float = 0.48  # Minimum entropy target
+    entropy_floor_weight: float = 0.1  # Weight for floor penalty
+
+    # V9.5.1 Force Evolution (manual intervention)
+    force_evolution_stage: int = None  # Force to stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9
+
+    # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
+    # Gemini Protocol: Freeze Authority, flood with Sensory to break stiffness
+    # ChatGPT Guardrails: Compound trigger, strict duration, gradual LR restore
+    enable_stress_probe: bool = False  # Enable automatic stress-probe detection
+    stress_probe_entropy_trigger: float = 0.42  # Trigger when entropy drops below this (ChatGPT: 0.42)
+    stress_probe_rep3_trigger: float = 0.18  # Trigger when REP-3 exceeds this (ChatGPT: 0.18)
+    stress_probe_utr_trigger: float = 0.55  # Trigger when UTR drops below this (ChatGPT: 0.55)
+    stress_probe_drs_trigger: float = 12.0  # Trigger when DRS exceeds this (ChatGPT: 12)
+    stress_probe_coherence_min: float = 0.80  # Only trigger if coherence is high (stiff, not dying)
+    stress_probe_patience: int = 2  # Consecutive evals of degeneracy before triggering (ChatGPT: 2)
+    stress_probe_authority_scale: float = 0.05  # Nearly freeze Authority layers
+    stress_probe_lr_factor: float = 0.60  # Reduce LR to 60% during stress-probe (ChatGPT: 0.6)
+    stress_probe_exit_entropy: float = 0.55  # Exit when entropy exceeds this for 2 evals
+    stress_probe_exit_rep3: float = 0.12  # Exit when REP-3 drops below this
+    stress_probe_min_steps: int = 100  # Minimum steps in stress-probe (ChatGPT: 100)
+    stress_probe_max_steps: int = 300  # Maximum steps in stress-probe (ChatGPT: 300)
+    stress_probe_lr_restore_steps: int = 50  # Steps to gradually restore LR after exit
+    force_stress_probe: bool = False  # Force immediate stress-probe activation
 
     # Sovereign-1 loss configuration (hardened decomposed loss)
     use_sovereign_loss: bool = True  # Enable Sovereign-1 decomposed loss
@@ -5532,11 +6029,17 @@ class UnifiedTrainingConfig:
     # Quality Sampling
     sample_every: int = 500  # Generate samples every N steps (0 = disabled)
     sample_prompts: tuple = (
+        # Original open-ended prompts
         "The history of the Roman Empire began when",
         "In computer science, algorithms are",
-        "The weather today is expected to be",
-        "Once upon a time in a small village",
-        "The meaning of life is often debated",
+        # Targeted probes for factual continuity (ChatGPT recommendation)
+        "The Roman Empire began when Julius Caesar",
+        "An algorithm is a step-by-step procedure that",
+        # Syntax closure probes
+        "A triangle has three sides, therefore",
+        "If A implies B and A is true, then",
+        # Causal reasoning probe
+        "Water boils at 100 degrees Celsius because",
     )
 
     # LRA Validation (Long-Range Retrieval)
@@ -6051,7 +6554,7 @@ def train(config: UnifiedTrainingConfig):
         device = torch.device(config.device)
 
     print(f"\n{'='*70}")
-    print("   UNIFIED SYMBOLU LLM TRAINING V9.4.4")
+    print("   UNIFIED SYMBOLU LLM TRAINING V9.5.2")
     print(f"{'='*70}")
     print(f"\n  Model Type: {config.model_type.upper()}")
     print(f"  Model Size: {config.model_size}")
@@ -6400,6 +6903,18 @@ def train(config: UnifiedTrainingConfig):
             saturation_thaw_steps=config.saturation_thaw_steps,
         )
 
+        # V9.5.1 Force Evolution: Manual intervention to specific stage
+        if config.force_evolution_stage is not None:
+            target_stage = config.force_evolution_stage
+            if 1 <= target_stage <= 4:
+                relaxation_controller.current_stage_idx = target_stage
+                new_split = relaxation_controller.evolution_stages[target_stage]
+                relaxation_controller.current_split = new_split
+                relaxation_controller.saturation_triggered = True  # Skip 9:3→6:6 check
+                relaxation_controller.state = relaxation_controller.STATE_BALANCED
+                print(f"\n  🔧 [FORCE EVOLUTION] Manually set to stage {target_stage}: {new_split[0]}:{new_split[1]}")
+                print(f"      Stages: 0=9:3, 1=6:6, 2=5:7, 3=4:8, 4=3:9")
+
     # Adaptive Training Controller (dynamic hyperparameter tuning)
     adaptive_controller = None
     if config.enable_adaptive_training:
@@ -6470,6 +6985,22 @@ def train(config: UnifiedTrainingConfig):
         print(f"\n  V9.4.5: Friction Controller ENABLED")
         print(f"    Alignment thresholds: warn={friction_controller.config.align_warning}, crit={friction_controller.config.align_critical}")
         print(f"    Dominance range: [{friction_controller.config.dom_low}, {friction_controller.config.dom_high}]")
+
+    # V9.5.2 Emergency Stress-Probe configuration display (ChatGPT Guardrails)
+    if config.enable_stress_probe:
+        print(f"\n  V9.5.2: Emergency Stress-Probe ENABLED (ChatGPT Guardrails)")
+        print(f"    Compound Trigger (2 consecutive evals):")
+        print(f"      Ent < {config.stress_probe_entropy_trigger} AND (REP-3 > {config.stress_probe_rep3_trigger} OR UTR < {config.stress_probe_utr_trigger} OR DRS > {config.stress_probe_drs_trigger})")
+        print(f"    Safety: Coherence > {config.stress_probe_coherence_min} (stiff, not dying)")
+        print(f"    Patience: {config.stress_probe_patience} consecutive evals")
+        print(f"    Authority Scale: {config.stress_probe_authority_scale} (nearly frozen)")
+        print(f"    LR Factor: {config.stress_probe_lr_factor*100:.0f}%")
+        print(f"    Duration: {config.stress_probe_min_steps}-{config.stress_probe_max_steps} steps")
+        print(f"    Exit: Ent > {config.stress_probe_exit_entropy} for 2 evals AND REP-3 < {config.stress_probe_exit_rep3}")
+        print(f"    LR Restore: Gradual over {config.stress_probe_lr_restore_steps} steps")
+
+    if config.force_stress_probe:
+        print(f"\n  ⚡ FORCE STRESS-PROBE: Activated at first step")
 
     # Track previous state for S-drift computation
     previous_state = None
@@ -6680,6 +7211,16 @@ def train(config: UnifiedTrainingConfig):
                     metrics['evo_toroid'] = evo_result['flow_result']['toroidal_coherence']
                     metrics['evo_rec'] = evo_result['metacognitive']['recommendation']
 
+            # V9.5.1 Entropy Floor Penalty (breaks repetition curse)
+            if config.enable_entropy_floor and 'onto_entropy' in metrics:
+                current_entropy = metrics['onto_entropy']
+                if current_entropy < config.entropy_floor:
+                    # Penalize low entropy to encourage diversity
+                    entropy_deficit = config.entropy_floor - current_entropy
+                    entropy_floor_loss = config.entropy_floor_weight * entropy_deficit
+                    loss = loss + entropy_floor_loss
+                    metrics['entropy_floor_penalty'] = entropy_floor_loss
+
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
 
@@ -6845,7 +7386,98 @@ def train(config: UnifiedTrainingConfig):
                     if flip_result == "TRIGGER_FLIP":
                         # Metabolic flip triggered! Execute 9:3 → 6:6 relaxation
                         relaxation_controller.execute_relaxation(current_step=global_step)
+                        relaxation_controller.current_stage_idx = 1  # Now at 6:6
                         print(f"  🔄 [RELAXATION] 9:3 → 6:6 transition initiated")
+
+                    # V9.5.1 Granular Evolution: Check for further evolution (6:6 → 5:7 → 4:8 → 3:9)
+                    evolution_result = relaxation_controller.check_granular_evolution(
+                        metrics=metrics,
+                        vram_usage=vram_usage,
+                        global_step=global_step,
+                    )
+
+                    if evolution_result.startswith("EVOLVE_TO_"):
+                        # Execute granular evolution
+                        new_split = relaxation_controller.execute_granular_evolution(global_step)
+                        # Reconfigure gradient scaler for new split
+                        if gradient_scaler_hgs is not None:
+                            gradient_scaler_hgs.reconfigure(
+                                new_authority_layers=new_split[0],
+                                new_sensory_layers=new_split[1],
+                                alpha_range=(0.05, 0.70),
+                            )
+                            print(f"  ✓ [HGS] Reconfigured for {new_split[0]}:{new_split[1]} split")
+
+                    # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
+                    if relaxation_controller.stress_probe_active:
+                        # Already in stress-probe: check for exit
+                        exit_result = relaxation_controller.check_stress_probe_exit(
+                            metrics=metrics,
+                            config=config,
+                            global_step=global_step,
+                        )
+
+                        if exit_result in ("EXIT_SUCCESS", "EXIT_FORCED"):
+                            # Exit stress-probe (starts gradual LR restore)
+                            new_split, initial_lr = relaxation_controller.exit_stress_probe(
+                                global_step=global_step,
+                                exit_reason=exit_result,
+                                config=config,
+                            )
+                            # Set initial LR (will be gradually restored)
+                            for param_group in optimizer.param_groups:
+                                param_group['lr'] = initial_lr
+                            # Reconfigure gradient scaler for 6:6
+                            if gradient_scaler_hgs is not None:
+                                gradient_scaler_hgs.reconfigure(
+                                    new_authority_layers=new_split[0],
+                                    new_sensory_layers=new_split[1],
+                                    alpha_range=(0.05, 0.70),
+                                )
+                                print(f"  ✓ [HGS] Reconfigured for {new_split[0]}:{new_split[1]} split")
+
+                    # ChatGPT Guardrail: Gradual LR restore after stress-probe exit
+                    if relaxation_controller.stress_probe_lr_restoring:
+                        restore_lr = relaxation_controller.get_stress_probe_restore_lr(
+                            global_step=global_step,
+                            config=config,
+                        )
+                        for param_group in optimizer.param_groups:
+                            param_group['lr'] = restore_lr
+
+                    if not relaxation_controller.stress_probe_active:
+                        # Not in stress-probe: check for trigger
+                        stress_result = relaxation_controller.check_stress_probe(
+                            metrics=metrics,
+                            config=config,
+                            global_step=global_step,
+                        )
+
+                        # Also check for force_stress_probe CLI flag
+                        if config.force_stress_probe and not relaxation_controller.stress_probe_active:
+                            stress_result = "TRIGGER_STRESS_PROBE"
+                            config.force_stress_probe = False  # Only trigger once
+
+                        if stress_result == "TRIGGER_STRESS_PROBE":
+                            # Get current LR
+                            current_lr = optimizer.param_groups[0]['lr']
+                            # Execute stress-probe
+                            new_split, new_lr = relaxation_controller.execute_stress_probe(
+                                config=config,
+                                current_lr=current_lr,
+                                global_step=global_step,
+                            )
+                            # Update optimizer LR
+                            for param_group in optimizer.param_groups:
+                                param_group['lr'] = new_lr
+                            # Reconfigure gradient scaler for 3:9 with frozen authority
+                            if gradient_scaler_hgs is not None:
+                                gradient_scaler_hgs.reconfigure(
+                                    new_authority_layers=new_split[0],
+                                    new_sensory_layers=new_split[1],
+                                    alpha_range=(config.stress_probe_authority_scale, 0.70),
+                                )
+                                print(f"  ✓ [HGS] Reconfigured for 3:9 stress-probe (α_authority={config.stress_probe_authority_scale})")
 
             # Periodic CUDA memory cleanup to prevent fragmentation
             if device.type == "cuda" and global_step % 500 == 0:
@@ -6922,14 +7554,20 @@ def train(config: UnifiedTrainingConfig):
                     else:
                         mem_str = ""
 
-                    # Log message
+                    # Timestamp for each log line
+                    timestamp = datetime.now().strftime("%H:%M:%S")
+
+                    # Log message with timestamp
                     log_msg = (
-                        f"Step {global_step:>6} | "
+                        f"[{timestamp}] Step {global_step:>6} | "
                         f"Loss: {avg_loss:.4f} | "
                         f"PPL: {metrics['ppl']:.2f} | "
                         f"LR: {lr:.2e} | "
                         f"Tok/s: {tokens_per_sec:.0f}{mem_str}"
                     )
+
+                    # Check if this is a validation step (show verbose metrics)
+                    is_verbose_step = (global_step % config.eval_every == 0)
 
                     # Add ontological metrics
                     if config.model_type == "ontological":
@@ -6978,15 +7616,15 @@ def train(config: UnifiedTrainingConfig):
                             sa_ind = "!"  # Sensory may be overriding
                         log_msg += f" | S/A:{current_sa_ratio:.2f}{sa_ind} α_s:{alpha_sens:.2f}"
 
-                    # Sattvic Brake: Confidence score with status icon
-                    if sattvic_brake is not None:
+                    # Sattvic Brake: Confidence score with status icon (only every 100 steps)
+                    if sattvic_brake is not None and is_verbose_step:
                         conf_icon = sattvic_brake.get_status_icon(sattvic_confidence)
                         log_msg += f" | Conf:{sattvic_confidence:.2f}{conf_icon}"
                         if sattvic_lr_mult < 1.0:
                             log_msg += f" [BRAKE×{sattvic_lr_mult:.2f}]"
 
-                    # v2.7 Training State Tracker: Knowledge state
-                    if training_state_tracker is not None and training_state_tracker.enabled:
+                    # v2.7 Training State Tracker: Knowledge state (only every 100 steps)
+                    if training_state_tracker is not None and training_state_tracker.enabled and is_verbose_step:
                         know_state = training_state_tracker.state['cognitive_state']
                         log_msg += f" | Know:{know_state:.2f}"
 
@@ -7001,8 +7639,8 @@ def train(config: UnifiedTrainingConfig):
                             guna_icon = "🌙"  # Tamas - inertia/plateau
                         log_msg += f" | S:{guna_s:.2f} R:{guna_r:.2f} T:{guna_t:.2f}{guna_icon}"
 
-                    # Toroidal Bridge: Coherence and metacognitive status
-                    if evolutionary_bridge is not None:
+                    # Toroidal Bridge: Coherence and metacognitive status (only every 100 steps)
+                    if evolutionary_bridge is not None and is_verbose_step:
                         log_msg += f" | {evolutionary_bridge.get_coherence_status()}"
                         if metacognitive_tracker is not None:
                             log_msg += f" {metacognitive_tracker.get_status()}"
@@ -7585,6 +8223,51 @@ def main():
     parser.add_argument("--gc_floor", type=float, default=0.65,
                        help="Minimum Guna Coherence before PIDv2 intervention")
 
+    # V9.5.1 Entropy Floor (breaks repetition curse)
+    parser.add_argument("--enable_entropy_floor", action="store_true",
+                       help="Enable entropy floor penalty (prevents stiffness)")
+    parser.add_argument("--entropy_floor", type=float, default=0.48,
+                       help="Minimum entropy target (default 0.48)")
+    parser.add_argument("--entropy_floor_weight", type=float, default=0.1,
+                       help="Weight for entropy floor penalty")
+
+    # V9.5.1 Force Evolution (manual intervention)
+    parser.add_argument("--force_evolution_stage", type=int, default=None,
+                       help="Force evolution to specific stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9")
+
+    # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
+    # ChatGPT Guardrails: Compound trigger, strict duration, gradual LR restore
+    parser.add_argument("--enable_stress_probe", action="store_true",
+                       help="Enable automatic stress-probe detection for stiffness")
+    parser.add_argument("--stress_probe_entropy_trigger", type=float, default=0.42,
+                       help="Trigger when entropy < this (ChatGPT: 0.42)")
+    parser.add_argument("--stress_probe_rep3_trigger", type=float, default=0.18,
+                       help="Trigger when REP-3 > this (ChatGPT: 0.18)")
+    parser.add_argument("--stress_probe_utr_trigger", type=float, default=0.55,
+                       help="Trigger when UTR < this (ChatGPT: 0.55)")
+    parser.add_argument("--stress_probe_drs_trigger", type=float, default=12.0,
+                       help="Trigger when DRS > this (ChatGPT: 12)")
+    parser.add_argument("--stress_probe_coherence_min", type=float, default=0.80,
+                       help="Only trigger if coherence > this (stiff, not dying)")
+    parser.add_argument("--stress_probe_patience", type=int, default=2,
+                       help="Consecutive evals of degeneracy before triggering (ChatGPT: 2)")
+    parser.add_argument("--stress_probe_authority_scale", type=float, default=0.05,
+                       help="Authority layer gradient scale during stress-probe (nearly frozen)")
+    parser.add_argument("--stress_probe_lr_factor", type=float, default=0.60,
+                       help="LR reduction factor during stress-probe (ChatGPT: 0.6)")
+    parser.add_argument("--stress_probe_exit_entropy", type=float, default=0.55,
+                       help="Exit when entropy > this for 2 consecutive evals")
+    parser.add_argument("--stress_probe_exit_rep3", type=float, default=0.12,
+                       help="Exit when REP-3 < this")
+    parser.add_argument("--stress_probe_min_steps", type=int, default=100,
+                       help="Minimum steps in stress-probe (ChatGPT: 100)")
+    parser.add_argument("--stress_probe_max_steps", type=int, default=300,
+                       help="Maximum steps in stress-probe (ChatGPT: 300)")
+    parser.add_argument("--stress_probe_lr_restore_steps", type=int, default=50,
+                       help="Steps to gradually restore LR after exit (ChatGPT: 50)")
+    parser.add_argument("--force_stress_probe", action="store_true",
+                       help="Force immediate stress-probe activation")
+
     # Logging
     parser.add_argument("--log_every", type=int, default=10,
                        help="Log every N steps")
@@ -7853,6 +8536,28 @@ def main():
         mu_s3=args.mu_s3,
         enable_stability_constraint=args.enable_stability_constraint,
         gc_floor=args.gc_floor,
+        # V9.5.1 Entropy Floor
+        enable_entropy_floor=args.enable_entropy_floor,
+        entropy_floor=args.entropy_floor,
+        entropy_floor_weight=args.entropy_floor_weight,
+        # V9.5.1 Force Evolution
+        force_evolution_stage=args.force_evolution_stage,
+        # V9.5.2 Emergency Stress-Probe (ChatGPT Guardrails)
+        enable_stress_probe=args.enable_stress_probe,
+        stress_probe_entropy_trigger=args.stress_probe_entropy_trigger,
+        stress_probe_rep3_trigger=args.stress_probe_rep3_trigger,
+        stress_probe_utr_trigger=args.stress_probe_utr_trigger,
+        stress_probe_drs_trigger=args.stress_probe_drs_trigger,
+        stress_probe_coherence_min=args.stress_probe_coherence_min,
+        stress_probe_patience=args.stress_probe_patience,
+        stress_probe_authority_scale=args.stress_probe_authority_scale,
+        stress_probe_lr_factor=args.stress_probe_lr_factor,
+        stress_probe_exit_entropy=args.stress_probe_exit_entropy,
+        stress_probe_exit_rep3=args.stress_probe_exit_rep3,
+        stress_probe_min_steps=args.stress_probe_min_steps,
+        stress_probe_max_steps=args.stress_probe_max_steps,
+        stress_probe_lr_restore_steps=args.stress_probe_lr_restore_steps,
+        force_stress_probe=args.force_stress_probe,
         # PIDv2 Controller settings
         controller=args.controller,
         pidv2_kp_min=args.pidv2_kp_min,
