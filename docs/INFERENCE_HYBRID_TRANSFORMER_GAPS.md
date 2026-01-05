@@ -1,31 +1,65 @@
 # Inference vs Training Gaps: Hybrid Transformer Logic
 
-**Document Version:** 1.0
+**Document Version:** 2.2
 **Date:** January 2026
-**Status:** Active Gap Analysis
+**Status:** ⏳ Phases 1-3 IMPLEMENTED | Phase 4 BLOCKED (Awaiting Training)
 **Related File:** `train_unified_llm.py` (V9.5.2)
+**Implementation:** `symbolu/inference/` module
 
 ---
 
 ## Executive Summary
 
-This document comprehensively catalogs the gaps between the training-time logic implemented in `train_unified_llm.py` and the inference-time behavior of the hybrid transformer models. Many sophisticated training components—designed to improve model quality and cognitive coherence—are not utilized during inference, potentially leaving significant capabilities on the table.
+This document catalogs the gaps between training-time logic in `train_unified_llm.py` and inference-time behavior. **All priority 1 and 2 gaps have been addressed** with the implementation of the `symbolu.inference` module.
+
+### Implementation Summary
+
+| Phase | Status | Components |
+|-------|--------|------------|
+| Phase 1 (Critical) | ✅ Complete | `EvolutionaryInferenceEngine`, `extract_layers` parameter |
+| Phase 2 (Important) | ✅ Complete | `InferenceMetacognition`, `InferenceGunas`, `CSRInferenceGuard`, `SovereignInferenceScorer` |
+| Phase 3 (Orchestration) | ✅ Complete | `InferenceManager` with Fast/Standard/Sovereign modes |
+| Phase 4 (Deployment) | ⏳ BLOCKED | `generate_sovereign.py` CLI script (awaiting training completion) |
+
+### Quick Start
+
+```python
+from symbolu.inference import InferenceManager, InferenceMode
+
+# Create manager with desired mode
+manager = InferenceManager(model, mode=InferenceMode.SOVEREIGN)
+
+# Generate with full pipeline
+output, metrics = manager.generate(
+    input_ids,
+    max_new_tokens=100,
+    compute_alignment=True,
+)
+
+# Check quality metrics
+print(f"Mode: {metrics['mode']}")
+print(f"Sovereign alignment: {metrics['sovereign_score']:.3f}")
+print(f"Karma stored: {metrics['karma_stored']}")
+print(f"Interventions: {metrics['interventions']}")
+```
 
 ---
 
 ## Table of Contents
 
-1. [Critical Gaps (Priority 1)](#1-critical-gaps-priority-1)
-2. [Important Gaps (Priority 2)](#2-important-gaps-priority-2)
-3. [Enhancement Gaps (Priority 3)](#3-enhancement-gaps-priority-3)
-4. [Implementation Roadmap](#4-implementation-roadmap)
+1. [Critical Gaps (Priority 1)](#1-critical-gaps-priority-1) - ✅ IMPLEMENTED
+2. [Important Gaps (Priority 2)](#2-important-gaps-priority-2) - ✅ IMPLEMENTED
+3. [Enhancement Gaps (Priority 3)](#3-enhancement-gaps-priority-3) - ✅ IMPLEMENTED
+4. [Implementation Roadmap](#4-implementation-roadmap) - Phases 1-3 ✅ | Phase 4 ⏳
 5. [Architecture Considerations](#5-architecture-considerations)
+6. [Usage Guide](#6-usage-guide)
+7. [Phase 4: Deployment Script](#7-phase-4-deployment-script) - ⏳ BLOCKED
 
 ---
 
 ## 1. Critical Gaps (Priority 1)
 
-### 1.1 Evolutionary Bridge (O12→O1 Karma Transfer)
+### 1.1 Evolutionary Bridge (O12→O1 Karma Transfer) ✅ IMPLEMENTED
 
 **Training Behavior:**
 The `EvolutionaryBridge` class (`train_unified_llm.py:373-538`) implements toroidal state persistence where the final hidden state from O12 (Absolving layer) is projected and stored as a "karma buffer" to seed O1 (Potential layer) in the next sequence.
@@ -36,70 +70,43 @@ evolutionary_bridge.store_harvest(harvest=o12_hidden, global_step=step)
 seed = evolutionary_bridge.retrieve_seed()  # For next sequence
 ```
 
-**Inference Behavior:**
-The `generate_sample()` function (`train_unified_llm.py:5605-5724`) and `HybridPhaseTransformer.generate()` method (`symbolu/phase_transformer.py:1793-1810`) perform simple autoregressive decoding with no state carryover between sequences.
+**✅ Implementation:**
 
-**Gap Impact:**
-- Loss of cognitive continuity across context windows
-- No "memory" of previous conversations/sequences
-- Recursive intelligence pattern is broken
+Located in `symbolu/inference/evolutionary_inference.py`:
 
-**Implementation Recommendation:**
+- **`EvolutionaryBridgeInference`**: Lightweight inference-time bridge for O12→O1 projection
+  - Gated seed projection (matching training behavior)
+  - Loads weights from training checkpoint
+  - LayerNorm for seed stabilization
 
+- **`EvolutionaryInferenceEngine`**: Main engine for karma persistence
+  - `generate_with_karma()`: Autoregressive generation with karma injection/storage
+  - `apply_inference_resonance()`: Delayed resonance injection with dynamic alpha
+  - `compute_generation_coherence()`: Track toroidal coherence
+  - `load_bridge_checkpoint()`: Load trained bridge weights
+
+**Usage:**
 ```python
-# Priority: HIGH
-# Effort: Medium (2-3 days)
-# Location: Create inference/evolutionary_inference.py
+from symbolu.inference import EvolutionaryInferenceEngine
 
-class EvolutionaryInferenceEngine:
-    """Inference-time evolutionary state management."""
+engine = EvolutionaryInferenceEngine(model, resonance_alpha=0.1)
+engine.load_bridge_checkpoint("checkpoint.pt")
 
-    def __init__(self, model, bridge_checkpoint_path: str = None):
-        self.model = model
-        self.karma_buffer = None
-        self.bridge = self._load_bridge(bridge_checkpoint_path)
+# First generation - stores karma
+output1, metrics1 = engine.generate_with_karma(input_ids_1, store_karma=True)
 
-    def _load_bridge(self, path):
-        """Load trained EvolutionaryBridge weights."""
-        # Load seed_gate, seed_proj, seed_norm from checkpoint
-        pass
-
-    def generate_with_karma(
-        self,
-        input_ids: torch.Tensor,
-        max_new_tokens: int = 128,
-        inject_karma: bool = True,
-    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
-        """
-        Generate with evolutionary state injection.
-
-        1. If karma_buffer exists, inject into initial hidden state
-        2. Generate tokens
-        3. Extract O12 hidden state and store as new karma
-        """
-        # Step 1: Inject previous karma into embeddings
-        if inject_karma and self.karma_buffer is not None:
-            # Add karma to initial embedding (at O1 position)
-            hidden_0 = self.karma_buffer * self.resonance_alpha
-
-        # Step 2: Forward pass with hidden state extraction
-        outputs = self.model(input_ids, return_hidden=True)
-
-        # Step 3: Store harvest for next sequence
-        o12_hidden = outputs['hidden_states'][-1]  # Last layer
-        self.karma_buffer = self.bridge.compute_seed(o12_hidden.mean(dim=1))
-
-        return outputs['logits'], {'karma_coherence': self._compute_coherence()}
+# Second generation - injects previous karma
+output2, metrics2 = engine.generate_with_karma(input_ids_2, inject_karma=True)
+print(f"Karma coherence: {metrics2['karma_coherence']:.3f}")
 ```
 
-**Files to Modify:**
-- Create: `symbolu/inference/evolutionary_inference.py`
-- Modify: `symbolu/phase_transformer.py` - Add `return_hidden=True` support to all model variants
-- Modify: `generate_sample()` to optionally use `EvolutionaryInferenceEngine`
+**Files Created/Modified:**
+- ✅ Created: `symbolu/inference/evolutionary_inference.py`
+- ✅ Modified: `symbolu/phase_transformer.py` - Added `extract_layers` and `return_last_hidden` parameters
 
 ---
 
-### 1.2 Delayed Resonance Injection
+### 1.2 Delayed Resonance Injection ✅ IMPLEMENTED
 
 **Training Behavior:**
 The `EvolutionaryIntelligenceEngine.apply_delayed_resonance()` method (`train_unified_llm.py:1513-1558`) injects previous step's O12 state into current O1 with Guna-scaled alpha:
@@ -110,44 +117,37 @@ dynamic_alpha = self.resonance_alpha * (1.0 + (s * 1.5) - (r * 0.5))
 current_states[0] = o1_current + (dynamic_alpha * o12_prev)
 ```
 
-**Inference Behavior:**
-No resonance injection occurs during generation.
+**✅ Implementation:**
 
-**Gap Impact:**
-- Tokens generated without benefit of accumulated cognitive state
-- Long-range coherence may suffer in multi-turn conversations
+Located in `symbolu/inference/evolutionary_inference.py`:
 
-**Implementation Recommendation:**
+- **`apply_inference_resonance()`**: Injects karma into current hidden state
+- **`_compute_dynamic_alpha()`**: Computes Guna-scaled alpha (matching training formula)
+- **Integration with `InferenceGunas`**: Dynamic alpha scaling based on generation state
 
+**Key Features:**
+- Dynamic alpha range: [0.05, 0.25] based on Guna state
+- High Sattva → increase retention (trust karma more)
+- High Rajas → decrease retention (focus on current)
+- Automatic karma expansion to match sequence dimensions
+
+**Usage:**
 ```python
-# Priority: HIGH
-# Effort: Low (1 day)
-# Location: Extend EvolutionaryInferenceEngine
+from symbolu.inference import EvolutionaryInferenceEngine, InferenceGunas
 
-def apply_inference_resonance(
-    self,
-    current_hidden: torch.Tensor,
-    alpha: float = 0.1,
-) -> torch.Tensor:
-    """
-    Apply resonance from stored karma to current hidden state.
+engine = EvolutionaryInferenceEngine(model)
+gunas = InferenceGunas()
 
-    For inference, use fixed alpha (no Guna tracking available).
-    Consider: User-configurable "memory strength" parameter.
-    """
-    if self.karma_buffer is None:
-        return current_hidden
-
-    # Reshape karma to match current hidden
-    karma_expanded = self.karma_buffer.unsqueeze(1).expand_as(current_hidden)
-
-    # Inject with fixed alpha (could expose as generation parameter)
-    return current_hidden + (alpha * karma_expanded)
+# Generate with dynamic alpha from Guna state
+output, metrics = engine.generate_with_karma(
+    input_ids,
+    guna_tracker=gunas,  # Feeds Guna state for dynamic alpha
+)
 ```
 
 ---
 
-### 1.3 Hidden State Extraction for Ontological Models
+### 1.3 Hidden State Extraction for Ontological Models ✅ IMPLEMENTED
 
 **Training Behavior:**
 The `HiddenStateExtractor` class (`train_unified_llm.py:1291-1427`) uses forward hooks to capture hidden states from all 12 layers, enabling:
@@ -155,65 +155,48 @@ The `HiddenStateExtractor` class (`train_unified_llm.py:1291-1427`) uses forward
 - CSR safety layer integration
 - Coherence loss computation
 
-**Inference Behavior:**
-The `HybridPhaseTransformer.forward()` method supports `return_hidden=True` but only returns the final hidden state list, not intermediate layer outputs in a hook-based manner.
+**✅ Implementation:**
 
-**Gap Impact:**
-- Cannot compute layer-wise coherence metrics at inference
-- Cannot apply CSR safety layers during generation
-- Cannot monitor ontological health during inference
+Modified `symbolu/phase_transformer.py` - All transformer variants now support:
 
-**Implementation Recommendation:**
+- **`extract_layers: List[int]`**: Memory-efficient extraction of specific layers only
+- **`return_last_hidden: bool`**: Returns final hidden state before lm_head (for CSR re-projection)
 
+**Transformer Variants Updated:**
+- `HybridPhaseTransformer`
+- `LocalOnlyTransformer`
+- `PhaseTransformer`
+- `StandardTransformer`
+
+**Key Features:**
+- Only allocates memory for requested layers
+- Layer indices map correctly to output list (sorted order)
+- Backward compatible with `return_hidden=True` (returns all layers)
+
+**Usage:**
 ```python
-# Priority: HIGH
-# Effort: Medium (2 days)
-# Location: symbolu/inference/state_extractor.py
+# Efficient extraction of O1 and O12 only
+outputs = model(input_ids, extract_layers=[0, 11])
 
-class InferenceStateExtractor:
-    """
-    Lightweight hidden state extraction for inference.
+# hidden_states is a list with 2 elements:
+# hidden_states[0] = layer 0 (O1)
+# hidden_states[1] = layer 11 (O12)
+layer_states = outputs['hidden_states']
 
-    Unlike training HiddenStateExtractor which uses hooks,
-    this modifies the forward pass to return states efficiently.
-    """
-
-    def __init__(self, model: nn.Module, layers_to_extract: List[int] = None):
-        """
-        Args:
-            model: The transformer model
-            layers_to_extract: Specific layer indices to extract (None = all)
-                             For efficiency, extract only [0, 5, 11] (O1, mid, O12)
-        """
-        self.model = model
-        self.layers_to_extract = layers_to_extract or list(range(12))
-
-    def forward_with_states(
-        self,
-        input_ids: torch.Tensor,
-    ) -> Tuple[torch.Tensor, Dict[int, torch.Tensor]]:
-        """
-        Forward pass that efficiently extracts specified layer states.
-
-        Returns:
-            logits: Model output logits
-            layer_states: Dict mapping layer_idx -> hidden state
-        """
-        # Implementation requires model modification to return intermediates
-        # OR use gradient checkpointing infrastructure to cache states
-        pass
+# For CSR re-projection, get last hidden before lm_head
+outputs = model(input_ids, return_last_hidden=True)
+last_hidden = outputs['last_hidden_state']  # [B, N, D]
 ```
 
-**Recommended Approach:**
-1. Modify `HybridPhaseTransformer.forward()` to accept `extract_layers: List[int]` parameter
-2. Only extract specified layers to minimize memory overhead
-3. Default to extracting O1 and O12 only for karma/resonance purposes
+**Files Modified:**
+- ✅ `symbolu/phase_transformer.py` - Added `extract_layers` and `return_last_hidden` to all variants
+- ✅ `symbolu/inference/evolutionary_inference.py` - `_extract_layer_states()` uses efficient extraction
 
 ---
 
 ## 2. Important Gaps (Priority 2)
 
-### 2.1 Metacognitive Tracking
+### 2.1 Metacognitive Tracking ✅ IMPLEMENTED
 
 **Training Behavior:**
 The `MetacognitiveTracker` class (`train_unified_llm.py:666-825`) monitors:
@@ -222,103 +205,50 @@ The `MetacognitiveTracker` class (`train_unified_llm.py:666-825`) monitors:
 - Evolutionary velocity
 - Generates recommendations: BRAKE, SLOW_DOWN, RECOVER, ACCELERATE, STABILIZE, CONTINUE
 
-**Inference Behavior:**
-No metacognitive monitoring during generation.
+**✅ Implementation:**
 
-**Gap Impact:**
-- Cannot detect when generation quality is degrading
-- Cannot adaptively adjust generation parameters
-- No early warning for incoherent outputs
+Located in `symbolu/inference/metacognitive_monitor.py`:
 
-**Implementation Recommendation:**
+- **`InferenceMetacognition`**: Real-time generation quality monitoring
+- **`Recommendation` enum**: ABORT, BRAKE, SLOW_DOWN, RECOVER, ACCELERATE, STABILIZE, CONTINUE
 
+**Key Features:**
+- Token-level entropy monitoring as confidence proxy
+- Coherence trend detection with configurable window
+- Consecutive low-coherence detection for ABORT
+- Guna integration for informed recommendations
+- Automatic temperature adjustment suggestions
+
+**Recommendation Hierarchy:**
+1. **ABORT**: Consecutive low coherence (default: 5 tokens below threshold)
+2. **BRAKE**: Rapid degradation detected (coherence drop > 0.15 in 3 tokens)
+3. **SLOW_DOWN**: Coherence alarm active
+4. **RECOVER**: High Tamas (stagnation) with flat coherence
+5. **ACCELERATE**: High Sattva + improving trend
+6. **STABILIZE**: Declining trend, maintain course
+7. **CONTINUE**: Default state
+
+**Usage:**
 ```python
-# Priority: MEDIUM
-# Effort: Medium (2-3 days)
-# Location: symbolu/inference/metacognitive_monitor.py
+from symbolu.inference import InferenceMetacognition, Recommendation
 
-class InferenceMetacognition:
-    """
-    Real-time generation quality monitoring.
+monitor = InferenceMetacognition(alarm_threshold=0.3, abort_consecutive=5)
 
-    Tracks coherence signals and can signal when generation
-    should be aborted, restarted, or parameters adjusted.
-    """
+for token_logits in generation:
+    status = monitor.update(token_logits)
 
-    def __init__(
-        self,
-        coherence_window: int = 10,
-        alarm_threshold: float = 0.3,
-    ):
-        self.coherence_history = []
-        self.alarm_threshold = alarm_threshold
-        self.coherence_window = coherence_window
+    if status['recommendation'] == 'ABORT':
+        break  # Stop generation
 
-    def update(
-        self,
-        token_logits: torch.Tensor,
-        hidden_state: torch.Tensor = None,
-    ) -> Dict[str, Any]:
-        """
-        Update metacognitive state with new generation step.
+    if status['recommendation'] == 'BRAKE':
+        temperature *= 0.7  # Reduce randomness
 
-        Computes:
-        - Entropy of token distribution (proxy for confidence)
-        - Optional: Hidden state coherence with previous
-
-        Returns recommendation for generation control.
-        """
-        # Compute token entropy
-        probs = F.softmax(token_logits, dim=-1)
-        entropy = -(probs * torch.log(probs + 1e-10)).sum().item()
-
-        # Normalize to [0, 1] range (vocab_size dependent)
-        normalized_entropy = entropy / math.log(token_logits.shape[-1])
-
-        # Track as proxy for coherence (lower entropy = higher confidence)
-        coherence_proxy = 1.0 - normalized_entropy
-        self.coherence_history.append(coherence_proxy)
-
-        # Check for alarm conditions
-        if len(self.coherence_history) >= 3:
-            recent = self.coherence_history[-3:]
-            if all(c < self.alarm_threshold for c in recent):
-                return {
-                    "recommendation": "ABORT",
-                    "reason": "Coherence dropped below threshold for 3 consecutive tokens",
-                    "coherence": coherence_proxy,
-                }
-
-        return {
-            "recommendation": "CONTINUE",
-            "coherence": coherence_proxy,
-            "entropy": normalized_entropy,
-        }
-
-    def get_generation_adjustment(self) -> Dict[str, float]:
-        """
-        Suggest generation parameter adjustments based on state.
-
-        Returns adjustments to temperature, top_p, etc.
-        """
-        if not self.coherence_history:
-            return {}
-
-        avg_coherence = sum(self.coherence_history[-10:]) / min(10, len(self.coherence_history))
-
-        if avg_coherence < 0.3:
-            # Low coherence: reduce temperature for more deterministic outputs
-            return {"temperature_multiplier": 0.7, "top_p_adjustment": -0.1}
-        elif avg_coherence > 0.8:
-            # High coherence: can afford more creativity
-            return {"temperature_multiplier": 1.1, "top_p_adjustment": 0.05}
-
-        return {}
+    print(f"Coherence: {status['coherence']:.2f}, Alarm: {status['alarm']}")
 ```
 
 ---
 
-### 2.2 Training Gunas (Sattva/Rajas/Tamas)
+### 2.2 Training Gunas (Sattva/Rajas/Tamas) ✅ IMPLEMENTED
 
 **Training Behavior:**
 The `TrainingGunas` class (`train_unified_llm.py:3440-3539`) computes cognitive state from training dynamics:
@@ -326,81 +256,47 @@ The `TrainingGunas` class (`train_unified_llm.py:3440-3539`) computes cognitive 
 - **Rajas (Action):** normalized gradient activity
 - **Tamas (Inertia):** loss velocity stagnation
 
-**Inference Behavior:**
-No Guna computation during generation.
+**✅ Implementation:**
 
-**Gap Impact:**
-- Cannot characterize generation "quality mode"
-- Cannot adjust behavior based on cognitive state
-- Resonance alpha cannot be dynamically scaled (uses fixed value)
+Located in `symbolu/inference/guna_inference.py`:
 
-**Implementation Recommendation:**
+- **`InferenceGunas`**: Approximates Guna state from generation dynamics
 
+**Guna Mappings (Inference Approximation):**
+- **Sattva (Clarity):** Token probability confidence × (1 - entropy)
+- **Rajas (Action):** Token-to-token probability variance
+- **Tamas (Inertia):** N-gram repetition rate (bigram weighted)
+
+**Key Features:**
+- Configurable window size for trend tracking
+- `get_dynamic_alpha_multiplier()`: Computes alpha scaling for resonance
+- `get_temperature_adjustment()`: Suggests temperature changes
+- `is_repetition_detected()`: Quick check for stuck loops
+
+**Usage:**
 ```python
-# Priority: MEDIUM
-# Effort: Low (1 day)
-# Location: symbolu/inference/guna_inference.py
+from symbolu.inference import InferenceGunas
 
-class InferenceGunas:
-    """
-    Inference-time Guna approximation using available signals.
+gunas = InferenceGunas(window_size=20)
 
-    Without gradients, we approximate:
-    - Sattva: Token probability confidence × sequence coherence
-    - Rajas: Token-to-token probability variance (activity)
-    - Tamas: Repetition rate (inertia/stuckness)
-    """
+for token_id, token_prob in generated_tokens:
+    s, r, t = gunas.update(token_id, token_prob)
 
-    def __init__(self, window_size: int = 20):
-        self.window_size = window_size
-        self.token_probs = []
-        self.generated_tokens = []
+    # Get dynamic alpha for resonance injection
+    alpha = gunas.get_dynamic_alpha_multiplier(base_alpha=0.1)
 
-    def update(
-        self,
-        token_id: int,
-        token_prob: float,
-        top_probs: torch.Tensor = None,
-    ) -> Tuple[float, float, float]:
-        """
-        Update Guna state with new generated token.
+    # Detect repetition loops
+    if gunas.is_repetition_detected(threshold=0.6):
+        temperature *= 1.2  # Break the loop
 
-        Returns (sattva, rajas, tamas) normalized to sum to 1.
-        """
-        self.token_probs.append(token_prob)
-        self.generated_tokens.append(token_id)
-
-        # Keep window
-        if len(self.token_probs) > self.window_size:
-            self.token_probs = self.token_probs[-self.window_size:]
-            self.generated_tokens = self.generated_tokens[-self.window_size:]
-
-        # Sattva: Average confidence (higher prob = clearer)
-        sattva = sum(self.token_probs) / len(self.token_probs)
-
-        # Rajas: Probability variance (activity/change)
-        if len(self.token_probs) >= 2:
-            mean_prob = sum(self.token_probs) / len(self.token_probs)
-            variance = sum((p - mean_prob) ** 2 for p in self.token_probs) / len(self.token_probs)
-            rajas = min(1.0, variance * 10)  # Scale variance to [0, 1]
-        else:
-            rajas = 0.33
-
-        # Tamas: Repetition rate (stuckness)
-        if len(self.generated_tokens) >= 3:
-            unique_ratio = len(set(self.generated_tokens[-10:])) / min(10, len(self.generated_tokens))
-            tamas = 1.0 - unique_ratio  # More repetition = higher tamas
-        else:
-            tamas = 0.33
-
-        # Normalize to sum to 1
-        total = sattva + rajas + tamas
-        return sattva / total, rajas / total, tamas / total
+    # Get detailed state
+    state = gunas.get_detailed_state()
+    print(f"Dominant: {state['dominant']}, Alpha: {state['alpha_multiplier']:.2f}")
 ```
 
 ---
 
-### 2.3 CSR Safety Layers (EntropySink, SynthesisGate)
+### 2.3 CSR Safety Layers (EntropySink, SynthesisGate) ✅ IMPLEMENTED
 
 **Training Behavior:**
 When enabled, CSR phoneme-ontological grounding applies:
@@ -412,88 +308,54 @@ When enabled, CSR phoneme-ontological grounding applies:
 csr_provider, csr_entropy_sink, csr_synthesis_gate = create_csr_for_training(...)
 ```
 
-**Inference Behavior:**
-CSR layers are not applied during generation.
+**✅ Implementation:**
 
-**Gap Impact:**
-- Generation may produce high-entropy (incoherent) sequences without intervention
-- No phoneme-ontological grounding during output
-- Safety constraints trained into model not enforced at inference
+Located in `symbolu/inference/csr_inference.py`:
 
-**Implementation Recommendation:**
+- **`EntropySinkInference`**: Lightweight entropy absorption layer
+- **`SynthesisGateInference`**: Information flow control based on coherence
+- **`CSRInferenceGuard`**: Main guard that orchestrates CSR layers
+
+**Critical Feature - lm_head Re-projection:**
+The guard properly re-projects modified hidden states through lm_head to ensure CSR modifications affect token selection:
 
 ```python
-# Priority: MEDIUM-HIGH
-# Effort: Medium (2-3 days)
-# Location: symbolu/inference/csr_inference.py
+# When hidden state is modified by CSR layers
+if state_modified and self.lm_head is not None:
+    modified_logits = self.lm_head(current_hidden)  # Re-project!
+```
 
-class CSRInferenceGuard:
-    """
-    Apply CSR safety layers during inference.
+**Key Features:**
+- Entropy threshold detection with configurable skip threshold
+- Intervention counting and statistics
+- Per-step or batch application modes
+- Loads trained CSR weights from checkpoint
 
-    Monitors generation entropy and can:
-    1. Flag high-entropy tokens for review
-    2. Apply synthesis gating to hidden states
-    3. Optionally reject/resample tokens exceeding entropy threshold
-    """
+**Usage:**
+```python
+from symbolu.inference import CSRInferenceGuard
 
-    def __init__(
-        self,
-        entropy_sink: 'EntropySink',
-        synthesis_gate: 'SynthesisGate',
-        entropy_threshold: float = 2.0,  # Log-entropy threshold
-    ):
-        self.entropy_sink = entropy_sink
-        self.synthesis_gate = synthesis_gate
-        self.entropy_threshold = entropy_threshold
+guard = CSRInferenceGuard(
+    lm_head=model.lm_head,
+    dim=768,
+    entropy_threshold=2.0,
+    skip_threshold=0.9,  # Skip if confidence > 0.9
+)
 
-    def check_and_gate(
-        self,
-        hidden_state: torch.Tensor,
-        token_logits: torch.Tensor,
-    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
-        """
-        Apply CSR safety checks to generation step.
+# Apply to generation step
+logits, guard_info = guard.apply(
+    hidden_state=last_hidden,
+    original_logits=logits,
+)
 
-        Args:
-            hidden_state: Current hidden state [B, D]
-            token_logits: Logits for next token [B, V]
-
-        Returns:
-            gated_logits: Possibly modified logits
-            safety_info: Dict with entropy, gate values, warnings
-        """
-        # Compute token entropy
-        probs = F.softmax(token_logits, dim=-1)
-        entropy = -(probs * torch.log(probs + 1e-10)).sum(dim=-1)
-
-        # Apply entropy sink if threshold exceeded
-        if entropy.max().item() > self.entropy_threshold:
-            # Sink absorbs high-entropy energy
-            hidden_state = self.entropy_sink(hidden_state, entropy_level=entropy.mean())
-
-            # Re-project to logits with dampened hidden state
-            # (Requires access to lm_head - consider passing as parameter)
-
-            return token_logits, {
-                "entropy": entropy.mean().item(),
-                "sink_activated": True,
-                "warning": "High entropy detected - sink applied",
-            }
-
-        # Apply synthesis gate for coherence control
-        gate_value = self.synthesis_gate.compute_gate(hidden_state)
-
-        return token_logits, {
-            "entropy": entropy.mean().item(),
-            "gate_value": gate_value.mean().item(),
-            "sink_activated": False,
-        }
+if guard_info['intervention']:
+    print(f"CSR intervened! Entropy: {guard_info['entropy']:.2f}")
+    print(f"Re-projected: {guard_info['re_projected']}")
 ```
 
 ---
 
-### 2.4 Sovereign-1 Loss Components at Inference
+### 2.4 Sovereign-1 Loss Components at Inference ✅ IMPLEMENTED
 
 **Training Behavior:**
 Sovereign-1 loss (`train_unified_llm.py:6690-6703`) provides:
@@ -502,250 +364,267 @@ Sovereign-1 loss (`train_unified_llm.py:6690-6703`) provides:
 - R-Signal (ontology) enforcement
 - C-Signal (phoneme) grounding
 
-**Inference Behavior:**
-No Sovereign-1 signal computation during generation.
+**✅ Implementation:**
 
-**Gap Impact:**
-- Cannot verify if generated tokens maintain ontological alignment
-- No runtime check for Guna balance
-- Coherence signals used for training not available for inference quality scoring
+Located in `symbolu/inference/sovereign_scorer.py`:
 
-**Implementation Recommendation:**
+- **`SovereignInferenceScorer`**: Computes alignment scores for generated sequences
+- **`SOVEREIGN_R_MATRIX`**: 5 Vṛttis × 12 Layers target distribution
+- **`VRTTI_NAMES`**: Pramāṇa, Vikalpa, Viparyaya, Nidrā, Smṛti
 
+**Key Features:**
+- Vṛtti projection layer (learned hidden→Vṛtti mapping)
+- Per-layer R-Matrix alignment scoring
+- 9:3 Authority/Sensory split awareness
+- Composite sovereign score (0-1 range)
+
+**R-Matrix Structure:**
 ```python
-# Priority: MEDIUM
-# Effort: Medium (2 days)
-# Location: symbolu/inference/sovereign_scorer.py
+SOVEREIGN_R_MATRIX = torch.tensor([
+    [0.1, 0.5, 0.7, 0.7, 0.8, 0.6, 0.9, 0.8, 0.6, 0.7, 0.5, 0.9],  # Pramāṇa (valid knowledge)
+    [0.1, 0.2, 0.2, 0.4, 0.4, 0.4, 0.1, 0.1, 0.2, 0.2, 0.2, 0.3],  # Vikalpa (conceptualization)
+    [0.1, 0.2, 0.4, 0.4, 0.2, 0.3, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0],  # Viparyaya (error)
+    [0.7, 0.1, 0.1, 0.3, 0.1, 0.1, 0.0, 0.0, 0.3, 0.3, 0.4, 0.1],  # Nidrā (latency)
+    [0.1, 0.1, 0.3, 0.3, 0.2, 0.2, 0.1, 0.0, 0.2, 0.2, 0.2, 0.8],  # Smṛti (memory)
+])
+```
 
-class SovereignInferenceScorer:
-    """
-    Compute Sovereign-1 style signals during inference for quality scoring.
+**Usage:**
+```python
+from symbolu.inference import SovereignInferenceScorer
 
-    Not used for loss/backprop, but for:
-    1. Scoring generated sequences
-    2. Detecting quality degradation
-    3. Providing interpretable quality metrics
-    """
+scorer = SovereignInferenceScorer(dim=768)
 
-    def __init__(self, sovereign_config: 'SovereignLossConfig'):
-        self.config = sovereign_config
-        self.r_matrix = SOVEREIGN_R_MATRIX  # From train_unified_llm.py
+# Score a generation using layer hidden states
+layer_states = {0: h0, 5: h5, 11: h11}  # Dict[layer_idx, tensor]
+score, info = scorer.score_generation(layer_states)
 
-    def score_sequence(
-        self,
-        hidden_states: List[torch.Tensor],
-        generated_tokens: torch.Tensor,
-    ) -> Dict[str, float]:
-        """
-        Score a generated sequence using Sovereign-1 metrics.
-
-        Returns interpretable quality scores:
-        - guna_balance: How well Sattva/Rajas/Tamas are balanced
-        - ontological_alignment: How well hidden states align with R-Matrix targets
-        - coherence_score: Cross-layer coherence
-        """
-        scores = {}
-
-        # Compute per-layer Vṛtti alignment
-        if hidden_states:
-            layer_alignments = []
-            for i, hs in enumerate(hidden_states[:12]):  # Up to 12 layers
-                target_vrtti = self.r_matrix[:, min(i, 11)]
-                # Compute alignment (simplified - actual would use learned projections)
-                layer_alignments.append(self._compute_vrtti_alignment(hs, target_vrtti))
-
-            scores['ontological_alignment'] = sum(layer_alignments) / len(layer_alignments)
-
-        # Compute token-level coherence
-        if generated_tokens.numel() > 1:
-            # Use bigram/trigram repetition as proxy for coherence
-            tokens = generated_tokens.tolist()
-            unique_bigrams = len(set(zip(tokens[:-1], tokens[1:])))
-            total_bigrams = len(tokens) - 1
-            scores['coherence_score'] = unique_bigrams / max(1, total_bigrams)
-
-        return scores
+print(f"Sovereign alignment: {score:.3f}")
+print(f"Authority alignment: {info['authority_alignment']:.3f}")
+print(f"Sensory alignment: {info['sensory_alignment']:.3f}")
+print(f"Per-layer scores: {info['layer_scores']}")
 ```
 
 ---
 
-## 3. Enhancement Gaps (Priority 3)
+## 3. Enhancement Gaps (Priority 3) ✅ IMPLEMENTED
 
-### 3.1 9:3 Hierarchical Split Awareness
+### 3.1 9:3 Hierarchical Split Awareness ✅ IMPLEMENTED
 
 **Training Behavior:**
 `HierarchicalGradientScaler` (`train_unified_llm.py`) applies different gradient scales to:
 - Authority layers (0-8): Full gradients
 - Sensory layers (9-11): Dampened gradients (α_sens)
 
-**Inference Gap:**
-While inference doesn't use gradients, the 9:3 split concept could inform:
-- Which layers to cache for KV-cache optimization
-- Layer-specific attention temperature adjustments
-- Interpretability of layer contributions
+**✅ Implementation:**
 
-**Implementation Recommendation:**
+Located in `symbolu/inference/layer_config.py`:
 
+- **`LayerInferenceConfig`**: Configuration class for 9:3 split
+- **`LayerType` enum**: AUTHORITY / SENSORY classification
+- **`CachePriority` enum**: HIGH / MEDIUM / LOW levels
+
+**Key Features:**
+- `get_cache_priority()`: Authority=HIGH, Sensory=MEDIUM
+- `get_temperature_adjustment()`: Sensory layers get 0.9x sharper temperature
+- `get_extraction_layers()`: Preset modes (minimal, endpoints, full)
+- `get_layer_weights()`: For weighted aggregation operations
+- Ontological layer names (O1-Potential through O12-Integration)
+
+**Usage:**
 ```python
-# Priority: LOW
-# Effort: Low (0.5 days)
-# Location: symbolu/inference/layer_config.py
+from symbolu.inference import LayerInferenceConfig, AUTHORITY_LAYERS, SENSORY_LAYERS
 
-class LayerInferenceConfig:
-    """
-    Configuration for layer-specific inference behavior.
+# Get layer-adjusted temperature
+for layer_idx in range(12):
+    temp = LayerInferenceConfig.get_temperature_adjustment(layer_idx, base_temp=1.0)
+    priority = LayerInferenceConfig.get_cache_priority(layer_idx)
+    print(f"{LayerInferenceConfig.get_layer_name(layer_idx)}: temp={temp:.2f}, cache={priority}")
 
-    Reflects 9:3 Authority/Sensory split from training.
-    """
-
-    # Authority layers: More important for "meaning"
-    AUTHORITY_LAYERS = list(range(9))  # O1-O9
-
-    # Sensory layers: More important for "expression"
-    SENSORY_LAYERS = list(range(9, 12))  # O10-O12
-
-    @classmethod
-    def get_cache_priority(cls, layer_idx: int) -> str:
-        """
-        Get caching priority for layer (for memory optimization).
-
-        Authority layers: HIGH priority (cache aggressively)
-        Sensory layers: MEDIUM priority (can recompute if needed)
-        """
-        if layer_idx in cls.AUTHORITY_LAYERS:
-            return "HIGH"
-        return "MEDIUM"
-
-    @classmethod
-    def get_temperature_adjustment(cls, layer_idx: int, base_temp: float) -> float:
-        """
-        Adjust attention temperature per layer type.
-
-        Sensory layers may benefit from sharper attention (lower temp)
-        for more precise token selection.
-        """
-        if layer_idx in cls.SENSORY_LAYERS:
-            return base_temp * 0.9  # Slightly sharper for sensory
-        return base_temp
+# Via InferenceManager
+manager = InferenceManager(model)
+temp = manager.get_layer_temperature(layer_idx=10, base_temp=1.0)  # 0.9
 ```
 
 ---
 
-### 3.2 Toroidal Coherence Metrics
+### 3.2 Toroidal Coherence Metrics ✅ IMPLEMENTED
 
 **Training Behavior:**
 `ToroidalConsistencyLoss` computes coherence between:
 - Seed (previous O12) and Harvest (current O12)
 - Optional 3-way consistency with current O1
 
-**Inference Gap:**
-No coherence tracking across generation sequences.
+**✅ Implementation:**
 
-**Implementation Recommendation:**
+Located in `symbolu/inference/evolutionary_inference.py`:
 
+- **`compute_generation_coherence()`**: 2-way coherence (Seed ↔ O12)
+- **`compute_3way_toroidal_coherence()`**: Full 3-way cognitive flow
+- **`get_cognitive_flow_status()`**: Formatted status string
+
+**3-Way Coherence Components:**
+1. **Birth Similarity**: Seed ↔ O1 (karma injection effectiveness)
+2. **Flow Similarity**: O1 ↔ O12 (internal coherence)
+3. **Evolution Similarity**: Seed ↔ O12 (loop closure)
+
+**Usage:**
 ```python
-# Priority: LOW
-# Effort: Low (0.5 days)
-# Location: Add to EvolutionaryInferenceEngine
+from symbolu.inference import EvolutionaryInferenceEngine
 
-def compute_generation_coherence(self) -> float:
-    """
-    Compute coherence between stored karma and current generation.
+engine = EvolutionaryInferenceEngine(model)
 
-    Useful for:
-    - Detecting topic drift in long conversations
-    - Measuring "memory retention" quality
-    """
-    if self.karma_buffer is None or self.current_o12 is None:
-        return 0.0
+# After generation, compute full cognitive flow
+flow_score, details = engine.compute_3way_toroidal_coherence(
+    o1_hidden=layer_states[0],
+    o12_hidden=layer_states[11],
+)
 
-    # Cosine similarity between karma and current O12
-    sim = F.cosine_similarity(
-        self.karma_buffer.view(1, -1),
-        self.current_o12.mean(dim=1).view(1, -1),
-    )
-    return (sim.item() + 1) / 2  # Map to [0, 1]
+print(f"Cognitive Flow: {flow_score:.3f}")
+print(f"  Birth: {details['birth_similarity']:.3f}")
+print(f"  Flow: {details['flow_similarity']:.3f}")
+print(f"  Evolution: {details['evolution_similarity']:.3f}")
+
+# Status line
+print(engine.get_cognitive_flow_status())
+# Output: "Flow:0.72(strong/3way)"
 ```
 
 ---
 
-### 3.3 Dynamic Relaxation State Persistence
+### 3.3 Dynamic Relaxation State Persistence ✅ IMPLEMENTED
 
 **Training Behavior:**
 `DynamicRelaxationController` manages state transitions:
 - STATE_AUTHORITY (9:3) → STATE_BALANCED (6:6) → Evolution stages
 
-**Inference Gap:**
-Model inference doesn't know which training state the model was in when saved.
+**✅ Implementation:**
 
-**Implementation Recommendation:**
+Located in `symbolu/inference/checkpoint_utils.py`:
 
+- **`InferenceConfig`**: Dataclass for inference configuration
+- **`save_sovereign_checkpoint()`**: Save with inference hints
+- **`load_sovereign_config()`**: Load configuration from checkpoint
+- **`load_model_with_config()`**: Load model + config together
+- **`get_checkpoint_info()`**: Inspect checkpoint metadata
+
+**Checkpoint Metadata:**
 ```python
-# Priority: LOW
-# Effort: Low (0.5 days)
-# Location: Checkpoint metadata
-
-# When saving checkpoint, include DRC state:
-checkpoint = {
-    "model": model.state_dict(),
-    "drc_state": relaxation_controller.get_state(),  # Already saved
-    # Add inference-relevant fields:
-    "inference_config": {
-        "authority_sensory_split": (9, 3) if drc.state == "authority" else (6, 6),
-        "evolution_stage": drc.current_stage_idx,
-        "recommended_resonance_alpha": 0.1 if drc.state == "authority" else 0.15,
-    }
+inference_config = {
+    "authority_sensory_split": (9, 3),  # or (6, 6) for balanced
+    "evolution_stage": 2,
+    "recommended_alpha": 0.1,
+    "training_state": "authority",
+    "sgp_rate": 25,
 }
+```
 
-# At inference, load and apply:
-inference_config = checkpoint.get("inference_config", {})
-resonance_alpha = inference_config.get("recommended_resonance_alpha", 0.1)
+**Usage:**
+```python
+from symbolu.inference import (
+    save_sovereign_checkpoint,
+    load_sovereign_config,
+    load_model_with_config,
+)
+
+# Save with inference hints
+save_sovereign_checkpoint(
+    model=model,
+    path="checkpoint.pt",
+    drc_state="authority",
+    evolution_stage=2,
+)
+
+# Load and auto-configure
+config = load_sovereign_config("checkpoint.pt")
+print(f"Recommended alpha: {config.recommended_alpha}")
+print(f"Split: {config.authority_sensory_split}")
+
+# Or load model + config together
+model, config = load_model_with_config("checkpoint.pt", model)
+```
+
+**InferenceManager Integration:**
+```python
+# Checkpoint config is auto-applied when loading
+manager = InferenceManager(model, checkpoint_path="checkpoint.pt")
+# resonance_alpha is automatically set from checkpoint
 ```
 
 ---
 
-## 4. Implementation Roadmap
+## 4. Implementation Roadmap (Phases 1-3 ✅ | Phase 4 ⏳)
 
-### Phase 1: Core Inference Infrastructure (Week 1-2)
+### Phase 1: Core Inference Infrastructure ✅
 
-| Task | Priority | Effort | Dependency |
-|------|----------|--------|------------|
-| Create `EvolutionaryInferenceEngine` | P1 | 2-3 days | None |
-| Add hidden state extraction to models | P1 | 2 days | None |
-| Implement delayed resonance injection | P1 | 1 day | EvolutionaryInferenceEngine |
-
-**Deliverables:**
-- `symbolu/inference/evolutionary_inference.py`
-- Modified `HybridPhaseTransformer.forward()` with layer extraction
-- Unit tests for karma persistence
-
-### Phase 2: Quality Monitoring (Week 3)
-
-| Task | Priority | Effort | Dependency |
-|------|----------|--------|------------|
-| Create `InferenceMetacognition` | P2 | 2-3 days | None |
-| Implement `InferenceGunas` | P2 | 1 day | None |
-| Add CSR safety guard | P2 | 2-3 days | Hidden state extraction |
+| Task | Status | Files |
+|------|--------|-------|
+| Create `EvolutionaryInferenceEngine` | ✅ Done | `symbolu/inference/evolutionary_inference.py` |
+| Add hidden state extraction to models | ✅ Done | `symbolu/phase_transformer.py` |
+| Implement delayed resonance injection | ✅ Done | `symbolu/inference/evolutionary_inference.py` |
 
 **Deliverables:**
-- `symbolu/inference/metacognitive_monitor.py`
-- `symbolu/inference/guna_inference.py`
-- `symbolu/inference/csr_inference.py`
-- Integration tests for quality monitoring
+- ✅ `symbolu/inference/evolutionary_inference.py`
+- ✅ Modified `HybridPhaseTransformer.forward()` with `extract_layers` parameter
+- ✅ Unit tests: `tests/test_evolutionary_inference.py`
 
-### Phase 3: Advanced Features (Week 4)
+### Phase 2: Quality Monitoring ✅
 
-| Task | Priority | Effort | Dependency |
-|------|----------|--------|------------|
-| Sovereign inference scorer | P2 | 2 days | Hidden state extraction |
-| Layer configuration | P3 | 0.5 days | None |
-| Toroidal coherence metrics | P3 | 0.5 days | EvolutionaryInferenceEngine |
-| Checkpoint metadata enhancement | P3 | 0.5 days | None |
+| Task | Status | Files |
+|------|--------|-------|
+| Create `InferenceMetacognition` | ✅ Done | `symbolu/inference/metacognitive_monitor.py` |
+| Implement `InferenceGunas` | ✅ Done | `symbolu/inference/guna_inference.py` |
+| Add CSR safety guard | ✅ Done | `symbolu/inference/csr_inference.py` |
+| Sovereign inference scorer | ✅ Done | `symbolu/inference/sovereign_scorer.py` |
 
 **Deliverables:**
-- `symbolu/inference/sovereign_scorer.py`
-- `symbolu/inference/layer_config.py`
-- Enhanced checkpoint format documentation
+- ✅ `symbolu/inference/metacognitive_monitor.py`
+- ✅ `symbolu/inference/guna_inference.py`
+- ✅ `symbolu/inference/csr_inference.py`
+- ✅ `symbolu/inference/sovereign_scorer.py`
+- ✅ Integration tests: `tests/test_inference_integration.py`
+
+### Phase 3: Orchestration ✅
+
+| Task | Status | Files |
+|------|--------|-------|
+| Create `InferenceManager` | ✅ Done | `symbolu/inference/manager.py` |
+| Fast/Standard/Sovereign modes | ✅ Done | `symbolu/inference/manager.py` |
+| Unified generate() interface | ✅ Done | `symbolu/inference/manager.py` |
+
+**Deliverables:**
+- ✅ `symbolu/inference/manager.py`
+- ✅ Unit tests: `tests/test_inference_manager.py`
+
+### Phase 3 Enhancements ✅
+
+| Task | Status | Files |
+|------|--------|-------|
+| `LayerInferenceConfig` (9:3 split) | ✅ Done | `symbolu/inference/layer_config.py` |
+| Checkpoint metadata utilities | ✅ Done | `symbolu/inference/checkpoint_utils.py` |
+| 3-way toroidal coherence | ✅ Done | `symbolu/inference/evolutionary_inference.py` |
+
+**Deliverables:**
+- ✅ `symbolu/inference/layer_config.py`
+- ✅ `symbolu/inference/checkpoint_utils.py`
+- ✅ Enhanced `EvolutionaryInferenceEngine` with `compute_3way_toroidal_coherence()`
+- ✅ Enhanced `InferenceManager` with layer config integration
+
+### Phase 4: Deployment Script ⏳ BLOCKED
+
+| Task | Status | Files |
+|------|--------|-------|
+| Create `generate_sovereign.py` CLI | ⏳ Blocked | `generate_sovereign.py` (root) |
+| Implement `generate_full_sequence()` | ⏳ Blocked | `symbolu/inference/manager.py` |
+| Interactive sovereign loop | ⏳ Blocked | `generate_sovereign.py` |
+| Cognitive telemetry output | ⏳ Blocked | `generate_sovereign.py` |
+
+**Blocked By:** Training script completion (see Section 7 for details)
+
+**Planned Deliverables:**
+- ⏳ `generate_sovereign.py` - CLI entry point
+- ⏳ `InferenceManager.generate_full_sequence()` - High-level generation loop
+- ⏳ Integration tests with real checkpoint
 
 ---
 
@@ -838,9 +717,448 @@ def load_inference_engine(checkpoint_path: str) -> 'EvolutionaryInferenceEngine'
 
 ---
 
+## 6. Usage Guide
+
+### 6.1 Recommended: Using InferenceManager
+
+The `InferenceManager` is the recommended entry point for all inference operations. It automatically orchestrates all components based on the selected mode.
+
+```python
+from symbolu.inference import InferenceManager, InferenceMode
+
+# Load your model
+model = HybridPhaseTransformer(...)
+model.load_state_dict(checkpoint['model'])
+
+# Create manager with desired mode
+manager = InferenceManager(
+    model,
+    mode=InferenceMode.SOVEREIGN,  # or STANDARD, FAST
+    checkpoint_path="checkpoint.pt",  # Optional: load trained component weights
+)
+
+# Generate with full pipeline
+output_ids, metrics = manager.generate(
+    input_ids,
+    max_new_tokens=100,
+    temperature=0.8,
+    top_p=0.9,
+)
+
+# Check metrics
+print(f"Mode: {metrics['mode']}")
+print(f"Karma stored: {metrics['karma_stored']}")
+print(f"Aborted: {metrics['aborted']}")
+print(f"CSR interventions: {metrics['interventions']}")
+print(f"Sovereign alignment: {metrics.get('sovereign_score', 'N/A')}")
+
+# Status line for logging
+print(manager.get_status_line())
+# Output: [SOVEREIGN] Karma:0.75(strong)|avg:0.72 | Guna:S🔵|s=0.45|r=0.30|t=0.25 | Meta:CONT|c=0.68➡️
+```
+
+### 6.2 Inference Modes
+
+| Mode | Components Active | Use Case |
+|------|-------------------|----------|
+| **FAST** | Raw model only | Benchmarking, latency-sensitive apps |
+| **STANDARD** | Engine + Gunas | Production, multi-turn conversations |
+| **SOVEREIGN** | All components | High-stakes, alignment research |
+
+**Mode Switching:**
+```python
+# Start fast
+manager = InferenceManager(model, mode=InferenceMode.FAST)
+
+# Switch to sovereign for important generation
+manager.set_mode(InferenceMode.SOVEREIGN)
+output, metrics = manager.generate(input_ids, max_new_tokens=200)
+
+# Switch back to fast
+manager.set_mode(InferenceMode.FAST)
+```
+
+### 6.3 Multi-Turn Conversations with Karma
+
+```python
+# Karma persists across calls automatically
+manager = InferenceManager(model, mode=InferenceMode.STANDARD)
+
+# Turn 1
+output1, metrics1 = manager.generate(user_input_1)
+print(f"Karma stored: {metrics1['karma_stored']}")  # True
+
+# Turn 2 - previous karma is injected
+output2, metrics2 = manager.generate(user_input_2)
+print(f"Karma injected: {metrics2['karma_injected']}")  # True
+print(f"Coherence: {metrics2['karma_coherence']:.3f}")
+
+# Reset for new conversation
+manager.clear_karma()
+```
+
+### 6.4 Using Components Directly
+
+For advanced use cases, you can use components directly:
+
+```python
+from symbolu.inference import (
+    EvolutionaryInferenceEngine,
+    InferenceMetacognition,
+    InferenceGunas,
+    CSRInferenceGuard,
+    SovereignInferenceScorer,
+)
+
+# Create engine
+engine = EvolutionaryInferenceEngine(model, resonance_alpha=0.1)
+engine.load_bridge_checkpoint("checkpoint.pt")
+
+# Create quality monitors
+metacog = InferenceMetacognition(alarm_threshold=0.3)
+gunas = InferenceGunas(window_size=20)
+
+# Create safety guard
+guard = CSRInferenceGuard(lm_head=model.lm_head, dim=768)
+
+# Generate with all components
+output, metrics = engine.generate_with_karma(
+    input_ids,
+    metacognition=metacog,
+    guna_tracker=gunas,
+    csr_guard=guard,
+)
+```
+
+### 6.5 Configuration Options
+
+**InferenceManager Configuration:**
+```python
+manager = InferenceManager(
+    model,
+    mode=InferenceMode.SOVEREIGN,
+    # Engine settings
+    resonance_alpha=0.1,        # Base alpha for karma injection
+    karma_decay=0.99,           # Decay per generation
+    # Metacognition settings
+    coherence_window=50,        # Tokens to track
+    alarm_threshold=0.3,        # Coherence alarm level
+    abort_consecutive=5,        # Tokens before ABORT
+    # Guna settings
+    guna_window_size=20,        # Token window for Guna calc
+    # CSR settings
+    entropy_threshold=2.0,      # Entropy for intervention
+    csr_skip_threshold=0.9,     # Skip if confidence > this
+)
+```
+
+### 6.6 Metrics Reference
+
+**FAST mode metrics:**
+- `mode`: "fast"
+- `tokens_generated`: Number of tokens generated
+
+**STANDARD mode metrics:**
+- All FAST metrics +
+- `karma_injected`: Whether previous karma was used
+- `karma_stored`: Whether new karma was stored
+- `karma_coherence`: Coherence with previous sequence
+- `final_gunas`: (sattva, rajas, tamas) tuple
+
+**SOVEREIGN mode metrics:**
+- All STANDARD metrics +
+- `aborted`: Whether generation was aborted
+- `interventions`: Number of CSR interventions
+- `metacognition`: Detailed metacognitive status
+- `csr_statistics`: CSR intervention statistics
+- `sovereign_score`: R-Matrix alignment score (0-1)
+- `sovereign_info`: Detailed alignment breakdown
+
+---
+
+## 7. Phase 4: Deployment Script (⏳ BLOCKED)
+
+### 7.1 Why Phase 4 Must Wait
+
+**The Chassis Cannot Be Built Before the Engine is Forged.**
+
+The inference script `generate_sovereign.py` must wait until the training script successfully completes. Jumping into the full inference script now would be premature for three specific reasons:
+
+#### 7.1.1 The "Broken Handshake" Risk
+
+If we finalize `generate_sovereign.py` before the training script successfully exports the `inference_config` and Vṛtti Projection Heads, the inference script will crash looking for weights and metadata that don't exist yet.
+
+**Required Training Output:**
+- `SOVEREIGN_R_MATRIX` properly serialized
+- `evolutionary_bridge` weights trained and saved
+- `inference_config` metadata in checkpoint
+
+#### 7.1.2 Parameter Tuning
+
+The Resonance Alpha (α) and Entropy Thresholds are currently theoretical. Until the training script runs and we see how the 9:3 Split actually behaves on the H200, we won't know if our "Sovereign Mode" needs a threshold of `2.0` or `0.5`.
+
+**Training Provides:**
+- Calibrated `recommended_alpha` value
+- Validated entropy thresholds
+- Tested temperature scaling factors
+
+#### 7.1.3 The SGP Metabolic Lock
+
+Since SGP (Stochastic Gradient Persistence) has not yet been fully implemented in the training loop, the model hasn't yet "locked" its ontological invariants. Running inference on a model that hasn't been SGP-hardened would likely result in the same repetition loops we are trying to solve.
+
+**Required Before Inference:**
+- SGP Rate 25 applied to Authority layers
+- Ontological invariants locked
+- Stable karma buffer projection weights
+
+---
+
+### 7.2 Training Prerequisites
+
+Focus should remain **100% on the Training Script** until it can successfully:
+
+| Prerequisite | Status | Blocker |
+|--------------|--------|---------|
+| Execute the 9:3 Split without gradient explosion | ⏳ Pending | Training script |
+| Apply SGP (Rate 25) to harden the Authority layers | ⏳ Pending | Training script |
+| Export Metadata (Phase, Alpha, Stage) into `.pt` checkpoint | ⏳ Pending | Training script |
+| Serialize `SOVEREIGN_R_MATRIX` correctly | ⏳ Pending | Training script |
+
+**Once training produces a single successful checkpoint with "Sovereign Metadata," the `generate_sovereign.py` script can be deployed and verified in approximately 30 minutes.**
+
+---
+
+### 7.3 Proposed Script: `generate_sovereign.py`
+
+This script will serve as the inference counterpart to `train_unified_llm.py`. It will be placed in the project root and handle CLI arguments, model loading, and the interactive Sovereign loop.
+
+#### 7.3.1 Script Structure
+
+```python
+# generate_sovereign.py - The Metabolic Inference Script
+import torch
+import argparse
+from symbolu.inference.manager import InferenceManager
+from symbolu.inference.evolutionary_inference import EvolutionaryInferenceEngine
+from symbolu.inference.metacognitive_monitor import InferenceMetacognition
+from symbolu.inference.csr_inference import CSRInferenceGuard
+from symbolu.inference.layer_config import LayerInferenceConfig
+from symbolu.inference.checkpoint_utils import load_sovereign_config
+
+def run_sovereign_session():
+    parser = argparse.ArgumentParser(description="Symbolu Sovereign Generation")
+    parser.add_argument("--checkpoint", type=str, required=True, help="Path to .pt checkpoint")
+    parser.add_argument("--mode", type=str, default="Sovereign", choices=["Fast", "Standard", "Sovereign"])
+    parser.add_argument("--temp", type=float, default=0.7)
+    args = parser.parse_args()
+
+    # 1. Load Enhanced Metadata & Model
+    print(f"📡 Loading Sovereign State from {args.checkpoint}...")
+    checkpoint = torch.load(args.checkpoint)
+    config = load_sovereign_config(args.checkpoint)
+
+    # Auto-configure based on Training State
+    alpha = config.recommended_alpha
+    split = config.authority_sensory_split
+    print(f"✅ Training State Detected: Split {split} | Alpha {alpha}")
+
+    # 2. Load Model
+    model = load_model_from_checkpoint(checkpoint)  # Implementation depends on model architecture
+
+    # 3. Instantiate Cognitive Stack
+    karma = EvolutionaryInferenceEngine(model, resonance_alpha=alpha)
+    karma.load_bridge_checkpoint(args.checkpoint)
+
+    meta = InferenceMetacognition()
+    guard = CSRInferenceGuard(model.lm_head, dim=model.config.hidden_size)
+
+    manager = InferenceManager(
+        model=model,
+        karma_engine=karma,
+        metacognition=meta,
+        csr_guard=guard,
+    )
+    manager.set_mode(args.mode)
+
+    # 4. Interactive Loop with 9:3 Awareness
+    print("\n🧘 Sovereign Engine Active. Type 'exit' to quit.\n")
+    while True:
+        prompt = input("[Sovereign Query] > ")
+        if prompt.lower() in ["exit", "quit"]:
+            break
+
+        print(f"| Mode: {args.mode} | Scaling: 9:3 Hierarchical |")
+
+        # Generation with 3-Way Coherence & Guna-Feedback
+        output = manager.generate_full_sequence(
+            prompt_ids=tokenize(prompt),  # Tokenizer implementation
+            base_temp=args.temp,
+            max_tokens=128
+        )
+
+        # 5. Cognitive Telemetry Log
+        s, r, t = output['gunas']
+        print(f"\n[Cognitive Log] Sattva: {s:.2f} | Rajas: {r:.2f} | Tamas: {t:.2f}")
+        print(f"[Metacognition] Final Recommendation: {output['recommendation']}")
+        print(f"[Coherence] 3-Way Flow: {output['coherence']:.4f}")
+        print(f"[Response] {decode(output['generated_ids'])}\n")
+
+if __name__ == "__main__":
+    run_sovereign_session()
+```
+
+#### 7.3.2 Key Stages
+
+| Stage | Description |
+|-------|-------------|
+| **Model & Metadata Load** | Use `load_sovereign_config()` to pull inference hints (like recommended α) from checkpoint |
+| **Manager Initialization** | Wrap model in `EvolutionaryInferenceEngine`, `CSRInferenceGuard`, and `InferenceMetacognition` |
+| **The Sovereign Loop** | Execute `generate_step` logic, applying `LayerInferenceConfig` temperature adjustments in real-time |
+| **Cognitive Telemetry** | Print Guna states and Metacognitive recommendations to console during generation |
+
+---
+
+### 7.4 Required Method: `InferenceManager.generate_full_sequence()`
+
+This method is the high-level orchestrator that connects discrete token generation to the Metabolic Loop, ensuring every step is governed by Guna state and Karma persistence.
+
+#### 7.4.1 Implementation Specification
+
+```python
+@torch.no_grad()
+def generate_full_sequence(
+    self,
+    prompt_ids: torch.Tensor,
+    max_tokens: int = 128,
+    base_temp: float = 0.7
+) -> Dict[str, Any]:
+    """
+    Executes a complete metabolic generation sequence.
+    Orchestrates Guna tracking, CSR Gating, and Karma update.
+    """
+    generated = prompt_ids
+    current_temp = base_temp
+    all_gunas = []
+
+    # 1. Initialize Sequence with Evolutionary Seed
+    # Injects Karma from the previous conversation turn into Layer 0
+
+    for _ in range(max_tokens):
+        # --- A. The Metabolic Step ---
+        # Returns logits, recommendations, and current Guna triplet
+        step_result = self.generate_step(generated, temperature=current_temp)
+
+        logits = step_result["logits"]
+        recommendation = step_result["recommendation"]
+        s, r, t = step_result["gunas"]
+        all_gunas.append((s, r, t))
+
+        # --- B. Metacognitive Adjustment ---
+        if recommendation == "BRAKE":
+            current_temp *= 0.8  # Sharpen focus to reduce entropy
+        elif recommendation == "RECOVER":
+            current_temp = min(base_temp, current_temp * 1.2)  # Allow creative flow
+        elif recommendation == "ABORT":
+            print("⚠️ [ABORT] Sovereign Guard detected coherence collapse.")
+            break
+
+        # --- C. Sampling with 9:3 Awareness ---
+        # LayerInferenceConfig temperature adjustments happen inside generate_step
+        probs = torch.softmax(logits / current_temp, dim=-1)
+        next_token = torch.multinomial(probs, num_samples=1)
+
+        # --- D. Sequence Update & Stop Condition ---
+        generated = torch.cat((generated, next_token), dim=1)
+        if next_token.item() == self.model.config.eos_token_id:
+            break
+
+    # --- E. Final Harvest (Toroidal Bridge) ---
+    # Extract O12 state to seed the NEXT conversation turn
+    final_outputs = self.model(generated, extract_layers=[0, 11])
+    self.karma_engine.karma_buffer = self.karma_engine.bridge.compute_seed(
+        final_outputs['hidden_states'][-1].mean(dim=1)
+    )
+
+    # Calculate 3-Way Toroidal Coherence
+    coherence = self.karma_engine.compute_3way_toroidal_coherence(
+        o1_hidden=final_outputs['hidden_states'][0],
+        o12_hidden=final_outputs['hidden_states'][-1]
+    )[0]
+
+    return {
+        "generated_ids": generated,
+        "gunas": (s, r, t),  # Final state
+        "recommendation": recommendation,
+        "coherence": coherence
+    }
+```
+
+#### 7.4.2 Key Logic Components
+
+| Component | Purpose |
+|-----------|---------|
+| **Gated Toroidal Harvest** | Unlike standard transformers that forget everything after a prompt, this method "harvests" the final state of Layer 11 (Integration). It uses the learned `bridge.compute_seed` logic (Sigmoid-gating) to compress the sequence's essence into the `karma_buffer` for the next interaction. |
+| **3-Way Coherence Validation** | At the end of the sequence, computes a "Truth Score" by checking if the O1 Birth, the O12 Result, and the Seed all align. If they don't, the coherence score drops, signaling that the model "drifted" from its ontological intent. |
+| **Adaptive Temperature** | The loop doesn't just generate tokens; it manages Rajas (Action). If the BRAKE signal is issued, the temperature is crushed to force a more deterministic (Sattvic) path, effectively shattering repetition loops before they consume H200 cycles. |
+
+---
+
+### 7.5 Implementation Status Summary
+
+| Component | Logic ("What") | Script ("How") |
+|-----------|----------------|----------------|
+| `EvolutionaryInferenceEngine` | ✅ Implemented | ⏳ Blocked |
+| `InferenceMetacognition` | ✅ Implemented | ⏳ Blocked |
+| `InferenceGunas` | ✅ Implemented | ⏳ Blocked |
+| `CSRInferenceGuard` | ✅ Implemented | ⏳ Blocked |
+| `SovereignInferenceScorer` | ✅ Implemented | ⏳ Blocked |
+| `LayerInferenceConfig` | ✅ Implemented | ⏳ Blocked |
+| `InferenceManager` | ✅ Implemented | ⏳ Blocked |
+| `generate_full_sequence()` | 📋 Specified | ⏳ Blocked |
+| `generate_sovereign.py` | 📋 Specified | ⏳ Blocked |
+
+**The Logic is complete. The Script awaits training completion.**
+
+---
+
+### 7.6 Unblocking Criteria
+
+Phase 4 implementation can proceed when the training script successfully produces a checkpoint containing:
+
+```python
+# Required checkpoint structure
+{
+    "model": model.state_dict(),
+    "evolutionary_bridge": {
+        "projection": ...,
+        "gate_weights": ...,
+        "layer_norm": ...,
+    },
+    "inference_config": {
+        "authority_sensory_split": (9, 3),
+        "evolution_stage": N,
+        "recommended_alpha": 0.1,  # Calibrated from training
+        "training_state": "authority",
+        "sgp_rate": 25,
+    },
+    "sovereign_r_matrix": SOVEREIGN_R_MATRIX,  # If custom R-matrix trained
+    "csr_weights": {  # If CSR layers trained
+        "entropy_sink": ...,
+        "synthesis_gate": ...,
+    },
+}
+```
+
+**Upon receiving a valid checkpoint, Phase 4 deployment time estimate: ~30 minutes.**
+
+---
+
 ## Revision History
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 2.2 | 2026-01-05 | Claude | Phase 4 specification added (BLOCKED awaiting training), `generate_full_sequence()` documented |
+| 2.1 | 2026-01-05 | Claude | Priority 3 enhancements complete: LayerInferenceConfig, checkpoint utilities, 3-way coherence |
+| 2.0 | 2026-01-05 | Claude | Full implementation complete (Phases 1-3), added Usage Guide |
 | 1.0 | 2026-01-05 | Claude | Initial comprehensive gap analysis |
 
