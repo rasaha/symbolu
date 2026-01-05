@@ -7637,6 +7637,15 @@ def train(config: UnifiedTrainingConfig):
                     if global_step % 100 == 0:  # Log warning every 100 steps to avoid spam
                         print(f"  Warning: Friction measurement failed at step {global_step}: {e}")
 
+            # V9.5.6 FIX: Capture gradient norm BEFORE zero_grad for Rajas computation (6:6 mode)
+            # In 6:6 mode without HGS, we need to compute this before gradients are cleared
+            captured_grad_norm = 0.0
+            if gradient_scaler_hgs is None:
+                captured_grad_norm = sum(
+                    p.grad.norm().item() for p in model.parameters()
+                    if p.grad is not None
+                )
+
             optimizer.zero_grad()
 
             # Update scheduler after warmup
@@ -7694,12 +7703,12 @@ def train(config: UnifiedTrainingConfig):
             guna_s, guna_r, guna_t = 0.33, 0.33, 0.34  # Default balanced
             guna_action = "CONTINUE"
             if training_gunas is not None:
-                # Get gradient norm from HGS metrics or compute from model
+                # Get gradient norm from HGS metrics or use captured value (6:6 mode)
                 if hgs_metrics:
                     grad_norm = hgs_metrics.get('a_grad_norm', 0.0) + hgs_metrics.get('s_grad_norm', 0.0)
                 else:
-                    # Fallback: compute total gradient norm
-                    grad_norm = sum(p.grad.norm().item() for p in model.parameters() if p.grad is not None)
+                    # V9.5.6 FIX: Use captured_grad_norm (computed before zero_grad)
+                    grad_norm = captured_grad_norm
 
                 # Get coherence and entropy from metrics
                 coherence = float(metrics.get('coherence', metrics.get('gc', 0.5)))
