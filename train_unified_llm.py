@@ -7349,9 +7349,7 @@ def train(config: UnifiedTrainingConfig):
                 csr_affinity = csr_output['csr_affinity']
                 csr_confidence = csr_output['csr_confidence']
 
-                # V9.5.3 CRITICAL FIX: Use hidden_state_extractor to get 512-dim hidden states
-                # NOT the 50257-dim logits. The old code silently skipped CSR loss (always 0.0)
-                # because logits.shape[-1]=50257 != csr_emb.shape[-1]=512
+                # V9.5.3 CRITICAL FIX: Use hidden_state_extractor to get hidden states
                 csr_hidden = None
                 if hidden_state_extractor is not None:
                     layer_hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
@@ -7359,7 +7357,21 @@ def train(config: UnifiedTrainingConfig):
                         # Use last layer (Layer 11 - Sensory Integration) for alignment
                         csr_hidden = layer_hidden_states[-1]
 
-                if csr_hidden is not None and csr_hidden.shape[-1] == csr_emb.shape[-1]:
+                if csr_hidden is not None:
+                    # V9.5.4 DIMENSION FIX: Project CSR embeddings to match model hidden size
+                    # CSR embeddings are 512-dim, model hidden states may be 768-dim (or other)
+                    if csr_emb.shape[-1] != csr_hidden.shape[-1]:
+                        # Create projector on first mismatch (lazy initialization)
+                        if not hasattr(model, '_csr_projector') or model._csr_projector is None:
+                            csr_dim = csr_emb.shape[-1]
+                            hidden_dim = csr_hidden.shape[-1]
+                            model._csr_projector = torch.nn.Linear(csr_dim, hidden_dim, bias=False).to(csr_emb.device)
+                            # Initialize with small weights for stable training
+                            torch.nn.init.xavier_uniform_(model._csr_projector.weight)
+                            print(f"  ⚡ [CSR] Created projector: {csr_dim}D → {hidden_dim}D (Phoneme→Model space)")
+                        # Project CSR embeddings to model dimension
+                        csr_emb = model._csr_projector(csr_emb)
+
                     # CSR alignment loss: encourage hidden states to correlate with CSR embeddings
                     # Use cosine similarity weighted by confidence
                     csr_hidden_norm = torch.nn.functional.normalize(csr_hidden, dim=-1)
@@ -7374,9 +7386,6 @@ def train(config: UnifiedTrainingConfig):
                     csr_metrics['csr_confidence'] = csr_confidence.mean().item()
                     csr_metrics['csr_similarity'] = csr_similarity.mean().item()
                 else:
-                    # Log warning if dimension mismatch persists
-                    if global_step % 100 == 0 and csr_hidden is not None:
-                        print(f"  ⚠️ [CSR] Dimension mismatch: Hidden {csr_hidden.shape[-1]} vs Emb {csr_emb.shape[-1]}")
                     csr_metrics['csr_loss'] = 0.0
                     csr_metrics['csr_confidence'] = csr_confidence.mean().item() if csr_confidence is not None else 0.0
 
