@@ -8692,6 +8692,12 @@ def main():
                        help="Global Coherence weight [S3] (phase-lock penalty)")
     parser.add_argument("--enable_sovereign_loss", action="store_true",
                        help="Enable Sovereign-Lagrangian loss (B1+S3) instead of standard CE")
+    parser.add_argument("--sovereign_weight_r", type=float, default=5.0,
+                       help="R-Signal (ontology) weight for Sovereign-1 loss (default 5.0)")
+    parser.add_argument("--sovereign_weight_s", type=float, default=2.0,
+                       help="S-Signal (referent) weight for Sovereign-1 loss (default 2.0)")
+    parser.add_argument("--sovereign_weight_c", type=float, default=0.5,
+                       help="C-Signal (phoneme) weight for Sovereign-1 loss (default 0.5)")
     parser.add_argument("--enable_stability_constraint", action="store_true",
                        help="Enable S8 Stability Constraint (entropy-based anchoring)")
     parser.add_argument("--gc_floor", type=float, default=0.65,
@@ -9057,6 +9063,9 @@ def main():
         seed=args.seed,
         # Sovereign-Lagrangian Loss [Patent B1/S3]
         enable_sovereign_loss=args.enable_sovereign_loss,
+        sovereign_weight_r=args.sovereign_weight_r,
+        sovereign_weight_s=args.sovereign_weight_s,
+        sovereign_weight_c=args.sovereign_weight_c,
         b1_lambda=args.b1_lambda,
         mu_s3=args.mu_s3,
         enable_stability_constraint=args.enable_stability_constraint,
