@@ -582,6 +582,85 @@ SANSKRIT_VOWEL_CALIBRATION: Dict[str, Dict[str, Any]] = {
 
 
 # =============================================================================
+# ARPABET → SANSKRIT VARNA MAPPING (Mental Propensities Bridge)
+# =============================================================================
+# This critical mapping bridges English phonemes to Sanskrit Varna Mala,
+# enabling the training to learn ontological structure from mental propensities.
+#
+# Each ARPABET phoneme maps to a Sanskrit varṇa, which carries:
+# - Vowels: States of consciousness (birth, expansion, contraction, etc.)
+# - Consonants: Vrittis/Mental Propensities (hope, worry, attachment, etc.)
+#
+# This is the "missing link" that turns a Phonetic LLM into an Ontological Engine.
+
+ARPABET_TO_VARNA: Dict[str, str] = {
+    # ==========================================================================
+    # VOWELS: Roots of Consciousness
+    # ==========================================================================
+    'AA': 'a',    # अ - Birth of cognition / Raw potential
+    'AH': 'a',    # अ - Same root vowel
+    'AE': 'a',    # अ - Open vowel variant
+    'AO': 'o',    # ओ - Completion / Closure
+    'AW': 'au',   # औ - Surrender / Letting-go
+    'AY': 'ai',   # ऐ - Welfare / Materialization
+    'EH': 'e',    # ए - Practical thought / Benefit
+    'ER': 'ṛ',    # ऋ - Vocalic R (execution energy)
+    'EY': 'e',    # ए - Practical thought
+    'IH': 'i',    # इ - I-ness / Doing self
+    'IY': 'ī',    # ई - Specialization of self
+    'OW': 'o',    # ओ - Completion / Closure
+    'OY': 'ai',   # ऐ - Welfare (diphthong blend)
+    'UH': 'u',    # उ - Zoom / Contraction
+    'UW': 'ū',    # ऊ - Sustained attention / Holding
+
+    # ==========================================================================
+    # CONSONANTS: Vrittis (Mental Propensities)
+    # ==========================================================================
+    # Ka-varga (Guttural) - Throat chakra propensities
+    'K':  'ka',   # क - Āśā (Hope) - forward-seeking pressure
+    'G':  'ga',   # ग - Ceṣṭā (Action) - kinetic momentum
+    'NG': 'ṅa',   # ङ - Dambha (Vanity) - nasal marker
+
+    # Ca-varga (Palatal) - Heart/expression propensities
+    'CH': 'ca',   # च - Vikṣepa (Scatter) - boundary checking
+    'JH': 'ja',   # ज - Dambha (Vanity) - aspiration pressure
+
+    # Ṭa-varga (Retroflex) - Solar plexus propensities
+    'T':  'ṭa',   # ट - Vitarka (Overstatement) - sharp execution
+    'D':  'ḍa',   # ड - Lajjā (Shyness) - retroactive pressure
+
+    # Ta-varga (Dental) - Sacral propensities
+    'TH': 'tha',  # थ - Viṣāda (Melancholy) - aspirated inertia
+    'DH': 'dha',  # ध - Tṛṣṇā (Craving) - retention pressure
+
+    # Pa-varga (Labial) - Root chakra propensities
+    'P':  'pa',   # प - Ghrṇā (Hatred/Revulsion) - forceful rejection
+    'B':  'ba',   # ब - Avajñā (Indifference) - passive pressure
+    'M':  'ma',   # म - Praśraya (Indulgence) - nasal completion
+
+    # Semi-vowels (Antaḥstha) - Transitional energies
+    'Y':  'ya',   # य - Aviśvāsa (Lack of confidence) - glide transition
+    'R':  'ra',   # र - Sarvanāśa (Annihilation) - fire/destruction energy
+    'L':  'la',   # ल - Krūratā (Cruelty) - lateral flow
+    'W':  'va',   # व - Dharma (Righteousness) - labio-dental flow
+    'V':  'va',   # व - Same as W
+
+    # Sibilants (Ūṣman) - Friction/heat energies
+    'S':  'sa',   # स - Escapism / Static detachment
+    'SH': 'śa',   # श - Material greed
+    'Z':  'ja',   # Approximation to ja (voiced sibilant)
+    'ZH': 'ja',   # Same approximation
+
+    # Aspirate
+    'HH': 'ha',   # ह - Avidyā (Darkness/Ignorance) - aspirate release
+
+    # Affricates (mapped to nearest varga)
+    'F':  'pha',  # फ - Bhaya (Fear) - aspirated labial
+    'N':  'na',   # न - Moha (Blind attachment) - dental nasal
+}
+
+
+# =============================================================================
 # GRAPHEME TO PHONEME (G2P) FALLBACK
 # =============================================================================
 # Simple rule-based G2P for English. In production, use a proper G2P model.
@@ -1197,6 +1276,17 @@ class CSREmbeddingProvider(nn.Module):
         # Initialize Hybrid G2P system (CMUdict + g2p_en)
         self._hybrid_g2p = get_hybrid_g2p()
 
+        # V9.5.3 CRITICAL: Initialize Sanskrit Varna Bridge for Mental Propensities
+        # This bridges ARPABET → Sanskrit Varna → 12D Ontological vectors
+        # WITHOUT this, training uses generic phonetic vectors instead of
+        # the mental propensities (Hope, Worry, Attachment, etc.) from varna_bridge_map_v1.json
+        self._varna_bridge = VarnaCSRBridge()
+        self._varna_bridge_loaded = self._varna_bridge.load()
+        if self._varna_bridge_loaded:
+            print(f"  ⚡ [CSR] Sanskrit Varna Bridge ACTIVE - Mental propensities enabled!")
+        else:
+            print(f"  ⚠️ [CSR] Varna Bridge not loaded - using ARPABET fallback")
+
         # V9.5.2 Performance: Precompute token ID → affinity lookup table
         # This eliminates O(B*T) tokenizer.decode() calls in forward pass
         if tokenizer is not None:
@@ -1218,40 +1308,71 @@ class CSREmbeddingProvider(nn.Module):
 
     def _build_token_affinity_table(self):
         """
-        V9.5.2 Performance: Precompute affinity vectors for ALL vocab tokens.
+        V9.5.3 CRITICAL FIX: Build token affinity table with Sanskrit Varna Bridge.
 
-        This eliminates O(B*T) tokenizer.decode() calls during forward pass,
-        replacing them with a single tensor indexing operation.
+        This now traces the full path:
+            Token → ARPABET phonemes → Sanskrit Varna → 12D Ontological vector
 
-        The table maps token_id → 12D affinity vector for the entire vocabulary.
+        The Sanskrit Varna carries the mental propensities (vrittis):
+            - K → ka → Āśā (Hope)
+            - P → pa → Ghrṇā (Hatred)
+            - M → ma → Praśraya (Indulgence)
+            etc.
+
+        This is the "missing link" that turns a Phonetic LLM into an Ontological Engine.
         """
         if self.tokenizer is None:
             return
 
         vocab_size = getattr(self.tokenizer, 'vocab_size', None)
         if vocab_size is None:
-            # Try to get vocab size from the tokenizer
             try:
                 vocab_size = len(self.tokenizer)
             except:
                 vocab_size = 50257  # GPT-2 default
 
-        print(f"  [CSR] Building token affinity table for {vocab_size:,} tokens...")
+        use_varna = self._varna_bridge_loaded
+        if use_varna:
+            print(f"  ⚡ [CSR] Building SANSKRIT VARNA affinity table for {vocab_size:,} tokens...")
+            print(f"       Bridging ARPABET → Sanskrit Varna → 12D Ontology (Mental Propensities)")
+        else:
+            print(f"  [CSR] Building ARPABET affinity table for {vocab_size:,} tokens...")
+
         import time
         start_time = time.time()
 
         # Preallocate table
         affinity_table = torch.zeros(vocab_size, 12, dtype=torch.float32)
 
+        # Statistics
+        varna_mapped = 0
+        arpabet_fallback = 0
+
         # Compute affinity for each token
         for token_id in range(vocab_size):
             try:
                 token_str = self.tokenizer.decode([token_id])
                 phonemes = self.token_to_phonemes(token_str)
-                affinity_table[token_id] = self.phonemes_to_affinity(phonemes)
+
+                if use_varna and phonemes:
+                    # V9.5.3: Use Sanskrit Varna Bridge for mental propensities
+                    varna_vector = self._phonemes_to_varna_affinity(phonemes)
+                    if varna_vector is not None:
+                        affinity_table[token_id] = varna_vector
+                        varna_mapped += 1
+                    else:
+                        # Fallback to ARPABET
+                        affinity_table[token_id] = self.phonemes_to_affinity(phonemes)
+                        arpabet_fallback += 1
+                else:
+                    # No Varna bridge - use ARPABET directly
+                    affinity_table[token_id] = self.phonemes_to_affinity(phonemes)
+                    arpabet_fallback += 1
+
             except Exception:
                 # Fallback for problematic tokens
                 affinity_table[token_id] = self.phoneme_map[token_id % len(self._phoneme_list)]
+                arpabet_fallback += 1
 
         # L2 normalize
         affinity_table = F.normalize(affinity_table, p=2, dim=-1)
@@ -1263,7 +1384,65 @@ class CSREmbeddingProvider(nn.Module):
         self.register_buffer('_token_affinity_table', affinity_table, persistent=False)
 
         elapsed = time.time() - start_time
-        print(f"  [CSR] Token affinity table built in {elapsed:.2f}s")
+        if use_varna:
+            print(f"  ⚡ [CSR] Token affinity table built in {elapsed:.2f}s")
+            print(f"       Sanskrit Varna mapped: {varna_mapped:,} tokens ({100*varna_mapped/vocab_size:.1f}%)")
+            print(f"       ARPABET fallback: {arpabet_fallback:,} tokens")
+        else:
+            print(f"  [CSR] Token affinity table built in {elapsed:.2f}s")
+
+    def _phonemes_to_varna_affinity(self, phonemes: List[str]) -> Optional[torch.Tensor]:
+        """
+        V9.5.3: Convert phonemes to 12D affinity via Sanskrit Varna Bridge.
+
+        Traces: ARPABET → Sanskrit Varna → 12D Ontological vector
+
+        This injects the mental propensities from varna_bridge_map_v1.json:
+            - K → ka → Āśā (Hope) → O3_Execution dominant
+            - P → pa → Ghrṇā (Hatred) → O3_Execution + O6_Agency
+            etc.
+
+        Returns:
+            12D tensor if any phoneme mapped, None if all failed
+        """
+        if not phonemes or not self._varna_bridge_loaded:
+            return None
+
+        # Get weights for position weighting
+        weights = list(self.config.position_weights)
+        while len(weights) < len(phonemes):
+            weights.append(1.0)
+        weights = weights[:len(phonemes)]
+
+        affinity = torch.zeros(12, dtype=torch.float32)
+        total_weight = 0.0
+        mapped_count = 0
+
+        for i, phoneme in enumerate(phonemes):
+            # Strip stress markers (AA0 → AA)
+            clean_phoneme = phoneme.rstrip('012')
+
+            # Step 1: ARPABET → Sanskrit Varna key
+            varna_key = ARPABET_TO_VARNA.get(clean_phoneme)
+
+            if varna_key:
+                # Step 2: Sanskrit Varna → 12D vector (from varna_bridge_map_v1.json)
+                varna_vector = self._varna_bridge.get_vector(varna_key)
+
+                if varna_vector is not None:
+                    # Apply position weight
+                    weight = weights[i]
+                    affinity += weight * torch.tensor(varna_vector, dtype=torch.float32)
+                    total_weight += weight
+                    mapped_count += 1
+
+        if mapped_count == 0:
+            return None
+
+        # Normalize by total weight
+        affinity = affinity / total_weight
+
+        return affinity
 
     def token_to_phonemes(self, token: str) -> List[str]:
         """
