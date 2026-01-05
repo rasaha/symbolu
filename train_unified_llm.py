@@ -6108,6 +6108,9 @@ class UnifiedTrainingConfig:
     csr_use_entropy_sink: bool = True        # Apply Layer 0 entropy floor
     csr_use_synthesis_gate: bool = True      # Apply Layer 11 synthesis reconciliation
 
+    # V9.6.0: Embedding configuration
+    untie_embeddings: bool = False           # Untie input/output embeddings (CRITICAL when using CSR)
+
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
     enable_sgp: bool = True                  # Enable SGP synchronized with Sattvic Controller
     sgp_base_rate: int = 25                  # Base SGP rate (Toroidal Refresh Rate)
@@ -6316,6 +6319,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
                     module.gradient_checkpointing = True
 
     elif config.model_type == "phase":
+        # V9.6.0: Untie embeddings when CSR is enabled to prevent vocabulary corruption
+        tie_emb = not config.untie_embeddings
         model = PhaseTransformer(
             vocab_size=config.vocab_size,
             embed_dim=preset["embed_dim"],
@@ -6326,9 +6331,12 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             dropout=config.dropout,
             sync_steps=config.sync_steps,
             sync_lr=config.sync_lr,
+            tie_embeddings=tie_emb,
         )
 
     elif config.model_type == "hybrid":
+        # V9.6.0: Untie embeddings when CSR is enabled to prevent vocabulary corruption
+        tie_emb = not config.untie_embeddings
         model = HybridPhaseTransformer(
             vocab_size=config.vocab_size,
             embed_dim=preset["embed_dim"],
@@ -6342,6 +6350,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             local_backend=config.local_backend,
             alpha_local=config.alpha_local,
             alpha_phase=config.alpha_phase,
+            tie_embeddings=tie_emb,
         )
 
     elif config.model_type == "gen2":
@@ -8976,6 +8985,10 @@ def main():
                        help="Gate Phase Attention with CSR confidence")
     parser.add_argument("--csr_trainable", action="store_true", default=True,
                        help="Allow CSR projection to train")
+
+    # V9.6.0: Embedding configuration
+    parser.add_argument("--untie_embeddings", action="store_true",
+                       help="Untie input/output embeddings (CRITICAL when using CSR to prevent vocabulary corruption)")
     parser.add_argument("--csr_use_entropy_sink", action="store_true", default=True,
                        help="Apply Layer 0 entropy floor")
     parser.add_argument("--csr_use_synthesis_gate", action="store_true", default=True,
