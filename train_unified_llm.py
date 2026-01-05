@@ -7342,16 +7342,10 @@ def train(config: UnifiedTrainingConfig):
             # CSR Phoneme-Ontological Grounding Integration
             csr_metrics = {}
             if csr_provider is not None:
-                # Decode tokens for phoneme extraction
-                token_strings = None
-                if tokenizer is not None:
-                    try:
-                        token_strings = [[tokenizer.decode([tid.item()]) for tid in batch] for batch in x]
-                    except Exception:
-                        token_strings = None
-
-                # Compute CSR embeddings
-                csr_output = csr_provider(x, token_strings=token_strings)
+                # V9.5.2 Performance: CSR provider uses precomputed token affinity table
+                # No need to decode tokens here - the table maps token_id → affinity directly
+                # This eliminates O(B*T) tokenizer.decode() calls that caused Step 10 stall
+                csr_output = csr_provider(x, token_strings=None)
                 csr_emb = csr_output['csr_emb']
                 csr_affinity = csr_output['csr_affinity']
                 csr_confidence = csr_output['csr_confidence']
@@ -7708,6 +7702,12 @@ def train(config: UnifiedTrainingConfig):
                     'entropy': entropy,
                     'variance': sattvic_controller.entropy_variance,
                 })
+
+                # V9.5.2 H200 Optimization: Clear SGP temporary buffers after heavy pulses
+                # This prevents memory fragmentation stalls on high-VRAM GPUs
+                if pulse_applied and device.type == "cuda":
+                    torch.cuda.synchronize()  # Ensure kernels finished before clearing
+                    torch.cuda.empty_cache()  # Free up H200 'Swing Space'
 
                 # Log SGP status periodically
                 if global_step % 500 == 0:
