@@ -363,28 +363,35 @@ class EvolutionaryInferenceEngine:
         """
         Forward pass with efficient hidden state extraction.
 
+        Uses the model's extract_layers parameter for memory-efficient
+        extraction of only the requested layers.
+
         Args:
             input_ids: Input token IDs [B, N]
             extract_layers: Which layers to extract (default: [0, 11] for O1, O12)
+                           Common patterns:
+                           - [0, 11]: O1 (Potential) + O12 (Integration) for karma
+                           - [0, 5, 11]: Authority + midpoint + final
 
         Returns:
             logits: Model output logits
-            layer_states: Dict mapping layer_idx -> hidden state
+            layer_states: Dict mapping layer_idx -> hidden state tensor
         """
         if extract_layers is None:
             extract_layers = [0, 11]  # O1 and O12 by default
 
-        # Use model's return_hidden capability
-        outputs = self.model(input_ids, return_hidden=True)
+        # Use efficient extraction - only requested layers are stored
+        outputs = self.model(input_ids, extract_layers=extract_layers)
 
         logits = outputs['logits']
-        all_hidden = outputs.get('hidden_states', [])
+        hidden_list = outputs.get('hidden_states', [])
 
-        # Extract requested layers
+        # Map list positions back to layer indices
+        # hidden_list[0] corresponds to extract_layers[0], etc.
         layer_states = {}
-        for layer_idx in extract_layers:
-            if layer_idx < len(all_hidden):
-                layer_states[layer_idx] = all_hidden[layer_idx]
+        for i, layer_idx in enumerate(sorted(extract_layers)):
+            if i < len(hidden_list):
+                layer_states[layer_idx] = hidden_list[i]
 
         return logits, layer_states
 
