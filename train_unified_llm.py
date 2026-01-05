@@ -6014,11 +6014,6 @@ class UnifiedTrainingConfig:
     toroidal_truncated_bptt: int = 0         # Steps of gradient flow (0 = full detach)
     toroidal_coherence_threshold: float = 0.3  # Alarm threshold for cognitive discontinuity
 
-    # V9.4.7: Stochastic Gradient Persistence (SGP) - High-Rajas recursive learning
-    # Allows gradients to flow through bridge at a capped rate for stability
-    enable_sgp: bool = False                 # Enable SGP (off by default, H200 recommended)
-    sgp_rate: int = 100                      # SGP pulse every N steps (1% rule: 100 = 1%)
-
     # Full Evolutionary Flow System (Phase 2: All Layer Transitions)
     # Extends Toroidal Bridge to ALL layer transitions with Delayed Resonance
     enable_evolutionary_flow: bool = True    # Master switch for evolutionary intelligence
@@ -6878,7 +6873,7 @@ def train(config: UnifiedTrainingConfig):
             use_gating=config.toroidal_use_gating,
             truncated_bptt_steps=config.toroidal_truncated_bptt,
             enable_sgp=config.enable_sgp,
-            sgp_rate=config.sgp_rate,
+            sgp_rate=config.sgp_base_rate,  # Use new SGP base rate
         ).to(device)
         toroidal_loss_fn = ToroidalConsistencyLoss(
             lambda_toroid=config.toroidal_lambda,
@@ -6889,7 +6884,7 @@ def train(config: UnifiedTrainingConfig):
         )
         print(f"  Toroidal Bridge: ENABLED (λ={config.toroidal_lambda}, gate={config.toroidal_use_gating})")
         if config.enable_sgp:
-            print(f"    → SGP (Stochastic Gradient Persistence): ENABLED (rate=1/{config.sgp_rate})")
+            print(f"    → SGP (Stochastic Gradient Persistence): ENABLED (rate=1/{config.sgp_base_rate})")
         print(f"    → O12 (Absolving) feeds O1 (Potential) for recursive intelligence")
 
     # Full Evolutionary Flow System (Phase 2: All Layer Transitions with Delayed Resonance)
@@ -8591,12 +8586,6 @@ def main():
                        help="Steps of gradient flow (0 = full detach)")
     parser.add_argument("--toroidal_coherence_threshold", type=float, default=0.3,
                        help="Alarm threshold for cognitive discontinuity")
-
-    # V9.4.7: Stochastic Gradient Persistence (SGP)
-    parser.add_argument("--enable_sgp", action="store_true",
-                       help="Enable SGP recursive gradient pulses (H200 recommended)")
-    parser.add_argument("--sgp_rate", type=int, default=100,
-                       help="SGP pulse every N steps (default 100 = 1%% rule)")
 
     # Full Evolutionary Flow System (Phase 2-5)
     parser.add_argument("--enable_evolutionary_flow", action="store_true", default=True,
