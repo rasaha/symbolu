@@ -6130,6 +6130,7 @@ class UnifiedTrainingConfig:
     csr_trainable: bool = True               # Allow CSR projection to train
     csr_use_entropy_sink: bool = True        # Apply Layer 0 entropy floor
     csr_use_synthesis_gate: bool = True      # Apply Layer 11 synthesis reconciliation
+    csr_alignment_layer: int = 2             # V9.6.0: Which layer to use for CSR alignment (2=concept, 11=output)
 
     # V9.6.0: Embedding configuration
     untie_embeddings: bool = False           # Untie input/output embeddings (CRITICAL when using CSR)
@@ -7430,13 +7431,21 @@ def train(config: UnifiedTrainingConfig):
                 csr_affinity = csr_output['csr_affinity']
                 csr_confidence = csr_output['csr_confidence']
 
-                # V9.5.3 CRITICAL FIX: Use hidden_state_extractor to get hidden states
+                # V9.6.0 FIX: Use EARLY layer (not Layer 11) for CSR alignment
+                # CRITICAL: Layer 11 is the LM Head input - pushing it toward Sanskrit
+                # corrupts token prediction and causes "@ = <" aphasia.
+                # Early layers (2-3) influence concept formation without hijacking output.
                 csr_hidden = None
                 if hidden_state_extractor is not None:
                     layer_hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
                     if layer_hidden_states is not None and len(layer_hidden_states) > 0:
-                        # Use last layer (Layer 11 - Sensory Integration) for alignment
-                        csr_hidden = layer_hidden_states[-1]
+                        # V9.6.0: Configurable CSR alignment layer
+                        # - Layer 0-1: Raw token processing
+                        # - Layer 2-3: Abstract concept formation ← DEFAULT for Sanskrit ontology
+                        # - Layer 4-8: Reasoning and structure
+                        # - Layer 9-11: Output preparation ← AVOID (causes aphasia)
+                        csr_layer_idx = min(config.csr_alignment_layer, len(layer_hidden_states) - 1)
+                        csr_hidden = layer_hidden_states[csr_layer_idx]
 
                 if csr_hidden is not None:
                     # V9.5.4 DIMENSION FIX: Project CSR embeddings to match model hidden size
@@ -9016,6 +9025,8 @@ def main():
                        help="Apply Layer 0 entropy floor")
     parser.add_argument("--csr_use_synthesis_gate", action="store_true", default=True,
                        help="Apply Layer 11 synthesis reconciliation")
+    parser.add_argument("--csr_alignment_layer", type=int, default=2,
+                       help="Which layer to use for CSR alignment (2=concept formation, 11=output - AVOID)")
 
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
     parser.add_argument("--enable_sgp", action="store_true", default=True,
