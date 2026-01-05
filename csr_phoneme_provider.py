@@ -40,16 +40,31 @@ import warnings
 # =============================================================================
 # Tiered lookup: CMUdict → CUSTOM_VOCAB → g2p_en neural fallback
 # This provides 134K+ word coverage with neural OOV handling.
+#
+# V9.5.2 Optimization: Background preloading with pickle cache for fast startup
+
+import threading
+import pickle
+import os
+import time
 
 _CMUDICT_LOADED = False
 _CMUDICT: Dict[str, List[List[str]]] = {}
 _G2P_EN_AVAILABLE = False
 _G2P_ENGINE = None
+_PRELOAD_THREAD: Optional[threading.Thread] = None
+_PRELOAD_LOCK = threading.Lock()
+_PRELOAD_STARTED = False
+
+# Cache directory for pickled CMUdict (much faster to load)
+_CACHE_DIR = Path.home() / ".cache" / "symbolu" / "csr"
 
 
 def _load_cmudict() -> bool:
     """
-    Load CMUdict from NLTK corpus.
+    Load CMUdict from pickle cache or NLTK corpus.
+
+    V9.5.2 Optimization: Uses pickle cache for ~10x faster loading.
 
     CMUdict provides 134K words with ARPABET pronunciations.
     This is the primary fast-path for G2P conversion.
@@ -59,6 +74,22 @@ def _load_cmudict() -> bool:
     if _CMUDICT_LOADED:
         return True
 
+    cache_file = _CACHE_DIR / "cmudict.pkl"
+    start_time = time.time()
+
+    # Try loading from pickle cache first (10x faster)
+    if cache_file.exists():
+        try:
+            with open(cache_file, 'rb') as f:
+                _CMUDICT = pickle.load(f)
+            _CMUDICT_LOADED = True
+            elapsed = time.time() - start_time
+            print(f"  [G2P] CMUdict loaded from cache: {len(_CMUDICT):,} words ({elapsed:.2f}s)")
+            return True
+        except Exception as e:
+            warnings.warn(f"Failed to load CMUdict cache: {e}, falling back to NLTK")
+
+    # Fall back to NLTK loading
     try:
         import nltk
         from nltk.corpus import cmudict
@@ -73,7 +104,18 @@ def _load_cmudict() -> bool:
             _CMUDICT = dict(cmudict.entries())
 
         _CMUDICT_LOADED = True
-        print(f"  [G2P] CMUdict loaded: {len(_CMUDICT):,} words (Primary Tier)")
+        elapsed = time.time() - start_time
+        print(f"  [G2P] CMUdict loaded: {len(_CMUDICT):,} words ({elapsed:.2f}s)")
+
+        # Save to pickle cache for next time
+        try:
+            _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            with open(cache_file, 'wb') as f:
+                pickle.dump(_CMUDICT, f, protocol=pickle.HIGHEST_PROTOCOL)
+            print(f"  [G2P] CMUdict cached to {cache_file}")
+        except Exception as e:
+            warnings.warn(f"Failed to cache CMUdict: {e}")
+
         return True
 
     except ImportError:
@@ -313,6 +355,68 @@ class HybridG2P:
 
 # Global hybrid G2P instance (lazy initialization)
 _HYBRID_G2P: Optional[HybridG2P] = None
+
+
+def _background_preload():
+    """
+    Background preload thread for G2P initialization.
+
+    V9.5.2 Optimization: Load CMUdict and g2p_en in parallel background threads
+    so they're ready when training actually needs them.
+    """
+    global _PRELOAD_STARTED
+    _PRELOAD_STARTED = True
+
+    # Load both in parallel
+    cmu_thread = threading.Thread(target=_load_cmudict, daemon=True)
+    g2p_thread = threading.Thread(target=_init_g2p_engine, daemon=True)
+
+    cmu_thread.start()
+    g2p_thread.start()
+
+    # Wait for both
+    cmu_thread.join()
+    g2p_thread.join()
+
+
+def start_background_preload():
+    """
+    Start background preloading of G2P resources.
+
+    Call this early (e.g., at module import or training script start)
+    to warm up CMUdict and g2p_en before they're actually needed.
+
+    V9.5.2 Optimization: This allows training to start immediately
+    while G2P resources load in parallel.
+    """
+    global _PRELOAD_THREAD, _PRELOAD_STARTED
+
+    with _PRELOAD_LOCK:
+        if _PRELOAD_STARTED:
+            return  # Already started
+
+        _PRELOAD_THREAD = threading.Thread(target=_background_preload, daemon=True)
+        _PRELOAD_THREAD.start()
+        print("  [G2P] Background preload started...")
+
+
+def wait_for_preload(timeout: float = 30.0) -> bool:
+    """
+    Wait for background preload to complete.
+
+    Args:
+        timeout: Maximum seconds to wait
+
+    Returns:
+        True if preload completed, False if timed out
+    """
+    global _PRELOAD_THREAD
+
+    if _PRELOAD_THREAD is None:
+        return True  # Nothing to wait for
+
+    _PRELOAD_THREAD.join(timeout=timeout)
+    return not _PRELOAD_THREAD.is_alive()
 
 
 def get_hybrid_g2p() -> HybridG2P:

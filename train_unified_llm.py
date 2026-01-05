@@ -165,10 +165,17 @@ try:
         SynthesisGate,
         create_csr_for_training,
         integrate_csr_into_forward,
+        start_background_preload as csr_start_preload,  # V9.5.2 background loading
+        wait_for_preload as csr_wait_preload,
     )
     CSR_AVAILABLE = True
+    # V9.5.2 Optimization: Start G2P loading in background immediately
+    # This loads CMUdict and g2p_en in parallel while other imports happen
+    csr_start_preload()
 except ImportError as e:
     CSR_AVAILABLE = False
+    csr_start_preload = None
+    csr_wait_preload = None
     print(f"Warning: CSR Phoneme Provider not available: {e}")
 
 # Import SGP (Stochastic Gradient Persistence) and Sattvic Controller
@@ -6781,6 +6788,10 @@ def train(config: UnifiedTrainingConfig):
     csr_entropy_sink = None
     csr_synthesis_gate = None
     if config.enable_csr and CSR_AVAILABLE:
+        # V9.5.2 Optimization: Wait for background G2P preload to complete
+        # This ensures CMUdict and g2p_en are ready (should already be loaded by now)
+        if csr_wait_preload is not None:
+            csr_wait_preload(timeout=30.0)
         csr_provider, csr_entropy_sink, csr_synthesis_gate = create_csr_for_training(
             model_config=model.config if hasattr(model, 'config') else type('Config', (), {'d_model': 512})(),
             tokenizer=tokenizer,
