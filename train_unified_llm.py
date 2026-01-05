@@ -1465,6 +1465,9 @@ class EvolutionaryIntelligenceEngine:
         resonance_alpha: float = 0.1,
         lr_slowdown_factor: float = 0.5,
         lr_accelerate_factor: float = 1.2,
+        dropout: float = 0.1,
+        use_rmatrix: bool = True,
+        coherence_window: int = 100,
         device: torch.device = None,
     ):
         self.dim = dim
@@ -1473,19 +1476,23 @@ class EvolutionaryIntelligenceEngine:
         self.resonance_alpha = resonance_alpha
         self.lr_slowdown_factor = lr_slowdown_factor
         self.lr_accelerate_factor = lr_accelerate_factor
+        self.coherence_window = coherence_window
         self.device = device or torch.device('cpu')
 
         # Core components
         self.flow_network = EvolutionaryFlowNetwork(
             dim=dim,
             num_layers=num_layers,
+            dropout=dropout,
+            use_rmatrix_weighting=use_rmatrix,
             enable_backward_resonance=enable_backward_resonance,
         ).to(self.device)
 
         self.flow_loss = EvolutionaryFlowLoss()
 
-        # Metacognitive tracking
+        # Metacognitive tracking with configurable coherence window
         self.metacognitive = MetacognitiveTracker(
+            window_size=coherence_window,
             coherence_alarm_threshold=0.3,
         )
 
@@ -4455,8 +4462,9 @@ class DynamicRelaxationController:
         model: nn.Module,
         # Stability thresholds
         stability_threshold: float = 0.82,
-        stability_window: int = 500,        # Steps for stability check
-        mode: str = "consecutive",          # "consecutive" or "average"
+        stability_window: int = 500,        # Steps for stability check (rolling window)
+        streak_target: int = 5,             # Consecutive stable evals for 'consecutive' mode
+        mode: str = "consecutive",          # "consecutive", "average", or "sa_ratio"
         # Split configurations
         authority_split: Tuple[int, int] = (9, 3),  # Initial 9:3
         balanced_split: Tuple[int, int] = (6, 6),   # Target 6:6
@@ -4490,6 +4498,7 @@ class DynamicRelaxationController:
         # Thresholds
         self.stability_threshold = stability_threshold
         self.stability_window = stability_window
+        self.streak_target = streak_target
         self.mode = mode.lower()
         self.ppl_spike_threshold = ppl_spike_threshold
         self.recovery_steps = recovery_steps
@@ -4655,10 +4664,10 @@ class DynamicRelaxationController:
         - sa_ratio: Requires average S/A ratio >= threshold over rolling N-step window
         """
         if self.mode == "consecutive":
-            # Consecutive mode: reset on any dip
+            # Consecutive mode: reset on any dip, use streak_target for trigger
             if stability_index >= self.stability_threshold:
                 self.stability_streak += 1
-                return self.stability_streak >= self.stability_window
+                return self.stability_streak >= self.streak_target
             else:
                 self.stability_streak = 0
                 return False
@@ -6496,13 +6505,16 @@ def compute_ontological_loss(
         bhava_loss = torch.tensor(0.0, device=logits.device)
 
     # 3. Global coherence regularization
-    if "global_coherence" in outputs:
+    if "global_coherence" in outputs and not config.no_coherence_loss:
         coherence = outputs["global_coherence"].mean()
         coherence_loss = 1.0 - coherence
         metrics["coherence"] = coherence.item()
         metrics["coherence_loss"] = coherence_loss.item()
     else:
         coherence_loss = torch.tensor(0.0, device=logits.device)
+        if "global_coherence" in outputs:
+            # Still track coherence metric even if loss is disabled
+            metrics["coherence"] = outputs["global_coherence"].mean().item()
 
     # 4. Entropy regularization
     if "ontological_probs" in outputs:
@@ -6907,6 +6919,9 @@ def train(config: UnifiedTrainingConfig):
             resonance_alpha=config.evo_resonance_alpha,
             lr_slowdown_factor=config.evo_lr_slowdown,
             lr_accelerate_factor=config.evo_lr_accelerate,
+            dropout=config.evo_dropout,
+            use_rmatrix=config.evo_use_rmatrix,
+            coherence_window=config.evo_coherence_window,
             device=device,
         )
         # Update flow loss weights
@@ -6950,6 +6965,30 @@ def train(config: UnifiedTrainingConfig):
         T_max=config.max_steps - config.warmup_steps,
         eta_min=config.learning_rate * 0.1,
     )
+
+    # Resume from checkpoint if specified
+    resume_step = 0
+    best_val_loss = float('inf')
+    resumed_hgs_state = None
+    resumed_drc_state = None
+    if config.resume:
+        resume_path = Path(config.resume)
+        if resume_path.exists():
+            resume_result = load_checkpoint(
+                path=resume_path,
+                model=model,
+                optimizer=optimizer if not config.resume_weights_only else None,
+                scheduler=scheduler if not config.resume_weights_only else None,
+                weights_only=config.resume_weights_only,
+                device=device,
+            )
+            resume_step = resume_result["step"]
+            best_val_loss = resume_result["best_val_loss"]
+            resumed_hgs_state = resume_result.get("hgs_state")
+            resumed_drc_state = resume_result.get("drc_state")
+        else:
+            print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
+            print(f"      Starting training from scratch...")
 
     # Formula [1331]: 9:3 Hierarchical Gradient Scaling
     gradient_scaler_hgs = None
@@ -7003,6 +7042,7 @@ def train(config: UnifiedTrainingConfig):
             model=model,
             stability_threshold=config.relaxation_stability_threshold,
             stability_window=config.relaxation_stability_window,
+            streak_target=config.relaxation_streak_target,
             mode=config.relaxation_mode,
             authority_split=(config.authority_layers, config.sensory_layers),
             balanced_split=(config.relaxation_target_authority, config.relaxation_target_sensory),
@@ -7057,13 +7097,28 @@ def train(config: UnifiedTrainingConfig):
             min_steps_between_adjustments=config.adaptive_min_interval,
         )
 
+    # Restore HGS/DRC state from checkpoint if available
+    if resumed_hgs_state is not None and gradient_scaler_hgs is not None:
+        try:
+            gradient_scaler_hgs.set_state(resumed_hgs_state)
+            print(f"    ✓ HGS state restored from checkpoint")
+        except Exception as e:
+            print(f"    ⚠️  Could not restore HGS state: {e}")
+
+    if resumed_drc_state is not None and relaxation_controller is not None:
+        try:
+            relaxation_controller.set_state(resumed_drc_state)
+            print(f"    ✓ DRC state restored from checkpoint")
+        except Exception as e:
+            print(f"    ⚠️  Could not restore DRC state: {e}")
+
     # Mixed precision
     scaler = torch.amp.GradScaler('cuda') if config.mixed_precision != "none" else None
     autocast_dtype = torch.bfloat16 if config.mixed_precision == "bf16" else torch.float16
 
-    # Training state
-    global_step = 0
-    best_val_loss = float("inf")
+    # Training state (use resume_step if resuming from checkpoint)
+    global_step = resume_step
+    best_val_loss = best_val_loss if resume_step > 0 else float("inf")
     best_ppl = float("inf")
     spike_count = 0
     train_losses = []
@@ -8365,6 +8420,82 @@ def save_checkpoint(
         path.unlink()
 
     torch.save(checkpoint, path)
+
+
+def load_checkpoint(
+    path: Path,
+    model: nn.Module,
+    optimizer: Optional[torch.optim.Optimizer] = None,
+    scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
+    weights_only: bool = False,
+    device: torch.device = None,
+) -> Dict[str, Any]:
+    """Load training checkpoint.
+
+    Args:
+        path: Path to checkpoint file
+        model: Model to load weights into
+        optimizer: Optimizer to restore state (None if weights_only)
+        scheduler: Scheduler to restore state (None if weights_only)
+        weights_only: If True, only load model weights (fresh optimizer/scheduler)
+        device: Device to map tensors to
+
+    Returns:
+        Dict with checkpoint info (step, best_val_loss, etc.)
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"Checkpoint not found: {path}")
+
+    print(f"\n  📂 Loading checkpoint from: {path}")
+
+    # Load checkpoint
+    checkpoint = torch.load(path, map_location=device, weights_only=False)
+
+    # Load model weights
+    model.load_state_dict(checkpoint["model"])
+    print(f"    ✓ Model weights loaded")
+
+    result = {
+        "step": checkpoint.get("step", 0),
+        "best_val_loss": checkpoint.get("best_val_loss", float('inf')),
+    }
+
+    if weights_only:
+        print(f"    → Weights-only mode: Optimizer/Scheduler will start fresh")
+        result["step"] = 0  # Start from step 0 with fresh optimizer
+        return result
+
+    # Restore optimizer state
+    if optimizer is not None and "optimizer" in checkpoint:
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        print(f"    ✓ Optimizer state restored")
+
+    # Restore scheduler state
+    if scheduler is not None and "scheduler" in checkpoint:
+        scheduler.load_state_dict(checkpoint["scheduler"])
+        print(f"    ✓ Scheduler state restored")
+
+    # Restore RNG states for reproducibility
+    if "rng_state" in checkpoint:
+        torch.set_rng_state(checkpoint["rng_state"])
+        print(f"    ✓ RNG state restored")
+
+    if "cuda_rng_state" in checkpoint and torch.cuda.is_available():
+        torch.cuda.set_rng_state(checkpoint["cuda_rng_state"])
+        print(f"    ✓ CUDA RNG state restored")
+
+    # Return additional state for HGS/DRC restoration
+    if "hgs_state" in checkpoint:
+        result["hgs_state"] = checkpoint["hgs_state"]
+        print(f"    ✓ HGS state available for restoration")
+
+    if "drc_state" in checkpoint:
+        result["drc_state"] = checkpoint["drc_state"]
+        print(f"    ✓ DRC state available for restoration")
+
+    print(f"    → Resuming from step {result['step']}, best_val_loss={result['best_val_loss']:.4f}")
+
+    return result
 
 
 # =============================================================================
