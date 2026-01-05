@@ -1816,6 +1816,13 @@ class HierarchicalGradientScaler:
         self._sensory_grad_norms = collections.deque(maxlen=1000)
         self._phase_grad_norms = collections.deque(maxlen=1000)  # Track Phase Attention grads
 
+        # V9.6.0 FIX: EMA authority norm for backward-pass ordering
+        # Problem: In backward pass, sensory hooks fire BEFORE authority hooks (layers 11→0)
+        # So sensory hooks can't use current step's authority norm - it doesn't exist yet.
+        # Solution: Use EMA of authority norm that persists across steps.
+        self._ema_authority_norm = 1.0  # Initialize to 1.0, will be updated each step
+        self._ema_alpha = 0.1  # EMA decay factor (0.1 = slow adaptation, stable)
+
         self.gradient_stats = {
             "authority_grad_norm": 0.0,
             "sensory_grad_norm": 0.0,
@@ -1823,6 +1830,7 @@ class HierarchicalGradientScaler:
             "sensory_scale": alpha_sens_min,
             "sensory_authority_ratio": 0.0,
             "dynamic_scale_factor": 1.0,  # V9.6.0: Dynamic normalization factor
+            "ema_authority_norm": 1.0,  # V9.6.0: Track EMA for debugging
         }
 
         # Register hooks
@@ -1933,20 +1941,22 @@ class HierarchicalGradientScaler:
                 return grad
 
             if is_sensory:
-                # V9.6.0: Dynamic Normalization
+                # V9.6.0: Dynamic Normalization with EMA fix
                 # Step 1: Get current sensory gradient norm
                 sensory_norm = grad.norm().item()
                 self._sensory_grad_norms.append(sensory_norm)
 
-                # Step 2: Get mean authority gradient norm (running average)
-                if self._authority_grad_norms:
-                    authority_norm = sum(self._authority_grad_norms) / len(self._authority_grad_norms)
-                else:
-                    authority_norm = 1.0  # Fallback before authority stats available
+                # Step 2: Use EMA authority norm (persists across steps)
+                # CRITICAL: In backward pass, sensory hooks fire BEFORE authority hooks
+                # So we can't use current step's authority norms - they don't exist yet.
+                # EMA provides stable reference from previous steps.
+                authority_norm = self._ema_authority_norm
 
                 # Step 3: Compute dynamic scale factor to match magnitudes
                 if sensory_norm > 1e-8:  # Avoid division by zero
                     scale_factor = authority_norm / sensory_norm
+                    # Clamp scale factor to prevent extreme scaling
+                    scale_factor = max(0.01, min(scale_factor, 100.0))
                 else:
                     scale_factor = 1.0
 
@@ -2047,6 +2057,17 @@ class HierarchicalGradientScaler:
         p_norm = sum(self._phase_grad_norms) if self._phase_grad_norms else 0.0
         s_a_ratio = s_norm / a_norm if a_norm > 0 else 0.0
 
+        # V9.6.0 FIX: Update EMA authority norm for next step's sensory hooks
+        # This is the key fix for backward-pass ordering: we update the EMA AFTER
+        # the backward pass completes, so it's available for the NEXT step's sensory hooks.
+        if self._authority_grad_norms:
+            current_a_mean = a_norm / len(self._authority_grad_norms)
+            # EMA update: new = alpha * current + (1 - alpha) * old
+            self._ema_authority_norm = (
+                self._ema_alpha * current_a_mean +
+                (1 - self._ema_alpha) * self._ema_authority_norm
+            )
+
         # Clamp S/A ratio to prevent extreme imbalance at startup
         # Healthy range is 0.3-0.7, warn if outside 0.1-10.0
         s_a_ratio_clamped = max(0.01, min(100.0, s_a_ratio))
@@ -2059,6 +2080,7 @@ class HierarchicalGradientScaler:
         self.gradient_stats["phase_grad_norm"] = p_norm
         self.gradient_stats["sensory_authority_ratio"] = s_a_ratio_clamped
         self.gradient_stats["sensory_scale"] = self._compute_alpha_sens()
+        self.gradient_stats["ema_authority_norm"] = self._ema_authority_norm  # V9.6.0
 
         # Prepare metrics for return
         metrics = {
@@ -2071,6 +2093,7 @@ class HierarchicalGradientScaler:
             "step": self.current_step,
             "in_thaw_mode": self.in_thaw_mode,
             "dynamic_scale_factor": self.gradient_stats.get("dynamic_scale_factor", 1.0),  # V9.6.0
+            "ema_authority_norm": self._ema_authority_norm,  # V9.6.0
         }
 
         # Clear deques for next step
