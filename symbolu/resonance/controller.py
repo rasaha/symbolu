@@ -248,6 +248,11 @@ class SattvicController:
             variance = sum((x - mean) ** 2 for x in values) / n
             return variance
 
+    @property
+    def entropy_variance(self) -> float:
+        """Property accessor for entropy variance (used by SGP controller)."""
+        return self._compute_entropy_variance()
+
     def _compute_decay_factor(self, progress: float) -> float:
         """Compute decay factor based on progress (0→1)."""
         # progress: 0 = no knowledge, 1 = at threshold
