@@ -6339,9 +6339,14 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
     # V9.5.2 Metabolic Tuning: Use non-reentrant checkpointing for better memory efficiency
     if config.gradient_checkpointing:
         if hasattr(model, 'gradient_checkpointing_enable'):
-            # Modern HuggingFace-style API
-            model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
-            print(f"  [Metabolic] Gradient checkpointing enabled (non-reentrant mode)")
+            # Try HuggingFace-style API first, fall back to simple call
+            try:
+                model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+                print(f"  [Metabolic] Gradient checkpointing enabled (non-reentrant mode)")
+            except TypeError:
+                # Model has the method but doesn't accept kwargs
+                model.gradient_checkpointing_enable()
+                print(f"  [Metabolic] Gradient checkpointing enabled")
         else:
             # Manual flag-based checkpointing
             for module in model.modules():
