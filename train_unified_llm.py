@@ -6010,6 +6010,7 @@ class UnifiedTrainingConfig:
 
     # Formula [1331]: 9:3 Hierarchical Split Configuration
     use_9_3_split: bool = False           # Enable 9:3 Authority/Sensory gradient scaling
+    enable_gradient_scaling: bool = False  # Enable gradient scaling for ANY split (6:6, 9:3, etc.)
     authority_layers: int = 9             # Number of Authority (State-Delta) layers
     sensory_layers: int = 3               # Number of Sensory (Quadratic) layers
     alpha_sens_initial: float = 0.05      # Initial sensory gradient multiplier (balanced start to prevent S/A spikes)
@@ -7078,9 +7079,9 @@ def train(config: UnifiedTrainingConfig):
             print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
             print(f"      Starting training from scratch...")
 
-    # Formula [1331]: 9:3 Hierarchical Gradient Scaling
+    # Formula [1331]: Hierarchical Gradient Scaling (9:3, 6:6, or any split)
     gradient_scaler_hgs = None
-    if config.use_9_3_split:
+    if config.use_9_3_split or config.enable_gradient_scaling:
         gradient_scaler_hgs = HierarchicalGradientScaler(
             model=model,
             authority_layers=config.authority_layers,
@@ -8821,6 +8822,8 @@ def main():
     # Formula [1331]: 9:3 Hierarchical Split
     parser.add_argument("--use_9_3_split", action="store_true",
                        help="Enable 9:3 Authority/Sensory gradient scaling")
+    parser.add_argument("--enable_gradient_scaling", action="store_true",
+                       help="Enable gradient scaling for ANY split (use with --authority_layers and --sensory_layers)")
     parser.add_argument("--authority_layers", type=int, default=9,
                        help="Number of Authority (State-Delta) layers")
     parser.add_argument("--sensory_layers", type=int, default=3,
@@ -9117,6 +9120,7 @@ def main():
         resume_weights_only=args.resume_weights_only,
         # Formula [1331]: 9:3 Hierarchical Split
         use_9_3_split=args.use_9_3_split,
+        enable_gradient_scaling=args.enable_gradient_scaling,
         authority_layers=args.authority_layers,
         sensory_layers=args.sensory_layers,
         alpha_sens_initial=args.alpha_sens_initial,
