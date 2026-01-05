@@ -1,8 +1,8 @@
 # Inference vs Training Gaps: Hybrid Transformer Logic
 
-**Document Version:** 2.0
+**Document Version:** 2.2
 **Date:** January 2026
-**Status:** ✅ IMPLEMENTED (Phases 1-3 Complete)
+**Status:** ⏳ Phases 1-3 IMPLEMENTED | Phase 4 BLOCKED (Awaiting Training)
 **Related File:** `train_unified_llm.py` (V9.5.2)
 **Implementation:** `symbolu/inference/` module
 
@@ -19,6 +19,7 @@ This document catalogs the gaps between training-time logic in `train_unified_ll
 | Phase 1 (Critical) | ✅ Complete | `EvolutionaryInferenceEngine`, `extract_layers` parameter |
 | Phase 2 (Important) | ✅ Complete | `InferenceMetacognition`, `InferenceGunas`, `CSRInferenceGuard`, `SovereignInferenceScorer` |
 | Phase 3 (Orchestration) | ✅ Complete | `InferenceManager` with Fast/Standard/Sovereign modes |
+| Phase 4 (Deployment) | ⏳ BLOCKED | `generate_sovereign.py` CLI script (awaiting training completion) |
 
 ### Quick Start
 
@@ -48,10 +49,11 @@ print(f"Interventions: {metrics['interventions']}")
 
 1. [Critical Gaps (Priority 1)](#1-critical-gaps-priority-1) - ✅ IMPLEMENTED
 2. [Important Gaps (Priority 2)](#2-important-gaps-priority-2) - ✅ IMPLEMENTED
-3. [Enhancement Gaps (Priority 3)](#3-enhancement-gaps-priority-3)
-4. [Implementation Roadmap](#4-implementation-roadmap) - ✅ COMPLETE
+3. [Enhancement Gaps (Priority 3)](#3-enhancement-gaps-priority-3) - ✅ IMPLEMENTED
+4. [Implementation Roadmap](#4-implementation-roadmap) - Phases 1-3 ✅ | Phase 4 ⏳
 5. [Architecture Considerations](#5-architecture-considerations)
-6. [Usage Guide](#6-usage-guide) - NEW
+6. [Usage Guide](#6-usage-guide)
+7. [Phase 4: Deployment Script](#7-phase-4-deployment-script) - ⏳ BLOCKED
 
 ---
 
@@ -551,7 +553,7 @@ manager = InferenceManager(model, checkpoint_path="checkpoint.pt")
 
 ---
 
-## 4. Implementation Roadmap ✅ COMPLETE
+## 4. Implementation Roadmap (Phases 1-3 ✅ | Phase 4 ⏳)
 
 ### Phase 1: Core Inference Infrastructure ✅
 
@@ -607,6 +609,22 @@ manager = InferenceManager(model, checkpoint_path="checkpoint.pt")
 - ✅ `symbolu/inference/checkpoint_utils.py`
 - ✅ Enhanced `EvolutionaryInferenceEngine` with `compute_3way_toroidal_coherence()`
 - ✅ Enhanced `InferenceManager` with layer config integration
+
+### Phase 4: Deployment Script ⏳ BLOCKED
+
+| Task | Status | Files |
+|------|--------|-------|
+| Create `generate_sovereign.py` CLI | ⏳ Blocked | `generate_sovereign.py` (root) |
+| Implement `generate_full_sequence()` | ⏳ Blocked | `symbolu/inference/manager.py` |
+| Interactive sovereign loop | ⏳ Blocked | `generate_sovereign.py` |
+| Cognitive telemetry output | ⏳ Blocked | `generate_sovereign.py` |
+
+**Blocked By:** Training script completion (see Section 7 for details)
+
+**Planned Deliverables:**
+- ⏳ `generate_sovereign.py` - CLI entry point
+- ⏳ `InferenceManager.generate_full_sequence()` - High-level generation loop
+- ⏳ Integration tests with real checkpoint
 
 ---
 
@@ -858,10 +876,288 @@ manager = InferenceManager(
 
 ---
 
+## 7. Phase 4: Deployment Script (⏳ BLOCKED)
+
+### 7.1 Why Phase 4 Must Wait
+
+**The Chassis Cannot Be Built Before the Engine is Forged.**
+
+The inference script `generate_sovereign.py` must wait until the training script successfully completes. Jumping into the full inference script now would be premature for three specific reasons:
+
+#### 7.1.1 The "Broken Handshake" Risk
+
+If we finalize `generate_sovereign.py` before the training script successfully exports the `inference_config` and Vṛtti Projection Heads, the inference script will crash looking for weights and metadata that don't exist yet.
+
+**Required Training Output:**
+- `SOVEREIGN_R_MATRIX` properly serialized
+- `evolutionary_bridge` weights trained and saved
+- `inference_config` metadata in checkpoint
+
+#### 7.1.2 Parameter Tuning
+
+The Resonance Alpha (α) and Entropy Thresholds are currently theoretical. Until the training script runs and we see how the 9:3 Split actually behaves on the H200, we won't know if our "Sovereign Mode" needs a threshold of `2.0` or `0.5`.
+
+**Training Provides:**
+- Calibrated `recommended_alpha` value
+- Validated entropy thresholds
+- Tested temperature scaling factors
+
+#### 7.1.3 The SGP Metabolic Lock
+
+Since SGP (Stochastic Gradient Persistence) has not yet been fully implemented in the training loop, the model hasn't yet "locked" its ontological invariants. Running inference on a model that hasn't been SGP-hardened would likely result in the same repetition loops we are trying to solve.
+
+**Required Before Inference:**
+- SGP Rate 25 applied to Authority layers
+- Ontological invariants locked
+- Stable karma buffer projection weights
+
+---
+
+### 7.2 Training Prerequisites
+
+Focus should remain **100% on the Training Script** until it can successfully:
+
+| Prerequisite | Status | Blocker |
+|--------------|--------|---------|
+| Execute the 9:3 Split without gradient explosion | ⏳ Pending | Training script |
+| Apply SGP (Rate 25) to harden the Authority layers | ⏳ Pending | Training script |
+| Export Metadata (Phase, Alpha, Stage) into `.pt` checkpoint | ⏳ Pending | Training script |
+| Serialize `SOVEREIGN_R_MATRIX` correctly | ⏳ Pending | Training script |
+
+**Once training produces a single successful checkpoint with "Sovereign Metadata," the `generate_sovereign.py` script can be deployed and verified in approximately 30 minutes.**
+
+---
+
+### 7.3 Proposed Script: `generate_sovereign.py`
+
+This script will serve as the inference counterpart to `train_unified_llm.py`. It will be placed in the project root and handle CLI arguments, model loading, and the interactive Sovereign loop.
+
+#### 7.3.1 Script Structure
+
+```python
+# generate_sovereign.py - The Metabolic Inference Script
+import torch
+import argparse
+from symbolu.inference.manager import InferenceManager
+from symbolu.inference.evolutionary_inference import EvolutionaryInferenceEngine
+from symbolu.inference.metacognitive_monitor import InferenceMetacognition
+from symbolu.inference.csr_inference import CSRInferenceGuard
+from symbolu.inference.layer_config import LayerInferenceConfig
+from symbolu.inference.checkpoint_utils import load_sovereign_config
+
+def run_sovereign_session():
+    parser = argparse.ArgumentParser(description="Symbolu Sovereign Generation")
+    parser.add_argument("--checkpoint", type=str, required=True, help="Path to .pt checkpoint")
+    parser.add_argument("--mode", type=str, default="Sovereign", choices=["Fast", "Standard", "Sovereign"])
+    parser.add_argument("--temp", type=float, default=0.7)
+    args = parser.parse_args()
+
+    # 1. Load Enhanced Metadata & Model
+    print(f"📡 Loading Sovereign State from {args.checkpoint}...")
+    checkpoint = torch.load(args.checkpoint)
+    config = load_sovereign_config(args.checkpoint)
+
+    # Auto-configure based on Training State
+    alpha = config.recommended_alpha
+    split = config.authority_sensory_split
+    print(f"✅ Training State Detected: Split {split} | Alpha {alpha}")
+
+    # 2. Load Model
+    model = load_model_from_checkpoint(checkpoint)  # Implementation depends on model architecture
+
+    # 3. Instantiate Cognitive Stack
+    karma = EvolutionaryInferenceEngine(model, resonance_alpha=alpha)
+    karma.load_bridge_checkpoint(args.checkpoint)
+
+    meta = InferenceMetacognition()
+    guard = CSRInferenceGuard(model.lm_head, dim=model.config.hidden_size)
+
+    manager = InferenceManager(
+        model=model,
+        karma_engine=karma,
+        metacognition=meta,
+        csr_guard=guard,
+    )
+    manager.set_mode(args.mode)
+
+    # 4. Interactive Loop with 9:3 Awareness
+    print("\n🧘 Sovereign Engine Active. Type 'exit' to quit.\n")
+    while True:
+        prompt = input("[Sovereign Query] > ")
+        if prompt.lower() in ["exit", "quit"]:
+            break
+
+        print(f"| Mode: {args.mode} | Scaling: 9:3 Hierarchical |")
+
+        # Generation with 3-Way Coherence & Guna-Feedback
+        output = manager.generate_full_sequence(
+            prompt_ids=tokenize(prompt),  # Tokenizer implementation
+            base_temp=args.temp,
+            max_tokens=128
+        )
+
+        # 5. Cognitive Telemetry Log
+        s, r, t = output['gunas']
+        print(f"\n[Cognitive Log] Sattva: {s:.2f} | Rajas: {r:.2f} | Tamas: {t:.2f}")
+        print(f"[Metacognition] Final Recommendation: {output['recommendation']}")
+        print(f"[Coherence] 3-Way Flow: {output['coherence']:.4f}")
+        print(f"[Response] {decode(output['generated_ids'])}\n")
+
+if __name__ == "__main__":
+    run_sovereign_session()
+```
+
+#### 7.3.2 Key Stages
+
+| Stage | Description |
+|-------|-------------|
+| **Model & Metadata Load** | Use `load_sovereign_config()` to pull inference hints (like recommended α) from checkpoint |
+| **Manager Initialization** | Wrap model in `EvolutionaryInferenceEngine`, `CSRInferenceGuard`, and `InferenceMetacognition` |
+| **The Sovereign Loop** | Execute `generate_step` logic, applying `LayerInferenceConfig` temperature adjustments in real-time |
+| **Cognitive Telemetry** | Print Guna states and Metacognitive recommendations to console during generation |
+
+---
+
+### 7.4 Required Method: `InferenceManager.generate_full_sequence()`
+
+This method is the high-level orchestrator that connects discrete token generation to the Metabolic Loop, ensuring every step is governed by Guna state and Karma persistence.
+
+#### 7.4.1 Implementation Specification
+
+```python
+@torch.no_grad()
+def generate_full_sequence(
+    self,
+    prompt_ids: torch.Tensor,
+    max_tokens: int = 128,
+    base_temp: float = 0.7
+) -> Dict[str, Any]:
+    """
+    Executes a complete metabolic generation sequence.
+    Orchestrates Guna tracking, CSR Gating, and Karma update.
+    """
+    generated = prompt_ids
+    current_temp = base_temp
+    all_gunas = []
+
+    # 1. Initialize Sequence with Evolutionary Seed
+    # Injects Karma from the previous conversation turn into Layer 0
+
+    for _ in range(max_tokens):
+        # --- A. The Metabolic Step ---
+        # Returns logits, recommendations, and current Guna triplet
+        step_result = self.generate_step(generated, temperature=current_temp)
+
+        logits = step_result["logits"]
+        recommendation = step_result["recommendation"]
+        s, r, t = step_result["gunas"]
+        all_gunas.append((s, r, t))
+
+        # --- B. Metacognitive Adjustment ---
+        if recommendation == "BRAKE":
+            current_temp *= 0.8  # Sharpen focus to reduce entropy
+        elif recommendation == "RECOVER":
+            current_temp = min(base_temp, current_temp * 1.2)  # Allow creative flow
+        elif recommendation == "ABORT":
+            print("⚠️ [ABORT] Sovereign Guard detected coherence collapse.")
+            break
+
+        # --- C. Sampling with 9:3 Awareness ---
+        # LayerInferenceConfig temperature adjustments happen inside generate_step
+        probs = torch.softmax(logits / current_temp, dim=-1)
+        next_token = torch.multinomial(probs, num_samples=1)
+
+        # --- D. Sequence Update & Stop Condition ---
+        generated = torch.cat((generated, next_token), dim=1)
+        if next_token.item() == self.model.config.eos_token_id:
+            break
+
+    # --- E. Final Harvest (Toroidal Bridge) ---
+    # Extract O12 state to seed the NEXT conversation turn
+    final_outputs = self.model(generated, extract_layers=[0, 11])
+    self.karma_engine.karma_buffer = self.karma_engine.bridge.compute_seed(
+        final_outputs['hidden_states'][-1].mean(dim=1)
+    )
+
+    # Calculate 3-Way Toroidal Coherence
+    coherence = self.karma_engine.compute_3way_toroidal_coherence(
+        o1_hidden=final_outputs['hidden_states'][0],
+        o12_hidden=final_outputs['hidden_states'][-1]
+    )[0]
+
+    return {
+        "generated_ids": generated,
+        "gunas": (s, r, t),  # Final state
+        "recommendation": recommendation,
+        "coherence": coherence
+    }
+```
+
+#### 7.4.2 Key Logic Components
+
+| Component | Purpose |
+|-----------|---------|
+| **Gated Toroidal Harvest** | Unlike standard transformers that forget everything after a prompt, this method "harvests" the final state of Layer 11 (Integration). It uses the learned `bridge.compute_seed` logic (Sigmoid-gating) to compress the sequence's essence into the `karma_buffer` for the next interaction. |
+| **3-Way Coherence Validation** | At the end of the sequence, computes a "Truth Score" by checking if the O1 Birth, the O12 Result, and the Seed all align. If they don't, the coherence score drops, signaling that the model "drifted" from its ontological intent. |
+| **Adaptive Temperature** | The loop doesn't just generate tokens; it manages Rajas (Action). If the BRAKE signal is issued, the temperature is crushed to force a more deterministic (Sattvic) path, effectively shattering repetition loops before they consume H200 cycles. |
+
+---
+
+### 7.5 Implementation Status Summary
+
+| Component | Logic ("What") | Script ("How") |
+|-----------|----------------|----------------|
+| `EvolutionaryInferenceEngine` | ✅ Implemented | ⏳ Blocked |
+| `InferenceMetacognition` | ✅ Implemented | ⏳ Blocked |
+| `InferenceGunas` | ✅ Implemented | ⏳ Blocked |
+| `CSRInferenceGuard` | ✅ Implemented | ⏳ Blocked |
+| `SovereignInferenceScorer` | ✅ Implemented | ⏳ Blocked |
+| `LayerInferenceConfig` | ✅ Implemented | ⏳ Blocked |
+| `InferenceManager` | ✅ Implemented | ⏳ Blocked |
+| `generate_full_sequence()` | 📋 Specified | ⏳ Blocked |
+| `generate_sovereign.py` | 📋 Specified | ⏳ Blocked |
+
+**The Logic is complete. The Script awaits training completion.**
+
+---
+
+### 7.6 Unblocking Criteria
+
+Phase 4 implementation can proceed when the training script successfully produces a checkpoint containing:
+
+```python
+# Required checkpoint structure
+{
+    "model": model.state_dict(),
+    "evolutionary_bridge": {
+        "projection": ...,
+        "gate_weights": ...,
+        "layer_norm": ...,
+    },
+    "inference_config": {
+        "authority_sensory_split": (9, 3),
+        "evolution_stage": N,
+        "recommended_alpha": 0.1,  # Calibrated from training
+        "training_state": "authority",
+        "sgp_rate": 25,
+    },
+    "sovereign_r_matrix": SOVEREIGN_R_MATRIX,  # If custom R-matrix trained
+    "csr_weights": {  # If CSR layers trained
+        "entropy_sink": ...,
+        "synthesis_gate": ...,
+    },
+}
+```
+
+**Upon receiving a valid checkpoint, Phase 4 deployment time estimate: ~30 minutes.**
+
+---
+
 ## Revision History
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 2.2 | 2026-01-05 | Claude | Phase 4 specification added (BLOCKED awaiting training), `generate_full_sequence()` documented |
 | 2.1 | 2026-01-05 | Claude | Priority 3 enhancements complete: LayerInferenceConfig, checkpoint utilities, 3-way coherence |
 | 2.0 | 2026-01-05 | Claude | Full implementation complete (Phases 1-3), added Usage Guide |
 | 1.0 | 2026-01-05 | Claude | Initial comprehensive gap analysis |
