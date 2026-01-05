@@ -2004,10 +2004,18 @@ class HierarchicalGradientScaler:
         p_norm = sum(self._phase_grad_norms) if self._phase_grad_norms else 0.0
         s_a_ratio = s_norm / a_norm if a_norm > 0 else 0.0
 
+        # Clamp S/A ratio to prevent extreme imbalance at startup
+        # Healthy range is 0.3-0.7, warn if outside 0.1-10.0
+        s_a_ratio_clamped = max(0.01, min(100.0, s_a_ratio))
+        if s_a_ratio > 10.0 and self.current_step < 100:
+            # Early training with extreme ratio - apply emergency damping
+            # This prevents runaway sensory gradients from destabilizing authority
+            self.alpha_sens_min = min(self.alpha_sens_min, 0.005)
+
         self.gradient_stats["authority_grad_norm"] = a_norm
         self.gradient_stats["sensory_grad_norm"] = s_norm
         self.gradient_stats["phase_grad_norm"] = p_norm
-        self.gradient_stats["sensory_authority_ratio"] = s_a_ratio
+        self.gradient_stats["sensory_authority_ratio"] = s_a_ratio_clamped
         self.gradient_stats["sensory_scale"] = self._compute_alpha_sens()
 
         # Prepare metrics for return
@@ -2015,7 +2023,8 @@ class HierarchicalGradientScaler:
             "s_grad_norm": s_norm,
             "a_grad_norm": a_norm,
             "phase_grad_norm": p_norm,
-            "s_a_ratio": s_a_ratio,
+            "s_a_ratio": s_a_ratio_clamped,
+            "s_a_ratio_raw": s_a_ratio,  # Keep raw for debugging
             "alpha_sens": self._compute_alpha_sens(),
             "step": self.current_step,
             "in_thaw_mode": self.in_thaw_mode,
@@ -5986,7 +5995,7 @@ class UnifiedTrainingConfig:
     use_9_3_split: bool = False           # Enable 9:3 Authority/Sensory gradient scaling
     authority_layers: int = 9             # Number of Authority (State-Delta) layers
     sensory_layers: int = 3               # Number of Sensory (Quadratic) layers
-    alpha_sens_initial: float = 0.1       # Initial sensory gradient multiplier (heavy dampening)
+    alpha_sens_initial: float = 0.01      # Initial sensory gradient multiplier (very heavy dampening to prevent S/A imbalance)
     alpha_sens_max: float = 0.7           # Maximum sensory gradient (after warmup/relaxation)
     gradient_warmup_steps: int = 500      # Steps to ramp α_sens from initial to max
 
@@ -6644,18 +6653,18 @@ def train(config: UnifiedTrainingConfig):
         print(f"\n  Auto Batch Sizing: ENABLED")
 
         # Sovereign loss requires (B, Seq, Vocab) tensors - massive overhead
-        # Scale max_batch based on available VRAM (conservative to allow SGP headroom)
+        # Scale max_batch based on available VRAM
         if config.enable_sovereign_loss:
             total_vram_gb = torch.cuda.get_device_properties(device).total_memory / 1e9
             if total_vram_gb >= 140:  # H200 class (141GB+)
-                auto_max_batch = 32  # Conservative - use gradient accumulation
+                auto_max_batch = 96  # H200 can handle much larger batches
             elif total_vram_gb >= 90:  # 96GB class
-                auto_max_batch = 32
+                auto_max_batch = 64
             elif total_vram_gb >= 70:  # A100 80GB class
-                auto_max_batch = 24
+                auto_max_batch = 48
             else:  # Smaller GPUs
-                auto_max_batch = 16
-            print(f"  ⚠️  Sovereign Loss detected: capping max_batch to {auto_max_batch} (VRAM: {total_vram_gb:.0f}GB)")
+                auto_max_batch = 24
+            print(f"  ⚠️  Sovereign Loss detected: max_batch set to {auto_max_batch} (VRAM: {total_vram_gb:.0f}GB)")
         else:
             auto_max_batch = 128
 
@@ -8694,7 +8703,7 @@ def main():
                        help="Number of Authority (State-Delta) layers")
     parser.add_argument("--sensory_layers", type=int, default=3,
                        help="Number of Sensory (Quadratic) layers")
-    parser.add_argument("--alpha_sens_initial", type=float, default=0.1,
+    parser.add_argument("--alpha_sens_initial", type=float, default=0.01,
                        help="Initial sensory gradient scale (heavy dampening at start)")
     parser.add_argument("--alpha_sens_max", type=float, default=0.7,
                        help="Maximum sensory gradient scale (after warmup/relaxation)")
