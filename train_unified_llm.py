@@ -2017,10 +2017,9 @@ class HierarchicalGradientScaler:
         # Clamp S/A ratio to prevent extreme imbalance at startup
         # Healthy range is 0.3-0.7, warn if outside 0.1-10.0
         s_a_ratio_clamped = max(0.01, min(100.0, s_a_ratio))
-        if s_a_ratio > 10.0 and self.current_step < 100:
-            # Early training with extreme ratio - apply emergency damping
-            # This prevents runaway sensory gradients from destabilizing authority
-            self.alpha_sens_min = min(self.alpha_sens_min, 0.005)
+        # V9.5.3: Removed emergency damping override - trust configured alpha_sens_initial
+        # The old code forcibly set alpha_sens_min=0.005 when S/A>10 in first 100 steps,
+        # which defeated the purpose of setting alpha_sens_initial=0.05
 
         self.gradient_stats["authority_grad_norm"] = a_norm
         self.gradient_stats["sensory_grad_norm"] = s_norm
