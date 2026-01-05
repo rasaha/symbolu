@@ -6681,21 +6681,33 @@ def train(config: UnifiedTrainingConfig):
     if config.enable_auto_batch:
         print(f"\n  Auto Batch Sizing: ENABLED")
 
+        # V9.5.2: Model size scaling factors for batch estimation
+        # Larger models need smaller batches due to activation memory
+        model_size_scale = {
+            "tiny": 4.0,    # 256 embed, 6 layers - very small
+            "small": 2.0,   # 512 embed, 8 layers
+            "medium": 1.0,  # 768 embed, 12 layers (baseline)
+            "large": 0.5,   # 1024 embed, 16 layers - needs smaller batches
+        }
+        size_factor = model_size_scale.get(config.model_size, 1.0)
+
         # Sovereign loss requires (B, Seq, Vocab) tensors - massive overhead
-        # Scale max_batch based on available VRAM
+        # Scale max_batch based on available VRAM AND model size
         if config.enable_sovereign_loss:
             total_vram_gb = torch.cuda.get_device_properties(device).total_memory / 1e9
             if total_vram_gb >= 140:  # H200 class (141GB+)
-                auto_max_batch = 96  # H200 can handle much larger batches
+                base_max_batch = 96
             elif total_vram_gb >= 90:  # 96GB class
-                auto_max_batch = 64
+                base_max_batch = 64
             elif total_vram_gb >= 70:  # A100 80GB class
-                auto_max_batch = 48
+                base_max_batch = 48
             else:  # Smaller GPUs
-                auto_max_batch = 24
-            print(f"  ⚠️  Sovereign Loss detected: max_batch set to {auto_max_batch} (VRAM: {total_vram_gb:.0f}GB)")
+                base_max_batch = 24
+            # Apply model size scaling
+            auto_max_batch = max(8, int(base_max_batch * size_factor))
+            print(f"  ⚠️  Sovereign Loss detected: max_batch={auto_max_batch} (VRAM: {total_vram_gb:.0f}GB, model: {config.model_size}, scale: {size_factor}x)")
         else:
-            auto_max_batch = 128
+            auto_max_batch = max(8, int(128 * size_factor))
 
         auto_sizer = AutoBatchSizer(
             model=model,
