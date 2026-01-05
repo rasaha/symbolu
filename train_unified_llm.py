@@ -6708,7 +6708,7 @@ def train(config: UnifiedTrainingConfig):
     if config.enable_sovereign_loss:
         from symbolu.sovereign.metrics import SovereignEngine, SovereignLossConfig as SovEngineConfig, StabilityState
         sov_engine_config = SovEngineConfig(
-            b1_lambda=config.b1_lambda,
+            lambda_b1=config.b1_lambda,
             mu_s3=config.mu_s3,
             gc_floor=config.gc_floor,
         )
