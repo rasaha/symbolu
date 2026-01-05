@@ -6681,46 +6681,51 @@ def train(config: UnifiedTrainingConfig):
     if config.enable_auto_batch:
         print(f"\n  Auto Batch Sizing: ENABLED")
 
-        # V9.5.2: Model size scaling factors for batch estimation
-        # Larger models need smaller batches due to activation memory
+        # V9.5.2: Calibrated max batch limits from real-world testing
+        # These are HARD LIMITS for sovereign loss + 2048 seq len
+        # Medium and Large models have SAME limits (sovereign loss dominates)
+        # Only tiny/small can use larger batches
         model_size_scale = {
-            "tiny": 4.0,    # 256 embed, 6 layers - very small
-            "small": 2.0,   # 512 embed, 8 layers
-            "medium": 1.0,  # 768 embed, 12 layers (baseline)
-            "large": 0.5,   # 1024 embed, 16 layers - needs smaller batches
+            "tiny": 2.0,    # Can use 2x the base limit
+            "small": 1.5,   # Can use 1.5x the base limit
+            "medium": 1.0,  # Base limit (tested)
+            "large": 1.0,   # Same as medium (sovereign loss dominates)
         }
         size_factor = model_size_scale.get(config.model_size, 1.0)
 
         # V9.5.2: Sequence length scaling (baseline: 2048)
-        # Attention is O(n²), activations are O(n), so longer sequences need smaller batches
+        # Only scale UP for shorter sequences, not down (limits are already tight)
         seq_baseline = 2048
-        seq_ratio = seq_baseline / max(config.max_seq_len, 512)  # Clamp minimum
-        # Use sqrt for O(n²) attention approximation, clamped to reasonable range
-        seq_factor = max(0.25, min(2.0, seq_ratio ** 0.5))
+        if config.max_seq_len < seq_baseline:
+            # Shorter sequences can use slightly larger batches
+            seq_factor = min(1.5, seq_baseline / config.max_seq_len)
+        else:
+            # Longer sequences: be conservative
+            seq_factor = max(0.5, seq_baseline / config.max_seq_len)
 
         # Combined scaling factor
         combined_factor = size_factor * seq_factor
 
         # Sovereign loss requires (B, Seq, Vocab) tensors - massive overhead
-        # Scale max_batch based on available VRAM, model size, AND sequence length
-        # V9.5.2: Calibrated from real-world testing (large model, 2048 seq, sovereign loss)
-        #   - H200 (141GB): max 32 batch for large model
-        #   - A100 (80GB): max 24 batch for large model
+        # V9.5.2: HARD LIMITS calibrated from real GPU testing (medium/large, 2048 seq)
+        #   - A100 (80GB): 16 max batch
+        #   - H100 (96GB): 24 max batch
+        #   - H200 (141GB): 32 max batch
         if config.enable_sovereign_loss:
             total_vram_gb = torch.cuda.get_device_properties(device).total_memory / 1e9
             if total_vram_gb >= 140:  # H200 class (141GB+)
-                base_max_batch = 64   # → 32 for large (0.5x), 64 for medium (1.0x)
-            elif total_vram_gb >= 90:  # 96GB class
-                base_max_batch = 48
+                base_max_batch = 32
+            elif total_vram_gb >= 90:  # H100 class (96GB)
+                base_max_batch = 24
             elif total_vram_gb >= 70:  # A100 80GB class
-                base_max_batch = 48   # → 24 for large (0.5x), 48 for medium (1.0x)
-            else:  # Smaller GPUs
                 base_max_batch = 16
-            # Apply combined scaling (model size + seq length)
+            else:  # Smaller GPUs
+                base_max_batch = 8
+            # Apply scaling (only for tiny/small models or shorter sequences)
             auto_max_batch = max(8, int(base_max_batch * combined_factor))
             print(f"  ⚠️  Sovereign Loss: max_batch={auto_max_batch} (VRAM: {total_vram_gb:.0f}GB, model: {config.model_size}, seq: {config.max_seq_len}, scale: {combined_factor:.2f}x)")
         else:
-            auto_max_batch = max(8, int(128 * combined_factor))
+            auto_max_batch = max(8, int(64 * combined_factor))
 
         auto_sizer = AutoBatchSizer(
             model=model,
