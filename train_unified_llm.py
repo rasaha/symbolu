@@ -6013,7 +6013,7 @@ class UnifiedTrainingConfig:
     use_9_3_split: bool = False           # Enable 9:3 Authority/Sensory gradient scaling
     authority_layers: int = 9             # Number of Authority (State-Delta) layers
     sensory_layers: int = 3               # Number of Sensory (Quadratic) layers
-    alpha_sens_initial: float = 0.01      # Initial sensory gradient multiplier (very heavy dampening to prevent S/A imbalance)
+    alpha_sens_initial: float = 0.05      # Initial sensory gradient multiplier (balanced start to prevent S/A spikes)
     alpha_sens_max: float = 0.7           # Maximum sensory gradient (after warmup/relaxation)
     gradient_warmup_steps: int = 500      # Steps to ramp α_sens from initial to max
 
@@ -8778,8 +8778,8 @@ def main():
                        help="Number of Authority (State-Delta) layers")
     parser.add_argument("--sensory_layers", type=int, default=3,
                        help="Number of Sensory (Quadratic) layers")
-    parser.add_argument("--alpha_sens_initial", type=float, default=0.01,
-                       help="Initial sensory gradient scale (heavy dampening at start)")
+    parser.add_argument("--alpha_sens_initial", type=float, default=0.05,
+                       help="Initial sensory gradient scale (balanced start to prevent S/A spikes)")
     parser.add_argument("--alpha_sens_max", type=float, default=0.7,
                        help="Maximum sensory gradient scale (after warmup/relaxation)")
     parser.add_argument("--gradient_warmup_steps", type=int, default=500,
