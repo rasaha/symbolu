@@ -156,6 +156,39 @@ except ImportError:
     COMPUTE_S_DRIFT_AVAILABLE = False
     compute_s_drift = None
 
+# Import CSR Phoneme Provider for phoneme-ontological grounding
+try:
+    from csr_phoneme_provider import (
+        CSREmbeddingProvider,
+        CSRConfig,
+        EntropySink,
+        SynthesisGate,
+        create_csr_for_training,
+        integrate_csr_into_forward,
+    )
+    CSR_AVAILABLE = True
+except ImportError as e:
+    CSR_AVAILABLE = False
+    print(f"Warning: CSR Phoneme Provider not available: {e}")
+
+# Import SGP (Stochastic Gradient Persistence) and Sattvic Controller
+try:
+    from symbolu.resonance.sgp import (
+        SGPController,
+        SGPConfig,
+        create_sgp_controller,
+        create_synchronized_controllers,
+    )
+    from symbolu.resonance.controller import (
+        SattvicController,
+        SattvicConfig,
+        create_sattvic_controller,
+    )
+    SGP_AVAILABLE = True
+except ImportError as e:
+    SGP_AVAILABLE = False
+    print(f"Warning: SGP Controller not available: {e}")
+
 
 # =============================================================================
 # SOVEREIGN R[v,a] MATRIX: Vṛtti-Layer Probability Target
@@ -6001,6 +6034,27 @@ class UnifiedTrainingConfig:
     evo_lr_slowdown: float = 0.5             # LR multiplier when SLOW_DOWN/BRAKE
     evo_lr_accelerate: float = 1.2           # LR multiplier when ACCELERATE
 
+    # CSR Phoneme-Ontological Grounding
+    enable_csr: bool = True                  # Enable CSR phoneme grounding
+    csr_lambda: float = 0.1                  # CSR injection strength
+    csr_use_phase_gating: bool = True        # Gate Phase Attention with CSR confidence
+    csr_trainable: bool = True               # Allow CSR projection to train
+    csr_use_entropy_sink: bool = True        # Apply Layer 0 entropy floor
+    csr_use_synthesis_gate: bool = True      # Apply Layer 11 synthesis reconciliation
+
+    # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
+    enable_sgp: bool = True                  # Enable SGP synchronized with Sattvic Controller
+    sgp_base_rate: int = 25                  # Base SGP rate (Toroidal Refresh Rate)
+    sgp_stagnation_rate: int = 12            # Rate when stagnation detected (HALVED for more frequent hammering)
+    sgp_gamma: float = 0.3                   # Persistence coefficient: θ ← θ - η(∇θ + γ∇θ_persisted)
+
+    # Sattvic Controller (Dynamic λ_csr regulation)
+    sattvic_initial_lambda: float = 0.5      # Initial λ_csr during warmup
+    sattvic_floor_lambda: float = 0.1        # Minimum λ_csr after decay
+    sattvic_warmup_steps: int = 500          # Steps for warmup phase
+    sattvic_variance_window: int = 50        # Window for entropy variance detection
+    sattvic_variance_threshold: float = 0.001  # Variance threshold for stagnation
+
     # Adaptive Training Controller (dynamic hyperparameter tuning)
     enable_adaptive_training: bool = True    # Enable automatic LR/Kp adjustment
     adaptive_lr_min: float = 1e-5            # Minimum learning rate floor
@@ -6684,6 +6738,71 @@ def train(config: UnifiedTrainingConfig):
         )
         print(f"  S8 Stability Hook: ENABLED (Entropy Guard)")
 
+    # Initialize CSR Phoneme-Ontological Grounding
+    csr_provider = None
+    csr_entropy_sink = None
+    csr_synthesis_gate = None
+    if config.enable_csr and CSR_AVAILABLE:
+        csr_provider, csr_entropy_sink, csr_synthesis_gate = create_csr_for_training(
+            model_config=model.config if hasattr(model, 'config') else type('Config', (), {'d_model': 512})(),
+            tokenizer=tokenizer,
+            lambda_csr=config.csr_lambda,
+            use_phase_gating=config.csr_use_phase_gating,
+            trainable=config.csr_trainable,
+        )
+        csr_provider = csr_provider.to(device)
+        csr_entropy_sink = csr_entropy_sink.to(device) if config.csr_use_entropy_sink else None
+        csr_synthesis_gate = csr_synthesis_gate.to(device) if config.csr_use_synthesis_gate else None
+        print(f"  CSR Phoneme Grounding: ENABLED (λ_csr={config.csr_lambda})")
+    elif config.enable_csr and not CSR_AVAILABLE:
+        print(f"  CSR Phoneme Grounding: Disabled (module not available)")
+    else:
+        print(f"  CSR Phoneme Grounding: Disabled")
+
+    # Initialize SGP (Stochastic Gradient Persistence) and Sattvic Controller
+    sattvic_controller = None
+    sgp_controller = None
+    if config.enable_sgp and SGP_AVAILABLE:
+        # Create Sattvic Controller for dynamic λ_csr regulation
+        sattvic_config = SattvicConfig(
+            initial_lambda=config.sattvic_initial_lambda,
+            floor_lambda=config.sattvic_floor_lambda,
+            warmup_steps=config.sattvic_warmup_steps,
+            variance_window=config.sattvic_variance_window,
+            variance_threshold=config.sattvic_variance_threshold,
+        )
+        sattvic_controller = SattvicController(sattvic_config)
+
+        # Create SGP Controller synchronized with Sattvic
+        sgp_config = SGPConfig(
+            base_rate=config.sgp_base_rate,
+            stagnation_rate=config.sgp_stagnation_rate,
+            gamma=config.sgp_gamma,
+        )
+        sgp_controller = SGPController(sgp_config)
+        sgp_controller.attach_sattvic_controller(sattvic_controller)
+
+        # Register Authority layer parameters (layers 0-8) for gradient persistence
+        authority_params = []
+        for name, param in model.named_parameters():
+            # Match layers 0-8 (Authority layers)
+            layer_match = False
+            for i in range(9):  # 0-8
+                if f"layers.{i}." in name or f"layer.{i}." in name:
+                    layer_match = True
+                    break
+            if layer_match and param.requires_grad:
+                authority_params.append(param)
+        sgp_controller.register_authority_params(authority_params)
+
+        print(f"  SGP Controller: ENABLED (base_rate={config.sgp_base_rate}, stagnation_rate={config.sgp_stagnation_rate}, γ={config.sgp_gamma})")
+        print(f"    → Sattvic Controller: λ_init={config.sattvic_initial_lambda}, λ_floor={config.sattvic_floor_lambda}")
+        print(f"    → Authority Params Registered: {len(authority_params)}")
+    elif config.enable_sgp and not SGP_AVAILABLE:
+        print(f"  SGP Controller: Disabled (module not available)")
+    else:
+        print(f"  SGP Controller: Disabled")
+
     # VRAM Governor for dynamic batch scaling
     vram_governor = VRAMGovernor(
         initial_batch_size=config.batch_size,
@@ -7079,6 +7198,48 @@ def train(config: UnifiedTrainingConfig):
                     logits = outputs
                 loss, metrics = compute_phase_loss(logits, y, config)
 
+            # CSR Phoneme-Ontological Grounding Integration
+            csr_metrics = {}
+            if csr_provider is not None:
+                # Decode tokens for phoneme extraction
+                token_strings = None
+                if tokenizer is not None:
+                    try:
+                        token_strings = [[tokenizer.decode([tid.item()]) for tid in batch] for batch in x]
+                    except Exception:
+                        token_strings = None
+
+                # Compute CSR embeddings
+                csr_output = csr_provider(x, token_strings=token_strings)
+                csr_emb = csr_output['csr_emb']
+                csr_affinity = csr_output['csr_affinity']
+                csr_confidence = csr_output['csr_confidence']
+
+                # Get hidden states for CSR alignment (if available)
+                csr_hidden = None
+                if isinstance(outputs, dict):
+                    csr_hidden = outputs.get('last_hidden_state', outputs.get('logits'))
+                elif isinstance(outputs, torch.Tensor):
+                    csr_hidden = outputs
+
+                if csr_hidden is not None and csr_hidden.shape[-1] == csr_emb.shape[-1]:
+                    # CSR alignment loss: encourage hidden states to correlate with CSR embeddings
+                    # Use cosine similarity weighted by confidence
+                    csr_hidden_norm = torch.nn.functional.normalize(csr_hidden, dim=-1)
+                    csr_emb_norm = torch.nn.functional.normalize(csr_emb, dim=-1)
+                    csr_similarity = (csr_hidden_norm * csr_emb_norm).sum(dim=-1)
+                    csr_alignment_loss = (1 - csr_similarity) * csr_confidence.squeeze(-1)
+                    csr_loss = csr_alignment_loss.mean() * config.csr_lambda
+
+                    # Add CSR loss to total loss
+                    loss = loss + csr_loss
+                    csr_metrics['csr_loss'] = csr_loss.item()
+                    csr_metrics['csr_confidence'] = csr_confidence.mean().item()
+                    csr_metrics['csr_similarity'] = csr_similarity.mean().item()
+                else:
+                    csr_metrics['csr_loss'] = 0.0
+                    csr_metrics['csr_confidence'] = csr_confidence.mean().item() if csr_confidence is not None else 0.0
+
             # Initialize default guna values for first iteration
             # (actual values computed later in the loop, but needed here for evolutionary bridge)
             try:
@@ -7355,6 +7516,26 @@ def train(config: UnifiedTrainingConfig):
                 # Update TrainingStateTracker with Gunas (semantic bridge)
                 if training_state_tracker is not None and training_state_tracker.enabled:
                     training_state_tracker.update_with_gunas(guna_s, guna_r, guna_t, global_step)
+
+            # SGP Metabolic Step and Sattvic Controller Update
+            if sattvic_controller is not None and sgp_controller is not None:
+                # Update Sattvic Controller with current entropy
+                knowledge = float(metrics.get('coherence', 0.5))  # Use coherence as knowledge proxy
+                lambda_csr = sattvic_controller.update(global_step, {
+                    'ent': entropy,
+                    'know': knowledge,
+                })
+
+                # SGP Metabolic Step: Inject persisted gradients to Authority layers
+                pulse_applied = sgp_controller.sgp_metabolic_step({
+                    'entropy': entropy,
+                    'variance': sattvic_controller.entropy_variance,
+                })
+
+                # Log SGP status periodically
+                if global_step % 500 == 0:
+                    status = sgp_controller.get_status()
+                    print(f"  🔨 [SGP] step={global_step} rate={status['rate']} λ_csr={lambda_csr:.3f} stag={'Y' if status['stagnation_active'] else 'N'}")
 
             # V9.4.9 Per-step updates: Both metabolic flip AND stability streak count every gradient step
             if relaxation_controller is not None:
@@ -7796,6 +7977,12 @@ def train(config: UnifiedTrainingConfig):
                                     gate_coh = coherence_summary['gate_coherences']
                                     if len(gate_coh) > 0:
                                         tb_writer.add_histogram("evo/gate_coherence_dist", torch.tensor(gate_coh), global_step)
+
+                        # CSR Phoneme-Ontological Metrics
+                        if csr_metrics:
+                            tb_writer.add_scalar("csr/loss", csr_metrics.get('csr_loss', 0.0), global_step)
+                            tb_writer.add_scalar("csr/confidence", csr_metrics.get('csr_confidence', 0.0), global_step)
+                            tb_writer.add_scalar("csr/similarity", csr_metrics.get('csr_similarity', 0.0), global_step)
                 else:
                     print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
 
@@ -8439,6 +8626,46 @@ def main():
     parser.add_argument("--evo_lr_accelerate", type=float, default=1.2,
                        help="LR multiplier when ACCELERATE")
 
+    # CSR Phoneme-Ontological Grounding
+    parser.add_argument("--enable_csr", action="store_true", default=True,
+                       help="Enable CSR phoneme grounding")
+    parser.add_argument("--disable_csr", action="store_true",
+                       help="Disable CSR phoneme grounding")
+    parser.add_argument("--csr_lambda", type=float, default=0.1,
+                       help="CSR injection strength")
+    parser.add_argument("--csr_use_phase_gating", action="store_true", default=True,
+                       help="Gate Phase Attention with CSR confidence")
+    parser.add_argument("--csr_trainable", action="store_true", default=True,
+                       help="Allow CSR projection to train")
+    parser.add_argument("--csr_use_entropy_sink", action="store_true", default=True,
+                       help="Apply Layer 0 entropy floor")
+    parser.add_argument("--csr_use_synthesis_gate", action="store_true", default=True,
+                       help="Apply Layer 11 synthesis reconciliation")
+
+    # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
+    parser.add_argument("--enable_sgp", action="store_true", default=True,
+                       help="Enable SGP synchronized with Sattvic Controller")
+    parser.add_argument("--disable_sgp", action="store_true",
+                       help="Disable SGP")
+    parser.add_argument("--sgp_base_rate", type=int, default=25,
+                       help="SGP base rate (Toroidal Refresh Rate)")
+    parser.add_argument("--sgp_stagnation_rate", type=int, default=12,
+                       help="SGP rate when stagnation detected (HALVED for more frequent hammering)")
+    parser.add_argument("--sgp_gamma", type=float, default=0.3,
+                       help="SGP persistence coefficient (gamma) for gradient injection")
+
+    # Sattvic Controller (Dynamic λ_csr regulation)
+    parser.add_argument("--sattvic_initial_lambda", type=float, default=0.5,
+                       help="Initial λ_csr during warmup")
+    parser.add_argument("--sattvic_floor_lambda", type=float, default=0.1,
+                       help="Minimum λ_csr after decay")
+    parser.add_argument("--sattvic_warmup_steps", type=int, default=500,
+                       help="Steps for warmup phase")
+    parser.add_argument("--sattvic_variance_window", type=int, default=50,
+                       help="Window for entropy variance detection")
+    parser.add_argument("--sattvic_variance_threshold", type=float, default=0.001,
+                       help="Variance threshold for stagnation")
+
     # Adaptive Training Controller (dynamic hyperparameter tuning)
     parser.add_argument("--enable_adaptive_training", action="store_true", default=True,
                        help="Enable automatic LR/Kp adjustment based on training dynamics")
@@ -8610,9 +8837,6 @@ def main():
         toroidal_use_gating=args.toroidal_use_gating,
         toroidal_truncated_bptt=args.toroidal_truncated_bptt,
         toroidal_coherence_threshold=args.toroidal_coherence_threshold,
-        # V9.4.7: Stochastic Gradient Persistence (SGP)
-        enable_sgp=args.enable_sgp,
-        sgp_rate=args.sgp_rate,
         # Full Evolutionary Flow System (Phase 2-5)
         enable_evolutionary_flow=args.enable_evolutionary_flow and not args.disable_evolutionary_flow,
         evo_lambda=args.evo_lambda,
@@ -8626,6 +8850,24 @@ def main():
         evo_lr_modulation=args.evo_lr_modulation,
         evo_lr_slowdown=args.evo_lr_slowdown,
         evo_lr_accelerate=args.evo_lr_accelerate,
+        # CSR Phoneme-Ontological Grounding
+        enable_csr=args.enable_csr and not args.disable_csr,
+        csr_lambda=args.csr_lambda,
+        csr_use_phase_gating=args.csr_use_phase_gating,
+        csr_trainable=args.csr_trainable,
+        csr_use_entropy_sink=args.csr_use_entropy_sink,
+        csr_use_synthesis_gate=args.csr_use_synthesis_gate,
+        # SGP (Stochastic Gradient Persistence)
+        enable_sgp=args.enable_sgp and not args.disable_sgp,
+        sgp_base_rate=args.sgp_base_rate,
+        sgp_stagnation_rate=args.sgp_stagnation_rate,
+        sgp_gamma=args.sgp_gamma,
+        # Sattvic Controller
+        sattvic_initial_lambda=args.sattvic_initial_lambda,
+        sattvic_floor_lambda=args.sattvic_floor_lambda,
+        sattvic_warmup_steps=args.sattvic_warmup_steps,
+        sattvic_variance_window=args.sattvic_variance_window,
+        sattvic_variance_threshold=args.sattvic_variance_threshold,
         # Adaptive Training Controller
         enable_adaptive_training=args.enable_adaptive_training and not args.disable_adaptive_training,
         adaptive_lr_min=args.adaptive_lr_min,

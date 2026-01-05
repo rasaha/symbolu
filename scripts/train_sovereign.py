@@ -979,6 +979,16 @@ Examples:
     parser.add_argument("--lambda_guna", type=float, default=0.1,
                         help="Weight for Guna coherence loss (default: 0.1)")
 
+    # SGP (Stochastic Gradient Persistence)
+    parser.add_argument("--sgp_rate", type=int, default=25,
+                        help="SGP base rate (Toroidal Refresh Rate). Default: 25")
+    parser.add_argument("--sgp_stagnation_rate", type=int, default=12,
+                        help="SGP rate when stagnation detected (HALVED for more frequent hammering). Default: 12")
+    parser.add_argument("--sgp_gamma", type=float, default=0.3,
+                        help="SGP persistence coefficient (gamma) for gradient injection. Default: 0.3")
+    parser.add_argument("--use_sgp", action="store_true",
+                        help="Enable SGP synchronized with Sattvic Controller")
+
     # Vritti PID Governor
     parser.add_argument("--use_vritti", action="store_true",
                         help="Enable Vritti-driven PID Governor with stiffness multiplier")
