@@ -2017,10 +2017,9 @@ class HierarchicalGradientScaler:
         # Clamp S/A ratio to prevent extreme imbalance at startup
         # Healthy range is 0.3-0.7, warn if outside 0.1-10.0
         s_a_ratio_clamped = max(0.01, min(100.0, s_a_ratio))
-        if s_a_ratio > 10.0 and self.current_step < 100:
-            # Early training with extreme ratio - apply emergency damping
-            # This prevents runaway sensory gradients from destabilizing authority
-            self.alpha_sens_min = min(self.alpha_sens_min, 0.005)
+        # V9.5.3: Removed emergency damping override - trust configured alpha_sens_initial
+        # The old code forcibly set alpha_sens_min=0.005 when S/A>10 in first 100 steps,
+        # which defeated the purpose of setting alpha_sens_initial=0.05
 
         self.gradient_stats["authority_grad_norm"] = a_norm
         self.gradient_stats["sensory_grad_norm"] = s_norm
@@ -6013,12 +6012,12 @@ class UnifiedTrainingConfig:
     use_9_3_split: bool = False           # Enable 9:3 Authority/Sensory gradient scaling
     authority_layers: int = 9             # Number of Authority (State-Delta) layers
     sensory_layers: int = 3               # Number of Sensory (Quadratic) layers
-    alpha_sens_initial: float = 0.01      # Initial sensory gradient multiplier (very heavy dampening to prevent S/A imbalance)
+    alpha_sens_initial: float = 0.05      # Initial sensory gradient multiplier (balanced start to prevent S/A spikes)
     alpha_sens_max: float = 0.7           # Maximum sensory gradient (after warmup/relaxation)
     gradient_warmup_steps: int = 500      # Steps to ramp α_sens from initial to max
 
     # Dynamic Relaxation: 9:3 → 6:6 transition
-    enable_dynamic_relaxation: bool = False  # Enable automatic 9:3 → 6:6 transition
+    enable_dynamic_relaxation: bool = True   # Enable automatic 9:3 → 6:6 transition
     relaxation_mode: str = "sa_ratio"        # "sa_ratio" (recommended), "consecutive", or "average"
     relaxation_stability_threshold: float = 0.50  # S/A ratio threshold for trigger
     relaxation_stability_window: int = 500   # Steps for stability check (rolling window)
@@ -6112,7 +6111,7 @@ class UnifiedTrainingConfig:
     tensorboard: bool = True
 
     # Quality Sampling
-    sample_every: int = 500  # Generate samples every N steps (0 = disabled)
+    sample_every: int = 200  # Generate samples every N steps (0 = disabled)
     sample_prompts: tuple = (
         # Original open-ended prompts
         "The history of the Roman Empire began when",
@@ -7342,16 +7341,10 @@ def train(config: UnifiedTrainingConfig):
             # CSR Phoneme-Ontological Grounding Integration
             csr_metrics = {}
             if csr_provider is not None:
-                # Decode tokens for phoneme extraction
-                token_strings = None
-                if tokenizer is not None:
-                    try:
-                        token_strings = [[tokenizer.decode([tid.item()]) for tid in batch] for batch in x]
-                    except Exception:
-                        token_strings = None
-
-                # Compute CSR embeddings
-                csr_output = csr_provider(x, token_strings=token_strings)
+                # V9.5.2 Performance: CSR provider uses precomputed token affinity table
+                # No need to decode tokens here - the table maps token_id → affinity directly
+                # This eliminates O(B*T) tokenizer.decode() calls that caused Step 10 stall
+                csr_output = csr_provider(x, token_strings=None)
                 csr_emb = csr_output['csr_emb']
                 csr_affinity = csr_output['csr_affinity']
                 csr_confidence = csr_output['csr_confidence']
@@ -7708,6 +7701,12 @@ def train(config: UnifiedTrainingConfig):
                     'entropy': entropy,
                     'variance': sattvic_controller.entropy_variance,
                 })
+
+                # V9.5.2 H200 Optimization: Clear SGP temporary buffers after heavy pulses
+                # This prevents memory fragmentation stalls on high-VRAM GPUs
+                if pulse_applied and device.type == "cuda":
+                    torch.cuda.synchronize()  # Ensure kernels finished before clearing
+                    torch.cuda.empty_cache()  # Free up H200 'Swing Space'
 
                 # Log SGP status periodically
                 if global_step % 500 == 0:
@@ -8760,7 +8759,7 @@ def main():
                        help="Disable TensorBoard logging")
 
     # Quality Sampling
-    parser.add_argument("--sample_every", type=int, default=500,
+    parser.add_argument("--sample_every", type=int, default=200,
                        help="Generate quality samples every N steps (0 = disabled)")
 
     # LRA Validation (Long-Range Retrieval)
@@ -8778,16 +8777,18 @@ def main():
                        help="Number of Authority (State-Delta) layers")
     parser.add_argument("--sensory_layers", type=int, default=3,
                        help="Number of Sensory (Quadratic) layers")
-    parser.add_argument("--alpha_sens_initial", type=float, default=0.01,
-                       help="Initial sensory gradient scale (heavy dampening at start)")
+    parser.add_argument("--alpha_sens_initial", type=float, default=0.05,
+                       help="Initial sensory gradient scale (balanced start to prevent S/A spikes)")
     parser.add_argument("--alpha_sens_max", type=float, default=0.7,
                        help="Maximum sensory gradient scale (after warmup/relaxation)")
     parser.add_argument("--gradient_warmup_steps", type=int, default=500,
                        help="Steps to ramp sensory gradient scale from initial to max")
 
     # Dynamic Relaxation: 9:3 → 6:6 transition
-    parser.add_argument("--enable_dynamic_relaxation", action="store_true",
-                       help="Enable automatic 9:3 → 6:6 split transition based on stability")
+    parser.add_argument("--enable_dynamic_relaxation", action="store_true", default=True,
+                       help="Enable automatic 9:3 → 6:6 split transition (default: enabled)")
+    parser.add_argument("--disable_dynamic_relaxation", action="store_true",
+                       help="Disable automatic 9:3 → 6:6 split transition")
     parser.add_argument("--relaxation_mode", type=str, default="sa_ratio",
                        choices=["consecutive", "average", "sa_ratio"],
                        help="Trigger mode: 'sa_ratio' (S/A ratio, recommended), 'average' (SSI rolling mean), 'consecutive' (SSI streak)")
@@ -9060,7 +9061,7 @@ def main():
         gradient_warmup_steps=args.gradient_warmup_steps,
         use_per_layer_clipping=args.use_per_layer_clipping,
         # Dynamic Relaxation: 9:3 → 6:6 transition
-        enable_dynamic_relaxation=args.enable_dynamic_relaxation,
+        enable_dynamic_relaxation=args.enable_dynamic_relaxation and not args.disable_dynamic_relaxation,
         relaxation_mode=args.relaxation_mode,
         relaxation_stability_threshold=args.relaxation_stability_threshold,
         relaxation_stability_window=args.relaxation_stability_window,
