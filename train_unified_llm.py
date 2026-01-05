@@ -165,10 +165,17 @@ try:
         SynthesisGate,
         create_csr_for_training,
         integrate_csr_into_forward,
+        start_background_preload as csr_start_preload,  # V9.5.2 background loading
+        wait_for_preload as csr_wait_preload,
     )
     CSR_AVAILABLE = True
+    # V9.5.2 Optimization: Start G2P loading in background immediately
+    # This loads CMUdict and g2p_en in parallel while other imports happen
+    csr_start_preload()
 except ImportError as e:
     CSR_AVAILABLE = False
+    csr_start_preload = None
+    csr_wait_preload = None
     print(f"Warning: CSR Phoneme Provider not available: {e}")
 
 # Import SGP (Stochastic Gradient Persistence) and Sattvic Controller
@@ -491,18 +498,21 @@ class EvolutionaryBridge(nn.Module):
             # SGP: Keep gradients only at capped rate (e.g., every 100 steps)
             if global_step % self.sgp_rate == 0:
                 # High-Rajas: Main graph remains connected for recursive evolution
-                self.karma_buffer = seed
+                # V9.5.2 Metabolic Tuning: Ensure BF16 precision to save memory
+                self.karma_buffer = seed.to(torch.bfloat16) if seed.dtype != torch.bfloat16 else seed
                 is_sgp_heavy_step = True
                 self.last_sgp_step = global_step
             else:
                 # Sattvic: Detach to maintain high throughput
-                self.karma_buffer = seed.detach()
+                # V9.5.2 Metabolic Tuning: Ensure BF16 precision
+                self.karma_buffer = seed.detach().to(torch.bfloat16) if seed.dtype != torch.bfloat16 else seed.detach()
         elif self.truncated_bptt_steps > 0 and self.step_count % self.truncated_bptt_steps != 0:
             # Legacy truncated BPTT mode (if SGP not enabled)
-            self.karma_buffer = seed
+            self.karma_buffer = seed.to(torch.bfloat16) if seed.dtype != torch.bfloat16 else seed
         else:
             # Default: Detach to prevent infinite gradient chains
-            self.karma_buffer = seed.detach()
+            # V9.5.2 Metabolic Tuning: Ensure BF16 precision
+            self.karma_buffer = seed.detach().to(torch.bfloat16) if seed.dtype != torch.bfloat16 else seed.detach()
 
         self.bridge_active = True
         return is_sgp_heavy_step
@@ -2004,10 +2014,18 @@ class HierarchicalGradientScaler:
         p_norm = sum(self._phase_grad_norms) if self._phase_grad_norms else 0.0
         s_a_ratio = s_norm / a_norm if a_norm > 0 else 0.0
 
+        # Clamp S/A ratio to prevent extreme imbalance at startup
+        # Healthy range is 0.3-0.7, warn if outside 0.1-10.0
+        s_a_ratio_clamped = max(0.01, min(100.0, s_a_ratio))
+        if s_a_ratio > 10.0 and self.current_step < 100:
+            # Early training with extreme ratio - apply emergency damping
+            # This prevents runaway sensory gradients from destabilizing authority
+            self.alpha_sens_min = min(self.alpha_sens_min, 0.005)
+
         self.gradient_stats["authority_grad_norm"] = a_norm
         self.gradient_stats["sensory_grad_norm"] = s_norm
         self.gradient_stats["phase_grad_norm"] = p_norm
-        self.gradient_stats["sensory_authority_ratio"] = s_a_ratio
+        self.gradient_stats["sensory_authority_ratio"] = s_a_ratio_clamped
         self.gradient_stats["sensory_scale"] = self._compute_alpha_sens()
 
         # Prepare metrics for return
@@ -2015,7 +2033,8 @@ class HierarchicalGradientScaler:
             "s_grad_norm": s_norm,
             "a_grad_norm": a_norm,
             "phase_grad_norm": p_norm,
-            "s_a_ratio": s_a_ratio,
+            "s_a_ratio": s_a_ratio_clamped,
+            "s_a_ratio_raw": s_a_ratio,  # Keep raw for debugging
             "alpha_sens": self._compute_alpha_sens(),
             "step": self.current_step,
             "in_thaw_mode": self.in_thaw_mode,
@@ -2692,8 +2711,8 @@ class VRAMGovernor:
 
         if sovereign_engine is not None and hasattr(sovereign_engine, 'config'):
             # Apply the compensation to the engine
-            sovereign_engine.config.b1_lambda *= (1.0 + compensation)
-            actions.append(f"   λ_B1 scaled: {sovereign_engine.config.b1_lambda / (1 + compensation):.2f} → {sovereign_engine.config.b1_lambda:.2f} (noise compensation)")
+            sovereign_engine.config.lambda_b1 *= (1.0 + compensation)
+            actions.append(f"   λ_B1 scaled: {sovereign_engine.config.lambda_b1 / (1 + compensation):.2f} → {sovereign_engine.config.lambda_b1:.2f} (noise compensation)")
 
         # Auto-scale gradient accumulation if batch gets too small
         if self.enable_accumulation_scaling and new_batch < self.target_effective_batch:
@@ -2722,9 +2741,9 @@ class VRAMGovernor:
         self.b1_scale_factor = max(1.0, self.b1_scale_factor / (1.0 + reduction))
 
         if sovereign_engine is not None and hasattr(sovereign_engine, 'config'):
-            old_b1 = sovereign_engine.config.b1_lambda
-            sovereign_engine.config.b1_lambda /= (1.0 + reduction)
-            actions.append(f"   λ_B1 relaxed: {old_b1:.2f} → {sovereign_engine.config.b1_lambda:.2f}")
+            old_b1 = sovereign_engine.config.lambda_b1
+            sovereign_engine.config.lambda_b1 /= (1.0 + reduction)
+            actions.append(f"   λ_B1 relaxed: {old_b1:.2f} → {sovereign_engine.config.lambda_b1:.2f}")
 
         # Adjust accumulation steps
         if self.enable_accumulation_scaling:
@@ -2955,12 +2974,19 @@ class AutoBatchSizer:
             print(f"  {'─'*60}")
 
         # Build list of candidate batch sizes (multiples of 8 for Tensor Core efficiency)
+        # V9.5.2 Metabolic Tuning: Also include intermediate batch sizes (48, 40) for better
+        # gradient accumulation granularity (e.g., 48/6=288 effective, 40/8=320 effective)
         alignment = 8
         if target_effective_batch > 0:
             max_candidate = min(self.max_batch_size, target_effective_batch)
         else:
             max_candidate = self.max_batch_size
         candidates = [b for b in range(alignment, max_candidate + 1, alignment)]
+        # Add intermediate values for fine-grained accumulation tuning
+        for intermediate in [40, 48, 56, 72]:
+            if intermediate not in candidates and intermediate <= max_candidate:
+                candidates.append(intermediate)
+        candidates = sorted(set(candidates))
         if not candidates:
             candidates = [alignment]  # Minimum fallback
 
@@ -5899,6 +5925,7 @@ class UnifiedTrainingConfig:
 
     # Gradient checkpointing
     gradient_checkpointing: bool = False
+    checkpoint_offload_cpu: bool = False  # Offload checkpointed activations to CPU (metabolic tuning)
 
     # Checkpointing
     checkpoint_dir: str = "checkpoints_unified"
@@ -5986,7 +6013,7 @@ class UnifiedTrainingConfig:
     use_9_3_split: bool = False           # Enable 9:3 Authority/Sensory gradient scaling
     authority_layers: int = 9             # Number of Authority (State-Delta) layers
     sensory_layers: int = 3               # Number of Sensory (Quadratic) layers
-    alpha_sens_initial: float = 0.1       # Initial sensory gradient multiplier (heavy dampening)
+    alpha_sens_initial: float = 0.01      # Initial sensory gradient multiplier (very heavy dampening to prevent S/A imbalance)
     alpha_sens_max: float = 0.7           # Maximum sensory gradient (after warmup/relaxation)
     gradient_warmup_steps: int = 500      # Steps to ramp α_sens from initial to max
 
@@ -6309,13 +6336,29 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         raise ValueError(f"Unknown model type: {config.model_type}")
 
     # Enable gradient checkpointing after model creation
+    # V9.5.2 Metabolic Tuning: Use non-reentrant checkpointing for better memory efficiency
     if config.gradient_checkpointing:
         if hasattr(model, 'gradient_checkpointing_enable'):
-            model.gradient_checkpointing_enable()
+            # Try HuggingFace-style API first, fall back to simple call
+            try:
+                model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+                print(f"  [Metabolic] Gradient checkpointing enabled (non-reentrant mode)")
+            except TypeError:
+                # Model has the method but doesn't accept kwargs
+                model.gradient_checkpointing_enable()
+                print(f"  [Metabolic] Gradient checkpointing enabled")
         else:
+            # Manual flag-based checkpointing
             for module in model.modules():
                 if hasattr(module, 'gradient_checkpointing'):
                     module.gradient_checkpointing = True
+                # Set use_reentrant=False for torch.utils.checkpoint compatibility
+                if hasattr(module, 'use_reentrant'):
+                    module.use_reentrant = False
+            print(f"  [Metabolic] Gradient checkpointing enabled (flag-based)")
+
+        if config.checkpoint_offload_cpu:
+            print(f"  [Metabolic] CPU activation offloading requested (requires custom forward)")
 
     return model.to(device)
 
@@ -6421,15 +6464,15 @@ def compute_ontological_loss(
         if gc is not None and isinstance(gc, torch.Tensor):
             gc = gc.mean()
 
-        # [S5/B1] Scale b1_lambda based on entropy - higher entropy = stronger consistency
+        # [S5/B1] Scale lambda_b1 based on entropy - higher entropy = stronger consistency
         b1_scale = 1.0
         if onto_entropy > 0.60:
             # Scale up to 1.5x when entropy is very high (Rajasic state)
             excess = (onto_entropy - 0.60) / 0.40  # Scale 0.60-1.0 to 0-1
             b1_scale = 1.0 + excess * 0.5  # 1.0 to 1.5
-            # Temporarily boost b1_lambda
-            original_b1_lambda = sovereign_engine.config.b1_lambda
-            sovereign_engine.config.b1_lambda = original_b1_lambda * b1_scale
+            # Temporarily boost lambda_b1
+            original_lambda_b1 = sovereign_engine.config.lambda_b1
+            sovereign_engine.config.lambda_b1 = original_lambda_b1 * b1_scale
 
         # Compute Sovereign-Lagrangian loss
         total_loss, sov_metrics = sovereign_engine.sovereign_loss(
@@ -6438,9 +6481,9 @@ def compute_ontological_loss(
             guna_coherence=gc,
         )
 
-        # Restore original b1_lambda if scaled
+        # Restore original lambda_b1 if scaled
         if b1_scale > 1.0:
-            sovereign_engine.config.b1_lambda = original_b1_lambda
+            sovereign_engine.config.lambda_b1 = original_lambda_b1
 
         # Merge metrics
         metrics.update({
@@ -6643,21 +6686,56 @@ def train(config: UnifiedTrainingConfig):
     if config.enable_auto_batch:
         print(f"\n  Auto Batch Sizing: ENABLED")
 
+        # V9.5.2: Model size is the PRIMARY factor in batch sizing
+        # GPU VRAM is a "zero-sum game":
+        #   - FLOOR (static): Model weights + Optimizer states + SGP buffers
+        #   - SWING SPACE (dynamic): Activations (batch × seq × layers)
+        # Larger models → bigger floor → less swing space → smaller batches
+        #
+        # Base limits are calibrated for LARGE models (conservative)
+        # Smaller models scale UP because they have more swing space
+        model_size_scale = {
+            "tiny": 4.0,    # ~4x swing space vs large
+            "small": 3.0,   # ~3x swing space vs large
+            "medium": 2.0,  # ~2x swing space vs large
+            "large": 1.0,   # Base limit (tested, conservative)
+        }
+        size_factor = model_size_scale.get(config.model_size, 1.0)
+
+        # V9.5.2: Sequence length scaling (baseline: 2048)
+        # Activations scale linearly with seq len (attention is handled by flash/sdpa)
+        seq_baseline = 2048
+        if config.max_seq_len < seq_baseline:
+            # Shorter sequences: more swing space available
+            seq_factor = min(2.0, seq_baseline / config.max_seq_len)
+        else:
+            # Longer sequences: less swing space
+            seq_factor = max(0.5, seq_baseline / config.max_seq_len)
+
+        # Combined scaling factor
+        combined_factor = size_factor * seq_factor
+
         # Sovereign loss requires (B, Seq, Vocab) tensors - massive overhead
-        # Scale max_batch based on available VRAM (conservative to allow SGP headroom)
+        # V9.5.2: BASE LIMITS for LARGE model + 2048 seq (smallest swing space)
+        #   - A100 (80GB): 16 max batch for large
+        #   - H100 (96GB): 24 max batch for large
+        #   - H200 (141GB): 32 max batch for large
+        # Smaller models can scale UP from these limits
         if config.enable_sovereign_loss:
             total_vram_gb = torch.cuda.get_device_properties(device).total_memory / 1e9
             if total_vram_gb >= 140:  # H200 class (141GB+)
-                auto_max_batch = 32  # Conservative - use gradient accumulation
-            elif total_vram_gb >= 90:  # 96GB class
-                auto_max_batch = 32
+                base_max_batch = 32   # Large: 32, Medium: 64, Small: 96, Tiny: 128
+            elif total_vram_gb >= 90:  # H100 class (96GB)
+                base_max_batch = 24   # Large: 24, Medium: 48, Small: 72, Tiny: 96
             elif total_vram_gb >= 70:  # A100 80GB class
-                auto_max_batch = 24
+                base_max_batch = 16   # Large: 16, Medium: 32, Small: 48, Tiny: 64
             else:  # Smaller GPUs
-                auto_max_batch = 16
-            print(f"  ⚠️  Sovereign Loss detected: capping max_batch to {auto_max_batch} (VRAM: {total_vram_gb:.0f}GB)")
+                base_max_batch = 8
+            # Apply scaling (smaller models get more swing space)
+            auto_max_batch = max(8, int(base_max_batch * combined_factor))
+            print(f"  ⚠️  Sovereign Loss: max_batch={auto_max_batch} (VRAM: {total_vram_gb:.0f}GB, model: {config.model_size}, seq: {config.max_seq_len}, scale: {combined_factor:.2f}x)")
         else:
-            auto_max_batch = 128
+            auto_max_batch = max(8, int(64 * combined_factor))
 
         auto_sizer = AutoBatchSizer(
             model=model,
@@ -6708,7 +6786,7 @@ def train(config: UnifiedTrainingConfig):
     if config.enable_sovereign_loss:
         from symbolu.sovereign.metrics import SovereignEngine, SovereignLossConfig as SovEngineConfig, StabilityState
         sov_engine_config = SovEngineConfig(
-            b1_lambda=config.b1_lambda,
+            lambda_b1=config.b1_lambda,
             mu_s3=config.mu_s3,
             gc_floor=config.gc_floor,
         )
@@ -6750,6 +6828,10 @@ def train(config: UnifiedTrainingConfig):
     csr_entropy_sink = None
     csr_synthesis_gate = None
     if config.enable_csr and CSR_AVAILABLE:
+        # V9.5.2 Optimization: Wait for background G2P preload to complete
+        # This ensures CMUdict and g2p_en are ready (should already be loaded by now)
+        if csr_wait_preload is not None:
+            csr_wait_preload(timeout=30.0)
         csr_provider, csr_entropy_sink, csr_synthesis_gate = create_csr_for_training(
             model_config=model.config if hasattr(model, 'config') else type('Config', (), {'d_model': 512})(),
             tokenizer=tokenizer,
@@ -8538,6 +8620,8 @@ def main():
     # Memory optimization
     parser.add_argument("--gradient_checkpointing", action="store_true",
                        help="Enable gradient checkpointing")
+    parser.add_argument("--checkpoint_offload_cpu", action="store_true",
+                       help="Offload checkpointed activations to CPU (metabolic tuning for large models)")
     parser.add_argument("--mixed_precision", type=str, default="bf16",
                        choices=["none", "fp16", "bf16"],
                        help="Mixed precision training")
@@ -8694,7 +8778,7 @@ def main():
                        help="Number of Authority (State-Delta) layers")
     parser.add_argument("--sensory_layers", type=int, default=3,
                        help="Number of Sensory (Quadratic) layers")
-    parser.add_argument("--alpha_sens_initial", type=float, default=0.1,
+    parser.add_argument("--alpha_sens_initial", type=float, default=0.01,
                        help="Initial sensory gradient scale (heavy dampening at start)")
     parser.add_argument("--alpha_sens_max", type=float, default=0.7,
                        help="Maximum sensory gradient scale (after warmup/relaxation)")
@@ -8912,6 +8996,7 @@ def main():
         learning_rate=args.learning_rate,
         dataset=args.dataset,
         gradient_checkpointing=args.gradient_checkpointing,
+        checkpoint_offload_cpu=args.checkpoint_offload_cpu,
         mixed_precision=args.mixed_precision,
         local_backend=args.local_backend,
         window_size=args.window_size,
