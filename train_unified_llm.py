@@ -6018,7 +6018,7 @@ class UnifiedTrainingConfig:
     gradient_warmup_steps: int = 500      # Steps to ramp α_sens from initial to max
 
     # Dynamic Relaxation: 9:3 → 6:6 transition
-    enable_dynamic_relaxation: bool = False  # Enable automatic 9:3 → 6:6 transition
+    enable_dynamic_relaxation: bool = True   # Enable automatic 9:3 → 6:6 transition
     relaxation_mode: str = "sa_ratio"        # "sa_ratio" (recommended), "consecutive", or "average"
     relaxation_stability_threshold: float = 0.50  # S/A ratio threshold for trigger
     relaxation_stability_window: int = 500   # Steps for stability check (rolling window)
@@ -8786,8 +8786,8 @@ def main():
                        help="Steps to ramp sensory gradient scale from initial to max")
 
     # Dynamic Relaxation: 9:3 → 6:6 transition
-    parser.add_argument("--enable_dynamic_relaxation", action="store_true",
-                       help="Enable automatic 9:3 → 6:6 split transition based on stability")
+    parser.add_argument("--disable_dynamic_relaxation", action="store_true",
+                       help="Disable automatic 9:3 → 6:6 split transition (enabled by default)")
     parser.add_argument("--relaxation_mode", type=str, default="sa_ratio",
                        choices=["consecutive", "average", "sa_ratio"],
                        help="Trigger mode: 'sa_ratio' (S/A ratio, recommended), 'average' (SSI rolling mean), 'consecutive' (SSI streak)")
@@ -9060,7 +9060,7 @@ def main():
         gradient_warmup_steps=args.gradient_warmup_steps,
         use_per_layer_clipping=args.use_per_layer_clipping,
         # Dynamic Relaxation: 9:3 → 6:6 transition
-        enable_dynamic_relaxation=args.enable_dynamic_relaxation,
+        enable_dynamic_relaxation=not args.disable_dynamic_relaxation,
         relaxation_mode=args.relaxation_mode,
         relaxation_stability_threshold=args.relaxation_stability_threshold,
         relaxation_stability_window=args.relaxation_stability_window,
