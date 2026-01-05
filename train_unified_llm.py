@@ -2685,8 +2685,8 @@ class VRAMGovernor:
 
         if sovereign_engine is not None and hasattr(sovereign_engine, 'config'):
             # Apply the compensation to the engine
-            sovereign_engine.config.lambda_b1 *= (1.0 + compensation)
-            actions.append(f"   λ_B1 scaled: {sovereign_engine.config.lambda_b1 / (1 + compensation):.2f} → {sovereign_engine.config.lambda_b1:.2f} (noise compensation)")
+            sovereign_engine.config.b1_lambda *= (1.0 + compensation)
+            actions.append(f"   λ_B1 scaled: {sovereign_engine.config.b1_lambda / (1 + compensation):.2f} → {sovereign_engine.config.b1_lambda:.2f} (noise compensation)")
 
         # Auto-scale gradient accumulation if batch gets too small
         if self.enable_accumulation_scaling and new_batch < self.target_effective_batch:
@@ -2715,9 +2715,9 @@ class VRAMGovernor:
         self.b1_scale_factor = max(1.0, self.b1_scale_factor / (1.0 + reduction))
 
         if sovereign_engine is not None and hasattr(sovereign_engine, 'config'):
-            old_b1 = sovereign_engine.config.lambda_b1
-            sovereign_engine.config.lambda_b1 /= (1.0 + reduction)
-            actions.append(f"   λ_B1 relaxed: {old_b1:.2f} → {sovereign_engine.config.lambda_b1:.2f}")
+            old_b1 = sovereign_engine.config.b1_lambda
+            sovereign_engine.config.b1_lambda /= (1.0 + reduction)
+            actions.append(f"   λ_B1 relaxed: {old_b1:.2f} → {sovereign_engine.config.b1_lambda:.2f}")
 
         # Adjust accumulation steps
         if self.enable_accumulation_scaling:
@@ -5906,8 +5906,8 @@ class UnifiedTrainingConfig:
 
     # Loss weights for ontological model
     lambda_lm: float = 1.0        # Language modeling loss
-    lambda_bhava: float = 0.1     # Bhava relationship consistency
-    lambda_coherence: float = 0.05  # Global coherence
+    bhava_lambda: float = 0.1     # Bhava relationship consistency
+    coherence_lambda: float = 0.05  # Global coherence
     lambda_entropy: float = 0.01  # Entropy regularization
 
     # V9.5.1 Entropy Floor (prevents repetition curse)
@@ -5950,7 +5950,7 @@ class UnifiedTrainingConfig:
 
     # Sovereign-Lagrangian Loss [Patent B1/S3]
     enable_sovereign_loss: bool = False   # Enable Sovereign-Lagrangian loss
-    lambda_b1: float = 0.5                # Consistency Lagrangian weight [B1]
+    b1_lambda: float = 0.5                # Consistency Lagrangian weight [B1]
     mu_s3: float = 0.2                    # Global Coherence weight [S3]
     enable_stability_constraint: bool = False  # Enable S8 entropy anchoring
     gc_floor: float = 0.65                # Minimum GC for PIDv2 intervention
@@ -6412,15 +6412,15 @@ def compute_ontological_loss(
         if gc is not None and isinstance(gc, torch.Tensor):
             gc = gc.mean()
 
-        # [S5/B1] Scale lambda_b1 based on entropy - higher entropy = stronger consistency
+        # [S5/B1] Scale b1_lambda based on entropy - higher entropy = stronger consistency
         b1_scale = 1.0
         if onto_entropy > 0.60:
             # Scale up to 1.5x when entropy is very high (Rajasic state)
             excess = (onto_entropy - 0.60) / 0.40  # Scale 0.60-1.0 to 0-1
             b1_scale = 1.0 + excess * 0.5  # 1.0 to 1.5
-            # Temporarily boost lambda_b1
-            original_lambda_b1 = sovereign_engine.config.lambda_b1
-            sovereign_engine.config.lambda_b1 = original_lambda_b1 * b1_scale
+            # Temporarily boost b1_lambda
+            original_b1_lambda = sovereign_engine.config.b1_lambda
+            sovereign_engine.config.b1_lambda = original_b1_lambda * b1_scale
 
         # Compute Sovereign-Lagrangian loss
         total_loss, sov_metrics = sovereign_engine.sovereign_loss(
@@ -6429,9 +6429,9 @@ def compute_ontological_loss(
             guna_coherence=gc,
         )
 
-        # Restore original lambda_b1 if scaled
+        # Restore original b1_lambda if scaled
         if b1_scale > 1.0:
-            sovereign_engine.config.lambda_b1 = original_lambda_b1
+            sovereign_engine.config.b1_lambda = original_b1_lambda
 
         # Merge metrics
         metrics.update({
@@ -6517,8 +6517,8 @@ def compute_ontological_loss(
     # Combine losses
     total_loss = (
         config.lambda_lm * lm_loss +
-        config.lambda_bhava * bhava_loss +
-        config.lambda_coherence * coherence_loss +
+        config.bhava_lambda * bhava_loss +
+        config.coherence_lambda * coherence_loss +
         config.lambda_entropy * entropy_loss
     )
 
@@ -6696,12 +6696,12 @@ def train(config: UnifiedTrainingConfig):
     if config.enable_sovereign_loss:
         from symbolu.sovereign.metrics import SovereignEngine, SovereignLossConfig as SovEngineConfig, StabilityState
         sov_engine_config = SovEngineConfig(
-            lambda_b1=config.lambda_b1,
+            b1_lambda=config.b1_lambda,
             mu_s3=config.mu_s3,
             gc_floor=config.gc_floor,
         )
         sovereign_engine = SovereignEngine(config=sov_engine_config)
-        print(f"  Sovereign-Lagrangian Loss: ENABLED (λ_B1={config.lambda_b1}, μ_S3={config.mu_s3})")
+        print(f"  Sovereign-Lagrangian Loss: ENABLED (λ_B1={config.b1_lambda}, μ_S3={config.mu_s3})")
         if config.enable_stability_constraint:
             stability_state = StabilityState(window_size=5)
             print(f"  Stability Constraint [S8]: ENABLED (entropy anchoring)")
@@ -8433,13 +8433,13 @@ def main():
                        help="Steps over which alpha_phase decays from start to end")
 
     # Ontological-specific
-    parser.add_argument("--lambda_bhava", type=float, default=0.1,
+    parser.add_argument("--bhava_lambda", type=float, default=0.1,
                        help="Bhava relationship loss weight")
-    parser.add_argument("--lambda_coherence", type=float, default=0.05,
+    parser.add_argument("--coherence_lambda", type=float, default=0.05,
                        help="Coherence loss weight")
 
     # Sovereign-Lagrangian Loss [Patent B1/S3]
-    parser.add_argument("--lambda_b1", type=float, default=0.5,
+    parser.add_argument("--b1_lambda", type=float, default=0.5,
                        help="Consistency Lagrangian weight [B1] (forward/backward alignment)")
     parser.add_argument("--mu_s3", type=float, default=0.2,
                        help="Global Coherence weight [S3] (phase-lock penalty)")
@@ -8784,8 +8784,8 @@ def main():
         mixed_precision=args.mixed_precision,
         local_backend=args.local_backend,
         window_size=args.window_size,
-        lambda_bhava=args.lambda_bhava,
-        lambda_coherence=args.lambda_coherence,
+        bhava_lambda=args.bhava_lambda,
+        coherence_lambda=args.coherence_lambda,
         log_every=args.log_every,
         quiet=args.quiet,
         eval_every=args.eval_every,
@@ -8795,7 +8795,7 @@ def main():
         seed=args.seed,
         # Sovereign-Lagrangian Loss [Patent B1/S3]
         enable_sovereign_loss=args.enable_sovereign_loss,
-        lambda_b1=args.lambda_b1,
+        b1_lambda=args.b1_lambda,
         mu_s3=args.mu_s3,
         enable_stability_constraint=args.enable_stability_constraint,
         gc_floor=args.gc_floor,
