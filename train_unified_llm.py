@@ -7349,12 +7349,15 @@ def train(config: UnifiedTrainingConfig):
                 csr_affinity = csr_output['csr_affinity']
                 csr_confidence = csr_output['csr_confidence']
 
-                # Get hidden states for CSR alignment (if available)
+                # V9.5.3 CRITICAL FIX: Use hidden_state_extractor to get 512-dim hidden states
+                # NOT the 50257-dim logits. The old code silently skipped CSR loss (always 0.0)
+                # because logits.shape[-1]=50257 != csr_emb.shape[-1]=512
                 csr_hidden = None
-                if isinstance(outputs, dict):
-                    csr_hidden = outputs.get('last_hidden_state', outputs.get('logits'))
-                elif isinstance(outputs, torch.Tensor):
-                    csr_hidden = outputs
+                if hidden_state_extractor is not None:
+                    layer_hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
+                    if layer_hidden_states is not None and len(layer_hidden_states) > 0:
+                        # Use last layer (Layer 11 - Sensory Integration) for alignment
+                        csr_hidden = layer_hidden_states[-1]
 
                 if csr_hidden is not None and csr_hidden.shape[-1] == csr_emb.shape[-1]:
                     # CSR alignment loss: encourage hidden states to correlate with CSR embeddings
@@ -7371,6 +7374,9 @@ def train(config: UnifiedTrainingConfig):
                     csr_metrics['csr_confidence'] = csr_confidence.mean().item()
                     csr_metrics['csr_similarity'] = csr_similarity.mean().item()
                 else:
+                    # Log warning if dimension mismatch persists
+                    if global_step % 100 == 0 and csr_hidden is not None:
+                        print(f"  ⚠️ [CSR] Dimension mismatch: Hidden {csr_hidden.shape[-1]} vs Emb {csr_emb.shape[-1]}")
                     csr_metrics['csr_loss'] = 0.0
                     csr_metrics['csr_confidence'] = csr_confidence.mean().item() if csr_confidence is not None else 0.0
 
