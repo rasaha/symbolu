@@ -13,6 +13,7 @@ and inference-time behavior, enabling:
 - Guna-based quality tracking
 - CSR safety layers
 - Ontological alignment scoring
+- Tiered inference modes (Fast/Standard/Sovereign)
 
 Phase 1 (Priority 1 - Critical):
 - EvolutionaryInferenceEngine: Karma buffer and cross-sequence state
@@ -23,8 +24,18 @@ Phase 2 (Priority 2 - Important):
 - CSRInferenceGuard: CSR safety layer application
 - SovereignInferenceScorer: Ontological alignment scoring
 
+Phase 3 (Priority 3 - Orchestration):
+- InferenceManager: Central orchestrator with tiered modes
+
 Usage:
 ------
+    from symbolu.inference import InferenceManager, InferenceMode
+
+    # Recommended: Use InferenceManager for unified access
+    manager = InferenceManager(model, mode=InferenceMode.SOVEREIGN)
+    output, metrics = manager.generate(input_ids, max_new_tokens=100)
+
+    # Alternative: Use individual components directly
     from symbolu.inference import (
         EvolutionaryInferenceEngine,
         InferenceMetacognition,
@@ -52,8 +63,12 @@ from .metacognitive_monitor import InferenceMetacognition, Recommendation
 from .guna_inference import InferenceGunas
 from .csr_inference import CSRInferenceGuard, EntropySinkInference, SynthesisGateInference
 from .sovereign_scorer import SovereignInferenceScorer, SOVEREIGN_R_MATRIX, VRTTI_NAMES
+from .manager import InferenceManager, InferenceMode
 
 __all__ = [
+    # Phase 3 - Orchestration (recommended entry point)
+    "InferenceManager",
+    "InferenceMode",
     # Phase 1
     "EvolutionaryInferenceEngine",
     # Phase 2 - Metacognition
