@@ -1199,12 +1199,11 @@ class CSREmbeddingProvider(nn.Module):
 
         # V9.5.2 Performance: Precompute token ID → affinity lookup table
         # This eliminates O(B*T) tokenizer.decode() calls in forward pass
-        # Note: Don't set self._token_affinity_table = None here, as register_buffer will fail
         if tokenizer is not None:
             self._build_token_affinity_table()
         else:
-            # No tokenizer, register empty buffer
-            self.register_buffer('_token_affinity_table', None)
+            # No tokenizer available - will use slow path in forward()
+            self.register_buffer('_token_affinity_table', None, persistent=False)
 
     def _build_phoneme_tensor(self) -> torch.Tensor:
         """Build tensor of phoneme → 12D mappings."""
@@ -1258,7 +1257,10 @@ class CSREmbeddingProvider(nn.Module):
         affinity_table = F.normalize(affinity_table, p=2, dim=-1)
 
         # Register as buffer (moves with model to GPU)
-        self.register_buffer('_token_affinity_table', affinity_table)
+        # Safe registration: delete existing attribute if present
+        if hasattr(self, '_token_affinity_table'):
+            del self._token_affinity_table
+        self.register_buffer('_token_affinity_table', affinity_table, persistent=False)
 
         elapsed = time.time() - start_time
         print(f"  [CSR] Token affinity table built in {elapsed:.2f}s")
