@@ -6927,6 +6927,15 @@ def train(config: UnifiedTrainingConfig):
         if config.enable_toroidal_bridge:
             print(f"    ⚠️  Note: Toroidal Bridge superseded by Evolutionary Flow")
 
+    # Also create HiddenStateExtractor for CSR safety layers if needed (and not already created)
+    csr_needs_extractor = (
+        config.enable_csr and CSR_AVAILABLE and
+        (config.csr_use_entropy_sink or config.csr_use_synthesis_gate)
+    )
+    if csr_needs_extractor and hidden_state_extractor is None:
+        hidden_state_extractor = HiddenStateExtractor(model, num_layers=12)
+        print(f"  CSR Hidden State Extractor: ENABLED ({len(hidden_state_extractor.hooks)} hooks registered)")
+
     # Optimizer
     optimizer = AdamW(
         model.parameters(),
@@ -7234,6 +7243,42 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     csr_metrics['csr_loss'] = 0.0
                     csr_metrics['csr_confidence'] = csr_confidence.mean().item() if csr_confidence is not None else 0.0
+
+                # CSR Safety Layers: EntropySink (Layer 0) and SynthesisGate (Layer 11)
+                # These enforce ontological safety at the boundaries of the 12D structure
+                if hidden_state_extractor is not None:
+                    layer_hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
+
+                    if layer_hidden_states is not None and len(layer_hidden_states) >= 12:
+                        # EntropySink: Layer 0 (O1_Potential) safety - prevents mode collapse
+                        if csr_entropy_sink is not None:
+                            layer_0_hidden = layer_hidden_states[0]
+                            if layer_0_hidden.shape[-1] == csr_emb.shape[-1]:
+                                _, sink_metrics = csr_entropy_sink(layer_0_hidden, csr_affinity)
+                                csr_metrics['entropy_sink_entropy'] = sink_metrics.get('entropy', 0.0)
+                                csr_metrics['entropy_sink_anchor'] = sink_metrics.get('anchor_strength', 0.0)
+                                # Add entropy floor loss: penalize if entropy drops below min_entropy
+                                if 'entropy' in sink_metrics:
+                                    entropy_val = sink_metrics['entropy']
+                                    if isinstance(entropy_val, torch.Tensor):
+                                        entropy_floor_loss = torch.clamp(0.1 - entropy_val.mean(), min=0) * 0.1
+                                        loss = loss + entropy_floor_loss
+                                        csr_metrics['entropy_floor_loss'] = entropy_floor_loss.item()
+
+                        # SynthesisGate: Layer 11 (O11_Integration) safety - reconciles structure with flow
+                        if csr_synthesis_gate is not None:
+                            layer_11_hidden = layer_hidden_states[11]
+                            if layer_11_hidden.shape[-1] == csr_emb.shape[-1]:
+                                synthesized, gate_metrics = csr_synthesis_gate(layer_11_hidden, csr_emb, csr_affinity)
+                                csr_metrics['synthesis_gate_value'] = gate_metrics.get('gate_value', 0.0)
+                                csr_metrics['synthesis_coherence'] = gate_metrics.get('coherence', 0.0)
+                                # Add synthesis coherence loss: encourage high coherence at integration layer
+                                if 'coherence' in gate_metrics:
+                                    coherence_val = gate_metrics['coherence']
+                                    if isinstance(coherence_val, torch.Tensor):
+                                        synthesis_loss = (1 - coherence_val.mean()) * 0.05
+                                        loss = loss + synthesis_loss
+                                        csr_metrics['synthesis_loss'] = synthesis_loss.item()
 
             # Initialize default guna values for first iteration
             # (actual values computed later in the loop, but needed here for evolutionary bridge)
