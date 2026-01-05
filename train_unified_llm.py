@@ -1465,6 +1465,9 @@ class EvolutionaryIntelligenceEngine:
         resonance_alpha: float = 0.1,
         lr_slowdown_factor: float = 0.5,
         lr_accelerate_factor: float = 1.2,
+        dropout: float = 0.1,
+        use_rmatrix: bool = True,
+        coherence_window: int = 100,
         device: torch.device = None,
     ):
         self.dim = dim
@@ -1473,19 +1476,23 @@ class EvolutionaryIntelligenceEngine:
         self.resonance_alpha = resonance_alpha
         self.lr_slowdown_factor = lr_slowdown_factor
         self.lr_accelerate_factor = lr_accelerate_factor
+        self.coherence_window = coherence_window
         self.device = device or torch.device('cpu')
 
         # Core components
         self.flow_network = EvolutionaryFlowNetwork(
             dim=dim,
             num_layers=num_layers,
+            dropout=dropout,
+            use_rmatrix_weighting=use_rmatrix,
             enable_backward_resonance=enable_backward_resonance,
         ).to(self.device)
 
         self.flow_loss = EvolutionaryFlowLoss()
 
-        # Metacognitive tracking
+        # Metacognitive tracking with configurable coherence window
         self.metacognitive = MetacognitiveTracker(
+            window_size=coherence_window,
             coherence_alarm_threshold=0.3,
         )
 
@@ -2685,8 +2692,8 @@ class VRAMGovernor:
 
         if sovereign_engine is not None and hasattr(sovereign_engine, 'config'):
             # Apply the compensation to the engine
-            sovereign_engine.config.lambda_b1 *= (1.0 + compensation)
-            actions.append(f"   λ_B1 scaled: {sovereign_engine.config.lambda_b1 / (1 + compensation):.2f} → {sovereign_engine.config.lambda_b1:.2f} (noise compensation)")
+            sovereign_engine.config.b1_lambda *= (1.0 + compensation)
+            actions.append(f"   λ_B1 scaled: {sovereign_engine.config.b1_lambda / (1 + compensation):.2f} → {sovereign_engine.config.b1_lambda:.2f} (noise compensation)")
 
         # Auto-scale gradient accumulation if batch gets too small
         if self.enable_accumulation_scaling and new_batch < self.target_effective_batch:
@@ -2715,9 +2722,9 @@ class VRAMGovernor:
         self.b1_scale_factor = max(1.0, self.b1_scale_factor / (1.0 + reduction))
 
         if sovereign_engine is not None and hasattr(sovereign_engine, 'config'):
-            old_b1 = sovereign_engine.config.lambda_b1
-            sovereign_engine.config.lambda_b1 /= (1.0 + reduction)
-            actions.append(f"   λ_B1 relaxed: {old_b1:.2f} → {sovereign_engine.config.lambda_b1:.2f}")
+            old_b1 = sovereign_engine.config.b1_lambda
+            sovereign_engine.config.b1_lambda /= (1.0 + reduction)
+            actions.append(f"   λ_B1 relaxed: {old_b1:.2f} → {sovereign_engine.config.b1_lambda:.2f}")
 
         # Adjust accumulation steps
         if self.enable_accumulation_scaling:
@@ -4455,8 +4462,9 @@ class DynamicRelaxationController:
         model: nn.Module,
         # Stability thresholds
         stability_threshold: float = 0.82,
-        stability_window: int = 500,        # Steps for stability check
-        mode: str = "consecutive",          # "consecutive" or "average"
+        stability_window: int = 500,        # Steps for stability check (rolling window)
+        streak_target: int = 5,             # Consecutive stable evals for 'consecutive' mode
+        mode: str = "consecutive",          # "consecutive", "average", or "sa_ratio"
         # Split configurations
         authority_split: Tuple[int, int] = (9, 3),  # Initial 9:3
         balanced_split: Tuple[int, int] = (6, 6),   # Target 6:6
@@ -4490,6 +4498,7 @@ class DynamicRelaxationController:
         # Thresholds
         self.stability_threshold = stability_threshold
         self.stability_window = stability_window
+        self.streak_target = streak_target
         self.mode = mode.lower()
         self.ppl_spike_threshold = ppl_spike_threshold
         self.recovery_steps = recovery_steps
@@ -4655,10 +4664,10 @@ class DynamicRelaxationController:
         - sa_ratio: Requires average S/A ratio >= threshold over rolling N-step window
         """
         if self.mode == "consecutive":
-            # Consecutive mode: reset on any dip
+            # Consecutive mode: reset on any dip, use streak_target for trigger
             if stability_index >= self.stability_threshold:
                 self.stability_streak += 1
-                return self.stability_streak >= self.stability_window
+                return self.stability_streak >= self.streak_target
             else:
                 self.stability_streak = 0
                 return False
@@ -5906,8 +5915,8 @@ class UnifiedTrainingConfig:
 
     # Loss weights for ontological model
     lambda_lm: float = 1.0        # Language modeling loss
-    lambda_bhava: float = 0.1     # Bhava relationship consistency
-    lambda_coherence: float = 0.05  # Global coherence
+    bhava_lambda: float = 0.1     # Bhava relationship consistency
+    coherence_lambda: float = 0.05  # Global coherence
     lambda_entropy: float = 0.01  # Entropy regularization
 
     # V9.5.1 Entropy Floor (prevents repetition curse)
@@ -5950,7 +5959,7 @@ class UnifiedTrainingConfig:
 
     # Sovereign-Lagrangian Loss [Patent B1/S3]
     enable_sovereign_loss: bool = False   # Enable Sovereign-Lagrangian loss
-    lambda_b1: float = 0.5                # Consistency Lagrangian weight [B1]
+    b1_lambda: float = 0.5                # Consistency Lagrangian weight [B1]
     mu_s3: float = 0.2                    # Global Coherence weight [S3]
     enable_stability_constraint: bool = False  # Enable S8 entropy anchoring
     gc_floor: float = 0.65                # Minimum GC for PIDv2 intervention
@@ -6013,11 +6022,6 @@ class UnifiedTrainingConfig:
     toroidal_use_gating: bool = True         # Use gated projection for selective carryover
     toroidal_truncated_bptt: int = 0         # Steps of gradient flow (0 = full detach)
     toroidal_coherence_threshold: float = 0.3  # Alarm threshold for cognitive discontinuity
-
-    # V9.4.7: Stochastic Gradient Persistence (SGP) - High-Rajas recursive learning
-    # Allows gradients to flow through bridge at a capped rate for stability
-    enable_sgp: bool = False                 # Enable SGP (off by default, H200 recommended)
-    sgp_rate: int = 100                      # SGP pulse every N steps (1% rule: 100 = 1%)
 
     # Full Evolutionary Flow System (Phase 2: All Layer Transitions)
     # Extends Toroidal Bridge to ALL layer transitions with Delayed Resonance
@@ -6417,15 +6421,15 @@ def compute_ontological_loss(
         if gc is not None and isinstance(gc, torch.Tensor):
             gc = gc.mean()
 
-        # [S5/B1] Scale lambda_b1 based on entropy - higher entropy = stronger consistency
+        # [S5/B1] Scale b1_lambda based on entropy - higher entropy = stronger consistency
         b1_scale = 1.0
         if onto_entropy > 0.60:
             # Scale up to 1.5x when entropy is very high (Rajasic state)
             excess = (onto_entropy - 0.60) / 0.40  # Scale 0.60-1.0 to 0-1
             b1_scale = 1.0 + excess * 0.5  # 1.0 to 1.5
-            # Temporarily boost lambda_b1
-            original_lambda_b1 = sovereign_engine.config.lambda_b1
-            sovereign_engine.config.lambda_b1 = original_lambda_b1 * b1_scale
+            # Temporarily boost b1_lambda
+            original_b1_lambda = sovereign_engine.config.b1_lambda
+            sovereign_engine.config.b1_lambda = original_b1_lambda * b1_scale
 
         # Compute Sovereign-Lagrangian loss
         total_loss, sov_metrics = sovereign_engine.sovereign_loss(
@@ -6434,9 +6438,9 @@ def compute_ontological_loss(
             guna_coherence=gc,
         )
 
-        # Restore original lambda_b1 if scaled
+        # Restore original b1_lambda if scaled
         if b1_scale > 1.0:
-            sovereign_engine.config.lambda_b1 = original_lambda_b1
+            sovereign_engine.config.b1_lambda = original_b1_lambda
 
         # Merge metrics
         metrics.update({
@@ -6501,13 +6505,16 @@ def compute_ontological_loss(
         bhava_loss = torch.tensor(0.0, device=logits.device)
 
     # 3. Global coherence regularization
-    if "global_coherence" in outputs:
+    if "global_coherence" in outputs and not config.no_coherence_loss:
         coherence = outputs["global_coherence"].mean()
         coherence_loss = 1.0 - coherence
         metrics["coherence"] = coherence.item()
         metrics["coherence_loss"] = coherence_loss.item()
     else:
         coherence_loss = torch.tensor(0.0, device=logits.device)
+        if "global_coherence" in outputs:
+            # Still track coherence metric even if loss is disabled
+            metrics["coherence"] = outputs["global_coherence"].mean().item()
 
     # 4. Entropy regularization
     if "ontological_probs" in outputs:
@@ -6522,8 +6529,8 @@ def compute_ontological_loss(
     # Combine losses
     total_loss = (
         config.lambda_lm * lm_loss +
-        config.lambda_bhava * bhava_loss +
-        config.lambda_coherence * coherence_loss +
+        config.bhava_lambda * bhava_loss +
+        config.coherence_lambda * coherence_loss +
         config.lambda_entropy * entropy_loss
     )
 
@@ -6701,12 +6708,12 @@ def train(config: UnifiedTrainingConfig):
     if config.enable_sovereign_loss:
         from symbolu.sovereign.metrics import SovereignEngine, SovereignLossConfig as SovEngineConfig, StabilityState
         sov_engine_config = SovEngineConfig(
-            lambda_b1=config.lambda_b1,
+            b1_lambda=config.b1_lambda,
             mu_s3=config.mu_s3,
             gc_floor=config.gc_floor,
         )
         sovereign_engine = SovereignEngine(config=sov_engine_config)
-        print(f"  Sovereign-Lagrangian Loss: ENABLED (λ_B1={config.lambda_b1}, μ_S3={config.mu_s3})")
+        print(f"  Sovereign-Lagrangian Loss: ENABLED (λ_B1={config.b1_lambda}, μ_S3={config.mu_s3})")
         if config.enable_stability_constraint:
             stability_state = StabilityState(window_size=5)
             print(f"  Stability Constraint [S8]: ENABLED (entropy anchoring)")
@@ -6878,7 +6885,7 @@ def train(config: UnifiedTrainingConfig):
             use_gating=config.toroidal_use_gating,
             truncated_bptt_steps=config.toroidal_truncated_bptt,
             enable_sgp=config.enable_sgp,
-            sgp_rate=config.sgp_rate,
+            sgp_rate=config.sgp_base_rate,  # Use new SGP base rate
         ).to(device)
         toroidal_loss_fn = ToroidalConsistencyLoss(
             lambda_toroid=config.toroidal_lambda,
@@ -6889,7 +6896,7 @@ def train(config: UnifiedTrainingConfig):
         )
         print(f"  Toroidal Bridge: ENABLED (λ={config.toroidal_lambda}, gate={config.toroidal_use_gating})")
         if config.enable_sgp:
-            print(f"    → SGP (Stochastic Gradient Persistence): ENABLED (rate=1/{config.sgp_rate})")
+            print(f"    → SGP (Stochastic Gradient Persistence): ENABLED (rate=1/{config.sgp_base_rate})")
         print(f"    → O12 (Absolving) feeds O1 (Potential) for recursive intelligence")
 
     # Full Evolutionary Flow System (Phase 2: All Layer Transitions with Delayed Resonance)
@@ -6912,6 +6919,9 @@ def train(config: UnifiedTrainingConfig):
             resonance_alpha=config.evo_resonance_alpha,
             lr_slowdown_factor=config.evo_lr_slowdown,
             lr_accelerate_factor=config.evo_lr_accelerate,
+            dropout=config.evo_dropout,
+            use_rmatrix=config.evo_use_rmatrix,
+            coherence_window=config.evo_coherence_window,
             device=device,
         )
         # Update flow loss weights
@@ -6932,6 +6942,15 @@ def train(config: UnifiedTrainingConfig):
         if config.enable_toroidal_bridge:
             print(f"    ⚠️  Note: Toroidal Bridge superseded by Evolutionary Flow")
 
+    # Also create HiddenStateExtractor for CSR safety layers if needed (and not already created)
+    csr_needs_extractor = (
+        config.enable_csr and CSR_AVAILABLE and
+        (config.csr_use_entropy_sink or config.csr_use_synthesis_gate)
+    )
+    if csr_needs_extractor and hidden_state_extractor is None:
+        hidden_state_extractor = HiddenStateExtractor(model, num_layers=12)
+        print(f"  CSR Hidden State Extractor: ENABLED ({len(hidden_state_extractor.hooks)} hooks registered)")
+
     # Optimizer
     optimizer = AdamW(
         model.parameters(),
@@ -6946,6 +6965,30 @@ def train(config: UnifiedTrainingConfig):
         T_max=config.max_steps - config.warmup_steps,
         eta_min=config.learning_rate * 0.1,
     )
+
+    # Resume from checkpoint if specified
+    resume_step = 0
+    best_val_loss = float('inf')
+    resumed_hgs_state = None
+    resumed_drc_state = None
+    if config.resume:
+        resume_path = Path(config.resume)
+        if resume_path.exists():
+            resume_result = load_checkpoint(
+                path=resume_path,
+                model=model,
+                optimizer=optimizer if not config.resume_weights_only else None,
+                scheduler=scheduler if not config.resume_weights_only else None,
+                weights_only=config.resume_weights_only,
+                device=device,
+            )
+            resume_step = resume_result["step"]
+            best_val_loss = resume_result["best_val_loss"]
+            resumed_hgs_state = resume_result.get("hgs_state")
+            resumed_drc_state = resume_result.get("drc_state")
+        else:
+            print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
+            print(f"      Starting training from scratch...")
 
     # Formula [1331]: 9:3 Hierarchical Gradient Scaling
     gradient_scaler_hgs = None
@@ -6999,6 +7042,7 @@ def train(config: UnifiedTrainingConfig):
             model=model,
             stability_threshold=config.relaxation_stability_threshold,
             stability_window=config.relaxation_stability_window,
+            streak_target=config.relaxation_streak_target,
             mode=config.relaxation_mode,
             authority_split=(config.authority_layers, config.sensory_layers),
             balanced_split=(config.relaxation_target_authority, config.relaxation_target_sensory),
@@ -7053,13 +7097,28 @@ def train(config: UnifiedTrainingConfig):
             min_steps_between_adjustments=config.adaptive_min_interval,
         )
 
+    # Restore HGS/DRC state from checkpoint if available
+    if resumed_hgs_state is not None and gradient_scaler_hgs is not None:
+        try:
+            gradient_scaler_hgs.set_state(resumed_hgs_state)
+            print(f"    ✓ HGS state restored from checkpoint")
+        except Exception as e:
+            print(f"    ⚠️  Could not restore HGS state: {e}")
+
+    if resumed_drc_state is not None and relaxation_controller is not None:
+        try:
+            relaxation_controller.set_state(resumed_drc_state)
+            print(f"    ✓ DRC state restored from checkpoint")
+        except Exception as e:
+            print(f"    ⚠️  Could not restore DRC state: {e}")
+
     # Mixed precision
     scaler = torch.amp.GradScaler('cuda') if config.mixed_precision != "none" else None
     autocast_dtype = torch.bfloat16 if config.mixed_precision == "bf16" else torch.float16
 
-    # Training state
-    global_step = 0
-    best_val_loss = float("inf")
+    # Training state (use resume_step if resuming from checkpoint)
+    global_step = resume_step
+    best_val_loss = best_val_loss if resume_step > 0 else float("inf")
     best_ppl = float("inf")
     spike_count = 0
     train_losses = []
@@ -7239,6 +7298,42 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     csr_metrics['csr_loss'] = 0.0
                     csr_metrics['csr_confidence'] = csr_confidence.mean().item() if csr_confidence is not None else 0.0
+
+                # CSR Safety Layers: EntropySink (Layer 0) and SynthesisGate (Layer 11)
+                # These enforce ontological safety at the boundaries of the 12D structure
+                if hidden_state_extractor is not None:
+                    layer_hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
+
+                    if layer_hidden_states is not None and len(layer_hidden_states) >= 12:
+                        # EntropySink: Layer 0 (O1_Potential) safety - prevents mode collapse
+                        if csr_entropy_sink is not None:
+                            layer_0_hidden = layer_hidden_states[0]
+                            if layer_0_hidden.shape[-1] == csr_emb.shape[-1]:
+                                _, sink_metrics = csr_entropy_sink(layer_0_hidden, csr_affinity)
+                                csr_metrics['entropy_sink_entropy'] = sink_metrics.get('entropy', 0.0)
+                                csr_metrics['entropy_sink_anchor'] = sink_metrics.get('anchor_strength', 0.0)
+                                # Add entropy floor loss: penalize if entropy drops below min_entropy
+                                if 'entropy' in sink_metrics:
+                                    entropy_val = sink_metrics['entropy']
+                                    if isinstance(entropy_val, torch.Tensor):
+                                        entropy_floor_loss = torch.clamp(0.1 - entropy_val.mean(), min=0) * 0.1
+                                        loss = loss + entropy_floor_loss
+                                        csr_metrics['entropy_floor_loss'] = entropy_floor_loss.item()
+
+                        # SynthesisGate: Layer 11 (O11_Integration) safety - reconciles structure with flow
+                        if csr_synthesis_gate is not None:
+                            layer_11_hidden = layer_hidden_states[11]
+                            if layer_11_hidden.shape[-1] == csr_emb.shape[-1]:
+                                synthesized, gate_metrics = csr_synthesis_gate(layer_11_hidden, csr_emb, csr_affinity)
+                                csr_metrics['synthesis_gate_value'] = gate_metrics.get('gate_value', 0.0)
+                                csr_metrics['synthesis_coherence'] = gate_metrics.get('coherence', 0.0)
+                                # Add synthesis coherence loss: encourage high coherence at integration layer
+                                if 'coherence' in gate_metrics:
+                                    coherence_val = gate_metrics['coherence']
+                                    if isinstance(coherence_val, torch.Tensor):
+                                        synthesis_loss = (1 - coherence_val.mean()) * 0.05
+                                        loss = loss + synthesis_loss
+                                        csr_metrics['synthesis_loss'] = synthesis_loss.item()
 
             # Initialize default guna values for first iteration
             # (actual values computed later in the loop, but needed here for evolutionary bridge)
@@ -8327,6 +8422,82 @@ def save_checkpoint(
     torch.save(checkpoint, path)
 
 
+def load_checkpoint(
+    path: Path,
+    model: nn.Module,
+    optimizer: Optional[torch.optim.Optimizer] = None,
+    scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
+    weights_only: bool = False,
+    device: torch.device = None,
+) -> Dict[str, Any]:
+    """Load training checkpoint.
+
+    Args:
+        path: Path to checkpoint file
+        model: Model to load weights into
+        optimizer: Optimizer to restore state (None if weights_only)
+        scheduler: Scheduler to restore state (None if weights_only)
+        weights_only: If True, only load model weights (fresh optimizer/scheduler)
+        device: Device to map tensors to
+
+    Returns:
+        Dict with checkpoint info (step, best_val_loss, etc.)
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"Checkpoint not found: {path}")
+
+    print(f"\n  📂 Loading checkpoint from: {path}")
+
+    # Load checkpoint
+    checkpoint = torch.load(path, map_location=device, weights_only=False)
+
+    # Load model weights
+    model.load_state_dict(checkpoint["model"])
+    print(f"    ✓ Model weights loaded")
+
+    result = {
+        "step": checkpoint.get("step", 0),
+        "best_val_loss": checkpoint.get("best_val_loss", float('inf')),
+    }
+
+    if weights_only:
+        print(f"    → Weights-only mode: Optimizer/Scheduler will start fresh")
+        result["step"] = 0  # Start from step 0 with fresh optimizer
+        return result
+
+    # Restore optimizer state
+    if optimizer is not None and "optimizer" in checkpoint:
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        print(f"    ✓ Optimizer state restored")
+
+    # Restore scheduler state
+    if scheduler is not None and "scheduler" in checkpoint:
+        scheduler.load_state_dict(checkpoint["scheduler"])
+        print(f"    ✓ Scheduler state restored")
+
+    # Restore RNG states for reproducibility
+    if "rng_state" in checkpoint:
+        torch.set_rng_state(checkpoint["rng_state"])
+        print(f"    ✓ RNG state restored")
+
+    if "cuda_rng_state" in checkpoint and torch.cuda.is_available():
+        torch.cuda.set_rng_state(checkpoint["cuda_rng_state"])
+        print(f"    ✓ CUDA RNG state restored")
+
+    # Return additional state for HGS/DRC restoration
+    if "hgs_state" in checkpoint:
+        result["hgs_state"] = checkpoint["hgs_state"]
+        print(f"    ✓ HGS state available for restoration")
+
+    if "drc_state" in checkpoint:
+        result["drc_state"] = checkpoint["drc_state"]
+        print(f"    ✓ DRC state available for restoration")
+
+    print(f"    → Resuming from step {result['step']}, best_val_loss={result['best_val_loss']:.4f}")
+
+    return result
+
+
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -8393,13 +8564,13 @@ def main():
                        help="Steps over which alpha_phase decays from start to end")
 
     # Ontological-specific
-    parser.add_argument("--lambda_bhava", type=float, default=0.1,
+    parser.add_argument("--bhava_lambda", type=float, default=0.1,
                        help="Bhava relationship loss weight")
-    parser.add_argument("--lambda_coherence", type=float, default=0.05,
+    parser.add_argument("--coherence_lambda", type=float, default=0.05,
                        help="Coherence loss weight")
 
     # Sovereign-Lagrangian Loss [Patent B1/S3]
-    parser.add_argument("--lambda_b1", type=float, default=0.5,
+    parser.add_argument("--b1_lambda", type=float, default=0.5,
                        help="Consistency Lagrangian weight [B1] (forward/backward alignment)")
     parser.add_argument("--mu_s3", type=float, default=0.2,
                        help="Global Coherence weight [S3] (phase-lock penalty)")
@@ -8575,6 +8746,8 @@ def main():
     # Weight Transfer (9:3 → 6:6 transition)
     parser.add_argument("--enable_weight_transfer", action="store_true", default=True,
                        help="Enable weight transfer from Authority to Sensory layers during relaxation")
+    parser.add_argument("--disable_weight_transfer", action="store_true",
+                       help="Disable weight transfer (overrides --enable_weight_transfer)")
     parser.add_argument("--guna_lock_steps", type=int, default=50,
                        help="Steps to freeze W_q/W_k after relaxation (Guna-Lock)")
 
@@ -8591,12 +8764,6 @@ def main():
                        help="Steps of gradient flow (0 = full detach)")
     parser.add_argument("--toroidal_coherence_threshold", type=float, default=0.3,
                        help="Alarm threshold for cognitive discontinuity")
-
-    # V9.4.7: Stochastic Gradient Persistence (SGP)
-    parser.add_argument("--enable_sgp", action="store_true",
-                       help="Enable SGP recursive gradient pulses (H200 recommended)")
-    parser.add_argument("--sgp_rate", type=int, default=100,
-                       help="SGP pulse every N steps (default 100 = 1%% rule)")
 
     # Full Evolutionary Flow System (Phase 2-5)
     parser.add_argument("--enable_evolutionary_flow", action="store_true", default=True,
@@ -8748,8 +8915,8 @@ def main():
         mixed_precision=args.mixed_precision,
         local_backend=args.local_backend,
         window_size=args.window_size,
-        lambda_bhava=args.lambda_bhava,
-        lambda_coherence=args.lambda_coherence,
+        bhava_lambda=args.bhava_lambda,
+        coherence_lambda=args.coherence_lambda,
         log_every=args.log_every,
         quiet=args.quiet,
         eval_every=args.eval_every,
@@ -8759,7 +8926,7 @@ def main():
         seed=args.seed,
         # Sovereign-Lagrangian Loss [Patent B1/S3]
         enable_sovereign_loss=args.enable_sovereign_loss,
-        lambda_b1=args.lambda_b1,
+        b1_lambda=args.b1_lambda,
         mu_s3=args.mu_s3,
         enable_stability_constraint=args.enable_stability_constraint,
         gc_floor=args.gc_floor,
@@ -8828,7 +8995,7 @@ def main():
         relaxation_ppl_spike_threshold=args.relaxation_ppl_spike_threshold,
         relaxation_recovery_steps=args.relaxation_recovery_steps,
         # Weight Transfer
-        enable_weight_transfer=args.enable_weight_transfer,
+        enable_weight_transfer=args.enable_weight_transfer and not args.disable_weight_transfer,
         guna_lock_steps=args.guna_lock_steps,
         # Toroidal Evolutionary Bridge
         enable_toroidal_bridge=args.enable_toroidal_bridge,
