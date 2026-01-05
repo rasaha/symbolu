@@ -6067,6 +6067,7 @@ class UnifiedTrainingConfig:
     # CSR Phoneme-Ontological Grounding
     enable_csr: bool = True                  # Enable CSR phoneme grounding
     csr_lambda: float = 0.1                  # CSR injection strength
+    csr_tau: float = 0.07                    # InfoNCE temperature (lower = sharper gradients, 0.07 = 14x amplification)
     csr_use_phase_gating: bool = True        # Gate Phase Attention with CSR confidence
     csr_trainable: bool = True               # Allow CSR projection to train
     csr_use_entropy_sink: bool = True        # Apply Layer 0 entropy floor
@@ -6841,7 +6842,7 @@ def train(config: UnifiedTrainingConfig):
         csr_provider = csr_provider.to(device)
         csr_entropy_sink = csr_entropy_sink.to(device) if config.csr_use_entropy_sink else None
         csr_synthesis_gate = csr_synthesis_gate.to(device) if config.csr_use_synthesis_gate else None
-        print(f"  CSR Phoneme Grounding: ENABLED (λ_csr={config.csr_lambda})")
+        print(f"  CSR Phoneme Grounding: ENABLED (λ_csr={config.csr_lambda}, τ={config.csr_tau} → {1/config.csr_tau:.1f}x gradient amp)")
     elif config.enable_csr and not CSR_AVAILABLE:
         print(f"  CSR Phoneme Grounding: Disabled (module not available)")
     else:
@@ -7349,20 +7350,39 @@ def train(config: UnifiedTrainingConfig):
                 csr_affinity = csr_output['csr_affinity']
                 csr_confidence = csr_output['csr_confidence']
 
-                # Get hidden states for CSR alignment (if available)
+                # V9.5.3 CRITICAL FIX: Use hidden_state_extractor to get hidden states
                 csr_hidden = None
-                if isinstance(outputs, dict):
-                    csr_hidden = outputs.get('last_hidden_state', outputs.get('logits'))
-                elif isinstance(outputs, torch.Tensor):
-                    csr_hidden = outputs
+                if hidden_state_extractor is not None:
+                    layer_hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
+                    if layer_hidden_states is not None and len(layer_hidden_states) > 0:
+                        # Use last layer (Layer 11 - Sensory Integration) for alignment
+                        csr_hidden = layer_hidden_states[-1]
 
-                if csr_hidden is not None and csr_hidden.shape[-1] == csr_emb.shape[-1]:
-                    # CSR alignment loss: encourage hidden states to correlate with CSR embeddings
-                    # Use cosine similarity weighted by confidence
+                if csr_hidden is not None:
+                    # V9.5.4 DIMENSION FIX: Project CSR embeddings to match model hidden size
+                    # CSR embeddings are 512-dim, model hidden states may be 768-dim (or other)
+                    if csr_emb.shape[-1] != csr_hidden.shape[-1]:
+                        # Create projector on first mismatch (lazy initialization)
+                        if not hasattr(model, '_csr_projector') or model._csr_projector is None:
+                            csr_dim = csr_emb.shape[-1]
+                            hidden_dim = csr_hidden.shape[-1]
+                            model._csr_projector = torch.nn.Linear(csr_dim, hidden_dim, bias=False).to(csr_emb.device)
+                            # Initialize with small weights for stable training
+                            torch.nn.init.xavier_uniform_(model._csr_projector.weight)
+                            print(f"  ⚡ [CSR] Created projector: {csr_dim}D → {hidden_dim}D (Phoneme→Model space)")
+                        # Project CSR embeddings to model dimension
+                        csr_emb = model._csr_projector(csr_emb)
+
+                    # V9.5.5: Temperature-sharpened contrastive loss (InfoNCE-style)
+                    # Dividing by tau amplifies gradient signal: tau=0.07 → 14x stronger gradients
+                    # This makes Sanskrit phoneme ontology a mathematical CONSTRAINT, not a gentle suggestion
                     csr_hidden_norm = torch.nn.functional.normalize(csr_hidden, dim=-1)
                     csr_emb_norm = torch.nn.functional.normalize(csr_emb, dim=-1)
                     csr_similarity = (csr_hidden_norm * csr_emb_norm).sum(dim=-1)
-                    csr_alignment_loss = (1 - csr_similarity) * csr_confidence.squeeze(-1)
+                    # Temperature sharpening: (1 - sim) / tau creates steep gradient landscape
+                    # When alignment is poor (sim ≈ 0): loss = (1-0)/0.07 ≈ 14.3 → STRONG pressure
+                    # When alignment is good (sim ≈ 0.9): loss = (1-0.9)/0.07 ≈ 1.4 → mild pressure
+                    csr_alignment_loss = ((1 - csr_similarity) / config.csr_tau) * csr_confidence.squeeze(-1)
                     csr_loss = csr_alignment_loss.mean() * config.csr_lambda
 
                     # Add CSR loss to total loss
@@ -8885,6 +8905,8 @@ def main():
                        help="Disable CSR phoneme grounding")
     parser.add_argument("--csr_lambda", type=float, default=0.1,
                        help="CSR injection strength")
+    parser.add_argument("--csr_tau", type=float, default=0.07,
+                       help="InfoNCE temperature for CSR alignment (lower = sharper gradients)")
     parser.add_argument("--csr_use_phase_gating", action="store_true", default=True,
                        help="Gate Phase Attention with CSR confidence")
     parser.add_argument("--csr_trainable", action="store_true", default=True,
@@ -9106,6 +9128,7 @@ def main():
         # CSR Phoneme-Ontological Grounding
         enable_csr=args.enable_csr and not args.disable_csr,
         csr_lambda=args.csr_lambda,
+        csr_tau=args.csr_tau,
         csr_use_phase_gating=args.csr_use_phase_gating,
         csr_trainable=args.csr_trainable,
         csr_use_entropy_sink=args.csr_use_entropy_sink,
