@@ -2692,8 +2692,8 @@ class VRAMGovernor:
 
         if sovereign_engine is not None and hasattr(sovereign_engine, 'config'):
             # Apply the compensation to the engine
-            sovereign_engine.config.b1_lambda *= (1.0 + compensation)
-            actions.append(f"   λ_B1 scaled: {sovereign_engine.config.b1_lambda / (1 + compensation):.2f} → {sovereign_engine.config.b1_lambda:.2f} (noise compensation)")
+            sovereign_engine.config.lambda_b1 *= (1.0 + compensation)
+            actions.append(f"   λ_B1 scaled: {sovereign_engine.config.lambda_b1 / (1 + compensation):.2f} → {sovereign_engine.config.lambda_b1:.2f} (noise compensation)")
 
         # Auto-scale gradient accumulation if batch gets too small
         if self.enable_accumulation_scaling and new_batch < self.target_effective_batch:
@@ -2722,9 +2722,9 @@ class VRAMGovernor:
         self.b1_scale_factor = max(1.0, self.b1_scale_factor / (1.0 + reduction))
 
         if sovereign_engine is not None and hasattr(sovereign_engine, 'config'):
-            old_b1 = sovereign_engine.config.b1_lambda
-            sovereign_engine.config.b1_lambda /= (1.0 + reduction)
-            actions.append(f"   λ_B1 relaxed: {old_b1:.2f} → {sovereign_engine.config.b1_lambda:.2f}")
+            old_b1 = sovereign_engine.config.lambda_b1
+            sovereign_engine.config.lambda_b1 /= (1.0 + reduction)
+            actions.append(f"   λ_B1 relaxed: {old_b1:.2f} → {sovereign_engine.config.lambda_b1:.2f}")
 
         # Adjust accumulation steps
         if self.enable_accumulation_scaling:
@@ -6421,15 +6421,15 @@ def compute_ontological_loss(
         if gc is not None and isinstance(gc, torch.Tensor):
             gc = gc.mean()
 
-        # [S5/B1] Scale b1_lambda based on entropy - higher entropy = stronger consistency
+        # [S5/B1] Scale lambda_b1 based on entropy - higher entropy = stronger consistency
         b1_scale = 1.0
         if onto_entropy > 0.60:
             # Scale up to 1.5x when entropy is very high (Rajasic state)
             excess = (onto_entropy - 0.60) / 0.40  # Scale 0.60-1.0 to 0-1
             b1_scale = 1.0 + excess * 0.5  # 1.0 to 1.5
-            # Temporarily boost b1_lambda
-            original_b1_lambda = sovereign_engine.config.b1_lambda
-            sovereign_engine.config.b1_lambda = original_b1_lambda * b1_scale
+            # Temporarily boost lambda_b1
+            original_lambda_b1 = sovereign_engine.config.lambda_b1
+            sovereign_engine.config.lambda_b1 = original_lambda_b1 * b1_scale
 
         # Compute Sovereign-Lagrangian loss
         total_loss, sov_metrics = sovereign_engine.sovereign_loss(
@@ -6438,9 +6438,9 @@ def compute_ontological_loss(
             guna_coherence=gc,
         )
 
-        # Restore original b1_lambda if scaled
+        # Restore original lambda_b1 if scaled
         if b1_scale > 1.0:
-            sovereign_engine.config.b1_lambda = original_b1_lambda
+            sovereign_engine.config.lambda_b1 = original_lambda_b1
 
         # Merge metrics
         metrics.update({
