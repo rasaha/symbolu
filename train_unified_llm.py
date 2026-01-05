@@ -6681,47 +6681,52 @@ def train(config: UnifiedTrainingConfig):
     if config.enable_auto_batch:
         print(f"\n  Auto Batch Sizing: ENABLED")
 
-        # V9.5.2: Calibrated max batch limits from real-world testing
-        # These are HARD LIMITS for sovereign loss + 2048 seq len
-        # Medium and Large models have SAME limits (sovereign loss dominates)
-        # Only tiny/small can use larger batches
+        # V9.5.2: Model size is the PRIMARY factor in batch sizing
+        # GPU VRAM is a "zero-sum game":
+        #   - FLOOR (static): Model weights + Optimizer states + SGP buffers
+        #   - SWING SPACE (dynamic): Activations (batch × seq × layers)
+        # Larger models → bigger floor → less swing space → smaller batches
+        #
+        # Base limits are calibrated for LARGE models (conservative)
+        # Smaller models scale UP because they have more swing space
         model_size_scale = {
-            "tiny": 2.0,    # Can use 2x the base limit
-            "small": 1.5,   # Can use 1.5x the base limit
-            "medium": 1.0,  # Base limit (tested)
-            "large": 1.0,   # Same as medium (sovereign loss dominates)
+            "tiny": 4.0,    # ~4x swing space vs large
+            "small": 3.0,   # ~3x swing space vs large
+            "medium": 2.0,  # ~2x swing space vs large
+            "large": 1.0,   # Base limit (tested, conservative)
         }
         size_factor = model_size_scale.get(config.model_size, 1.0)
 
         # V9.5.2: Sequence length scaling (baseline: 2048)
-        # Only scale UP for shorter sequences, not down (limits are already tight)
+        # Activations scale linearly with seq len (attention is handled by flash/sdpa)
         seq_baseline = 2048
         if config.max_seq_len < seq_baseline:
-            # Shorter sequences can use slightly larger batches
-            seq_factor = min(1.5, seq_baseline / config.max_seq_len)
+            # Shorter sequences: more swing space available
+            seq_factor = min(2.0, seq_baseline / config.max_seq_len)
         else:
-            # Longer sequences: be conservative
+            # Longer sequences: less swing space
             seq_factor = max(0.5, seq_baseline / config.max_seq_len)
 
         # Combined scaling factor
         combined_factor = size_factor * seq_factor
 
         # Sovereign loss requires (B, Seq, Vocab) tensors - massive overhead
-        # V9.5.2: HARD LIMITS calibrated from real GPU testing (medium/large, 2048 seq)
-        #   - A100 (80GB): 16 max batch
-        #   - H100 (96GB): 24 max batch
-        #   - H200 (141GB): 32 max batch
+        # V9.5.2: BASE LIMITS for LARGE model + 2048 seq (smallest swing space)
+        #   - A100 (80GB): 16 max batch for large
+        #   - H100 (96GB): 24 max batch for large
+        #   - H200 (141GB): 32 max batch for large
+        # Smaller models can scale UP from these limits
         if config.enable_sovereign_loss:
             total_vram_gb = torch.cuda.get_device_properties(device).total_memory / 1e9
             if total_vram_gb >= 140:  # H200 class (141GB+)
-                base_max_batch = 32
+                base_max_batch = 32   # Large: 32, Medium: 64, Small: 96, Tiny: 128
             elif total_vram_gb >= 90:  # H100 class (96GB)
-                base_max_batch = 24
+                base_max_batch = 24   # Large: 24, Medium: 48, Small: 72, Tiny: 96
             elif total_vram_gb >= 70:  # A100 80GB class
-                base_max_batch = 16
+                base_max_batch = 16   # Large: 16, Medium: 32, Small: 48, Tiny: 64
             else:  # Smaller GPUs
                 base_max_batch = 8
-            # Apply scaling (only for tiny/small models or shorter sequences)
+            # Apply scaling (smaller models get more swing space)
             auto_max_batch = max(8, int(base_max_batch * combined_factor))
             print(f"  ⚠️  Sovereign Loss: max_batch={auto_max_batch} (VRAM: {total_vram_gb:.0f}GB, model: {config.model_size}, seq: {config.max_seq_len}, scale: {combined_factor:.2f}x)")
         else:
