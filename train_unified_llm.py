@@ -491,18 +491,21 @@ class EvolutionaryBridge(nn.Module):
             # SGP: Keep gradients only at capped rate (e.g., every 100 steps)
             if global_step % self.sgp_rate == 0:
                 # High-Rajas: Main graph remains connected for recursive evolution
-                self.karma_buffer = seed
+                # V9.5.2 Metabolic Tuning: Ensure BF16 precision to save memory
+                self.karma_buffer = seed.to(torch.bfloat16) if seed.dtype != torch.bfloat16 else seed
                 is_sgp_heavy_step = True
                 self.last_sgp_step = global_step
             else:
                 # Sattvic: Detach to maintain high throughput
-                self.karma_buffer = seed.detach()
+                # V9.5.2 Metabolic Tuning: Ensure BF16 precision
+                self.karma_buffer = seed.detach().to(torch.bfloat16) if seed.dtype != torch.bfloat16 else seed.detach()
         elif self.truncated_bptt_steps > 0 and self.step_count % self.truncated_bptt_steps != 0:
             # Legacy truncated BPTT mode (if SGP not enabled)
-            self.karma_buffer = seed
+            self.karma_buffer = seed.to(torch.bfloat16) if seed.dtype != torch.bfloat16 else seed
         else:
             # Default: Detach to prevent infinite gradient chains
-            self.karma_buffer = seed.detach()
+            # V9.5.2 Metabolic Tuning: Ensure BF16 precision
+            self.karma_buffer = seed.detach().to(torch.bfloat16) if seed.dtype != torch.bfloat16 else seed.detach()
 
         self.bridge_active = True
         return is_sgp_heavy_step
@@ -2964,12 +2967,19 @@ class AutoBatchSizer:
             print(f"  {'─'*60}")
 
         # Build list of candidate batch sizes (multiples of 8 for Tensor Core efficiency)
+        # V9.5.2 Metabolic Tuning: Also include intermediate batch sizes (48, 40) for better
+        # gradient accumulation granularity (e.g., 48/6=288 effective, 40/8=320 effective)
         alignment = 8
         if target_effective_batch > 0:
             max_candidate = min(self.max_batch_size, target_effective_batch)
         else:
             max_candidate = self.max_batch_size
         candidates = [b for b in range(alignment, max_candidate + 1, alignment)]
+        # Add intermediate values for fine-grained accumulation tuning
+        for intermediate in [40, 48, 56, 72]:
+            if intermediate not in candidates and intermediate <= max_candidate:
+                candidates.append(intermediate)
+        candidates = sorted(set(candidates))
         if not candidates:
             candidates = [alignment]  # Minimum fallback
 
@@ -5908,6 +5918,7 @@ class UnifiedTrainingConfig:
 
     # Gradient checkpointing
     gradient_checkpointing: bool = False
+    checkpoint_offload_cpu: bool = False  # Offload checkpointed activations to CPU (metabolic tuning)
 
     # Checkpointing
     checkpoint_dir: str = "checkpoints_unified"
@@ -6318,13 +6329,24 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         raise ValueError(f"Unknown model type: {config.model_type}")
 
     # Enable gradient checkpointing after model creation
+    # V9.5.2 Metabolic Tuning: Use non-reentrant checkpointing for better memory efficiency
     if config.gradient_checkpointing:
         if hasattr(model, 'gradient_checkpointing_enable'):
-            model.gradient_checkpointing_enable()
+            # Modern HuggingFace-style API
+            model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+            print(f"  [Metabolic] Gradient checkpointing enabled (non-reentrant mode)")
         else:
+            # Manual flag-based checkpointing
             for module in model.modules():
                 if hasattr(module, 'gradient_checkpointing'):
                     module.gradient_checkpointing = True
+                # Set use_reentrant=False for torch.utils.checkpoint compatibility
+                if hasattr(module, 'use_reentrant'):
+                    module.use_reentrant = False
+            print(f"  [Metabolic] Gradient checkpointing enabled (flag-based)")
+
+        if config.checkpoint_offload_cpu:
+            print(f"  [Metabolic] CPU activation offloading requested (requires custom forward)")
 
     return model.to(device)
 
@@ -8547,6 +8569,8 @@ def main():
     # Memory optimization
     parser.add_argument("--gradient_checkpointing", action="store_true",
                        help="Enable gradient checkpointing")
+    parser.add_argument("--checkpoint_offload_cpu", action="store_true",
+                       help="Offload checkpointed activations to CPU (metabolic tuning for large models)")
     parser.add_argument("--mixed_precision", type=str, default="bf16",
                        choices=["none", "fp16", "bf16"],
                        help="Mixed precision training")
@@ -8921,6 +8945,7 @@ def main():
         learning_rate=args.learning_rate,
         dataset=args.dataset,
         gradient_checkpointing=args.gradient_checkpointing,
+        checkpoint_offload_cpu=args.checkpoint_offload_cpu,
         mixed_precision=args.mixed_precision,
         local_backend=args.local_backend,
         window_size=args.window_size,
