@@ -399,12 +399,19 @@ class EvolutionaryBridge(nn.Module):
         bridge_dropout: float = 0.1,
         use_gating: bool = True,
         truncated_bptt_steps: int = 0,
+        enable_sgp: bool = False,
+        sgp_rate: int = 100,
     ):
         super().__init__()
         self.dim = dim
         self.num_layers = num_layers
         self.truncated_bptt_steps = truncated_bptt_steps
         self.step_count = 0
+
+        # V9.4.7: Stochastic Gradient Persistence (SGP)
+        self.enable_sgp = enable_sgp
+        self.sgp_rate = sgp_rate
+        self.last_sgp_step: Optional[int] = None  # Track last SGP pulse
 
         # Seed Projection: W_seed maps O12 → O1
         # Uses SwiGLU-style gating for selective information flow
@@ -427,6 +434,10 @@ class EvolutionaryBridge(nn.Module):
         self.coherence_history: List[float] = []
         self.bridge_active = False
 
+        # V9.4.6: Active projection for SMA gradient flow
+        # Keeps non-detached seed for meta-learning while karma_buffer remains detached
+        self.active_projection: Optional[torch.Tensor] = None
+
     def _compute_seed(self, harvest: torch.Tensor) -> torch.Tensor:
         """
         Compute the Seed state from the Harvest (O12 → O1 projection).
@@ -446,12 +457,20 @@ class EvolutionaryBridge(nn.Module):
         seed = self.seed_norm(seed)
         return seed
 
-    def store_harvest(self, harvest: torch.Tensor) -> None:
+    def store_harvest(self, harvest: torch.Tensor, global_step: int = 0) -> bool:
         """
         Store the Harvest (O12 final state) for the next cycle.
 
+        V9.4.7 Hybrid Logic:
+        - SMA (Sattvic): active_projection always retains gradients for meta-learning
+        - SGP (High-Rajas): karma_buffer keeps gradients only on "heavy steps"
+
         Args:
             harvest: Final hidden state from O12_ABSOLVING layer [B, dim] or [B, N, dim]
+            global_step: Current training step for SGP rate calculation
+
+        Returns:
+            bool: True if this was an SGP heavy step (gradients flow through karma_buffer)
         """
         # Take mean across sequence if needed (distill to essence)
         if harvest.dim() == 3:
@@ -460,16 +479,33 @@ class EvolutionaryBridge(nn.Module):
         # Compute the seed for next cycle
         seed = self._compute_seed(harvest)
 
-        # Handle gradient flow based on truncated BPTT setting
+        # V9.4.6: Keep active projection with gradients for SMA meta-learning
+        # This allows gradients to flow back to seed_proj/seed_gate weights (runs every step)
+        self.active_projection = seed  # Retains gradient path
+
+        # V9.4.7: SGP Hybrid Logic - determine if this is a "heavy step"
         self.step_count += 1
-        if self.truncated_bptt_steps > 0 and self.step_count % self.truncated_bptt_steps != 0:
-            # Allow gradient flow for truncated BPTT
+        is_sgp_heavy_step = False
+
+        if self.enable_sgp and self.sgp_rate > 0 and global_step > 0:
+            # SGP: Keep gradients only at capped rate (e.g., every 100 steps)
+            if global_step % self.sgp_rate == 0:
+                # High-Rajas: Main graph remains connected for recursive evolution
+                self.karma_buffer = seed
+                is_sgp_heavy_step = True
+                self.last_sgp_step = global_step
+            else:
+                # Sattvic: Detach to maintain high throughput
+                self.karma_buffer = seed.detach()
+        elif self.truncated_bptt_steps > 0 and self.step_count % self.truncated_bptt_steps != 0:
+            # Legacy truncated BPTT mode (if SGP not enabled)
             self.karma_buffer = seed
         else:
-            # Detach to prevent infinite gradient chains
+            # Default: Detach to prevent infinite gradient chains
             self.karma_buffer = seed.detach()
 
         self.bridge_active = True
+        return is_sgp_heavy_step
 
     def get_seed(self) -> Optional[torch.Tensor]:
         """
@@ -1464,15 +1500,22 @@ class EvolutionaryIntelligenceEngine:
         # Evolutionary history
         self.evolution_history: List[Dict[str, float]] = []
 
+        # V9.4.6: Elastic Resonance tracking
+        self.last_dynamic_alpha: float = self.resonance_alpha
+
     def apply_delayed_resonance(
         self,
         current_states: List[torch.Tensor],
     ) -> List[torch.Tensor]:
         """
+        V9.4.6: Elastic Resonance - Guna-scaled alpha.
+
         Apply delayed resonance: inject previous step's O12 (Authority/Integration)
         into current step's O1 (Potential/Sensory).
 
-        This creates the Toroidal 12→1 bridge without 2x compute penalty.
+        Dynamic alpha based on Guna state:
+        - High Sattva (clarity) → increase retention (up to 0.25)
+        - High Rajas (error/heat) → reduce retention (down to 0.05)
 
         Args:
             current_states: Hidden states from current forward pass
@@ -1483,6 +1526,13 @@ class EvolutionaryIntelligenceEngine:
         if self.resonance_buffer is None or len(self.resonance_buffer) == 0:
             return current_states
 
+        # V9.4.6: Compute dynamic alpha based on Gunas
+        s, r, t = self.current_gunas
+        # Base is resonance_alpha (0.1); range is [0.05, 0.25]
+        dynamic_alpha = self.resonance_alpha * (1.0 + (s * 1.5) - (r * 0.5))
+        dynamic_alpha = max(0.05, min(0.25, dynamic_alpha))
+        self.last_dynamic_alpha = dynamic_alpha
+
         # Inject Layer 11 (O12 - Authority/Integration) into Layer 0 (O1 - Potential)
         if len(self.resonance_buffer) >= 12 and len(current_states) >= 1:
             o12_prev = self.resonance_buffer[11]  # Previous O12 state
@@ -1490,13 +1540,13 @@ class EvolutionaryIntelligenceEngine:
 
             # Ensure shape compatibility
             if o12_prev.shape == o1_current.shape:
-                # Resonant injection: O1' = O1 + α * O12_prev
-                current_states[0] = o1_current + (self.resonance_alpha * o12_prev)
+                # Resonant injection: O1' = O1 + α * O12_prev (using dynamic alpha)
+                current_states[0] = o1_current + (dynamic_alpha * o12_prev)
             elif o12_prev.shape[-1] == o1_current.shape[-1]:
                 # Handle sequence length mismatch by averaging
                 if o12_prev.dim() == 3 and o1_current.dim() == 3:
                     o12_avg = o12_prev.mean(dim=1, keepdim=True).expand_as(o1_current)
-                    current_states[0] = o1_current + (self.resonance_alpha * o12_avg)
+                    current_states[0] = o1_current + (dynamic_alpha * o12_avg)
 
         return current_states
 
@@ -2703,6 +2753,299 @@ class VRAMGovernor:
 
 
 # =============================================================================
+# AUTO BATCH SIZER: VRAM-Based Startup Probing
+# =============================================================================
+
+class AutoBatchSizer:
+    """
+    VRAM-Aware Automatic Batch Size Detector.
+
+    At training startup, probes GPU memory to find the optimal batch size
+    that utilizes a target percentage of VRAM (default 80%). Uses binary
+    search for efficiency.
+
+    This runs ONCE at startup, before training begins. The determined
+    batch size remains fixed throughout training (VRAMGovernor handles
+    dynamic adjustments during training if needed).
+
+    Usage:
+        sizer = AutoBatchSizer(model, seq_len=2048, target_utilization=0.80)
+        batch_size, grad_accum = sizer.find_optimal_batch(target_effective=32)
+
+        # Use these to configure your dataloader
+        config.batch_size = batch_size
+        config.gradient_accumulation = grad_accum
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        seq_len: int = 2048,
+        vocab_size: int = 50257,
+        target_utilization: float = 0.80,
+        min_batch_size: int = 1,
+        max_batch_size: int = 128,
+        safety_margin: float = 0.05,  # Extra headroom below target
+        device: Optional[torch.device] = None,
+    ):
+        """
+        Args:
+            model: The model to probe (should be on GPU)
+            seq_len: Maximum sequence length for probing
+            vocab_size: Vocabulary size for dummy inputs
+            target_utilization: Target VRAM utilization (0.80 = 80%)
+            min_batch_size: Minimum batch size to try
+            max_batch_size: Maximum batch size to try
+            safety_margin: Extra margin below target (0.05 = 5% headroom)
+            device: Device to probe (defaults to cuda:0)
+        """
+        self.model = model
+        self.seq_len = seq_len
+        self.vocab_size = vocab_size
+        self.target_utilization = target_utilization
+        self.effective_target = target_utilization - safety_margin
+        self.min_batch_size = min_batch_size
+        self.max_batch_size = max_batch_size
+        self.device = device or torch.device("cuda:0")
+
+        # Results
+        self.probed_batch_size: Optional[int] = None
+        self.peak_memory_gb: float = 0.0
+        self.total_memory_gb: float = 0.0
+
+    def _get_memory_info(self) -> Tuple[float, float, float]:
+        """Get current VRAM usage."""
+        if not torch.cuda.is_available():
+            return 0.0, 0.0, 0.0
+
+        torch.cuda.synchronize()
+        allocated = torch.cuda.memory_allocated(self.device)
+        reserved = torch.cuda.memory_reserved(self.device)
+        total = torch.cuda.get_device_properties(self.device).total_memory
+
+        return allocated / total, reserved / (1024**3), total / (1024**3)
+
+    def _clear_memory(self):
+        """Aggressively clear GPU memory."""
+        import gc
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
+    def _probe_batch_size(self, batch_size: int) -> Tuple[bool, float]:
+        """
+        Probe if a given batch size fits in memory.
+
+        Returns:
+            (success, peak_utilization)
+        """
+        self._clear_memory()
+
+        try:
+            # Create dummy batch
+            dummy_input = torch.randint(
+                0, self.vocab_size,
+                (batch_size, self.seq_len),
+                device=self.device,
+                dtype=torch.long
+            )
+            dummy_target = torch.randint(
+                0, self.vocab_size,
+                (batch_size, self.seq_len),
+                device=self.device,
+                dtype=torch.long
+            )
+
+            # Forward pass
+            self.model.train()
+            with torch.amp.autocast('cuda', dtype=torch.bfloat16):
+                outputs = self.model(dummy_input)
+
+                # Handle different output formats
+                if isinstance(outputs, dict):
+                    # Ontological models return dict with 'logits' key
+                    logits = outputs.get('logits', outputs.get('output', list(outputs.values())[0]))
+                elif isinstance(outputs, tuple):
+                    logits = outputs[0]
+                elif hasattr(outputs, 'logits'):
+                    logits = outputs.logits
+                else:
+                    logits = outputs
+
+                # Compute loss (simulates full training step memory)
+                loss = F.cross_entropy(
+                    logits.view(-1, logits.size(-1)),
+                    dummy_target.view(-1),
+                    ignore_index=-100
+                )
+
+            # Backward pass (this is where most memory is used)
+            loss.backward()
+
+            # Check peak memory
+            torch.cuda.synchronize()
+            peak_allocated = torch.cuda.max_memory_allocated(self.device)
+            total = torch.cuda.get_device_properties(self.device).total_memory
+            peak_utilization = peak_allocated / total
+
+            # Cleanup
+            del dummy_input, dummy_target, outputs, logits, loss
+            self.model.zero_grad(set_to_none=True)
+            self._clear_memory()
+            torch.cuda.reset_peak_memory_stats()
+
+            return True, peak_utilization
+
+        except RuntimeError as e:
+            if "out of memory" in str(e).lower() or "CUDA" in str(e):
+                # OOM - this batch size is too large
+                self.model.zero_grad(set_to_none=True)
+                self._clear_memory()
+                torch.cuda.reset_peak_memory_stats()
+                return False, 1.0
+            else:
+                raise
+
+    def find_optimal_batch(
+        self,
+        target_effective_batch: int = 32,
+        verbose: bool = True
+    ) -> Tuple[int, int]:
+        """
+        Find optimal batch size using binary search.
+
+        Args:
+            target_effective_batch: Desired effective batch size (for grad accum calculation).
+                                   If 0, just finds max batch that fits and sets accum=1.
+            verbose: Print progress
+
+        Returns:
+            (batch_size, gradient_accumulation_steps)
+        """
+        if not torch.cuda.is_available():
+            if verbose:
+                print("  ⚠️  No CUDA available, using default batch size")
+            if target_effective_batch > 0:
+                return self.min_batch_size, target_effective_batch // self.min_batch_size
+            return self.min_batch_size, 1
+
+        # Get total memory
+        total_mem = torch.cuda.get_device_properties(self.device).total_memory
+        self.total_memory_gb = total_mem / (1024**3)
+
+        if verbose:
+            print(f"\n  {'='*60}")
+            print(f"  AUTO BATCH SIZER: Probing optimal batch size")
+            print(f"  {'='*60}")
+            print(f"  GPU: {torch.cuda.get_device_name(self.device)}")
+            print(f"  Total VRAM: {self.total_memory_gb:.1f} GB")
+            print(f"  Target Utilization: {self.target_utilization:.0%} (effective: {self.effective_target:.0%})")
+            print(f"  Sequence Length: {self.seq_len:,}")
+            if target_effective_batch > 0:
+                print(f"  Target Effective Batch: {target_effective_batch}")
+            else:
+                print(f"  Mode: Find maximum batch (no accumulation target)")
+            print(f"  {'─'*60}")
+
+        # Build list of candidate batch sizes (multiples of 8 for Tensor Core efficiency)
+        alignment = 8
+        if target_effective_batch > 0:
+            max_candidate = min(self.max_batch_size, target_effective_batch)
+        else:
+            max_candidate = self.max_batch_size
+        candidates = [b for b in range(alignment, max_candidate + 1, alignment)]
+        if not candidates:
+            candidates = [alignment]  # Minimum fallback
+
+        if verbose:
+            print(f"  Candidates (multiples of {alignment}): {candidates}")
+
+        # Binary search for optimal batch size
+        low_idx = 0
+        high_idx = len(candidates) - 1
+        optimal_batch = candidates[0]
+        optimal_utilization = 0.0
+
+        # First, find the maximum that fits
+        if verbose:
+            print(f"  Phase 1: Finding maximum batch size that fits...")
+
+        while low_idx <= high_idx:
+            mid_idx = (low_idx + high_idx) // 2
+            mid = candidates[mid_idx]
+            if verbose:
+                print(f"    Probing batch_size={mid}...", end=" ", flush=True)
+
+            success, utilization = self._probe_batch_size(mid)
+
+            if success:
+                if verbose:
+                    print(f"✓ ({utilization:.1%} VRAM)")
+
+                if utilization <= self.effective_target:
+                    # Fits within target, try larger
+                    optimal_batch = mid
+                    optimal_utilization = utilization
+                    low_idx = mid_idx + 1
+                else:
+                    # Exceeds target but doesn't OOM, this is close
+                    optimal_batch = mid
+                    optimal_utilization = utilization
+                    high_idx = mid_idx - 1
+            else:
+                if verbose:
+                    print(f"✗ OOM")
+                high_idx = mid_idx - 1
+
+        # Verify final choice fits within target
+        if optimal_utilization > self.effective_target:
+            # Step down to previous candidate
+            current_idx = candidates.index(optimal_batch)
+            while current_idx > 0:
+                current_idx -= 1
+                optimal_batch = candidates[current_idx]
+                success, utilization = self._probe_batch_size(optimal_batch)
+                if success and utilization <= self.effective_target:
+                    optimal_utilization = utilization
+                    if verbose:
+                        print(f"    Stepping down to batch_size={optimal_batch}... ✓ ({utilization:.1%} VRAM)")
+                    break
+
+        # Calculate gradient accumulation
+        if target_effective_batch <= 0 or optimal_batch >= target_effective_batch:
+            grad_accum = 1
+        else:
+            grad_accum = max(1, target_effective_batch // optimal_batch)
+
+        effective_batch = optimal_batch * grad_accum
+
+        # Store results
+        self.probed_batch_size = optimal_batch
+        self.peak_memory_gb = optimal_utilization * self.total_memory_gb
+
+        if verbose:
+            print(f"  {'─'*60}")
+            print(f"  ✓ OPTIMAL CONFIGURATION FOUND:")
+            print(f"    Batch Size: {optimal_batch}")
+            print(f"    Gradient Accumulation: {grad_accum}")
+            print(f"    Effective Batch: {effective_batch}")
+            print(f"    Peak VRAM: {self.peak_memory_gb:.1f} GB ({optimal_utilization:.1%})")
+            print(f"  {'='*60}\n")
+
+        return optimal_batch, grad_accum
+
+    def get_summary(self) -> Dict[str, any]:
+        """Get summary of probing results."""
+        return {
+            "batch_size": self.probed_batch_size,
+            "total_vram_gb": self.total_memory_gb,
+            "peak_vram_gb": self.peak_memory_gb,
+            "target_utilization": self.target_utilization,
+            "seq_len": self.seq_len,
+        }
+
+
+# =============================================================================
 # V2.7 TRAINING STATE TRACKER: Knowledge State Evolution
 # =============================================================================
 
@@ -3828,6 +4171,247 @@ class LRAValidator:
 
 
 # =============================================================================
+# ADAPTIVE TRAINING CONTROLLER: Dynamic Hyperparameter Tuning
+# =============================================================================
+
+class AdaptiveTrainingController:
+    """
+    Dynamically adjusts training hyperparameters based on observed metrics.
+
+    Instead of manual tuning, this controller:
+    1. Monitors PPL velocity, coherence, and loss stability
+    2. Adjusts learning rate when training is too slow or unstable
+    3. Modulates PIDv2 Kp based on train/val gap
+    4. Logs all adjustments for transparency
+
+    Philosophy:
+    - If model is learning slowly (low velocity) → increase LR
+    - If model is unstable (high variance) → decrease LR
+    - If train >> val (overfitting) → decrease Kp
+    - If train ≈ val (underfitting) → increase Kp
+
+    Usage:
+        controller = AdaptiveTrainingController(optimizer, config)
+        # In training loop after validation:
+        controller.update(train_loss, val_loss, val_ppl, coherence, step)
+    """
+
+    def __init__(
+        self,
+        optimizer: torch.optim.Optimizer,
+        # LR adaptation
+        base_lr: float = 3e-4,
+        lr_min: float = 1e-5,
+        lr_max: float = 1e-3,
+        lr_boost_factor: float = 1.5,
+        lr_decay_factor: float = 0.7,
+        # PPL velocity thresholds
+        velocity_slow_threshold: float = -2.0,   # % per eval, below this = too slow
+        velocity_spike_threshold: float = 10.0,  # % per eval, above this = unstable
+        # Plateau detection
+        plateau_window: int = 5,                 # Evals to check for plateau
+        plateau_threshold: float = 1.0,          # % improvement threshold
+        # Kp adaptation
+        kp_base: float = 0.20,
+        kp_min: float = 0.10,
+        kp_max: float = 0.50,
+        # Stability
+        min_steps_between_adjustments: int = 200,
+    ):
+        self.optimizer = optimizer
+        self.base_lr = base_lr
+        self.lr_min = lr_min
+        self.lr_max = lr_max
+        self.lr_boost_factor = lr_boost_factor
+        self.lr_decay_factor = lr_decay_factor
+
+        self.velocity_slow_threshold = velocity_slow_threshold
+        self.velocity_spike_threshold = velocity_spike_threshold
+
+        self.plateau_window = plateau_window
+        self.plateau_threshold = plateau_threshold
+
+        self.kp_base = kp_base
+        self.kp_min = kp_min
+        self.kp_max = kp_max
+        self.current_kp = kp_base
+
+        self.min_steps_between_adjustments = min_steps_between_adjustments
+        self.last_adjustment_step = 0
+
+        # History tracking
+        self.val_ppl_history = []
+        self.train_loss_history = []
+        self.val_loss_history = []
+        self.coherence_history = []
+        self.adjustment_log = []
+
+        # State
+        self.current_lr_multiplier = 1.0
+        self.boost_count = 0
+        self.decay_count = 0
+        self.plateau_count = 0
+
+        print(f"\n  [AdaptiveTraining] Controller initialized:")
+        print(f"    Base LR: {base_lr:.2e} (range: {lr_min:.2e} - {lr_max:.2e})")
+        print(f"    Velocity thresholds: slow < {velocity_slow_threshold}%, spike > {velocity_spike_threshold}%")
+        print(f"    Kp range: {kp_min} - {kp_max} (base: {kp_base})")
+        print(f"    Plateau detection: {plateau_window} evals, {plateau_threshold}% threshold")
+
+    def _compute_velocity(self) -> float:
+        """Compute PPL velocity (% change per eval)."""
+        if len(self.val_ppl_history) < 2:
+            return 0.0
+        current = self.val_ppl_history[-1]
+        previous = self.val_ppl_history[-2]
+        if previous == 0:
+            return 0.0
+        return ((current - previous) / previous) * 100
+
+    def _detect_plateau(self) -> bool:
+        """Detect if PPL has plateaued (< threshold improvement over window)."""
+        if len(self.val_ppl_history) < self.plateau_window:
+            return False
+        recent = self.val_ppl_history[-self.plateau_window:]
+        first = recent[0]
+        last = recent[-1]
+        if first == 0:
+            return False
+        improvement = ((first - last) / first) * 100
+        return improvement < self.plateau_threshold
+
+    def _compute_train_val_gap(self) -> float:
+        """Compute gap between train and val loss (overfitting indicator)."""
+        if not self.train_loss_history or not self.val_loss_history:
+            return 0.0
+        train = self.train_loss_history[-1]
+        val = self.val_loss_history[-1]
+        if val == 0:
+            return 0.0
+        return ((val - train) / val) * 100  # Positive = val > train = normal
+
+    def update(
+        self,
+        train_loss: float,
+        val_loss: float,
+        val_ppl: float,
+        coherence: float,
+        global_step: int,
+        authority_controller=None,  # PIDv2 controller reference
+    ) -> Dict[str, Any]:
+        """
+        Update controller with current metrics and adjust hyperparameters.
+
+        Returns dict of adjustments made.
+        """
+        # Record history
+        self.val_ppl_history.append(val_ppl)
+        self.train_loss_history.append(train_loss)
+        self.val_loss_history.append(val_loss)
+        self.coherence_history.append(coherence)
+
+        # Keep history bounded
+        max_history = 50
+        if len(self.val_ppl_history) > max_history:
+            self.val_ppl_history = self.val_ppl_history[-max_history:]
+            self.train_loss_history = self.train_loss_history[-max_history:]
+            self.val_loss_history = self.val_loss_history[-max_history:]
+            self.coherence_history = self.coherence_history[-max_history:]
+
+        adjustments = {"step": global_step, "actions": []}
+
+        # Check if we can make adjustments
+        if global_step - self.last_adjustment_step < self.min_steps_between_adjustments:
+            return adjustments
+
+        velocity = self._compute_velocity()
+        is_plateau = self._detect_plateau()
+        train_val_gap = self._compute_train_val_gap()
+
+        # === LR Adaptation ===
+        current_lr = self.optimizer.param_groups[0]['lr']
+
+        # Case 1: PPL spiking (unstable) → decay LR
+        if velocity > self.velocity_spike_threshold:
+            new_lr = max(self.lr_min, current_lr * self.lr_decay_factor)
+            if new_lr != current_lr:
+                for pg in self.optimizer.param_groups:
+                    pg['lr'] = new_lr
+                self.decay_count += 1
+                adjustments["actions"].append(f"LR_DECAY: {current_lr:.2e}→{new_lr:.2e} (spike: {velocity:+.1f}%)")
+                print(f"\n  🔻 [AdaptiveTraining] LR DECAY: {current_lr:.2e} → {new_lr:.2e} (PPL spike: {velocity:+.1f}%)")
+                self.last_adjustment_step = global_step
+
+        # Case 2: Learning too slow or plateau → boost LR
+        elif velocity > self.velocity_slow_threshold or is_plateau:
+            if is_plateau:
+                self.plateau_count += 1
+
+            # Only boost if we're not already at max
+            new_lr = min(self.lr_max, current_lr * self.lr_boost_factor)
+            if new_lr != current_lr and new_lr > current_lr:
+                for pg in self.optimizer.param_groups:
+                    pg['lr'] = new_lr
+                self.boost_count += 1
+                reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
+                adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
+                print(f"\n  🔺 [AdaptiveTraining] LR BOOST: {current_lr:.2e} → {new_lr:.2e} ({reason})")
+                self.last_adjustment_step = global_step
+
+        # === Kp Adaptation (if PIDv2 controller provided) ===
+        if authority_controller is not None and hasattr(authority_controller, 'Kp_min'):
+            # Adjust Kp based on train/val gap
+            # Large positive gap (val >> train) = overfitting → lower Kp
+            # Small or negative gap = underfitting → higher Kp
+
+            if train_val_gap > 20:  # Significant overfitting
+                new_kp_min = max(self.kp_min, authority_controller.Kp_min * 0.8)
+                new_kp_max = max(self.kp_min, authority_controller.Kp_max * 0.8)
+                if new_kp_min != authority_controller.Kp_min:
+                    authority_controller.Kp_min = new_kp_min
+                    authority_controller.Kp_max = new_kp_max
+                    adjustments["actions"].append(f"Kp_REDUCE: gap={train_val_gap:.1f}%")
+                    print(f"\n  📉 [AdaptiveTraining] Kp REDUCED (train/val gap: {train_val_gap:.1f}%)")
+                    self.last_adjustment_step = global_step
+
+            elif train_val_gap < 5 and velocity > self.velocity_slow_threshold:
+                # Underfitting and slow → increase Kp
+                new_kp_min = min(self.kp_max, authority_controller.Kp_min * 1.2)
+                new_kp_max = min(self.kp_max, authority_controller.Kp_max * 1.2)
+                if new_kp_max != authority_controller.Kp_max:
+                    authority_controller.Kp_min = new_kp_min
+                    authority_controller.Kp_max = new_kp_max
+                    adjustments["actions"].append(f"Kp_BOOST: gap={train_val_gap:.1f}%")
+                    print(f"\n  📈 [AdaptiveTraining] Kp BOOSTED (underfitting, gap: {train_val_gap:.1f}%)")
+                    self.last_adjustment_step = global_step
+
+        if adjustments["actions"]:
+            self.adjustment_log.append(adjustments)
+
+        return adjustments
+
+    def get_status_string(self) -> str:
+        """Get formatted status string."""
+        velocity = self._compute_velocity() if len(self.val_ppl_history) >= 2 else 0.0
+        plateau = "PLATEAU" if self._detect_plateau() else "OK"
+        current_lr = self.optimizer.param_groups[0]['lr']
+        return f"AdaptLR:{current_lr:.2e} vel:{velocity:+.1f}% [{plateau}] boosts:{self.boost_count} decays:{self.decay_count}"
+
+    def get_telemetry(self) -> Dict[str, Any]:
+        """Get telemetry for logging."""
+        return {
+            "current_lr": self.optimizer.param_groups[0]['lr'],
+            "velocity": self._compute_velocity() if len(self.val_ppl_history) >= 2 else 0.0,
+            "is_plateau": self._detect_plateau(),
+            "train_val_gap": self._compute_train_val_gap(),
+            "boost_count": self.boost_count,
+            "decay_count": self.decay_count,
+            "plateau_count": self.plateau_count,
+            "adjustment_log": self.adjustment_log[-10:],  # Last 10 adjustments
+        }
+
+
+# =============================================================================
 # DYNAMIC RELAXATION CONTROLLER: 9:3 → 6:6 TRANSITION
 # =============================================================================
 
@@ -3890,6 +4474,15 @@ class DynamicRelaxationController:
         # Weight Transfer settings
         guna_lock_steps: int = 50,           # Steps to freeze W_q/W_k post-swap
         enable_weight_transfer: bool = True,  # Enable weight transfer during relaxation
+        # Force relaxation at specific step (bypasses stability check)
+        force_relaxation_step: int = None,   # If set, force 9:3→6:6 at this step
+        # Sovereign Saturation Gate (automatic detection)
+        enable_saturation_gate: bool = True,  # Enable automatic saturation detection
+        saturation_coherence_threshold: float = 0.74,  # Coherence threshold for trigger
+        saturation_patience: int = 50,        # Steps where sensory derivative must be flat
+        saturation_thaw_start: float = 0.3,   # New sensory layers start at this α
+        saturation_thaw_end: float = 0.7,     # Ramp to this α
+        saturation_thaw_steps: int = 100,     # Steps to ramp new layers
     ):
         self.gradient_scaler = gradient_scaler
         self.model = model
@@ -3920,6 +4513,50 @@ class DynamicRelaxationController:
         # Weight Transfer for 9:3 → 6:6 transition
         self.enable_weight_transfer = enable_weight_transfer
         self.guna_lock_steps = guna_lock_steps
+
+        # Force relaxation at specific step
+        self.force_relaxation_step = force_relaxation_step
+        self.force_relaxation_triggered = False  # Track if we've already forced
+
+        # Sovereign Saturation Gate
+        self.enable_saturation_gate = enable_saturation_gate
+        self.saturation_coherence_threshold = saturation_coherence_threshold
+        self.saturation_patience = saturation_patience
+        self.saturation_thaw_start = saturation_thaw_start
+        self.saturation_thaw_end = saturation_thaw_end
+        self.saturation_thaw_steps = saturation_thaw_steps
+        # Saturation tracking
+        self.sensory_flow_history = []  # Track sensory flow for derivative
+        self.saturation_flat_count = 0  # Count of steps with flat derivative
+        self.saturation_triggered = False  # Track if saturation gate fired
+        self.saturation_thaw_step = None  # Step when thaw started
+
+        # V9.5.0 Dynamic Streak Controller: Entropy-triggered flip
+        self.metabolic_step_counter = 0   # Consecutive steps meeting validity criteria
+        self.metabolic_entropy_threshold = 0.45  # Below this = looping, need fast escape
+        self.metabolic_vram_safety = 0.90  # Don't flip if VRAM > 90%
+        self._current_target_streak = 500  # Dynamic target (50 or 500 based on entropy)
+
+        # V9.5.1 Multi-Stage Granular Evolution: 9:3 → 6:6 → 5:7 → 4:8 → 3:9
+        self.evolution_stages = [(9, 3), (6, 6), (5, 7), (4, 8), (3, 9)]
+        self.current_stage_idx = 0  # Start at 9:3
+        self.evolution_streak = 0   # Steps meeting evolution criteria
+        self.evolution_patience = 200  # Steps needed to trigger next stage
+        self.evolution_entropy_floor = 0.42  # Abort if entropy drops below this
+        self.evolution_coherence_min = 0.82  # Must maintain high coherence
+
+        # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
+        self.stress_probe_active = False  # Currently in stress-probe mode
+        self.stress_probe_start_step = None  # When stress-probe started
+        self.stress_probe_degeneracy_streak = 0  # Consecutive evals of degeneracy detection
+        self.stress_probe_exit_streak = 0  # Consecutive evals meeting exit criteria
+        self.pre_stress_probe_split = None  # Split before stress-probe (to restore)
+        self.pre_stress_probe_lr = None  # LR before stress-probe (to restore)
+        self.stress_probe_steps_in = 0  # Steps spent in stress-probe
+        # Gradual LR restore tracking (ChatGPT guardrail)
+        self.stress_probe_lr_restoring = False  # Currently restoring LR
+        self.stress_probe_lr_restore_start_step = None  # When LR restore started
+        self.stress_probe_reduced_lr = None  # The reduced LR during stress-probe
 
         # [S5] Entropy Gate: Block relaxation if entropy too high
         self.entropy_gate_threshold = 0.50  # Must be below this to relax
@@ -3968,6 +4605,13 @@ class DynamicRelaxationController:
         if enable_weight_transfer:
             print(f"    Weight Transfer: ENABLED")
             print(f"    Guna-Lock: {guna_lock_steps} steps post-swap")
+        if force_relaxation_step is not None:
+            print(f"    ⚡ Force Relaxation: Step {force_relaxation_step} (bypasses stability check)")
+        if enable_saturation_gate:
+            print(f"    🎯 Saturation Gate: ENABLED")
+            print(f"       Coherence threshold: {saturation_coherence_threshold}")
+            print(f"       Patience: {saturation_patience} steps flat derivative")
+            print(f"       Dampened Thaw: α {saturation_thaw_start}→{saturation_thaw_end} over {saturation_thaw_steps} steps")
 
     def compute_stability_index(
         self,
@@ -4048,6 +4692,479 @@ class DynamicRelaxationController:
 
             return False
 
+    def _check_saturation_gate(
+        self,
+        coherence: float,
+        sensory_flow: float,
+        global_step: int,
+    ) -> bool:
+        """
+        Sovereign Saturation Gate: Detect when sensory layers are saturated.
+
+        Triggers when:
+        1. Coherence >= saturation_coherence_threshold (0.74)
+        2. Sensory flow derivative is flat for saturation_patience steps (50)
+
+        Returns True if saturation detected and relaxation should trigger.
+        """
+        if not self.enable_saturation_gate or self.saturation_triggered:
+            return False
+
+        # Check coherence threshold first
+        if coherence < self.saturation_coherence_threshold:
+            self.saturation_flat_count = 0  # Reset if coherence drops
+            return False
+
+        # Track sensory flow history
+        self.sensory_flow_history.append(sensory_flow)
+        if len(self.sensory_flow_history) > self.saturation_patience + 10:
+            self.sensory_flow_history.pop(0)
+
+        # Need enough history to compute derivative
+        if len(self.sensory_flow_history) < 10:
+            return False
+
+        # Compute derivative (change over last 10 steps)
+        recent = self.sensory_flow_history[-10:]
+        derivative = abs(recent[-1] - recent[0]) / 10.0
+
+        # Check if derivative is "flat" (< 0.001 change per step)
+        # Sensory flow at 1.00 means it's saturated
+        is_saturated = sensory_flow >= 0.99 or derivative < 0.001
+
+        if is_saturated:
+            self.saturation_flat_count += 1
+        else:
+            self.saturation_flat_count = max(0, self.saturation_flat_count - 1)
+
+        # Trigger if flat for patience steps
+        if self.saturation_flat_count >= self.saturation_patience:
+            self.saturation_triggered = True
+            self.saturation_thaw_step = global_step
+            return True
+
+        return False
+
+    def check_metabolic_flip(
+        self,
+        metrics: Dict[str, float],
+        vram_usage: float,
+        global_step: int,
+    ) -> str:
+        """
+        V9.5.0 Dynamic Streak Controller: Entropy-triggered 9:3 → 6:6 flip.
+
+        Key insight: Entropy determines streak LENGTH, VRAM determines streak VALIDITY.
+        - Low entropy (<0.45) = looping = SHORT streak (50) to escape quickly
+        - High entropy (>0.45) = learning = LONG streak (500) to solidify
+
+        Validity criteria (must pass every step):
+        1. Coherence > 0.74 (Sattvic stability)
+        2. VRAM < 90% (safety gate)
+
+        If validity fails, counter resets to 0.
+        Returns "TRIGGER_FLIP" when dynamic target reached.
+        """
+        if self.saturation_triggered:
+            return "ALREADY_FLIPPED"
+
+        coherence = metrics.get('coherence', 0.0)
+        entropy = metrics.get('entropy', 1.0)
+
+        # 1. Validity Criteria (must pass to increment counter)
+        is_stable = coherence > self.saturation_coherence_threshold  # 0.74
+        is_safe = vram_usage < self.metabolic_vram_safety            # 0.90
+
+        # 2. Dynamic Streak Target based on Entropy
+        # Low entropy = looping/repetition = need SHORT streak to escape
+        # High entropy = still learning = need LONG streak to solidify
+        if entropy < self.metabolic_entropy_threshold:  # 0.45
+            target_streak = 50   # Emergency "Escape" Mode - break loops fast
+        else:
+            target_streak = 500  # Standard "Sattvic" Mode - let authority crystallize
+
+        # 3. Increment or Reset Counter (based on validity, not entropy)
+        if is_stable and is_safe:
+            self.metabolic_step_counter += 1
+        else:
+            self.metabolic_step_counter = 0  # Hard reset if validity fails
+
+        # 4. Execute Flip when dynamic target reached
+        if self.metabolic_step_counter >= target_streak:
+            self.saturation_triggered = True
+            self.saturation_thaw_step = global_step
+            mode = "ESCAPE" if entropy < self.metabolic_entropy_threshold else "SATTVIC"
+            print(f"\n  🚀 [DYNAMIC FLIP] Step {global_step}: {mode} mode - target {target_streak} reached")
+            print(f"      Coherence: {coherence:.3f} > 0.74 ✓")
+            print(f"      Entropy:   {entropy:.3f} {'< 0.45 (looping)' if entropy < 0.45 else '>= 0.45 (learning)'}")
+            print(f"      VRAM:      {vram_usage*100:.1f}% < 90% ✓")
+            return "TRIGGER_FLIP"
+
+        # Store current target for status display
+        self._current_target_streak = target_streak
+        return "WAITING"
+
+    def check_granular_evolution(
+        self,
+        metrics: Dict[str, float],
+        vram_usage: float,
+        global_step: int,
+    ) -> str:
+        """
+        V9.5.1 Granular Evolution: Check for multi-stage transitions.
+
+        After 6:6, can evolve to 5:7 → 4:8 → 3:9 based on:
+        - Coherence > 0.82 (stability)
+        - Entropy > 0.42 (diversity floor - prevent repetition curse)
+        - VRAM < 90% (safety)
+
+        Triggers when criteria met for evolution_patience steps (200).
+        """
+        # Only check if we're past the initial 6:6 stage
+        if self.current_stage_idx < 1:
+            return "NOT_READY"
+
+        # Already at final stage (3:9)
+        if self.current_stage_idx >= len(self.evolution_stages) - 1:
+            return "FINAL_STAGE"
+
+        coherence = metrics.get('coherence', 0.0)
+        entropy = metrics.get('entropy', 1.0)
+
+        # Evolution criteria (different from initial flip)
+        is_stable = coherence > self.evolution_coherence_min  # 0.82
+        is_diverse = entropy > self.evolution_entropy_floor   # 0.42 - MUST have diversity
+        is_safe = vram_usage < self.metabolic_vram_safety     # 0.90
+
+        # Key insight: We want to evolve when STIFF (low entropy) but stable
+        # This breaks the repetition curse by adding sensory capacity
+        wants_evolution = entropy < 0.45 and coherence > 0.85  # Stiff but stable
+
+        if is_stable and is_safe and (is_diverse or wants_evolution):
+            self.evolution_streak += 1
+        else:
+            self.evolution_streak = 0  # Hard reset
+
+        # Trigger evolution when patience reached
+        if self.evolution_streak >= self.evolution_patience:
+            next_stage = self.evolution_stages[self.current_stage_idx + 1]
+            return f"EVOLVE_TO_{next_stage[0]}_{next_stage[1]}"
+
+        return "WAITING"
+
+    def execute_granular_evolution(self, global_step: int) -> Tuple[int, int]:
+        """
+        Execute transition to next evolution stage.
+
+        Returns the new (authority, sensory) split.
+        """
+        if self.current_stage_idx >= len(self.evolution_stages) - 1:
+            return self.current_split
+
+        # Advance to next stage
+        self.current_stage_idx += 1
+        new_split = self.evolution_stages[self.current_stage_idx]
+
+        # Reset evolution streak for next stage
+        self.evolution_streak = 0
+
+        # Update current split
+        self.current_split = new_split
+
+        # Print evolution message
+        prev_split = self.evolution_stages[self.current_stage_idx - 1]
+        print(f"\n  🌀 [GRANULAR EVOLUTION] Step {global_step}")
+        print(f"      {prev_split[0]}:{prev_split[1]} → {new_split[0]}:{new_split[1]}")
+        print(f"      Authority layers: 0-{new_split[0]-1}")
+        print(f"      Sensory layers: {new_split[0]}-11")
+        print(f"      Transitional layer: {new_split[0]} (newly sensory)")
+
+        return new_split
+
+    def check_stress_probe(
+        self,
+        metrics: Dict[str, float],
+        config,
+        global_step: int,
+    ) -> str:
+        """
+        V9.5.2 Emergency Stress-Probe Detection.
+
+        ChatGPT Guardrails: Compound trigger confirmation
+        - Low entropy (< 0.42) is REQUIRED
+        - AND at least ONE of: REP-3 > 0.18, UTR < 0.55, DRS > 12
+        - Must hold for 2 consecutive evals
+
+        Gemini Protocol: Freeze Authority, flood with Sensory to break stiffness.
+        """
+        if not config.enable_stress_probe:
+            return "DISABLED"
+
+        # Don't trigger if already in stress-probe
+        if self.stress_probe_active:
+            return "ALREADY_ACTIVE"
+
+        coherence = metrics.get('coherence', 0.0)
+        entropy = metrics.get('entropy', 1.0)
+        rep3 = metrics.get('rep3', 0.0)  # REP-3 from quality metrics
+        utr = metrics.get('utr', 1.0)  # Unique Token Ratio
+        drs = metrics.get('drs', 0.0)  # Degeneracy Repetition Score
+
+        # ChatGPT Guardrails: Conservative compound trigger
+        # Requirement 1: Model must be stiff (high coherence)
+        is_stiff = coherence > config.stress_probe_coherence_min  # 0.80
+
+        # Requirement 2: Low entropy (REQUIRED)
+        is_low_entropy = entropy < config.stress_probe_entropy_trigger  # 0.42
+
+        # Requirement 3: At least ONE degeneracy signal
+        has_high_rep3 = rep3 > config.stress_probe_rep3_trigger  # 0.18
+        has_low_utr = utr < config.stress_probe_utr_trigger  # 0.55
+        has_high_drs = drs > config.stress_probe_drs_trigger  # 12
+
+        has_degeneracy_signal = has_high_rep3 or has_low_utr or has_high_drs
+
+        # Compound trigger: stiff AND low_entropy AND at_least_one_signal
+        is_degenerate = is_stiff and is_low_entropy and has_degeneracy_signal
+
+        if is_degenerate:
+            self.stress_probe_degeneracy_streak += 1
+            # Log degeneracy detection for debugging
+            if self.stress_probe_degeneracy_streak == 1:
+                signals = []
+                if has_high_rep3:
+                    signals.append(f"REP-3={rep3:.3f}>{config.stress_probe_rep3_trigger}")
+                if has_low_utr:
+                    signals.append(f"UTR={utr:.3f}<{config.stress_probe_utr_trigger}")
+                if has_high_drs:
+                    signals.append(f"DRS={drs:.1f}>{config.stress_probe_drs_trigger}")
+                print(f"  ⚠️ [STRESS-PROBE] Degeneracy detected: Ent={entropy:.3f}, {', '.join(signals)}")
+        else:
+            self.stress_probe_degeneracy_streak = 0
+
+        # Trigger after patience consecutive evals of degeneracy (ChatGPT: 2)
+        if self.stress_probe_degeneracy_streak >= config.stress_probe_patience:
+            return "TRIGGER_STRESS_PROBE"
+
+        return "MONITORING"
+
+    def execute_stress_probe(
+        self,
+        config,
+        current_lr: float,
+        global_step: int,
+    ) -> Tuple[Tuple[int, int], float]:
+        """
+        Execute transition to 3:9 stress-probe mode.
+
+        Returns: (new_split, new_lr)
+        - Jumps to 3:9 split (nearly all Sensory)
+        - Reduces LR to stress_probe_lr_factor (65%)
+        - Records pre-stress-probe state for restoration
+        """
+        # Save current state for restoration
+        self.pre_stress_probe_split = self.current_split
+        self.pre_stress_probe_lr = current_lr
+
+        # Activate stress-probe
+        self.stress_probe_active = True
+        self.stress_probe_start_step = global_step
+        self.stress_probe_steps_in = 0
+        self.stress_probe_degeneracy_streak = 0  # Reset
+
+        # Jump to 3:9 (Phase A: Rajas)
+        new_split = (3, 9)
+        self.current_split = new_split
+
+        # Also update stage index to reflect 3:9
+        self.current_stage_idx = len(self.evolution_stages) - 1  # Final stage
+
+        # Reduce LR
+        new_lr = current_lr * config.stress_probe_lr_factor
+
+        print(f"\n  🚨 [STRESS-PROBE] EMERGENCY ACTIVATION - Step {global_step}")
+        print(f"      {self.pre_stress_probe_split[0]}:{self.pre_stress_probe_split[1]} → 3:9 (Phase A: Rajas)")
+        print(f"      Authority Scale: {config.stress_probe_authority_scale} (nearly frozen)")
+        print(f"      LR: {current_lr:.6f} → {new_lr:.6f} ({config.stress_probe_lr_factor*100:.0f}%)")
+        print(f"      Exit Criteria: Ent > {config.stress_probe_exit_entropy} OR REP-3 < {config.stress_probe_exit_rep3}")
+        print(f"      Max Steps: {config.stress_probe_max_steps}")
+
+        return new_split, new_lr
+
+    def check_stress_probe_exit(
+        self,
+        metrics: Dict[str, float],
+        config,
+        global_step: int,
+    ) -> str:
+        """
+        Check if stress-probe should exit.
+
+        ChatGPT Guardrails:
+        - Minimum 100 steps (don't exit early)
+        - Exit when Entropy > 0.55 for 2 consecutive evals
+        - Maximum 300 steps (forced exit)
+        """
+        if not self.stress_probe_active:
+            return "NOT_ACTIVE"
+
+        self.stress_probe_steps_in += 1
+
+        entropy = metrics.get('entropy', 0.0)
+        rep3 = metrics.get('rep3', 1.0)
+
+        # ChatGPT Guardrail: Enforce minimum steps
+        if self.stress_probe_steps_in < config.stress_probe_min_steps:
+            return "CONTINUE"
+
+        # Success criteria: diversity restored
+        entropy_ok = entropy > config.stress_probe_exit_entropy  # 0.55
+        rep3_ok = rep3 < config.stress_probe_exit_rep3  # 0.12
+
+        # ChatGPT Guardrail: Require 2 consecutive evals meeting exit criteria
+        if entropy_ok:
+            self.stress_probe_exit_streak += 1
+        else:
+            self.stress_probe_exit_streak = 0
+
+        # Forced exit: max steps reached
+        max_reached = self.stress_probe_steps_in >= config.stress_probe_max_steps
+
+        # Exit success: 2 consecutive good evals (ChatGPT: entropy > 0.55 for 2 evals)
+        if self.stress_probe_exit_streak >= 2 and rep3_ok:
+            return "EXIT_SUCCESS"
+        elif max_reached:
+            return "EXIT_FORCED"
+
+        # Log progress every 50 steps during stress-probe
+        if self.stress_probe_steps_in % 50 == 0:
+            print(f"  📊 [STRESS-PROBE] Step {self.stress_probe_steps_in}/{config.stress_probe_max_steps}: "
+                  f"Ent={entropy:.3f}, REP-3={rep3:.3f}, exit_streak={self.stress_probe_exit_streak}")
+
+        return "CONTINUE"
+
+    def exit_stress_probe(
+        self,
+        global_step: int,
+        exit_reason: str,
+        config,
+    ) -> Tuple[Tuple[int, int], float]:
+        """
+        Exit stress-probe and return to 6:6 (Sattva).
+
+        ChatGPT Guardrails:
+        - Return to 6:6, not 9:3
+        - Gradual LR restore over ~50 steps
+        - Re-enable adaptive LR after 100 steps
+
+        Returns: (new_split, initial_lr_for_restore)
+        """
+        # Return to 6:6 (not pre-stress-probe split - we want balanced digestion)
+        new_split = (6, 6)
+        self.current_split = new_split
+        self.current_stage_idx = 1  # 6:6 stage
+
+        # Record stress-probe statistics
+        duration = self.stress_probe_steps_in
+
+        # Deactivate stress-probe but setup gradual LR restore
+        self.stress_probe_active = False
+        self.stress_probe_steps_in = 0
+        self.stress_probe_exit_streak = 0
+
+        # ChatGPT Guardrail: Gradual LR restore over ~50 steps
+        self.stress_probe_lr_restoring = True
+        self.stress_probe_lr_restore_start_step = global_step
+        self.stress_probe_reduced_lr = self.pre_stress_probe_lr * config.stress_probe_lr_factor
+
+        print(f"\n  ✅ [STRESS-PROBE] EXIT - Step {global_step}")
+        print(f"      Reason: {exit_reason}")
+        print(f"      Duration: {duration} steps")
+        print(f"      3:9 → 6:6 (Phase B: Sattva - Digestion)")
+        print(f"      LR Restore: {self.stress_probe_reduced_lr:.6f} → {self.pre_stress_probe_lr:.6f}")
+        print(f"      Restore Steps: {config.stress_probe_lr_restore_steps}")
+
+        # Return reduced LR (gradual restore will ramp up)
+        return new_split, self.stress_probe_reduced_lr
+
+    def get_stress_probe_restore_lr(
+        self,
+        global_step: int,
+        config,
+    ) -> float:
+        """
+        Compute LR during gradual restore period after stress-probe exit.
+
+        ChatGPT Guardrail: Restore LR gradually over ~50 steps.
+        """
+        if not self.stress_probe_lr_restoring:
+            return self.pre_stress_probe_lr
+
+        steps_since_exit = global_step - self.stress_probe_lr_restore_start_step
+
+        # Check if restore complete
+        if steps_since_exit >= config.stress_probe_lr_restore_steps:
+            self.stress_probe_lr_restoring = False
+            print(f"  ✓ [STRESS-PROBE] LR restore complete: {self.pre_stress_probe_lr:.6f}")
+            return self.pre_stress_probe_lr
+
+        # Linear ramp from reduced_lr to pre_stress_probe_lr
+        progress = steps_since_exit / config.stress_probe_lr_restore_steps
+        current_lr = self.stress_probe_reduced_lr + progress * (
+            self.pre_stress_probe_lr - self.stress_probe_reduced_lr
+        )
+
+        return current_lr
+
+    def update_stability_per_step(self, coherence: float, sa_ratio: float = None) -> None:
+        """
+        V9.4.9: Update stability streak every gradient step (not just at validation).
+
+        This ensures the streak counter reflects actual gradient steps, not log intervals.
+        """
+        if self.state != self.STATE_AUTHORITY:
+            return  # Only track during authority phase
+
+        if self.mode == "consecutive":
+            # Consecutive mode: streak of coherence >= threshold
+            stability = coherence  # Use raw coherence for simplicity
+            if stability >= self.stability_threshold:
+                self.stability_streak += 1
+            else:
+                self.stability_streak = 0  # Hard reset
+
+        elif self.mode == "sa_ratio" and sa_ratio is not None:
+            # S/A ratio mode: rolling window
+            self.sa_rolling_window.append(sa_ratio)
+            if len(self.sa_rolling_window) > self.stability_window:
+                self.sa_rolling_window.pop(0)
+            self.stability_streak = len(self.sa_rolling_window)
+
+        else:  # average mode
+            self.ssi_rolling_window.append(coherence)
+            if len(self.ssi_rolling_window) > self.stability_window:
+                self.ssi_rolling_window.pop(0)
+            self.stability_streak = len(self.ssi_rolling_window)
+
+    def get_saturation_thaw_alpha(self, global_step: int) -> float:
+        """
+        Compute the Dampened Thaw alpha for newly sensory layers (6, 7, 8).
+
+        During thaw, α ramps from saturation_thaw_start (0.3) to saturation_thaw_end (0.7)
+        over saturation_thaw_steps (100) steps.
+        """
+        if self.saturation_thaw_step is None:
+            return self.saturation_thaw_start
+
+        steps_since_thaw = global_step - self.saturation_thaw_step
+        if steps_since_thaw >= self.saturation_thaw_steps:
+            return self.saturation_thaw_end
+
+        # Linear ramp
+        progress = steps_since_thaw / self.saturation_thaw_steps
+        alpha = self.saturation_thaw_start + progress * (self.saturation_thaw_end - self.saturation_thaw_start)
+        return alpha
+
     def _log_integration_tax(self, current_ppl: float, global_step: int):
         """
         Log the Integration Tax: PPL difference after relaxation.
@@ -4101,6 +5218,7 @@ class DynamicRelaxationController:
         global_step: int,
         sa_ratio: float = None,
         entropy: float = None,
+        sensory_flow: float = None,
     ) -> Tuple[bool, str]:
         """
         Update controller state based on current metrics.
@@ -4112,6 +5230,10 @@ class DynamicRelaxationController:
         [S5] Entropy Gate:
             Relaxation is blocked if entropy > entropy_gate_threshold (0.50).
             This prevents the model from gaining sensory freedom while confused.
+
+        Sovereign Saturation Gate:
+            Triggers relaxation when coherence >= 0.74 AND sensory flow derivative
+            is flat for 50 steps (sensory layers saturated).
         """
         stability_index = self.compute_stability_index(guna_coherence, s_drift_ema)
 
@@ -4136,12 +5258,36 @@ class DynamicRelaxationController:
 
         # State machine
         if self.state == self.STATE_AUTHORITY:
+            # Check for force relaxation at specific step (bypasses all checks)
+            force_triggered = False
+            if (self.force_relaxation_step is not None and
+                global_step >= self.force_relaxation_step and
+                not self.force_relaxation_triggered):
+                force_triggered = True
+                self.force_relaxation_triggered = True
+                print(f"\n  ⚡ [FORCE RELAXATION] Step {global_step} >= {self.force_relaxation_step}")
+                print(f"      Triggering 9:3 → 6:6 transition (bypassing stability check)")
+
+            # Sovereign Saturation Gate: Check if sensory layers are saturated
+            saturation_triggered = False
+            if not force_triggered and sensory_flow is not None:
+                saturation_triggered = self._check_saturation_gate(
+                    coherence=guna_coherence,
+                    sensory_flow=sensory_flow,
+                    global_step=global_step,
+                )
+                if saturation_triggered:
+                    print(f"\n  --> [RELAXATION] SATURATION REACHED. PIVOTING TO 6:6.")
+                    print(f"      Coherence: {guna_coherence:.3f} >= {self.saturation_coherence_threshold}")
+                    print(f"      Sensory Flow: {sensory_flow:.3f} (flat for {self.saturation_patience} steps)")
+                    print(f"      Dampened Thaw: α {self.saturation_thaw_start}→{self.saturation_thaw_end} over {self.saturation_thaw_steps} steps")
+
             # Check if we should trigger relaxation (mode-dependent)
             stability_ready = self._check_relaxation_ready(stability_index, sa_ratio=sa_ratio)
 
-            # [S5] Entropy Gate: Block relaxation if entropy too high
+            # [S5] Entropy Gate: Block relaxation if entropy too high (skipped for force/saturation trigger)
             entropy_clear = True
-            if entropy is not None and entropy > self.entropy_gate_threshold:
+            if not force_triggered and not saturation_triggered and entropy is not None and entropy > self.entropy_gate_threshold:
                 entropy_clear = False
                 if stability_ready and not self.entropy_gate_blocked:
                     # Log that we're blocking due to entropy
@@ -4151,19 +5297,30 @@ class DynamicRelaxationController:
             else:
                 self.entropy_gate_blocked = False
 
-            if stability_ready and entropy_clear:
+            if force_triggered or saturation_triggered or (stability_ready and entropy_clear):
                 # Ready to relax!
                 self.state = self.STATE_RELAXING
                 self.pre_relaxation_ppl = val_ppl
                 self.relaxation_step = global_step
                 action = "RELAX"
+
+                # Determine trigger mode for logging
+                if force_triggered:
+                    trigger_mode = "FORCED"
+                elif saturation_triggered:
+                    trigger_mode = "SATURATION"
+                else:
+                    trigger_mode = self.mode
+
                 self.transitions.append({
                     "step": global_step,
                     "from": "AUTHORITY",
                     "to": "BALANCED",
                     "stability": stability_index,
                     "ppl": val_ppl,
-                    "mode": self.mode,
+                    "mode": trigger_mode,
+                    "forced": force_triggered,
+                    "saturation": saturation_triggered,
                 })
 
         elif self.state == self.STATE_RELAXING:
@@ -4347,12 +5504,25 @@ class DynamicRelaxationController:
         streak_str = f"{self.stability_streak}/{self.stability_window}" if self.state == self.STATE_AUTHORITY else "—"
         lock_str = " 🔒" if self.is_guna_locked() else ""
 
+        # V9.5.0 Dynamic Streak progress (if enabled and not yet triggered)
+        sat_str = ""
+        if self.enable_saturation_gate and self.state == self.STATE_AUTHORITY:
+            if self.saturation_triggered:
+                sat_str = " 🚀FLIP"
+            elif self.metabolic_step_counter > 0:
+                # Show dynamic target: 50 (escape) or 500 (sattvic)
+                mode = "⚡" if self._current_target_streak == 50 else "🧘"
+                sat_str = f" {mode}Met:{self.metabolic_step_counter}/{self._current_target_streak}"
+
         if self.state == self.STATE_RECOVERY:
             return f"Split:{split_str} State:RECOVERY Streak:{streak_str}{lock_str}"
         elif self.state == self.STATE_BALANCED:
-            return f"Split:{split_str} State:BALANCED ✓{lock_str}"
+            thaw_str = ""
+            if self.saturation_thaw_step is not None:
+                thaw_str = " (Thaw)"
+            return f"Split:{split_str} State:BALANCED ✓{lock_str}{thaw_str}"
         else:
-            return f"Split:{split_str} State:{self.state} Streak:{streak_str}{lock_str}"
+            return f"Split:{split_str} State:{self.state} Streak:{streak_str}{sat_str}{lock_str}"
 
     def get_telemetry(self) -> Dict[str, Any]:
         """Get telemetry data for logging/visualization."""
@@ -4428,25 +5598,43 @@ def generate_sample(
     tokenizer,
     prompt: str,
     device: torch.device,
-    max_new_tokens: int = 50,
-    temperature: float = 0.8,
-    top_p: float = 0.9,
+    max_new_tokens: int = 128,
+    temperature: float = 0.9,
+    top_p: float = 0.95,
+    top_k: int = 50,
+    repetition_penalty: float = 1.15,
+    no_repeat_ngram_size: int = 3,
 ) -> str:
     """
     Generate text from a prompt for quality monitoring.
 
     Uses nucleus (top-p) sampling with temperature for diverse outputs.
-    Works with SymbolU12, PhaseTransformer, and HybridPhaseTransformer models.
+    ChatGPT recommendations for breaking repetition:
+    - temperature = 0.8-1.0
+    - top_p = 0.95
+    - top_k = 50
+    - repetition_penalty = 1.1-1.2
+    - no_repeat_ngram_size = 3
+    - max_new_tokens = 128-192
     """
     model.eval()
 
     # Encode prompt
     input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+    prompt_len = input_ids.shape[1]
 
     # Generate tokens one by one
     generated = input_ids.clone()
 
-    for _ in range(max_new_tokens):
+    # Track generated n-grams for no_repeat_ngram blocking
+    def get_ngrams(seq, n):
+        """Extract n-grams from a sequence."""
+        ngrams = set()
+        for i in range(len(seq) - n + 1):
+            ngrams.add(tuple(seq[i:i+n].tolist()))
+        return ngrams
+
+    for step in range(max_new_tokens):
         # Forward pass
         outputs = model(generated)
 
@@ -4468,7 +5656,36 @@ def generate_sample(
             break
 
         # Get next token logits
-        next_logits = logits[:, -1, :] / temperature
+        next_logits = logits[:, -1, :].clone()
+
+        # Apply repetition penalty to previously generated tokens
+        if repetition_penalty != 1.0:
+            for token_id in set(generated[0, prompt_len:].tolist()):
+                if next_logits[0, token_id] > 0:
+                    next_logits[0, token_id] /= repetition_penalty
+                else:
+                    next_logits[0, token_id] *= repetition_penalty
+
+        # Apply no_repeat_ngram blocking
+        if no_repeat_ngram_size > 0 and generated.shape[1] >= no_repeat_ngram_size:
+            # Get the last (n-1) tokens as the prefix
+            prefix = tuple(generated[0, -(no_repeat_ngram_size - 1):].tolist())
+            # Get all existing n-grams
+            existing_ngrams = get_ngrams(generated[0], no_repeat_ngram_size)
+            # Block tokens that would create a repeated n-gram
+            for ngram in existing_ngrams:
+                if ngram[:-1] == prefix:
+                    # This token would complete a repeated n-gram
+                    next_logits[0, ngram[-1]] = float('-inf')
+
+        # Apply temperature
+        next_logits = next_logits / temperature
+
+        # Top-k filtering (optional, applied before top-p)
+        if top_k > 0:
+            top_k_vals, _ = torch.topk(next_logits, min(top_k, next_logits.size(-1)))
+            threshold = top_k_vals[0, -1]
+            next_logits[next_logits < threshold] = float('-inf')
 
         # Top-p (nucleus) sampling
         sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
@@ -4498,6 +5715,40 @@ def generate_sample(
     return tokenizer.decode(generated[0], skip_special_tokens=True)
 
 
+def compute_sample_metrics(text: str) -> Dict[str, float]:
+    """
+    Compute quality metrics for generated text (ChatGPT recommendation).
+
+    Returns:
+        - completion_rate: 1.0 if ends with punctuation, 0.0 otherwise
+        - repetition_score: n-gram repetition rate (lower is better)
+        - unique_ratio: ratio of unique tokens to total tokens
+    """
+    words = text.split()
+    if len(words) < 2:
+        return {"completion": 0.0, "repetition": 1.0, "unique_ratio": 0.0}
+
+    # Completion rate: ends with sentence-ending punctuation
+    completion = 1.0 if text.rstrip()[-1:] in '.!?' else 0.0
+
+    # Repetition score: bigram repetition rate
+    bigrams = [f"{words[i]} {words[i+1]}" for i in range(len(words)-1)]
+    if bigrams:
+        unique_bigrams = len(set(bigrams))
+        repetition = 1.0 - (unique_bigrams / len(bigrams))
+    else:
+        repetition = 0.0
+
+    # Unique token ratio
+    unique_ratio = len(set(words)) / len(words) if words else 0.0
+
+    return {
+        "completion": completion,
+        "repetition": repetition,
+        "unique_ratio": unique_ratio,
+    }
+
+
 def run_quality_samples(
     model: nn.Module,
     tokenizer,
@@ -4512,7 +5763,7 @@ def run_quality_samples(
     This provides a qualitative check that the model is learning
     meaningful language patterns, not just minimizing perplexity.
 
-    Samples are logged with prompts and generated completions.
+    Samples are logged with prompts, generated completions, and quality metrics.
     """
     def log(msg):
         if logger:
@@ -4525,21 +5776,61 @@ def run_quality_samples(
     log(f"  📝 QUALITY SAMPLES (Step {step})")
     log("=" * 60)
 
+    # Aggregate metrics across all samples
+    total_completion = 0.0
+    total_repetition = 0.0
+    total_unique = 0.0
+    sample_count = 0
+
     for prompt in config.sample_prompts:
         try:
+            # ChatGPT recommendations for quality samples:
+            # temperature=0.9, top_p=0.95, top_k=50
+            # repetition_penalty=1.15, no_repeat_ngram_size=3
             generated = generate_sample(
                 model, tokenizer, prompt, device,
-                max_new_tokens=50,
-                temperature=0.8,
-                top_p=0.9,
+                max_new_tokens=128,
+                temperature=0.9,
+                top_p=0.95,
+                top_k=50,
+                repetition_penalty=1.15,
+                no_repeat_ngram_size=3,
             )
             # Clean up and truncate for display
             generated = generated.strip().replace('\n', ' ')[:200]
+
+            # Compute quality metrics
+            metrics = compute_sample_metrics(generated)
+            total_completion += metrics["completion"]
+            total_repetition += metrics["repetition"]
+            total_unique += metrics["unique_ratio"]
+            sample_count += 1
+
             log(f"  Prompt: \"{prompt}\"")
             log(f"  Output: \"{generated}\"")
             log("")
         except Exception as e:
             log(f"  ⚠️ Sampling failed for prompt '{prompt[:30]}...': {e}")
+
+    # Log aggregate quality metrics
+    if sample_count > 0:
+        avg_completion = total_completion / sample_count
+        avg_repetition = total_repetition / sample_count
+        avg_unique = total_unique / sample_count
+
+        log("  ────────────────────────────────────────────────────────")
+        log(f"  📊 SAMPLE QUALITY METRICS (n={sample_count})")
+        log(f"     Completion Rate: {avg_completion*100:.0f}% (ends with punctuation)")
+        log(f"     Repetition Score: {avg_repetition*100:.1f}% (lower is better)")
+        log(f"     Unique Token Ratio: {avg_unique*100:.1f}%")
+
+        # Quality indicator
+        if avg_repetition < 0.3 and avg_unique > 0.6:
+            log("     Quality: 🟢 GOOD")
+        elif avg_repetition < 0.5 and avg_unique > 0.4:
+            log("     Quality: 🟡 IMPROVING")
+        else:
+            log("     Quality: 🔴 NEEDS WORK (expect improvement by step 2k-6k)")
 
     log("=" * 60)
     log("")
@@ -4619,6 +5910,33 @@ class UnifiedTrainingConfig:
     lambda_coherence: float = 0.05  # Global coherence
     lambda_entropy: float = 0.01  # Entropy regularization
 
+    # V9.5.1 Entropy Floor (prevents repetition curse)
+    enable_entropy_floor: bool = False  # Enable entropy floor penalty
+    entropy_floor: float = 0.48  # Minimum entropy target
+    entropy_floor_weight: float = 0.1  # Weight for floor penalty
+
+    # V9.5.1 Force Evolution (manual intervention)
+    force_evolution_stage: int = None  # Force to stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9
+
+    # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
+    # Gemini Protocol: Freeze Authority, flood with Sensory to break stiffness
+    # ChatGPT Guardrails: Compound trigger, strict duration, gradual LR restore
+    enable_stress_probe: bool = False  # Enable automatic stress-probe detection
+    stress_probe_entropy_trigger: float = 0.42  # Trigger when entropy drops below this (ChatGPT: 0.42)
+    stress_probe_rep3_trigger: float = 0.18  # Trigger when REP-3 exceeds this (ChatGPT: 0.18)
+    stress_probe_utr_trigger: float = 0.55  # Trigger when UTR drops below this (ChatGPT: 0.55)
+    stress_probe_drs_trigger: float = 12.0  # Trigger when DRS exceeds this (ChatGPT: 12)
+    stress_probe_coherence_min: float = 0.80  # Only trigger if coherence is high (stiff, not dying)
+    stress_probe_patience: int = 2  # Consecutive evals of degeneracy before triggering (ChatGPT: 2)
+    stress_probe_authority_scale: float = 0.05  # Nearly freeze Authority layers
+    stress_probe_lr_factor: float = 0.60  # Reduce LR to 60% during stress-probe (ChatGPT: 0.6)
+    stress_probe_exit_entropy: float = 0.55  # Exit when entropy exceeds this for 2 evals
+    stress_probe_exit_rep3: float = 0.12  # Exit when REP-3 drops below this
+    stress_probe_min_steps: int = 100  # Minimum steps in stress-probe (ChatGPT: 100)
+    stress_probe_max_steps: int = 300  # Maximum steps in stress-probe (ChatGPT: 300)
+    stress_probe_lr_restore_steps: int = 50  # Steps to gradually restore LR after exit
+    force_stress_probe: bool = False  # Force immediate stress-probe activation
+
     # Sovereign-1 loss configuration (hardened decomposed loss)
     use_sovereign_loss: bool = True  # Enable Sovereign-1 decomposed loss
     sovereign_weight_guna: float = 1.0   # Guna signal weight
@@ -4669,6 +5987,14 @@ class UnifiedTrainingConfig:
     relaxation_stability_threshold: float = 0.50  # S/A ratio threshold for trigger
     relaxation_stability_window: int = 500   # Steps for stability check (rolling window)
     relaxation_streak_target: int = 5        # Consecutive stable evals (for consecutive mode)
+    force_relaxation_step: int = None        # Force 9:3→6:6 at this step (bypasses stability check)
+    # Sovereign Saturation Gate (automatic detection)
+    enable_saturation_gate: bool = True      # Enable automatic saturation detection
+    saturation_coherence_threshold: float = 0.74  # Coherence threshold for trigger
+    saturation_patience: int = 50            # Steps where sensory derivative must be flat
+    saturation_thaw_start: float = 0.3       # New sensory layers start at this α
+    saturation_thaw_end: float = 0.7         # Ramp to this α
+    saturation_thaw_steps: int = 100         # Steps to ramp new layers
     relaxation_target_authority: int = 6     # Target authority layers after relaxation
     relaxation_target_sensory: int = 6       # Target sensory layers after relaxation
     relaxation_thaw_alpha: float = 0.05      # Dampened Thaw starting α for new sensory layers
@@ -4687,6 +6013,11 @@ class UnifiedTrainingConfig:
     toroidal_use_gating: bool = True         # Use gated projection for selective carryover
     toroidal_truncated_bptt: int = 0         # Steps of gradient flow (0 = full detach)
     toroidal_coherence_threshold: float = 0.3  # Alarm threshold for cognitive discontinuity
+
+    # V9.4.7: Stochastic Gradient Persistence (SGP) - High-Rajas recursive learning
+    # Allows gradients to flow through bridge at a capped rate for stability
+    enable_sgp: bool = False                 # Enable SGP (off by default, H200 recommended)
+    sgp_rate: int = 100                      # SGP pulse every N steps (1% rule: 100 = 1%)
 
     # Full Evolutionary Flow System (Phase 2: All Layer Transitions)
     # Extends Toroidal Bridge to ALL layer transitions with Delayed Resonance
@@ -4724,6 +6055,24 @@ class UnifiedTrainingConfig:
     sattvic_variance_window: int = 50        # Window for entropy variance detection
     sattvic_variance_threshold: float = 0.001  # Variance threshold for stagnation
 
+    # Adaptive Training Controller (dynamic hyperparameter tuning)
+    enable_adaptive_training: bool = True    # Enable automatic LR/Kp adjustment
+    adaptive_lr_min: float = 1e-5            # Minimum learning rate floor
+    adaptive_lr_max: float = 1e-3            # Maximum learning rate ceiling
+    adaptive_lr_boost: float = 1.5           # LR boost multiplier when plateau/slow
+    adaptive_lr_decay: float = 0.7           # LR decay multiplier when spike
+    adaptive_velocity_slow: float = -2.0     # PPL velocity threshold for "too slow" (%)
+    adaptive_velocity_spike: float = 10.0    # PPL velocity threshold for "spike" (%)
+    adaptive_plateau_window: int = 5         # Evals to check for plateau
+    adaptive_plateau_threshold: float = 1.0  # Min improvement % to avoid plateau detection
+    adaptive_min_interval: int = 200         # Min steps between adjustments
+
+    # Auto Batch Sizing (VRAM-based startup probing)
+    enable_auto_batch: bool = False          # Enable automatic batch size detection at startup
+    auto_batch_target_utilization: float = 0.80  # Target VRAM utilization (80%)
+    auto_batch_safety_margin: float = 0.05   # Extra headroom (5%)
+    auto_batch_target_effective: int = 0     # Target effective batch (0 = just find max, no accum)
+
     # Resume checkpoint
     resume: str = ""
     resume_weights_only: bool = False
@@ -4734,11 +6083,17 @@ class UnifiedTrainingConfig:
     # Quality Sampling
     sample_every: int = 500  # Generate samples every N steps (0 = disabled)
     sample_prompts: tuple = (
+        # Original open-ended prompts
         "The history of the Roman Empire began when",
         "In computer science, algorithms are",
-        "The weather today is expected to be",
-        "Once upon a time in a small village",
-        "The meaning of life is often debated",
+        # Targeted probes for factual continuity (ChatGPT recommendation)
+        "The Roman Empire began when Julius Caesar",
+        "An algorithm is a step-by-step procedure that",
+        # Syntax closure probes
+        "A triangle has three sides, therefore",
+        "If A implies B and A is true, then",
+        # Causal reasoning probe
+        "Water boils at 100 degrees Celsius because",
     )
 
     # LRA Validation (Long-Range Retrieval)
@@ -5253,7 +6608,7 @@ def train(config: UnifiedTrainingConfig):
         device = torch.device(config.device)
 
     print(f"\n{'='*70}")
-    print("   UNIFIED SYMBOLU LLM TRAINING V9.4.4")
+    print("   UNIFIED SYMBOLU LLM TRAINING V9.5.2")
     print(f"{'='*70}")
     print(f"\n  Model Type: {config.model_type.upper()}")
     print(f"  Model Size: {config.model_size}")
@@ -5272,13 +6627,58 @@ def train(config: UnifiedTrainingConfig):
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
     tokenizer.model_max_length = int(1e12)
 
-    # Load data
-    train_loader, val_loader = load_data(config, tokenizer)
-
-    # Create model
+    # Create model BEFORE data loading (needed for AutoBatchSizer)
     model = create_model(config, device)
     num_params = sum(p.numel() for p in model.parameters())
     print(f"\n  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
+
+    # Auto Batch Sizing: Probe VRAM at startup to find optimal batch size
+    if config.enable_auto_batch:
+        print(f"\n  Auto Batch Sizing: ENABLED")
+
+        # Sovereign loss requires (B, Seq, Vocab) tensors - massive overhead
+        # Scale max_batch based on available VRAM (conservative to allow SGP headroom)
+        if config.enable_sovereign_loss:
+            total_vram_gb = torch.cuda.get_device_properties(device).total_memory / 1e9
+            if total_vram_gb >= 140:  # H200 class (141GB+)
+                auto_max_batch = 32  # Conservative - use gradient accumulation
+            elif total_vram_gb >= 90:  # 96GB class
+                auto_max_batch = 32
+            elif total_vram_gb >= 70:  # A100 80GB class
+                auto_max_batch = 24
+            else:  # Smaller GPUs
+                auto_max_batch = 16
+            print(f"  ⚠️  Sovereign Loss detected: capping max_batch to {auto_max_batch} (VRAM: {total_vram_gb:.0f}GB)")
+        else:
+            auto_max_batch = 128
+
+        auto_sizer = AutoBatchSizer(
+            model=model,
+            seq_len=config.max_seq_len,
+            vocab_size=config.vocab_size,
+            target_utilization=config.auto_batch_target_utilization,
+            safety_margin=config.auto_batch_safety_margin,
+            min_batch_size=1,
+            max_batch_size=auto_max_batch,
+            device=device,
+        )
+
+        probed_batch, probed_accum = auto_sizer.find_optimal_batch(
+            target_effective_batch=config.auto_batch_target_effective,
+            verbose=True,
+        )
+
+        # Update config with probed values
+        old_batch = config.batch_size
+        old_accum = config.gradient_accumulation
+        config.batch_size = probed_batch
+        config.gradient_accumulation = probed_accum
+
+        print(f"  Auto Batch: {old_batch}×{old_accum} → {probed_batch}×{probed_accum}")
+        print(f"  Effective Batch: {probed_batch * probed_accum}")
+
+    # Load data (using potentially updated batch_size from AutoBatchSizer)
+    train_loader, val_loader = load_data(config, tokenizer)
 
     # Initialize Sovereign-1 loss if available and enabled
     sovereign_loss = None
@@ -5463,14 +6863,22 @@ def train(config: UnifiedTrainingConfig):
     toroidal_loss_fn = None
     metacognitive_tracker = None
     if config.enable_toroidal_bridge:
-        # Get model dimension
-        model_dim = getattr(model, 'embed_dim', None) or getattr(model, 'd_model', 512)
+        # Get model dimension - check multiple possible attribute locations
+        model_dim = (
+            getattr(model, 'embed_dim', None) or
+            getattr(model, 'd_model', None) or
+            getattr(getattr(model, 'config', None), 'embed_dim', None) or
+            getattr(getattr(model, 'config', None), 'd_model', None) or
+            512  # Fallback default
+        )
         evolutionary_bridge = EvolutionaryBridge(
             dim=model_dim,
             num_layers=12,
             bridge_dropout=config.toroidal_dropout,
             use_gating=config.toroidal_use_gating,
             truncated_bptt_steps=config.toroidal_truncated_bptt,
+            enable_sgp=config.enable_sgp,
+            sgp_rate=config.sgp_rate,
         ).to(device)
         toroidal_loss_fn = ToroidalConsistencyLoss(
             lambda_toroid=config.toroidal_lambda,
@@ -5480,14 +6888,22 @@ def train(config: UnifiedTrainingConfig):
             coherence_alarm_threshold=config.toroidal_coherence_threshold,
         )
         print(f"  Toroidal Bridge: ENABLED (λ={config.toroidal_lambda}, gate={config.toroidal_use_gating})")
+        if config.enable_sgp:
+            print(f"    → SGP (Stochastic Gradient Persistence): ENABLED (rate=1/{config.sgp_rate})")
         print(f"    → O12 (Absolving) feeds O1 (Potential) for recursive intelligence")
 
     # Full Evolutionary Flow System (Phase 2: All Layer Transitions with Delayed Resonance)
     evolutionary_engine = None
     hidden_state_extractor = None
     if config.enable_evolutionary_flow:
-        # Get model dimension
-        model_dim = getattr(model, 'embed_dim', None) or getattr(model, 'd_model', 512)
+        # Get model dimension - check multiple possible attribute locations
+        model_dim = (
+            getattr(model, 'embed_dim', None) or
+            getattr(model, 'd_model', None) or
+            getattr(getattr(model, 'config', None), 'embed_dim', None) or
+            getattr(getattr(model, 'config', None), 'd_model', None) or
+            512  # Fallback default
+        )
         evolutionary_engine = EvolutionaryIntelligenceEngine(
             dim=model_dim,
             num_layers=12,
@@ -5504,7 +6920,7 @@ def train(config: UnifiedTrainingConfig):
         evolutionary_engine.flow_loss.lambda_macro = config.evo_macro_weight
         evolutionary_engine.flow_loss.min_coherence = config.toroidal_coherence_threshold
 
-        print(f"  Evolutionary Flow: ENABLED (λ={config.evo_lambda})")
+        print(f"  Evolutionary Flow: ENABLED (λ={config.evo_lambda}, dim={model_dim})")
         print(f"    → Micro:{config.evo_micro_weight} Meso:{config.evo_meso_weight} Macro:{config.evo_macro_weight}")
         print(f"    → Delayed Resonance α={config.evo_resonance_alpha}")
         print(f"    → LR Modulation: SLOW={config.evo_lr_slowdown}x ACCEL={config.evo_lr_accelerate}x")
@@ -5558,6 +6974,26 @@ def train(config: UnifiedTrainingConfig):
     # Dynamic Relaxation Controller: 9:3 → 6:6 transition
     relaxation_controller = None
     if config.enable_dynamic_relaxation and gradient_scaler_hgs is not None:
+        # V9.4.7: Auto-scale saturation_patience based on GPU VRAM
+        # Larger VRAM → larger batches → faster convergence → lower patience needed
+        # H200 (141GB+): 50 steps | H100 (80GB): 200 steps | A100 (40GB): 400 steps
+        auto_saturation_patience = config.saturation_patience  # Default from CLI
+        if device.type == "cuda":
+            total_vram_gb = torch.cuda.get_device_properties(device).total_memory / 1e9
+            if total_vram_gb >= 140:      # H200 class (141GB+)
+                auto_saturation_patience = 50
+            elif total_vram_gb >= 90:     # 96GB class
+                auto_saturation_patience = 100
+            elif total_vram_gb >= 70:     # H100/A100-80GB class
+                auto_saturation_patience = 200
+            elif total_vram_gb >= 35:     # A100-40GB class
+                auto_saturation_patience = 400
+            else:                          # Smaller GPUs
+                auto_saturation_patience = 500
+
+            if auto_saturation_patience != config.saturation_patience:
+                print(f"  📊 [VRAM-AUTO] Saturation patience scaled: {config.saturation_patience} → {auto_saturation_patience} (based on {total_vram_gb:.0f}GB VRAM)")
+
         relaxation_controller = DynamicRelaxationController(
             gradient_scaler=gradient_scaler_hgs,
             model=model,
@@ -5575,6 +7011,46 @@ def train(config: UnifiedTrainingConfig):
             # Weight Transfer settings
             guna_lock_steps=config.guna_lock_steps,
             enable_weight_transfer=config.enable_weight_transfer,
+            # Force relaxation at specific step
+            force_relaxation_step=config.force_relaxation_step,
+            # Sovereign Saturation Gate
+            enable_saturation_gate=config.enable_saturation_gate,
+            saturation_coherence_threshold=config.saturation_coherence_threshold,
+            saturation_patience=auto_saturation_patience,
+            saturation_thaw_start=config.saturation_thaw_start,
+            saturation_thaw_end=config.saturation_thaw_end,
+            saturation_thaw_steps=config.saturation_thaw_steps,
+        )
+
+        # V9.5.1 Force Evolution: Manual intervention to specific stage
+        if config.force_evolution_stage is not None:
+            target_stage = config.force_evolution_stage
+            if 1 <= target_stage <= 4:
+                relaxation_controller.current_stage_idx = target_stage
+                new_split = relaxation_controller.evolution_stages[target_stage]
+                relaxation_controller.current_split = new_split
+                relaxation_controller.saturation_triggered = True  # Skip 9:3→6:6 check
+                relaxation_controller.state = relaxation_controller.STATE_BALANCED
+                print(f"\n  🔧 [FORCE EVOLUTION] Manually set to stage {target_stage}: {new_split[0]}:{new_split[1]}")
+                print(f"      Stages: 0=9:3, 1=6:6, 2=5:7, 3=4:8, 4=3:9")
+
+    # Adaptive Training Controller (dynamic hyperparameter tuning)
+    adaptive_controller = None
+    if config.enable_adaptive_training:
+        adaptive_controller = AdaptiveTrainingController(
+            optimizer=optimizer,
+            base_lr=config.learning_rate,
+            lr_min=config.adaptive_lr_min,
+            lr_max=config.adaptive_lr_max,
+            lr_boost_factor=config.adaptive_lr_boost,
+            lr_decay_factor=config.adaptive_lr_decay,
+            velocity_slow_threshold=config.adaptive_velocity_slow,
+            velocity_spike_threshold=config.adaptive_velocity_spike,
+            plateau_window=config.adaptive_plateau_window,
+            plateau_threshold=config.adaptive_plateau_threshold,
+            kp_min=config.pidv2_kp_min,
+            kp_max=config.pidv2_kp_max,
+            min_steps_between_adjustments=config.adaptive_min_interval,
         )
 
     # Mixed precision
@@ -5629,6 +7105,22 @@ def train(config: UnifiedTrainingConfig):
         print(f"    Alignment thresholds: warn={friction_controller.config.align_warning}, crit={friction_controller.config.align_critical}")
         print(f"    Dominance range: [{friction_controller.config.dom_low}, {friction_controller.config.dom_high}]")
 
+    # V9.5.2 Emergency Stress-Probe configuration display (ChatGPT Guardrails)
+    if config.enable_stress_probe:
+        print(f"\n  V9.5.2: Emergency Stress-Probe ENABLED (ChatGPT Guardrails)")
+        print(f"    Compound Trigger (2 consecutive evals):")
+        print(f"      Ent < {config.stress_probe_entropy_trigger} AND (REP-3 > {config.stress_probe_rep3_trigger} OR UTR < {config.stress_probe_utr_trigger} OR DRS > {config.stress_probe_drs_trigger})")
+        print(f"    Safety: Coherence > {config.stress_probe_coherence_min} (stiff, not dying)")
+        print(f"    Patience: {config.stress_probe_patience} consecutive evals")
+        print(f"    Authority Scale: {config.stress_probe_authority_scale} (nearly frozen)")
+        print(f"    LR Factor: {config.stress_probe_lr_factor*100:.0f}%")
+        print(f"    Duration: {config.stress_probe_min_steps}-{config.stress_probe_max_steps} steps")
+        print(f"    Exit: Ent > {config.stress_probe_exit_entropy} for 2 evals AND REP-3 < {config.stress_probe_exit_rep3}")
+        print(f"    LR Restore: Gradual over {config.stress_probe_lr_restore_steps} steps")
+
+    if config.force_stress_probe:
+        print(f"\n  ⚡ FORCE STRESS-PROBE: Activated at first step")
+
     # Track previous state for S-drift computation
     previous_state = None
     current_s_drift = 0.0
@@ -5654,6 +7146,12 @@ def train(config: UnifiedTrainingConfig):
     toroidal_coherence = 0.5  # Neutral initial coherence
     toroidal_loss_value = 0.0
     toroidal_seed = None  # Will be populated after first forward pass
+
+    # Training Gunas: Initialize before loop (used by Evolutionary Flow and Metacognitive Tracker)
+    guna_s, guna_r, guna_t = 0.33, 0.33, 0.34  # Default balanced state
+
+    # Sensory flow tracking for Saturation Gate (used by DynamicRelaxationController)
+    last_sensory_flow = 0.5  # Default value, updated each step from EvoFlow
 
     while global_step < config.max_steps:
         # Get batch
@@ -5784,6 +7282,25 @@ def train(config: UnifiedTrainingConfig):
                         loss = loss + toroid_loss
                         toroidal_loss_value = toroid_metrics['toroid_loss']
 
+                        # V9.4.6: Shadow Mirror Alignment (SMA) - Lite Meta-Learning
+                        # Trains bridge weights (seed_proj, seed_gate) to predict actual O1 state
+                        # Uses active_projection (non-detached) for proper gradient flow to bridge
+                        # Zero VRAM overhead, achieves meta-learning without BPTT risks
+                        sma_weight = 0.05
+                        o1_target = o1_state.detach()  # Don't backprop through model
+                        if o1_target.dim() == 3:
+                            o1_target = o1_target.mean(dim=1)  # [B, N, dim] → [B, dim]
+
+                        # Use active_projection for gradient flow (not detached toroidal_seed)
+                        seed_for_sma = evolutionary_bridge.active_projection
+                        if seed_for_sma is not None:
+                            if seed_for_sma.dim() == 3:
+                                seed_for_sma = seed_for_sma.mean(dim=1)
+                            # MSE loss: bridge learns to project O12 → O1 accurately
+                            sma_loss = F.mse_loss(seed_for_sma, o1_target) * sma_weight
+                            loss = loss + sma_loss
+                            metrics['sma_loss'] = sma_loss.item()
+
                         # Update metacognitive tracker
                         if metacognitive_tracker is not None:
                             meta_assessment = metacognitive_tracker.update(
@@ -5792,8 +7309,14 @@ def train(config: UnifiedTrainingConfig):
                             )
 
                     # Store harvest for next cycle (becomes next seed)
-                    evolutionary_bridge.store_harvest(o12_state)
+                    # V9.4.7: Pass global_step for SGP rate calculation
+                    is_sgp_heavy_step = evolutionary_bridge.store_harvest(o12_state, global_step=global_step)
                     toroidal_seed = evolutionary_bridge.get_seed()
+
+                    # Log SGP heavy step (recursive gradient pulse)
+                    if is_sgp_heavy_step and global_step % config.log_every == 0:
+                        print(f"  🌀 [SGP-HEAVY] Recursive Gradient Pulse at Step {global_step}")
+                    metrics['sgp_heavy_step'] = is_sgp_heavy_step
 
             # Full Evolutionary Flow System: All Layer Transitions with Delayed Resonance
             evo_result = None
@@ -5805,6 +7328,24 @@ def train(config: UnifiedTrainingConfig):
                 hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
 
                 if hidden_states is not None and len(hidden_states) > 0:
+
+                    # V9.4.6: Sensory Noise Injection (SNI)
+                    # Break repetitive loops by injecting tiny noise into sensory layers
+                    # when entropy drops below floor (signaling "city of the city" patterns)
+                    sni_entropy_floor = 0.30
+                    sni_noise_scale = 1e-4
+                    current_entropy = metrics.get("onto_entropy", 1.0)
+
+                    if current_entropy < sni_entropy_floor:
+                        # Inject noise into sensory layers (O10-O12 = indices 9, 10, 11)
+                        sensory_indices = [9, 10, 11]
+                        for idx in sensory_indices:
+                            if idx < len(hidden_states):
+                                hidden_states[idx] = hidden_states[idx] + \
+                                    torch.randn_like(hidden_states[idx]) * sni_noise_scale
+                        metrics['sni_triggered'] = True
+                    else:
+                        metrics['sni_triggered'] = False
 
                     # Update Gunas in engine for metacognitive decisions
                     evolutionary_engine.update_gunas(guna_s, guna_r, guna_t)
@@ -5830,6 +7371,16 @@ def train(config: UnifiedTrainingConfig):
                     metrics['evo_sens'] = evo_result['flow_result']['sensory_coherence']
                     metrics['evo_toroid'] = evo_result['flow_result']['toroidal_coherence']
                     metrics['evo_rec'] = evo_result['metacognitive']['recommendation']
+
+            # V9.5.1 Entropy Floor Penalty (breaks repetition curse)
+            if config.enable_entropy_floor and 'onto_entropy' in metrics:
+                current_entropy = metrics['onto_entropy']
+                if current_entropy < config.entropy_floor:
+                    # Penalize low entropy to encourage diversity
+                    entropy_deficit = config.entropy_floor - current_entropy
+                    entropy_floor_loss = config.entropy_floor_weight * entropy_deficit
+                    loss = loss + entropy_floor_loss
+                    metrics['entropy_floor_penalty'] = entropy_floor_loss
 
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
@@ -5986,6 +7537,129 @@ def train(config: UnifiedTrainingConfig):
                     status = sgp_controller.get_status()
                     print(f"  🔨 [SGP] step={global_step} rate={status['rate']} λ_csr={lambda_csr:.3f} stag={'Y' if status['stagnation_active'] else 'N'}")
 
+            # V9.4.9 Per-step updates: Both metabolic flip AND stability streak count every gradient step
+            if relaxation_controller is not None:
+                # Update stability streak every step (not just at validation)
+                current_coherence = metrics.get('coherence', 0.75)
+                sa_ratio = hgs_metrics.get("s_a_ratio", 0.5) if hgs_metrics else 0.5
+                relaxation_controller.update_stability_per_step(
+                    coherence=current_coherence,
+                    sa_ratio=sa_ratio,
+                )
+
+                # Metabolic Flip check (when saturation gate is enabled)
+                if relaxation_controller.enable_saturation_gate:
+                    # Get current VRAM usage (0.0 to 1.0)
+                    if device.type == "cuda":
+                        vram_used = torch.cuda.memory_allocated(device)
+                        vram_total = torch.cuda.get_device_properties(device).total_memory
+                        vram_usage = vram_used / vram_total
+                    else:
+                        vram_usage = 0.0
+
+                    # Check metabolic flip criteria every step
+                    flip_result = relaxation_controller.check_metabolic_flip(
+                        metrics=metrics,
+                        vram_usage=vram_usage,
+                        global_step=global_step,
+                    )
+
+                    if flip_result == "TRIGGER_FLIP":
+                        # Metabolic flip triggered! Execute 9:3 → 6:6 relaxation
+                        relaxation_controller.execute_relaxation(current_step=global_step)
+                        relaxation_controller.current_stage_idx = 1  # Now at 6:6
+                        print(f"  🔄 [RELAXATION] 9:3 → 6:6 transition initiated")
+
+                    # V9.5.1 Granular Evolution: Check for further evolution (6:6 → 5:7 → 4:8 → 3:9)
+                    evolution_result = relaxation_controller.check_granular_evolution(
+                        metrics=metrics,
+                        vram_usage=vram_usage,
+                        global_step=global_step,
+                    )
+
+                    if evolution_result.startswith("EVOLVE_TO_"):
+                        # Execute granular evolution
+                        new_split = relaxation_controller.execute_granular_evolution(global_step)
+                        # Reconfigure gradient scaler for new split
+                        if gradient_scaler_hgs is not None:
+                            gradient_scaler_hgs.reconfigure(
+                                new_authority_layers=new_split[0],
+                                new_sensory_layers=new_split[1],
+                                alpha_range=(0.05, 0.70),
+                            )
+                            print(f"  ✓ [HGS] Reconfigured for {new_split[0]}:{new_split[1]} split")
+
+                    # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
+                    if relaxation_controller.stress_probe_active:
+                        # Already in stress-probe: check for exit
+                        exit_result = relaxation_controller.check_stress_probe_exit(
+                            metrics=metrics,
+                            config=config,
+                            global_step=global_step,
+                        )
+
+                        if exit_result in ("EXIT_SUCCESS", "EXIT_FORCED"):
+                            # Exit stress-probe (starts gradual LR restore)
+                            new_split, initial_lr = relaxation_controller.exit_stress_probe(
+                                global_step=global_step,
+                                exit_reason=exit_result,
+                                config=config,
+                            )
+                            # Set initial LR (will be gradually restored)
+                            for param_group in optimizer.param_groups:
+                                param_group['lr'] = initial_lr
+                            # Reconfigure gradient scaler for 6:6
+                            if gradient_scaler_hgs is not None:
+                                gradient_scaler_hgs.reconfigure(
+                                    new_authority_layers=new_split[0],
+                                    new_sensory_layers=new_split[1],
+                                    alpha_range=(0.05, 0.70),
+                                )
+                                print(f"  ✓ [HGS] Reconfigured for {new_split[0]}:{new_split[1]} split")
+
+                    # ChatGPT Guardrail: Gradual LR restore after stress-probe exit
+                    if relaxation_controller.stress_probe_lr_restoring:
+                        restore_lr = relaxation_controller.get_stress_probe_restore_lr(
+                            global_step=global_step,
+                            config=config,
+                        )
+                        for param_group in optimizer.param_groups:
+                            param_group['lr'] = restore_lr
+
+                    if not relaxation_controller.stress_probe_active:
+                        # Not in stress-probe: check for trigger
+                        stress_result = relaxation_controller.check_stress_probe(
+                            metrics=metrics,
+                            config=config,
+                            global_step=global_step,
+                        )
+
+                        # Also check for force_stress_probe CLI flag
+                        if config.force_stress_probe and not relaxation_controller.stress_probe_active:
+                            stress_result = "TRIGGER_STRESS_PROBE"
+                            config.force_stress_probe = False  # Only trigger once
+
+                        if stress_result == "TRIGGER_STRESS_PROBE":
+                            # Get current LR
+                            current_lr = optimizer.param_groups[0]['lr']
+                            # Execute stress-probe
+                            new_split, new_lr = relaxation_controller.execute_stress_probe(
+                                config=config,
+                                current_lr=current_lr,
+                                global_step=global_step,
+                            )
+                            # Update optimizer LR
+                            for param_group in optimizer.param_groups:
+                                param_group['lr'] = new_lr
+                            # Reconfigure gradient scaler for 3:9 with frozen authority
+                            if gradient_scaler_hgs is not None:
+                                gradient_scaler_hgs.reconfigure(
+                                    new_authority_layers=new_split[0],
+                                    new_sensory_layers=new_split[1],
+                                    alpha_range=(config.stress_probe_authority_scale, 0.70),
+                                )
+                                print(f"  ✓ [HGS] Reconfigured for 3:9 stress-probe (α_authority={config.stress_probe_authority_scale})")
+
             # Periodic CUDA memory cleanup to prevent fragmentation
             if device.type == "cuda" and global_step % 500 == 0:
                 torch.cuda.empty_cache()
@@ -6004,13 +7678,17 @@ def train(config: UnifiedTrainingConfig):
                 # Reinitialize DataLoader if batch size changed
                 if new_batch != old_batch:
                     print(f"  🔄 Reinitializing DataLoader with batch_size={new_batch}")
+                    # Get dataset from existing DataLoader (train_dataset may not be in scope)
+                    dataset = train_loader.dataset
                     train_loader = DataLoader(
-                        train_dataset,
+                        dataset,
                         batch_size=new_batch,
                         shuffle=True,
-                        num_workers=4,
+                        num_workers=config.num_workers,
                         pin_memory=True,
                         drop_last=True,
+                        prefetch_factor=2 if config.num_workers > 0 else None,
+                        persistent_workers=config.num_workers > 0,
                     )
                     train_iter = iter(train_loader)
                     # Update config for logging
@@ -6057,14 +7735,20 @@ def train(config: UnifiedTrainingConfig):
                     else:
                         mem_str = ""
 
-                    # Log message
+                    # Timestamp for each log line
+                    timestamp = datetime.now().strftime("%H:%M:%S")
+
+                    # Log message with timestamp
                     log_msg = (
-                        f"Step {global_step:>6} | "
+                        f"[{timestamp}] Step {global_step:>6} | "
                         f"Loss: {avg_loss:.4f} | "
                         f"PPL: {metrics['ppl']:.2f} | "
                         f"LR: {lr:.2e} | "
                         f"Tok/s: {tokens_per_sec:.0f}{mem_str}"
                     )
+
+                    # Check if this is a validation step (show verbose metrics)
+                    is_verbose_step = (global_step % config.eval_every == 0)
 
                     # Add ontological metrics
                     if config.model_type == "ontological":
@@ -6113,15 +7797,15 @@ def train(config: UnifiedTrainingConfig):
                             sa_ind = "!"  # Sensory may be overriding
                         log_msg += f" | S/A:{current_sa_ratio:.2f}{sa_ind} α_s:{alpha_sens:.2f}"
 
-                    # Sattvic Brake: Confidence score with status icon
-                    if sattvic_brake is not None:
+                    # Sattvic Brake: Confidence score with status icon (only every 100 steps)
+                    if sattvic_brake is not None and is_verbose_step:
                         conf_icon = sattvic_brake.get_status_icon(sattvic_confidence)
                         log_msg += f" | Conf:{sattvic_confidence:.2f}{conf_icon}"
                         if sattvic_lr_mult < 1.0:
                             log_msg += f" [BRAKE×{sattvic_lr_mult:.2f}]"
 
-                    # v2.7 Training State Tracker: Knowledge state
-                    if training_state_tracker is not None and training_state_tracker.enabled:
+                    # v2.7 Training State Tracker: Knowledge state (only every 100 steps)
+                    if training_state_tracker is not None and training_state_tracker.enabled and is_verbose_step:
                         know_state = training_state_tracker.state['cognitive_state']
                         log_msg += f" | Know:{know_state:.2f}"
 
@@ -6136,8 +7820,8 @@ def train(config: UnifiedTrainingConfig):
                             guna_icon = "🌙"  # Tamas - inertia/plateau
                         log_msg += f" | S:{guna_s:.2f} R:{guna_r:.2f} T:{guna_t:.2f}{guna_icon}"
 
-                    # Toroidal Bridge: Coherence and metacognitive status
-                    if evolutionary_bridge is not None:
+                    # Toroidal Bridge: Coherence and metacognitive status (only every 100 steps)
+                    if evolutionary_bridge is not None and is_verbose_step:
                         log_msg += f" | {evolutionary_bridge.get_coherence_status()}"
                         if metacognitive_tracker is not None:
                             log_msg += f" {metacognitive_tracker.get_status()}"
@@ -6149,6 +7833,9 @@ def train(config: UnifiedTrainingConfig):
                         evo_sens = metrics.get('evo_sens', 0.0)
                         evo_toroid = metrics.get('evo_toroid', 0.0)
                         evo_rec = metrics.get('evo_rec', 'CONTINUE')
+
+                        # Update last_sensory_flow for Saturation Gate
+                        last_sensory_flow = evo_sens
 
                         # Metacognitive status icon
                         evo_icons = {
@@ -6169,6 +7856,10 @@ def train(config: UnifiedTrainingConfig):
                         log_msg += f"\n    --> [EvoFlow] Micro:{evo_micro:.2f} | Auth:{evo_auth:.2f} Sens:{evo_sens:.2f}{meso_ind} | Toroid:{evo_toroid:.2f} | {evo_rec[:4]}{evo_icon}"
                         if evo_lr_multiplier != 1.0:
                             log_msg += f" [LR×{evo_lr_multiplier:.2f}]"
+
+                # V9.4.6: Log SNI activation
+                if metrics.get('sni_triggered', False):
+                    log_msg += f"\n    --> [SNI] Low entropy ({metrics.get('onto_entropy', 0):.2f}) - injecting sensory noise"
 
                 print(log_msg)
                 step_start_time = time.time()
@@ -6191,7 +7882,24 @@ def train(config: UnifiedTrainingConfig):
                         step=global_step,
                         phase_ramp_steps=config.phase_ramp_steps,
                     )
-                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f} | {authority_controller.get_status_string()}")
+
+                    # V9.4.6: PIDv2 Relaxation Sensitivity
+                    # Dampen Kp during post-relaxation recovery to let sensory layers stabilize
+                    relaxation_dampening_active = False
+                    if relaxation_controller is not None and relaxation_controller.relaxation_step is not None:
+                        steps_since_relaxation = global_step - relaxation_controller.relaxation_step
+                        ppl_derivative = getattr(authority_controller, 'last_v', 0.0)
+                        # If within 100 steps of swap AND PPL is rising, dampen authority
+                        if 0 < steps_since_relaxation <= 100 and ppl_derivative > 0:
+                            # Force minimum authority to let sensory layers re-anchor
+                            new_A = config.pidv2_a_min
+                            relaxation_dampening_active = True
+
+                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f} | {authority_controller.get_status_string()}", end="")
+                    if relaxation_dampening_active:
+                        print(f" [RELAX_DAMP]")
+                    else:
+                        print()
 
                     # V9.4.5: Log Friction Controller status (with corrective actions)
                     if friction_controller is not None:
@@ -6224,6 +7932,12 @@ def train(config: UnifiedTrainingConfig):
                         if evolutionary_bridge is not None:
                             tb_writer.add_scalar("toroid/coherence", toroidal_coherence, global_step)
                             tb_writer.add_scalar("toroid/loss", toroidal_loss_value, global_step)
+                            # V9.4.6: Shadow Mirror Alignment loss
+                            if 'sma_loss' in metrics:
+                                tb_writer.add_scalar("toroid/sma_loss", metrics['sma_loss'], global_step)
+                            # V9.4.7: Stochastic Gradient Persistence tracking
+                            if 'sgp_heavy_step' in metrics:
+                                tb_writer.add_scalar("toroid/sgp_active", 1.0 if metrics['sgp_heavy_step'] else 0.0, global_step)
                             if metacognitive_tracker is not None:
                                 tb_writer.add_scalar("toroid/velocity", metacognitive_tracker.coherence_history[-1] - metacognitive_tracker.coherence_history[-2] if len(metacognitive_tracker.coherence_history) >= 2 else 0.0, global_step)
 
@@ -6349,7 +8063,7 @@ def train(config: UnifiedTrainingConfig):
                     # Get entropy for gating (from S8 hook or val_metrics)
                     current_entropy = val_metrics.get('entropy', val_metrics.get('onto_entropy', 0.5))
 
-                    # Update relaxation controller with entropy gate
+                    # Update relaxation controller with entropy gate and saturation gate
                     state_changed, action = relaxation_controller.update(
                         guna_coherence=guna_coherence,
                         s_drift_ema=s_drift_ema,
@@ -6357,11 +8071,12 @@ def train(config: UnifiedTrainingConfig):
                         global_step=global_step,
                         sa_ratio=current_sa_ratio,
                         entropy=current_entropy,
+                        sensory_flow=last_sensory_flow,  # For Saturation Gate
                     )
 
                     # Execute actions
                     if action == "RELAX":
-                        relaxation_controller.execute_relaxation()
+                        relaxation_controller.execute_relaxation(current_step=global_step)
                         print(f"  🎯 StabilityIndex achieved! Transitioning to balanced mode.")
                     elif action == "RECOVER":
                         relaxation_controller.execute_recovery()
@@ -6377,8 +8092,40 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("relax/is_balanced", 1.0 if relaxation_controller.state == "BALANCED" else 0.0, global_step)
                         tb_writer.add_scalar("relax/guna_coherence", guna_coherence, global_step)
                         tb_writer.add_scalar("relax/s_drift_ema", s_drift_ema, global_step)
+                        # Saturation Gate metrics
+                        tb_writer.add_scalar("relax/sensory_flow", last_sensory_flow, global_step)
+                        tb_writer.add_scalar("relax/saturation_flat_count", relaxation_controller.saturation_flat_count, global_step)
+                        tb_writer.add_scalar("relax/saturation_triggered", 1.0 if relaxation_controller.saturation_triggered else 0.0, global_step)
 
-                    # Adaptive LR on PPL spike (only if no PIDv2)
+                # Adaptive Training Controller (dynamic LR/Kp adjustment)
+                if adaptive_controller is not None:
+                    # Get recent train loss (average of last 10 steps)
+                    recent_train_loss = sum(train_losses[-10:]) / len(train_losses[-10:]) if train_losses else 0.0
+
+                    adaptive_adjustments = adaptive_controller.update(
+                        train_loss=recent_train_loss,
+                        val_loss=val_loss,
+                        val_ppl=val_ppl,
+                        coherence=val_metrics.get('coherence', 0.75),
+                        global_step=global_step,
+                        authority_controller=authority_controller,  # Pass PIDv2 for Kp adjustment
+                    )
+
+                    # Log adaptive controller status
+                    if adaptive_adjustments.get("actions"):
+                        # Already logged by the controller
+                        pass
+
+                    # TensorBoard logging for adaptive controller
+                    if tb_writer is not None:
+                        telemetry = adaptive_controller.get_telemetry()
+                        tb_writer.add_scalar("adaptive/lr", telemetry["current_lr"], global_step)
+                        tb_writer.add_scalar("adaptive/velocity", telemetry["velocity"], global_step)
+                        tb_writer.add_scalar("adaptive/boost_count", telemetry["boost_count"], global_step)
+                        tb_writer.add_scalar("adaptive/decay_count", telemetry["decay_count"], global_step)
+                        tb_writer.add_scalar("adaptive/plateau_count", telemetry["plateau_count"], global_step)
+                else:
+                    # Legacy: Adaptive LR on PPL spike (only if no adaptive controller)
                     if val_ppl < best_ppl:
                         best_ppl = val_ppl
                     elif global_step > config.warmup_steps:
@@ -6411,6 +8158,10 @@ def train(config: UnifiedTrainingConfig):
                 # Log HGS status (only if relaxation controller not active, to avoid duplicate logging)
                 if gradient_scaler_hgs is not None and relaxation_controller is None:
                     print(f"  --> {gradient_scaler_hgs.get_status_string()}")
+
+                # Log Adaptive Training Controller status
+                if adaptive_controller is not None and len(adaptive_controller.val_ppl_history) >= 2:
+                    print(f"  --> {adaptive_controller.get_status_string()}")
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
@@ -6453,7 +8204,7 @@ def train(config: UnifiedTrainingConfig):
                 )
                 # v2.7 Training State Tracker: Save state on checkpoint
                 if training_state_tracker is not None and training_state_tracker.enabled:
-                    training_state_tracker.save()
+                    training_state_tracker.save_state()
 
     # Final save
     save_checkpoint(
@@ -6464,7 +8215,7 @@ def train(config: UnifiedTrainingConfig):
     )
     # v2.7 Training State Tracker: Save final state
     if training_state_tracker is not None and training_state_tracker.enabled:
-        training_state_tracker.save()
+        training_state_tracker.save_state()
 
     # Close TensorBoard
     if tb_writer is not None:
@@ -6542,7 +8293,11 @@ def save_checkpoint(
     hgs_state: Optional[dict] = None,
     drc_state: Optional[dict] = None,
 ):
-    """Save training checkpoint with optional HGS/DRC state."""
+    """Save training checkpoint with optional HGS/DRC state.
+
+    For last.pt checkpoints, explicitly removes old file before saving new one
+    to ensure clean replacement and avoid potential corruption.
+    """
     checkpoint = {
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
@@ -6563,6 +8318,11 @@ def save_checkpoint(
     # Add DRC state if provided
     if drc_state is not None:
         checkpoint["drc_state"] = drc_state
+
+    # Explicitly remove old checkpoint before saving (especially for last.pt)
+    # This ensures clean replacement and frees disk space before writing
+    if path.exists():
+        path.unlink()
 
     torch.save(checkpoint, path)
 
@@ -6649,6 +8409,51 @@ def main():
                        help="Enable S8 Stability Constraint (entropy-based anchoring)")
     parser.add_argument("--gc_floor", type=float, default=0.65,
                        help="Minimum Guna Coherence before PIDv2 intervention")
+
+    # V9.5.1 Entropy Floor (breaks repetition curse)
+    parser.add_argument("--enable_entropy_floor", action="store_true",
+                       help="Enable entropy floor penalty (prevents stiffness)")
+    parser.add_argument("--entropy_floor", type=float, default=0.48,
+                       help="Minimum entropy target (default 0.48)")
+    parser.add_argument("--entropy_floor_weight", type=float, default=0.1,
+                       help="Weight for entropy floor penalty")
+
+    # V9.5.1 Force Evolution (manual intervention)
+    parser.add_argument("--force_evolution_stage", type=int, default=None,
+                       help="Force evolution to specific stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9")
+
+    # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
+    # ChatGPT Guardrails: Compound trigger, strict duration, gradual LR restore
+    parser.add_argument("--enable_stress_probe", action="store_true",
+                       help="Enable automatic stress-probe detection for stiffness")
+    parser.add_argument("--stress_probe_entropy_trigger", type=float, default=0.42,
+                       help="Trigger when entropy < this (ChatGPT: 0.42)")
+    parser.add_argument("--stress_probe_rep3_trigger", type=float, default=0.18,
+                       help="Trigger when REP-3 > this (ChatGPT: 0.18)")
+    parser.add_argument("--stress_probe_utr_trigger", type=float, default=0.55,
+                       help="Trigger when UTR < this (ChatGPT: 0.55)")
+    parser.add_argument("--stress_probe_drs_trigger", type=float, default=12.0,
+                       help="Trigger when DRS > this (ChatGPT: 12)")
+    parser.add_argument("--stress_probe_coherence_min", type=float, default=0.80,
+                       help="Only trigger if coherence > this (stiff, not dying)")
+    parser.add_argument("--stress_probe_patience", type=int, default=2,
+                       help="Consecutive evals of degeneracy before triggering (ChatGPT: 2)")
+    parser.add_argument("--stress_probe_authority_scale", type=float, default=0.05,
+                       help="Authority layer gradient scale during stress-probe (nearly frozen)")
+    parser.add_argument("--stress_probe_lr_factor", type=float, default=0.60,
+                       help="LR reduction factor during stress-probe (ChatGPT: 0.6)")
+    parser.add_argument("--stress_probe_exit_entropy", type=float, default=0.55,
+                       help="Exit when entropy > this for 2 consecutive evals")
+    parser.add_argument("--stress_probe_exit_rep3", type=float, default=0.12,
+                       help="Exit when REP-3 < this")
+    parser.add_argument("--stress_probe_min_steps", type=int, default=100,
+                       help="Minimum steps in stress-probe (ChatGPT: 100)")
+    parser.add_argument("--stress_probe_max_steps", type=int, default=300,
+                       help="Maximum steps in stress-probe (ChatGPT: 300)")
+    parser.add_argument("--stress_probe_lr_restore_steps", type=int, default=50,
+                       help="Steps to gradually restore LR after exit (ChatGPT: 50)")
+    parser.add_argument("--force_stress_probe", action="store_true",
+                       help="Force immediate stress-probe activation")
 
     # Logging
     parser.add_argument("--log_every", type=int, default=10,
@@ -6737,6 +8542,23 @@ def main():
                        help="Rolling window size for stability check")
     parser.add_argument("--relaxation_streak_target", type=int, default=5,
                        help="Consecutive stable evals for 'consecutive' mode")
+    parser.add_argument("--force_relaxation_step", type=int, default=None,
+                       help="Force 9:3→6:6 swap at this step (bypasses stability check)")
+    # Sovereign Saturation Gate
+    parser.add_argument("--enable_saturation_gate", action="store_true", default=True,
+                       help="Enable automatic saturation detection for 9:3→6:6 transition")
+    parser.add_argument("--disable_saturation_gate", action="store_true",
+                       help="Disable automatic saturation gate")
+    parser.add_argument("--saturation_coherence_threshold", type=float, default=0.74,
+                       help="Coherence threshold for saturation gate trigger")
+    parser.add_argument("--saturation_patience", type=int, default=50,
+                       help="Steps where sensory derivative must be flat to trigger")
+    parser.add_argument("--saturation_thaw_start", type=float, default=0.3,
+                       help="Starting α for new sensory layers during Dampened Thaw")
+    parser.add_argument("--saturation_thaw_end", type=float, default=0.7,
+                       help="Ending α for new sensory layers during Dampened Thaw")
+    parser.add_argument("--saturation_thaw_steps", type=int, default=100,
+                       help="Steps to ramp new sensory layers from start to end α")
     parser.add_argument("--relaxation_target_authority", type=int, default=6,
                        help="Target authority layers after relaxation")
     parser.add_argument("--relaxation_target_sensory", type=int, default=6,
@@ -6770,11 +8592,17 @@ def main():
     parser.add_argument("--toroidal_coherence_threshold", type=float, default=0.3,
                        help="Alarm threshold for cognitive discontinuity")
 
-    # Evolutionary Flow System (Phase 2-5)
+    # V9.4.7: Stochastic Gradient Persistence (SGP)
+    parser.add_argument("--enable_sgp", action="store_true",
+                       help="Enable SGP recursive gradient pulses (H200 recommended)")
+    parser.add_argument("--sgp_rate", type=int, default=100,
+                       help="SGP pulse every N steps (default 100 = 1%% rule)")
+
+    # Full Evolutionary Flow System (Phase 2-5)
     parser.add_argument("--enable_evolutionary_flow", action="store_true", default=True,
-                       help="Enable Evolutionary Flow System (default: True)")
+                       help="Enable full evolutionary flow across all layer transitions")
     parser.add_argument("--disable_evolutionary_flow", action="store_true",
-                       help="Disable Evolutionary Flow System")
+                       help="Disable evolutionary flow system")
     parser.add_argument("--evo_lambda", type=float, default=0.1,
                        help="Overall evolutionary loss weight")
     parser.add_argument("--evo_micro_weight", type=float, default=0.3,
@@ -6783,6 +8611,12 @@ def main():
                        help="Weight for cluster coherence loss (Auth/Sens)")
     parser.add_argument("--evo_macro_weight", type=float, default=0.4,
                        help="Weight for toroidal coherence loss")
+    parser.add_argument("--evo_dropout", type=float, default=0.1,
+                       help="Dropout in evolutionary gates")
+    parser.add_argument("--evo_use_rmatrix", action="store_true", default=True,
+                       help="Use R-Matrix for evolutionary weights")
+    parser.add_argument("--evo_coherence_window", type=int, default=100,
+                       help="Steps for coherence history tracking")
     parser.add_argument("--evo_resonance_alpha", type=float, default=0.1,
                        help="Strength of O12→O1 delayed resonance injection")
     parser.add_argument("--evo_lr_modulation", action="store_true", default=True,
@@ -6831,6 +8665,40 @@ def main():
                        help="Window for entropy variance detection")
     parser.add_argument("--sattvic_variance_threshold", type=float, default=0.001,
                        help="Variance threshold for stagnation")
+
+    # Adaptive Training Controller (dynamic hyperparameter tuning)
+    parser.add_argument("--enable_adaptive_training", action="store_true", default=True,
+                       help="Enable automatic LR/Kp adjustment based on training dynamics")
+    parser.add_argument("--disable_adaptive_training", action="store_true",
+                       help="Disable adaptive training controller")
+    parser.add_argument("--adaptive_lr_min", type=float, default=1e-5,
+                       help="Minimum learning rate floor for adaptive adjustment")
+    parser.add_argument("--adaptive_lr_max", type=float, default=1e-3,
+                       help="Maximum learning rate ceiling for adaptive adjustment")
+    parser.add_argument("--adaptive_lr_boost", type=float, default=1.5,
+                       help="LR boost multiplier when plateau or slow learning detected")
+    parser.add_argument("--adaptive_lr_decay", type=float, default=0.7,
+                       help="LR decay multiplier when PPL spike detected")
+    parser.add_argument("--adaptive_velocity_slow", type=float, default=-2.0,
+                       help="PPL velocity threshold (%) for 'too slow' detection")
+    parser.add_argument("--adaptive_velocity_spike", type=float, default=10.0,
+                       help="PPL velocity threshold (%) for 'spike' detection")
+    parser.add_argument("--adaptive_plateau_window", type=int, default=5,
+                       help="Number of evaluations to check for plateau")
+    parser.add_argument("--adaptive_plateau_threshold", type=float, default=1.0,
+                       help="Minimum improvement (%) to avoid plateau detection")
+    parser.add_argument("--adaptive_min_interval", type=int, default=200,
+                       help="Minimum steps between adaptive adjustments")
+
+    # Auto Batch Sizing (VRAM-based startup probing)
+    parser.add_argument("--enable_auto_batch", action="store_true",
+                       help="Enable automatic batch size detection at startup based on VRAM")
+    parser.add_argument("--auto_batch_target_utilization", type=float, default=0.80,
+                       help="Target VRAM utilization for auto batch sizing (0.80 = 80%%)")
+    parser.add_argument("--auto_batch_safety_margin", type=float, default=0.05,
+                       help="Extra VRAM headroom below target (0.05 = 5%%)")
+    parser.add_argument("--auto_batch_target_effective", type=int, default=0,
+                       help="Target effective batch size (0 = just find max batch, no accumulation)")
 
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
@@ -6895,6 +8763,28 @@ def main():
         mu_s3=args.mu_s3,
         enable_stability_constraint=args.enable_stability_constraint,
         gc_floor=args.gc_floor,
+        # V9.5.1 Entropy Floor
+        enable_entropy_floor=args.enable_entropy_floor,
+        entropy_floor=args.entropy_floor,
+        entropy_floor_weight=args.entropy_floor_weight,
+        # V9.5.1 Force Evolution
+        force_evolution_stage=args.force_evolution_stage,
+        # V9.5.2 Emergency Stress-Probe (ChatGPT Guardrails)
+        enable_stress_probe=args.enable_stress_probe,
+        stress_probe_entropy_trigger=args.stress_probe_entropy_trigger,
+        stress_probe_rep3_trigger=args.stress_probe_rep3_trigger,
+        stress_probe_utr_trigger=args.stress_probe_utr_trigger,
+        stress_probe_drs_trigger=args.stress_probe_drs_trigger,
+        stress_probe_coherence_min=args.stress_probe_coherence_min,
+        stress_probe_patience=args.stress_probe_patience,
+        stress_probe_authority_scale=args.stress_probe_authority_scale,
+        stress_probe_lr_factor=args.stress_probe_lr_factor,
+        stress_probe_exit_entropy=args.stress_probe_exit_entropy,
+        stress_probe_exit_rep3=args.stress_probe_exit_rep3,
+        stress_probe_min_steps=args.stress_probe_min_steps,
+        stress_probe_max_steps=args.stress_probe_max_steps,
+        stress_probe_lr_restore_steps=args.stress_probe_lr_restore_steps,
+        force_stress_probe=args.force_stress_probe,
         # PIDv2 Controller settings
         controller=args.controller,
         pidv2_kp_min=args.pidv2_kp_min,
@@ -6923,6 +8813,14 @@ def main():
         relaxation_stability_threshold=args.relaxation_stability_threshold,
         relaxation_stability_window=args.relaxation_stability_window,
         relaxation_streak_target=args.relaxation_streak_target,
+        force_relaxation_step=args.force_relaxation_step,
+        # Sovereign Saturation Gate
+        enable_saturation_gate=args.enable_saturation_gate and not args.disable_saturation_gate,
+        saturation_coherence_threshold=args.saturation_coherence_threshold,
+        saturation_patience=args.saturation_patience,
+        saturation_thaw_start=args.saturation_thaw_start,
+        saturation_thaw_end=args.saturation_thaw_end,
+        saturation_thaw_steps=args.saturation_thaw_steps,
         relaxation_target_authority=args.relaxation_target_authority,
         relaxation_target_sensory=args.relaxation_target_sensory,
         relaxation_thaw_alpha=args.relaxation_thaw_alpha,
@@ -6939,12 +8837,15 @@ def main():
         toroidal_use_gating=args.toroidal_use_gating,
         toroidal_truncated_bptt=args.toroidal_truncated_bptt,
         toroidal_coherence_threshold=args.toroidal_coherence_threshold,
-        # Evolutionary Flow System
+        # Full Evolutionary Flow System (Phase 2-5)
         enable_evolutionary_flow=args.enable_evolutionary_flow and not args.disable_evolutionary_flow,
         evo_lambda=args.evo_lambda,
         evo_micro_weight=args.evo_micro_weight,
         evo_meso_weight=args.evo_meso_weight,
         evo_macro_weight=args.evo_macro_weight,
+        evo_dropout=args.evo_dropout,
+        evo_use_rmatrix=args.evo_use_rmatrix,
+        evo_coherence_window=args.evo_coherence_window,
         evo_resonance_alpha=args.evo_resonance_alpha,
         evo_lr_modulation=args.evo_lr_modulation,
         evo_lr_slowdown=args.evo_lr_slowdown,
@@ -6967,6 +8868,22 @@ def main():
         sattvic_warmup_steps=args.sattvic_warmup_steps,
         sattvic_variance_window=args.sattvic_variance_window,
         sattvic_variance_threshold=args.sattvic_variance_threshold,
+        # Adaptive Training Controller
+        enable_adaptive_training=args.enable_adaptive_training and not args.disable_adaptive_training,
+        adaptive_lr_min=args.adaptive_lr_min,
+        adaptive_lr_max=args.adaptive_lr_max,
+        adaptive_lr_boost=args.adaptive_lr_boost,
+        adaptive_lr_decay=args.adaptive_lr_decay,
+        adaptive_velocity_slow=args.adaptive_velocity_slow,
+        adaptive_velocity_spike=args.adaptive_velocity_spike,
+        adaptive_plateau_window=args.adaptive_plateau_window,
+        adaptive_plateau_threshold=args.adaptive_plateau_threshold,
+        adaptive_min_interval=args.adaptive_min_interval,
+        # Auto Batch Sizing
+        enable_auto_batch=args.enable_auto_batch,
+        auto_batch_target_utilization=args.auto_batch_target_utilization,
+        auto_batch_safety_margin=args.auto_batch_safety_margin,
+        auto_batch_target_effective=args.auto_batch_target_effective,
     )
 
     # Train
