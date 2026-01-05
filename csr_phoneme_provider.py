@@ -2061,10 +2061,16 @@ def create_csr_for_training(
     Returns:
         Tuple of (CSREmbeddingProvider, EntropySink, SynthesisGate)
     """
-    # Get model dimension
-    d_model = getattr(model_config, 'd_model', 512)
+    # Get model dimension - check multiple common attribute names
+    d_model = 512  # default fallback
     if hasattr(model_config, 'hidden_size'):
         d_model = model_config.hidden_size
+    elif hasattr(model_config, 'n_embd'):  # GPT-2 style
+        d_model = model_config.n_embd
+    elif hasattr(model_config, 'd_model'):
+        d_model = model_config.d_model
+    elif hasattr(model_config, 'dim'):  # Some transformer variants
+        d_model = model_config.dim
 
     # Create CSR config
     csr_config = CSRConfig(
