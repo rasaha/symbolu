@@ -405,137 +405,148 @@ print(f"Per-layer scores: {info['layer_scores']}")
 
 ---
 
-## 3. Enhancement Gaps (Priority 3)
+## 3. Enhancement Gaps (Priority 3) ✅ IMPLEMENTED
 
-### 3.1 9:3 Hierarchical Split Awareness
+### 3.1 9:3 Hierarchical Split Awareness ✅ IMPLEMENTED
 
 **Training Behavior:**
 `HierarchicalGradientScaler` (`train_unified_llm.py`) applies different gradient scales to:
 - Authority layers (0-8): Full gradients
 - Sensory layers (9-11): Dampened gradients (α_sens)
 
-**Inference Gap:**
-While inference doesn't use gradients, the 9:3 split concept could inform:
-- Which layers to cache for KV-cache optimization
-- Layer-specific attention temperature adjustments
-- Interpretability of layer contributions
+**✅ Implementation:**
 
-**Implementation Recommendation:**
+Located in `symbolu/inference/layer_config.py`:
 
+- **`LayerInferenceConfig`**: Configuration class for 9:3 split
+- **`LayerType` enum**: AUTHORITY / SENSORY classification
+- **`CachePriority` enum**: HIGH / MEDIUM / LOW levels
+
+**Key Features:**
+- `get_cache_priority()`: Authority=HIGH, Sensory=MEDIUM
+- `get_temperature_adjustment()`: Sensory layers get 0.9x sharper temperature
+- `get_extraction_layers()`: Preset modes (minimal, endpoints, full)
+- `get_layer_weights()`: For weighted aggregation operations
+- Ontological layer names (O1-Potential through O12-Integration)
+
+**Usage:**
 ```python
-# Priority: LOW
-# Effort: Low (0.5 days)
-# Location: symbolu/inference/layer_config.py
+from symbolu.inference import LayerInferenceConfig, AUTHORITY_LAYERS, SENSORY_LAYERS
 
-class LayerInferenceConfig:
-    """
-    Configuration for layer-specific inference behavior.
+# Get layer-adjusted temperature
+for layer_idx in range(12):
+    temp = LayerInferenceConfig.get_temperature_adjustment(layer_idx, base_temp=1.0)
+    priority = LayerInferenceConfig.get_cache_priority(layer_idx)
+    print(f"{LayerInferenceConfig.get_layer_name(layer_idx)}: temp={temp:.2f}, cache={priority}")
 
-    Reflects 9:3 Authority/Sensory split from training.
-    """
-
-    # Authority layers: More important for "meaning"
-    AUTHORITY_LAYERS = list(range(9))  # O1-O9
-
-    # Sensory layers: More important for "expression"
-    SENSORY_LAYERS = list(range(9, 12))  # O10-O12
-
-    @classmethod
-    def get_cache_priority(cls, layer_idx: int) -> str:
-        """
-        Get caching priority for layer (for memory optimization).
-
-        Authority layers: HIGH priority (cache aggressively)
-        Sensory layers: MEDIUM priority (can recompute if needed)
-        """
-        if layer_idx in cls.AUTHORITY_LAYERS:
-            return "HIGH"
-        return "MEDIUM"
-
-    @classmethod
-    def get_temperature_adjustment(cls, layer_idx: int, base_temp: float) -> float:
-        """
-        Adjust attention temperature per layer type.
-
-        Sensory layers may benefit from sharper attention (lower temp)
-        for more precise token selection.
-        """
-        if layer_idx in cls.SENSORY_LAYERS:
-            return base_temp * 0.9  # Slightly sharper for sensory
-        return base_temp
+# Via InferenceManager
+manager = InferenceManager(model)
+temp = manager.get_layer_temperature(layer_idx=10, base_temp=1.0)  # 0.9
 ```
 
 ---
 
-### 3.2 Toroidal Coherence Metrics
+### 3.2 Toroidal Coherence Metrics ✅ IMPLEMENTED
 
 **Training Behavior:**
 `ToroidalConsistencyLoss` computes coherence between:
 - Seed (previous O12) and Harvest (current O12)
 - Optional 3-way consistency with current O1
 
-**Inference Gap:**
-No coherence tracking across generation sequences.
+**✅ Implementation:**
 
-**Implementation Recommendation:**
+Located in `symbolu/inference/evolutionary_inference.py`:
 
+- **`compute_generation_coherence()`**: 2-way coherence (Seed ↔ O12)
+- **`compute_3way_toroidal_coherence()`**: Full 3-way cognitive flow
+- **`get_cognitive_flow_status()`**: Formatted status string
+
+**3-Way Coherence Components:**
+1. **Birth Similarity**: Seed ↔ O1 (karma injection effectiveness)
+2. **Flow Similarity**: O1 ↔ O12 (internal coherence)
+3. **Evolution Similarity**: Seed ↔ O12 (loop closure)
+
+**Usage:**
 ```python
-# Priority: LOW
-# Effort: Low (0.5 days)
-# Location: Add to EvolutionaryInferenceEngine
+from symbolu.inference import EvolutionaryInferenceEngine
 
-def compute_generation_coherence(self) -> float:
-    """
-    Compute coherence between stored karma and current generation.
+engine = EvolutionaryInferenceEngine(model)
 
-    Useful for:
-    - Detecting topic drift in long conversations
-    - Measuring "memory retention" quality
-    """
-    if self.karma_buffer is None or self.current_o12 is None:
-        return 0.0
+# After generation, compute full cognitive flow
+flow_score, details = engine.compute_3way_toroidal_coherence(
+    o1_hidden=layer_states[0],
+    o12_hidden=layer_states[11],
+)
 
-    # Cosine similarity between karma and current O12
-    sim = F.cosine_similarity(
-        self.karma_buffer.view(1, -1),
-        self.current_o12.mean(dim=1).view(1, -1),
-    )
-    return (sim.item() + 1) / 2  # Map to [0, 1]
+print(f"Cognitive Flow: {flow_score:.3f}")
+print(f"  Birth: {details['birth_similarity']:.3f}")
+print(f"  Flow: {details['flow_similarity']:.3f}")
+print(f"  Evolution: {details['evolution_similarity']:.3f}")
+
+# Status line
+print(engine.get_cognitive_flow_status())
+# Output: "Flow:0.72(strong/3way)"
 ```
 
 ---
 
-### 3.3 Dynamic Relaxation State Persistence
+### 3.3 Dynamic Relaxation State Persistence ✅ IMPLEMENTED
 
 **Training Behavior:**
 `DynamicRelaxationController` manages state transitions:
 - STATE_AUTHORITY (9:3) → STATE_BALANCED (6:6) → Evolution stages
 
-**Inference Gap:**
-Model inference doesn't know which training state the model was in when saved.
+**✅ Implementation:**
 
-**Implementation Recommendation:**
+Located in `symbolu/inference/checkpoint_utils.py`:
 
+- **`InferenceConfig`**: Dataclass for inference configuration
+- **`save_sovereign_checkpoint()`**: Save with inference hints
+- **`load_sovereign_config()`**: Load configuration from checkpoint
+- **`load_model_with_config()`**: Load model + config together
+- **`get_checkpoint_info()`**: Inspect checkpoint metadata
+
+**Checkpoint Metadata:**
 ```python
-# Priority: LOW
-# Effort: Low (0.5 days)
-# Location: Checkpoint metadata
-
-# When saving checkpoint, include DRC state:
-checkpoint = {
-    "model": model.state_dict(),
-    "drc_state": relaxation_controller.get_state(),  # Already saved
-    # Add inference-relevant fields:
-    "inference_config": {
-        "authority_sensory_split": (9, 3) if drc.state == "authority" else (6, 6),
-        "evolution_stage": drc.current_stage_idx,
-        "recommended_resonance_alpha": 0.1 if drc.state == "authority" else 0.15,
-    }
+inference_config = {
+    "authority_sensory_split": (9, 3),  # or (6, 6) for balanced
+    "evolution_stage": 2,
+    "recommended_alpha": 0.1,
+    "training_state": "authority",
+    "sgp_rate": 25,
 }
+```
 
-# At inference, load and apply:
-inference_config = checkpoint.get("inference_config", {})
-resonance_alpha = inference_config.get("recommended_resonance_alpha", 0.1)
+**Usage:**
+```python
+from symbolu.inference import (
+    save_sovereign_checkpoint,
+    load_sovereign_config,
+    load_model_with_config,
+)
+
+# Save with inference hints
+save_sovereign_checkpoint(
+    model=model,
+    path="checkpoint.pt",
+    drc_state="authority",
+    evolution_stage=2,
+)
+
+# Load and auto-configure
+config = load_sovereign_config("checkpoint.pt")
+print(f"Recommended alpha: {config.recommended_alpha}")
+print(f"Split: {config.authority_sensory_split}")
+
+# Or load model + config together
+model, config = load_model_with_config("checkpoint.pt", model)
+```
+
+**InferenceManager Integration:**
+```python
+# Checkpoint config is auto-applied when loading
+manager = InferenceManager(model, checkpoint_path="checkpoint.pt")
+# resonance_alpha is automatically set from checkpoint
 ```
 
 ---
@@ -583,12 +594,19 @@ resonance_alpha = inference_config.get("recommended_resonance_alpha", 0.1)
 - ✅ `symbolu/inference/manager.py`
 - ✅ Unit tests: `tests/test_inference_manager.py`
 
-### Remaining (Priority 3 - Enhancement):
+### Phase 3 Enhancements ✅
 
-| Task | Status | Notes |
+| Task | Status | Files |
 |------|--------|-------|
-| Layer configuration | 📋 Optional | Low priority, can be added as needed |
-| Checkpoint metadata enhancement | 📋 Optional | Low priority |
+| `LayerInferenceConfig` (9:3 split) | ✅ Done | `symbolu/inference/layer_config.py` |
+| Checkpoint metadata utilities | ✅ Done | `symbolu/inference/checkpoint_utils.py` |
+| 3-way toroidal coherence | ✅ Done | `symbolu/inference/evolutionary_inference.py` |
+
+**Deliverables:**
+- ✅ `symbolu/inference/layer_config.py`
+- ✅ `symbolu/inference/checkpoint_utils.py`
+- ✅ Enhanced `EvolutionaryInferenceEngine` with `compute_3way_toroidal_coherence()`
+- ✅ Enhanced `InferenceManager` with layer config integration
 
 ---
 
@@ -844,6 +862,7 @@ manager = InferenceManager(
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 2.1 | 2026-01-05 | Claude | Priority 3 enhancements complete: LayerInferenceConfig, checkpoint utilities, 3-way coherence |
 | 2.0 | 2026-01-05 | Claude | Full implementation complete (Phases 1-3), added Usage Guide |
 | 1.0 | 2026-01-05 | Claude | Initial comprehensive gap analysis |
 

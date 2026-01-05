@@ -614,6 +614,149 @@ class EvolutionaryInferenceEngine:
 
         return coherence
 
+    def compute_3way_toroidal_coherence(
+        self,
+        o1_hidden: Optional[torch.Tensor] = None,
+        o12_hidden: Optional[torch.Tensor] = None,
+    ) -> Tuple[float, Dict[str, float]]:
+        """
+        Compute full 3-way toroidal coherence: Seed ↔ O1 ↔ O12.
+
+        This implements the complete "Cognitive Flow" metric that validates
+        the toroidal intelligence loop:
+
+        1. **Birth Similarity**: Does the Seed match the Birth (O1)?
+           - Measures if karma is being properly injected into initial state
+        2. **Flow Similarity**: Does the Result (O12) fulfill the Birth (O1)?
+           - Measures if the sequence maintains internal coherence
+        3. **Evolution Similarity**: Does the Result (O12) match the Seed?
+           - Measures if the cognitive loop closes properly
+
+        The average of these three forms the "Cognitive Flow Score" which
+        indicates whether the toroidal intelligence pattern is intact.
+
+        Args:
+            o1_hidden: O1 (Potential) hidden state [B, N, D] (extracted if None)
+            o12_hidden: O12 (Integration) hidden state [B, N, D] (uses current if None)
+
+        Returns:
+            flow_score: Average 3-way coherence (0-1)
+            details: Dict with individual similarity scores
+        """
+        details = {
+            'birth_similarity': 0.5,
+            'flow_similarity': 0.5,
+            'evolution_similarity': 0.5,
+            'valid': False,
+        }
+
+        # Need karma buffer (seed) for comparison
+        if self.karma_buffer is None:
+            return 0.5, details
+
+        seed = self.karma_buffer
+
+        # Use provided O12 or current stored state
+        if o12_hidden is None:
+            o12_hidden = self.current_o12
+        if o12_hidden is None:
+            return 0.5, details
+
+        # Reduce to [B, D] if needed
+        if o12_hidden.dim() == 3:
+            o12_mean = o12_hidden.mean(dim=1)
+        else:
+            o12_mean = o12_hidden
+
+        # If O1 provided, compute full 3-way
+        if o1_hidden is not None:
+            if o1_hidden.dim() == 3:
+                o1_mean = o1_hidden.mean(dim=1)
+            else:
+                o1_mean = o1_hidden
+
+            # Ensure seed matches batch dimension
+            if seed.dim() == 2 and seed.shape[0] != o1_mean.shape[0]:
+                seed = seed.expand(o1_mean.shape[0], -1)
+
+            # Consistency 1: Does the Seed match the Birth (O1)?
+            birth_sim = F.cosine_similarity(
+                seed.view(-1),
+                o1_mean.view(-1),
+                dim=0,
+            )
+            details['birth_similarity'] = (birth_sim.item() + 1) / 2
+
+            # Consistency 2: Does the Result (O12) fulfill the Birth (O1)?
+            flow_sim = F.cosine_similarity(
+                o1_mean.view(-1),
+                o12_mean.view(-1),
+                dim=0,
+            )
+            details['flow_similarity'] = (flow_sim.item() + 1) / 2
+
+            # Consistency 3: Does the Result (O12) match the original Seed?
+            evolution_sim = F.cosine_similarity(
+                seed.view(-1),
+                o12_mean.view(-1),
+                dim=0,
+            )
+            details['evolution_similarity'] = (evolution_sim.item() + 1) / 2
+
+            details['valid'] = True
+
+        else:
+            # Without O1, just compute seed-to-O12 (evolution)
+            evolution_sim = F.cosine_similarity(
+                seed.view(-1),
+                o12_mean.view(-1),
+                dim=0,
+            )
+            details['evolution_similarity'] = (evolution_sim.item() + 1) / 2
+            details['birth_similarity'] = 0.5  # Unknown
+            details['flow_similarity'] = 0.5   # Unknown
+            details['valid'] = False
+
+        # Compute overall flow score
+        flow_score = (
+            details['birth_similarity'] +
+            details['flow_similarity'] +
+            details['evolution_similarity']
+        ) / 3.0
+
+        return flow_score, details
+
+    def get_cognitive_flow_status(self) -> str:
+        """
+        Get formatted cognitive flow status for logging.
+
+        Computes 3-way coherence if O1 is available, otherwise
+        falls back to 2-way (seed-O12).
+
+        Returns:
+            Status string like "Flow:0.72(strong)" or "Flow:N/A"
+        """
+        if self.karma_buffer is None or self.current_o12 is None:
+            return "Flow:N/A"
+
+        flow_score, details = self.compute_3way_toroidal_coherence()
+
+        if details['valid']:
+            mode = "3way"
+        else:
+            mode = "2way"
+
+        if flow_score >= 0.7:
+            status = "strong"
+        elif flow_score >= 0.5:
+            status = "moderate"
+        elif flow_score >= 0.3:
+            status = "weak"
+        else:
+            status = "broken"
+
+        return f"Flow:{flow_score:.2f}({status}/{mode})"
+
     def _get_coherence_trend(self) -> str:
         """
         Get trend of coherence over recent generations.

@@ -60,6 +60,7 @@ from .metacognitive_monitor import InferenceMetacognition, Recommendation
 from .guna_inference import InferenceGunas
 from .csr_inference import CSRInferenceGuard
 from .sovereign_scorer import SovereignInferenceScorer
+from .layer_config import LayerInferenceConfig
 
 
 class InferenceMode(Enum):
@@ -212,6 +213,41 @@ class InferenceManager:
     def scorer(self) -> Optional[SovereignInferenceScorer]:
         """Sovereign alignment scorer."""
         return self._scorer
+
+    @property
+    def layer_config(self) -> type:
+        """Layer configuration for 9:3 hierarchical split."""
+        return LayerInferenceConfig
+
+    def get_layer_temperature(self, layer_idx: int, base_temp: float) -> float:
+        """
+        Get temperature adjusted for layer type (9:3 split).
+
+        Sensory layers (O10-O12) get sharper temperature for precise
+        token selection.
+
+        Args:
+            layer_idx: Layer index (0-11)
+            base_temp: Base temperature value
+
+        Returns:
+            Adjusted temperature for the layer
+        """
+        return LayerInferenceConfig.get_temperature_adjustment(layer_idx, base_temp)
+
+    def get_cache_priority(self, layer_idx: int) -> str:
+        """
+        Get KV-cache priority for a layer.
+
+        Authority layers (O1-O9) get HIGH priority, Sensory (O10-O12) MEDIUM.
+
+        Args:
+            layer_idx: Layer index (0-11)
+
+        Returns:
+            Priority string: "high" or "medium"
+        """
+        return LayerInferenceConfig.get_cache_priority(layer_idx)
 
     def set_mode(self, mode: InferenceMode):
         """
@@ -592,22 +628,38 @@ class InferenceManager:
 
         return score, info
 
-    def load_checkpoint(self, checkpoint_path: str) -> bool:
+    def load_checkpoint(self, checkpoint_path: str, apply_config: bool = True) -> bool:
         """
-        Load trained weights for inference components.
+        Load trained weights and inference configuration.
 
         Loads:
+        - Inference config (resonance_alpha, split, etc.) if present
         - Evolutionary bridge weights (if present)
         - CSR Guard weights (if present)
         - Sovereign Scorer weights (if present)
 
         Args:
             checkpoint_path: Path to training checkpoint
+            apply_config: Whether to apply inference config from checkpoint
 
         Returns:
             True if any weights were loaded
         """
         success = False
+
+        try:
+            checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        except Exception as e:
+            if self.enable_logging:
+                print(f"[InferenceManager] Failed to load checkpoint: {e}")
+            return False
+
+        # Load and apply inference config if present
+        if apply_config and 'inference_config' in checkpoint:
+            self._apply_inference_config(checkpoint['inference_config'])
+            success = True
+            if self.enable_logging:
+                print(f"[InferenceManager] Applied inference config from {checkpoint_path}")
 
         # Initialize engine if needed for loading
         if self._engine is None:
@@ -623,7 +675,6 @@ class InferenceManager:
         # Load CSR weights if guard exists
         if self._csr_guard is not None:
             try:
-                checkpoint = torch.load(checkpoint_path, map_location=self.device)
                 self._csr_guard.load_from_training(checkpoint)
                 success = True
                 if self.enable_logging:
@@ -635,7 +686,6 @@ class InferenceManager:
         # Load scorer weights if exists
         if self._scorer is not None:
             try:
-                checkpoint = torch.load(checkpoint_path, map_location=self.device)
                 if 'sovereign_scorer' in checkpoint:
                     self._scorer.load_state_dict(checkpoint['sovereign_scorer'], strict=False)
                     success = True
@@ -646,6 +696,34 @@ class InferenceManager:
                     print(f"[InferenceManager] Scorer weight loading failed: {e}")
 
         return success
+
+    def _apply_inference_config(self, config: Dict[str, Any]):
+        """
+        Apply inference configuration from checkpoint.
+
+        Updates internal config with checkpoint-specified values.
+
+        Args:
+            config: Inference config dict from checkpoint
+        """
+        # Apply recommended resonance alpha
+        if 'recommended_alpha' in config:
+            self._config['resonance_alpha'] = config['recommended_alpha']
+            if self._engine is not None:
+                self._engine.resonance_alpha = config['recommended_alpha']
+
+        # Store split info for reference
+        if 'authority_sensory_split' in config:
+            self._inference_split = tuple(config['authority_sensory_split'])
+
+        # Store training state for reference
+        if 'training_state' in config:
+            self._training_state = config['training_state']
+
+        if self.enable_logging:
+            print(f"[InferenceManager] Config: alpha={config.get('recommended_alpha', 0.1)}, "
+                  f"split={config.get('authority_sensory_split', (9, 3))}, "
+                  f"state={config.get('training_state', 'unknown')}")
 
     def clear_karma(self):
         """
