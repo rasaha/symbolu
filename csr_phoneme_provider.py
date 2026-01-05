@@ -1197,6 +1197,12 @@ class CSREmbeddingProvider(nn.Module):
         # Initialize Hybrid G2P system (CMUdict + g2p_en)
         self._hybrid_g2p = get_hybrid_g2p()
 
+        # V9.5.2 Performance: Precompute token ID → affinity lookup table
+        # This eliminates O(B*T) tokenizer.decode() calls in forward pass
+        self._token_affinity_table = None
+        if tokenizer is not None:
+            self._build_token_affinity_table()
+
     def _build_phoneme_tensor(self) -> torch.Tensor:
         """Build tensor of phoneme → 12D mappings."""
         phonemes = list(PHONEME_MAP_ARPABET.keys())
@@ -1207,6 +1213,52 @@ class CSREmbeddingProvider(nn.Module):
         self._phoneme_to_idx = {p: i for i, p in enumerate(phonemes)}
 
         return torch.tensor(vectors, dtype=torch.float32)
+
+    def _build_token_affinity_table(self):
+        """
+        V9.5.2 Performance: Precompute affinity vectors for ALL vocab tokens.
+
+        This eliminates O(B*T) tokenizer.decode() calls during forward pass,
+        replacing them with a single tensor indexing operation.
+
+        The table maps token_id → 12D affinity vector for the entire vocabulary.
+        """
+        if self.tokenizer is None:
+            return
+
+        vocab_size = getattr(self.tokenizer, 'vocab_size', None)
+        if vocab_size is None:
+            # Try to get vocab size from the tokenizer
+            try:
+                vocab_size = len(self.tokenizer)
+            except:
+                vocab_size = 50257  # GPT-2 default
+
+        print(f"  [CSR] Building token affinity table for {vocab_size:,} tokens...")
+        import time
+        start_time = time.time()
+
+        # Preallocate table
+        affinity_table = torch.zeros(vocab_size, 12, dtype=torch.float32)
+
+        # Compute affinity for each token
+        for token_id in range(vocab_size):
+            try:
+                token_str = self.tokenizer.decode([token_id])
+                phonemes = self.token_to_phonemes(token_str)
+                affinity_table[token_id] = self.phonemes_to_affinity(phonemes)
+            except Exception:
+                # Fallback for problematic tokens
+                affinity_table[token_id] = self.phoneme_map[token_id % len(self._phoneme_list)]
+
+        # L2 normalize
+        affinity_table = F.normalize(affinity_table, p=2, dim=-1)
+
+        # Register as buffer (moves with model to GPU)
+        self.register_buffer('_token_affinity_table', affinity_table)
+
+        elapsed = time.time() - start_time
+        print(f"  [CSR] Token affinity table built in {elapsed:.2f}s")
 
     def token_to_phonemes(self, token: str) -> List[str]:
         """
@@ -1295,34 +1347,42 @@ class CSREmbeddingProvider(nn.Module):
         B, T = input_ids.shape
         device = input_ids.device
 
-        # Get token strings if tokenizer available
-        if token_strings is None and self.tokenizer is not None:
-            token_strings = []
-            for batch_idx in range(B):
-                tokens = [self.tokenizer.decode([tid.item()]) for tid in input_ids[batch_idx]]
-                token_strings.append(tokens)
-
-        # Compute 12D affinities for each token
-        affinities = torch.zeros(B, T, 12, device=device)
-
-        if token_strings is not None:
-            for b in range(B):
-                for t in range(T):
-                    token = token_strings[b][t] if t < len(token_strings[b]) else ""
-                    phonemes = self.token_to_phonemes(token)
-                    affinities[b, t] = self.phonemes_to_affinity(phonemes)
+        # V9.5.2 Performance: Use precomputed token affinity table if available
+        # This is O(1) tensor indexing instead of O(B*T) tokenizer.decode() calls
+        if self._token_affinity_table is not None:
+            # Fast path: single tensor indexing operation
+            # Clamp token IDs to valid range
+            clamped_ids = input_ids.clamp(0, self._token_affinity_table.size(0) - 1)
+            affinities = self._token_affinity_table[clamped_ids]  # [B, T, 12]
+            # Table is already L2 normalized
         else:
-            # Fallback: use input_ids directly with simple heuristic
-            # This is less accurate but works without tokenizer
-            for b in range(B):
-                for t in range(T):
-                    # Use token ID modulo to select phonemes (crude fallback)
-                    tid = input_ids[b, t].item()
-                    phoneme_idx = tid % len(self._phoneme_list)
-                    affinities[b, t] = self.phoneme_map[phoneme_idx]
+            # Slow path: compute affinities on-the-fly (fallback)
+            # Get token strings if tokenizer available
+            if token_strings is None and self.tokenizer is not None:
+                token_strings = []
+                for batch_idx in range(B):
+                    tokens = [self.tokenizer.decode([tid.item()]) for tid in input_ids[batch_idx]]
+                    token_strings.append(tokens)
 
-        # L2 normalize affinities
-        affinities = F.normalize(affinities, p=2, dim=-1)
+            # Compute 12D affinities for each token
+            affinities = torch.zeros(B, T, 12, device=device)
+
+            if token_strings is not None:
+                for b in range(B):
+                    for t in range(T):
+                        token = token_strings[b][t] if t < len(token_strings[b]) else ""
+                        phonemes = self.token_to_phonemes(token)
+                        affinities[b, t] = self.phonemes_to_affinity(phonemes)
+            else:
+                # Fallback: use input_ids directly with simple heuristic
+                for b in range(B):
+                    for t in range(T):
+                        tid = input_ids[b, t].item()
+                        phoneme_idx = tid % len(self._phoneme_list)
+                        affinities[b, t] = self.phoneme_map[phoneme_idx]
+
+            # L2 normalize affinities
+            affinities = F.normalize(affinities, p=2, dim=-1)
 
         # Compute confidence
         confidence = self.confidence_head(affinities)
