@@ -1497,22 +1497,31 @@ class PhaseTransformer(nn.Module):
         self,
         input_ids: torch.Tensor,
         return_hidden: bool = False,
+        extract_layers: Optional[List[int]] = None,
+        return_last_hidden: bool = False,
         phase_contexts: Optional[List[Dict[str, torch.Tensor]]] = None,
         position_offset: int = 0,
     ) -> Dict[str, Any]:
         """
-        Forward pass with optional streaming phase context.
+        Forward pass with optional streaming phase context and layer extraction.
 
         Args:
             input_ids: [B, N] token indices
-            return_hidden: Return hidden states
+            return_hidden: Return all hidden states
+            extract_layers: Specific layer indices to extract (memory-efficient)
+            return_last_hidden: Return normalized hidden state before lm_head
             phase_contexts: List of phase contexts per layer for streaming (10M+ tokens)
             position_offset: Position offset for streaming (chunk start position)
 
         Returns:
-            Dict with 'logits', optionally 'hidden_states', and 'phase_contexts' if streaming
+            Dict with 'logits', optionally 'hidden_states', 'last_hidden_state',
+            and 'phase_contexts' if streaming
         """
         B, N = input_ids.shape
+
+        # Determine which layers to extract
+        should_extract = return_hidden or extract_layers is not None
+        extract_set = set(extract_layers) if extract_layers is not None else None
 
         # Embeddings with position offset for streaming
         positions = torch.arange(position_offset, position_offset + N, device=input_ids.device).unsqueeze(0)
@@ -1525,7 +1534,7 @@ class PhaseTransformer(nn.Module):
             phase_contexts = [{}] * len(self.blocks)
 
         # Transformer blocks
-        hidden_states = []
+        hidden_states = [] if should_extract else None
         new_phase_contexts = []
 
         for i, block in enumerate(self.blocks):
@@ -1550,16 +1559,23 @@ class PhaseTransformer(nn.Module):
                 else:
                     x = block(x, causal_mask=True)
 
-            if return_hidden:
-                hidden_states.append(x)
+            # Extract if: return_hidden=True (all), or layer in extract_layers
+            if should_extract:
+                if extract_set is None or i in extract_set:
+                    hidden_states.append(x)
 
         # Output
         x = self.norm(x)
         logits = self.lm_head(x)
 
         result = {'logits': logits}
-        if return_hidden:
+
+        if should_extract:
             result['hidden_states'] = hidden_states
+
+        if return_last_hidden:
+            result['last_hidden_state'] = x
+
         if streaming:
             result['phase_contexts'] = new_phase_contexts
 
@@ -1747,27 +1763,51 @@ class HybridPhaseTransformer(nn.Module):
         self,
         input_ids: torch.Tensor,
         return_hidden: bool = False,
+        extract_layers: Optional[List[int]] = None,
+        return_last_hidden: bool = False,
     ) -> Dict[str, torch.Tensor]:
         """
-        Forward pass.
+        Forward pass with efficient layer extraction.
+
+        Supports targeted hidden state extraction for inference components
+        (EvolutionaryInferenceEngine, CSRInferenceGuard, SovereignScorer).
 
         Args:
             input_ids: [B, N] token indices
-            return_hidden: Return hidden states
+            return_hidden: Return all hidden states (legacy behavior)
+            extract_layers: Specific layer indices to extract (0-indexed).
+                           More memory-efficient than return_hidden=True.
+                           Common patterns:
+                           - [0, 11]: O1 (Potential) and O12 (Integration) for karma
+                           - [0, 5, 11]: Authority sample + midpoint + final
+                           - None with return_hidden=True: all layers
+            return_last_hidden: Return normalized hidden state before lm_head.
+                               Required for CSR re-projection after gating.
 
         Returns:
-            Dict with 'logits' and optionally 'hidden_states'
+            Dict with:
+            - 'logits': [B, N, V] output logits
+            - 'hidden_states': List[Tensor] if return_hidden or extract_layers
+            - 'last_hidden_state': [B, N, D] if return_last_hidden (post-norm)
+
+        Note:
+            Authority layers (0-8) capture "meaning" / ontological structure.
+            Sensory layers (9-11) capture "expression" / output refinement.
         """
         B, N = input_ids.shape
+
+        # Determine which layers to extract
+        should_extract = return_hidden or extract_layers is not None
+        extract_set = set(extract_layers) if extract_layers is not None else None
 
         # Embeddings
         positions = torch.arange(N, device=input_ids.device).unsqueeze(0)
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
-        # Transformer blocks
-        hidden_states = []
-        for block in self.blocks:
+        # Transformer blocks with targeted extraction
+        hidden_states = [] if should_extract else None
+        for i, block in enumerate(self.blocks):
             if self.gradient_checkpointing and self.training:
                 x = checkpoint(
                     block,
@@ -1777,16 +1817,23 @@ class HybridPhaseTransformer(nn.Module):
                 )
             else:
                 x = block(x, causal_mask=True)
-            if return_hidden:
-                hidden_states.append(x)
+
+            # Extract if: return_hidden=True (all), or layer in extract_layers
+            if should_extract:
+                if extract_set is None or i in extract_set:
+                    hidden_states.append(x)
 
         # Output
         x = self.norm(x)
         logits = self.lm_head(x)
 
         result = {'logits': logits}
-        if return_hidden:
+
+        if should_extract:
             result['hidden_states'] = hidden_states
+
+        if return_last_hidden:
+            result['last_hidden_state'] = x
 
         return result
 
@@ -1893,8 +1940,26 @@ class LocalOnlyTransformer(nn.Module):
         self,
         input_ids: torch.Tensor,
         return_hidden: bool = False,
+        extract_layers: Optional[List[int]] = None,
+        return_last_hidden: bool = False,
     ) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass with efficient layer extraction.
+
+        Args:
+            input_ids: [B, N] token indices
+            return_hidden: Return all hidden states
+            extract_layers: Specific layer indices to extract (memory-efficient)
+            return_last_hidden: Return normalized hidden state before lm_head
+
+        Returns:
+            Dict with 'logits' and optionally 'hidden_states', 'last_hidden_state'
+        """
         B, N = input_ids.shape
+
+        # Determine which layers to extract
+        should_extract = return_hidden or extract_layers is not None
+        extract_set = set(extract_layers) if extract_layers is not None else None
 
         # Embeddings
         positions = torch.arange(N, device=input_ids.device).unsqueeze(0)
@@ -1902,22 +1967,28 @@ class LocalOnlyTransformer(nn.Module):
         x = self.embed_dropout(x)
 
         # Transformer blocks (all local, no phase)
-        hidden_states = []
-        for block in self.blocks:
+        hidden_states = [] if should_extract else None
+        for i, block in enumerate(self.blocks):
             if self.gradient_checkpointing and self.training:
                 x = checkpoint(block, x, True, use_reentrant=False)
             else:
                 x = block(x, causal_mask=True)
-            if return_hidden:
-                hidden_states.append(x)
+
+            if should_extract:
+                if extract_set is None or i in extract_set:
+                    hidden_states.append(x)
 
         # Output
         x = self.norm(x)
         logits = self.lm_head(x)
 
         result = {'logits': logits}
-        if return_hidden:
+
+        if should_extract:
             result['hidden_states'] = hidden_states
+
+        if return_last_hidden:
+            result['last_hidden_state'] = x
 
         return result
 
@@ -2003,25 +2074,49 @@ class StandardTransformer(nn.Module):
         self,
         input_ids: torch.Tensor,
         return_hidden: bool = False,
+        extract_layers: Optional[List[int]] = None,
+        return_last_hidden: bool = False,
     ) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass with efficient layer extraction.
+
+        Args:
+            input_ids: [B, N] token indices
+            return_hidden: Return all hidden states
+            extract_layers: Specific layer indices to extract (memory-efficient)
+            return_last_hidden: Return normalized hidden state before lm_head
+
+        Returns:
+            Dict with 'logits' and optionally 'hidden_states', 'last_hidden_state'
+        """
         B, N = input_ids.shape
+
+        # Determine which layers to extract
+        should_extract = return_hidden or extract_layers is not None
+        extract_set = set(extract_layers) if extract_layers is not None else None
 
         positions = torch.arange(N, device=input_ids.device).unsqueeze(0)
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
-        hidden_states = []
-        for block in self.blocks:
+        hidden_states = [] if should_extract else None
+        for i, block in enumerate(self.blocks):
             x = block(x, causal_mask=True)
-            if return_hidden:
-                hidden_states.append(x)
+
+            if should_extract:
+                if extract_set is None or i in extract_set:
+                    hidden_states.append(x)
 
         x = self.norm(x)
         logits = self.lm_head(x)
 
         result = {'logits': logits}
-        if return_hidden:
+
+        if should_extract:
             result['hidden_states'] = hidden_states
+
+        if return_last_hidden:
+            result['last_hidden_state'] = x
 
         return result
 
