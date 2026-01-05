@@ -8615,6 +8615,8 @@ def main():
     # Weight Transfer (9:3 → 6:6 transition)
     parser.add_argument("--enable_weight_transfer", action="store_true", default=True,
                        help="Enable weight transfer from Authority to Sensory layers during relaxation")
+    parser.add_argument("--disable_weight_transfer", action="store_true",
+                       help="Disable weight transfer (overrides --enable_weight_transfer)")
     parser.add_argument("--guna_lock_steps", type=int, default=50,
                        help="Steps to freeze W_q/W_k after relaxation (Guna-Lock)")
 
@@ -8862,7 +8864,7 @@ def main():
         relaxation_ppl_spike_threshold=args.relaxation_ppl_spike_threshold,
         relaxation_recovery_steps=args.relaxation_recovery_steps,
         # Weight Transfer
-        enable_weight_transfer=args.enable_weight_transfer,
+        enable_weight_transfer=args.enable_weight_transfer and not args.disable_weight_transfer,
         guna_lock_steps=args.guna_lock_steps,
         # Toroidal Evolutionary Bridge
         enable_toroidal_bridge=args.enable_toroidal_bridge,
