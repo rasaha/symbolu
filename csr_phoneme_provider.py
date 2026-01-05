@@ -1309,6 +1309,7 @@ class CSREmbeddingProvider(nn.Module):
     def _build_token_affinity_table(self):
         """
         V9.5.3 CRITICAL FIX: Build token affinity table with Sanskrit Varna Bridge.
+        V9.6.0 FIX: Zero out special tokens (PAD, EOS, BOS, UNK) to prevent "Pad Token Ghost"
 
         This now traces the full path:
             Token → ARPABET phonemes → Sanskrit Varna → 12D Ontological vector
@@ -1341,15 +1342,38 @@ class CSREmbeddingProvider(nn.Module):
         import time
         start_time = time.time()
 
+        # V9.6.0: Identify special tokens to zero out (prevents "Pad Token Ghost")
+        special_token_ids = set()
+        for attr in ['pad_token_id', 'eos_token_id', 'bos_token_id', 'unk_token_id', 'sep_token_id', 'cls_token_id', 'mask_token_id']:
+            tid = getattr(self.tokenizer, attr, None)
+            if tid is not None:
+                special_token_ids.add(tid)
+        # Also check special_tokens_map
+        if hasattr(self.tokenizer, 'special_tokens_map'):
+            for token in self.tokenizer.special_tokens_map.values():
+                if isinstance(token, str):
+                    tid = self.tokenizer.convert_tokens_to_ids(token)
+                    if tid is not None and tid < vocab_size:
+                        special_token_ids.add(tid)
+        # Store for use in forward()
+        self._special_token_ids = special_token_ids
+
         # Preallocate table
         affinity_table = torch.zeros(vocab_size, 12, dtype=torch.float32)
 
         # Statistics
         varna_mapped = 0
         arpabet_fallback = 0
+        special_zeroed = 0
 
         # Compute affinity for each token
         for token_id in range(vocab_size):
+            # V9.6.0: Zero out special tokens - they should NOT contribute to CSR loss
+            if token_id in special_token_ids:
+                affinity_table[token_id] = torch.zeros(12)
+                special_zeroed += 1
+                continue
+
             try:
                 token_str = self.tokenizer.decode([token_id])
                 phonemes = self.token_to_phonemes(token_str)
@@ -1374,8 +1398,11 @@ class CSREmbeddingProvider(nn.Module):
                 affinity_table[token_id] = self.phoneme_map[token_id % len(self._phoneme_list)]
                 arpabet_fallback += 1
 
-        # L2 normalize
-        affinity_table = F.normalize(affinity_table, p=2, dim=-1)
+        # L2 normalize (special tokens remain zero after normalization)
+        # Handle zero vectors by adding epsilon before norm
+        norms = affinity_table.norm(dim=-1, keepdim=True)
+        norms = torch.where(norms > 1e-8, norms, torch.ones_like(norms))
+        affinity_table = affinity_table / norms
 
         # Register as buffer (moves with model to GPU)
         # Safe registration: delete existing attribute if present
@@ -1388,8 +1415,10 @@ class CSREmbeddingProvider(nn.Module):
             print(f"  ⚡ [CSR] Token affinity table built in {elapsed:.2f}s")
             print(f"       Sanskrit Varna mapped: {varna_mapped:,} tokens ({100*varna_mapped/vocab_size:.1f}%)")
             print(f"       ARPABET fallback: {arpabet_fallback:,} tokens")
+            print(f"       Special tokens zeroed: {special_zeroed} (PAD/EOS/BOS/UNK ghosting prevented)")
         else:
             print(f"  [CSR] Token affinity table built in {elapsed:.2f}s")
+            print(f"       Special tokens zeroed: {special_zeroed} (PAD/EOS/BOS/UNK ghosting prevented)")
 
     def _phonemes_to_varna_affinity(self, phonemes: List[str]) -> Optional[torch.Tensor]:
         """
@@ -1570,6 +1599,15 @@ class CSREmbeddingProvider(nn.Module):
 
         # Compute confidence
         confidence = self.confidence_head(affinities)
+
+        # V9.6.0: Zero confidence for special tokens (prevents "Pad Token Ghost")
+        # Special tokens have zero affinity vectors, but confidence_head may still output non-zero
+        if hasattr(self, '_special_token_ids') and self._special_token_ids:
+            # Create mask: 1 for normal tokens, 0 for special tokens
+            special_mask = torch.ones(B, T, 1, device=device)
+            for tid in self._special_token_ids:
+                special_mask = special_mask * (input_ids != tid).unsqueeze(-1).float()
+            confidence = confidence * special_mask
 
         # Project to model dimension
         csr_emb = self.projection(affinities)

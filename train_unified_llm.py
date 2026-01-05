@@ -1822,6 +1822,7 @@ class HierarchicalGradientScaler:
             "phase_grad_norm": 0.0,
             "sensory_scale": alpha_sens_min,
             "sensory_authority_ratio": 0.0,
+            "dynamic_scale_factor": 1.0,  # V9.6.0: Dynamic normalization factor
         }
 
         # Register hooks
@@ -1909,6 +1910,17 @@ class HierarchicalGradientScaler:
         """
         Create a gradient scaling hook for a specific layer parameter.
 
+        V9.6.0 FIX: Dynamic Normalization (The 58x Overwrite Bug Fix)
+
+        Previous bug: Static scaling (grad * alpha) allowed high-magnitude Sanskrit/Sensory
+        gradients to overwrite English/Authority gradients. Even with alpha=0.1, if
+        sensory_norm=58 and authority_norm=1, the result was 5.8x overwrite.
+
+        Fix: Normalize sensory gradients to match authority magnitude BEFORE applying alpha.
+        scale_factor = authority_norm / sensory_norm
+        balanced_grad = grad * scale_factor  (now same magnitude as authority)
+        final_grad = balanced_grad * alpha   (THEN apply mixing ratio)
+
         Phase Attention Protection:
         During Thaw mode, Phase Attention weights (W_phase, W_amp, etc.) in Authority
         layers receive extra gradient dampening to maintain stability of the complex
@@ -1921,13 +1933,34 @@ class HierarchicalGradientScaler:
                 return grad
 
             if is_sensory:
-                # Apply dampening to sensory layers
-                alpha = self._compute_alpha_sens()
-                scaled_grad = grad * alpha
+                # V9.6.0: Dynamic Normalization
+                # Step 1: Get current sensory gradient norm
+                sensory_norm = grad.norm().item()
+                self._sensory_grad_norms.append(sensory_norm)
 
-                # Track stats using bounded deques
-                self._sensory_grad_norms.append(grad.norm().item())
+                # Step 2: Get mean authority gradient norm (running average)
+                if self._authority_grad_norms:
+                    authority_norm = sum(self._authority_grad_norms) / len(self._authority_grad_norms)
+                else:
+                    authority_norm = 1.0  # Fallback before authority stats available
+
+                # Step 3: Compute dynamic scale factor to match magnitudes
+                if sensory_norm > 1e-8:  # Avoid division by zero
+                    scale_factor = authority_norm / sensory_norm
+                else:
+                    scale_factor = 1.0
+
+                # Step 4: Apply mixing ratio alpha AFTER normalization
+                alpha = self._compute_alpha_sens()
+
+                # balanced_grad has same magnitude as authority gradients
+                # final_grad = balanced_grad * alpha = exact alpha% contribution
+                scaled_grad = grad * scale_factor * alpha
+
+                # Track stats
                 self.gradient_stats["sensory_scale"] = alpha
+                self.gradient_stats["sensory_authority_ratio"] = sensory_norm / authority_norm if authority_norm > 1e-8 else 0.0
+                self.gradient_stats["dynamic_scale_factor"] = scale_factor
 
                 return scaled_grad
             else:
@@ -2037,6 +2070,7 @@ class HierarchicalGradientScaler:
             "alpha_sens": self._compute_alpha_sens(),
             "step": self.current_step,
             "in_thaw_mode": self.in_thaw_mode,
+            "dynamic_scale_factor": self.gradient_stats.get("dynamic_scale_factor", 1.0),  # V9.6.0
         }
 
         # Clear deques for next step
@@ -6074,6 +6108,9 @@ class UnifiedTrainingConfig:
     csr_use_entropy_sink: bool = True        # Apply Layer 0 entropy floor
     csr_use_synthesis_gate: bool = True      # Apply Layer 11 synthesis reconciliation
 
+    # V9.6.0: Embedding configuration
+    untie_embeddings: bool = False           # Untie input/output embeddings (CRITICAL when using CSR)
+
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
     enable_sgp: bool = True                  # Enable SGP synchronized with Sattvic Controller
     sgp_base_rate: int = 25                  # Base SGP rate (Toroidal Refresh Rate)
@@ -6282,6 +6319,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
                     module.gradient_checkpointing = True
 
     elif config.model_type == "phase":
+        # V9.6.0: Untie embeddings when CSR is enabled to prevent vocabulary corruption
+        tie_emb = not config.untie_embeddings
         model = PhaseTransformer(
             vocab_size=config.vocab_size,
             embed_dim=preset["embed_dim"],
@@ -6292,9 +6331,12 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             dropout=config.dropout,
             sync_steps=config.sync_steps,
             sync_lr=config.sync_lr,
+            tie_embeddings=tie_emb,
         )
 
     elif config.model_type == "hybrid":
+        # V9.6.0: Untie embeddings when CSR is enabled to prevent vocabulary corruption
+        tie_emb = not config.untie_embeddings
         model = HybridPhaseTransformer(
             vocab_size=config.vocab_size,
             embed_dim=preset["embed_dim"],
@@ -6308,6 +6350,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             local_backend=config.local_backend,
             alpha_local=config.alpha_local,
             alpha_phase=config.alpha_phase,
+            tie_embeddings=tie_emb,
         )
 
     elif config.model_type == "gen2":
@@ -8942,6 +8985,10 @@ def main():
                        help="Gate Phase Attention with CSR confidence")
     parser.add_argument("--csr_trainable", action="store_true", default=True,
                        help="Allow CSR projection to train")
+
+    # V9.6.0: Embedding configuration
+    parser.add_argument("--untie_embeddings", action="store_true",
+                       help="Untie input/output embeddings (CRITICAL when using CSR to prevent vocabulary corruption)")
     parser.add_argument("--csr_use_entropy_sink", action="store_true", default=True,
                        help="Apply Layer 0 entropy floor")
     parser.add_argument("--csr_use_synthesis_gate", action="store_true", default=True,

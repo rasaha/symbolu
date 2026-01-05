@@ -1075,6 +1075,7 @@ class GroupedHybridTransformer(nn.Module):
         M: int = 4,  # Lightning layers per group
         num_groups: int = 3,  # Number of (M+1) groups
         decay_init: float = 0.99,
+        tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR
     ):
         super().__init__()
 
@@ -1093,6 +1094,7 @@ class GroupedHybridTransformer(nn.Module):
         self.config = config
         self.M = M
         self.num_groups = num_groups
+        self.tie_embeddings = tie_embeddings
 
         # Embeddings
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
@@ -1112,8 +1114,9 @@ class GroupedHybridTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Tie weights
-        self.lm_head.weight = self.token_embed.weight
+        # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
+        if tie_embeddings:
+            self.lm_head.weight = self.token_embed.weight
 
         self._init_weights()
 
@@ -1390,6 +1393,7 @@ class PhaseTransformer(nn.Module):
         sync_steps: int = 3,
         sync_lr: float = 0.1,
         temperature: float = 1.0,  # Lower = sharper attention (for classification)
+        tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR to prevent embedding corruption
     ):
         super().__init__()
 
@@ -1406,6 +1410,7 @@ class PhaseTransformer(nn.Module):
             temperature=temperature,  # Pass temperature for sharper attention
         )
         self.config = config
+        self.tie_embeddings = tie_embeddings
 
         # Embeddings
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
@@ -1421,8 +1426,10 @@ class PhaseTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Tie weights
-        self.lm_head.weight = self.token_embed.weight
+        # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
+        # When tied, Sanskrit gradients corrupt the output decoder vocabulary space
+        if tie_embeddings:
+            self.lm_head.weight = self.token_embed.weight
 
         # State-centric training head (optional, for token-free training)
         self.state_delta_predictor = StateDeltaPredictor(
@@ -1642,6 +1649,7 @@ class HybridPhaseTransformer(nn.Module):
         alpha_local: float = 0.8,  # Weight for local attention in hybrid layers
         alpha_phase: float = 0.2,  # Weight for phase attention in hybrid layers
         temperature: float = 1.0,  # Lower = sharper attention (for classification)
+        tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR to prevent embedding corruption
     ):
         super().__init__()
 
@@ -1660,6 +1668,7 @@ class HybridPhaseTransformer(nn.Module):
         self.config = config
         self.local_layers = local_layers
         self.local_backend = local_backend
+        self.tie_embeddings = tie_embeddings
 
         # Embeddings
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
@@ -1687,8 +1696,10 @@ class HybridPhaseTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Tie weights
-        self.lm_head.weight = self.token_embed.weight
+        # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
+        # When tied, Sanskrit gradients corrupt the output decoder vocabulary space
+        if tie_embeddings:
+            self.lm_head.weight = self.token_embed.weight
 
         # State-centric training head (optional, for token-free training)
         self.state_delta_predictor = StateDeltaPredictor(
@@ -1883,6 +1894,7 @@ class LocalOnlyTransformer(nn.Module):
         alpha_local: float = 0.8,
         alpha_phase: float = 0.2,
         temperature: float = 1.0,
+        tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR
     ):
         super().__init__()
 
@@ -1897,6 +1909,7 @@ class LocalOnlyTransformer(nn.Module):
         )
         self.config = config
         self.local_backend = local_backend
+        self.tie_embeddings = tie_embeddings
 
         # Embeddings
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
@@ -1913,8 +1926,9 @@ class LocalOnlyTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Tie weights
-        self.lm_head.weight = self.token_embed.weight
+        # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
+        if tie_embeddings:
+            self.lm_head.weight = self.token_embed.weight
 
         # Gradient checkpointing
         self.gradient_checkpointing = False
@@ -2028,6 +2042,7 @@ class StandardTransformer(nn.Module):
         ff_dim: Optional[int] = None,
         max_seq_len: int = 8192,
         dropout: float = 0.1,
+        tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR
         **kwargs,  # Ignore phase-specific params
     ):
         super().__init__()
@@ -2042,6 +2057,7 @@ class StandardTransformer(nn.Module):
             dropout=dropout,
         )
         self.config = config
+        self.tie_embeddings = tie_embeddings
 
         # Embeddings
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
@@ -2057,8 +2073,9 @@ class StandardTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Tie weights
-        self.lm_head.weight = self.token_embed.weight
+        # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
+        if tie_embeddings:
+            self.lm_head.weight = self.token_embed.weight
 
         self.apply(self._init_weights)
 
