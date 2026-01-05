@@ -6691,8 +6691,18 @@ def train(config: UnifiedTrainingConfig):
         }
         size_factor = model_size_scale.get(config.model_size, 1.0)
 
+        # V9.5.2: Sequence length scaling (baseline: 2048)
+        # Attention is O(n²), activations are O(n), so longer sequences need smaller batches
+        seq_baseline = 2048
+        seq_ratio = seq_baseline / max(config.max_seq_len, 512)  # Clamp minimum
+        # Use sqrt for O(n²) attention approximation, clamped to reasonable range
+        seq_factor = max(0.25, min(2.0, seq_ratio ** 0.5))
+
+        # Combined scaling factor
+        combined_factor = size_factor * seq_factor
+
         # Sovereign loss requires (B, Seq, Vocab) tensors - massive overhead
-        # Scale max_batch based on available VRAM AND model size
+        # Scale max_batch based on available VRAM, model size, AND sequence length
         if config.enable_sovereign_loss:
             total_vram_gb = torch.cuda.get_device_properties(device).total_memory / 1e9
             if total_vram_gb >= 140:  # H200 class (141GB+)
@@ -6703,11 +6713,11 @@ def train(config: UnifiedTrainingConfig):
                 base_max_batch = 48
             else:  # Smaller GPUs
                 base_max_batch = 24
-            # Apply model size scaling
-            auto_max_batch = max(8, int(base_max_batch * size_factor))
-            print(f"  ⚠️  Sovereign Loss detected: max_batch={auto_max_batch} (VRAM: {total_vram_gb:.0f}GB, model: {config.model_size}, scale: {size_factor}x)")
+            # Apply combined scaling (model size + seq length)
+            auto_max_batch = max(8, int(base_max_batch * combined_factor))
+            print(f"  ⚠️  Sovereign Loss: max_batch={auto_max_batch} (VRAM: {total_vram_gb:.0f}GB, model: {config.model_size}, seq: {config.max_seq_len}, scale: {combined_factor:.2f}x)")
         else:
-            auto_max_batch = max(8, int(128 * size_factor))
+            auto_max_batch = max(8, int(128 * combined_factor))
 
         auto_sizer = AutoBatchSizer(
             model=model,
