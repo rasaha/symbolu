@@ -6104,6 +6104,12 @@ class UnifiedTrainingConfig:
     auto_batch_safety_margin: float = 0.05   # Extra headroom (5%)
     auto_batch_target_effective: int = 0     # Target effective batch (0 = just find max, no accum)
 
+    # Friction Controller (V9.4.5)
+    disable_friction: bool = False           # Disable friction controller
+    friction_dom_high: float = 3.0           # Dominance 'riot' threshold (higher = allow more Sanskrit)
+    friction_dom_low: float = 0.3            # Dominance 'lock' threshold
+    friction_align_critical: float = -0.10   # Alignment critical threshold
+
     # Resume checkpoint
     resume: str = ""
     resume_weights_only: bool = False
@@ -7240,11 +7246,18 @@ def train(config: UnifiedTrainingConfig):
 
     # V9.4.5: Initialize Friction Controller with Corrective Actions
     friction_controller = None
-    if PIDV2_AVAILABLE and config.model_type == "hybrid":
-        friction_controller = FrictionController(FrictionControllerConfig())
+    if PIDV2_AVAILABLE and config.model_type == "hybrid" and not config.disable_friction:
+        friction_config = FrictionControllerConfig(
+            dom_high=config.friction_dom_high,
+            dom_low=config.friction_dom_low,
+            align_critical=config.friction_align_critical,
+        )
+        friction_controller = FrictionController(friction_config)
         print(f"\n  V9.4.5: Friction Controller ENABLED")
         print(f"    Alignment thresholds: warn={friction_controller.config.align_warning}, crit={friction_controller.config.align_critical}")
         print(f"    Dominance range: [{friction_controller.config.dom_low}, {friction_controller.config.dom_high}]")
+    elif config.disable_friction:
+        print(f"\n  V9.4.5: Friction Controller DISABLED (Sanskrit dominance allowed)")
 
     # V9.5.2 Emergency Stress-Probe configuration display (ChatGPT Guardrails)
     if config.enable_stress_probe:
@@ -7624,6 +7637,15 @@ def train(config: UnifiedTrainingConfig):
                     if global_step % 100 == 0:  # Log warning every 100 steps to avoid spam
                         print(f"  Warning: Friction measurement failed at step {global_step}: {e}")
 
+            # V9.5.6 FIX: Capture gradient norm BEFORE zero_grad for Rajas computation (6:6 mode)
+            # In 6:6 mode without HGS, we need to compute this before gradients are cleared
+            captured_grad_norm = 0.0
+            if gradient_scaler_hgs is None:
+                captured_grad_norm = sum(
+                    p.grad.norm().item() for p in model.parameters()
+                    if p.grad is not None
+                )
+
             optimizer.zero_grad()
 
             # Update scheduler after warmup
@@ -7681,12 +7703,12 @@ def train(config: UnifiedTrainingConfig):
             guna_s, guna_r, guna_t = 0.33, 0.33, 0.34  # Default balanced
             guna_action = "CONTINUE"
             if training_gunas is not None:
-                # Get gradient norm from HGS metrics or compute from model
+                # Get gradient norm from HGS metrics or use captured value (6:6 mode)
                 if hgs_metrics:
                     grad_norm = hgs_metrics.get('a_grad_norm', 0.0) + hgs_metrics.get('s_grad_norm', 0.0)
                 else:
-                    # Fallback: compute total gradient norm
-                    grad_norm = sum(p.grad.norm().item() for p in model.parameters() if p.grad is not None)
+                    # V9.5.6 FIX: Use captured_grad_norm (computed before zero_grad)
+                    grad_norm = captured_grad_norm
 
                 # Get coherence and entropy from metrics
                 coherence = float(metrics.get('coherence', metrics.get('gc', 0.5)))
@@ -8679,6 +8701,12 @@ def main():
                        help="Global Coherence weight [S3] (phase-lock penalty)")
     parser.add_argument("--enable_sovereign_loss", action="store_true",
                        help="Enable Sovereign-Lagrangian loss (B1+S3) instead of standard CE")
+    parser.add_argument("--sovereign_weight_r", type=float, default=5.0,
+                       help="R-Signal (ontology) weight for Sovereign-1 loss (default 5.0)")
+    parser.add_argument("--sovereign_weight_s", type=float, default=2.0,
+                       help="S-Signal (referent) weight for Sovereign-1 loss (default 2.0)")
+    parser.add_argument("--sovereign_weight_c", type=float, default=0.5,
+                       help="C-Signal (phoneme) weight for Sovereign-1 loss (default 0.5)")
     parser.add_argument("--enable_stability_constraint", action="store_true",
                        help="Enable S8 Stability Constraint (entropy-based anchoring)")
     parser.add_argument("--gc_floor", type=float, default=0.65,
@@ -8974,6 +9002,16 @@ def main():
     parser.add_argument("--auto_batch_target_effective", type=int, default=0,
                        help="Target effective batch size (0 = just find max batch, no accumulation)")
 
+    # Friction Controller (V9.4.5)
+    parser.add_argument("--disable_friction", action="store_true",
+                       help="Disable friction controller (allows high dominance ratios)")
+    parser.add_argument("--friction_dom_high", type=float, default=3.0,
+                       help="Friction dominance 'riot' threshold (default 3.0, set higher to allow Sanskrit dominance)")
+    parser.add_argument("--friction_dom_low", type=float, default=0.3,
+                       help="Friction dominance 'lock' threshold (default 0.3)")
+    parser.add_argument("--friction_align_critical", type=float, default=-0.10,
+                       help="Friction alignment critical threshold (default -0.10)")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -9034,6 +9072,9 @@ def main():
         seed=args.seed,
         # Sovereign-Lagrangian Loss [Patent B1/S3]
         enable_sovereign_loss=args.enable_sovereign_loss,
+        sovereign_weight_r=args.sovereign_weight_r,
+        sovereign_weight_s=args.sovereign_weight_s,
+        sovereign_weight_c=args.sovereign_weight_c,
         b1_lambda=args.b1_lambda,
         mu_s3=args.mu_s3,
         enable_stability_constraint=args.enable_stability_constraint,
@@ -9160,6 +9201,11 @@ def main():
         auto_batch_target_utilization=args.auto_batch_target_utilization,
         auto_batch_safety_margin=args.auto_batch_safety_margin,
         auto_batch_target_effective=args.auto_batch_target_effective,
+        # Friction Controller
+        disable_friction=args.disable_friction,
+        friction_dom_high=args.friction_dom_high,
+        friction_dom_low=args.friction_dom_low,
+        friction_align_critical=args.friction_align_critical,
     )
 
     # Train

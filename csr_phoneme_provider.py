@@ -2067,6 +2067,8 @@ def create_csr_for_training(
         d_model = model_config.hidden_size
     elif hasattr(model_config, 'n_embd'):  # GPT-2 style
         d_model = model_config.n_embd
+    elif hasattr(model_config, 'embed_dim'):  # Custom transformers (PhaseTransformer)
+        d_model = model_config.embed_dim
     elif hasattr(model_config, 'd_model'):
         d_model = model_config.d_model
     elif hasattr(model_config, 'dim'):  # Some transformer variants
