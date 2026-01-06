@@ -1372,6 +1372,10 @@ class HiddenStateExtractor:
         1. Model output (if contains hidden_states)
         2. Hook-captured states
         3. Synthetic states from logits (fallback)
+
+        V9.6.5 FIX: Preserve layer index positions when returning hook-captured states.
+        Previously, filtering Nones would shift indices, causing layer_hidden_states[2]
+        to return layer 11 instead of layer 2 - the root cause of CSR aphasia.
         """
         # Try model output first
         if isinstance(model_output, dict):
@@ -1383,13 +1387,41 @@ class HiddenStateExtractor:
                     return hs if isinstance(hs, list) else [hs]
 
         # Try hook-captured states
+        # V9.6.5 FIX: Preserve index positions by keeping Nones and filling them
         if self.hidden_states and any(h is not None for h in self.hidden_states):
-            valid_states = [h for h in self.hidden_states if h is not None]
-            if len(valid_states) >= 3:
-                # Pad to num_layers if needed
-                while len(valid_states) < self.num_layers:
-                    valid_states.append(valid_states[-1])
-                return valid_states[:self.num_layers]
+            num_valid = sum(1 for h in self.hidden_states if h is not None)
+            if num_valid >= 3:
+                # Find the first valid state to use as template for filling gaps
+                first_valid = next(h for h in self.hidden_states if h is not None)
+
+                # Create result list preserving index positions
+                result = []
+                for i in range(self.num_layers):
+                    if i < len(self.hidden_states) and self.hidden_states[i] is not None:
+                        result.append(self.hidden_states[i])
+                    else:
+                        # Fill gap with nearest valid state (interpolation)
+                        # Find closest previous valid state
+                        prev_valid = None
+                        for j in range(i - 1, -1, -1):
+                            if j < len(self.hidden_states) and self.hidden_states[j] is not None:
+                                prev_valid = self.hidden_states[j]
+                                break
+                        # Find closest next valid state
+                        next_valid = None
+                        for j in range(i + 1, len(self.hidden_states)):
+                            if self.hidden_states[j] is not None:
+                                next_valid = self.hidden_states[j]
+                                break
+                        # Use whichever is available (prefer previous for causal consistency)
+                        if prev_valid is not None:
+                            result.append(prev_valid)
+                        elif next_valid is not None:
+                            result.append(next_valid)
+                        else:
+                            result.append(first_valid)
+
+                return result[:self.num_layers]
 
         # Fallback: generate synthetic hidden states from logits
         return self._generate_synthetic_states(model_output, input_ids)
@@ -6180,7 +6212,7 @@ class UnifiedTrainingConfig:
     tensorboard: bool = True
 
     # Quality Sampling
-    sample_every: int = 200  # Generate samples every N steps (0 = disabled)
+    sample_every: int = 50  # Generate samples every N steps (0 = disabled)
     sample_prompts: tuple = (
         # Original open-ended prompts
         "The history of the Roman Empire began when",
@@ -7447,6 +7479,19 @@ def train(config: UnifiedTrainingConfig):
                         csr_layer_idx = min(config.csr_alignment_layer, len(layer_hidden_states) - 1)
                         csr_hidden = layer_hidden_states[csr_layer_idx]
 
+                        # V9.6.7: One-time diagnostic log to confirm layer selection and gradient isolation
+                        if not hasattr(model, '_csr_layer_logged'):
+                            model._csr_layer_logged = True
+                            print(f"  ✅ [V9.6.7] Using Layer {csr_layer_idx} for CSR alignment (config: {config.csr_alignment_layer})")
+                            print(f"     Hidden states available: {len(layer_hidden_states)} layers")
+                            print(f"  🛡️ [V9.6.7] COMPLETE gradient isolation ACTIVE:")
+                            print(f"     ├─ CSR alignment:  detached (no gradient to model)")
+                            print(f"     ├─ EntropySink:    detached (no gradient to Layer 0)")
+                            print(f"     ├─ SynthesisGate:  detached (no gradient to Layer 11)")
+                            print(f"     ├─ Toroidal O1/O12: detached (no gradient to model)")
+                            print(f"     └─ EvoFlow states: detached (no gradient to model)")
+                            print(f"     All auxiliary systems are now MONITOR-ONLY - LM loss is the ONLY training signal")
+
                 if csr_hidden is not None:
                     # V9.5.4 DIMENSION FIX: Project CSR embeddings to match model hidden size
                     # CSR embeddings are 512-dim, model hidden states may be 768-dim (or other)
@@ -7465,7 +7510,16 @@ def train(config: UnifiedTrainingConfig):
                     # V9.5.5: Temperature-sharpened contrastive loss (InfoNCE-style)
                     # Dividing by tau amplifies gradient signal: tau=0.07 → 14x stronger gradients
                     # This makes Sanskrit phoneme ontology a mathematical CONSTRAINT, not a gentle suggestion
-                    csr_hidden_norm = torch.nn.functional.normalize(csr_hidden, dim=-1)
+                    #
+                    # V9.6.5 CRITICAL FIX: Detach csr_hidden to prevent gradient flow to embeddings!
+                    # Without detach, CSR gradients flow: csr_hidden → Layer 2 → Layer 1 → Layer 0 → token_embed
+                    # This corrupts the INPUT embeddings, causing "@ = <" garbage output.
+                    # With detach, CSR becomes a forward-only alignment signal - the model READS the Sanskrit
+                    # target but doesn't corrupt its own vocabulary trying to chase it.
+                    # Sovereign Loss and EvoFlow provide the actual ontological training signal.
+                    csr_hidden_detached = csr_hidden.detach()  # CRITICAL: Break gradient flow!
+
+                    csr_hidden_norm = torch.nn.functional.normalize(csr_hidden_detached, dim=-1)
                     csr_emb_norm = torch.nn.functional.normalize(csr_emb, dim=-1)
                     csr_similarity = (csr_hidden_norm * csr_emb_norm).sum(dim=-1)
                     # Temperature sharpening: (1 - sim) / tau creates steep gradient landscape
@@ -7485,33 +7539,46 @@ def train(config: UnifiedTrainingConfig):
 
                 # CSR Safety Layers: EntropySink (Layer 0) and SynthesisGate (Layer 11)
                 # These enforce ontological safety at the boundaries of the 12D structure
+                #
+                # V9.6.6 CRITICAL FIX: DETACH hidden states for EntropySink and SynthesisGate!
+                # Without detach, their trainable projections create gradient flow:
+                #   - EntropySink: entropy_proj(layer_0) → Layer 0 → token embeddings (CORRUPTION!)
+                #   - SynthesisGate: gate_proj(layer_11) → Layer 11 → ... → token embeddings (CORRUPTION!)
+                # This was the REMAINING source of aphasia after V9.6.5 CSR alignment fix.
+                #
+                # With detach, these become monitor-only modules that track metrics without corrupting.
                 if hidden_state_extractor is not None:
                     layer_hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
 
                     if layer_hidden_states is not None and len(layer_hidden_states) >= 12:
                         # EntropySink: Layer 0 (O1_Potential) safety - prevents mode collapse
                         if csr_entropy_sink is not None:
-                            layer_0_hidden = layer_hidden_states[0]
+                            # V9.6.6: DETACH to prevent gradient flow to token embeddings!
+                            layer_0_hidden = layer_hidden_states[0].detach()
                             if layer_0_hidden.shape[-1] == csr_emb.shape[-1]:
                                 _, sink_metrics = csr_entropy_sink(layer_0_hidden, csr_affinity)
                                 csr_metrics['entropy_sink_entropy'] = sink_metrics.get('entropy', 0.0)
                                 csr_metrics['entropy_sink_anchor'] = sink_metrics.get('anchor_strength', 0.0)
-                                # Add entropy floor loss: penalize if entropy drops below min_entropy
+                                # Note: With detach, this loss only trains EntropySink's projection,
+                                # NOT the main model. This is intentional - monitoring, not corrupting.
                                 if 'entropy' in sink_metrics:
                                     entropy_val = sink_metrics['entropy']
                                     if isinstance(entropy_val, torch.Tensor):
                                         entropy_floor_loss = torch.clamp(0.1 - entropy_val.mean(), min=0) * 0.1
+                                        # V9.6.6: Still add loss but now only affects entropy_proj, not model
                                         loss = loss + entropy_floor_loss
                                         csr_metrics['entropy_floor_loss'] = entropy_floor_loss.item()
 
                         # SynthesisGate: Layer 11 (O11_Integration) safety - reconciles structure with flow
                         if csr_synthesis_gate is not None:
-                            layer_11_hidden = layer_hidden_states[11]
+                            # V9.6.6: DETACH to prevent gradient flow through entire model!
+                            layer_11_hidden = layer_hidden_states[11].detach()
                             if layer_11_hidden.shape[-1] == csr_emb.shape[-1]:
                                 synthesized, gate_metrics = csr_synthesis_gate(layer_11_hidden, csr_emb, csr_affinity)
                                 csr_metrics['synthesis_gate_value'] = gate_metrics.get('gate_value', 0.0)
                                 csr_metrics['synthesis_coherence'] = gate_metrics.get('coherence', 0.0)
-                                # Add synthesis coherence loss: encourage high coherence at integration layer
+                                # Note: With detach, this loss only trains SynthesisGate's projection,
+                                # NOT the main model. This is intentional - monitoring, not corrupting.
                                 if 'coherence' in gate_metrics:
                                     coherence_val = gate_metrics['coherence']
                                     if isinstance(coherence_val, torch.Tensor):
@@ -7527,6 +7594,10 @@ def train(config: UnifiedTrainingConfig):
                 guna_s, guna_r, guna_t = 0.33, 0.33, 0.34
 
             # Toroidal Evolutionary Bridge: O12 → O1 state carryover
+            #
+            # V9.6.7 CRITICAL FIX: DETACH hidden states for Toroidal bridge!
+            # Without detach, toroid_loss gradients flow: o12_state → Layer 11 → ... → token embeddings
+            # This was ANOTHER source of vocabulary corruption alongside CSR!
             if evolutionary_bridge is not None:
                 # Extract hidden states for O1 (first layer) and O12 (last layer)
                 # Different model types store hidden states differently
@@ -7540,11 +7611,13 @@ def train(config: UnifiedTrainingConfig):
                 if hidden_states is not None:
                     # Get O12 (harvest) - either last element of list or the tensor itself
                     if isinstance(hidden_states, (list, tuple)) and len(hidden_states) > 0:
-                        o12_state = hidden_states[-1]  # Last layer = O12
-                        o1_state = hidden_states[0] if len(hidden_states) > 1 else o12_state
+                        # V9.6.7: DETACH to prevent gradient flow to model!
+                        o12_state = hidden_states[-1].detach()  # Last layer = O12
+                        o1_state = hidden_states[0].detach() if len(hidden_states) > 1 else o12_state
                     else:
-                        o12_state = hidden_states
-                        o1_state = hidden_states
+                        # V9.6.7: DETACH to prevent gradient flow!
+                        o12_state = hidden_states.detach()
+                        o1_state = hidden_states.detach()
 
                     # Compute toroidal coherence if we have a prior seed
                     if toroidal_seed is not None:
@@ -7553,6 +7626,7 @@ def train(config: UnifiedTrainingConfig):
                         )
 
                         # Compute toroidal loss
+                        # V9.6.7: With detached states, this loss only trains the bridge, not the model
                         toroid_loss, toroid_metrics = toroidal_loss_fn(
                             seed=toroidal_seed,
                             harvest=o12_state,
@@ -7566,7 +7640,7 @@ def train(config: UnifiedTrainingConfig):
                         # Uses active_projection (non-detached) for proper gradient flow to bridge
                         # Zero VRAM overhead, achieves meta-learning without BPTT risks
                         sma_weight = 0.05
-                        o1_target = o1_state.detach()  # Don't backprop through model
+                        o1_target = o1_state  # Already detached above in V9.6.7
                         if o1_target.dim() == 3:
                             o1_target = o1_target.mean(dim=1)  # [B, N, dim] → [B, dim]
 
@@ -7598,6 +7672,10 @@ def train(config: UnifiedTrainingConfig):
                     metrics['sgp_heavy_step'] = is_sgp_heavy_step
 
             # Full Evolutionary Flow System: All Layer Transitions with Delayed Resonance
+            #
+            # V9.6.7 CRITICAL FIX: DETACH hidden states for EvoFlow!
+            # Without detach, evo_loss gradients flow: hidden_states → all layers → token embeddings
+            # This was a MAJOR source of vocabulary corruption alongside CSR and Toroidal!
             evo_result = None
             evo_lr_multiplier = 1.0
             # Note: guna_s/r/t initialized earlier in the loop (before evolutionary_bridge section)
@@ -7607,36 +7685,29 @@ def train(config: UnifiedTrainingConfig):
                 hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
 
                 if hidden_states is not None and len(hidden_states) > 0:
+                    # V9.6.7: DETACH all hidden states to prevent gradient flow!
+                    # This ensures EvoFlow only monitors layer coherence, doesn't corrupt the model
+                    hidden_states_detached = [h.detach() if h is not None else None for h in hidden_states]
 
-                    # V9.4.6: Sensory Noise Injection (SNI)
-                    # Break repetitive loops by injecting tiny noise into sensory layers
-                    # when entropy drops below floor (signaling "city of the city" patterns)
-                    sni_entropy_floor = 0.30
-                    sni_noise_scale = 1e-4
+                    # V9.4.6: Sensory Noise Injection (SNI) - DISABLED in V9.6.7
+                    # SNI modifies hidden states in-place which can cause gradient issues
+                    # With detached states, SNI would have no effect anyway
                     current_entropy = metrics.get("onto_entropy", 1.0)
-
-                    if current_entropy < sni_entropy_floor:
-                        # Inject noise into sensory layers (O10-O12 = indices 9, 10, 11)
-                        sensory_indices = [9, 10, 11]
-                        for idx in sensory_indices:
-                            if idx < len(hidden_states):
-                                hidden_states[idx] = hidden_states[idx] + \
-                                    torch.randn_like(hidden_states[idx]) * sni_noise_scale
-                        metrics['sni_triggered'] = True
-                    else:
-                        metrics['sni_triggered'] = False
+                    metrics['sni_triggered'] = False  # Disabled
 
                     # Update Gunas in engine for metacognitive decisions
                     evolutionary_engine.update_gunas(guna_s, guna_r, guna_t)
 
                     # Process through evolutionary system with delayed resonance
+                    # V9.6.7: Use detached states - EvoFlow becomes monitor-only
                     evo_result = evolutionary_engine.process(
-                        layer_states=hidden_states,
+                        layer_states=hidden_states_detached,
                         compute_loss=True,
                         apply_resonance=True,
                     )
 
                     # Add evolutionary loss to total
+                    # V9.6.7: With detached states, this only trains EvoFlow's internal weights, not the model
                     if 'loss' in evo_result:
                         evo_loss = config.evo_lambda * evo_result['loss']
                         loss = loss + evo_loss
@@ -8883,7 +8954,7 @@ def main():
                        help="Disable TensorBoard logging")
 
     # Quality Sampling
-    parser.add_argument("--sample_every", type=int, default=200,
+    parser.add_argument("--sample_every", type=int, default=50,
                        help="Generate quality samples every N steps (0 = disabled)")
 
     # LRA Validation (Long-Range Retrieval)
