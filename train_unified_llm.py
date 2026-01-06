@@ -7479,13 +7479,16 @@ def train(config: UnifiedTrainingConfig):
                         csr_layer_idx = min(config.csr_alignment_layer, len(layer_hidden_states) - 1)
                         csr_hidden = layer_hidden_states[csr_layer_idx]
 
-                        # V9.6.5: One-time diagnostic log to confirm layer selection
+                        # V9.6.6: One-time diagnostic log to confirm layer selection and gradient isolation
                         if not hasattr(model, '_csr_layer_logged'):
                             model._csr_layer_logged = True
-                            print(f"  ✅ [CSR V9.6.5] Using Layer {csr_layer_idx} for alignment (config: {config.csr_alignment_layer})")
+                            print(f"  ✅ [CSR V9.6.6] Using Layer {csr_layer_idx} for alignment (config: {config.csr_alignment_layer})")
                             print(f"     Hidden states available: {len(layer_hidden_states)} layers")
-                            print(f"  🛡️ [CSR V9.6.5] Gradient isolation ACTIVE - CSR is monitor-only")
-                            print(f"     Sanskrit alignment tracked but won't corrupt token embeddings")
+                            print(f"  🛡️ [CSR V9.6.6] FULL gradient isolation ACTIVE:")
+                            print(f"     ├─ CSR alignment: detached (no gradient to model)")
+                            print(f"     ├─ EntropySink:   detached (no gradient to Layer 0)")
+                            print(f"     └─ SynthesisGate: detached (no gradient to Layer 11)")
+                            print(f"     All CSR/Sanskrit modules are now MONITOR-ONLY - no vocabulary corruption")
 
                 if csr_hidden is not None:
                     # V9.5.4 DIMENSION FIX: Project CSR embeddings to match model hidden size
@@ -7534,33 +7537,46 @@ def train(config: UnifiedTrainingConfig):
 
                 # CSR Safety Layers: EntropySink (Layer 0) and SynthesisGate (Layer 11)
                 # These enforce ontological safety at the boundaries of the 12D structure
+                #
+                # V9.6.6 CRITICAL FIX: DETACH hidden states for EntropySink and SynthesisGate!
+                # Without detach, their trainable projections create gradient flow:
+                #   - EntropySink: entropy_proj(layer_0) → Layer 0 → token embeddings (CORRUPTION!)
+                #   - SynthesisGate: gate_proj(layer_11) → Layer 11 → ... → token embeddings (CORRUPTION!)
+                # This was the REMAINING source of aphasia after V9.6.5 CSR alignment fix.
+                #
+                # With detach, these become monitor-only modules that track metrics without corrupting.
                 if hidden_state_extractor is not None:
                     layer_hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
 
                     if layer_hidden_states is not None and len(layer_hidden_states) >= 12:
                         # EntropySink: Layer 0 (O1_Potential) safety - prevents mode collapse
                         if csr_entropy_sink is not None:
-                            layer_0_hidden = layer_hidden_states[0]
+                            # V9.6.6: DETACH to prevent gradient flow to token embeddings!
+                            layer_0_hidden = layer_hidden_states[0].detach()
                             if layer_0_hidden.shape[-1] == csr_emb.shape[-1]:
                                 _, sink_metrics = csr_entropy_sink(layer_0_hidden, csr_affinity)
                                 csr_metrics['entropy_sink_entropy'] = sink_metrics.get('entropy', 0.0)
                                 csr_metrics['entropy_sink_anchor'] = sink_metrics.get('anchor_strength', 0.0)
-                                # Add entropy floor loss: penalize if entropy drops below min_entropy
+                                # Note: With detach, this loss only trains EntropySink's projection,
+                                # NOT the main model. This is intentional - monitoring, not corrupting.
                                 if 'entropy' in sink_metrics:
                                     entropy_val = sink_metrics['entropy']
                                     if isinstance(entropy_val, torch.Tensor):
                                         entropy_floor_loss = torch.clamp(0.1 - entropy_val.mean(), min=0) * 0.1
+                                        # V9.6.6: Still add loss but now only affects entropy_proj, not model
                                         loss = loss + entropy_floor_loss
                                         csr_metrics['entropy_floor_loss'] = entropy_floor_loss.item()
 
                         # SynthesisGate: Layer 11 (O11_Integration) safety - reconciles structure with flow
                         if csr_synthesis_gate is not None:
-                            layer_11_hidden = layer_hidden_states[11]
+                            # V9.6.6: DETACH to prevent gradient flow through entire model!
+                            layer_11_hidden = layer_hidden_states[11].detach()
                             if layer_11_hidden.shape[-1] == csr_emb.shape[-1]:
                                 synthesized, gate_metrics = csr_synthesis_gate(layer_11_hidden, csr_emb, csr_affinity)
                                 csr_metrics['synthesis_gate_value'] = gate_metrics.get('gate_value', 0.0)
                                 csr_metrics['synthesis_coherence'] = gate_metrics.get('coherence', 0.0)
-                                # Add synthesis coherence loss: encourage high coherence at integration layer
+                                # Note: With detach, this loss only trains SynthesisGate's projection,
+                                # NOT the main model. This is intentional - monitoring, not corrupting.
                                 if 'coherence' in gate_metrics:
                                     coherence_val = gate_metrics['coherence']
                                     if isinstance(coherence_val, torch.Tensor):
