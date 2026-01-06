@@ -7479,16 +7479,18 @@ def train(config: UnifiedTrainingConfig):
                         csr_layer_idx = min(config.csr_alignment_layer, len(layer_hidden_states) - 1)
                         csr_hidden = layer_hidden_states[csr_layer_idx]
 
-                        # V9.6.6: One-time diagnostic log to confirm layer selection and gradient isolation
+                        # V9.6.7: One-time diagnostic log to confirm layer selection and gradient isolation
                         if not hasattr(model, '_csr_layer_logged'):
                             model._csr_layer_logged = True
-                            print(f"  ✅ [CSR V9.6.6] Using Layer {csr_layer_idx} for alignment (config: {config.csr_alignment_layer})")
+                            print(f"  ✅ [V9.6.7] Using Layer {csr_layer_idx} for CSR alignment (config: {config.csr_alignment_layer})")
                             print(f"     Hidden states available: {len(layer_hidden_states)} layers")
-                            print(f"  🛡️ [CSR V9.6.6] FULL gradient isolation ACTIVE:")
-                            print(f"     ├─ CSR alignment: detached (no gradient to model)")
-                            print(f"     ├─ EntropySink:   detached (no gradient to Layer 0)")
-                            print(f"     └─ SynthesisGate: detached (no gradient to Layer 11)")
-                            print(f"     All CSR/Sanskrit modules are now MONITOR-ONLY - no vocabulary corruption")
+                            print(f"  🛡️ [V9.6.7] COMPLETE gradient isolation ACTIVE:")
+                            print(f"     ├─ CSR alignment:  detached (no gradient to model)")
+                            print(f"     ├─ EntropySink:    detached (no gradient to Layer 0)")
+                            print(f"     ├─ SynthesisGate:  detached (no gradient to Layer 11)")
+                            print(f"     ├─ Toroidal O1/O12: detached (no gradient to model)")
+                            print(f"     └─ EvoFlow states: detached (no gradient to model)")
+                            print(f"     All auxiliary systems are now MONITOR-ONLY - LM loss is the ONLY training signal")
 
                 if csr_hidden is not None:
                     # V9.5.4 DIMENSION FIX: Project CSR embeddings to match model hidden size
@@ -7592,6 +7594,10 @@ def train(config: UnifiedTrainingConfig):
                 guna_s, guna_r, guna_t = 0.33, 0.33, 0.34
 
             # Toroidal Evolutionary Bridge: O12 → O1 state carryover
+            #
+            # V9.6.7 CRITICAL FIX: DETACH hidden states for Toroidal bridge!
+            # Without detach, toroid_loss gradients flow: o12_state → Layer 11 → ... → token embeddings
+            # This was ANOTHER source of vocabulary corruption alongside CSR!
             if evolutionary_bridge is not None:
                 # Extract hidden states for O1 (first layer) and O12 (last layer)
                 # Different model types store hidden states differently
@@ -7605,11 +7611,13 @@ def train(config: UnifiedTrainingConfig):
                 if hidden_states is not None:
                     # Get O12 (harvest) - either last element of list or the tensor itself
                     if isinstance(hidden_states, (list, tuple)) and len(hidden_states) > 0:
-                        o12_state = hidden_states[-1]  # Last layer = O12
-                        o1_state = hidden_states[0] if len(hidden_states) > 1 else o12_state
+                        # V9.6.7: DETACH to prevent gradient flow to model!
+                        o12_state = hidden_states[-1].detach()  # Last layer = O12
+                        o1_state = hidden_states[0].detach() if len(hidden_states) > 1 else o12_state
                     else:
-                        o12_state = hidden_states
-                        o1_state = hidden_states
+                        # V9.6.7: DETACH to prevent gradient flow!
+                        o12_state = hidden_states.detach()
+                        o1_state = hidden_states.detach()
 
                     # Compute toroidal coherence if we have a prior seed
                     if toroidal_seed is not None:
@@ -7618,6 +7626,7 @@ def train(config: UnifiedTrainingConfig):
                         )
 
                         # Compute toroidal loss
+                        # V9.6.7: With detached states, this loss only trains the bridge, not the model
                         toroid_loss, toroid_metrics = toroidal_loss_fn(
                             seed=toroidal_seed,
                             harvest=o12_state,
@@ -7631,7 +7640,7 @@ def train(config: UnifiedTrainingConfig):
                         # Uses active_projection (non-detached) for proper gradient flow to bridge
                         # Zero VRAM overhead, achieves meta-learning without BPTT risks
                         sma_weight = 0.05
-                        o1_target = o1_state.detach()  # Don't backprop through model
+                        o1_target = o1_state  # Already detached above in V9.6.7
                         if o1_target.dim() == 3:
                             o1_target = o1_target.mean(dim=1)  # [B, N, dim] → [B, dim]
 
@@ -7663,6 +7672,10 @@ def train(config: UnifiedTrainingConfig):
                     metrics['sgp_heavy_step'] = is_sgp_heavy_step
 
             # Full Evolutionary Flow System: All Layer Transitions with Delayed Resonance
+            #
+            # V9.6.7 CRITICAL FIX: DETACH hidden states for EvoFlow!
+            # Without detach, evo_loss gradients flow: hidden_states → all layers → token embeddings
+            # This was a MAJOR source of vocabulary corruption alongside CSR and Toroidal!
             evo_result = None
             evo_lr_multiplier = 1.0
             # Note: guna_s/r/t initialized earlier in the loop (before evolutionary_bridge section)
@@ -7672,36 +7685,29 @@ def train(config: UnifiedTrainingConfig):
                 hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
 
                 if hidden_states is not None and len(hidden_states) > 0:
+                    # V9.6.7: DETACH all hidden states to prevent gradient flow!
+                    # This ensures EvoFlow only monitors layer coherence, doesn't corrupt the model
+                    hidden_states_detached = [h.detach() if h is not None else None for h in hidden_states]
 
-                    # V9.4.6: Sensory Noise Injection (SNI)
-                    # Break repetitive loops by injecting tiny noise into sensory layers
-                    # when entropy drops below floor (signaling "city of the city" patterns)
-                    sni_entropy_floor = 0.30
-                    sni_noise_scale = 1e-4
+                    # V9.4.6: Sensory Noise Injection (SNI) - DISABLED in V9.6.7
+                    # SNI modifies hidden states in-place which can cause gradient issues
+                    # With detached states, SNI would have no effect anyway
                     current_entropy = metrics.get("onto_entropy", 1.0)
-
-                    if current_entropy < sni_entropy_floor:
-                        # Inject noise into sensory layers (O10-O12 = indices 9, 10, 11)
-                        sensory_indices = [9, 10, 11]
-                        for idx in sensory_indices:
-                            if idx < len(hidden_states):
-                                hidden_states[idx] = hidden_states[idx] + \
-                                    torch.randn_like(hidden_states[idx]) * sni_noise_scale
-                        metrics['sni_triggered'] = True
-                    else:
-                        metrics['sni_triggered'] = False
+                    metrics['sni_triggered'] = False  # Disabled
 
                     # Update Gunas in engine for metacognitive decisions
                     evolutionary_engine.update_gunas(guna_s, guna_r, guna_t)
 
                     # Process through evolutionary system with delayed resonance
+                    # V9.6.7: Use detached states - EvoFlow becomes monitor-only
                     evo_result = evolutionary_engine.process(
-                        layer_states=hidden_states,
+                        layer_states=hidden_states_detached,
                         compute_loss=True,
                         apply_resonance=True,
                     )
 
                     # Add evolutionary loss to total
+                    # V9.6.7: With detached states, this only trains EvoFlow's internal weights, not the model
                     if 'loss' in evo_result:
                         evo_loss = config.evo_lambda * evo_result['loss']
                         loss = loss + evo_loss
