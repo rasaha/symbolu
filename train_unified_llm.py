@@ -7016,13 +7016,15 @@ def train(config: UnifiedTrainingConfig):
         sgp_controller = SGPController(sgp_config)
         sgp_controller.attach_sattvic_controller(sattvic_controller)
 
-        # Register Authority layer parameters (layers 0-8) for gradient persistence
+        # Register Authority layer parameters (layers 0 to authority_layers-1) for gradient persistence
         authority_params = []
+        num_authority_layers = config.authority_layers  # Use configured split, not hardcoded 9
         for name, param in model.named_parameters():
-            # Match layers 0-8 (Authority layers)
+            # Match authority layers (0 to num_authority_layers-1)
+            # Support multiple naming conventions: layers.N, layer.N, blocks.N
             layer_match = False
-            for i in range(9):  # 0-8
-                if f"layers.{i}." in name or f"layer.{i}." in name:
+            for i in range(num_authority_layers):
+                if f"layers.{i}." in name or f"layer.{i}." in name or f"blocks.{i}." in name:
                     layer_match = True
                     break
             if layer_match and param.requires_grad:
@@ -8602,13 +8604,6 @@ def train(config: UnifiedTrainingConfig):
                     )
                     print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}")
 
-                # Quality Sampling
-                if config.sample_every > 0 and global_step % config.sample_every == 0:
-                    if tokenizer is not None:
-                        run_quality_samples(model, tokenizer, config, device, global_step)
-                    else:
-                        print(f"  [Sampling] Skipped - tokenizer not available")
-
                 # LRA Validation (Long-Range Retrieval)
                 if lra_validator is not None and global_step % config.lra_validate_every == 0:
                     lra_results = lra_validator.run_validation(step=global_step)
@@ -8622,6 +8617,15 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("lra/mean_entropy", lra_results["summary"]["mean_entropy"], global_step)
 
                 model.train()
+
+            # Quality Sampling (OUTSIDE eval block - runs independently of eval_every)
+            if config.sample_every > 0 and global_step % config.sample_every == 0:
+                if tokenizer is not None:
+                    model.eval()
+                    run_quality_samples(model, tokenizer, config, device, global_step)
+                    model.train()
+                else:
+                    print(f"  [Sampling] Skipped - tokenizer not available")
 
             # Save checkpoint (overwrites last.pt each time)
             if global_step % config.save_every == 0:
