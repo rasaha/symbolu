@@ -155,8 +155,9 @@ class PhaseAttentionLayer(nn.Module):
         # Output projection
         self.out_proj = nn.Linear(embed_dim, embed_dim, bias=False)
 
-        # Initialize out_proj to near-zero for gradual contribution
-        nn.init.zeros_(self.out_proj.weight)
+        # V9.6.11: Removed zero initialization - was preventing learning
+        # The standard normal init from _init_weights() is sufficient
+        # nn.init.zeros_(self.out_proj.weight)  # DISABLED: caused phase attention to contribute nothing
 
         # Layer normalization for stability
         self.norm = nn.LayerNorm(embed_dim)
