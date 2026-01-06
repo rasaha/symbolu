@@ -5929,6 +5929,27 @@ def run_quality_samples(
     log(f"  📝 QUALITY SAMPLES (Step {step})")
     log("=" * 60)
 
+    # V9.6.10 Diagnostic: Show top predicted tokens for first prompt
+    try:
+        diag_prompt = config.sample_prompts[0] if config.sample_prompts else "The"
+        diag_ids = tokenizer.encode(diag_prompt, return_tensors="pt").to(device)
+        with torch.no_grad():
+            diag_out = model(diag_ids)
+            if isinstance(diag_out, dict):
+                diag_logits = diag_out.get('logits', diag_out.get('output'))
+            else:
+                diag_logits = diag_out
+            # Get logits for last position
+            last_logits = diag_logits[0, -1, :]
+            top_probs = torch.softmax(last_logits, dim=-1)
+            top_vals, top_ids = torch.topk(top_probs, 10)
+            log(f"  🔍 [DIAGNOSTIC] Top-10 predicted tokens after \"{diag_prompt}\":")
+            for i, (prob, tid) in enumerate(zip(top_vals, top_ids)):
+                tok_str = tokenizer.decode([tid.item()])
+                log(f"      {i+1}. '{tok_str}' (id={tid.item()}, p={prob.item():.4f})")
+    except Exception as e:
+        log(f"  🔍 [DIAGNOSTIC] Failed: {e}")
+
     # Aggregate metrics across all samples
     total_completion = 0.0
     total_repetition = 0.0
