@@ -143,11 +143,22 @@ class PhaseAttentionLayer(nn.Module):
         self.sync_lr = nn.Parameter(torch.tensor(sync_lr))
 
         # =====================================================================
-        # V2: LEARNED PHASE-AMPLITUDE PROJECTIONS (The "Brain" of Phase)
+        # V9.6.11: DECOUPLED HIGH-CAPACITY PHASE-AMPLITUDE PROJECTIONS
         # =====================================================================
-        # Learn WHAT to sync (Phase) and HOW MUCH to sync (Amplitude)
-        self.W_phase = nn.Linear(embed_dim, num_heads, bias=False)
-        self.W_amp = nn.Linear(embed_dim, num_heads, bias=False)
+        # Previous issues fixed:
+        # 1. Low capacity: was 768→12, now 768→768 (full head_dim per head)
+        # 2. Shared Q/K: was same φ,a for both, now separate projections
+        # 3. Vanishing gradients: uniform [-π,π] init instead of small normal
+        #
+        # This matches standard attention capacity while keeping O(n) complexity
+
+        # Separate Query projections (what am I looking for?)
+        self.W_q_phase = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.W_q_amp = nn.Linear(embed_dim, embed_dim, bias=False)
+
+        # Separate Key projections (what do I represent?)
+        self.W_k_phase = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.W_k_amp = nn.Linear(embed_dim, embed_dim, bias=False)
 
         # Value projection (content)
         self.v_proj = nn.Linear(embed_dim, embed_dim, bias=False)
@@ -155,21 +166,23 @@ class PhaseAttentionLayer(nn.Module):
         # Output projection
         self.out_proj = nn.Linear(embed_dim, embed_dim, bias=False)
 
-        # V9.6.11: Removed zero initialization - was preventing learning
-        # The standard normal init from _init_weights() is sufficient
-        # nn.init.zeros_(self.out_proj.weight)  # DISABLED: caused phase attention to contribute nothing
-
         # Layer normalization for stability
         self.norm = nn.LayerNorm(embed_dim)
         self.dropout = nn.Dropout(dropout)
 
+        # V9.6.11: Initialize phase projections with uniform [-π, π]
+        # This ensures diverse phases at initialization for gradient flow
+        nn.init.uniform_(self.W_q_phase.weight, -3.14159, 3.14159)
+        nn.init.uniform_(self.W_k_phase.weight, -3.14159, 3.14159)
+
         # Legacy projections kept for checkpoint compatibility
+        self.W_phase = nn.Linear(embed_dim, num_heads, bias=False)  # Legacy
+        self.W_amp = nn.Linear(embed_dim, num_heads, bias=False)    # Legacy
         self.q_proj = nn.Linear(embed_dim, embed_dim)
         self.k_proj = nn.Linear(embed_dim, embed_dim)
         self.phase_proj = nn.Linear(self.head_dim, self.head_dim)
         self.key_gate = nn.Linear(self.head_dim, self.head_dim)
         self.value_gate = nn.Linear(self.head_dim, self.head_dim)
-        # Legacy V2 projections
         self.phase_embed = nn.Linear(embed_dim, num_heads)
         self.amp_gate = nn.Linear(embed_dim, num_heads)
 
@@ -197,16 +210,20 @@ class PhaseAttentionLayer(nn.Module):
         x_norm = self.norm(x)
 
         # =====================================================================
-        # 1. Project to Phase (φ) and Amplitude (a)
+        # 1. Project to SEPARATE Phase (φ) and Amplitude (a) for Q and K
         # =====================================================================
-        # φ: learned phase angle per head
-        # a: learned amplitude gate (how much this token participates)
-        # V9.6.11: Scale phi by π to ensure meaningful phase range at initialization
-        # Without scaling, phi ≈ 0 for all tokens, leading to:
-        #   cos(φ_i - φ_j) ≈ 1 (uniform attention)
-        #   gradient ∝ sin(φ_i - φ_j) ≈ 0 (vanishing gradients!)
-        phi = self.W_phase(x_norm) * 3.14159  # [B, N, H], range ~[-π, π]
-        a = torch.sigmoid(self.W_amp(x_norm))  # [B, N, H], range (0, 1)
+        # V9.6.11: Decoupled Q/K with high capacity (embed_dim → embed_dim)
+        # - Query: "what am I looking for?"
+        # - Key: "what do I represent?"
+        # This allows asymmetric attention patterns (e.g., "The" → "Empire")
+
+        # Query phase and amplitude: [B, N, D] → [B, N, H, D_h]
+        phi_q = self.W_q_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
+        a_q = torch.sigmoid(self.W_q_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+
+        # Key phase and amplitude: [B, N, D] → [B, N, H, D_h]
+        phi_k = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
+        a_k = torch.sigmoid(self.W_k_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
 
         # =====================================================================
         # 2. Project Values (content)
@@ -216,34 +233,33 @@ class PhaseAttentionLayer(nn.Module):
         # =====================================================================
         # 3. Form Complex Phasors using Euler's Formula
         # =====================================================================
-        # Q = a * e^(iφ)   - Query phasor
-        # K = a * e^(-iφ)  - Key phasor (conjugate for cos(φ_i - φ_j))
-
-        # Reshape for broadcasting: [B, N, H] -> [B, N, H, 1]
-        phi = phi.unsqueeze(-1)
-        a = a.unsqueeze(-1)
+        # Q = a_q * e^(iφ_q)   - Query phasor (what I'm looking for)
+        # K = a_k * e^(-iφ_k)  - Key phasor (what I represent, conjugate)
 
         # torch.polar doesn't support BFloat16 - cast to float32 for complex ops
-        orig_dtype = phi.dtype
+        orig_dtype = phi_q.dtype
         if orig_dtype == torch.bfloat16:
-            phi = phi.float()
-            a = a.float()
+            phi_q = phi_q.float()
+            phi_k = phi_k.float()
+            a_q = a_q.float()
+            a_k = a_k.float()
             v = v.float()
 
         # Create complex phasors using torch.polar(magnitude, angle)
-        q_phasor = torch.polar(a, phi)      # [B, N, H, 1]
-        k_phasor = torch.polar(a, -phi)     # [B, N, H, 1] (negative phase = conjugate)
+        # Q and K now have DIFFERENT learned phases and amplitudes!
+        q_phasor = torch.polar(a_q, phi_q)      # [B, N, H, D_h]
+        k_phasor = torch.polar(a_k, -phi_k)     # [B, N, H, D_h] (negative phase for conjugate)
 
         # =====================================================================
         # 4. O(n) State Accumulation via Complex Cumsum
         # =====================================================================
-        # KV = K * V (complex × real = complex)
+        # KV = K * V (complex × real = complex, element-wise per head_dim)
         # State_t = Σ_{j≤t} K_j * V_j
 
         # Convert V to complex (real part only, imaginary = 0)
         v_complex = torch.complex(v, torch.zeros_like(v))
 
-        # KV product: [B, N, H, 1] × [B, N, H, D_h] -> [B, N, H, D_h]
+        # KV product: [B, N, H, D_h] × [B, N, H, D_h] -> [B, N, H, D_h]
         kv_complex = k_phasor * v_complex
 
         # O(n) Causal aggregation: cumulative sum along sequence dimension
@@ -253,12 +269,9 @@ class PhaseAttentionLayer(nn.Module):
         # 5. Readout: Synchronization via Q × State (NORMALIZED)
         # =====================================================================
         # V9.6.11: Use amplitude-based normalization (always positive)
-        # The phase-based denominator Re(Q × cumsum(K)) can be negative or zero
-        # due to cos(φ_i - φ_j) oscillating between -1 and +1.
-        # Instead, normalize by cumulative amplitude which is always positive:
-        #   normalizer = a_t × Σ_{j≤t} a_j  (amplitude "energy")
-        a_cumsum = torch.cumsum(a, dim=1)  # [B, N, H, 1], always positive
-        normalizer = a * a_cumsum + 1e-6  # [B, N, H, 1], always positive
+        # normalizer = a_q × Σ_{j≤t} a_k  (cross-amplitude energy)
+        a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
+        normalizer = a_q * a_k_cumsum + 1e-6   # [B, N, H, D_h], always positive
 
         numerator = (q_phasor * global_state).real  # [B, N, H, D_h]
         sync_output = numerator / normalizer  # Amplitude-normalized output
