@@ -245,11 +245,19 @@ class PhaseAttentionLayer(nn.Module):
         # O(n) Causal aggregation: cumulative sum along sequence dimension
         global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
 
+        # V9.6.11: Cumulative key sum for normalization (Linear Attention style)
+        # Without this, cumsum grows unbounded with sequence length!
+        k_cumsum = torch.cumsum(k_phasor, dim=1)  # [B, N, H, 1]
+
         # =====================================================================
-        # 5. Readout: Synchronization via Q × State
+        # 5. Readout: Synchronization via Q × State (NORMALIZED)
         # =====================================================================
-        # Out = Re(Q × State) = Σ_{j≤t} a_t * a_j * cos(φ_t - φ_j) * V_j
-        sync_output = (q_phasor * global_state).real  # [B, N, H, D_h]
+        # Numerator: Re(Q × State) = Σ_{j≤t} a_t * a_j * cos(φ_t - φ_j) * V_j
+        # Denominator: Re(Q × cumsum(K)) = Σ_{j≤t} a_t * a_j * cos(φ_t - φ_j)
+        # This normalizes attention weights to prevent unbounded growth
+        numerator = (q_phasor * global_state).real  # [B, N, H, D_h]
+        denominator = (q_phasor * k_cumsum).real + 1e-6  # [B, N, H, 1] + eps for stability
+        sync_output = numerator / denominator  # Normalized output
 
         # Cast back to original dtype if we converted
         if orig_dtype == torch.bfloat16:
