@@ -89,6 +89,7 @@ class TransformerConfig:
     sync_steps: int = 3
     sync_lr: float = 0.1
     temperature: float = 1.0  # Lower = sharper attention (for classification tasks)
+    cosine_mode: str = "standard"  # V9.6.12: "standard", "shifted", or "complex"
 
     def __post_init__(self):
         if self.ff_dim is None:
@@ -119,6 +120,25 @@ class PhaseAttentionLayer(nn.Module):
 
     This is mathematically equivalent to amplitude-gated phase attention
     but more elegant and numerically stable via complex arithmetic.
+
+    V9.6.12: Cosine Mode Alternatives
+    ---------------------------------
+    Three modes for the cosine interaction kernel:
+
+    1. "standard" (default): cos(φ_q - φ_k), range [-1, +1]
+       - Original implementation
+       - Can have destructive interference (negative cancellation)
+
+    2. "shifted": 1 + cos(φ_q - φ_k), range [0, 2]
+       - Eliminates negative cancellation
+       - Guarantees positive signal flow
+       - Use when training plateaus due to signal collapse
+
+    3. "complex": Uses both real (cos) and imaginary (sin) components
+       - Real part: symmetric interaction
+       - Imaginary part: asymmetric/directional ("the" → "cat" ≠ "cat" → "the")
+       - Projects complex output to real via learned linear layer
+       - Most expressive but slightly higher memory
     """
 
     def __init__(
@@ -130,12 +150,18 @@ class PhaseAttentionLayer(nn.Module):
         sync_lr: float = 0.1,     # Unused in V2 but kept for compatibility
         temperature: float = 1.0,  # Unused in V2 but kept for compatibility
         aux_scale: float = 0.1,   # Output scaling for auxiliary path integration
+        cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
         self.aux_scale = aux_scale
+
+        # V9.6.12: Cosine mode for interaction kernel
+        assert cosine_mode in ("standard", "shifted", "complex"), \
+            f"cosine_mode must be 'standard', 'shifted', or 'complex', got '{cosine_mode}'"
+        self.cosine_mode = cosine_mode
 
         # Legacy parameters kept for checkpoint compatibility
         self.sync_steps = sync_steps
@@ -174,6 +200,18 @@ class PhaseAttentionLayer(nn.Module):
         # This ensures diverse phases at initialization for gradient flow
         nn.init.uniform_(self.W_q_phase.weight, -3.14159, 3.14159)
         nn.init.uniform_(self.W_k_phase.weight, -3.14159, 3.14159)
+
+        # V9.6.12: Complex-to-real projection for "complex" cosine mode
+        # Projects [real, imag] → real, allowing the model to learn how to
+        # combine symmetric (cos) and asymmetric (sin) components
+        if cosine_mode == "complex":
+            self.complex_to_real = nn.Linear(2 * embed_dim, embed_dim, bias=False)
+            # Initialize to favor real (cos) component initially for stability
+            with torch.no_grad():
+                self.complex_to_real.weight[:, :embed_dim] = torch.eye(embed_dim) * 0.8
+                self.complex_to_real.weight[:, embed_dim:] = torch.eye(embed_dim) * 0.2
+        else:
+            self.complex_to_real = None
 
         # Legacy projections kept for checkpoint compatibility
         self.W_phase = nn.Linear(embed_dim, num_heads, bias=False)  # Legacy
@@ -273,10 +311,72 @@ class PhaseAttentionLayer(nn.Module):
         a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
         normalizer = a_q * a_k_cumsum + 1e-6   # [B, N, H, D_h], always positive
 
-        numerator = (q_phasor * global_state).real  # [B, N, H, D_h]
-        sync_output = numerator / normalizer  # Amplitude-normalized output
+        # V9.6.12: Cosine mode selection for interaction kernel
+        qk_product = q_phasor * global_state  # [B, N, H, D_h] complex
 
-        # Cast back to original dtype if we converted
+        if self.cosine_mode == "standard":
+            # Original: cos(φ_q - φ_k), range [-1, +1]
+            # Can have destructive interference (negative cancellation)
+            numerator = qk_product.real  # [B, N, H, D_h]
+            sync_output = numerator / normalizer
+
+        elif self.cosine_mode == "shifted":
+            # Shifted: 1 + cos(φ_q - φ_k), range [0, 2]
+            # Eliminates negative cancellation, guarantees positive signal flow
+            #
+            # Mathematically: Σ a_q * a_k * (1 + cos(φ_q - φ_k)) * v
+            #               = Σ a_q * a_k * v + Σ a_q * a_k * cos(φ_q - φ_k) * v
+            #
+            # First term: amplitude-only product (no phase modulation)
+            # Second term: cosine-modulated product (from complex phasor)
+
+            # Accumulator for the "+1" shift term: a_k * v
+            av_state = torch.cumsum(a_k * v, dim=1)  # [B, N, H, D_h]
+
+            # Combined: shift_term + cos_term
+            shift_term = a_q * av_state           # a_q * Σ(a_k * v)
+            cos_term = qk_product.real            # Re(q_phasor * global_state)
+
+            numerator = shift_term + cos_term     # [B, N, H, D_h]
+            # Normalizer for range [0, 2] → divide by 2 to keep same scale
+            sync_output = numerator / (normalizer * 2)
+
+        elif self.cosine_mode == "complex":
+            # Full complex: uses both cos (real) and sin (imaginary)
+            # Real: symmetric interaction (cos)
+            # Imaginary: asymmetric/directional (sin)
+            #
+            # The sin component encodes ordering:
+            #   sin(φ_q - φ_k) ≠ sin(φ_k - φ_q)
+            # This allows "the" → "cat" ≠ "cat" → "the"
+
+            real_part = qk_product.real / normalizer   # [B, N, H, D_h]
+            imag_part = qk_product.imag / normalizer   # [B, N, H, D_h]
+
+            # Reshape for concatenation: [B, N, H, D_h] → [B, N, D]
+            real_flat = real_part.reshape(B, N, D)
+            imag_flat = imag_part.reshape(B, N, D)
+
+            # Concatenate real and imaginary: [B, N, 2*D]
+            complex_concat = torch.cat([real_flat, imag_flat], dim=-1)
+
+            # Cast back to original dtype before projection if needed
+            if orig_dtype == torch.bfloat16:
+                complex_concat = complex_concat.to(orig_dtype)
+
+            # Project complex → real via learned linear layer: [B, N, 2*D] → [B, N, D]
+            sync_output = self.complex_to_real(complex_concat)
+
+            # Early return for complex mode (dtype already handled)
+            output = self.out_proj(sync_output)
+            output = self.dropout(output)
+            output = output * self.aux_scale
+            result = output + residual
+            if phase_context is not None:
+                return result, None
+            return result
+
+        # Cast back to original dtype if we converted (for standard/shifted modes)
         if orig_dtype == torch.bfloat16:
             sync_output = sync_output.to(orig_dtype)
 
@@ -1225,6 +1325,7 @@ class HybridAttentionLayer(nn.Module):
         alpha_phase: float = 0.2,
         local_backend: str = 'auto',
         temperature: float = 1.0,  # Lower = sharper phase attention
+        cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
     ):
         super().__init__()
         # Keep alphas for potential future use (e.g., residual weighting)
@@ -1251,6 +1352,7 @@ class HybridAttentionLayer(nn.Module):
             sync_lr=sync_lr,
             temperature=temperature,  # Pass temperature for sharper attention
             aux_scale=1.0,  # V9.6.11: Full strength (was 0.1 causing 2% effective signal)
+            cosine_mode=cosine_mode,  # V9.6.12: Cosine interaction mode
         )
 
         self.norm = nn.LayerNorm(embed_dim)
@@ -1366,6 +1468,7 @@ class PhaseTransformerBlock(nn.Module):
             sync_lr=config.sync_lr,
             temperature=getattr(config, 'temperature', 1.0),  # Sharper attention for classification
             aux_scale=1.0,  # V9.6.11: Full strength for pure phase model
+            cosine_mode=getattr(config, 'cosine_mode', 'standard'),  # V9.6.12
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,

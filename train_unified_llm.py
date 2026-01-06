@@ -6028,6 +6028,7 @@ class UnifiedTrainingConfig:
     # Phase-specific parameters
     sync_steps: int = 3
     sync_lr: float = 0.1
+    cosine_mode: str = "standard"  # V9.6.12: "standard", "shifted", or "complex"
 
     # Hybrid-specific parameters
     local_layers: int = 4
@@ -8952,6 +8953,13 @@ def main():
                        help="Final alpha_phase value after decay")
     parser.add_argument("--alpha_decay_steps", type=int, default=10000,
                        help="Steps over which alpha_phase decays from start to end")
+
+    # V9.6.12: Cosine mode for phase attention
+    parser.add_argument("--cosine_mode", type=str, default="standard",
+                       choices=["standard", "shifted", "complex"],
+                       help="Cosine interaction mode: 'standard' (cos, range [-1,1]), "
+                            "'shifted' (1+cos, range [0,2], no negative cancellation), "
+                            "'complex' (uses both cos and sin for directional asymmetry)")
 
     # Ontological-specific
     parser.add_argument("--bhava_lambda", type=float, default=0.1,
