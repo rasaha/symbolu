@@ -9362,6 +9362,7 @@ def main():
         mixed_precision=args.mixed_precision,
         local_backend=args.local_backend,
         window_size=args.window_size,
+        cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         bhava_lambda=args.bhava_lambda,
         coherence_lambda=args.coherence_lambda,
         log_every=args.log_every,
