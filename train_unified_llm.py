@@ -1827,6 +1827,10 @@ class HierarchicalGradientScaler:
         layer_attr: str = "blocks",     # Attribute name for layers
         alpha_phase_protection: float = 0.5,  # Protection factor for Phase Attention weights
         protect_phase_during_thaw: bool = True,  # Enable Phase Attention protection
+        # V9.6.8: Layer-wise alpha dampening (Gemini recommendation)
+        enable_layerwise_alpha: bool = False,  # Enable per-layer alpha scaling
+        alpha_output_scale: float = 0.5,       # Scale for output layers (last 3 sensory)
+        alpha_reasoning_scale: float = 1.0,    # Scale for reasoning layers (first 3 sensory)
     ):
         self.model = model
         self.authority_layers = authority_layers
@@ -1837,6 +1841,10 @@ class HierarchicalGradientScaler:
         self.layer_attr = layer_attr
         self.alpha_phase_protection = alpha_phase_protection
         self.protect_phase_during_thaw = protect_phase_during_thaw
+        # V9.6.8: Layer-wise alpha
+        self.enable_layerwise_alpha = enable_layerwise_alpha
+        self.alpha_output_scale = alpha_output_scale
+        self.alpha_reasoning_scale = alpha_reasoning_scale
 
         self.current_step = 0
         self.hooks = []
@@ -1961,12 +1969,19 @@ class HierarchicalGradientScaler:
         balanced_grad = grad * scale_factor  (now same magnitude as authority)
         final_grad = balanced_grad * alpha   (THEN apply mixing ratio)
 
+        V9.6.8: Layer-wise Alpha Dampening (Gemini recommendation)
+        Output layers (9-11) should be more stable than reasoning layers (6-8).
+        - Reasoning layers (first half of sensory): alpha × alpha_reasoning_scale
+        - Output layers (last half of sensory): alpha × alpha_output_scale
+
         Phase Attention Protection:
         During Thaw mode, Phase Attention weights (W_phase, W_amp, etc.) in Authority
         layers receive extra gradient dampening to maintain stability of the complex
         O(n) attention mechanism while Sensory layers are being relaxed.
         """
         is_phase_param = self._is_phase_attention_param(param_name)
+        total_layers = self.authority_layers + self.sensory_layers
+        sensory_start = self.authority_layers
 
         def hook(grad):
             if grad is None:
@@ -1994,6 +2009,20 @@ class HierarchicalGradientScaler:
 
                 # Step 4: Apply mixing ratio alpha AFTER normalization
                 alpha = self._compute_alpha_sens()
+
+                # V9.6.8: Layer-wise alpha dampening
+                # Output layers (later in sensory range) should be more stable
+                if self.enable_layerwise_alpha:
+                    # Determine if this is a "reasoning" or "output" layer
+                    # For 6:6 split: layers 6-8 are reasoning, 9-11 are output
+                    # For 9:3 split: layers 9-10 are reasoning, 11 is output
+                    sensory_midpoint = sensory_start + (self.sensory_layers // 2)
+                    if layer_idx < sensory_midpoint:
+                        # Reasoning layers (first half of sensory): more expressive
+                        alpha = alpha * self.alpha_reasoning_scale
+                    else:
+                        # Output layers (last half of sensory): more stable
+                        alpha = alpha * self.alpha_output_scale
 
                 # balanced_grad has same magnitude as authority gradients
                 # final_grad = balanced_grad * alpha = exact alpha% contribution
@@ -6105,6 +6134,11 @@ class UnifiedTrainingConfig:
     alpha_sens_initial: float = 0.05      # Initial sensory gradient multiplier (balanced start to prevent S/A spikes)
     alpha_sens_max: float = 0.7           # Maximum sensory gradient (after warmup/relaxation)
     gradient_warmup_steps: int = 500      # Steps to ramp α_sens from initial to max
+    # V9.6.8: Layer-wise alpha dampening (Gemini recommendation)
+    # Output layers (9-11) should be more stable than reasoning layers (6-8)
+    enable_layerwise_alpha: bool = True   # Enable per-layer alpha scaling
+    alpha_output_scale: float = 0.5       # Scale for output layers 9-11 (α × 0.5 = more stable)
+    alpha_reasoning_scale: float = 1.0    # Scale for reasoning layers 6-8 (α × 1.0 = more expressive)
 
     # Dynamic Relaxation: 9:3 → 6:6 transition
     enable_dynamic_relaxation: bool = True   # Enable automatic 9:3 → 6:6 transition
@@ -6163,15 +6197,20 @@ class UnifiedTrainingConfig:
     csr_use_entropy_sink: bool = True        # Apply Layer 0 entropy floor
     csr_use_synthesis_gate: bool = True      # Apply Layer 11 synthesis reconciliation
     csr_alignment_layer: int = 2             # V9.6.0: Which layer to use for CSR alignment (2=concept, 11=output)
+    # V9.6.8: CSR Projector Learning Rate Scale (Gemini recommendation)
+    csr_projector_lr_scale: float = 0.1      # CSR projector learns at 0.1x main LR for stability
+    # V9.6.8: CSR Gradient Warmup - re-enable gradients after model learns grammar
+    csr_gradient_warmup_steps: int = 0       # Steps before re-enabling CSR gradients (0=always detached)
 
     # V9.6.0: Embedding configuration
     untie_embeddings: bool = False           # Untie input/output embeddings (CRITICAL when using CSR)
 
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
+    # V9.6.8: Updated defaults per Gemini recommendation (stronger cement, less frequent)
     enable_sgp: bool = True                  # Enable SGP synchronized with Sattvic Controller
-    sgp_base_rate: int = 25                  # Base SGP rate (Toroidal Refresh Rate)
-    sgp_stagnation_rate: int = 12            # Rate when stagnation detected (HALVED for more frequent hammering)
-    sgp_gamma: float = 0.3                   # Persistence coefficient: θ ← θ - η(∇θ + γ∇θ_persisted)
+    sgp_base_rate: int = 50                  # Base SGP rate (Toroidal Refresh Rate) - was 25
+    sgp_stagnation_rate: int = 25            # Rate when stagnation detected - was 12
+    sgp_gamma: float = 0.5                   # Persistence coefficient - was 0.3 (stronger cement)
 
     # Sattvic Controller (Dynamic λ_csr regulation)
     sattvic_initial_lambda: float = 0.5      # Initial λ_csr during warmup
@@ -7189,6 +7228,10 @@ def train(config: UnifiedTrainingConfig):
             alpha_sens_max=config.alpha_sens_max,
             warmup_steps=config.gradient_warmup_steps,
             layer_attr="blocks",  # Common attribute name for transformer layers
+            # V9.6.8: Layer-wise alpha dampening
+            enable_layerwise_alpha=config.enable_layerwise_alpha,
+            alpha_output_scale=config.alpha_output_scale,
+            alpha_reasoning_scale=config.alpha_reasoning_scale,
         )
         # Validate layer count matches configuration
         expected_layers = config.authority_layers + config.sensory_layers
@@ -7504,6 +7547,16 @@ def train(config: UnifiedTrainingConfig):
                             # Initialize with small weights for stable training
                             torch.nn.init.xavier_uniform_(model._csr_projector.weight)
                             print(f"  ⚡ [CSR] Created projector: {csr_dim}D → {hidden_dim}D (Phoneme→Model space)")
+
+                            # V9.6.8: Apply gradient scaling hook for 0.1x LR effect (Gemini recommendation)
+                            # This ensures the projector learns slowly and stably
+                            lr_scale = config.csr_projector_lr_scale
+                            if lr_scale != 1.0:
+                                def csr_proj_grad_hook(grad):
+                                    return grad * lr_scale
+                                model._csr_projector.weight.register_hook(csr_proj_grad_hook)
+                                print(f"  ⚡ [CSR] Projector LR scale: {lr_scale}x (stable foundation)")
+
                         # Project CSR embeddings to model dimension
                         csr_emb = model._csr_projector(csr_emb)
 
@@ -7517,9 +7570,20 @@ def train(config: UnifiedTrainingConfig):
                     # With detach, CSR becomes a forward-only alignment signal - the model READS the Sanskrit
                     # target but doesn't corrupt its own vocabulary trying to chase it.
                     # Sovereign Loss and EvoFlow provide the actual ontological training signal.
-                    csr_hidden_detached = csr_hidden.detach()  # CRITICAL: Break gradient flow!
+                    #
+                    # V9.6.8: Optional gradient warmup - re-enable after model learns grammar (Gemini recommendation)
+                    # Once PPL < 800 or step > csr_gradient_warmup_steps, allow CSR to subtly reshape Layer 2
+                    if config.csr_gradient_warmup_steps > 0 and global_step > config.csr_gradient_warmup_steps:
+                        # Re-enable gradient flow after warmup (model has learned basic grammar)
+                        csr_hidden_for_loss = csr_hidden  # Allow gradients to flow
+                        if not hasattr(model, '_csr_warmup_logged'):
+                            model._csr_warmup_logged = True
+                            print(f"  🔓 [CSR V9.6.8] Gradient warmup complete at step {global_step}")
+                            print(f"     CSR gradients now flow to Layer {csr_layer_idx} for ontological shaping")
+                    else:
+                        csr_hidden_for_loss = csr_hidden.detach()  # CRITICAL: Break gradient flow!
 
-                    csr_hidden_norm = torch.nn.functional.normalize(csr_hidden_detached, dim=-1)
+                    csr_hidden_norm = torch.nn.functional.normalize(csr_hidden_for_loss, dim=-1)
                     csr_emb_norm = torch.nn.functional.normalize(csr_emb, dim=-1)
                     csr_similarity = (csr_hidden_norm * csr_emb_norm).sum(dim=-1)
                     # Temperature sharpening: (1 - sim) / tau creates steep gradient landscape
@@ -8980,6 +9044,15 @@ def main():
                        help="Maximum sensory gradient scale (after warmup/relaxation)")
     parser.add_argument("--gradient_warmup_steps", type=int, default=500,
                        help="Steps to ramp sensory gradient scale from initial to max")
+    # V9.6.8: Layer-wise alpha dampening (Gemini recommendation)
+    parser.add_argument("--enable_layerwise_alpha", action="store_true", default=True,
+                       help="Enable per-layer alpha scaling (output layers more stable)")
+    parser.add_argument("--disable_layerwise_alpha", action="store_true",
+                       help="Disable per-layer alpha scaling")
+    parser.add_argument("--alpha_output_scale", type=float, default=0.5,
+                       help="Scale for output layers 9-11 (default 0.5 = more stable)")
+    parser.add_argument("--alpha_reasoning_scale", type=float, default=1.0,
+                       help="Scale for reasoning layers 6-8 (default 1.0 = more expressive)")
 
     # Dynamic Relaxation: 9:3 → 6:6 transition
     parser.add_argument("--enable_dynamic_relaxation", action="store_true", default=True,
@@ -9098,18 +9171,25 @@ def main():
                        help="Apply Layer 11 synthesis reconciliation")
     parser.add_argument("--csr_alignment_layer", type=int, default=2,
                        help="Which layer to use for CSR alignment (2=concept formation, 11=output - AVOID)")
+    # V9.6.8: CSR Projector LR Scale (Gemini recommendation)
+    parser.add_argument("--csr_projector_lr_scale", type=float, default=0.1,
+                       help="CSR projector learns at this fraction of main LR (0.1 = 10x slower)")
+    # V9.6.8: CSR Gradient Warmup (Gemini recommendation)
+    parser.add_argument("--csr_gradient_warmup_steps", type=int, default=0,
+                       help="Steps before re-enabling CSR gradients (0=always detached, 1000=re-enable after 1000 steps)")
 
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
+    # V9.6.8: Updated defaults per Gemini recommendation (stronger cement, less frequent)
     parser.add_argument("--enable_sgp", action="store_true", default=True,
                        help="Enable SGP synchronized with Sattvic Controller")
     parser.add_argument("--disable_sgp", action="store_true",
                        help="Disable SGP")
-    parser.add_argument("--sgp_base_rate", type=int, default=25,
-                       help="SGP base rate (Toroidal Refresh Rate)")
-    parser.add_argument("--sgp_stagnation_rate", type=int, default=12,
-                       help="SGP rate when stagnation detected (HALVED for more frequent hammering)")
-    parser.add_argument("--sgp_gamma", type=float, default=0.3,
-                       help="SGP persistence coefficient (gamma) for gradient injection")
+    parser.add_argument("--sgp_base_rate", type=int, default=50,
+                       help="SGP base rate (Toroidal Refresh Rate) - was 25, now 50 per Gemini")
+    parser.add_argument("--sgp_stagnation_rate", type=int, default=25,
+                       help="SGP rate when stagnation detected - was 12, now 25 per Gemini")
+    parser.add_argument("--sgp_gamma", type=float, default=0.5,
+                       help="SGP persistence coefficient (gamma) - was 0.3, now 0.5 per Gemini (stronger cement)")
 
     # Sattvic Controller (Dynamic λ_csr regulation)
     parser.add_argument("--sattvic_initial_lambda", type=float, default=0.5,
@@ -9278,6 +9358,10 @@ def main():
         alpha_sens_initial=args.alpha_sens_initial,
         alpha_sens_max=args.alpha_sens_max,
         gradient_warmup_steps=args.gradient_warmup_steps,
+        # V9.6.8: Layer-wise alpha dampening
+        enable_layerwise_alpha=args.enable_layerwise_alpha and not args.disable_layerwise_alpha,
+        alpha_output_scale=args.alpha_output_scale,
+        alpha_reasoning_scale=args.alpha_reasoning_scale,
         use_per_layer_clipping=args.use_per_layer_clipping,
         # Dynamic Relaxation: 9:3 → 6:6 transition
         enable_dynamic_relaxation=args.enable_dynamic_relaxation and not args.disable_dynamic_relaxation,
@@ -9330,6 +9414,10 @@ def main():
         csr_trainable=args.csr_trainable,
         csr_use_entropy_sink=args.csr_use_entropy_sink,
         csr_use_synthesis_gate=args.csr_use_synthesis_gate,
+        csr_alignment_layer=args.csr_alignment_layer,
+        # V9.6.8: CSR Projector LR Scale and Gradient Warmup
+        csr_projector_lr_scale=args.csr_projector_lr_scale,
+        csr_gradient_warmup_steps=args.csr_gradient_warmup_steps,
         # SGP (Stochastic Gradient Persistence)
         enable_sgp=args.enable_sgp and not args.disable_sgp,
         sgp_base_rate=args.sgp_base_rate,
