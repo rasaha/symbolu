@@ -1,355 +1,382 @@
+#!/usr/bin/env python3
 """
-Checkpoint Utilities for Sovereign Inference
-=============================================
+Checkpoint Utilities for Inference
+===================================
 
-Utilities for saving and loading model checkpoints with inference metadata.
-Ensures the inference engine "remembers" the training context and can
-auto-configure resonance, layer splits, and other parameters.
+Utilities for loading checkpoints with inference-ready components.
 
-The checkpoint metadata includes:
-- Authority/Sensory split configuration (9:3 or 6:6)
-- Dynamic Relaxation Controller (DRC) state
-- Recommended resonance alpha based on training phase
-- sGP (Stochastic Gradient Projection) rate used during training
+Handles:
+- Model loading with proper device placement
+- Evolutionary bridge weight extraction
+- CSR component loading
+- Inference configuration from checkpoint metadata
 
-Training Reference:
-    DynamicRelaxationController (train_unified_llm.py) manages state transitions:
-    STATE_AUTHORITY (9:3) → STATE_BALANCED (6:6) → Evolution stages
-
-Usage:
-------
-    from symbolu.inference import (
-        save_sovereign_checkpoint,
-        load_sovereign_config,
-        InferenceConfig,
-    )
-
-    # Save with inference hints
-    save_sovereign_checkpoint(
-        model=model,
-        drc_state="authority",
-        evolution_stage=2,
-        path="checkpoint.pt",
-    )
-
-    # Load and auto-configure
-    config = load_sovereign_config("checkpoint.pt")
-    print(f"Recommended alpha: {config.recommended_alpha}")
-    print(f"Split: {config.authority_sensory_split}")
+Author: Sovereign-1 Training Initiative
+Date: January 2026
 """
-
-from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, Tuple
-from pathlib import Path
 
 import torch
 import torch.nn as nn
+from typing import Dict, List, Optional, Tuple, Any, Union
+from pathlib import Path
+import warnings
 
 
-@dataclass
-class InferenceConfig:
+class InferenceCheckpointLoader:
     """
-    Inference configuration extracted from checkpoint metadata.
+    Load checkpoints for inference with all components.
 
-    Contains all hints needed to auto-configure the InferenceManager
-    based on the model's training state.
+    Handles graceful degradation when components are missing and
+    provides warnings about disabled features.
 
-    Attributes:
-        authority_sensory_split: Tuple of (authority_layers, sensory_layers)
-        evolution_stage: Current evolution stage index from DRC
-        recommended_alpha: Recommended resonance alpha for karma injection
-        sgp_rate: Stochastic Gradient Projection rate used in training
-        training_state: DRC state name ("authority", "balanced", etc.)
-        checkpoint_version: Version of checkpoint format
+    Example:
+        loader = InferenceCheckpointLoader(checkpoint_path)
+
+        model = loader.load_model(model_class)
+        engine = loader.load_evolutionary_engine(model)
+        guard = loader.load_csr_guard(model.lm_head)
+
+        # Check what was loaded
+        print(loader.get_loading_summary())
     """
-    authority_sensory_split: Tuple[int, int] = (9, 3)
-    evolution_stage: int = 0
-    recommended_alpha: float = 0.1
-    sgp_rate: int = 25
-    training_state: str = "authority"
-    checkpoint_version: str = "2.0"
 
-    # Optional extended metadata
-    total_steps: int = 0
-    final_loss: float = 0.0
-    guna_balance: Tuple[float, float, float] = (0.33, 0.33, 0.34)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for checkpoint storage."""
-        return {
-            "authority_sensory_split": self.authority_sensory_split,
-            "evolution_stage": self.evolution_stage,
-            "recommended_alpha": self.recommended_alpha,
-            "sgp_rate": self.sgp_rate,
-            "training_state": self.training_state,
-            "checkpoint_version": self.checkpoint_version,
-            "total_steps": self.total_steps,
-            "final_loss": self.final_loss,
-            "guna_balance": self.guna_balance,
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "InferenceConfig":
-        """Create from dictionary (loaded from checkpoint)."""
-        return cls(
-            authority_sensory_split=tuple(data.get("authority_sensory_split", (9, 3))),
-            evolution_stage=data.get("evolution_stage", 0),
-            recommended_alpha=data.get("recommended_alpha", 0.1),
-            sgp_rate=data.get("sgp_rate", 25),
-            training_state=data.get("training_state", "authority"),
-            checkpoint_version=data.get("checkpoint_version", "1.0"),
-            total_steps=data.get("total_steps", 0),
-            final_loss=data.get("final_loss", 0.0),
-            guna_balance=tuple(data.get("guna_balance", (0.33, 0.33, 0.34))),
-        )
-
-    def get_layer_config_mode(self) -> str:
+    def __init__(
+        self,
+        checkpoint_path: Union[str, Path],
+        device: Union[str, torch.device] = 'cpu',
+    ):
         """
-        Determine layer configuration mode based on training state.
+        Initialize checkpoint loader.
+
+        Args:
+            checkpoint_path: Path to checkpoint file
+            device: Target device for loading
+        """
+        self.checkpoint_path = Path(checkpoint_path)
+        self.device = torch.device(device) if isinstance(device, str) else device
+
+        # Loading state
+        self._checkpoint: Optional[Dict] = None
+        self._loaded_components: Dict[str, bool] = {}
+        self._warnings: List[str] = []
+
+    def _ensure_loaded(self) -> Dict:
+        """Ensure checkpoint is loaded."""
+        if self._checkpoint is None:
+            self._checkpoint = torch.load(
+                self.checkpoint_path,
+                map_location=self.device,
+            )
+        return self._checkpoint
+
+    def get_model_state_dict(self) -> Dict[str, torch.Tensor]:
+        """
+        Get model state dict from checkpoint.
 
         Returns:
-            "authority" for 9:3 split, "balanced" for 6:6 split
+            state_dict: Model weights
         """
-        auth, sens = self.authority_sensory_split
-        if auth == 9 and sens == 3:
-            return "authority"
-        elif auth == 6 and sens == 6:
-            return "balanced"
+        checkpoint = self._ensure_loaded()
+
+        # Try different key patterns
+        if 'model' in checkpoint:
+            return checkpoint['model']
+        elif 'model_state_dict' in checkpoint:
+            return checkpoint['model_state_dict']
+        elif 'state_dict' in checkpoint:
+            return checkpoint['state_dict']
         else:
-            return "custom"
+            # Assume checkpoint IS the state dict
+            return checkpoint
 
+    def load_model(
+        self,
+        model_class: type,
+        model_kwargs: Optional[Dict] = None,
+        strict: bool = False,
+    ) -> nn.Module:
+        """
+        Load model from checkpoint.
 
-def save_sovereign_checkpoint(
-    model: nn.Module,
-    path: str,
-    drc_state: str = "authority",
-    evolution_stage: int = 0,
-    recommended_alpha: Optional[float] = None,
-    sgp_rate: int = 25,
-    optimizer: Optional[Any] = None,
-    scheduler: Optional[Any] = None,
-    evolutionary_bridge: Optional[nn.Module] = None,
-    csr_components: Optional[Dict[str, nn.Module]] = None,
-    extra_metadata: Optional[Dict[str, Any]] = None,
-) -> str:
-    """
-    Save model checkpoint with comprehensive inference metadata.
+        Args:
+            model_class: Model class to instantiate
+            model_kwargs: Arguments for model constructor
+            strict: Whether to enforce strict state dict loading
 
-    This enhanced checkpoint format ensures the InferenceManager can
-    auto-configure based on the model's specific training state.
+        Returns:
+            model: Loaded model on target device
+        """
+        checkpoint = self._ensure_loaded()
+        model_kwargs = model_kwargs or {}
 
-    Args:
-        model: The transformer model
-        path: Path to save checkpoint
-        drc_state: DRC state name ("authority", "balanced", "probe")
-        evolution_stage: Current evolution stage index
-        recommended_alpha: Resonance alpha (auto-computed if None)
-        sgp_rate: sGP rate used during training
-        optimizer: Optional optimizer state
-        scheduler: Optional scheduler state
-        evolutionary_bridge: Optional EvolutionaryBridge module
-        csr_components: Optional dict of CSR components (entropy_sink, synthesis_gate)
-        extra_metadata: Additional metadata to include
+        # Try to get config from checkpoint
+        if 'config' in checkpoint:
+            saved_config = checkpoint['config']
+            # Merge with provided kwargs (provided take precedence)
+            if hasattr(saved_config, '__dict__'):
+                for k, v in saved_config.__dict__.items():
+                    if k not in model_kwargs:
+                        model_kwargs[k] = v
 
-    Returns:
-        Path where checkpoint was saved
-    """
-    # Determine split configuration based on DRC state
-    if drc_state in ("authority", "locked"):
-        authority_sensory_split = (9, 3)
-    elif drc_state in ("balanced", "relaxed"):
-        authority_sensory_split = (6, 6)
-    elif drc_state == "probe":
-        authority_sensory_split = (3, 9)  # Stress-probe inverted
-    else:
-        authority_sensory_split = (9, 3)  # Default
+        # Instantiate model
+        model = model_class(**model_kwargs)
 
-    # Auto-compute recommended alpha if not provided
-    if recommended_alpha is None:
-        if drc_state in ("authority", "locked"):
-            recommended_alpha = 0.1
-        elif drc_state in ("balanced", "relaxed"):
-            recommended_alpha = 0.15
+        # Load state dict
+        state_dict = self.get_model_state_dict()
+
+        try:
+            missing, unexpected = model.load_state_dict(state_dict, strict=strict)
+
+            if missing:
+                self._warnings.append(f"Missing keys in model: {len(missing)} keys")
+            if unexpected:
+                self._warnings.append(f"Unexpected keys in model: {len(unexpected)} keys")
+
+            self._loaded_components['model'] = True
+
+        except Exception as e:
+            self._warnings.append(f"Model loading error: {e}")
+            self._loaded_components['model'] = False
+
+        return model.to(self.device)
+
+    def load_evolutionary_engine(
+        self,
+        model: nn.Module,
+    ) -> 'EvolutionaryInferenceEngine':
+        """
+        Load evolutionary inference engine.
+
+        Args:
+            model: Loaded model
+
+        Returns:
+            engine: Evolutionary inference engine
+        """
+        from .evolutionary_inference import EvolutionaryInferenceEngine, EvolutionaryConfig
+
+        checkpoint = self._ensure_loaded()
+
+        # Get config from checkpoint
+        inference_config = checkpoint.get('inference_config', {})
+        resonance_alpha = inference_config.get('recommended_resonance_alpha', 0.1)
+
+        config = EvolutionaryConfig(
+            resonance_alpha=resonance_alpha,
+        )
+
+        engine = EvolutionaryInferenceEngine(model, config)
+
+        # Try to load bridge weights
+        if 'evolutionary_bridge' in checkpoint:
+            success = engine.bridge.load_from_checkpoint(checkpoint['evolutionary_bridge'])
+            engine.bridge_enabled = success
+            self._loaded_components['evolutionary_bridge'] = success
+
+            if not success:
+                self._warnings.append("Failed to load evolutionary bridge weights")
         else:
-            recommended_alpha = 0.12
+            # Try loading from flat checkpoint
+            success = engine.bridge.load_from_checkpoint(checkpoint)
+            engine.bridge_enabled = success
+            self._loaded_components['evolutionary_bridge'] = success
 
-    # Build inference config
-    inference_config = InferenceConfig(
-        authority_sensory_split=authority_sensory_split,
-        evolution_stage=evolution_stage,
-        recommended_alpha=recommended_alpha,
-        sgp_rate=sgp_rate,
-        training_state=drc_state,
-        checkpoint_version="2.0",
-    )
+            if not success:
+                self._warnings.append(
+                    "Checkpoint does not contain evolutionary bridge - karma disabled"
+                )
 
-    # Build checkpoint
-    checkpoint = {
-        "model": model.state_dict(),
-        "inference_config": inference_config.to_dict(),
-    }
+        engine.to(self.device)
+        return engine
 
-    # Add optional components
-    if optimizer is not None:
-        checkpoint["optimizer"] = optimizer.state_dict()
+    def load_csr_guard(
+        self,
+        lm_head: Optional[nn.Module] = None,
+        embed_dim: int = 768,
+    ) -> 'CSRInferenceGuard':
+        """
+        Load CSR inference guard.
 
-    if scheduler is not None:
-        checkpoint["scheduler"] = scheduler.state_dict()
+        Args:
+            lm_head: Language model head (may be None)
+            embed_dim: Embedding dimension
 
-    if evolutionary_bridge is not None:
-        checkpoint["evolutionary_bridge"] = evolutionary_bridge.state_dict()
+        Returns:
+            guard: CSR inference guard
+        """
+        from .csr_inference import CSRInferenceGuard, CSRGuardConfig
 
-    if csr_components is not None:
-        checkpoint["csr_components"] = {
-            name: comp.state_dict()
-            for name, comp in csr_components.items()
-        }
+        checkpoint = self._ensure_loaded()
 
-    if extra_metadata is not None:
-        checkpoint["metadata"] = extra_metadata
+        config = CSRGuardConfig()
+        guard = CSRInferenceGuard(
+            config=config,
+            embed_dim=embed_dim,
+            lm_head=lm_head,
+        )
 
-    # Save
-    torch.save(checkpoint, path)
-    return path
+        # Try to load CSR components
+        if guard.load_from_checkpoint(checkpoint):
+            self._loaded_components['csr_guard'] = True
+        else:
+            self._loaded_components['csr_guard'] = False
+            self._warnings.append(
+                "Checkpoint does not contain CSR components - using default initialization"
+            )
+
+        if lm_head is None:
+            self._warnings.append(
+                "lm_head is None - CSR re-projection will be disabled"
+            )
+
+        guard.to(self.device)
+        return guard
+
+    def load_layer_config(self) -> 'LayerInferenceConfig':
+        """
+        Load layer configuration from checkpoint.
+
+        Returns:
+            config: Layer inference configuration
+        """
+        from .layer_config import LayerInferenceConfig
+
+        checkpoint = self._ensure_loaded()
+        config = LayerInferenceConfig.from_checkpoint(checkpoint)
+
+        self._loaded_components['layer_config'] = True
+        return config
+
+    def get_training_step(self) -> int:
+        """Get training step from checkpoint."""
+        checkpoint = self._ensure_loaded()
+        return checkpoint.get('global_step', checkpoint.get('step', 0))
+
+    def get_training_config(self) -> Dict[str, Any]:
+        """Get training configuration from checkpoint."""
+        checkpoint = self._ensure_loaded()
+        return checkpoint.get('config', {})
+
+    def get_inference_config(self) -> Dict[str, Any]:
+        """Get inference-specific configuration."""
+        checkpoint = self._ensure_loaded()
+        return checkpoint.get('inference_config', {})
+
+    def get_loading_summary(self) -> str:
+        """
+        Get summary of what was loaded.
+
+        Returns:
+            summary: Human-readable loading summary
+        """
+        lines = [
+            f"Checkpoint: {self.checkpoint_path}",
+            f"Device: {self.device}",
+            "",
+            "Components loaded:",
+        ]
+
+        for component, loaded in self._loaded_components.items():
+            status = "OK" if loaded else "FAILED"
+            lines.append(f"  {component}: {status}")
+
+        if self._warnings:
+            lines.append("")
+            lines.append("Warnings:")
+            for warning in self._warnings:
+                lines.append(f"  - {warning}")
+
+        return "\n".join(lines)
+
+    def get_warnings(self) -> List[str]:
+        """Get all warnings from loading."""
+        return self._warnings.copy()
 
 
-def load_sovereign_config(
-    checkpoint_path: str,
-    device: str = "cpu",
-) -> InferenceConfig:
+def load_inference_engine(
+    checkpoint_path: Union[str, Path],
+    model_class: type,
+    model_kwargs: Optional[Dict] = None,
+    device: Union[str, torch.device] = 'cuda' if torch.cuda.is_available() else 'cpu',
+) -> Tuple['EvolutionaryInferenceEngine', 'CSRInferenceGuard', Dict[str, Any]]:
     """
-    Load inference configuration from a checkpoint.
-
-    Extracts the inference_config metadata to auto-configure
-    the InferenceManager with correct parameters.
+    Convenience function to load all inference components.
 
     Args:
-        checkpoint_path: Path to checkpoint file
-        device: Device for loading (default "cpu" for metadata only)
+        checkpoint_path: Path to checkpoint
+        model_class: Model class to instantiate
+        model_kwargs: Model constructor arguments
+        device: Target device
 
     Returns:
-        InferenceConfig with training state hints
+        engine: Evolutionary inference engine
+        guard: CSR inference guard
+        info: Dict with loading info and warnings
     """
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    loader = InferenceCheckpointLoader(checkpoint_path, device)
 
-    if "inference_config" in checkpoint:
-        return InferenceConfig.from_dict(checkpoint["inference_config"])
+    # Load model
+    model = loader.load_model(model_class, model_kwargs)
 
-    # Fallback: try to infer from checkpoint structure
-    return _infer_config_from_checkpoint(checkpoint)
+    # Get lm_head if available
+    lm_head = getattr(model, 'lm_head', None)
+    embed_dim = getattr(model, 'embed_dim', 768)
 
-
-def _infer_config_from_checkpoint(checkpoint: Dict[str, Any]) -> InferenceConfig:
-    """
-    Infer inference configuration from legacy checkpoint format.
-
-    Attempts to detect training state from available checkpoint keys.
-
-    Args:
-        checkpoint: Loaded checkpoint dictionary
-
-    Returns:
-        Best-effort InferenceConfig
-    """
-    config = InferenceConfig()
-
-    # Check for DRC state
-    if "drc_state" in checkpoint:
-        drc = checkpoint["drc_state"]
-        config.training_state = drc.get("state", "authority")
-        config.evolution_stage = drc.get("current_stage_idx", 0)
-
-    # Check for evolutionary bridge (indicates karma training)
-    if "evolutionary_bridge" in checkpoint:
-        # Presence of bridge suggests full training
-        config.recommended_alpha = 0.12
-
-    # Check for metadata
-    if "metadata" in checkpoint:
-        meta = checkpoint["metadata"]
-        if "total_steps" in meta:
-            config.total_steps = meta["total_steps"]
-        if "final_loss" in meta:
-            config.final_loss = meta["final_loss"]
-
-    return config
-
-
-def load_model_with_config(
-    checkpoint_path: str,
-    model: nn.Module,
-    device: str = "cuda",
-    strict: bool = True,
-) -> Tuple[nn.Module, InferenceConfig]:
-    """
-    Load model weights and extract inference configuration.
-
-    Convenience function that loads model state and returns
-    the inference config for InferenceManager setup.
-
-    Args:
-        checkpoint_path: Path to checkpoint file
-        model: Model instance to load weights into
-        device: Device to load model onto
-        strict: Whether to require exact key matching
-
-    Returns:
-        (model, InferenceConfig) tuple
-    """
-    checkpoint = torch.load(checkpoint_path, map_location=device)
-
-    # Load model weights
-    if "model" in checkpoint:
-        model.load_state_dict(checkpoint["model"], strict=strict)
-    else:
-        # Try loading directly (old format)
-        model.load_state_dict(checkpoint, strict=strict)
-
-    model = model.to(device)
-
-    # Extract config
-    if "inference_config" in checkpoint:
-        config = InferenceConfig.from_dict(checkpoint["inference_config"])
-    else:
-        config = _infer_config_from_checkpoint(checkpoint)
-
-    return model, config
-
-
-def get_checkpoint_info(checkpoint_path: str) -> Dict[str, Any]:
-    """
-    Get summary information about a checkpoint without fully loading it.
-
-    Useful for checkpoint inspection and selection.
-
-    Args:
-        checkpoint_path: Path to checkpoint file
-
-    Returns:
-        Dict with checkpoint information
-    """
-    checkpoint = torch.load(checkpoint_path, map_location="cpu")
+    # Load components
+    engine = loader.load_evolutionary_engine(model)
+    guard = loader.load_csr_guard(lm_head, embed_dim)
 
     info = {
-        "path": str(checkpoint_path),
-        "keys": list(checkpoint.keys()),
-        "has_model": "model" in checkpoint,
-        "has_optimizer": "optimizer" in checkpoint,
-        "has_evolutionary_bridge": "evolutionary_bridge" in checkpoint,
-        "has_csr_components": "csr_components" in checkpoint,
-        "has_inference_config": "inference_config" in checkpoint,
+        'loaded_components': loader._loaded_components,
+        'warnings': loader.get_warnings(),
+        'training_step': loader.get_training_step(),
+        'summary': loader.get_loading_summary(),
     }
 
-    if "inference_config" in checkpoint:
-        config = InferenceConfig.from_dict(checkpoint["inference_config"])
-        info["inference_config"] = {
-            "split": config.authority_sensory_split,
-            "state": config.training_state,
-            "stage": config.evolution_stage,
-            "alpha": config.recommended_alpha,
-        }
+    return engine, guard, info
 
-    if "metadata" in checkpoint:
-        info["metadata"] = checkpoint["metadata"]
 
-    return info
+def save_inference_checkpoint(
+    checkpoint_path: Union[str, Path],
+    model: nn.Module,
+    evolutionary_bridge: Optional[nn.Module] = None,
+    csr_entropy_sink: Optional[nn.Module] = None,
+    csr_synthesis_gate: Optional[nn.Module] = None,
+    training_step: int = 0,
+    config: Optional[Any] = None,
+    inference_config: Optional[Dict] = None,
+) -> None:
+    """
+    Save checkpoint with inference components.
+
+    Args:
+        checkpoint_path: Save path
+        model: Model to save
+        evolutionary_bridge: Optional bridge module
+        csr_entropy_sink: Optional entropy sink
+        csr_synthesis_gate: Optional synthesis gate
+        training_step: Current training step
+        config: Training configuration
+        inference_config: Inference-specific configuration
+    """
+    checkpoint = {
+        'model': model.state_dict(),
+        'global_step': training_step,
+    }
+
+    if config is not None:
+        checkpoint['config'] = config
+
+    if inference_config is not None:
+        checkpoint['inference_config'] = inference_config
+
+    if evolutionary_bridge is not None:
+        checkpoint['evolutionary_bridge'] = evolutionary_bridge.state_dict()
+
+    if csr_entropy_sink is not None:
+        checkpoint['csr_entropy_sink'] = csr_entropy_sink.state_dict()
+
+    if csr_synthesis_gate is not None:
+        checkpoint['csr_synthesis_gate'] = csr_synthesis_gate.state_dict()
+
+    torch.save(checkpoint, checkpoint_path)

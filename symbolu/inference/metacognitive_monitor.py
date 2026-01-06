@@ -1,133 +1,114 @@
+#!/usr/bin/env python3
 """
-Inference Metacognition Module
-==============================
+Inference Metacognitive Monitor
+================================
 
-Real-time generation quality monitoring with actionable recommendations.
+Real-time generation quality monitoring during inference.
 
-This module implements the inference counterpart to the training-time
-MetacognitiveTracker (train_unified_llm.py:666-825), providing:
+Tracks coherence signals and can signal when generation should be:
+- Aborted (quality too low)
+- Restarted with different parameters
+- Continued normally
 
-1. Token-level entropy monitoring as confidence proxy
-2. Coherence trend detection
-3. Actionable recommendations (ABORT, BRAKE, RECOVER, etc.)
-4. Dynamic generation parameter adjustment
+Training Reference: MetacognitiveTracker in train_unified_llm.py:666-825
 
-The metacognitive system provides "Sovereign" agency over generation,
-allowing the model to self-regulate quality in real-time.
-
-Usage:
-------
-    from symbolu.inference import InferenceMetacognition
-
-    monitor = InferenceMetacognition(alarm_threshold=0.3)
-
-    for token in generation:
-        status = monitor.update(token_logits, token_prob)
-
-        if status['recommendation'] == 'ABORT':
-            break  # Stop generation
-
-        if status['recommendation'] == 'BRAKE':
-            temperature *= 0.8  # Reduce creativity
+Author: Sovereign-1 Training Initiative
+Date: January 2026
 """
-
-import math
-from typing import Dict, List, Optional, Tuple, Any
-from enum import Enum
-from collections import deque
 
 import torch
 import torch.nn.functional as F
+from typing import Dict, List, Optional, Tuple, Any
+from dataclasses import dataclass
+from enum import Enum
+import math
 
 
-class Recommendation(Enum):
-    """Metacognitive recommendations for generation control."""
-    ABORT = "ABORT"          # Critical failure - stop generation
-    BRAKE = "BRAKE"          # Rapid degradation - protect model
-    SLOW_DOWN = "SLOW_DOWN"  # Coherence alarm - reduce temperature
-    RECOVER = "RECOVER"      # Stagnation - increase temperature/randomness
-    ACCELERATE = "ACCELERATE"  # High quality - can push harder
-    STABILIZE = "STABILIZE"  # Declining trend - maintain current
-    CONTINUE = "CONTINUE"    # Default - no intervention needed
+class GenerationRecommendation(Enum):
+    """Recommendations for generation control."""
+    CONTINUE = "continue"
+    SLOW_DOWN = "slow_down"  # Reduce temperature
+    SPEED_UP = "speed_up"  # Increase temperature
+    ABORT = "abort"  # Stop generation
+    RESTART = "restart"  # Restart with different params
+    STABILIZE = "stabilize"  # Apply additional sampling constraints
+
+
+@dataclass
+class MetacognitiveConfig:
+    """Configuration for metacognitive monitoring."""
+    coherence_window: int = 10
+    alarm_threshold: float = 0.3
+    excellent_threshold: float = 0.8
+    consecutive_low_trigger: int = 3
+    consecutive_high_trigger: int = 5
+    entropy_weight: float = 0.6
+    repetition_weight: float = 0.4
 
 
 class InferenceMetacognition:
     """
     Real-time generation quality monitoring.
 
-    Tracks coherence signals and provides actionable recommendations
-    for generation control. Uses token entropy as a proxy for model
-    confidence, enabling quality monitoring without hidden state access.
+    Tracks coherence signals and can signal when generation
+    should be aborted, restarted, or parameters adjusted.
 
-    This bridges gap 2.1 from INFERENCE_HYBRID_TRANSFORMER_GAPS.md,
-    implementing the inference counterpart to MetacognitiveTracker.
+    Example:
+        monitor = InferenceMetacognition()
 
-    Args:
-        coherence_window: Number of tokens to track for trend analysis
-        alarm_threshold: Coherence threshold for alarm state (0-1)
-        abort_consecutive: Consecutive low-coherence tokens before ABORT
-        entropy_vocab_size: Vocabulary size for entropy normalization
+        for step in generation_loop:
+            logits = model(tokens)
+            meta = monitor.update(logits, hidden_state)
 
-    Attributes:
-        coherence_history: Recent coherence (confidence) values
-        entropy_history: Recent entropy values
-        recommendation: Current recommendation
+            if meta["recommendation"] == GenerationRecommendation.ABORT:
+                break
+
+            adjustments = monitor.get_generation_adjustment()
+            temperature *= adjustments.get("temperature_multiplier", 1.0)
     """
 
-    def __init__(
-        self,
-        coherence_window: int = 50,
-        alarm_threshold: float = 0.3,
-        abort_consecutive: int = 5,
-        entropy_vocab_size: int = 50257,
-    ):
-        self.coherence_window = coherence_window
-        self.alarm_threshold = alarm_threshold
-        self.abort_consecutive = abort_consecutive
-        self.max_entropy = math.log(entropy_vocab_size)
+    def __init__(self, config: Optional[MetacognitiveConfig] = None):
+        """
+        Initialize metacognitive monitor.
 
-        # Tracking buffers (using deque for efficient window management)
-        self.coherence_history: deque = deque(maxlen=coherence_window)
-        self.entropy_history: deque = deque(maxlen=coherence_window)
-        self.token_probs: deque = deque(maxlen=coherence_window)
+        Args:
+            config: Monitoring configuration
+        """
+        self.config = config or MetacognitiveConfig()
 
-        # Guna tracking (updated externally or computed from probs)
-        self.guna_history: deque = deque(maxlen=coherence_window)
-        self.current_gunas: Tuple[float, float, float] = (0.33, 0.33, 0.34)
+        # History tracking
+        self.coherence_history: List[float] = []
+        self.entropy_history: List[float] = []
+        self.hidden_state_history: List[torch.Tensor] = []
+        self.token_history: List[int] = []
 
-        # Alarm states
-        self.coherence_alarm = False
-        self.consecutive_low = 0
-
-        # Statistics
-        self.total_tokens = 0
+        # State
+        self.consecutive_low: int = 0
+        self.consecutive_high: int = 0
+        self.total_tokens: int = 0
+        self.alarm_triggered: bool = False
 
     def update(
         self,
         token_logits: torch.Tensor,
-        token_prob: Optional[float] = None,
         hidden_state: Optional[torch.Tensor] = None,
+        generated_token: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Update metacognitive state with new generation step.
 
         Computes:
-        - Entropy of token distribution (proxy for uncertainty)
-        - Coherence proxy from confidence (1 - normalized_entropy)
-        - Recommendation for generation control
+        - Entropy of token distribution (proxy for confidence)
+        - Optional: Hidden state coherence with previous
+        - Repetition tracking
 
         Args:
-            token_logits: Logits for current token [V] or [B, V]
-            token_prob: Probability of selected token (optional)
-            hidden_state: Hidden state for coherence (optional, advanced)
+            token_logits: [B, V] or [V] logits for next token
+            hidden_state: Optional [B, D] or [D] hidden state
+            generated_token: Optional generated token ID
 
         Returns:
-            Dict with:
-            - recommendation: Recommendation enum value
-            - coherence: Current coherence proxy
-            - entropy: Normalized entropy
-            - alarm: Whether alarm state is active
-            - adjustments: Suggested parameter adjustments
+            meta: Dict with recommendation, coherence, entropy, etc.
         """
         self.total_tokens += 1
 
@@ -136,211 +117,235 @@ class InferenceMetacognition:
             token_logits = token_logits[0]
 
         # Compute token entropy
-        probs = F.softmax(token_logits.float(), dim=-1)
+        probs = F.softmax(token_logits, dim=-1)
         entropy = -(probs * torch.log(probs + 1e-10)).sum().item()
 
-        # Normalize to [0, 1] range
-        normalized_entropy = min(1.0, entropy / self.max_entropy)
+        # Normalize entropy to [0, 1] (vocab size dependent)
+        vocab_size = token_logits.shape[-1]
+        max_entropy = math.log(vocab_size)
+        normalized_entropy = entropy / max_entropy
 
-        # Coherence proxy: higher confidence = higher coherence
-        # Low entropy (confident) → high coherence
-        coherence_proxy = 1.0 - normalized_entropy
-
-        # Track selected token probability if provided
-        if token_prob is not None:
-            self.token_probs.append(token_prob)
-
-        # Update histories
-        self.coherence_history.append(coherence_proxy)
         self.entropy_history.append(normalized_entropy)
 
-        # Check alarm conditions
-        self._update_alarm_state(coherence_proxy)
+        # Compute coherence proxy (lower entropy = higher confidence = higher coherence)
+        entropy_coherence = 1.0 - normalized_entropy
 
-        # Get recommendation
-        recommendation = self._get_recommendation()
+        # Track token for repetition
+        if generated_token is not None:
+            self.token_history.append(generated_token)
 
-        # Compute parameter adjustments
-        adjustments = self._get_generation_adjustments()
+        # Compute repetition penalty
+        repetition_score = self._compute_repetition_score()
 
-        return {
-            "recommendation": recommendation.value,
-            "coherence": coherence_proxy,
-            "entropy": normalized_entropy,
-            "alarm": self.coherence_alarm,
-            "consecutive_low": self.consecutive_low,
-            "adjustments": adjustments,
-            "total_tokens": self.total_tokens,
-        }
+        # Combined coherence
+        coherence = (
+            self.config.entropy_weight * entropy_coherence +
+            self.config.repetition_weight * (1.0 - repetition_score)
+        )
 
-    def _update_alarm_state(self, coherence: float):
-        """Update alarm state based on coherence."""
-        # Track consecutive low-coherence tokens
-        if coherence < self.alarm_threshold:
+        self.coherence_history.append(coherence)
+
+        # Track hidden state for cross-step coherence
+        if hidden_state is not None:
+            if hidden_state.dim() > 1:
+                hidden_state = hidden_state[0]
+            self.hidden_state_history.append(hidden_state.detach().cpu())
+            if len(self.hidden_state_history) > 10:
+                self.hidden_state_history.pop(0)
+
+        # Update consecutive counters
+        if coherence < self.config.alarm_threshold:
             self.consecutive_low += 1
+            self.consecutive_high = 0
+        elif coherence > self.config.excellent_threshold:
+            self.consecutive_high += 1
+            self.consecutive_low = 0
         else:
             self.consecutive_low = 0
+            self.consecutive_high = 0
 
-        # Check if recent average is below threshold
-        if len(self.coherence_history) >= 5:
-            recent_avg = sum(list(self.coherence_history)[-5:]) / 5
-            self.coherence_alarm = recent_avg < self.alarm_threshold
-        else:
-            self.coherence_alarm = coherence < self.alarm_threshold
+        # Determine recommendation
+        recommendation = self._get_recommendation()
 
-    def _get_recommendation(self) -> Recommendation:
+        return {
+            "recommendation": recommendation,
+            "coherence": coherence,
+            "entropy": normalized_entropy,
+            "repetition_score": repetition_score,
+            "consecutive_low": self.consecutive_low,
+            "consecutive_high": self.consecutive_high,
+            "alarm": self.alarm_triggered,
+        }
+
+    def _compute_repetition_score(self) -> float:
         """
-        Generate metacognitive recommendation based on current state.
+        Compute repetition score from recent tokens.
 
-        Recommendation Hierarchy (matching training MetacognitiveTracker):
-        - ABORT: Sustained critical failure (consecutive low coherence)
-        - BRAKE: Rapid degradation, protect the model
-        - SLOW_DOWN: Coherence alarm, reduce temperature
-        - RECOVER: High Tamas (stagnation), need perturbation
-        - ACCELERATE: High Sattva + improving, push forward
-        - STABILIZE: Declining trend, maintain course
-        - CONTINUE: Default state
+        Returns:
+            score: 0.0 (no repetition) to 1.0 (heavy repetition)
         """
-        # Get current Guna state
-        s, r, t = self.current_gunas
+        if len(self.token_history) < 3:
+            return 0.0
 
-        # Priority 0: ABORT - sustained critical failure
-        if self.consecutive_low >= self.abort_consecutive:
-            return Recommendation.ABORT
+        recent = self.token_history[-20:]
 
-        # Priority 1: BRAKE - rapid degradation
-        if self.coherence_alarm and len(self.coherence_history) >= 3:
-            history = list(self.coherence_history)
-            recent_trend = history[-1] - history[-3]
-            if recent_trend < -0.15:  # Rapid drop
-                return Recommendation.BRAKE
+        # Bigram repetition
+        bigrams = list(zip(recent[:-1], recent[1:]))
+        unique_bigrams = len(set(bigrams))
+        bigram_diversity = unique_bigrams / max(1, len(bigrams))
 
-        # Priority 2: SLOW_DOWN - coherence alarm (but not critical)
-        if self.coherence_alarm:
-            return Recommendation.SLOW_DOWN
+        # Single token repetition
+        unique_tokens = len(set(recent))
+        token_diversity = unique_tokens / len(recent)
 
-        # Priority 3: RECOVER - Tamas stagnation
-        if t > 0.5 and len(self.coherence_history) >= 10:
-            # Check if coherence has been flat (stagnation)
-            history = list(self.coherence_history)[-10:]
-            mean = sum(history) / len(history)
-            variance = sum((c - mean) ** 2 for c in history) / len(history)
-            std = variance ** 0.5
-            if std < 0.02:  # Very flat = stagnation
-                return Recommendation.RECOVER
+        # Combined (lower diversity = higher repetition)
+        repetition = 1.0 - (0.5 * bigram_diversity + 0.5 * token_diversity)
 
-        # Priority 4: Check for positive/negative trends
+        return repetition
+
+    def _get_recommendation(self) -> GenerationRecommendation:
+        """Get generation recommendation based on current state."""
+        # Check for abort condition
+        if self.consecutive_low >= self.config.consecutive_low_trigger:
+            self.alarm_triggered = True
+            return GenerationRecommendation.ABORT
+
+        # Check recent history for sustained low coherence
         if len(self.coherence_history) >= 5:
-            history = list(self.coherence_history)
-            trend = history[-1] - history[-5]
+            recent_avg = sum(self.coherence_history[-5:]) / 5
+            if recent_avg < self.config.alarm_threshold:
+                return GenerationRecommendation.SLOW_DOWN
 
-            # High Sattva + improving = ACCELERATE
-            if s > 0.4 and trend > 0.05:
-                return Recommendation.ACCELERATE
+        # Check for excellent performance
+        if self.consecutive_high >= self.config.consecutive_high_trigger:
+            return GenerationRecommendation.SPEED_UP
 
-            # Declining coherence = STABILIZE
-            if trend < -0.05:
-                return Recommendation.STABILIZE
+        # Check repetition
+        if len(self.token_history) >= 10:
+            rep_score = self._compute_repetition_score()
+            if rep_score > 0.7:
+                return GenerationRecommendation.STABILIZE
 
-        return Recommendation.CONTINUE
+        return GenerationRecommendation.CONTINUE
 
-    def _get_generation_adjustments(self) -> Dict[str, float]:
+    def get_generation_adjustment(self) -> Dict[str, float]:
         """
         Suggest generation parameter adjustments based on state.
 
-        Returns adjustments to temperature, top_p, etc.
+        Returns:
+            adjustments: Dict with temperature_multiplier, top_p_adjustment, etc.
         """
-        if len(self.coherence_history) < 3:
+        if not self.coherence_history:
             return {}
 
-        history = list(self.coherence_history)
-        avg_coherence = sum(history[-10:]) / min(10, len(history))
+        avg_coherence = sum(self.coherence_history[-10:]) / min(10, len(self.coherence_history))
+        recent_entropy = self.entropy_history[-1] if self.entropy_history else 0.5
 
         adjustments = {}
 
-        if avg_coherence < 0.3:
+        if avg_coherence < self.config.alarm_threshold:
             # Low coherence: reduce temperature for more deterministic outputs
             adjustments["temperature_multiplier"] = 0.7
             adjustments["top_p_adjustment"] = -0.1
-        elif avg_coherence < 0.5:
-            # Moderate coherence: slight reduction
-            adjustments["temperature_multiplier"] = 0.9
-            adjustments["top_p_adjustment"] = -0.05
-        elif avg_coherence > 0.8:
+            adjustments["reason"] = "low_coherence"
+
+        elif avg_coherence > self.config.excellent_threshold:
             # High coherence: can afford more creativity
             adjustments["temperature_multiplier"] = 1.1
             adjustments["top_p_adjustment"] = 0.05
+            adjustments["reason"] = "high_coherence"
+
+        elif recent_entropy > 0.8:
+            # Very high entropy: sharpen distribution
+            adjustments["temperature_multiplier"] = 0.8
+            adjustments["top_k_adjustment"] = -10
+            adjustments["reason"] = "high_entropy"
+
+        # Check for repetition issues
+        if len(self.token_history) >= 10:
+            rep_score = self._compute_repetition_score()
+            if rep_score > 0.5:
+                # Increase diversity
+                adjustments["temperature_multiplier"] = adjustments.get("temperature_multiplier", 1.0) * 1.1
+                adjustments["repetition_penalty"] = 1.2
+                adjustments["reason"] = adjustments.get("reason", "") + "_repetitive"
 
         return adjustments
 
-    def update_gunas(self, sattva: float, rajas: float, tamas: float):
+    def compute_hidden_coherence(self) -> float:
         """
-        Update Guna state from external tracker (InferenceGunas).
+        Compute coherence between recent hidden states.
 
-        Args:
-            sattva: Clarity/confidence (0-1)
-            rajas: Activity/variance (0-1)
-            tamas: Inertia/repetition (0-1)
+        Returns:
+            coherence: Average cosine similarity between consecutive states
         """
-        # Normalize to sum to 1
-        total = sattva + rajas + tamas
-        if total > 0:
-            self.current_gunas = (sattva / total, rajas / total, tamas / total)
-        self.guna_history.append(self.current_gunas)
+        if len(self.hidden_state_history) < 2:
+            return 1.0
 
-    def should_abort(self) -> bool:
-        """Quick check if generation should be aborted."""
-        return self.consecutive_low >= self.abort_consecutive
+        similarities = []
+        for i in range(1, len(self.hidden_state_history)):
+            prev = self.hidden_state_history[i - 1].view(1, -1)
+            curr = self.hidden_state_history[i].view(1, -1)
+            sim = F.cosine_similarity(prev, curr).item()
+            similarities.append(sim)
 
-    def should_intervene(self) -> bool:
-        """Check if any intervention is needed."""
-        rec = self._get_recommendation()
-        return rec not in (Recommendation.CONTINUE, Recommendation.ACCELERATE)
+        return sum(similarities) / len(similarities)
 
-    def get_status(self) -> str:
-        """Get formatted status string for logging."""
+    def get_status_line(self) -> str:
+        """
+        Get status line for monitoring display.
+
+        Returns:
+            status: Human-readable status string
+        """
         if not self.coherence_history:
-            return "Meta:--"
+            return "Metacog: no data"
 
-        rec = self._get_recommendation()
-        icons = {
-            Recommendation.ABORT: "🛑",
-            Recommendation.BRAKE: "⛔",
-            Recommendation.SLOW_DOWN: "🐢",
-            Recommendation.RECOVER: "🔄",
-            Recommendation.ACCELERATE: "🚀",
-            Recommendation.STABILIZE: "⚓",
-            Recommendation.CONTINUE: "➡️",
-        }
-        icon = icons.get(rec, "➡️")
-        coh = list(self.coherence_history)[-1]
+        avg_coherence = sum(self.coherence_history[-10:]) / min(10, len(self.coherence_history))
+        avg_entropy = sum(self.entropy_history[-10:]) / min(10, len(self.entropy_history))
 
-        return f"Meta:{rec.value[:4]}|c={coh:.2f}{icon}"
+        recommendation = self._get_recommendation()
 
-    def get_detailed_status(self) -> Dict[str, Any]:
-        """Get detailed metacognitive status for logging."""
-        s, r, t = self.current_gunas
-        history = list(self.coherence_history)
+        parts = [
+            f"Metacog",
+            f"Coh: {avg_coherence:.2f}",
+            f"Ent: {avg_entropy:.2f}",
+            f"Rec: {recommendation.value}",
+        ]
+
+        if self.alarm_triggered:
+            parts.append("ALARM!")
+
+        return " | ".join(parts)
+
+    def reset(self) -> None:
+        """Reset all tracking state."""
+        self.coherence_history = []
+        self.entropy_history = []
+        self.hidden_state_history = []
+        self.token_history = []
+        self.consecutive_low = 0
+        self.consecutive_high = 0
+        self.total_tokens = 0
+        self.alarm_triggered = False
+
+    def get_summary(self) -> Dict[str, Any]:
+        """
+        Get summary statistics for the generation session.
+
+        Returns:
+            summary: Dict with statistics
+        """
+        if not self.coherence_history:
+            return {"tokens": 0, "status": "no_data"}
 
         return {
-            "recommendation": self._get_recommendation().value,
-            "coherence_current": history[-1] if history else 0.0,
-            "coherence_mean": sum(history) / len(history) if history else 0.0,
-            "coherence_alarm": self.coherence_alarm,
-            "consecutive_low": self.consecutive_low,
-            "guna_sattva": s,
-            "guna_rajas": r,
-            "guna_tamas": t,
-            "total_tokens": self.total_tokens,
+            "tokens": self.total_tokens,
+            "avg_coherence": sum(self.coherence_history) / len(self.coherence_history),
+            "min_coherence": min(self.coherence_history),
+            "max_coherence": max(self.coherence_history),
+            "avg_entropy": sum(self.entropy_history) / len(self.entropy_history),
+            "alarm_triggered": self.alarm_triggered,
+            "final_recommendation": self._get_recommendation().value,
+            "repetition_score": self._compute_repetition_score(),
         }
-
-    def reset(self):
-        """Reset all tracking state for new generation."""
-        self.coherence_history.clear()
-        self.entropy_history.clear()
-        self.token_probs.clear()
-        self.guna_history.clear()
-        self.current_gunas = (0.33, 0.33, 0.34)
-        self.coherence_alarm = False
-        self.consecutive_low = 0
-        self.total_tokens = 0
