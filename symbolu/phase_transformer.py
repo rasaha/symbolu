@@ -1213,6 +1213,10 @@ class HybridAttentionLayer(nn.Module):
             backend=local_backend,
         )
 
+        # V9.6.11: Fix Double Dampening - use aux_scale=1.0 in hybrid mode
+        # Previously: aux_scale=0.1 (default) × w_phase=0.2 = 2% effective signal
+        # This caused phase attention gradients to be 40x smaller than local
+        # Fix: Full strength phase output, let alpha weights handle the mixing
         self.phase_attn = PhaseAttentionLayer(
             embed_dim=embed_dim,
             num_heads=num_heads,
@@ -1220,6 +1224,7 @@ class HybridAttentionLayer(nn.Module):
             sync_steps=sync_steps,
             sync_lr=sync_lr,
             temperature=temperature,  # Pass temperature for sharper attention
+            aux_scale=1.0,  # V9.6.11: Full strength (was 0.1 causing 2% effective signal)
         )
 
         self.norm = nn.LayerNorm(embed_dim)
