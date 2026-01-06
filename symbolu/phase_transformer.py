@@ -317,28 +317,16 @@ class PhaseAttentionLayer(nn.Module):
             # Original: infinite memory via cumsum
             global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
         else:
-            # Decay accumulation: S_t = γ * S_{t-1} + kv_t
-            # Vectorized: S_t = γ^t * cumsum(kv_j * γ^(-j))
-            # This gives: S_t = Σ_{j=0}^{t} γ^(t-j) * kv_j
-            device = kv_complex.device
-            dtype = kv_complex.dtype if kv_complex.dtype != torch.complex64 else torch.float32
-
-            # Position indices [0, 1, 2, ..., N-1]
-            positions = torch.arange(N, device=device, dtype=dtype)  # [N]
-
-            # Decay weights: γ^(-j) for scaling before cumsum, γ^t for scaling after
-            gamma_neg_j = (self.decay_gamma ** (-positions)).view(1, N, 1, 1)  # [1, N, 1, 1]
-            gamma_t = (self.decay_gamma ** positions).view(1, N, 1, 1)  # [1, N, 1, 1]
-
-            # Scale kv by γ^(-j), cumsum, then scale by γ^t
-            # Handle complex by applying to both real and imag
-            kv_real = kv_complex.real * gamma_neg_j  # [B, N, H, D_h]
-            kv_imag = kv_complex.imag * gamma_neg_j  # [B, N, H, D_h]
-
-            cumsum_real = torch.cumsum(kv_real, dim=1) * gamma_t
-            cumsum_imag = torch.cumsum(kv_imag, dim=1) * gamma_t
-
-            global_state = torch.complex(cumsum_real, cumsum_imag)  # [B, N, H, D_h]
+            # Stable decay accumulation: S_t = γ * S_{t-1} + kv_t
+            # Using loop for numerical stability (γ^(-j) overflows for large j)
+            B_size, N_size, H_size, D_size = kv_complex.shape
+            global_state = torch.zeros_like(kv_complex)
+            state = torch.zeros(B_size, 1, H_size, D_size,
+                              dtype=kv_complex.dtype, device=kv_complex.device)
+            gamma = self.decay_gamma
+            for t in range(N_size):
+                state = gamma * state + kv_complex[:, t:t+1, :, :]
+                global_state[:, t:t+1, :, :] = state
 
         # =====================================================================
         # 5. Readout: Synchronization via Q × State (NORMALIZED)
@@ -349,9 +337,15 @@ class PhaseAttentionLayer(nn.Module):
         if self.decay_gamma == 1.0:
             a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
         else:
-            # Reuse decay weights computed above
-            a_k_scaled = a_k * gamma_neg_j
-            a_k_cumsum = torch.cumsum(a_k_scaled, dim=1) * gamma_t
+            # Stable decay accumulation for normalizer
+            B_size, N_size, H_size, D_size = a_k.shape
+            a_k_cumsum = torch.zeros_like(a_k)
+            state_ak = torch.zeros(B_size, 1, H_size, D_size,
+                                   dtype=a_k.dtype, device=a_k.device)
+            gamma = self.decay_gamma
+            for t in range(N_size):
+                state_ak = gamma * state_ak + a_k[:, t:t+1, :, :]
+                a_k_cumsum[:, t:t+1, :, :] = state_ak
         normalizer = a_q * a_k_cumsum + 1e-6   # [B, N, H, D_h], always positive
 
         # V9.6.12: Cosine mode selection for interaction kernel
@@ -378,8 +372,16 @@ class PhaseAttentionLayer(nn.Module):
             if self.decay_gamma == 1.0:
                 av_state = torch.cumsum(a_k * v, dim=1)  # [B, N, H, D_h]
             else:
-                av_scaled = (a_k * v) * gamma_neg_j
-                av_state = torch.cumsum(av_scaled, dim=1) * gamma_t
+                # Stable decay accumulation for shifted mode
+                av_input = a_k * v
+                B_size, N_size, H_size, D_size = av_input.shape
+                av_state = torch.zeros_like(av_input)
+                state_av = torch.zeros(B_size, 1, H_size, D_size,
+                                       dtype=av_input.dtype, device=av_input.device)
+                gamma = self.decay_gamma
+                for t in range(N_size):
+                    state_av = gamma * state_av + av_input[:, t:t+1, :, :]
+                    av_state[:, t:t+1, :, :] = state_av
 
             # Combined: shift_term + cos_term
             shift_term = a_q * av_state           # a_q * Σ(a_k * v)
