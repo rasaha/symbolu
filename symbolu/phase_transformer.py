@@ -1329,6 +1329,9 @@ class PhaseTransformerBlock(nn.Module):
 
     def __init__(self, config: TransformerConfig):
         super().__init__()
+        # V9.6.11: Use aux_scale=1.0 for pure phase model
+        # In pure phase, there's no local attention to compete with
+        # The 0.1 default was designed for hybrid mode auxiliary integration
         self.attention = PhaseAttentionLayer(
             embed_dim=config.embed_dim,
             num_heads=config.num_heads,
@@ -1336,6 +1339,7 @@ class PhaseTransformerBlock(nn.Module):
             sync_steps=config.sync_steps,
             sync_lr=config.sync_lr,
             temperature=getattr(config, 'temperature', 1.0),  # Sharper attention for classification
+            aux_scale=1.0,  # V9.6.11: Full strength for pure phase model
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
