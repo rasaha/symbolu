@@ -1411,6 +1411,7 @@ class HybridTransformerBlock(nn.Module):
             alpha_phase=alpha_phase,
             local_backend=local_backend,
             temperature=getattr(config, 'temperature', 1.0),  # Sharper attention
+            cosine_mode=getattr(config, 'cosine_mode', 'standard'),  # V9.6.12
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -1539,6 +1540,7 @@ class PhaseTransformer(nn.Module):
         sync_lr: float = 0.1,
         temperature: float = 1.0,  # Lower = sharper attention (for classification)
         tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR to prevent embedding corruption
+        cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
     ):
         super().__init__()
 
@@ -1553,6 +1555,7 @@ class PhaseTransformer(nn.Module):
             sync_steps=sync_steps,
             sync_lr=sync_lr,
             temperature=temperature,  # Pass temperature for sharper attention
+            cosine_mode=cosine_mode,  # V9.6.12: Pass cosine mode to attention layers
         )
         self.config = config
         self.tie_embeddings = tie_embeddings
@@ -1801,6 +1804,7 @@ class HybridPhaseTransformer(nn.Module):
         alpha_phase: float = 0.2,  # Weight for phase attention in hybrid layers
         temperature: float = 1.0,  # Lower = sharper attention (for classification)
         tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR to prevent embedding corruption
+        cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
     ):
         super().__init__()
 
@@ -1815,6 +1819,7 @@ class HybridPhaseTransformer(nn.Module):
             sync_steps=sync_steps,
             sync_lr=sync_lr,
             temperature=temperature,  # Pass temperature for sharper attention
+            cosine_mode=cosine_mode,  # V9.6.12: Pass cosine mode to attention layers
         )
         self.config = config
         self.local_layers = local_layers

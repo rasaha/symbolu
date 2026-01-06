@@ -6450,7 +6450,9 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             sync_steps=config.sync_steps,
             sync_lr=config.sync_lr,
             tie_embeddings=tie_emb,
+            cosine_mode=config.cosine_mode,  # V9.6.12: Pass cosine mode
         )
+        print(f"  Phase Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
 
     elif config.model_type == "hybrid":
         # V9.6.0: Untie embeddings when CSR is enabled to prevent vocabulary corruption
@@ -6469,7 +6471,9 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             alpha_local=config.alpha_local,
             alpha_phase=config.alpha_phase,
             tie_embeddings=tie_emb,
+            cosine_mode=config.cosine_mode,  # V9.6.12: Pass cosine mode
         )
+        print(f"  Hybrid Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
 
     elif config.model_type == "gen2":
         if not GEN2_AVAILABLE:
