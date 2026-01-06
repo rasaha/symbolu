@@ -7484,6 +7484,8 @@ def train(config: UnifiedTrainingConfig):
                             model._csr_layer_logged = True
                             print(f"  ✅ [CSR V9.6.5] Using Layer {csr_layer_idx} for alignment (config: {config.csr_alignment_layer})")
                             print(f"     Hidden states available: {len(layer_hidden_states)} layers")
+                            print(f"  🛡️ [CSR V9.6.5] Gradient isolation ACTIVE - CSR is monitor-only")
+                            print(f"     Sanskrit alignment tracked but won't corrupt token embeddings")
 
                 if csr_hidden is not None:
                     # V9.5.4 DIMENSION FIX: Project CSR embeddings to match model hidden size
@@ -7503,7 +7505,16 @@ def train(config: UnifiedTrainingConfig):
                     # V9.5.5: Temperature-sharpened contrastive loss (InfoNCE-style)
                     # Dividing by tau amplifies gradient signal: tau=0.07 → 14x stronger gradients
                     # This makes Sanskrit phoneme ontology a mathematical CONSTRAINT, not a gentle suggestion
-                    csr_hidden_norm = torch.nn.functional.normalize(csr_hidden, dim=-1)
+                    #
+                    # V9.6.5 CRITICAL FIX: Detach csr_hidden to prevent gradient flow to embeddings!
+                    # Without detach, CSR gradients flow: csr_hidden → Layer 2 → Layer 1 → Layer 0 → token_embed
+                    # This corrupts the INPUT embeddings, causing "@ = <" garbage output.
+                    # With detach, CSR becomes a forward-only alignment signal - the model READS the Sanskrit
+                    # target but doesn't corrupt its own vocabulary trying to chase it.
+                    # Sovereign Loss and EvoFlow provide the actual ontological training signal.
+                    csr_hidden_detached = csr_hidden.detach()  # CRITICAL: Break gradient flow!
+
+                    csr_hidden_norm = torch.nn.functional.normalize(csr_hidden_detached, dim=-1)
                     csr_emb_norm = torch.nn.functional.normalize(csr_emb, dim=-1)
                     csr_similarity = (csr_hidden_norm * csr_emb_norm).sum(dim=-1)
                     # Temperature sharpening: (1 - sim) / tau creates steep gradient landscape
