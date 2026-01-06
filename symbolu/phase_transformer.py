@@ -201,7 +201,11 @@ class PhaseAttentionLayer(nn.Module):
         # =====================================================================
         # φ: learned phase angle per head
         # a: learned amplitude gate (how much this token participates)
-        phi = self.W_phase(x_norm)  # [B, N, H]
+        # V9.6.11: Scale phi by π to ensure meaningful phase range at initialization
+        # Without scaling, phi ≈ 0 for all tokens, leading to:
+        #   cos(φ_i - φ_j) ≈ 1 (uniform attention)
+        #   gradient ∝ sin(φ_i - φ_j) ≈ 0 (vanishing gradients!)
+        phi = self.W_phase(x_norm) * 3.14159  # [B, N, H], range ~[-π, π]
         a = torch.sigmoid(self.W_amp(x_norm))  # [B, N, H], range (0, 1)
 
         # =====================================================================
