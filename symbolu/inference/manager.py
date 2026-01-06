@@ -38,6 +38,7 @@ class InferenceMode(Enum):
     STANDARD = "standard"  # Karma + basic monitoring
     FULL = "full"  # All features enabled
     SAFE = "safe"  # Full + strict CSR enforcement
+    SOVEREIGN = "sovereign"  # Full metabolic loop with 3-way coherence
 
 
 @dataclass
@@ -160,6 +161,16 @@ class InferenceManager:
             self.config.enable_gunas = True
             self.config.enable_scoring = True
             self.config.abort_on_low_coherence = True
+
+        elif self.config.mode == InferenceMode.SOVEREIGN:
+            # Full metabolic loop with all cognitive components
+            self.config.enable_karma = True
+            self.config.enable_csr_guard = True
+            self.config.enable_metacognition = True
+            self.config.enable_gunas = True
+            self.config.enable_scoring = True
+            self.config.abort_on_low_coherence = True
+            self.config.auto_adjust_params = True
 
     @classmethod
     def from_checkpoint(
@@ -570,3 +581,409 @@ class InferenceManager:
 
         if 'evolutionary' in state and self.evolutionary_engine is not None:
             self.evolutionary_engine.load_state(state['evolutionary'])
+
+    @torch.no_grad()
+    def generate_full_sequence(
+        self,
+        prompt_ids: torch.Tensor,
+        max_tokens: int = 128,
+        base_temp: float = 0.7,
+        top_p: float = 0.9,
+        top_k: int = 50,
+        on_step_callback: Optional[callable] = None,
+    ) -> Dict[str, Any]:
+        """
+        Execute a complete metabolic generation sequence.
+
+        This is the SOVEREIGN-level orchestrator that connects discrete token
+        generation to the Metabolic Loop, ensuring every step is governed by
+        Guna state and Karma persistence.
+
+        The metabolic loop:
+        1. Initialize sequence with evolutionary seed (karma injection)
+        2. Generate tokens with Guna tracking and metacognitive adjustments
+        3. Apply CSR safety checks and temperature adaptation
+        4. Handle recommendations: BRAKE, RECOVER, ABORT
+        5. Harvest O12 state for next sequence karma
+        6. Compute 3-way toroidal coherence
+
+        Args:
+            prompt_ids: [B, T] input token IDs
+            max_tokens: Maximum tokens to generate
+            base_temp: Base sampling temperature
+            top_p: Nucleus sampling threshold
+            top_k: Top-k sampling
+            on_step_callback: Optional callback(step, step_result) per step
+
+        Returns:
+            result: Dict with:
+                - generated_ids: Full sequence including prompt
+                - text: Decoded text (if tokenizer available)
+                - gunas: Final (sattva, rajas, tamas) tuple
+                - recommendation: Final metacognitive recommendation
+                - coherence: 3-way toroidal coherence score
+                - coherence_details: Dict with birth, flow, evolution similarities
+                - aborted: Whether generation was aborted
+                - abort_reason: Reason for abort (if applicable)
+                - interventions: Number of CSR interventions
+                - karma_stored: Whether karma was stored for next sequence
+                - tokens_generated: Number of tokens generated
+                - temperature_history: List of effective temperatures used
+        """
+        # Ensure on correct device
+        prompt_ids = prompt_ids.to(self._device)
+        B = prompt_ids.size(0)
+
+        # Reset per-generation state
+        if self.metacognition is not None:
+            self.metacognition.reset()
+        if self.gunas is not None:
+            self.gunas.reset()
+        if self.csr_guard is not None:
+            self.csr_guard.reset_history()
+
+        # Track generation state
+        generated = prompt_ids.clone()
+        current_temp = base_temp
+        all_gunas = []
+        temperature_history = []
+        csr_interventions = 0
+        final_recommendation = "CONTINUE"
+        aborted = False
+        abort_reason = None
+
+        # === STEP 1: Initialize with Evolutionary Seed ===
+        # Inject karma from previous conversation into Layer 0
+        karma_injected = False
+        if (self.config.enable_karma and
+            self.evolutionary_engine is not None and
+            self.evolutionary_engine.karma_buffer is not None and
+            self.evolutionary_engine.bridge_enabled):
+            karma_injected = True
+
+        # === STEP 2: The Metabolic Generation Loop ===
+        for step in range(max_tokens):
+            # --- A. Forward Pass ---
+            # Request hidden states for O12 extraction
+            outputs = self.model(
+                generated,
+                extract_layers=[0, 11] if hasattr(self.model, 'forward') else None,
+            )
+
+            # Extract outputs
+            if isinstance(outputs, dict):
+                logits = outputs.get('logits', outputs.get('output'))
+                hidden_states = outputs.get('hidden_states')
+                last_hidden = outputs.get('last_hidden_state')
+            elif isinstance(outputs, tuple):
+                logits = outputs[0]
+                hidden_states = outputs[1] if len(outputs) > 1 else None
+                last_hidden = None
+            else:
+                logits = outputs
+                hidden_states = None
+                last_hidden = None
+
+            next_logits = logits[:, -1, :].clone()
+
+            # --- B. CSR Safety Check ---
+            if self.config.enable_csr_guard and self.csr_guard is not None:
+                # Get hidden state for CSR
+                if last_hidden is not None:
+                    hidden_for_csr = last_hidden[:, -1, :]
+                elif hidden_states is not None:
+                    h = hidden_states[-1] if isinstance(hidden_states, list) else hidden_states
+                    hidden_for_csr = h[:, -1, :] if h.dim() == 3 else h
+                else:
+                    hidden_for_csr = torch.zeros(B, self.model.embed_dim, device=self._device)
+
+                next_logits, csr_info = self.csr_guard.check_and_gate(
+                    hidden_for_csr,
+                    next_logits,
+                )
+                if csr_info.get('intervention', False):
+                    csr_interventions += 1
+
+            # --- C. Metacognitive Monitoring ---
+            recommendation = "CONTINUE"
+            if self.metacognition is not None:
+                meta_result = self.metacognition.update(
+                    next_logits,
+                    hidden_states[-1] if hidden_states and isinstance(hidden_states, list) else hidden_states,
+                    token_id=None,  # Not yet sampled
+                )
+                recommendation = meta_result.get('recommendation', GenerationRecommendation.CONTINUE)
+                if isinstance(recommendation, GenerationRecommendation):
+                    recommendation = recommendation.name
+                final_recommendation = recommendation
+
+            # --- D. Metacognitive Adjustment ---
+            if recommendation == "BRAKE":
+                current_temp *= 0.8  # Sharpen focus to reduce entropy
+            elif recommendation == "RECOVER":
+                current_temp = min(base_temp, current_temp * 1.2)  # Allow creative flow
+            elif recommendation == "ABORT":
+                aborted = True
+                abort_reason = "coherence_collapse"
+                break
+
+            # --- E. Guna-based Temperature Adjustment ---
+            effective_temp = current_temp
+            if self.gunas is not None:
+                effective_temp = self.gunas.get_temperature_modifier(current_temp)
+            temperature_history.append(effective_temp)
+
+            # --- F. Layer-aware Temperature (9:3 Split) ---
+            # Sensory layers get sharper temperature (0.9x)
+            # This is applied implicitly through the model's attention mechanism
+            # but we can apply an additional adjustment here
+            if self.layer_config is not None:
+                # Get layer-adjusted temperature for final layers
+                layer_temp_mult = self.layer_config.get_temperature_multiplier(layer_idx=11)
+                effective_temp *= layer_temp_mult
+
+            # --- G. Sampling ---
+            # Apply temperature
+            next_logits = next_logits / max(effective_temp, 1e-8)
+
+            # Top-k filtering
+            if top_k > 0:
+                top_k_values = torch.topk(next_logits, min(top_k, next_logits.size(-1)))[0]
+                threshold = top_k_values[:, -1].unsqueeze(-1)
+                next_logits = torch.where(
+                    next_logits < threshold,
+                    torch.full_like(next_logits, float('-inf')),
+                    next_logits,
+                )
+
+            # Top-p (nucleus) filtering
+            if top_p < 1.0:
+                sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
+                cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+                sorted_indices_to_remove = cumulative_probs > top_p
+                sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+                sorted_indices_to_remove[:, 0] = False
+                indices_to_remove = sorted_indices_to_remove.scatter(
+                    -1, sorted_indices, sorted_indices_to_remove
+                )
+                next_logits[indices_to_remove] = float('-inf')
+
+            # Sample token
+            probs = F.softmax(next_logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+            next_token_prob = probs.gather(-1, next_token).item()
+
+            # --- H. Update Guna State ---
+            if self.gunas is not None:
+                s, r, t = self.gunas.update(next_token.item(), next_token_prob)
+                all_gunas.append((s, r, t))
+
+            # --- I. Sequence Update ---
+            generated = torch.cat((generated, next_token), dim=1)
+
+            # Step callback
+            if on_step_callback is not None:
+                step_result = {
+                    'step': step,
+                    'token_id': next_token.item(),
+                    'prob': next_token_prob,
+                    'temperature': effective_temp,
+                    'recommendation': recommendation,
+                    'gunas': all_gunas[-1] if all_gunas else None,
+                }
+                on_step_callback(step, step_result)
+
+            # --- J. Stop Condition ---
+            eos_token_id = getattr(self.tokenizer, 'eos_token_id', 2) if self.tokenizer else 2
+            if next_token.item() == eos_token_id:
+                break
+
+        # === STEP 3: Final Harvest (Toroidal Bridge) ===
+        # Extract O1 and O12 states for coherence and karma
+        coherence = 0.0
+        coherence_details = {}
+        karma_stored = False
+
+        if self.evolutionary_engine is not None and self.evolutionary_engine.bridge_enabled:
+            # Get final hidden states
+            final_outputs = self.model(generated, extract_layers=[0, 11])
+            if isinstance(final_outputs, dict) and 'hidden_states' in final_outputs:
+                final_hidden_states = final_outputs['hidden_states']
+
+                # Extract O1 (layer 0) and O12 (layer 11)
+                if len(final_hidden_states) >= 2:
+                    o1_hidden = final_hidden_states[0]  # Layer 0
+                    o12_hidden = final_hidden_states[-1]  # Layer 11
+
+                    # Mean pool over sequence dimension
+                    o1_pooled = o1_hidden.mean(dim=1) if o1_hidden.dim() == 3 else o1_hidden
+                    o12_pooled = o12_hidden.mean(dim=1) if o12_hidden.dim() == 3 else o12_hidden
+
+                    # Compute 3-way toroidal coherence
+                    coherence, coherence_details = self._compute_3way_coherence(
+                        o1_pooled, o12_pooled
+                    )
+
+                    # Store new karma (harvest O12 for next sequence)
+                    new_karma = self.evolutionary_engine.bridge.compute_seed(o12_pooled)
+                    self.evolutionary_engine.karma_buffer = (
+                        new_karma * self.evolutionary_engine.config.karma_decay
+                    )
+                    self.evolutionary_engine.karma_age += 1
+                    karma_stored = True
+
+        # === STEP 4: Build Result ===
+        tokens_generated = generated.size(1) - prompt_ids.size(1)
+        self._generation_count += 1
+        self._total_tokens_generated += tokens_generated
+
+        # Final Guna state
+        final_gunas = all_gunas[-1] if all_gunas else (0.33, 0.33, 0.34)
+
+        # Decode text if tokenizer available
+        generated_text = ""
+        if self.tokenizer is not None:
+            generated_token_ids = generated[0, prompt_ids.size(1):].tolist()
+            generated_text = self.tokenizer.decode(generated_token_ids, skip_special_tokens=True)
+
+        # Sovereign score if available
+        sovereign_score = None
+        sovereign_info = {}
+        if self.scorer is not None:
+            try:
+                sovereign_score, sovereign_info = self.scorer.score_generation_simple(
+                    gunas=final_gunas,
+                    coherence=coherence,
+                )
+            except Exception:
+                pass
+
+        return {
+            # Core outputs
+            'generated_ids': generated,
+            'text': generated_text,
+
+            # Cognitive state
+            'gunas': final_gunas,
+            'recommendation': final_recommendation,
+
+            # Toroidal coherence
+            'coherence': coherence,
+            'coherence_details': coherence_details,
+
+            # Generation status
+            'aborted': aborted,
+            'abort_reason': abort_reason,
+            'interventions': csr_interventions,
+            'karma_stored': karma_stored,
+            'karma_injected': karma_injected,
+            'tokens_generated': tokens_generated,
+            'temperature_history': temperature_history,
+
+            # Sovereign alignment (if available)
+            'sovereign_score': sovereign_score,
+            'sovereign_info': sovereign_info,
+        }
+
+    def _compute_3way_coherence(
+        self,
+        o1_hidden: torch.Tensor,
+        o12_hidden: torch.Tensor,
+    ) -> Tuple[float, Dict[str, float]]:
+        """
+        Compute 3-way toroidal coherence between Seed, O1, and O12.
+
+        The 3-way coherence measures:
+        1. Birth Similarity: Seed <-> O1 (karma injection effectiveness)
+        2. Flow Similarity: O1 <-> O12 (internal coherence)
+        3. Evolution Similarity: Seed <-> O12 (loop closure)
+
+        Args:
+            o1_hidden: [B, D] mean-pooled O1 hidden state
+            o12_hidden: [B, D] mean-pooled O12 hidden state
+
+        Returns:
+            coherence: Combined coherence score [0, 1]
+            details: Dict with individual similarity scores
+        """
+        if self.evolutionary_engine is None or self.evolutionary_engine.karma_buffer is None:
+            # No seed available, compute 2-way coherence
+            flow_sim = F.cosine_similarity(
+                o1_hidden.view(1, -1),
+                o12_hidden.view(1, -1),
+            ).item()
+            flow_sim = (flow_sim + 1) / 2  # Map to [0, 1]
+
+            return flow_sim, {
+                'birth_similarity': 0.0,
+                'flow_similarity': flow_sim,
+                'evolution_similarity': 0.0,
+                '3way': False,
+            }
+
+        seed = self.evolutionary_engine.karma_buffer
+
+        # Flatten for cosine similarity
+        seed_flat = seed.view(1, -1)
+        o1_flat = o1_hidden.view(1, -1)
+        o12_flat = o12_hidden.view(1, -1)
+
+        # Compute 3 similarities
+        birth_sim = F.cosine_similarity(seed_flat, o1_flat).item()
+        flow_sim = F.cosine_similarity(o1_flat, o12_flat).item()
+        evolution_sim = F.cosine_similarity(seed_flat, o12_flat).item()
+
+        # Map from [-1, 1] to [0, 1]
+        birth_sim = (birth_sim + 1) / 2
+        flow_sim = (flow_sim + 1) / 2
+        evolution_sim = (evolution_sim + 1) / 2
+
+        # Combined coherence (geometric mean for balance)
+        combined = (birth_sim * flow_sim * evolution_sim) ** (1/3)
+
+        return combined, {
+            'birth_similarity': birth_sim,
+            'flow_similarity': flow_sim,
+            'evolution_similarity': evolution_sim,
+            '3way': True,
+        }
+
+    def get_cognitive_status_line(self) -> str:
+        """
+        Get comprehensive cognitive status line for Sovereign mode.
+
+        Format: [SOVEREIGN] Karma:0.75(strong)|avg:0.72 | Guna:S|s=0.45|r=0.30|t=0.25 | Meta:CONT|c=0.68
+
+        Returns:
+            status: Formatted status line
+        """
+        parts = [f"[{self.config.mode.value.upper()}]"]
+
+        # Karma status
+        if self.evolutionary_engine is not None and self.evolutionary_engine.bridge_enabled:
+            coh = self.evolutionary_engine.compute_generation_coherence()
+            strength = "strong" if coh > 0.7 else "weak" if coh < 0.3 else "medium"
+            avg_coh = (
+                sum(self.evolutionary_engine.coherence_history[-5:]) /
+                len(self.evolutionary_engine.coherence_history[-5:])
+                if self.evolutionary_engine.coherence_history else 0.0
+            )
+            parts.append(f"Karma:{coh:.2f}({strength})|avg:{avg_coh:.2f}")
+
+        # Guna status
+        if self.gunas is not None:
+            s, r, t = self.gunas.sattva, self.gunas.rajas, self.gunas.tamas
+            dominant = "S" if s >= r and s >= t else "R" if r >= t else "T"
+            parts.append(f"Guna:{dominant}|s={s:.2f}|r={r:.2f}|t={t:.2f}")
+
+        # Metacognition status
+        if self.metacognition is not None:
+            rec = self.metacognition.get_current_recommendation()
+            if isinstance(rec, GenerationRecommendation):
+                rec = rec.name[:4]
+            coh = self.metacognition.get_current_coherence()
+            trend = self.metacognition.get_coherence_trend()
+            trend_symbol = "📈" if trend > 0.02 else "📉" if trend < -0.02 else "➡️"
+            parts.append(f"Meta:{rec}|c={coh:.2f}{trend_symbol}")
+
+        return " | ".join(parts)
