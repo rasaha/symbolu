@@ -1,474 +1,417 @@
+#!/usr/bin/env python3
 """
-Sovereign Inference Scorer Module
-=================================
+Sovereign Inference Scorer
+===========================
 
 Compute Sovereign-1 style signals during inference for quality scoring.
 
-This module implements ontological alignment scoring using:
-- The SOVEREIGN_R_MATRIX: 5 Vṛttis × 12 Layers target distribution
-- Learned Vṛtti projectors: Map d_model hidden → 5D Vṛtti space
-- Per-layer alignment scores against R-Matrix targets
+Not used for loss/backprop, but for:
+1. Scoring generated sequences
+2. Detecting quality degradation
+3. Providing interpretable quality metrics
 
-The scorer provides interpretable quality metrics without backpropagation,
-enabling:
-1. Scoring generated sequences for ontological alignment
-2. Detecting quality degradation during generation
-3. Providing human-readable cognitive state interpretation
+Training Reference: Sovereign loss in symbolu/sovereign/loss.py and
+train_unified_llm.py:6690-6703
 
-Vṛtti Categories:
-- Pramāṇa (प्रमाण): Valid cognition, truth-bearing
-- Vikalpa (विकल्प): Conceptual construction, imagination
-- Viparyaya (विपर्यय): Misconception, error
-- Nidrā (निद्रा): Sleep/dormancy, latent state
-- Smṛti (स्मृति): Memory, recollection
-
-Usage:
-------
-    from symbolu.inference import SovereignInferenceScorer
-
-    scorer = SovereignInferenceScorer(dim=768)
-    scorer.load_projectors(checkpoint)  # Load trained Vṛtti heads
-
-    # Score a generation
-    scores = scorer.score_sequence(
-        hidden_states={0: h0, 5: h5, 11: h11},
-        generated_tokens=token_ids,
-        gunas=(sattva, rajas, tamas),
-    )
-
-    print(f"Ontological alignment: {scores['ontological_alignment']:.3f}")
-    print(f"Coherence: {scores['coherence_score']:.3f}")
+Author: Sovereign-1 Training Initiative
+Date: January 2026
 """
 
-import math
-from typing import Dict, List, Tuple, Optional, Any
-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from typing import Dict, List, Optional, Tuple, Any
+from dataclasses import dataclass
+import math
 
 
-# =============================================================================
-# SOVEREIGN R-MATRIX (From train_unified_llm.py:214-222)
-# =============================================================================
-
-# Target Vṛtti distribution per ontological layer
-# Shape: [5 Vṛttis, 12 Layers]
+# Sovereign R-Matrix: Maps ontological layers to Vritti states
+# Each column represents target Vritti weights for that layer
 SOVEREIGN_R_MATRIX = torch.tensor([
-    # O1    O2    O3    O4    O5    O6    O7    O8    O9   O10   O11   O12
-    # POT  IDEN  EXEC  STRC  COGN  AGEN  REAS  PURP  WITN  UNIF  INTG  ABSL
-    [0.1, 0.5, 0.7, 0.7, 0.8, 0.6, 0.9, 0.8, 0.6, 0.7, 0.5, 0.9],  # Pramāṇa
-    [0.1, 0.2, 0.2, 0.4, 0.4, 0.4, 0.1, 0.1, 0.2, 0.2, 0.2, 0.3],  # Vikalpa
-    [0.1, 0.2, 0.4, 0.4, 0.2, 0.3, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0],  # Viparyaya
-    [0.7, 0.1, 0.1, 0.3, 0.1, 0.1, 0.0, 0.0, 0.3, 0.3, 0.4, 0.1],  # Nidrā
-    [0.1, 0.1, 0.3, 0.3, 0.2, 0.2, 0.1, 0.0, 0.2, 0.2, 0.2, 0.8],  # Smṛti
+    # O1    O2    O3    O4    O5    O6    O7    O8    O9    O10   O11   O12
+    [1.0,  0.8,  0.5,  0.3,  0.2,  0.1,  0.1,  0.1,  0.1,  0.1,  0.1,  0.1],  # Pramana (Valid cognition)
+    [0.1,  0.3,  0.8,  0.9,  0.7,  0.5,  0.3,  0.2,  0.1,  0.1,  0.1,  0.1],  # Viparyaya (Misconception)
+    [0.1,  0.2,  0.3,  0.5,  0.7,  0.8,  0.7,  0.5,  0.3,  0.2,  0.1,  0.1],  # Vikalpa (Conceptualization)
+    [0.1,  0.1,  0.1,  0.2,  0.3,  0.5,  0.7,  0.8,  0.9,  0.8,  0.5,  0.3],  # Nidra (Sleep/Rest)
+    [0.1,  0.1,  0.1,  0.1,  0.2,  0.3,  0.5,  0.7,  0.8,  0.9,  0.9,  0.8],  # Smriti (Memory)
 ], dtype=torch.float32)
 
-# Vṛtti names for interpretation
-VRTTI_NAMES = ["Pramāṇa", "Vikalpa", "Viparyaya", "Nidrā", "Smṛti"]
 
-# Layer names for interpretation
-LAYER_NAMES = [
-    "O1_POTENTIAL", "O2_IDENTITY", "O3_EXECUTION", "O4_STRUCTURE",
-    "O5_COGNITION", "O6_AGENCY", "O7_REASONING", "O8_PURPOSE",
-    "O9_WITNESSES", "O10_UNIFYING", "O11_INTEGRATION", "O12_ABSOLVING",
-]
-
-
-class VrttiProjector(nn.Module):
-    """
-    Learned projector from hidden state to 5D Vṛtti space.
-
-    Maps d_model → 5 dimensions corresponding to the five Vṛttis.
-    Each output dimension represents activation of that Vṛtti.
-
-    Args:
-        dim: Input hidden dimension (d_model)
-        num_vrttis: Number of Vṛtti categories (default 5)
-    """
-
-    def __init__(self, dim: int, num_vrttis: int = 5):
-        super().__init__()
-        self.dim = dim
-        self.num_vrttis = num_vrttis
-
-        # Two-layer projection for expressiveness
-        self.proj = nn.Sequential(
-            nn.Linear(dim, dim // 4),
-            nn.GELU(),
-            nn.Linear(dim // 4, num_vrttis),
-        )
-
-    def forward(self, hidden_state: torch.Tensor) -> torch.Tensor:
-        """
-        Project hidden state to Vṛtti activations.
-
-        Args:
-            hidden_state: [B, D] or [B, N, D]
-
-        Returns:
-            vrtti_activations: [B, 5] or [B, N, 5] (softmax normalized)
-        """
-        logits = self.proj(hidden_state)
-        return F.softmax(logits, dim=-1)
+@dataclass
+class SovereignScorerConfig:
+    """Configuration for Sovereign scoring."""
+    guna_weight: float = 0.3
+    ontology_weight: float = 0.4
+    coherence_weight: float = 0.3
+    vritti_threshold: float = 0.5
+    enable_r_matrix: bool = True
 
 
 class SovereignInferenceScorer:
     """
-    Compute Sovereign-1 signals during inference for quality scoring.
+    Compute Sovereign-1 style signals during inference for quality scoring.
 
-    This provides interpretable quality metrics based on:
-    - Vṛtti alignment with R-Matrix targets per layer
-    - Guna balance (Sattva/Rajas/Tamas)
-    - Token-level coherence (bigram uniqueness)
+    Provides interpretable quality scores:
+    - guna_balance: How well Sattva/Rajas/Tamas are balanced
+    - ontological_alignment: How well hidden states align with R-Matrix targets
+    - coherence_score: Cross-layer and sequence coherence
 
-    Addresses gap 2.4 from INFERENCE_HYBRID_TRANSFORMER_GAPS.md.
+    Example:
+        scorer = SovereignInferenceScorer()
 
-    Args:
-        dim: Model hidden dimension
-        num_vrttis: Number of Vṛtti categories (default 5)
-        num_layers: Number of ontological layers (default 12)
-        device: Torch device
-
-    Attributes:
-        r_matrix: Sovereign R-Matrix [5, 12]
-        vrtti_projectors: Per-layer Vṛtti projection heads
+        # Score a generation
+        scores = scorer.score_sequence(hidden_states, generated_tokens)
+        print(f"Ontological alignment: {scores['ontological_alignment']:.2f}")
+        print(f"Quality grade: {scores['quality_grade']}")
     """
 
-    def __init__(
-        self,
-        dim: int,
-        num_vrttis: int = 5,
-        num_layers: int = 12,
-        device: Optional[torch.device] = None,
-    ):
-        self.dim = dim
-        self.num_vrttis = num_vrttis
-        self.num_layers = num_layers
-        self.device = device or torch.device('cpu')
-
-        # R-Matrix on device
-        self.r_matrix = SOVEREIGN_R_MATRIX.to(self.device)
-
-        # Per-layer Vṛtti projectors
-        # In a full implementation, each layer could have its own projector
-        # For simplicity, we use a shared projector with layer embedding
-        self.vrtti_projector = VrttiProjector(dim, num_vrttis).to(self.device)
-
-        # Layer embedding to condition the projector
-        self.layer_embedding = nn.Embedding(num_layers, dim // 4).to(self.device)
-
-        # Statistics
-        self.scored_sequences = 0
-
-    def to(self, device: torch.device) -> 'SovereignInferenceScorer':
-        """Move scorer to device."""
-        self.device = device
-        self.r_matrix = self.r_matrix.to(device)
-        self.vrtti_projector = self.vrtti_projector.to(device)
-        self.layer_embedding = self.layer_embedding.to(device)
-        return self
-
-    def load_projectors(self, checkpoint: Dict[str, Any], prefix: str = "sovereign_"):
+    def __init__(self, config: Optional[SovereignScorerConfig] = None):
         """
-        Load trained Vṛtti projector weights from checkpoint.
+        Initialize Sovereign scorer.
 
         Args:
-            checkpoint: Training checkpoint dict
-            prefix: Key prefix for sovereign weights
+            config: Scoring configuration
         """
-        # Try to find projector weights
-        proj_keys = [k for k in checkpoint.keys() if "vrtti_proj" in k.lower()]
-        if proj_keys:
-            proj_state = {
-                k.replace(f"{prefix}vrtti_projector.", ""): v
-                for k, v in checkpoint.items()
-                if k.startswith(f"{prefix}vrtti_projector.")
-            }
-            if proj_state:
-                self.vrtti_projector.load_state_dict(proj_state, strict=False)
+        self.config = config or SovereignScorerConfig()
+        self.r_matrix = SOVEREIGN_R_MATRIX
 
-    def compute_vrtti_distribution(
-        self,
-        hidden_state: torch.Tensor,
-        layer_idx: int,
-    ) -> torch.Tensor:
-        """
-        Compute Vṛtti distribution for a hidden state at given layer.
-
-        Args:
-            hidden_state: Hidden state [B, D] or [B, N, D]
-            layer_idx: Ontological layer index (0-11)
-
-        Returns:
-            vrtti_dist: Vṛtti distribution [B, 5] or [B, N, 5]
-        """
-        # Get layer embedding
-        layer_emb = self.layer_embedding(
-            torch.tensor([layer_idx], device=self.device)
-        )  # [1, dim//4]
-
-        # For now, we don't condition on layer (would need architectural changes)
-        # Just use the base projector
-        vrtti_dist = self.vrtti_projector(hidden_state)
-
-        return vrtti_dist
-
-    def compute_layer_alignment(
-        self,
-        hidden_state: torch.Tensor,
-        layer_idx: int,
-    ) -> Tuple[float, Dict[str, float]]:
-        """
-        Compute alignment between hidden state and R-Matrix target for layer.
-
-        Args:
-            hidden_state: Hidden state [B, D] or [B, N, D]
-            layer_idx: Ontological layer index (0-11)
-
-        Returns:
-            alignment: Overall alignment score [0, 1]
-            vrtti_scores: Per-Vṛtti alignment scores
-        """
-        # Get predicted Vṛtti distribution
-        vrtti_pred = self.compute_vrtti_distribution(hidden_state, layer_idx)
-
-        # Average over batch and sequence if needed
-        if vrtti_pred.dim() == 3:
-            vrtti_pred = vrtti_pred.mean(dim=(0, 1))  # [5]
-        elif vrtti_pred.dim() == 2:
-            vrtti_pred = vrtti_pred.mean(dim=0)  # [5]
-
-        # Get target distribution from R-Matrix
-        vrtti_target = self.r_matrix[:, layer_idx]  # [5]
-
-        # Normalize target to probability distribution
-        vrtti_target = vrtti_target / vrtti_target.sum()
-
-        # Compute cosine similarity as alignment
-        alignment = F.cosine_similarity(
-            vrtti_pred.unsqueeze(0),
-            vrtti_target.unsqueeze(0),
-            dim=1,
-        ).item()
-
-        # Map from [-1, 1] to [0, 1]
-        alignment = (alignment + 1) / 2
-
-        # Per-Vṛtti scores
-        vrtti_scores = {}
-        for i, name in enumerate(VRTTI_NAMES):
-            # How close is predicted to target for this Vṛtti
-            diff = abs(vrtti_pred[i].item() - vrtti_target[i].item())
-            vrtti_scores[name] = 1.0 - min(1.0, diff * 2)
-
-        return alignment, vrtti_scores
-
-    def score_step(
-        self,
-        layer_states: Dict[int, torch.Tensor],
-        gunas: Tuple[float, float, float],
-    ) -> Dict[str, float]:
-        """
-        Score a single generation step using layer states and Gunas.
-
-        Args:
-            layer_states: Dict mapping layer_idx -> hidden state
-            gunas: (sattva, rajas, tamas) tuple
-
-        Returns:
-            scores: Dict with guna_balance, ontological_alignment, etc.
-        """
-        scores = {}
-        s, r, t = gunas
-
-        # Guna balance: higher Sattva relative to Rajas+Tamas is better
-        scores['guna_balance'] = s / (r + t + 1e-6)
-        scores['sattva'] = s
-        scores['rajas'] = r
-        scores['tamas'] = t
-
-        # Ontological alignment across available layers
-        if layer_states:
-            alignments = []
-            vrtti_details = {}
-
-            for layer_idx, state in layer_states.items():
-                if layer_idx < self.num_layers:
-                    alignment, vrtti_scores = self.compute_layer_alignment(
-                        state, layer_idx
-                    )
-                    alignments.append(alignment)
-                    vrtti_details[LAYER_NAMES[layer_idx]] = vrtti_scores
-
-            if alignments:
-                scores['ontological_alignment'] = sum(alignments) / len(alignments)
-                scores['layer_alignments'] = {
-                    LAYER_NAMES[idx]: alignments[i]
-                    for i, idx in enumerate(sorted(layer_states.keys()))
-                    if idx < self.num_layers
-                }
-
-        # Coherence from Tamas (low Tamas = high coherence)
-        scores['coherence_proxy'] = 1.0 - t
-
-        return scores
+        # Scoring history
+        self.score_history: List[Dict[str, float]] = []
 
     def score_sequence(
         self,
-        hidden_states: Dict[int, torch.Tensor],
-        generated_tokens: torch.Tensor,
+        hidden_states: Optional[List[torch.Tensor]] = None,
+        generated_tokens: Optional[torch.Tensor] = None,
         gunas: Optional[Tuple[float, float, float]] = None,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, float]:
         """
-        Score a complete generated sequence.
+        Score a generated sequence using Sovereign-1 metrics.
 
         Args:
-            hidden_states: Dict mapping layer_idx -> hidden state
-            generated_tokens: Generated token IDs [N] or [B, N]
-            gunas: Optional final Guna state
+            hidden_states: List of [B, T, D] or [B, D] hidden states per layer
+            generated_tokens: [T] or [B, T] generated token IDs
+            gunas: Optional (sattva, rajas, tamas) tuple
 
         Returns:
-            scores: Comprehensive quality scores
+            scores: Dict with interpretable quality scores
         """
-        self.scored_sequences += 1
+        scores = {}
 
-        scores = {
-            'sequence_id': self.scored_sequences,
-        }
-
-        # Token-level coherence: unique bigram ratio
-        if generated_tokens.numel() > 1:
-            tokens = generated_tokens.flatten().tolist()
-
-            # Unigram uniqueness
-            unique_unigrams = len(set(tokens))
-            scores['unigram_ratio'] = unique_unigrams / len(tokens)
-
-            # Bigram uniqueness
-            if len(tokens) >= 2:
-                bigrams = list(zip(tokens[:-1], tokens[1:]))
-                unique_bigrams = len(set(bigrams))
-                scores['bigram_ratio'] = unique_bigrams / len(bigrams)
-                scores['coherence_score'] = scores['bigram_ratio']
-            else:
-                scores['coherence_score'] = 1.0
-
-        # Ontological alignment
-        if hidden_states:
-            alignments = []
-            for layer_idx, state in hidden_states.items():
-                if layer_idx < self.num_layers:
-                    alignment, _ = self.compute_layer_alignment(state, layer_idx)
-                    alignments.append(alignment)
-
-            if alignments:
-                scores['ontological_alignment'] = sum(alignments) / len(alignments)
-
-        # Guna-weighted quality
+        # Compute Guna balance score
         if gunas is not None:
-            s, r, t = gunas
-            scores['guna_sattva'] = s
-            scores['guna_rajas'] = r
-            scores['guna_tamas'] = t
-            scores['guna_balance'] = s / (r + t + 1e-6)
+            scores['guna_balance'] = self._compute_guna_balance(*gunas)
+        else:
+            scores['guna_balance'] = 0.5  # Neutral if not provided
 
-            # Combined quality: alignment weighted by Guna balance
-            if 'ontological_alignment' in scores:
-                scores['sovereign_quality'] = (
-                    scores['ontological_alignment'] *
-                    (1.0 + scores['guna_balance']) / 2
-                )
+        # Compute ontological alignment from hidden states
+        if hidden_states is not None and len(hidden_states) > 0:
+            scores['ontological_alignment'] = self._compute_ontological_alignment(hidden_states)
+            scores['layer_coherence'] = self._compute_layer_coherence(hidden_states)
+        else:
+            scores['ontological_alignment'] = 0.5
+            scores['layer_coherence'] = 0.5
+
+        # Compute token-level coherence
+        if generated_tokens is not None and generated_tokens.numel() > 1:
+            scores['token_coherence'] = self._compute_token_coherence(generated_tokens)
+        else:
+            scores['token_coherence'] = 0.5
+
+        # Combined coherence
+        scores['coherence_score'] = (
+            scores.get('layer_coherence', 0.5) * 0.5 +
+            scores.get('token_coherence', 0.5) * 0.5
+        )
 
         # Overall quality score
-        component_scores = [
-            scores.get('coherence_score', 0.5),
-            scores.get('ontological_alignment', 0.5),
-        ]
-        scores['overall_quality'] = sum(component_scores) / len(component_scores)
+        scores['overall_quality'] = (
+            self.config.guna_weight * scores['guna_balance'] +
+            self.config.ontology_weight * scores['ontological_alignment'] +
+            self.config.coherence_weight * scores['coherence_score']
+        )
+
+        # Quality grade
+        scores['quality_grade'] = self._get_quality_grade(scores['overall_quality'])
+
+        # Store in history
+        self.score_history.append(scores)
 
         return scores
 
-    def interpret_scores(self, scores: Dict[str, Any]) -> str:
+    def _compute_guna_balance(
+        self,
+        sattva: float,
+        rajas: float,
+        tamas: float,
+    ) -> float:
         """
-        Generate human-readable interpretation of scores.
+        Compute Guna balance score.
+
+        Ideal balance is high Sattva with moderate Rajas and low Tamas.
+        Training target: S=0.5, R=0.3, T=0.2
 
         Args:
-            scores: Dict from score_sequence()
+            sattva, rajas, tamas: Guna values (should sum to ~1.0)
 
         Returns:
-            interpretation: Human-readable string
+            balance: [0, 1] balance score
         """
-        lines = ["=== Sovereign Quality Report ==="]
+        # Target distribution
+        target_s, target_r, target_t = 0.5, 0.3, 0.2
 
-        # Overall quality
-        quality = scores.get('overall_quality', 0.5)
-        if quality >= 0.8:
-            quality_label = "Excellent"
-        elif quality >= 0.6:
-            quality_label = "Good"
-        elif quality >= 0.4:
-            quality_label = "Moderate"
-        else:
-            quality_label = "Poor"
-        lines.append(f"Overall Quality: {quality:.3f} ({quality_label})")
+        # Compute distance from target
+        distance = math.sqrt(
+            (sattva - target_s) ** 2 +
+            (rajas - target_r) ** 2 +
+            (tamas - target_t) ** 2
+        )
 
-        # Coherence
-        if 'coherence_score' in scores:
-            coh = scores['coherence_score']
-            lines.append(f"Coherence: {coh:.3f} (bigram uniqueness)")
+        # Max distance is sqrt(3) (all in one corner)
+        max_distance = math.sqrt(3)
 
-        # Ontological alignment
-        if 'ontological_alignment' in scores:
-            align = scores['ontological_alignment']
-            lines.append(f"Ontological Alignment: {align:.3f}")
+        # Invert to get balance score (closer = higher)
+        balance = 1.0 - (distance / max_distance)
 
-        # Guna state
-        if 'guna_sattva' in scores:
-            s, r, t = scores['guna_sattva'], scores['guna_rajas'], scores['guna_tamas']
-            dominant = "Sattva" if s >= r and s >= t else ("Rajas" if r >= t else "Tamas")
-            lines.append(f"Guna State: {dominant} (S={s:.2f}, R={r:.2f}, T={t:.2f})")
+        return balance
 
-        return "\n".join(lines)
+    def _compute_ontological_alignment(
+        self,
+        hidden_states: List[torch.Tensor],
+    ) -> float:
+        """
+        Compute alignment with Sovereign R-Matrix targets.
 
-    def get_vrtti_interpretation(
+        Each layer should exhibit the Vritti pattern specified in R-Matrix.
+
+        Args:
+            hidden_states: List of hidden states per layer
+
+        Returns:
+            alignment: [0, 1] alignment score
+        """
+        if not self.config.enable_r_matrix:
+            return 0.5
+
+        num_layers = min(len(hidden_states), 12)
+        alignments = []
+
+        for layer_idx in range(num_layers):
+            hs = hidden_states[layer_idx]
+
+            # Get target Vritti weights for this layer
+            target_vritti = self.r_matrix[:, layer_idx]
+
+            # Compute alignment (simplified projection)
+            alignment = self._compute_vritti_alignment(hs, target_vritti)
+            alignments.append(alignment)
+
+        return sum(alignments) / len(alignments) if alignments else 0.5
+
+    def _compute_vritti_alignment(
         self,
         hidden_state: torch.Tensor,
-        layer_idx: int,
-    ) -> Dict[str, Any]:
+        target_vritti: torch.Tensor,
+    ) -> float:
         """
-        Get detailed Vṛtti interpretation for a hidden state.
+        Compute alignment between hidden state and target Vritti.
+
+        Uses simplified projection assuming hidden state encodes Vritti-like
+        patterns in its structure.
 
         Args:
-            hidden_state: Hidden state tensor
-            layer_idx: Ontological layer index
+            hidden_state: [B, T, D] or [B, D] hidden state
+            target_vritti: [5] target Vritti weights
 
         Returns:
-            interpretation: Dict with Vṛtti breakdown and meaning
+            alignment: [0, 1] alignment score
         """
-        vrtti_dist = self.compute_vrtti_distribution(hidden_state, layer_idx)
+        # Flatten hidden state
+        if hidden_state.dim() == 3:
+            hs = hidden_state.mean(dim=1)  # [B, D]
+        else:
+            hs = hidden_state
 
-        if vrtti_dist.dim() > 1:
-            vrtti_dist = vrtti_dist.mean(dim=tuple(range(vrtti_dist.dim() - 1)))
+        # Use first 5 dimensions as proxy for Vritti (simplified)
+        if hs.shape[-1] >= 5:
+            vritti_proxy = hs[..., :5]  # [B, 5]
+        else:
+            # Pad if needed
+            vritti_proxy = F.pad(hs, (0, 5 - hs.shape[-1]))
 
-        vrtti_values = vrtti_dist.tolist()
+        # Normalize
+        vritti_proxy = F.softmax(vritti_proxy, dim=-1)
+        target_norm = target_vritti / target_vritti.sum()
 
-        # Find dominant Vṛtti
-        dominant_idx = vrtti_values.index(max(vrtti_values))
-        dominant = VRTTI_NAMES[dominant_idx]
+        # Cosine similarity
+        if vritti_proxy.dim() == 2:
+            vritti_proxy = vritti_proxy.mean(dim=0)
 
-        # Meanings
-        meanings = {
-            "Pramāṇa": "Valid cognition - truthful, well-grounded output",
-            "Vikalpa": "Conceptual construction - creative but potentially unfounded",
-            "Viparyaya": "Misconception - likely erroneous or confused",
-            "Nidrā": "Dormant state - underactivated, low engagement",
-            "Smṛti": "Memory recall - drawing from learned patterns",
-        }
+        vritti_proxy = vritti_proxy.to(target_norm.device)
+        similarity = F.cosine_similarity(
+            vritti_proxy.unsqueeze(0),
+            target_norm.unsqueeze(0),
+        ).item()
 
+        # Map from [-1, 1] to [0, 1]
+        return (similarity + 1) / 2
+
+    def _compute_layer_coherence(
+        self,
+        hidden_states: List[torch.Tensor],
+    ) -> float:
+        """
+        Compute coherence across layers.
+
+        Adjacent layers should have smooth transitions.
+
+        Args:
+            hidden_states: List of hidden states per layer
+
+        Returns:
+            coherence: [0, 1] coherence score
+        """
+        if len(hidden_states) < 2:
+            return 1.0
+
+        similarities = []
+        for i in range(1, len(hidden_states)):
+            prev = hidden_states[i - 1]
+            curr = hidden_states[i]
+
+            # Mean pool if needed
+            if prev.dim() == 3:
+                prev = prev.mean(dim=1)
+            if curr.dim() == 3:
+                curr = curr.mean(dim=1)
+
+            # Flatten for similarity
+            prev_flat = prev.view(prev.size(0), -1)
+            curr_flat = curr.view(curr.size(0), -1)
+
+            sim = F.cosine_similarity(prev_flat, curr_flat).mean().item()
+            similarities.append(sim)
+
+        # Average similarity (higher = more coherent)
+        avg_sim = sum(similarities) / len(similarities)
+
+        # Map from [-1, 1] to [0, 1]
+        return (avg_sim + 1) / 2
+
+    def _compute_token_coherence(
+        self,
+        generated_tokens: torch.Tensor,
+    ) -> float:
+        """
+        Compute token-level coherence using n-gram diversity.
+
+        Args:
+            generated_tokens: [T] or [B, T] generated tokens
+
+        Returns:
+            coherence: [0, 1] coherence score
+        """
+        if generated_tokens.dim() == 2:
+            tokens = generated_tokens[0].tolist()
+        else:
+            tokens = generated_tokens.tolist()
+
+        if len(tokens) < 2:
+            return 1.0
+
+        # Bigram diversity
+        bigrams = list(zip(tokens[:-1], tokens[1:]))
+        unique_bigrams = len(set(bigrams))
+        total_bigrams = len(bigrams)
+        bigram_diversity = unique_bigrams / max(1, total_bigrams)
+
+        # Trigram diversity (if enough tokens)
+        if len(tokens) >= 3:
+            trigrams = list(zip(tokens[:-2], tokens[1:-1], tokens[2:]))
+            unique_trigrams = len(set(trigrams))
+            total_trigrams = len(trigrams)
+            trigram_diversity = unique_trigrams / max(1, total_trigrams)
+        else:
+            trigram_diversity = 1.0
+
+        # Combined diversity as coherence proxy
+        # High diversity = good coherence (not repetitive)
+        return 0.6 * bigram_diversity + 0.4 * trigram_diversity
+
+    def _get_quality_grade(self, score: float) -> str:
+        """
+        Get letter grade for quality score.
+
+        Args:
+            score: [0, 1] quality score
+
+        Returns:
+            grade: Letter grade A-F
+        """
+        if score >= 0.9:
+            return "A"
+        elif score >= 0.8:
+            return "B"
+        elif score >= 0.7:
+            return "C"
+        elif score >= 0.6:
+            return "D"
+        return "F"
+
+    def score_step(
+        self,
+        hidden_state: torch.Tensor,
+        token_id: int,
+        token_prob: float,
+    ) -> Dict[str, float]:
+        """
+        Score a single generation step.
+
+        Args:
+            hidden_state: Current hidden state
+            token_id: Generated token
+            token_prob: Token probability
+
+        Returns:
+            step_scores: Dict with step-level scores
+        """
         return {
-            "layer": LAYER_NAMES[layer_idx],
-            "dominant_vrtti": dominant,
-            "meaning": meanings[dominant],
-            "distribution": {name: val for name, val in zip(VRTTI_NAMES, vrtti_values)},
+            "confidence": token_prob,
+            "hidden_magnitude": hidden_state.norm().item() if isinstance(hidden_state, torch.Tensor) else 0,
         }
+
+    def get_status_line(self) -> str:
+        """
+        Get status line for monitoring display.
+
+        Returns:
+            status: Human-readable status string
+        """
+        if not self.score_history:
+            return "Sovereign: no data"
+
+        recent = self.score_history[-1]
+        return (
+            f"Sovereign: Q:{recent['overall_quality']:.2f} "
+            f"[{recent['quality_grade']}] | "
+            f"G:{recent['guna_balance']:.2f} O:{recent['ontological_alignment']:.2f}"
+        )
+
+    def get_average_scores(self) -> Dict[str, float]:
+        """Get average scores across all scored sequences."""
+        if not self.score_history:
+            return {}
+
+        keys = self.score_history[0].keys()
+        averages = {}
+
+        for key in keys:
+            if key == 'quality_grade':
+                continue
+            values = [s[key] for s in self.score_history if isinstance(s.get(key), (int, float))]
+            if values:
+                averages[key] = sum(values) / len(values)
+
+        return averages
+
+    def reset(self) -> None:
+        """Reset scoring history."""
+        self.score_history = []

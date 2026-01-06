@@ -1,317 +1,399 @@
+#!/usr/bin/env python3
 """
 Evolutionary Inference Engine
-=============================
+==============================
 
-Inference-time evolutionary state management for cross-sequence intelligence.
+Inference-time implementation of the EvolutionaryBridge (O12->O1 karma transfer).
 
-This module implements the inference counterpart to the training-time
-EvolutionaryBridge (train_unified_llm.py:373-538), enabling:
+This enables:
+- Cognitive continuity across context windows
+- "Memory" of previous conversations/sequences
+- Recursive intelligence pattern during generation
 
-1. Karma Buffer: Persistent state that carries cognitive patterns across sequences
-2. Delayed Resonance: Injection of previous O12 state into current O1
-3. Toroidal Coherence: Tracking cognitive continuity across context windows
+Training Reference: train_unified_llm.py:373-538 (EvolutionaryBridge class)
 
-The EvolutionaryBridge creates recursive intelligence where:
-- The 'Harvest' of one sequence becomes the 'Seed' of the next
-- Cognitive patterns persist and evolve across context boundaries
-- Multi-turn conversations maintain coherent "memory"
-
-Usage:
-------
-    from symbolu.inference import EvolutionaryInferenceEngine
-    from symbolu.phase_transformer import HybridPhaseTransformer
-
-    model = HybridPhaseTransformer(...)
-    engine = EvolutionaryInferenceEngine(model)
-
-    # Load trained bridge weights if available
-    engine.load_bridge_checkpoint("checkpoint.pt")
-
-    # Generate with karma persistence
-    output_ids, metrics = engine.generate_with_karma(
-        input_ids,
-        max_new_tokens=100,
-        inject_karma=True,
-    )
-
-    # Check coherence with previous sequence
-    coherence = engine.compute_generation_coherence()
+Author: Sovereign-1 Training Initiative
+Date: January 2026
 """
-
-import math
-from typing import Dict, List, Optional, Tuple, Any, Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import Dict, List, Optional, Tuple, Any, Union
+from dataclasses import dataclass
+import math
+import warnings
+
+
+@dataclass
+class EvolutionaryConfig:
+    """Configuration for evolutionary inference."""
+    embed_dim: int = 768
+    resonance_alpha: float = 0.1
+    karma_decay: float = 0.95
+    coherence_threshold: float = 0.3
+    max_karma_age: int = 10  # Max sequences before karma expires
+    enable_guna_scaling: bool = False  # Scale alpha by Guna state
 
 
 class EvolutionaryBridgeInference(nn.Module):
     """
-    Inference-time Evolutionary Bridge for O12 → O1 projection.
+    Inference-time evolutionary bridge for karma state management.
 
-    This is a lightweight version of the training EvolutionaryBridge
-    that focuses on:
-    - Loading trained seed projection weights
-    - Computing seeds from harvest states
-    - No gradient tracking or SGP/BPTT logic (inference-only)
-
-    The bridge implements the toroidal state transfer:
-        O12 (Absolving) --[seed_proj]--> O1 (Potential)
-
-    Args:
-        dim: Hidden dimension of the model
-        use_gating: Whether to use gated projection (matches training config)
-        dropout: Dropout rate (typically 0.0 for inference)
+    Loads trained weights from checkpoint and provides:
+    - seed_gate: Gates how much karma influences next sequence
+    - seed_proj: Projects O12 harvest to seed space
+    - seed_norm: Normalizes seed for stability
     """
 
-    def __init__(
-        self,
-        dim: int,
-        use_gating: bool = True,
-        dropout: float = 0.0,
-    ):
+    def __init__(self, embed_dim: int):
         super().__init__()
-        self.dim = dim
-        self.use_gating = use_gating
+        self.embed_dim = embed_dim
 
-        # Seed Projection: W_seed maps O12 → O1
-        if use_gating:
-            self.seed_gate = nn.Linear(dim, dim, bias=False)
-            self.seed_proj = nn.Linear(dim, dim, bias=False)
-            self.gate_activation = nn.Sigmoid()
-        else:
-            self.seed_gate = None
-            self.seed_proj = nn.Linear(dim, dim, bias=False)
+        # Match training architecture
+        self.seed_proj = nn.Linear(embed_dim, embed_dim)
+        self.seed_gate = nn.Linear(embed_dim, embed_dim)
+        self.seed_norm = nn.LayerNorm(embed_dim)
 
-        self.seed_norm = nn.LayerNorm(dim)
-        self.dropout = nn.Dropout(dropout)
-
-    def compute_seed(self, harvest: torch.Tensor) -> torch.Tensor:
+    def compute_seed(self, o12_hidden: torch.Tensor) -> torch.Tensor:
         """
-        Compute the Seed state from the Harvest (O12 → O1 projection).
-
-        The projection preserves ontological structure while applying
-        'Evolutionary Loss' - shedding sequence-specific details.
+        Compute karma seed from O12 hidden state.
 
         Args:
-            harvest: O12 hidden state [B, dim] or [B, N, dim]
+            o12_hidden: [B, D] mean-pooled O12 hidden state
 
         Returns:
-            seed: Projected state for O1 injection [B, dim]
+            seed: [B, D] karma seed for next sequence
         """
-        # Reduce to [B, dim] if sequence dimension present
-        if harvest.dim() == 3:
-            harvest = harvest.mean(dim=1)
-
-        if self.seed_gate is not None:
-            # Gated projection: gate decides what to carry forward
-            gate = self.gate_activation(self.seed_gate(harvest))
-            projected = self.seed_proj(harvest)
-            seed = gate * projected
-        else:
-            seed = self.seed_proj(harvest)
-
-        seed = self.dropout(seed)
-        seed = self.seed_norm(seed)
+        projected = self.seed_proj(o12_hidden)
+        gate = torch.sigmoid(self.seed_gate(o12_hidden))
+        seed = self.seed_norm(projected * gate)
         return seed
 
-    def load_from_training_bridge(self, training_bridge_state: Dict[str, torch.Tensor]):
+    def load_from_checkpoint(self, state_dict: Dict[str, torch.Tensor]) -> bool:
         """
-        Load weights from a training EvolutionaryBridge state dict.
+        Load bridge weights from checkpoint.
 
         Args:
-            training_bridge_state: State dict from training checkpoint
+            state_dict: Checkpoint state dict (may contain evolutionary_bridge.*)
+
+        Returns:
+            success: Whether weights were loaded
         """
-        # Map training keys to inference keys
-        key_mapping = {
-            'seed_gate.weight': 'seed_gate.weight',
-            'seed_proj.weight': 'seed_proj.weight',
-            'seed_norm.weight': 'seed_norm.weight',
-            'seed_norm.bias': 'seed_norm.bias',
-        }
+        # Try different key patterns
+        prefixes = ["evolutionary_bridge.", "bridge.", ""]
 
-        inference_state = {}
-        for train_key, inference_key in key_mapping.items():
-            if train_key in training_bridge_state:
-                inference_state[inference_key] = training_bridge_state[train_key]
+        for prefix in prefixes:
+            try:
+                self.seed_proj.weight.data = state_dict[f"{prefix}seed_proj.weight"]
+                self.seed_proj.bias.data = state_dict[f"{prefix}seed_proj.bias"]
+                self.seed_gate.weight.data = state_dict[f"{prefix}seed_gate.weight"]
+                self.seed_gate.bias.data = state_dict[f"{prefix}seed_gate.bias"]
+                self.seed_norm.weight.data = state_dict[f"{prefix}seed_norm.weight"]
+                self.seed_norm.bias.data = state_dict[f"{prefix}seed_norm.bias"]
+                return True
+            except KeyError:
+                continue
 
-        # Load with strict=False to handle potential mismatches
-        self.load_state_dict(inference_state, strict=False)
+        return False
 
 
 class EvolutionaryInferenceEngine:
     """
     Inference-time evolutionary state management.
 
-    Implements cross-sequence intelligence by:
-    1. Storing O12 hidden states as "karma" for the next sequence
-    2. Injecting karma into O1 via delayed resonance
-    3. Tracking toroidal coherence for quality monitoring
+    Maintains karma buffer across generation sequences and injects
+    previous cognitive state into new sequences.
 
-    This bridges the gap identified in INFERENCE_HYBRID_TRANSFORMER_GAPS.md
-    Section 1.1 (Evolutionary Bridge) and 1.2 (Delayed Resonance).
+    Key Methods:
+        - generate_with_karma(): Generate with evolutionary state injection
+        - apply_inference_resonance(): Inject karma into hidden states
+        - get_status_line(): Return status for monitoring
 
-    Args:
-        model: The HybridPhaseTransformer model
-        dim: Hidden dimension (inferred from model if not provided)
-        use_gating: Whether bridge uses gated projection
-        resonance_alpha: Base alpha for resonance injection (default 0.1)
-        karma_decay: Decay factor for karma across long conversations (default 0.99)
+    Example:
+        engine = EvolutionaryInferenceEngine(model, checkpoint_path)
+        engine.to(device)  # Move to correct device
 
-    Attributes:
-        karma_buffer: Stored seed state from previous sequence
-        current_o12: Most recent O12 hidden state
-        coherence_history: Recent coherence scores
-        bridge_enabled: Whether bridge weights are loaded
+        output, meta = engine.generate_with_karma(input_ids, max_new_tokens=128)
+        print(engine.get_status_line())  # "Karma: active | Coherence: 0.85"
     """
 
     def __init__(
         self,
         model: nn.Module,
-        dim: Optional[int] = None,
-        use_gating: bool = True,
-        resonance_alpha: float = 0.1,
-        karma_decay: float = 0.99,
+        config: Optional[EvolutionaryConfig] = None,
+        bridge_checkpoint_path: Optional[str] = None,
     ):
+        """
+        Initialize evolutionary inference engine.
+
+        Args:
+            model: The transformer model (HybridPhaseTransformer or similar)
+            config: Evolutionary configuration
+            bridge_checkpoint_path: Path to checkpoint with bridge weights
+        """
         self.model = model
-        self.device = next(model.parameters()).device
+        self.config = config or EvolutionaryConfig()
 
-        # Infer dimension from model
-        if dim is None:
-            if hasattr(model, 'config'):
-                dim = model.config.embed_dim
-            elif hasattr(model, 'token_embed'):
-                dim = model.token_embed.weight.shape[1]
-            else:
-                raise ValueError("Cannot infer dim from model, please provide explicitly")
+        # Infer embed_dim from model
+        if hasattr(model, 'embed_dim'):
+            embed_dim = model.embed_dim
+        elif hasattr(model, 'config') and hasattr(model.config, 'hidden_size'):
+            embed_dim = model.config.hidden_size
+        else:
+            embed_dim = self.config.embed_dim
 
-        self.dim = dim
-        self.resonance_alpha = resonance_alpha
-        self.karma_decay = karma_decay
+        self.embed_dim = embed_dim
 
-        # Initialize bridge for O12 → O1 projection
-        self.bridge = EvolutionaryBridgeInference(dim, use_gating=use_gating)
-        self.bridge.to(self.device)
+        # Initialize bridge
+        self.bridge = EvolutionaryBridgeInference(embed_dim)
         self.bridge_enabled = False
 
         # State buffers
         self.karma_buffer: Optional[torch.Tensor] = None
         self.current_o12: Optional[torch.Tensor] = None
-
-        # Coherence tracking
+        self.karma_age: int = 0
         self.coherence_history: List[float] = []
-        self.generation_count = 0
 
-        # Guna state (for dynamic alpha, if available)
-        # Default to balanced state
-        self.current_gunas: Tuple[float, float, float] = (0.33, 0.33, 0.33)
+        # Device tracking
+        self._device: torch.device = torch.device('cpu')
 
-    def load_bridge_checkpoint(self, checkpoint_path: str) -> bool:
+        # Load bridge if checkpoint provided
+        if bridge_checkpoint_path:
+            self._load_bridge(bridge_checkpoint_path)
+
+    def to(self, device: Union[str, torch.device]) -> 'EvolutionaryInferenceEngine':
         """
-        Load trained EvolutionaryBridge weights from checkpoint.
+        Move engine to specified device.
 
         Args:
-            checkpoint_path: Path to training checkpoint file
+            device: Target device ('cuda', 'cpu', or torch.device)
 
         Returns:
-            True if bridge weights were loaded successfully
+            self for chaining
         """
-        try:
-            checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        if isinstance(device, str):
+            device = torch.device(device)
 
-            # Try different possible keys for bridge state
-            bridge_state = None
-            for key in ['evolutionary_bridge', 'bridge', 'evolutionary_bridge_state_dict']:
-                if key in checkpoint:
-                    bridge_state = checkpoint[key]
-                    break
+        self._device = device
+        self.bridge = self.bridge.to(device)
 
-            if bridge_state is None:
-                # Check if bridge params are in the main model state
-                if 'model' in checkpoint:
-                    model_state = checkpoint['model']
-                    bridge_state = {
-                        k.replace('evolutionary_bridge.', ''): v
-                        for k, v in model_state.items()
-                        if k.startswith('evolutionary_bridge.')
-                    }
+        # Move karma buffer if exists
+        if self.karma_buffer is not None:
+            self.karma_buffer = self.karma_buffer.to(device)
+        if self.current_o12 is not None:
+            self.current_o12 = self.current_o12.to(device)
 
-            if bridge_state:
-                self.bridge.load_from_training_bridge(bridge_state)
-                self.bridge_enabled = True
-                return True
-            else:
-                print("Warning: Checkpoint does not contain evolutionary bridge weights")
-                self.bridge_enabled = False
-                return False
+        return self
 
-        except Exception as e:
-            print(f"Warning: Failed to load bridge checkpoint: {e}")
-            self.bridge_enabled = False
-            return False
+    @property
+    def device(self) -> torch.device:
+        """Get current device."""
+        return self._device
 
-    def load_inference_config(self, checkpoint_path: str) -> Dict[str, Any]:
-        """
-        Load inference configuration from checkpoint metadata.
-
-        Returns recommended inference settings based on training state.
-        """
+    def _load_bridge(self, checkpoint_path: str) -> None:
+        """Load bridge weights from checkpoint."""
         try:
             checkpoint = torch.load(checkpoint_path, map_location='cpu')
 
-            if 'inference_config' in checkpoint:
-                config = checkpoint['inference_config']
-                if 'recommended_resonance_alpha' in config:
-                    self.resonance_alpha = config['recommended_resonance_alpha']
-                return config
+            # Handle different checkpoint formats
+            if isinstance(checkpoint, dict):
+                if 'evolutionary_bridge' in checkpoint:
+                    state_dict = checkpoint['evolutionary_bridge']
+                elif 'model' in checkpoint:
+                    state_dict = checkpoint['model']
+                else:
+                    state_dict = checkpoint
+            else:
+                state_dict = checkpoint
 
-            return {}
-        except Exception:
-            return {}
+            success = self.bridge.load_from_checkpoint(state_dict)
 
-    def clear_karma(self):
+            if success:
+                self.bridge_enabled = True
+                print(f"[EvolutionaryInference] Bridge loaded from {checkpoint_path}")
+            else:
+                warnings.warn(
+                    f"Checkpoint {checkpoint_path} does not contain evolutionary bridge weights. "
+                    "Karma injection will be disabled."
+                )
+
+        except Exception as e:
+            warnings.warn(f"Failed to load bridge from {checkpoint_path}: {e}")
+
+    def generate_with_karma(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 128,
+        inject_karma: bool = True,
+        temperature: float = 1.0,
+        top_p: float = 0.9,
+        top_k: int = 50,
+        **kwargs,
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
         """
-        Clear karma buffer to start fresh conversation.
+        Generate with evolutionary state injection.
 
-        Use this when:
-        - Starting a completely new conversation topic
-        - User explicitly requests memory reset
-        - Coherence drops below critical threshold
-        """
-        self.karma_buffer = None
-        self.current_o12 = None
-        self.coherence_history.clear()
-        self.generation_count = 0
+        1. If karma_buffer exists, inject into initial hidden state
+        2. Generate tokens
+        3. Extract O12 hidden state and store as new karma
 
-    def apply_karma_decay(self):
-        """
-        Apply decay to karma buffer for long conversations.
-
-        Prevents stale patterns from dominating new context.
-        Called automatically after each generation.
-        """
-        if self.karma_buffer is not None:
-            self.karma_buffer = self.karma_buffer * self.karma_decay
-
-    def _compute_dynamic_alpha(self) -> float:
-        """
-        Compute dynamic resonance alpha based on Guna state.
-
-        Mirrors training behavior (train_unified_llm.py:1536-1541):
-        - High Sattva (clarity) → increase retention
-        - High Rajas (error/heat) → reduce retention
+        Args:
+            input_ids: [B, T] input token IDs
+            max_new_tokens: Maximum tokens to generate
+            inject_karma: Whether to inject stored karma
+            temperature: Sampling temperature
+            top_p: Nucleus sampling probability
+            top_k: Top-k sampling
+            **kwargs: Additional generation arguments
 
         Returns:
-            Dynamic alpha in range [0.05, 0.25]
+            generated_ids: [B, T+N] generated token IDs
+            meta: Dict with karma_coherence, bridge_active, etc.
         """
-        s, r, t = self.current_gunas
+        # Ensure on correct device
+        input_ids = input_ids.to(self._device)
 
-        # Base is resonance_alpha (0.1); range is [0.05, 0.25]
-        dynamic_alpha = self.resonance_alpha * (1.0 + (s * 1.5) - (r * 0.5))
-        dynamic_alpha = max(0.05, min(0.25, dynamic_alpha))
+        meta = {
+            "karma_injected": False,
+            "karma_coherence": 0.0,
+            "bridge_active": self.bridge_enabled,
+            "karma_age": self.karma_age,
+        }
 
-        return dynamic_alpha
+        # Check karma expiration
+        if self.karma_age >= self.config.max_karma_age:
+            self.karma_buffer = None
+            self.karma_age = 0
+
+        # Prepare karma injection
+        karma_to_inject = None
+        if inject_karma and self.karma_buffer is not None and self.bridge_enabled:
+            karma_to_inject = self.karma_buffer * self.config.resonance_alpha
+            meta["karma_injected"] = True
+
+        # Forward pass with hidden state extraction
+        with torch.no_grad():
+            # Check if model supports return_hidden
+            if hasattr(self.model, 'forward'):
+                try:
+                    outputs = self.model(
+                        input_ids,
+                        return_hidden=True,
+                        karma_injection=karma_to_inject,
+                        **kwargs,
+                    )
+                except TypeError:
+                    # Model doesn't support these args, use basic forward
+                    outputs = self.model(input_ids, **kwargs)
+            else:
+                outputs = self.model(input_ids, **kwargs)
+
+            # Extract hidden states
+            if isinstance(outputs, dict) and 'hidden_states' in outputs:
+                hidden_states = outputs['hidden_states']
+                logits = outputs.get('logits', outputs.get('output'))
+            elif isinstance(outputs, tuple) and len(outputs) >= 2:
+                logits = outputs[0]
+                hidden_states = outputs[1] if len(outputs) > 1 else None
+            else:
+                logits = outputs
+                hidden_states = None
+
+            # Generate tokens autoregressively
+            generated = self._autoregressive_generate(
+                input_ids=input_ids,
+                logits=logits,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+            )
+
+            # Extract and store new karma from O12
+            if hidden_states is not None and self.bridge_enabled:
+                o12_hidden = hidden_states[-1] if isinstance(hidden_states, list) else hidden_states
+
+                # Mean pool over sequence dimension
+                if o12_hidden.dim() == 3:
+                    o12_pooled = o12_hidden.mean(dim=1)
+                else:
+                    o12_pooled = o12_hidden
+
+                # Compute new karma seed
+                new_karma = self.bridge.compute_seed(o12_pooled)
+
+                # Compute coherence with previous karma
+                if self.karma_buffer is not None:
+                    coherence = self._compute_coherence(self.karma_buffer, new_karma)
+                    meta["karma_coherence"] = coherence
+                    self.coherence_history.append(coherence)
+
+                # Apply decay and store
+                self.karma_buffer = new_karma * self.config.karma_decay
+                self.current_o12 = o12_pooled
+                self.karma_age += 1
+
+        return generated, meta
+
+    def _autoregressive_generate(
+        self,
+        input_ids: torch.Tensor,
+        logits: Optional[torch.Tensor],
+        max_new_tokens: int,
+        temperature: float,
+        top_p: float,
+        top_k: int,
+    ) -> torch.Tensor:
+        """Simple autoregressive generation loop."""
+        generated = input_ids.clone()
+
+        for _ in range(max_new_tokens):
+            # Get logits for last position
+            if logits is None:
+                with torch.no_grad():
+                    outputs = self.model(generated)
+                    if isinstance(outputs, dict):
+                        logits = outputs.get('logits', outputs.get('output'))
+                    elif isinstance(outputs, tuple):
+                        logits = outputs[0]
+                    else:
+                        logits = outputs
+
+            next_logits = logits[:, -1, :] / max(temperature, 1e-8)
+
+            # Apply top-k
+            if top_k > 0:
+                indices_to_remove = next_logits < torch.topk(next_logits, top_k)[0][..., -1, None]
+                next_logits[indices_to_remove] = float('-inf')
+
+            # Apply top-p (nucleus)
+            if top_p < 1.0:
+                sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
+                cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+                sorted_indices_to_remove = cumulative_probs > top_p
+                sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+                sorted_indices_to_remove[..., 0] = 0
+                indices_to_remove = sorted_indices_to_remove.scatter(
+                    -1, sorted_indices, sorted_indices_to_remove
+                )
+                next_logits[indices_to_remove] = float('-inf')
+
+            # Sample
+            probs = F.softmax(next_logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+
+            # Append
+            generated = torch.cat([generated, next_token], dim=-1)
+
+            # Reset logits for next iteration
+            logits = None
+
+            # Check for EOS (assuming token 2 is EOS)
+            if next_token.item() == 2:
+                break
+
+        return generated
 
     def apply_inference_resonance(
         self,
@@ -321,528 +403,128 @@ class EvolutionaryInferenceEngine:
         """
         Apply resonance from stored karma to current hidden state.
 
-        This implements delayed resonance injection at inference time,
-        mirroring the training behavior (train_unified_llm.py:1513-1558).
+        For inference, use fixed alpha (no Guna tracking available unless
+        InferenceGunas is integrated).
 
         Args:
-            current_hidden: Current O1 hidden state [B, N, D] or [B, D]
-            alpha: Override alpha (uses dynamic alpha if None)
+            current_hidden: [B, T, D] current hidden state
+            alpha: Override resonance strength (default: config.resonance_alpha)
 
         Returns:
-            Modified hidden state with karma injection
+            resonated: [B, T, D] hidden state with karma injected
         """
         if self.karma_buffer is None:
             return current_hidden
 
-        # Use dynamic alpha if not specified
-        if alpha is None:
-            alpha = self._compute_dynamic_alpha()
+        alpha = alpha if alpha is not None else self.config.resonance_alpha
 
         # Expand karma to match current hidden dimensions
-        karma = self.karma_buffer
+        karma_expanded = self.karma_buffer.unsqueeze(1)  # [B, 1, D]
 
         if current_hidden.dim() == 3:
-            # [B, N, D] - expand karma to sequence length
-            B, N, D = current_hidden.shape
-            if karma.dim() == 2:
-                # [B, D] -> [B, 1, D] -> [B, N, D]
-                karma_expanded = karma.unsqueeze(1).expand(B, N, D)
-            else:
-                karma_expanded = karma.expand(B, N, D)
-        else:
-            karma_expanded = karma
+            karma_expanded = karma_expanded.expand(-1, current_hidden.size(1), -1)
 
         # Inject with alpha scaling
-        return current_hidden + (alpha * karma_expanded)
+        resonated = current_hidden + (alpha * karma_expanded)
 
-    def _extract_layer_states(
+        return resonated
+
+    def _compute_coherence(
         self,
-        input_ids: torch.Tensor,
-        extract_layers: Optional[List[int]] = None,
-    ) -> Tuple[torch.Tensor, Dict[int, torch.Tensor]]:
-        """
-        Forward pass with efficient hidden state extraction.
+        karma: torch.Tensor,
+        current: torch.Tensor,
+    ) -> float:
+        """Compute cosine coherence between karma and current state."""
+        # Flatten if needed
+        karma_flat = karma.view(1, -1)
+        current_flat = current.view(1, -1)
 
-        Uses the model's extract_layers parameter for memory-efficient
-        extraction of only the requested layers.
+        sim = F.cosine_similarity(karma_flat, current_flat)
 
-        Args:
-            input_ids: Input token IDs [B, N]
-            extract_layers: Which layers to extract (default: [0, 11] for O1, O12)
-                           Common patterns:
-                           - [0, 11]: O1 (Potential) + O12 (Integration) for karma
-                           - [0, 5, 11]: Authority + midpoint + final
-
-        Returns:
-            logits: Model output logits
-            layer_states: Dict mapping layer_idx -> hidden state tensor
-        """
-        if extract_layers is None:
-            extract_layers = [0, 11]  # O1 and O12 by default
-
-        # Use efficient extraction - only requested layers are stored
-        outputs = self.model(input_ids, extract_layers=extract_layers)
-
-        logits = outputs['logits']
-        hidden_list = outputs.get('hidden_states', [])
-
-        # Map list positions back to layer indices
-        # hidden_list[0] corresponds to extract_layers[0], etc.
-        layer_states = {}
-        for i, layer_idx in enumerate(sorted(extract_layers)):
-            if i < len(hidden_list):
-                layer_states[layer_idx] = hidden_list[i]
-
-        return logits, layer_states
-
-    def generate_with_karma(
-        self,
-        input_ids: torch.Tensor,
-        max_new_tokens: int = 128,
-        temperature: float = 1.0,
-        top_k: int = 50,
-        top_p: float = 0.9,
-        inject_karma: bool = True,
-        store_karma: bool = True,
-        return_coherence: bool = False,
-        # Phase 2 integration (optional)
-        metacognition: Optional[Any] = None,  # InferenceMetacognition
-        guna_tracker: Optional[Any] = None,   # InferenceGunas
-        csr_guard: Optional[Any] = None,      # CSRInferenceGuard
-    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
-        """
-        Generate with evolutionary state injection and Phase 2 monitoring.
-
-        This is the main inference method that implements:
-        1. Karma injection into O1 via delayed resonance
-        2. Token generation with quality monitoring (Phase 2)
-        3. CSR safety enforcement with lm_head re-projection
-        4. O12 extraction and karma storage for next sequence
-
-        Args:
-            input_ids: Input token IDs [B, N]
-            max_new_tokens: Maximum tokens to generate
-            temperature: Sampling temperature
-            top_k: Top-k filtering (0 to disable)
-            top_p: Nucleus sampling threshold
-            inject_karma: Whether to inject stored karma
-            store_karma: Whether to store new karma for next sequence
-            return_coherence: Include coherence metrics in output
-            metacognition: Optional InferenceMetacognition for ABORT/BRAKE
-            guna_tracker: Optional InferenceGunas for dynamic alpha
-            csr_guard: Optional CSRInferenceGuard for safety enforcement
-
-        Returns:
-            output_ids: Generated token IDs including input
-            metrics: Dict with karma_coherence, generation_info, etc.
-        """
-        self.generation_count += 1
-        metrics: Dict[str, Any] = {
-            'generation_id': self.generation_count,
-            'karma_injected': False,
-            'karma_stored': False,
-            'aborted': False,
-            'interventions': 0,
-        }
-
-        # Move input to model device
-        input_ids = input_ids.to(self.device)
-        B = input_ids.shape[0]
-
-        # Track current temperature (may be adjusted by Phase 2)
-        current_temp = temperature
-
-        # Step 1: Autoregressive generation with Phase 2 integration
-        generated_ids = input_ids.clone()
-
-        for step in range(max_new_tokens):
-            # Forward pass - use return_last_hidden for CSR re-projection
-            outputs = self.model(
-                generated_ids,
-                return_hidden=True,
-                return_last_hidden=(csr_guard is not None),
-            )
-            logits = outputs['logits'][:, -1, :]  # [B, V]
-            hidden_states = outputs.get('hidden_states', [])
-
-            # Phase 2: Apply karma injection via resonance (at each step)
-            # This injects previous O12 state into current processing
-            if inject_karma and self.karma_buffer is not None and step == 0:
-                # For first step, note that karma is being used
-                metrics['karma_injected'] = True
-                metrics['karma_norm'] = self.karma_buffer.norm().item()
-
-            # Phase 2: CSR Safety Guard with lm_head re-projection
-            if csr_guard is not None and 'last_hidden_state' in outputs:
-                last_hidden = outputs['last_hidden_state'][:, -1, :]  # [B, D]
-                logits, guard_info = csr_guard.apply(
-                    hidden_state=last_hidden,
-                    original_logits=logits,
-                )
-                if guard_info.get('intervention', False):
-                    metrics['interventions'] += 1
-
-            # Phase 2: Metacognitive monitoring
-            if metacognition is not None:
-                meta_status = metacognition.update(logits)
-
-                # Check for ABORT recommendation
-                if meta_status['recommendation'] == 'ABORT':
-                    metrics['aborted'] = True
-                    metrics['abort_reason'] = 'Sustained low coherence'
-                    break
-
-                # Adjust temperature based on recommendations
-                if meta_status['recommendation'] == 'BRAKE':
-                    current_temp = temperature * 0.7
-                elif meta_status['recommendation'] == 'RECOVER':
-                    current_temp = temperature * 1.3
-                else:
-                    current_temp = temperature
-
-            # Apply temperature
-            logits = logits / current_temp
-
-            # Top-k filtering
-            if top_k > 0:
-                indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
-                logits[indices_to_remove] = float('-inf')
-
-            # Top-p (nucleus) filtering
-            if top_p < 1.0:
-                sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-                cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
-
-                # Remove tokens with cumulative probability above threshold
-                sorted_indices_to_remove = cumulative_probs > top_p
-                sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-                sorted_indices_to_remove[..., 0] = False
-
-                indices_to_remove = sorted_indices_to_remove.scatter(
-                    1, sorted_indices, sorted_indices_to_remove
-                )
-                logits[indices_to_remove] = float('-inf')
-
-            # Sample next token
-            probs = F.softmax(logits, dim=-1)
-            next_token = torch.multinomial(probs, num_samples=1)
-            token_prob = probs.gather(1, next_token).item() if B == 1 else probs.gather(1, next_token)[0].item()
-
-            # Phase 2: Update Guna tracker
-            if guna_tracker is not None:
-                s, r, t = guna_tracker.update(
-                    token_id=next_token.item() if B == 1 else next_token[0].item(),
-                    token_prob=token_prob,
-                )
-                # Update engine's Guna state for dynamic alpha
-                self.update_gunas(s, r, t)
-
-                # Feed Gunas to metacognition if available
-                if metacognition is not None:
-                    metacognition.update_gunas(s, r, t)
-
-            generated_ids = torch.cat([generated_ids, next_token], dim=1)
-
-            # Check for EOS
-            if hasattr(self.model, 'config') and hasattr(self.model.config, 'eos_token_id'):
-                eos_id = self.model.config.eos_token_id
-                if eos_id is not None and (next_token == eos_id).all():
-                    break
-
-        # Step 2: Extract O12 and store as karma for next sequence
-        if store_karma and self.bridge_enabled:
-            # Final forward pass to get O12 state
-            final_outputs = self.model(generated_ids, extract_layers=[11])
-            hidden_states = final_outputs.get('hidden_states', [])
-
-            if len(hidden_states) >= 1:
-                # O12 is extracted
-                o12_hidden = hidden_states[0]  # [B, N, D] (first in list since we only extracted layer 11)
-                self.current_o12 = o12_hidden
-
-                # Compute seed and store as karma
-                self.karma_buffer = self.bridge.compute_seed(o12_hidden)
-                metrics['karma_stored'] = True
-                metrics['new_karma_norm'] = self.karma_buffer.norm().item()
-
-                # Apply decay for long conversations
-                self.apply_karma_decay()
-
-        # Step 4: Compute coherence if requested
-        if return_coherence:
-            coherence = self.compute_generation_coherence()
-            metrics['karma_coherence'] = coherence
-            metrics['coherence_trend'] = self._get_coherence_trend()
-
-        return generated_ids, metrics
+        # Map from [-1, 1] to [0, 1]
+        return (sim.item() + 1) / 2
 
     def compute_generation_coherence(self) -> float:
         """
-        Compute coherence between stored karma and current O12.
+        Compute coherence between stored karma and current generation.
 
         Useful for:
         - Detecting topic drift in long conversations
         - Measuring "memory retention" quality
-        - Deciding when to clear karma buffer
 
         Returns:
-            Coherence score in [0, 1] (0.5 if no prior state)
+            coherence: [0, 1] coherence score
         """
         if self.karma_buffer is None or self.current_o12 is None:
-            return 0.5
+            return 0.0
 
-        # Get O12 mean for comparison
-        if self.current_o12.dim() == 3:
-            o12_mean = self.current_o12.mean(dim=1)  # [B, D]
-        else:
-            o12_mean = self.current_o12
+        return self._compute_coherence(self.karma_buffer, self.current_o12)
 
-        # Cosine similarity
-        sim = F.cosine_similarity(
-            self.karma_buffer.view(1, -1),
-            o12_mean.view(1, -1),
-            dim=-1
+    def clear_karma(self) -> None:
+        """Clear karma buffer and reset state."""
+        self.karma_buffer = None
+        self.current_o12 = None
+        self.karma_age = 0
+        self.coherence_history = []
+
+    def get_status_line(self) -> str:
+        """
+        Get status line for monitoring display.
+
+        Returns:
+            status: Human-readable status string
+        """
+        if not self.bridge_enabled:
+            return "Karma: disabled (no bridge)"
+
+        if self.karma_buffer is None:
+            return "Karma: inactive (no buffer)"
+
+        coherence = self.compute_generation_coherence()
+        avg_coherence = (
+            sum(self.coherence_history[-10:]) / len(self.coherence_history[-10:])
+            if self.coherence_history else 0.0
         )
 
-        # Map from [-1, 1] to [0, 1]
-        coherence = (sim.item() + 1) / 2
+        status_parts = [
+            f"Karma: active",
+            f"Age: {self.karma_age}",
+            f"Coh: {coherence:.2f}",
+            f"Avg: {avg_coherence:.2f}",
+        ]
 
-        # Track history
-        self.coherence_history.append(coherence)
-        if len(self.coherence_history) > 100:
-            self.coherence_history = self.coherence_history[-100:]
+        return " | ".join(status_parts)
 
-        return coherence
-
-    def compute_3way_toroidal_coherence(
-        self,
-        o1_hidden: Optional[torch.Tensor] = None,
-        o12_hidden: Optional[torch.Tensor] = None,
-    ) -> Tuple[float, Dict[str, float]]:
+    def get_state(self) -> Dict[str, Any]:
         """
-        Compute full 3-way toroidal coherence: Seed ↔ O1 ↔ O12.
-
-        This implements the complete "Cognitive Flow" metric that validates
-        the toroidal intelligence loop:
-
-        1. **Birth Similarity**: Does the Seed match the Birth (O1)?
-           - Measures if karma is being properly injected into initial state
-        2. **Flow Similarity**: Does the Result (O12) fulfill the Birth (O1)?
-           - Measures if the sequence maintains internal coherence
-        3. **Evolution Similarity**: Does the Result (O12) match the Seed?
-           - Measures if the cognitive loop closes properly
-
-        The average of these three forms the "Cognitive Flow Score" which
-        indicates whether the toroidal intelligence pattern is intact.
-
-        Args:
-            o1_hidden: O1 (Potential) hidden state [B, N, D] (extracted if None)
-            o12_hidden: O12 (Integration) hidden state [B, N, D] (uses current if None)
+        Get full state for serialization.
 
         Returns:
-            flow_score: Average 3-way coherence (0-1)
-            details: Dict with individual similarity scores
-        """
-        details = {
-            'birth_similarity': 0.5,
-            'flow_similarity': 0.5,
-            'evolution_similarity': 0.5,
-            'valid': False,
-        }
-
-        # Need karma buffer (seed) for comparison
-        if self.karma_buffer is None:
-            return 0.5, details
-
-        seed = self.karma_buffer
-
-        # Use provided O12 or current stored state
-        if o12_hidden is None:
-            o12_hidden = self.current_o12
-        if o12_hidden is None:
-            return 0.5, details
-
-        # Reduce to [B, D] if needed
-        if o12_hidden.dim() == 3:
-            o12_mean = o12_hidden.mean(dim=1)
-        else:
-            o12_mean = o12_hidden
-
-        # If O1 provided, compute full 3-way
-        if o1_hidden is not None:
-            if o1_hidden.dim() == 3:
-                o1_mean = o1_hidden.mean(dim=1)
-            else:
-                o1_mean = o1_hidden
-
-            # Ensure seed matches batch dimension
-            if seed.dim() == 2 and seed.shape[0] != o1_mean.shape[0]:
-                seed = seed.expand(o1_mean.shape[0], -1)
-
-            # Consistency 1: Does the Seed match the Birth (O1)?
-            birth_sim = F.cosine_similarity(
-                seed.view(-1),
-                o1_mean.view(-1),
-                dim=0,
-            )
-            details['birth_similarity'] = (birth_sim.item() + 1) / 2
-
-            # Consistency 2: Does the Result (O12) fulfill the Birth (O1)?
-            flow_sim = F.cosine_similarity(
-                o1_mean.view(-1),
-                o12_mean.view(-1),
-                dim=0,
-            )
-            details['flow_similarity'] = (flow_sim.item() + 1) / 2
-
-            # Consistency 3: Does the Result (O12) match the original Seed?
-            evolution_sim = F.cosine_similarity(
-                seed.view(-1),
-                o12_mean.view(-1),
-                dim=0,
-            )
-            details['evolution_similarity'] = (evolution_sim.item() + 1) / 2
-
-            details['valid'] = True
-
-        else:
-            # Without O1, just compute seed-to-O12 (evolution)
-            evolution_sim = F.cosine_similarity(
-                seed.view(-1),
-                o12_mean.view(-1),
-                dim=0,
-            )
-            details['evolution_similarity'] = (evolution_sim.item() + 1) / 2
-            details['birth_similarity'] = 0.5  # Unknown
-            details['flow_similarity'] = 0.5   # Unknown
-            details['valid'] = False
-
-        # Compute overall flow score
-        flow_score = (
-            details['birth_similarity'] +
-            details['flow_similarity'] +
-            details['evolution_similarity']
-        ) / 3.0
-
-        return flow_score, details
-
-    def get_cognitive_flow_status(self) -> str:
-        """
-        Get formatted cognitive flow status for logging.
-
-        Computes 3-way coherence if O1 is available, otherwise
-        falls back to 2-way (seed-O12).
-
-        Returns:
-            Status string like "Flow:0.72(strong)" or "Flow:N/A"
-        """
-        if self.karma_buffer is None or self.current_o12 is None:
-            return "Flow:N/A"
-
-        flow_score, details = self.compute_3way_toroidal_coherence()
-
-        if details['valid']:
-            mode = "3way"
-        else:
-            mode = "2way"
-
-        if flow_score >= 0.7:
-            status = "strong"
-        elif flow_score >= 0.5:
-            status = "moderate"
-        elif flow_score >= 0.3:
-            status = "weak"
-        else:
-            status = "broken"
-
-        return f"Flow:{flow_score:.2f}({status}/{mode})"
-
-    def _get_coherence_trend(self) -> str:
-        """
-        Get trend of coherence over recent generations.
-
-        Returns:
-            'improving', 'stable', 'declining', or 'unknown'
-        """
-        if len(self.coherence_history) < 3:
-            return 'unknown'
-
-        recent = self.coherence_history[-5:]
-        avg_first_half = sum(recent[:len(recent)//2]) / max(1, len(recent)//2)
-        avg_second_half = sum(recent[len(recent)//2:]) / max(1, len(recent) - len(recent)//2)
-
-        diff = avg_second_half - avg_first_half
-
-        if diff > 0.05:
-            return 'improving'
-        elif diff < -0.05:
-            return 'declining'
-        else:
-            return 'stable'
-
-    def get_coherence_status(self) -> str:
-        """Get formatted coherence status for logging."""
-        if not self.coherence_history:
-            return "Karma:--"
-
-        recent = self.coherence_history[-1]
-        avg = sum(self.coherence_history[-10:]) / min(10, len(self.coherence_history))
-
-        if recent >= 0.7:
-            status = "strong"
-        elif recent >= 0.5:
-            status = "moderate"
-        elif recent >= 0.3:
-            status = "weak"
-        else:
-            status = "lost"
-
-        return f"Karma:{recent:.2f}({status})|avg:{avg:.2f}"
-
-    def update_gunas(self, sattva: float, rajas: float, tamas: float):
-        """
-        Update Guna state for dynamic alpha computation.
-
-        Can be updated by external metacognitive monitoring.
-
-        Args:
-            sattva: Clarity/confidence (0-1)
-            rajas: Activity/variance (0-1)
-            tamas: Inertia/repetition (0-1)
-        """
-        # Normalize to sum to 1
-        total = sattva + rajas + tamas
-        if total > 0:
-            self.current_gunas = (sattva / total, rajas / total, tamas / total)
-
-    def get_state_dict(self) -> Dict[str, Any]:
-        """
-        Get serializable state for saving conversation state.
-
-        Returns:
-            Dict containing karma buffer and metadata
+            state: Dict containing all state info
         """
         return {
-            'karma_buffer': self.karma_buffer.cpu() if self.karma_buffer is not None else None,
-            'coherence_history': self.coherence_history.copy(),
-            'generation_count': self.generation_count,
-            'current_gunas': self.current_gunas,
-            'resonance_alpha': self.resonance_alpha,
+            "karma_buffer": self.karma_buffer.cpu() if self.karma_buffer is not None else None,
+            "current_o12": self.current_o12.cpu() if self.current_o12 is not None else None,
+            "karma_age": self.karma_age,
+            "coherence_history": self.coherence_history,
+            "bridge_enabled": self.bridge_enabled,
+            "config": {
+                "embed_dim": self.config.embed_dim,
+                "resonance_alpha": self.config.resonance_alpha,
+                "karma_decay": self.config.karma_decay,
+            },
         }
 
-    def load_state_dict(self, state: Dict[str, Any]):
+    def load_state(self, state: Dict[str, Any]) -> None:
         """
-        Restore state from saved conversation state.
+        Load state from serialized dict.
 
         Args:
-            state: Dict from get_state_dict()
+            state: Dict from get_state()
         """
-        if state.get('karma_buffer') is not None:
-            self.karma_buffer = state['karma_buffer'].to(self.device)
-        else:
-            self.karma_buffer = None
-
-        self.coherence_history = state.get('coherence_history', [])
-        self.generation_count = state.get('generation_count', 0)
-        self.current_gunas = state.get('current_gunas', (0.33, 0.33, 0.33))
-        self.resonance_alpha = state.get('resonance_alpha', self.resonance_alpha)
+        if state.get("karma_buffer") is not None:
+            self.karma_buffer = state["karma_buffer"].to(self._device)
+        if state.get("current_o12") is not None:
+            self.current_o12 = state["current_o12"].to(self._device)
+        self.karma_age = state.get("karma_age", 0)
+        self.coherence_history = state.get("coherence_history", [])

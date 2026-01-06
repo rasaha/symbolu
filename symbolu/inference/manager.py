@@ -1,803 +1,572 @@
+#!/usr/bin/env python3
 """
-Inference Manager Module
-========================
+Inference Manager
+==================
 
-Central orchestrator for the Symbolu inference pipeline with tiered modes.
+Orchestrates all inference components for unified generation.
 
-The InferenceManager is the "central nervous system" that coordinates all
-inference-time components (Karma, Gunas, CSR, Scorer, Metacognition) into
-a unified, tiered generation pipeline.
+Provides a single interface that coordinates:
+- EvolutionaryInferenceEngine (karma/resonance)
+- CSRInferenceGuard (safety/entropy)
+- InferenceMetacognition (quality monitoring)
+- InferenceGunas (cognitive state)
+- SovereignInferenceScorer (quality scoring)
 
-Modes:
-------
-1. **Fast**: Raw transformer inference with minimal overhead.
-   - No karma injection or storage
-   - No quality monitoring
-   - Ideal for: Rapid prototyping, benchmarking, latency-sensitive applications
-
-2. **Standard**: Karma persistence with Guna-scaled dynamic alpha.
-   - Cross-sequence state via karma buffer
-   - Guna tracking for dynamic alpha
-   - Basic quality metrics
-   - Ideal for: Production inference, multi-turn conversations
-
-3. **Sovereign**: Full safety and alignment pipeline.
-   - All Standard features +
-   - CSR Guard with lm_head re-projection
-   - Metacognitive monitoring (ABORT/BRAKE/RECOVER)
-   - Sovereign R-Matrix alignment scoring
-   - Ideal for: High-stakes applications, alignment research
-
-Usage:
-------
-    from symbolu.inference import InferenceManager, InferenceMode
-
-    # Create manager
-    manager = InferenceManager(model, mode=InferenceMode.SOVEREIGN)
-
-    # Generate with full pipeline
-    output, metrics = manager.generate(
-        input_ids,
-        max_new_tokens=100,
-    )
-
-    # Check alignment score
-    print(f"Sovereign alignment: {metrics['sovereign_score']:.3f}")
-
-    # Switch modes dynamically
-    manager.set_mode(InferenceMode.FAST)
+Author: Sovereign-1 Training Initiative
+Date: January 2026
 """
-
-from enum import Enum
-from typing import Dict, List, Optional, Tuple, Any, Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import Dict, List, Optional, Tuple, Any, Union
+from dataclasses import dataclass
+from pathlib import Path
+from enum import Enum
 
-from .evolutionary_inference import EvolutionaryInferenceEngine
-from .metacognitive_monitor import InferenceMetacognition, Recommendation
-from .guna_inference import InferenceGunas
-from .csr_inference import CSRInferenceGuard
-from .sovereign_scorer import SovereignInferenceScorer
-from .layer_config import LayerInferenceConfig
+from .evolutionary_inference import EvolutionaryInferenceEngine, EvolutionaryConfig
+from .csr_inference import CSRInferenceGuard, CSRGuardConfig
+from .metacognitive_monitor import InferenceMetacognition, MetacognitiveConfig, GenerationRecommendation
+from .guna_inference import InferenceGunas, GunaConfig
+from .sovereign_scorer import SovereignInferenceScorer, SovereignScorerConfig
+from .layer_config import LayerInferenceConfig, ArchitectureMode
 
 
 class InferenceMode(Enum):
-    """Inference pipeline modes."""
-    FAST = "fast"            # Raw transformer, minimal overhead
-    STANDARD = "standard"    # Karma + Guna-Alpha scaling
-    SOVEREIGN = "sovereign"  # Full CSR + Scorer + Metacognition
+    """Inference mode presets."""
+    FAST = "fast"  # Minimal overhead, basic generation
+    STANDARD = "standard"  # Karma + basic monitoring
+    FULL = "full"  # All features enabled
+    SAFE = "safe"  # Full + strict CSR enforcement
+
+
+@dataclass
+class InferenceManagerConfig:
+    """Configuration for inference manager."""
+    mode: InferenceMode = InferenceMode.STANDARD
+    enable_karma: bool = True
+    enable_csr_guard: bool = True
+    enable_metacognition: bool = True
+    enable_gunas: bool = True
+    enable_scoring: bool = True
+
+    # Generation defaults
+    default_temperature: float = 1.0
+    default_top_p: float = 0.9
+    default_top_k: int = 50
+    max_new_tokens: int = 128
+
+    # Safety
+    abort_on_low_coherence: bool = False
+    auto_adjust_params: bool = True
 
 
 class InferenceManager:
     """
-    Central orchestrator for tiered inference pipeline.
+    Unified inference orchestrator for Sovereign-1 models.
 
-    Manages all inference-time components and provides a unified
-    interface for generation across different quality/latency tradeoffs.
+    Coordinates all inference components and provides a simple interface
+    for generation with full cognitive capabilities.
 
-    The manager lazily initializes components based on the selected mode,
-    minimizing overhead when not using full Sovereign mode.
+    Example:
+        # Basic usage
+        manager = InferenceManager.from_checkpoint(
+            checkpoint_path,
+            model_class=HybridPhaseTransformer,
+            device='cuda',
+        )
 
-    Args:
-        model: The transformer model (HybridPhaseTransformer or compatible)
-        mode: Initial inference mode (default: STANDARD)
-        dim: Hidden dimension (inferred from model if not provided)
-        enable_logging: Enable detailed logging of pipeline operations
-        checkpoint_path: Optional path to load trained component weights
+        output = manager.generate(
+            "The meaning of life is",
+            max_new_tokens=100,
+        )
+        print(output['text'])
+        print(manager.get_status())
 
-    Attributes:
-        mode: Current inference mode
-        engine: EvolutionaryInferenceEngine (karma and base generation)
-        metacognition: InferenceMetacognition (quality monitoring)
-        gunas: InferenceGunas (cognitive state tracking)
-        csr_guard: CSRInferenceGuard (safety layer)
-        scorer: SovereignInferenceScorer (alignment scoring)
+        # Advanced usage with callbacks
+        def on_token(token, meta):
+            print(f"Generated: {token}, Coherence: {meta['coherence']:.2f}")
+
+        output = manager.generate(
+            input_ids,
+            on_token_callback=on_token,
+        )
     """
-
-    # Mode-to-components mapping
-    MODE_COMPONENTS = {
-        InferenceMode.FAST: {
-            'engine': False,
-            'gunas': False,
-            'metacognition': False,
-            'csr_guard': False,
-            'scorer': False,
-        },
-        InferenceMode.STANDARD: {
-            'engine': True,
-            'gunas': True,
-            'metacognition': False,
-            'csr_guard': False,
-            'scorer': False,
-        },
-        InferenceMode.SOVEREIGN: {
-            'engine': True,
-            'gunas': True,
-            'metacognition': True,
-            'csr_guard': True,
-            'scorer': True,
-        },
-    }
 
     def __init__(
         self,
         model: nn.Module,
-        mode: InferenceMode = InferenceMode.STANDARD,
-        dim: Optional[int] = None,
-        enable_logging: bool = False,
-        checkpoint_path: Optional[str] = None,
-        # Component configuration
-        resonance_alpha: float = 0.1,
-        karma_decay: float = 0.99,
-        coherence_window: int = 50,
-        alarm_threshold: float = 0.3,
-        abort_consecutive: int = 5,
-        guna_window_size: int = 20,
-        entropy_threshold: float = 2.0,
-        csr_skip_threshold: float = 0.9,
+        tokenizer: Any,
+        config: Optional[InferenceManagerConfig] = None,
+        evolutionary_engine: Optional[EvolutionaryInferenceEngine] = None,
+        csr_guard: Optional[CSRInferenceGuard] = None,
+        layer_config: Optional[LayerInferenceConfig] = None,
+        device: Union[str, torch.device] = 'cpu',
     ):
+        """
+        Initialize inference manager.
+
+        Args:
+            model: The transformer model
+            tokenizer: Tokenizer for text encoding/decoding
+            config: Manager configuration
+            evolutionary_engine: Pre-initialized evolutionary engine
+            csr_guard: Pre-initialized CSR guard
+            layer_config: Layer configuration
+            device: Target device
+        """
+        self.config = config or InferenceManagerConfig()
         self.model = model
-        self._mode = mode
-        self.enable_logging = enable_logging
+        self.tokenizer = tokenizer
+        self._device = torch.device(device) if isinstance(device, str) else device
 
-        # Infer dimension from model
-        if dim is None:
-            if hasattr(model, 'config'):
-                dim = model.config.embed_dim
-            elif hasattr(model, 'token_embed'):
-                dim = model.token_embed.weight.shape[1]
-            else:
-                raise ValueError("Cannot infer dim from model, please provide explicitly")
+        # Apply mode presets
+        self._apply_mode_preset()
 
-        self.dim = dim
-        self.device = next(model.parameters()).device
+        # Initialize components based on config
+        self.evolutionary_engine = evolutionary_engine
+        self.csr_guard = csr_guard
+        self.layer_config = layer_config or LayerInferenceConfig()
 
-        # Store configuration for lazy initialization
-        self._config = {
-            'resonance_alpha': resonance_alpha,
-            'karma_decay': karma_decay,
-            'coherence_window': coherence_window,
-            'alarm_threshold': alarm_threshold,
-            'abort_consecutive': abort_consecutive,
-            'guna_window_size': guna_window_size,
-            'entropy_threshold': entropy_threshold,
-            'csr_skip_threshold': csr_skip_threshold,
-        }
+        # Create remaining components
+        self.metacognition = InferenceMetacognition() if self.config.enable_metacognition else None
+        self.gunas = InferenceGunas() if self.config.enable_gunas else None
+        self.scorer = SovereignInferenceScorer() if self.config.enable_scoring else None
 
-        # Component storage (lazily initialized)
-        self._engine: Optional[EvolutionaryInferenceEngine] = None
-        self._metacognition: Optional[InferenceMetacognition] = None
-        self._gunas: Optional[InferenceGunas] = None
-        self._csr_guard: Optional[CSRInferenceGuard] = None
-        self._scorer: Optional[SovereignInferenceScorer] = None
+        # Generation state
+        self._generation_count: int = 0
+        self._total_tokens_generated: int = 0
 
-        # Statistics
-        self.generation_count = 0
-        self.mode_history: List[InferenceMode] = []
+    def _apply_mode_preset(self) -> None:
+        """Apply mode-specific defaults."""
+        if self.config.mode == InferenceMode.FAST:
+            self.config.enable_karma = False
+            self.config.enable_csr_guard = False
+            self.config.enable_metacognition = False
+            self.config.enable_gunas = False
+            self.config.enable_scoring = False
 
-        # Load checkpoint if provided
-        if checkpoint_path:
-            self.load_checkpoint(checkpoint_path)
+        elif self.config.mode == InferenceMode.STANDARD:
+            self.config.enable_karma = True
+            self.config.enable_csr_guard = False
+            self.config.enable_metacognition = True
+            self.config.enable_gunas = False
+            self.config.enable_scoring = False
 
-        # Initialize components for current mode
-        self._initialize_mode_components()
+        elif self.config.mode == InferenceMode.SAFE:
+            self.config.enable_karma = True
+            self.config.enable_csr_guard = True
+            self.config.enable_metacognition = True
+            self.config.enable_gunas = True
+            self.config.enable_scoring = True
+            self.config.abort_on_low_coherence = True
 
-    @property
-    def mode(self) -> InferenceMode:
-        """Current inference mode."""
-        return self._mode
-
-    @property
-    def engine(self) -> Optional[EvolutionaryInferenceEngine]:
-        """Evolutionary inference engine (karma, generation)."""
-        return self._engine
-
-    @property
-    def metacognition(self) -> Optional[InferenceMetacognition]:
-        """Metacognitive monitor (quality recommendations)."""
-        return self._metacognition
-
-    @property
-    def gunas(self) -> Optional[InferenceGunas]:
-        """Guna tracker (cognitive state)."""
-        return self._gunas
-
-    @property
-    def csr_guard(self) -> Optional[CSRInferenceGuard]:
-        """CSR safety guard."""
-        return self._csr_guard
-
-    @property
-    def scorer(self) -> Optional[SovereignInferenceScorer]:
-        """Sovereign alignment scorer."""
-        return self._scorer
-
-    @property
-    def layer_config(self) -> type:
-        """Layer configuration for 9:3 hierarchical split."""
-        return LayerInferenceConfig
-
-    def get_layer_temperature(self, layer_idx: int, base_temp: float) -> float:
+    @classmethod
+    def from_checkpoint(
+        cls,
+        checkpoint_path: Union[str, Path],
+        model_class: type,
+        tokenizer: Any,
+        model_kwargs: Optional[Dict] = None,
+        config: Optional[InferenceManagerConfig] = None,
+        device: Union[str, torch.device] = 'cuda' if torch.cuda.is_available() else 'cpu',
+    ) -> 'InferenceManager':
         """
-        Get temperature adjusted for layer type (9:3 split).
-
-        Sensory layers (O10-O12) get sharper temperature for precise
-        token selection.
+        Create manager from checkpoint.
 
         Args:
-            layer_idx: Layer index (0-11)
-            base_temp: Base temperature value
+            checkpoint_path: Path to checkpoint
+            model_class: Model class to instantiate
+            tokenizer: Tokenizer instance
+            model_kwargs: Model constructor arguments
+            config: Manager configuration
+            device: Target device
 
         Returns:
-            Adjusted temperature for the layer
+            manager: Initialized inference manager
         """
-        return LayerInferenceConfig.get_temperature_adjustment(layer_idx, base_temp)
+        from .checkpoint_utils import InferenceCheckpointLoader
 
-    def get_cache_priority(self, layer_idx: int) -> str:
+        loader = InferenceCheckpointLoader(checkpoint_path, device)
+
+        # Load model
+        model = loader.load_model(model_class, model_kwargs)
+
+        # Get embed_dim
+        embed_dim = getattr(model, 'embed_dim', 768)
+        lm_head = getattr(model, 'lm_head', None)
+
+        # Load components
+        evolutionary_engine = loader.load_evolutionary_engine(model)
+        csr_guard = loader.load_csr_guard(lm_head, embed_dim)
+        layer_config = loader.load_layer_config()
+
+        return cls(
+            model=model,
+            tokenizer=tokenizer,
+            config=config,
+            evolutionary_engine=evolutionary_engine,
+            csr_guard=csr_guard,
+            layer_config=layer_config,
+            device=device,
+        )
+
+    def to(self, device: Union[str, torch.device]) -> 'InferenceManager':
         """
-        Get KV-cache priority for a layer.
-
-        Authority layers (O1-O9) get HIGH priority, Sensory (O10-O12) MEDIUM.
+        Move manager to device.
 
         Args:
-            layer_idx: Layer index (0-11)
+            device: Target device
 
         Returns:
-            Priority string: "high" or "medium"
+            self for chaining
         """
-        return LayerInferenceConfig.get_cache_priority(layer_idx)
+        if isinstance(device, str):
+            device = torch.device(device)
 
-    def set_mode(self, mode: InferenceMode):
-        """
-        Switch inference mode.
+        self._device = device
+        self.model = self.model.to(device)
 
-        Lazily initializes required components if not already present.
+        if self.evolutionary_engine is not None:
+            self.evolutionary_engine.to(device)
 
-        Args:
-            mode: New inference mode
-        """
-        if mode == self._mode:
-            return
+        if self.csr_guard is not None:
+            self.csr_guard.to(device)
 
-        self.mode_history.append(self._mode)
-        self._mode = mode
-        self._initialize_mode_components()
+        return self
 
-        if self.enable_logging:
-            print(f"[InferenceManager] Mode switched to: {mode.value}")
-
-    def _initialize_mode_components(self):
-        """Initialize components required for current mode."""
-        required = self.MODE_COMPONENTS[self._mode]
-
-        # Engine (karma, base generation)
-        if required['engine'] and self._engine is None:
-            self._engine = EvolutionaryInferenceEngine(
-                self.model,
-                dim=self.dim,
-                resonance_alpha=self._config['resonance_alpha'],
-                karma_decay=self._config['karma_decay'],
-            )
-            if self.enable_logging:
-                print("[InferenceManager] Initialized EvolutionaryInferenceEngine")
-
-        # Gunas (cognitive state tracking)
-        if required['gunas'] and self._gunas is None:
-            self._gunas = InferenceGunas(
-                window_size=self._config['guna_window_size'],
-            )
-            if self.enable_logging:
-                print("[InferenceManager] Initialized InferenceGunas")
-
-        # Metacognition (quality monitoring)
-        if required['metacognition'] and self._metacognition is None:
-            self._metacognition = InferenceMetacognition(
-                coherence_window=self._config['coherence_window'],
-                alarm_threshold=self._config['alarm_threshold'],
-                abort_consecutive=self._config['abort_consecutive'],
-            )
-            if self.enable_logging:
-                print("[InferenceManager] Initialized InferenceMetacognition")
-
-        # CSR Guard (safety layer)
-        if required['csr_guard'] and self._csr_guard is None:
-            # Get lm_head from model
-            lm_head = getattr(self.model, 'lm_head', None)
-            self._csr_guard = CSRInferenceGuard(
-                lm_head=lm_head,
-                dim=self.dim,
-                entropy_threshold=self._config['entropy_threshold'],
-                skip_threshold=self._config['csr_skip_threshold'],
-            )
-            self._csr_guard.to(self.device)
-            if self.enable_logging:
-                print("[InferenceManager] Initialized CSRInferenceGuard")
-
-        # Sovereign Scorer (alignment scoring)
-        if required['scorer'] and self._scorer is None:
-            self._scorer = SovereignInferenceScorer(dim=self.dim)
-            self._scorer.to(self.device)
-            if self.enable_logging:
-                print("[InferenceManager] Initialized SovereignInferenceScorer")
-
-    def _get_active_components(self) -> Dict[str, bool]:
-        """Get which components are active for current mode."""
-        return self.MODE_COMPONENTS[self._mode]
+    @property
+    def device(self) -> torch.device:
+        """Get current device."""
+        return self._device
 
     def generate(
         self,
-        input_ids: torch.Tensor,
-        max_new_tokens: int = 128,
-        temperature: float = 1.0,
-        top_k: int = 50,
-        top_p: float = 0.9,
-        # Karma controls
+        prompt: Union[str, torch.Tensor],
+        max_new_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        top_p: Optional[float] = None,
+        top_k: Optional[int] = None,
         inject_karma: bool = True,
-        store_karma: bool = True,
-        # Scoring controls (Sovereign mode)
-        compute_alignment: bool = True,
-        alignment_layers: Optional[List[int]] = None,
-        # Return options
-        return_detailed_metrics: bool = False,
-    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        on_token_callback: Optional[callable] = None,
+        return_hidden_states: bool = False,
+        **kwargs,
+    ) -> Dict[str, Any]:
         """
-        Generate with the configured inference pipeline.
-
-        This is the main entry point for generation. The behavior depends
-        on the current mode:
-
-        - **FAST**: Direct model generation, minimal processing
-        - **STANDARD**: Karma injection/storage + Guna tracking
-        - **SOVEREIGN**: Full pipeline with CSR, metacognition, scoring
+        Generate text with full cognitive capabilities.
 
         Args:
-            input_ids: Input token IDs [B, N]
+            prompt: Text prompt or input_ids tensor
             max_new_tokens: Maximum tokens to generate
             temperature: Sampling temperature
-            top_k: Top-k filtering (0 to disable)
             top_p: Nucleus sampling threshold
-            inject_karma: Whether to inject stored karma (STANDARD/SOVEREIGN)
-            store_karma: Whether to store new karma (STANDARD/SOVEREIGN)
-            compute_alignment: Whether to compute Sovereign alignment (SOVEREIGN)
-            alignment_layers: Layers to use for alignment scoring
-            return_detailed_metrics: Include detailed component metrics
+            top_k: Top-k sampling
+            inject_karma: Whether to inject stored karma
+            on_token_callback: Optional callback(token_id, meta) per token
+            return_hidden_states: Whether to return hidden states
+            **kwargs: Additional generation arguments
 
         Returns:
-            output_ids: Generated token IDs including input
-            metrics: Dict with generation info, mode-specific metrics
+            result: Dict with:
+                - text: Generated text
+                - tokens: Generated token IDs
+                - hidden_states: Optional hidden states
+                - meta: Generation metadata
+                - scores: Quality scores
         """
-        self.generation_count += 1
-        active = self._get_active_components()
+        # Apply defaults
+        max_new_tokens = max_new_tokens or self.config.max_new_tokens
+        temperature = temperature or self.config.default_temperature
+        top_p = top_p or self.config.default_top_p
+        top_k = top_k or self.config.default_top_k
 
-        # Base metrics
-        metrics: Dict[str, Any] = {
-            'generation_id': self.generation_count,
-            'mode': self._mode.value,
+        # Encode prompt if string
+        if isinstance(prompt, str):
+            input_ids = self.tokenizer.encode(prompt, return_tensors='pt')
+        else:
+            input_ids = prompt
+
+        input_ids = input_ids.to(self._device)
+
+        # Reset per-generation state
+        if self.metacognition is not None:
+            self.metacognition.reset()
+        if self.gunas is not None:
+            self.gunas.reset()
+
+        # Generation loop
+        generated_ids = input_ids.clone()
+        hidden_states_list = []
+        generation_meta = {
+            'tokens_generated': 0,
+            'aborted': False,
+            'abort_reason': None,
         }
 
-        # Move input to device
-        input_ids = input_ids.to(self.device)
+        # Inject karma at start if enabled
+        karma_meta = {}
+        if self.config.enable_karma and self.evolutionary_engine is not None and inject_karma:
+            # Will be injected during forward pass
+            karma_meta['karma_available'] = self.evolutionary_engine.karma_buffer is not None
 
-        # Route based on mode
-        if self._mode == InferenceMode.FAST:
-            output_ids, fast_metrics = self._generate_fast(
-                input_ids,
-                max_new_tokens=max_new_tokens,
-                temperature=temperature,
-                top_k=top_k,
-                top_p=top_p,
-            )
-            metrics.update(fast_metrics)
+        with torch.no_grad():
+            for step in range(max_new_tokens):
+                # Get current effective parameters
+                effective_temp = temperature
+                effective_top_p = top_p
 
-        elif self._mode == InferenceMode.STANDARD:
-            output_ids, standard_metrics = self._generate_standard(
-                input_ids,
-                max_new_tokens=max_new_tokens,
-                temperature=temperature,
-                top_k=top_k,
-                top_p=top_p,
-                inject_karma=inject_karma,
-                store_karma=store_karma,
-            )
-            metrics.update(standard_metrics)
+                # Auto-adjust parameters based on monitoring
+                if self.config.auto_adjust_params and self.metacognition is not None:
+                    adjustments = self.metacognition.get_generation_adjustment()
+                    effective_temp *= adjustments.get('temperature_multiplier', 1.0)
+                    effective_top_p = max(
+                        0.1,
+                        min(1.0, effective_top_p + adjustments.get('top_p_adjustment', 0.0))
+                    )
 
-        else:  # SOVEREIGN
-            output_ids, sovereign_metrics = self._generate_sovereign(
-                input_ids,
-                max_new_tokens=max_new_tokens,
-                temperature=temperature,
-                top_k=top_k,
-                top_p=top_p,
-                inject_karma=inject_karma,
-                store_karma=store_karma,
-                compute_alignment=compute_alignment,
-                alignment_layers=alignment_layers,
-            )
-            metrics.update(sovereign_metrics)
+                # Guna-based adjustments
+                if self.gunas is not None:
+                    effective_temp = self.gunas.get_temperature_modifier(effective_temp)
 
-        # Add detailed component metrics if requested
-        if return_detailed_metrics:
-            metrics['component_status'] = self._get_component_status()
+                # Forward pass
+                outputs = self.model(generated_ids, **kwargs)
 
-        return output_ids, metrics
+                if isinstance(outputs, dict):
+                    logits = outputs.get('logits', outputs.get('output'))
+                    hidden = outputs.get('hidden_states')
+                elif isinstance(outputs, tuple):
+                    logits = outputs[0]
+                    hidden = outputs[1] if len(outputs) > 1 else None
+                else:
+                    logits = outputs
+                    hidden = None
 
-    def _generate_fast(
-        self,
-        input_ids: torch.Tensor,
-        max_new_tokens: int,
-        temperature: float,
-        top_k: int,
-        top_p: float,
-    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
-        """
-        Fast mode: Direct model generation with minimal overhead.
+                next_logits = logits[:, -1, :]
 
-        Bypasses all components and uses simple autoregressive sampling.
-        """
-        metrics: Dict[str, Any] = {'overhead': 'minimal'}
+                # CSR safety check
+                csr_info = {}
+                if self.config.enable_csr_guard and self.csr_guard is not None:
+                    if hidden is not None:
+                        hidden_for_csr = hidden[-1] if isinstance(hidden, list) else hidden
+                        if hidden_for_csr.dim() == 3:
+                            hidden_for_csr = hidden_for_csr[:, -1, :]
+                    else:
+                        hidden_for_csr = torch.zeros(1, self.model.embed_dim, device=self._device)
 
-        generated_ids = input_ids.clone()
-        B = input_ids.shape[0]
+                    next_logits, csr_info = self.csr_guard.check_and_gate(
+                        hidden_for_csr,
+                        next_logits,
+                    )
 
-        for step in range(max_new_tokens):
-            # Forward pass
-            outputs = self.model(generated_ids)
-            logits = outputs['logits'][:, -1, :]  # [B, V]
+                # Apply temperature
+                next_logits = next_logits / max(effective_temp, 1e-8)
 
-            # Apply temperature
-            logits = logits / temperature
+                # Top-k filtering
+                if top_k > 0:
+                    top_k_values = torch.topk(next_logits, top_k)[0]
+                    threshold = top_k_values[:, -1].unsqueeze(-1)
+                    next_logits = torch.where(
+                        next_logits < threshold,
+                        torch.full_like(next_logits, float('-inf')),
+                        next_logits,
+                    )
 
-            # Top-k filtering
-            if top_k > 0:
-                indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
-                logits[indices_to_remove] = float('-inf')
+                # Top-p (nucleus) filtering
+                if effective_top_p < 1.0:
+                    sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
+                    cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+                    sorted_indices_to_remove = cumulative_probs > effective_top_p
+                    sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+                    sorted_indices_to_remove[:, 0] = False
+                    indices_to_remove = sorted_indices_to_remove.scatter(
+                        -1, sorted_indices, sorted_indices_to_remove
+                    )
+                    next_logits[indices_to_remove] = float('-inf')
 
-            # Top-p (nucleus) filtering
-            if top_p < 1.0:
-                sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-                cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
-                sorted_indices_to_remove = cumulative_probs > top_p
-                sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-                sorted_indices_to_remove[..., 0] = False
-                indices_to_remove = sorted_indices_to_remove.scatter(
-                    1, sorted_indices, sorted_indices_to_remove
-                )
-                logits[indices_to_remove] = float('-inf')
+                # Sample
+                probs = F.softmax(next_logits, dim=-1)
+                next_token = torch.multinomial(probs, num_samples=1)
+                next_token_prob = probs.gather(-1, next_token).item()
 
-            # Sample
-            probs = F.softmax(logits, dim=-1)
-            next_token = torch.multinomial(probs, num_samples=1)
-            generated_ids = torch.cat([generated_ids, next_token], dim=1)
+                # Append token
+                generated_ids = torch.cat([generated_ids, next_token], dim=-1)
+                generation_meta['tokens_generated'] += 1
 
-            # Check for EOS
-            if hasattr(self.model, 'config') and hasattr(self.model.config, 'eos_token_id'):
-                eos_id = self.model.config.eos_token_id
-                if eos_id is not None and (next_token == eos_id).all():
+                # Store hidden states if requested
+                if return_hidden_states and hidden is not None:
+                    hidden_states_list.append(hidden)
+
+                # Update monitoring
+                step_meta = {'step': step, 'token_id': next_token.item(), 'prob': next_token_prob}
+                step_meta.update(csr_info)
+
+                if self.metacognition is not None:
+                    meta_result = self.metacognition.update(
+                        next_logits,
+                        hidden[-1] if hidden is not None and isinstance(hidden, list) else hidden,
+                        next_token.item(),
+                    )
+                    step_meta.update(meta_result)
+
+                    # Check for abort
+                    if (self.config.abort_on_low_coherence and
+                        meta_result['recommendation'] == GenerationRecommendation.ABORT):
+                        generation_meta['aborted'] = True
+                        generation_meta['abort_reason'] = 'low_coherence'
+                        break
+
+                if self.gunas is not None:
+                    sattva, rajas, tamas = self.gunas.update(
+                        next_token.item(),
+                        next_token_prob,
+                    )
+                    step_meta['gunas'] = {'sattva': sattva, 'rajas': rajas, 'tamas': tamas}
+
+                # Callback
+                if on_token_callback is not None:
+                    on_token_callback(next_token.item(), step_meta)
+
+                # Check for EOS
+                eos_token_id = getattr(self.tokenizer, 'eos_token_id', 2)
+                if next_token.item() == eos_token_id:
                     break
 
-        metrics['tokens_generated'] = generated_ids.shape[1] - input_ids.shape[1]
-        return generated_ids, metrics
+        # Update karma after generation
+        if self.config.enable_karma and self.evolutionary_engine is not None:
+            # Extract final hidden for karma
+            if hidden is not None:
+                final_hidden = hidden[-1] if isinstance(hidden, list) else hidden
+                if final_hidden.dim() == 3:
+                    final_hidden = final_hidden.mean(dim=1)
 
-    def _generate_standard(
-        self,
-        input_ids: torch.Tensor,
-        max_new_tokens: int,
-        temperature: float,
-        top_k: int,
-        top_p: float,
-        inject_karma: bool,
-        store_karma: bool,
-    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
-        """
-        Standard mode: Karma persistence with Guna-scaled dynamic alpha.
+                new_karma = self.evolutionary_engine.bridge.compute_seed(final_hidden)
+                self.evolutionary_engine.karma_buffer = new_karma * self.evolutionary_engine.config.karma_decay
+                self.evolutionary_engine.karma_age += 1
 
-        Uses EvolutionaryInferenceEngine with Guna tracker but without
-        CSR/Metacognition overhead.
-        """
-        # Reset Gunas for new generation
-        if self._gunas is not None:
-            self._gunas.reset()
+        # Compute quality scores
+        scores = {}
+        if self.scorer is not None:
+            gunas_tuple = None
+            if self.gunas is not None:
+                gunas_tuple = (self.gunas.sattva, self.gunas.rajas, self.gunas.tamas)
 
-        # Generate with karma using engine
-        output_ids, engine_metrics = self._engine.generate_with_karma(
-            input_ids,
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
-            top_k=top_k,
-            top_p=top_p,
-            inject_karma=inject_karma,
-            store_karma=store_karma,
-            return_coherence=True,
-            guna_tracker=self._gunas,
-            metacognition=None,
-            csr_guard=None,
-        )
-
-        # Add Guna summary
-        if self._gunas is not None:
-            engine_metrics['final_gunas'] = self._gunas.current_gunas
-            engine_metrics['guna_dominant'] = self._gunas.get_detailed_state()['dominant']
-
-        return output_ids, engine_metrics
-
-    def _generate_sovereign(
-        self,
-        input_ids: torch.Tensor,
-        max_new_tokens: int,
-        temperature: float,
-        top_k: int,
-        top_p: float,
-        inject_karma: bool,
-        store_karma: bool,
-        compute_alignment: bool,
-        alignment_layers: Optional[List[int]],
-    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
-        """
-        Sovereign mode: Full pipeline with CSR, metacognition, scoring.
-
-        Engages all safety and alignment components for maximum quality
-        at the cost of additional latency.
-        """
-        # Reset components for new generation
-        if self._gunas is not None:
-            self._gunas.reset()
-        if self._metacognition is not None:
-            self._metacognition.reset()
-        if self._csr_guard is not None:
-            self._csr_guard.reset_statistics()
-
-        # Generate with full pipeline
-        output_ids, engine_metrics = self._engine.generate_with_karma(
-            input_ids,
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
-            top_k=top_k,
-            top_p=top_p,
-            inject_karma=inject_karma,
-            store_karma=store_karma,
-            return_coherence=True,
-            metacognition=self._metacognition,
-            guna_tracker=self._gunas,
-            csr_guard=self._csr_guard,
-        )
-
-        # Add component summaries
-        if self._gunas is not None:
-            engine_metrics['final_gunas'] = self._gunas.current_gunas
-            engine_metrics['guna_detailed'] = self._gunas.get_detailed_state()
-
-        if self._metacognition is not None:
-            engine_metrics['metacognition'] = self._metacognition.get_detailed_status()
-            engine_metrics['final_recommendation'] = self._metacognition._get_recommendation().value
-
-        if self._csr_guard is not None:
-            engine_metrics['csr_statistics'] = self._csr_guard.get_statistics()
-
-        # Compute Sovereign alignment score if requested
-        if compute_alignment and self._scorer is not None:
-            alignment_score, alignment_info = self._compute_alignment_score(
-                output_ids,
-                alignment_layers,
-            )
-            engine_metrics['sovereign_score'] = alignment_score
-            engine_metrics['sovereign_info'] = alignment_info
-
-        return output_ids, engine_metrics
-
-    def _compute_alignment_score(
-        self,
-        output_ids: torch.Tensor,
-        alignment_layers: Optional[List[int]] = None,
-    ) -> Tuple[float, Dict[str, Any]]:
-        """
-        Compute Sovereign R-Matrix alignment score.
-
-        Args:
-            output_ids: Generated sequence
-            alignment_layers: Which layers to score (default: all 12)
-
-        Returns:
-            alignment_score: Overall alignment score (0-1)
-            alignment_info: Detailed Vṛtti distribution info
-        """
-        if alignment_layers is None:
-            alignment_layers = list(range(12))
-
-        # Get hidden states for scoring
-        with torch.no_grad():
-            outputs = self.model(
-                output_ids,
-                extract_layers=alignment_layers,
+            scores = self.scorer.score_sequence(
+                hidden_states=hidden_states_list if hidden_states_list else None,
+                generated_tokens=generated_ids[:, input_ids.size(1):],
+                gunas=gunas_tuple,
             )
 
-        hidden_states = outputs.get('hidden_states', [])
+        # Decode output
+        generated_token_ids = generated_ids[0, input_ids.size(1):].tolist()
+        generated_text = self.tokenizer.decode(generated_token_ids, skip_special_tokens=True)
 
-        if not hidden_states:
-            return 0.5, {'error': 'No hidden states available'}
+        # Update counters
+        self._generation_count += 1
+        self._total_tokens_generated += generation_meta['tokens_generated']
 
-        # Build layer states dict
-        layer_states = {}
-        for i, layer_idx in enumerate(sorted(alignment_layers)):
-            if i < len(hidden_states):
-                layer_states[layer_idx] = hidden_states[i]
-
-        # Compute alignment using scorer
-        score, info = self._scorer.score_generation(layer_states)
-
-        return score, info
-
-    def load_checkpoint(self, checkpoint_path: str, apply_config: bool = True) -> bool:
-        """
-        Load trained weights and inference configuration.
-
-        Loads:
-        - Inference config (resonance_alpha, split, etc.) if present
-        - Evolutionary bridge weights (if present)
-        - CSR Guard weights (if present)
-        - Sovereign Scorer weights (if present)
-
-        Args:
-            checkpoint_path: Path to training checkpoint
-            apply_config: Whether to apply inference config from checkpoint
-
-        Returns:
-            True if any weights were loaded
-        """
-        success = False
-
-        try:
-            checkpoint = torch.load(checkpoint_path, map_location=self.device)
-        except Exception as e:
-            if self.enable_logging:
-                print(f"[InferenceManager] Failed to load checkpoint: {e}")
-            return False
-
-        # Load and apply inference config if present
-        if apply_config and 'inference_config' in checkpoint:
-            self._apply_inference_config(checkpoint['inference_config'])
-            success = True
-            if self.enable_logging:
-                print(f"[InferenceManager] Applied inference config from {checkpoint_path}")
-
-        # Initialize engine if needed for loading
-        if self._engine is None:
-            self._initialize_mode_components()
-
-        # Load bridge weights
-        if self._engine is not None:
-            if self._engine.load_bridge_checkpoint(checkpoint_path):
-                success = True
-                if self.enable_logging:
-                    print(f"[InferenceManager] Loaded bridge weights from {checkpoint_path}")
-
-        # Load CSR weights if guard exists
-        if self._csr_guard is not None:
-            try:
-                self._csr_guard.load_from_training(checkpoint)
-                success = True
-                if self.enable_logging:
-                    print(f"[InferenceManager] Loaded CSR weights from {checkpoint_path}")
-            except Exception as e:
-                if self.enable_logging:
-                    print(f"[InferenceManager] CSR weight loading failed: {e}")
-
-        # Load scorer weights if exists
-        if self._scorer is not None:
-            try:
-                if 'sovereign_scorer' in checkpoint:
-                    self._scorer.load_state_dict(checkpoint['sovereign_scorer'], strict=False)
-                    success = True
-                    if self.enable_logging:
-                        print(f"[InferenceManager] Loaded Scorer weights from {checkpoint_path}")
-            except Exception as e:
-                if self.enable_logging:
-                    print(f"[InferenceManager] Scorer weight loading failed: {e}")
-
-        return success
-
-    def _apply_inference_config(self, config: Dict[str, Any]):
-        """
-        Apply inference configuration from checkpoint.
-
-        Updates internal config with checkpoint-specified values.
-
-        Args:
-            config: Inference config dict from checkpoint
-        """
-        # Apply recommended resonance alpha
-        if 'recommended_alpha' in config:
-            self._config['resonance_alpha'] = config['recommended_alpha']
-            if self._engine is not None:
-                self._engine.resonance_alpha = config['recommended_alpha']
-
-        # Store split info for reference
-        if 'authority_sensory_split' in config:
-            self._inference_split = tuple(config['authority_sensory_split'])
-
-        # Store training state for reference
-        if 'training_state' in config:
-            self._training_state = config['training_state']
-
-        if self.enable_logging:
-            print(f"[InferenceManager] Config: alpha={config.get('recommended_alpha', 0.1)}, "
-                  f"split={config.get('authority_sensory_split', (9, 3))}, "
-                  f"state={config.get('training_state', 'unknown')}")
-
-    def clear_karma(self):
-        """
-        Clear karma buffer for fresh conversation start.
-
-        Also resets component states.
-        """
-        if self._engine is not None:
-            self._engine.clear_karma()
-        if self._gunas is not None:
-            self._gunas.reset()
-        if self._metacognition is not None:
-            self._metacognition.reset()
-        if self._csr_guard is not None:
-            self._csr_guard.reset_statistics()
-
-    def get_karma_status(self) -> str:
-        """Get karma coherence status string."""
-        if self._engine is not None:
-            return self._engine.get_coherence_status()
-        return "Karma:disabled"
-
-    def _get_component_status(self) -> Dict[str, Any]:
-        """Get detailed status of all components."""
-        status = {
-            'mode': self._mode.value,
-            'generation_count': self.generation_count,
+        result = {
+            'text': generated_text,
+            'tokens': generated_token_ids,
+            'full_ids': generated_ids,
+            'meta': generation_meta,
+            'scores': scores,
         }
 
-        if self._engine is not None:
-            status['engine'] = {
-                'bridge_enabled': self._engine.bridge_enabled,
-                'karma_stored': self._engine.karma_buffer is not None,
-                'gunas': self._engine.current_gunas,
-            }
+        if return_hidden_states:
+            result['hidden_states'] = hidden_states_list
 
-        if self._gunas is not None:
-            status['gunas'] = self._gunas.get_detailed_state()
+        return result
 
-        if self._metacognition is not None:
-            status['metacognition'] = self._metacognition.get_detailed_status()
+    def get_status(self) -> str:
+        """
+        Get comprehensive status string.
 
-        if self._csr_guard is not None:
-            status['csr_guard'] = self._csr_guard.get_statistics()
+        Returns:
+            status: Multi-line status string
+        """
+        lines = [f"InferenceManager [{self.config.mode.value}]"]
+        lines.append(f"  Device: {self._device}")
+        lines.append(f"  Generations: {self._generation_count}")
+        lines.append(f"  Total tokens: {self._total_tokens_generated}")
+        lines.append("")
 
-        if self._scorer is not None:
-            status['scorer'] = {'initialized': True}
+        # Component statuses
+        if self.evolutionary_engine is not None:
+            lines.append(f"  {self.evolutionary_engine.get_status_line()}")
 
-        return status
+        if self.csr_guard is not None:
+            lines.append(f"  {self.csr_guard.get_status_line()}")
+
+        if self.metacognition is not None:
+            lines.append(f"  {self.metacognition.get_status_line()}")
+
+        if self.gunas is not None:
+            lines.append(f"  {self.gunas.get_status_line()}")
+
+        if self.scorer is not None:
+            lines.append(f"  {self.scorer.get_status_line()}")
+
+        return "\n".join(lines)
 
     def get_status_line(self) -> str:
-        """
-        Get compact status line for logging.
+        """Get single-line status."""
+        parts = [f"Mode: {self.config.mode.value}"]
 
-        Format: [MODE] karma_status | guna_status | meta_status
-        """
-        parts = [f"[{self._mode.value.upper()}]"]
+        if self.evolutionary_engine is not None and self.evolutionary_engine.bridge_enabled:
+            parts.append(f"Karma: age={self.evolutionary_engine.karma_age}")
 
-        if self._engine is not None:
-            parts.append(self._engine.get_coherence_status())
-
-        if self._gunas is not None:
-            parts.append(self._gunas.get_status())
-
-        if self._metacognition is not None:
-            parts.append(self._metacognition.get_status())
+        if self.metacognition is not None and self.metacognition.coherence_history:
+            avg_coh = sum(self.metacognition.coherence_history[-10:]) / len(self.metacognition.coherence_history[-10:])
+            parts.append(f"Coh: {avg_coh:.2f}")
 
         return " | ".join(parts)
 
-    def __repr__(self) -> str:
-        active = self._get_active_components()
-        components = [k for k, v in active.items() if v]
-        return (
-            f"InferenceManager(mode={self._mode.value}, "
-            f"dim={self.dim}, "
-            f"components={components})"
-        )
+    def clear_state(self) -> None:
+        """Clear all accumulated state."""
+        if self.evolutionary_engine is not None:
+            self.evolutionary_engine.clear_karma()
+
+        if self.csr_guard is not None:
+            self.csr_guard.reset_history()
+
+        if self.metacognition is not None:
+            self.metacognition.reset()
+
+        if self.gunas is not None:
+            self.gunas.reset()
+
+        if self.scorer is not None:
+            self.scorer.reset()
+
+    def save_state(self, path: Union[str, Path]) -> None:
+        """
+        Save manager state for later resumption.
+
+        Args:
+            path: Save path
+        """
+        state = {
+            'generation_count': self._generation_count,
+            'total_tokens': self._total_tokens_generated,
+            'config': self.config,
+        }
+
+        if self.evolutionary_engine is not None:
+            state['evolutionary'] = self.evolutionary_engine.get_state()
+
+        torch.save(state, path)
+
+    def load_state(self, path: Union[str, Path]) -> None:
+        """
+        Load manager state.
+
+        Args:
+            path: State file path
+        """
+        state = torch.load(path, map_location=self._device)
+
+        self._generation_count = state.get('generation_count', 0)
+        self._total_tokens_generated = state.get('total_tokens', 0)
+
+        if 'evolutionary' in state and self.evolutionary_engine is not None:
+            self.evolutionary_engine.load_state(state['evolutionary'])

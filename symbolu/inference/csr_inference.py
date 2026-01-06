@@ -1,426 +1,518 @@
+#!/usr/bin/env python3
 """
-CSR Inference Guard Module
-==========================
+CSR Inference Guard
+====================
 
-Inference-time CSR (Constraint-Structure-Resonance) safety layers.
+Inference-time safety layer using CSR (Constraint-Structure-Resonance) components.
 
-This module implements phonetic-ontological grounding during generation,
-applying the same safety constraints used during training to prevent:
-- High-entropy (incoherent) output
-- Repetition loops
-- Divergent generation
+Monitors generation entropy and applies safety interventions:
+1. Flag high-entropy tokens for review
+2. Apply synthesis gating to hidden states
+3. Optionally reject/resample tokens exceeding entropy threshold
 
-Key components:
-- EntropySink: Absorbs high-entropy energy from hidden states
-- SynthesisGate: Controls information flow based on coherence
+Training Reference: csr_phoneme_provider.py (EntropySink, SynthesisGate)
 
-**CRITICAL**: Unlike earlier proposals, this implementation properly
-re-projects modified hidden states through lm_head to ensure safety
-interventions actually affect token selection.
-
-Usage:
-------
-    from symbolu.inference import CSRInferenceGuard
-
-    guard = CSRInferenceGuard(
-        entropy_sink=trained_sink,
-        synthesis_gate=trained_gate,
-        lm_head=model.lm_head,
-    )
-
-    # In generation loop:
-    outputs = model(input_ids, return_last_hidden=True)
-    gated_logits, info = guard.apply(
-        hidden_state=outputs['last_hidden_state'][:, -1, :],
-        original_logits=outputs['logits'][:, -1, :],
-    )
-
-    # Use gated_logits for sampling (safety-enforced)
-    next_token = sample(gated_logits)
+Author: Sovereign-1 Training Initiative
+Date: January 2026
 """
-
-import math
-from typing import Dict, List, Tuple, Optional, Any, Callable
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import Dict, List, Optional, Tuple, Any, Union
+from dataclasses import dataclass
+import math
+import warnings
+
+
+@dataclass
+class CSRGuardConfig:
+    """Configuration for CSR inference guard."""
+    entropy_threshold: float = 2.0  # Log-entropy threshold for intervention
+    confidence_threshold: float = 0.1  # Min confidence to accept token
+    temperature_dampening: float = 0.7  # Temperature multiplier when entropy high
+    max_resample_attempts: int = 3  # Max resampling when entropy exceeded
+    enable_entropy_sink: bool = True
+    enable_synthesis_gate: bool = True
 
 
 class EntropySinkInference(nn.Module):
     """
-    Inference-time Entropy Sink for absorbing high-entropy states.
+    Inference-time entropy sink.
 
-    The EntropySink dampens hidden states when entropy is too high,
-    preventing divergent generation. This is a lightweight version
-    optimized for inference (no gradient tracking needed).
-
-    Args:
-        dim: Hidden dimension
-        absorption_strength: How strongly to dampen high-entropy states
-        threshold: Entropy threshold for activation
+    Absorbs high-entropy energy from hidden states to prevent divergence.
+    Trained version learns projection; inference uses simplified dampening.
     """
 
-    def __init__(
-        self,
-        dim: int,
-        absorption_strength: float = 0.3,
-        threshold: float = 2.0,
-    ):
+    def __init__(self, embed_dim: int, sink_dim: Optional[int] = None):
         super().__init__()
-        self.dim = dim
-        self.absorption_strength = absorption_strength
-        self.threshold = threshold
+        self.embed_dim = embed_dim
+        self.sink_dim = sink_dim or embed_dim // 4
 
-        # Learnable sink projection (can be loaded from training)
-        self.sink_proj = nn.Linear(dim, dim, bias=False)
-        self.sink_gate = nn.Linear(dim, 1, bias=True)
+        # Projection to sink space
+        self.sink_proj = nn.Linear(embed_dim, self.sink_dim)
+        self.sink_gate = nn.Linear(self.sink_dim, 1)
+
+        # Re-projection back
+        self.out_proj = nn.Linear(self.sink_dim, embed_dim)
 
         # Initialize to identity-like behavior
-        nn.init.eye_(self.sink_proj.weight)
-        nn.init.zeros_(self.sink_gate.weight)
-        nn.init.constant_(self.sink_gate.bias, -2.0)  # Start mostly closed
+        nn.init.zeros_(self.out_proj.weight)
+        nn.init.zeros_(self.out_proj.bias)
 
     def forward(
         self,
         hidden_state: torch.Tensor,
-        entropy_level: float,
-    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        entropy_level: float = 0.0,
+    ) -> torch.Tensor:
         """
-        Apply entropy absorption to hidden state.
+        Apply entropy sink to absorb high-entropy energy.
 
         Args:
-            hidden_state: Hidden state tensor [B, D] or [B, N, D]
-            entropy_level: Current entropy level (log-entropy)
+            hidden_state: [B, D] or [B, T, D] hidden state
+            entropy_level: Current entropy level (0-inf)
 
         Returns:
-            modified_state: Dampened hidden state
-            info: Dict with absorption details
+            dampened: Hidden state with entropy absorbed
         """
-        info = {
-            "entropy_level": entropy_level,
-            "sink_activated": False,
-            "absorption_amount": 0.0,
-        }
-
-        # Only activate if entropy exceeds threshold
-        if entropy_level <= self.threshold:
-            return hidden_state, info
-
-        info["sink_activated"] = True
-
-        # Compute absorption amount based on how far above threshold
-        excess = (entropy_level - self.threshold) / self.threshold
-        absorption = min(self.absorption_strength, excess * self.absorption_strength)
-        info["absorption_amount"] = absorption
-
-        # Apply sink: project to dampened representation
-        sink_output = self.sink_proj(hidden_state)
-
-        # Gate controls how much sink to apply
-        gate = torch.sigmoid(self.sink_gate(hidden_state))
-        gate = gate * absorption  # Scale by absorption amount
-
-        # Blend: hidden = (1 - gate) * hidden + gate * sink
+        original_shape = hidden_state.shape
         if hidden_state.dim() == 3:
-            gate = gate.unsqueeze(-1)
+            B, T, D = hidden_state.shape
+            hidden_state = hidden_state.view(B * T, D)
 
-        modified = (1 - gate) * hidden_state + gate * sink_output
+        # Project to sink space
+        sink_state = self.sink_proj(hidden_state)
+        sink_state = F.gelu(sink_state)
 
-        return modified, info
+        # Compute absorption gate based on entropy
+        absorption = torch.sigmoid(self.sink_gate(sink_state))
+
+        # Scale absorption by entropy (more entropy = more absorption)
+        entropy_scale = min(1.0, entropy_level / 3.0)  # Normalize
+        absorption = absorption * entropy_scale
+
+        # Absorb energy (subtract from hidden)
+        absorbed = self.out_proj(sink_state * absorption)
+        dampened = hidden_state - absorbed
+
+        # Reshape if needed
+        if len(original_shape) == 3:
+            dampened = dampened.view(original_shape)
+
+        return dampened
+
+    def load_from_checkpoint(self, state_dict: Dict[str, torch.Tensor]) -> bool:
+        """Load weights from checkpoint."""
+        prefixes = ["csr_entropy_sink.", "entropy_sink.", ""]
+
+        for prefix in prefixes:
+            try:
+                self.sink_proj.weight.data = state_dict[f"{prefix}sink_proj.weight"]
+                self.sink_proj.bias.data = state_dict[f"{prefix}sink_proj.bias"]
+                self.sink_gate.weight.data = state_dict[f"{prefix}sink_gate.weight"]
+                self.sink_gate.bias.data = state_dict[f"{prefix}sink_gate.bias"]
+                self.out_proj.weight.data = state_dict[f"{prefix}out_proj.weight"]
+                self.out_proj.bias.data = state_dict[f"{prefix}out_proj.bias"]
+                return True
+            except KeyError:
+                continue
+
+        return False
 
 
 class SynthesisGateInference(nn.Module):
     """
-    Inference-time Synthesis Gate for coherence-based information flow.
+    Inference-time synthesis gate.
 
-    The SynthesisGate modulates hidden state magnitude based on
-    coherence signals, suppressing low-coherence representations.
-
-    Args:
-        dim: Hidden dimension
-        gate_bias: Initial gate bias (negative = more restrictive)
+    Controls information flow based on coherence/confidence signals.
     """
 
-    def __init__(
-        self,
-        dim: int,
-        gate_bias: float = 0.0,
-    ):
+    def __init__(self, embed_dim: int):
         super().__init__()
-        self.dim = dim
+        self.embed_dim = embed_dim
 
-        # Gating network
-        self.gate_proj = nn.Sequential(
-            nn.Linear(dim, dim // 4),
-            nn.GELU(),
-            nn.Linear(dim // 4, 1),
-        )
-
-        # Apply initial bias
-        if gate_bias != 0:
-            self.gate_proj[-1].bias.data.fill_(gate_bias)
+        # Gate computation
+        self.gate_proj = nn.Linear(embed_dim, embed_dim)
+        self.gate_norm = nn.LayerNorm(embed_dim)
 
     def forward(
         self,
         hidden_state: torch.Tensor,
-        coherence: Optional[float] = None,
-    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        confidence: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Apply synthesis gating to hidden state.
+        Apply synthesis gate to hidden state.
 
         Args:
-            hidden_state: Hidden state tensor [B, D] or [B, N, D]
-            coherence: External coherence signal (optional)
+            hidden_state: [B, D] or [B, T, D] hidden state
+            confidence: Optional [B] or [B, T] confidence scores
 
         Returns:
-            gated_state: Gated hidden state
-            info: Dict with gate values
+            gated: Gated hidden state
+            gate_values: Gate activations for monitoring
         """
-        # Compute gate value from hidden state
-        gate_logit = self.gate_proj(hidden_state)
-        gate = torch.sigmoid(gate_logit)
+        # Compute gate
+        gate = torch.sigmoid(self.gate_proj(hidden_state))
+        gate = self.gate_norm(gate)
 
-        # If external coherence provided, factor it in
-        if coherence is not None:
-            external_gate = torch.tensor(coherence, device=hidden_state.device)
-            gate = gate * 0.7 + external_gate * 0.3
+        # Apply confidence scaling if provided
+        if confidence is not None:
+            if confidence.dim() < gate.dim():
+                confidence = confidence.unsqueeze(-1)
+            gate = gate * confidence
 
         # Apply gate
-        if hidden_state.dim() == 3:
-            gate = gate.unsqueeze(-1)
+        gated = hidden_state * gate
 
-        gated_state = hidden_state * gate
-
-        info = {
-            "gate_value": gate.mean().item(),
-            "gate_min": gate.min().item(),
-            "gate_max": gate.max().item(),
-        }
-
-        return gated_state, info
+        return gated, gate.mean(dim=-1)
 
     def compute_gate(self, hidden_state: torch.Tensor) -> torch.Tensor:
-        """Compute gate value without applying it."""
-        gate_logit = self.gate_proj(hidden_state)
-        return torch.sigmoid(gate_logit)
+        """Compute gate value without applying."""
+        gate = torch.sigmoid(self.gate_proj(hidden_state))
+        return gate.mean(dim=-1)
+
+    def load_from_checkpoint(self, state_dict: Dict[str, torch.Tensor]) -> bool:
+        """Load weights from checkpoint."""
+        prefixes = ["csr_synthesis_gate.", "synthesis_gate.", ""]
+
+        for prefix in prefixes:
+            try:
+                self.gate_proj.weight.data = state_dict[f"{prefix}gate_proj.weight"]
+                self.gate_proj.bias.data = state_dict[f"{prefix}gate_proj.bias"]
+                self.gate_norm.weight.data = state_dict[f"{prefix}gate_norm.weight"]
+                self.gate_norm.bias.data = state_dict[f"{prefix}gate_norm.bias"]
+                return True
+            except KeyError:
+                continue
+
+        return False
 
 
 class CSRInferenceGuard:
     """
-    CSR Inference Guard with lm_head re-projection.
+    Apply CSR safety layers during inference.
 
-    This is the main safety layer for inference, combining:
-    - EntropySink: Absorbs high-entropy states
-    - SynthesisGate: Controls information flow
+    Monitors generation entropy and can:
+    1. Flag high-entropy tokens for review
+    2. Apply synthesis gating to hidden states
+    3. Optionally reject/resample tokens exceeding entropy threshold
 
-    **CRITICAL FEATURE**: After modifying hidden states, this guard
-    re-projects through lm_head to ensure safety interventions
-    actually affect the final token logits.
+    IMPORTANT: The lm_head parameter may be None. All methods that use
+    lm_head must check for None before accessing it.
 
-    This addresses the gap identified in evaluation:
-    > "the SynthesisGate and EntropySink being computed but not
-    > re-projected through the lm_head, rendering their safety
-    > effects invisible to the actual token selection"
+    Example:
+        guard = CSRInferenceGuard(config, lm_head=model.lm_head)
+        guard.to(device)
 
-    Args:
-        entropy_sink: Trained EntropySink module (or None for default)
-        synthesis_gate: Trained SynthesisGate module (or None for default)
-        lm_head: Language model head for re-projection (nn.Linear)
-        dim: Hidden dimension (required if sink/gate are None)
-        entropy_threshold: Threshold for entropy sink activation
-        skip_threshold: Skip guard if confidence above this threshold
-
-    Attributes:
-        intervention_count: Number of times guard has intervened
-        total_calls: Total number of guard calls
+        # During generation
+        gated_logits, info = guard.check_and_gate(hidden_state, logits)
+        if info['warning']:
+            print(f"Warning: {info['warning']}")
     """
 
     def __init__(
         self,
-        entropy_sink: Optional[nn.Module] = None,
-        synthesis_gate: Optional[nn.Module] = None,
+        config: Optional[CSRGuardConfig] = None,
+        entropy_sink: Optional[EntropySinkInference] = None,
+        synthesis_gate: Optional[SynthesisGateInference] = None,
+        embed_dim: int = 768,
         lm_head: Optional[nn.Module] = None,
-        dim: int = 768,
-        entropy_threshold: float = 2.0,
-        skip_threshold: float = 0.9,
     ):
-        # Initialize or use provided modules
-        if entropy_sink is None:
-            self.entropy_sink = EntropySinkInference(dim, threshold=entropy_threshold)
-        else:
-            self.entropy_sink = entropy_sink
-
-        if synthesis_gate is None:
-            self.synthesis_gate = SynthesisGateInference(dim)
-        else:
-            self.synthesis_gate = synthesis_gate
-
-        self.lm_head = lm_head
-        self.entropy_threshold = entropy_threshold
-        self.skip_threshold = skip_threshold
-
-        # Statistics
-        self.intervention_count = 0
-        self.total_calls = 0
-
-    def set_lm_head(self, lm_head: nn.Module):
-        """Set the lm_head for re-projection (call after model loading)."""
-        self.lm_head = lm_head
-
-    def to(self, device: torch.device) -> 'CSRInferenceGuard':
-        """Move guard modules to device."""
-        self.entropy_sink = self.entropy_sink.to(device)
-        self.synthesis_gate = self.synthesis_gate.to(device)
-        return self
-
-    def apply(
-        self,
-        hidden_state: torch.Tensor,
-        original_logits: torch.Tensor,
-        coherence: Optional[float] = None,
-    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
         """
-        Apply CSR safety checks and return modified logits.
-
-        This is the main entry point for the guard. It:
-        1. Computes entropy from original logits
-        2. Applies EntropySink if threshold exceeded
-        3. Applies SynthesisGate for coherence control
-        4. **Re-projects modified hidden state through lm_head**
+        Initialize CSR inference guard.
 
         Args:
-            hidden_state: Current hidden state [B, D] (last position)
-            original_logits: Original logits [B, V] (for entropy check)
-            coherence: External coherence signal (optional)
+            config: Guard configuration
+            entropy_sink: Pre-initialized entropy sink (or None to create)
+            synthesis_gate: Pre-initialized synthesis gate (or None to create)
+            embed_dim: Embedding dimension for creating components
+            lm_head: Language model head for re-projection (MAY BE NONE)
+        """
+        self.config = config or CSRGuardConfig()
+        self.embed_dim = embed_dim
+
+        # Initialize components
+        self.entropy_sink = entropy_sink or EntropySinkInference(embed_dim)
+        self.synthesis_gate = synthesis_gate or SynthesisGateInference(embed_dim)
+
+        # CRITICAL: lm_head may be None - always check before use
+        self._lm_head = lm_head
+        self._lm_head_available = lm_head is not None
+
+        # Tracking
+        self.entropy_history: List[float] = []
+        self.intervention_count: int = 0
+        self._device: torch.device = torch.device('cpu')
+
+    @property
+    def lm_head(self) -> Optional[nn.Module]:
+        """Get lm_head with explicit None check warning."""
+        if self._lm_head is None:
+            warnings.warn(
+                "CSRInferenceGuard.lm_head is None. "
+                "Re-projection after entropy sink is disabled."
+            )
+        return self._lm_head
+
+    def set_lm_head(self, lm_head: nn.Module) -> None:
+        """
+        Set lm_head after initialization.
+
+        Args:
+            lm_head: Language model head module
+        """
+        self._lm_head = lm_head
+        self._lm_head_available = lm_head is not None
+
+    def to(self, device: Union[str, torch.device]) -> 'CSRInferenceGuard':
+        """
+        Move guard to specified device.
+
+        Args:
+            device: Target device
 
         Returns:
-            modified_logits: Safety-enforced logits (use for sampling)
-            info: Dict with intervention details
+            self for chaining
         """
-        self.total_calls += 1
+        if isinstance(device, str):
+            device = torch.device(device)
 
-        info = {
-            "entropy": 0.0,
+        self._device = device
+        self.entropy_sink = self.entropy_sink.to(device)
+        self.synthesis_gate = self.synthesis_gate.to(device)
+
+        return self
+
+    @property
+    def device(self) -> torch.device:
+        """Get current device."""
+        return self._device
+
+    def compute_entropy(self, logits: torch.Tensor) -> torch.Tensor:
+        """
+        Compute token distribution entropy.
+
+        Args:
+            logits: [B, V] or [B, T, V] logits
+
+        Returns:
+            entropy: [B] or [B, T] entropy values
+        """
+        probs = F.softmax(logits, dim=-1)
+        log_probs = torch.log(probs + 1e-10)
+        entropy = -(probs * log_probs).sum(dim=-1)
+
+        return entropy
+
+    def check_and_gate(
+        self,
+        hidden_state: torch.Tensor,
+        token_logits: torch.Tensor,
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        """
+        Apply CSR safety checks to generation step.
+
+        Args:
+            hidden_state: Current hidden state [B, D] or [B, T, D]
+            token_logits: Logits for next token [B, V] or [B, T, V]
+
+        Returns:
+            gated_logits: Possibly modified logits
+            safety_info: Dict with entropy, gate values, warnings
+        """
+        # Compute entropy
+        entropy = self.compute_entropy(token_logits)
+        mean_entropy = entropy.mean().item()
+        self.entropy_history.append(mean_entropy)
+
+        safety_info = {
+            "entropy": mean_entropy,
             "sink_activated": False,
-            "gate_applied": True,
-            "re_projected": False,
+            "gate_applied": False,
+            "gate_value": 1.0,
+            "warning": None,
             "intervention": False,
         }
 
-        # Compute entropy from original logits
-        probs = F.softmax(original_logits.float(), dim=-1)
-        entropy = -(probs * torch.log(probs + 1e-10)).sum(dim=-1)
-        mean_entropy = entropy.mean().item()
-        info["entropy"] = mean_entropy
-
-        # Fast path: skip if entropy is very low (high confidence)
-        max_entropy = math.log(original_logits.shape[-1])
-        normalized_entropy = mean_entropy / max_entropy
-        if normalized_entropy < (1 - self.skip_threshold):
-            info["skipped"] = True
-            return original_logits, info
-
-        # Track if we need to re-project
-        state_modified = False
-        current_hidden = hidden_state
-
-        # Step 1: Apply EntropySink if entropy exceeds threshold
-        if mean_entropy > self.entropy_threshold:
-            current_hidden, sink_info = self.entropy_sink(
-                current_hidden,
-                entropy_level=mean_entropy,
-            )
-            info.update({f"sink_{k}": v for k, v in sink_info.items()})
-            if sink_info["sink_activated"]:
-                state_modified = True
-                info["sink_activated"] = True
-
-        # Step 2: Apply SynthesisGate
-        current_hidden, gate_info = self.synthesis_gate(
-            current_hidden,
-            coherence=coherence,
-        )
-        info.update({f"gate_{k}": v for k, v in gate_info.items()})
-
-        # Check if gate significantly modified the state
-        if gate_info["gate_value"] < 0.95:
-            state_modified = True
-
-        # Step 3: Re-project through lm_head if state was modified
-        if state_modified and self.lm_head is not None:
-            modified_logits = self.lm_head(current_hidden)
-            info["re_projected"] = True
-            info["intervention"] = True
+        # Check if entropy exceeds threshold
+        if mean_entropy > self.config.entropy_threshold:
             self.intervention_count += 1
-            return modified_logits, info
+            safety_info["intervention"] = True
 
-        # No significant modification, return original
-        return original_logits, info
+            # Apply entropy sink if enabled
+            if self.config.enable_entropy_sink:
+                hidden_state = self.entropy_sink(hidden_state, entropy_level=mean_entropy)
+                safety_info["sink_activated"] = True
 
-    def check_entropy(self, logits: torch.Tensor) -> Tuple[float, bool]:
+                # CRITICAL: Check if lm_head is available before re-projection
+                if self._lm_head_available and self._lm_head is not None:
+                    # Re-project to logits with dampened hidden state
+                    if hidden_state.dim() == 2:
+                        token_logits = self._lm_head(hidden_state)
+                    else:
+                        # For sequence hidden states, take last position
+                        token_logits = self._lm_head(hidden_state[:, -1, :])
+
+                    safety_info["warning"] = (
+                        f"High entropy ({mean_entropy:.2f}) - sink applied, logits recomputed"
+                    )
+                else:
+                    # Cannot recompute logits without lm_head
+                    # Apply temperature dampening instead
+                    token_logits = token_logits / self.config.temperature_dampening
+                    safety_info["warning"] = (
+                        f"High entropy ({mean_entropy:.2f}) - sink applied, "
+                        f"lm_head unavailable so temperature dampened"
+                    )
+
+        # Apply synthesis gate if enabled
+        if self.config.enable_synthesis_gate:
+            _, gate_value = self.synthesis_gate(hidden_state)
+            safety_info["gate_value"] = gate_value.mean().item()
+            safety_info["gate_applied"] = True
+
+        return token_logits, safety_info
+
+    def should_resample(
+        self,
+        token_logits: torch.Tensor,
+        attempt: int = 0,
+    ) -> Tuple[bool, Dict[str, Any]]:
         """
-        Quick entropy check without full guard application.
+        Check if token should be resampled due to high entropy.
 
         Args:
-            logits: Token logits [B, V]
+            token_logits: [B, V] logits for next token
+            attempt: Current resampling attempt number
 
         Returns:
-            entropy: Mean log-entropy
-            exceeds_threshold: Whether entropy exceeds threshold
+            should_resample: Whether to resample
+            info: Dict with reason and suggestions
         """
-        probs = F.softmax(logits.float(), dim=-1)
-        entropy = -(probs * torch.log(probs + 1e-10)).sum(dim=-1)
+        if attempt >= self.config.max_resample_attempts:
+            return False, {"reason": "max_attempts_reached", "attempts": attempt}
+
+        entropy = self.compute_entropy(token_logits)
         mean_entropy = entropy.mean().item()
-        return mean_entropy, mean_entropy > self.entropy_threshold
 
-    def get_statistics(self) -> Dict[str, Any]:
-        """Get guard intervention statistics."""
-        intervention_rate = (
-            self.intervention_count / self.total_calls
-            if self.total_calls > 0 else 0.0
-        )
-        return {
-            "total_calls": self.total_calls,
-            "intervention_count": self.intervention_count,
-            "intervention_rate": intervention_rate,
-        }
+        if mean_entropy > self.config.entropy_threshold * 1.5:  # Higher threshold for resampling
+            return True, {
+                "reason": "entropy_exceeded",
+                "entropy": mean_entropy,
+                "suggestion": "lower_temperature",
+            }
 
-    def reset_statistics(self):
-        """Reset intervention statistics."""
-        self.intervention_count = 0
-        self.total_calls = 0
+        # Check if top probability is too low (low confidence)
+        probs = F.softmax(token_logits, dim=-1)
+        top_prob = probs.max(dim=-1)[0].mean().item()
 
-    def load_from_training(
+        if top_prob < self.config.confidence_threshold:
+            return True, {
+                "reason": "low_confidence",
+                "top_prob": top_prob,
+                "suggestion": "increase_top_k",
+            }
+
+        return False, {"reason": "acceptable"}
+
+    def get_adjusted_sampling_params(
         self,
-        checkpoint: Dict[str, Any],
-        prefix: str = "csr_",
-    ):
+        base_temperature: float,
+        base_top_p: float,
+        current_entropy: Optional[float] = None,
+    ) -> Dict[str, float]:
         """
-        Load trained CSR weights from checkpoint.
+        Get adjusted sampling parameters based on entropy history.
 
         Args:
-            checkpoint: Training checkpoint dict
-            prefix: Key prefix for CSR weights in checkpoint
-        """
-        # Try to find entropy sink weights
-        sink_keys = [k for k in checkpoint.keys() if "entropy_sink" in k.lower()]
-        if sink_keys:
-            sink_state = {
-                k.replace(f"{prefix}entropy_sink.", ""): v
-                for k, v in checkpoint.items()
-                if k.startswith(f"{prefix}entropy_sink.")
-            }
-            if sink_state:
-                self.entropy_sink.load_state_dict(sink_state, strict=False)
+            base_temperature: Base temperature
+            base_top_p: Base top-p value
+            current_entropy: Current step entropy (or use recent average)
 
-        # Try to find synthesis gate weights
-        gate_keys = [k for k in checkpoint.keys() if "synthesis_gate" in k.lower()]
-        if gate_keys:
-            gate_state = {
-                k.replace(f"{prefix}synthesis_gate.", ""): v
-                for k, v in checkpoint.items()
-                if k.startswith(f"{prefix}synthesis_gate.")
-            }
-            if gate_state:
-                self.synthesis_gate.load_state_dict(gate_state, strict=False)
+        Returns:
+            params: Dict with adjusted temperature, top_p
+        """
+        # Use recent average if current not provided
+        if current_entropy is None and self.entropy_history:
+            current_entropy = sum(self.entropy_history[-5:]) / len(self.entropy_history[-5:])
+        elif current_entropy is None:
+            return {"temperature": base_temperature, "top_p": base_top_p}
+
+        # Adjust based on entropy level
+        if current_entropy > self.config.entropy_threshold:
+            # High entropy: reduce temperature, reduce top_p
+            temp_mult = max(0.5, 1.0 - (current_entropy - self.config.entropy_threshold) / 5.0)
+            top_p_adj = max(-0.2, -(current_entropy - self.config.entropy_threshold) / 10.0)
+        elif current_entropy < self.config.entropy_threshold * 0.5:
+            # Low entropy: slight increase for variety
+            temp_mult = min(1.2, 1.0 + (self.config.entropy_threshold * 0.5 - current_entropy) / 5.0)
+            top_p_adj = min(0.05, (self.config.entropy_threshold * 0.5 - current_entropy) / 20.0)
+        else:
+            # Normal range
+            temp_mult = 1.0
+            top_p_adj = 0.0
+
+        return {
+            "temperature": base_temperature * temp_mult,
+            "top_p": max(0.1, min(1.0, base_top_p + top_p_adj)),
+        }
+
+    def get_status_line(self) -> str:
+        """
+        Get status line for monitoring display.
+
+        Returns:
+            status: Human-readable status string
+        """
+        if not self.entropy_history:
+            return "CSR Guard: no data"
+
+        avg_entropy = sum(self.entropy_history[-20:]) / len(self.entropy_history[-20:])
+        max_entropy = max(self.entropy_history[-20:]) if self.entropy_history else 0
+
+        parts = [
+            f"CSR Guard",
+            f"Entropy: {avg_entropy:.2f}",
+            f"Max: {max_entropy:.2f}",
+            f"Interventions: {self.intervention_count}",
+        ]
+
+        if not self._lm_head_available:
+            parts.append("(no lm_head)")
+
+        return " | ".join(parts)
+
+    def reset_history(self) -> None:
+        """Reset tracking history."""
+        self.entropy_history = []
+        self.intervention_count = 0
+
+    def load_from_checkpoint(self, checkpoint: Dict[str, Any]) -> bool:
+        """
+        Load CSR components from checkpoint.
+
+        Args:
+            checkpoint: Checkpoint dict
+
+        Returns:
+            success: Whether any components were loaded
+        """
+        success = False
+
+        # Try to load entropy sink
+        if 'csr_entropy_sink' in checkpoint:
+            if self.entropy_sink.load_from_checkpoint(checkpoint['csr_entropy_sink']):
+                success = True
+
+        # Try to load synthesis gate
+        if 'csr_synthesis_gate' in checkpoint:
+            if self.synthesis_gate.load_from_checkpoint(checkpoint['csr_synthesis_gate']):
+                success = True
+
+        # Try loading from flat state dict
+        if not success and isinstance(checkpoint, dict):
+            sink_loaded = self.entropy_sink.load_from_checkpoint(checkpoint)
+            gate_loaded = self.synthesis_gate.load_from_checkpoint(checkpoint)
+            success = sink_loaded or gate_loaded
+
+        return success

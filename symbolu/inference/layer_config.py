@@ -1,284 +1,250 @@
+#!/usr/bin/env python3
 """
 Layer Inference Configuration
 ==============================
 
-Configuration for layer-specific inference behavior reflecting the 9:3
-Authority/Sensory hierarchical split from the Symbolu architecture.
+Configuration for layer-specific inference behavior reflecting
+the hierarchical split from training.
 
-The 9:3 split divides the 12-layer transformer into:
-- **Authority Layers (O1-O9)**: Core semantic intent and meaning
-- **Sensory Layers (O10-O12)**: Phonetic expression and fluency
+Supports both:
+- 9:3 Authority/Sensory split (original architecture)
+- 6:6 Authority/Sensory split (balanced architecture)
 
-This configuration enables:
-1. KV-cache optimization by prioritizing authority layers
-2. Layer-specific temperature adjustments for precise token selection
-3. Memory-efficient inference on constrained hardware
+Training Reference: HierarchicalGradientScaler in train_unified_llm.py
 
-Training Reference:
-    HierarchicalGradientScaler (train_unified_llm.py) applies different
-    gradient scales: full gradients for authority, dampened (α_sens) for sensory.
-
-Usage:
-------
-    from symbolu.inference import LayerInferenceConfig
-
-    # Get cache priority for memory optimization
-    for layer_idx in range(12):
-        priority = LayerInferenceConfig.get_cache_priority(layer_idx)
-        print(f"Layer {layer_idx}: {priority}")
-
-    # Apply layer-specific temperature
-    base_temp = 1.0
-    for layer_idx in range(12):
-        adjusted = LayerInferenceConfig.get_temperature_adjustment(layer_idx, base_temp)
-        print(f"Layer {layer_idx}: {adjusted:.2f}")
+Author: Sovereign-1 Training Initiative
+Date: January 2026
 """
 
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Optional
+from dataclasses import dataclass
 from enum import Enum
 
 
-class CachePriority(Enum):
-    """KV-cache retention priority levels."""
-    HIGH = "high"      # Retain aggressively, evict last
-    MEDIUM = "medium"  # Standard retention
-    LOW = "low"        # Can be recomputed if needed
+class ArchitectureMode(Enum):
+    """Supported layer architecture modes."""
+    SPLIT_9_3 = "9:3"  # Original: 9 Authority, 3 Sensory
+    SPLIT_6_6 = "6:6"  # Balanced: 6 Authority, 6 Sensory
+    SPLIT_12_0 = "12:0"  # All Authority (standard transformer)
 
 
-class LayerType(Enum):
-    """Ontological layer classification."""
-    AUTHORITY = "authority"  # O1-O9: Meaning and intent
-    SENSORY = "sensory"      # O10-O12: Expression and fluency
-
-
+@dataclass
 class LayerInferenceConfig:
     """
     Configuration for layer-specific inference behavior.
 
-    Reflects the 9:3 Authority/Sensory split from the Symbolu architecture.
-    Enables heterogeneous layer treatment for memory optimization and
-    output precision.
-
-    The 9:3 split is based on the ontological structure:
-    - Authority (O1-O9): Potential → Momentum → Restraint → Expansion →
-                        Cohesion → Transformation → Refinement →
-                        Manifestation → Rhythm
-    - Sensory (O10-O12): Stability → Dissolving → Integration
+    Reflects Authority/Sensory split from training and provides:
+    - Cache priority for KV-cache optimization
+    - Temperature adjustments per layer type
+    - Interpretability of layer contributions
 
     Attributes:
-        AUTHORITY_LAYERS: Layer indices for core semantic processing
-        SENSORY_LAYERS: Layer indices for phonetic/expressive output
-        LAYER_NAMES: Mapping of layer index to ontological name
+        mode: Architecture mode (9:3, 6:6, or 12:0)
+        authority_layers: List of authority layer indices
+        sensory_layers: List of sensory layer indices
+        num_layers: Total number of layers
     """
 
-    # Authority layers (O1-O9): Core semantic intent
-    AUTHORITY_LAYERS: List[int] = list(range(9))
+    mode: ArchitectureMode = ArchitectureMode.SPLIT_6_6
+    num_layers: int = 12
 
-    # Sensory layers (O10-O12): Phonetic and expressive output
-    SENSORY_LAYERS: List[int] = list(range(9, 12))
+    def __post_init__(self):
+        """Configure layer splits based on mode."""
+        if self.mode == ArchitectureMode.SPLIT_9_3:
+            self._authority_layers = list(range(9))  # O1-O9
+            self._sensory_layers = list(range(9, 12))  # O10-O12
+        elif self.mode == ArchitectureMode.SPLIT_6_6:
+            self._authority_layers = list(range(6))  # O1-O6
+            self._sensory_layers = list(range(6, 12))  # O7-O12
+        else:  # 12:0
+            self._authority_layers = list(range(12))
+            self._sensory_layers = []
 
-    # Ontological layer names (0-indexed)
-    LAYER_NAMES: Dict[int, str] = {
-        0: "O1-Potential",
-        1: "O2-Momentum",
-        2: "O3-Restraint",
-        3: "O4-Expansion",
-        4: "O5-Cohesion",
-        5: "O6-Transformation",
-        6: "O7-Refinement",
-        7: "O8-Manifestation",
-        8: "O9-Rhythm",
-        9: "O10-Stability",
-        10: "O11-Dissolving",
-        11: "O12-Integration",
-    }
+    @property
+    def authority_layers(self) -> List[int]:
+        """Get authority layer indices."""
+        return self._authority_layers
 
-    # Default temperature multipliers
-    AUTHORITY_TEMP_MULTIPLIER: float = 1.0
-    SENSORY_TEMP_MULTIPLIER: float = 0.9  # Sharper for precise token selection
-
-    # Cache priority assignments
-    AUTHORITY_CACHE_PRIORITY: CachePriority = CachePriority.HIGH
-    SENSORY_CACHE_PRIORITY: CachePriority = CachePriority.MEDIUM
+    @property
+    def sensory_layers(self) -> List[int]:
+        """Get sensory layer indices."""
+        return self._sensory_layers
 
     @classmethod
-    def get_layer_type(cls, layer_idx: int) -> LayerType:
+    def from_checkpoint(cls, checkpoint: Dict) -> 'LayerInferenceConfig':
         """
-        Get the ontological type of a layer.
+        Create config from checkpoint metadata.
 
         Args:
-            layer_idx: Layer index (0-11)
+            checkpoint: Checkpoint dict with possible inference_config
 
         Returns:
-            LayerType.AUTHORITY or LayerType.SENSORY
+            config: LayerInferenceConfig instance
         """
-        if layer_idx in cls.AUTHORITY_LAYERS:
-            return LayerType.AUTHORITY
-        return LayerType.SENSORY
+        inference_config = checkpoint.get('inference_config', {})
 
-    @classmethod
-    def get_layer_name(cls, layer_idx: int) -> str:
+        # Try to infer mode from checkpoint
+        split = inference_config.get('authority_sensory_split', (6, 6))
+
+        if split == (9, 3):
+            mode = ArchitectureMode.SPLIT_9_3
+        elif split == (6, 6):
+            mode = ArchitectureMode.SPLIT_6_6
+        elif split == (12, 0):
+            mode = ArchitectureMode.SPLIT_12_0
+        else:
+            # Default to 6:6
+            mode = ArchitectureMode.SPLIT_6_6
+
+        num_layers = inference_config.get('num_layers', 12)
+
+        return cls(mode=mode, num_layers=num_layers)
+
+    def get_cache_priority(self, layer_idx: int) -> str:
         """
-        Get the ontological name of a layer.
+        Get caching priority for layer (for memory optimization).
+
+        Authority layers: HIGH priority (cache aggressively)
+        Sensory layers: MEDIUM priority (can recompute if needed)
 
         Args:
-            layer_idx: Layer index (0-11)
+            layer_idx: Layer index (0-based)
 
         Returns:
-            Ontological name (e.g., "O1-Potential")
+            priority: "HIGH", "MEDIUM", or "LOW"
         """
-        return cls.LAYER_NAMES.get(layer_idx, f"Layer-{layer_idx}")
+        if layer_idx in self._authority_layers:
+            return "HIGH"
+        elif layer_idx in self._sensory_layers:
+            return "MEDIUM"
+        return "LOW"
 
-    @classmethod
-    def get_cache_priority(cls, layer_idx: int) -> str:
-        """
-        Get KV-cache retention priority for a layer.
-
-        Authority layers are HIGH priority (evict last) because they
-        contain core semantic intent that's expensive to recompute.
-
-        Sensory layers are MEDIUM priority and can be recomputed
-        more readily if memory pressure requires eviction.
-
-        Args:
-            layer_idx: Layer index (0-11)
-
-        Returns:
-            Priority string: "high", "medium", or "low"
-        """
-        if layer_idx in cls.AUTHORITY_LAYERS:
-            return cls.AUTHORITY_CACHE_PRIORITY.value
-        return cls.SENSORY_CACHE_PRIORITY.value
-
-    @classmethod
     def get_temperature_adjustment(
-        cls,
+        self,
         layer_idx: int,
         base_temp: float,
     ) -> float:
         """
-        Get layer-adjusted temperature for attention computation.
+        Adjust attention temperature per layer type.
 
-        Sensory layers use sharper attention (lower temperature) for
-        precise token selection, reducing the risk of "word salad"
-        even when authority layers are exploring broader semantic spaces.
-
-        Args:
-            layer_idx: Layer index (0-11)
-            base_temp: Base temperature value
-
-        Returns:
-            Adjusted temperature for the layer
-        """
-        if layer_idx in cls.SENSORY_LAYERS:
-            return base_temp * cls.SENSORY_TEMP_MULTIPLIER
-        return base_temp * cls.AUTHORITY_TEMP_MULTIPLIER
-
-    @classmethod
-    def get_gradient_scale(
-        cls,
-        layer_idx: int,
-        authority_scale: float = 1.0,
-        sensory_scale: float = 0.3,
-    ) -> float:
-        """
-        Get gradient scaling factor for a layer (training reference).
-
-        This mirrors the HierarchicalGradientScaler behavior from training.
-        Useful for inference-time gradient-based methods (e.g., guided generation).
+        Sensory layers may benefit from sharper attention (lower temp)
+        for more precise token selection.
 
         Args:
-            layer_idx: Layer index (0-11)
-            authority_scale: Scale for authority layers (default 1.0)
-            sensory_scale: Scale for sensory layers (default 0.3)
+            layer_idx: Layer index
+            base_temp: Base temperature
 
         Returns:
-            Gradient scale factor
+            adjusted_temp: Adjusted temperature
         """
-        if layer_idx in cls.AUTHORITY_LAYERS:
-            return authority_scale
-        return sensory_scale
+        if layer_idx in self._sensory_layers:
+            # Slightly sharper for sensory (expression) layers
+            return base_temp * 0.9
+        return base_temp
 
-    @classmethod
-    def get_extraction_layers(
-        cls,
-        mode: str = "minimal",
-    ) -> List[int]:
+    def get_layer_role(self, layer_idx: int) -> str:
         """
-        Get recommended layers to extract for different use cases.
+        Get semantic role of layer.
 
         Args:
-            mode: Extraction mode
-                - "minimal": O1 and O12 only (karma/resonance)
-                - "authority": All authority layers
-                - "sensory": All sensory layers
-                - "endpoints": O1, O9 (authority end), O12
-                - "full": All 12 layers
+            layer_idx: Layer index
 
         Returns:
-            List of layer indices to extract
+            role: "authority" (meaning) or "sensory" (expression)
         """
-        modes = {
-            "minimal": [0, 11],
-            "authority": cls.AUTHORITY_LAYERS,
-            "sensory": cls.SENSORY_LAYERS,
-            "endpoints": [0, 8, 11],  # O1, O9, O12
-            "full": list(range(12)),
-        }
-        return modes.get(mode, [0, 11])
+        if layer_idx in self._authority_layers:
+            return "authority"
+        return "sensory"
 
-    @classmethod
-    def get_split_config(cls) -> Tuple[int, int]:
+    def get_ontological_name(self, layer_idx: int) -> str:
         """
-        Get the authority/sensory split configuration.
-
-        Returns:
-            (authority_count, sensory_count) tuple, e.g., (9, 3)
-        """
-        return (len(cls.AUTHORITY_LAYERS), len(cls.SENSORY_LAYERS))
-
-    @classmethod
-    def get_layer_weights(
-        cls,
-        authority_weight: float = 1.0,
-        sensory_weight: float = 0.5,
-    ) -> Dict[int, float]:
-        """
-        Get per-layer weights for aggregation operations.
-
-        Useful for weighted averaging of layer outputs or
-        computing weighted coherence scores.
+        Get ontological layer name (O1-O12).
 
         Args:
-            authority_weight: Weight for authority layers
-            sensory_weight: Weight for sensory layers
+            layer_idx: Layer index (0-based)
 
         Returns:
-            Dict mapping layer_idx to weight
+            name: Ontological name (O1, O2, ..., O12)
+        """
+        ontological_names = [
+            "O1 (Potential)",
+            "O2 (Density)",
+            "O3 (Activity)",
+            "O4 (Binding)",
+            "O5 (Structuring)",
+            "O6 (Diversifying)",
+            "O7 (Integrating)",
+            "O8 (Rhythmic)",
+            "O9 (Conscious)",
+            "O10 (Knowing)",
+            "O11 (Manifesting)",
+            "O12 (Absolving)",
+        ]
+        if 0 <= layer_idx < len(ontological_names):
+            return ontological_names[layer_idx]
+        return f"O{layer_idx + 1}"
+
+    def get_layer_weights(self) -> Dict[int, float]:
+        """
+        Get importance weights for each layer.
+
+        Authority layers get higher weights for quality scoring.
+
+        Returns:
+            weights: Dict mapping layer_idx -> weight
         """
         weights = {}
-        for idx in cls.AUTHORITY_LAYERS:
-            weights[idx] = authority_weight
-        for idx in cls.SENSORY_LAYERS:
-            weights[idx] = sensory_weight
+
+        for i in range(self.num_layers):
+            if i in self._authority_layers:
+                # Authority layers: higher weight, decreasing with depth
+                weight = 1.0 - (i / len(self._authority_layers)) * 0.3
+            else:
+                # Sensory layers: lower base weight
+                sensory_idx = i - len(self._authority_layers)
+                weight = 0.7 - (sensory_idx / len(self._sensory_layers)) * 0.2
+
+            weights[i] = max(0.3, weight)
+
         return weights
 
-    @classmethod
-    def summarize(cls) -> str:
-        """Get a summary string of the configuration."""
-        auth_count, sens_count = cls.get_split_config()
+    def get_extraction_layers(self, mode: str = "minimal") -> List[int]:
+        """
+        Get which layers to extract hidden states from.
+
+        Args:
+            mode: "minimal" (O1, O12), "authority" (authority only),
+                  "full" (all layers)
+
+        Returns:
+            layers: List of layer indices to extract
+        """
+        if mode == "minimal":
+            # Just first and last for karma
+            return [0, self.num_layers - 1]
+        elif mode == "authority":
+            return self._authority_layers
+        elif mode == "sensory":
+            return self._sensory_layers
+        elif mode == "key":
+            # Key layers: first, middle, last
+            return [0, self.num_layers // 2, self.num_layers - 1]
+        else:
+            # Full extraction
+            return list(range(self.num_layers))
+
+    def describe(self) -> str:
+        """Get human-readable description."""
         return (
-            f"LayerInferenceConfig({auth_count}:{sens_count} split)\n"
-            f"  Authority (O1-O9): {cls.AUTHORITY_LAYERS}\n"
-            f"  Sensory (O10-O12): {cls.SENSORY_LAYERS}\n"
-            f"  Cache: Authority={cls.AUTHORITY_CACHE_PRIORITY.value}, "
-            f"Sensory={cls.SENSORY_CACHE_PRIORITY.value}\n"
-            f"  Temp: Authority={cls.AUTHORITY_TEMP_MULTIPLIER}x, "
-            f"Sensory={cls.SENSORY_TEMP_MULTIPLIER}x"
+            f"LayerConfig: {self.mode.value} split\n"
+            f"  Authority: layers {self._authority_layers[0]}-{self._authority_layers[-1]} "
+            f"({len(self._authority_layers)} layers)\n"
+            f"  Sensory: layers {self._sensory_layers[0]}-{self._sensory_layers[-1]} "
+            f"({len(self._sensory_layers)} layers)" if self._sensory_layers else ""
         )
 
 
-# Convenience aliases for common patterns
-AUTHORITY_LAYERS = LayerInferenceConfig.AUTHORITY_LAYERS
-SENSORY_LAYERS = LayerInferenceConfig.SENSORY_LAYERS
-LAYER_NAMES = LayerInferenceConfig.LAYER_NAMES
+# Pre-configured instances
+CONFIG_9_3 = LayerInferenceConfig(mode=ArchitectureMode.SPLIT_9_3)
+CONFIG_6_6 = LayerInferenceConfig(mode=ArchitectureMode.SPLIT_6_6)
+CONFIG_STANDARD = LayerInferenceConfig(mode=ArchitectureMode.SPLIT_12_0)
