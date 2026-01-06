@@ -8877,8 +8877,8 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid", "gen2"],
-                       help="Model architecture type (gen2 = hierarchical complex Bhava)")
+                       choices=["ontological", "phase", "hybrid", "gen2", "standard"],
+                       help="Model architecture type (standard = O(n²) baseline for comparison)")
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large"],
                        help="Model size preset")
