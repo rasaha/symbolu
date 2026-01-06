@@ -87,6 +87,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from symbolu.phase_transformer import (
     PhaseTransformer,
     HybridPhaseTransformer,
+    StandardTransformer,  # V9.6.9: O(n²) baseline for comparison
 )
 
 # Import ontological models
@@ -6476,6 +6477,22 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         print(f"  [Gen 2] Complex dim: {gen2_config.complex_dim}")
         print(f"  [Gen 2] Num layers: {gen2_num_layers} (9:3 split: {config.use_9_3_split})")
         print(f"  [Gen 2] Hierarchy: 3-tier phase rotation")
+
+    elif config.model_type == "standard":
+        # V9.6.9: Standard O(n²) transformer baseline for comparison
+        # Uses StandardTransformer from phase_transformer.py
+        tie_emb = not config.untie_embeddings
+        model = StandardTransformer(
+            vocab_size=config.vocab_size,
+            embed_dim=preset["embed_dim"],
+            num_layers=preset["num_layers"],
+            num_heads=preset["num_heads"],
+            ff_dim=preset["ff_dim"],
+            max_seq_len=config.max_seq_len,
+            dropout=config.dropout,
+            tie_embeddings=tie_emb,
+        )
+        print(f"\n  [Standard] O(n²) baseline transformer for comparison")
 
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
