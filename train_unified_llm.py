@@ -6029,6 +6029,7 @@ class UnifiedTrainingConfig:
     sync_steps: int = 3
     sync_lr: float = 0.1
     cosine_mode: str = "standard"  # V9.6.12: "standard", "shifted", or "complex"
+    decay_gamma: float = 1.0  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
 
     # Hybrid-specific parameters
     local_layers: int = 4
@@ -6451,8 +6452,10 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             sync_lr=config.sync_lr,
             tie_embeddings=tie_emb,
             cosine_mode=config.cosine_mode,  # V9.6.12: Pass cosine mode
+            decay_gamma=config.decay_gamma,  # V9.6.13: Pass decay factor
         )
         print(f"  Phase Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
+        print(f"  Phase Decay Gamma: {config.decay_gamma}")  # V9.6.13: Log decay
 
     elif config.model_type == "hybrid":
         # V9.6.0: Untie embeddings when CSR is enabled to prevent vocabulary corruption
@@ -6472,8 +6475,10 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             alpha_phase=config.alpha_phase,
             tie_embeddings=tie_emb,
             cosine_mode=config.cosine_mode,  # V9.6.12: Pass cosine mode
+            decay_gamma=config.decay_gamma,  # V9.6.13: Pass decay factor
         )
         print(f"  Hybrid Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
+        print(f"  Hybrid Decay Gamma: {config.decay_gamma}")  # V9.6.13: Log decay
 
     elif config.model_type == "gen2":
         if not GEN2_AVAILABLE:
@@ -8965,6 +8970,12 @@ def main():
                             "'shifted' (1+cos, range [0,2], no negative cancellation), "
                             "'complex' (uses both cos and sin for directional asymmetry)")
 
+    # V9.6.13: State decay factor for phase attention
+    parser.add_argument("--decay_gamma", type=float, default=1.0,
+                       help="State decay factor for phase attention (1.0=infinite memory, "
+                            "<1.0=local focus like Mamba/RWKV). "
+                            "Example: 0.9 = ~10 token memory, 0.95 = ~20 token memory")
+
     # Ontological-specific
     parser.add_argument("--bhava_lambda", type=float, default=0.1,
                        help="Bhava relationship loss weight")
@@ -9363,6 +9374,7 @@ def main():
         local_backend=args.local_backend,
         window_size=args.window_size,
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
+        decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
         bhava_lambda=args.bhava_lambda,
         coherence_lambda=args.coherence_lambda,
         log_every=args.log_every,

@@ -90,6 +90,7 @@ class TransformerConfig:
     sync_lr: float = 0.1
     temperature: float = 1.0  # Lower = sharper attention (for classification tasks)
     cosine_mode: str = "standard"  # V9.6.12: "standard", "shifted", or "complex"
+    decay_gamma: float = 1.0  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
 
     def __post_init__(self):
         if self.ff_dim is None:
@@ -151,6 +152,7 @@ class PhaseAttentionLayer(nn.Module):
         temperature: float = 1.0,  # Unused in V2 but kept for compatibility
         aux_scale: float = 0.1,   # Output scaling for auxiliary path integration
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
+        decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite memory, <1.0=local focus)
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -162,6 +164,15 @@ class PhaseAttentionLayer(nn.Module):
         assert cosine_mode in ("standard", "shifted", "complex"), \
             f"cosine_mode must be 'standard', 'shifted', or 'complex', got '{cosine_mode}'"
         self.cosine_mode = cosine_mode
+
+        # V9.6.13: State decay factor for memory horizon control
+        # γ = 1.0: Infinite memory (current behavior), cumsum is exact
+        # γ < 1.0: Exponential decay, effective memory ~1/(1-γ) tokens
+        #          γ=0.9 → ~10 token memory, γ=0.95 → ~20 token memory
+        # This forces pure Phase to focus on local grammar (like Mamba/RWKV/RetNet)
+        assert 0.0 < decay_gamma <= 1.0, \
+            f"decay_gamma must be in (0, 1], got {decay_gamma}"
+        self.decay_gamma = decay_gamma
 
         # Legacy parameters kept for checkpoint compatibility
         self.sync_steps = sync_steps
@@ -300,15 +311,47 @@ class PhaseAttentionLayer(nn.Module):
         # KV product: [B, N, H, D_h] × [B, N, H, D_h] -> [B, N, H, D_h]
         kv_complex = k_phasor * v_complex
 
-        # O(n) Causal aggregation: cumulative sum along sequence dimension
-        global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
+        # O(n) Causal aggregation with optional decay
+        # V9.6.13: State decay for memory horizon control
+        if self.decay_gamma == 1.0:
+            # Original: infinite memory via cumsum
+            global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
+        else:
+            # Decay accumulation: S_t = γ * S_{t-1} + kv_t
+            # Vectorized: S_t = γ^t * cumsum(kv_j * γ^(-j))
+            # This gives: S_t = Σ_{j=0}^{t} γ^(t-j) * kv_j
+            device = kv_complex.device
+            dtype = kv_complex.dtype if kv_complex.dtype != torch.complex64 else torch.float32
+
+            # Position indices [0, 1, 2, ..., N-1]
+            positions = torch.arange(N, device=device, dtype=dtype)  # [N]
+
+            # Decay weights: γ^(-j) for scaling before cumsum, γ^t for scaling after
+            gamma_neg_j = (self.decay_gamma ** (-positions)).view(1, N, 1, 1)  # [1, N, 1, 1]
+            gamma_t = (self.decay_gamma ** positions).view(1, N, 1, 1)  # [1, N, 1, 1]
+
+            # Scale kv by γ^(-j), cumsum, then scale by γ^t
+            # Handle complex by applying to both real and imag
+            kv_real = kv_complex.real * gamma_neg_j  # [B, N, H, D_h]
+            kv_imag = kv_complex.imag * gamma_neg_j  # [B, N, H, D_h]
+
+            cumsum_real = torch.cumsum(kv_real, dim=1) * gamma_t
+            cumsum_imag = torch.cumsum(kv_imag, dim=1) * gamma_t
+
+            global_state = torch.complex(cumsum_real, cumsum_imag)  # [B, N, H, D_h]
 
         # =====================================================================
         # 5. Readout: Synchronization via Q × State (NORMALIZED)
         # =====================================================================
         # V9.6.11: Use amplitude-based normalization (always positive)
         # normalizer = a_q × Σ_{j≤t} a_k  (cross-amplitude energy)
-        a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
+        # V9.6.13: Apply same decay to normalizer for consistency
+        if self.decay_gamma == 1.0:
+            a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
+        else:
+            # Reuse decay weights computed above
+            a_k_scaled = a_k * gamma_neg_j
+            a_k_cumsum = torch.cumsum(a_k_scaled, dim=1) * gamma_t
         normalizer = a_q * a_k_cumsum + 1e-6   # [B, N, H, D_h], always positive
 
         # V9.6.12: Cosine mode selection for interaction kernel
@@ -331,7 +374,12 @@ class PhaseAttentionLayer(nn.Module):
             # Second term: cosine-modulated product (from complex phasor)
 
             # Accumulator for the "+1" shift term: a_k * v
-            av_state = torch.cumsum(a_k * v, dim=1)  # [B, N, H, D_h]
+            # V9.6.13: Apply decay to shifted mode accumulator
+            if self.decay_gamma == 1.0:
+                av_state = torch.cumsum(a_k * v, dim=1)  # [B, N, H, D_h]
+            else:
+                av_scaled = (a_k * v) * gamma_neg_j
+                av_state = torch.cumsum(av_scaled, dim=1) * gamma_t
 
             # Combined: shift_term + cos_term
             shift_term = a_q * av_state           # a_q * Σ(a_k * v)
@@ -1326,6 +1374,7 @@ class HybridAttentionLayer(nn.Module):
         local_backend: str = 'auto',
         temperature: float = 1.0,  # Lower = sharper phase attention
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
+        decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
     ):
         super().__init__()
         # Keep alphas for potential future use (e.g., residual weighting)
@@ -1353,6 +1402,7 @@ class HybridAttentionLayer(nn.Module):
             temperature=temperature,  # Pass temperature for sharper attention
             aux_scale=1.0,  # V9.6.11: Full strength (was 0.1 causing 2% effective signal)
             cosine_mode=cosine_mode,  # V9.6.12: Cosine interaction mode
+            decay_gamma=decay_gamma,  # V9.6.13: State decay factor
         )
 
         self.norm = nn.LayerNorm(embed_dim)
@@ -1412,6 +1462,7 @@ class HybridTransformerBlock(nn.Module):
             local_backend=local_backend,
             temperature=getattr(config, 'temperature', 1.0),  # Sharper attention
             cosine_mode=getattr(config, 'cosine_mode', 'standard'),  # V9.6.12
+            decay_gamma=getattr(config, 'decay_gamma', 1.0),  # V9.6.13
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -1470,6 +1521,7 @@ class PhaseTransformerBlock(nn.Module):
             temperature=getattr(config, 'temperature', 1.0),  # Sharper attention for classification
             aux_scale=1.0,  # V9.6.11: Full strength for pure phase model
             cosine_mode=getattr(config, 'cosine_mode', 'standard'),  # V9.6.12
+            decay_gamma=getattr(config, 'decay_gamma', 1.0),  # V9.6.13
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -1541,6 +1593,7 @@ class PhaseTransformer(nn.Module):
         temperature: float = 1.0,  # Lower = sharper attention (for classification)
         tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR to prevent embedding corruption
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
+        decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
     ):
         super().__init__()
 
@@ -1556,6 +1609,7 @@ class PhaseTransformer(nn.Module):
             sync_lr=sync_lr,
             temperature=temperature,  # Pass temperature for sharper attention
             cosine_mode=cosine_mode,  # V9.6.12: Pass cosine mode to attention layers
+            decay_gamma=decay_gamma,  # V9.6.13: Pass decay factor to attention layers
         )
         self.config = config
         self.tie_embeddings = tie_embeddings
@@ -1805,6 +1859,7 @@ class HybridPhaseTransformer(nn.Module):
         temperature: float = 1.0,  # Lower = sharper attention (for classification)
         tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR to prevent embedding corruption
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
+        decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
     ):
         super().__init__()
 
@@ -1820,6 +1875,7 @@ class HybridPhaseTransformer(nn.Module):
             sync_lr=sync_lr,
             temperature=temperature,  # Pass temperature for sharper attention
             cosine_mode=cosine_mode,  # V9.6.12: Pass cosine mode to attention layers
+            decay_gamma=decay_gamma,  # V9.6.13: Pass decay factor to attention layers
         )
         self.config = config
         self.local_layers = local_layers
