@@ -143,11 +143,22 @@ class PhaseAttentionLayer(nn.Module):
         self.sync_lr = nn.Parameter(torch.tensor(sync_lr))
 
         # =====================================================================
-        # V2: LEARNED PHASE-AMPLITUDE PROJECTIONS (The "Brain" of Phase)
+        # V9.6.11: DECOUPLED HIGH-CAPACITY PHASE-AMPLITUDE PROJECTIONS
         # =====================================================================
-        # Learn WHAT to sync (Phase) and HOW MUCH to sync (Amplitude)
-        self.W_phase = nn.Linear(embed_dim, num_heads, bias=False)
-        self.W_amp = nn.Linear(embed_dim, num_heads, bias=False)
+        # Previous issues fixed:
+        # 1. Low capacity: was 768→12, now 768→768 (full head_dim per head)
+        # 2. Shared Q/K: was same φ,a for both, now separate projections
+        # 3. Vanishing gradients: uniform [-π,π] init instead of small normal
+        #
+        # This matches standard attention capacity while keeping O(n) complexity
+
+        # Separate Query projections (what am I looking for?)
+        self.W_q_phase = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.W_q_amp = nn.Linear(embed_dim, embed_dim, bias=False)
+
+        # Separate Key projections (what do I represent?)
+        self.W_k_phase = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.W_k_amp = nn.Linear(embed_dim, embed_dim, bias=False)
 
         # Value projection (content)
         self.v_proj = nn.Linear(embed_dim, embed_dim, bias=False)
@@ -155,20 +166,23 @@ class PhaseAttentionLayer(nn.Module):
         # Output projection
         self.out_proj = nn.Linear(embed_dim, embed_dim, bias=False)
 
-        # Initialize out_proj to near-zero for gradual contribution
-        nn.init.zeros_(self.out_proj.weight)
-
         # Layer normalization for stability
         self.norm = nn.LayerNorm(embed_dim)
         self.dropout = nn.Dropout(dropout)
 
+        # V9.6.11: Initialize phase projections with uniform [-π, π]
+        # This ensures diverse phases at initialization for gradient flow
+        nn.init.uniform_(self.W_q_phase.weight, -3.14159, 3.14159)
+        nn.init.uniform_(self.W_k_phase.weight, -3.14159, 3.14159)
+
         # Legacy projections kept for checkpoint compatibility
+        self.W_phase = nn.Linear(embed_dim, num_heads, bias=False)  # Legacy
+        self.W_amp = nn.Linear(embed_dim, num_heads, bias=False)    # Legacy
         self.q_proj = nn.Linear(embed_dim, embed_dim)
         self.k_proj = nn.Linear(embed_dim, embed_dim)
         self.phase_proj = nn.Linear(self.head_dim, self.head_dim)
         self.key_gate = nn.Linear(self.head_dim, self.head_dim)
         self.value_gate = nn.Linear(self.head_dim, self.head_dim)
-        # Legacy V2 projections
         self.phase_embed = nn.Linear(embed_dim, num_heads)
         self.amp_gate = nn.Linear(embed_dim, num_heads)
 
@@ -196,12 +210,20 @@ class PhaseAttentionLayer(nn.Module):
         x_norm = self.norm(x)
 
         # =====================================================================
-        # 1. Project to Phase (φ) and Amplitude (a)
+        # 1. Project to SEPARATE Phase (φ) and Amplitude (a) for Q and K
         # =====================================================================
-        # φ: learned phase angle per head
-        # a: learned amplitude gate (how much this token participates)
-        phi = self.W_phase(x_norm)  # [B, N, H]
-        a = torch.sigmoid(self.W_amp(x_norm))  # [B, N, H], range (0, 1)
+        # V9.6.11: Decoupled Q/K with high capacity (embed_dim → embed_dim)
+        # - Query: "what am I looking for?"
+        # - Key: "what do I represent?"
+        # This allows asymmetric attention patterns (e.g., "The" → "Empire")
+
+        # Query phase and amplitude: [B, N, D] → [B, N, H, D_h]
+        phi_q = self.W_q_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
+        a_q = torch.sigmoid(self.W_q_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+
+        # Key phase and amplitude: [B, N, D] → [B, N, H, D_h]
+        phi_k = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
+        a_k = torch.sigmoid(self.W_k_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
 
         # =====================================================================
         # 2. Project Values (content)
@@ -211,44 +233,48 @@ class PhaseAttentionLayer(nn.Module):
         # =====================================================================
         # 3. Form Complex Phasors using Euler's Formula
         # =====================================================================
-        # Q = a * e^(iφ)   - Query phasor
-        # K = a * e^(-iφ)  - Key phasor (conjugate for cos(φ_i - φ_j))
-
-        # Reshape for broadcasting: [B, N, H] -> [B, N, H, 1]
-        phi = phi.unsqueeze(-1)
-        a = a.unsqueeze(-1)
+        # Q = a_q * e^(iφ_q)   - Query phasor (what I'm looking for)
+        # K = a_k * e^(-iφ_k)  - Key phasor (what I represent, conjugate)
 
         # torch.polar doesn't support BFloat16 - cast to float32 for complex ops
-        orig_dtype = phi.dtype
+        orig_dtype = phi_q.dtype
         if orig_dtype == torch.bfloat16:
-            phi = phi.float()
-            a = a.float()
+            phi_q = phi_q.float()
+            phi_k = phi_k.float()
+            a_q = a_q.float()
+            a_k = a_k.float()
             v = v.float()
 
         # Create complex phasors using torch.polar(magnitude, angle)
-        q_phasor = torch.polar(a, phi)      # [B, N, H, 1]
-        k_phasor = torch.polar(a, -phi)     # [B, N, H, 1] (negative phase = conjugate)
+        # Q and K now have DIFFERENT learned phases and amplitudes!
+        q_phasor = torch.polar(a_q, phi_q)      # [B, N, H, D_h]
+        k_phasor = torch.polar(a_k, -phi_k)     # [B, N, H, D_h] (negative phase for conjugate)
 
         # =====================================================================
         # 4. O(n) State Accumulation via Complex Cumsum
         # =====================================================================
-        # KV = K * V (complex × real = complex)
+        # KV = K * V (complex × real = complex, element-wise per head_dim)
         # State_t = Σ_{j≤t} K_j * V_j
 
         # Convert V to complex (real part only, imaginary = 0)
         v_complex = torch.complex(v, torch.zeros_like(v))
 
-        # KV product: [B, N, H, 1] × [B, N, H, D_h] -> [B, N, H, D_h]
+        # KV product: [B, N, H, D_h] × [B, N, H, D_h] -> [B, N, H, D_h]
         kv_complex = k_phasor * v_complex
 
         # O(n) Causal aggregation: cumulative sum along sequence dimension
         global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
 
         # =====================================================================
-        # 5. Readout: Synchronization via Q × State
+        # 5. Readout: Synchronization via Q × State (NORMALIZED)
         # =====================================================================
-        # Out = Re(Q × State) = Σ_{j≤t} a_t * a_j * cos(φ_t - φ_j) * V_j
-        sync_output = (q_phasor * global_state).real  # [B, N, H, D_h]
+        # V9.6.11: Use amplitude-based normalization (always positive)
+        # normalizer = a_q × Σ_{j≤t} a_k  (cross-amplitude energy)
+        a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
+        normalizer = a_q * a_k_cumsum + 1e-6   # [B, N, H, D_h], always positive
+
+        numerator = (q_phasor * global_state).real  # [B, N, H, D_h]
+        sync_output = numerator / normalizer  # Amplitude-normalized output
 
         # Cast back to original dtype if we converted
         if orig_dtype == torch.bfloat16:
@@ -1213,6 +1239,10 @@ class HybridAttentionLayer(nn.Module):
             backend=local_backend,
         )
 
+        # V9.6.11: Fix Double Dampening - use aux_scale=1.0 in hybrid mode
+        # Previously: aux_scale=0.1 (default) × w_phase=0.2 = 2% effective signal
+        # This caused phase attention gradients to be 40x smaller than local
+        # Fix: Full strength phase output, let alpha weights handle the mixing
         self.phase_attn = PhaseAttentionLayer(
             embed_dim=embed_dim,
             num_heads=num_heads,
@@ -1220,6 +1250,7 @@ class HybridAttentionLayer(nn.Module):
             sync_steps=sync_steps,
             sync_lr=sync_lr,
             temperature=temperature,  # Pass temperature for sharper attention
+            aux_scale=1.0,  # V9.6.11: Full strength (was 0.1 causing 2% effective signal)
         )
 
         self.norm = nn.LayerNorm(embed_dim)
@@ -1324,6 +1355,9 @@ class PhaseTransformerBlock(nn.Module):
 
     def __init__(self, config: TransformerConfig):
         super().__init__()
+        # V9.6.11: Use aux_scale=1.0 for pure phase model
+        # In pure phase, there's no local attention to compete with
+        # The 0.1 default was designed for hybrid mode auxiliary integration
         self.attention = PhaseAttentionLayer(
             embed_dim=config.embed_dim,
             num_heads=config.num_heads,
@@ -1331,6 +1365,7 @@ class PhaseTransformerBlock(nn.Module):
             sync_steps=config.sync_steps,
             sync_lr=config.sync_lr,
             temperature=getattr(config, 'temperature', 1.0),  # Sharper attention for classification
+            aux_scale=1.0,  # V9.6.11: Full strength for pure phase model
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
