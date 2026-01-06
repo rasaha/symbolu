@@ -6212,7 +6212,7 @@ class UnifiedTrainingConfig:
     tensorboard: bool = True
 
     # Quality Sampling
-    sample_every: int = 200  # Generate samples every N steps (0 = disabled)
+    sample_every: int = 50  # Generate samples every N steps (0 = disabled)
     sample_prompts: tuple = (
         # Original open-ended prompts
         "The history of the Roman Empire began when",
@@ -8948,7 +8948,7 @@ def main():
                        help="Disable TensorBoard logging")
 
     # Quality Sampling
-    parser.add_argument("--sample_every", type=int, default=200,
+    parser.add_argument("--sample_every", type=int, default=50,
                        help="Generate quality samples every N steps (0 = disabled)")
 
     # LRA Validation (Long-Range Retrieval)
