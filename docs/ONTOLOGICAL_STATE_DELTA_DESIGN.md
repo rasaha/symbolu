@@ -1067,3 +1067,419 @@ Same tokens, different relationships, based on understanding.
 2. **Multi-Scale Intent**: Different θ per layer (early = syntax, late = semantics)
 3. **Learned Update Frequency**: When to update ΔS (every token? every sentence?)
 4. **External Ontological Model**: Full Tier 3 model separate from Hybrid
+
+---
+
+## OPERATIONAL: CLI Usage (V9.6.14)
+
+### Training with Ontological Hybrid
+
+The Two-Tier AGI architecture is now accessible via CLI:
+
+```bash
+# Basic training
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --model_size small \
+    --dataset wikitext103 \
+    --max_steps 10000
+
+# With custom state dimension
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --model_size small \
+    --state_dim 124 \
+    --dataset wikitext103
+
+# With per-head-dim projection (more expressive)
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --model_size small \
+    --state_dim 124 \
+    --project_per_head_dim \
+    --dataset wikitext103
+
+# Full configuration
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --model_size medium \
+    --state_dim 124 \
+    --project_per_head_dim \
+    --cosine_mode complex \
+    --max_steps 50000 \
+    --batch_size 4 \
+    --gradient_accumulation 8 \
+    --checkpoint_dir checkpoints_agi
+```
+
+### CLI Arguments
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--model_type` | str | ontological | Set to `ontological_hybrid` for Two-Tier AGI |
+| `--state_dim` | int | 124 | CognitiveState dimension (44+64+12+4) |
+| `--project_per_head_dim` | flag | False | Enable per-head-dim phase projection |
+| `--cosine_mode` | str | standard | Phase attention mode (standard/shifted/complex) |
+| `--decay_gamma` | float | 1.0 | State decay factor (1.0=infinite, <1.0=local) |
+
+---
+
+## OPERATIONAL: How State Delta Learns
+
+### The Learning Process
+
+During training, the `OntologicalHybridTransformer` learns **three interconnected things**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                         │
+│  WHAT IS LEARNED DURING TRAINING                                        │
+│                                                                         │
+│  1. STATE PROJECTOR: hidden[768] → CognitiveState[124]                  │
+│     Learns: What aspects of hidden state matter for understanding       │
+│                                                                         │
+│  2. INTENT PROJECTOR: ΔS[124] → θ[H]                                   │
+│     Learns: How understanding changes should rotate attention           │
+│                                                                         │
+│  3. HYBRID TRANSFORMER: How to generate given intent-rotated attention  │
+│     Learns: How to respond to rotated phase relationships               │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### End-to-End Gradient Flow
+
+```
+Forward Pass:
+    input_ids → Hybrid(no intent) → hidden → StateProjector → S_t
+                                                                │
+                                              S_t - S_{t-1} = ΔS
+                                                                │
+                                              IntentProjector → θ
+                                                                │
+    input_ids → Hybrid(with θ) ────────────────────────────────┘
+                      │
+                      ▼
+                    logits → CrossEntropy(target) → loss
+
+Backward Pass:
+    loss.backward() propagates gradients through:
+    1. Hybrid transformer layers (with rotated attention)
+    2. IntentPhaseProjector (learns ΔS → θ mapping)
+    3. StateProjector (learns hidden → S mapping)
+    4. Previous hidden states (learns what to encode)
+```
+
+### What the Model Discovers
+
+Through backpropagation, the model learns:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                         │
+│  STATE PROJECTOR learns to extract:                                     │
+│  ─────────────────────────────────                                      │
+│  - Phoneme energy: Which sounds/syllables are active                    │
+│  - Topic embedding: What domain we're discussing                        │
+│  - Ontological state: Analytical? Evaluative? Narrative?                │
+│  - Dynamics: Coherence, entropy, confidence, momentum                   │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  INTENT PROJECTOR learns:                                               │
+│  ───────────────────────                                                │
+│  - WHEN ΔS indicates topic shift → rotate to different key clusters     │
+│  - WHEN ΔS indicates certainty drop → widen attention                   │
+│  - WHEN ΔS indicates contrast → rotate to opposing context              │
+│  - WHEN ΔS indicates conclusion → narrow to summary tokens              │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  HYBRID TRANSFORMER learns:                                             │
+│  ──────────────────────────                                             │
+│  - How to use rotated attention for context-dependent generation        │
+│  - Same token embeddings produce different outputs based on θ           │
+│  - Grammar (local attention) stays stable, semantics (phase) adapts     │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Training Dynamics
+
+```
+Early Training (steps 0-1000):
+    - State projector outputs near-zero
+    - ΔS ≈ 0, so θ ≈ 0
+    - Model behaves like standard Hybrid (baseline performance)
+    - Gradients flow, projectors start learning patterns
+
+Mid Training (steps 1000-10000):
+    - State projector finds meaningful dimensions
+    - ΔS becomes non-trivial for topic shifts, sentiment changes
+    - θ starts rotating attention meaningfully
+    - Model learns to use rotated context
+
+Late Training (steps 10000+):
+    - Refined ΔS → θ mapping
+    - Model reliably uses intent for long-range context
+    - Different θ values lead to different generation styles
+    - Emergent: Same prompt with different θ → different completions
+```
+
+---
+
+## OPERATIONAL: How the Signal (θ) Is Used
+
+### Signal Flow During Inference
+
+```
+
+    Input: "The company reported strong revenue growth, but"
+                              │
+                              ▼
+    ┌──────────────────────────────────────────────────────┐
+    │  STEP 1: First Forward Pass (No Intent)              │
+    │  Hybrid model processes tokens normally              │
+    │  Output: hidden states [B, T, 768]                   │
+    └──────────────────────────────────────────────────────┘
+                              │
+                              ▼
+    ┌──────────────────────────────────────────────────────┐
+    │  STEP 2: Compute Current State                       │
+    │  StateProjector: hidden.mean() → S_t [B, 124]        │
+    │  Example: topic=financial, sentiment=mixed,          │
+    │           ontology=analytical, entropy=0.6           │
+    └──────────────────────────────────────────────────────┘
+                              │
+                              ▼
+    ┌──────────────────────────────────────────────────────┐
+    │  STEP 3: Compute State Delta                         │
+    │  ΔS = S_t - S_{t-1}                                  │
+    │  Example: Δsentiment = +0.3 (shift toward caution)   │
+    │           Δentropy = +0.2 (uncertainty increased)    │
+    └──────────────────────────────────────────────────────┘
+                              │
+                              ▼
+    ┌──────────────────────────────────────────────────────┐
+    │  STEP 4: Project to Phase Rotation                   │
+    │  IntentProjector: ΔS → θ [B, H]                      │
+    │  Example: θ = [0.2, -0.1, 0.5, ..., -0.3]           │
+    │  Head 1: slight rightward rotation                   │
+    │  Head 3: significant rotation (topic head)           │
+    └──────────────────────────────────────────────────────┘
+                              │
+                              ▼
+    ┌──────────────────────────────────────────────────────┐
+    │  STEP 5: Second Forward Pass (With Intent)           │
+    │  Query phases rotated by θ                           │
+    │  φ_q' = φ_q + θ                                      │
+    │  Attention patterns shift based on understanding     │
+    └──────────────────────────────────────────────────────┘
+                              │
+                              ▼
+    ┌──────────────────────────────────────────────────────┐
+    │  STEP 6: Generate Token                              │
+    │  With rotated attention, "concerns" scores higher    │
+    │  than "success" because θ biased toward caution      │
+    │  Output: "...but concerns about margins persist"     │
+    └──────────────────────────────────────────────────────┘
+```
+
+### What θ Does to Attention
+
+```
+BEFORE θ (standard attention):
+    Q("but") attends equally to "revenue", "growth", "strong"
+    All tokens in context compete for attention
+
+AFTER θ (intent-rotated):
+    θ rotates Q("but") phase by ~45°
+    Now "revenue" and "growth" are LESS aligned (cos drops)
+    Tokens about "concerns", "risks", "margins" become MORE aligned
+
+    Same Q embedding, different θ → different attention pattern
+```
+
+---
+
+## OPERATIONAL: Example Scenarios
+
+### Scenario 1: Topic Shift Detection
+
+```
+INPUT: "Let's discuss the technical architecture. The system uses..."
+
+BEFORE "The system uses":
+    S_t = {topic: architecture, mode: explanatory, entropy: 0.3}
+
+AFTER "The system uses":
+    S_t+1 = {topic: technical_detail, mode: descriptive, entropy: 0.4}
+
+ΔS = {Δtopic: +0.4 toward technical,
+      Δentropy: +0.1 (slight uncertainty)}
+
+θ = IntentProjector(ΔS) = [0.3, 0.1, 0.0, 0.5, ...]
+
+EFFECT:
+    Head 1 (maybe: topic head) rotates 0.3 rad
+    → Queries now align better with technical vocabulary keys
+    → "microservices", "containers", "API" get higher attention
+    → Generation continues: "...microservices with Docker containers"
+```
+
+### Scenario 2: Sentiment Contrast
+
+```
+INPUT: "The weather was beautiful yesterday, but today"
+
+BEFORE "but today":
+    S_t = {sentiment: positive, topic: weather, coherence: 0.9}
+
+AFTER "but today":
+    S_t+1 = {sentiment: anticipating_negative, topic: weather, coherence: 0.85}
+
+ΔS = {Δsentiment: -0.6 (shift from positive to anticipating negative)}
+
+θ = IntentProjector(ΔS) = [-0.4, 0.0, -0.3, ...]
+
+EFFECT:
+    Negative θ values rotate attention AWAY from positive context
+    → "beautiful", "sunny" get lower attention
+    → "rain", "cloudy", "cold" become more aligned
+    → Generation: "...but today it's pouring rain"
+```
+
+### Scenario 3: Conclusion/Summary Mode
+
+```
+INPUT: "In summary, the key findings were..."
+
+BEFORE "In summary":
+    S_t = {mode: analytical, entropy: 0.6, detail_level: high}
+
+AFTER "In summary":
+    S_t+1 = {mode: summary, entropy: 0.3, detail_level: low}
+
+ΔS = {Δmode: +0.8 toward summary,
+      Δentropy: -0.3 (increased certainty),
+      Δdetail: -0.5 (less detail)}
+
+θ = IntentProjector(ΔS) = [0.6, 0.4, 0.2, ...]
+
+EFFECT:
+    High θ values narrow attention to key concepts
+    → Detail tokens get lower attention
+    → High-level concepts get higher attention
+    → Generation: "...three major trends: growth, efficiency, and innovation"
+```
+
+### Scenario 4: Question/Uncertainty Mode
+
+```
+INPUT: "I'm not sure, but perhaps the reason is"
+
+BEFORE "the reason is":
+    S_t = {certainty: 0.4, mode: speculative, entropy: 0.7}
+
+AFTER "the reason is":
+    S_t+1 = {certainty: 0.3, mode: explanatory_uncertain, entropy: 0.8}
+
+ΔS = {Δcertainty: -0.1,
+      Δentropy: +0.1}
+
+θ = IntentProjector(ΔS) = [0.1, 0.1, 0.1, ...]
+
+EFFECT:
+    Small uniform θ = attention explores widely
+    → Multiple possible explanations get attention
+    → Generation hedges: "...the complexity of the underlying systems"
+```
+
+### Scenario 5: Long-Range Context Retrieval
+
+```
+INPUT (at position 5000): "As I mentioned earlier about the budget,"
+
+Early context (position 100): "The budget was set at $10 million"
+
+CURRENT STATE:
+    S_t = {topic: budget_reference, coherence: 0.7, retrieval_mode: active}
+
+ΔS = {Δtopic: +0.5 toward budget,
+      Δretrieval: +0.3}
+
+θ = IntentProjector(ΔS) = [0.4, 0.0, 0.6, 0.0, ...]
+
+EFFECT:
+    Head 3 (long-range head) gets large rotation 0.6
+    → Phase attention O(n) scans all context with new alignment
+    → Position 100's "$10 million" becomes highly aligned
+    → Generation: "...the budget of $10 million allocated last quarter"
+
+THIS IS THE AGI MOMENT:
+    - Standard attention at position 5000 struggles with position 100
+    - Phase attention + θ rotation makes old context RESONATE
+    - Same mechanism that works in humans: intent focuses retrieval
+```
+
+---
+
+## OPERATIONAL: Debugging and Monitoring
+
+### Inspecting State During Training
+
+```python
+model = OntologicalHybridTransformer(...)
+output = model(input_ids)
+
+# Monitor state evolution
+print(f"State magnitude: {output['state'].norm().item():.4f}")
+print(f"Delta S magnitude: {output['delta_S'].norm().item():.4f}")
+print(f"Intent phase (per head): {output['intent_phase'].mean(0).tolist()}")
+
+# Check if learning
+if output['delta_S'].norm() < 0.01:
+    print("WARNING: State delta near zero - projector may not be learning")
+```
+
+### Visualizing Intent Phase
+
+```python
+import matplotlib.pyplot as plt
+
+# Get intent phases over sequence
+intent_phases = []
+for i in range(0, seq_len, 100):
+    output = model(input_ids[:, :i])
+    intent_phases.append(output['intent_phase'].cpu().detach())
+
+# Plot per-head rotation over time
+intent_tensor = torch.stack(intent_phases)  # [T, B, H]
+plt.figure(figsize=(12, 6))
+for h in range(num_heads):
+    plt.plot(intent_tensor[:, 0, h], label=f'Head {h}')
+plt.xlabel('Position')
+plt.ylabel('Phase Rotation (radians)')
+plt.title('Intent Phase Evolution')
+plt.legend()
+plt.savefig('intent_phase_evolution.png')
+```
+
+### Expected Training Metrics
+
+```
+Early (step 0-500):
+    - delta_S_norm: ~0.01-0.1 (learning to extract)
+    - intent_phase_std: ~0.01 (near-zero rotation)
+    - loss: normal cross-entropy baseline
+
+Mid (step 500-5000):
+    - delta_S_norm: ~0.1-0.5 (meaningful changes)
+    - intent_phase_std: ~0.1-0.3 (learning rotations)
+    - loss: improving, potentially faster than baseline
+
+Late (step 5000+):
+    - delta_S_norm: ~0.3-1.0 (calibrated changes)
+    - intent_phase_std: ~0.2-0.5 (varied rotations)
+    - loss: significantly better than baseline on long-range tasks
+```

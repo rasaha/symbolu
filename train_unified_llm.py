@@ -38,6 +38,10 @@ Usage:
     python train_unified_llm.py --model_type gen2 --model_size small \
         --max_seq_len 16384 --gradient_checkpointing --batch_size 1
 
+    # Train Ontological Hybrid (Two-Tier AGI Architecture)
+    python train_unified_llm.py --model_type ontological_hybrid --model_size small \
+        --dataset wikitext103 --max_steps 1000 --state_dim 124
+
     # Stress Test (Trial by Fire)
     python train_unified_llm.py --stress_test --resume checkpoints/best.pt
 
@@ -88,6 +92,7 @@ from symbolu.phase_transformer import (
     PhaseTransformer,
     HybridPhaseTransformer,
     StandardTransformer,  # V9.6.9: O(n²) baseline for comparison
+    OntologicalHybridTransformer,  # V9.6.14: Two-Tier AGI Architecture
 )
 
 # Import ontological models
@@ -6047,6 +6052,10 @@ class UnifiedTrainingConfig:
     bhava_embed_dim: int = 128
     num_drishti_heads: int = 4
 
+    # V9.6.14: Ontological Hybrid (Two-Tier AGI) parameters
+    state_dim: int = 124  # CognitiveState dimension (44 phonemes + 64 topic + 12 bhava + 4 dynamics)
+    project_per_head_dim: bool = False  # If True, project ΔS to [H, D_h] instead of [H]
+
     # Training hyperparameters
     batch_size: int = 8
     gradient_accumulation: int = 1
@@ -6525,6 +6534,36 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             tie_embeddings=tie_emb,
         )
         print(f"\n  [Standard] O(n²) baseline transformer for comparison")
+
+    elif config.model_type == "ontological_hybrid":
+        # V9.6.14: Two-Tier AGI Architecture (Ontological State Delta + Hybrid)
+        # Ontological: Slow semantic state tracking (System 2)
+        # Hybrid: Fast token generation with intent-modulated attention (System 1)
+        tie_emb = not config.untie_embeddings
+        model = OntologicalHybridTransformer(
+            vocab_size=config.vocab_size,
+            embed_dim=preset["embed_dim"],
+            num_layers=preset["num_layers"],
+            num_heads=preset["num_heads"],
+            ff_dim=preset["ff_dim"],
+            max_seq_len=config.max_seq_len,
+            dropout=config.dropout,
+            local_layers=config.local_layers,
+            window_size=config.window_size,
+            local_backend=config.local_backend,
+            alpha_local=config.alpha_local,
+            alpha_phase=config.alpha_phase,
+            tie_embeddings=tie_emb,
+            cosine_mode=config.cosine_mode,
+            decay_gamma=config.decay_gamma,
+            state_dim=config.state_dim,
+            project_per_head_dim=config.project_per_head_dim,
+        )
+        print(f"\n  [Ontological Hybrid] Two-Tier AGI Architecture enabled")
+        print(f"    State Dimension: {config.state_dim}")
+        print(f"    Project Per Head Dim: {config.project_per_head_dim}")
+        print(f"    Hybrid Cosine Mode: {config.cosine_mode}")
+        print(f"    Hybrid Decay Gamma: {config.decay_gamma}")
 
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
@@ -8929,8 +8968,8 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid", "gen2", "standard"],
-                       help="Model architecture type (standard = O(n²) baseline for comparison)")
+                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "ontological_hybrid"],
+                       help="Model architecture type (standard = O(n²) baseline, ontological_hybrid = Two-Tier AGI)")
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large"],
                        help="Model size preset")
@@ -8998,6 +9037,13 @@ def main():
                        help="State decay factor for phase attention (1.0=infinite memory, "
                             "<1.0=local focus like Mamba/RWKV). "
                             "Example: 0.9 = ~10 token memory, 0.95 = ~20 token memory")
+
+    # V9.6.14: Ontological Hybrid (Two-Tier AGI) parameters
+    parser.add_argument("--state_dim", type=int, default=124,
+                       help="CognitiveState dimension for ontological_hybrid model "
+                            "(default 124 = 44 phonemes + 64 topic + 12 bhava + 4 dynamics)")
+    parser.add_argument("--project_per_head_dim", action="store_true",
+                       help="Project state delta to [H, D_h] instead of [H] for finer control")
 
     # Ontological-specific
     parser.add_argument("--bhava_lambda", type=float, default=0.1,
@@ -9398,6 +9444,8 @@ def main():
         window_size=args.window_size,
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
+        state_dim=args.state_dim,  # V9.6.14: Ontological Hybrid state dimension
+        project_per_head_dim=args.project_per_head_dim,  # V9.6.14: Per-head-dim projection
         bhava_lambda=args.bhava_lambda,
         coherence_lambda=args.coherence_lambda,
         log_every=args.log_every,
