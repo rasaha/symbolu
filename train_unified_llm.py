@@ -7585,16 +7585,28 @@ def train(config: UnifiedTrainingConfig):
                     else:
                         csr_hidden_for_loss = csr_hidden.detach()  # CRITICAL: Break gradient flow!
 
+                    # V9.6.9: Also detach csr_emb to make CSR purely observational
+                    # Previously, gradients flowed: loss → csr_emb → CSR provider
+                    # This trained CSR's projection/confidence_head to align with model states,
+                    # creating an indirect Sanskrit influence on the loss landscape.
+                    # With both sides detached, CSR becomes monitor-only - no training signal flows.
+                    csr_emb_for_loss = csr_emb.detach()
+
                     csr_hidden_norm = torch.nn.functional.normalize(csr_hidden_for_loss, dim=-1)
-                    csr_emb_norm = torch.nn.functional.normalize(csr_emb, dim=-1)
+                    csr_emb_norm = torch.nn.functional.normalize(csr_emb_for_loss, dim=-1)
                     csr_similarity = (csr_hidden_norm * csr_emb_norm).sum(dim=-1)
                     # Temperature sharpening: (1 - sim) / tau creates steep gradient landscape
                     # When alignment is poor (sim ≈ 0): loss = (1-0)/0.07 ≈ 14.3 → STRONG pressure
                     # When alignment is good (sim ≈ 0.9): loss = (1-0.9)/0.07 ≈ 1.4 → mild pressure
-                    csr_alignment_loss = ((1 - csr_similarity) / config.csr_tau) * csr_confidence.squeeze(-1)
+                    # V9.6.9: Detach confidence to make CSR fully observational
+                    # Without this, gradient flows: loss → csr_alignment_loss → csr_confidence → confidence_head
+                    csr_confidence_for_loss = csr_confidence.detach()
+                    csr_alignment_loss = ((1 - csr_similarity) / config.csr_tau) * csr_confidence_for_loss.squeeze(-1)
                     csr_loss = csr_alignment_loss.mean() * config.csr_lambda
 
-                    # Add CSR loss to total loss
+                    # V9.6.9: CSR loss is now purely observational (no gradients flow)
+                    # We still track it for metrics, but it doesn't influence training
+                    # The cross-entropy LM loss is the ONLY training signal
                     loss = loss + csr_loss
                     csr_metrics['csr_loss'] = csr_loss.item()
                     csr_metrics['csr_confidence'] = csr_confidence.mean().item()
