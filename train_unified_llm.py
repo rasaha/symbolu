@@ -1372,6 +1372,10 @@ class HiddenStateExtractor:
         1. Model output (if contains hidden_states)
         2. Hook-captured states
         3. Synthetic states from logits (fallback)
+
+        V9.6.5 FIX: Preserve layer index positions when returning hook-captured states.
+        Previously, filtering Nones would shift indices, causing layer_hidden_states[2]
+        to return layer 11 instead of layer 2 - the root cause of CSR aphasia.
         """
         # Try model output first
         if isinstance(model_output, dict):
@@ -1383,13 +1387,41 @@ class HiddenStateExtractor:
                     return hs if isinstance(hs, list) else [hs]
 
         # Try hook-captured states
+        # V9.6.5 FIX: Preserve index positions by keeping Nones and filling them
         if self.hidden_states and any(h is not None for h in self.hidden_states):
-            valid_states = [h for h in self.hidden_states if h is not None]
-            if len(valid_states) >= 3:
-                # Pad to num_layers if needed
-                while len(valid_states) < self.num_layers:
-                    valid_states.append(valid_states[-1])
-                return valid_states[:self.num_layers]
+            num_valid = sum(1 for h in self.hidden_states if h is not None)
+            if num_valid >= 3:
+                # Find the first valid state to use as template for filling gaps
+                first_valid = next(h for h in self.hidden_states if h is not None)
+
+                # Create result list preserving index positions
+                result = []
+                for i in range(self.num_layers):
+                    if i < len(self.hidden_states) and self.hidden_states[i] is not None:
+                        result.append(self.hidden_states[i])
+                    else:
+                        # Fill gap with nearest valid state (interpolation)
+                        # Find closest previous valid state
+                        prev_valid = None
+                        for j in range(i - 1, -1, -1):
+                            if j < len(self.hidden_states) and self.hidden_states[j] is not None:
+                                prev_valid = self.hidden_states[j]
+                                break
+                        # Find closest next valid state
+                        next_valid = None
+                        for j in range(i + 1, len(self.hidden_states)):
+                            if self.hidden_states[j] is not None:
+                                next_valid = self.hidden_states[j]
+                                break
+                        # Use whichever is available (prefer previous for causal consistency)
+                        if prev_valid is not None:
+                            result.append(prev_valid)
+                        elif next_valid is not None:
+                            result.append(next_valid)
+                        else:
+                            result.append(first_valid)
+
+                return result[:self.num_layers]
 
         # Fallback: generate synthetic hidden states from logits
         return self._generate_synthetic_states(model_output, input_ids)
@@ -7446,6 +7478,12 @@ def train(config: UnifiedTrainingConfig):
                         # - Layer 9-11: Output preparation ← AVOID (causes aphasia)
                         csr_layer_idx = min(config.csr_alignment_layer, len(layer_hidden_states) - 1)
                         csr_hidden = layer_hidden_states[csr_layer_idx]
+
+                        # V9.6.5: One-time diagnostic log to confirm layer selection
+                        if not hasattr(model, '_csr_layer_logged'):
+                            model._csr_layer_logged = True
+                            print(f"  ✅ [CSR V9.6.5] Using Layer {csr_layer_idx} for alignment (config: {config.csr_alignment_layer})")
+                            print(f"     Hidden states available: {len(layer_hidden_states)} layers")
 
                 if csr_hidden is not None:
                     # V9.5.4 DIMENSION FIX: Project CSR embeddings to match model hidden size
