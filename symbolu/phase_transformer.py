@@ -1120,6 +1120,13 @@ class GroupedHybridTransformer(nn.Module):
 
         self._init_weights()
 
+        # V9.6.10: For untied embeddings, copy token_embed to lm_head AFTER init
+        # This provides semantic alignment at start while keeping them separate
+        # Without this, lm_head is random → gibberish output early in training
+        if not self.tie_embeddings:
+            with torch.no_grad():
+                self.lm_head.weight.copy_(self.token_embed.weight)
+
     def _init_weights(self):
         for module in self.modules():
             if isinstance(module, nn.Linear):
@@ -1445,6 +1452,12 @@ class PhaseTransformer(nn.Module):
         # Initialize
         self.apply(self._init_weights)
 
+        # V9.6.10: For untied embeddings, copy token_embed to lm_head AFTER init
+        # This provides semantic alignment at start while keeping them separate
+        if not self.tie_embeddings:
+            with torch.no_grad():
+                self.lm_head.weight.copy_(self.token_embed.weight)
+
     def gradient_checkpointing_enable(self):
         """Enable gradient checkpointing to save memory at cost of speed."""
         self.gradient_checkpointing = True
@@ -1715,6 +1728,12 @@ class HybridPhaseTransformer(nn.Module):
         # Initialize
         self.apply(self._init_weights)
 
+        # V9.6.10: For untied embeddings, copy token_embed to lm_head AFTER init
+        # This provides semantic alignment at start while keeping them separate
+        if not self.tie_embeddings:
+            with torch.no_grad():
+                self.lm_head.weight.copy_(self.token_embed.weight)
+
     def gradient_checkpointing_enable(self):
         """Enable gradient checkpointing to save memory at cost of speed."""
         self.gradient_checkpointing = True
@@ -1936,6 +1955,12 @@ class LocalOnlyTransformer(nn.Module):
         # Initialize
         self.apply(self._init_weights)
 
+        # V9.6.10: For untied embeddings, copy token_embed to lm_head AFTER init
+        # This provides semantic alignment at start while keeping them separate
+        if not self.tie_embeddings:
+            with torch.no_grad():
+                self.lm_head.weight.copy_(self.token_embed.weight)
+
     def gradient_checkpointing_enable(self):
         self.gradient_checkpointing = True
 
@@ -2078,6 +2103,12 @@ class StandardTransformer(nn.Module):
             self.lm_head.weight = self.token_embed.weight
 
         self.apply(self._init_weights)
+
+        # V9.6.10: For untied embeddings, copy token_embed to lm_head AFTER init
+        # This provides semantic alignment at start while keeping them separate
+        if not self.tie_embeddings:
+            with torch.no_grad():
+                self.lm_head.weight.copy_(self.token_embed.weight)
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):

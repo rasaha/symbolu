@@ -87,6 +87,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from symbolu.phase_transformer import (
     PhaseTransformer,
     HybridPhaseTransformer,
+    StandardTransformer,  # V9.6.9: O(n²) baseline for comparison
 )
 
 # Import ontological models
@@ -5928,6 +5929,27 @@ def run_quality_samples(
     log(f"  📝 QUALITY SAMPLES (Step {step})")
     log("=" * 60)
 
+    # V9.6.10 Diagnostic: Show top predicted tokens for first prompt
+    try:
+        diag_prompt = config.sample_prompts[0] if config.sample_prompts else "The"
+        diag_ids = tokenizer.encode(diag_prompt, return_tensors="pt").to(device)
+        with torch.no_grad():
+            diag_out = model(diag_ids)
+            if isinstance(diag_out, dict):
+                diag_logits = diag_out.get('logits', diag_out.get('output'))
+            else:
+                diag_logits = diag_out
+            # Get logits for last position
+            last_logits = diag_logits[0, -1, :]
+            top_probs = torch.softmax(last_logits, dim=-1)
+            top_vals, top_ids = torch.topk(top_probs, 10)
+            log(f"  🔍 [DIAGNOSTIC] Top-10 predicted tokens after \"{diag_prompt}\":")
+            for i, (prob, tid) in enumerate(zip(top_vals, top_ids)):
+                tok_str = tokenizer.decode([tid.item()])
+                log(f"      {i+1}. '{tok_str}' (id={tid.item()}, p={prob.item():.4f})")
+    except Exception as e:
+        log(f"  🔍 [DIAGNOSTIC] Failed: {e}")
+
     # Aggregate metrics across all samples
     total_completion = 0.0
     total_repetition = 0.0
@@ -6477,6 +6499,22 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         print(f"  [Gen 2] Num layers: {gen2_num_layers} (9:3 split: {config.use_9_3_split})")
         print(f"  [Gen 2] Hierarchy: 3-tier phase rotation")
 
+    elif config.model_type == "standard":
+        # V9.6.9: Standard O(n²) transformer baseline for comparison
+        # Uses StandardTransformer from phase_transformer.py
+        tie_emb = not config.untie_embeddings
+        model = StandardTransformer(
+            vocab_size=config.vocab_size,
+            embed_dim=preset["embed_dim"],
+            num_layers=preset["num_layers"],
+            num_heads=preset["num_heads"],
+            ff_dim=preset["ff_dim"],
+            max_seq_len=config.max_seq_len,
+            dropout=config.dropout,
+            tie_embeddings=tie_emb,
+        )
+        print(f"\n  [Standard] O(n²) baseline transformer for comparison")
+
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
 
@@ -7016,13 +7054,15 @@ def train(config: UnifiedTrainingConfig):
         sgp_controller = SGPController(sgp_config)
         sgp_controller.attach_sattvic_controller(sattvic_controller)
 
-        # Register Authority layer parameters (layers 0-8) for gradient persistence
+        # Register Authority layer parameters (layers 0 to authority_layers-1) for gradient persistence
         authority_params = []
+        num_authority_layers = config.authority_layers  # Use configured split, not hardcoded 9
         for name, param in model.named_parameters():
-            # Match layers 0-8 (Authority layers)
+            # Match authority layers (0 to num_authority_layers-1)
+            # Support multiple naming conventions: layers.N, layer.N, blocks.N
             layer_match = False
-            for i in range(9):  # 0-8
-                if f"layers.{i}." in name or f"layer.{i}." in name:
+            for i in range(num_authority_layers):
+                if f"layers.{i}." in name or f"layer.{i}." in name or f"blocks.{i}." in name:
                     layer_match = True
                     break
             if layer_match and param.requires_grad:
@@ -7583,16 +7623,28 @@ def train(config: UnifiedTrainingConfig):
                     else:
                         csr_hidden_for_loss = csr_hidden.detach()  # CRITICAL: Break gradient flow!
 
+                    # V9.6.9: Also detach csr_emb to make CSR purely observational
+                    # Previously, gradients flowed: loss → csr_emb → CSR provider
+                    # This trained CSR's projection/confidence_head to align with model states,
+                    # creating an indirect Sanskrit influence on the loss landscape.
+                    # With both sides detached, CSR becomes monitor-only - no training signal flows.
+                    csr_emb_for_loss = csr_emb.detach()
+
                     csr_hidden_norm = torch.nn.functional.normalize(csr_hidden_for_loss, dim=-1)
-                    csr_emb_norm = torch.nn.functional.normalize(csr_emb, dim=-1)
+                    csr_emb_norm = torch.nn.functional.normalize(csr_emb_for_loss, dim=-1)
                     csr_similarity = (csr_hidden_norm * csr_emb_norm).sum(dim=-1)
                     # Temperature sharpening: (1 - sim) / tau creates steep gradient landscape
                     # When alignment is poor (sim ≈ 0): loss = (1-0)/0.07 ≈ 14.3 → STRONG pressure
                     # When alignment is good (sim ≈ 0.9): loss = (1-0.9)/0.07 ≈ 1.4 → mild pressure
-                    csr_alignment_loss = ((1 - csr_similarity) / config.csr_tau) * csr_confidence.squeeze(-1)
+                    # V9.6.9: Detach confidence to make CSR fully observational
+                    # Without this, gradient flows: loss → csr_alignment_loss → csr_confidence → confidence_head
+                    csr_confidence_for_loss = csr_confidence.detach()
+                    csr_alignment_loss = ((1 - csr_similarity) / config.csr_tau) * csr_confidence_for_loss.squeeze(-1)
                     csr_loss = csr_alignment_loss.mean() * config.csr_lambda
 
-                    # Add CSR loss to total loss
+                    # V9.6.9: CSR loss is now purely observational (no gradients flow)
+                    # We still track it for metrics, but it doesn't influence training
+                    # The cross-entropy LM loss is the ONLY training signal
                     loss = loss + csr_loss
                     csr_metrics['csr_loss'] = csr_loss.item()
                     csr_metrics['csr_confidence'] = csr_confidence.mean().item()
@@ -8602,13 +8654,6 @@ def train(config: UnifiedTrainingConfig):
                     )
                     print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}")
 
-                # Quality Sampling
-                if config.sample_every > 0 and global_step % config.sample_every == 0:
-                    if tokenizer is not None:
-                        run_quality_samples(model, tokenizer, config, device, global_step)
-                    else:
-                        print(f"  [Sampling] Skipped - tokenizer not available")
-
                 # LRA Validation (Long-Range Retrieval)
                 if lra_validator is not None and global_step % config.lra_validate_every == 0:
                     lra_results = lra_validator.run_validation(step=global_step)
@@ -8622,6 +8667,15 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("lra/mean_entropy", lra_results["summary"]["mean_entropy"], global_step)
 
                 model.train()
+
+            # Quality Sampling (OUTSIDE eval block - runs independently of eval_every)
+            if config.sample_every > 0 and global_step % config.sample_every == 0:
+                if tokenizer is not None:
+                    model.eval()
+                    run_quality_samples(model, tokenizer, config, device, global_step)
+                    model.train()
+                else:
+                    print(f"  [Sampling] Skipped - tokenizer not available")
 
             # Save checkpoint (overwrites last.pt each time)
             if global_step % config.save_every == 0:
@@ -8844,8 +8898,8 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid", "gen2"],
-                       help="Model architecture type (gen2 = hierarchical complex Bhava)")
+                       choices=["ontological", "phase", "hybrid", "gen2", "standard"],
+                       help="Model architecture type (standard = O(n²) baseline for comparison)")
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large"],
                        help="Model size preset")
