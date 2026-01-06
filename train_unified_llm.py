@@ -6060,6 +6060,7 @@ class UnifiedTrainingConfig:
     beta2: float = 0.95
     max_grad_norm: float = 1.0
     use_per_layer_clipping: bool = False  # Clip auth/sens layers separately
+    use_8bit_optimizer: bool = False  # Use bitsandbytes 8-bit AdamW (saves ~50% optimizer memory)
 
     # Mixed precision
     mixed_precision: str = "bf16"
@@ -7229,12 +7230,32 @@ def train(config: UnifiedTrainingConfig):
         print(f"  CSR Hidden State Extractor: ENABLED ({len(hidden_state_extractor.hooks)} hooks registered)")
 
     # Optimizer
-    optimizer = AdamW(
-        model.parameters(),
-        lr=config.learning_rate,
-        weight_decay=config.weight_decay,
-        betas=(config.beta1, config.beta2),
-    )
+    if config.use_8bit_optimizer:
+        try:
+            import bitsandbytes as bnb
+            optimizer = bnb.optim.AdamW8bit(
+                model.parameters(),
+                lr=config.learning_rate,
+                weight_decay=config.weight_decay,
+                betas=(config.beta1, config.beta2),
+            )
+            print(f"  8-bit Optimizer: ENABLED (bitsandbytes AdamW8bit)")
+        except ImportError:
+            print("  WARNING: bitsandbytes not installed, falling back to standard AdamW")
+            print("           Install with: pip install bitsandbytes")
+            optimizer = AdamW(
+                model.parameters(),
+                lr=config.learning_rate,
+                weight_decay=config.weight_decay,
+                betas=(config.beta1, config.beta2),
+            )
+    else:
+        optimizer = AdamW(
+            model.parameters(),
+            lr=config.learning_rate,
+            weight_decay=config.weight_decay,
+            betas=(config.beta1, config.beta2),
+        )
 
     # Scheduler
     scheduler = CosineAnnealingLR(
@@ -8927,6 +8948,8 @@ def main():
                        help="Peak learning rate")
     parser.add_argument("--use_per_layer_clipping", action="store_true",
                        help="Clip authority/sensory gradients separately (respects 9:3 design)")
+    parser.add_argument("--use_8bit_optimizer", action="store_true",
+                       help="Use bitsandbytes 8-bit AdamW (saves ~50%% optimizer memory)")
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext103",
@@ -9442,6 +9465,7 @@ def main():
         alpha_output_scale=args.alpha_output_scale,
         alpha_reasoning_scale=args.alpha_reasoning_scale,
         use_per_layer_clipping=args.use_per_layer_clipping,
+        use_8bit_optimizer=args.use_8bit_optimizer,
         # Dynamic Relaxation: 9:3 → 6:6 transition
         enable_dynamic_relaxation=args.enable_dynamic_relaxation and not args.disable_dynamic_relaxation,
         relaxation_mode=args.relaxation_mode,
