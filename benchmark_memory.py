@@ -75,6 +75,7 @@ class MemoryBenchmarkConfig:
     model_size: str = "small"  # tiny, small, medium, large
     batch_size: int = 1
     seq_lengths: List[int] = field(default_factory=lambda: [512, 1024, 2048, 4096])
+    model_types: List[str] = field(default_factory=lambda: ["standard", "phase", "hybrid"])
     num_warmup: int = 2
     num_runs: int = 3
     include_backward: bool = True  # Measure training memory (forward + backward)
@@ -180,11 +181,22 @@ def create_model(model_type: str, preset: dict, max_seq_len: int) -> nn.Module:
             **common_args,
             local_layers=min(4, preset["num_layers"] // 3),
             window_size=256,
+            local_backend="sdpa",  # Use SDPA for better memory (flash if available)
+            alpha_local=0.8,
+            alpha_phase=0.2,
+        )
+    elif model_type == "hybrid_unfold":
+        # Hybrid with unfold backend (fallback, higher memory)
+        return HybridPhaseTransformer(
+            **common_args,
+            local_layers=min(4, preset["num_layers"] // 3),
+            window_size=256,
             local_backend="unfold",
             alpha_local=0.8,
             alpha_phase=0.2,
         )
     elif model_type == "phase":
+        # Pure Phase attention - TRUE O(n) memory, no attention matrix
         return PhaseTransformer(**common_args)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
@@ -358,7 +370,12 @@ def run_benchmark(config: MemoryBenchmarkConfig) -> Dict[str, List[MemoryResult]
     print(f"\n  Model Config: {preset['embed_dim']}d, {preset['num_layers']}L, {preset['num_heads']}H")
 
     # Model types to compare
-    model_types = ["standard", "hybrid"]
+    # "phase" = Pure Phase attention O(n) - best memory efficiency
+    # "standard" = Traditional O(n²) attention - baseline
+    # "hybrid" = Local + Phase attention - production quality
+    model_types = config.model_types if hasattr(config, 'model_types') and config.model_types else ["standard", "phase", "hybrid"]
+
+    print(f"  Models: {', '.join(model_types)}")
 
     results = {mt: [] for mt in model_types}
 
@@ -459,37 +476,52 @@ def compute_savings(results: Dict[str, List[MemoryResult]]) -> Dict[int, Dict[st
 
     savings = {}
 
-    standard_results = {r.seq_length: r for r in results.get("standard", [])}
-    hybrid_results = {r.seq_length: r for r in results.get("hybrid", [])}
+    # Get results by model type
+    results_by_type = {}
+    for model_type, type_results in results.items():
+        results_by_type[model_type] = {r.seq_length: r for r in type_results}
 
-    for seq_len in standard_results.keys():
-        if seq_len not in hybrid_results:
-            continue
+    standard_results = results_by_type.get("standard", {})
+    phase_results = results_by_type.get("phase", {})
+    hybrid_results = results_by_type.get("hybrid", {})
 
-        std = standard_results[seq_len]
-        hyb = hybrid_results[seq_len]
+    # Get all sequence lengths
+    all_seq_lens = set()
+    for type_results in results_by_type.values():
+        all_seq_lens.update(type_results.keys())
 
-        if std.oom and not hyb.oom:
-            savings[seq_len] = {
-                "standard_gb": float("inf"),
-                "hybrid_gb": hyb.peak_memory_gb,
-                "savings_percent": 100.0,
-                "savings_factor": float("inf"),
-                "hybrid_fits_oom_standard": True,
-            }
-        elif not std.oom and not hyb.oom:
-            savings_gb = std.peak_memory_gb - hyb.peak_memory_gb
-            savings_pct = (savings_gb / std.peak_memory_gb) * 100 if std.peak_memory_gb > 0 else 0
-            savings_factor = std.peak_memory_gb / hyb.peak_memory_gb if hyb.peak_memory_gb > 0 else 1
+    for seq_len in all_seq_lens:
+        std = standard_results.get(seq_len)
+        phase = phase_results.get(seq_len)
+        hyb = hybrid_results.get(seq_len)
 
-            savings[seq_len] = {
-                "standard_gb": std.peak_memory_gb,
-                "hybrid_gb": hyb.peak_memory_gb,
-                "savings_gb": savings_gb,
-                "savings_percent": savings_pct,
-                "savings_factor": savings_factor,
-                "hybrid_fits_oom_standard": False,
-            }
+        entry = {"seq_len": seq_len}
+
+        # Standard memory
+        if std:
+            entry["standard_gb"] = float("inf") if std.oom else std.peak_memory_gb
+            entry["standard_oom"] = std.oom
+
+        # Phase memory (best efficiency)
+        if phase:
+            entry["phase_gb"] = float("inf") if phase.oom else phase.peak_memory_gb
+            entry["phase_oom"] = phase.oom
+
+        # Hybrid memory
+        if hyb:
+            entry["hybrid_gb"] = float("inf") if hyb.oom else hyb.peak_memory_gb
+            entry["hybrid_oom"] = hyb.oom
+
+        # Compute savings vs standard
+        if std and not std.oom:
+            if phase and not phase.oom:
+                entry["phase_savings_pct"] = ((std.peak_memory_gb - phase.peak_memory_gb) / std.peak_memory_gb) * 100
+                entry["phase_factor"] = std.peak_memory_gb / phase.peak_memory_gb if phase.peak_memory_gb > 0 else 1
+            if hyb and not hyb.oom:
+                entry["hybrid_savings_pct"] = ((std.peak_memory_gb - hyb.peak_memory_gb) / std.peak_memory_gb) * 100
+                entry["hybrid_factor"] = std.peak_memory_gb / hyb.peak_memory_gb if hyb.peak_memory_gb > 0 else 1
+
+        savings[seq_len] = entry
 
     return savings
 
@@ -507,21 +539,63 @@ def print_results(
 
     # Memory comparison table
     print("  Memory Usage by Sequence Length:")
-    print(f"  {'-'*60}")
-    print(f"  {'Seq Len':>10} | {'Standard':>12} | {'Hybrid':>12} | {'Savings':>12}")
-    print(f"  {'-'*60}")
+    print(f"  {'-'*80}")
+
+    # Determine which models are present
+    has_phase = "phase" in results and results["phase"]
+    has_hybrid = "hybrid" in results and results["hybrid"]
+    has_standard = "standard" in results and results["standard"]
+
+    # Build header
+    header = f"  {'Seq Len':>10} | {'Standard':>12}"
+    if has_phase:
+        header += f" | {'Phase':>12}"
+    if has_hybrid:
+        header += f" | {'Hybrid':>12}"
+    header += f" | {'Best Savings':>15}"
+    print(header)
+    print(f"  {'-'*80}")
 
     for seq_len in sorted(savings.keys()):
         s = savings[seq_len]
-        std_str = "OOM" if s["standard_gb"] == float("inf") else f"{s['standard_gb']:.2f} GB"
-        hyb_str = f"{s['hybrid_gb']:.2f} GB"
 
-        if s.get("hybrid_fits_oom_standard"):
-            save_str = "ONLY Hybrid fits!"
+        # Standard
+        std_gb = s.get("standard_gb", 0)
+        std_str = "OOM" if std_gb == float("inf") else f"{std_gb:.2f} GB"
+
+        row = f"  {seq_len:>10,} | {std_str:>12}"
+
+        # Phase
+        if has_phase:
+            phase_gb = s.get("phase_gb", 0)
+            phase_str = "OOM" if phase_gb == float("inf") else f"{phase_gb:.2f} GB"
+            row += f" | {phase_str:>12}"
+
+        # Hybrid
+        if has_hybrid:
+            hyb_gb = s.get("hybrid_gb", 0)
+            hyb_str = "OOM" if hyb_gb == float("inf") else f"{hyb_gb:.2f} GB"
+            row += f" | {hyb_str:>12}"
+
+        # Best savings (phase vs standard, or hybrid vs standard)
+        phase_pct = s.get("phase_savings_pct", 0)
+        phase_factor = s.get("phase_factor", 1)
+        hyb_pct = s.get("hybrid_savings_pct", 0)
+        hyb_factor = s.get("hybrid_factor", 1)
+
+        if phase_pct > hyb_pct and phase_pct > 0:
+            save_str = f"Phase {phase_pct:.0f}% ({phase_factor:.1f}x)"
+        elif hyb_pct > 0:
+            save_str = f"Hybrid {hyb_pct:.0f}% ({hyb_factor:.1f}x)"
+        elif s.get("phase_oom") == False and s.get("standard_oom") == True:
+            save_str = "Phase ONLY fits"
+        elif s.get("hybrid_oom") == False and s.get("standard_oom") == True:
+            save_str = "Hybrid ONLY fits"
         else:
-            save_str = f"{s['savings_percent']:.1f}% ({s['savings_factor']:.1f}x)"
+            save_str = "-"
 
-        print(f"  {seq_len:>10,} | {std_str:>12} | {hyb_str:>12} | {save_str:>12}")
+        row += f" | {save_str:>15}"
+        print(row)
 
     # Scaling analysis
     print(f"\n  Scaling Analysis:")
@@ -533,12 +607,20 @@ def print_results(
 
     # GPU compatibility
     print(f"\n  Maximum Sequence Length by GPU:")
-    print(f"  {'-'*60}")
-    print(f"  {'GPU':<20} | {'Standard':>12} | {'Hybrid':>12} | {'Cost Tier':>12}")
-    print(f"  {'-'*60}")
+    print(f"  {'-'*75}")
 
     std_analysis = analysis.get("standard", {})
+    phase_analysis = analysis.get("phase", {})
     hyb_analysis = analysis.get("hybrid", {})
+
+    header = f"  {'GPU':<20} | {'Standard':>10}"
+    if phase_analysis:
+        header += f" | {'Phase':>10}"
+    if hyb_analysis:
+        header += f" | {'Hybrid':>10}"
+    header += f" | {'Cost':>10}"
+    print(header)
+    print(f"  {'-'*75}")
 
     # Group GPUs by tier
     consumer_gpus = ["RTX 4070", "RTX 4080", "RTX 4090"]
@@ -553,13 +635,22 @@ def print_results(
         print(f"\n  {tier_name}:")
         for gpu in tier_gpus:
             std_max = std_analysis.get("max_seq_by_gpu", {}).get(gpu, 0)
+            phase_max = phase_analysis.get("max_seq_by_gpu", {}).get(gpu, 0)
             hyb_max = hyb_analysis.get("max_seq_by_gpu", {}).get(gpu, 0)
 
             std_str = f"{std_max:,}" if std_max > 0 else "N/A"
-            hyb_str = f"{hyb_max:,}" if hyb_max > 0 else "N/A"
+
+            row = f"    {gpu:<18} | {std_str:>10}"
+
+            if phase_analysis:
+                phase_str = f"{phase_max:,}" if phase_max > 0 else "N/A"
+                row += f" | {phase_str:>10}"
+
+            if hyb_analysis:
+                hyb_str = f"{hyb_max:,}" if hyb_max > 0 else "N/A"
+                row += f" | {hyb_str:>10}"
 
             # Cost tier
-            vram = GPU_SPECS.get(gpu, 0)
             if "RTX" in gpu:
                 cost = "$1-2K"
             elif "A10" in gpu or "A30" in gpu:
@@ -573,44 +664,52 @@ def print_results(
             else:
                 cost = "$40K+"
 
-            print(f"    {gpu:<18} | {std_str:>12} | {hyb_str:>12} | {cost:>12}")
+            row += f" | {cost:>10}"
+            print(row)
 
     # Key takeaways
     print(f"\n{'='*70}")
     print("   KEY FINDINGS")
     print(f"{'='*70}\n")
 
-    # Find the crossover point where Standard OOMs but Hybrid doesn't
-    hybrid_only_seq = [
+    # Find the crossover point where Standard OOMs but Phase/Hybrid doesn't
+    phase_only_seq = [
         seq_len for seq_len, s in savings.items()
-        if s.get("hybrid_fits_oom_standard")
+        if s.get("phase_oom") == False and s.get("standard_oom") == True
     ]
 
-    if hybrid_only_seq:
-        print(f"  1. At {min(hybrid_only_seq):,} tokens, Standard Transformer hits OOM")
-        print(f"     while Hybrid Transformer still fits comfortably!")
+    if phase_only_seq:
+        print(f"  1. At {min(phase_only_seq):,} tokens, Standard Transformer hits OOM")
+        print(f"     while Phase Transformer still fits!")
 
     # Memory efficiency at max common sequence length
-    common_seqs = [seq_len for seq_len, s in savings.items() if s["standard_gb"] != float("inf")]
+    common_seqs = [
+        seq_len for seq_len, s in savings.items()
+        if s.get("standard_gb") and s.get("standard_gb") != float("inf")
+    ]
+
     if common_seqs:
         max_common = max(common_seqs)
         s = savings[max_common]
-        print(f"\n  2. At {max_common:,} tokens (both fit):")
-        print(f"     - Standard uses {s['standard_gb']:.2f} GB")
-        print(f"     - Hybrid uses {s['hybrid_gb']:.2f} GB")
-        print(f"     - Savings: {s['savings_percent']:.1f}% ({s['savings_factor']:.1f}x less memory)")
+        print(f"\n  2. At {max_common:,} tokens (all models fit):")
+        print(f"     - Standard: {s.get('standard_gb', 0):.2f} GB")
+        if s.get("phase_gb"):
+            print(f"     - Phase: {s.get('phase_gb', 0):.2f} GB ({s.get('phase_savings_pct', 0):.0f}% savings)")
+        if s.get("hybrid_gb"):
+            print(f"     - Hybrid: {s.get('hybrid_gb', 0):.2f} GB ({s.get('hybrid_savings_pct', 0):.0f}% savings)")
 
-    # Hardware implications
-    print(f"\n  3. Hardware Implications:")
-    print(f"     - Standard Transformer 32K context: Requires 80GB+ HBM3E (A100/H100)")
-    print(f"     - Hybrid Transformer 32K context: Runs on RTX 4090 (24GB GDDR6X)")
-    print(f"     - Cost difference: $30,000+ vs $1,600")
+    # Scaling analysis
+    print(f"\n  3. Scaling Behavior:")
+    print(f"     - Standard Attention: Creates [B, H, N, N] attention matrix -> O(n²) memory")
+    print(f"     - Phase Attention: State accumulation, no attention matrix -> O(n) memory")
+    print(f"     - Hybrid Attention: Local window + Phase -> O(n) with better quality")
 
-    print(f"\n  4. Why This Matters:")
-    print(f"     - Train production LLMs on consumer hardware")
-    print(f"     - No need for expensive HBM/HBM3E memory")
-    print(f"     - Democratizes large context training")
-    print(f"     - Same quality at fraction of the cost")
+    # Note about the results
+    print(f"\n  4. Important Notes:")
+    print(f"     - Phase attention is TRUE O(n) - best memory efficiency")
+    print(f"     - Hybrid adds LocalAttention for quality, increases base memory")
+    print(f"     - At LONG sequences (16K+), the O(n²) vs O(n) difference is dramatic")
+    print(f"     - Run with --full to see 8K/16K/32K where Standard OOMs")
 
 
 def save_results(
@@ -658,6 +757,8 @@ Examples:
     parser.add_argument("--model_size", type=str, default="small",
                         choices=["tiny", "small", "medium", "large", "xl"],
                         help="Model size preset")
+    parser.add_argument("--models", type=str, default="standard,phase,hybrid",
+                        help="Comma-separated model types to compare (standard,phase,hybrid)")
     parser.add_argument("--batch_size", type=int, default=1,
                         help="Batch size for testing")
     parser.add_argument("--seq_lengths", type=str, default=None,
@@ -685,10 +786,14 @@ Examples:
     else:
         seq_lengths = [512, 1024, 2048, 4096, 8192]  # Default
 
+    # Parse model types
+    model_types = [m.strip() for m in args.models.split(",")]
+
     config = MemoryBenchmarkConfig(
         model_size=args.model_size,
         batch_size=args.batch_size,
         seq_lengths=seq_lengths,
+        model_types=model_types,
         include_backward=not args.no_backward,
         output_file=args.output,
         verbose=args.verbose,
