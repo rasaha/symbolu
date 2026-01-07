@@ -5,35 +5,40 @@ Hybrid 7B Training Script for FineWeb Dataset
 
 Optimized for NVIDIA A100 80GB with HybridPhaseTransformer.
 
-Memory Budget (A100 80GB, BF16 Mixed Precision, seq_len=1024):
+Memory Budget (A100 80GB, BF16 + 8-bit Optimizer, seq_len=1024):
 - Model weights (BF16): ~14GB
-- Optimizer states (FP32 Adam): ~28GB (2x model for momentum buffers)
+- Optimizer states (8-bit Adam): ~7GB (vs ~28GB with FP32 Adam)
 - Gradients (BF16): ~14GB
-- Activations (batch=1, checkpointed): ~20GB
-- Total: ~76GB -> Batch size 1 ONLY on single A100 80GB
+- Activations (batch=2, checkpointed): ~35GB
+- Total: ~70GB -> Batch size 2 on A100 80GB with 8-bit optimizer!
 
-Benchmark Results (A100 80GB):
-- Batch=1, seq=1024: ~55GB (Hybrid) - FITS
-- Batch=2, seq=1024: ~78GB+ - OOM with optimizer states
+Memory Savings with 8-bit Optimizer:
+- FP32 Adam: ~28GB optimizer states
+- 8-bit Adam: ~7GB optimizer states (75% savings)
+- Enables batch_size=2 on A100 80GB
 
 Key Features:
 - HybridPhaseTransformer 7B (32 layers, 16:16 split)
 - FineWeb dataset streaming from HuggingFace
 - Mixed precision (BF16) training
+- 8-bit AdamW optimizer (bitsandbytes)
 - Gradient checkpointing for memory efficiency
 - Gradient accumulation for effective larger batches
 - Cosine learning rate schedule with warmup
 - Distributed training ready (DDP)
 
 Usage:
-    # Single A100 80GB (batch=1 required)
-    python train_hybrid_7b.py --batch_size 1 --gradient_accumulation 16
+    # Single A100 80GB with 8-bit optimizer (default, batch=2)
+    python train_hybrid_7b.py
 
-    # Multi-GPU (4x A100) - can use batch=2 per GPU
+    # Single A100 80GB without 8-bit optimizer (batch=1 required)
+    python train_hybrid_7b.py --no_8bit_optimizer --batch_size 1 --gradient_accumulation 16
+
+    # Multi-GPU (4x A100)
     torchrun --nproc_per_node=4 train_hybrid_7b.py --batch_size 2 --gradient_accumulation 4
 
-    # H100/H200 (more VRAM) - can use batch=2
-    python train_hybrid_7b.py --batch_size 2 --gradient_accumulation 8
+Requirements:
+    pip install bitsandbytes transformers datasets wandb
 
 Author: Sovereign-1 Training Initiative
 Date: January 2026
@@ -100,8 +105,8 @@ class TrainingConfig:
     alpha_phase: float = 0.2
 
     # Training hyperparameters
-    batch_size: int = 1  # Per-GPU batch size (1 for A100 80GB with 7B)
-    gradient_accumulation: int = 16  # Effective batch = 1 * 16 = 16
+    batch_size: int = 2  # Per-GPU batch size (2 for A100 80GB with 8-bit optimizer)
+    gradient_accumulation: int = 8  # Effective batch = 2 * 8 = 16
     learning_rate: float = 3e-4
     min_learning_rate: float = 3e-5
     weight_decay: float = 0.1
@@ -116,6 +121,7 @@ class TrainingConfig:
     # Memory optimization
     use_mixed_precision: bool = True
     use_gradient_checkpointing: bool = True
+    use_8bit_optimizer: bool = True  # Use bitsandbytes 8-bit AdamW (saves ~75% optimizer memory)
 
     # Dataset
     dataset_name: str = "HuggingFaceFW/fineweb"
@@ -351,13 +357,35 @@ def train(config: TrainingConfig):
     if is_distributed:
         model = DDP(model, device_ids=[rank])
 
-    # Optimizer
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=config.learning_rate,
-        betas=(config.beta1, config.beta2),
-        weight_decay=config.weight_decay,
-    )
+    # Optimizer (8-bit for memory efficiency)
+    if config.use_8bit_optimizer:
+        try:
+            import bitsandbytes as bnb
+            optimizer = bnb.optim.AdamW8bit(
+                model.parameters(),
+                lr=config.learning_rate,
+                betas=(config.beta1, config.beta2),
+                weight_decay=config.weight_decay,
+            )
+            if is_main:
+                print(f"  8-bit Optimizer: ENABLED (saves ~75% optimizer memory)")
+        except ImportError:
+            if is_main:
+                print("  WARNING: bitsandbytes not installed, using standard AdamW")
+                print("           Install with: pip install bitsandbytes")
+            optimizer = torch.optim.AdamW(
+                model.parameters(),
+                lr=config.learning_rate,
+                betas=(config.beta1, config.beta2),
+                weight_decay=config.weight_decay,
+            )
+    else:
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=config.learning_rate,
+            betas=(config.beta1, config.beta2),
+            weight_decay=config.weight_decay,
+        )
 
     # Mixed precision
     scaler = GradScaler('cuda') if config.use_mixed_precision else None
@@ -538,6 +566,8 @@ def main():
     # Memory optimization
     parser.add_argument("--no_mixed_precision", action="store_true")
     parser.add_argument("--no_gradient_checkpointing", action="store_true")
+    parser.add_argument("--no_8bit_optimizer", action="store_true",
+                        help="Disable 8-bit optimizer (requires batch_size=1 on A100 80GB)")
 
     # Dataset
     parser.add_argument("--dataset_name", type=str, default="HuggingFaceFW/fineweb")
@@ -571,6 +601,7 @@ def main():
         grad_clip=args.grad_clip,
         use_mixed_precision=not args.no_mixed_precision,
         use_gradient_checkpointing=not args.no_gradient_checkpointing,
+        use_8bit_optimizer=not args.no_8bit_optimizer,
         dataset_name=args.dataset_name,
         dataset_subset=args.dataset_subset,
         output_dir=args.output_dir,
