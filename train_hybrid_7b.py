@@ -202,6 +202,7 @@ def get_tokenizer():
     from transformers import GPT2TokenizerFast
     tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
     tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.model_max_length = 1000000  # Suppress "sequence length > max" warnings
     return tokenizer
 
 
@@ -314,30 +315,32 @@ def generate_samples(model, tokenizer, device, config, step, num_samples=3, max_
     print(f"  SAMPLES @ Step {step}")
     print(f"  {'='*60}")
 
-    for i, prompt in enumerate(prompts[:num_samples]):
-        input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+    # Disable torch.compile for generation (dynamic shapes cause hangs)
+    with torch.compiler.disable():
+        for i, prompt in enumerate(prompts[:num_samples]):
+            input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
 
-        # Simple greedy generation
-        generated = input_ids.clone()
-        for _ in range(max_new_tokens):
-            if generated.shape[1] >= config.max_seq_len:
-                break
+            # Simple greedy generation
+            generated = input_ids.clone()
+            for _ in range(max_new_tokens):
+                if generated.shape[1] >= config.max_seq_len:
+                    break
 
-            with autocast('cuda', enabled=config.use_mixed_precision, dtype=torch.bfloat16):
-                output = model(generated)
-                logits = output["logits"] if isinstance(output, dict) else output
+                with autocast('cuda', enabled=config.use_mixed_precision, dtype=torch.bfloat16):
+                    output = model(generated)
+                    logits = output["logits"] if isinstance(output, dict) else output
 
-            # Greedy: take argmax of last token
-            next_token = logits[:, -1, :].argmax(dim=-1, keepdim=True)
-            generated = torch.cat([generated, next_token], dim=1)
+                # Greedy: take argmax of last token
+                next_token = logits[:, -1, :].argmax(dim=-1, keepdim=True)
+                generated = torch.cat([generated, next_token], dim=1)
 
-            # Stop at EOS
-            if next_token.item() == tokenizer.eos_token_id:
-                break
+                # Stop at EOS
+                if next_token.item() == tokenizer.eos_token_id:
+                    break
 
-        # Decode and print
-        text = tokenizer.decode(generated[0], skip_special_tokens=True)
-        print(f"\n  [{i+1}] {text[:200]}{'...' if len(text) > 200 else ''}")
+            # Decode and print
+            text = tokenizer.decode(generated[0], skip_special_tokens=True)
+            print(f"\n  [{i+1}] {text[:200]}{'...' if len(text) > 200 else ''}")
 
     print(f"\n  {'='*60}\n")
     model.train()
