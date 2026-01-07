@@ -133,6 +133,7 @@ class TrainingConfig:
     # Logging & Checkpointing
     log_interval: int = 10
     sample_interval: int = 50  # Generate text samples every N steps
+    cache_val_batches: int = 20  # Pre-cache N validation batches (0 = disable, eliminates 7-min gap)
     eval_interval: int = 500
     save_interval: int = 1000
     output_dir: str = "./checkpoints/hybrid_7b"
@@ -264,21 +265,38 @@ def count_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
+def cache_validation_batches(dataloader, num_batches: int = 20) -> list:
+    """Pre-cache validation batches to avoid re-resolving streaming dataset.
+
+    This eliminates the 7-minute "Resolving data files" delay during validation.
+    """
+    print(f"  Caching {num_batches} validation batches...")
+    cached = []
+    data_iter = iter(dataloader)
+    for i in range(num_batches):
+        try:
+            batch = next(data_iter)
+            # Move to CPU and store (will move to GPU during val)
+            cached.append({
+                "input_ids": batch["input_ids"].clone(),
+                "labels": batch["labels"].clone(),
+            })
+        except StopIteration:
+            break
+    print(f"  Cached {len(cached)} validation batches")
+    return cached
+
+
 @torch.no_grad()
-def compute_val_ppl(model, val_dataloader, device, config, num_batches=10):
-    """Compute validation perplexity on a few batches."""
+def compute_val_ppl(model, val_batches, device, config, num_batches=10):
+    """Compute validation perplexity on pre-cached batches."""
     model.eval()
     total_loss = 0.0
     total_tokens = 0
 
-    val_iter = iter(val_dataloader)
-    for _ in range(num_batches):
-        try:
-            batch = next(val_iter)
-        except StopIteration:
-            val_iter = iter(val_dataloader)
-            batch = next(val_iter)
-
+    # Use pre-cached batches (no re-resolving!)
+    for i in range(min(num_batches, len(val_batches))):
+        batch = val_batches[i]
         input_ids = batch["input_ids"].to(device)
         labels = batch["labels"].to(device)
 
@@ -504,8 +522,16 @@ def train(config: TrainingConfig):
     dataloader = create_dataloader(config, tokenizer, world_size, rank)
     data_iter = iter(dataloader)
 
-    # Validation dataloader (separate stream for val PPL)
-    val_dataloader = create_dataloader(config, tokenizer, world_size, rank)  # Uses same streaming, different iterator
+    # Validation: Pre-cache batches to avoid 7-minute "Resolving data files" delay
+    val_batches = []
+    if config.cache_val_batches > 0:
+        val_dataloader = create_dataloader(config, tokenizer, world_size, rank)
+        val_batches = cache_validation_batches(val_dataloader, config.cache_val_batches)
+        del val_dataloader  # Free the streaming dataloader
+    else:
+        # Legacy: create fresh dataloader each validation (slow but uses less RAM)
+        if is_main:
+            print(f"  Val batch caching: DISABLED (will re-resolve dataset each validation)")
 
     # Initialize wandb
     if is_main and HAS_WANDB and config.wandb_project:
@@ -618,7 +644,7 @@ def train(config: TrainingConfig):
 
         # Compute validation PPL and generate samples periodically
         if step % config.sample_interval == 0 and is_main:
-            val_ppl, val_loss = compute_val_ppl(model, val_dataloader, device, config)
+            val_ppl, val_loss = compute_val_ppl(model, val_batches, device, config)
             print(f"\n  VAL PPL: {val_ppl:.2f} | VAL Loss: {val_loss:.4f}")
 
             if HAS_WANDB and config.wandb_project:
@@ -703,6 +729,8 @@ def main():
                         help="Disable 8-bit optimizer (requires batch_size=1 on A100 80GB)")
     parser.add_argument("--no_compile", action="store_true",
                         help="Disable torch.compile() (use if seeing compilation errors)")
+    parser.add_argument("--cache_val_batches", type=int, default=20,
+                        help="Pre-cache N validation batches (0=disable, eliminates 7-min gap)")
 
     # Dataset
     parser.add_argument("--dataset_name", type=str, default="HuggingFaceFW/fineweb")
@@ -739,6 +767,7 @@ def main():
         use_gradient_checkpointing=not args.no_gradient_checkpointing,
         use_8bit_optimizer=not args.no_8bit_optimizer,
         use_compile=not args.no_compile,
+        cache_val_batches=args.cache_val_batches,
         dataset_name=args.dataset_name,
         dataset_subset=args.dataset_subset,
         output_dir=args.output_dir,
