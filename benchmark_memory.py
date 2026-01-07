@@ -1,31 +1,40 @@
 #!/usr/bin/env python3
 """
-Memory Efficiency Benchmark: Hybrid vs Standard Transformer
-============================================================
+Memory Efficiency Benchmark: Phase O(n) vs Standard O(n²)
+=========================================================
 
-Proves that HybridPhaseTransformer significantly reduces memory consumption
-compared to StandardTransformer, enabling training on consumer GPUs without
+Proves that PhaseTransformer (TRUE O(n)) significantly reduces memory consumption
+compared to StandardTransformer (O(n²)), enabling training on consumer GPUs without
 requiring expensive HBM/HBM3E memory.
+
+Model Complexity:
+-----------------
+- StandardTransformer: O(n²) - creates [B, H, N, N] attention matrix
+- PhaseTransformer: O(n) - state accumulation, NO attention matrix
+- HybridTransformer: O(n×w) - local window + phase (w=window size)
 
 Key Findings This Script Demonstrates:
 --------------------------------------
-1. StandardTransformer: O(n²) memory scaling - attention matrix [B, H, N, N]
-2. HybridPhaseTransformer: O(n) memory scaling - no attention matrix
-3. At 8K sequence length, Hybrid uses ~4x less memory
-4. At 32K sequence length, Standard OOMs on 24GB VRAM, Hybrid fits easily
+1. StandardTransformer: O(n²) memory scaling - attention matrix explodes
+2. PhaseTransformer: O(n) memory scaling - linear growth
+3. At 8K sequence length, Phase uses ~4x less memory than Standard
+4. At 32K sequence length, Standard OOMs on 24GB VRAM, Phase fits easily
 
 Hardware Implications:
 ----------------------
 - StandardTransformer 32K context: Requires 80GB+ HBM3E (A100/H100)
-- HybridPhaseTransformer 32K context: Runs on RTX 4090 (24GB GDDR6X)
+- PhaseTransformer 32K context: Runs on RTX 4090 (24GB GDDR6X)
 
 Usage:
 ------
-    # Quick test (512-4K)
+    # Default: Compare Standard O(n²) vs Phase O(n)
     python benchmark_memory.py --quick
 
     # Full benchmark (512-32K)
     python benchmark_memory.py --full
+
+    # Include Hybrid O(n×w) in comparison
+    python benchmark_memory.py --models standard,phase,hybrid --full
 
     # Custom sequence lengths
     python benchmark_memory.py --seq_lengths 512,1024,2048,4096,8192
@@ -75,7 +84,7 @@ class MemoryBenchmarkConfig:
     model_size: str = "small"  # tiny, small, medium, large
     batch_size: int = 1
     seq_lengths: List[int] = field(default_factory=lambda: [512, 1024, 2048, 4096])
-    model_types: List[str] = field(default_factory=lambda: ["standard", "phase", "hybrid"])
+    model_types: List[str] = field(default_factory=lambda: ["standard", "phase"])  # True O(n²) vs O(n)
     num_warmup: int = 2
     num_runs: int = 3
     include_backward: bool = True  # Measure training memory (forward + backward)
@@ -757,8 +766,8 @@ Examples:
     parser.add_argument("--model_size", type=str, default="small",
                         choices=["tiny", "small", "medium", "large", "xl"],
                         help="Model size preset")
-    parser.add_argument("--models", type=str, default="standard,phase,hybrid",
-                        help="Comma-separated model types to compare (standard,phase,hybrid)")
+    parser.add_argument("--models", type=str, default="standard,phase",
+                        help="Comma-separated model types: standard (O(n²)), phase (O(n)), hybrid (O(n×w))")
     parser.add_argument("--batch_size", type=int, default=1,
                         help="Batch size for testing")
     parser.add_argument("--seq_lengths", type=str, default=None,

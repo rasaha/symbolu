@@ -4,13 +4,17 @@
 
 This document describes the `benchmark_memory.py` script that compares memory consumption across different transformer architectures during training.
 
+**Primary Comparison**: Standard O(n²) vs Phase O(n) - proves consumer GPU viability.
+
 ## Architecture Comparison
 
 | Model | Attention Type | Memory Complexity | Best For |
 |-------|---------------|-------------------|----------|
-| **StandardTransformer** | Full O(n²) | Creates [B, H, N, N] attention matrix | Baseline comparison |
-| **PhaseTransformer** | Phase O(n) | State accumulation, no attention matrix | Maximum memory efficiency |
-| **HybridPhaseTransformer** | Local + Phase | Local window + Phase attention | Production quality + efficiency |
+| **StandardTransformer** | Full attention | **O(n²)** - creates [B, H, N, N] matrix | Baseline comparison |
+| **PhaseTransformer** | Phase attention | **O(n)** - state accumulation only | Maximum memory efficiency |
+| **HybridPhaseTransformer** | Local + Phase | **O(n×w)** - window size w | Production quality + efficiency |
+
+> **Note**: The default comparison is Standard vs Phase to demonstrate TRUE O(n²) vs O(n) scaling.
 
 ## Memory Scaling
 
