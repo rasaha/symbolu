@@ -643,7 +643,7 @@ def train(config: TrainingConfig):
             start_time = time.time()
 
         # Compute validation PPL and generate samples periodically
-        if step % config.sample_interval == 0 and is_main:
+        if config.sample_interval > 0 and step % config.sample_interval == 0 and is_main:
             val_ppl, val_loss = compute_val_ppl(model, val_batches, device, config)
             print(f"\n  VAL PPL: {val_ppl:.2f} | VAL Loss: {val_loss:.4f}")
 
@@ -731,6 +731,8 @@ def main():
                         help="Disable torch.compile() (use if seeing compilation errors)")
     parser.add_argument("--cache_val_batches", type=int, default=20,
                         help="Pre-cache N validation batches (0=disable, eliminates 7-min gap)")
+    parser.add_argument("--sample_interval", type=int, default=50,
+                        help="Generate quality samples every N steps (0=disable)")
 
     # Dataset
     parser.add_argument("--dataset_name", type=str, default="HuggingFaceFW/fineweb")
@@ -768,6 +770,7 @@ def main():
         use_8bit_optimizer=not args.no_8bit_optimizer,
         use_compile=not args.no_compile,
         cache_val_batches=args.cache_val_batches,
+        sample_interval=args.sample_interval,
         dataset_name=args.dataset_name,
         dataset_subset=args.dataset_subset,
         output_dir=args.output_dir,

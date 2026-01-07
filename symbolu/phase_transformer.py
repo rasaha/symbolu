@@ -137,13 +137,16 @@ class IntentPhaseProjector(nn.Module):
         self.head_dim = head_dim
         self.project_per_head_dim = project_per_head_dim
 
+        # Store the total output dimension for consistent reshaping
+        self.output_dim = num_heads * head_dim if project_per_head_dim else num_heads
+
         if project_per_head_dim:
             # Full projection: different phase offset for each (head, dim) pair
             # More expressive but more parameters
             self.phase_proj = nn.Sequential(
                 nn.Linear(state_dim, state_dim * 2),
                 nn.GELU(),
-                nn.Linear(state_dim * 2, num_heads * head_dim),
+                nn.Linear(state_dim * 2, self.output_dim),
             )
         else:
             # Per-head projection: one phase offset per head
@@ -173,11 +176,14 @@ class IntentPhaseProjector(nn.Module):
 
         if self.project_per_head_dim:
             # Reshape to [B, H, D_h] or [B, T, H, D_h]
+            # Use actual output_dim to compute head_dim for consistent reshaping
+            actual_head_dim = self.output_dim // self.num_heads
             if delta_S.dim() == 2:
-                theta = theta.view(-1, self.num_heads, self.head_dim)
+                B = delta_S.shape[0]
+                theta = theta.view(B, self.num_heads, actual_head_dim)
             else:
                 B, T, _ = delta_S.shape
-                theta = theta.view(B, T, self.num_heads, self.head_dim)
+                theta = theta.view(B, T, self.num_heads, actual_head_dim)
 
         # Scale to reasonable phase range (tanh → [-1, 1] → [-π, π])
         theta = torch.tanh(theta) * 3.14159

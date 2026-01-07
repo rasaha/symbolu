@@ -66,7 +66,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, IterableDataset
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR
 
@@ -5751,6 +5751,7 @@ class DynamicRelaxationController:
 # =============================================================================
 
 @torch.no_grad()
+@torch._dynamo.disable  # Disable torch.compile for generation (dynamic shapes cause hangs)
 def generate_sample(
     model: nn.Module,
     tokenizer,
@@ -6070,6 +6071,7 @@ class UnifiedTrainingConfig:
     max_grad_norm: float = 1.0
     use_per_layer_clipping: bool = False  # Clip auth/sens layers separately
     use_8bit_optimizer: bool = False  # Use bitsandbytes 8-bit AdamW (saves ~50% optimizer memory)
+    use_compile: bool = False  # Use torch.compile() for faster training (PyTorch 2.0+)
 
     # Mixed precision
     mixed_precision: str = "bf16"
@@ -6088,7 +6090,11 @@ class UnifiedTrainingConfig:
     quiet: bool = False  # Quiet mode: only print Critical 5 (Loss, PPL, S/A, GC, Conf)
 
     # Dataset
-    dataset: str = "wikitext103"
+    dataset: str = "wikitext103"  # "wikitext103", "wikitext2", or "fineweb"
+    dataset_name: str = "HuggingFaceFW/fineweb"  # HuggingFace dataset name (for fineweb mode)
+    dataset_subset: str = "sample-10BT"  # Dataset subset/config
+    cache_val_batches: int = 20  # Pre-cache N validation batches (for streaming datasets)
+    cache_dataset: bool = False  # Download and cache dataset locally (vs streaming)
     tokenizer: str = "gpt2"
 
     # Loss weights for ontological model
@@ -6242,8 +6248,8 @@ class UnifiedTrainingConfig:
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
     # V9.6.8: Updated defaults per Gemini recommendation (stronger cement, less frequent)
     enable_sgp: bool = True                  # Enable SGP synchronized with Sattvic Controller
-    sgp_base_rate: int = 50                  # Base SGP rate (Toroidal Refresh Rate) - was 25
-    sgp_stagnation_rate: int = 25            # Rate when stagnation detected - was 12
+    sgp_base_rate: int = 200                 # Base SGP rate (Toroidal Refresh Rate) - every 200 steps
+    sgp_stagnation_rate: int = 100           # Rate when stagnation detected - halved from base
     sgp_gamma: float = 0.5                   # Persistence coefficient - was 0.3 (stronger cement)
 
     # Sattvic Controller (Dynamic λ_csr regulation)
@@ -6287,17 +6293,11 @@ class UnifiedTrainingConfig:
     # Quality Sampling
     sample_every: int = 50  # Generate samples every N steps (0 = disabled)
     sample_prompts: tuple = (
-        # Original open-ended prompts
-        "The history of the Roman Empire began when",
-        "In computer science, algorithms are",
-        # Targeted probes for factual continuity (ChatGPT recommendation)
-        "The Roman Empire began when Julius Caesar",
-        "An algorithm is a step-by-step procedure that",
-        # Syntax closure probes
-        "A triangle has three sides, therefore",
-        "If A implies B and A is true, then",
-        # Causal reasoning probe
-        "Water boils at 100 degrees Celsius because",
+        "The Roman Empire began when Julius Caesar",  # Baseline
+        "Water boils at 100 degrees Celsius, but at high altitudes,",  # Pivot/Contrast
+        "To solve for x in the equation 2x + 6 = 10, the first step is to",  # Logic
+        "The three primary colors are red, blue, and yellow. If we mix the first two, we get",  # Memory/Reference
+        "The primary difference between a stack and a queue is that",  # Definitions (FineWeb)
     )
 
     # LRA Validation (Long-Range Retrieval)
@@ -6364,56 +6364,224 @@ class TextDataset(Dataset):
         return chunk[:-1], chunk[1:]
 
 
+class FineWebStreamingDataset(IterableDataset):
+    """Streaming FineWeb dataset for efficient training on large datasets.
+
+    Supports:
+    - HuggingFaceFW/fineweb (CC-based web text)
+    - HuggingFaceFW/fineweb-edu (educational content)
+    - Any streaming-compatible HuggingFace dataset
+
+    Args:
+        cache_dataset: If True, download and cache dataset locally (slower first run,
+                       faster subsequent runs, no network required). If False, stream
+                       data on-the-fly (faster start, requires network).
+    """
+
+    def __init__(
+        self,
+        tokenizer,
+        seq_length: int = 2048,
+        dataset_name: str = "HuggingFaceFW/fineweb",
+        dataset_subset: str = "sample-10BT",
+        split: str = "train",
+        cache_dataset: bool = False,
+    ):
+        self.tokenizer = tokenizer
+        self.seq_length = seq_length
+        self.dataset_name = dataset_name
+        self.dataset_subset = dataset_subset
+        self.split = split
+        self.cache_dataset = cache_dataset
+        self._cached_dataset = None
+
+    def _load_dataset(self):
+        """Load dataset (streaming or cached)."""
+        from datasets import load_dataset
+
+        if self.cache_dataset:
+            # Download and cache locally (stored in ~/.cache/huggingface/datasets/)
+            return load_dataset(
+                self.dataset_name,
+                name=self.dataset_subset,
+                split=self.split,
+                streaming=False,
+            )
+        else:
+            # Stream dataset to avoid loading everything into memory
+            return load_dataset(
+                self.dataset_name,
+                name=self.dataset_subset,
+                split=self.split,
+                streaming=True,
+            )
+
+    def __iter__(self):
+        if self.cache_dataset and self._cached_dataset is None:
+            print(f"  [FineWeb] Downloading and caching dataset locally...")
+            print(f"  [FineWeb] This may take a while on first run, but will be fast on subsequent runs.")
+            self._cached_dataset = self._load_dataset()
+            print(f"  [FineWeb] Dataset cached. Size: {len(self._cached_dataset):,} examples")
+
+        dataset = self._cached_dataset if self.cache_dataset else self._load_dataset()
+        buffer = []
+
+        for example in dataset:
+            # Tokenize text
+            text = example.get("text", "")
+            if not text:
+                continue
+
+            tokens = self.tokenizer.encode(text)
+            buffer.extend(tokens)
+
+            # Yield chunks of seq_length + 1 (for input/target)
+            while len(buffer) >= self.seq_length + 1:
+                chunk = buffer[:self.seq_length + 1]
+                buffer = buffer[self.seq_length:]
+
+                input_ids = torch.tensor(chunk[:-1], dtype=torch.long)
+                labels = torch.tensor(chunk[1:], dtype=torch.long)
+
+                yield {"input_ids": input_ids, "labels": labels}
+
+
+def cache_validation_batches(dataloader, num_batches: int = 20) -> list:
+    """Pre-cache validation batches to avoid re-resolving streaming dataset.
+
+    This eliminates the 7-minute "Resolving data files" delay during validation
+    when using streaming FineWeb datasets.
+    """
+    print(f"  Caching {num_batches} validation batches...")
+    cached = []
+    data_iter = iter(dataloader)
+    for i in range(num_batches):
+        try:
+            batch = next(data_iter)
+            # Handle different batch formats
+            if isinstance(batch, dict):
+                cached.append({
+                    "input_ids": batch["input_ids"].clone(),
+                    "labels": batch["labels"].clone(),
+                })
+            else:
+                # Tuple format (input_ids, labels)
+                cached.append({
+                    "input_ids": batch[0].clone(),
+                    "labels": batch[1].clone(),
+                })
+        except StopIteration:
+            break
+    print(f"  Cached {len(cached)} validation batches")
+    return cached
+
+
 def load_data(config: UnifiedTrainingConfig, tokenizer) -> Tuple[DataLoader, DataLoader]:
-    """Load and tokenize dataset."""
+    """Load and tokenize dataset.
+
+    Supports:
+    - wikitext103: WikiText-103 (static, ~100M tokens)
+    - wikitext2: WikiText-2 (static, ~2M tokens)
+    - fineweb: Streaming FineWeb/FineWeb-edu (uses dataset_name and dataset_subset)
+    """
     print(f"Loading {config.dataset} dataset...")
 
-    if config.dataset == "wikitext103":
-        ds = load_dataset("wikitext", "wikitext-103-v1")
-    elif config.dataset == "wikitext2":
-        ds = load_dataset("wikitext", "wikitext-2-v1")
-    else:
-        raise ValueError(f"Unknown dataset: {config.dataset}")
-
-    def tokenize(split):
-        text = "\n".join(ds[split]["text"])
-        if hasattr(tokenizer, "encode"):
-            tokens = tokenizer.encode(text)
+    if config.dataset in ["wikitext103", "wikitext2"]:
+        # Static WikiText datasets
+        if config.dataset == "wikitext103":
+            ds = load_dataset("wikitext", "wikitext-103-v1")
         else:
-            tokens = tokenizer(text)["input_ids"]
-        return torch.tensor(tokens, dtype=torch.long)
+            ds = load_dataset("wikitext", "wikitext-2-v1")
 
-    train_tokens = tokenize("train")
-    val_tokens = tokenize("validation")
+        def tokenize(split):
+            text = "\n".join(ds[split]["text"])
+            if hasattr(tokenizer, "encode"):
+                tokens = tokenizer.encode(text)
+            else:
+                tokens = tokenizer(text)["input_ids"]
+            return torch.tensor(tokens, dtype=torch.long)
 
-    print(f"Loaded {len(train_tokens):,} train tokens, {len(val_tokens):,} val tokens")
+        train_tokens = tokenize("train")
+        val_tokens = tokenize("validation")
 
-    train_dataset = TextDataset(train_tokens, config.max_seq_len)
-    val_dataset = TextDataset(val_tokens, config.max_seq_len)
+        print(f"Loaded {len(train_tokens):,} train tokens, {len(val_tokens):,} val tokens")
 
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=config.batch_size,
-        shuffle=True,
-        num_workers=config.num_workers,
-        pin_memory=True,
-        drop_last=True,
-        prefetch_factor=2 if config.num_workers > 0 else None,
-        persistent_workers=config.num_workers > 0,
-    )
+        train_dataset = TextDataset(train_tokens, config.max_seq_len)
+        val_dataset = TextDataset(val_tokens, config.max_seq_len)
 
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=config.batch_size,
-        shuffle=False,
-        num_workers=config.num_workers,
-        pin_memory=True,
-        drop_last=True,
-        prefetch_factor=2 if config.num_workers > 0 else None,
-        persistent_workers=config.num_workers > 0,
-    )
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=config.batch_size,
+            shuffle=True,
+            num_workers=config.num_workers,
+            pin_memory=True,
+            drop_last=True,
+            prefetch_factor=2 if config.num_workers > 0 else None,
+            persistent_workers=config.num_workers > 0,
+        )
 
-    return train_loader, val_loader
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=config.batch_size,
+            shuffle=False,
+            num_workers=config.num_workers,
+            pin_memory=True,
+            drop_last=True,
+            prefetch_factor=2 if config.num_workers > 0 else None,
+            persistent_workers=config.num_workers > 0,
+        )
+
+        return train_loader, val_loader
+
+    elif config.dataset == "fineweb":
+        # Streaming or cached FineWeb dataset
+        print(f"  Dataset: {config.dataset_name}")
+        print(f"  Subset: {config.dataset_subset}")
+        print(f"  Sequence length: {config.max_seq_len}")
+        print(f"  Mode: {'Cached (local)' if config.cache_dataset else 'Streaming'}")
+
+        # Create streaming/cached datasets for train and val
+        train_dataset = FineWebStreamingDataset(
+            tokenizer=tokenizer,
+            seq_length=config.max_seq_len,
+            dataset_name=config.dataset_name,
+            dataset_subset=config.dataset_subset,
+            split="train",
+            cache_dataset=config.cache_dataset,
+        )
+
+        # For validation, we use a small portion of train (FineWeb doesn't have val split)
+        val_dataset = FineWebStreamingDataset(
+            tokenizer=tokenizer,
+            seq_length=config.max_seq_len,
+            dataset_name=config.dataset_name,
+            dataset_subset=config.dataset_subset,
+            split="train",  # Use train split, will cache limited batches
+            cache_dataset=config.cache_dataset,
+        )
+
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=config.batch_size,
+            num_workers=4,
+            pin_memory=True,
+            prefetch_factor=4,
+        )
+
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=config.batch_size,
+            num_workers=2,
+            pin_memory=True,
+            prefetch_factor=2,
+        )
+
+        print(f"  Streaming dataloaders created (batch_size={config.batch_size})")
+
+        return train_loader, val_loader
+
+    else:
+        raise ValueError(f"Unknown dataset: {config.dataset}. Use 'wikitext103', 'wikitext2', or 'fineweb'")
 
 
 # =============================================================================
@@ -6915,6 +7083,18 @@ def train(config: UnifiedTrainingConfig):
     num_params = sum(p.numel() for p in model.parameters())
     print(f"\n  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
 
+    # torch.compile() for faster training (PyTorch 2.0+)
+    if config.use_compile:
+        try:
+            print(f"  Compiling model with torch.compile()...")
+            model = torch.compile(model, mode="reduce-overhead")
+            print(f"  torch.compile: ENABLED (reduce-overhead mode)")
+        except Exception as e:
+            print(f"  torch.compile: FAILED ({e})")
+            print(f"  Continuing without compilation...")
+    else:
+        print(f"  torch.compile: Disabled (use --use_compile to enable)")
+
     # Auto Batch Sizing: Probe VRAM at startup to find optimal batch size
     if config.enable_auto_batch:
         print(f"\n  Auto Batch Sizing: ENABLED")
@@ -6997,6 +7177,13 @@ def train(config: UnifiedTrainingConfig):
 
     # Load data (using potentially updated batch_size from AutoBatchSizer)
     train_loader, val_loader = load_data(config, tokenizer)
+
+    # Pre-cache validation batches for streaming datasets (eliminates 7-min delay)
+    cached_val_batches = None
+    if config.dataset == "fineweb" and config.cache_val_batches > 0:
+        print(f"  Pre-caching {config.cache_val_batches} validation batches...")
+        cached_val_batches = cache_validation_batches(val_loader, config.cache_val_batches)
+        print(f"  Cached {len(cached_val_batches)} validation batches")
 
     # Initialize Sovereign-1 loss if available and enabled
     sovereign_loss = None
@@ -7308,6 +7495,8 @@ def train(config: UnifiedTrainingConfig):
     best_val_loss = float('inf')
     resumed_hgs_state = None
     resumed_drc_state = None
+    resumed_sgp_state = None
+    resumed_sattvic_state = None
     if config.resume:
         resume_path = Path(config.resume)
         if resume_path.exists():
@@ -7323,6 +7512,8 @@ def train(config: UnifiedTrainingConfig):
             best_val_loss = resume_result["best_val_loss"]
             resumed_hgs_state = resume_result.get("hgs_state")
             resumed_drc_state = resume_result.get("drc_state")
+            resumed_sgp_state = resume_result.get("sgp_state")
+            resumed_sattvic_state = resume_result.get("sattvic_state")
         else:
             print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
             print(f"      Starting training from scratch...")
@@ -7453,6 +7644,19 @@ def train(config: UnifiedTrainingConfig):
         except Exception as e:
             print(f"    ⚠️  Could not restore DRC state: {e}")
 
+    # Restore SGP/Sattvic state from checkpoint if available
+    if resumed_sattvic_state is not None and sattvic_controller is not None:
+        try:
+            sattvic_controller.load_state(resumed_sattvic_state)
+        except Exception as e:
+            print(f"    ⚠️  Could not restore Sattvic state: {e}")
+
+    if resumed_sgp_state is not None and sgp_controller is not None:
+        try:
+            sgp_controller.load_state(resumed_sgp_state)
+        except Exception as e:
+            print(f"    ⚠️  Could not restore SGP state: {e}")
+
     # Mixed precision
     scaler = torch.amp.GradScaler('cuda') if config.mixed_precision != "none" else None
     autocast_dtype = torch.bfloat16 if config.mixed_precision == "bf16" else torch.float16
@@ -7563,12 +7767,18 @@ def train(config: UnifiedTrainingConfig):
     while global_step < config.max_steps:
         # Get batch
         try:
-            x, y = next(train_iter)
+            batch = next(train_iter)
         except StopIteration:
             train_iter = iter(train_loader)
-            x, y = next(train_iter)
+            batch = next(train_iter)
 
-        x, y = x.to(device), y.to(device)
+        # Handle different batch formats (tuple for WikiText, dict for FineWeb)
+        if isinstance(batch, dict):
+            x = batch["input_ids"].to(device)
+            y = batch["labels"].to(device)
+        else:
+            x, y = batch
+            x, y = x.to(device), y.to(device)
 
         # Forward pass
         # Clear hidden state extractor before forward pass so hooks capture fresh states
@@ -8421,6 +8631,7 @@ def train(config: UnifiedTrainingConfig):
                     model, val_loader, device, config, autocast_dtype,
                     sovereign_loss=sovereign_loss,
                     sovereign_engine=sovereign_engine,
+                    cached_val_batches=cached_val_batches,
                 )
                 val_ppl = val_metrics['ppl']
                 current_coh = val_metrics.get('coherence', 0.75)
@@ -8721,6 +8932,8 @@ def train(config: UnifiedTrainingConfig):
                         ckpt_dir / "best.pt",
                         hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
                         drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+                        sgp_state=sgp_controller.get_state() if sgp_controller else None,
+                        sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                     )
                     print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}")
 
@@ -8754,6 +8967,8 @@ def train(config: UnifiedTrainingConfig):
                     ckpt_dir / "last.pt",
                     hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
                     drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+                    sgp_state=sgp_controller.get_state() if sgp_controller else None,
+                    sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                 )
                 # v2.7 Training State Tracker: Save state on checkpoint
                 if training_state_tracker is not None and training_state_tracker.enabled:
@@ -8765,6 +8980,8 @@ def train(config: UnifiedTrainingConfig):
         ckpt_dir / "final.pt",
         hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
         drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+        sgp_state=sgp_controller.get_state() if sgp_controller else None,
+        sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
     )
     # v2.7 Training State Tracker: Save final state
     if training_state_tracker is not None and training_state_tracker.enabled:
@@ -8793,15 +9010,32 @@ def evaluate(
     autocast_dtype: torch.dtype,
     sovereign_loss: Optional['SovereignLoss'] = None,
     sovereign_engine: Optional['SovereignEngine'] = None,
+    cached_val_batches: Optional[list] = None,
 ) -> Tuple[float, Dict[str, float]]:
-    """Evaluate model on validation set."""
+    """Evaluate model on validation set.
+
+    Args:
+        cached_val_batches: Optional pre-cached validation batches (for streaming datasets)
+    """
     model.eval()
     total_loss = 0.0
     total_batches = 0
 
     with torch.no_grad():
-        for x, y in val_loader:
-            x, y = x.to(device), y.to(device)
+        # Use cached batches if available (streaming datasets), otherwise use dataloader
+        if cached_val_batches is not None:
+            batch_iter = cached_val_batches
+        else:
+            batch_iter = val_loader
+
+        for batch in batch_iter:
+            # Handle different batch formats
+            if isinstance(batch, dict):
+                x = batch["input_ids"].to(device)
+                y = batch["labels"].to(device)
+            else:
+                x, y = batch
+                x, y = x.to(device), y.to(device)
 
             with torch.amp.autocast('cuda', dtype=autocast_dtype):
                 if config.model_type == "ontological":
@@ -8845,8 +9079,10 @@ def save_checkpoint(
     path: Path,
     hgs_state: Optional[dict] = None,
     drc_state: Optional[dict] = None,
+    sgp_state: Optional[dict] = None,
+    sattvic_state: Optional[dict] = None,
 ):
-    """Save training checkpoint with optional HGS/DRC state.
+    """Save training checkpoint with optional HGS/DRC/SGP/Sattvic state.
 
     For last.pt checkpoints, explicitly removes old file before saving new one
     to ensure clean replacement and avoid potential corruption.
@@ -8871,6 +9107,14 @@ def save_checkpoint(
     # Add DRC state if provided
     if drc_state is not None:
         checkpoint["drc_state"] = drc_state
+
+    # Add SGP state if provided
+    if sgp_state is not None:
+        checkpoint["sgp_state"] = sgp_state
+
+    # Add Sattvic Controller state if provided
+    if sattvic_state is not None:
+        checkpoint["sattvic_state"] = sattvic_state
 
     # Explicitly remove old checkpoint before saving (especially for last.pt)
     # This ensures clean replacement and frees disk space before writing
@@ -8951,6 +9195,16 @@ def load_checkpoint(
         result["drc_state"] = checkpoint["drc_state"]
         print(f"    ✓ DRC state available for restoration")
 
+    # Return SGP state for restoration
+    if "sgp_state" in checkpoint:
+        result["sgp_state"] = checkpoint["sgp_state"]
+        print(f"    ✓ SGP state available for restoration")
+
+    # Return Sattvic Controller state for restoration
+    if "sattvic_state" in checkpoint:
+        result["sattvic_state"] = checkpoint["sattvic_state"]
+        print(f"    ✓ Sattvic Controller state available for restoration")
+
     print(f"    → Resuming from step {result['step']}, best_val_loss={result['best_val_loss']:.4f}")
 
     return result
@@ -8989,11 +9243,23 @@ def main():
                        help="Clip authority/sensory gradients separately (respects 9:3 design)")
     parser.add_argument("--use_8bit_optimizer", action="store_true",
                        help="Use bitsandbytes 8-bit AdamW (saves ~50%% optimizer memory)")
+    parser.add_argument("--use_compile", action="store_true",
+                       help="Use torch.compile() for faster training (PyTorch 2.0+)")
+    parser.add_argument("--no_compile", action="store_true",
+                       help="Disable torch.compile() (use if seeing compilation errors)")
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext103",
-                       choices=["wikitext103", "wikitext2"],
-                       help="Training dataset")
+                       choices=["wikitext103", "wikitext2", "fineweb"],
+                       help="Training dataset: wikitext103, wikitext2, or fineweb (streaming)")
+    parser.add_argument("--dataset_name", type=str, default="HuggingFaceFW/fineweb",
+                       help="HuggingFace dataset name for fineweb mode (e.g., HuggingFaceFW/fineweb-edu)")
+    parser.add_argument("--dataset_subset", type=str, default="sample-10BT",
+                       help="Dataset subset/config for fineweb mode")
+    parser.add_argument("--cache_val_batches", type=int, default=20,
+                       help="Pre-cache N validation batches for streaming datasets (0=disable)")
+    parser.add_argument("--cache_dataset", action="store_true",
+                       help="Download and cache FineWeb dataset locally (slower first run, faster subsequent)")
 
     # Memory optimization
     parser.add_argument("--gradient_checkpointing", action="store_true",
@@ -9330,10 +9596,10 @@ def main():
                        help="Enable SGP synchronized with Sattvic Controller")
     parser.add_argument("--disable_sgp", action="store_true",
                        help="Disable SGP")
-    parser.add_argument("--sgp_base_rate", type=int, default=50,
-                       help="SGP base rate (Toroidal Refresh Rate) - was 25, now 50 per Gemini")
-    parser.add_argument("--sgp_stagnation_rate", type=int, default=25,
-                       help="SGP rate when stagnation detected - was 12, now 25 per Gemini")
+    parser.add_argument("--sgp_base_rate", type=int, default=200,
+                       help="SGP base rate (Toroidal Refresh Rate) - every N steps")
+    parser.add_argument("--sgp_stagnation_rate", type=int, default=100,
+                       help="SGP rate when stagnation detected (halved from base)")
     parser.add_argument("--sgp_gamma", type=float, default=0.5,
                        help="SGP persistence coefficient (gamma) - was 0.3, now 0.5 per Gemini (stronger cement)")
 
@@ -9437,6 +9703,10 @@ def main():
         max_steps=args.max_steps,
         learning_rate=args.learning_rate,
         dataset=args.dataset,
+        dataset_name=args.dataset_name,
+        dataset_subset=args.dataset_subset,
+        cache_val_batches=args.cache_val_batches,
+        cache_dataset=args.cache_dataset,
         gradient_checkpointing=args.gradient_checkpointing,
         checkpoint_offload_cpu=args.checkpoint_offload_cpu,
         mixed_precision=args.mixed_precision,
@@ -9514,6 +9784,7 @@ def main():
         alpha_reasoning_scale=args.alpha_reasoning_scale,
         use_per_layer_clipping=args.use_per_layer_clipping,
         use_8bit_optimizer=args.use_8bit_optimizer,
+        use_compile=args.use_compile and not args.no_compile,
         # Dynamic Relaxation: 9:3 → 6:6 transition
         enable_dynamic_relaxation=args.enable_dynamic_relaxation and not args.disable_dynamic_relaxation,
         relaxation_mode=args.relaxation_mode,
