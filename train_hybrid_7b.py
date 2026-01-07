@@ -545,7 +545,7 @@ def train(config: TrainingConfig):
             else:
                 loss.backward()
 
-            total_loss += loss.item() * config.gradient_accumulation
+            total_loss += loss.item()  # Already divided by gradient_accumulation
             total_tokens += input_ids.numel()
 
         # Gradient clipping
