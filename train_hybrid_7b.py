@@ -128,6 +128,7 @@ class TrainingConfig:
 
     # Logging & Checkpointing
     log_interval: int = 10
+    sample_interval: int = 50  # Generate text samples every N steps
     eval_interval: int = 500
     save_interval: int = 1000
     output_dir: str = "./checkpoints/hybrid_7b"
@@ -255,6 +256,50 @@ def create_model(config: TrainingConfig) -> nn.Module:
 def count_parameters(model: nn.Module) -> int:
     """Count trainable parameters."""
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+@torch.no_grad()
+def generate_samples(model, tokenizer, device, config, step, num_samples=3, max_new_tokens=50):
+    """Generate text samples to monitor training quality."""
+    model.eval()
+
+    prompts = [
+        "The meaning of life is",
+        "In the year 2050,",
+        "Once upon a time",
+    ]
+
+    print(f"\n  {'='*60}")
+    print(f"  SAMPLES @ Step {step}")
+    print(f"  {'='*60}")
+
+    for i, prompt in enumerate(prompts[:num_samples]):
+        input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+
+        # Simple greedy generation
+        generated = input_ids.clone()
+        for _ in range(max_new_tokens):
+            if generated.shape[1] >= config.max_seq_len:
+                break
+
+            with autocast('cuda', enabled=config.use_mixed_precision, dtype=torch.bfloat16):
+                output = model(generated)
+                logits = output["logits"] if isinstance(output, dict) else output
+
+            # Greedy: take argmax of last token
+            next_token = logits[:, -1, :].argmax(dim=-1, keepdim=True)
+            generated = torch.cat([generated, next_token], dim=1)
+
+            # Stop at EOS
+            if next_token.item() == tokenizer.eos_token_id:
+                break
+
+        # Decode and print
+        text = tokenizer.decode(generated[0], skip_special_tokens=True)
+        print(f"\n  [{i+1}] {text[:200]}{'...' if len(text) > 200 else ''}")
+
+    print(f"\n  {'='*60}\n")
+    model.train()
 
 
 # =============================================================================
@@ -483,19 +528,20 @@ def train(config: TrainingConfig):
 
         step += 1
 
-        # Logging
+        # Logging with PPL
         if step % config.log_interval == 0 and is_main:
             elapsed = time.time() - start_time
             tokens_per_sec = total_tokens / elapsed
             avg_loss = total_loss / config.log_interval
+            ppl = math.exp(min(avg_loss, 20))  # Cap to avoid overflow
 
-            print(f"  Step {step:6d} | Loss: {avg_loss:.4f} | "
-                  f"LR: {lr:.2e} | Grad: {grad_norm:.2f} | "
-                  f"Tok/s: {tokens_per_sec:.0f}")
+            print(f"  Step {step:6d} | Loss: {avg_loss:.4f} | PPL: {ppl:.2f} | "
+                  f"LR: {lr:.2e} | Grad: {grad_norm:.2f} | Tok/s: {tokens_per_sec:.0f}")
 
             if HAS_WANDB and config.wandb_project:
                 wandb.log({
                     "loss": avg_loss,
+                    "ppl": ppl,
                     "learning_rate": lr,
                     "grad_norm": grad_norm,
                     "tokens_per_second": tokens_per_sec,
@@ -505,6 +551,10 @@ def train(config: TrainingConfig):
             total_loss = 0.0
             total_tokens = 0
             start_time = time.time()
+
+        # Generate samples periodically
+        if step % config.sample_interval == 0 and is_main:
+            generate_samples(model, tokenizer, device, config, step)
 
         # Save checkpoint
         if step % config.save_interval == 0 and is_main:
