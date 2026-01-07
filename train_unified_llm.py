@@ -5751,6 +5751,7 @@ class DynamicRelaxationController:
 # =============================================================================
 
 @torch.no_grad()
+@torch._dynamo.disable  # Disable torch.compile for generation (dynamic shapes cause hangs)
 def generate_sample(
     model: nn.Module,
     tokenizer,
@@ -6070,6 +6071,7 @@ class UnifiedTrainingConfig:
     max_grad_norm: float = 1.0
     use_per_layer_clipping: bool = False  # Clip auth/sens layers separately
     use_8bit_optimizer: bool = False  # Use bitsandbytes 8-bit AdamW (saves ~50% optimizer memory)
+    use_compile: bool = False  # Use torch.compile() for faster training (PyTorch 2.0+)
 
     # Mixed precision
     mixed_precision: str = "bf16"
@@ -7056,6 +7058,18 @@ def train(config: UnifiedTrainingConfig):
     model = create_model(config, device)
     num_params = sum(p.numel() for p in model.parameters())
     print(f"\n  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
+
+    # torch.compile() for faster training (PyTorch 2.0+)
+    if config.use_compile:
+        try:
+            print(f"  Compiling model with torch.compile()...")
+            model = torch.compile(model, mode="reduce-overhead")
+            print(f"  torch.compile: ENABLED (reduce-overhead mode)")
+        except Exception as e:
+            print(f"  torch.compile: FAILED ({e})")
+            print(f"  Continuing without compilation...")
+    else:
+        print(f"  torch.compile: Disabled (use --use_compile to enable)")
 
     # Auto Batch Sizing: Probe VRAM at startup to find optimal batch size
     if config.enable_auto_batch:
@@ -9162,6 +9176,10 @@ def main():
                        help="Clip authority/sensory gradients separately (respects 9:3 design)")
     parser.add_argument("--use_8bit_optimizer", action="store_true",
                        help="Use bitsandbytes 8-bit AdamW (saves ~50%% optimizer memory)")
+    parser.add_argument("--use_compile", action="store_true",
+                       help="Use torch.compile() for faster training (PyTorch 2.0+)")
+    parser.add_argument("--no_compile", action="store_true",
+                       help="Disable torch.compile() (use if seeing compilation errors)")
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext103",
@@ -9696,6 +9714,7 @@ def main():
         alpha_reasoning_scale=args.alpha_reasoning_scale,
         use_per_layer_clipping=args.use_per_layer_clipping,
         use_8bit_optimizer=args.use_8bit_optimizer,
+        use_compile=args.use_compile and not args.no_compile,
         # Dynamic Relaxation: 9:3 → 6:6 transition
         enable_dynamic_relaxation=args.enable_dynamic_relaxation and not args.disable_dynamic_relaxation,
         relaxation_mode=args.relaxation_mode,
