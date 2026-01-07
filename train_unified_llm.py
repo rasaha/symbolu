@@ -2807,8 +2807,8 @@ class VRAMGovernor:
                 self._apply_batch_reduction(new_batch, sovereign_engine, actions, emergency=False)
 
         # Check if we can recover (increase batch) after being in recovery mode
-        elif self.in_recovery_mode and usage < (self.vram_threshold - 0.15):
-            # VRAM is now 15% below threshold - safe to try increasing
+        elif self.in_recovery_mode and usage < (self.vram_threshold - 0.12):
+            # VRAM is now 12% below threshold (80% with 92% trigger) - safe to try increasing
             steps_in_recovery = current_step - self.recovery_start_step
             if steps_in_recovery > 200:  # Wait at least 200 steps
                 # Try increasing batch by 4
