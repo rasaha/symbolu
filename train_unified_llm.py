@@ -9161,7 +9161,15 @@ def load_checkpoint(
     checkpoint = torch.load(path, map_location=device, weights_only=False)
 
     # Load model weights
-    model.load_state_dict(checkpoint["model"])
+    # Filter out runtime buffers that may have been saved with tensor values
+    # but are initialized as None in fresh models (e.g., prev_state in OntologicalHybridTransformer)
+    model_state = checkpoint["model"]
+    runtime_buffers = ["prev_state"]  # Buffers that are runtime state, not trained weights
+    filtered_state = {k: v for k, v in model_state.items() if k not in runtime_buffers}
+    if len(filtered_state) < len(model_state):
+        removed = [k for k in model_state if k in runtime_buffers]
+        print(f"    → Filtered runtime buffers: {removed}")
+    model.load_state_dict(filtered_state)
     print(f"    ✓ Model weights loaded")
 
     result = {
