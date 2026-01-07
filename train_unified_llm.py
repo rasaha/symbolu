@@ -66,7 +66,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, IterableDataset
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR
 
@@ -6088,7 +6088,10 @@ class UnifiedTrainingConfig:
     quiet: bool = False  # Quiet mode: only print Critical 5 (Loss, PPL, S/A, GC, Conf)
 
     # Dataset
-    dataset: str = "wikitext103"
+    dataset: str = "wikitext103"  # "wikitext103", "wikitext2", or "fineweb"
+    dataset_name: str = "HuggingFaceFW/fineweb"  # HuggingFace dataset name (for fineweb mode)
+    dataset_subset: str = "sample-10BT"  # Dataset subset/config
+    cache_val_batches: int = 20  # Pre-cache N validation batches (for streaming datasets)
     tokenizer: str = "gpt2"
 
     # Loss weights for ontological model
@@ -6364,56 +6367,195 @@ class TextDataset(Dataset):
         return chunk[:-1], chunk[1:]
 
 
+class FineWebStreamingDataset(IterableDataset):
+    """Streaming FineWeb dataset for efficient training on large datasets.
+
+    Supports:
+    - HuggingFaceFW/fineweb (CC-based web text)
+    - HuggingFaceFW/fineweb-edu (educational content)
+    - Any streaming-compatible HuggingFace dataset
+    """
+
+    def __init__(
+        self,
+        tokenizer,
+        seq_length: int = 2048,
+        dataset_name: str = "HuggingFaceFW/fineweb",
+        dataset_subset: str = "sample-10BT",
+        split: str = "train",
+    ):
+        self.tokenizer = tokenizer
+        self.seq_length = seq_length
+        self.dataset_name = dataset_name
+        self.dataset_subset = dataset_subset
+        self.split = split
+
+    def __iter__(self):
+        from datasets import load_dataset
+
+        # Stream dataset to avoid loading everything into memory
+        dataset = load_dataset(
+            self.dataset_name,
+            name=self.dataset_subset,
+            split=self.split,
+            streaming=True,
+        )
+
+        buffer = []
+
+        for example in dataset:
+            # Tokenize text
+            text = example.get("text", "")
+            if not text:
+                continue
+
+            tokens = self.tokenizer.encode(text)
+            buffer.extend(tokens)
+
+            # Yield chunks of seq_length + 1 (for input/target)
+            while len(buffer) >= self.seq_length + 1:
+                chunk = buffer[:self.seq_length + 1]
+                buffer = buffer[self.seq_length:]
+
+                input_ids = torch.tensor(chunk[:-1], dtype=torch.long)
+                labels = torch.tensor(chunk[1:], dtype=torch.long)
+
+                yield {"input_ids": input_ids, "labels": labels}
+
+
+def cache_validation_batches(dataloader, num_batches: int = 20) -> list:
+    """Pre-cache validation batches to avoid re-resolving streaming dataset.
+
+    This eliminates the 7-minute "Resolving data files" delay during validation
+    when using streaming FineWeb datasets.
+    """
+    print(f"  Caching {num_batches} validation batches...")
+    cached = []
+    data_iter = iter(dataloader)
+    for i in range(num_batches):
+        try:
+            batch = next(data_iter)
+            # Handle different batch formats
+            if isinstance(batch, dict):
+                cached.append({
+                    "input_ids": batch["input_ids"].clone(),
+                    "labels": batch["labels"].clone(),
+                })
+            else:
+                # Tuple format (input_ids, labels)
+                cached.append({
+                    "input_ids": batch[0].clone(),
+                    "labels": batch[1].clone(),
+                })
+        except StopIteration:
+            break
+    print(f"  Cached {len(cached)} validation batches")
+    return cached
+
+
 def load_data(config: UnifiedTrainingConfig, tokenizer) -> Tuple[DataLoader, DataLoader]:
-    """Load and tokenize dataset."""
+    """Load and tokenize dataset.
+
+    Supports:
+    - wikitext103: WikiText-103 (static, ~100M tokens)
+    - wikitext2: WikiText-2 (static, ~2M tokens)
+    - fineweb: Streaming FineWeb/FineWeb-edu (uses dataset_name and dataset_subset)
+    """
     print(f"Loading {config.dataset} dataset...")
 
-    if config.dataset == "wikitext103":
-        ds = load_dataset("wikitext", "wikitext-103-v1")
-    elif config.dataset == "wikitext2":
-        ds = load_dataset("wikitext", "wikitext-2-v1")
-    else:
-        raise ValueError(f"Unknown dataset: {config.dataset}")
-
-    def tokenize(split):
-        text = "\n".join(ds[split]["text"])
-        if hasattr(tokenizer, "encode"):
-            tokens = tokenizer.encode(text)
+    if config.dataset in ["wikitext103", "wikitext2"]:
+        # Static WikiText datasets
+        if config.dataset == "wikitext103":
+            ds = load_dataset("wikitext", "wikitext-103-v1")
         else:
-            tokens = tokenizer(text)["input_ids"]
-        return torch.tensor(tokens, dtype=torch.long)
+            ds = load_dataset("wikitext", "wikitext-2-v1")
 
-    train_tokens = tokenize("train")
-    val_tokens = tokenize("validation")
+        def tokenize(split):
+            text = "\n".join(ds[split]["text"])
+            if hasattr(tokenizer, "encode"):
+                tokens = tokenizer.encode(text)
+            else:
+                tokens = tokenizer(text)["input_ids"]
+            return torch.tensor(tokens, dtype=torch.long)
 
-    print(f"Loaded {len(train_tokens):,} train tokens, {len(val_tokens):,} val tokens")
+        train_tokens = tokenize("train")
+        val_tokens = tokenize("validation")
 
-    train_dataset = TextDataset(train_tokens, config.max_seq_len)
-    val_dataset = TextDataset(val_tokens, config.max_seq_len)
+        print(f"Loaded {len(train_tokens):,} train tokens, {len(val_tokens):,} val tokens")
 
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=config.batch_size,
-        shuffle=True,
-        num_workers=config.num_workers,
-        pin_memory=True,
-        drop_last=True,
-        prefetch_factor=2 if config.num_workers > 0 else None,
-        persistent_workers=config.num_workers > 0,
-    )
+        train_dataset = TextDataset(train_tokens, config.max_seq_len)
+        val_dataset = TextDataset(val_tokens, config.max_seq_len)
 
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=config.batch_size,
-        shuffle=False,
-        num_workers=config.num_workers,
-        pin_memory=True,
-        drop_last=True,
-        prefetch_factor=2 if config.num_workers > 0 else None,
-        persistent_workers=config.num_workers > 0,
-    )
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=config.batch_size,
+            shuffle=True,
+            num_workers=config.num_workers,
+            pin_memory=True,
+            drop_last=True,
+            prefetch_factor=2 if config.num_workers > 0 else None,
+            persistent_workers=config.num_workers > 0,
+        )
 
-    return train_loader, val_loader
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=config.batch_size,
+            shuffle=False,
+            num_workers=config.num_workers,
+            pin_memory=True,
+            drop_last=True,
+            prefetch_factor=2 if config.num_workers > 0 else None,
+            persistent_workers=config.num_workers > 0,
+        )
+
+        return train_loader, val_loader
+
+    elif config.dataset == "fineweb":
+        # Streaming FineWeb dataset
+        print(f"  Dataset: {config.dataset_name}")
+        print(f"  Subset: {config.dataset_subset}")
+        print(f"  Sequence length: {config.max_seq_len}")
+
+        # Create streaming datasets for train and val
+        train_dataset = FineWebStreamingDataset(
+            tokenizer=tokenizer,
+            seq_length=config.max_seq_len,
+            dataset_name=config.dataset_name,
+            dataset_subset=config.dataset_subset,
+            split="train",
+        )
+
+        # For validation, we use a small portion of train (FineWeb doesn't have val split)
+        val_dataset = FineWebStreamingDataset(
+            tokenizer=tokenizer,
+            seq_length=config.max_seq_len,
+            dataset_name=config.dataset_name,
+            dataset_subset=config.dataset_subset,
+            split="train",  # Use train split, will cache limited batches
+        )
+
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=config.batch_size,
+            num_workers=4,
+            pin_memory=True,
+            prefetch_factor=4,
+        )
+
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=config.batch_size,
+            num_workers=2,
+            pin_memory=True,
+            prefetch_factor=2,
+        )
+
+        print(f"  Streaming dataloaders created (batch_size={config.batch_size})")
+
+        return train_loader, val_loader
+
+    else:
+        raise ValueError(f"Unknown dataset: {config.dataset}. Use 'wikitext103', 'wikitext2', or 'fineweb'")
 
 
 # =============================================================================
@@ -6998,6 +7140,13 @@ def train(config: UnifiedTrainingConfig):
     # Load data (using potentially updated batch_size from AutoBatchSizer)
     train_loader, val_loader = load_data(config, tokenizer)
 
+    # Pre-cache validation batches for streaming datasets (eliminates 7-min delay)
+    cached_val_batches = None
+    if config.dataset == "fineweb" and config.cache_val_batches > 0:
+        print(f"  Pre-caching {config.cache_val_batches} validation batches...")
+        cached_val_batches = cache_validation_batches(val_loader, config.cache_val_batches)
+        print(f"  Cached {len(cached_val_batches)} validation batches")
+
     # Initialize Sovereign-1 loss if available and enabled
     sovereign_loss = None
     if config.use_sovereign_loss and SOVEREIGN_AVAILABLE:
@@ -7563,12 +7712,18 @@ def train(config: UnifiedTrainingConfig):
     while global_step < config.max_steps:
         # Get batch
         try:
-            x, y = next(train_iter)
+            batch = next(train_iter)
         except StopIteration:
             train_iter = iter(train_loader)
-            x, y = next(train_iter)
+            batch = next(train_iter)
 
-        x, y = x.to(device), y.to(device)
+        # Handle different batch formats (tuple for WikiText, dict for FineWeb)
+        if isinstance(batch, dict):
+            x = batch["input_ids"].to(device)
+            y = batch["labels"].to(device)
+        else:
+            x, y = batch
+            x, y = x.to(device), y.to(device)
 
         # Forward pass
         # Clear hidden state extractor before forward pass so hooks capture fresh states
@@ -8421,6 +8576,7 @@ def train(config: UnifiedTrainingConfig):
                     model, val_loader, device, config, autocast_dtype,
                     sovereign_loss=sovereign_loss,
                     sovereign_engine=sovereign_engine,
+                    cached_val_batches=cached_val_batches,
                 )
                 val_ppl = val_metrics['ppl']
                 current_coh = val_metrics.get('coherence', 0.75)
@@ -8793,15 +8949,32 @@ def evaluate(
     autocast_dtype: torch.dtype,
     sovereign_loss: Optional['SovereignLoss'] = None,
     sovereign_engine: Optional['SovereignEngine'] = None,
+    cached_val_batches: Optional[list] = None,
 ) -> Tuple[float, Dict[str, float]]:
-    """Evaluate model on validation set."""
+    """Evaluate model on validation set.
+
+    Args:
+        cached_val_batches: Optional pre-cached validation batches (for streaming datasets)
+    """
     model.eval()
     total_loss = 0.0
     total_batches = 0
 
     with torch.no_grad():
-        for x, y in val_loader:
-            x, y = x.to(device), y.to(device)
+        # Use cached batches if available (streaming datasets), otherwise use dataloader
+        if cached_val_batches is not None:
+            batch_iter = cached_val_batches
+        else:
+            batch_iter = val_loader
+
+        for batch in batch_iter:
+            # Handle different batch formats
+            if isinstance(batch, dict):
+                x = batch["input_ids"].to(device)
+                y = batch["labels"].to(device)
+            else:
+                x, y = batch
+                x, y = x.to(device), y.to(device)
 
             with torch.amp.autocast('cuda', dtype=autocast_dtype):
                 if config.model_type == "ontological":
@@ -8992,8 +9165,14 @@ def main():
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext103",
-                       choices=["wikitext103", "wikitext2"],
-                       help="Training dataset")
+                       choices=["wikitext103", "wikitext2", "fineweb"],
+                       help="Training dataset: wikitext103, wikitext2, or fineweb (streaming)")
+    parser.add_argument("--dataset_name", type=str, default="HuggingFaceFW/fineweb",
+                       help="HuggingFace dataset name for fineweb mode (e.g., HuggingFaceFW/fineweb-edu)")
+    parser.add_argument("--dataset_subset", type=str, default="sample-10BT",
+                       help="Dataset subset/config for fineweb mode")
+    parser.add_argument("--cache_val_batches", type=int, default=20,
+                       help="Pre-cache N validation batches for streaming datasets (0=disable)")
 
     # Memory optimization
     parser.add_argument("--gradient_checkpointing", action="store_true",
@@ -9437,6 +9616,9 @@ def main():
         max_steps=args.max_steps,
         learning_rate=args.learning_rate,
         dataset=args.dataset,
+        dataset_name=args.dataset_name,
+        dataset_subset=args.dataset_subset,
+        cache_val_batches=args.cache_val_batches,
         gradient_checkpointing=args.gradient_checkpointing,
         checkpoint_offload_cpu=args.checkpoint_offload_cpu,
         mixed_precision=args.mixed_precision,
