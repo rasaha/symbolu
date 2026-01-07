@@ -41,6 +41,9 @@ Usage:
     # Test with decay gamma for local focus
     python benchmark_memory.py --decay_gamma 0.95 --full
 
+    # Custom layer splits (e.g., 6:6 for 12-layer model)
+    python benchmark_memory.py --local_layers 6 --model_size medium --full
+
     # Include Phase O(n) in comparison
     python benchmark_memory.py --models standard,hybrid,phase --full
 
@@ -94,6 +97,7 @@ class MemoryBenchmarkConfig:
     cosine_mode: str = "standard"  # "standard", "shifted", or "complex"
     decay_gamma: float = 1.0  # State decay (1.0=infinite, <1.0=local focus)
     window_size: int = 256  # Local attention window
+    local_layers: Optional[int] = None  # Number of local-only layers (None=auto: num_layers//2)
     num_warmup: int = 2
     num_runs: int = 3
     include_backward: bool = True  # Measure training memory (forward + backward)
@@ -187,8 +191,19 @@ def create_model(
     cosine_mode: str = "standard",
     decay_gamma: float = 1.0,
     window_size: int = 256,
+    local_layers: Optional[int] = None,
 ) -> nn.Module:
-    """Create model of specified type with Hybrid configuration."""
+    """Create model of specified type with Hybrid configuration.
+
+    Args:
+        model_type: 'standard', 'hybrid', or 'phase'
+        preset: Model size preset dict
+        max_seq_len: Maximum sequence length
+        cosine_mode: Phase cosine mode ("standard", "shifted", "complex")
+        decay_gamma: State decay factor (1.0=infinite, <1.0=local focus)
+        window_size: Local attention window size
+        local_layers: Number of local-only layers (None=auto: num_layers//2)
+    """
     common_args = {
         "vocab_size": 50257,
         "embed_dim": preset["embed_dim"],
@@ -202,10 +217,14 @@ def create_model(
     if model_type == "standard":
         return StandardTransformer(**common_args)
     elif model_type == "hybrid":
+        # Determine local_layers: use provided value or auto-calculate
+        # Default: num_layers // 2 for balanced 6:6 style splits
+        num_local = local_layers if local_layers is not None else preset["num_layers"] // 2
+
         # Production Hybrid with V9.6.12+ features
         return HybridPhaseTransformer(
             **common_args,
-            local_layers=min(4, preset["num_layers"] // 3),
+            local_layers=num_local,
             window_size=window_size,
             local_backend="sdpa",  # Use SDPA for better memory (flash if available)
             alpha_local=0.8,
@@ -215,9 +234,10 @@ def create_model(
         )
     elif model_type == "hybrid_unfold":
         # Hybrid with unfold backend (fallback, higher memory)
+        num_local = local_layers if local_layers is not None else preset["num_layers"] // 2
         return HybridPhaseTransformer(
             **common_args,
-            local_layers=min(4, preset["num_layers"] // 3),
+            local_layers=num_local,
             window_size=window_size,
             local_backend="unfold",
             alpha_local=0.8,
@@ -249,6 +269,7 @@ def measure_memory(
     cosine_mode: str = "standard",
     decay_gamma: float = 1.0,
     window_size: int = 256,
+    local_layers: Optional[int] = None,
 ) -> MemoryResult:
     """
     Measure memory usage for a specific model configuration.
@@ -265,6 +286,7 @@ def measure_memory(
         cosine_mode: Phase cosine mode ("standard", "shifted", "complex")
         decay_gamma: State decay factor (1.0=infinite, <1.0=local focus)
         window_size: Local attention window size
+        local_layers: Number of local-only layers (None=auto: num_layers//2)
 
     Returns:
         MemoryResult with all metrics
@@ -296,6 +318,7 @@ def measure_memory(
             cosine_mode=cosine_mode,
             decay_gamma=decay_gamma,
             window_size=window_size,
+            local_layers=local_layers,
         )
         model = model.to(device)
         model.train()
@@ -416,7 +439,8 @@ def run_benchmark(config: MemoryBenchmarkConfig) -> Dict[str, List[MemoryResult]
     print(f"\n  Model Config: {preset['embed_dim']}d, {preset['num_layers']}L, {preset['num_heads']}H")
 
     # Hybrid configuration (V9.6.12+)
-    print(f"  Hybrid Config: cosine_mode={config.cosine_mode}, decay_gamma={config.decay_gamma}, window={config.window_size}")
+    local_layers_str = str(config.local_layers) if config.local_layers is not None else f"auto ({preset['num_layers']//2})"
+    print(f"  Hybrid Config: cosine_mode={config.cosine_mode}, decay_gamma={config.decay_gamma}, window={config.window_size}, local_layers={local_layers_str}")
 
     # Model types to compare
     # "standard" = Traditional O(n²) attention - baseline
@@ -452,6 +476,7 @@ def run_benchmark(config: MemoryBenchmarkConfig) -> Dict[str, List[MemoryResult]
                 cosine_mode=config.cosine_mode,
                 decay_gamma=config.decay_gamma,
                 window_size=config.window_size,
+                local_layers=config.local_layers,
             )
 
             results[model_type].append(result)
@@ -805,6 +830,7 @@ Examples:
   python benchmark_memory.py --model_size medium --full    # Medium model test
   python benchmark_memory.py --cosine_mode shifted --full  # Test shifted cosine
   python benchmark_memory.py --decay_gamma 0.95 --full     # Test with decay
+  python benchmark_memory.py --local_layers 6 --full       # 6:6 split (6 local + 6 hybrid)
   python benchmark_memory.py --models standard,hybrid,phase --full  # All models
         """,
     )
@@ -837,6 +863,8 @@ Examples:
                         help="State decay factor (1.0=infinite, <1.0=local focus)")
     parser.add_argument("--window_size", type=int, default=256,
                         help="Local attention window size")
+    parser.add_argument("--local_layers", type=int, default=None,
+                        help="Number of local-only layers in Hybrid model (default: auto = num_layers//2, e.g., 6 for 12-layer = 6:6 split)")
 
     args = parser.parse_args()
 
@@ -862,6 +890,7 @@ Examples:
         cosine_mode=args.cosine_mode,
         decay_gamma=args.decay_gamma,
         window_size=args.window_size,
+        local_layers=args.local_layers,
         include_backward=not args.no_backward,
         output_file=args.output,
         verbose=args.verbose,

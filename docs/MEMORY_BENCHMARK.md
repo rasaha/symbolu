@@ -63,6 +63,30 @@ python benchmark_memory.py --decay_gamma 0.9 --full        # ~10 token memory
 
 # Adjust local attention window
 python benchmark_memory.py --window_size 512 --full        # Larger window
+
+# Custom layer splits (local-only : hybrid layers)
+python benchmark_memory.py --local_layers 6 --model_size medium --full  # 6:6 split (6 local + 6 hybrid)
+python benchmark_memory.py --local_layers 4 --model_size small --full   # 4:4 split
+python benchmark_memory.py --local_layers 0 --full                       # All hybrid layers (pure Hybrid)
+```
+
+### Layer Split Configurations
+
+The `--local_layers` parameter controls how many early layers use local-only attention:
+
+| Model Size | Layers | Default local_layers | Architecture |
+|------------|--------|---------------------|--------------|
+| tiny | 4 | 2 (auto) | 2 local + 2 hybrid |
+| small | 8 | 4 (auto) | 4 local + 4 hybrid |
+| medium | 12 | 6 (auto) | 6 local + 6 hybrid |
+| large | 24 | 12 (auto) | 12 local + 12 hybrid |
+
+- **Local-only layers**: Use sliding window attention only (no phase)
+- **Hybrid layers**: Use local + phase attention combined
+
+For production 6:6 split on 12-layer model:
+```bash
+python benchmark_memory.py --model_size medium --local_layers 6 --full
 ```
 
 ### Model Selection
