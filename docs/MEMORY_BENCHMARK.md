@@ -112,6 +112,8 @@ python benchmark_memory.py --full --output results.json
 
 ## Benchmark Results (A100 80GB)
 
+### Medium Model (125M Parameters)
+
 **Test Configuration:**
 - GPU: NVIDIA A100 80GB PCIe
 - Model: Medium (768d, 12L, 12H)
@@ -119,7 +121,7 @@ python benchmark_memory.py --full --output results.json
 - Batch Size: 1
 - Include Backward: True (training mode)
 
-### Memory Usage Comparison
+#### Memory Usage Comparison
 
 | Seq Length | Standard O(n²) | Hybrid O(n×w) | Savings |
 |------------|----------------|---------------|---------|
@@ -131,12 +133,53 @@ python benchmark_memory.py --full --output results.json
 | 16,384 | **OOM** | 33.41 GB | **Hybrid ONLY fits** |
 | 32,768 | **OOM** | **OOM** | - |
 
-### Key Observations
+#### Key Observations (Medium)
 
 1. **Crossover Point at 1K tokens**: Hybrid becomes more efficient than Standard
 2. **At 8K tokens**: Hybrid uses **73% less memory** (52GB → 14GB)
 3. **At 16K tokens**: Standard OOMs on 80GB GPU, Hybrid still fits at 33GB
 4. **Scaling**: Standard ~2.6x per doubling, Hybrid ~1.9x per doubling
+
+---
+
+### 7B Model (7 Billion Parameters)
+
+**Test Configuration:**
+- GPU: NVIDIA A100 80GB PCIe
+- Model: 7B (4096d, 32L, 32H, 11008 FFN)
+- Layer Split: 16:16 (16 local + 16 hybrid)
+- Batch Size: 1
+- Include Backward: True (training mode)
+
+#### Memory Usage Comparison
+
+| Seq Length | Standard O(n²) | Hybrid O(n×w) | Savings |
+|------------|----------------|---------------|---------|
+| 512 | 40.71 GB | 54.99 GB | - |
+| 1,024 | 40.82 GB | 55.10 GB | - |
+| 2,048 | 51.86 GB | 55.33 GB | - |
+| 4,096 | **OOM** | 78.14 GB | **Hybrid ONLY fits** |
+| 8,192+ | **OOM** | **OOM** | - |
+
+#### Key Observations (7B)
+
+1. **Model weights dominate**: ~40GB baseline for 7B in FP32
+2. **At 4K tokens**: Standard OOMs, Hybrid still fits at 78GB
+3. **Scaling at 7B**: Both show O(n) scaling because model weights >> activation memory
+4. **For 8K+ at 7B**: Requires multi-GPU or lower precision (BF16/FP16)
+
+#### Timing Comparison (7B)
+
+| Seq Length | Standard Fwd | Hybrid Fwd | Standard Bwd | Hybrid Bwd |
+|------------|--------------|------------|--------------|------------|
+| 512 | 373.2ms | 488.6ms | 663.7ms | 863.0ms |
+| 1,024 | 696.8ms | 883.9ms | 1357.5ms | 1737.0ms |
+| 2,048 | 1575.0ms | 1893.4ms | 2957.4ms | 3700.3ms |
+| 4,096 | OOM | 3728.5ms | OOM | 7810.3ms |
+
+> **Note**: At 7B scale, Hybrid has higher overhead due to combined attention. For production 7B training, use mixed precision (BF16) and gradient checkpointing.
+
+---
 
 ### Maximum Sequence Length by GPU
 
