@@ -9,8 +9,8 @@ Memory Budget (A100 80GB, BF16 + 8-bit Optimizer, seq_len=1024):
 - Model weights (BF16): ~14GB
 - Optimizer states (8-bit Adam): ~7GB (vs ~28GB with FP32 Adam)
 - Gradients (BF16): ~14GB
-- Activations (batch=1, checkpointed): ~40GB
-- Total: ~75GB -> Batch size 1 on A100 80GB
+- Activations (batch=2, checkpointed): ~45GB
+- Total: ~80GB -> Batch size 2 on A100 80GB with optimizations
 
 Memory Savings with 8-bit Optimizer:
 - FP32 Adam: ~28GB optimizer states -> OOM even with batch=1
@@ -104,8 +104,8 @@ class TrainingConfig:
     alpha_phase: float = 0.2
 
     # Training hyperparameters
-    batch_size: int = 1  # Per-GPU batch size (1 for A100 80GB even with 8-bit optimizer)
-    gradient_accumulation: int = 16  # Effective batch = 1 * 16 = 16
+    batch_size: int = 2  # Per-GPU batch size (2 for A100 80GB with optimizations)
+    gradient_accumulation: int = 8  # Effective batch = 2 * 8 = 16
     learning_rate: float = 3e-4
     min_learning_rate: float = 3e-5
     weight_decay: float = 0.1
@@ -121,6 +121,7 @@ class TrainingConfig:
     use_mixed_precision: bool = True
     use_gradient_checkpointing: bool = True
     use_8bit_optimizer: bool = True  # Use bitsandbytes 8-bit AdamW (saves ~75% optimizer memory)
+    use_compile: bool = True  # Use torch.compile() for faster training (PyTorch 2.0+)
 
     # Dataset
     dataset_name: str = "HuggingFaceFW/fineweb"
@@ -214,9 +215,9 @@ def create_dataloader(config: TrainingConfig, tokenizer, world_size: int = 1, ra
     dataloader = DataLoader(
         dataset,
         batch_size=config.batch_size,
-        num_workers=2,
+        num_workers=4,
         pin_memory=True,
-        prefetch_factor=2,
+        prefetch_factor=4,
     )
 
     return dataloader
@@ -395,6 +396,11 @@ def train(config: TrainingConfig):
     # Set seed
     torch.manual_seed(config.seed + rank)
 
+    # GPU optimizations for throughput
+    if torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = True  # Auto-tune convolutions
+        torch.set_float32_matmul_precision('medium')  # Faster matmuls with TF32
+
     # Device
     device = torch.device(config.device if torch.cuda.is_available() else "cpu")
 
@@ -440,6 +446,14 @@ def train(config: TrainingConfig):
         print(f"  Layer Split: {config.local_layers}:{config.num_layers - config.local_layers}")
         print(f"  Cosine Mode: {config.cosine_mode}")
         print(f"  Decay Gamma: {config.decay_gamma}")
+
+    # Compile model for faster training (PyTorch 2.0+)
+    if config.use_compile:
+        if is_main:
+            print(f"  Compiling model with torch.compile()...")
+        model = torch.compile(model, mode="reduce-overhead")
+        if is_main:
+            print(f"  torch.compile: ENABLED (faster forward/backward)")
 
     # Wrap in DDP if distributed
     if is_distributed:
@@ -568,15 +582,16 @@ def train(config: TrainingConfig):
 
         step += 1
 
-        # Logging with PPL
+        # Logging with PPL and VRAM
         if step % config.log_interval == 0 and is_main:
             elapsed = time.time() - start_time
             tokens_per_sec = total_tokens / elapsed
             avg_loss = total_loss / config.log_interval
             ppl = math.exp(min(avg_loss, 20))  # Cap to avoid overflow
+            vram_gb = torch.cuda.max_memory_allocated() / 1e9 if torch.cuda.is_available() else 0
 
             print(f"  Step {step:6d} | Loss: {avg_loss:.4f} | PPL: {ppl:.2f} | "
-                  f"LR: {lr:.2e} | Grad: {grad_norm:.2f} | Tok/s: {tokens_per_sec:.0f}")
+                  f"LR: {lr:.2e} | Grad: {grad_norm:.2f} | Tok/s: {tokens_per_sec:.0f} | VRAM: {vram_gb:.1f}GB")
 
             if HAS_WANDB and config.wandb_project:
                 wandb.log({
@@ -585,6 +600,7 @@ def train(config: TrainingConfig):
                     "learning_rate": lr,
                     "grad_norm": grad_norm,
                     "tokens_per_second": tokens_per_sec,
+                    "vram_gb": vram_gb,
                     "step": step,
                 })
 
@@ -675,6 +691,8 @@ def main():
     parser.add_argument("--no_gradient_checkpointing", action="store_true")
     parser.add_argument("--no_8bit_optimizer", action="store_true",
                         help="Disable 8-bit optimizer (requires batch_size=1 on A100 80GB)")
+    parser.add_argument("--no_compile", action="store_true",
+                        help="Disable torch.compile() (use if seeing compilation errors)")
 
     # Dataset
     parser.add_argument("--dataset_name", type=str, default="HuggingFaceFW/fineweb")
@@ -709,6 +727,7 @@ def main():
         use_mixed_precision=not args.no_mixed_precision,
         use_gradient_checkpointing=not args.no_gradient_checkpointing,
         use_8bit_optimizer=not args.no_8bit_optimizer,
+        use_compile=not args.no_compile,
         dataset_name=args.dataset_name,
         dataset_subset=args.dataset_subset,
         output_dir=args.output_dir,
