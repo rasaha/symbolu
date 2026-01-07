@@ -343,6 +343,13 @@ def train(config: TrainingConfig):
         print(f"\n  Creating Hybrid 7B model...")
 
     model = create_model(config)
+
+    # Convert model to BF16 to save memory (weights: ~28GB FP32 -> ~14GB BF16)
+    if config.use_mixed_precision:
+        model = model.to(torch.bfloat16)
+        if is_main:
+            print(f"  Model dtype: BF16 (saves ~50% memory)")
+
     model = model.to(device)
 
     num_params = count_parameters(model)
