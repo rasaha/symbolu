@@ -110,21 +110,78 @@ python benchmark_memory.py --no_backward
 python benchmark_memory.py --full --output results.json
 ```
 
+## Benchmark Results (A100 80GB)
+
+**Test Configuration:**
+- GPU: NVIDIA A100 80GB PCIe
+- Model: Medium (768d, 12L, 12H)
+- Layer Split: 6:6 (6 local + 6 hybrid)
+- Batch Size: 1
+- Include Backward: True (training mode)
+
+### Memory Usage Comparison
+
+| Seq Length | Standard O(n²) | Hybrid O(n×w) | Savings |
+|------------|----------------|---------------|---------|
+| 512 | 1.32 GB | 1.52 GB | - |
+| 1,024 | 2.15 GB | 2.08 GB | 4% (1.0x) |
+| 2,048 | 4.95 GB | 3.51 GB | **29% (1.4x)** |
+| 4,096 | 14.98 GB | 6.66 GB | **56% (2.3x)** |
+| 8,192 | 52.19 GB | 14.08 GB | **73% (3.7x)** |
+| 16,384 | **OOM** | 33.41 GB | **Hybrid ONLY fits** |
+| 32,768 | **OOM** | **OOM** | - |
+
+### Key Observations
+
+1. **Crossover Point at 1K tokens**: Hybrid becomes more efficient than Standard
+2. **At 8K tokens**: Hybrid uses **73% less memory** (52GB → 14GB)
+3. **At 16K tokens**: Standard OOMs on 80GB GPU, Hybrid still fits at 33GB
+4. **Scaling**: Standard ~2.6x per doubling, Hybrid ~1.9x per doubling
+
+### Maximum Sequence Length by GPU
+
+| GPU | VRAM | Standard Max | Hybrid Max | Cost |
+|-----|------|--------------|------------|------|
+| **Consumer (GDDR6)** |
+| RTX 4070 | 12GB | 2,048 | 4,096 | $1-2K |
+| RTX 4080 | 16GB | 2,048 | 8,192 | $1-2K |
+| RTX 4090 | 24GB | 4,096 | 8,192 | $1-2K |
+| **Professional (HBM2)** |
+| A40 | 48GB | 4,096 | 16,384 | $10-15K |
+| A100-40GB | 40GB | 4,096 | 16,384 | $15-30K |
+| A100-80GB | 80GB | 8,192 | 16,384 | $15-30K |
+| **Datacenter (HBM3)** |
+| H100-80GB | 80GB | 8,192 | 16,384 | $30-40K |
+| H200-141GB | 141GB | 8,192 | 16,384 | $40K+ |
+
+### Timing Comparison
+
+| Seq Length | Standard Fwd | Hybrid Fwd | Standard Bwd | Hybrid Bwd |
+|------------|--------------|------------|--------------|------------|
+| 512 | 12.7ms | 16.0ms | 24.2ms | 28.7ms |
+| 1,024 | 24.9ms | 29.5ms | 47.1ms | 51.1ms |
+| 2,048 | 63.1ms | 61.8ms | 115.4ms | 108.8ms |
+| 4,096 | 176.2ms | 142.2ms | 332.6ms | 268.0ms |
+| 8,192 | 574.2ms | 367.4ms | 1060.2ms | 703.7ms |
+| 16,384 | OOM | 1069.0ms | OOM | 2056.3ms |
+
+> **Note**: At 4K+ tokens, Hybrid is also **faster** due to avoiding the O(n²) attention computation.
+
 ## Expected Results
 
 ### At Short Sequences (512-2K)
-- Standard and Phase have similar memory usage
+- Standard and Hybrid have similar memory usage
 - Model parameters dominate memory consumption
-- Phase has slight overhead from state tracking
+- Hybrid has slight overhead from combined attention
 
 ### At Medium Sequences (4K-8K)
 - Standard memory grows quadratically
-- Phase memory grows linearly
-- Crossover point where Phase becomes more efficient
+- Hybrid memory grows linearly
+- Crossover point where Hybrid becomes more efficient
 
 ### At Long Sequences (16K-32K)
 - Standard: Often hits OOM on consumer GPUs
-- Phase: Still fits comfortably
+- Hybrid: Still fits comfortably
 - Memory savings: 50-80%+
 
 ## Understanding the Results
@@ -216,8 +273,19 @@ MODEL_PRESETS = {
     "small":  {"embed_dim": 512,  "num_layers": 8,  "num_heads": 8,  "ff_dim": 2048},
     "medium": {"embed_dim": 768,  "num_layers": 12, "num_heads": 12, "ff_dim": 3072},
     "large":  {"embed_dim": 1024, "num_layers": 24, "num_heads": 16, "ff_dim": 4096},
+    "xl":     {"embed_dim": 2048, "num_layers": 24, "num_heads": 16, "ff_dim": 8192},
+    "7b":     {"embed_dim": 4096, "num_layers": 32, "num_heads": 32, "ff_dim": 11008},  # LLaMA 7B scale
 }
 ```
+
+| Model Size | Params (approx) | Default Split | Use Case |
+|------------|-----------------|---------------|----------|
+| tiny | ~5M | 2:2 | Quick testing |
+| small | ~40M | 4:4 | Development |
+| medium | ~125M | 6:6 | Benchmarking |
+| large | ~350M | 12:12 | Production testing |
+| xl | ~1.3B | 12:12 | Large scale testing |
+| 7b | ~7B | 16:16 | Production LLM scale |
 
 ## References
 
