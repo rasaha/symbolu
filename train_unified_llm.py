@@ -8989,6 +8989,7 @@ def train(config: UnifiedTrainingConfig):
                     sgp_state=sgp_controller.get_state() if sgp_controller else None,
                     sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                 )
+                print(f"  💾 Checkpoint saved: last.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
                 if training_state_tracker is not None and training_state_tracker.enabled:
                     training_state_tracker.save_state()
