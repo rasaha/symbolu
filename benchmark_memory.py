@@ -118,15 +118,13 @@ class MemoryResult:
     allocated_memory_gb: float
     reserved_memory_gb: float
 
-    # nvidia-smi validation (in GB)
-    nvidia_smi_gb: float = 0.0
-
     # Scalability
     memory_per_token_mb: float
+
+    # Fields with defaults must come after fields without defaults
+    nvidia_smi_gb: float = 0.0  # nvidia-smi validation (in GB)
     oom: bool = False
     error_message: Optional[str] = None
-
-    # Timing
     forward_time_ms: float = 0.0
     backward_time_ms: float = 0.0
 
