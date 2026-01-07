@@ -9,13 +9,12 @@ Memory Budget (A100 80GB, BF16 + 8-bit Optimizer, seq_len=1024):
 - Model weights (BF16): ~14GB
 - Optimizer states (8-bit Adam): ~7GB (vs ~28GB with FP32 Adam)
 - Gradients (BF16): ~14GB
-- Activations (batch=2, checkpointed): ~35GB
-- Total: ~70GB -> Batch size 2 on A100 80GB with 8-bit optimizer!
+- Activations (batch=1, checkpointed): ~40GB
+- Total: ~75GB -> Batch size 1 on A100 80GB
 
 Memory Savings with 8-bit Optimizer:
-- FP32 Adam: ~28GB optimizer states
-- 8-bit Adam: ~7GB optimizer states (75% savings)
-- Enables batch_size=2 on A100 80GB
+- FP32 Adam: ~28GB optimizer states -> OOM even with batch=1
+- 8-bit Adam: ~7GB optimizer states (75% savings) -> batch=1 fits!
 
 Key Features:
 - HybridPhaseTransformer 7B (32 layers, 16:16 split)
@@ -28,14 +27,14 @@ Key Features:
 - Distributed training ready (DDP)
 
 Usage:
-    # Single A100 80GB with 8-bit optimizer (default, batch=2)
+    # Single A100 80GB (default: batch=1, 8-bit optimizer required)
     python train_hybrid_7b.py
 
-    # Single A100 80GB without 8-bit optimizer (batch=1 required)
-    python train_hybrid_7b.py --no_8bit_optimizer --batch_size 1 --gradient_accumulation 16
-
-    # Multi-GPU (4x A100)
+    # Multi-GPU (4x A100) - can use batch=2 per GPU
     torchrun --nproc_per_node=4 train_hybrid_7b.py --batch_size 2 --gradient_accumulation 4
+
+    # H200 141GB - can try batch=2
+    python train_hybrid_7b.py --batch_size 2 --gradient_accumulation 8
 
 Requirements:
     pip install bitsandbytes transformers datasets wandb
@@ -105,8 +104,8 @@ class TrainingConfig:
     alpha_phase: float = 0.2
 
     # Training hyperparameters
-    batch_size: int = 2  # Per-GPU batch size (2 for A100 80GB with 8-bit optimizer)
-    gradient_accumulation: int = 8  # Effective batch = 2 * 8 = 16
+    batch_size: int = 1  # Per-GPU batch size (1 for A100 80GB even with 8-bit optimizer)
+    gradient_accumulation: int = 16  # Effective batch = 1 * 16 = 16
     learning_rate: float = 3e-4
     min_learning_rate: float = 3e-5
     weight_decay: float = 0.1
