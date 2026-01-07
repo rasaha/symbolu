@@ -118,6 +118,9 @@ class MemoryResult:
     allocated_memory_gb: float
     reserved_memory_gb: float
 
+    # nvidia-smi validation (in GB)
+    nvidia_smi_gb: float = 0.0
+
     # Scalability
     memory_per_token_mb: float
     oom: bool = False
@@ -183,6 +186,22 @@ def get_memory_stats() -> Dict[str, float]:
         "allocated": torch.cuda.memory_allocated() / (1024**3),
         "reserved": torch.cuda.memory_reserved() / (1024**3),
     }
+
+
+def get_nvidia_smi_memory() -> float:
+    """Get GPU memory usage from nvidia-smi for validation (in GB)."""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            # Returns memory in MiB, convert to GB
+            return float(result.stdout.strip().split('\n')[0]) / 1024
+    except Exception:
+        pass
+    return 0.0
 
 
 def create_model(
@@ -324,33 +343,56 @@ def measure_memory(
         model = model.to(device)
         model.train()
 
+        # VERIFY model is actually on GPU
+        if device.type == "cuda":
+            param_device = next(model.parameters()).device
+            if param_device.type != "cuda":
+                raise RuntimeError(f"Model failed to move to CUDA! Params on: {param_device}")
+
         # Count parameters
         num_params = sum(p.numel() for p in model.parameters())
 
-        # Create input
+        # Create input - ensure on same device as model
         input_ids = torch.randint(0, 50257, (batch_size, seq_length), device=device)
 
-        # Warmup
+        # Verify input is on correct device
+        if device.type == "cuda" and input_ids.device.type != "cuda":
+            raise RuntimeError(f"Input failed to move to CUDA! Input on: {input_ids.device}")
+
+        # Get baseline memory after model load (model weights on GPU)
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            model_memory_gb = torch.cuda.memory_allocated() / (1024**3)
+            nvidia_smi_baseline = get_nvidia_smi_memory()
+
+        # Warmup (don't reset memory during warmup)
         for _ in range(num_warmup):
-            clear_memory()
             output = model(input_ids)
             logits = output["logits"] if isinstance(output, dict) else output
 
             if include_backward:
-                # Simulate training loss
                 loss = logits.mean()
                 loss.backward()
                 model.zero_grad()
+
+            # Clear gradients and intermediate tensors
+            del output, logits
+            if include_backward:
+                del loss
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
 
         # Measurement runs
         forward_times = []
         backward_times = []
         peak_memories = []
+        nvidia_smi_peaks = []
 
         for _ in range(num_runs):
-            clear_memory()
-
+            # Reset peak stats for this run only
             if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
                 torch.cuda.synchronize()
 
             # Forward pass
@@ -373,14 +415,40 @@ def measure_memory(
                 backward_times.append((time.perf_counter() - t0) * 1000)
                 model.zero_grad()
 
-            # Record peak memory
-            stats = get_memory_stats()
-            peak_memories.append(stats["peak"])
+            # Record peak memory from PyTorch
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+                peak_memories.append(torch.cuda.max_memory_allocated() / (1024**3))
+                # Also get nvidia-smi for validation
+                nvidia_smi_peaks.append(get_nvidia_smi_memory())
+
+            # Cleanup for next iteration
+            del output, logits
+            if include_backward:
+                del loss
+            gc.collect()
 
         # Compute averages
-        result.peak_memory_gb = sum(peak_memories) / len(peak_memories)
-        result.allocated_memory_gb = stats["allocated"]
-        result.reserved_memory_gb = stats["reserved"]
+        result.peak_memory_gb = sum(peak_memories) / len(peak_memories) if peak_memories else 0.0
+        avg_nvidia_smi = sum(nvidia_smi_peaks) / len(nvidia_smi_peaks) if nvidia_smi_peaks else 0.0
+
+        # Get final memory state
+        if torch.cuda.is_available():
+            result.allocated_memory_gb = torch.cuda.memory_allocated() / (1024**3)
+            result.reserved_memory_gb = torch.cuda.memory_reserved() / (1024**3)
+        else:
+            result.allocated_memory_gb = 0.0
+            result.reserved_memory_gb = 0.0
+
+        # Store nvidia-smi reading for validation
+        result.nvidia_smi_gb = avg_nvidia_smi
+
+        # Validate: PyTorch peak should roughly match nvidia-smi
+        # If huge mismatch, something is wrong (model on CPU?)
+        if torch.cuda.is_available() and avg_nvidia_smi > 0:
+            mismatch = abs(result.peak_memory_gb - avg_nvidia_smi)
+            if mismatch > 5.0 and result.peak_memory_gb > 1.0:  # >5GB difference is suspicious
+                print(f"\n    WARNING: Memory mismatch! PyTorch: {result.peak_memory_gb:.2f}GB, nvidia-smi: {avg_nvidia_smi:.2f}GB")
         result.forward_time_ms = sum(forward_times) / len(forward_times)
         result.backward_time_ms = sum(backward_times) / len(backward_times) if backward_times else 0.0
 
@@ -426,8 +494,16 @@ def run_benchmark(config: MemoryBenchmarkConfig) -> Dict[str, List[MemoryResult]
     if torch.cuda.is_available():
         gpu_name = torch.cuda.get_device_name(0)
         gpu_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        nvidia_smi_mem = get_nvidia_smi_memory()
         print(f"\n  GPU: {gpu_name}")
         print(f"  Total VRAM: {gpu_mem:.1f} GB")
+        print(f"  Current GPU Usage (nvidia-smi): {nvidia_smi_mem:.2f} GB")
+
+        # Verify CUDA is actually working
+        test_tensor = torch.zeros(1, device="cuda")
+        print(f"  CUDA Test: tensor on {test_tensor.device}")
+        del test_tensor
+        torch.cuda.empty_cache()
     else:
         print("\n  WARNING: No GPU available, results will be limited")
 
@@ -485,7 +561,9 @@ def run_benchmark(config: MemoryBenchmarkConfig) -> Dict[str, List[MemoryResult]
             if result.oom:
                 print(f"OOM ({result.error_message})")
             else:
-                print(f"{result.peak_memory_gb:6.2f} GB | "
+                # Show both PyTorch and nvidia-smi memory for validation
+                nv_str = f"(nv:{result.nvidia_smi_gb:.1f}GB)" if result.nvidia_smi_gb > 0 else ""
+                print(f"{result.peak_memory_gb:6.2f} GB {nv_str:12s} | "
                       f"{result.forward_time_ms:6.1f}ms fwd | "
                       f"{result.backward_time_ms:6.1f}ms bwd")
 
