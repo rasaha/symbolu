@@ -372,11 +372,10 @@ def measure_memory(
                 loss = logits.mean()
                 loss.backward()
                 model.zero_grad()
+                del loss
 
             # Clear gradients and intermediate tensors
             del output, logits
-            if include_backward:
-                del loss
             gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
@@ -421,9 +420,9 @@ def measure_memory(
                 nvidia_smi_peaks.append(get_nvidia_smi_memory())
 
             # Cleanup for next iteration
-            del output, logits
             if include_backward:
                 del loss
+            del output, logits
             gc.collect()
 
         # Compute averages
@@ -455,7 +454,7 @@ def measure_memory(
         result.memory_per_token_mb = (result.peak_memory_gb * 1024) / total_tokens
 
         # Cleanup
-        del model, input_ids, output, logits
+        del model, input_ids
         clear_memory()
 
     except RuntimeError as e:
