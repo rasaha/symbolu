@@ -53,6 +53,7 @@ import argparse
 from pathlib import Path
 from dataclasses import dataclass, asdict
 from typing import Optional, Dict, Any
+from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -596,8 +597,9 @@ def train(config: TrainingConfig):
             avg_loss = total_loss / config.log_interval
             ppl = math.exp(min(avg_loss, 20))  # Cap to avoid overflow
             vram_gb = torch.cuda.max_memory_allocated() / 1e9 if torch.cuda.is_available() else 0
+            timestamp = datetime.now().strftime("%H:%M:%S")
 
-            print(f"  Step {step:6d} | Loss: {avg_loss:.4f} | PPL: {ppl:.2f} | "
+            print(f"  [{timestamp}] Step {step:6d} | Loss: {avg_loss:.4f} | PPL: {ppl:.2f} | "
                   f"LR: {lr:.2e} | Grad: {grad_norm:.2f} | Tok/s: {tokens_per_sec:.0f} | VRAM: {vram_gb:.1f}GB")
 
             if HAS_WANDB and config.wandb_project:
