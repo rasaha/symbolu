@@ -1,34 +1,51 @@
 #!/usr/bin/env python3
 """
-Memory Efficiency Benchmark: Hybrid vs Standard Transformer
+Memory Efficiency Benchmark: Hybrid O(n×w) vs Standard O(n²)
 ============================================================
 
-Proves that HybridPhaseTransformer significantly reduces memory consumption
-compared to StandardTransformer, enabling training on consumer GPUs without
+Proves that HybridPhaseTransformer (O(n×w)) significantly reduces memory consumption
+compared to StandardTransformer (O(n²)), enabling training on consumer GPUs without
 requiring expensive HBM/HBM3E memory.
+
+Model Complexity:
+-----------------
+- StandardTransformer: O(n²) - creates [B, H, N, N] attention matrix
+- HybridTransformer: O(n×w) - local window (w) + phase attention
+- PhaseTransformer: O(n) - pure phase, state accumulation only
 
 Key Findings This Script Demonstrates:
 --------------------------------------
-1. StandardTransformer: O(n²) memory scaling - attention matrix [B, H, N, N]
-2. HybridPhaseTransformer: O(n) memory scaling - no attention matrix
-3. At 8K sequence length, Hybrid uses ~4x less memory
-4. At 32K sequence length, Standard OOMs on 24GB VRAM, Hybrid fits easily
+1. StandardTransformer: O(n²) memory scaling - attention matrix explodes at long seq
+2. HybridTransformer: O(n×w) memory scaling - linear in n, constant in window w
+3. At 8K+ sequence length, Hybrid uses significantly less memory than Standard
+4. At 32K sequence length, Standard OOMs on 24GB VRAM, Hybrid fits
 
-Hardware Implications:
-----------------------
-- StandardTransformer 32K context: Requires 80GB+ HBM3E (A100/H100)
-- HybridPhaseTransformer 32K context: Runs on RTX 4090 (24GB GDDR6X)
+Hybrid Model Features (V9.6.12+):
+---------------------------------
+- cosine_mode: "standard", "shifted", or "complex" phase interaction
+- decay_gamma: State decay factor (1.0=infinite memory, <1.0=local focus)
+- local_layers: Number of early layers with local-only attention
+- window_size: Local attention window size (default 256)
 
 Usage:
 ------
-    # Quick test (512-4K)
+    # Default: Compare Standard O(n²) vs Hybrid O(n×w)
     python benchmark_memory.py --quick
 
     # Full benchmark (512-32K)
     python benchmark_memory.py --full
 
-    # Custom sequence lengths
-    python benchmark_memory.py --seq_lengths 512,1024,2048,4096,8192
+    # Test different cosine modes
+    python benchmark_memory.py --cosine_mode shifted --full
+
+    # Test with decay gamma for local focus
+    python benchmark_memory.py --decay_gamma 0.95 --full
+
+    # Custom layer splits (e.g., 6:6 for 12-layer model)
+    python benchmark_memory.py --local_layers 6 --model_size medium --full
+
+    # Include Phase O(n) in comparison
+    python benchmark_memory.py --models standard,hybrid,phase --full
 
     # Specific model sizes
     python benchmark_memory.py --model_size medium --full
@@ -75,6 +92,12 @@ class MemoryBenchmarkConfig:
     model_size: str = "small"  # tiny, small, medium, large
     batch_size: int = 1
     seq_lengths: List[int] = field(default_factory=lambda: [512, 1024, 2048, 4096])
+    model_types: List[str] = field(default_factory=lambda: ["standard", "hybrid"])  # O(n²) vs O(n×w)
+    # Hybrid model configuration (V9.6.12+)
+    cosine_mode: str = "standard"  # "standard", "shifted", or "complex"
+    decay_gamma: float = 1.0  # State decay (1.0=infinite, <1.0=local focus)
+    window_size: int = 256  # Local attention window
+    local_layers: Optional[int] = None  # Number of local-only layers (None=auto: num_layers//2)
     num_warmup: int = 2
     num_runs: int = 3
     include_backward: bool = True  # Measure training memory (forward + backward)
@@ -97,10 +120,11 @@ class MemoryResult:
 
     # Scalability
     memory_per_token_mb: float
+
+    # Fields with defaults must come after fields without defaults
+    nvidia_smi_gb: float = 0.0  # nvidia-smi validation (in GB)
     oom: bool = False
     error_message: Optional[str] = None
-
-    # Timing
     forward_time_ms: float = 0.0
     backward_time_ms: float = 0.0
 
@@ -112,6 +136,7 @@ MODEL_PRESETS = {
     "medium": {"embed_dim": 768, "num_layers": 12, "num_heads": 12, "ff_dim": 3072},
     "large": {"embed_dim": 1024, "num_layers": 24, "num_heads": 16, "ff_dim": 4096},
     "xl": {"embed_dim": 2048, "num_layers": 24, "num_heads": 16, "ff_dim": 8192},
+    "7b": {"embed_dim": 4096, "num_layers": 32, "num_heads": 32, "ff_dim": 11008},  # LLaMA 7B scale
 }
 
 # GPU memory specifications for reference
@@ -161,8 +186,42 @@ def get_memory_stats() -> Dict[str, float]:
     }
 
 
-def create_model(model_type: str, preset: dict, max_seq_len: int) -> nn.Module:
-    """Create model of specified type."""
+def get_nvidia_smi_memory() -> float:
+    """Get GPU memory usage from nvidia-smi for validation (in GB)."""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            # Returns memory in MiB, convert to GB
+            return float(result.stdout.strip().split('\n')[0]) / 1024
+    except Exception:
+        pass
+    return 0.0
+
+
+def create_model(
+    model_type: str,
+    preset: dict,
+    max_seq_len: int,
+    cosine_mode: str = "standard",
+    decay_gamma: float = 1.0,
+    window_size: int = 256,
+    local_layers: Optional[int] = None,
+) -> nn.Module:
+    """Create model of specified type with Hybrid configuration.
+
+    Args:
+        model_type: 'standard', 'hybrid', or 'phase'
+        preset: Model size preset dict
+        max_seq_len: Maximum sequence length
+        cosine_mode: Phase cosine mode ("standard", "shifted", "complex")
+        decay_gamma: State decay factor (1.0=infinite, <1.0=local focus)
+        window_size: Local attention window size
+        local_layers: Number of local-only layers (None=auto: num_layers//2)
+    """
     common_args = {
         "vocab_size": 50257,
         "embed_dim": preset["embed_dim"],
@@ -176,16 +235,41 @@ def create_model(model_type: str, preset: dict, max_seq_len: int) -> nn.Module:
     if model_type == "standard":
         return StandardTransformer(**common_args)
     elif model_type == "hybrid":
+        # Determine local_layers: use provided value or auto-calculate
+        # Default: num_layers // 2 for balanced 6:6 style splits
+        num_local = local_layers if local_layers is not None else preset["num_layers"] // 2
+
+        # Production Hybrid with V9.6.12+ features
         return HybridPhaseTransformer(
             **common_args,
-            local_layers=min(4, preset["num_layers"] // 3),
-            window_size=256,
+            local_layers=num_local,
+            window_size=window_size,
+            local_backend="sdpa",  # Use SDPA for better memory (flash if available)
+            alpha_local=0.8,
+            alpha_phase=0.2,
+            cosine_mode=cosine_mode,  # V9.6.12
+            decay_gamma=decay_gamma,  # V9.6.13
+        )
+    elif model_type == "hybrid_unfold":
+        # Hybrid with unfold backend (fallback, higher memory)
+        num_local = local_layers if local_layers is not None else preset["num_layers"] // 2
+        return HybridPhaseTransformer(
+            **common_args,
+            local_layers=num_local,
+            window_size=window_size,
             local_backend="unfold",
             alpha_local=0.8,
             alpha_phase=0.2,
+            cosine_mode=cosine_mode,
+            decay_gamma=decay_gamma,
         )
     elif model_type == "phase":
-        return PhaseTransformer(**common_args)
+        # Pure Phase attention - TRUE O(n) memory, no attention matrix
+        return PhaseTransformer(
+            **common_args,
+            cosine_mode=cosine_mode,
+            decay_gamma=decay_gamma,
+        )
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
@@ -199,6 +283,11 @@ def measure_memory(
     num_warmup: int = 2,
     num_runs: int = 3,
     device: torch.device = None,
+    # Hybrid configuration (V9.6.12+)
+    cosine_mode: str = "standard",
+    decay_gamma: float = 1.0,
+    window_size: int = 256,
+    local_layers: Optional[int] = None,
 ) -> MemoryResult:
     """
     Measure memory usage for a specific model configuration.
@@ -212,6 +301,10 @@ def measure_memory(
         num_warmup: Warmup iterations
         num_runs: Measurement iterations
         device: Device to use
+        cosine_mode: Phase cosine mode ("standard", "shifted", "complex")
+        decay_gamma: State decay factor (1.0=infinite, <1.0=local focus)
+        window_size: Local attention window size
+        local_layers: Number of local-only layers (None=auto: num_layers//2)
 
     Returns:
         MemoryResult with all metrics
@@ -237,38 +330,66 @@ def measure_memory(
         # Clear memory before measurement
         clear_memory()
 
-        # Create model
-        model = create_model(model_type, preset, seq_length)
+        # Create model with Hybrid configuration
+        model = create_model(
+            model_type, preset, seq_length,
+            cosine_mode=cosine_mode,
+            decay_gamma=decay_gamma,
+            window_size=window_size,
+            local_layers=local_layers,
+        )
         model = model.to(device)
         model.train()
+
+        # VERIFY model is actually on GPU
+        if device.type == "cuda":
+            param_device = next(model.parameters()).device
+            if param_device.type != "cuda":
+                raise RuntimeError(f"Model failed to move to CUDA! Params on: {param_device}")
 
         # Count parameters
         num_params = sum(p.numel() for p in model.parameters())
 
-        # Create input
+        # Create input - ensure on same device as model
         input_ids = torch.randint(0, 50257, (batch_size, seq_length), device=device)
 
-        # Warmup
+        # Verify input is on correct device
+        if device.type == "cuda" and input_ids.device.type != "cuda":
+            raise RuntimeError(f"Input failed to move to CUDA! Input on: {input_ids.device}")
+
+        # Get baseline memory after model load (model weights on GPU)
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            model_memory_gb = torch.cuda.memory_allocated() / (1024**3)
+            nvidia_smi_baseline = get_nvidia_smi_memory()
+
+        # Warmup (don't reset memory during warmup)
         for _ in range(num_warmup):
-            clear_memory()
             output = model(input_ids)
             logits = output["logits"] if isinstance(output, dict) else output
 
             if include_backward:
-                # Simulate training loss
                 loss = logits.mean()
                 loss.backward()
                 model.zero_grad()
+                del loss
+
+            # Clear gradients and intermediate tensors
+            del output, logits
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
 
         # Measurement runs
         forward_times = []
         backward_times = []
         peak_memories = []
+        nvidia_smi_peaks = []
 
         for _ in range(num_runs):
-            clear_memory()
-
+            # Reset peak stats for this run only
             if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
                 torch.cuda.synchronize()
 
             # Forward pass
@@ -291,14 +412,40 @@ def measure_memory(
                 backward_times.append((time.perf_counter() - t0) * 1000)
                 model.zero_grad()
 
-            # Record peak memory
-            stats = get_memory_stats()
-            peak_memories.append(stats["peak"])
+            # Record peak memory from PyTorch
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+                peak_memories.append(torch.cuda.max_memory_allocated() / (1024**3))
+                # Also get nvidia-smi for validation
+                nvidia_smi_peaks.append(get_nvidia_smi_memory())
+
+            # Cleanup for next iteration
+            if include_backward:
+                del loss
+            del output, logits
+            gc.collect()
 
         # Compute averages
-        result.peak_memory_gb = sum(peak_memories) / len(peak_memories)
-        result.allocated_memory_gb = stats["allocated"]
-        result.reserved_memory_gb = stats["reserved"]
+        result.peak_memory_gb = sum(peak_memories) / len(peak_memories) if peak_memories else 0.0
+        avg_nvidia_smi = sum(nvidia_smi_peaks) / len(nvidia_smi_peaks) if nvidia_smi_peaks else 0.0
+
+        # Get final memory state
+        if torch.cuda.is_available():
+            result.allocated_memory_gb = torch.cuda.memory_allocated() / (1024**3)
+            result.reserved_memory_gb = torch.cuda.memory_reserved() / (1024**3)
+        else:
+            result.allocated_memory_gb = 0.0
+            result.reserved_memory_gb = 0.0
+
+        # Store nvidia-smi reading for validation
+        result.nvidia_smi_gb = avg_nvidia_smi
+
+        # Validate: PyTorch peak should roughly match nvidia-smi
+        # If huge mismatch, something is wrong (model on CPU?)
+        if torch.cuda.is_available() and avg_nvidia_smi > 0:
+            mismatch = abs(result.peak_memory_gb - avg_nvidia_smi)
+            if mismatch > 5.0 and result.peak_memory_gb > 1.0:  # >5GB difference is suspicious
+                print(f"\n    WARNING: Memory mismatch! PyTorch: {result.peak_memory_gb:.2f}GB, nvidia-smi: {avg_nvidia_smi:.2f}GB")
         result.forward_time_ms = sum(forward_times) / len(forward_times)
         result.backward_time_ms = sum(backward_times) / len(backward_times) if backward_times else 0.0
 
@@ -307,7 +454,7 @@ def measure_memory(
         result.memory_per_token_mb = (result.peak_memory_gb * 1024) / total_tokens
 
         # Cleanup
-        del model, input_ids, output, logits
+        del model, input_ids
         clear_memory()
 
     except RuntimeError as e:
@@ -344,8 +491,16 @@ def run_benchmark(config: MemoryBenchmarkConfig) -> Dict[str, List[MemoryResult]
     if torch.cuda.is_available():
         gpu_name = torch.cuda.get_device_name(0)
         gpu_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        nvidia_smi_mem = get_nvidia_smi_memory()
         print(f"\n  GPU: {gpu_name}")
         print(f"  Total VRAM: {gpu_mem:.1f} GB")
+        print(f"  Current GPU Usage (nvidia-smi): {nvidia_smi_mem:.2f} GB")
+
+        # Verify CUDA is actually working
+        test_tensor = torch.zeros(1, device="cuda")
+        print(f"  CUDA Test: tensor on {test_tensor.device}")
+        del test_tensor
+        torch.cuda.empty_cache()
     else:
         print("\n  WARNING: No GPU available, results will be limited")
 
@@ -357,8 +512,17 @@ def run_benchmark(config: MemoryBenchmarkConfig) -> Dict[str, List[MemoryResult]
     preset = MODEL_PRESETS[config.model_size]
     print(f"\n  Model Config: {preset['embed_dim']}d, {preset['num_layers']}L, {preset['num_heads']}H")
 
+    # Hybrid configuration (V9.6.12+)
+    local_layers_str = str(config.local_layers) if config.local_layers is not None else f"auto ({preset['num_layers']//2})"
+    print(f"  Hybrid Config: cosine_mode={config.cosine_mode}, decay_gamma={config.decay_gamma}, window={config.window_size}, local_layers={local_layers_str}")
+
     # Model types to compare
-    model_types = ["standard", "hybrid"]
+    # "standard" = Traditional O(n²) attention - baseline
+    # "hybrid" = Local + Phase attention O(n×w) - production quality
+    # "phase" = Pure Phase attention O(n) - best memory efficiency
+    model_types = config.model_types if hasattr(config, 'model_types') and config.model_types else ["standard", "hybrid"]
+
+    print(f"  Models: {', '.join(model_types)}")
 
     results = {mt: [] for mt in model_types}
 
@@ -382,6 +546,11 @@ def run_benchmark(config: MemoryBenchmarkConfig) -> Dict[str, List[MemoryResult]
                 num_warmup=config.num_warmup,
                 num_runs=config.num_runs,
                 device=device,
+                # Hybrid configuration (V9.6.12+)
+                cosine_mode=config.cosine_mode,
+                decay_gamma=config.decay_gamma,
+                window_size=config.window_size,
+                local_layers=config.local_layers,
             )
 
             results[model_type].append(result)
@@ -389,7 +558,9 @@ def run_benchmark(config: MemoryBenchmarkConfig) -> Dict[str, List[MemoryResult]
             if result.oom:
                 print(f"OOM ({result.error_message})")
             else:
-                print(f"{result.peak_memory_gb:6.2f} GB | "
+                # Show both PyTorch and nvidia-smi memory for validation
+                nv_str = f"(nv:{result.nvidia_smi_gb:.1f}GB)" if result.nvidia_smi_gb > 0 else ""
+                print(f"{result.peak_memory_gb:6.2f} GB {nv_str:12s} | "
                       f"{result.forward_time_ms:6.1f}ms fwd | "
                       f"{result.backward_time_ms:6.1f}ms bwd")
 
@@ -459,37 +630,52 @@ def compute_savings(results: Dict[str, List[MemoryResult]]) -> Dict[int, Dict[st
 
     savings = {}
 
-    standard_results = {r.seq_length: r for r in results.get("standard", [])}
-    hybrid_results = {r.seq_length: r for r in results.get("hybrid", [])}
+    # Get results by model type
+    results_by_type = {}
+    for model_type, type_results in results.items():
+        results_by_type[model_type] = {r.seq_length: r for r in type_results}
 
-    for seq_len in standard_results.keys():
-        if seq_len not in hybrid_results:
-            continue
+    standard_results = results_by_type.get("standard", {})
+    phase_results = results_by_type.get("phase", {})
+    hybrid_results = results_by_type.get("hybrid", {})
 
-        std = standard_results[seq_len]
-        hyb = hybrid_results[seq_len]
+    # Get all sequence lengths
+    all_seq_lens = set()
+    for type_results in results_by_type.values():
+        all_seq_lens.update(type_results.keys())
 
-        if std.oom and not hyb.oom:
-            savings[seq_len] = {
-                "standard_gb": float("inf"),
-                "hybrid_gb": hyb.peak_memory_gb,
-                "savings_percent": 100.0,
-                "savings_factor": float("inf"),
-                "hybrid_fits_oom_standard": True,
-            }
-        elif not std.oom and not hyb.oom:
-            savings_gb = std.peak_memory_gb - hyb.peak_memory_gb
-            savings_pct = (savings_gb / std.peak_memory_gb) * 100 if std.peak_memory_gb > 0 else 0
-            savings_factor = std.peak_memory_gb / hyb.peak_memory_gb if hyb.peak_memory_gb > 0 else 1
+    for seq_len in all_seq_lens:
+        std = standard_results.get(seq_len)
+        phase = phase_results.get(seq_len)
+        hyb = hybrid_results.get(seq_len)
 
-            savings[seq_len] = {
-                "standard_gb": std.peak_memory_gb,
-                "hybrid_gb": hyb.peak_memory_gb,
-                "savings_gb": savings_gb,
-                "savings_percent": savings_pct,
-                "savings_factor": savings_factor,
-                "hybrid_fits_oom_standard": False,
-            }
+        entry = {"seq_len": seq_len}
+
+        # Standard memory
+        if std:
+            entry["standard_gb"] = float("inf") if std.oom else std.peak_memory_gb
+            entry["standard_oom"] = std.oom
+
+        # Phase memory (best efficiency)
+        if phase:
+            entry["phase_gb"] = float("inf") if phase.oom else phase.peak_memory_gb
+            entry["phase_oom"] = phase.oom
+
+        # Hybrid memory
+        if hyb:
+            entry["hybrid_gb"] = float("inf") if hyb.oom else hyb.peak_memory_gb
+            entry["hybrid_oom"] = hyb.oom
+
+        # Compute savings vs standard
+        if std and not std.oom:
+            if phase and not phase.oom:
+                entry["phase_savings_pct"] = ((std.peak_memory_gb - phase.peak_memory_gb) / std.peak_memory_gb) * 100
+                entry["phase_factor"] = std.peak_memory_gb / phase.peak_memory_gb if phase.peak_memory_gb > 0 else 1
+            if hyb and not hyb.oom:
+                entry["hybrid_savings_pct"] = ((std.peak_memory_gb - hyb.peak_memory_gb) / std.peak_memory_gb) * 100
+                entry["hybrid_factor"] = std.peak_memory_gb / hyb.peak_memory_gb if hyb.peak_memory_gb > 0 else 1
+
+        savings[seq_len] = entry
 
     return savings
 
@@ -507,21 +693,63 @@ def print_results(
 
     # Memory comparison table
     print("  Memory Usage by Sequence Length:")
-    print(f"  {'-'*60}")
-    print(f"  {'Seq Len':>10} | {'Standard':>12} | {'Hybrid':>12} | {'Savings':>12}")
-    print(f"  {'-'*60}")
+    print(f"  {'-'*80}")
+
+    # Determine which models are present
+    has_phase = "phase" in results and results["phase"]
+    has_hybrid = "hybrid" in results and results["hybrid"]
+    has_standard = "standard" in results and results["standard"]
+
+    # Build header
+    header = f"  {'Seq Len':>10} | {'Standard':>12}"
+    if has_phase:
+        header += f" | {'Phase':>12}"
+    if has_hybrid:
+        header += f" | {'Hybrid':>12}"
+    header += f" | {'Best Savings':>15}"
+    print(header)
+    print(f"  {'-'*80}")
 
     for seq_len in sorted(savings.keys()):
         s = savings[seq_len]
-        std_str = "OOM" if s["standard_gb"] == float("inf") else f"{s['standard_gb']:.2f} GB"
-        hyb_str = f"{s['hybrid_gb']:.2f} GB"
 
-        if s.get("hybrid_fits_oom_standard"):
-            save_str = "ONLY Hybrid fits!"
+        # Standard
+        std_gb = s.get("standard_gb", 0)
+        std_str = "OOM" if std_gb == float("inf") else f"{std_gb:.2f} GB"
+
+        row = f"  {seq_len:>10,} | {std_str:>12}"
+
+        # Phase
+        if has_phase:
+            phase_gb = s.get("phase_gb", 0)
+            phase_str = "OOM" if phase_gb == float("inf") else f"{phase_gb:.2f} GB"
+            row += f" | {phase_str:>12}"
+
+        # Hybrid
+        if has_hybrid:
+            hyb_gb = s.get("hybrid_gb", 0)
+            hyb_str = "OOM" if hyb_gb == float("inf") else f"{hyb_gb:.2f} GB"
+            row += f" | {hyb_str:>12}"
+
+        # Best savings (phase vs standard, or hybrid vs standard)
+        phase_pct = s.get("phase_savings_pct", 0)
+        phase_factor = s.get("phase_factor", 1)
+        hyb_pct = s.get("hybrid_savings_pct", 0)
+        hyb_factor = s.get("hybrid_factor", 1)
+
+        if phase_pct > hyb_pct and phase_pct > 0:
+            save_str = f"Phase {phase_pct:.0f}% ({phase_factor:.1f}x)"
+        elif hyb_pct > 0:
+            save_str = f"Hybrid {hyb_pct:.0f}% ({hyb_factor:.1f}x)"
+        elif s.get("phase_oom") == False and s.get("standard_oom") == True:
+            save_str = "Phase ONLY fits"
+        elif s.get("hybrid_oom") == False and s.get("standard_oom") == True:
+            save_str = "Hybrid ONLY fits"
         else:
-            save_str = f"{s['savings_percent']:.1f}% ({s['savings_factor']:.1f}x)"
+            save_str = "-"
 
-        print(f"  {seq_len:>10,} | {std_str:>12} | {hyb_str:>12} | {save_str:>12}")
+        row += f" | {save_str:>15}"
+        print(row)
 
     # Scaling analysis
     print(f"\n  Scaling Analysis:")
@@ -533,12 +761,20 @@ def print_results(
 
     # GPU compatibility
     print(f"\n  Maximum Sequence Length by GPU:")
-    print(f"  {'-'*60}")
-    print(f"  {'GPU':<20} | {'Standard':>12} | {'Hybrid':>12} | {'Cost Tier':>12}")
-    print(f"  {'-'*60}")
+    print(f"  {'-'*75}")
 
     std_analysis = analysis.get("standard", {})
+    phase_analysis = analysis.get("phase", {})
     hyb_analysis = analysis.get("hybrid", {})
+
+    header = f"  {'GPU':<20} | {'Standard':>10}"
+    if phase_analysis:
+        header += f" | {'Phase':>10}"
+    if hyb_analysis:
+        header += f" | {'Hybrid':>10}"
+    header += f" | {'Cost':>10}"
+    print(header)
+    print(f"  {'-'*75}")
 
     # Group GPUs by tier
     consumer_gpus = ["RTX 4070", "RTX 4080", "RTX 4090"]
@@ -553,13 +789,22 @@ def print_results(
         print(f"\n  {tier_name}:")
         for gpu in tier_gpus:
             std_max = std_analysis.get("max_seq_by_gpu", {}).get(gpu, 0)
+            phase_max = phase_analysis.get("max_seq_by_gpu", {}).get(gpu, 0)
             hyb_max = hyb_analysis.get("max_seq_by_gpu", {}).get(gpu, 0)
 
             std_str = f"{std_max:,}" if std_max > 0 else "N/A"
-            hyb_str = f"{hyb_max:,}" if hyb_max > 0 else "N/A"
+
+            row = f"    {gpu:<18} | {std_str:>10}"
+
+            if phase_analysis:
+                phase_str = f"{phase_max:,}" if phase_max > 0 else "N/A"
+                row += f" | {phase_str:>10}"
+
+            if hyb_analysis:
+                hyb_str = f"{hyb_max:,}" if hyb_max > 0 else "N/A"
+                row += f" | {hyb_str:>10}"
 
             # Cost tier
-            vram = GPU_SPECS.get(gpu, 0)
             if "RTX" in gpu:
                 cost = "$1-2K"
             elif "A10" in gpu or "A30" in gpu:
@@ -573,44 +818,52 @@ def print_results(
             else:
                 cost = "$40K+"
 
-            print(f"    {gpu:<18} | {std_str:>12} | {hyb_str:>12} | {cost:>12}")
+            row += f" | {cost:>10}"
+            print(row)
 
     # Key takeaways
     print(f"\n{'='*70}")
     print("   KEY FINDINGS")
     print(f"{'='*70}\n")
 
-    # Find the crossover point where Standard OOMs but Hybrid doesn't
-    hybrid_only_seq = [
+    # Find the crossover point where Standard OOMs but Phase/Hybrid doesn't
+    phase_only_seq = [
         seq_len for seq_len, s in savings.items()
-        if s.get("hybrid_fits_oom_standard")
+        if s.get("phase_oom") == False and s.get("standard_oom") == True
     ]
 
-    if hybrid_only_seq:
-        print(f"  1. At {min(hybrid_only_seq):,} tokens, Standard Transformer hits OOM")
-        print(f"     while Hybrid Transformer still fits comfortably!")
+    if phase_only_seq:
+        print(f"  1. At {min(phase_only_seq):,} tokens, Standard Transformer hits OOM")
+        print(f"     while Phase Transformer still fits!")
 
     # Memory efficiency at max common sequence length
-    common_seqs = [seq_len for seq_len, s in savings.items() if s["standard_gb"] != float("inf")]
+    common_seqs = [
+        seq_len for seq_len, s in savings.items()
+        if s.get("standard_gb") and s.get("standard_gb") != float("inf")
+    ]
+
     if common_seqs:
         max_common = max(common_seqs)
         s = savings[max_common]
-        print(f"\n  2. At {max_common:,} tokens (both fit):")
-        print(f"     - Standard uses {s['standard_gb']:.2f} GB")
-        print(f"     - Hybrid uses {s['hybrid_gb']:.2f} GB")
-        print(f"     - Savings: {s['savings_percent']:.1f}% ({s['savings_factor']:.1f}x less memory)")
+        print(f"\n  2. At {max_common:,} tokens (all models fit):")
+        print(f"     - Standard: {s.get('standard_gb', 0):.2f} GB")
+        if s.get("phase_gb"):
+            print(f"     - Phase: {s.get('phase_gb', 0):.2f} GB ({s.get('phase_savings_pct', 0):.0f}% savings)")
+        if s.get("hybrid_gb"):
+            print(f"     - Hybrid: {s.get('hybrid_gb', 0):.2f} GB ({s.get('hybrid_savings_pct', 0):.0f}% savings)")
 
-    # Hardware implications
-    print(f"\n  3. Hardware Implications:")
-    print(f"     - Standard Transformer 32K context: Requires 80GB+ HBM3E (A100/H100)")
-    print(f"     - Hybrid Transformer 32K context: Runs on RTX 4090 (24GB GDDR6X)")
-    print(f"     - Cost difference: $30,000+ vs $1,600")
+    # Scaling analysis
+    print(f"\n  3. Scaling Behavior:")
+    print(f"     - Standard Attention: Creates [B, H, N, N] attention matrix -> O(n²) memory")
+    print(f"     - Phase Attention: State accumulation, no attention matrix -> O(n) memory")
+    print(f"     - Hybrid Attention: Local window + Phase -> O(n) with better quality")
 
-    print(f"\n  4. Why This Matters:")
-    print(f"     - Train production LLMs on consumer hardware")
-    print(f"     - No need for expensive HBM/HBM3E memory")
-    print(f"     - Democratizes large context training")
-    print(f"     - Same quality at fraction of the cost")
+    # Note about the results
+    print(f"\n  4. Important Notes:")
+    print(f"     - Phase attention is TRUE O(n) - best memory efficiency")
+    print(f"     - Hybrid adds LocalAttention for quality, increases base memory")
+    print(f"     - At LONG sequences (16K+), the O(n²) vs O(n) difference is dramatic")
+    print(f"     - Run with --full to see 8K/16K/32K where Standard OOMs")
 
 
 def save_results(
@@ -644,20 +897,25 @@ def save_results(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Memory Efficiency Benchmark: Hybrid vs Standard Transformer",
+        description="Memory Efficiency Benchmark: Hybrid O(n×w) vs Standard O(n²)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python benchmark_memory.py --quick                    # Fast test (512-4K)
-  python benchmark_memory.py --full                     # Full test (512-32K)
-  python benchmark_memory.py --model_size large --full  # Large model test
-  python benchmark_memory.py --seq_lengths 1024,4096,16384
+  python benchmark_memory.py --quick                       # Fast test (512-4K)
+  python benchmark_memory.py --full                        # Full test (512-32K)
+  python benchmark_memory.py --model_size medium --full    # Medium model test
+  python benchmark_memory.py --cosine_mode shifted --full  # Test shifted cosine
+  python benchmark_memory.py --decay_gamma 0.95 --full     # Test with decay
+  python benchmark_memory.py --local_layers 6 --full       # 6:6 split (6 local + 6 hybrid)
+  python benchmark_memory.py --models standard,hybrid,phase --full  # All models
         """,
     )
 
     parser.add_argument("--model_size", type=str, default="small",
-                        choices=["tiny", "small", "medium", "large", "xl"],
+                        choices=["tiny", "small", "medium", "large", "xl", "7b"],
                         help="Model size preset")
+    parser.add_argument("--models", type=str, default="standard,hybrid",
+                        help="Comma-separated model types: standard (O(n²)), hybrid (O(n×w)), phase (O(n))")
     parser.add_argument("--batch_size", type=int, default=1,
                         help="Batch size for testing")
     parser.add_argument("--seq_lengths", type=str, default=None,
@@ -673,6 +931,17 @@ Examples:
     parser.add_argument("--verbose", action="store_true",
                         help="Verbose output")
 
+    # Hybrid configuration (V9.6.12+)
+    parser.add_argument("--cosine_mode", type=str, default="standard",
+                        choices=["standard", "shifted", "complex"],
+                        help="Phase cosine interaction mode")
+    parser.add_argument("--decay_gamma", type=float, default=1.0,
+                        help="State decay factor (1.0=infinite, <1.0=local focus)")
+    parser.add_argument("--window_size", type=int, default=256,
+                        help="Local attention window size")
+    parser.add_argument("--local_layers", type=int, default=None,
+                        help="Number of local-only layers in Hybrid model (default: auto = num_layers//2, e.g., 6 for 12-layer = 6:6 split)")
+
     args = parser.parse_args()
 
     # Determine sequence lengths
@@ -685,10 +954,19 @@ Examples:
     else:
         seq_lengths = [512, 1024, 2048, 4096, 8192]  # Default
 
+    # Parse model types
+    model_types = [m.strip() for m in args.models.split(",")]
+
     config = MemoryBenchmarkConfig(
         model_size=args.model_size,
         batch_size=args.batch_size,
         seq_lengths=seq_lengths,
+        model_types=model_types,
+        # Hybrid configuration (V9.6.12+)
+        cosine_mode=args.cosine_mode,
+        decay_gamma=args.decay_gamma,
+        window_size=args.window_size,
+        local_layers=args.local_layers,
         include_backward=not args.no_backward,
         output_file=args.output,
         verbose=args.verbose,
