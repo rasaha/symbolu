@@ -58,12 +58,15 @@ python train_unified_llm.py --resume checkpoints_unified/step_5000.pt
 | `--learning_rate` | float | `3e-4` | Peak learning rate |
 | `--use_per_layer_clipping` | flag | `False` | Clip authority/sensory gradients separately |
 | `--use_8bit_optimizer` | flag | `False` | Use bitsandbytes 8-bit AdamW |
+| `--use_compile` | flag | `False` | Use torch.compile() for faster training |
+| `--no_compile` | flag | `False` | Disable torch.compile() |
 | `--seed` | int | `42` | Random seed |
 
 ### Notes
 - **batch_size**: Effective batch = `batch_size * gradient_accumulation`
 - **use_8bit_optimizer**: Saves ~50% optimizer memory. Requires `bitsandbytes` package.
 - **use_per_layer_clipping**: Respects 9:3 Authority/Sensory design. Enable for ontological models.
+- **use_compile**: PyTorch 2.0+ only. Can provide 15-30% speedup. May have issues with dynamic shapes.
 
 ---
 
@@ -75,6 +78,7 @@ python train_unified_llm.py --resume checkpoints_unified/step_5000.pt
 | `--dataset_name` | str | `HuggingFaceFW/fineweb` | HuggingFace dataset name (for fineweb mode) |
 | `--dataset_subset` | str | `sample-10BT` | Dataset subset/config (for fineweb mode) |
 | `--cache_val_batches` | int | `20` | Pre-cache N validation batches (streaming datasets) |
+| `--cache_dataset` | flag | `False` | Download and cache dataset locally (vs streaming) |
 
 ### Dataset Choices
 
@@ -99,7 +103,7 @@ For `--dataset fineweb`, configure with:
 | `sample-100BT` | ~100B tokens | Extended training |
 | `CC-MAIN-*` | Varies | Specific Common Crawl snapshots |
 
-### Example: FineWeb Training
+### Example: FineWeb Training (Streaming)
 ```bash
 python train_unified_llm.py \
     --dataset fineweb \
@@ -108,8 +112,18 @@ python train_unified_llm.py \
     --cache_val_batches 20
 ```
 
+### Example: FineWeb Training (Cached Locally)
+```bash
+python train_unified_llm.py \
+    --dataset fineweb \
+    --dataset_name "HuggingFaceFW/fineweb-edu" \
+    --dataset_subset "sample-10BT" \
+    --cache_dataset
+```
+
 ### Notes
-- **Streaming**: FineWeb uses streaming to avoid loading entire dataset into memory
+- **Streaming** (default): Data streamed on-the-fly, requires network, minimal disk usage
+- **cache_dataset**: Downloads to `~/.cache/huggingface/datasets/`, no network after first run
 - **cache_val_batches**: Pre-caches validation batches to eliminate 7-minute "Resolving data files" delay
 - Set `--cache_val_batches 0` to disable caching (not recommended)
 
@@ -588,19 +602,21 @@ Full evolutionary flow across layer transitions.
 |--------|------|---------|-------------|
 | `--enable_sgp` | flag | `True` | Enable SGP |
 | `--disable_sgp` | flag | `False` | Disable SGP |
-| `--sgp_base_rate` | int | `50` | Toroidal Refresh Rate |
-| `--sgp_stagnation_rate` | int | `25` | Rate when stagnation detected |
+| `--sgp_base_rate` | int | `200` | Toroidal Refresh Rate (every N steps) |
+| `--sgp_stagnation_rate` | int | `100` | Rate when stagnation detected (halved) |
 | `--sgp_gamma` | float | `0.5` | Persistence coefficient |
 
 ### Notes
-- Higher gamma = stronger "cement" (more persistence)
-- Lower rates = more frequent refresh
+- SGP runs every `sgp_base_rate` steps (200 by default)
+- When stagnation is detected, rate halves to `sgp_stagnation_rate` (100) for more frequent hammering
+- Higher gamma = stronger "cement" (more gradient persistence)
+- SGP state is saved to checkpoints and restored on resume
 
 ---
 
 ## Sattvic Controller
 
-Dynamic λ_csr regulation.
+Dynamic λ_csr regulation based on training health.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -612,7 +628,9 @@ Dynamic λ_csr regulation.
 
 ### Notes
 - Controls CSR influence dynamically based on training state
-- Decays from initial to floor over warmup
+- Decays from initial λ (0.5) to floor λ (0.1) over warmup
+- Emergency boost: When stagnation/collapse detected, λ increases to break loops
+- Sattvic state is saved to checkpoints and restored on resume
 
 ---
 
