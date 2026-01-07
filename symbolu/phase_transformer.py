@@ -89,10 +89,100 @@ class TransformerConfig:
     sync_steps: int = 3
     sync_lr: float = 0.1
     temperature: float = 1.0  # Lower = sharper attention (for classification tasks)
+    cosine_mode: str = "standard"  # V9.6.12: "standard", "shifted", or "complex"
+    decay_gamma: float = 1.0  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
 
     def __post_init__(self):
         if self.ff_dim is None:
             self.ff_dim = 4 * self.embed_dim
+
+
+# =============================================================================
+# INTENT PHASE PROJECTOR - Ontological → Phase Rotation
+# =============================================================================
+
+class IntentPhaseProjector(nn.Module):
+    """
+    Projects Ontological State Delta (ΔS) to phase rotation offsets.
+
+    This is the bridge between Ontological understanding and Phase attention.
+    The Ontological model outputs a 124-dim CognitiveState delta representing
+    how "understanding" changed. This projector converts that to phase offsets
+    that rotate the Query phasors in Phase attention.
+
+    Theory (from ONTOLOGICAL_STATE_DELTA_DESIGN.md):
+        z_lower' = z_lower × e^{iθ_higher}
+
+    In practice:
+        φ_q' = φ_q + θ_intent
+
+    This means: Same tokens, but their RELATIONSHIPS change based on intent.
+
+    Example:
+        "The door is open"
+        - Intent = "enter building" → θ ≈ 0° → tokens relate as "opportunity"
+        - Intent = "secure building" → θ ≈ π → tokens relate as "problem"
+    """
+
+    def __init__(
+        self,
+        state_dim: int = 124,      # CognitiveState dimension (44+64+12+4)
+        num_heads: int = 12,       # Number of attention heads
+        head_dim: int = 64,        # Dimension per head
+        project_per_head_dim: bool = False,  # If True, project to [H, D_h], else [H]
+    ):
+        super().__init__()
+        self.state_dim = state_dim
+        self.num_heads = num_heads
+        self.head_dim = head_dim
+        self.project_per_head_dim = project_per_head_dim
+
+        if project_per_head_dim:
+            # Full projection: different phase offset for each (head, dim) pair
+            # More expressive but more parameters
+            self.phase_proj = nn.Sequential(
+                nn.Linear(state_dim, state_dim * 2),
+                nn.GELU(),
+                nn.Linear(state_dim * 2, num_heads * head_dim),
+            )
+        else:
+            # Per-head projection: one phase offset per head
+            # Simpler, each head gets uniformly rotated
+            self.phase_proj = nn.Sequential(
+                nn.Linear(state_dim, state_dim),
+                nn.GELU(),
+                nn.Linear(state_dim, num_heads),
+            )
+
+        # Initialize to near-zero so model starts unaffected
+        with torch.no_grad():
+            self.phase_proj[-1].weight.fill_(0.01)
+            self.phase_proj[-1].bias.fill_(0.0)
+
+    def forward(self, delta_S: torch.Tensor) -> torch.Tensor:
+        """
+        Convert state delta to phase offsets.
+
+        Args:
+            delta_S: [B, state_dim] or [B, T, state_dim] - CognitiveState delta
+
+        Returns:
+            theta_intent: [B, H] or [B, H, D_h] or [B, T, H, D_h] - phase offsets
+        """
+        theta = self.phase_proj(delta_S)  # [B, H] or [B, H*D_h]
+
+        if self.project_per_head_dim:
+            # Reshape to [B, H, D_h] or [B, T, H, D_h]
+            if delta_S.dim() == 2:
+                theta = theta.view(-1, self.num_heads, self.head_dim)
+            else:
+                B, T, _ = delta_S.shape
+                theta = theta.view(B, T, self.num_heads, self.head_dim)
+
+        # Scale to reasonable phase range (tanh → [-1, 1] → [-π, π])
+        theta = torch.tanh(theta) * 3.14159
+
+        return theta
 
 
 # =============================================================================
@@ -119,6 +209,25 @@ class PhaseAttentionLayer(nn.Module):
 
     This is mathematically equivalent to amplitude-gated phase attention
     but more elegant and numerically stable via complex arithmetic.
+
+    V9.6.12: Cosine Mode Alternatives
+    ---------------------------------
+    Three modes for the cosine interaction kernel:
+
+    1. "standard" (default): cos(φ_q - φ_k), range [-1, +1]
+       - Original implementation
+       - Can have destructive interference (negative cancellation)
+
+    2. "shifted": 1 + cos(φ_q - φ_k), range [0, 2]
+       - Eliminates negative cancellation
+       - Guarantees positive signal flow
+       - Use when training plateaus due to signal collapse
+
+    3. "complex": Uses both real (cos) and imaginary (sin) components
+       - Real part: symmetric interaction
+       - Imaginary part: asymmetric/directional ("the" → "cat" ≠ "cat" → "the")
+       - Projects complex output to real via learned linear layer
+       - Most expressive but slightly higher memory
     """
 
     def __init__(
@@ -130,12 +239,28 @@ class PhaseAttentionLayer(nn.Module):
         sync_lr: float = 0.1,     # Unused in V2 but kept for compatibility
         temperature: float = 1.0,  # Unused in V2 but kept for compatibility
         aux_scale: float = 0.1,   # Output scaling for auxiliary path integration
+        cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
+        decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite memory, <1.0=local focus)
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
         self.aux_scale = aux_scale
+
+        # V9.6.12: Cosine mode for interaction kernel
+        assert cosine_mode in ("standard", "shifted", "complex"), \
+            f"cosine_mode must be 'standard', 'shifted', or 'complex', got '{cosine_mode}'"
+        self.cosine_mode = cosine_mode
+
+        # V9.6.13: State decay factor for memory horizon control
+        # γ = 1.0: Infinite memory (current behavior), cumsum is exact
+        # γ < 1.0: Exponential decay, effective memory ~1/(1-γ) tokens
+        #          γ=0.9 → ~10 token memory, γ=0.95 → ~20 token memory
+        # This forces pure Phase to focus on local grammar (like Mamba/RWKV/RetNet)
+        assert 0.0 < decay_gamma <= 1.0, \
+            f"decay_gamma must be in (0, 1], got {decay_gamma}"
+        self.decay_gamma = decay_gamma
 
         # Legacy parameters kept for checkpoint compatibility
         self.sync_steps = sync_steps
@@ -175,6 +300,18 @@ class PhaseAttentionLayer(nn.Module):
         nn.init.uniform_(self.W_q_phase.weight, -3.14159, 3.14159)
         nn.init.uniform_(self.W_k_phase.weight, -3.14159, 3.14159)
 
+        # V9.6.12: Complex-to-real projection for "complex" cosine mode
+        # Projects [real, imag] → real, allowing the model to learn how to
+        # combine symmetric (cos) and asymmetric (sin) components
+        if cosine_mode == "complex":
+            self.complex_to_real = nn.Linear(2 * embed_dim, embed_dim, bias=False)
+            # Initialize to favor real (cos) component initially for stability
+            with torch.no_grad():
+                self.complex_to_real.weight[:, :embed_dim] = torch.eye(embed_dim) * 0.8
+                self.complex_to_real.weight[:, embed_dim:] = torch.eye(embed_dim) * 0.2
+        else:
+            self.complex_to_real = None
+
         # Legacy projections kept for checkpoint compatibility
         self.W_phase = nn.Linear(embed_dim, num_heads, bias=False)  # Legacy
         self.W_amp = nn.Linear(embed_dim, num_heads, bias=False)    # Legacy
@@ -191,6 +328,7 @@ class PhaseAttentionLayer(nn.Module):
         x: torch.Tensor,
         causal_mask: bool = True,
         phase_context: Optional[Dict[str, torch.Tensor]] = None,
+        intent_phase: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, Dict[str, torch.Tensor]]]:
         """
         Forward pass with O(n) complex phase attention.
@@ -199,6 +337,9 @@ class PhaseAttentionLayer(nn.Module):
             x: [B, N, D] input tensor
             causal_mask: Apply causal masking (always True for complex cumsum)
             phase_context: Optional streaming context (not used in V2)
+            intent_phase: Optional [B, H] or [B, H, D_h] or [B, T, H, D_h] phase rotation
+                         from Ontological State Delta. Rotates query phasors to change
+                         how tokens relate based on intent/understanding.
 
         Returns:
             output: [B, N, D] or (output, None) if phase_context given
@@ -224,6 +365,26 @@ class PhaseAttentionLayer(nn.Module):
         # Key phase and amplitude: [B, N, D] → [B, N, H, D_h]
         phi_k = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
         a_k = torch.sigmoid(self.W_k_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+
+        # =====================================================================
+        # 1.5. Apply Intent Phase Rotation (Ontological → Phase bridge)
+        # =====================================================================
+        # If intent_phase is provided, rotate query phases by the intent signal.
+        # This changes HOW tokens relate to each other based on understanding.
+        # φ_q' = φ_q + θ_intent (from Ontological State Delta)
+        if intent_phase is not None:
+            # Handle different intent_phase shapes:
+            # [B, H] → broadcast to [B, 1, H, 1] for all positions and dims
+            # [B, H, D_h] → broadcast to [B, 1, H, D_h] for all positions
+            # [B, T, H, D_h] → use directly (per-position intent)
+            if intent_phase.dim() == 2:
+                # [B, H] → [B, 1, H, 1]
+                intent_phase = intent_phase.unsqueeze(1).unsqueeze(-1)
+            elif intent_phase.dim() == 3:
+                # [B, H, D_h] → [B, 1, H, D_h]
+                intent_phase = intent_phase.unsqueeze(1)
+            # [B, T, H, D_h] or broadcasted shape
+            phi_q = phi_q + intent_phase
 
         # =====================================================================
         # 2. Project Values (content)
@@ -262,21 +423,122 @@ class PhaseAttentionLayer(nn.Module):
         # KV product: [B, N, H, D_h] × [B, N, H, D_h] -> [B, N, H, D_h]
         kv_complex = k_phasor * v_complex
 
-        # O(n) Causal aggregation: cumulative sum along sequence dimension
-        global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
+        # O(n) Causal aggregation with optional decay
+        # V9.6.13: State decay for memory horizon control
+        if self.decay_gamma == 1.0:
+            # Original: infinite memory via cumsum
+            global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
+        else:
+            # Stable decay accumulation: S_t = γ * S_{t-1} + kv_t
+            # Using loop for numerical stability (γ^(-j) overflows for large j)
+            B_size, N_size, H_size, D_size = kv_complex.shape
+            global_state = torch.zeros_like(kv_complex)
+            state = torch.zeros(B_size, 1, H_size, D_size,
+                              dtype=kv_complex.dtype, device=kv_complex.device)
+            gamma = self.decay_gamma
+            for t in range(N_size):
+                state = gamma * state + kv_complex[:, t:t+1, :, :]
+                global_state[:, t:t+1, :, :] = state
 
         # =====================================================================
         # 5. Readout: Synchronization via Q × State (NORMALIZED)
         # =====================================================================
         # V9.6.11: Use amplitude-based normalization (always positive)
         # normalizer = a_q × Σ_{j≤t} a_k  (cross-amplitude energy)
-        a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
+        # V9.6.13: Apply same decay to normalizer for consistency
+        if self.decay_gamma == 1.0:
+            a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
+        else:
+            # Stable decay accumulation for normalizer
+            B_size, N_size, H_size, D_size = a_k.shape
+            a_k_cumsum = torch.zeros_like(a_k)
+            state_ak = torch.zeros(B_size, 1, H_size, D_size,
+                                   dtype=a_k.dtype, device=a_k.device)
+            gamma = self.decay_gamma
+            for t in range(N_size):
+                state_ak = gamma * state_ak + a_k[:, t:t+1, :, :]
+                a_k_cumsum[:, t:t+1, :, :] = state_ak
         normalizer = a_q * a_k_cumsum + 1e-6   # [B, N, H, D_h], always positive
 
-        numerator = (q_phasor * global_state).real  # [B, N, H, D_h]
-        sync_output = numerator / normalizer  # Amplitude-normalized output
+        # V9.6.12: Cosine mode selection for interaction kernel
+        qk_product = q_phasor * global_state  # [B, N, H, D_h] complex
 
-        # Cast back to original dtype if we converted
+        if self.cosine_mode == "standard":
+            # Original: cos(φ_q - φ_k), range [-1, +1]
+            # Can have destructive interference (negative cancellation)
+            numerator = qk_product.real  # [B, N, H, D_h]
+            sync_output = numerator / normalizer
+
+        elif self.cosine_mode == "shifted":
+            # Shifted: 1 + cos(φ_q - φ_k), range [0, 2]
+            # Eliminates negative cancellation, guarantees positive signal flow
+            #
+            # Mathematically: Σ a_q * a_k * (1 + cos(φ_q - φ_k)) * v
+            #               = Σ a_q * a_k * v + Σ a_q * a_k * cos(φ_q - φ_k) * v
+            #
+            # First term: amplitude-only product (no phase modulation)
+            # Second term: cosine-modulated product (from complex phasor)
+
+            # Accumulator for the "+1" shift term: a_k * v
+            # V9.6.13: Apply decay to shifted mode accumulator
+            if self.decay_gamma == 1.0:
+                av_state = torch.cumsum(a_k * v, dim=1)  # [B, N, H, D_h]
+            else:
+                # Stable decay accumulation for shifted mode
+                av_input = a_k * v
+                B_size, N_size, H_size, D_size = av_input.shape
+                av_state = torch.zeros_like(av_input)
+                state_av = torch.zeros(B_size, 1, H_size, D_size,
+                                       dtype=av_input.dtype, device=av_input.device)
+                gamma = self.decay_gamma
+                for t in range(N_size):
+                    state_av = gamma * state_av + av_input[:, t:t+1, :, :]
+                    av_state[:, t:t+1, :, :] = state_av
+
+            # Combined: shift_term + cos_term
+            shift_term = a_q * av_state           # a_q * Σ(a_k * v)
+            cos_term = qk_product.real            # Re(q_phasor * global_state)
+
+            numerator = shift_term + cos_term     # [B, N, H, D_h]
+            # Normalizer for range [0, 2] → divide by 2 to keep same scale
+            sync_output = numerator / (normalizer * 2)
+
+        elif self.cosine_mode == "complex":
+            # Full complex: uses both cos (real) and sin (imaginary)
+            # Real: symmetric interaction (cos)
+            # Imaginary: asymmetric/directional (sin)
+            #
+            # The sin component encodes ordering:
+            #   sin(φ_q - φ_k) ≠ sin(φ_k - φ_q)
+            # This allows "the" → "cat" ≠ "cat" → "the"
+
+            real_part = qk_product.real / normalizer   # [B, N, H, D_h]
+            imag_part = qk_product.imag / normalizer   # [B, N, H, D_h]
+
+            # Reshape for concatenation: [B, N, H, D_h] → [B, N, D]
+            real_flat = real_part.reshape(B, N, D)
+            imag_flat = imag_part.reshape(B, N, D)
+
+            # Concatenate real and imaginary: [B, N, 2*D]
+            complex_concat = torch.cat([real_flat, imag_flat], dim=-1)
+
+            # Cast back to original dtype before projection if needed
+            if orig_dtype == torch.bfloat16:
+                complex_concat = complex_concat.to(orig_dtype)
+
+            # Project complex → real via learned linear layer: [B, N, 2*D] → [B, N, D]
+            sync_output = self.complex_to_real(complex_concat)
+
+            # Early return for complex mode (dtype already handled)
+            output = self.out_proj(sync_output)
+            output = self.dropout(output)
+            output = output * self.aux_scale
+            result = output + residual
+            if phase_context is not None:
+                return result, None
+            return result
+
+        # Cast back to original dtype if we converted (for standard/shifted modes)
         if orig_dtype == torch.bfloat16:
             sync_output = sync_output.to(orig_dtype)
 
@@ -1225,6 +1487,8 @@ class HybridAttentionLayer(nn.Module):
         alpha_phase: float = 0.2,
         local_backend: str = 'auto',
         temperature: float = 1.0,  # Lower = sharper phase attention
+        cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
+        decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
     ):
         super().__init__()
         # Keep alphas for potential future use (e.g., residual weighting)
@@ -1251,11 +1515,18 @@ class HybridAttentionLayer(nn.Module):
             sync_lr=sync_lr,
             temperature=temperature,  # Pass temperature for sharper attention
             aux_scale=1.0,  # V9.6.11: Full strength (was 0.1 causing 2% effective signal)
+            cosine_mode=cosine_mode,  # V9.6.12: Cosine interaction mode
+            decay_gamma=decay_gamma,  # V9.6.13: State decay factor
         )
 
         self.norm = nn.LayerNorm(embed_dim)
 
-    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        causal_mask: bool = True,
+        intent_phase: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         """
         Weighted hybrid forward: Blend local and phase attention outputs.
 
@@ -1265,15 +1536,24 @@ class HybridAttentionLayer(nn.Module):
         Uses alpha weights to blend contributions:
         - alpha_local: Weight for local attention (syntax, grammar)
         - alpha_phase: Weight for phase attention (long-range context)
+
+        Args:
+            x: [B, N, D] input tensor
+            causal_mask: Apply causal masking
+            intent_phase: Optional phase rotation from Ontological State Delta.
+                         Only affects Phase attention (Local is unchanged).
         """
         residual = x
 
         # Local attention on original input (captures local patterns)
+        # Note: Local attention is NOT affected by intent_phase
+        # Grammar/syntax should remain stable regardless of intent
         x_local = self.local_attn(x, causal_mask)
 
         # Phase attention on ORIGINAL input (captures global context)
         # This is critical: phase needs raw input to do long-range retrieval
-        x_phase = self.phase_attn(residual, causal_mask)
+        # intent_phase rotates how tokens relate to each other based on understanding
+        x_phase = self.phase_attn(residual, causal_mask, intent_phase=intent_phase)
 
         # Weighted combination using learnable alphas
         # Normalize alphas to sum to 1 for stability
@@ -1309,6 +1589,8 @@ class HybridTransformerBlock(nn.Module):
             alpha_phase=alpha_phase,
             local_backend=local_backend,
             temperature=getattr(config, 'temperature', 1.0),  # Sharper attention
+            cosine_mode=getattr(config, 'cosine_mode', 'standard'),  # V9.6.12
+            decay_gamma=getattr(config, 'decay_gamma', 1.0),  # V9.6.13
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -1316,8 +1598,13 @@ class HybridTransformerBlock(nn.Module):
             dropout=config.dropout,
         )
 
-    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
-        x = self.attention(x, causal_mask)
+    def forward(
+        self,
+        x: torch.Tensor,
+        causal_mask: bool = True,
+        intent_phase: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        x = self.attention(x, causal_mask, intent_phase=intent_phase)
         x = self.ff(x)
         return x
 
@@ -1366,6 +1653,8 @@ class PhaseTransformerBlock(nn.Module):
             sync_lr=config.sync_lr,
             temperature=getattr(config, 'temperature', 1.0),  # Sharper attention for classification
             aux_scale=1.0,  # V9.6.11: Full strength for pure phase model
+            cosine_mode=getattr(config, 'cosine_mode', 'standard'),  # V9.6.12
+            decay_gamma=getattr(config, 'decay_gamma', 1.0),  # V9.6.13
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -1436,6 +1725,8 @@ class PhaseTransformer(nn.Module):
         sync_lr: float = 0.1,
         temperature: float = 1.0,  # Lower = sharper attention (for classification)
         tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR to prevent embedding corruption
+        cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
+        decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
     ):
         super().__init__()
 
@@ -1450,6 +1741,8 @@ class PhaseTransformer(nn.Module):
             sync_steps=sync_steps,
             sync_lr=sync_lr,
             temperature=temperature,  # Pass temperature for sharper attention
+            cosine_mode=cosine_mode,  # V9.6.12: Pass cosine mode to attention layers
+            decay_gamma=decay_gamma,  # V9.6.13: Pass decay factor to attention layers
         )
         self.config = config
         self.tie_embeddings = tie_embeddings
@@ -1698,6 +1991,8 @@ class HybridPhaseTransformer(nn.Module):
         alpha_phase: float = 0.2,  # Weight for phase attention in hybrid layers
         temperature: float = 1.0,  # Lower = sharper attention (for classification)
         tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR to prevent embedding corruption
+        cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
+        decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
     ):
         super().__init__()
 
@@ -1712,6 +2007,8 @@ class HybridPhaseTransformer(nn.Module):
             sync_steps=sync_steps,
             sync_lr=sync_lr,
             temperature=temperature,  # Pass temperature for sharper attention
+            cosine_mode=cosine_mode,  # V9.6.12: Pass cosine mode to attention layers
+            decay_gamma=decay_gamma,  # V9.6.13: Pass decay factor to attention layers
         )
         self.config = config
         self.local_layers = local_layers
@@ -1788,6 +2085,7 @@ class HybridPhaseTransformer(nn.Module):
     def forward_hidden(
         self,
         input_ids: torch.Tensor,
+        intent_phase: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
         Forward pass returning hidden states BEFORE LM head.
@@ -1798,6 +2096,8 @@ class HybridPhaseTransformer(nn.Module):
 
         Args:
             input_ids: [B, N] token indices
+            intent_phase: Optional phase rotation from Ontological State Delta.
+                         Only affects Hybrid layers (not Local-only layers).
 
         Returns:
             hidden: [B, N, embed_dim] - final hidden states before LM head
@@ -1810,16 +2110,32 @@ class HybridPhaseTransformer(nn.Module):
         x = self.embed_dropout(x)
 
         # Transformer blocks
-        for block in self.blocks:
+        for i, block in enumerate(self.blocks):
+            # Only pass intent_phase to Hybrid blocks (not Local-only blocks)
+            is_hybrid_block = i >= self.local_layers
+            block_intent = intent_phase if is_hybrid_block else None
+
             if self.gradient_checkpointing and self.training:
-                x = checkpoint(
-                    block,
-                    x,
-                    True,  # causal_mask
-                    use_reentrant=False,
-                )
+                if is_hybrid_block and intent_phase is not None:
+                    x = checkpoint(
+                        block,
+                        x,
+                        True,  # causal_mask
+                        block_intent,
+                        use_reentrant=False,
+                    )
+                else:
+                    x = checkpoint(
+                        block,
+                        x,
+                        True,  # causal_mask
+                        use_reentrant=False,
+                    )
             else:
-                x = block(x, causal_mask=True)
+                if is_hybrid_block:
+                    x = block(x, causal_mask=True, intent_phase=block_intent)
+                else:
+                    x = block(x, causal_mask=True)
 
         # Return normalized hidden states (before LM head)
         return self.norm(x)
@@ -1830,6 +2146,7 @@ class HybridPhaseTransformer(nn.Module):
         return_hidden: bool = False,
         extract_layers: Optional[List[int]] = None,
         return_last_hidden: bool = False,
+        intent_phase: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         """
         Forward pass with efficient layer extraction.
@@ -1848,6 +2165,8 @@ class HybridPhaseTransformer(nn.Module):
                            - None with return_hidden=True: all layers
             return_last_hidden: Return normalized hidden state before lm_head.
                                Required for CSR re-projection after gating.
+            intent_phase: Optional phase rotation from Ontological State Delta.
+                         Only affects Hybrid layers (not Local-only layers).
 
         Returns:
             Dict with:
@@ -1873,15 +2192,31 @@ class HybridPhaseTransformer(nn.Module):
         # Transformer blocks with targeted extraction
         hidden_states = [] if should_extract else None
         for i, block in enumerate(self.blocks):
+            # Only pass intent_phase to Hybrid blocks (not Local-only blocks)
+            is_hybrid_block = i >= self.local_layers
+            block_intent = intent_phase if is_hybrid_block else None
+
             if self.gradient_checkpointing and self.training:
-                x = checkpoint(
-                    block,
-                    x,
-                    True,  # causal_mask
-                    use_reentrant=False,
-                )
+                if is_hybrid_block and intent_phase is not None:
+                    x = checkpoint(
+                        block,
+                        x,
+                        True,  # causal_mask
+                        block_intent,
+                        use_reentrant=False,
+                    )
+                else:
+                    x = checkpoint(
+                        block,
+                        x,
+                        True,  # causal_mask
+                        use_reentrant=False,
+                    )
             else:
-                x = block(x, causal_mask=True)
+                if is_hybrid_block:
+                    x = block(x, causal_mask=True, intent_phase=block_intent)
+                else:
+                    x = block(x, causal_mask=True)
 
             # Extract if: return_hidden=True (all), or layer in extract_layers
             if should_extract:
@@ -1919,6 +2254,224 @@ class HybridPhaseTransformer(nn.Module):
             probs = F.softmax(logits, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
             input_ids = torch.cat([input_ids, next_token], dim=1)
+        return input_ids
+
+
+# =============================================================================
+# ONTOLOGICAL HYBRID TRANSFORMER - AGI Architecture
+# =============================================================================
+
+class OntologicalHybridTransformer(nn.Module):
+    """
+    Two-Tier AGI Architecture: Ontological (slow/semantic) + Hybrid (fast/generation).
+
+    This combines:
+    1. Ontological Layer: Tracks semantic state, outputs ΔS (understanding change)
+    2. Hybrid Layer: Local + Phase attention, conditioned on ΔS via phase rotation
+
+    Theory:
+        - System 2 (Ontological): Slow, deliberate semantic reasoning
+        - System 1 (Hybrid): Fast, automatic pattern completion
+        - ΔS → Phase Rotation: Intent changes HOW tokens relate, not WHAT they are
+
+    From ONTOLOGICAL_STATE_DELTA_DESIGN.md:
+        "z_lower' = z_lower × e^{iθ_higher}"
+
+    Usage:
+        model = OntologicalHybridTransformer(...)
+        output = model(input_ids)  # Automatically computes ΔS and applies phase rotation
+
+    Memory (at 10M context):
+        - Token-centric: 2TB (impossible)
+        - State-Delta (Tier 2): 30GB
+        - Ontological (Tier 3): 5GB
+    """
+
+    def __init__(
+        self,
+        vocab_size: int = 50257,
+        embed_dim: int = 768,
+        num_layers: int = 12,
+        num_heads: int = 12,
+        ff_dim: Optional[int] = None,
+        max_seq_len: int = 8192,
+        dropout: float = 0.1,
+        # Hybrid params
+        local_layers: int = 4,
+        window_size: int = 256,
+        local_backend: str = 'auto',
+        alpha_local: float = 0.8,
+        alpha_phase: float = 0.2,
+        # Ontological params
+        state_dim: int = 124,  # CognitiveState dimension
+        project_per_head_dim: bool = False,  # Phase projection granularity
+        tie_embeddings: bool = True,
+        cosine_mode: str = "standard",
+        decay_gamma: float = 1.0,
+    ):
+        super().__init__()
+
+        # The Hybrid (generation) model
+        self.hybrid = HybridPhaseTransformer(
+            vocab_size=vocab_size,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            max_seq_len=max_seq_len,
+            dropout=dropout,
+            local_layers=local_layers,
+            window_size=window_size,
+            local_backend=local_backend,
+            alpha_local=alpha_local,
+            alpha_phase=alpha_phase,
+            tie_embeddings=tie_embeddings,
+            cosine_mode=cosine_mode,
+            decay_gamma=decay_gamma,
+        )
+
+        # State projector: hidden[768] → CognitiveState[124]
+        # (Import from experimental or define inline)
+        self.state_projector = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim // 2),
+            nn.GELU(),
+            nn.Linear(embed_dim // 2, state_dim),
+        )
+
+        # Intent phase projector: ΔS[124] → θ[H] or θ[H, D_h]
+        head_dim = embed_dim // num_heads
+        self.intent_projector = IntentPhaseProjector(
+            state_dim=state_dim,
+            num_heads=num_heads,
+            head_dim=head_dim,
+            project_per_head_dim=project_per_head_dim,
+        )
+
+        # Store config
+        self.state_dim = state_dim
+        self.embed_dim = embed_dim
+
+        # Previous state for delta computation (will be set during forward)
+        self.register_buffer('prev_state', None)
+
+    def compute_state_delta(
+        self,
+        hidden: torch.Tensor,
+        reset_state: bool = False,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Compute CognitiveState and its delta from hidden states.
+
+        Args:
+            hidden: [B, N, embed_dim] - hidden states from hybrid model
+            reset_state: Reset prev_state (use at start of new sequence)
+
+        Returns:
+            state: [B, state_dim] - current CognitiveState (pooled)
+            delta_S: [B, state_dim] - change from previous state
+        """
+        # Pool hidden states (mean over sequence)
+        pooled = hidden.mean(dim=1)  # [B, embed_dim]
+
+        # Project to CognitiveState
+        state = self.state_projector(pooled)  # [B, state_dim]
+
+        # Compute delta
+        if reset_state or self.prev_state is None:
+            delta_S = torch.zeros_like(state)
+        else:
+            delta_S = state - self.prev_state
+
+        # Update prev_state for next call
+        self.prev_state = state.detach()
+
+        return state, delta_S
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        return_hidden: bool = False,
+        extract_layers: Optional[List[int]] = None,
+        return_last_hidden: bool = False,
+        reset_state: bool = False,
+        external_delta_S: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass with Ontological → Hybrid integration.
+
+        Two modes:
+        1. Auto mode (default): Compute ΔS from hidden states automatically
+        2. External mode: Use provided external_delta_S (from separate Ontological model)
+
+        Args:
+            input_ids: [B, N] token indices
+            return_hidden: Return all hidden states
+            extract_layers: Specific layers to extract
+            return_last_hidden: Return final hidden state
+            reset_state: Reset Ontological state (new sequence)
+            external_delta_S: [B, state_dim] external state delta (bypasses auto computation)
+
+        Returns:
+            Dict with:
+            - 'logits': [B, N, V] output logits
+            - 'state': [B, state_dim] current CognitiveState
+            - 'delta_S': [B, state_dim] state delta
+            - 'intent_phase': [B, H] or [B, H, D_h] phase rotation applied
+            - Plus any requested hidden states
+        """
+        # First pass: Get hidden states WITHOUT intent phase
+        # (We need hidden states to compute the state delta)
+        with torch.no_grad():
+            hidden = self.hybrid.forward_hidden(input_ids, intent_phase=None)
+
+        # Compute state delta (or use external)
+        if external_delta_S is not None:
+            delta_S = external_delta_S
+            state = self.state_projector(hidden.mean(dim=1))
+        else:
+            state, delta_S = self.compute_state_delta(hidden, reset_state)
+
+        # Convert delta_S to intent phase rotation
+        intent_phase = self.intent_projector(delta_S)  # [B, H] or [B, H, D_h]
+
+        # Second pass: Full forward WITH intent phase
+        result = self.hybrid(
+            input_ids,
+            return_hidden=return_hidden,
+            extract_layers=extract_layers,
+            return_last_hidden=return_last_hidden,
+            intent_phase=intent_phase,
+        )
+
+        # Add ontological outputs
+        result['state'] = state
+        result['delta_S'] = delta_S
+        result['intent_phase'] = intent_phase
+
+        return result
+
+    def generate(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 50,
+        temperature: float = 1.0,
+        top_k: int = 50,
+    ) -> torch.Tensor:
+        """Generation with Ontological state tracking."""
+        # Reset state at start of generation
+        self.prev_state = None
+
+        for _ in range(max_new_tokens):
+            result = self(input_ids, reset_state=(self.prev_state is None))
+            logits = result['logits'][:, -1, :]
+            logits = logits / temperature
+            if top_k > 0:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = float('-inf')
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+
         return input_ids
 
 

@@ -126,6 +126,7 @@ class SymbolU12BhavaConfig:
     phase_sync_steps: int = 3         # Synchronization iterations (legacy, kept for compat)
     phase_sync_lr: float = 0.1        # Phase update learning rate
     r_signal_dim: int = 48            # R-Signal dimension for phase bias projection
+    phase_cosine_mode: str = "standard"  # V9.6.12: "standard", "shifted", or "complex"
 
     # Harmonic ratios
     HARMONIC_RATIOS: Dict[int, int] = None
@@ -176,6 +177,7 @@ class StateDeltaPhaseBlock(nn.Module):
                 dropout=0.1,
                 sync_steps=config.phase_sync_steps,
                 sync_lr=config.phase_sync_lr,
+                cosine_mode=getattr(config, 'phase_cosine_mode', 'standard'),  # V9.6.12
             )
             self.use_phase = True
         else:

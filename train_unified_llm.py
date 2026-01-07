@@ -38,6 +38,10 @@ Usage:
     python train_unified_llm.py --model_type gen2 --model_size small \
         --max_seq_len 16384 --gradient_checkpointing --batch_size 1
 
+    # Train Ontological Hybrid (Two-Tier AGI Architecture)
+    python train_unified_llm.py --model_type ontological_hybrid --model_size small \
+        --dataset wikitext103 --max_steps 1000 --state_dim 124
+
     # Stress Test (Trial by Fire)
     python train_unified_llm.py --stress_test --resume checkpoints/best.pt
 
@@ -88,6 +92,7 @@ from symbolu.phase_transformer import (
     PhaseTransformer,
     HybridPhaseTransformer,
     StandardTransformer,  # V9.6.9: O(n²) baseline for comparison
+    OntologicalHybridTransformer,  # V9.6.14: Two-Tier AGI Architecture
 )
 
 # Import ontological models
@@ -6028,6 +6033,8 @@ class UnifiedTrainingConfig:
     # Phase-specific parameters
     sync_steps: int = 3
     sync_lr: float = 0.1
+    cosine_mode: str = "standard"  # V9.6.12: "standard", "shifted", or "complex"
+    decay_gamma: float = 1.0  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
 
     # Hybrid-specific parameters
     local_layers: int = 4
@@ -6045,6 +6052,10 @@ class UnifiedTrainingConfig:
     bhava_embed_dim: int = 128
     num_drishti_heads: int = 4
 
+    # V9.6.14: Ontological Hybrid (Two-Tier AGI) parameters
+    state_dim: int = 124  # CognitiveState dimension (44 phonemes + 64 topic + 12 bhava + 4 dynamics)
+    project_per_head_dim: bool = False  # If True, project ΔS to [H, D_h] instead of [H]
+
     # Training hyperparameters
     batch_size: int = 8
     gradient_accumulation: int = 1
@@ -6058,6 +6069,7 @@ class UnifiedTrainingConfig:
     beta2: float = 0.95
     max_grad_norm: float = 1.0
     use_per_layer_clipping: bool = False  # Clip auth/sens layers separately
+    use_8bit_optimizer: bool = False  # Use bitsandbytes 8-bit AdamW (saves ~50% optimizer memory)
 
     # Mixed precision
     mixed_precision: str = "bf16"
@@ -6449,7 +6461,11 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             sync_steps=config.sync_steps,
             sync_lr=config.sync_lr,
             tie_embeddings=tie_emb,
+            cosine_mode=config.cosine_mode,  # V9.6.12: Pass cosine mode
+            decay_gamma=config.decay_gamma,  # V9.6.13: Pass decay factor
         )
+        print(f"  Phase Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
+        print(f"  Phase Decay Gamma: {config.decay_gamma}")  # V9.6.13: Log decay
 
     elif config.model_type == "hybrid":
         # V9.6.0: Untie embeddings when CSR is enabled to prevent vocabulary corruption
@@ -6468,7 +6484,11 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             alpha_local=config.alpha_local,
             alpha_phase=config.alpha_phase,
             tie_embeddings=tie_emb,
+            cosine_mode=config.cosine_mode,  # V9.6.12: Pass cosine mode
+            decay_gamma=config.decay_gamma,  # V9.6.13: Pass decay factor
         )
+        print(f"  Hybrid Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
+        print(f"  Hybrid Decay Gamma: {config.decay_gamma}")  # V9.6.13: Log decay
 
     elif config.model_type == "gen2":
         if not GEN2_AVAILABLE:
@@ -6514,6 +6534,36 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             tie_embeddings=tie_emb,
         )
         print(f"\n  [Standard] O(n²) baseline transformer for comparison")
+
+    elif config.model_type == "ontological_hybrid":
+        # V9.6.14: Two-Tier AGI Architecture (Ontological State Delta + Hybrid)
+        # Ontological: Slow semantic state tracking (System 2)
+        # Hybrid: Fast token generation with intent-modulated attention (System 1)
+        tie_emb = not config.untie_embeddings
+        model = OntologicalHybridTransformer(
+            vocab_size=config.vocab_size,
+            embed_dim=preset["embed_dim"],
+            num_layers=preset["num_layers"],
+            num_heads=preset["num_heads"],
+            ff_dim=preset["ff_dim"],
+            max_seq_len=config.max_seq_len,
+            dropout=config.dropout,
+            local_layers=config.local_layers,
+            window_size=config.window_size,
+            local_backend=config.local_backend,
+            alpha_local=config.alpha_local,
+            alpha_phase=config.alpha_phase,
+            tie_embeddings=tie_emb,
+            cosine_mode=config.cosine_mode,
+            decay_gamma=config.decay_gamma,
+            state_dim=config.state_dim,
+            project_per_head_dim=config.project_per_head_dim,
+        )
+        print(f"\n  [Ontological Hybrid] Two-Tier AGI Architecture enabled")
+        print(f"    State Dimension: {config.state_dim}")
+        print(f"    Project Per Head Dim: {config.project_per_head_dim}")
+        print(f"    Hybrid Cosine Mode: {config.cosine_mode}")
+        print(f"    Hybrid Decay Gamma: {config.decay_gamma}")
 
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
@@ -7219,12 +7269,32 @@ def train(config: UnifiedTrainingConfig):
         print(f"  CSR Hidden State Extractor: ENABLED ({len(hidden_state_extractor.hooks)} hooks registered)")
 
     # Optimizer
-    optimizer = AdamW(
-        model.parameters(),
-        lr=config.learning_rate,
-        weight_decay=config.weight_decay,
-        betas=(config.beta1, config.beta2),
-    )
+    if config.use_8bit_optimizer:
+        try:
+            import bitsandbytes as bnb
+            optimizer = bnb.optim.AdamW8bit(
+                model.parameters(),
+                lr=config.learning_rate,
+                weight_decay=config.weight_decay,
+                betas=(config.beta1, config.beta2),
+            )
+            print(f"  8-bit Optimizer: ENABLED (bitsandbytes AdamW8bit)")
+        except ImportError:
+            print("  WARNING: bitsandbytes not installed, falling back to standard AdamW")
+            print("           Install with: pip install bitsandbytes")
+            optimizer = AdamW(
+                model.parameters(),
+                lr=config.learning_rate,
+                weight_decay=config.weight_decay,
+                betas=(config.beta1, config.beta2),
+            )
+    else:
+        optimizer = AdamW(
+            model.parameters(),
+            lr=config.learning_rate,
+            weight_decay=config.weight_decay,
+            betas=(config.beta1, config.beta2),
+        )
 
     # Scheduler
     scheduler = CosineAnnealingLR(
@@ -8898,8 +8968,8 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid", "gen2", "standard"],
-                       help="Model architecture type (standard = O(n²) baseline for comparison)")
+                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "ontological_hybrid"],
+                       help="Model architecture type (standard = O(n²) baseline, ontological_hybrid = Two-Tier AGI)")
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large"],
                        help="Model size preset")
@@ -8917,6 +8987,8 @@ def main():
                        help="Peak learning rate")
     parser.add_argument("--use_per_layer_clipping", action="store_true",
                        help="Clip authority/sensory gradients separately (respects 9:3 design)")
+    parser.add_argument("--use_8bit_optimizer", action="store_true",
+                       help="Use bitsandbytes 8-bit AdamW (saves ~50%% optimizer memory)")
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext103",
@@ -8952,6 +9024,26 @@ def main():
                        help="Final alpha_phase value after decay")
     parser.add_argument("--alpha_decay_steps", type=int, default=10000,
                        help="Steps over which alpha_phase decays from start to end")
+
+    # V9.6.12: Cosine mode for phase attention
+    parser.add_argument("--cosine_mode", type=str, default="standard",
+                       choices=["standard", "shifted", "complex"],
+                       help="Cosine interaction mode: 'standard' (cos, range [-1,1]), "
+                            "'shifted' (1+cos, range [0,2], no negative cancellation), "
+                            "'complex' (uses both cos and sin for directional asymmetry)")
+
+    # V9.6.13: State decay factor for phase attention
+    parser.add_argument("--decay_gamma", type=float, default=1.0,
+                       help="State decay factor for phase attention (1.0=infinite memory, "
+                            "<1.0=local focus like Mamba/RWKV). "
+                            "Example: 0.9 = ~10 token memory, 0.95 = ~20 token memory")
+
+    # V9.6.14: Ontological Hybrid (Two-Tier AGI) parameters
+    parser.add_argument("--state_dim", type=int, default=124,
+                       help="CognitiveState dimension for ontological_hybrid model "
+                            "(default 124 = 44 phonemes + 64 topic + 12 bhava + 4 dynamics)")
+    parser.add_argument("--project_per_head_dim", action="store_true",
+                       help="Project state delta to [H, D_h] instead of [H] for finer control")
 
     # Ontological-specific
     parser.add_argument("--bhava_lambda", type=float, default=0.1,
@@ -9350,6 +9442,10 @@ def main():
         mixed_precision=args.mixed_precision,
         local_backend=args.local_backend,
         window_size=args.window_size,
+        cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
+        decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
+        state_dim=args.state_dim,  # V9.6.14: Ontological Hybrid state dimension
+        project_per_head_dim=args.project_per_head_dim,  # V9.6.14: Per-head-dim projection
         bhava_lambda=args.bhava_lambda,
         coherence_lambda=args.coherence_lambda,
         log_every=args.log_every,
@@ -9417,6 +9513,7 @@ def main():
         alpha_output_scale=args.alpha_output_scale,
         alpha_reasoning_scale=args.alpha_reasoning_scale,
         use_per_layer_clipping=args.use_per_layer_clipping,
+        use_8bit_optimizer=args.use_8bit_optimizer,
         # Dynamic Relaxation: 9:3 → 6:6 transition
         enable_dynamic_relaxation=args.enable_dynamic_relaxation and not args.disable_dynamic_relaxation,
         relaxation_mode=args.relaxation_mode,

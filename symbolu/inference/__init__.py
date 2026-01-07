@@ -27,13 +27,15 @@ from .guna_inference import InferenceGunas
 from .sovereign_scorer import SovereignInferenceScorer
 from .layer_config import LayerInferenceConfig
 from .checkpoint_utils import load_inference_engine, InferenceCheckpointLoader
-from .manager import InferenceManager
+from .manager import InferenceManager, InferenceMode, InferenceManagerConfig
 
 __all__ = [
     # Core engines
     "EvolutionaryInferenceEngine",
     "CSRInferenceGuard",
     "InferenceManager",
+    "InferenceMode",
+    "InferenceManagerConfig",
 
     # Monitoring
     "InferenceMetacognition",
