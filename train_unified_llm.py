@@ -6066,6 +6066,7 @@ class UnifiedTrainingConfig:
     # Training hyperparameters
     batch_size: int = 8
     gradient_accumulation: int = 1
+    vram_threshold: float = 0.92  # VRAM % to trigger batch reduction (0.92 = 92%)
     max_steps: int = 10000
     warmup_steps: int = 500
 
@@ -7329,14 +7330,14 @@ def train(config: UnifiedTrainingConfig):
     vram_governor = VRAMGovernor(
         initial_batch_size=config.batch_size,
         min_batch_size=4,
-        vram_threshold=0.92,
-        vram_critical=0.97,
+        vram_threshold=config.vram_threshold,
+        vram_critical=min(0.97, config.vram_threshold + 0.05),  # Critical = threshold + 5%
         check_interval=10,
         b1_compensation_rate=0.20,
         enable_accumulation_scaling=True,
         target_effective_batch=config.batch_size,
     )
-    print(f"  VRAM Governor: ENABLED (threshold=92%, compensation=20%)")
+    print(f"  VRAM Governor: ENABLED (threshold={config.vram_threshold:.0%}, compensation=20%)")
 
     # LRA Validator (Long-Range Retrieval Testing)
     lra_validator = None
@@ -9270,6 +9271,8 @@ def main():
                        help="Batch size per GPU")
     parser.add_argument("--gradient_accumulation", type=int, default=1,
                        help="Gradient accumulation steps")
+    parser.add_argument("--vram_threshold", type=float, default=0.92,
+                       help="VRAM usage %% to trigger batch reduction (0.92=92%%, higher=more aggressive)")
     parser.add_argument("--max_steps", type=int, default=10000,
                        help="Maximum training steps")
     parser.add_argument("--learning_rate", type=float, default=3e-4,
@@ -9735,6 +9738,7 @@ def main():
         max_seq_len=args.max_seq_len,
         batch_size=args.batch_size,
         gradient_accumulation=args.gradient_accumulation,
+        vram_threshold=args.vram_threshold,
         max_steps=args.max_steps,
         learning_rate=args.learning_rate,
         dataset=args.dataset,
