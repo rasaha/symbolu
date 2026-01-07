@@ -1,43 +1,48 @@
 #!/usr/bin/env python3
 """
-Memory Efficiency Benchmark: Phase O(n) vs Standard O(n²)
-=========================================================
+Memory Efficiency Benchmark: Hybrid O(n×w) vs Standard O(n²)
+============================================================
 
-Proves that PhaseTransformer (TRUE O(n)) significantly reduces memory consumption
+Proves that HybridPhaseTransformer (O(n×w)) significantly reduces memory consumption
 compared to StandardTransformer (O(n²)), enabling training on consumer GPUs without
 requiring expensive HBM/HBM3E memory.
 
 Model Complexity:
 -----------------
 - StandardTransformer: O(n²) - creates [B, H, N, N] attention matrix
-- PhaseTransformer: O(n) - state accumulation, NO attention matrix
-- HybridTransformer: O(n×w) - local window + phase (w=window size)
+- HybridTransformer: O(n×w) - local window (w) + phase attention
+- PhaseTransformer: O(n) - pure phase, state accumulation only
 
 Key Findings This Script Demonstrates:
 --------------------------------------
-1. StandardTransformer: O(n²) memory scaling - attention matrix explodes
-2. PhaseTransformer: O(n) memory scaling - linear growth
-3. At 8K sequence length, Phase uses ~4x less memory than Standard
-4. At 32K sequence length, Standard OOMs on 24GB VRAM, Phase fits easily
+1. StandardTransformer: O(n²) memory scaling - attention matrix explodes at long seq
+2. HybridTransformer: O(n×w) memory scaling - linear in n, constant in window w
+3. At 8K+ sequence length, Hybrid uses significantly less memory than Standard
+4. At 32K sequence length, Standard OOMs on 24GB VRAM, Hybrid fits
 
-Hardware Implications:
-----------------------
-- StandardTransformer 32K context: Requires 80GB+ HBM3E (A100/H100)
-- PhaseTransformer 32K context: Runs on RTX 4090 (24GB GDDR6X)
+Hybrid Model Features (V9.6.12+):
+---------------------------------
+- cosine_mode: "standard", "shifted", or "complex" phase interaction
+- decay_gamma: State decay factor (1.0=infinite memory, <1.0=local focus)
+- local_layers: Number of early layers with local-only attention
+- window_size: Local attention window size (default 256)
 
 Usage:
 ------
-    # Default: Compare Standard O(n²) vs Phase O(n)
+    # Default: Compare Standard O(n²) vs Hybrid O(n×w)
     python benchmark_memory.py --quick
 
     # Full benchmark (512-32K)
     python benchmark_memory.py --full
 
-    # Include Hybrid O(n×w) in comparison
-    python benchmark_memory.py --models standard,phase,hybrid --full
+    # Test different cosine modes
+    python benchmark_memory.py --cosine_mode shifted --full
 
-    # Custom sequence lengths
-    python benchmark_memory.py --seq_lengths 512,1024,2048,4096,8192
+    # Test with decay gamma for local focus
+    python benchmark_memory.py --decay_gamma 0.95 --full
+
+    # Include Phase O(n) in comparison
+    python benchmark_memory.py --models standard,hybrid,phase --full
 
     # Specific model sizes
     python benchmark_memory.py --model_size medium --full
@@ -84,7 +89,11 @@ class MemoryBenchmarkConfig:
     model_size: str = "small"  # tiny, small, medium, large
     batch_size: int = 1
     seq_lengths: List[int] = field(default_factory=lambda: [512, 1024, 2048, 4096])
-    model_types: List[str] = field(default_factory=lambda: ["standard", "phase"])  # True O(n²) vs O(n)
+    model_types: List[str] = field(default_factory=lambda: ["standard", "hybrid"])  # O(n²) vs O(n×w)
+    # Hybrid model configuration (V9.6.12+)
+    cosine_mode: str = "standard"  # "standard", "shifted", or "complex"
+    decay_gamma: float = 1.0  # State decay (1.0=infinite, <1.0=local focus)
+    window_size: int = 256  # Local attention window
     num_warmup: int = 2
     num_runs: int = 3
     include_backward: bool = True  # Measure training memory (forward + backward)
@@ -171,8 +180,15 @@ def get_memory_stats() -> Dict[str, float]:
     }
 
 
-def create_model(model_type: str, preset: dict, max_seq_len: int) -> nn.Module:
-    """Create model of specified type."""
+def create_model(
+    model_type: str,
+    preset: dict,
+    max_seq_len: int,
+    cosine_mode: str = "standard",
+    decay_gamma: float = 1.0,
+    window_size: int = 256,
+) -> nn.Module:
+    """Create model of specified type with Hybrid configuration."""
     common_args = {
         "vocab_size": 50257,
         "embed_dim": preset["embed_dim"],
@@ -186,27 +202,36 @@ def create_model(model_type: str, preset: dict, max_seq_len: int) -> nn.Module:
     if model_type == "standard":
         return StandardTransformer(**common_args)
     elif model_type == "hybrid":
+        # Production Hybrid with V9.6.12+ features
         return HybridPhaseTransformer(
             **common_args,
             local_layers=min(4, preset["num_layers"] // 3),
-            window_size=256,
+            window_size=window_size,
             local_backend="sdpa",  # Use SDPA for better memory (flash if available)
             alpha_local=0.8,
             alpha_phase=0.2,
+            cosine_mode=cosine_mode,  # V9.6.12
+            decay_gamma=decay_gamma,  # V9.6.13
         )
     elif model_type == "hybrid_unfold":
         # Hybrid with unfold backend (fallback, higher memory)
         return HybridPhaseTransformer(
             **common_args,
             local_layers=min(4, preset["num_layers"] // 3),
-            window_size=256,
+            window_size=window_size,
             local_backend="unfold",
             alpha_local=0.8,
             alpha_phase=0.2,
+            cosine_mode=cosine_mode,
+            decay_gamma=decay_gamma,
         )
     elif model_type == "phase":
         # Pure Phase attention - TRUE O(n) memory, no attention matrix
-        return PhaseTransformer(**common_args)
+        return PhaseTransformer(
+            **common_args,
+            cosine_mode=cosine_mode,
+            decay_gamma=decay_gamma,
+        )
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
@@ -220,6 +245,10 @@ def measure_memory(
     num_warmup: int = 2,
     num_runs: int = 3,
     device: torch.device = None,
+    # Hybrid configuration (V9.6.12+)
+    cosine_mode: str = "standard",
+    decay_gamma: float = 1.0,
+    window_size: int = 256,
 ) -> MemoryResult:
     """
     Measure memory usage for a specific model configuration.
@@ -233,6 +262,9 @@ def measure_memory(
         num_warmup: Warmup iterations
         num_runs: Measurement iterations
         device: Device to use
+        cosine_mode: Phase cosine mode ("standard", "shifted", "complex")
+        decay_gamma: State decay factor (1.0=infinite, <1.0=local focus)
+        window_size: Local attention window size
 
     Returns:
         MemoryResult with all metrics
@@ -258,8 +290,13 @@ def measure_memory(
         # Clear memory before measurement
         clear_memory()
 
-        # Create model
-        model = create_model(model_type, preset, seq_length)
+        # Create model with Hybrid configuration
+        model = create_model(
+            model_type, preset, seq_length,
+            cosine_mode=cosine_mode,
+            decay_gamma=decay_gamma,
+            window_size=window_size,
+        )
         model = model.to(device)
         model.train()
 
@@ -378,11 +415,14 @@ def run_benchmark(config: MemoryBenchmarkConfig) -> Dict[str, List[MemoryResult]
     preset = MODEL_PRESETS[config.model_size]
     print(f"\n  Model Config: {preset['embed_dim']}d, {preset['num_layers']}L, {preset['num_heads']}H")
 
+    # Hybrid configuration (V9.6.12+)
+    print(f"  Hybrid Config: cosine_mode={config.cosine_mode}, decay_gamma={config.decay_gamma}, window={config.window_size}")
+
     # Model types to compare
-    # "phase" = Pure Phase attention O(n) - best memory efficiency
     # "standard" = Traditional O(n²) attention - baseline
-    # "hybrid" = Local + Phase attention - production quality
-    model_types = config.model_types if hasattr(config, 'model_types') and config.model_types else ["standard", "phase", "hybrid"]
+    # "hybrid" = Local + Phase attention O(n×w) - production quality
+    # "phase" = Pure Phase attention O(n) - best memory efficiency
+    model_types = config.model_types if hasattr(config, 'model_types') and config.model_types else ["standard", "hybrid"]
 
     print(f"  Models: {', '.join(model_types)}")
 
@@ -408,6 +448,10 @@ def run_benchmark(config: MemoryBenchmarkConfig) -> Dict[str, List[MemoryResult]
                 num_warmup=config.num_warmup,
                 num_runs=config.num_runs,
                 device=device,
+                # Hybrid configuration (V9.6.12+)
+                cosine_mode=config.cosine_mode,
+                decay_gamma=config.decay_gamma,
+                window_size=config.window_size,
             )
 
             results[model_type].append(result)
@@ -752,22 +796,24 @@ def save_results(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Memory Efficiency Benchmark: Hybrid vs Standard Transformer",
+        description="Memory Efficiency Benchmark: Hybrid O(n×w) vs Standard O(n²)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python benchmark_memory.py --quick                    # Fast test (512-4K)
-  python benchmark_memory.py --full                     # Full test (512-32K)
-  python benchmark_memory.py --model_size large --full  # Large model test
-  python benchmark_memory.py --seq_lengths 1024,4096,16384
+  python benchmark_memory.py --quick                       # Fast test (512-4K)
+  python benchmark_memory.py --full                        # Full test (512-32K)
+  python benchmark_memory.py --model_size medium --full    # Medium model test
+  python benchmark_memory.py --cosine_mode shifted --full  # Test shifted cosine
+  python benchmark_memory.py --decay_gamma 0.95 --full     # Test with decay
+  python benchmark_memory.py --models standard,hybrid,phase --full  # All models
         """,
     )
 
     parser.add_argument("--model_size", type=str, default="small",
                         choices=["tiny", "small", "medium", "large", "xl"],
                         help="Model size preset")
-    parser.add_argument("--models", type=str, default="standard,phase",
-                        help="Comma-separated model types: standard (O(n²)), phase (O(n)), hybrid (O(n×w))")
+    parser.add_argument("--models", type=str, default="standard,hybrid",
+                        help="Comma-separated model types: standard (O(n²)), hybrid (O(n×w)), phase (O(n))")
     parser.add_argument("--batch_size", type=int, default=1,
                         help="Batch size for testing")
     parser.add_argument("--seq_lengths", type=str, default=None,
@@ -782,6 +828,15 @@ Examples:
                         help="Output file for results (JSON)")
     parser.add_argument("--verbose", action="store_true",
                         help="Verbose output")
+
+    # Hybrid configuration (V9.6.12+)
+    parser.add_argument("--cosine_mode", type=str, default="standard",
+                        choices=["standard", "shifted", "complex"],
+                        help="Phase cosine interaction mode")
+    parser.add_argument("--decay_gamma", type=float, default=1.0,
+                        help="State decay factor (1.0=infinite, <1.0=local focus)")
+    parser.add_argument("--window_size", type=int, default=256,
+                        help="Local attention window size")
 
     args = parser.parse_args()
 
@@ -803,6 +858,10 @@ Examples:
         batch_size=args.batch_size,
         seq_lengths=seq_lengths,
         model_types=model_types,
+        # Hybrid configuration (V9.6.12+)
+        cosine_mode=args.cosine_mode,
+        decay_gamma=args.decay_gamma,
+        window_size=args.window_size,
         include_backward=not args.no_backward,
         output_file=args.output,
         verbose=args.verbose,

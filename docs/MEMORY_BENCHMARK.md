@@ -4,17 +4,17 @@
 
 This document describes the `benchmark_memory.py` script that compares memory consumption across different transformer architectures during training.
 
-**Primary Comparison**: Standard O(n²) vs Phase O(n) - proves consumer GPU viability.
+**Primary Comparison**: Standard O(n²) vs Hybrid O(n×w) - proves consumer GPU viability for production LLMs.
 
 ## Architecture Comparison
 
 | Model | Attention Type | Memory Complexity | Best For |
 |-------|---------------|-------------------|----------|
 | **StandardTransformer** | Full attention | **O(n²)** - creates [B, H, N, N] matrix | Baseline comparison |
-| **PhaseTransformer** | Phase attention | **O(n)** - state accumulation only | Maximum memory efficiency |
 | **HybridPhaseTransformer** | Local + Phase | **O(n×w)** - window size w | Production quality + efficiency |
+| **PhaseTransformer** | Phase attention | **O(n)** - state accumulation only | Maximum memory efficiency |
 
-> **Note**: The default comparison is Standard vs Phase to demonstrate TRUE O(n²) vs O(n) scaling.
+> **Note**: The default comparison is Standard vs Hybrid for production-quality benchmarking.
 
 ## Memory Scaling
 
@@ -39,7 +39,7 @@ Example at 8K tokens, 12 heads, 64 head_dim:
 ### Basic Usage
 
 ```bash
-# Quick test (512-4K tokens)
+# Default: Compare Standard O(n²) vs Hybrid O(n×w)
 python benchmark_memory.py --quick
 
 # Full test (512-32K tokens)
@@ -49,12 +49,29 @@ python benchmark_memory.py --full
 python benchmark_memory.py --seq_lengths 1024,4096,8192,16384
 ```
 
-### Advanced Options
+### Hybrid Configuration (V9.6.12+)
+
+```bash
+# Test different cosine modes
+python benchmark_memory.py --cosine_mode standard --full   # Default
+python benchmark_memory.py --cosine_mode shifted --full    # No negative interference
+python benchmark_memory.py --cosine_mode complex --full    # Full cos+sin
+
+# Test with decay gamma for local focus
+python benchmark_memory.py --decay_gamma 0.95 --full       # ~20 token memory
+python benchmark_memory.py --decay_gamma 0.9 --full        # ~10 token memory
+
+# Adjust local attention window
+python benchmark_memory.py --window_size 512 --full        # Larger window
+```
+
+### Model Selection
 
 ```bash
 # Compare specific models
-python benchmark_memory.py --models standard,phase
-python benchmark_memory.py --models standard,phase,hybrid
+python benchmark_memory.py --models standard,hybrid        # Default (production)
+python benchmark_memory.py --models standard,phase         # True O(n²) vs O(n)
+python benchmark_memory.py --models standard,hybrid,phase  # All three
 
 # Different model sizes
 python benchmark_memory.py --model_size tiny    # 256d, 4L, 4H
