@@ -18,6 +18,7 @@ Memory Savings with 8-bit Optimizer:
 
 Key Features:
 - HybridPhaseTransformer 7B (32 layers, 16:16 split)
+- Grouped Query Attention (GQA): 8 KV heads = 4x KV memory savings
 - FineWeb dataset streaming from HuggingFace
 - Mixed precision (BF16) training
 - 8-bit AdamW optimizer (bitsandbytes)
@@ -91,6 +92,7 @@ class TrainingConfig:
     embed_dim: int = 4096
     num_layers: int = 32
     num_heads: int = 32
+    n_kv_heads: int = 8  # GQA: 8 KV heads (Mistral-style) = 4x KV memory savings
     ff_dim: int = 11008  # LLaMA style: 2.7x embed_dim
     max_seq_len: int = 1024
     dropout: float = 0.0
@@ -228,12 +230,13 @@ def create_dataloader(config: TrainingConfig, tokenizer, world_size: int = 1, ra
 # =============================================================================
 
 def create_model(config: TrainingConfig) -> nn.Module:
-    """Create HybridPhaseTransformer 7B model."""
+    """Create HybridPhaseTransformer 7B model with GQA."""
     model = HybridPhaseTransformer(
         vocab_size=config.vocab_size,
         embed_dim=config.embed_dim,
         num_layers=config.num_layers,
         num_heads=config.num_heads,
+        n_kv_heads=config.n_kv_heads,  # GQA: fewer KV heads for memory efficiency
         ff_dim=config.ff_dim,
         max_seq_len=config.max_seq_len,
         dropout=config.dropout,
@@ -444,6 +447,7 @@ def train(config: TrainingConfig):
     if is_main:
         print(f"  Parameters: {num_params:,} ({num_params/1e9:.2f}B)")
         print(f"  Layer Split: {config.local_layers}:{config.num_layers - config.local_layers}")
+        print(f"  GQA: {config.num_heads} Q heads / {config.n_kv_heads} KV heads ({config.num_heads // config.n_kv_heads}x KV savings)")
         print(f"  Cosine Mode: {config.cosine_mode}")
         print(f"  Decay Gamma: {config.decay_gamma}")
 
@@ -665,6 +669,8 @@ def main():
     parser.add_argument("--embed_dim", type=int, default=4096)
     parser.add_argument("--num_layers", type=int, default=32)
     parser.add_argument("--num_heads", type=int, default=32)
+    parser.add_argument("--n_kv_heads", type=int, default=8,
+                        help="GQA: Number of KV heads (8 = Mistral-style, 32 = full MHA)")
     parser.add_argument("--ff_dim", type=int, default=11008)
     parser.add_argument("--max_seq_len", type=int, default=1024)
 
@@ -712,6 +718,7 @@ def main():
         embed_dim=args.embed_dim,
         num_layers=args.num_layers,
         num_heads=args.num_heads,
+        n_kv_heads=args.n_kv_heads,
         ff_dim=args.ff_dim,
         max_seq_len=args.max_seq_len,
         local_layers=args.local_layers,

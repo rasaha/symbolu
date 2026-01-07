@@ -867,6 +867,11 @@ class LocalAttention(nn.Module):
 
     Complexity: O(n * window_size) instead of O(n²)
 
+    Supports Grouped Query Attention (GQA) via n_kv_heads parameter:
+    - n_kv_heads = num_heads: Standard MHA (default)
+    - n_kv_heads < num_heads: GQA (e.g., 8 KV heads for 32 Q heads = 4x KV memory savings)
+    - n_kv_heads = 1: Multi-Query Attention (MQA)
+
     Backends:
     - 'flash': FlashAttention with sliding window (fastest, requires flash-attn)
     - 'sdpa': PyTorch 2.0 SDPA (good performance, built-in)
@@ -877,6 +882,7 @@ class LocalAttention(nn.Module):
         self,
         embed_dim: int,
         num_heads: int,
+        n_kv_heads: Optional[int] = None,  # GQA: Number of KV heads (default = num_heads)
         window_size: int = 256,
         dropout: float = 0.1,
         backend: str = 'auto',  # 'auto', 'flash', 'sdpa', 'unfold'
@@ -884,14 +890,22 @@ class LocalAttention(nn.Module):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
+        self.n_kv_heads = n_kv_heads if n_kv_heads is not None else num_heads
         self.head_dim = embed_dim // num_heads
         self.window_size = window_size
         self.scale = self.head_dim ** -0.5
         self.dropout_p = dropout
 
+        # GQA: Number of times to repeat KV heads
+        assert num_heads % self.n_kv_heads == 0, f"num_heads ({num_heads}) must be divisible by n_kv_heads ({self.n_kv_heads})"
+        self.n_rep = num_heads // self.n_kv_heads
+        self.kv_dim = self.n_kv_heads * self.head_dim
+
+        # Q projection: full embed_dim
         self.q_proj = nn.Linear(embed_dim, embed_dim)
-        self.k_proj = nn.Linear(embed_dim, embed_dim)
-        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        # K, V projections: reduced for GQA
+        self.k_proj = nn.Linear(embed_dim, self.kv_dim)
+        self.v_proj = nn.Linear(embed_dim, self.kv_dim)
         self.out_proj = nn.Linear(embed_dim, embed_dim)
 
         self.dropout = nn.Dropout(dropout)
@@ -1062,9 +1076,19 @@ class LocalAttention(nn.Module):
 
         return torch.cat(outputs, dim=2)
 
+    def _repeat_kv(self, x: torch.Tensor) -> torch.Tensor:
+        """Repeat KV heads to match Q heads for GQA."""
+        if self.n_rep == 1:
+            return x
+        B, H, N, D = x.shape
+        # (B, n_kv_heads, N, head_dim) -> (B, num_heads, N, head_dim)
+        return x.repeat_interleave(self.n_rep, dim=1)
+
     def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
         """
         Local attention with sliding window - O(n × window_size) complexity.
+
+        Supports GQA: K and V have fewer heads than Q, expanded via repeat_interleave.
 
         Automatically selects best available backend:
         1. FlashAttention (if available) - fastest, true O(n×w) kernel
@@ -1074,10 +1098,16 @@ class LocalAttention(nn.Module):
         B, N, D = x.shape
         residual = x
 
+        # Q: (B, N, num_heads, head_dim) -> (B, num_heads, N, head_dim)
         Q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
-        K = self.k_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
-        V = self.v_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
-        # Q, K, V: (B, H, N, head_dim)
+
+        # K, V: (B, N, n_kv_heads, head_dim) -> (B, n_kv_heads, N, head_dim)
+        K = self.k_proj(x).view(B, N, self.n_kv_heads, self.head_dim).transpose(1, 2)
+        V = self.v_proj(x).view(B, N, self.n_kv_heads, self.head_dim).transpose(1, 2)
+
+        # GQA: Expand K, V to match Q heads
+        K = self._repeat_kv(K)  # (B, num_heads, N, head_dim)
+        V = self._repeat_kv(V)  # (B, num_heads, N, head_dim)
 
         # Select backend
         if self.backend == 'flash' and FLASH_ATTN_AVAILABLE:
@@ -1471,6 +1501,8 @@ class HybridAttentionLayer(nn.Module):
     - Local: Quickly learns syntax, grammar, local patterns
     - Phase: Handles long-range dependencies efficiently O(n)
 
+    Supports Grouped Query Attention (GQA) via n_kv_heads parameter for memory efficiency.
+
     Previous parallel approach (α_local * LocalAttn(x) + α_phase * PhaseAttn(x))
     required 2x memory. Sequential approach processes one at a time.
     """
@@ -1479,6 +1511,7 @@ class HybridAttentionLayer(nn.Module):
         self,
         embed_dim: int,
         num_heads: int,
+        n_kv_heads: Optional[int] = None,  # GQA: Number of KV heads (default = num_heads)
         window_size: int = 256,
         dropout: float = 0.1,
         sync_steps: int = 3,
@@ -1498,6 +1531,7 @@ class HybridAttentionLayer(nn.Module):
         self.local_attn = LocalAttention(
             embed_dim=embed_dim,
             num_heads=num_heads,
+            n_kv_heads=n_kv_heads,  # GQA support
             window_size=window_size,
             dropout=dropout,
             backend=local_backend,
@@ -1576,11 +1610,13 @@ class HybridTransformerBlock(nn.Module):
         local_backend: str = 'auto',
         alpha_local: float = 0.8,
         alpha_phase: float = 0.2,
+        n_kv_heads: Optional[int] = None,  # GQA: Number of KV heads
     ):
         super().__init__()
         self.attention = HybridAttentionLayer(
             embed_dim=config.embed_dim,
             num_heads=config.num_heads,
+            n_kv_heads=n_kv_heads,  # GQA support
             window_size=window_size,
             dropout=config.dropout,
             sync_steps=config.sync_steps,
@@ -1612,11 +1648,18 @@ class HybridTransformerBlock(nn.Module):
 class LocalTransformerBlock(nn.Module):
     """Transformer block with local attention only (for early layers)."""
 
-    def __init__(self, config: TransformerConfig, window_size: int = 256, backend: str = 'auto'):
+    def __init__(
+        self,
+        config: TransformerConfig,
+        window_size: int = 256,
+        backend: str = 'auto',
+        n_kv_heads: Optional[int] = None,  # GQA: Number of KV heads
+    ):
         super().__init__()
         self.attention = LocalAttention(
             embed_dim=config.embed_dim,
             num_heads=config.num_heads,
+            n_kv_heads=n_kv_heads,
             window_size=window_size,
             dropout=config.dropout,
             backend=backend,
@@ -1966,10 +2009,16 @@ class HybridPhaseTransformer(nn.Module):
     - Early layers (1 to local_layers): Local attention only
     - Later layers: Hybrid (Local + Phase) attention
 
+    Supports Grouped Query Attention (GQA) via n_kv_heads parameter:
+    - n_kv_heads = num_heads: Standard MHA (default)
+    - n_kv_heads = 8: Mistral-style GQA (4x KV memory savings for 32 heads)
+    - n_kv_heads = 1: Multi-Query Attention (MQA)
+
     This enables:
     - Fast learning of local patterns (syntax, grammar)
     - Efficient global context via Phase attention O(n)
     - Better PPL convergence than pure Phase attention
+    - Memory-efficient KV cache with GQA
     """
 
     def __init__(
@@ -1978,6 +2027,7 @@ class HybridPhaseTransformer(nn.Module):
         embed_dim: int = 768,
         num_layers: int = 12,
         num_heads: int = 12,
+        n_kv_heads: Optional[int] = None,  # GQA: Number of KV heads (default = num_heads)
         ff_dim: Optional[int] = None,
         max_seq_len: int = 8192,
         dropout: float = 0.1,
@@ -2014,6 +2064,7 @@ class HybridPhaseTransformer(nn.Module):
         self.local_layers = local_layers
         self.local_backend = local_backend
         self.tie_embeddings = tie_embeddings
+        self.n_kv_heads = n_kv_heads  # Store for reference
 
         # Embeddings
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
@@ -2026,7 +2077,8 @@ class HybridPhaseTransformer(nn.Module):
             if i < local_layers:
                 # Early layers: Local attention only (fast pattern learning)
                 self.blocks.append(LocalTransformerBlock(
-                    config, window_size=window_size, backend=local_backend))
+                    config, window_size=window_size, backend=local_backend,
+                    n_kv_heads=n_kv_heads))  # GQA support
             else:
                 # Later layers: Hybrid Local + Phase attention
                 self.blocks.append(HybridTransformerBlock(
@@ -2035,6 +2087,7 @@ class HybridPhaseTransformer(nn.Module):
                     local_backend=local_backend,
                     alpha_local=alpha_local,
                     alpha_phase=alpha_phase,
+                    n_kv_heads=n_kv_heads,  # GQA support
                 ))
 
         # Output
