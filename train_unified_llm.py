@@ -7252,8 +7252,13 @@ def train(config: UnifiedTrainingConfig):
         # This ensures CMUdict and g2p_en are ready (should already be loaded by now)
         if csr_wait_preload is not None:
             csr_wait_preload(timeout=30.0)
+        # Get correct d_model from model config or preset
+        preset = MODEL_PRESETS[config.model_size]
+        csr_d_model = preset['embed_dim']
+        if hasattr(model, 'config') and hasattr(model.config, 'd_model'):
+            csr_d_model = model.config.d_model
         csr_provider, csr_entropy_sink, csr_synthesis_gate = create_csr_for_training(
-            model_config=model.config if hasattr(model, 'config') else type('Config', (), {'d_model': 512})(),
+            model_config=type('Config', (), {'d_model': csr_d_model})(),
             tokenizer=tokenizer,
             lambda_csr=config.csr_lambda,
             use_phase_gating=config.csr_use_phase_gating,
