@@ -259,6 +259,43 @@ def count_parameters(model: nn.Module) -> int:
 
 
 @torch.no_grad()
+def compute_val_ppl(model, val_dataloader, device, config, num_batches=10):
+    """Compute validation perplexity on a few batches."""
+    model.eval()
+    total_loss = 0.0
+    total_tokens = 0
+
+    val_iter = iter(val_dataloader)
+    for _ in range(num_batches):
+        try:
+            batch = next(val_iter)
+        except StopIteration:
+            val_iter = iter(val_dataloader)
+            batch = next(val_iter)
+
+        input_ids = batch["input_ids"].to(device)
+        labels = batch["labels"].to(device)
+
+        with autocast('cuda', enabled=config.use_mixed_precision, dtype=torch.bfloat16):
+            output = model(input_ids)
+            logits = output["logits"] if isinstance(output, dict) else output
+            loss = F.cross_entropy(
+                logits.view(-1, config.vocab_size),
+                labels.view(-1),
+                ignore_index=-100,
+            )
+
+        total_loss += loss.item() * input_ids.numel()
+        total_tokens += input_ids.numel()
+
+    avg_loss = total_loss / total_tokens if total_tokens > 0 else 0
+    val_ppl = math.exp(min(avg_loss, 20))
+
+    model.train()
+    return val_ppl, avg_loss
+
+
+@torch.no_grad()
 def generate_samples(model, tokenizer, device, config, step, num_samples=3, max_new_tokens=50):
     """Generate text samples to monitor training quality."""
     model.eval()
@@ -442,9 +479,12 @@ def train(config: TrainingConfig):
     # BF16 has same exponent range as FP32, so no loss scaling needed
     scaler = None  # BF16 doesn't need GradScaler
 
-    # Dataloader
+    # Dataloader (train)
     dataloader = create_dataloader(config, tokenizer, world_size, rank)
     data_iter = iter(dataloader)
+
+    # Validation dataloader (separate stream for val PPL)
+    val_dataloader = create_dataloader(config, tokenizer, world_size, rank)  # Uses same streaming, different iterator
 
     # Initialize wandb
     if is_main and HAS_WANDB and config.wandb_project:
@@ -552,8 +592,18 @@ def train(config: TrainingConfig):
             total_tokens = 0
             start_time = time.time()
 
-        # Generate samples periodically
+        # Compute validation PPL and generate samples periodically
         if step % config.sample_interval == 0 and is_main:
+            val_ppl, val_loss = compute_val_ppl(model, val_dataloader, device, config)
+            print(f"\n  VAL PPL: {val_ppl:.2f} | VAL Loss: {val_loss:.4f}")
+
+            if HAS_WANDB and config.wandb_project:
+                wandb.log({
+                    "val_ppl": val_ppl,
+                    "val_loss": val_loss,
+                    "step": step,
+                })
+
             generate_samples(model, tokenizer, device, config, step)
 
         # Save checkpoint
