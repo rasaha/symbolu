@@ -9194,12 +9194,26 @@ def load_checkpoint(
 
     # Restore RNG states for reproducibility
     if "rng_state" in checkpoint:
-        torch.set_rng_state(checkpoint["rng_state"])
-        print(f"    ✓ RNG state restored")
+        try:
+            rng_state = checkpoint["rng_state"]
+            # Ensure RNG state is ByteTensor on CPU
+            if not isinstance(rng_state, torch.ByteTensor):
+                rng_state = rng_state.to(dtype=torch.uint8, device='cpu')
+            torch.set_rng_state(rng_state)
+            print(f"    ✓ RNG state restored")
+        except Exception as e:
+            print(f"    ⚠ RNG state restoration failed: {e} (continuing without)")
 
     if "cuda_rng_state" in checkpoint and torch.cuda.is_available():
-        torch.cuda.set_rng_state(checkpoint["cuda_rng_state"])
-        print(f"    ✓ CUDA RNG state restored")
+        try:
+            cuda_rng_state = checkpoint["cuda_rng_state"]
+            # Ensure CUDA RNG state is ByteTensor
+            if not isinstance(cuda_rng_state, torch.ByteTensor):
+                cuda_rng_state = cuda_rng_state.to(dtype=torch.uint8)
+            torch.cuda.set_rng_state(cuda_rng_state)
+            print(f"    ✓ CUDA RNG state restored")
+        except Exception as e:
+            print(f"    ⚠ CUDA RNG state restoration failed: {e} (continuing without)")
 
     # Return additional state for HGS/DRC restoration
     if "hgs_state" in checkpoint:
