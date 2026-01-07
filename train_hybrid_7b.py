@@ -5,12 +5,16 @@ Hybrid 7B Training Script for FineWeb Dataset
 
 Optimized for NVIDIA A100 80GB with HybridPhaseTransformer.
 
-Memory Budget (A100 80GB, Mixed Precision):
+Memory Budget (A100 80GB, BF16 Mixed Precision, seq_len=1024):
 - Model weights (BF16): ~14GB
-- Optimizer states (FP32): ~28GB
+- Optimizer states (FP32 Adam): ~28GB (2x model for momentum buffers)
 - Gradients (BF16): ~14GB
-- Activations: ~20GB (with gradient checkpointing)
-- Total: ~76GB -> Batch size 2-4 safe
+- Activations (batch=1, checkpointed): ~20GB
+- Total: ~76GB -> Batch size 1 ONLY on single A100 80GB
+
+Benchmark Results (A100 80GB):
+- Batch=1, seq=1024: ~55GB (Hybrid) - FITS
+- Batch=2, seq=1024: ~78GB+ - OOM with optimizer states
 
 Key Features:
 - HybridPhaseTransformer 7B (32 layers, 16:16 split)
@@ -22,11 +26,14 @@ Key Features:
 - Distributed training ready (DDP)
 
 Usage:
-    # Single GPU
-    python train_hybrid_7b.py --batch_size 2 --gradient_accumulation 8
+    # Single A100 80GB (batch=1 required)
+    python train_hybrid_7b.py --batch_size 1 --gradient_accumulation 16
 
-    # Multi-GPU (4x A100)
-    torchrun --nproc_per_node=4 train_hybrid_7b.py --batch_size 2 --gradient_accumulation 2
+    # Multi-GPU (4x A100) - can use batch=2 per GPU
+    torchrun --nproc_per_node=4 train_hybrid_7b.py --batch_size 2 --gradient_accumulation 4
+
+    # H100/H200 (more VRAM) - can use batch=2
+    python train_hybrid_7b.py --batch_size 2 --gradient_accumulation 8
 
 Author: Sovereign-1 Training Initiative
 Date: January 2026
@@ -46,7 +53,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, IterableDataset
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast, GradScaler
 
 # Optional: Distributed training
 try:
@@ -93,8 +100,8 @@ class TrainingConfig:
     alpha_phase: float = 0.2
 
     # Training hyperparameters
-    batch_size: int = 2  # Per-GPU batch size
-    gradient_accumulation: int = 8  # Effective batch = 2 * 8 = 16
+    batch_size: int = 1  # Per-GPU batch size (1 for A100 80GB with 7B)
+    gradient_accumulation: int = 16  # Effective batch = 1 * 16 = 16
     learning_rate: float = 3e-4
     min_learning_rate: float = 3e-5
     weight_decay: float = 0.1
@@ -353,7 +360,7 @@ def train(config: TrainingConfig):
     )
 
     # Mixed precision
-    scaler = GradScaler() if config.use_mixed_precision else None
+    scaler = GradScaler('cuda') if config.use_mixed_precision else None
 
     # Dataloader
     dataloader = create_dataloader(config, tokenizer, world_size, rank)
@@ -400,7 +407,7 @@ def train(config: TrainingConfig):
             labels = batch["labels"].to(device)
 
             # Forward pass with mixed precision
-            with autocast(enabled=config.use_mixed_precision, dtype=torch.bfloat16):
+            with autocast('cuda', enabled=config.use_mixed_precision, dtype=torch.bfloat16):
                 output = model(input_ids)
                 logits = output["logits"] if isinstance(output, dict) else output
 
