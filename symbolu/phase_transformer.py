@@ -182,8 +182,10 @@ class IntentPhaseProjector(nn.Module):
                 B = delta_S.shape[0]
                 theta = theta.view(B, self.num_heads, actual_head_dim)
             else:
-                B, T, _ = delta_S.shape
-                theta = theta.view(B, T, self.num_heads, actual_head_dim)
+                # Use -1 to dynamically infer sequence length from tensor elements
+                # This handles cases where the sequence length changes during generation
+                B = delta_S.shape[0]
+                theta = theta.view(B, -1, self.num_heads, actual_head_dim)
 
         # Scale to reasonable phase range (tanh → [-1, 1] → [-π, π])
         theta = torch.tanh(theta) * 3.14159
