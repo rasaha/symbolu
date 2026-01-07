@@ -2439,7 +2439,12 @@ class OntologicalHybridTransformer(nn.Module):
         state = self.state_projector(pooled)  # [B, state_dim]
 
         # Compute delta
-        if reset_state or self.prev_state is None:
+        # Also reset if batch size changed (e.g., VRAM governor resize)
+        batch_size_changed = (
+            self.prev_state is not None and
+            self.prev_state.shape[0] != state.shape[0]
+        )
+        if reset_state or self.prev_state is None or batch_size_changed:
             delta_S = torch.zeros_like(state)
         else:
             delta_S = state - self.prev_state
