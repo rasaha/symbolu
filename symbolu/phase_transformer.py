@@ -2413,7 +2413,8 @@ class OntologicalHybridTransformer(nn.Module):
         self.embed_dim = embed_dim
 
         # Previous state for delta computation (will be set during forward)
-        self.register_buffer('prev_state', None)
+        # persistent=False excludes from state_dict (runtime state, not trained weights)
+        self.register_buffer('prev_state', None, persistent=False)
 
     def compute_state_delta(
         self,
