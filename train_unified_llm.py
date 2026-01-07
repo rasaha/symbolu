@@ -1593,6 +1593,12 @@ class EvolutionaryIntelligenceEngine:
             o12_prev = self.resonance_buffer[11]  # Previous O12 state
             o1_current = current_states[0]  # Current O1 state
 
+            # Check for batch size mismatch (e.g., VRAM governor resize)
+            if o12_prev.shape[0] != o1_current.shape[0]:
+                # Clear buffer and skip resonance this step
+                self.resonance_buffer = None
+                return current_states
+
             # Ensure shape compatibility
             if o12_prev.shape == o1_current.shape:
                 # Resonant injection: O1' = O1 + α * O12_prev (using dynamic alpha)
