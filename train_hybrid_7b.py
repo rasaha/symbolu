@@ -393,8 +393,9 @@ def train(config: TrainingConfig):
             weight_decay=config.weight_decay,
         )
 
-    # Mixed precision
-    scaler = GradScaler('cuda') if config.use_mixed_precision else None
+    # Mixed precision - GradScaler only needed for FP16, not BF16
+    # BF16 has same exponent range as FP32, so no loss scaling needed
+    scaler = None  # BF16 doesn't need GradScaler
 
     # Dataloader
     dataloader = create_dataloader(config, tokenizer, world_size, rank)
