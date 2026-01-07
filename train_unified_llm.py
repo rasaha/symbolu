@@ -6293,17 +6293,11 @@ class UnifiedTrainingConfig:
     # Quality Sampling
     sample_every: int = 50  # Generate samples every N steps (0 = disabled)
     sample_prompts: tuple = (
-        # Original open-ended prompts
-        "The history of the Roman Empire began when",
-        "In computer science, algorithms are",
-        # Targeted probes for factual continuity (ChatGPT recommendation)
-        "The Roman Empire began when Julius Caesar",
-        "An algorithm is a step-by-step procedure that",
-        # Syntax closure probes
-        "A triangle has three sides, therefore",
-        "If A implies B and A is true, then",
-        # Causal reasoning probe
-        "Water boils at 100 degrees Celsius because",
+        "The Roman Empire began when Julius Caesar",  # Baseline
+        "Water boils at 100 degrees Celsius, but at high altitudes,",  # Pivot/Contrast
+        "To solve for x in the equation 2x + 6 = 10, the first step is to",  # Logic
+        "The three primary colors are red, blue, and yellow. If we mix the first two, we get",  # Memory/Reference
+        "The primary difference between a stack and a queue is that",  # Definitions (FineWeb)
     )
 
     # LRA Validation (Long-Range Retrieval)
