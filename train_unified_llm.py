@@ -6094,6 +6094,7 @@ class UnifiedTrainingConfig:
     dataset_name: str = "HuggingFaceFW/fineweb"  # HuggingFace dataset name (for fineweb mode)
     dataset_subset: str = "sample-10BT"  # Dataset subset/config
     cache_val_batches: int = 20  # Pre-cache N validation batches (for streaming datasets)
+    cache_dataset: bool = False  # Download and cache dataset locally (vs streaming)
     tokenizer: str = "gpt2"
 
     # Loss weights for ontological model
@@ -6247,8 +6248,8 @@ class UnifiedTrainingConfig:
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
     # V9.6.8: Updated defaults per Gemini recommendation (stronger cement, less frequent)
     enable_sgp: bool = True                  # Enable SGP synchronized with Sattvic Controller
-    sgp_base_rate: int = 50                  # Base SGP rate (Toroidal Refresh Rate) - was 25
-    sgp_stagnation_rate: int = 25            # Rate when stagnation detected - was 12
+    sgp_base_rate: int = 200                 # Base SGP rate (Toroidal Refresh Rate) - every 200 steps
+    sgp_stagnation_rate: int = 100           # Rate when stagnation detected - halved from base
     sgp_gamma: float = 0.5                   # Persistence coefficient - was 0.3 (stronger cement)
 
     # Sattvic Controller (Dynamic λ_csr regulation)
@@ -6376,6 +6377,11 @@ class FineWebStreamingDataset(IterableDataset):
     - HuggingFaceFW/fineweb (CC-based web text)
     - HuggingFaceFW/fineweb-edu (educational content)
     - Any streaming-compatible HuggingFace dataset
+
+    Args:
+        cache_dataset: If True, download and cache dataset locally (slower first run,
+                       faster subsequent runs, no network required). If False, stream
+                       data on-the-fly (faster start, requires network).
     """
 
     def __init__(
@@ -6385,24 +6391,45 @@ class FineWebStreamingDataset(IterableDataset):
         dataset_name: str = "HuggingFaceFW/fineweb",
         dataset_subset: str = "sample-10BT",
         split: str = "train",
+        cache_dataset: bool = False,
     ):
         self.tokenizer = tokenizer
         self.seq_length = seq_length
         self.dataset_name = dataset_name
         self.dataset_subset = dataset_subset
         self.split = split
+        self.cache_dataset = cache_dataset
+        self._cached_dataset = None
 
-    def __iter__(self):
+    def _load_dataset(self):
+        """Load dataset (streaming or cached)."""
         from datasets import load_dataset
 
-        # Stream dataset to avoid loading everything into memory
-        dataset = load_dataset(
-            self.dataset_name,
-            name=self.dataset_subset,
-            split=self.split,
-            streaming=True,
-        )
+        if self.cache_dataset:
+            # Download and cache locally (stored in ~/.cache/huggingface/datasets/)
+            return load_dataset(
+                self.dataset_name,
+                name=self.dataset_subset,
+                split=self.split,
+                streaming=False,
+            )
+        else:
+            # Stream dataset to avoid loading everything into memory
+            return load_dataset(
+                self.dataset_name,
+                name=self.dataset_subset,
+                split=self.split,
+                streaming=True,
+            )
 
+    def __iter__(self):
+        if self.cache_dataset and self._cached_dataset is None:
+            print(f"  [FineWeb] Downloading and caching dataset locally...")
+            print(f"  [FineWeb] This may take a while on first run, but will be fast on subsequent runs.")
+            self._cached_dataset = self._load_dataset()
+            print(f"  [FineWeb] Dataset cached. Size: {len(self._cached_dataset):,} examples")
+
+        dataset = self._cached_dataset if self.cache_dataset else self._load_dataset()
         buffer = []
 
         for example in dataset:
@@ -6513,18 +6540,20 @@ def load_data(config: UnifiedTrainingConfig, tokenizer) -> Tuple[DataLoader, Dat
         return train_loader, val_loader
 
     elif config.dataset == "fineweb":
-        # Streaming FineWeb dataset
+        # Streaming or cached FineWeb dataset
         print(f"  Dataset: {config.dataset_name}")
         print(f"  Subset: {config.dataset_subset}")
         print(f"  Sequence length: {config.max_seq_len}")
+        print(f"  Mode: {'Cached (local)' if config.cache_dataset else 'Streaming'}")
 
-        # Create streaming datasets for train and val
+        # Create streaming/cached datasets for train and val
         train_dataset = FineWebStreamingDataset(
             tokenizer=tokenizer,
             seq_length=config.max_seq_len,
             dataset_name=config.dataset_name,
             dataset_subset=config.dataset_subset,
             split="train",
+            cache_dataset=config.cache_dataset,
         )
 
         # For validation, we use a small portion of train (FineWeb doesn't have val split)
@@ -6534,6 +6563,7 @@ def load_data(config: UnifiedTrainingConfig, tokenizer) -> Tuple[DataLoader, Dat
             dataset_name=config.dataset_name,
             dataset_subset=config.dataset_subset,
             split="train",  # Use train split, will cache limited batches
+            cache_dataset=config.cache_dataset,
         )
 
         train_loader = DataLoader(
@@ -7471,6 +7501,8 @@ def train(config: UnifiedTrainingConfig):
     best_val_loss = float('inf')
     resumed_hgs_state = None
     resumed_drc_state = None
+    resumed_sgp_state = None
+    resumed_sattvic_state = None
     if config.resume:
         resume_path = Path(config.resume)
         if resume_path.exists():
@@ -7486,6 +7518,8 @@ def train(config: UnifiedTrainingConfig):
             best_val_loss = resume_result["best_val_loss"]
             resumed_hgs_state = resume_result.get("hgs_state")
             resumed_drc_state = resume_result.get("drc_state")
+            resumed_sgp_state = resume_result.get("sgp_state")
+            resumed_sattvic_state = resume_result.get("sattvic_state")
         else:
             print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
             print(f"      Starting training from scratch...")
@@ -7615,6 +7649,19 @@ def train(config: UnifiedTrainingConfig):
             print(f"    ✓ DRC state restored from checkpoint")
         except Exception as e:
             print(f"    ⚠️  Could not restore DRC state: {e}")
+
+    # Restore SGP/Sattvic state from checkpoint if available
+    if resumed_sattvic_state is not None and sattvic_controller is not None:
+        try:
+            sattvic_controller.load_state(resumed_sattvic_state)
+        except Exception as e:
+            print(f"    ⚠️  Could not restore Sattvic state: {e}")
+
+    if resumed_sgp_state is not None and sgp_controller is not None:
+        try:
+            sgp_controller.load_state(resumed_sgp_state)
+        except Exception as e:
+            print(f"    ⚠️  Could not restore SGP state: {e}")
 
     # Mixed precision
     scaler = torch.amp.GradScaler('cuda') if config.mixed_precision != "none" else None
@@ -8891,6 +8938,8 @@ def train(config: UnifiedTrainingConfig):
                         ckpt_dir / "best.pt",
                         hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
                         drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+                        sgp_state=sgp_controller.get_state() if sgp_controller else None,
+                        sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                     )
                     print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}")
 
@@ -8924,6 +8973,8 @@ def train(config: UnifiedTrainingConfig):
                     ckpt_dir / "last.pt",
                     hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
                     drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+                    sgp_state=sgp_controller.get_state() if sgp_controller else None,
+                    sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                 )
                 # v2.7 Training State Tracker: Save state on checkpoint
                 if training_state_tracker is not None and training_state_tracker.enabled:
@@ -8935,6 +8986,8 @@ def train(config: UnifiedTrainingConfig):
         ckpt_dir / "final.pt",
         hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
         drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+        sgp_state=sgp_controller.get_state() if sgp_controller else None,
+        sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
     )
     # v2.7 Training State Tracker: Save final state
     if training_state_tracker is not None and training_state_tracker.enabled:
@@ -9032,8 +9085,10 @@ def save_checkpoint(
     path: Path,
     hgs_state: Optional[dict] = None,
     drc_state: Optional[dict] = None,
+    sgp_state: Optional[dict] = None,
+    sattvic_state: Optional[dict] = None,
 ):
-    """Save training checkpoint with optional HGS/DRC state.
+    """Save training checkpoint with optional HGS/DRC/SGP/Sattvic state.
 
     For last.pt checkpoints, explicitly removes old file before saving new one
     to ensure clean replacement and avoid potential corruption.
@@ -9058,6 +9113,14 @@ def save_checkpoint(
     # Add DRC state if provided
     if drc_state is not None:
         checkpoint["drc_state"] = drc_state
+
+    # Add SGP state if provided
+    if sgp_state is not None:
+        checkpoint["sgp_state"] = sgp_state
+
+    # Add Sattvic Controller state if provided
+    if sattvic_state is not None:
+        checkpoint["sattvic_state"] = sattvic_state
 
     # Explicitly remove old checkpoint before saving (especially for last.pt)
     # This ensures clean replacement and frees disk space before writing
@@ -9138,6 +9201,16 @@ def load_checkpoint(
         result["drc_state"] = checkpoint["drc_state"]
         print(f"    ✓ DRC state available for restoration")
 
+    # Return SGP state for restoration
+    if "sgp_state" in checkpoint:
+        result["sgp_state"] = checkpoint["sgp_state"]
+        print(f"    ✓ SGP state available for restoration")
+
+    # Return Sattvic Controller state for restoration
+    if "sattvic_state" in checkpoint:
+        result["sattvic_state"] = checkpoint["sattvic_state"]
+        print(f"    ✓ Sattvic Controller state available for restoration")
+
     print(f"    → Resuming from step {result['step']}, best_val_loss={result['best_val_loss']:.4f}")
 
     return result
@@ -9191,6 +9264,8 @@ def main():
                        help="Dataset subset/config for fineweb mode")
     parser.add_argument("--cache_val_batches", type=int, default=20,
                        help="Pre-cache N validation batches for streaming datasets (0=disable)")
+    parser.add_argument("--cache_dataset", action="store_true",
+                       help="Download and cache FineWeb dataset locally (slower first run, faster subsequent)")
 
     # Memory optimization
     parser.add_argument("--gradient_checkpointing", action="store_true",
@@ -9527,10 +9602,10 @@ def main():
                        help="Enable SGP synchronized with Sattvic Controller")
     parser.add_argument("--disable_sgp", action="store_true",
                        help="Disable SGP")
-    parser.add_argument("--sgp_base_rate", type=int, default=50,
-                       help="SGP base rate (Toroidal Refresh Rate) - was 25, now 50 per Gemini")
-    parser.add_argument("--sgp_stagnation_rate", type=int, default=25,
-                       help="SGP rate when stagnation detected - was 12, now 25 per Gemini")
+    parser.add_argument("--sgp_base_rate", type=int, default=200,
+                       help="SGP base rate (Toroidal Refresh Rate) - every N steps")
+    parser.add_argument("--sgp_stagnation_rate", type=int, default=100,
+                       help="SGP rate when stagnation detected (halved from base)")
     parser.add_argument("--sgp_gamma", type=float, default=0.5,
                        help="SGP persistence coefficient (gamma) - was 0.3, now 0.5 per Gemini (stronger cement)")
 
@@ -9637,6 +9712,7 @@ def main():
         dataset_name=args.dataset_name,
         dataset_subset=args.dataset_subset,
         cache_val_batches=args.cache_val_batches,
+        cache_dataset=args.cache_dataset,
         gradient_checkpointing=args.gradient_checkpointing,
         checkpoint_offload_cpu=args.checkpoint_offload_cpu,
         mixed_precision=args.mixed_precision,

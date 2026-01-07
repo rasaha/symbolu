@@ -408,6 +408,38 @@ class SattvicController:
             "variance_history": self.variance_history[-10:] if self.variance_history else [],
         }
 
+    def get_state(self) -> Dict[str, Any]:
+        """Get serializable state for checkpoint saving."""
+        return {
+            "lambda_csr": self.lambda_csr,
+            "current_step": self.current_step,
+            "current_entropy": self.current_entropy,
+            "current_knowledge": self.current_knowledge,
+            "stagnation_detected": self.stagnation_detected,
+            "mode_collapse_detected": self.mode_collapse_detected,
+            "boost_active": self.boost_active,
+            "last_boost_step": self.last_boost_step,
+            "entropy_history": list(self.entropy_history),
+            "variance_history": self.variance_history.copy(),
+        }
+
+    def load_state(self, state: Dict[str, Any]):
+        """Restore state from checkpoint."""
+        self.lambda_csr = state.get("lambda_csr", self.config.initial_lambda)
+        self.current_step = state.get("current_step", 0)
+        self.current_entropy = state.get("current_entropy", 1.0)
+        self.current_knowledge = state.get("current_knowledge", 0.0)
+        self.stagnation_detected = state.get("stagnation_detected", False)
+        self.mode_collapse_detected = state.get("mode_collapse_detected", False)
+        self.boost_active = state.get("boost_active", False)
+        self.last_boost_step = state.get("last_boost_step", -self.config.boost_cooldown)
+        # Restore entropy history
+        self.entropy_history.clear()
+        for ent in state.get("entropy_history", []):
+            self.entropy_history.append(ent)
+        self.variance_history = state.get("variance_history", []).copy()
+        print(f"    ✓ Sattvic Controller state restored (λ={self.lambda_csr:.3f}, step={self.current_step})")
+
 
 # =============================================================================
 # FACTORY FUNCTION

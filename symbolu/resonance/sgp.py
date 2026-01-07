@@ -487,6 +487,29 @@ class SGPController:
         """Check if gradients should be applied (persistence threshold met)."""
         return accumulated_steps >= self.current_rate
 
+    def get_state(self) -> Dict[str, Any]:
+        """Get serializable state for checkpoint saving."""
+        return {
+            "current_rate": self.current_rate,
+            "current_momentum": self.current_momentum,
+            "step_count": self.step_count,
+            "gamma": self.gamma,
+            "stagnation_active": self.stagnation_active,
+            "last_pulse_step": self.last_pulse_step,
+            "rate_history": self.rate_history[-100:],  # Keep last 100 entries
+        }
+
+    def load_state(self, state: Dict[str, Any]):
+        """Restore state from checkpoint."""
+        self.current_rate = state.get("current_rate", self.config.base_rate)
+        self.current_momentum = state.get("current_momentum", self.config.momentum)
+        self.step_count = state.get("step_count", 0)
+        self.gamma = state.get("gamma", self.config.gamma)
+        self.stagnation_active = state.get("stagnation_active", False)
+        self.last_pulse_step = state.get("last_pulse_step", 0)
+        self.rate_history = state.get("rate_history", [])
+        print(f"    ✓ SGP Controller state restored (rate={self.current_rate}, step={self.step_count})")
+
 
 # =============================================================================
 # FACTORY FUNCTIONS
