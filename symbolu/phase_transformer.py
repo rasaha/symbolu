@@ -182,8 +182,10 @@ class IntentPhaseProjector(nn.Module):
                 B = delta_S.shape[0]
                 theta = theta.view(B, self.num_heads, actual_head_dim)
             else:
-                B, T, _ = delta_S.shape
-                theta = theta.view(B, T, self.num_heads, actual_head_dim)
+                # Use -1 to dynamically infer sequence length from tensor elements
+                # This handles cases where the sequence length changes during generation
+                B = delta_S.shape[0]
+                theta = theta.view(B, -1, self.num_heads, actual_head_dim)
 
         # Scale to reasonable phase range (tanh → [-1, 1] → [-π, π])
         theta = torch.tanh(theta) * 3.14159
@@ -2411,7 +2413,8 @@ class OntologicalHybridTransformer(nn.Module):
         self.embed_dim = embed_dim
 
         # Previous state for delta computation (will be set during forward)
-        self.register_buffer('prev_state', None)
+        # persistent=False excludes from state_dict (runtime state, not trained weights)
+        self.register_buffer('prev_state', None, persistent=False)
 
     def compute_state_delta(
         self,
@@ -2436,7 +2439,12 @@ class OntologicalHybridTransformer(nn.Module):
         state = self.state_projector(pooled)  # [B, state_dim]
 
         # Compute delta
-        if reset_state or self.prev_state is None:
+        # Also reset if batch size changed (e.g., VRAM governor resize)
+        batch_size_changed = (
+            self.prev_state is not None and
+            self.prev_state.shape[0] != state.shape[0]
+        )
+        if reset_state or self.prev_state is None or batch_size_changed:
             delta_S = torch.zeros_like(state)
         else:
             delta_S = state - self.prev_state

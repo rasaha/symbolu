@@ -1593,6 +1593,12 @@ class EvolutionaryIntelligenceEngine:
             o12_prev = self.resonance_buffer[11]  # Previous O12 state
             o1_current = current_states[0]  # Current O1 state
 
+            # Check for batch size mismatch (e.g., VRAM governor resize)
+            if o12_prev.shape[0] != o1_current.shape[0]:
+                # Clear buffer and skip resonance this step
+                self.resonance_buffer = None
+                return current_states
+
             # Ensure shape compatibility
             if o12_prev.shape == o1_current.shape:
                 # Resonant injection: O1' = O1 + α * O12_prev (using dynamic alpha)
@@ -2695,6 +2701,7 @@ class VRAMGovernor:
         min_batch_size: int = 4,
         vram_threshold: float = 0.92,  # Trigger at 92% usage
         vram_critical: float = 0.97,   # Emergency at 97%
+        vram_recovery_buffer: float = 0.12,  # Recovery when < (threshold - buffer)
         check_interval: int = 10,      # Check every N steps
         b1_compensation_rate: float = 0.20,  # 20% λ_B1 increase per reduction
         enable_accumulation_scaling: bool = True,
@@ -2705,6 +2712,7 @@ class VRAMGovernor:
         self.min_batch_size = min_batch_size
         self.vram_threshold = vram_threshold
         self.vram_critical = vram_critical
+        self.vram_recovery_buffer = vram_recovery_buffer
         self.check_interval = check_interval
         self.b1_compensation_rate = b1_compensation_rate
         self.enable_accumulation_scaling = enable_accumulation_scaling
@@ -2801,8 +2809,8 @@ class VRAMGovernor:
                 self._apply_batch_reduction(new_batch, sovereign_engine, actions, emergency=False)
 
         # Check if we can recover (increase batch) after being in recovery mode
-        elif self.in_recovery_mode and usage < (self.vram_threshold - 0.15):
-            # VRAM is now 15% below threshold - safe to try increasing
+        elif self.in_recovery_mode and usage < (self.vram_threshold - self.vram_recovery_buffer):
+            # VRAM is below recovery threshold - safe to try increasing
             steps_in_recovery = current_step - self.recovery_start_step
             if steps_in_recovery > 200:  # Wait at least 200 steps
                 # Try increasing batch by 4
@@ -6060,6 +6068,8 @@ class UnifiedTrainingConfig:
     # Training hyperparameters
     batch_size: int = 8
     gradient_accumulation: int = 1
+    vram_threshold: float = 0.92  # VRAM % to trigger batch reduction (0.92 = 92%)
+    vram_recovery_buffer: float = 0.12  # Recovery when VRAM < (threshold - buffer)
     max_steps: int = 10000
     warmup_steps: int = 500
 
@@ -7323,14 +7333,16 @@ def train(config: UnifiedTrainingConfig):
     vram_governor = VRAMGovernor(
         initial_batch_size=config.batch_size,
         min_batch_size=4,
-        vram_threshold=0.92,
-        vram_critical=0.97,
+        vram_threshold=config.vram_threshold,
+        vram_critical=min(0.97, config.vram_threshold + 0.05),  # Critical = threshold + 5%
+        vram_recovery_buffer=config.vram_recovery_buffer,
         check_interval=10,
         b1_compensation_rate=0.20,
         enable_accumulation_scaling=True,
         target_effective_batch=config.batch_size,
     )
-    print(f"  VRAM Governor: ENABLED (threshold=92%, compensation=20%)")
+    recovery_threshold = config.vram_threshold - config.vram_recovery_buffer
+    print(f"  VRAM Governor: ENABLED (reduce={config.vram_threshold:.0%}, recover={recovery_threshold:.0%})")
 
     # LRA Validator (Long-Range Retrieval Testing)
     lra_validator = None
@@ -8446,10 +8458,12 @@ def train(config: UnifiedTrainingConfig):
                     print(f"  🔄 Reinitializing DataLoader with batch_size={new_batch}")
                     # Get dataset from existing DataLoader (train_dataset may not be in scope)
                     dataset = train_loader.dataset
+                    # IterableDataset (streaming) doesn't support shuffle
+                    is_iterable = isinstance(dataset, IterableDataset)
                     train_loader = DataLoader(
                         dataset,
                         batch_size=new_batch,
-                        shuffle=True,
+                        shuffle=False if is_iterable else True,
                         num_workers=config.num_workers,
                         pin_memory=True,
                         drop_last=True,
@@ -8975,6 +8989,7 @@ def train(config: UnifiedTrainingConfig):
                     sgp_state=sgp_controller.get_state() if sgp_controller else None,
                     sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                 )
+                print(f"  💾 Checkpoint saved: last.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
                 if training_state_tracker is not None and training_state_tracker.enabled:
                     training_state_tracker.save_state()
@@ -9159,7 +9174,15 @@ def load_checkpoint(
     checkpoint = torch.load(path, map_location=device, weights_only=False)
 
     # Load model weights
-    model.load_state_dict(checkpoint["model"])
+    # Filter out runtime buffers that may have been saved with tensor values
+    # but are initialized as None in fresh models (e.g., prev_state in OntologicalHybridTransformer)
+    model_state = checkpoint["model"]
+    runtime_buffers = ["prev_state"]  # Buffers that are runtime state, not trained weights
+    filtered_state = {k: v for k, v in model_state.items() if k not in runtime_buffers}
+    if len(filtered_state) < len(model_state):
+        removed = [k for k in model_state if k in runtime_buffers]
+        print(f"    → Filtered runtime buffers: {removed}")
+    model.load_state_dict(filtered_state)
     print(f"    ✓ Model weights loaded")
 
     result = {
@@ -9184,12 +9207,26 @@ def load_checkpoint(
 
     # Restore RNG states for reproducibility
     if "rng_state" in checkpoint:
-        torch.set_rng_state(checkpoint["rng_state"])
-        print(f"    ✓ RNG state restored")
+        try:
+            rng_state = checkpoint["rng_state"]
+            # Ensure RNG state is ByteTensor on CPU
+            if not isinstance(rng_state, torch.ByteTensor):
+                rng_state = rng_state.to(dtype=torch.uint8, device='cpu')
+            torch.set_rng_state(rng_state)
+            print(f"    ✓ RNG state restored")
+        except Exception as e:
+            print(f"    ⚠ RNG state restoration failed: {e} (continuing without)")
 
     if "cuda_rng_state" in checkpoint and torch.cuda.is_available():
-        torch.cuda.set_rng_state(checkpoint["cuda_rng_state"])
-        print(f"    ✓ CUDA RNG state restored")
+        try:
+            cuda_rng_state = checkpoint["cuda_rng_state"]
+            # Ensure CUDA RNG state is ByteTensor
+            if not isinstance(cuda_rng_state, torch.ByteTensor):
+                cuda_rng_state = cuda_rng_state.to(dtype=torch.uint8)
+            torch.cuda.set_rng_state(cuda_rng_state)
+            print(f"    ✓ CUDA RNG state restored")
+        except Exception as e:
+            print(f"    ⚠ CUDA RNG state restoration failed: {e} (continuing without)")
 
     # Return additional state for HGS/DRC restoration
     if "hgs_state" in checkpoint:
@@ -9240,6 +9277,10 @@ def main():
                        help="Batch size per GPU")
     parser.add_argument("--gradient_accumulation", type=int, default=1,
                        help="Gradient accumulation steps")
+    parser.add_argument("--vram_threshold", type=float, default=0.92,
+                       help="VRAM usage %% to trigger batch reduction (0.92=92%%, higher=more aggressive)")
+    parser.add_argument("--vram_recovery_buffer", type=float, default=0.12,
+                       help="Recovery buffer: batch increases when VRAM < (threshold - buffer). 0.12=80%% recovery with 92%% threshold")
     parser.add_argument("--max_steps", type=int, default=10000,
                        help="Maximum training steps")
     parser.add_argument("--learning_rate", type=float, default=3e-4,
@@ -9705,6 +9746,8 @@ def main():
         max_seq_len=args.max_seq_len,
         batch_size=args.batch_size,
         gradient_accumulation=args.gradient_accumulation,
+        vram_threshold=args.vram_threshold,
+        vram_recovery_buffer=args.vram_recovery_buffer,
         max_steps=args.max_steps,
         learning_rate=args.learning_rate,
         dataset=args.dataset,

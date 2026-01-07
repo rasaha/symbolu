@@ -675,6 +675,34 @@ VRAM-based automatic batch detection.
 
 ---
 
+## VRAM Governor (Dynamic Batch Scaling)
+
+Runtime VRAM monitoring with automatic batch size adjustment.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--vram_threshold` | float | `0.92` | VRAM % to trigger batch reduction |
+| `--vram_recovery_buffer` | float | `0.12` | Recovery buffer (batch increases when VRAM < threshold - buffer) |
+
+### How It Works
+- **Reduction**: When VRAM exceeds `vram_threshold` (92%), batch size is halved
+- **Recovery**: When VRAM drops below `threshold - buffer` (80%), batch size increases
+- **Gradient Accumulation**: Automatically increases to maintain effective batch size
+
+### Example Configurations
+| vram_threshold | vram_recovery_buffer | Reduce At | Recover At |
+|----------------|---------------------|-----------|------------|
+| `0.92` | `0.12` | 92% | 80% |
+| `0.95` | `0.10` | 95% | 85% |
+| `0.90` | `0.15` | 90% | 75% |
+
+### Notes
+- Recovery requires 200+ steps after reduction before attempting scale-up
+- Use higher `vram_threshold` (e.g., 0.95) if you want more aggressive VRAM usage
+- Use lower `vram_recovery_buffer` (e.g., 0.08) for faster batch recovery
+
+---
+
 ## Friction Controller
 
 Prevents extreme dominance ratios.
