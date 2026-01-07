@@ -135,6 +135,7 @@ MODEL_PRESETS = {
     "medium": {"embed_dim": 768, "num_layers": 12, "num_heads": 12, "ff_dim": 3072},
     "large": {"embed_dim": 1024, "num_layers": 24, "num_heads": 16, "ff_dim": 4096},
     "xl": {"embed_dim": 2048, "num_layers": 24, "num_heads": 16, "ff_dim": 8192},
+    "7b": {"embed_dim": 4096, "num_layers": 32, "num_heads": 32, "ff_dim": 11008},  # LLaMA 7B scale
 }
 
 # GPU memory specifications for reference
@@ -836,7 +837,7 @@ Examples:
     )
 
     parser.add_argument("--model_size", type=str, default="small",
-                        choices=["tiny", "small", "medium", "large", "xl"],
+                        choices=["tiny", "small", "medium", "large", "xl", "7b"],
                         help="Model size preset")
     parser.add_argument("--models", type=str, default="standard,hybrid",
                         help="Comma-separated model types: standard (O(n²)), hybrid (O(n×w)), phase (O(n))")
