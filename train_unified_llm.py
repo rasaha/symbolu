@@ -8446,10 +8446,12 @@ def train(config: UnifiedTrainingConfig):
                     print(f"  🔄 Reinitializing DataLoader with batch_size={new_batch}")
                     # Get dataset from existing DataLoader (train_dataset may not be in scope)
                     dataset = train_loader.dataset
+                    # IterableDataset (streaming) doesn't support shuffle
+                    is_iterable = isinstance(dataset, IterableDataset)
                     train_loader = DataLoader(
                         dataset,
                         batch_size=new_batch,
-                        shuffle=True,
+                        shuffle=False if is_iterable else True,
                         num_workers=config.num_workers,
                         pin_memory=True,
                         drop_last=True,
