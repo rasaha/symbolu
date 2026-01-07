@@ -69,13 +69,49 @@ python train_unified_llm.py --resume checkpoints_unified/step_5000.pt
 
 ## Dataset
 
-| Option | Type | Default | Choices | Description |
-|--------|------|---------|---------|-------------|
-| `--dataset` | str | `wikitext103` | `wikitext103`, `wikitext2` | Training dataset |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--dataset` | str | `wikitext103` | Dataset type: `wikitext103`, `wikitext2`, or `fineweb` |
+| `--dataset_name` | str | `HuggingFaceFW/fineweb` | HuggingFace dataset name (for fineweb mode) |
+| `--dataset_subset` | str | `sample-10BT` | Dataset subset/config (for fineweb mode) |
+| `--cache_val_batches` | int | `20` | Pre-cache N validation batches (streaming datasets) |
+
+### Dataset Choices
+
+| Value | Type | Size | Description |
+|-------|------|------|-------------|
+| `wikitext103` | Static | ~100M tokens | WikiText-103, recommended for quick experiments |
+| `wikitext2` | Static | ~2M tokens | WikiText-2, good for quick tests |
+| `fineweb` | Streaming | 10B+ tokens | FineWeb/FineWeb-edu, for production training |
+
+### FineWeb Configuration
+
+For `--dataset fineweb`, configure with:
+
+| dataset_name | Description | Use When |
+|--------------|-------------|----------|
+| `HuggingFaceFW/fineweb` | Web text (CC-based) | General pretraining |
+| `HuggingFaceFW/fineweb-edu` | Educational content | Higher quality, educational focus |
+
+| dataset_subset | Size | Description |
+|----------------|------|-------------|
+| `sample-10BT` | ~10B tokens | Quick experiments |
+| `sample-100BT` | ~100B tokens | Extended training |
+| `CC-MAIN-*` | Varies | Specific Common Crawl snapshots |
+
+### Example: FineWeb Training
+```bash
+python train_unified_llm.py \
+    --dataset fineweb \
+    --dataset_name "HuggingFaceFW/fineweb-edu" \
+    --dataset_subset "sample-10BT" \
+    --cache_val_batches 20
+```
 
 ### Notes
-- **wikitext103**: ~100M tokens, recommended for full training
-- **wikitext2**: ~2M tokens, good for quick tests
+- **Streaming**: FineWeb uses streaming to avoid loading entire dataset into memory
+- **cache_val_batches**: Pre-caches validation batches to eliminate 7-minute "Resolving data files" delay
+- Set `--cache_val_batches 0` to disable caching (not recommended)
 
 ---
 
