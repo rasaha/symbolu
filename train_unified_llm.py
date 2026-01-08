@@ -8901,7 +8901,7 @@ def train(config: UnifiedTrainingConfig):
                     try:
                         # Get logits for entropy calculation
                         kosha_logits = None
-                        if config.model_type == "ontological":
+                        if config.model_type in ("ontological", "ontological_hybrid"):
                             kosha_logits = outputs.get("logits", None) if isinstance(outputs, dict) else None
                         else:
                             kosha_logits = logits if 'logits' in dir() else None
