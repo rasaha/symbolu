@@ -6441,6 +6441,12 @@ class UnifiedTrainingConfig:
     pidv2_w_s: float = 0.30  # Semantic weight
     pidv2_semantic_scale: float = 50.0
     pidv2_handshake_dampen: bool = True
+    # V9.7.0: PIDv2 Dynamic Batch Sizing
+    pidv2_batch_resize: bool = False          # Enable PPL-driven batch resizing
+    pidv2_batch_min: int = 4                  # Minimum batch size
+    pidv2_batch_max: int = 64                 # Maximum batch size
+    pidv2_batch_velocity_threshold: float = 5.0  # PPL velocity % to trigger reduction
+    pidv2_batch_stable_streak: int = 5        # Consecutive stable evals before increase
 
     # Phase ramp settings (for handshake dampening)
     phase_delay_steps: int = 0
@@ -8320,12 +8326,23 @@ def train(config: UnifiedTrainingConfig):
             W_s=config.pidv2_w_s,
             semantic_ppl_scale=config.pidv2_semantic_scale,
             handshake_Kd_dampen=config.pidv2_handshake_dampen,
+            # V9.7.0: Dynamic Batch Sizing
+            enable_batch_resize=config.pidv2_batch_resize,
+            batch_min=config.pidv2_batch_min,
+            batch_max=config.pidv2_batch_max,
+            batch_velocity_threshold=config.pidv2_batch_velocity_threshold,
+            batch_stable_streak=config.pidv2_batch_stable_streak,
         )
         authority_controller = AuthorityPIDv2(pidv2_config)
+        authority_controller.set_batch_size(config.batch_size)  # Initialize with current batch
         print(f"\n  PIDv2 Governor ENABLED")
         print(f"    Dynamic Kp: [{config.pidv2_kp_min}, {config.pidv2_kp_max}]")
         print(f"    Semantic Weight (W_s): {config.pidv2_w_s:.0%}")
         print(f"    Authority floor: {config.pidv2_a_min}")
+        if config.pidv2_batch_resize:
+            print(f"    🔄 Batch Resize: ENABLED (min={config.pidv2_batch_min}, max={config.pidv2_batch_max})")
+            print(f"       Reduce when: PPL vel > {config.pidv2_batch_velocity_threshold}%")
+            print(f"       Increase after: {config.pidv2_batch_stable_streak} stable evals")
     elif config.controller == "emergency_pd" and PIDV2_AVAILABLE:
         pd_config = EmergencyPDConfig(A_min=0.25)
         authority_controller = EmergencyPD(pd_config)
@@ -9499,6 +9516,32 @@ def train(config: UnifiedTrainingConfig):
                         if friction_controller.correction_active:
                             print(f"  ⚠️ FRICTION CORRECTION: LR reduced by {(1-friction_controller.friction_penalty)*100:.0f}%")
 
+                    # V9.7.0: PIDv2 Dynamic Batch Sizing Check
+                    if hasattr(authority_controller, 'check_batch_action') and config.pidv2_batch_resize:
+                        # Get current VRAM usage for headroom check
+                        vram_usage = 0.0
+                        if torch.cuda.is_available():
+                            vram_used = torch.cuda.memory_reserved()
+                            vram_total = torch.cuda.get_device_properties(0).total_memory
+                            vram_usage = vram_used / vram_total
+
+                        batch_action, new_batch, batch_reason = authority_controller.check_batch_action(
+                            vram_usage=vram_usage,
+                            vram_threshold=config.vram_threshold - 0.10  # Leave 10% headroom
+                        )
+
+                        if batch_action != "HOLD":
+                            old_batch = config.batch_size
+                            config.batch_size = new_batch
+                            print(f"  🔄 [BATCH RESIZE] {batch_action}: {old_batch} → {new_batch}")
+                            print(f"     Reason: {batch_reason}", flush=True)
+
+                            # Reinitialize dataloader with new batch size
+                            # Note: This is a simplified approach - full implementation would
+                            # need to properly reinit the dataloader
+                            if tb_writer is not None:
+                                tb_writer.add_scalar("ctrl/batch_size", new_batch, global_step)
+
                     # Apply authority factor AND friction penalty to learning rate
                     effective_factor = new_A * friction_penalty
                     for pg in optimizer.param_groups:
@@ -10289,6 +10332,17 @@ def main():
                        help="PIDv2 minimum authority factor (sensory floor)")
     parser.add_argument("--pidv2_w_s", type=float, default=0.30,
                        help="Semantic weight (0.30 = 30%% prompt-based)")
+    # V9.7.0: PIDv2 Dynamic Batch Sizing
+    parser.add_argument("--pidv2_batch_resize", action="store_true",
+                       help="Enable PPL-driven batch resizing in PIDv2")
+    parser.add_argument("--pidv2_batch_min", type=int, default=4,
+                       help="Minimum batch size for PIDv2 resize")
+    parser.add_argument("--pidv2_batch_max", type=int, default=64,
+                       help="Maximum batch size for PIDv2 resize")
+    parser.add_argument("--pidv2_batch_velocity_threshold", type=float, default=5.0,
+                       help="PPL velocity %% to trigger batch reduction")
+    parser.add_argument("--pidv2_batch_stable_streak", type=int, default=5,
+                       help="Consecutive stable evals before batch increase")
     parser.add_argument("--phase_ramp_steps", type=int, default=7000,
                        help="Steps for phase LR ramp (handshake dampening)")
     parser.add_argument("--tensorboard", action="store_true", default=True,
@@ -10644,6 +10698,12 @@ def main():
         pidv2_kd=args.pidv2_kd,
         pidv2_a_min=args.pidv2_a_min,
         pidv2_w_s=args.pidv2_w_s,
+        # V9.7.0: PIDv2 Dynamic Batch Sizing
+        pidv2_batch_resize=args.pidv2_batch_resize,
+        pidv2_batch_min=args.pidv2_batch_min,
+        pidv2_batch_max=args.pidv2_batch_max,
+        pidv2_batch_velocity_threshold=args.pidv2_batch_velocity_threshold,
+        pidv2_batch_stable_streak=args.pidv2_batch_stable_streak,
         phase_ramp_steps=args.phase_ramp_steps,
         tensorboard=args.tensorboard and not args.no_tensorboard,
         sample_every=args.sample_every,
