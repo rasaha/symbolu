@@ -38,9 +38,9 @@ Usage:
     python train_unified_llm.py --model_type gen2 --model_size small \
         --max_seq_len 16384 --gradient_checkpointing --batch_size 1
 
-    # Train Ontological Hybrid (Two-Tier AGI Architecture)
+    # Train Ontological Hybrid (Two-Tier AGI Architecture) with 32D Sovereign State
     python train_unified_llm.py --model_type ontological_hybrid --model_size small \
-        --dataset wikitext103 --max_steps 1000 --state_dim 124
+        --dataset wikitext103 --max_steps 1000 --state_dim 32
 
     # Stress Test (Trial by Fire)
     python train_unified_llm.py --stress_test --resume checkpoints/best.pt
@@ -93,6 +93,17 @@ from symbolu.phase_transformer import (
     HybridPhaseTransformer,
     StandardTransformer,  # V9.6.9: O(n²) baseline for comparison
     OntologicalHybridTransformer,  # V9.6.14: Two-Tier AGI Architecture
+    # V9.8.0: 32D Sovereign State (replaces 124D CognitiveState)
+    SOVEREIGN_STATE_DIM,
+    BHAVA_NAMES,
+    KOSHA_NAMES,
+    VRITTI_NAMES,
+    GUNA_NAMES,
+    BHAVA_SLICE,
+    KOSHA_SLICE,
+    VRITTI_SLICE,
+    GUNA_SLICE,
+    get_sovereign_state_summary,
 )
 
 # Import ontological models
@@ -6478,8 +6489,10 @@ class UnifiedTrainingConfig:
     bhava_embed_dim: int = 128
     num_drishti_heads: int = 4
 
-    # V9.6.14: Ontological Hybrid (Two-Tier AGI) parameters
-    state_dim: int = 124  # CognitiveState dimension (44 phonemes + 64 topic + 12 bhava + 4 dynamics)
+    # V9.8.0: Ontological Hybrid (Two-Tier AGI) with 32D Sovereign State
+    # Replaces arbitrary 124D (44 phonemes + 64 topics + 12 bhava + 4 dynamics)
+    # with principled 32D: [0:12] Bhava, [12:17] Kosha, [17:22] Vritti, [22:28] Guna, [28:32] Reserved
+    state_dim: int = SOVEREIGN_STATE_DIM  # 32D Sovereign State (was 124D CognitiveState)
     project_per_head_dim: bool = False  # If True, project ΔS to [H, D_h] instead of [H]
 
     # Training hyperparameters
@@ -7218,10 +7231,13 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             project_per_head_dim=config.project_per_head_dim,
         )
         print(f"\n  [Ontological Hybrid] Two-Tier AGI Architecture enabled")
-        print(f"    State Dimension: {config.state_dim}")
+        print(f"    Sovereign State Dimension: {config.state_dim}D")
+        if config.state_dim == SOVEREIGN_STATE_DIM:
+            print(f"      [0:12] 12 Bhavas | [12:17] 5 Koshas | [17:22] 5 Vrittis | [22:28] 6 Gunas | [28:32] Reserved")
         print(f"    Project Per Head Dim: {config.project_per_head_dim}")
         print(f"    Hybrid Cosine Mode: {config.cosine_mode}")
         print(f"    Hybrid Decay Gamma: {config.decay_gamma}")
+        print(f"    Initial State: O12_ABS (Absolute) + Annamaya (Physical) - Grounded Awareness")
 
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
@@ -8297,6 +8313,151 @@ def format_onto_bridge_diagnostic(diag: Dict[str, Any]) -> str:
         lines.append(
             f"    📊 [ONTO] Diversity: {div:.3f} | Pramāṇa Corr: {pram:+.3f} | GradNorm: {diag.get('grad_norm', 0.0):.2f}"
         )
+
+    return "\n".join(lines)
+
+
+# =============================================================================
+# V9.8.0: 32D SOVEREIGN STATE DIAGNOSTICS
+# =============================================================================
+
+def compute_sovereign_state_diagnostics(
+    state: Optional[torch.Tensor] = None,
+    delta_S: Optional[torch.Tensor] = None,
+    grad_norm: float = 0.0,
+) -> Dict[str, Any]:
+    """
+    Compute diagnostics for the 32D Sovereign State.
+
+    V9.8.0: Replaces the arbitrary 124D diagnostics with principled readouts.
+
+    Args:
+        state: [B, 32] Sovereign State tensor from OntologicalHybridTransformer
+        delta_S: [B, 32] State delta tensor
+        grad_norm: Current gradient norm
+
+    Returns:
+        Dict with:
+        - dominant_bhava: Name of most active Bhava (0-11)
+        - active_kosha: Name of most active Kosha (12-16)
+        - vritti_state: Name of current Vritti (17-21)
+        - guna_balance: Sattva/Rajas/Tamas balance
+        - delta_magnitude: How much state changed
+        - All raw activations for detailed logging
+    """
+    result = {
+        'dominant_bhava': 'ABS',
+        'dominant_bhava_idx': 11,
+        'bhava_activation': 0.0,
+        'active_kosha': 'ANNA',
+        'active_kosha_idx': 0,
+        'kosha_activation': 0.0,
+        'vritti_state': 'PRAMANA',
+        'vritti_state_idx': 0,
+        'vritti_activation': 0.0,
+        'guna_sattva': 0.33,
+        'guna_rajas': 0.33,
+        'guna_tamas': 0.33,
+        'velocity': 0.0,
+        'delta_magnitude': 0.0,
+        'grad_norm': grad_norm,
+        'bhava_activations': [0.0] * 12,
+        'kosha_activations': [0.0] * 5,
+        'vritti_activations': [0.0] * 5,
+        'guna_activations': [0.0] * 6,
+    }
+
+    if state is None:
+        return result
+
+    try:
+        # Use get_sovereign_state_summary from phase_transformer
+        summary = get_sovereign_state_summary(state)
+        result.update(summary)
+
+        # Extract raw activations for detailed logging
+        if state.dim() == 1:
+            state = state.unsqueeze(0)
+
+        # Bhava activations [0:12]
+        bhava_vals = state[0, BHAVA_SLICE].detach().cpu().tolist()
+        result['bhava_activations'] = bhava_vals
+
+        # Kosha activations [12:17]
+        kosha_vals = state[0, KOSHA_SLICE].detach().cpu().tolist()
+        result['kosha_activations'] = kosha_vals
+
+        # Vritti activations [17:22]
+        vritti_vals = state[0, VRITTI_SLICE].detach().cpu().tolist()
+        result['vritti_activations'] = vritti_vals
+
+        # Guna activations [22:28]
+        guna_vals = state[0, GUNA_SLICE].detach().cpu().tolist()
+        result['guna_activations'] = guna_vals
+
+        # Compute delta magnitude if provided
+        if delta_S is not None:
+            result['delta_magnitude'] = delta_S.norm().item()
+
+    except Exception as e:
+        # Silent fallback on error
+        pass
+
+    return result
+
+
+def format_sovereign_state_diagnostic(diag: Dict[str, Any]) -> str:
+    """
+    Format 32D Sovereign State diagnostic for logging output.
+
+    V9.8.0: Shows Bhava/Kosha/Vritti/Guna readouts instead of generic state.
+    """
+    lines = []
+
+    # Main state summary line
+    bhava = diag.get('dominant_bhava', 'ABS')
+    kosha = diag.get('active_kosha', 'ANNA')
+    vritti = diag.get('vritti_state', 'PRAMANA')
+    delta = diag.get('delta_magnitude', 0.0)
+
+    lines.append(
+        f"    🔱 [SOVEREIGN] Bhava: {bhava} | Kosha: {kosha} | Vritti: {vritti} | Δ={delta:.3f}"
+    )
+
+    # Guna balance (Sattva-Rajas-Tamas)
+    sattva = diag.get('guna_sattva', 0.33)
+    rajas = diag.get('guna_rajas', 0.33)
+    tamas = diag.get('guna_tamas', 0.33)
+    velocity = diag.get('velocity', 0.0)
+
+    # Visual bar for guna balance
+    s_bar = '▓' * int(sattva * 10)
+    r_bar = '▒' * int(rajas * 10)
+    t_bar = '░' * int(tamas * 10)
+
+    lines.append(
+        f"    ⚖️  [GUNA] S:{sattva:.2f}{s_bar} R:{rajas:.2f}{r_bar} T:{tamas:.2f}{t_bar} | v={velocity:+.2f}"
+    )
+
+    # Bhava activations (12D) - split into 2 rows of 6
+    bhava_acts = diag.get('bhava_activations', [0.0] * 12)
+    if bhava_acts:
+        row1 = [f"{BHAVA_NAMES[i]}:{bhava_acts[i]:+.2f}" for i in range(6)]
+        row2 = [f"{BHAVA_NAMES[i]}:{bhava_acts[i]:+.2f}" for i in range(6, 12)]
+        lines.append(f"    🕉️  [BHAVA] {' | '.join(row1)}")
+        lines.append(f"    🕉️  [BHAVA] {' | '.join(row2)}")
+
+    # Kosha activations (5D) - single row
+    kosha_acts = diag.get('kosha_activations', [0.0] * 5)
+    if kosha_acts:
+        kosha_row = [f"{KOSHA_NAMES[i]}:{kosha_acts[i]:+.2f}" for i in range(5)]
+        lines.append(f"    🪷 [KOSHA] {' | '.join(kosha_row)}")
+
+    # Vritti activations (5D) - single row
+    vritti_acts = diag.get('vritti_activations', [0.0] * 5)
+    if vritti_acts:
+        vritti_row = [f"{VRITTI_NAMES[i]}:{vritti_acts[i]:+.2f}" for i in range(5)]
+        lines.append(f"    🌀 [VRITTI] {' | '.join(vritti_row)}")
 
     return "\n".join(lines)
 
@@ -10269,6 +10430,28 @@ def train(config: UnifiedTrainingConfig):
                         if global_step % 100 == 0:
                             print(f"    ⚠️ [ONTO] Diagnostic error: {e}", flush=True)
 
+                # V9.8.0: Sovereign State Diagnostics for ontological_hybrid model
+                if config.model_type == "ontological_hybrid":
+                    try:
+                        # Extract state and delta_S from outputs dict
+                        sovereign_state = None
+                        sovereign_delta = None
+                        if isinstance(outputs, dict):
+                            sovereign_state = outputs.get('state', None)
+                            sovereign_delta = outputs.get('delta_S', None)
+
+                        if sovereign_state is not None:
+                            sovereign_diag = compute_sovereign_state_diagnostics(
+                                state=sovereign_state,
+                                delta_S=sovereign_delta,
+                                grad_norm=raw_grad_norm if 'raw_grad_norm' in dir() else 0.0,
+                            )
+                            sovereign_output = format_sovereign_state_diagnostic(sovereign_diag)
+                            print(sovereign_output, flush=True)
+                    except Exception as e:
+                        if global_step % 100 == 0:
+                            print(f"    ⚠️ [SOVEREIGN] Diagnostic error: {e}", flush=True)
+
                 step_start_time = time.time()
 
             # Evaluation
@@ -11004,10 +11187,11 @@ def main():
                             "<1.0=local focus like Mamba/RWKV). "
                             "Example: 0.9 = ~10 token memory, 0.95 = ~20 token memory")
 
-    # V9.6.14: Ontological Hybrid (Two-Tier AGI) parameters
-    parser.add_argument("--state_dim", type=int, default=124,
-                       help="CognitiveState dimension for ontological_hybrid model "
-                            "(default 124 = 44 phonemes + 64 topic + 12 bhava + 4 dynamics)")
+    # V9.8.0: Ontological Hybrid (Two-Tier AGI) with 32D Sovereign State
+    parser.add_argument("--state_dim", type=int, default=SOVEREIGN_STATE_DIM,
+                       help="Sovereign State dimension for ontological_hybrid model "
+                            "(default 32 = 12 Bhava + 5 Kosha + 5 Vritti + 6 Guna + 4 Reserved). "
+                            "V9.8.0: Replaces arbitrary 124D with principled ontology.")
     parser.add_argument("--project_per_head_dim", action="store_true",
                        help="Project state delta to [H, D_h] instead of [H] for finer control")
 
