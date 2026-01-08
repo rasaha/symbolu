@@ -107,34 +107,34 @@ BHAVA_NAMES = [
 ]
 BHAVA_SLICE = slice(0, 12)
 
-# Kosha indices [12:17] - Consciousness Sheaths
+# Sheath indices [12:17] - Depth Mapping (5 Sheaths)
 KOSHA_NAMES = [
-    'ANNA',    # 12: Annamaya - physical/food sheath
-    'PRANA',   # 13: Pranamaya - vital/energy sheath
-    'MANO',    # 14: Manomaya - mental/emotional sheath
-    'VIJNANA', # 15: Vijnanamaya - wisdom/intellect sheath
-    'ANANDA',  # 16: Anandamaya - bliss/causal sheath
+    'MATERIAL',     # 12: Physicality/Syntax
+    'VITAL',        # 13: Flow/Energy
+    'MENTAL',       # 14: Semantics/Meaning
+    'INTELLECTUAL', # 15: Pattern/Wisdom
+    'BLISSFUL',     # 16: Unity/Integration
 ]
 KOSHA_SLICE = slice(12, 17)
 
-# Vritti indices [17:22] - Mental Modifications
+# State indices [17:22] - Reliability Mapping (5 States)
 VRITTI_NAMES = [
-    'PRAMANA',   # 17: Valid cognition (correct knowledge)
-    'VIPARYAYA', # 18: Misconception (incorrect knowledge)
-    'VIKALPA',   # 19: Imagination (verbal construct)
-    'NIDRA',     # 20: Sleep (absence of content)
-    'SMRITI',    # 21: Memory (retention of experience)
+    'FACT',        # 17: Verified Truth
+    'ERROR',       # 18: Hallucination
+    'IMAGINATION', # 19: Conceptualization
+    'VOID',        # 20: Null State
+    'MEMORY',      # 21: Recall/Weights
 ]
 VRITTI_SLICE = slice(17, 22)
 
-# Guna/Dynamics indices [22:28] - Energy States
+# Qualia/Dynamics indices [22:28] - System Dynamics (6 Qualia)
 GUNA_NAMES = [
-    'SATTVA',   # 22: Clarity/harmony/balance
-    'RAJAS',    # 23: Activity/passion/change
-    'TAMAS',    # 24: Inertia/darkness/stability
-    'VELOCITY', # 25: Rate of state change
-    'ACCEL',    # 26: Acceleration of change
-    'STABLE',   # 27: Stability measure
+    'LUCIDITY',  # 22: Clarity/Precision
+    'ACTIVITY',  # 23: Dynamism/Turbulence
+    'STABILITY', # 24: Inertia/Fixedness
+    'VELOCITY',  # 25: Rate of state change
+    'ACCEL',     # 26: Acceleration of change
+    'STABLE',    # 27: Stability measure
 ]
 GUNA_SLICE = slice(22, 28)
 
@@ -2478,7 +2478,7 @@ class OntologicalHybridTransformer(nn.Module):
         - ΔS → Phase Rotation: Intent changes HOW tokens relate, not WHAT they are
 
     Initialization:
-        - State projector biased toward O12_ABS (Absolute) and Annamaya (Physical)
+        - State projector biased toward O12_ABS (Absolute) and Material (Physicality)
         - Represents "Absolute Potential" - pure awareness grounded in physical reality
 
     From ONTOLOGICAL_STATE_DELTA_DESIGN.md:
@@ -2547,7 +2547,7 @@ class OntologicalHybridTransformer(nn.Module):
 
         # V9.8.0: Initialize state projector bias toward "Absolute Potential"
         # - O12_ABS (index 11): Transcendent ground / pure awareness
-        # - Annamaya (index 12): Physical/grounded sheath
+        # - Material (index 12): Physicality/Syntax sheath
         # This represents the starting state: awareness grounded in physical reality
         self._init_absolute_potential_bias()
 
@@ -2574,7 +2574,7 @@ class OntologicalHybridTransformer(nn.Module):
 
         At step 0, the model should start in:
         - O12_ABS (index 11): Absolute/transcendent awareness
-        - Annamaya (index 12): Physical/grounded reality
+        - Material (index 12): Physicality/Syntax grounding
 
         This represents pure potential grounded in physical existence.
         """
@@ -2587,12 +2587,12 @@ class OntologicalHybridTransformer(nn.Module):
                 # Boost O12_ABS (index 11) - Absolute/transcendent
                 if final_layer.bias.shape[0] > 11:
                     final_layer.bias[11] = 1.0  # O12_ABS
-                # Boost Annamaya (index 12) - Physical grounding
+                # Boost Material (index 12) - Physicality grounding
                 if final_layer.bias.shape[0] > 12:
-                    final_layer.bias[12] = 0.8  # Annamaya
-                # Small boost to Pramana (index 17) - Valid cognition
+                    final_layer.bias[12] = 0.8  # Material
+                # Small boost to Fact (index 17) - Verified truth
                 if final_layer.bias.shape[0] > 17:
-                    final_layer.bias[17] = 0.3  # Pramana
+                    final_layer.bias[17] = 0.3  # Fact
 
     def compute_state_delta(
         self,

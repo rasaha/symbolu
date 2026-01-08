@@ -506,8 +506,8 @@ SOVEREIGN_R_MATRIX = torch.tensor([
     [0.1, 0.1, 0.3, 0.3, 0.2, 0.2, 0.1, 0.0, 0.2, 0.2, 0.2, 0.8],  # Smṛti (Memory)
 ], dtype=torch.float32)
 
-# Vṛtti names for logging/debugging
-VRTTI_NAMES = ["Pramāṇa", "Vikalpa", "Viparyaya", "Nidrā", "Smṛti"]
+# Vṛtti names for logging/debugging (English functional equivalents)
+VRTTI_NAMES = ["Fact", "Imagination", "Error", "Void", "Memory"]
 
 # 12 Ontological Layer names (patent-exact sequence)
 ONTOLOGICAL_LAYER_NAMES = [
@@ -3908,11 +3908,11 @@ class TrainingStateTracker:
         # Determine dominant Guna for logging
         gunas = self.state["gunas"]
         if gunas["s"] > gunas["r"] and gunas["s"] > gunas["t"]:
-            dominant = "Sattva"
+            dominant = "Lucidity"
         elif gunas["r"] > gunas["t"]:
-            dominant = "Rajas"
+            dominant = "Activity"
         else:
-            dominant = "Tamas"
+            dominant = "Stability"
 
         return {
             "gunas": self.state["gunas"].copy(),
@@ -3930,11 +3930,11 @@ class TrainingStateTracker:
         g = self.state["gunas"]
         # Determine dominant and icon
         if g["s"] > g["r"] and g["s"] > g["t"]:
-            icon = "☀️"  # Sattva - clarity
+            icon = "☀️"  # Lucidity - clarity
         elif g["r"] > g["t"]:
-            icon = "🔥"  # Rajas - action
+            icon = "🔥"  # Activity - dynamism
         else:
-            icon = "🌙"  # Tamas - inertia
+            icon = "🌙"  # Stability - inertia
 
         return f"S:{g['s']:.2f} R:{g['r']:.2f} T:{g['t']:.2f}{icon}"
 
@@ -4169,16 +4169,16 @@ class TrainingGunas:
         """Format Guna status for logging."""
         # Determine dominant
         if s > r and s > t:
-            icon = "☀️"  # Sattva
+            icon = "☀️"  # Lucidity
             state = "Learning"
         elif r > t:
-            icon = "🔥"  # Rajas
+            icon = "🔥"  # Activity
             state = "Active"
         else:
-            icon = "🌙"  # Tamas
+            icon = "🌙"  # Stability
             state = "Plateau"
 
-        return f"Gunas[{state}]: S:{s:.2f} R:{r:.2f} T:{t:.2f} {icon}"
+        return f"Gunas[{state}]: L:{s:.2f} A:{r:.2f} S:{t:.2f} {icon}"
 
     def get_action_recommendation(self, s: float, r: float, t: float) -> str:
         """
@@ -5948,7 +5948,7 @@ class DynamicRelaxationController:
                         "ppl_increase": ppl_increase,
                         "ppl": val_ppl,
                     })
-                    print(f"\n  ⚠️ [DynamicRelaxation] VIPARYAYA TRIGGERED!")
+                    print(f"\n  ⚠️ [DynamicRelaxation] ERROR STATE TRIGGERED!")
                     print(f"    PPL spike: {ppl_increase*100:.1f}% (threshold: {self.ppl_spike_threshold*100:.0f}%)")
                     print(f"    Reverting to {self.authority_split[0]}:{self.authority_split[1]} for {self.recovery_steps} steps")
 
@@ -6050,7 +6050,7 @@ class DynamicRelaxationController:
         This 're-stiffens' the model by returning to Authority-heavy configuration.
         Also releases Guna-Lock if active, as the layer structure is changing.
         """
-        print(f"\n  🔄 [DynamicRelaxation] VIPARYAYA RECOVERY: Reverting to {self.authority_split}")
+        print(f"\n  🔄 [DynamicRelaxation] ERROR RECOVERY: Reverting to {self.authority_split}")
 
         # Release Guna-Lock if active (layer structure is changing)
         if self.weight_transfer is not None and self.weight_transfer.guna_lock_active:
@@ -6530,7 +6530,7 @@ class UnifiedTrainingConfig:
     quiet: bool = False  # Quiet mode: only print Critical 5 (Loss, PPL, S/A, GC, Conf)
 
     # Kosha-Vritti Diagnostic System
-    enable_kosha_diagnostics: bool = False   # Enable Kosha-Vritti diagnostic output
+    enable_kosha_diagnostics: bool = False   # Enable Sheath-State diagnostic output
     kosha_log_every: int = 0                 # Log Kosha every N steps (0 = use log_every)
     lightweight_diagnostics: bool = True     # V9.7.0: Skip expensive gradient norm computation in diagnostics
 
@@ -7233,11 +7233,11 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         print(f"\n  [Ontological Hybrid] Two-Tier AGI Architecture enabled")
         print(f"    Sovereign State Dimension: {config.state_dim}D")
         if config.state_dim == SOVEREIGN_STATE_DIM:
-            print(f"      [0:12] 12 Bhavas | [12:17] 5 Koshas | [17:22] 5 Vrittis | [22:28] 6 Gunas | [28:32] Reserved")
+            print(f"      [0:12] 12 Bhavas | [12:17] 5 Sheaths | [17:22] 5 States | [22:28] 6 Qualia | [28:32] Reserved")
         print(f"    Project Per Head Dim: {config.project_per_head_dim}")
         print(f"    Hybrid Cosine Mode: {config.cosine_mode}")
         print(f"    Hybrid Decay Gamma: {config.decay_gamma}")
-        print(f"    Initial State: O12_ABS (Absolute) + Annamaya (Physical) - Grounded Awareness")
+        print(f"    Initial State: O12_ABS (Absolute) + Material (Physicality) - Grounded Awareness")
 
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
@@ -7680,17 +7680,17 @@ def compute_kosha_vritti_diagnostics(
     - Vritti State: Cognitive mode classification
 
     Kosha zones (Cartesian Quadrants per Symbolu Ontology):
-    - Q1 (0-90°):   +r, +t = ANANDAMAYA (Purpose/Bliss) - optimal flow
-    - Q2 (90-180°): -r, +t = VIJNANAMAYA (Logic/Wisdom) - valid learning
-    - Q3 (180-270°): -r, -t = ANNAMAYA (Action/Physical) - execution
-    - Q4 (270-360°): +r, -t = MANOMAYA (Memory/Mind) - recall
+    - Q1 (0-90°):   +r, +t = BLISSFUL (Unity/Integration) - optimal flow
+    - Q2 (90-180°): -r, +t = INTELLECTUAL (Pattern/Wisdom) - valid learning
+    - Q3 (180-270°): -r, -t = MATERIAL (Physicality/Syntax) - execution
+    - Q4 (270-360°): +r, -t = MENTAL (Semantics/Meaning) - recall
 
     Vritti states (with corrected Reality axis):
-    - PRAMANA (Valid Cognition): r < -0.3, t > 0.2 - confident learning
-    - VIPARYAYA (Hallucination): r < -0.5, t < -0.2 - over-confident, stagnant
-    - VIKALPA (Imagination): -0.3 < r < 0.3 - conceptual exploration
-    - NIDRA (Sleep/Plateau): r > 0.3, |t| < 0.2 - uncertain and stuck
-    - SMRITI (Memory): r < 0, t < -0.3 - confident but decaying
+    - FACT (Verified Truth): r < -0.3, t > 0.2 - confident learning
+    - ERROR (Hallucination): r < -0.5, t < -0.2 - over-confident, stagnant
+    - IMAGINATION (Conceptualization): -0.3 < r < 0.3 - conceptual exploration
+    - VOID (Null State): r > 0.3, |t| < 0.2 - uncertain and stuck
+    - MEMORY (Recall/Weights): r < 0, t < -0.3 - confident but decaying
     """
     result = {}
     result['diagnostic_layer'] = diagnostic_layer
@@ -7765,10 +7765,10 @@ def compute_kosha_vritti_diagnostics(
         # PHASE ANGLE: Geometric Truth using atan2(t, r)
         # This ensures the compass matches the map (r,t quadrant)
         # Standard polar angle: 0° = +r axis, counter-clockwise positive
-        #   Q1 (0-90°):   +r, +t = ANANDAMAYA
-        #   Q2 (90-180°): -r, +t = VIJNANAMAYA
-        #   Q3 (180-270°): -r, -t = ANNAMAYA
-        #   Q4 (270-360°): +r, -t = MANOMAYA
+        #   Q1 (0-90°):   +r, +t = BLISSFUL
+        #   Q2 (90-180°): -r, +t = INTELLECTUAL
+        #   Q3 (180-270°): -r, -t = MATERIAL
+        #   Q4 (270-360°): +r, -t = MENTAL
         # =========================================================================
         # atan2 returns [-180, 180], we convert to [0, 360]
         raw_angle = math.atan2(t, r) * 180 / math.pi  # Returns [-180, 180]
@@ -7782,26 +7782,26 @@ def compute_kosha_vritti_diagnostics(
         # =========================================================================
         # KOSHA ZONE: Direct Cartesian Quadrant Classification (Gemini Fix)
         # Use r,t coordinates directly instead of phase angle for accuracy
-        #   Q1: +r, +t = ANANDAMAYA (Purpose/Bliss)
-        #   Q2: -r, +t = VIJNANAMAYA (Logic/Wisdom)
-        #   Q3: -r, -t = ANNAMAYA (Action/Physical)
-        #   Q4: +r, -t = MANOMAYA (Memory/Mind)
+        #   Q1: +r, +t = BLISSFUL (Unity/Integration)
+        #   Q2: -r, +t = INTELLECTUAL (Pattern/Wisdom)
+        #   Q3: -r, -t = MATERIAL (Physicality/Syntax)
+        #   Q4: +r, -t = MENTAL (Semantics/Meaning)
         # =========================================================================
         r = result['r']
         t = result['t']
 
         if r > 0 and t > 0:
-            kosha = "ANANDAMAYA"
-            kosha_desc = "Purpose"
+            kosha = "BLISSFUL"
+            kosha_desc = "Unity"
         elif r < 0 and t > 0:
-            kosha = "VIJNANAMAYA"
-            kosha_desc = "Logic"
+            kosha = "INTELLECTUAL"
+            kosha_desc = "Wisdom"
         elif r < 0 and t < 0:
-            kosha = "ANNAMAYA"
-            kosha_desc = "Action"
+            kosha = "MATERIAL"
+            kosha_desc = "Physical"
         else:  # r > 0 and t < 0, or edge cases
-            kosha = "MANOMAYA"
-            kosha_desc = "Memory"
+            kosha = "MENTAL"
+            kosha_desc = "Meaning"
 
         result['kosha'] = kosha
         result['kosha_desc'] = kosha_desc
@@ -7814,31 +7814,31 @@ def compute_kosha_vritti_diagnostics(
 
         if r < -0.3 and t > 0.2:
             # Low entropy (confident) + High gradient (learning) = Valid cognition
-            vritti = "PRAMANA"
-            vritti_desc = "Valid Learning"
+            vritti = "FACT"
+            vritti_desc = "Verified Truth"
             vritti_icon = "✅"
         elif r < -0.5 and t < -0.2:
             # Very low entropy (over-confident) + Low gradient (stagnant) = Hallucination risk
-            vritti = "VIPARYAYA"
+            vritti = "ERROR"
             vritti_desc = "Hallucination Risk"
             vritti_icon = "⚠️"
         elif -0.3 < r < 0.3:
             # Transitional entropy = Conceptual exploration
-            vritti = "VIKALPA"
-            vritti_desc = "Conceptual Exploration"
+            vritti = "IMAGINATION"
+            vritti_desc = "Conceptualization"
             vritti_icon = "🔍"
         elif r > 0.3 and abs(t) < 0.2:
             # High entropy (uncertain) + Low gradient (not moving) = Plateau
-            vritti = "NIDRA"
-            vritti_desc = "Plateau/Stalled"
+            vritti = "VOID"
+            vritti_desc = "Null State"
             vritti_icon = "💤"
         elif r < 0 and t < -0.3:
             # Low entropy (confident) + Negative gradient (decaying) = Memory recall
-            vritti = "SMRITI"
-            vritti_desc = "Memory Recall"
+            vritti = "MEMORY"
+            vritti_desc = "Recall/Weights"
             vritti_icon = "📚"
         else:
-            vritti = "PRAJNA"
+            vritti = "BALANCED"
             vritti_desc = "Balanced State"
             vritti_icon = "⚖️"
 
@@ -7878,10 +7878,10 @@ def format_kosha_diagnostic(
     include_phase: bool = True,
     steering_metrics: Optional[Dict[str, float]] = None,
 ) -> str:
-    """Format Kosha diagnostic for logging output."""
+    """Format Sheath diagnostic for logging output."""
     lines = []
 
-    # Line 1: Kosha coordinates
+    # Line 1: Sheath coordinates
     r = diag['r']
     t = diag['t']
     reality_zone = diag['reality_zone']
@@ -7889,7 +7889,7 @@ def format_kosha_diagnostic(
     kosha = diag['kosha']
 
     lines.append(
-        f"    🧭 [KOSHA] Coords: r={r:+.2f} ({reality_zone}) | "
+        f"    🧭 [SHEATH] Coords: r={r:+.2f} ({reality_zone}) | "
         f"t={t:+.2f} ({time_zone}) --> Zone: {kosha}"
     )
 
@@ -7902,13 +7902,13 @@ def format_kosha_diagnostic(
             f"Entropy: {diag['entropy']:.2f} | GradNorm: {diag['grad_norm']:.2f}"
         )
 
-    # Line 3: Vritti state
+    # Line 3: State (Vritti)
     vritti = diag['vritti']
     vritti_desc = diag['vritti_desc']
     vritti_icon = diag['vritti_icon']
 
     lines.append(
-        f"    🧠 [VRITTI] State: {vritti} ({vritti_desc}) {vritti_icon}"
+        f"    🧠 [STATE] Mode: {vritti} ({vritti_desc}) {vritti_icon}"
     )
 
     # Line 4: Steering info (if active)
@@ -8296,7 +8296,7 @@ def compute_sovereign_state_diagnostics(
         - dominant_bhava: Name of most active Bhava (0-11)
         - active_kosha: Name of most active Kosha (12-16)
         - vritti_state: Name of current Vritti (17-21)
-        - guna_balance: Sattva/Rajas/Tamas balance
+        - guna_balance: Lucidity/Activity/Stability balance
         - delta_magnitude: How much state changed
         - All raw activations for detailed logging
     """
@@ -8304,10 +8304,10 @@ def compute_sovereign_state_diagnostics(
         'dominant_bhava': 'ABS',
         'dominant_bhava_idx': 11,
         'bhava_activation': 0.0,
-        'active_kosha': 'ANNA',
+        'active_kosha': 'MATERIAL',
         'active_kosha_idx': 0,
         'kosha_activation': 0.0,
-        'vritti_state': 'PRAMANA',
+        'vritti_state': 'FACT',
         'vritti_state_idx': 0,
         'vritti_activation': 0.0,
         'guna_sattva': 0.33,
@@ -8370,19 +8370,19 @@ def format_sovereign_state_diagnostic(diag: Dict[str, Any]) -> str:
     """
     # Main state summary
     bhava = diag.get('dominant_bhava', 'ABS')
-    kosha = diag.get('active_kosha', 'ANNA')
-    vritti = diag.get('vritti_state', 'PRAMANA')
+    kosha = diag.get('active_kosha', 'MATERIAL')
+    vritti = diag.get('vritti_state', 'FACT')
     delta = diag.get('delta_magnitude', 0.0)
 
-    # Guna balance as compact percentages
-    sattva = diag.get('guna_sattva', 0.33)
-    rajas = diag.get('guna_rajas', 0.33)
-    tamas = diag.get('guna_tamas', 0.33)
+    # Guna balance as compact percentages (L=Lucidity, A=Activity, S=Stability)
+    lucidity = diag.get('guna_sattva', 0.33)
+    activity = diag.get('guna_rajas', 0.33)
+    stability = diag.get('guna_tamas', 0.33)
 
     # Single line with all key info
     return (
-        f"    🔱 [32D] Bhava:{bhava} Kosha:{kosha} Vritti:{vritti} | "
-        f"Guna[S{sattva:.0%}/R{rajas:.0%}/T{tamas:.0%}] Δ={delta:.2f}"
+        f"    🔱 [32D] Bhava:{bhava} Sheath:{kosha} State:{vritti} | "
+        f"Qualia[L{lucidity:.0%}/A{activity:.0%}/S{stability:.0%}] Δ={delta:.2f}"
     )
 
 
@@ -8746,7 +8746,7 @@ def train(config: UnifiedTrainingConfig):
         grad_ema_alpha=0.1,  # Gradient norm EMA smoothing
         loss_ema_alpha=0.05,  # Loss velocity tracking
     )
-    print(f"  Training Gunas: ENABLED (S/R/T tracking)")
+    print(f"  Training Qualia: ENABLED (L/A/S tracking)")
 
     # Toroidal Evolutionary Bridge (O12 → O1 Recursive Intelligence)
     evolutionary_bridge = None
@@ -9139,10 +9139,10 @@ def train(config: UnifiedTrainingConfig):
     # Kosha-Vritti Diagnostic System
     if config.enable_kosha_diagnostics:
         kosha_interval = config.kosha_log_every if config.kosha_log_every > 0 else config.log_every
-        print(f"\n  🧭 Kosha-Vritti Diagnostics: ENABLED (every {kosha_interval} steps)")
+        print(f"\n  🧭 Sheath-State Diagnostics: ENABLED (every {kosha_interval} steps)")
         print(f"     Axes: Reality (r: +Unmanifest/-Manifest) | Time (t: -Past/+Future)")
-        print(f"     Quadrants: Q1=ANANDAMAYA | Q2=VIJNANAMAYA | Q3=ANNAMAYA | Q4=MANOMAYA")
-        print(f"     Vritti: PRAMANA | VIPARYAYA | VIKALPA | NIDRA | SMRITI | PRAJNA")
+        print(f"     Sheaths: Q1=BLISSFUL | Q2=INTELLECTUAL | Q3=MATERIAL | Q4=MENTAL")
+        print(f"     States: FACT | ERROR | IMAGINATION | VOID | MEMORY | BALANCED")
 
     # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
     # Moved BEFORE Kosha: Ontology grounds structure early, Kosha witnesses later
@@ -10182,16 +10182,16 @@ def train(config: UnifiedTrainingConfig):
                         know_state = training_state_tracker.state['cognitive_state']
                         log_msg += f" | Know:{know_state:.2f}"
 
-                    # Training Gunas: S/R/T with dominant state icon
+                    # Training Qualia: L/A/S (Lucidity/Activity/Stability) with dominant state icon
                     if training_gunas is not None:
-                        # Determine dominant Guna and icon
+                        # Determine dominant Qualia and icon
                         if guna_s > guna_r and guna_s > guna_t:
-                            guna_icon = "☀️"  # Sattva - clarity/learning
+                            guna_icon = "☀️"  # Lucidity - clarity/learning
                         elif guna_r > guna_t:
-                            guna_icon = "🔥"  # Rajas - action/activity
+                            guna_icon = "🔥"  # Activity - dynamism/turbulence
                         else:
-                            guna_icon = "🌙"  # Tamas - inertia/plateau
-                        log_msg += f" | S:{guna_s:.2f} R:{guna_r:.2f} T:{guna_t:.2f}{guna_icon}"
+                            guna_icon = "🌙"  # Stability - inertia/plateau
+                        log_msg += f" | L:{guna_s:.2f} A:{guna_r:.2f} S:{guna_t:.2f}{guna_icon}"
 
                     # Toroidal Bridge: Coherence and metacognitive status (only every 100 steps)
                     if evolutionary_bridge is not None and is_verbose_step:
@@ -11194,7 +11194,7 @@ def main():
     parser.add_argument("--quiet", action="store_true",
                        help="Quiet mode: only print Critical 5 (Loss, PPL, S/A, GC, Conf)")
     parser.add_argument("--enable_kosha_diagnostics", action="store_true",
-                       help="Enable Kosha-Vritti diagnostic output (Reality/Time axes, Vritti states)")
+                       help="Enable Sheath-State diagnostic output (Reality/Time axes, cognitive states)")
     parser.add_argument("--kosha_log_every", type=int, default=0,
                        help="Log Kosha diagnostics every N steps (0 = use log_every)")
     parser.add_argument("--lightweight_diagnostics", action="store_true", default=True,
