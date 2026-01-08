@@ -184,6 +184,267 @@ except ImportError as e:
     csr_wait_preload = None
     print(f"Warning: CSR Phoneme Provider not available: {e}")
 
+
+# =============================================================================
+# V9.7.0: CSR SPARSE DELAYED SUPERVISION (Whole Word Alignment)
+# =============================================================================
+# Fixes the "word salad" problem by applying ontological supervision only at
+# word boundaries, using whole-word varna lookup instead of per-subtoken.
+#
+# Key insight: For "Imperial" → [Im, per, ial], we should NOT penalize each
+# subtoken individually. Instead, we:
+#   1. Detect word boundaries (where next token starts with Ġ/space)
+#   2. Reconstruct the whole word from subtokens
+#   3. Look up varna for the WHOLE word
+#   4. Apply loss only at the last token of each word
+#   5. Weight content words higher than stopwords
+
+# Stopwords to filter (no ontological pressure on grammatical glue)
+CSR_STOPWORDS = {
+    'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i',
+    'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at',
+    'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her',
+    'she', 'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there',
+    'their', 'what', 'so', 'up', 'out', 'if', 'about', 'who', 'get',
+    'which', 'go', 'me', 'when', 'make', 'can', 'like', 'time', 'no',
+    'just', 'him', 'know', 'take', 'people', 'into', 'year', 'your',
+    'good', 'some', 'could', 'them', 'see', 'other', 'than', 'then',
+    'now', 'look', 'only', 'come', 'its', 'over', 'think', 'also',
+    'back', 'after', 'use', 'two', 'how', 'our', 'work', 'first',
+    'well', 'way', 'even', 'new', 'want', 'because', 'any', 'these',
+    'give', 'day', 'most', 'us'
+}
+
+
+class WholeWordCSRHelper:
+    """
+    V9.7.0: Helper for Sparse Delayed Supervision.
+
+    Computes word boundaries, content weights, and whole-word varna targets
+    for a batch of token sequences.
+
+    This enables ontological supervision at the semantic level (whole words)
+    rather than the syntactic level (subword tokens).
+    """
+
+    def __init__(self, tokenizer, csr_provider):
+        """
+        Initialize the helper.
+
+        Args:
+            tokenizer: HuggingFace tokenizer (GPT-2 style with Ġ prefix)
+            csr_provider: CSREmbeddingProvider instance for varna lookup
+        """
+        self.tokenizer = tokenizer
+        self.csr_provider = csr_provider
+        self._cache = {}  # Cache whole-word varna lookups
+
+    def compute_word_boundaries(self, input_ids: torch.Tensor) -> tuple:
+        """
+        Compute word boundaries and content weights for a batch.
+
+        Args:
+            input_ids: (batch_size, seq_len) tensor of token IDs
+
+        Returns:
+            word_end_mask: (batch_size, seq_len) tensor, 1.0 at word ends
+            content_weight: (batch_size, seq_len) tensor, 1.0 for content words
+            whole_word_varna: (batch_size, seq_len, 12) tensor of varna targets
+        """
+        batch_size, seq_len = input_ids.shape
+        device = input_ids.device
+
+        # Initialize outputs
+        word_end_mask = torch.zeros(batch_size, seq_len, device=device)
+        content_weight = torch.ones(batch_size, seq_len, device=device)
+        whole_word_varna = torch.zeros(batch_size, seq_len, 12, device=device)
+
+        # Process each sequence in batch
+        for b in range(batch_size):
+            ids = input_ids[b].tolist()
+            tokens = self.tokenizer.convert_ids_to_tokens(ids)
+
+            # Track current word being built
+            current_word_tokens = []
+            current_word_start = 0
+
+            for i, token in enumerate(tokens):
+                # Check if this token starts a new word (has Ġ prefix or is special)
+                is_word_start = (
+                    token.startswith('Ġ') or
+                    token.startswith('<') or  # Special tokens
+                    i == 0  # First token always starts a word
+                )
+
+                if is_word_start and current_word_tokens:
+                    # Previous word ended at i-1
+                    self._finalize_word(
+                        word_end_mask, content_weight, whole_word_varna,
+                        b, i - 1, current_word_tokens
+                    )
+                    current_word_tokens = []
+                    current_word_start = i
+
+                # Add to current word (strip Ġ prefix)
+                clean_token = token.lstrip('Ġ') if token.startswith('Ġ') else token
+                if not token.startswith('<'):  # Skip special tokens
+                    current_word_tokens.append(clean_token)
+
+            # Finalize last word
+            if current_word_tokens:
+                self._finalize_word(
+                    word_end_mask, content_weight, whole_word_varna,
+                    b, seq_len - 1, current_word_tokens
+                )
+
+        return word_end_mask, content_weight, whole_word_varna
+
+    def _finalize_word(
+        self,
+        word_end_mask: torch.Tensor,
+        content_weight: torch.Tensor,
+        whole_word_varna: torch.Tensor,
+        batch_idx: int,
+        end_pos: int,
+        word_tokens: list
+    ):
+        """
+        Finalize a word: mark boundary, compute weight, get varna.
+
+        Args:
+            word_end_mask: Mask tensor to update
+            content_weight: Weight tensor to update
+            whole_word_varna: Varna tensor to update
+            batch_idx: Batch index
+            end_pos: Position of word end token
+            word_tokens: List of subword tokens forming the word
+        """
+        # Mark word end
+        word_end_mask[batch_idx, end_pos] = 1.0
+
+        # Reconstruct whole word
+        whole_word = ''.join(word_tokens).lower()
+
+        # Check if stopword
+        if whole_word in CSR_STOPWORDS:
+            content_weight[batch_idx, end_pos] = 0.0
+        else:
+            content_weight[batch_idx, end_pos] = 1.0
+
+        # Get varna for whole word (cached)
+        varna = self._get_whole_word_varna(whole_word)
+        if varna is not None:
+            whole_word_varna[batch_idx, end_pos] = varna
+
+    def _get_whole_word_varna(self, word: str) -> Optional[torch.Tensor]:
+        """
+        Get 12D varna vector for a whole word.
+
+        Uses CSR provider's G2P and varna lookup, with caching.
+        """
+        if word in self._cache:
+            return self._cache[word]
+
+        if self.csr_provider is None:
+            return None
+
+        try:
+            # Get phonemes for whole word
+            phonemes = self.csr_provider.token_to_phonemes(word)
+            if not phonemes:
+                self._cache[word] = None
+                return None
+
+            # Convert phonemes to varna affinity
+            # Use the provider's internal method
+            varna = self.csr_provider._phonemes_to_varna_affinity(phonemes)
+            if varna is not None:
+                self._cache[word] = varna
+            else:
+                self._cache[word] = None
+            return varna
+
+        except Exception:
+            self._cache[word] = None
+            return None
+
+
+def calculate_sparse_csr_loss(
+    hidden_states: torch.Tensor,
+    whole_word_varna: torch.Tensor,
+    word_end_mask: torch.Tensor,
+    content_weight: torch.Tensor,
+    csr_projector: torch.nn.Module,
+    tau: float = 0.07,
+    lambda_csr: float = 0.1,
+    content_word_only: bool = False
+) -> tuple:
+    """
+    V9.7.0: Calculate CSR loss with Sparse Delayed Supervision.
+
+    Only applies loss at word boundaries, using whole-word varna targets.
+
+    Math:
+        L_CSR = Σ(RawLoss × WordEndMask × ContentWeight) / (Σ(WordEndMask × ContentWeight) + ε)
+
+    Args:
+        hidden_states: (batch, seq, hidden_dim) from alignment layer
+        whole_word_varna: (batch, seq, 12) varna targets for whole words
+        word_end_mask: (batch, seq) binary mask for word boundaries
+        content_weight: (batch, seq) weight (0 for stopwords, 1 for content)
+        csr_projector: Linear layer projecting hidden → varna space
+        tau: Temperature for InfoNCE
+        lambda_csr: CSR loss weight
+        content_word_only: If True, apply content_weight; otherwise all words
+
+    Returns:
+        (csr_loss, metrics_dict)
+    """
+    # Project hidden states to varna space
+    varna_predicted = csr_projector(hidden_states)  # (B, S, 12)
+
+    # Normalize both for cosine similarity
+    varna_pred_norm = F.normalize(varna_predicted, dim=-1)
+    varna_target_norm = F.normalize(whole_word_varna, dim=-1)
+
+    # Cosine similarity per position
+    similarity = (varna_pred_norm * varna_target_norm).sum(dim=-1)  # (B, S)
+
+    # Raw loss: (1 - similarity) / tau
+    raw_loss = (1 - similarity) / tau
+
+    # Apply masks
+    if content_word_only:
+        mask = word_end_mask * content_weight  # (B, S)
+    else:
+        mask = word_end_mask  # (B, S)
+
+    # Masked loss
+    masked_loss = raw_loss * mask
+
+    # Normalize by number of valid positions
+    num_valid = mask.sum() + 1e-6
+    csr_loss = (masked_loss.sum() / num_valid) * lambda_csr
+
+    # Compute metrics
+    with torch.no_grad():
+        # Average similarity at word boundaries
+        valid_sim = (similarity * mask).sum() / num_valid
+        # Number of content words vs stopwords
+        num_content = (word_end_mask * content_weight).sum()
+        num_stopword = (word_end_mask * (1 - content_weight)).sum()
+
+    metrics = {
+        'csr_sparse_loss': csr_loss.item(),
+        'csr_sparse_similarity': valid_sim.item(),
+        'csr_num_content_words': num_content.item(),
+        'csr_num_stopwords': num_stopword.item(),
+        'csr_num_boundaries': mask.sum().item(),
+    }
+
+    return csr_loss, metrics
+
+
 # Import SGP (Stochastic Gradient Persistence) and Sattvic Controller
 try:
     from symbolu.resonance.sgp import (
@@ -6255,11 +6516,15 @@ class UnifiedTrainingConfig:
     csr_trainable: bool = True               # Allow CSR projection to train
     csr_use_entropy_sink: bool = True        # Apply Layer 0 entropy floor
     csr_use_synthesis_gate: bool = True      # Apply Layer 11 synthesis reconciliation
-    csr_alignment_layer: int = 2             # V9.6.0: Which layer to use for CSR alignment (2=concept, 11=output)
+    csr_alignment_layer: int = 7             # V9.7.0: Which layer to use for CSR alignment (7=concept consolidation, 2=early, 11=output)
     # V9.6.8: CSR Projector Learning Rate Scale (Gemini recommendation)
     csr_projector_lr_scale: float = 0.1      # CSR projector learns at 0.1x main LR for stability
     # V9.6.8: CSR Gradient Warmup - re-enable gradients after model learns grammar
     csr_gradient_warmup_steps: int = 0       # Steps before re-enabling CSR gradients (0=always detached)
+
+    # V9.7.0: CSR Sparse Delayed Supervision (Whole Word Alignment)
+    csr_sparse_supervision: bool = False     # Enable word-boundary-only supervision
+    csr_content_word_only: bool = False      # Also filter out stopwords (requires sparse_supervision)
 
     # V9.6.0: Embedding configuration
     untie_embeddings: bool = False           # Untie input/output embeddings (CRITICAL when using CSR)
@@ -7623,6 +7888,11 @@ def train(config: UnifiedTrainingConfig):
         csr_entropy_sink = csr_entropy_sink.to(device) if config.csr_use_entropy_sink else None
         csr_synthesis_gate = csr_synthesis_gate.to(device) if config.csr_use_synthesis_gate else None
         print(f"  CSR Phoneme Grounding: ENABLED (λ_csr={config.csr_lambda}, τ={config.csr_tau} → {1/config.csr_tau:.1f}x gradient amp)")
+
+        # V9.7.0: Initialize Sparse Supervision helper if enabled
+        if config.csr_sparse_supervision:
+            print(f"  ⚡ [CSR SPARSE] Whole-Word Supervision: ENABLED at Layer {config.csr_alignment_layer}")
+            print(f"     Content-Only: {config.csr_content_word_only} | Stopwords filtered: {len(CSR_STOPWORDS)}")
     elif config.enable_csr and not CSR_AVAILABLE:
         print(f"  CSR Phoneme Grounding: Disabled (module not available)")
     else:
@@ -8289,25 +8559,72 @@ def train(config: UnifiedTrainingConfig):
                     # With both sides detached, CSR becomes monitor-only - no training signal flows.
                     csr_emb_for_loss = csr_emb.detach()
 
-                    csr_hidden_norm = torch.nn.functional.normalize(csr_hidden_for_loss, dim=-1)
-                    csr_emb_norm = torch.nn.functional.normalize(csr_emb_for_loss, dim=-1)
-                    csr_similarity = (csr_hidden_norm * csr_emb_norm).sum(dim=-1)
-                    # Temperature sharpening: (1 - sim) / tau creates steep gradient landscape
-                    # When alignment is poor (sim ≈ 0): loss = (1-0)/0.07 ≈ 14.3 → STRONG pressure
-                    # When alignment is good (sim ≈ 0.9): loss = (1-0.9)/0.07 ≈ 1.4 → mild pressure
-                    # V9.6.9: Detach confidence to make CSR fully observational
-                    # Without this, gradient flows: loss → csr_alignment_loss → csr_confidence → confidence_head
-                    csr_confidence_for_loss = csr_confidence.detach()
-                    csr_alignment_loss = ((1 - csr_similarity) / config.csr_tau) * csr_confidence_for_loss.squeeze(-1)
-                    csr_loss = csr_alignment_loss.mean() * config.csr_lambda
+                    # V9.7.0: Choose between Sparse (Whole-Word) and Dense (Per-Token) supervision
+                    if config.csr_sparse_supervision:
+                        # =====================================================================
+                        # SPARSE DELAYED SUPERVISION: Only apply loss at word boundaries
+                        # Uses whole-word varna lookup instead of per-subtoken
+                        # This fixes the "word salad" problem where grammar gets destroyed
+                        # =====================================================================
 
-                    # V9.6.9: CSR loss is now purely observational (no gradients flow)
-                    # We still track it for metrics, but it doesn't influence training
-                    # The cross-entropy LM loss is the ONLY training signal
-                    loss = loss + csr_loss
-                    csr_metrics['csr_loss'] = csr_loss.item()
-                    csr_metrics['csr_confidence'] = csr_confidence.mean().item()
-                    csr_metrics['csr_similarity'] = csr_similarity.mean().item()
+                        # Create helper for this batch (lazy init with caching)
+                        if not hasattr(model, '_whole_word_csr_helper'):
+                            model._whole_word_csr_helper = WholeWordCSRHelper(tokenizer, csr_provider)
+
+                        # Compute word boundaries and whole-word varna targets
+                        word_end_mask, content_weight, whole_word_varna = \
+                            model._whole_word_csr_helper.compute_word_boundaries(x)
+
+                        # Create projector for hidden → 12D varna space if needed
+                        if not hasattr(model, '_csr_varna_projector') or model._csr_varna_projector is None:
+                            hidden_dim = csr_hidden_for_loss.shape[-1]
+                            model._csr_varna_projector = torch.nn.Linear(hidden_dim, 12, bias=False).to(device)
+                            torch.nn.init.xavier_uniform_(model._csr_varna_projector.weight)
+                            print(f"  ⚡ [CSR SPARSE] Created varna projector: {hidden_dim}D → 12D")
+
+                        # Calculate sparse CSR loss
+                        csr_loss, sparse_metrics = calculate_sparse_csr_loss(
+                            hidden_states=csr_hidden_for_loss,
+                            whole_word_varna=whole_word_varna,
+                            word_end_mask=word_end_mask,
+                            content_weight=content_weight,
+                            csr_projector=model._csr_varna_projector,
+                            tau=config.csr_tau,
+                            lambda_csr=config.csr_lambda,
+                            content_word_only=config.csr_content_word_only,
+                        )
+
+                        loss = loss + csr_loss
+                        csr_metrics.update(sparse_metrics)
+                        csr_metrics['csr_loss'] = csr_loss.item()
+                        csr_metrics['csr_confidence'] = csr_confidence.mean().item()
+                        # Use sparse similarity metric
+                        csr_metrics['csr_similarity'] = sparse_metrics.get('csr_sparse_similarity', 0.0)
+
+                    else:
+                        # =====================================================================
+                        # DENSE PER-TOKEN SUPERVISION: Original method
+                        # Apply loss at every token position
+                        # =====================================================================
+                        csr_hidden_norm = torch.nn.functional.normalize(csr_hidden_for_loss, dim=-1)
+                        csr_emb_norm = torch.nn.functional.normalize(csr_emb_for_loss, dim=-1)
+                        csr_similarity = (csr_hidden_norm * csr_emb_norm).sum(dim=-1)
+                        # Temperature sharpening: (1 - sim) / tau creates steep gradient landscape
+                        # When alignment is poor (sim ≈ 0): loss = (1-0)/0.07 ≈ 14.3 → STRONG pressure
+                        # When alignment is good (sim ≈ 0.9): loss = (1-0.9)/0.07 ≈ 1.4 → mild pressure
+                        # V9.6.9: Detach confidence to make CSR fully observational
+                        # Without this, gradient flows: loss → csr_alignment_loss → csr_confidence → confidence_head
+                        csr_confidence_for_loss = csr_confidence.detach()
+                        csr_alignment_loss = ((1 - csr_similarity) / config.csr_tau) * csr_confidence_for_loss.squeeze(-1)
+                        csr_loss = csr_alignment_loss.mean() * config.csr_lambda
+
+                        # V9.6.9: CSR loss is now purely observational (no gradients flow)
+                        # We still track it for metrics, but it doesn't influence training
+                        # The cross-entropy LM loss is the ONLY training signal
+                        loss = loss + csr_loss
+                        csr_metrics['csr_loss'] = csr_loss.item()
+                        csr_metrics['csr_confidence'] = csr_confidence.mean().item()
+                        csr_metrics['csr_similarity'] = csr_similarity.mean().item()
                 else:
                     csr_metrics['csr_loss'] = 0.0
                     csr_metrics['csr_confidence'] = csr_confidence.mean().item() if csr_confidence is not None else 0.0
@@ -10131,14 +10448,19 @@ def main():
                        help="Apply Layer 0 entropy floor")
     parser.add_argument("--csr_use_synthesis_gate", action="store_true", default=True,
                        help="Apply Layer 11 synthesis reconciliation")
-    parser.add_argument("--csr_alignment_layer", type=int, default=2,
-                       help="Which layer to use for CSR alignment (2=concept formation, 11=output - AVOID)")
+    parser.add_argument("--csr_alignment_layer", type=int, default=7,
+                       help="Which layer to use for CSR alignment (7=concept consolidation, 2=early concept, 11=output - AVOID)")
     # V9.6.8: CSR Projector LR Scale (Gemini recommendation)
     parser.add_argument("--csr_projector_lr_scale", type=float, default=0.1,
                        help="CSR projector learns at this fraction of main LR (0.1 = 10x slower)")
     # V9.6.8: CSR Gradient Warmup (Gemini recommendation)
     parser.add_argument("--csr_gradient_warmup_steps", type=int, default=0,
                        help="Steps before re-enabling CSR gradients (0=always detached, 1000=re-enable after 1000 steps)")
+    # V9.7.0: CSR Sparse Delayed Supervision (Whole Word Alignment)
+    parser.add_argument("--csr_sparse_supervision", action="store_true",
+                       help="Enable word-boundary-only supervision (fixes 'word salad' problem)")
+    parser.add_argument("--csr_content_word_only", action="store_true",
+                       help="Only apply CSR to content words, skip stopwords (requires --csr_sparse_supervision)")
 
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
     # V9.6.8: Updated defaults per Gemini recommendation (stronger cement, less frequent)
@@ -10397,6 +10719,9 @@ def main():
         # V9.6.8: CSR Projector LR Scale and Gradient Warmup
         csr_projector_lr_scale=args.csr_projector_lr_scale,
         csr_gradient_warmup_steps=args.csr_gradient_warmup_steps,
+        # V9.7.0: CSR Sparse Delayed Supervision
+        csr_sparse_supervision=args.csr_sparse_supervision,
+        csr_content_word_only=args.csr_content_word_only,
         # SGP (Stochastic Gradient Persistence)
         enable_sgp=args.enable_sgp and not args.disable_sgp,
         sgp_base_rate=args.sgp_base_rate,
