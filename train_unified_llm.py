@@ -600,6 +600,160 @@ def get_dominant_vrtti(layer_idx: int) -> Tuple[int, str, float]:
     )
 
 
+# =============================================================================
+# V9.7.0: ONTOLOGICAL BRIDGE (Layer 9 - Authority→Sensory Transition)
+# =============================================================================
+# Projects Layer 9 hidden states to a 12-dimensional ontological space,
+# one dimension per Aspect (O1-O12). This creates a "witness point" at the
+# Authority→Sensory boundary where the model's internal representation is
+# aligned with the 12 Ontological Layers.
+#
+# Layer 9 (O9_WITNESSES) is the pivot point:
+# - Authority layers (0-8) have processed the input
+# - Sensory layers (9-11) will generate output
+# - The 12D projection creates an ontological "signature" at this transition
+#
+# Loss function encourages:
+# 1. Each dimension to specialize for its corresponding Aspect
+# 2. Coherence across the 12D representation (no collapsed dimensions)
+# 3. Alignment with the R-Matrix Pramāṇa weights (truth prioritization)
+# =============================================================================
+
+class OntologicalBridge(nn.Module):
+    """
+    V9.7.0: Projects Layer 9 hidden states to 12D ontological space.
+
+    This creates an ontological "witness point" at the Authority→Sensory
+    transition, grounding the model's internal representation in the
+    12 Aspects of Sovereign-1 ontology.
+
+    Architecture:
+        hidden_dim → 12D ontological projection
+        Each of the 12 dimensions corresponds to one Ontological Layer (O1-O12)
+
+    The loss encourages:
+        - Dimensional diversity (no collapse)
+        - Pramāṇa alignment (truth-bearing dimensions stronger)
+        - Coherent representation across aspects
+    """
+
+    def __init__(self, hidden_dim: int, device: torch.device = None):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.onto_dim = 12  # 12 Ontological Layers
+
+        # Projection to 12D ontological space
+        self.onto_proj = nn.Linear(hidden_dim, self.onto_dim, bias=False)
+
+        # Learnable target weights (initialized from R-Matrix Pramāṇa row)
+        # These are the "ideal" activation levels for each Aspect
+        pramana_weights = SOVEREIGN_R_MATRIX[0, :].clone()  # Truth row
+        self.register_buffer('pramana_target', pramana_weights)
+
+        # Layer norm for stable projections
+        self.onto_norm = nn.LayerNorm(self.onto_dim)
+
+        if device is not None:
+            self.to(device)
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,  # [B, N, D] from Layer 9
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """
+        Project hidden states to 12D ontological space.
+
+        Args:
+            hidden_states: Layer 9 hidden states [B, N, hidden_dim]
+
+        Returns:
+            onto_repr: 12D ontological representation [B, N, 12]
+            metrics: Dictionary with coherence and diversity metrics
+        """
+        # Project to 12D
+        onto_repr = self.onto_proj(hidden_states)  # [B, N, 12]
+        onto_repr = self.onto_norm(onto_repr)
+
+        # Compute metrics
+        with torch.no_grad():
+            # Mean activation per Aspect (across batch and sequence)
+            aspect_means = onto_repr.mean(dim=[0, 1])  # [12]
+
+            # Diversity: std across aspects (higher = more diverse)
+            diversity = aspect_means.std().item()
+
+            # Coherence: correlation with Pramāṇa targets
+            # Higher coherence = activations match truth-priority ordering
+            pramana_corr = torch.corrcoef(
+                torch.stack([aspect_means, self.pramana_target])
+            )[0, 1].item() if aspect_means.std() > 1e-6 else 0.0
+
+            # Witness strength: O9 dimension activation (self-reference)
+            o9_activation = aspect_means[8].item()  # O9 = index 8
+
+            metrics = {
+                'onto_diversity': diversity,
+                'onto_pramana_corr': pramana_corr if not math.isnan(pramana_corr) else 0.0,
+                'onto_o9_witness': o9_activation,
+                'onto_mean_activation': aspect_means.abs().mean().item(),
+            }
+
+        return onto_repr, metrics
+
+    def compute_loss(
+        self,
+        onto_repr: torch.Tensor,  # [B, N, 12]
+        lambda_diversity: float = 0.1,
+        lambda_pramana: float = 0.1,
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """
+        Compute ontological alignment loss.
+
+        Encourages:
+        1. Diversity: All 12 dimensions should be active (no collapse)
+        2. Pramāṇa alignment: Activations should follow truth-priority ordering
+
+        Args:
+            onto_repr: 12D ontological representation [B, N, 12]
+            lambda_diversity: Weight for diversity loss
+            lambda_pramana: Weight for Pramāṇa alignment loss
+
+        Returns:
+            total_loss: Combined ontological loss
+            metrics: Loss breakdown
+        """
+        # 1. Diversity loss: Penalize collapsed dimensions
+        # Use negative entropy of normalized activations
+        aspect_means = onto_repr.mean(dim=[0, 1])  # [12]
+        aspect_probs = F.softmax(aspect_means, dim=-1)
+        diversity_entropy = -(aspect_probs * torch.log(aspect_probs + 1e-10)).sum()
+        max_entropy = math.log(12)  # Maximum for uniform distribution
+        diversity_loss = (max_entropy - diversity_entropy) / max_entropy  # 0=diverse, 1=collapsed
+
+        # 2. Pramāṇa alignment loss: Match truth-priority ordering
+        # Encourage higher activations for high-Pramāṇa aspects (O7, O12)
+        # Use MSE between normalized activations and Pramāṇa targets
+        aspect_normalized = (aspect_means - aspect_means.mean()) / (aspect_means.std() + 1e-6)
+        pramana_normalized = (self.pramana_target - self.pramana_target.mean()) / (self.pramana_target.std() + 1e-6)
+        pramana_loss = F.mse_loss(aspect_normalized, pramana_normalized)
+
+        # Combined loss
+        total_loss = lambda_diversity * diversity_loss + lambda_pramana * pramana_loss
+
+        metrics = {
+            'onto_diversity_loss': diversity_loss.item(),
+            'onto_pramana_loss': pramana_loss.item(),
+            'onto_total_loss': total_loss.item(),
+        }
+
+        return total_loss, metrics
+
+
+def create_ontological_bridge(hidden_dim: int, device: torch.device = None) -> OntologicalBridge:
+    """Factory function to create OntologicalBridge."""
+    return OntologicalBridge(hidden_dim, device=device)
+
+
 def compute_rmatrix_loss_weight(
     layer_losses: torch.Tensor,
     num_layers: int = 12,
@@ -6370,6 +6524,12 @@ class UnifiedTrainingConfig:
     kosha_steering_warmup: int = 100         # Steps before steering activates
     kosha_steering_layer: int = 4            # V9.7.0: Layer for phase steering (4=grammar forming, 2=raw embeddings)
 
+    # V9.7.0: Ontological Bridge (Layer 9 - Authority→Sensory Transition)
+    enable_onto_bridge: bool = False         # Enable 12D ontological projection at Layer 9
+    onto_bridge_lambda: float = 0.1          # Weight for ontological bridge loss
+    onto_bridge_diversity: float = 0.1       # Weight for diversity component (prevent collapse)
+    onto_bridge_pramana: float = 0.1         # Weight for Pramāṇa alignment component
+
     # Dataset
     dataset: str = "wikitext103"  # "wikitext103", "wikitext2", or "fineweb"
     dataset_name: str = "HuggingFaceFW/fineweb"  # HuggingFace dataset name (for fineweb mode)
@@ -8418,6 +8578,16 @@ def train(config: UnifiedTrainingConfig):
         print(f"     Layer: {config.kosha_steering_layer} ({layer_desc})")
         print(f"     ⚠️  ACTIVE INTERVENTION - will modify loss landscape")
 
+    # V9.7.0: Ontological Bridge (Layer 9)
+    onto_bridge = None
+    if config.enable_onto_bridge:
+        onto_bridge = create_ontological_bridge(hidden_dim=config.d_model, device=device)
+        print(f"\n  🌉 Ontological Bridge: ENABLED (Layer 9 = O9_WITNESSES)")
+        print(f"     12D projection: hidden_dim → 12 Ontological Aspects")
+        print(f"     Lambda: {config.onto_bridge_lambda:.2f} | Diversity: {config.onto_bridge_diversity:.2f} | Pramāṇa: {config.onto_bridge_pramana:.2f}")
+        print(f"     Aspects: O1-O12 (Potential → Absolving)")
+        print(f"     ⚠️  ACTIVE INTERVENTION - shapes Authority→Sensory transition")
+
     print(f"\n{'='*70}")
     print("   STARTING TRAINING")
     print(f"{'='*70}\n")
@@ -8707,6 +8877,26 @@ def train(config: UnifiedTrainingConfig):
                                         synthesis_loss = (1 - coherence_val.mean()) * 0.05
                                         loss = loss + synthesis_loss
                                         csr_metrics['synthesis_loss'] = synthesis_loss.item()
+
+                        # V9.7.0: Ontological Bridge - Layer 9 (O9_WITNESSES) projection to 12D
+                        # This creates a "witness point" at the Authority→Sensory transition
+                        if onto_bridge is not None and len(layer_hidden_states) > 9:
+                            # DETACH to train only the bridge, not the main model
+                            layer_9_hidden = layer_hidden_states[9].detach()
+                            onto_repr, onto_metrics = onto_bridge(layer_9_hidden)
+                            onto_loss, onto_loss_metrics = onto_bridge.compute_loss(
+                                onto_repr,
+                                lambda_diversity=config.onto_bridge_diversity,
+                                lambda_pramana=config.onto_bridge_pramana,
+                            )
+                            # Scale by lambda and add to total loss
+                            scaled_onto_loss = config.onto_bridge_lambda * onto_loss
+                            loss = loss + scaled_onto_loss
+                            # Store metrics
+                            metrics['onto_bridge_loss'] = scaled_onto_loss.item()
+                            metrics['onto_diversity'] = onto_metrics.get('onto_diversity', 0.0)
+                            metrics['onto_pramana_corr'] = onto_metrics.get('onto_pramana_corr', 0.0)
+                            metrics['onto_o9_witness'] = onto_metrics.get('onto_o9_witness', 0.0)
 
             # Initialize default guna values for first iteration
             # (actual values computed later in the loop, but needed here for evolutionary bridge)
@@ -10329,6 +10519,15 @@ def main():
                        help="Steps before steering activates (default: 100)")
     parser.add_argument("--kosha_steering_layer", type=int, default=4,
                        help="Layer for phase steering (4=grammar forming, 2=raw embeddings, default: 4)")
+    # V9.7.0: Ontological Bridge (Layer 9)
+    parser.add_argument("--enable_onto_bridge", action="store_true",
+                       help="Enable 12D ontological projection at Layer 9 (Authority→Sensory transition)")
+    parser.add_argument("--onto_bridge_lambda", type=float, default=0.1,
+                       help="Weight for ontological bridge loss (default: 0.1)")
+    parser.add_argument("--onto_bridge_diversity", type=float, default=0.1,
+                       help="Weight for diversity component - prevents dimension collapse (default: 0.1)")
+    parser.add_argument("--onto_bridge_pramana", type=float, default=0.1,
+                       help="Weight for Pramāṇa alignment - truth prioritization (default: 0.1)")
     parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
     parser.add_argument("--save_every", type=int, default=1000,
@@ -10695,6 +10894,11 @@ def main():
         kosha_steering_force=args.kosha_steering_force,
         kosha_steering_warmup=args.kosha_steering_warmup,
         kosha_steering_layer=args.kosha_steering_layer,
+        # V9.7.0: Ontological Bridge (Layer 9)
+        enable_onto_bridge=args.enable_onto_bridge,
+        onto_bridge_lambda=args.onto_bridge_lambda,
+        onto_bridge_diversity=args.onto_bridge_diversity,
+        onto_bridge_pramana=args.onto_bridge_pramana,
         eval_every=args.eval_every,
         save_every=args.save_every,
         checkpoint_dir=args.checkpoint_dir,
