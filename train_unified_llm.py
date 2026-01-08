@@ -6519,6 +6519,7 @@ class UnifiedTrainingConfig:
     # Kosha-Vritti Diagnostic System
     enable_kosha_diagnostics: bool = False   # Enable Kosha-Vritti diagnostic output
     kosha_log_every: int = 0                 # Log Kosha every N steps (0 = use log_every)
+    lightweight_diagnostics: bool = True     # V9.7.0: Skip expensive gradient norm computation in diagnostics
 
     # Kosha Phase Steering (Active Intervention) - Layer 9 = O9_WITNESSES
     enable_kosha_steering: bool = False      # Enable phase coupling steering
@@ -10145,7 +10146,10 @@ def train(config: UnifiedTrainingConfig):
                         # V9.7.0: Layer-specific diagnostics - use kosha_steering_layer
                         # This ensures diagnostics measure the same layer that steering operates on
                         diag_layer = config.kosha_steering_layer
-                        layer_grad = compute_layer_gradient_norm(model, diag_layer) if diag_layer < 12 else 0.0
+                        # V9.7.0: Skip expensive layer gradient norm in lightweight mode
+                        layer_grad = 0.0
+                        if not config.lightweight_diagnostics and diag_layer < 12:
+                            layer_grad = compute_layer_gradient_norm(model, diag_layer)
 
                         # Compute diagnostics with layer-specific data
                         kosha_diag = compute_kosha_vritti_diagnostics(
@@ -10177,9 +10181,11 @@ def train(config: UnifiedTrainingConfig):
                         if hidden_state_extractor is not None:
                             csr_diag_hidden = hidden_state_extractor.get_hidden_states(outputs, x)
 
-                        # Layer-specific gradient for CSR
+                        # Layer-specific gradient for CSR (skip in lightweight mode)
                         csr_diag_layer = config.csr_alignment_layer
-                        csr_layer_grad = compute_layer_gradient_norm(model, csr_diag_layer) if csr_diag_layer < 12 else 0.0
+                        csr_layer_grad = 0.0
+                        if not config.lightweight_diagnostics and csr_diag_layer < 12:
+                            csr_layer_grad = compute_layer_gradient_norm(model, csr_diag_layer)
 
                         # Compute CSR diagnostics
                         csr_diag = compute_csr_diagnostics(
@@ -10200,19 +10206,23 @@ def train(config: UnifiedTrainingConfig):
                 # V9.7.0: Ontological Bridge Diagnostics (Layer 4 - Foundational Structure)
                 if config.enable_onto_bridge and global_step % kosha_log_interval == 0:
                     try:
-                        # Get hidden states for Onto Bridge layer
+                        # Get hidden states for Onto Bridge layer (skip in lightweight mode)
                         onto_diag_hidden = None
-                        if hidden_state_extractor is not None:
+                        if not config.lightweight_diagnostics and hidden_state_extractor is not None:
                             onto_diag_hidden = hidden_state_extractor.get_hidden_states(outputs, x)
 
-                        # Layer-specific gradient for Onto Bridge
+                        # Layer-specific gradient for Onto Bridge (skip in lightweight mode)
                         onto_diag_layer = config.onto_bridge_layer
-                        onto_layer_grad = compute_layer_gradient_norm(model, onto_diag_layer) if onto_diag_layer < 12 else 0.0
+                        onto_layer_grad = 0.0
+                        if not config.lightweight_diagnostics and onto_diag_layer < 12:
+                            onto_layer_grad = compute_layer_gradient_norm(model, onto_diag_layer)
 
-                        # Get onto_bridge module if available
-                        onto_bridge_module = onto_bridge if 'onto_bridge' in dir() else None
+                        # Get onto_bridge module (skip forward pass in lightweight mode)
+                        onto_bridge_module = None
+                        if not config.lightweight_diagnostics:
+                            onto_bridge_module = onto_bridge if 'onto_bridge' in dir() else None
 
-                        # Get onto metrics from training step
+                        # Get onto metrics from training step (always available, no extra computation)
                         onto_diag_metrics = {k: v for k, v in metrics.items() if k.startswith('onto_')}
 
                         # Compute Onto Bridge diagnostics
@@ -11058,6 +11068,10 @@ def main():
                        help="Enable Kosha-Vritti diagnostic output (Reality/Time axes, Vritti states)")
     parser.add_argument("--kosha_log_every", type=int, default=0,
                        help="Log Kosha diagnostics every N steps (0 = use log_every)")
+    parser.add_argument("--lightweight_diagnostics", action="store_true", default=True,
+                       help="Skip expensive gradient norm computation in diagnostics (default: True)")
+    parser.add_argument("--full_diagnostics", action="store_true",
+                       help="Enable full diagnostics with gradient norms (slower but more detailed)")
     parser.add_argument("--enable_kosha_steering", action="store_true",
                        help="Enable Kosha phase coupling steering (active intervention)")
     parser.add_argument("--kosha_steering_force", type=float, default=0.15,
@@ -11439,6 +11453,7 @@ def main():
         quiet=args.quiet,
         enable_kosha_diagnostics=args.enable_kosha_diagnostics,
         kosha_log_every=args.kosha_log_every,
+        lightweight_diagnostics=not args.full_diagnostics,  # Default True unless --full_diagnostics
         enable_kosha_steering=args.enable_kosha_steering,
         kosha_steering_force=args.kosha_steering_force,
         kosha_steering_warmup=args.kosha_steering_warmup,
