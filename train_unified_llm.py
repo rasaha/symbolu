@@ -9057,10 +9057,12 @@ def train(config: UnifiedTrainingConfig):
 
     print(f"\n{'='*70}")
     print("   STARTING TRAINING")
-    print(f"{'='*70}\n")
+    print(f"{'='*70}\n", flush=True)
 
     model.train()
+    print("  [DEBUG] Creating train iterator...", flush=True)
     train_iter = iter(train_loader)
+    print(f"  [DEBUG] Train iterator ready. Starting from step {global_step}", flush=True)
     step_start_time = time.time()
     running_loss = 0.0
     accumulation_step = 0
@@ -9082,6 +9084,8 @@ def train(config: UnifiedTrainingConfig):
 
     while global_step < config.max_steps:
         # Get batch
+        if global_step % config.log_every == 0 or global_step < 3:
+            print(f"  [DEBUG] Step {global_step}: Getting batch...", flush=True)
         try:
             batch = next(train_iter)
         except StopIteration:
