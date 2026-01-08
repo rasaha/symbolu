@@ -7449,29 +7449,29 @@ def compute_kosha_vritti_diagnostics(
             log_probs = torch.log(probs + 1e-10)
             entropy = -(probs * log_probs).sum(dim=-1).mean()
 
-            # Normalize entropy to [-1, +1] range
-            # Typical entropy range: 0 (certain) to ~10 (uniform over 50k vocab)
-            # Map: 0 → +1 (manifest), 5 → 0 (neutral), 10 → -1 (unmanifest)
-            max_entropy = 10.0  # Approximate for 50k vocab
+            # V9.7.0: Widened range for 50k vocab (max theoretical ~10.8)
+            # Map: 0 → +1 (manifest), 6 → 0 (neutral), 12 → -1 (unmanifest)
+            max_entropy = 12.0  # Widened from 10.0 for better spread
             r = 1.0 - (2.0 * entropy.item() / max_entropy)
             r = max(-1.0, min(1.0, r))  # Clamp to [-1, +1]
             result['r'] = r
             result['entropy'] = entropy.item()
         else:
             result['r'] = 0.0
-            result['entropy'] = 5.0
+            result['entropy'] = 6.0
 
         # =========================================================================
         # TIME AXIS (t): Gradient Norm → Temporal Orientation
         # High grad = future-oriented/learning (+1), Low grad = past-oriented/memory (-1)
         # =========================================================================
-        # Normalize gradient norm to [-1, +1]
-        # Typical grad norm range: 0.1 (stable) to 100+ (early training)
-        # Use log scale: log(0.1) ≈ -2.3, log(10) ≈ 2.3, log(100) ≈ 4.6
+        # V9.7.0: Use log10 scale with wider range for large models
+        # Typical range: 0.1 (very stable) to 1,000,000+ (early training large models)
+        # log10(0.1)=-1, log10(1)=0, log10(10)=1, log10(1000)=3, log10(1M)=6
         if grad_norm > 0:
-            log_grad = math.log(grad_norm + 1e-8)
-            # Map: log(0.1)=-2.3 → -1, log(1)=0 → 0, log(10)=2.3 → +1
-            t = log_grad / 2.3
+            log_grad = math.log10(grad_norm + 1e-8)
+            # Map: log10(0.01)=-2 → -1, log10(1)=0 → 0, log10(100)=2 → +1
+            # Divide by 3 to give good spread across typical training
+            t = log_grad / 3.0
             t = max(-1.0, min(1.0, t))
         else:
             t = 0.0
