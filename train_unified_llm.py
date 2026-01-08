@@ -10149,7 +10149,7 @@ def train(config: UnifiedTrainingConfig):
                 if metrics.get('sni_triggered', False):
                     log_msg += f"\n    --> [SNI] Low entropy ({metrics.get('onto_entropy', 0):.2f}) - injecting sensory noise"
 
-                print(log_msg)
+                print(log_msg, flush=True)  # V9.7.0: Flush for real-time output when piped to tee
 
                 # Kosha-Vritti Diagnostic System (Read-Only)
                 kosha_log_interval = config.kosha_log_every if config.kosha_log_every > 0 else config.log_every
