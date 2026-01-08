@@ -7481,6 +7481,45 @@ def _build_sovereign_state(
 # KOSHA-VRITTI DIAGNOSTIC SYSTEM
 # =============================================================================
 
+
+def compute_layer_gradient_norm(model: nn.Module, layer_idx: int) -> float:
+    """
+    V9.7.0: Compute gradient norm for a specific transformer layer.
+
+    This enables layer-specific Kosha diagnostics by measuring the gradient
+    magnitude at the target layer (e.g., Layer 9 for O9_WITNESSES).
+
+    Args:
+        model: The model with gradients computed
+        layer_idx: Which layer to measure (0-11)
+
+    Returns:
+        Gradient L2 norm for that layer's parameters
+    """
+    layer_grad_norm = 0.0
+    layer_found = False
+
+    # Try to find transformer layers in common locations
+    layers = None
+    for attr in ['layers', 'blocks', 'transformer_blocks', 'encoder_layers', 'decoder_layers']:
+        if hasattr(model, attr):
+            candidate = getattr(model, attr)
+            if isinstance(candidate, nn.ModuleList) and len(candidate) > layer_idx:
+                layers = candidate
+                break
+
+    if layers is not None and layer_idx < len(layers):
+        layer = layers[layer_idx]
+        for param in layer.parameters():
+            if param.grad is not None:
+                layer_grad_norm += param.grad.norm().item() ** 2
+                layer_found = True
+        layer_grad_norm = math.sqrt(layer_grad_norm) if layer_grad_norm > 0 else 0.0
+
+    # If layer not found, return 0 (caller will use fallback)
+    return layer_grad_norm if layer_found else 0.0
+
+
 def apply_kosha_phase_steering(
     embeddings: torch.Tensor,
     target_angle_rad: float,
@@ -7576,13 +7615,19 @@ def compute_kosha_vritti_diagnostics(
     grad_norm: float,
     hidden_states: Optional[List[torch.Tensor]] = None,
     metrics: Optional[Dict[str, float]] = None,
+    diagnostic_layer: int = 9,  # V9.7.0: Layer-specific diagnostics
+    layer_grad_norm: Optional[float] = None,  # V9.7.0: Layer-specific gradient
 ) -> Dict[str, Any]:
     """
     Compute Kosha-Vritti diagnostic coordinates.
 
+    V9.7.0: Now computes layer-specific diagnostics for accurate Kosha measurement.
+    - Reality Axis (r): Computed from diagnostic_layer hidden state entropy
+    - Time Axis (t): Computed from layer-specific gradient norm (or total if unavailable)
+
     This is a READ-ONLY diagnostic system that maps training state to:
-    - Reality Axis (r): +1 (Unmanifest/uncertain) to -1 (Manifest/confident) via logits entropy
-    - Time Axis (t): -1 (Past/Smriti) to +1 (Future/Pramana) via gradient norm
+    - Reality Axis (r): +1 (Unmanifest/uncertain) to -1 (Manifest/confident)
+    - Time Axis (t): -1 (Past/Smriti) to +1 (Future/Pramana)
     - Phase Angle: Current position in Kosha space (0-360°)
     - Vritti State: Cognitive mode classification
 
@@ -7600,47 +7645,73 @@ def compute_kosha_vritti_diagnostics(
     - SMRITI (Memory): r < 0, t < -0.3 - confident but decaying
     """
     result = {}
+    result['diagnostic_layer'] = diagnostic_layer
 
     with torch.no_grad():
         # =========================================================================
-        # REALITY AXIS (r): Logits Entropy → Manifestation Level
-        # High entropy = uncertain/unmanifest (-1), Low entropy = confident/manifest (+1)
+        # REALITY AXIS (r): Layer-Specific Hidden State Entropy
+        # V9.7.0: Compute from diagnostic_layer hidden states, not final logits
+        # High activation entropy = uncertain (-1), Low = confident/focused (+1)
         # =========================================================================
-        if logits is not None and logits.numel() > 0:
-            # Compute softmax probabilities
-            probs = F.softmax(logits.float(), dim=-1)
-            # Compute entropy: H = -sum(p * log(p))
-            log_probs = torch.log(probs + 1e-10)
-            entropy = -(probs * log_probs).sum(dim=-1).mean()
+        layer_entropy = None
+        if hidden_states is not None and len(hidden_states) > diagnostic_layer:
+            layer_hidden = hidden_states[diagnostic_layer]  # [B, N, D]
+            if layer_hidden is not None and layer_hidden.numel() > 0:
+                # Compute activation entropy across the hidden dimension
+                # Use softmax to get "attention" distribution over features
+                # This measures how focused vs distributed the activations are
+                layer_abs = layer_hidden.abs().float()  # [B, N, D]
+                # Normalize to probability-like distribution per position
+                layer_probs = layer_abs / (layer_abs.sum(dim=-1, keepdim=True) + 1e-10)
+                # Compute entropy: H = -sum(p * log(p))
+                log_probs = torch.log(layer_probs + 1e-10)
+                position_entropy = -(layer_probs * log_probs).sum(dim=-1)  # [B, N]
+                layer_entropy = position_entropy.mean().item()
 
-            # V9.7.0: Widened range for 50k vocab (max theoretical ~10.8)
-            # Map: 0 → +1 (manifest), 6 → 0 (neutral), 12 → -1 (unmanifest)
-            max_entropy = 12.0  # Widened from 10.0 for better spread
-            r = 1.0 - (2.0 * entropy.item() / max_entropy)
-            r = max(-1.0, min(1.0, r))  # Clamp to [-1, +1]
-            result['r'] = r
-            result['entropy'] = entropy.item()
-        else:
-            result['r'] = 0.0
-            result['entropy'] = 6.0
+                # Normalize: max entropy for D dimensions = log(D)
+                D = layer_hidden.shape[-1]
+                max_entropy = math.log(D)  # e.g., log(768) ≈ 6.6 for typical models
+                # Map: 0 → +1 (focused/manifest), max → -1 (diffuse/unmanifest)
+                r = 1.0 - (2.0 * layer_entropy / max_entropy)
+                r = max(-1.0, min(1.0, r))
+                result['r'] = r
+                result['entropy'] = layer_entropy
+                result['entropy_source'] = f'layer_{diagnostic_layer}'
+
+        # Fallback to logits entropy if layer-specific not available
+        if 'r' not in result:
+            if logits is not None and logits.numel() > 0:
+                probs = F.softmax(logits.float(), dim=-1)
+                log_probs = torch.log(probs + 1e-10)
+                entropy = -(probs * log_probs).sum(dim=-1).mean()
+                max_entropy = 12.0
+                r = 1.0 - (2.0 * entropy.item() / max_entropy)
+                r = max(-1.0, min(1.0, r))
+                result['r'] = r
+                result['entropy'] = entropy.item()
+                result['entropy_source'] = 'logits_fallback'
+            else:
+                result['r'] = 0.0
+                result['entropy'] = 6.0
+                result['entropy_source'] = 'default'
 
         # =========================================================================
-        # TIME AXIS (t): Gradient Norm → Temporal Orientation
-        # High grad = future-oriented/learning (+1), Low grad = past-oriented/memory (-1)
+        # TIME AXIS (t): Layer-Specific Gradient Norm
+        # V9.7.0: Use layer_grad_norm if provided, otherwise fall back to total
+        # High grad = future-oriented/learning (+1), Low = past-oriented/memory (-1)
         # =========================================================================
-        # V9.7.0: Use log10 scale with wider range for large models
-        # Typical range: 0.1 (very stable) to 1,000,000+ (early training large models)
-        # log10(0.1)=-1, log10(1)=0, log10(10)=1, log10(1000)=3, log10(1M)=6
-        if grad_norm > 0:
-            log_grad = math.log10(grad_norm + 1e-8)
+        effective_grad_norm = layer_grad_norm if layer_grad_norm is not None else grad_norm
+
+        if effective_grad_norm > 0:
+            log_grad = math.log10(effective_grad_norm + 1e-8)
             # Map: log10(0.01)=-2 → -1, log10(1)=0 → 0, log10(100)=2 → +1
-            # Divide by 3 to give good spread across typical training
             t = log_grad / 3.0
             t = max(-1.0, min(1.0, t))
         else:
             t = 0.0
         result['t'] = t
-        result['grad_norm'] = grad_norm
+        result['grad_norm'] = effective_grad_norm
+        result['grad_source'] = f'layer_{diagnostic_layer}' if layer_grad_norm is not None else 'total'
 
         # =========================================================================
         # PHASE ANGLE: Geometric Truth using atan2(t, r)
@@ -9674,15 +9745,21 @@ def train(config: UnifiedTrainingConfig):
                             kosha_hidden = hidden_state_extractor.get_hidden_states(outputs, x)
 
                         # V9.7.0: Use RAW gradient norm (before clipping) for meaningful Time axis
-                        # Post-clip norm is always ~1.0, which makes t=0 (useless)
                         kosha_grad_norm = raw_grad_norm if 'raw_grad_norm' in dir() else 0.0
 
-                        # Compute diagnostics
+                        # V9.7.0: Layer-specific diagnostics - use kosha_steering_layer
+                        # This ensures diagnostics measure the same layer that steering operates on
+                        diag_layer = config.kosha_steering_layer
+                        layer_grad = compute_layer_gradient_norm(model, diag_layer) if diag_layer < 12 else 0.0
+
+                        # Compute diagnostics with layer-specific data
                         kosha_diag = compute_kosha_vritti_diagnostics(
                             logits=kosha_logits,
                             grad_norm=kosha_grad_norm,
                             hidden_states=kosha_hidden,
                             metrics=metrics,
+                            diagnostic_layer=diag_layer,
+                            layer_grad_norm=layer_grad if layer_grad > 0 else None,
                         )
 
                         # Format and print (include steering metrics if available)
