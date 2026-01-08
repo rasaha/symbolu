@@ -6513,6 +6513,10 @@ class UnifiedTrainingConfig:
     evo_lr_modulation: bool = True           # Enable metacognitive LR adjustment
     evo_lr_slowdown: float = 0.5             # LR multiplier when SLOW_DOWN/BRAKE
     evo_lr_accelerate: float = 1.2           # LR multiplier when ACCELERATE
+    # V9.7.0: EvoFlow Fluency Gate - auto-engage gradients when model is fluent
+    evo_fluency_gate: bool = False           # Enable automatic EvoFlow gradient engagement
+    evo_fluency_min_steps: int = 2000        # Minimum steps before engagement (warmup)
+    evo_fluency_ppl_threshold: float = 100.0 # PPL threshold for "fluent" (engage when PPL < this)
 
     # CSR Phoneme-Ontological Grounding
     enable_csr: bool = True                  # Enable CSR phoneme grounding
@@ -8076,6 +8080,9 @@ def train(config: UnifiedTrainingConfig):
         print(f"    → Micro:{config.evo_micro_weight} Meso:{config.evo_meso_weight} Macro:{config.evo_macro_weight}")
         print(f"    → Delayed Resonance α={config.evo_resonance_alpha}")
         print(f"    → LR Modulation: SLOW={config.evo_lr_slowdown}x ACCEL={config.evo_lr_accelerate}x")
+        if config.evo_fluency_gate:
+            print(f"    🚦 Fluency Gate: ENABLED (engage when step>{config.evo_fluency_min_steps} AND PPL<{config.evo_fluency_ppl_threshold})")
+            print(f"       → EvoFlow gradients DORMANT until fluency achieved")
 
         # Create HiddenStateExtractor for models that don't return hidden_states
         hidden_state_extractor = HiddenStateExtractor(model, num_layers=12)
@@ -8429,6 +8436,10 @@ def train(config: UnifiedTrainingConfig):
 
     # Sensory flow tracking for Saturation Gate (used by DynamicRelaxationController)
     last_sensory_flow = 0.5  # Default value, updated each step from EvoFlow
+
+    # V9.7.0: EvoFlow Fluency Gate - track engagement state
+    evo_fluency_engaged = False  # Once True, stays True (no disengagement)
+    last_val_ppl = float('inf')  # Track validation PPL for fluency check
 
     while global_step < config.max_steps:
         # Get batch
@@ -8794,9 +8805,20 @@ def train(config: UnifiedTrainingConfig):
                 hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
 
                 if hidden_states is not None and len(hidden_states) > 0:
-                    # V9.6.7: DETACH all hidden states to prevent gradient flow!
-                    # This ensures EvoFlow only monitors layer coherence, doesn't corrupt the model
-                    hidden_states_detached = [h.detach() if h is not None else None for h in hidden_states]
+                    # V9.7.0: EvoFlow Fluency Gate - check if gradients should be engaged
+                    if config.evo_fluency_gate and not evo_fluency_engaged:
+                        if global_step >= config.evo_fluency_min_steps and last_val_ppl < config.evo_fluency_ppl_threshold:
+                            evo_fluency_engaged = True
+                            print(f"🚀 [FLUENCY GATE] EvoFlow Gradients ENGAGED! (Step {global_step}, PPL {last_val_ppl:.2f} < {config.evo_fluency_ppl_threshold})")
+
+                    # V9.6.7/V9.7.0: Conditionally detach hidden states
+                    if config.evo_fluency_gate and evo_fluency_engaged:
+                        # Fluency achieved - let gradients flow to main model
+                        hidden_states_detached = hidden_states  # No detach - gradients flow
+                    else:
+                        # V9.6.7: DETACH all hidden states to prevent gradient flow!
+                        # This ensures EvoFlow only monitors layer coherence, doesn't corrupt the model
+                        hidden_states_detached = [h.detach() if h is not None else None for h in hidden_states]
 
                     # V9.4.6: Sensory Noise Injection (SNI) - DISABLED in V9.6.7
                     # SNI modifies hidden states in-place which can cause gradient issues
@@ -9481,6 +9503,7 @@ def train(config: UnifiedTrainingConfig):
                     cached_val_batches=cached_val_batches,
                 )
                 val_ppl = val_metrics['ppl']
+                last_val_ppl = val_ppl  # V9.7.0: Update for EvoFlow Fluency Gate
                 current_coh = val_metrics.get('coherence', 0.75)
 
                 # PIDv2 Controller Update (V9.4.4)
@@ -10480,6 +10503,13 @@ def main():
                        help="LR multiplier when SLOW_DOWN/BRAKE")
     parser.add_argument("--evo_lr_accelerate", type=float, default=1.2,
                        help="LR multiplier when ACCELERATE")
+    # V9.7.0: EvoFlow Fluency Gate
+    parser.add_argument("--evo_fluency_gate", action="store_true",
+                       help="Enable automatic EvoFlow gradient engagement when fluent")
+    parser.add_argument("--evo_fluency_min_steps", type=int, default=2000,
+                       help="Minimum steps before EvoFlow engagement (warmup)")
+    parser.add_argument("--evo_fluency_ppl_threshold", type=float, default=100.0,
+                       help="PPL threshold for 'fluent' - engage EvoFlow when PPL < this")
 
     # CSR Phoneme-Ontological Grounding
     parser.add_argument("--enable_csr", action="store_true", default=True,
@@ -10767,6 +10797,10 @@ def main():
         evo_lr_modulation=args.evo_lr_modulation,
         evo_lr_slowdown=args.evo_lr_slowdown,
         evo_lr_accelerate=args.evo_lr_accelerate,
+        # V9.7.0: EvoFlow Fluency Gate
+        evo_fluency_gate=args.evo_fluency_gate,
+        evo_fluency_min_steps=args.evo_fluency_min_steps,
+        evo_fluency_ppl_threshold=args.evo_fluency_ppl_threshold,
         # CSR Phoneme-Ontological Grounding
         enable_csr=args.enable_csr and not args.disable_csr,
         csr_lambda=args.csr_lambda,
