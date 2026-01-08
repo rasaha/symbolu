@@ -6099,9 +6099,14 @@ class UnifiedTrainingConfig:
     # Logging verbosity
     quiet: bool = False  # Quiet mode: only print Critical 5 (Loss, PPL, S/A, GC, Conf)
 
-    # Kosha-Vritti Diagnostic System (Read-Only)
+    # Kosha-Vritti Diagnostic System
     enable_kosha_diagnostics: bool = False   # Enable Kosha-Vritti diagnostic output
     kosha_log_every: int = 0                 # Log Kosha every N steps (0 = use log_every)
+
+    # Kosha Phase Steering (Active Intervention)
+    enable_kosha_steering: bool = False      # Enable phase coupling steering
+    kosha_steering_force: float = 0.15       # Steering strength (0.0-1.0, start gentle)
+    kosha_steering_warmup: int = 100         # Steps before steering activates
 
     # Dataset
     dataset: str = "wikitext103"  # "wikitext103", "wikitext2", or "fineweb"
@@ -7034,8 +7039,98 @@ def _build_sovereign_state(
 
 
 # =============================================================================
-# KOSHA-VRITTI DIAGNOSTIC SYSTEM (Read-Only)
+# KOSHA-VRITTI DIAGNOSTIC SYSTEM
 # =============================================================================
+
+def apply_kosha_phase_steering(
+    embeddings: torch.Tensor,
+    target_angle_rad: float,
+    steering_force: float = 0.15,
+) -> torch.Tensor:
+    """
+    Apply phase coupling steering to rotate embeddings toward target angle.
+
+    This implements the 'Mind-Body Bridge' that couples:
+    - Entity State (Entropy/Gradients) → target_angle
+    - Representation (Embeddings) → current phase
+
+    The steering nudges the embedding phase toward the geometric target,
+    solving the 'Mind-Body Split' that causes hallucinations.
+
+    Args:
+        embeddings: Tensor of shape [..., D] where D is embedding dimension
+        target_angle_rad: Target angle in radians (from atan2(t, r))
+        steering_force: Nudge strength (0.0-1.0, default 0.15 = gentle)
+
+    Returns:
+        Steered embeddings with phase rotated toward target
+    """
+    with torch.no_grad():
+        # Treat embedding pairs as complex numbers: (dim_0, dim_1) = (Re, Im)
+        # This assumes the embedding dimension is even
+        D = embeddings.shape[-1]
+        if D % 2 != 0:
+            return embeddings  # Can't do complex pairing with odd dimension
+
+        # Reshape to pairs: [..., D] -> [..., D//2, 2]
+        emb_pairs = embeddings.view(*embeddings.shape[:-1], D // 2, 2)
+        real = emb_pairs[..., 0]  # Real part
+        imag = emb_pairs[..., 1]  # Imaginary part
+
+        # Compute current phase and magnitude for each pair
+        current_phase = torch.atan2(imag, real)  # [-π, π]
+        magnitude = torch.sqrt(real ** 2 + imag ** 2 + 1e-8)
+
+        # Calculate rotation needed (target - current)
+        # Wrap to [-π, π] to get shortest rotation
+        rotation_needed = target_angle_rad - current_phase
+        rotation_needed = torch.atan2(torch.sin(rotation_needed), torch.cos(rotation_needed))
+
+        # Apply gentle nudge (only a fraction of the full rotation)
+        nudge = rotation_needed * steering_force
+
+        # Compute new phase
+        new_phase = current_phase + nudge
+
+        # Reconstruct embeddings with new phase, same magnitude
+        new_real = magnitude * torch.cos(new_phase)
+        new_imag = magnitude * torch.sin(new_phase)
+
+        # Stack and reshape back: [..., D//2, 2] -> [..., D]
+        steered_pairs = torch.stack([new_real, new_imag], dim=-1)
+        steered_embeddings = steered_pairs.view(*embeddings.shape)
+
+    # Return with gradients enabled (clone to allow gradient flow)
+    return steered_embeddings.clone().detach().requires_grad_(embeddings.requires_grad)
+
+
+def compute_kosha_steering_stats(
+    embeddings: torch.Tensor,
+    target_angle_rad: float,
+) -> Dict[str, float]:
+    """Compute statistics about current embedding phase vs target."""
+    with torch.no_grad():
+        D = embeddings.shape[-1]
+        if D % 2 != 0:
+            return {'phase_error': 0.0, 'mean_phase': 0.0}
+
+        emb_pairs = embeddings.view(*embeddings.shape[:-1], D // 2, 2)
+        real = emb_pairs[..., 0]
+        imag = emb_pairs[..., 1]
+
+        current_phase = torch.atan2(imag, real)
+        mean_phase = current_phase.mean().item()
+
+        # Phase error (how far from target)
+        phase_error = abs(target_angle_rad - mean_phase)
+        phase_error = min(phase_error, 2 * math.pi - phase_error)  # Shortest arc
+
+    return {
+        'phase_error': math.degrees(phase_error),
+        'mean_phase': math.degrees(mean_phase),
+        'target_phase': math.degrees(target_angle_rad),
+    }
+
 
 def compute_kosha_vritti_diagnostics(
     logits: torch.Tensor,
@@ -7109,38 +7204,22 @@ def compute_kosha_vritti_diagnostics(
         result['grad_norm'] = grad_norm
 
         # =========================================================================
-        # PHASE ANGLE: Position in Kosha cycle (0-360°)
-        # Computed from hidden state statistics if available
+        # PHASE ANGLE: Geometric Truth using atan2(t, r)
+        # This ensures the compass matches the map (r,t quadrant)
+        # Standard polar angle: 0° = +r axis, counter-clockwise positive
+        #   Q1 (0-90°):   +r, +t = ANANDAMAYA
+        #   Q2 (90-180°): -r, +t = VIJNANAMAYA
+        #   Q3 (180-270°): -r, -t = ANNAMAYA
+        #   Q4 (270-360°): +r, -t = MANOMAYA
         # =========================================================================
-        if hidden_states is not None and len(hidden_states) > 0:
-            # Use statistics from hidden states to determine phase
-            # Mean activation magnitude indicates processing depth
-            try:
-                # Get middle layer for representative state
-                mid_idx = len(hidden_states) // 2
-                mid_state = hidden_states[mid_idx]
-                if mid_state is not None:
-                    # Compute activation statistics
-                    mean_act = mid_state.abs().mean().item()
-                    std_act = mid_state.std().item()
-
-                    # Phase from activation pattern (heuristic mapping)
-                    # Low mean + low std = early processing (0-60°)
-                    # High mean + low std = focused attention (120-180°)
-                    # High mean + high std = integration (180-240°)
-                    # Moderate mean + high std = flow state (240-300°)
-                    activation_magnitude = mean_act / (std_act + 0.1)
-                    phase_angle = (activation_magnitude * 60) % 360
-                else:
-                    phase_angle = 180.0  # Default to middle
-            except:
-                phase_angle = 180.0
-        else:
-            # Estimate phase from r and t coordinates
-            # Convert (r, t) to polar angle
-            phase_angle = (math.atan2(result['t'], result['r']) * 180 / math.pi + 180) % 360
+        # atan2 returns [-180, 180], we convert to [0, 360]
+        raw_angle = math.atan2(t, r) * 180 / math.pi  # Returns [-180, 180]
+        phase_angle = raw_angle if raw_angle >= 0 else raw_angle + 360  # Convert to [0, 360]
 
         result['phase_angle'] = phase_angle
+
+        # Compute target angle for steering (same as phase_angle when aligned)
+        result['target_angle'] = phase_angle
 
         # =========================================================================
         # KOSHA ZONE: Direct Cartesian Quadrant Classification (Gemini Fix)
@@ -7236,7 +7315,11 @@ def compute_kosha_vritti_diagnostics(
     return result
 
 
-def format_kosha_diagnostic(diag: Dict[str, Any], include_phase: bool = True) -> str:
+def format_kosha_diagnostic(
+    diag: Dict[str, Any],
+    include_phase: bool = True,
+    steering_metrics: Optional[Dict[str, float]] = None,
+) -> str:
     """Format Kosha diagnostic for logging output."""
     lines = []
 
@@ -7269,6 +7352,24 @@ def format_kosha_diagnostic(diag: Dict[str, Any], include_phase: bool = True) ->
     lines.append(
         f"    🧠 [VRITTI] State: {vritti} ({vritti_desc}) {vritti_icon}"
     )
+
+    # Line 4: Steering info (if active)
+    if steering_metrics is not None and 'kosha_steering_loss' in steering_metrics:
+        target = steering_metrics.get('kosha_target_angle', 0)
+        mean_phase = steering_metrics.get('kosha_mean_phase', 0)
+        phase_err = steering_metrics.get('kosha_phase_error', 0)
+        steer_loss = steering_metrics.get('kosha_steering_loss', 0)
+
+        # Direction indicator
+        if phase_err > 10:
+            direction = "↻" if mean_phase < target else "↺"
+        else:
+            direction = "✓"
+
+        lines.append(
+            f"    🎯 [STEER] Target: {target:.0f}° | Current: {mean_phase:.0f}° | "
+            f"Error: {phase_err:.1f}° {direction} | Loss: {steer_loss:.4f}"
+        )
 
     return "\n".join(lines)
 
@@ -8012,6 +8113,15 @@ def train(config: UnifiedTrainingConfig):
         print(f"     Quadrants: Q1=ANANDAMAYA | Q2=VIJNANAMAYA | Q3=ANNAMAYA | Q4=MANOMAYA")
         print(f"     Vritti: PRAMANA | VIPARYAYA | VIKALPA | NIDRA | SMRITI | PRAJNA")
 
+    # Kosha Phase Steering (Active Intervention)
+    if config.enable_kosha_steering:
+        print(f"\n  🎯 Kosha Phase Steering: ENABLED")
+        print(f"     Force: {config.kosha_steering_force:.2f} (0=off, 1=full)")
+        print(f"     Warmup: {config.kosha_steering_warmup} steps")
+        print(f"     Target: Geometric Truth from atan2(t, r)")
+        print(f"     Layer: 2 (Concept Formation)")
+        print(f"     ⚠️  ACTIVE INTERVENTION - will modify loss landscape")
+
     print(f"\n{'='*70}")
     print("   STARTING TRAINING")
     print(f"{'='*70}\n")
@@ -8396,6 +8506,85 @@ def train(config: UnifiedTrainingConfig):
                     entropy_floor_loss = config.entropy_floor_weight * entropy_deficit
                     loss = loss + entropy_floor_loss
                     metrics['entropy_floor_penalty'] = entropy_floor_loss
+
+            # =====================================================================
+            # KOSHA PHASE STEERING: Active Intervention for Mind-Body Alignment
+            # Couples Entity State (Entropy/Gradients) to Representation (Embeddings)
+            # =====================================================================
+            kosha_steering_loss = 0.0
+            if config.enable_kosha_steering and global_step >= config.kosha_steering_warmup:
+                try:
+                    # Compute Reality (r) and Time (t) axes from current state
+                    if config.model_type in ("ontological", "ontological_hybrid"):
+                        kosha_logits_for_steering = outputs.get("logits", None) if isinstance(outputs, dict) else None
+                    else:
+                        kosha_logits_for_steering = logits if 'logits' in dir() else None
+
+                    if kosha_logits_for_steering is not None:
+                        # Compute entropy (Reality axis)
+                        with torch.no_grad():
+                            steering_probs = F.softmax(kosha_logits_for_steering.float(), dim=-1)
+                            steering_log_probs = torch.log(steering_probs + 1e-10)
+                            steering_entropy = -(steering_probs * steering_log_probs).sum(dim=-1).mean()
+                            r_axis = 1.0 - (2.0 * steering_entropy.item() / 10.0)
+                            r_axis = max(-1.0, min(1.0, r_axis))
+
+                        # Get gradient norm (Time axis) - use captured value
+                        t_axis_grad = captured_grad_norm if 'captured_grad_norm' in dir() else 1.0
+                        if t_axis_grad > 0:
+                            t_axis = math.log(t_axis_grad + 1e-8) / 2.3
+                            t_axis = max(-1.0, min(1.0, t_axis))
+                        else:
+                            t_axis = 0.0
+
+                        # Compute target angle in radians
+                        target_angle_rad = math.atan2(t_axis, r_axis)
+
+                        # Get embeddings to steer (use early hidden state)
+                        if hidden_state_extractor is not None:
+                            steering_hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
+                            if steering_hidden_states is not None and len(steering_hidden_states) > 2:
+                                # Use Layer 2 (concept formation layer) for steering
+                                layer_to_steer = steering_hidden_states[2]
+
+                                # Compute phase alignment loss
+                                # Penalize deviation from target angle
+                                D = layer_to_steer.shape[-1]
+                                if D % 2 == 0:
+                                    emb_pairs = layer_to_steer.view(*layer_to_steer.shape[:-1], D // 2, 2)
+                                    real = emb_pairs[..., 0]
+                                    imag = emb_pairs[..., 1]
+                                    current_phase = torch.atan2(imag, real)
+
+                                    # Phase error: distance from target
+                                    phase_error = target_angle_rad - current_phase
+                                    # Wrap to [-π, π]
+                                    phase_error = torch.atan2(torch.sin(phase_error), torch.cos(phase_error))
+
+                                    # Steering loss: encourage phase alignment
+                                    # Use L2 loss scaled by steering force
+                                    kosha_steering_loss = (phase_error ** 2).mean() * config.kosha_steering_force
+
+                                    # Add to total loss (this creates gradient pressure toward target angle)
+                                    loss = loss + kosha_steering_loss
+
+                                    # Log steering metrics
+                                    metrics['kosha_steering_loss'] = kosha_steering_loss.item()
+                                    metrics['kosha_target_angle'] = math.degrees(target_angle_rad)
+                                    metrics['kosha_mean_phase'] = math.degrees(current_phase.mean().item())
+                                    metrics['kosha_phase_error'] = math.degrees(phase_error.abs().mean().item())
+
+                                    # One-time log when steering activates
+                                    if not hasattr(model, '_kosha_steering_logged'):
+                                        model._kosha_steering_logged = True
+                                        print(f"\n  🎯 [KOSHA STEERING] Activated at step {global_step}")
+                                        print(f"     Force: {config.kosha_steering_force:.2f}")
+                                        print(f"     Layer: 2 (Concept Formation)")
+                                        print(f"     Target: Geometric Truth from atan2(t, r)")
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  ⚠️ [KOSHA STEERING] Error: {e}")
 
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
@@ -8925,8 +9114,13 @@ def train(config: UnifiedTrainingConfig):
                             metrics=metrics,
                         )
 
-                        # Format and print
-                        kosha_output = format_kosha_diagnostic(kosha_diag, include_phase=True)
+                        # Format and print (include steering metrics if available)
+                        steering_metrics = {k: v for k, v in metrics.items() if k.startswith('kosha_')}
+                        kosha_output = format_kosha_diagnostic(
+                            kosha_diag,
+                            include_phase=True,
+                            steering_metrics=steering_metrics if steering_metrics else None,
+                        )
                         print(kosha_output, flush=True)
                     except Exception as e:
                         if global_step % 100 == 0:  # Limit error spam
@@ -9725,6 +9919,12 @@ def main():
                        help="Enable Kosha-Vritti diagnostic output (Reality/Time axes, Vritti states)")
     parser.add_argument("--kosha_log_every", type=int, default=0,
                        help="Log Kosha diagnostics every N steps (0 = use log_every)")
+    parser.add_argument("--enable_kosha_steering", action="store_true",
+                       help="Enable Kosha phase coupling steering (active intervention)")
+    parser.add_argument("--kosha_steering_force", type=float, default=0.15,
+                       help="Steering strength 0.0-1.0 (default: 0.15 = gentle nudge)")
+    parser.add_argument("--kosha_steering_warmup", type=int, default=100,
+                       help="Steps before steering activates (default: 100)")
     parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
     parser.add_argument("--save_every", type=int, default=1000,
@@ -10064,6 +10264,9 @@ def main():
         quiet=args.quiet,
         enable_kosha_diagnostics=args.enable_kosha_diagnostics,
         kosha_log_every=args.kosha_log_every,
+        enable_kosha_steering=args.enable_kosha_steering,
+        kosha_steering_force=args.kosha_steering_force,
+        kosha_steering_warmup=args.kosha_steering_warmup,
         eval_every=args.eval_every,
         save_every=args.save_every,
         checkpoint_dir=args.checkpoint_dir,
