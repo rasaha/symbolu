@@ -184,6 +184,267 @@ except ImportError as e:
     csr_wait_preload = None
     print(f"Warning: CSR Phoneme Provider not available: {e}")
 
+
+# =============================================================================
+# V9.7.0: CSR SPARSE DELAYED SUPERVISION (Whole Word Alignment)
+# =============================================================================
+# Fixes the "word salad" problem by applying ontological supervision only at
+# word boundaries, using whole-word varna lookup instead of per-subtoken.
+#
+# Key insight: For "Imperial" → [Im, per, ial], we should NOT penalize each
+# subtoken individually. Instead, we:
+#   1. Detect word boundaries (where next token starts with Ġ/space)
+#   2. Reconstruct the whole word from subtokens
+#   3. Look up varna for the WHOLE word
+#   4. Apply loss only at the last token of each word
+#   5. Weight content words higher than stopwords
+
+# Stopwords to filter (no ontological pressure on grammatical glue)
+CSR_STOPWORDS = {
+    'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i',
+    'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at',
+    'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her',
+    'she', 'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there',
+    'their', 'what', 'so', 'up', 'out', 'if', 'about', 'who', 'get',
+    'which', 'go', 'me', 'when', 'make', 'can', 'like', 'time', 'no',
+    'just', 'him', 'know', 'take', 'people', 'into', 'year', 'your',
+    'good', 'some', 'could', 'them', 'see', 'other', 'than', 'then',
+    'now', 'look', 'only', 'come', 'its', 'over', 'think', 'also',
+    'back', 'after', 'use', 'two', 'how', 'our', 'work', 'first',
+    'well', 'way', 'even', 'new', 'want', 'because', 'any', 'these',
+    'give', 'day', 'most', 'us'
+}
+
+
+class WholeWordCSRHelper:
+    """
+    V9.7.0: Helper for Sparse Delayed Supervision.
+
+    Computes word boundaries, content weights, and whole-word varna targets
+    for a batch of token sequences.
+
+    This enables ontological supervision at the semantic level (whole words)
+    rather than the syntactic level (subword tokens).
+    """
+
+    def __init__(self, tokenizer, csr_provider):
+        """
+        Initialize the helper.
+
+        Args:
+            tokenizer: HuggingFace tokenizer (GPT-2 style with Ġ prefix)
+            csr_provider: CSREmbeddingProvider instance for varna lookup
+        """
+        self.tokenizer = tokenizer
+        self.csr_provider = csr_provider
+        self._cache = {}  # Cache whole-word varna lookups
+
+    def compute_word_boundaries(self, input_ids: torch.Tensor) -> tuple:
+        """
+        Compute word boundaries and content weights for a batch.
+
+        Args:
+            input_ids: (batch_size, seq_len) tensor of token IDs
+
+        Returns:
+            word_end_mask: (batch_size, seq_len) tensor, 1.0 at word ends
+            content_weight: (batch_size, seq_len) tensor, 1.0 for content words
+            whole_word_varna: (batch_size, seq_len, 12) tensor of varna targets
+        """
+        batch_size, seq_len = input_ids.shape
+        device = input_ids.device
+
+        # Initialize outputs
+        word_end_mask = torch.zeros(batch_size, seq_len, device=device)
+        content_weight = torch.ones(batch_size, seq_len, device=device)
+        whole_word_varna = torch.zeros(batch_size, seq_len, 12, device=device)
+
+        # Process each sequence in batch
+        for b in range(batch_size):
+            ids = input_ids[b].tolist()
+            tokens = self.tokenizer.convert_ids_to_tokens(ids)
+
+            # Track current word being built
+            current_word_tokens = []
+            current_word_start = 0
+
+            for i, token in enumerate(tokens):
+                # Check if this token starts a new word (has Ġ prefix or is special)
+                is_word_start = (
+                    token.startswith('Ġ') or
+                    token.startswith('<') or  # Special tokens
+                    i == 0  # First token always starts a word
+                )
+
+                if is_word_start and current_word_tokens:
+                    # Previous word ended at i-1
+                    self._finalize_word(
+                        word_end_mask, content_weight, whole_word_varna,
+                        b, i - 1, current_word_tokens
+                    )
+                    current_word_tokens = []
+                    current_word_start = i
+
+                # Add to current word (strip Ġ prefix)
+                clean_token = token.lstrip('Ġ') if token.startswith('Ġ') else token
+                if not token.startswith('<'):  # Skip special tokens
+                    current_word_tokens.append(clean_token)
+
+            # Finalize last word
+            if current_word_tokens:
+                self._finalize_word(
+                    word_end_mask, content_weight, whole_word_varna,
+                    b, seq_len - 1, current_word_tokens
+                )
+
+        return word_end_mask, content_weight, whole_word_varna
+
+    def _finalize_word(
+        self,
+        word_end_mask: torch.Tensor,
+        content_weight: torch.Tensor,
+        whole_word_varna: torch.Tensor,
+        batch_idx: int,
+        end_pos: int,
+        word_tokens: list
+    ):
+        """
+        Finalize a word: mark boundary, compute weight, get varna.
+
+        Args:
+            word_end_mask: Mask tensor to update
+            content_weight: Weight tensor to update
+            whole_word_varna: Varna tensor to update
+            batch_idx: Batch index
+            end_pos: Position of word end token
+            word_tokens: List of subword tokens forming the word
+        """
+        # Mark word end
+        word_end_mask[batch_idx, end_pos] = 1.0
+
+        # Reconstruct whole word
+        whole_word = ''.join(word_tokens).lower()
+
+        # Check if stopword
+        if whole_word in CSR_STOPWORDS:
+            content_weight[batch_idx, end_pos] = 0.0
+        else:
+            content_weight[batch_idx, end_pos] = 1.0
+
+        # Get varna for whole word (cached)
+        varna = self._get_whole_word_varna(whole_word)
+        if varna is not None:
+            whole_word_varna[batch_idx, end_pos] = varna
+
+    def _get_whole_word_varna(self, word: str) -> Optional[torch.Tensor]:
+        """
+        Get 12D varna vector for a whole word.
+
+        Uses CSR provider's G2P and varna lookup, with caching.
+        """
+        if word in self._cache:
+            return self._cache[word]
+
+        if self.csr_provider is None:
+            return None
+
+        try:
+            # Get phonemes for whole word
+            phonemes = self.csr_provider.token_to_phonemes(word)
+            if not phonemes:
+                self._cache[word] = None
+                return None
+
+            # Convert phonemes to varna affinity
+            # Use the provider's internal method
+            varna = self.csr_provider._phonemes_to_varna_affinity(phonemes)
+            if varna is not None:
+                self._cache[word] = varna
+            else:
+                self._cache[word] = None
+            return varna
+
+        except Exception:
+            self._cache[word] = None
+            return None
+
+
+def calculate_sparse_csr_loss(
+    hidden_states: torch.Tensor,
+    whole_word_varna: torch.Tensor,
+    word_end_mask: torch.Tensor,
+    content_weight: torch.Tensor,
+    csr_projector: torch.nn.Module,
+    tau: float = 0.07,
+    lambda_csr: float = 0.1,
+    content_word_only: bool = False
+) -> tuple:
+    """
+    V9.7.0: Calculate CSR loss with Sparse Delayed Supervision.
+
+    Only applies loss at word boundaries, using whole-word varna targets.
+
+    Math:
+        L_CSR = Σ(RawLoss × WordEndMask × ContentWeight) / (Σ(WordEndMask × ContentWeight) + ε)
+
+    Args:
+        hidden_states: (batch, seq, hidden_dim) from alignment layer
+        whole_word_varna: (batch, seq, 12) varna targets for whole words
+        word_end_mask: (batch, seq) binary mask for word boundaries
+        content_weight: (batch, seq) weight (0 for stopwords, 1 for content)
+        csr_projector: Linear layer projecting hidden → varna space
+        tau: Temperature for InfoNCE
+        lambda_csr: CSR loss weight
+        content_word_only: If True, apply content_weight; otherwise all words
+
+    Returns:
+        (csr_loss, metrics_dict)
+    """
+    # Project hidden states to varna space
+    varna_predicted = csr_projector(hidden_states)  # (B, S, 12)
+
+    # Normalize both for cosine similarity
+    varna_pred_norm = F.normalize(varna_predicted, dim=-1)
+    varna_target_norm = F.normalize(whole_word_varna, dim=-1)
+
+    # Cosine similarity per position
+    similarity = (varna_pred_norm * varna_target_norm).sum(dim=-1)  # (B, S)
+
+    # Raw loss: (1 - similarity) / tau
+    raw_loss = (1 - similarity) / tau
+
+    # Apply masks
+    if content_word_only:
+        mask = word_end_mask * content_weight  # (B, S)
+    else:
+        mask = word_end_mask  # (B, S)
+
+    # Masked loss
+    masked_loss = raw_loss * mask
+
+    # Normalize by number of valid positions
+    num_valid = mask.sum() + 1e-6
+    csr_loss = (masked_loss.sum() / num_valid) * lambda_csr
+
+    # Compute metrics
+    with torch.no_grad():
+        # Average similarity at word boundaries
+        valid_sim = (similarity * mask).sum() / num_valid
+        # Number of content words vs stopwords
+        num_content = (word_end_mask * content_weight).sum()
+        num_stopword = (word_end_mask * (1 - content_weight)).sum()
+
+    metrics = {
+        'csr_sparse_loss': csr_loss.item(),
+        'csr_sparse_similarity': valid_sim.item(),
+        'csr_num_content_words': num_content.item(),
+        'csr_num_stopwords': num_stopword.item(),
+        'csr_num_boundaries': mask.sum().item(),
+    }
+
+    return csr_loss, metrics
+
+
 # Import SGP (Stochastic Gradient Persistence) and Sattvic Controller
 try:
     from symbolu.resonance.sgp import (
@@ -6099,6 +6360,15 @@ class UnifiedTrainingConfig:
     # Logging verbosity
     quiet: bool = False  # Quiet mode: only print Critical 5 (Loss, PPL, S/A, GC, Conf)
 
+    # Kosha-Vritti Diagnostic System
+    enable_kosha_diagnostics: bool = False   # Enable Kosha-Vritti diagnostic output
+    kosha_log_every: int = 0                 # Log Kosha every N steps (0 = use log_every)
+
+    # Kosha Phase Steering (Active Intervention)
+    enable_kosha_steering: bool = False      # Enable phase coupling steering
+    kosha_steering_force: float = 0.15       # Steering strength (0.0-1.0, start gentle)
+    kosha_steering_warmup: int = 100         # Steps before steering activates
+
     # Dataset
     dataset: str = "wikitext103"  # "wikitext103", "wikitext2", or "fineweb"
     dataset_name: str = "HuggingFaceFW/fineweb"  # HuggingFace dataset name (for fineweb mode)
@@ -6246,11 +6516,15 @@ class UnifiedTrainingConfig:
     csr_trainable: bool = True               # Allow CSR projection to train
     csr_use_entropy_sink: bool = True        # Apply Layer 0 entropy floor
     csr_use_synthesis_gate: bool = True      # Apply Layer 11 synthesis reconciliation
-    csr_alignment_layer: int = 2             # V9.6.0: Which layer to use for CSR alignment (2=concept, 11=output)
+    csr_alignment_layer: int = 7             # V9.7.0: Which layer to use for CSR alignment (7=concept consolidation, 2=early, 11=output)
     # V9.6.8: CSR Projector Learning Rate Scale (Gemini recommendation)
     csr_projector_lr_scale: float = 0.1      # CSR projector learns at 0.1x main LR for stability
     # V9.6.8: CSR Gradient Warmup - re-enable gradients after model learns grammar
     csr_gradient_warmup_steps: int = 0       # Steps before re-enabling CSR gradients (0=always detached)
+
+    # V9.7.0: CSR Sparse Delayed Supervision (Whole Word Alignment)
+    csr_sparse_supervision: bool = False     # Enable word-boundary-only supervision
+    csr_content_word_only: bool = False      # Also filter out stopwords (requires sparse_supervision)
 
     # V9.6.0: Embedding configuration
     untie_embeddings: bool = False           # Untie input/output embeddings (CRITICAL when using CSR)
@@ -7029,6 +7303,342 @@ def _build_sovereign_state(
     return torch.cat([guna, s_signal, r_signal, c_signal], dim=-1)
 
 
+# =============================================================================
+# KOSHA-VRITTI DIAGNOSTIC SYSTEM
+# =============================================================================
+
+def apply_kosha_phase_steering(
+    embeddings: torch.Tensor,
+    target_angle_rad: float,
+    steering_force: float = 0.15,
+) -> torch.Tensor:
+    """
+    Apply phase coupling steering to rotate embeddings toward target angle.
+
+    This implements the 'Mind-Body Bridge' that couples:
+    - Entity State (Entropy/Gradients) → target_angle
+    - Representation (Embeddings) → current phase
+
+    The steering nudges the embedding phase toward the geometric target,
+    solving the 'Mind-Body Split' that causes hallucinations.
+
+    Args:
+        embeddings: Tensor of shape [..., D] where D is embedding dimension
+        target_angle_rad: Target angle in radians (from atan2(t, r))
+        steering_force: Nudge strength (0.0-1.0, default 0.15 = gentle)
+
+    Returns:
+        Steered embeddings with phase rotated toward target
+    """
+    with torch.no_grad():
+        # Treat embedding pairs as complex numbers: (dim_0, dim_1) = (Re, Im)
+        # This assumes the embedding dimension is even
+        D = embeddings.shape[-1]
+        if D % 2 != 0:
+            return embeddings  # Can't do complex pairing with odd dimension
+
+        # Reshape to pairs: [..., D] -> [..., D//2, 2]
+        emb_pairs = embeddings.view(*embeddings.shape[:-1], D // 2, 2)
+        real = emb_pairs[..., 0]  # Real part
+        imag = emb_pairs[..., 1]  # Imaginary part
+
+        # Compute current phase and magnitude for each pair
+        current_phase = torch.atan2(imag, real)  # [-π, π]
+        magnitude = torch.sqrt(real ** 2 + imag ** 2 + 1e-8)
+
+        # Calculate rotation needed (target - current)
+        # Wrap to [-π, π] to get shortest rotation
+        rotation_needed = target_angle_rad - current_phase
+        rotation_needed = torch.atan2(torch.sin(rotation_needed), torch.cos(rotation_needed))
+
+        # Apply gentle nudge (only a fraction of the full rotation)
+        nudge = rotation_needed * steering_force
+
+        # Compute new phase
+        new_phase = current_phase + nudge
+
+        # Reconstruct embeddings with new phase, same magnitude
+        new_real = magnitude * torch.cos(new_phase)
+        new_imag = magnitude * torch.sin(new_phase)
+
+        # Stack and reshape back: [..., D//2, 2] -> [..., D]
+        steered_pairs = torch.stack([new_real, new_imag], dim=-1)
+        steered_embeddings = steered_pairs.view(*embeddings.shape)
+
+    # Return with gradients enabled (clone to allow gradient flow)
+    return steered_embeddings.clone().detach().requires_grad_(embeddings.requires_grad)
+
+
+def compute_kosha_steering_stats(
+    embeddings: torch.Tensor,
+    target_angle_rad: float,
+) -> Dict[str, float]:
+    """Compute statistics about current embedding phase vs target."""
+    with torch.no_grad():
+        D = embeddings.shape[-1]
+        if D % 2 != 0:
+            return {'phase_error': 0.0, 'mean_phase': 0.0}
+
+        emb_pairs = embeddings.view(*embeddings.shape[:-1], D // 2, 2)
+        real = emb_pairs[..., 0]
+        imag = emb_pairs[..., 1]
+
+        current_phase = torch.atan2(imag, real)
+        mean_phase = current_phase.mean().item()
+
+        # Phase error (how far from target)
+        phase_error = abs(target_angle_rad - mean_phase)
+        phase_error = min(phase_error, 2 * math.pi - phase_error)  # Shortest arc
+
+    return {
+        'phase_error': math.degrees(phase_error),
+        'mean_phase': math.degrees(mean_phase),
+        'target_phase': math.degrees(target_angle_rad),
+    }
+
+
+def compute_kosha_vritti_diagnostics(
+    logits: torch.Tensor,
+    grad_norm: float,
+    hidden_states: Optional[List[torch.Tensor]] = None,
+    metrics: Optional[Dict[str, float]] = None,
+) -> Dict[str, Any]:
+    """
+    Compute Kosha-Vritti diagnostic coordinates.
+
+    This is a READ-ONLY diagnostic system that maps training state to:
+    - Reality Axis (r): +1 (Unmanifest/uncertain) to -1 (Manifest/confident) via logits entropy
+    - Time Axis (t): -1 (Past/Smriti) to +1 (Future/Pramana) via gradient norm
+    - Phase Angle: Current position in Kosha space (0-360°)
+    - Vritti State: Cognitive mode classification
+
+    Kosha zones (Cartesian Quadrants per Symbolu Ontology):
+    - Q1 (0-90°):   +r, +t = ANANDAMAYA (Purpose/Bliss) - optimal flow
+    - Q2 (90-180°): -r, +t = VIJNANAMAYA (Logic/Wisdom) - valid learning
+    - Q3 (180-270°): -r, -t = ANNAMAYA (Action/Physical) - execution
+    - Q4 (270-360°): +r, -t = MANOMAYA (Memory/Mind) - recall
+
+    Vritti states (with corrected Reality axis):
+    - PRAMANA (Valid Cognition): r < -0.3, t > 0.2 - confident learning
+    - VIPARYAYA (Hallucination): r < -0.5, t < -0.2 - over-confident, stagnant
+    - VIKALPA (Imagination): -0.3 < r < 0.3 - conceptual exploration
+    - NIDRA (Sleep/Plateau): r > 0.3, |t| < 0.2 - uncertain and stuck
+    - SMRITI (Memory): r < 0, t < -0.3 - confident but decaying
+    """
+    result = {}
+
+    with torch.no_grad():
+        # =========================================================================
+        # REALITY AXIS (r): Logits Entropy → Manifestation Level
+        # High entropy = uncertain/unmanifest (-1), Low entropy = confident/manifest (+1)
+        # =========================================================================
+        if logits is not None and logits.numel() > 0:
+            # Compute softmax probabilities
+            probs = F.softmax(logits.float(), dim=-1)
+            # Compute entropy: H = -sum(p * log(p))
+            log_probs = torch.log(probs + 1e-10)
+            entropy = -(probs * log_probs).sum(dim=-1).mean()
+
+            # Normalize entropy to [-1, +1] range
+            # Typical entropy range: 0 (certain) to ~10 (uniform over 50k vocab)
+            # Map: 0 → +1 (manifest), 5 → 0 (neutral), 10 → -1 (unmanifest)
+            max_entropy = 10.0  # Approximate for 50k vocab
+            r = 1.0 - (2.0 * entropy.item() / max_entropy)
+            r = max(-1.0, min(1.0, r))  # Clamp to [-1, +1]
+            result['r'] = r
+            result['entropy'] = entropy.item()
+        else:
+            result['r'] = 0.0
+            result['entropy'] = 5.0
+
+        # =========================================================================
+        # TIME AXIS (t): Gradient Norm → Temporal Orientation
+        # High grad = future-oriented/learning (+1), Low grad = past-oriented/memory (-1)
+        # =========================================================================
+        # Normalize gradient norm to [-1, +1]
+        # Typical grad norm range: 0.1 (stable) to 100+ (early training)
+        # Use log scale: log(0.1) ≈ -2.3, log(10) ≈ 2.3, log(100) ≈ 4.6
+        if grad_norm > 0:
+            log_grad = math.log(grad_norm + 1e-8)
+            # Map: log(0.1)=-2.3 → -1, log(1)=0 → 0, log(10)=2.3 → +1
+            t = log_grad / 2.3
+            t = max(-1.0, min(1.0, t))
+        else:
+            t = 0.0
+        result['t'] = t
+        result['grad_norm'] = grad_norm
+
+        # =========================================================================
+        # PHASE ANGLE: Geometric Truth using atan2(t, r)
+        # This ensures the compass matches the map (r,t quadrant)
+        # Standard polar angle: 0° = +r axis, counter-clockwise positive
+        #   Q1 (0-90°):   +r, +t = ANANDAMAYA
+        #   Q2 (90-180°): -r, +t = VIJNANAMAYA
+        #   Q3 (180-270°): -r, -t = ANNAMAYA
+        #   Q4 (270-360°): +r, -t = MANOMAYA
+        # =========================================================================
+        # atan2 returns [-180, 180], we convert to [0, 360]
+        raw_angle = math.atan2(t, r) * 180 / math.pi  # Returns [-180, 180]
+        phase_angle = raw_angle if raw_angle >= 0 else raw_angle + 360  # Convert to [0, 360]
+
+        result['phase_angle'] = phase_angle
+
+        # Compute target angle for steering (same as phase_angle when aligned)
+        result['target_angle'] = phase_angle
+
+        # =========================================================================
+        # KOSHA ZONE: Direct Cartesian Quadrant Classification (Gemini Fix)
+        # Use r,t coordinates directly instead of phase angle for accuracy
+        #   Q1: +r, +t = ANANDAMAYA (Purpose/Bliss)
+        #   Q2: -r, +t = VIJNANAMAYA (Logic/Wisdom)
+        #   Q3: -r, -t = ANNAMAYA (Action/Physical)
+        #   Q4: +r, -t = MANOMAYA (Memory/Mind)
+        # =========================================================================
+        r = result['r']
+        t = result['t']
+
+        if r > 0 and t > 0:
+            kosha = "ANANDAMAYA"
+            kosha_desc = "Purpose"
+        elif r < 0 and t > 0:
+            kosha = "VIJNANAMAYA"
+            kosha_desc = "Logic"
+        elif r < 0 and t < 0:
+            kosha = "ANNAMAYA"
+            kosha_desc = "Action"
+        else:  # r > 0 and t < 0, or edge cases
+            kosha = "MANOMAYA"
+            kosha_desc = "Memory"
+
+        result['kosha'] = kosha
+        result['kosha_desc'] = kosha_desc
+
+        # =========================================================================
+        # VRITTI STATE: Cognitive mode classification (Corrected per Symbolu Ontology)
+        # With corrected Reality axis: +r = Unmanifest (uncertain), -r = Manifest (confident)
+        # =========================================================================
+        # r and t already defined above for Kosha zone
+
+        if r < -0.3 and t > 0.2:
+            # Low entropy (confident) + High gradient (learning) = Valid cognition
+            vritti = "PRAMANA"
+            vritti_desc = "Valid Learning"
+            vritti_icon = "✅"
+        elif r < -0.5 and t < -0.2:
+            # Very low entropy (over-confident) + Low gradient (stagnant) = Hallucination risk
+            vritti = "VIPARYAYA"
+            vritti_desc = "Hallucination Risk"
+            vritti_icon = "⚠️"
+        elif -0.3 < r < 0.3:
+            # Transitional entropy = Conceptual exploration
+            vritti = "VIKALPA"
+            vritti_desc = "Conceptual Exploration"
+            vritti_icon = "🔍"
+        elif r > 0.3 and abs(t) < 0.2:
+            # High entropy (uncertain) + Low gradient (not moving) = Plateau
+            vritti = "NIDRA"
+            vritti_desc = "Plateau/Stalled"
+            vritti_icon = "💤"
+        elif r < 0 and t < -0.3:
+            # Low entropy (confident) + Negative gradient (decaying) = Memory recall
+            vritti = "SMRITI"
+            vritti_desc = "Memory Recall"
+            vritti_icon = "📚"
+        else:
+            vritti = "PRAJNA"
+            vritti_desc = "Balanced State"
+            vritti_icon = "⚖️"
+
+        result['vritti'] = vritti
+        result['vritti_desc'] = vritti_desc
+        result['vritti_icon'] = vritti_icon
+
+        # =========================================================================
+        # REALITY ZONE: Manifest vs Unmanifest (Corrected per Symbolu Ontology)
+        # Gemini Correction: +r = Unmanifest (high entropy/potential)
+        #                    -r = Manifest (low entropy/concrete)
+        # =========================================================================
+        if r > 0.3:
+            reality_zone = "Unmanifest"  # High entropy = abstract/potential
+        elif r < -0.3:
+            reality_zone = "Manifest"    # Low entropy = concrete/actualized
+        else:
+            reality_zone = "Transitional"
+        result['reality_zone'] = reality_zone
+
+        # =========================================================================
+        # TIME ZONE: Past, Present, Future
+        # =========================================================================
+        if t > 0.3:
+            time_zone = "Future"
+        elif t < -0.3:
+            time_zone = "Past"
+        else:
+            time_zone = "Present"
+        result['time_zone'] = time_zone
+
+    return result
+
+
+def format_kosha_diagnostic(
+    diag: Dict[str, Any],
+    include_phase: bool = True,
+    steering_metrics: Optional[Dict[str, float]] = None,
+) -> str:
+    """Format Kosha diagnostic for logging output."""
+    lines = []
+
+    # Line 1: Kosha coordinates
+    r = diag['r']
+    t = diag['t']
+    reality_zone = diag['reality_zone']
+    time_zone = diag['time_zone']
+    kosha = diag['kosha']
+
+    lines.append(
+        f"    🧭 [KOSHA] Coords: r={r:+.2f} ({reality_zone}) | "
+        f"t={t:+.2f} ({time_zone}) --> Zone: {kosha}"
+    )
+
+    # Line 2: Phase angle (optional)
+    if include_phase:
+        phase = diag['phase_angle']
+        kosha_desc = diag['kosha_desc']
+        lines.append(
+            f"    📐 [PHASE] Angle: {phase:.0f}° ({kosha_desc}) | "
+            f"Entropy: {diag['entropy']:.2f} | GradNorm: {diag['grad_norm']:.2f}"
+        )
+
+    # Line 3: Vritti state
+    vritti = diag['vritti']
+    vritti_desc = diag['vritti_desc']
+    vritti_icon = diag['vritti_icon']
+
+    lines.append(
+        f"    🧠 [VRITTI] State: {vritti} ({vritti_desc}) {vritti_icon}"
+    )
+
+    # Line 4: Steering info (if active)
+    if steering_metrics is not None and 'kosha_steering_loss' in steering_metrics:
+        target = steering_metrics.get('kosha_target_angle', 0)
+        mean_phase = steering_metrics.get('kosha_mean_phase', 0)
+        phase_err = steering_metrics.get('kosha_phase_error', 0)
+        steer_loss = steering_metrics.get('kosha_steering_loss', 0)
+
+        # Direction indicator
+        if phase_err > 10:
+            direction = "↻" if mean_phase < target else "↺"
+        else:
+            direction = "✓"
+
+        lines.append(
+            f"    🎯 [STEER] Target: {target:.0f}° | Current: {mean_phase:.0f}° | "
+            f"Error: {phase_err:.1f}° {direction} | Loss: {steer_loss:.4f}"
+        )
+
+    return "\n".join(lines)
+
+
 def compute_phase_loss(
     logits: torch.Tensor,
     targets: torch.Tensor,
@@ -7278,6 +7888,11 @@ def train(config: UnifiedTrainingConfig):
         csr_entropy_sink = csr_entropy_sink.to(device) if config.csr_use_entropy_sink else None
         csr_synthesis_gate = csr_synthesis_gate.to(device) if config.csr_use_synthesis_gate else None
         print(f"  CSR Phoneme Grounding: ENABLED (λ_csr={config.csr_lambda}, τ={config.csr_tau} → {1/config.csr_tau:.1f}x gradient amp)")
+
+        # V9.7.0: Initialize Sparse Supervision helper if enabled
+        if config.csr_sparse_supervision:
+            print(f"  ⚡ [CSR SPARSE] Whole-Word Supervision: ENABLED at Layer {config.csr_alignment_layer}")
+            print(f"     Content-Only: {config.csr_content_word_only} | Stopwords filtered: {len(CSR_STOPWORDS)}")
     elif config.enable_csr and not CSR_AVAILABLE:
         print(f"  CSR Phoneme Grounding: Disabled (module not available)")
     else:
@@ -7760,6 +8375,23 @@ def train(config: UnifiedTrainingConfig):
         tb_writer = SummaryWriter(log_dir=str(tb_log_dir))
         print(f"  TensorBoard: {tb_log_dir}")
 
+    # Kosha-Vritti Diagnostic System
+    if config.enable_kosha_diagnostics:
+        kosha_interval = config.kosha_log_every if config.kosha_log_every > 0 else config.log_every
+        print(f"\n  🧭 Kosha-Vritti Diagnostics: ENABLED (every {kosha_interval} steps)")
+        print(f"     Axes: Reality (r: +Unmanifest/-Manifest) | Time (t: -Past/+Future)")
+        print(f"     Quadrants: Q1=ANANDAMAYA | Q2=VIJNANAMAYA | Q3=ANNAMAYA | Q4=MANOMAYA")
+        print(f"     Vritti: PRAMANA | VIPARYAYA | VIKALPA | NIDRA | SMRITI | PRAJNA")
+
+    # Kosha Phase Steering (Active Intervention)
+    if config.enable_kosha_steering:
+        print(f"\n  🎯 Kosha Phase Steering: ENABLED")
+        print(f"     Force: {config.kosha_steering_force:.2f} (0=off, 1=full)")
+        print(f"     Warmup: {config.kosha_steering_warmup} steps")
+        print(f"     Target: Geometric Truth from atan2(t, r)")
+        print(f"     Layer: 2 (Concept Formation)")
+        print(f"     ⚠️  ACTIVE INTERVENTION - will modify loss landscape")
+
     print(f"\n{'='*70}")
     print("   STARTING TRAINING")
     print(f"{'='*70}\n")
@@ -7927,25 +8559,72 @@ def train(config: UnifiedTrainingConfig):
                     # With both sides detached, CSR becomes monitor-only - no training signal flows.
                     csr_emb_for_loss = csr_emb.detach()
 
-                    csr_hidden_norm = torch.nn.functional.normalize(csr_hidden_for_loss, dim=-1)
-                    csr_emb_norm = torch.nn.functional.normalize(csr_emb_for_loss, dim=-1)
-                    csr_similarity = (csr_hidden_norm * csr_emb_norm).sum(dim=-1)
-                    # Temperature sharpening: (1 - sim) / tau creates steep gradient landscape
-                    # When alignment is poor (sim ≈ 0): loss = (1-0)/0.07 ≈ 14.3 → STRONG pressure
-                    # When alignment is good (sim ≈ 0.9): loss = (1-0.9)/0.07 ≈ 1.4 → mild pressure
-                    # V9.6.9: Detach confidence to make CSR fully observational
-                    # Without this, gradient flows: loss → csr_alignment_loss → csr_confidence → confidence_head
-                    csr_confidence_for_loss = csr_confidence.detach()
-                    csr_alignment_loss = ((1 - csr_similarity) / config.csr_tau) * csr_confidence_for_loss.squeeze(-1)
-                    csr_loss = csr_alignment_loss.mean() * config.csr_lambda
+                    # V9.7.0: Choose between Sparse (Whole-Word) and Dense (Per-Token) supervision
+                    if config.csr_sparse_supervision:
+                        # =====================================================================
+                        # SPARSE DELAYED SUPERVISION: Only apply loss at word boundaries
+                        # Uses whole-word varna lookup instead of per-subtoken
+                        # This fixes the "word salad" problem where grammar gets destroyed
+                        # =====================================================================
 
-                    # V9.6.9: CSR loss is now purely observational (no gradients flow)
-                    # We still track it for metrics, but it doesn't influence training
-                    # The cross-entropy LM loss is the ONLY training signal
-                    loss = loss + csr_loss
-                    csr_metrics['csr_loss'] = csr_loss.item()
-                    csr_metrics['csr_confidence'] = csr_confidence.mean().item()
-                    csr_metrics['csr_similarity'] = csr_similarity.mean().item()
+                        # Create helper for this batch (lazy init with caching)
+                        if not hasattr(model, '_whole_word_csr_helper'):
+                            model._whole_word_csr_helper = WholeWordCSRHelper(tokenizer, csr_provider)
+
+                        # Compute word boundaries and whole-word varna targets
+                        word_end_mask, content_weight, whole_word_varna = \
+                            model._whole_word_csr_helper.compute_word_boundaries(x)
+
+                        # Create projector for hidden → 12D varna space if needed
+                        if not hasattr(model, '_csr_varna_projector') or model._csr_varna_projector is None:
+                            hidden_dim = csr_hidden_for_loss.shape[-1]
+                            model._csr_varna_projector = torch.nn.Linear(hidden_dim, 12, bias=False).to(device)
+                            torch.nn.init.xavier_uniform_(model._csr_varna_projector.weight)
+                            print(f"  ⚡ [CSR SPARSE] Created varna projector: {hidden_dim}D → 12D")
+
+                        # Calculate sparse CSR loss
+                        csr_loss, sparse_metrics = calculate_sparse_csr_loss(
+                            hidden_states=csr_hidden_for_loss,
+                            whole_word_varna=whole_word_varna,
+                            word_end_mask=word_end_mask,
+                            content_weight=content_weight,
+                            csr_projector=model._csr_varna_projector,
+                            tau=config.csr_tau,
+                            lambda_csr=config.csr_lambda,
+                            content_word_only=config.csr_content_word_only,
+                        )
+
+                        loss = loss + csr_loss
+                        csr_metrics.update(sparse_metrics)
+                        csr_metrics['csr_loss'] = csr_loss.item()
+                        csr_metrics['csr_confidence'] = csr_confidence.mean().item()
+                        # Use sparse similarity metric
+                        csr_metrics['csr_similarity'] = sparse_metrics.get('csr_sparse_similarity', 0.0)
+
+                    else:
+                        # =====================================================================
+                        # DENSE PER-TOKEN SUPERVISION: Original method
+                        # Apply loss at every token position
+                        # =====================================================================
+                        csr_hidden_norm = torch.nn.functional.normalize(csr_hidden_for_loss, dim=-1)
+                        csr_emb_norm = torch.nn.functional.normalize(csr_emb_for_loss, dim=-1)
+                        csr_similarity = (csr_hidden_norm * csr_emb_norm).sum(dim=-1)
+                        # Temperature sharpening: (1 - sim) / tau creates steep gradient landscape
+                        # When alignment is poor (sim ≈ 0): loss = (1-0)/0.07 ≈ 14.3 → STRONG pressure
+                        # When alignment is good (sim ≈ 0.9): loss = (1-0.9)/0.07 ≈ 1.4 → mild pressure
+                        # V9.6.9: Detach confidence to make CSR fully observational
+                        # Without this, gradient flows: loss → csr_alignment_loss → csr_confidence → confidence_head
+                        csr_confidence_for_loss = csr_confidence.detach()
+                        csr_alignment_loss = ((1 - csr_similarity) / config.csr_tau) * csr_confidence_for_loss.squeeze(-1)
+                        csr_loss = csr_alignment_loss.mean() * config.csr_lambda
+
+                        # V9.6.9: CSR loss is now purely observational (no gradients flow)
+                        # We still track it for metrics, but it doesn't influence training
+                        # The cross-entropy LM loss is the ONLY training signal
+                        loss = loss + csr_loss
+                        csr_metrics['csr_loss'] = csr_loss.item()
+                        csr_metrics['csr_confidence'] = csr_confidence.mean().item()
+                        csr_metrics['csr_similarity'] = csr_similarity.mean().item()
                 else:
                     csr_metrics['csr_loss'] = 0.0
                     csr_metrics['csr_confidence'] = csr_confidence.mean().item() if csr_confidence is not None else 0.0
@@ -8145,8 +8824,97 @@ def train(config: UnifiedTrainingConfig):
                     loss = loss + entropy_floor_loss
                     metrics['entropy_floor_penalty'] = entropy_floor_loss
 
+            # =====================================================================
+            # KOSHA PHASE STEERING: Active Intervention for Mind-Body Alignment
+            # Couples Entity State (Entropy/Gradients) to Representation (Embeddings)
+            # =====================================================================
+            kosha_steering_loss = 0.0
+            if config.enable_kosha_steering and global_step >= config.kosha_steering_warmup:
+                try:
+                    # Compute Reality (r) and Time (t) axes from current state
+                    if config.model_type in ("ontological", "ontological_hybrid"):
+                        kosha_logits_for_steering = outputs.get("logits", None) if isinstance(outputs, dict) else None
+                    else:
+                        kosha_logits_for_steering = logits if 'logits' in dir() else None
+
+                    if kosha_logits_for_steering is not None:
+                        # Compute entropy (Reality axis)
+                        with torch.no_grad():
+                            steering_probs = F.softmax(kosha_logits_for_steering.float(), dim=-1)
+                            steering_log_probs = torch.log(steering_probs + 1e-10)
+                            steering_entropy = -(steering_probs * steering_log_probs).sum(dim=-1).mean()
+                            r_axis = 1.0 - (2.0 * steering_entropy.item() / 10.0)
+                            r_axis = max(-1.0, min(1.0, r_axis))
+
+                        # Get gradient norm (Time axis) - use captured value
+                        t_axis_grad = captured_grad_norm if 'captured_grad_norm' in dir() else 1.0
+                        if t_axis_grad > 0:
+                            t_axis = math.log(t_axis_grad + 1e-8) / 2.3
+                            t_axis = max(-1.0, min(1.0, t_axis))
+                        else:
+                            t_axis = 0.0
+
+                        # Compute target angle in radians
+                        target_angle_rad = math.atan2(t_axis, r_axis)
+
+                        # Get embeddings to steer (use early hidden state)
+                        if hidden_state_extractor is not None:
+                            steering_hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
+                            if steering_hidden_states is not None and len(steering_hidden_states) > 2:
+                                # Use Layer 2 (concept formation layer) for steering
+                                layer_to_steer = steering_hidden_states[2]
+
+                                # Compute phase alignment loss
+                                # Penalize deviation from target angle
+                                D = layer_to_steer.shape[-1]
+                                if D % 2 == 0:
+                                    emb_pairs = layer_to_steer.view(*layer_to_steer.shape[:-1], D // 2, 2)
+                                    real = emb_pairs[..., 0]
+                                    imag = emb_pairs[..., 1]
+                                    current_phase = torch.atan2(imag, real)
+
+                                    # Phase error: distance from target
+                                    phase_error = target_angle_rad - current_phase
+                                    # Wrap to [-π, π]
+                                    phase_error = torch.atan2(torch.sin(phase_error), torch.cos(phase_error))
+
+                                    # Steering loss: encourage phase alignment
+                                    # Use L2 loss scaled by steering force
+                                    kosha_steering_loss = (phase_error ** 2).mean() * config.kosha_steering_force
+
+                                    # Add to total loss (this creates gradient pressure toward target angle)
+                                    loss = loss + kosha_steering_loss
+
+                                    # Log steering metrics
+                                    metrics['kosha_steering_loss'] = kosha_steering_loss.item()
+                                    metrics['kosha_target_angle'] = math.degrees(target_angle_rad)
+                                    metrics['kosha_mean_phase'] = math.degrees(current_phase.mean().item())
+                                    metrics['kosha_phase_error'] = math.degrees(phase_error.abs().mean().item())
+
+                                    # One-time log when steering activates
+                                    if not hasattr(model, '_kosha_steering_logged'):
+                                        model._kosha_steering_logged = True
+                                        print(f"\n  🎯 [KOSHA STEERING] Activated at step {global_step}")
+                                        print(f"     Force: {config.kosha_steering_force:.2f}")
+                                        print(f"     Layer: 2 (Concept Formation)")
+                                        print(f"     Target: Geometric Truth from atan2(t, r)")
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  ⚠️ [KOSHA STEERING] Error: {e}")
+
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
+
+            # --- DEBUG: KOSHA STEERING HEARTBEAT ---
+            # Shows steering is active on "in-between" steps (e.g., 810, 820, 830)
+            # Only prints when steering IS active (non-zero) and once per global step
+            if config.enable_kosha_steering and global_step % 100 != 0 and global_step % 10 == 0:
+                steer_val = kosha_steering_loss.item() if isinstance(kosha_steering_loss, torch.Tensor) else kosha_steering_loss
+                # Only print if steering is actually active AND at end of accumulation
+                if steer_val > 0 and (accumulation_step + 1) % config.gradient_accumulation == 0:
+                    print(f"  🕵️ [STEER DEBUG Step {global_step}] Loss: {loss.item() * config.gradient_accumulation:.4f} | Steering: ✓ | Val: {steer_val:.6f}", flush=True)
+            # --- END DEBUG ---
 
         # Backward pass
         if scaler is not None:
@@ -8642,6 +9410,49 @@ def train(config: UnifiedTrainingConfig):
                     log_msg += f"\n    --> [SNI] Low entropy ({metrics.get('onto_entropy', 0):.2f}) - injecting sensory noise"
 
                 print(log_msg)
+
+                # Kosha-Vritti Diagnostic System (Read-Only)
+                kosha_log_interval = config.kosha_log_every if config.kosha_log_every > 0 else config.log_every
+                if config.enable_kosha_diagnostics and global_step % kosha_log_interval == 0:
+                    try:
+                        # Get logits for entropy calculation
+                        kosha_logits = None
+                        if config.model_type in ("ontological", "ontological_hybrid"):
+                            kosha_logits = outputs.get("logits", None) if isinstance(outputs, dict) else None
+                        else:
+                            kosha_logits = logits if 'logits' in dir() else None
+
+                        # Get hidden states if available
+                        kosha_hidden = None
+                        if hidden_state_extractor is not None:
+                            kosha_hidden = hidden_state_extractor.get_hidden_states(outputs, x)
+
+                        # Get gradient norm (captured before zero_grad)
+                        kosha_grad_norm = captured_grad_norm if 'captured_grad_norm' in dir() else 0.0
+                        # If using HGS, get gradient norm from there
+                        if hgs_metrics and 'total_grad_norm' in hgs_metrics:
+                            kosha_grad_norm = hgs_metrics['total_grad_norm']
+
+                        # Compute diagnostics
+                        kosha_diag = compute_kosha_vritti_diagnostics(
+                            logits=kosha_logits,
+                            grad_norm=kosha_grad_norm,
+                            hidden_states=kosha_hidden,
+                            metrics=metrics,
+                        )
+
+                        # Format and print (include steering metrics if available)
+                        steering_metrics = {k: v for k, v in metrics.items() if k.startswith('kosha_')}
+                        kosha_output = format_kosha_diagnostic(
+                            kosha_diag,
+                            include_phase=True,
+                            steering_metrics=steering_metrics if steering_metrics else None,
+                        )
+                        print(kosha_output, flush=True)
+                    except Exception as e:
+                        if global_step % 100 == 0:  # Limit error spam
+                            print(f"    ⚠️ [KOSHA] Diagnostic error: {e}", flush=True)
+
                 step_start_time = time.time()
 
             # Evaluation
@@ -8676,11 +9487,11 @@ def train(config: UnifiedTrainingConfig):
                             new_A = config.pidv2_a_min
                             relaxation_dampening_active = True
 
-                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f} | {authority_controller.get_status_string()}", end="")
+                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f} | {authority_controller.get_status_string()}", end="", flush=True)
                     if relaxation_dampening_active:
-                        print(f" [RELAX_DAMP]")
+                        print(f" [RELAX_DAMP]", flush=True)
                     else:
-                        print()
+                        print(flush=True)
 
                     # V9.4.5: Log Friction Controller status (with corrective actions)
                     if friction_controller is not None:
@@ -8765,7 +9576,7 @@ def train(config: UnifiedTrainingConfig):
                             tb_writer.add_scalar("csr/confidence", csr_metrics.get('csr_confidence', 0.0), global_step)
                             tb_writer.add_scalar("csr/similarity", csr_metrics.get('csr_similarity', 0.0), global_step)
                 else:
-                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
+                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}", flush=True)
 
                 # Sovereign Alert Monitor - Auto-Pivot Logic
                 if alert_monitor is not None:
@@ -8954,7 +9765,7 @@ def train(config: UnifiedTrainingConfig):
                         sgp_state=sgp_controller.get_state() if sgp_controller else None,
                         sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                     )
-                    print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}")
+                    print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
 
                 # LRA Validation (Long-Range Retrieval)
                 if lra_validator is not None and global_step % config.lra_validate_every == 0:
@@ -9431,6 +10242,16 @@ def main():
                        help="Log every N steps")
     parser.add_argument("--quiet", action="store_true",
                        help="Quiet mode: only print Critical 5 (Loss, PPL, S/A, GC, Conf)")
+    parser.add_argument("--enable_kosha_diagnostics", action="store_true",
+                       help="Enable Kosha-Vritti diagnostic output (Reality/Time axes, Vritti states)")
+    parser.add_argument("--kosha_log_every", type=int, default=0,
+                       help="Log Kosha diagnostics every N steps (0 = use log_every)")
+    parser.add_argument("--enable_kosha_steering", action="store_true",
+                       help="Enable Kosha phase coupling steering (active intervention)")
+    parser.add_argument("--kosha_steering_force", type=float, default=0.15,
+                       help="Steering strength 0.0-1.0 (default: 0.15 = gentle nudge)")
+    parser.add_argument("--kosha_steering_warmup", type=int, default=100,
+                       help="Steps before steering activates (default: 100)")
     parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
     parser.add_argument("--save_every", type=int, default=1000,
@@ -9627,14 +10448,19 @@ def main():
                        help="Apply Layer 0 entropy floor")
     parser.add_argument("--csr_use_synthesis_gate", action="store_true", default=True,
                        help="Apply Layer 11 synthesis reconciliation")
-    parser.add_argument("--csr_alignment_layer", type=int, default=2,
-                       help="Which layer to use for CSR alignment (2=concept formation, 11=output - AVOID)")
+    parser.add_argument("--csr_alignment_layer", type=int, default=7,
+                       help="Which layer to use for CSR alignment (7=concept consolidation, 2=early concept, 11=output - AVOID)")
     # V9.6.8: CSR Projector LR Scale (Gemini recommendation)
     parser.add_argument("--csr_projector_lr_scale", type=float, default=0.1,
                        help="CSR projector learns at this fraction of main LR (0.1 = 10x slower)")
     # V9.6.8: CSR Gradient Warmup (Gemini recommendation)
     parser.add_argument("--csr_gradient_warmup_steps", type=int, default=0,
                        help="Steps before re-enabling CSR gradients (0=always detached, 1000=re-enable after 1000 steps)")
+    # V9.7.0: CSR Sparse Delayed Supervision (Whole Word Alignment)
+    parser.add_argument("--csr_sparse_supervision", action="store_true",
+                       help="Enable word-boundary-only supervision (fixes 'word salad' problem)")
+    parser.add_argument("--csr_content_word_only", action="store_true",
+                       help="Only apply CSR to content words, skip stopwords (requires --csr_sparse_supervision)")
 
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
     # V9.6.8: Updated defaults per Gemini recommendation (stronger cement, less frequent)
@@ -9768,6 +10594,11 @@ def main():
         coherence_lambda=args.coherence_lambda,
         log_every=args.log_every,
         quiet=args.quiet,
+        enable_kosha_diagnostics=args.enable_kosha_diagnostics,
+        kosha_log_every=args.kosha_log_every,
+        enable_kosha_steering=args.enable_kosha_steering,
+        kosha_steering_force=args.kosha_steering_force,
+        kosha_steering_warmup=args.kosha_steering_warmup,
         eval_every=args.eval_every,
         save_every=args.save_every,
         checkpoint_dir=args.checkpoint_dir,
@@ -9888,6 +10719,9 @@ def main():
         # V9.6.8: CSR Projector LR Scale and Gradient Warmup
         csr_projector_lr_scale=args.csr_projector_lr_scale,
         csr_gradient_warmup_steps=args.csr_gradient_warmup_steps,
+        # V9.7.0: CSR Sparse Delayed Supervision
+        csr_sparse_supervision=args.csr_sparse_supervision,
+        csr_content_word_only=args.csr_content_word_only,
         # SGP (Stochastic Gradient Persistence)
         enable_sgp=args.enable_sgp and not args.disable_sgp,
         sgp_base_rate=args.sgp_base_rate,

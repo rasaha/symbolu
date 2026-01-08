@@ -376,6 +376,100 @@ Automatic detection and recovery from "stiffness" (model collapse).
 
 ---
 
+## Kosha-Vritti Diagnostics & Steering
+
+Maps training state to Vedantic coordinate system for ontological debugging and active phase alignment.
+
+### Diagnostic Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_kosha_diagnostics` | flag | `False` | Enable Kosha-Vritti diagnostic output |
+| `--kosha_log_every` | int | `0` | Log Kosha every N steps (0 = use log_every) |
+
+### Steering Options (Active Intervention)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_kosha_steering` | flag | `False` | Enable phase coupling steering |
+| `--kosha_steering_force` | float | `0.15` | Steering strength (0.0-1.0, start gentle) |
+| `--kosha_steering_warmup` | int | `100` | Steps before steering activates |
+
+### Coordinate Axes
+
+| Axis | Source | Range | Interpretation |
+|------|--------|-------|----------------|
+| Reality (r) | Logits Entropy | -1 to +1 | +1=Unmanifest (uncertain), -1=Manifest (confident) |
+| Time (t) | Gradient Norm | -1 to +1 | -1=Past/Memory, +1=Future/Learning |
+
+### Phase Angle (Geometric Truth)
+
+The phase angle is computed as `atan2(t, r)` to ensure the compass matches the map:
+- **0°**: Points toward +r (Unmanifest)
+- **90°**: Points toward +t (Future)
+- **180°**: Points toward -r (Manifest)
+- **270°**: Points toward -t (Past)
+
+### Kosha Zones (Cartesian Quadrants)
+
+| Zone | Quadrant | Angle | Coordinates | Description |
+|------|----------|-------|-------------|-------------|
+| ANANDAMAYA | Q1 | 0-90° | +r, +t | Purpose/Bliss (optimal flow) |
+| VIJNANAMAYA | Q2 | 90-180° | -r, +t | Logic/Wisdom (valid learning) |
+| ANNAMAYA | Q3 | 180-270° | -r, -t | Action/Physical (execution) |
+| MANOMAYA | Q4 | 270-360° | +r, -t | Memory/Mind (recall) |
+
+### Vritti States (Cognitive Modes)
+
+| State | Condition | Description | Icon |
+|-------|-----------|-------------|------|
+| PRAMANA | r<-0.3, t>0.2 | Valid Learning (confident + progressing) | ✅ |
+| VIPARYAYA | r<-0.5, t<-0.2 | Hallucination Risk (over-confident + stagnant) | ⚠️ |
+| VIKALPA | -0.3<r<0.3 | Conceptual Exploration (transitional) | 🔍 |
+| NIDRA | r>0.3, |t|<0.2 | Plateau/Stalled (uncertain + stuck) | 💤 |
+| SMRITI | r<0, t<-0.3 | Memory Recall (confident + decaying) | 📚 |
+| PRAJNA | else | Balanced State | ⚖️ |
+
+### Example Output (Diagnostic Only)
+```
+    🧭 [KOSHA] Coords: r=-0.42 (Manifest) | t=+0.35 (Future) --> Zone: VIJNANAMAYA
+    📐 [PHASE] Angle: 140° (Logic) | Entropy: 2.90 | GradNorm: 1.45
+    🧠 [VRITTI] State: PRAMANA (Valid Learning) ✅
+```
+
+### Example Output (With Steering Active)
+```
+    🧭 [KOSHA] Coords: r=-0.10 (Transitional) | t=+0.05 (Present) --> Zone: VIJNANAMAYA
+    📐 [PHASE] Angle: 153° (Logic) | Entropy: 5.52 | GradNorm: 1.12
+    🧠 [VRITTI] State: VIKALPA (Conceptual Exploration) 🔍
+    🎯 [STEER] Target: 153° | Current: 41° | Error: 112.0° ↻ | Loss: 0.0234
+```
+
+### How Steering Works
+
+1. **Computes Target Angle**: From entropy (r) and gradient norm (t) using `atan2(t, r)`
+2. **Reads Current Phase**: Treats embedding pairs as complex numbers (Re, Im)
+3. **Applies Phase Loss**: Penalizes deviation from target angle
+4. **Gradient Descent**: Model learns to align internal representations with semantic intent
+
+### When to Use Steering
+
+| Symptom | Diagnostic | Action |
+|---------|------------|--------|
+| Zone correct but wrong outputs | Mind-Body Split | Enable steering at 0.15 |
+| Persistent hallucinations | Phase locked at wrong angle | Increase force to 0.25 |
+| Loss explodes after steering | Force too strong | Reduce to 0.05-0.10 |
+
+### Notes
+- **Diagnostic mode**: Read-only, does not affect training
+- **Steering mode**: ACTIVE INTERVENTION - modifies loss landscape
+- **Start gentle**: Use `--kosha_steering_force 0.15` initially
+- **Monitor phase error**: Should decrease over 500+ steps
+- **VIPARYAYA warning**: If persistent, indicates over-confident generation
+- Pairs well with EvoFlow metrics for comprehensive monitoring
+
+---
+
 ## PIDv2 Controller
 
 Automatic authority/sensory balance controller.
@@ -591,6 +685,66 @@ Full evolutionary flow across layer transitions.
 - **untie_embeddings**: CRITICAL when using CSR to prevent vocabulary corruption
 - **csr_tau**: Lower = sharper gradients (0.07 is good default)
 - **csr_alignment_layer**: Use 2 for concept formation, avoid 11 (output)
+
+### CSR Tuning Guide
+
+#### What Each Parameter Does
+
+| Parameter | Plain English | Effect of Increasing |
+|-----------|---------------|---------------------|
+| `csr_lambda` | How much CSR loss contributes to total loss | Stronger phoneme-ontology alignment, may slow PPL improvement |
+| `csr_tau` | Temperature (sharpness of gradient signal) | Lower = sharper gradients, more decisive alignment |
+| `csr_projector_lr_scale` | How fast CSR↔Hidden projection adapts | Faster adaptation, may be less stable |
+| `csr_alignment_layer` | Which layer CSR aligns to | Layer 1 = fundamental, Layer 2 = concept, Layer 3+ = higher abstraction |
+| `csr_gradient_warmup_steps` | Steps before CSR gradients flow to model | Lower = earlier ontological influence |
+
+#### Strength Hierarchy
+
+```bash
+# Conservative (default) - Gentle ontological guidance
+--csr_lambda 0.1 --csr_tau 0.07 --csr_projector_lr_scale 0.1
+
+# Moderate - Balanced ontology vs perplexity
+--csr_lambda 0.2 --csr_tau 0.05 --csr_projector_lr_scale 0.2
+
+# Aggressive - Strong ontological shaping (may slow PPL)
+--csr_lambda 0.5 --csr_tau 0.03 --csr_projector_lr_scale 0.5
+```
+
+#### Gradient Amplification Reference
+
+| `csr_tau` | Amplification | Use Case |
+|-----------|---------------|----------|
+| `0.10` | 10x | Very gentle |
+| `0.07` | 14x | Default, balanced |
+| `0.05` | 20x | Moderate push |
+| `0.03` | 33x | Aggressive shaping |
+| `0.02` | 50x | Maximum (use with caution) |
+
+#### When to Increase CSR Influence
+
+| Symptom | Solution |
+|---------|----------|
+| Model learns grammar but no ontological structure | Increase `csr_lambda` to 0.2-0.3 |
+| CSR alignment too slow | Lower `csr_tau` to 0.05 |
+| Kosha steering not affecting embeddings | Increase `csr_projector_lr_scale` to 0.3 |
+| Want ontological shaping from step 1 | Set `csr_gradient_warmup_steps 0` |
+| PPL improving but Kosha phase stuck | Increase `csr_lambda` AND enable steering |
+
+#### Example: Strong CSR with Kosha Steering
+
+```bash
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --enable_csr \
+    --csr_lambda 0.3 \
+    --csr_tau 0.05 \
+    --csr_projector_lr_scale 0.3 \
+    --csr_gradient_warmup_steps 25 \
+    --enable_kosha_diagnostics --kosha_log_every 50 \
+    --enable_kosha_steering --kosha_steering_force 0.35 \
+    # ... other args
+```
 
 ---
 
