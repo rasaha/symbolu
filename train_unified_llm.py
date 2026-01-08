@@ -7884,6 +7884,380 @@ def format_kosha_diagnostic(
     return "\n".join(lines)
 
 
+# =============================================================================
+# V9.7.0: CSR DIAGNOSTICS (Layer 7 - Concept Consolidation)
+# =============================================================================
+# Provides layer-specific diagnostics for CSR alignment at Layer 7.
+# Measures phoneme-ontological grounding quality and alignment coherence.
+# =============================================================================
+
+def compute_csr_diagnostics(
+    hidden_states: Optional[List[torch.Tensor]] = None,
+    csr_metrics: Optional[Dict[str, float]] = None,
+    diagnostic_layer: int = 7,
+    layer_grad_norm: Optional[float] = None,
+    grad_norm: float = 0.0,
+) -> Dict[str, Any]:
+    """
+    V9.7.0: Compute CSR diagnostic coordinates at Layer 7.
+
+    CSR (Coherent Semantic Resonance) aligns hidden states with Sanskrit
+    phoneme-ontological embeddings. Layer 7 is where concept consolidation
+    happens - abstract concepts solidify into coherent representations.
+
+    Diagnostic Axes:
+    - Coherence Axis (c): -1 (fragmented) to +1 (coherent/aligned)
+    - Flow Axis (f): -1 (static/stuck) to +1 (flowing/learning)
+
+    CSR States (based on quadrant):
+    - RESONANT (c>0, f>0): Strong alignment + active learning - optimal
+    - SEEKING (c<0, f>0): Weak alignment but learning - exploring
+    - ANCHORED (c>0, f<0): Strong alignment but static - stable/memorized
+    - LOST (c<0, f<0): Weak alignment and stuck - needs intervention
+    """
+    result = {
+        'diagnostic_layer': diagnostic_layer,
+    }
+
+    with torch.no_grad():
+        # =====================================================================
+        # COHERENCE AXIS (c): Layer 7 Activation Focus
+        # High focus = coherent representations (+1)
+        # Low focus = fragmented/diffuse representations (-1)
+        # =====================================================================
+        layer_entropy = None
+        if hidden_states is not None and len(hidden_states) > diagnostic_layer:
+            layer_hidden = hidden_states[diagnostic_layer]
+            if layer_hidden is not None and layer_hidden.numel() > 0:
+                # Compute activation entropy (same method as Kosha)
+                layer_abs = layer_hidden.abs().float()
+                layer_probs = layer_abs / (layer_abs.sum(dim=-1, keepdim=True) + 1e-10)
+                log_probs = torch.log(layer_probs + 1e-10)
+                position_entropy = -(layer_probs * log_probs).sum(dim=-1)
+                layer_entropy = position_entropy.mean().item()
+
+                D = layer_hidden.shape[-1]
+                max_entropy = math.log(D)
+                # Map: low entropy → +1 (coherent), high entropy → -1 (fragmented)
+                c = 1.0 - (2.0 * layer_entropy / max_entropy)
+                c = max(-1.0, min(1.0, c))
+                result['c'] = c
+                result['entropy'] = layer_entropy
+                result['entropy_source'] = f'layer_{diagnostic_layer}'
+
+        if 'c' not in result:
+            result['c'] = 0.0
+            result['entropy'] = 0.0
+            result['entropy_source'] = 'default'
+
+        # =====================================================================
+        # FLOW AXIS (f): Layer 7 Gradient Activity
+        # High gradient = active learning/flow (+1)
+        # Low gradient = static/stuck (-1)
+        # =====================================================================
+        effective_grad = layer_grad_norm if layer_grad_norm is not None else grad_norm
+
+        if effective_grad > 0:
+            log_grad = math.log10(effective_grad + 1e-8)
+            f = log_grad / 3.0
+            f = max(-1.0, min(1.0, f))
+        else:
+            f = 0.0
+        result['f'] = f
+        result['grad_norm'] = effective_grad
+        result['grad_source'] = f'layer_{diagnostic_layer}' if layer_grad_norm is not None else 'total'
+
+        # =====================================================================
+        # CSR STATE CLASSIFICATION
+        # =====================================================================
+        c = result['c']
+        f = result['f']
+
+        if c >= 0 and f >= 0:
+            state = 'RESONANT'
+            state_desc = 'Aligned & Learning'
+            state_icon = '🎵'
+        elif c < 0 and f >= 0:
+            state = 'SEEKING'
+            state_desc = 'Exploring Alignment'
+            state_icon = '🔍'
+        elif c >= 0 and f < 0:
+            state = 'ANCHORED'
+            state_desc = 'Stable/Memorized'
+            state_icon = '⚓'
+        else:
+            state = 'LOST'
+            state_desc = 'Needs Intervention'
+            state_icon = '❓'
+
+        result['state'] = state
+        result['state_desc'] = state_desc
+        result['state_icon'] = state_icon
+
+        # Coherence zone description
+        if c > 0.3:
+            result['coherence_zone'] = 'FOCUSED'
+        elif c < -0.3:
+            result['coherence_zone'] = 'DIFFUSE'
+        else:
+            result['coherence_zone'] = 'BALANCED'
+
+        # Flow zone description
+        if f > 0.3:
+            result['flow_zone'] = 'FLOWING'
+        elif f < -0.3:
+            result['flow_zone'] = 'STATIC'
+        else:
+            result['flow_zone'] = 'MODERATE'
+
+        # =====================================================================
+        # CSR ALIGNMENT METRICS (from training loop)
+        # =====================================================================
+        if csr_metrics is not None:
+            result['csr_loss'] = csr_metrics.get('csr_loss', 0.0)
+            result['csr_confidence'] = csr_metrics.get('csr_confidence', 0.0)
+            result['csr_similarity'] = csr_metrics.get('csr_similarity', 0.0)
+            result['entropy_sink'] = csr_metrics.get('entropy_sink_entropy', 0.0)
+            result['synthesis_gate'] = csr_metrics.get('synthesis_gate_value', 0.0)
+
+    return result
+
+
+def format_csr_diagnostic(diag: Dict[str, Any]) -> str:
+    """Format CSR diagnostic for logging output."""
+    lines = []
+
+    c = diag.get('c', 0.0)
+    f = diag.get('f', 0.0)
+    coherence_zone = diag.get('coherence_zone', 'UNKNOWN')
+    flow_zone = diag.get('flow_zone', 'UNKNOWN')
+    state = diag.get('state', 'UNKNOWN')
+
+    lines.append(
+        f"    🎼 [CSR] Coords: c={c:+.2f} ({coherence_zone}) | "
+        f"f={f:+.2f} ({flow_zone}) --> State: {state}"
+    )
+
+    state_desc = diag.get('state_desc', '')
+    state_icon = diag.get('state_icon', '')
+    entropy = diag.get('entropy', 0.0)
+    grad_norm = diag.get('grad_norm', 0.0)
+
+    lines.append(
+        f"    📊 [CSR] {state_desc} {state_icon} | "
+        f"Entropy: {entropy:.2f} | GradNorm: {grad_norm:.2f}"
+    )
+
+    # CSR metrics if available
+    if 'csr_similarity' in diag:
+        sim = diag.get('csr_similarity', 0.0)
+        conf = diag.get('csr_confidence', 0.0)
+        loss = diag.get('csr_loss', 0.0)
+        lines.append(
+            f"    🔗 [CSR] Similarity: {sim:.3f} | Confidence: {conf:.3f} | Loss: {loss:.4f}"
+        )
+
+    return "\n".join(lines)
+
+
+# =============================================================================
+# V9.7.0: ONTOLOGICAL BRIDGE DIAGNOSTICS (Layer 4 - Foundational Structure)
+# =============================================================================
+# Provides layer-specific diagnostics for the 12D ontological projection.
+# Measures aspect diversity, Pramāṇa alignment, and dominant aspects.
+# =============================================================================
+
+def compute_onto_bridge_diagnostics(
+    hidden_states: Optional[List[torch.Tensor]] = None,
+    onto_metrics: Optional[Dict[str, float]] = None,
+    onto_bridge: Optional[nn.Module] = None,
+    diagnostic_layer: int = 4,
+    layer_grad_norm: Optional[float] = None,
+    grad_norm: float = 0.0,
+) -> Dict[str, Any]:
+    """
+    V9.7.0: Compute Ontological Bridge diagnostics at Layer 4.
+
+    The Ontological Bridge projects hidden states to 12D ontological space,
+    one dimension per Aspect (O1-O12). Layer 4 is where foundational
+    structure forms - the ontological "DNA" that propagates to all later layers.
+
+    Diagnostic Axes:
+    - Structure Axis (s): -1 (collapsed/uniform) to +1 (diverse/structured)
+    - Grounding Axis (g): -1 (static/stuck) to +1 (adapting/learning)
+
+    Onto States (based on quadrant):
+    - GROUNDED (s>0, g>0): Diverse structure + active learning - optimal
+    - FORMING (s<0, g>0): Uniform but learning - structure emerging
+    - STABLE (s>0, g<0): Diverse but static - established ontology
+    - DORMANT (s<0, g<0): Collapsed and stuck - needs activation
+    """
+    result = {
+        'diagnostic_layer': diagnostic_layer,
+    }
+
+    with torch.no_grad():
+        # =====================================================================
+        # STRUCTURE AXIS (s): Layer 4 Representation Diversity
+        # High diversity = rich ontological structure (+1)
+        # Low diversity = collapsed/uniform (-1)
+        # =====================================================================
+        if hidden_states is not None and len(hidden_states) > diagnostic_layer:
+            layer_hidden = hidden_states[diagnostic_layer]
+            if layer_hidden is not None and layer_hidden.numel() > 0:
+                # Compute activation entropy for structure measurement
+                layer_abs = layer_hidden.abs().float()
+                layer_probs = layer_abs / (layer_abs.sum(dim=-1, keepdim=True) + 1e-10)
+                log_probs = torch.log(layer_probs + 1e-10)
+                position_entropy = -(layer_probs * log_probs).sum(dim=-1)
+                layer_entropy = position_entropy.mean().item()
+
+                D = layer_hidden.shape[-1]
+                max_entropy = math.log(D)
+                # For structure, higher entropy = more diverse structure (+1)
+                # This is OPPOSITE of coherence - we want distributed activations
+                s = (2.0 * layer_entropy / max_entropy) - 1.0
+                s = max(-1.0, min(1.0, s))
+                result['s'] = s
+                result['entropy'] = layer_entropy
+                result['entropy_source'] = f'layer_{diagnostic_layer}'
+
+        if 's' not in result:
+            result['s'] = 0.0
+            result['entropy'] = 0.0
+            result['entropy_source'] = 'default'
+
+        # =====================================================================
+        # GROUNDING AXIS (g): Layer 4 Gradient Activity
+        # High gradient = actively grounding/adapting (+1)
+        # Low gradient = static/fixed (-1)
+        # =====================================================================
+        effective_grad = layer_grad_norm if layer_grad_norm is not None else grad_norm
+
+        if effective_grad > 0:
+            log_grad = math.log10(effective_grad + 1e-8)
+            g = log_grad / 3.0
+            g = max(-1.0, min(1.0, g))
+        else:
+            g = 0.0
+        result['g'] = g
+        result['grad_norm'] = effective_grad
+        result['grad_source'] = f'layer_{diagnostic_layer}' if layer_grad_norm is not None else 'total'
+
+        # =====================================================================
+        # ONTO STATE CLASSIFICATION
+        # =====================================================================
+        s = result['s']
+        g = result['g']
+
+        if s >= 0 and g >= 0:
+            state = 'GROUNDED'
+            state_desc = 'Diverse & Adapting'
+            state_icon = '🌳'
+        elif s < 0 and g >= 0:
+            state = 'FORMING'
+            state_desc = 'Structure Emerging'
+            state_icon = '🌱'
+        elif s >= 0 and g < 0:
+            state = 'STABLE'
+            state_desc = 'Established Ontology'
+            state_icon = '🏛️'
+        else:
+            state = 'DORMANT'
+            state_desc = 'Needs Activation'
+            state_icon = '💤'
+
+        result['state'] = state
+        result['state_desc'] = state_desc
+        result['state_icon'] = state_icon
+
+        # Structure zone description
+        if s > 0.3:
+            result['structure_zone'] = 'DIVERSE'
+        elif s < -0.3:
+            result['structure_zone'] = 'UNIFORM'
+        else:
+            result['structure_zone'] = 'MODERATE'
+
+        # Grounding zone description
+        if g > 0.3:
+            result['grounding_zone'] = 'ADAPTING'
+        elif g < -0.3:
+            result['grounding_zone'] = 'STATIC'
+        else:
+            result['grounding_zone'] = 'STABLE'
+
+        # =====================================================================
+        # 12D ASPECT METRICS (from OntologicalBridge or onto_metrics)
+        # =====================================================================
+        if onto_metrics is not None:
+            result['diversity'] = onto_metrics.get('onto_diversity', 0.0)
+            result['pramana_corr'] = onto_metrics.get('onto_pramana_corr', 0.0)
+            result['o9_witness'] = onto_metrics.get('onto_o9_witness', 0.0)
+            result['mean_activation'] = onto_metrics.get('onto_mean_activation', 0.0)
+
+        # Compute 12D projection if bridge available
+        if onto_bridge is not None and hidden_states is not None and len(hidden_states) > diagnostic_layer:
+            layer_hidden = hidden_states[diagnostic_layer]
+            if layer_hidden is not None:
+                onto_repr, bridge_metrics = onto_bridge(layer_hidden)
+                # Get aspect activations
+                aspect_means = onto_repr.mean(dim=[0, 1])  # [12]
+                result['aspect_activations'] = aspect_means.tolist()
+
+                # Find dominant aspect
+                dominant_idx = aspect_means.abs().argmax().item()
+                result['dominant_aspect'] = f'O{dominant_idx + 1}'
+                result['dominant_value'] = aspect_means[dominant_idx].item()
+
+    return result
+
+
+def format_onto_bridge_diagnostic(diag: Dict[str, Any]) -> str:
+    """Format Ontological Bridge diagnostic for logging output."""
+    lines = []
+
+    s = diag.get('s', 0.0)
+    g = diag.get('g', 0.0)
+    structure_zone = diag.get('structure_zone', 'UNKNOWN')
+    grounding_zone = diag.get('grounding_zone', 'UNKNOWN')
+    state = diag.get('state', 'UNKNOWN')
+
+    lines.append(
+        f"    🌉 [ONTO] Coords: s={s:+.2f} ({structure_zone}) | "
+        f"g={g:+.2f} ({grounding_zone}) --> State: {state}"
+    )
+
+    state_desc = diag.get('state_desc', '')
+    state_icon = diag.get('state_icon', '')
+    entropy = diag.get('entropy', 0.0)
+    grad_norm = diag.get('grad_norm', 0.0)
+
+    lines.append(
+        f"    📐 [ONTO] {state_desc} {state_icon} | "
+        f"Entropy: {entropy:.2f} | GradNorm: {grad_norm:.2f}"
+    )
+
+    # 12D metrics if available
+    if 'diversity' in diag:
+        div = diag.get('diversity', 0.0)
+        pram = diag.get('pramana_corr', 0.0)
+        o9 = diag.get('o9_witness', 0.0)
+        lines.append(
+            f"    🔮 [ONTO] Diversity: {div:.3f} | Pramāṇa: {pram:+.3f} | O9_Witness: {o9:+.3f}"
+        )
+
+    # Dominant aspect if available
+    if 'dominant_aspect' in diag:
+        dom = diag.get('dominant_aspect', 'O1')
+        val = diag.get('dominant_value', 0.0)
+        lines.append(
+            f"    🎯 [ONTO] Dominant: {dom} ({val:+.3f})"
+        )
+
+    return "\n".join(lines)
+
+
 def compute_phase_loss(
     logits: torch.Tensor,
     targets: torch.Tensor,
@@ -9773,6 +10147,69 @@ def train(config: UnifiedTrainingConfig):
                     except Exception as e:
                         if global_step % 100 == 0:  # Limit error spam
                             print(f"    ⚠️ [KOSHA] Diagnostic error: {e}", flush=True)
+
+                # V9.7.0: CSR Diagnostics (Layer 7 - Concept Consolidation)
+                if csr_provider is not None and global_step % kosha_log_interval == 0:
+                    try:
+                        # Get hidden states for CSR layer
+                        csr_diag_hidden = None
+                        if hidden_state_extractor is not None:
+                            csr_diag_hidden = hidden_state_extractor.get_hidden_states(outputs, x)
+
+                        # Layer-specific gradient for CSR
+                        csr_diag_layer = config.csr_alignment_layer
+                        csr_layer_grad = compute_layer_gradient_norm(model, csr_diag_layer) if csr_diag_layer < 12 else 0.0
+
+                        # Compute CSR diagnostics
+                        csr_diag = compute_csr_diagnostics(
+                            hidden_states=csr_diag_hidden,
+                            csr_metrics=csr_metrics if 'csr_metrics' in dir() else None,
+                            diagnostic_layer=csr_diag_layer,
+                            layer_grad_norm=csr_layer_grad if csr_layer_grad > 0 else None,
+                            grad_norm=raw_grad_norm if 'raw_grad_norm' in dir() else 0.0,
+                        )
+
+                        # Format and print
+                        csr_output = format_csr_diagnostic(csr_diag)
+                        print(csr_output, flush=True)
+                    except Exception as e:
+                        if global_step % 100 == 0:
+                            print(f"    ⚠️ [CSR] Diagnostic error: {e}", flush=True)
+
+                # V9.7.0: Ontological Bridge Diagnostics (Layer 4 - Foundational Structure)
+                if config.enable_onto_bridge and global_step % kosha_log_interval == 0:
+                    try:
+                        # Get hidden states for Onto Bridge layer
+                        onto_diag_hidden = None
+                        if hidden_state_extractor is not None:
+                            onto_diag_hidden = hidden_state_extractor.get_hidden_states(outputs, x)
+
+                        # Layer-specific gradient for Onto Bridge
+                        onto_diag_layer = config.onto_bridge_layer
+                        onto_layer_grad = compute_layer_gradient_norm(model, onto_diag_layer) if onto_diag_layer < 12 else 0.0
+
+                        # Get onto_bridge module if available
+                        onto_bridge_module = onto_bridge if 'onto_bridge' in dir() else None
+
+                        # Get onto metrics from training step
+                        onto_diag_metrics = {k: v for k, v in metrics.items() if k.startswith('onto_')}
+
+                        # Compute Onto Bridge diagnostics
+                        onto_diag = compute_onto_bridge_diagnostics(
+                            hidden_states=onto_diag_hidden,
+                            onto_metrics=onto_diag_metrics if onto_diag_metrics else None,
+                            onto_bridge=onto_bridge_module,
+                            diagnostic_layer=onto_diag_layer,
+                            layer_grad_norm=onto_layer_grad if onto_layer_grad > 0 else None,
+                            grad_norm=raw_grad_norm if 'raw_grad_norm' in dir() else 0.0,
+                        )
+
+                        # Format and print
+                        onto_output = format_onto_bridge_diagnostic(onto_diag)
+                        print(onto_output, flush=True)
+                    except Exception as e:
+                        if global_step % 100 == 0:
+                            print(f"    ⚠️ [ONTO] Diagnostic error: {e}", flush=True)
 
                 step_start_time = time.time()
 
