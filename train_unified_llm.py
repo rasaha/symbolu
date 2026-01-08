@@ -7047,25 +7047,23 @@ def compute_kosha_vritti_diagnostics(
     Compute Kosha-Vritti diagnostic coordinates.
 
     This is a READ-ONLY diagnostic system that maps training state to:
-    - Reality Axis (r): -1 (Unmanifest) to +1 (Manifest) via logits entropy
+    - Reality Axis (r): +1 (Unmanifest/uncertain) to -1 (Manifest/confident) via logits entropy
     - Time Axis (t): -1 (Past/Smriti) to +1 (Future/Pramana) via gradient norm
     - Phase Angle: Current position in Kosha space (0-360°)
     - Vritti State: Cognitive mode classification
 
-    Kosha zones (by phase angle):
-    - 0-60°: ANNAMAYA (Physical/Token) - raw token processing
-    - 60-120°: PRANAMAYA (Energy/Gradient) - training dynamics
-    - 120-180°: MANOMAYA (Mind/Attention) - attention patterns
-    - 180-240°: VIJNANAMAYA (Wisdom/Integration) - semantic coherence
-    - 240-300°: ANANDAMAYA (Bliss/Flow) - optimal training state
-    - 300-360°: ANNAMAYA (return) - completing the cycle
+    Kosha zones (Cartesian Quadrants per Symbolu Ontology):
+    - Q1 (0-90°):   +r, +t = ANANDAMAYA (Purpose/Bliss) - optimal flow
+    - Q2 (90-180°): -r, +t = VIJNANAMAYA (Logic/Wisdom) - valid learning
+    - Q3 (180-270°): -r, -t = ANNAMAYA (Action/Physical) - execution
+    - Q4 (270-360°): +r, -t = MANOMAYA (Memory/Mind) - recall
 
-    Vritti states:
-    - PRAMANA (Valid Cognition): r > 0.3, t > 0.2 - learning new patterns
-    - VIPARYAYA (Hallucination): r > 0.5, t < -0.2 - false certainty
+    Vritti states (with corrected Reality axis):
+    - PRAMANA (Valid Cognition): r < -0.3, t > 0.2 - confident learning
+    - VIPARYAYA (Hallucination): r < -0.5, t < -0.2 - over-confident, stagnant
     - VIKALPA (Imagination): -0.3 < r < 0.3 - conceptual exploration
-    - NIDRA (Sleep/Plateau): r < -0.3, |t| < 0.2 - training stalled
-    - SMRITI (Memory): r > 0, t < -0.3 - recalling learned patterns
+    - NIDRA (Sleep/Plateau): r > 0.3, |t| < 0.2 - uncertain and stuck
+    - SMRITI (Memory): r < 0, t < -0.3 - confident but decaying
     """
     result = {}
 
@@ -7145,53 +7143,58 @@ def compute_kosha_vritti_diagnostics(
         result['phase_angle'] = phase_angle
 
         # =========================================================================
-        # KOSHA ZONE: Map phase angle to Kosha layer
+        # KOSHA ZONE: Map to Cartesian Quadrants (Corrected per Symbolu Ontology)
+        # Gemini Correction: Use standard Cartesian quadrant mapping
+        #   Q1 (0-90°):   +r, +t = ANANDAMAYA (Purpose/Bliss)
+        #   Q2 (90-180°): -r, +t = VIJNANAMAYA (Logic/Wisdom)
+        #   Q3 (180-270°): -r, -t = ANNAMAYA (Action/Physical)
+        #   Q4 (270-360°): +r, -t = MANOMAYA (Memory/Mind)
         # =========================================================================
-        if phase_angle < 60:
-            kosha = "ANNAMAYA"
-            kosha_desc = "Physical"
-        elif phase_angle < 120:
-            kosha = "PRANAMAYA"
-            kosha_desc = "Energy"
-        elif phase_angle < 180:
-            kosha = "MANOMAYA"
-            kosha_desc = "Mind"
-        elif phase_angle < 240:
-            kosha = "VIJNANAMAYA"
-            kosha_desc = "Wisdom"
-        elif phase_angle < 300:
+        if phase_angle < 90:
             kosha = "ANANDAMAYA"
-            kosha_desc = "Bliss"
-        else:
+            kosha_desc = "Purpose"
+        elif phase_angle < 180:
+            kosha = "VIJNANAMAYA"
+            kosha_desc = "Logic"
+        elif phase_angle < 270:
             kosha = "ANNAMAYA"
-            kosha_desc = "Return"
+            kosha_desc = "Action"
+        else:
+            kosha = "MANOMAYA"
+            kosha_desc = "Memory"
 
         result['kosha'] = kosha
         result['kosha_desc'] = kosha_desc
 
         # =========================================================================
-        # VRITTI STATE: Cognitive mode classification
+        # VRITTI STATE: Cognitive mode classification (Corrected per Symbolu Ontology)
+        # With corrected Reality axis: +r = Unmanifest (uncertain), -r = Manifest (confident)
         # =========================================================================
         r = result['r']
         t = result['t']
 
-        if r > 0.3 and t > 0.2:
+        if r < -0.3 and t > 0.2:
+            # Low entropy (confident) + High gradient (learning) = Valid cognition
             vritti = "PRAMANA"
             vritti_desc = "Valid Learning"
             vritti_icon = "✅"
-        elif r > 0.5 and t < -0.2:
+        elif r < -0.5 and t < -0.2:
+            # Very low entropy (over-confident) + Low gradient (stagnant) = Hallucination risk
             vritti = "VIPARYAYA"
             vritti_desc = "Hallucination Risk"
             vritti_icon = "⚠️"
         elif -0.3 < r < 0.3:
+            # Transitional entropy = Conceptual exploration
             vritti = "VIKALPA"
             vritti_desc = "Conceptual Exploration"
             vritti_icon = "🔍"
-        elif r < -0.3 and abs(t) < 0.2:
+        elif r > 0.3 and abs(t) < 0.2:
+            # High entropy (uncertain) + Low gradient (not moving) = Plateau
             vritti = "NIDRA"
             vritti_desc = "Plateau/Stalled"
             vritti_icon = "💤"
-        elif r > 0 and t < -0.3:
+        elif r < 0 and t < -0.3:
+            # Low entropy (confident) + Negative gradient (decaying) = Memory recall
             vritti = "SMRITI"
             vritti_desc = "Memory Recall"
             vritti_icon = "📚"
@@ -7205,12 +7208,14 @@ def compute_kosha_vritti_diagnostics(
         result['vritti_icon'] = vritti_icon
 
         # =========================================================================
-        # REALITY ZONE: Manifest vs Unmanifest
+        # REALITY ZONE: Manifest vs Unmanifest (Corrected per Symbolu Ontology)
+        # Gemini Correction: +r = Unmanifest (high entropy/potential)
+        #                    -r = Manifest (low entropy/concrete)
         # =========================================================================
         if r > 0.3:
-            reality_zone = "Manifest"
+            reality_zone = "Unmanifest"  # High entropy = abstract/potential
         elif r < -0.3:
-            reality_zone = "Unmanifest"
+            reality_zone = "Manifest"    # Low entropy = concrete/actualized
         else:
             reality_zone = "Transitional"
         result['reality_zone'] = reality_zone
@@ -8001,8 +8006,8 @@ def train(config: UnifiedTrainingConfig):
     if config.enable_kosha_diagnostics:
         kosha_interval = config.kosha_log_every if config.kosha_log_every > 0 else config.log_every
         print(f"\n  🧭 Kosha-Vritti Diagnostics: ENABLED (every {kosha_interval} steps)")
-        print(f"     Axes: Reality (r: Entropy) | Time (t: GradNorm)")
-        print(f"     Zones: ANNAMAYA → PRANAMAYA → MANOMAYA → VIJNANAMAYA → ANANDAMAYA")
+        print(f"     Axes: Reality (r: +Unmanifest/-Manifest) | Time (t: -Past/+Future)")
+        print(f"     Quadrants: Q1=ANANDAMAYA | Q2=VIJNANAMAYA | Q3=ANNAMAYA | Q4=MANOMAYA")
         print(f"     Vritti: PRAMANA | VIPARYAYA | VIKALPA | NIDRA | SMRITI | PRAJNA")
 
     print(f"\n{'='*70}")
