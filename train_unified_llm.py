@@ -10060,6 +10060,8 @@ def main():
         coherence_lambda=args.coherence_lambda,
         log_every=args.log_every,
         quiet=args.quiet,
+        enable_kosha_diagnostics=args.enable_kosha_diagnostics,
+        kosha_log_every=args.kosha_log_every,
         eval_every=args.eval_every,
         save_every=args.save_every,
         checkpoint_dir=args.checkpoint_dir,
