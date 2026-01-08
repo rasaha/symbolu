@@ -8927,10 +8927,10 @@ def train(config: UnifiedTrainingConfig):
 
                         # Format and print
                         kosha_output = format_kosha_diagnostic(kosha_diag, include_phase=True)
-                        print(kosha_output)
+                        print(kosha_output, flush=True)
                     except Exception as e:
                         if global_step % 100 == 0:  # Limit error spam
-                            print(f"    ⚠️ [KOSHA] Diagnostic error: {e}")
+                            print(f"    ⚠️ [KOSHA] Diagnostic error: {e}", flush=True)
 
                 step_start_time = time.time()
 
