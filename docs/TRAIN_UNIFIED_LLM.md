@@ -376,6 +376,58 @@ Automatic detection and recovery from "stiffness" (model collapse).
 
 ---
 
+## Kosha-Vritti Diagnostics
+
+Maps training state to Vedantic coordinate system for ontological debugging.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_kosha_diagnostics` | flag | `False` | Enable Kosha-Vritti diagnostic output |
+| `--kosha_log_every` | int | `0` | Log Kosha every N steps (0 = use log_every) |
+
+### Coordinate Axes
+
+| Axis | Source | Range | Interpretation |
+|------|--------|-------|----------------|
+| Reality (r) | Logits Entropy | -1 to +1 | -1=Unmanifest (uncertain), +1=Manifest (confident) |
+| Time (t) | Gradient Norm | -1 to +1 | -1=Past/Memory, +1=Future/Learning |
+
+### Kosha Zones (by Phase Angle)
+
+| Zone | Angle | Description |
+|------|-------|-------------|
+| ANNAMAYA | 0-60° | Physical layer (raw token processing) |
+| PRANAMAYA | 60-120° | Energy layer (training dynamics) |
+| MANOMAYA | 120-180° | Mind layer (attention patterns) |
+| VIJNANAMAYA | 180-240° | Wisdom layer (semantic coherence) |
+| ANANDAMAYA | 240-300° | Bliss layer (optimal flow state) |
+
+### Vritti States (Cognitive Modes)
+
+| State | Condition | Description | Icon |
+|-------|-----------|-------------|------|
+| PRAMANA | r>0.3, t>0.2 | Valid Learning | ✅ |
+| VIPARYAYA | r>0.5, t<-0.2 | Hallucination Risk | ⚠️ |
+| VIKALPA | -0.3<r<0.3 | Conceptual Exploration | 🔍 |
+| NIDRA | r<-0.3, |t|<0.2 | Plateau/Stalled | 💤 |
+| SMRITI | r>0, t<-0.3 | Memory Recall | 📚 |
+| PRAJNA | else | Balanced State | ⚖️ |
+
+### Example Output
+```
+    🧭 [KOSHA] Coords: r=+0.42 (Manifest) | t=+0.18 (Present) --> Zone: MANOMAYA
+    📐 [PHASE] Angle: 145° (Mind) | Entropy: 2.90 | GradNorm: 1.45
+    🧠 [VRITTI] State: PRAMANA (Valid Learning) ✅
+```
+
+### Notes
+- **Read-only diagnostic**: Does not affect training, only monitors
+- **VIPARYAYA warning**: If persistent, may indicate over-confident generation
+- **NIDRA state**: Training plateau, consider LR adjustment
+- Pairs well with EvoFlow metrics for comprehensive monitoring
+
+---
+
 ## PIDv2 Controller
 
 Automatic authority/sensory balance controller.

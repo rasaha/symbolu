@@ -6099,6 +6099,10 @@ class UnifiedTrainingConfig:
     # Logging verbosity
     quiet: bool = False  # Quiet mode: only print Critical 5 (Loss, PPL, S/A, GC, Conf)
 
+    # Kosha-Vritti Diagnostic System (Read-Only)
+    enable_kosha_diagnostics: bool = False   # Enable Kosha-Vritti diagnostic output
+    kosha_log_every: int = 0                 # Log Kosha every N steps (0 = use log_every)
+
     # Dataset
     dataset: str = "wikitext103"  # "wikitext103", "wikitext2", or "fineweb"
     dataset_name: str = "HuggingFaceFW/fineweb"  # HuggingFace dataset name (for fineweb mode)
@@ -7029,6 +7033,239 @@ def _build_sovereign_state(
     return torch.cat([guna, s_signal, r_signal, c_signal], dim=-1)
 
 
+# =============================================================================
+# KOSHA-VRITTI DIAGNOSTIC SYSTEM (Read-Only)
+# =============================================================================
+
+def compute_kosha_vritti_diagnostics(
+    logits: torch.Tensor,
+    grad_norm: float,
+    hidden_states: Optional[List[torch.Tensor]] = None,
+    metrics: Optional[Dict[str, float]] = None,
+) -> Dict[str, Any]:
+    """
+    Compute Kosha-Vritti diagnostic coordinates.
+
+    This is a READ-ONLY diagnostic system that maps training state to:
+    - Reality Axis (r): -1 (Unmanifest) to +1 (Manifest) via logits entropy
+    - Time Axis (t): -1 (Past/Smriti) to +1 (Future/Pramana) via gradient norm
+    - Phase Angle: Current position in Kosha space (0-360°)
+    - Vritti State: Cognitive mode classification
+
+    Kosha zones (by phase angle):
+    - 0-60°: ANNAMAYA (Physical/Token) - raw token processing
+    - 60-120°: PRANAMAYA (Energy/Gradient) - training dynamics
+    - 120-180°: MANOMAYA (Mind/Attention) - attention patterns
+    - 180-240°: VIJNANAMAYA (Wisdom/Integration) - semantic coherence
+    - 240-300°: ANANDAMAYA (Bliss/Flow) - optimal training state
+    - 300-360°: ANNAMAYA (return) - completing the cycle
+
+    Vritti states:
+    - PRAMANA (Valid Cognition): r > 0.3, t > 0.2 - learning new patterns
+    - VIPARYAYA (Hallucination): r > 0.5, t < -0.2 - false certainty
+    - VIKALPA (Imagination): -0.3 < r < 0.3 - conceptual exploration
+    - NIDRA (Sleep/Plateau): r < -0.3, |t| < 0.2 - training stalled
+    - SMRITI (Memory): r > 0, t < -0.3 - recalling learned patterns
+    """
+    result = {}
+
+    with torch.no_grad():
+        # =========================================================================
+        # REALITY AXIS (r): Logits Entropy → Manifestation Level
+        # High entropy = uncertain/unmanifest (-1), Low entropy = confident/manifest (+1)
+        # =========================================================================
+        if logits is not None and logits.numel() > 0:
+            # Compute softmax probabilities
+            probs = F.softmax(logits.float(), dim=-1)
+            # Compute entropy: H = -sum(p * log(p))
+            log_probs = torch.log(probs + 1e-10)
+            entropy = -(probs * log_probs).sum(dim=-1).mean()
+
+            # Normalize entropy to [-1, +1] range
+            # Typical entropy range: 0 (certain) to ~10 (uniform over 50k vocab)
+            # Map: 0 → +1 (manifest), 5 → 0 (neutral), 10 → -1 (unmanifest)
+            max_entropy = 10.0  # Approximate for 50k vocab
+            r = 1.0 - (2.0 * entropy.item() / max_entropy)
+            r = max(-1.0, min(1.0, r))  # Clamp to [-1, +1]
+            result['r'] = r
+            result['entropy'] = entropy.item()
+        else:
+            result['r'] = 0.0
+            result['entropy'] = 5.0
+
+        # =========================================================================
+        # TIME AXIS (t): Gradient Norm → Temporal Orientation
+        # High grad = future-oriented/learning (+1), Low grad = past-oriented/memory (-1)
+        # =========================================================================
+        # Normalize gradient norm to [-1, +1]
+        # Typical grad norm range: 0.1 (stable) to 100+ (early training)
+        # Use log scale: log(0.1) ≈ -2.3, log(10) ≈ 2.3, log(100) ≈ 4.6
+        if grad_norm > 0:
+            log_grad = math.log(grad_norm + 1e-8)
+            # Map: log(0.1)=-2.3 → -1, log(1)=0 → 0, log(10)=2.3 → +1
+            t = log_grad / 2.3
+            t = max(-1.0, min(1.0, t))
+        else:
+            t = 0.0
+        result['t'] = t
+        result['grad_norm'] = grad_norm
+
+        # =========================================================================
+        # PHASE ANGLE: Position in Kosha cycle (0-360°)
+        # Computed from hidden state statistics if available
+        # =========================================================================
+        if hidden_states is not None and len(hidden_states) > 0:
+            # Use statistics from hidden states to determine phase
+            # Mean activation magnitude indicates processing depth
+            try:
+                # Get middle layer for representative state
+                mid_idx = len(hidden_states) // 2
+                mid_state = hidden_states[mid_idx]
+                if mid_state is not None:
+                    # Compute activation statistics
+                    mean_act = mid_state.abs().mean().item()
+                    std_act = mid_state.std().item()
+
+                    # Phase from activation pattern (heuristic mapping)
+                    # Low mean + low std = early processing (0-60°)
+                    # High mean + low std = focused attention (120-180°)
+                    # High mean + high std = integration (180-240°)
+                    # Moderate mean + high std = flow state (240-300°)
+                    activation_magnitude = mean_act / (std_act + 0.1)
+                    phase_angle = (activation_magnitude * 60) % 360
+                else:
+                    phase_angle = 180.0  # Default to middle
+            except:
+                phase_angle = 180.0
+        else:
+            # Estimate phase from r and t coordinates
+            # Convert (r, t) to polar angle
+            phase_angle = (math.atan2(result['t'], result['r']) * 180 / math.pi + 180) % 360
+
+        result['phase_angle'] = phase_angle
+
+        # =========================================================================
+        # KOSHA ZONE: Map phase angle to Kosha layer
+        # =========================================================================
+        if phase_angle < 60:
+            kosha = "ANNAMAYA"
+            kosha_desc = "Physical"
+        elif phase_angle < 120:
+            kosha = "PRANAMAYA"
+            kosha_desc = "Energy"
+        elif phase_angle < 180:
+            kosha = "MANOMAYA"
+            kosha_desc = "Mind"
+        elif phase_angle < 240:
+            kosha = "VIJNANAMAYA"
+            kosha_desc = "Wisdom"
+        elif phase_angle < 300:
+            kosha = "ANANDAMAYA"
+            kosha_desc = "Bliss"
+        else:
+            kosha = "ANNAMAYA"
+            kosha_desc = "Return"
+
+        result['kosha'] = kosha
+        result['kosha_desc'] = kosha_desc
+
+        # =========================================================================
+        # VRITTI STATE: Cognitive mode classification
+        # =========================================================================
+        r = result['r']
+        t = result['t']
+
+        if r > 0.3 and t > 0.2:
+            vritti = "PRAMANA"
+            vritti_desc = "Valid Learning"
+            vritti_icon = "✅"
+        elif r > 0.5 and t < -0.2:
+            vritti = "VIPARYAYA"
+            vritti_desc = "Hallucination Risk"
+            vritti_icon = "⚠️"
+        elif -0.3 < r < 0.3:
+            vritti = "VIKALPA"
+            vritti_desc = "Conceptual Exploration"
+            vritti_icon = "🔍"
+        elif r < -0.3 and abs(t) < 0.2:
+            vritti = "NIDRA"
+            vritti_desc = "Plateau/Stalled"
+            vritti_icon = "💤"
+        elif r > 0 and t < -0.3:
+            vritti = "SMRITI"
+            vritti_desc = "Memory Recall"
+            vritti_icon = "📚"
+        else:
+            vritti = "PRAJNA"
+            vritti_desc = "Balanced State"
+            vritti_icon = "⚖️"
+
+        result['vritti'] = vritti
+        result['vritti_desc'] = vritti_desc
+        result['vritti_icon'] = vritti_icon
+
+        # =========================================================================
+        # REALITY ZONE: Manifest vs Unmanifest
+        # =========================================================================
+        if r > 0.3:
+            reality_zone = "Manifest"
+        elif r < -0.3:
+            reality_zone = "Unmanifest"
+        else:
+            reality_zone = "Transitional"
+        result['reality_zone'] = reality_zone
+
+        # =========================================================================
+        # TIME ZONE: Past, Present, Future
+        # =========================================================================
+        if t > 0.3:
+            time_zone = "Future"
+        elif t < -0.3:
+            time_zone = "Past"
+        else:
+            time_zone = "Present"
+        result['time_zone'] = time_zone
+
+    return result
+
+
+def format_kosha_diagnostic(diag: Dict[str, Any], include_phase: bool = True) -> str:
+    """Format Kosha diagnostic for logging output."""
+    lines = []
+
+    # Line 1: Kosha coordinates
+    r = diag['r']
+    t = diag['t']
+    reality_zone = diag['reality_zone']
+    time_zone = diag['time_zone']
+    kosha = diag['kosha']
+
+    lines.append(
+        f"    🧭 [KOSHA] Coords: r={r:+.2f} ({reality_zone}) | "
+        f"t={t:+.2f} ({time_zone}) --> Zone: {kosha}"
+    )
+
+    # Line 2: Phase angle (optional)
+    if include_phase:
+        phase = diag['phase_angle']
+        kosha_desc = diag['kosha_desc']
+        lines.append(
+            f"    📐 [PHASE] Angle: {phase:.0f}° ({kosha_desc}) | "
+            f"Entropy: {diag['entropy']:.2f} | GradNorm: {diag['grad_norm']:.2f}"
+        )
+
+    # Line 3: Vritti state
+    vritti = diag['vritti']
+    vritti_desc = diag['vritti_desc']
+    vritti_icon = diag['vritti_icon']
+
+    lines.append(
+        f"    🧠 [VRITTI] State: {vritti} ({vritti_desc}) {vritti_icon}"
+    )
+
+    return "\n".join(lines)
+
+
 def compute_phase_loss(
     logits: torch.Tensor,
     targets: torch.Tensor,
@@ -7759,6 +7996,14 @@ def train(config: UnifiedTrainingConfig):
         tb_log_dir = ckpt_dir / "logs"
         tb_writer = SummaryWriter(log_dir=str(tb_log_dir))
         print(f"  TensorBoard: {tb_log_dir}")
+
+    # Kosha-Vritti Diagnostic System
+    if config.enable_kosha_diagnostics:
+        kosha_interval = config.kosha_log_every if config.kosha_log_every > 0 else config.log_every
+        print(f"\n  🧭 Kosha-Vritti Diagnostics: ENABLED (every {kosha_interval} steps)")
+        print(f"     Axes: Reality (r: Entropy) | Time (t: GradNorm)")
+        print(f"     Zones: ANNAMAYA → PRANAMAYA → MANOMAYA → VIJNANAMAYA → ANANDAMAYA")
+        print(f"     Vritti: PRAMANA | VIPARYAYA | VIKALPA | NIDRA | SMRITI | PRAJNA")
 
     print(f"\n{'='*70}")
     print("   STARTING TRAINING")
@@ -8642,6 +8887,44 @@ def train(config: UnifiedTrainingConfig):
                     log_msg += f"\n    --> [SNI] Low entropy ({metrics.get('onto_entropy', 0):.2f}) - injecting sensory noise"
 
                 print(log_msg)
+
+                # Kosha-Vritti Diagnostic System (Read-Only)
+                kosha_log_interval = config.kosha_log_every if config.kosha_log_every > 0 else config.log_every
+                if config.enable_kosha_diagnostics and global_step % kosha_log_interval == 0:
+                    try:
+                        # Get logits for entropy calculation
+                        kosha_logits = None
+                        if config.model_type == "ontological":
+                            kosha_logits = outputs.get("logits", None) if isinstance(outputs, dict) else None
+                        else:
+                            kosha_logits = logits if 'logits' in dir() else None
+
+                        # Get hidden states if available
+                        kosha_hidden = None
+                        if hidden_state_extractor is not None:
+                            kosha_hidden = hidden_state_extractor.get_hidden_states(outputs, x)
+
+                        # Get gradient norm (captured before zero_grad)
+                        kosha_grad_norm = captured_grad_norm if 'captured_grad_norm' in dir() else 0.0
+                        # If using HGS, get gradient norm from there
+                        if hgs_metrics and 'total_grad_norm' in hgs_metrics:
+                            kosha_grad_norm = hgs_metrics['total_grad_norm']
+
+                        # Compute diagnostics
+                        kosha_diag = compute_kosha_vritti_diagnostics(
+                            logits=kosha_logits,
+                            grad_norm=kosha_grad_norm,
+                            hidden_states=kosha_hidden,
+                            metrics=metrics,
+                        )
+
+                        # Format and print
+                        kosha_output = format_kosha_diagnostic(kosha_diag, include_phase=True)
+                        print(kosha_output)
+                    except Exception as e:
+                        if global_step % 100 == 0:  # Limit error spam
+                            print(f"    ⚠️ [KOSHA] Diagnostic error: {e}")
+
                 step_start_time = time.time()
 
             # Evaluation
@@ -9431,6 +9714,10 @@ def main():
                        help="Log every N steps")
     parser.add_argument("--quiet", action="store_true",
                        help="Quiet mode: only print Critical 5 (Loss, PPL, S/A, GC, Conf)")
+    parser.add_argument("--enable_kosha_diagnostics", action="store_true",
+                       help="Enable Kosha-Vritti diagnostic output (Reality/Time axes, Vritti states)")
+    parser.add_argument("--kosha_log_every", type=int, default=0,
+                       help="Log Kosha diagnostics every N steps (0 = use log_every)")
     parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
     parser.add_argument("--save_every", type=int, default=1000,
