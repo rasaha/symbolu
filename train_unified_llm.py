@@ -7143,23 +7143,26 @@ def compute_kosha_vritti_diagnostics(
         result['phase_angle'] = phase_angle
 
         # =========================================================================
-        # KOSHA ZONE: Map to Cartesian Quadrants (Corrected per Symbolu Ontology)
-        # Gemini Correction: Use standard Cartesian quadrant mapping
-        #   Q1 (0-90°):   +r, +t = ANANDAMAYA (Purpose/Bliss)
-        #   Q2 (90-180°): -r, +t = VIJNANAMAYA (Logic/Wisdom)
-        #   Q3 (180-270°): -r, -t = ANNAMAYA (Action/Physical)
-        #   Q4 (270-360°): +r, -t = MANOMAYA (Memory/Mind)
+        # KOSHA ZONE: Direct Cartesian Quadrant Classification (Gemini Fix)
+        # Use r,t coordinates directly instead of phase angle for accuracy
+        #   Q1: +r, +t = ANANDAMAYA (Purpose/Bliss)
+        #   Q2: -r, +t = VIJNANAMAYA (Logic/Wisdom)
+        #   Q3: -r, -t = ANNAMAYA (Action/Physical)
+        #   Q4: +r, -t = MANOMAYA (Memory/Mind)
         # =========================================================================
-        if phase_angle < 90:
+        r = result['r']
+        t = result['t']
+
+        if r > 0 and t > 0:
             kosha = "ANANDAMAYA"
             kosha_desc = "Purpose"
-        elif phase_angle < 180:
+        elif r < 0 and t > 0:
             kosha = "VIJNANAMAYA"
             kosha_desc = "Logic"
-        elif phase_angle < 270:
+        elif r < 0 and t < 0:
             kosha = "ANNAMAYA"
             kosha_desc = "Action"
-        else:
+        else:  # r > 0 and t < 0, or edge cases
             kosha = "MANOMAYA"
             kosha_desc = "Memory"
 
@@ -7170,8 +7173,7 @@ def compute_kosha_vritti_diagnostics(
         # VRITTI STATE: Cognitive mode classification (Corrected per Symbolu Ontology)
         # With corrected Reality axis: +r = Unmanifest (uncertain), -r = Manifest (confident)
         # =========================================================================
-        r = result['r']
-        t = result['t']
+        # r and t already defined above for Kosha zone
 
         if r < -0.3 and t > 0.2:
             # Low entropy (confident) + High gradient (learning) = Valid cognition
