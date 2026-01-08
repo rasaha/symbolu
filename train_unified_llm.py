@@ -8972,6 +8972,13 @@ def train(config: UnifiedTrainingConfig):
             # Note: Gradient scaling via hooks happens automatically during backward()
             # We'll call step() after optimizer.step() to update warmup schedule
 
+            # V9.7.0: Capture RAW gradient norm BEFORE clipping for Kosha Time axis
+            # This gives meaningful t values instead of always 0 (post-clip is always ~1.0)
+            raw_grad_norm = sum(
+                p.grad.norm().item() for p in model.parameters()
+                if p.grad is not None
+            )
+
             # Gradient clipping: per-layer or global
             if config.use_per_layer_clipping and gradient_scaler_hgs is not None:
                 # Clip authority and sensory layers separately to respect 9:3 design
@@ -9466,11 +9473,9 @@ def train(config: UnifiedTrainingConfig):
                         if hidden_state_extractor is not None:
                             kosha_hidden = hidden_state_extractor.get_hidden_states(outputs, x)
 
-                        # Get gradient norm (captured before zero_grad)
-                        kosha_grad_norm = captured_grad_norm if 'captured_grad_norm' in dir() else 0.0
-                        # If using HGS, get gradient norm from there
-                        if hgs_metrics and 'total_grad_norm' in hgs_metrics:
-                            kosha_grad_norm = hgs_metrics['total_grad_norm']
+                        # V9.7.0: Use RAW gradient norm (before clipping) for meaningful Time axis
+                        # Post-clip norm is always ~1.0, which makes t=0 (useless)
+                        kosha_grad_norm = raw_grad_norm if 'raw_grad_norm' in dir() else 0.0
 
                         # Compute diagnostics
                         kosha_diag = compute_kosha_vritti_diagnostics(
