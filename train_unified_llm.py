@@ -6368,6 +6368,7 @@ class UnifiedTrainingConfig:
     enable_kosha_steering: bool = False      # Enable phase coupling steering
     kosha_steering_force: float = 0.15       # Steering strength (0.0-1.0, start gentle)
     kosha_steering_warmup: int = 100         # Steps before steering activates
+    kosha_steering_layer: int = 4            # V9.7.0: Layer for phase steering (4=grammar forming, 2=raw embeddings)
 
     # Dataset
     dataset: str = "wikitext103"  # "wikitext103", "wikitext2", or "fineweb"
@@ -8413,7 +8414,8 @@ def train(config: UnifiedTrainingConfig):
         print(f"     Force: {config.kosha_steering_force:.2f} (0=off, 1=full)")
         print(f"     Warmup: {config.kosha_steering_warmup} steps")
         print(f"     Target: Geometric Truth from atan2(t, r)")
-        print(f"     Layer: 2 (Concept Formation)")
+        layer_desc = {2: "Raw Embeddings", 4: "Grammar Forming", 6: "Semantic", 7: "Consolidation"}.get(config.kosha_steering_layer, "Custom")
+        print(f"     Layer: {config.kosha_steering_layer} ({layer_desc})")
         print(f"     ⚠️  ACTIVE INTERVENTION - will modify loss landscape")
 
     print(f"\n{'='*70}")
@@ -8896,12 +8898,13 @@ def train(config: UnifiedTrainingConfig):
                         # Compute target angle in radians
                         target_angle_rad = math.atan2(t_axis, r_axis)
 
-                        # Get embeddings to steer (use early hidden state)
+                        # Get embeddings to steer (use configurable hidden state layer)
                         if hidden_state_extractor is not None:
                             steering_hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
-                            if steering_hidden_states is not None and len(steering_hidden_states) > 2:
-                                # Use Layer 2 (concept formation layer) for steering
-                                layer_to_steer = steering_hidden_states[2]
+                            steer_layer = config.kosha_steering_layer
+                            if steering_hidden_states is not None and len(steering_hidden_states) > steer_layer:
+                                # V9.7.0: Use configurable layer (default 4 = grammar forming)
+                                layer_to_steer = steering_hidden_states[steer_layer]
 
                                 # Compute phase alignment loss
                                 # Penalize deviation from target angle
@@ -8933,9 +8936,10 @@ def train(config: UnifiedTrainingConfig):
                                     # One-time log when steering activates
                                     if not hasattr(model, '_kosha_steering_logged'):
                                         model._kosha_steering_logged = True
+                                        layer_desc = {2: "Raw Embeddings", 4: "Grammar Forming", 6: "Semantic", 7: "Consolidation"}.get(steer_layer, "Custom")
                                         print(f"\n  🎯 [KOSHA STEERING] Activated at step {global_step}")
                                         print(f"     Force: {config.kosha_steering_force:.2f}")
-                                        print(f"     Layer: 2 (Concept Formation)")
+                                        print(f"     Layer: {steer_layer} ({layer_desc})")
                                         print(f"     Target: Geometric Truth from atan2(t, r)")
 
                 except Exception as e:
@@ -10323,6 +10327,8 @@ def main():
                        help="Steering strength 0.0-1.0 (default: 0.15 = gentle nudge)")
     parser.add_argument("--kosha_steering_warmup", type=int, default=100,
                        help="Steps before steering activates (default: 100)")
+    parser.add_argument("--kosha_steering_layer", type=int, default=4,
+                       help="Layer for phase steering (4=grammar forming, 2=raw embeddings, default: 4)")
     parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
     parser.add_argument("--save_every", type=int, default=1000,
@@ -10688,6 +10694,7 @@ def main():
         enable_kosha_steering=args.enable_kosha_steering,
         kosha_steering_force=args.kosha_steering_force,
         kosha_steering_warmup=args.kosha_steering_warmup,
+        kosha_steering_layer=args.kosha_steering_layer,
         eval_every=args.eval_every,
         save_every=args.save_every,
         checkpoint_dir=args.checkpoint_dir,
