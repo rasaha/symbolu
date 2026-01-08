@@ -9487,11 +9487,11 @@ def train(config: UnifiedTrainingConfig):
                             new_A = config.pidv2_a_min
                             relaxation_dampening_active = True
 
-                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f} | {authority_controller.get_status_string()}", end="")
+                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f} | {authority_controller.get_status_string()}", end="", flush=True)
                     if relaxation_dampening_active:
-                        print(f" [RELAX_DAMP]")
+                        print(f" [RELAX_DAMP]", flush=True)
                     else:
-                        print()
+                        print(flush=True)
 
                     # V9.4.5: Log Friction Controller status (with corrective actions)
                     if friction_controller is not None:
@@ -9576,7 +9576,7 @@ def train(config: UnifiedTrainingConfig):
                             tb_writer.add_scalar("csr/confidence", csr_metrics.get('csr_confidence', 0.0), global_step)
                             tb_writer.add_scalar("csr/similarity", csr_metrics.get('csr_similarity', 0.0), global_step)
                 else:
-                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
+                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}", flush=True)
 
                 # Sovereign Alert Monitor - Auto-Pivot Logic
                 if alert_monitor is not None:
@@ -9765,7 +9765,7 @@ def train(config: UnifiedTrainingConfig):
                         sgp_state=sgp_controller.get_state() if sgp_controller else None,
                         sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                     )
-                    print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}")
+                    print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
 
                 # LRA Validation (Long-Range Retrieval)
                 if lra_validator is not None and global_step % config.lra_validate_every == 0:
