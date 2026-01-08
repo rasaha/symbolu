@@ -376,14 +376,24 @@ Automatic detection and recovery from "stiffness" (model collapse).
 
 ---
 
-## Kosha-Vritti Diagnostics
+## Kosha-Vritti Diagnostics & Steering
 
-Maps training state to Vedantic coordinate system for ontological debugging.
+Maps training state to Vedantic coordinate system for ontological debugging and active phase alignment.
+
+### Diagnostic Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `--enable_kosha_diagnostics` | flag | `False` | Enable Kosha-Vritti diagnostic output |
 | `--kosha_log_every` | int | `0` | Log Kosha every N steps (0 = use log_every) |
+
+### Steering Options (Active Intervention)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_kosha_steering` | flag | `False` | Enable phase coupling steering |
+| `--kosha_steering_force` | float | `0.15` | Steering strength (0.0-1.0, start gentle) |
+| `--kosha_steering_warmup` | int | `100` | Steps before steering activates |
 
 ### Coordinate Axes
 
@@ -391,6 +401,14 @@ Maps training state to Vedantic coordinate system for ontological debugging.
 |------|--------|-------|----------------|
 | Reality (r) | Logits Entropy | -1 to +1 | +1=Unmanifest (uncertain), -1=Manifest (confident) |
 | Time (t) | Gradient Norm | -1 to +1 | -1=Past/Memory, +1=Future/Learning |
+
+### Phase Angle (Geometric Truth)
+
+The phase angle is computed as `atan2(t, r)` to ensure the compass matches the map:
+- **0°**: Points toward +r (Unmanifest)
+- **90°**: Points toward +t (Future)
+- **180°**: Points toward -r (Manifest)
+- **270°**: Points toward -t (Past)
 
 ### Kosha Zones (Cartesian Quadrants)
 
@@ -412,17 +430,42 @@ Maps training state to Vedantic coordinate system for ontological debugging.
 | SMRITI | r<0, t<-0.3 | Memory Recall (confident + decaying) | 📚 |
 | PRAJNA | else | Balanced State | ⚖️ |
 
-### Example Output
+### Example Output (Diagnostic Only)
 ```
     🧭 [KOSHA] Coords: r=-0.42 (Manifest) | t=+0.35 (Future) --> Zone: VIJNANAMAYA
-    📐 [PHASE] Angle: 145° (Logic) | Entropy: 2.90 | GradNorm: 1.45
+    📐 [PHASE] Angle: 140° (Logic) | Entropy: 2.90 | GradNorm: 1.45
     🧠 [VRITTI] State: PRAMANA (Valid Learning) ✅
 ```
 
+### Example Output (With Steering Active)
+```
+    🧭 [KOSHA] Coords: r=-0.10 (Transitional) | t=+0.05 (Present) --> Zone: VIJNANAMAYA
+    📐 [PHASE] Angle: 153° (Logic) | Entropy: 5.52 | GradNorm: 1.12
+    🧠 [VRITTI] State: VIKALPA (Conceptual Exploration) 🔍
+    🎯 [STEER] Target: 153° | Current: 41° | Error: 112.0° ↻ | Loss: 0.0234
+```
+
+### How Steering Works
+
+1. **Computes Target Angle**: From entropy (r) and gradient norm (t) using `atan2(t, r)`
+2. **Reads Current Phase**: Treats embedding pairs as complex numbers (Re, Im)
+3. **Applies Phase Loss**: Penalizes deviation from target angle
+4. **Gradient Descent**: Model learns to align internal representations with semantic intent
+
+### When to Use Steering
+
+| Symptom | Diagnostic | Action |
+|---------|------------|--------|
+| Zone correct but wrong outputs | Mind-Body Split | Enable steering at 0.15 |
+| Persistent hallucinations | Phase locked at wrong angle | Increase force to 0.25 |
+| Loss explodes after steering | Force too strong | Reduce to 0.05-0.10 |
+
 ### Notes
-- **Read-only diagnostic**: Does not affect training, only monitors
-- **VIPARYAYA warning**: If persistent, may indicate over-confident generation
-- **NIDRA state**: Training plateau, consider LR adjustment
+- **Diagnostic mode**: Read-only, does not affect training
+- **Steering mode**: ACTIVE INTERVENTION - modifies loss landscape
+- **Start gentle**: Use `--kosha_steering_force 0.15` initially
+- **Monitor phase error**: Should decrease over 500+ steps
+- **VIPARYAYA warning**: If persistent, indicates over-confident generation
 - Pairs well with EvoFlow metrics for comprehensive monitoring
 
 ---
