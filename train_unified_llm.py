@@ -9031,10 +9031,16 @@ def train(config: UnifiedTrainingConfig):
     # Moved BEFORE Kosha: Ontology grounds structure early, Kosha witnesses later
     onto_bridge = None
     if config.enable_onto_bridge:
-        onto_bridge = create_ontological_bridge(hidden_dim=config.d_model, device=device)
+        # Get hidden_dim from model or preset (not config)
+        onto_hidden_dim = (
+            getattr(model, 'd_model', None) or
+            getattr(getattr(model, 'config', None), 'd_model', None) or
+            preset['embed_dim']
+        )
+        onto_bridge = create_ontological_bridge(hidden_dim=onto_hidden_dim, device=device)
         layer_desc = {4: "Foundational Structure", 2: "Raw Embeddings", 6: "Semantic"}.get(config.onto_bridge_layer, "Custom")
         print(f"\n  🌉 Ontological Bridge: ENABLED (Layer {config.onto_bridge_layer} = {layer_desc})")
-        print(f"     12D projection: hidden_dim → 12 Ontological Aspects")
+        print(f"     12D projection: {onto_hidden_dim}D → 12 Ontological Aspects")
         print(f"     Lambda: {config.onto_bridge_lambda:.2f} | Diversity: {config.onto_bridge_diversity:.2f} | Pramāṇa: {config.onto_bridge_pramana:.2f}")
         print(f"     Aspects: O1-O12 (Potential → Absolving)")
         print(f"     ⚠️  FOUNDATIONAL - establishes ontological DNA early")
