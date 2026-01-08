@@ -600,6 +600,162 @@ def get_dominant_vrtti(layer_idx: int) -> Tuple[int, str, float]:
     )
 
 
+# =============================================================================
+# V9.7.0: ONTOLOGICAL BRIDGE (Layer 4 - Foundational Structure)
+# =============================================================================
+# Projects hidden states to a 12-dimensional ontological space, one dimension
+# per Aspect (O1-O12). This establishes the "ontological DNA" early in
+# processing, grounding all subsequent layers in the 12 Aspects.
+#
+# Layer 4 (Foundational) is where structure forms:
+# - Raw embeddings have been processed through layers 0-3
+# - Grammar and structure begin emerging at layer 4
+# - The 12D projection creates an ontological "signature" that propagates forward
+#
+# Philosophical insight: Ontology (structure of being) should be grounded EARLY,
+# while Kosha (consciousness/awareness) operates at the WITNESS point (Layer 9).
+#
+# Loss function encourages:
+# 1. Each dimension to specialize for its corresponding Aspect
+# 2. Coherence across the 12D representation (no collapsed dimensions)
+# 3. Alignment with the R-Matrix Pramāṇa weights (truth prioritization)
+# =============================================================================
+
+class OntologicalBridge(nn.Module):
+    """
+    V9.7.0: Projects hidden states to 12D ontological space.
+
+    Creates a foundational ontological "signature" early in processing,
+    grounding the model's internal representation in the
+    12 Aspects of Sovereign-1 ontology.
+
+    Architecture:
+        hidden_dim → 12D ontological projection
+        Each of the 12 dimensions corresponds to one Ontological Layer (O1-O12)
+
+    The loss encourages:
+        - Dimensional diversity (no collapse)
+        - Pramāṇa alignment (truth-bearing dimensions stronger)
+        - Coherent representation across aspects
+    """
+
+    def __init__(self, hidden_dim: int, device: torch.device = None):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.onto_dim = 12  # 12 Ontological Layers
+
+        # Projection to 12D ontological space
+        self.onto_proj = nn.Linear(hidden_dim, self.onto_dim, bias=False)
+
+        # Learnable target weights (initialized from R-Matrix Pramāṇa row)
+        # These are the "ideal" activation levels for each Aspect
+        pramana_weights = SOVEREIGN_R_MATRIX[0, :].clone()  # Truth row
+        self.register_buffer('pramana_target', pramana_weights)
+
+        # Layer norm for stable projections
+        self.onto_norm = nn.LayerNorm(self.onto_dim)
+
+        if device is not None:
+            self.to(device)
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,  # [B, N, D] from Layer 9
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """
+        Project hidden states to 12D ontological space.
+
+        Args:
+            hidden_states: Layer 9 hidden states [B, N, hidden_dim]
+
+        Returns:
+            onto_repr: 12D ontological representation [B, N, 12]
+            metrics: Dictionary with coherence and diversity metrics
+        """
+        # Project to 12D
+        onto_repr = self.onto_proj(hidden_states)  # [B, N, 12]
+        onto_repr = self.onto_norm(onto_repr)
+
+        # Compute metrics
+        with torch.no_grad():
+            # Mean activation per Aspect (across batch and sequence)
+            aspect_means = onto_repr.mean(dim=[0, 1])  # [12]
+
+            # Diversity: std across aspects (higher = more diverse)
+            diversity = aspect_means.std().item()
+
+            # Coherence: correlation with Pramāṇa targets
+            # Higher coherence = activations match truth-priority ordering
+            pramana_corr = torch.corrcoef(
+                torch.stack([aspect_means, self.pramana_target])
+            )[0, 1].item() if aspect_means.std() > 1e-6 else 0.0
+
+            # Witness strength: O9 dimension activation (self-reference)
+            o9_activation = aspect_means[8].item()  # O9 = index 8
+
+            metrics = {
+                'onto_diversity': diversity,
+                'onto_pramana_corr': pramana_corr if not math.isnan(pramana_corr) else 0.0,
+                'onto_o9_witness': o9_activation,
+                'onto_mean_activation': aspect_means.abs().mean().item(),
+            }
+
+        return onto_repr, metrics
+
+    def compute_loss(
+        self,
+        onto_repr: torch.Tensor,  # [B, N, 12]
+        lambda_diversity: float = 0.1,
+        lambda_pramana: float = 0.1,
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """
+        Compute ontological alignment loss.
+
+        Encourages:
+        1. Diversity: All 12 dimensions should be active (no collapse)
+        2. Pramāṇa alignment: Activations should follow truth-priority ordering
+
+        Args:
+            onto_repr: 12D ontological representation [B, N, 12]
+            lambda_diversity: Weight for diversity loss
+            lambda_pramana: Weight for Pramāṇa alignment loss
+
+        Returns:
+            total_loss: Combined ontological loss
+            metrics: Loss breakdown
+        """
+        # 1. Diversity loss: Penalize collapsed dimensions
+        # Use negative entropy of normalized activations
+        aspect_means = onto_repr.mean(dim=[0, 1])  # [12]
+        aspect_probs = F.softmax(aspect_means, dim=-1)
+        diversity_entropy = -(aspect_probs * torch.log(aspect_probs + 1e-10)).sum()
+        max_entropy = math.log(12)  # Maximum for uniform distribution
+        diversity_loss = (max_entropy - diversity_entropy) / max_entropy  # 0=diverse, 1=collapsed
+
+        # 2. Pramāṇa alignment loss: Match truth-priority ordering
+        # Encourage higher activations for high-Pramāṇa aspects (O7, O12)
+        # Use MSE between normalized activations and Pramāṇa targets
+        aspect_normalized = (aspect_means - aspect_means.mean()) / (aspect_means.std() + 1e-6)
+        pramana_normalized = (self.pramana_target - self.pramana_target.mean()) / (self.pramana_target.std() + 1e-6)
+        pramana_loss = F.mse_loss(aspect_normalized, pramana_normalized)
+
+        # Combined loss
+        total_loss = lambda_diversity * diversity_loss + lambda_pramana * pramana_loss
+
+        metrics = {
+            'onto_diversity_loss': diversity_loss.item(),
+            'onto_pramana_loss': pramana_loss.item(),
+            'onto_total_loss': total_loss.item(),
+        }
+
+        return total_loss, metrics
+
+
+def create_ontological_bridge(hidden_dim: int, device: torch.device = None) -> OntologicalBridge:
+    """Factory function to create OntologicalBridge."""
+    return OntologicalBridge(hidden_dim, device=device)
+
+
 def compute_rmatrix_loss_weight(
     layer_losses: torch.Tensor,
     num_layers: int = 12,
@@ -6363,11 +6519,20 @@ class UnifiedTrainingConfig:
     # Kosha-Vritti Diagnostic System
     enable_kosha_diagnostics: bool = False   # Enable Kosha-Vritti diagnostic output
     kosha_log_every: int = 0                 # Log Kosha every N steps (0 = use log_every)
+    lightweight_diagnostics: bool = True     # V9.7.0: Skip expensive gradient norm computation in diagnostics
 
-    # Kosha Phase Steering (Active Intervention)
+    # Kosha Phase Steering (Active Intervention) - Layer 9 = O9_WITNESSES
     enable_kosha_steering: bool = False      # Enable phase coupling steering
     kosha_steering_force: float = 0.15       # Steering strength (0.0-1.0, start gentle)
     kosha_steering_warmup: int = 100         # Steps before steering activates
+    kosha_steering_layer: int = 9            # V9.7.0: Layer 9 = O9_WITNESSES (consciousness/awareness alignment)
+
+    # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
+    enable_onto_bridge: bool = False         # Enable 12D ontological projection at Layer 4
+    onto_bridge_lambda: float = 0.1          # Weight for ontological bridge loss
+    onto_bridge_diversity: float = 0.1       # Weight for diversity component (prevent collapse)
+    onto_bridge_pramana: float = 0.1         # Weight for Pramāṇa alignment component
+    onto_bridge_layer: int = 4               # V9.7.0: Layer 4 = foundational ontological grounding
 
     # Dataset
     dataset: str = "wikitext103"  # "wikitext103", "wikitext2", or "fineweb"
@@ -6441,6 +6606,12 @@ class UnifiedTrainingConfig:
     pidv2_w_s: float = 0.30  # Semantic weight
     pidv2_semantic_scale: float = 50.0
     pidv2_handshake_dampen: bool = True
+    # V9.7.0: PIDv2 Dynamic Batch Sizing
+    pidv2_batch_resize: bool = False          # Enable PPL-driven batch resizing
+    pidv2_batch_min: int = 4                  # Minimum batch size
+    pidv2_batch_max: int = 64                 # Maximum batch size
+    pidv2_batch_velocity_threshold: float = 5.0  # PPL velocity % to trigger reduction
+    pidv2_batch_stable_streak: int = 5        # Consecutive stable evals before increase
 
     # Phase ramp settings (for handshake dampening)
     phase_delay_steps: int = 0
@@ -6507,6 +6678,10 @@ class UnifiedTrainingConfig:
     evo_lr_modulation: bool = True           # Enable metacognitive LR adjustment
     evo_lr_slowdown: float = 0.5             # LR multiplier when SLOW_DOWN/BRAKE
     evo_lr_accelerate: float = 1.2           # LR multiplier when ACCELERATE
+    # V9.7.0: EvoFlow Fluency Gate - auto-engage gradients when model is fluent
+    evo_fluency_gate: bool = False           # Enable automatic EvoFlow gradient engagement
+    evo_fluency_min_steps: int = 2000        # Minimum steps before engagement (warmup)
+    evo_fluency_ppl_threshold: float = 100.0 # PPL threshold for "fluent" (engage when PPL < this)
 
     # CSR Phoneme-Ontological Grounding
     enable_csr: bool = True                  # Enable CSR phoneme grounding
@@ -7307,6 +7482,45 @@ def _build_sovereign_state(
 # KOSHA-VRITTI DIAGNOSTIC SYSTEM
 # =============================================================================
 
+
+def compute_layer_gradient_norm(model: nn.Module, layer_idx: int) -> float:
+    """
+    V9.7.0: Compute gradient norm for a specific transformer layer.
+
+    This enables layer-specific Kosha diagnostics by measuring the gradient
+    magnitude at the target layer (e.g., Layer 9 for O9_WITNESSES).
+
+    Args:
+        model: The model with gradients computed
+        layer_idx: Which layer to measure (0-11)
+
+    Returns:
+        Gradient L2 norm for that layer's parameters
+    """
+    layer_grad_norm = 0.0
+    layer_found = False
+
+    # Try to find transformer layers in common locations
+    layers = None
+    for attr in ['layers', 'blocks', 'transformer_blocks', 'encoder_layers', 'decoder_layers']:
+        if hasattr(model, attr):
+            candidate = getattr(model, attr)
+            if isinstance(candidate, nn.ModuleList) and len(candidate) > layer_idx:
+                layers = candidate
+                break
+
+    if layers is not None and layer_idx < len(layers):
+        layer = layers[layer_idx]
+        for param in layer.parameters():
+            if param.grad is not None:
+                layer_grad_norm += param.grad.norm().item() ** 2
+                layer_found = True
+        layer_grad_norm = math.sqrt(layer_grad_norm) if layer_grad_norm > 0 else 0.0
+
+    # If layer not found, return 0 (caller will use fallback)
+    return layer_grad_norm if layer_found else 0.0
+
+
 def apply_kosha_phase_steering(
     embeddings: torch.Tensor,
     target_angle_rad: float,
@@ -7402,13 +7616,19 @@ def compute_kosha_vritti_diagnostics(
     grad_norm: float,
     hidden_states: Optional[List[torch.Tensor]] = None,
     metrics: Optional[Dict[str, float]] = None,
+    diagnostic_layer: int = 9,  # V9.7.0: Layer-specific diagnostics
+    layer_grad_norm: Optional[float] = None,  # V9.7.0: Layer-specific gradient
 ) -> Dict[str, Any]:
     """
     Compute Kosha-Vritti diagnostic coordinates.
 
+    V9.7.0: Now computes layer-specific diagnostics for accurate Kosha measurement.
+    - Reality Axis (r): Computed from diagnostic_layer hidden state entropy
+    - Time Axis (t): Computed from layer-specific gradient norm (or total if unavailable)
+
     This is a READ-ONLY diagnostic system that maps training state to:
-    - Reality Axis (r): +1 (Unmanifest/uncertain) to -1 (Manifest/confident) via logits entropy
-    - Time Axis (t): -1 (Past/Smriti) to +1 (Future/Pramana) via gradient norm
+    - Reality Axis (r): +1 (Unmanifest/uncertain) to -1 (Manifest/confident)
+    - Time Axis (t): -1 (Past/Smriti) to +1 (Future/Pramana)
     - Phase Angle: Current position in Kosha space (0-360°)
     - Vritti State: Cognitive mode classification
 
@@ -7426,47 +7646,73 @@ def compute_kosha_vritti_diagnostics(
     - SMRITI (Memory): r < 0, t < -0.3 - confident but decaying
     """
     result = {}
+    result['diagnostic_layer'] = diagnostic_layer
 
     with torch.no_grad():
         # =========================================================================
-        # REALITY AXIS (r): Logits Entropy → Manifestation Level
-        # High entropy = uncertain/unmanifest (-1), Low entropy = confident/manifest (+1)
+        # REALITY AXIS (r): Layer-Specific Hidden State Entropy
+        # V9.7.0: Compute from diagnostic_layer hidden states, not final logits
+        # High activation entropy = uncertain (-1), Low = confident/focused (+1)
         # =========================================================================
-        if logits is not None and logits.numel() > 0:
-            # Compute softmax probabilities
-            probs = F.softmax(logits.float(), dim=-1)
-            # Compute entropy: H = -sum(p * log(p))
-            log_probs = torch.log(probs + 1e-10)
-            entropy = -(probs * log_probs).sum(dim=-1).mean()
+        layer_entropy = None
+        if hidden_states is not None and len(hidden_states) > diagnostic_layer:
+            layer_hidden = hidden_states[diagnostic_layer]  # [B, N, D]
+            if layer_hidden is not None and layer_hidden.numel() > 0:
+                # Compute activation entropy across the hidden dimension
+                # Use softmax to get "attention" distribution over features
+                # This measures how focused vs distributed the activations are
+                layer_abs = layer_hidden.abs().float()  # [B, N, D]
+                # Normalize to probability-like distribution per position
+                layer_probs = layer_abs / (layer_abs.sum(dim=-1, keepdim=True) + 1e-10)
+                # Compute entropy: H = -sum(p * log(p))
+                log_probs = torch.log(layer_probs + 1e-10)
+                position_entropy = -(layer_probs * log_probs).sum(dim=-1)  # [B, N]
+                layer_entropy = position_entropy.mean().item()
 
-            # Normalize entropy to [-1, +1] range
-            # Typical entropy range: 0 (certain) to ~10 (uniform over 50k vocab)
-            # Map: 0 → +1 (manifest), 5 → 0 (neutral), 10 → -1 (unmanifest)
-            max_entropy = 10.0  # Approximate for 50k vocab
-            r = 1.0 - (2.0 * entropy.item() / max_entropy)
-            r = max(-1.0, min(1.0, r))  # Clamp to [-1, +1]
-            result['r'] = r
-            result['entropy'] = entropy.item()
-        else:
-            result['r'] = 0.0
-            result['entropy'] = 5.0
+                # Normalize: max entropy for D dimensions = log(D)
+                D = layer_hidden.shape[-1]
+                max_entropy = math.log(D)  # e.g., log(768) ≈ 6.6 for typical models
+                # Map: 0 → +1 (focused/manifest), max → -1 (diffuse/unmanifest)
+                r = 1.0 - (2.0 * layer_entropy / max_entropy)
+                r = max(-1.0, min(1.0, r))
+                result['r'] = r
+                result['entropy'] = layer_entropy
+                result['entropy_source'] = f'layer_{diagnostic_layer}'
+
+        # Fallback to logits entropy if layer-specific not available
+        if 'r' not in result:
+            if logits is not None and logits.numel() > 0:
+                probs = F.softmax(logits.float(), dim=-1)
+                log_probs = torch.log(probs + 1e-10)
+                entropy = -(probs * log_probs).sum(dim=-1).mean()
+                max_entropy = 12.0
+                r = 1.0 - (2.0 * entropy.item() / max_entropy)
+                r = max(-1.0, min(1.0, r))
+                result['r'] = r
+                result['entropy'] = entropy.item()
+                result['entropy_source'] = 'logits_fallback'
+            else:
+                result['r'] = 0.0
+                result['entropy'] = 6.0
+                result['entropy_source'] = 'default'
 
         # =========================================================================
-        # TIME AXIS (t): Gradient Norm → Temporal Orientation
-        # High grad = future-oriented/learning (+1), Low grad = past-oriented/memory (-1)
+        # TIME AXIS (t): Layer-Specific Gradient Norm
+        # V9.7.0: Use layer_grad_norm if provided, otherwise fall back to total
+        # High grad = future-oriented/learning (+1), Low = past-oriented/memory (-1)
         # =========================================================================
-        # Normalize gradient norm to [-1, +1]
-        # Typical grad norm range: 0.1 (stable) to 100+ (early training)
-        # Use log scale: log(0.1) ≈ -2.3, log(10) ≈ 2.3, log(100) ≈ 4.6
-        if grad_norm > 0:
-            log_grad = math.log(grad_norm + 1e-8)
-            # Map: log(0.1)=-2.3 → -1, log(1)=0 → 0, log(10)=2.3 → +1
-            t = log_grad / 2.3
+        effective_grad_norm = layer_grad_norm if layer_grad_norm is not None else grad_norm
+
+        if effective_grad_norm > 0:
+            log_grad = math.log10(effective_grad_norm + 1e-8)
+            # Map: log10(0.01)=-2 → -1, log10(1)=0 → 0, log10(100)=2 → +1
+            t = log_grad / 3.0
             t = max(-1.0, min(1.0, t))
         else:
             t = 0.0
         result['t'] = t
-        result['grad_norm'] = grad_norm
+        result['grad_norm'] = effective_grad_norm
+        result['grad_source'] = f'layer_{diagnostic_layer}' if layer_grad_norm is not None else 'total'
 
         # =========================================================================
         # PHASE ANGLE: Geometric Truth using atan2(t, r)
@@ -7634,6 +7880,391 @@ def format_kosha_diagnostic(
         lines.append(
             f"    🎯 [STEER] Target: {target:.0f}° | Current: {mean_phase:.0f}° | "
             f"Error: {phase_err:.1f}° {direction} | Loss: {steer_loss:.4f}"
+        )
+
+    return "\n".join(lines)
+
+
+# =============================================================================
+# V9.7.0: CSR DIAGNOSTICS (Layer 7 - Concept Consolidation)
+# =============================================================================
+# Provides layer-specific diagnostics for CSR alignment at Layer 7.
+# Measures phoneme-ontological grounding quality and alignment coherence.
+# =============================================================================
+
+def compute_csr_diagnostics(
+    hidden_states: Optional[List[torch.Tensor]] = None,
+    csr_metrics: Optional[Dict[str, float]] = None,
+    diagnostic_layer: int = 7,
+    layer_grad_norm: Optional[float] = None,
+    grad_norm: float = 0.0,
+) -> Dict[str, Any]:
+    """
+    V9.7.0: Compute CSR diagnostic coordinates at Layer 7.
+
+    CSR (Coherent Semantic Resonance) aligns hidden states with Sanskrit
+    phoneme-ontological embeddings. Layer 7 is where concept consolidation
+    happens - abstract concepts solidify into coherent representations.
+
+    Diagnostic Axes:
+    - Coherence Axis (c): -1 (fragmented) to +1 (coherent/aligned)
+    - Flow Axis (f): -1 (static/stuck) to +1 (flowing/learning)
+
+    CSR States (based on quadrant):
+    - RESONANT (c>0, f>0): Strong alignment + active learning - optimal
+    - SEEKING (c<0, f>0): Weak alignment but learning - exploring
+    - ANCHORED (c>0, f<0): Strong alignment but static - stable/memorized
+    - LOST (c<0, f<0): Weak alignment and stuck - needs intervention
+    """
+    result = {
+        'diagnostic_layer': diagnostic_layer,
+    }
+
+    with torch.no_grad():
+        # =====================================================================
+        # COHERENCE AXIS (c): Layer 7 Activation Focus
+        # High focus = coherent representations (+1)
+        # Low focus = fragmented/diffuse representations (-1)
+        # =====================================================================
+        layer_entropy = None
+        if hidden_states is not None and len(hidden_states) > diagnostic_layer:
+            layer_hidden = hidden_states[diagnostic_layer]
+            if layer_hidden is not None and layer_hidden.numel() > 0:
+                # Compute activation entropy (same method as Kosha)
+                layer_abs = layer_hidden.abs().float()
+                layer_probs = layer_abs / (layer_abs.sum(dim=-1, keepdim=True) + 1e-10)
+                log_probs = torch.log(layer_probs + 1e-10)
+                position_entropy = -(layer_probs * log_probs).sum(dim=-1)
+                layer_entropy = position_entropy.mean().item()
+
+                D = layer_hidden.shape[-1]
+                max_entropy = math.log(D)
+                # Map: low entropy → +1 (coherent), high entropy → -1 (fragmented)
+                c = 1.0 - (2.0 * layer_entropy / max_entropy)
+                c = max(-1.0, min(1.0, c))
+                result['c'] = c
+                result['entropy'] = layer_entropy
+                result['entropy_source'] = f'layer_{diagnostic_layer}'
+
+        if 'c' not in result:
+            result['c'] = 0.0
+            result['entropy'] = 0.0
+            result['entropy_source'] = 'default'
+
+        # =====================================================================
+        # FLOW AXIS (f): Layer 7 Gradient Activity
+        # High gradient = active learning/flow (+1)
+        # Low gradient = static/stuck (-1)
+        # =====================================================================
+        effective_grad = layer_grad_norm if layer_grad_norm is not None else grad_norm
+
+        if effective_grad > 0:
+            log_grad = math.log10(effective_grad + 1e-8)
+            f = log_grad / 3.0
+            f = max(-1.0, min(1.0, f))
+        else:
+            f = 0.0
+        result['f'] = f
+        result['grad_norm'] = effective_grad
+        result['grad_source'] = f'layer_{diagnostic_layer}' if layer_grad_norm is not None else 'total'
+
+        # =====================================================================
+        # CSR STATE CLASSIFICATION
+        # =====================================================================
+        c = result['c']
+        f = result['f']
+
+        if c >= 0 and f >= 0:
+            state = 'RESONANT'
+            state_desc = 'Aligned & Learning'
+            state_icon = '🎵'
+        elif c < 0 and f >= 0:
+            state = 'SEEKING'
+            state_desc = 'Exploring Alignment'
+            state_icon = '🔍'
+        elif c >= 0 and f < 0:
+            state = 'ANCHORED'
+            state_desc = 'Stable/Memorized'
+            state_icon = '⚓'
+        else:
+            state = 'LOST'
+            state_desc = 'Needs Intervention'
+            state_icon = '❓'
+
+        result['state'] = state
+        result['state_desc'] = state_desc
+        result['state_icon'] = state_icon
+
+        # Coherence zone description
+        if c > 0.3:
+            result['coherence_zone'] = 'FOCUSED'
+        elif c < -0.3:
+            result['coherence_zone'] = 'DIFFUSE'
+        else:
+            result['coherence_zone'] = 'BALANCED'
+
+        # Flow zone description
+        if f > 0.3:
+            result['flow_zone'] = 'FLOWING'
+        elif f < -0.3:
+            result['flow_zone'] = 'STATIC'
+        else:
+            result['flow_zone'] = 'MODERATE'
+
+        # =====================================================================
+        # CSR ALIGNMENT METRICS (from training loop)
+        # =====================================================================
+        if csr_metrics is not None:
+            result['csr_loss'] = csr_metrics.get('csr_loss', 0.0)
+            result['csr_confidence'] = csr_metrics.get('csr_confidence', 0.0)
+            result['csr_similarity'] = csr_metrics.get('csr_similarity', 0.0)
+            result['entropy_sink'] = csr_metrics.get('entropy_sink_entropy', 0.0)
+            result['synthesis_gate'] = csr_metrics.get('synthesis_gate_value', 0.0)
+
+    return result
+
+
+def format_csr_diagnostic(diag: Dict[str, Any]) -> str:
+    """Format CSR diagnostic for logging output."""
+    lines = []
+
+    c = diag.get('c', 0.0)
+    f = diag.get('f', 0.0)
+    coherence_zone = diag.get('coherence_zone', 'UNKNOWN')
+    flow_zone = diag.get('flow_zone', 'UNKNOWN')
+    state = diag.get('state', 'UNKNOWN')
+
+    lines.append(
+        f"    🎼 [CSR] Coords: c={c:+.2f} ({coherence_zone}) | "
+        f"f={f:+.2f} ({flow_zone}) --> State: {state}"
+    )
+
+    state_desc = diag.get('state_desc', '')
+    state_icon = diag.get('state_icon', '')
+    entropy = diag.get('entropy', 0.0)
+    grad_norm = diag.get('grad_norm', 0.0)
+
+    lines.append(
+        f"    📊 [CSR] {state_desc} {state_icon} | "
+        f"Entropy: {entropy:.2f} | GradNorm: {grad_norm:.2f}"
+    )
+
+    # CSR metrics if available
+    if 'csr_similarity' in diag:
+        sim = diag.get('csr_similarity', 0.0)
+        conf = diag.get('csr_confidence', 0.0)
+        loss = diag.get('csr_loss', 0.0)
+        lines.append(
+            f"    🔗 [CSR] Similarity: {sim:.3f} | Confidence: {conf:.3f} | Loss: {loss:.4f}"
+        )
+
+    return "\n".join(lines)
+
+
+# =============================================================================
+# V9.7.0: ONTOLOGICAL BRIDGE DIAGNOSTICS (Layer 4 - Foundational Structure)
+# =============================================================================
+# Provides layer-specific diagnostics for the 12D ontological projection.
+# Measures aspect diversity, Pramāṇa alignment, and dominant aspects.
+# =============================================================================
+
+def compute_onto_bridge_diagnostics(
+    hidden_states: Optional[List[torch.Tensor]] = None,
+    onto_metrics: Optional[Dict[str, float]] = None,
+    onto_bridge: Optional[nn.Module] = None,
+    diagnostic_layer: int = 4,
+    layer_grad_norm: Optional[float] = None,
+    grad_norm: float = 0.0,
+) -> Dict[str, Any]:
+    """
+    V9.7.0: Compute Ontological Bridge diagnostics at Layer 4.
+
+    The Ontological Bridge projects hidden states to 12D ontological space,
+    one dimension per Aspect (O1-O12). Layer 4 is where foundational
+    structure forms - the ontological "DNA" that propagates to all later layers.
+
+    Diagnostic Axes:
+    - Structure Axis (s): -1 (collapsed/uniform) to +1 (diverse/structured)
+    - Grounding Axis (g): -1 (static/stuck) to +1 (adapting/learning)
+
+    Onto States (based on quadrant):
+    - GROUNDED (s>0, g>0): Diverse structure + active learning - optimal
+    - FORMING (s<0, g>0): Uniform but learning - structure emerging
+    - STABLE (s>0, g<0): Diverse but static - established ontology
+    - DORMANT (s<0, g<0): Collapsed and stuck - needs activation
+    """
+    result = {
+        'diagnostic_layer': diagnostic_layer,
+    }
+
+    with torch.no_grad():
+        # =====================================================================
+        # STRUCTURE AXIS (s): Layer 4 Representation Diversity
+        # High diversity = rich ontological structure (+1)
+        # Low diversity = collapsed/uniform (-1)
+        # =====================================================================
+        if hidden_states is not None and len(hidden_states) > diagnostic_layer:
+            layer_hidden = hidden_states[diagnostic_layer]
+            if layer_hidden is not None and layer_hidden.numel() > 0:
+                # Compute activation entropy for structure measurement
+                layer_abs = layer_hidden.abs().float()
+                layer_probs = layer_abs / (layer_abs.sum(dim=-1, keepdim=True) + 1e-10)
+                log_probs = torch.log(layer_probs + 1e-10)
+                position_entropy = -(layer_probs * log_probs).sum(dim=-1)
+                layer_entropy = position_entropy.mean().item()
+
+                D = layer_hidden.shape[-1]
+                max_entropy = math.log(D)
+                # For structure, higher entropy = more diverse structure (+1)
+                # This is OPPOSITE of coherence - we want distributed activations
+                s = (2.0 * layer_entropy / max_entropy) - 1.0
+                s = max(-1.0, min(1.0, s))
+                result['s'] = s
+                result['entropy'] = layer_entropy
+                result['entropy_source'] = f'layer_{diagnostic_layer}'
+
+        if 's' not in result:
+            result['s'] = 0.0
+            result['entropy'] = 0.0
+            result['entropy_source'] = 'default'
+
+        # =====================================================================
+        # GROUNDING AXIS (g): Layer 4 Gradient Activity
+        # High gradient = actively grounding/adapting (+1)
+        # Low gradient = static/fixed (-1)
+        # =====================================================================
+        effective_grad = layer_grad_norm if layer_grad_norm is not None else grad_norm
+
+        if effective_grad > 0:
+            log_grad = math.log10(effective_grad + 1e-8)
+            g = log_grad / 3.0
+            g = max(-1.0, min(1.0, g))
+        else:
+            g = 0.0
+        result['g'] = g
+        result['grad_norm'] = effective_grad
+        result['grad_source'] = f'layer_{diagnostic_layer}' if layer_grad_norm is not None else 'total'
+
+        # =====================================================================
+        # ONTO STATE CLASSIFICATION
+        # =====================================================================
+        s = result['s']
+        g = result['g']
+
+        if s >= 0 and g >= 0:
+            state = 'GROUNDED'
+            state_desc = 'Diverse & Adapting'
+            state_icon = '🌳'
+        elif s < 0 and g >= 0:
+            state = 'FORMING'
+            state_desc = 'Structure Emerging'
+            state_icon = '🌱'
+        elif s >= 0 and g < 0:
+            state = 'STABLE'
+            state_desc = 'Established Ontology'
+            state_icon = '🏛️'
+        else:
+            state = 'DORMANT'
+            state_desc = 'Needs Activation'
+            state_icon = '💤'
+
+        result['state'] = state
+        result['state_desc'] = state_desc
+        result['state_icon'] = state_icon
+
+        # Structure zone description
+        if s > 0.3:
+            result['structure_zone'] = 'DIVERSE'
+        elif s < -0.3:
+            result['structure_zone'] = 'UNIFORM'
+        else:
+            result['structure_zone'] = 'MODERATE'
+
+        # Grounding zone description
+        if g > 0.3:
+            result['grounding_zone'] = 'ADAPTING'
+        elif g < -0.3:
+            result['grounding_zone'] = 'STATIC'
+        else:
+            result['grounding_zone'] = 'STABLE'
+
+        # =====================================================================
+        # 12D ASPECT METRICS (from OntologicalBridge or onto_metrics)
+        # =====================================================================
+        if onto_metrics is not None:
+            result['diversity'] = onto_metrics.get('onto_diversity', 0.0)
+            result['pramana_corr'] = onto_metrics.get('onto_pramana_corr', 0.0)
+            result['o9_witness'] = onto_metrics.get('onto_o9_witness', 0.0)
+            result['mean_activation'] = onto_metrics.get('onto_mean_activation', 0.0)
+
+        # Compute 12D projection if bridge available
+        if onto_bridge is not None and hidden_states is not None and len(hidden_states) > diagnostic_layer:
+            layer_hidden = hidden_states[diagnostic_layer]
+            if layer_hidden is not None:
+                onto_repr, bridge_metrics = onto_bridge(layer_hidden)
+                # Get aspect activations
+                aspect_means = onto_repr.mean(dim=[0, 1])  # [12]
+                result['aspect_activations'] = aspect_means.tolist()
+
+                # Find dominant aspect
+                dominant_idx = aspect_means.abs().argmax().item()
+                result['dominant_aspect'] = f'O{dominant_idx + 1}'
+                result['dominant_value'] = aspect_means[dominant_idx].item()
+
+    return result
+
+
+def format_onto_bridge_diagnostic(diag: Dict[str, Any]) -> str:
+    """Format Ontological Bridge diagnostic for logging output."""
+    lines = []
+
+    # Short names for 12 aspects (3-char each for compact display)
+    ASPECT_SHORT = ['POT', 'IDN', 'EXE', 'STR', 'COG', 'AGY', 'RSN', 'PRP', 'WIT', 'UNI', 'INT', 'ABS']
+
+    s = diag.get('s', 0.0)
+    g = diag.get('g', 0.0)
+    structure_zone = diag.get('structure_zone', 'UNKNOWN')
+    grounding_zone = diag.get('grounding_zone', 'UNKNOWN')
+    state = diag.get('state', 'UNKNOWN')
+
+    lines.append(
+        f"    🌉 [ONTO] Coords: s={s:+.2f} ({structure_zone}) | "
+        f"g={g:+.2f} ({grounding_zone}) --> State: {state}"
+    )
+
+    # 12D Aspect Activations (the core feature)
+    if 'aspect_activations' in diag:
+        activations = diag['aspect_activations']
+        # Row 1: O1-O6 (Physical/Mental layers)
+        row1_parts = []
+        for i in range(6):
+            val = activations[i] if i < len(activations) else 0.0
+            row1_parts.append(f"{ASPECT_SHORT[i]}:{val:+.2f}")
+        lines.append(f"    🔮 [12D] {' | '.join(row1_parts)}")
+
+        # Row 2: O7-O12 (Spiritual/Integration layers)
+        row2_parts = []
+        for i in range(6, 12):
+            val = activations[i] if i < len(activations) else 0.0
+            row2_parts.append(f"{ASPECT_SHORT[i]}:{val:+.2f}")
+        lines.append(f"    🔮 [12D] {' | '.join(row2_parts)}")
+
+        # Find dominant aspect
+        max_idx = 0
+        max_val = abs(activations[0]) if activations else 0
+        for i, v in enumerate(activations):
+            if abs(v) > max_val:
+                max_val = abs(v)
+                max_idx = i
+        dominant = f"O{max_idx + 1}_{ASPECT_SHORT[max_idx]}"
+        lines.append(f"    🎯 [ONTO] Dominant: {dominant} ({activations[max_idx]:+.3f})")
+
+    # Summary metrics
+    if 'diversity' in diag:
+        div = diag.get('diversity', 0.0)
+        pram = diag.get('pramana_corr', 0.0)
+        lines.append(
+            f"    📊 [ONTO] Diversity: {div:.3f} | Pramāṇa Corr: {pram:+.3f} | GradNorm: {diag.get('grad_norm', 0.0):.2f}"
         )
 
     return "\n".join(lines)
@@ -8070,6 +8701,9 @@ def train(config: UnifiedTrainingConfig):
         print(f"    → Micro:{config.evo_micro_weight} Meso:{config.evo_meso_weight} Macro:{config.evo_macro_weight}")
         print(f"    → Delayed Resonance α={config.evo_resonance_alpha}")
         print(f"    → LR Modulation: SLOW={config.evo_lr_slowdown}x ACCEL={config.evo_lr_accelerate}x")
+        if config.evo_fluency_gate:
+            print(f"    🚦 Fluency Gate: ENABLED (engage when step>{config.evo_fluency_min_steps} AND PPL<{config.evo_fluency_ppl_threshold})")
+            print(f"       → EvoFlow gradients DORMANT until fluency achieved")
 
         # Create HiddenStateExtractor for models that don't return hidden_states
         hidden_state_extractor = HiddenStateExtractor(model, num_layers=12)
@@ -8320,12 +8954,23 @@ def train(config: UnifiedTrainingConfig):
             W_s=config.pidv2_w_s,
             semantic_ppl_scale=config.pidv2_semantic_scale,
             handshake_Kd_dampen=config.pidv2_handshake_dampen,
+            # V9.7.0: Dynamic Batch Sizing
+            enable_batch_resize=config.pidv2_batch_resize,
+            batch_min=config.pidv2_batch_min,
+            batch_max=config.pidv2_batch_max,
+            batch_velocity_threshold=config.pidv2_batch_velocity_threshold,
+            batch_stable_streak=config.pidv2_batch_stable_streak,
         )
         authority_controller = AuthorityPIDv2(pidv2_config)
+        authority_controller.set_batch_size(config.batch_size)  # Initialize with current batch
         print(f"\n  PIDv2 Governor ENABLED")
         print(f"    Dynamic Kp: [{config.pidv2_kp_min}, {config.pidv2_kp_max}]")
         print(f"    Semantic Weight (W_s): {config.pidv2_w_s:.0%}")
         print(f"    Authority floor: {config.pidv2_a_min}")
+        if config.pidv2_batch_resize:
+            print(f"    🔄 Batch Resize: ENABLED (min={config.pidv2_batch_min}, max={config.pidv2_batch_max})")
+            print(f"       Reduce when: PPL vel > {config.pidv2_batch_velocity_threshold}%")
+            print(f"       Increase after: {config.pidv2_batch_stable_streak} stable evals")
     elif config.controller == "emergency_pd" and PIDV2_AVAILABLE:
         pd_config = EmergencyPDConfig(A_min=0.25)
         authority_controller = EmergencyPD(pd_config)
@@ -8383,18 +9028,37 @@ def train(config: UnifiedTrainingConfig):
         print(f"     Quadrants: Q1=ANANDAMAYA | Q2=VIJNANAMAYA | Q3=ANNAMAYA | Q4=MANOMAYA")
         print(f"     Vritti: PRAMANA | VIPARYAYA | VIKALPA | NIDRA | SMRITI | PRAJNA")
 
-    # Kosha Phase Steering (Active Intervention)
+    # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
+    # Moved BEFORE Kosha: Ontology grounds structure early, Kosha witnesses later
+    onto_bridge = None
+    if config.enable_onto_bridge:
+        # Get hidden_dim from model or preset (not config)
+        onto_hidden_dim = (
+            getattr(model, 'd_model', None) or
+            getattr(getattr(model, 'config', None), 'd_model', None) or
+            preset['embed_dim']
+        )
+        onto_bridge = create_ontological_bridge(hidden_dim=onto_hidden_dim, device=device)
+        layer_desc = {4: "Foundational Structure", 2: "Raw Embeddings", 6: "Semantic"}.get(config.onto_bridge_layer, "Custom")
+        print(f"\n  🌉 Ontological Bridge: ENABLED (Layer {config.onto_bridge_layer} = {layer_desc})")
+        print(f"     12D projection: {onto_hidden_dim}D → 12 Ontological Aspects")
+        print(f"     Lambda: {config.onto_bridge_lambda:.2f} | Diversity: {config.onto_bridge_diversity:.2f} | Pramāṇa: {config.onto_bridge_pramana:.2f}")
+        print(f"     Aspects: O1-O12 (Potential → Absolving)")
+        print(f"     ⚠️  FOUNDATIONAL - establishes ontological DNA early")
+
+    # Kosha Phase Steering (Active Intervention) - Layer 9 = O9_WITNESSES
     if config.enable_kosha_steering:
         print(f"\n  🎯 Kosha Phase Steering: ENABLED")
         print(f"     Force: {config.kosha_steering_force:.2f} (0=off, 1=full)")
         print(f"     Warmup: {config.kosha_steering_warmup} steps")
         print(f"     Target: Geometric Truth from atan2(t, r)")
-        print(f"     Layer: 2 (Concept Formation)")
-        print(f"     ⚠️  ACTIVE INTERVENTION - will modify loss landscape")
+        layer_desc = {9: "O9_WITNESSES (Consciousness)", 4: "Grammar Forming", 2: "Raw Embeddings"}.get(config.kosha_steering_layer, "Custom")
+        print(f"     Layer: {config.kosha_steering_layer} ({layer_desc})")
+        print(f"     ⚠️  WITNESS POINT - consciousness/awareness alignment")
 
     print(f"\n{'='*70}")
     print("   STARTING TRAINING")
-    print(f"{'='*70}\n")
+    print(f"{'='*70}\n", flush=True)
 
     model.train()
     train_iter = iter(train_loader)
@@ -8412,6 +9076,10 @@ def train(config: UnifiedTrainingConfig):
 
     # Sensory flow tracking for Saturation Gate (used by DynamicRelaxationController)
     last_sensory_flow = 0.5  # Default value, updated each step from EvoFlow
+
+    # V9.7.0: EvoFlow Fluency Gate - track engagement state
+    evo_fluency_engaged = False  # Once True, stays True (no disengagement)
+    last_val_ppl = float('inf')  # Track validation PPL for fluency check
 
     while global_step < config.max_steps:
         # Get batch
@@ -8678,6 +9346,27 @@ def train(config: UnifiedTrainingConfig):
                                         loss = loss + synthesis_loss
                                         csr_metrics['synthesis_loss'] = synthesis_loss.item()
 
+                        # V9.7.0: Ontological Bridge - Layer 4 (Foundational Structure) projection to 12D
+                        # Establishes ontological "DNA" early - 12 Aspects ground all subsequent processing
+                        onto_layer = config.onto_bridge_layer
+                        if onto_bridge is not None and len(layer_hidden_states) > onto_layer:
+                            # DETACH to train only the bridge, not the main model
+                            onto_hidden = layer_hidden_states[onto_layer].detach()
+                            onto_repr, onto_metrics = onto_bridge(onto_hidden)
+                            onto_loss, onto_loss_metrics = onto_bridge.compute_loss(
+                                onto_repr,
+                                lambda_diversity=config.onto_bridge_diversity,
+                                lambda_pramana=config.onto_bridge_pramana,
+                            )
+                            # Scale by lambda and add to total loss
+                            scaled_onto_loss = config.onto_bridge_lambda * onto_loss
+                            loss = loss + scaled_onto_loss
+                            # Store metrics
+                            metrics['onto_bridge_loss'] = scaled_onto_loss.item()
+                            metrics['onto_diversity'] = onto_metrics.get('onto_diversity', 0.0)
+                            metrics['onto_pramana_corr'] = onto_metrics.get('onto_pramana_corr', 0.0)
+                            metrics['onto_bridge_layer'] = onto_layer
+
             # Initialize default guna values for first iteration
             # (actual values computed later in the loop, but needed here for evolutionary bridge)
             try:
@@ -8777,9 +9466,20 @@ def train(config: UnifiedTrainingConfig):
                 hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
 
                 if hidden_states is not None and len(hidden_states) > 0:
-                    # V9.6.7: DETACH all hidden states to prevent gradient flow!
-                    # This ensures EvoFlow only monitors layer coherence, doesn't corrupt the model
-                    hidden_states_detached = [h.detach() if h is not None else None for h in hidden_states]
+                    # V9.7.0: EvoFlow Fluency Gate - check if gradients should be engaged
+                    if config.evo_fluency_gate and not evo_fluency_engaged:
+                        if global_step >= config.evo_fluency_min_steps and last_val_ppl < config.evo_fluency_ppl_threshold:
+                            evo_fluency_engaged = True
+                            print(f"🚀 [FLUENCY GATE] EvoFlow Gradients ENGAGED! (Step {global_step}, PPL {last_val_ppl:.2f} < {config.evo_fluency_ppl_threshold})")
+
+                    # V9.6.7/V9.7.0: Conditionally detach hidden states
+                    if config.evo_fluency_gate and evo_fluency_engaged:
+                        # Fluency achieved - let gradients flow to main model
+                        hidden_states_detached = hidden_states  # No detach - gradients flow
+                    else:
+                        # V9.6.7: DETACH all hidden states to prevent gradient flow!
+                        # This ensures EvoFlow only monitors layer coherence, doesn't corrupt the model
+                        hidden_states_detached = [h.detach() if h is not None else None for h in hidden_states]
 
                     # V9.4.6: Sensory Noise Injection (SNI) - DISABLED in V9.6.7
                     # SNI modifies hidden states in-place which can cause gradient issues
@@ -8857,12 +9557,13 @@ def train(config: UnifiedTrainingConfig):
                         # Compute target angle in radians
                         target_angle_rad = math.atan2(t_axis, r_axis)
 
-                        # Get embeddings to steer (use early hidden state)
+                        # Get embeddings to steer (use configurable hidden state layer)
                         if hidden_state_extractor is not None:
                             steering_hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
-                            if steering_hidden_states is not None and len(steering_hidden_states) > 2:
-                                # Use Layer 2 (concept formation layer) for steering
-                                layer_to_steer = steering_hidden_states[2]
+                            steer_layer = config.kosha_steering_layer
+                            if steering_hidden_states is not None and len(steering_hidden_states) > steer_layer:
+                                # V9.7.0: Use configurable layer (default 4 = grammar forming)
+                                layer_to_steer = steering_hidden_states[steer_layer]
 
                                 # Compute phase alignment loss
                                 # Penalize deviation from target angle
@@ -8894,9 +9595,10 @@ def train(config: UnifiedTrainingConfig):
                                     # One-time log when steering activates
                                     if not hasattr(model, '_kosha_steering_logged'):
                                         model._kosha_steering_logged = True
+                                        layer_desc = {2: "Raw Embeddings", 4: "Grammar Forming", 6: "Semantic", 7: "Consolidation"}.get(steer_layer, "Custom")
                                         print(f"\n  🎯 [KOSHA STEERING] Activated at step {global_step}")
                                         print(f"     Force: {config.kosha_steering_force:.2f}")
-                                        print(f"     Layer: 2 (Concept Formation)")
+                                        print(f"     Layer: {steer_layer} ({layer_desc})")
                                         print(f"     Target: Geometric Truth from atan2(t, r)")
 
                 except Exception as e:
@@ -8932,6 +9634,13 @@ def train(config: UnifiedTrainingConfig):
 
             # Note: Gradient scaling via hooks happens automatically during backward()
             # We'll call step() after optimizer.step() to update warmup schedule
+
+            # V9.7.0: Capture RAW gradient norm BEFORE clipping for Kosha Time axis
+            # This gives meaningful t values instead of always 0 (post-clip is always ~1.0)
+            raw_grad_norm = sum(
+                p.grad.norm().item() for p in model.parameters()
+                if p.grad is not None
+            )
 
             # Gradient clipping: per-layer or global
             if config.use_per_layer_clipping and gradient_scaler_hgs is not None:
@@ -9427,18 +10136,25 @@ def train(config: UnifiedTrainingConfig):
                         if hidden_state_extractor is not None:
                             kosha_hidden = hidden_state_extractor.get_hidden_states(outputs, x)
 
-                        # Get gradient norm (captured before zero_grad)
-                        kosha_grad_norm = captured_grad_norm if 'captured_grad_norm' in dir() else 0.0
-                        # If using HGS, get gradient norm from there
-                        if hgs_metrics and 'total_grad_norm' in hgs_metrics:
-                            kosha_grad_norm = hgs_metrics['total_grad_norm']
+                        # V9.7.0: Use RAW gradient norm (before clipping) for meaningful Time axis
+                        kosha_grad_norm = raw_grad_norm if 'raw_grad_norm' in dir() else 0.0
 
-                        # Compute diagnostics
+                        # V9.7.0: Layer-specific diagnostics - use kosha_steering_layer
+                        # This ensures diagnostics measure the same layer that steering operates on
+                        diag_layer = config.kosha_steering_layer
+                        # V9.7.0: Skip expensive layer gradient norm in lightweight mode
+                        layer_grad = 0.0
+                        if not config.lightweight_diagnostics and diag_layer < 12:
+                            layer_grad = compute_layer_gradient_norm(model, diag_layer)
+
+                        # Compute diagnostics with layer-specific data
                         kosha_diag = compute_kosha_vritti_diagnostics(
                             logits=kosha_logits,
                             grad_norm=kosha_grad_norm,
                             hidden_states=kosha_hidden,
                             metrics=metrics,
+                            diagnostic_layer=diag_layer,
+                            layer_grad_norm=layer_grad if layer_grad > 0 else None,
                         )
 
                         # Format and print (include steering metrics if available)
@@ -9453,6 +10169,75 @@ def train(config: UnifiedTrainingConfig):
                         if global_step % 100 == 0:  # Limit error spam
                             print(f"    ⚠️ [KOSHA] Diagnostic error: {e}", flush=True)
 
+                # V9.7.0: CSR Diagnostics (Layer 7 - Concept Consolidation)
+                if csr_provider is not None and global_step % kosha_log_interval == 0:
+                    try:
+                        # Get hidden states for CSR layer
+                        csr_diag_hidden = None
+                        if hidden_state_extractor is not None:
+                            csr_diag_hidden = hidden_state_extractor.get_hidden_states(outputs, x)
+
+                        # Layer-specific gradient for CSR (skip in lightweight mode)
+                        csr_diag_layer = config.csr_alignment_layer
+                        csr_layer_grad = 0.0
+                        if not config.lightweight_diagnostics and csr_diag_layer < 12:
+                            csr_layer_grad = compute_layer_gradient_norm(model, csr_diag_layer)
+
+                        # Compute CSR diagnostics
+                        csr_diag = compute_csr_diagnostics(
+                            hidden_states=csr_diag_hidden,
+                            csr_metrics=csr_metrics if 'csr_metrics' in dir() else None,
+                            diagnostic_layer=csr_diag_layer,
+                            layer_grad_norm=csr_layer_grad if csr_layer_grad > 0 else None,
+                            grad_norm=raw_grad_norm if 'raw_grad_norm' in dir() else 0.0,
+                        )
+
+                        # Format and print
+                        csr_output = format_csr_diagnostic(csr_diag)
+                        print(csr_output, flush=True)
+                    except Exception as e:
+                        if global_step % 100 == 0:
+                            print(f"    ⚠️ [CSR] Diagnostic error: {e}", flush=True)
+
+                # V9.7.0: Ontological Bridge Diagnostics (Layer 4 - Foundational Structure)
+                if config.enable_onto_bridge and global_step % kosha_log_interval == 0:
+                    try:
+                        # Get hidden states for Onto Bridge layer (skip in lightweight mode)
+                        onto_diag_hidden = None
+                        if not config.lightweight_diagnostics and hidden_state_extractor is not None:
+                            onto_diag_hidden = hidden_state_extractor.get_hidden_states(outputs, x)
+
+                        # Layer-specific gradient for Onto Bridge (skip in lightweight mode)
+                        onto_diag_layer = config.onto_bridge_layer
+                        onto_layer_grad = 0.0
+                        if not config.lightweight_diagnostics and onto_diag_layer < 12:
+                            onto_layer_grad = compute_layer_gradient_norm(model, onto_diag_layer)
+
+                        # Get onto_bridge module (skip forward pass in lightweight mode)
+                        onto_bridge_module = None
+                        if not config.lightweight_diagnostics:
+                            onto_bridge_module = onto_bridge if 'onto_bridge' in dir() else None
+
+                        # Get onto metrics from training step (always available, no extra computation)
+                        onto_diag_metrics = {k: v for k, v in metrics.items() if k.startswith('onto_')}
+
+                        # Compute Onto Bridge diagnostics
+                        onto_diag = compute_onto_bridge_diagnostics(
+                            hidden_states=onto_diag_hidden,
+                            onto_metrics=onto_diag_metrics if onto_diag_metrics else None,
+                            onto_bridge=onto_bridge_module,
+                            diagnostic_layer=onto_diag_layer,
+                            layer_grad_norm=onto_layer_grad if onto_layer_grad > 0 else None,
+                            grad_norm=raw_grad_norm if 'raw_grad_norm' in dir() else 0.0,
+                        )
+
+                        # Format and print
+                        onto_output = format_onto_bridge_diagnostic(onto_diag)
+                        print(onto_output, flush=True)
+                    except Exception as e:
+                        if global_step % 100 == 0:
+                            print(f"    ⚠️ [ONTO] Diagnostic error: {e}", flush=True)
+
                 step_start_time = time.time()
 
             # Evaluation
@@ -9464,6 +10249,7 @@ def train(config: UnifiedTrainingConfig):
                     cached_val_batches=cached_val_batches,
                 )
                 val_ppl = val_metrics['ppl']
+                last_val_ppl = val_ppl  # V9.7.0: Update for EvoFlow Fluency Gate
                 current_coh = val_metrics.get('coherence', 0.75)
 
                 # PIDv2 Controller Update (V9.4.4)
@@ -9498,6 +10284,32 @@ def train(config: UnifiedTrainingConfig):
                         print(f"  --> {friction_controller.get_status_string()}")
                         if friction_controller.correction_active:
                             print(f"  ⚠️ FRICTION CORRECTION: LR reduced by {(1-friction_controller.friction_penalty)*100:.0f}%")
+
+                    # V9.7.0: PIDv2 Dynamic Batch Sizing Check
+                    if hasattr(authority_controller, 'check_batch_action') and config.pidv2_batch_resize:
+                        # Get current VRAM usage for headroom check
+                        vram_usage = 0.0
+                        if torch.cuda.is_available():
+                            vram_used = torch.cuda.memory_reserved()
+                            vram_total = torch.cuda.get_device_properties(0).total_memory
+                            vram_usage = vram_used / vram_total
+
+                        batch_action, new_batch, batch_reason = authority_controller.check_batch_action(
+                            vram_usage=vram_usage,
+                            vram_threshold=config.vram_threshold - 0.10  # Leave 10% headroom
+                        )
+
+                        if batch_action != "HOLD":
+                            old_batch = config.batch_size
+                            config.batch_size = new_batch
+                            print(f"  🔄 [BATCH RESIZE] {batch_action}: {old_batch} → {new_batch}")
+                            print(f"     Reason: {batch_reason}", flush=True)
+
+                            # Reinitialize dataloader with new batch size
+                            # Note: This is a simplified approach - full implementation would
+                            # need to properly reinit the dataloader
+                            if tb_writer is not None:
+                                tb_writer.add_scalar("ctrl/batch_size", new_batch, global_step)
 
                     # Apply authority factor AND friction penalty to learning rate
                     effective_factor = new_A * friction_penalty
@@ -9765,7 +10577,7 @@ def train(config: UnifiedTrainingConfig):
                         sgp_state=sgp_controller.get_state() if sgp_controller else None,
                         sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                     )
-                    print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
+                print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
 
                 # LRA Validation (Long-Range Retrieval)
                 if lra_validator is not None and global_step % config.lra_validate_every == 0:
@@ -10246,12 +11058,29 @@ def main():
                        help="Enable Kosha-Vritti diagnostic output (Reality/Time axes, Vritti states)")
     parser.add_argument("--kosha_log_every", type=int, default=0,
                        help="Log Kosha diagnostics every N steps (0 = use log_every)")
+    parser.add_argument("--lightweight_diagnostics", action="store_true", default=True,
+                       help="Skip expensive gradient norm computation in diagnostics (default: True)")
+    parser.add_argument("--full_diagnostics", action="store_true",
+                       help="Enable full diagnostics with gradient norms (slower but more detailed)")
     parser.add_argument("--enable_kosha_steering", action="store_true",
                        help="Enable Kosha phase coupling steering (active intervention)")
     parser.add_argument("--kosha_steering_force", type=float, default=0.15,
                        help="Steering strength 0.0-1.0 (default: 0.15 = gentle nudge)")
     parser.add_argument("--kosha_steering_warmup", type=int, default=100,
                        help="Steps before steering activates (default: 100)")
+    parser.add_argument("--kosha_steering_layer", type=int, default=9,
+                       help="Layer for phase steering (9=O9_WITNESSES consciousness, default: 9)")
+    # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
+    parser.add_argument("--enable_onto_bridge", action="store_true",
+                       help="Enable 12D ontological projection at Layer 4 (foundational grounding)")
+    parser.add_argument("--onto_bridge_lambda", type=float, default=0.1,
+                       help="Weight for ontological bridge loss (default: 0.1)")
+    parser.add_argument("--onto_bridge_diversity", type=float, default=0.1,
+                       help="Weight for diversity component - prevents dimension collapse (default: 0.1)")
+    parser.add_argument("--onto_bridge_pramana", type=float, default=0.1,
+                       help="Weight for Pramāṇa alignment - truth prioritization (default: 0.1)")
+    parser.add_argument("--onto_bridge_layer", type=int, default=4,
+                       help="Layer for ontological bridge (4=foundational structure, default: 4)")
     parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
     parser.add_argument("--save_every", type=int, default=1000,
@@ -10289,6 +11118,17 @@ def main():
                        help="PIDv2 minimum authority factor (sensory floor)")
     parser.add_argument("--pidv2_w_s", type=float, default=0.30,
                        help="Semantic weight (0.30 = 30%% prompt-based)")
+    # V9.7.0: PIDv2 Dynamic Batch Sizing
+    parser.add_argument("--pidv2_batch_resize", action="store_true",
+                       help="Enable PPL-driven batch resizing in PIDv2")
+    parser.add_argument("--pidv2_batch_min", type=int, default=4,
+                       help="Minimum batch size for PIDv2 resize")
+    parser.add_argument("--pidv2_batch_max", type=int, default=64,
+                       help="Maximum batch size for PIDv2 resize")
+    parser.add_argument("--pidv2_batch_velocity_threshold", type=float, default=5.0,
+                       help="PPL velocity %% to trigger batch reduction")
+    parser.add_argument("--pidv2_batch_stable_streak", type=int, default=5,
+                       help="Consecutive stable evals before batch increase")
     parser.add_argument("--phase_ramp_steps", type=int, default=7000,
                        help="Steps for phase LR ramp (handshake dampening)")
     parser.add_argument("--tensorboard", action="store_true", default=True,
@@ -10426,6 +11266,13 @@ def main():
                        help="LR multiplier when SLOW_DOWN/BRAKE")
     parser.add_argument("--evo_lr_accelerate", type=float, default=1.2,
                        help="LR multiplier when ACCELERATE")
+    # V9.7.0: EvoFlow Fluency Gate
+    parser.add_argument("--evo_fluency_gate", action="store_true",
+                       help="Enable automatic EvoFlow gradient engagement when fluent")
+    parser.add_argument("--evo_fluency_min_steps", type=int, default=2000,
+                       help="Minimum steps before EvoFlow engagement (warmup)")
+    parser.add_argument("--evo_fluency_ppl_threshold", type=float, default=100.0,
+                       help="PPL threshold for 'fluent' - engage EvoFlow when PPL < this")
 
     # CSR Phoneme-Ontological Grounding
     parser.add_argument("--enable_csr", action="store_true", default=True,
@@ -10596,9 +11443,17 @@ def main():
         quiet=args.quiet,
         enable_kosha_diagnostics=args.enable_kosha_diagnostics,
         kosha_log_every=args.kosha_log_every,
+        lightweight_diagnostics=not args.full_diagnostics,  # Default True unless --full_diagnostics
         enable_kosha_steering=args.enable_kosha_steering,
         kosha_steering_force=args.kosha_steering_force,
         kosha_steering_warmup=args.kosha_steering_warmup,
+        kosha_steering_layer=args.kosha_steering_layer,
+        # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
+        enable_onto_bridge=args.enable_onto_bridge,
+        onto_bridge_lambda=args.onto_bridge_lambda,
+        onto_bridge_diversity=args.onto_bridge_diversity,
+        onto_bridge_pramana=args.onto_bridge_pramana,
+        onto_bridge_layer=args.onto_bridge_layer,
         eval_every=args.eval_every,
         save_every=args.save_every,
         checkpoint_dir=args.checkpoint_dir,
@@ -10644,6 +11499,12 @@ def main():
         pidv2_kd=args.pidv2_kd,
         pidv2_a_min=args.pidv2_a_min,
         pidv2_w_s=args.pidv2_w_s,
+        # V9.7.0: PIDv2 Dynamic Batch Sizing
+        pidv2_batch_resize=args.pidv2_batch_resize,
+        pidv2_batch_min=args.pidv2_batch_min,
+        pidv2_batch_max=args.pidv2_batch_max,
+        pidv2_batch_velocity_threshold=args.pidv2_batch_velocity_threshold,
+        pidv2_batch_stable_streak=args.pidv2_batch_stable_streak,
         phase_ramp_steps=args.phase_ramp_steps,
         tensorboard=args.tensorboard and not args.no_tensorboard,
         sample_every=args.sample_every,
@@ -10707,6 +11568,10 @@ def main():
         evo_lr_modulation=args.evo_lr_modulation,
         evo_lr_slowdown=args.evo_lr_slowdown,
         evo_lr_accelerate=args.evo_lr_accelerate,
+        # V9.7.0: EvoFlow Fluency Gate
+        evo_fluency_gate=args.evo_fluency_gate,
+        evo_fluency_min_steps=args.evo_fluency_min_steps,
+        evo_fluency_ppl_threshold=args.evo_fluency_ppl_threshold,
         # CSR Phoneme-Ontological Grounding
         enable_csr=args.enable_csr and not args.disable_csr,
         csr_lambda=args.csr_lambda,

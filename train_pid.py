@@ -818,6 +818,16 @@ class AuthorityPIDv2Config:
     # During phase ramp, dampen D term to prevent flutter
     handshake_Kd_dampen: bool = True  # Enable D-term dampening during ramp
 
+    # V9.7.0: Dynamic Batch Sizing (PPL-driven)
+    # Resize batch based on training dynamics, not just VRAM
+    enable_batch_resize: bool = False        # Enable PPL-driven batch resizing
+    batch_min: int = 4                       # Minimum batch size
+    batch_max: int = 64                      # Maximum batch size
+    batch_velocity_threshold: float = 5.0   # PPL velocity % to trigger reduction
+    batch_stable_streak: int = 5             # Consecutive stable evals before increase
+    batch_resize_cooldown: int = 3           # Evals between resizes
+    batch_step_factor: float = 0.5           # Reduction factor (0.5 = halve)
+
 
 class AuthorityPIDv2:
     """
@@ -868,6 +878,12 @@ class AuthorityPIDv2:
         self.last_semantic_error = 0.0 # Normalized semantic error
         self.last_effective_Kd = self.config.Kd  # Effective Kd (dampened during handshake)
         self.last_ramp_frac = 0.0      # Handshake ramp fraction (0→1)
+
+        # V9.7.0: Dynamic Batch Sizing state
+        self.current_batch_size = 32   # Will be set externally
+        self.batch_stable_streak = 0   # Consecutive stable evals
+        self.batch_resize_cooldown_counter = 0  # Cooldown counter
+        self.last_batch_action = "HOLD"  # HOLD, REDUCE, INCREASE
 
     def update(
         self,
@@ -1090,6 +1106,75 @@ class AuthorityPIDv2:
         self.A_ppl = max(self.config.A_min, self.A_ppl * factor)
         # Increase integral to maintain brake effect
         self.I = min(self.I + 0.2, 1.0)
+
+    def set_batch_size(self, batch_size: int):
+        """Set current batch size for tracking."""
+        self.current_batch_size = batch_size
+
+    def check_batch_action(self, vram_usage: float = 0.0, vram_threshold: float = 0.85) -> tuple:
+        """
+        V9.7.0: Check if batch size should be adjusted based on PPL dynamics.
+
+        Returns:
+            (action, new_batch_size, reason)
+            action: "HOLD", "REDUCE", "INCREASE"
+        """
+        cfg = self.config
+
+        if not cfg.enable_batch_resize:
+            return "HOLD", self.current_batch_size, "Batch resize disabled"
+
+        # Cooldown check
+        if self.batch_resize_cooldown_counter > 0:
+            self.batch_resize_cooldown_counter -= 1
+            return "HOLD", self.current_batch_size, f"Cooldown ({self.batch_resize_cooldown_counter} evals left)"
+
+        action = "HOLD"
+        new_batch = self.current_batch_size
+        reason = ""
+
+        # =====================================================================
+        # REDUCE: PPL velocity exceeds threshold (training struggling)
+        # =====================================================================
+        if self.last_v > cfg.batch_velocity_threshold:
+            if self.current_batch_size > cfg.batch_min:
+                new_batch = max(cfg.batch_min, int(self.current_batch_size * cfg.batch_step_factor))
+                action = "REDUCE"
+                reason = f"PPL velocity {self.last_v:.1f}% > threshold {cfg.batch_velocity_threshold}%"
+                self.batch_stable_streak = 0
+                self.batch_resize_cooldown_counter = cfg.batch_resize_cooldown
+
+        # =====================================================================
+        # INCREASE: Stable training AND VRAM has headroom
+        # =====================================================================
+        elif self.last_v < 0 and self.last_v_norm == 0:  # PPL improving, no stress
+            self.batch_stable_streak += 1
+
+            if self.batch_stable_streak >= cfg.batch_stable_streak:
+                # Check VRAM headroom before increasing
+                if vram_usage < vram_threshold and self.current_batch_size < cfg.batch_max:
+                    new_batch = min(cfg.batch_max, int(self.current_batch_size / cfg.batch_step_factor))
+                    action = "INCREASE"
+                    reason = f"Stable for {self.batch_stable_streak} evals, VRAM {vram_usage:.0%} < {vram_threshold:.0%}"
+                    self.batch_stable_streak = 0
+                    self.batch_resize_cooldown_counter = cfg.batch_resize_cooldown
+                else:
+                    reason = f"Stable but VRAM {vram_usage:.0%} >= {vram_threshold:.0%} or at max"
+        else:
+            # Reset streak on any instability
+            self.batch_stable_streak = 0
+
+        self.last_batch_action = action
+        if action != "HOLD":
+            self.current_batch_size = new_batch
+
+        return action, new_batch, reason
+
+    def get_batch_status(self) -> str:
+        """Get batch sizing status string."""
+        if not self.config.enable_batch_resize:
+            return ""
+        return f" | Batch: {self.current_batch_size} ({self.last_batch_action})"
 
 
 class AuthorityPID:
