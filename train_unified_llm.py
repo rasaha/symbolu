@@ -9061,9 +9061,7 @@ def train(config: UnifiedTrainingConfig):
     print(f"{'='*70}\n", flush=True)
 
     model.train()
-    print("  [DEBUG] Creating train iterator...", flush=True)
     train_iter = iter(train_loader)
-    print(f"  [DEBUG] Train iterator ready. Starting from step {global_step}", flush=True)
     step_start_time = time.time()
     running_loss = 0.0
     accumulation_step = 0
@@ -9085,8 +9083,6 @@ def train(config: UnifiedTrainingConfig):
 
     while global_step < config.max_steps:
         # Get batch
-        if global_step % config.log_every == 0 or global_step < 3:
-            print(f"  [DEBUG] Step {global_step}: Getting batch...", flush=True)
         try:
             batch = next(train_iter)
         except StopIteration:
@@ -10582,7 +10578,6 @@ def train(config: UnifiedTrainingConfig):
                         sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                     )
                 print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
-                print(f"  [DEBUG] Checkpoint saved, continuing training loop...", flush=True)
 
                 # LRA Validation (Long-Range Retrieval)
                 if lra_validator is not None and global_step % config.lra_validate_every == 0:
@@ -10597,7 +10592,6 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("lra/mean_entropy", lra_results["summary"]["mean_entropy"], global_step)
 
                 model.train()
-                print(f"  [DEBUG] Eval block complete, back to train mode", flush=True)
 
             # Quality Sampling (OUTSIDE eval block - runs independently of eval_every)
             if config.sample_every > 0 and global_step % config.sample_every == 0:
@@ -10622,10 +10616,6 @@ def train(config: UnifiedTrainingConfig):
                 # v2.7 Training State Tracker: Save state on checkpoint
                 if training_state_tracker is not None and training_state_tracker.enabled:
                     training_state_tracker.save_state()
-
-        # DEBUG: End of accumulation step - going to next iteration
-        if global_step % 50 == 0 or global_step < 3:
-            print(f"  [DEBUG] End of step {global_step} processing, looping to next batch...", flush=True)
 
     # Final save
     save_checkpoint(
