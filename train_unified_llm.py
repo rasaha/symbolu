@@ -8072,40 +8072,20 @@ def compute_csr_diagnostics(
 
 
 def format_csr_diagnostic(diag: Dict[str, Any]) -> str:
-    """Format CSR diagnostic for logging output."""
-    lines = []
-
+    """Format CSR diagnostic for logging output (single line, condensed)."""
     c = diag.get('c', 0.0)
     f = diag.get('f', 0.0)
-    coherence_zone = diag.get('coherence_zone', 'UNKNOWN')
-    flow_zone = diag.get('flow_zone', 'UNKNOWN')
-    state = diag.get('state', 'UNKNOWN')
-
-    lines.append(
-        f"    🎼 [CSR] Coords: c={c:+.2f} ({coherence_zone}) | "
-        f"f={f:+.2f} ({flow_zone}) --> State: {state}"
-    )
-
-    state_desc = diag.get('state_desc', '')
-    state_icon = diag.get('state_icon', '')
+    coherence_zone = diag.get('coherence_zone', 'UNK')[:3].upper()
+    flow_zone = diag.get('flow_zone', 'UNK')[:3].upper()
+    state = diag.get('state', 'UNK')
     entropy = diag.get('entropy', 0.0)
-    grad_norm = diag.get('grad_norm', 0.0)
+    sim = diag.get('csr_similarity', 0.0)
+    conf = diag.get('csr_confidence', 0.0)
 
-    lines.append(
-        f"    📊 [CSR] {state_desc} {state_icon} | "
-        f"Entropy: {entropy:.2f} | GradNorm: {grad_norm:.2f}"
+    return (
+        f"    🎼 [CSR] c={c:+.2f}({coherence_zone})|f={f:+.2f}({flow_zone})→{state} | "
+        f"H={entropy:.2f} Sim={sim:.3f} Conf={conf:.3f}"
     )
-
-    # CSR metrics if available
-    if 'csr_similarity' in diag:
-        sim = diag.get('csr_similarity', 0.0)
-        conf = diag.get('csr_confidence', 0.0)
-        loss = diag.get('csr_loss', 0.0)
-        lines.append(
-            f"    🔗 [CSR] Similarity: {sim:.3f} | Confidence: {conf:.3f} | Loss: {loss:.4f}"
-        )
-
-    return "\n".join(lines)
 
 
 # =============================================================================
@@ -8262,59 +8242,34 @@ def compute_onto_bridge_diagnostics(
 
 
 def format_onto_bridge_diagnostic(diag: Dict[str, Any]) -> str:
-    """Format Ontological Bridge diagnostic for logging output."""
-    lines = []
-
-    # Short names for 12 aspects (3-char each for compact display)
+    """Format Ontological Bridge diagnostic for logging output (single line, condensed)."""
+    # Short names for 12 aspects
     ASPECT_SHORT = ['POT', 'IDN', 'EXE', 'STR', 'COG', 'AGY', 'RSN', 'PRP', 'WIT', 'UNI', 'INT', 'ABS']
 
     s = diag.get('s', 0.0)
     g = diag.get('g', 0.0)
-    structure_zone = diag.get('structure_zone', 'UNKNOWN')
-    grounding_zone = diag.get('grounding_zone', 'UNKNOWN')
-    state = diag.get('state', 'UNKNOWN')
+    structure_zone = diag.get('structure_zone', 'UNK')[:3].upper()
+    grounding_zone = diag.get('grounding_zone', 'UNK')[:3].upper()
+    state = diag.get('state', 'UNK')
+    div = diag.get('diversity', 0.0)
+    pram = diag.get('pramana_corr', 0.0)
 
-    lines.append(
-        f"    🌉 [ONTO] Coords: s={s:+.2f} ({structure_zone}) | "
-        f"g={g:+.2f} ({grounding_zone}) --> State: {state}"
-    )
-
-    # 12D Aspect Activations (the core feature)
+    # Find dominant aspect
+    dominant = "ABS"
     if 'aspect_activations' in diag:
         activations = diag['aspect_activations']
-        # Row 1: O1-O6 (Physical/Mental layers)
-        row1_parts = []
-        for i in range(6):
-            val = activations[i] if i < len(activations) else 0.0
-            row1_parts.append(f"{ASPECT_SHORT[i]}:{val:+.2f}")
-        lines.append(f"    🔮 [12D] {' | '.join(row1_parts)}")
-
-        # Row 2: O7-O12 (Spiritual/Integration layers)
-        row2_parts = []
-        for i in range(6, 12):
-            val = activations[i] if i < len(activations) else 0.0
-            row2_parts.append(f"{ASPECT_SHORT[i]}:{val:+.2f}")
-        lines.append(f"    🔮 [12D] {' | '.join(row2_parts)}")
-
-        # Find dominant aspect
         max_idx = 0
         max_val = abs(activations[0]) if activations else 0
         for i, v in enumerate(activations):
             if abs(v) > max_val:
                 max_val = abs(v)
                 max_idx = i
-        dominant = f"O{max_idx + 1}_{ASPECT_SHORT[max_idx]}"
-        lines.append(f"    🎯 [ONTO] Dominant: {dominant} ({activations[max_idx]:+.3f})")
+        dominant = ASPECT_SHORT[max_idx]
 
-    # Summary metrics
-    if 'diversity' in diag:
-        div = diag.get('diversity', 0.0)
-        pram = diag.get('pramana_corr', 0.0)
-        lines.append(
-            f"    📊 [ONTO] Diversity: {div:.3f} | Pramāṇa Corr: {pram:+.3f} | GradNorm: {diag.get('grad_norm', 0.0):.2f}"
-        )
-
-    return "\n".join(lines)
+    return (
+        f"    🌉 [ONTO] s={s:+.2f}({structure_zone})|g={g:+.2f}({grounding_zone})→{state} | "
+        f"Div={div:.2f} Pram={pram:+.2f} Dom={dominant}"
+    )
 
 
 # =============================================================================
@@ -8410,56 +8365,25 @@ def format_sovereign_state_diagnostic(diag: Dict[str, Any]) -> str:
     """
     Format 32D Sovereign State diagnostic for logging output.
 
-    V9.8.0: Shows Bhava/Kosha/Vritti/Guna readouts instead of generic state.
+    V9.8.0: Condensed single-line output (was 6 lines).
+    Shows Bhava/Kosha/Vritti/Guna summary in compact form.
     """
-    lines = []
-
-    # Main state summary line
+    # Main state summary
     bhava = diag.get('dominant_bhava', 'ABS')
     kosha = diag.get('active_kosha', 'ANNA')
     vritti = diag.get('vritti_state', 'PRAMANA')
     delta = diag.get('delta_magnitude', 0.0)
 
-    lines.append(
-        f"    🔱 [SOVEREIGN] Bhava: {bhava} | Kosha: {kosha} | Vritti: {vritti} | Δ={delta:.3f}"
-    )
-
-    # Guna balance (Sattva-Rajas-Tamas)
+    # Guna balance as compact percentages
     sattva = diag.get('guna_sattva', 0.33)
     rajas = diag.get('guna_rajas', 0.33)
     tamas = diag.get('guna_tamas', 0.33)
-    velocity = diag.get('velocity', 0.0)
 
-    # Visual bar for guna balance
-    s_bar = '▓' * int(sattva * 10)
-    r_bar = '▒' * int(rajas * 10)
-    t_bar = '░' * int(tamas * 10)
-
-    lines.append(
-        f"    ⚖️  [GUNA] S:{sattva:.2f}{s_bar} R:{rajas:.2f}{r_bar} T:{tamas:.2f}{t_bar} | v={velocity:+.2f}"
+    # Single line with all key info
+    return (
+        f"    🔱 [32D] Bhava:{bhava} Kosha:{kosha} Vritti:{vritti} | "
+        f"Guna[S{sattva:.0%}/R{rajas:.0%}/T{tamas:.0%}] Δ={delta:.2f}"
     )
-
-    # Bhava activations (12D) - split into 2 rows of 6
-    bhava_acts = diag.get('bhava_activations', [0.0] * 12)
-    if bhava_acts:
-        row1 = [f"{BHAVA_NAMES[i]}:{bhava_acts[i]:+.2f}" for i in range(6)]
-        row2 = [f"{BHAVA_NAMES[i]}:{bhava_acts[i]:+.2f}" for i in range(6, 12)]
-        lines.append(f"    🕉️  [BHAVA] {' | '.join(row1)}")
-        lines.append(f"    🕉️  [BHAVA] {' | '.join(row2)}")
-
-    # Kosha activations (5D) - single row
-    kosha_acts = diag.get('kosha_activations', [0.0] * 5)
-    if kosha_acts:
-        kosha_row = [f"{KOSHA_NAMES[i]}:{kosha_acts[i]:+.2f}" for i in range(5)]
-        lines.append(f"    🪷 [KOSHA] {' | '.join(kosha_row)}")
-
-    # Vritti activations (5D) - single row
-    vritti_acts = diag.get('vritti_activations', [0.0] * 5)
-    if vritti_acts:
-        vritti_row = [f"{VRITTI_NAMES[i]}:{vritti_acts[i]:+.2f}" for i in range(5)]
-        lines.append(f"    🌀 [VRITTI] {' | '.join(vritti_row)}")
-
-    return "\n".join(lines)
 
 
 def compute_phase_loss(
