@@ -8410,56 +8410,25 @@ def format_sovereign_state_diagnostic(diag: Dict[str, Any]) -> str:
     """
     Format 32D Sovereign State diagnostic for logging output.
 
-    V9.8.0: Shows Bhava/Kosha/Vritti/Guna readouts instead of generic state.
+    V9.8.0: Condensed single-line output (was 6 lines).
+    Shows Bhava/Kosha/Vritti/Guna summary in compact form.
     """
-    lines = []
-
-    # Main state summary line
+    # Main state summary
     bhava = diag.get('dominant_bhava', 'ABS')
     kosha = diag.get('active_kosha', 'ANNA')
     vritti = diag.get('vritti_state', 'PRAMANA')
     delta = diag.get('delta_magnitude', 0.0)
 
-    lines.append(
-        f"    🔱 [SOVEREIGN] Bhava: {bhava} | Kosha: {kosha} | Vritti: {vritti} | Δ={delta:.3f}"
-    )
-
-    # Guna balance (Sattva-Rajas-Tamas)
+    # Guna balance as compact percentages
     sattva = diag.get('guna_sattva', 0.33)
     rajas = diag.get('guna_rajas', 0.33)
     tamas = diag.get('guna_tamas', 0.33)
-    velocity = diag.get('velocity', 0.0)
 
-    # Visual bar for guna balance
-    s_bar = '▓' * int(sattva * 10)
-    r_bar = '▒' * int(rajas * 10)
-    t_bar = '░' * int(tamas * 10)
-
-    lines.append(
-        f"    ⚖️  [GUNA] S:{sattva:.2f}{s_bar} R:{rajas:.2f}{r_bar} T:{tamas:.2f}{t_bar} | v={velocity:+.2f}"
+    # Single line with all key info
+    return (
+        f"    🔱 [32D] Bhava:{bhava} Kosha:{kosha} Vritti:{vritti} | "
+        f"Guna[S{sattva:.0%}/R{rajas:.0%}/T{tamas:.0%}] Δ={delta:.2f}"
     )
-
-    # Bhava activations (12D) - split into 2 rows of 6
-    bhava_acts = diag.get('bhava_activations', [0.0] * 12)
-    if bhava_acts:
-        row1 = [f"{BHAVA_NAMES[i]}:{bhava_acts[i]:+.2f}" for i in range(6)]
-        row2 = [f"{BHAVA_NAMES[i]}:{bhava_acts[i]:+.2f}" for i in range(6, 12)]
-        lines.append(f"    🕉️  [BHAVA] {' | '.join(row1)}")
-        lines.append(f"    🕉️  [BHAVA] {' | '.join(row2)}")
-
-    # Kosha activations (5D) - single row
-    kosha_acts = diag.get('kosha_activations', [0.0] * 5)
-    if kosha_acts:
-        kosha_row = [f"{KOSHA_NAMES[i]}:{kosha_acts[i]:+.2f}" for i in range(5)]
-        lines.append(f"    🪷 [KOSHA] {' | '.join(kosha_row)}")
-
-    # Vritti activations (5D) - single row
-    vritti_acts = diag.get('vritti_activations', [0.0] * 5)
-    if vritti_acts:
-        vritti_row = [f"{VRITTI_NAMES[i]}:{vritti_acts[i]:+.2f}" for i in range(5)]
-        lines.append(f"    🌀 [VRITTI] {' | '.join(vritti_row)}")
-
-    return "\n".join(lines)
 
 
 def compute_phase_loss(
