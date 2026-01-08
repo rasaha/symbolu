@@ -601,17 +601,19 @@ def get_dominant_vrtti(layer_idx: int) -> Tuple[int, str, float]:
 
 
 # =============================================================================
-# V9.7.0: ONTOLOGICAL BRIDGE (Layer 9 - Authority→Sensory Transition)
+# V9.7.0: ONTOLOGICAL BRIDGE (Layer 4 - Foundational Structure)
 # =============================================================================
-# Projects Layer 9 hidden states to a 12-dimensional ontological space,
-# one dimension per Aspect (O1-O12). This creates a "witness point" at the
-# Authority→Sensory boundary where the model's internal representation is
-# aligned with the 12 Ontological Layers.
+# Projects hidden states to a 12-dimensional ontological space, one dimension
+# per Aspect (O1-O12). This establishes the "ontological DNA" early in
+# processing, grounding all subsequent layers in the 12 Aspects.
 #
-# Layer 9 (O9_WITNESSES) is the pivot point:
-# - Authority layers (0-8) have processed the input
-# - Sensory layers (9-11) will generate output
-# - The 12D projection creates an ontological "signature" at this transition
+# Layer 4 (Foundational) is where structure forms:
+# - Raw embeddings have been processed through layers 0-3
+# - Grammar and structure begin emerging at layer 4
+# - The 12D projection creates an ontological "signature" that propagates forward
+#
+# Philosophical insight: Ontology (structure of being) should be grounded EARLY,
+# while Kosha (consciousness/awareness) operates at the WITNESS point (Layer 9).
 #
 # Loss function encourages:
 # 1. Each dimension to specialize for its corresponding Aspect
@@ -621,10 +623,10 @@ def get_dominant_vrtti(layer_idx: int) -> Tuple[int, str, float]:
 
 class OntologicalBridge(nn.Module):
     """
-    V9.7.0: Projects Layer 9 hidden states to 12D ontological space.
+    V9.7.0: Projects hidden states to 12D ontological space.
 
-    This creates an ontological "witness point" at the Authority→Sensory
-    transition, grounding the model's internal representation in the
+    Creates a foundational ontological "signature" early in processing,
+    grounding the model's internal representation in the
     12 Aspects of Sovereign-1 ontology.
 
     Architecture:
@@ -6518,17 +6520,18 @@ class UnifiedTrainingConfig:
     enable_kosha_diagnostics: bool = False   # Enable Kosha-Vritti diagnostic output
     kosha_log_every: int = 0                 # Log Kosha every N steps (0 = use log_every)
 
-    # Kosha Phase Steering (Active Intervention)
+    # Kosha Phase Steering (Active Intervention) - Layer 9 = O9_WITNESSES
     enable_kosha_steering: bool = False      # Enable phase coupling steering
     kosha_steering_force: float = 0.15       # Steering strength (0.0-1.0, start gentle)
     kosha_steering_warmup: int = 100         # Steps before steering activates
-    kosha_steering_layer: int = 4            # V9.7.0: Layer for phase steering (4=grammar forming, 2=raw embeddings)
+    kosha_steering_layer: int = 9            # V9.7.0: Layer 9 = O9_WITNESSES (consciousness/awareness alignment)
 
-    # V9.7.0: Ontological Bridge (Layer 9 - Authority→Sensory Transition)
-    enable_onto_bridge: bool = False         # Enable 12D ontological projection at Layer 9
+    # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
+    enable_onto_bridge: bool = False         # Enable 12D ontological projection at Layer 4
     onto_bridge_lambda: float = 0.1          # Weight for ontological bridge loss
     onto_bridge_diversity: float = 0.1       # Weight for diversity component (prevent collapse)
     onto_bridge_pramana: float = 0.1         # Weight for Pramāṇa alignment component
+    onto_bridge_layer: int = 4               # V9.7.0: Layer 4 = foundational ontological grounding
 
     # Dataset
     dataset: str = "wikitext103"  # "wikitext103", "wikitext2", or "fineweb"
@@ -8568,25 +8571,27 @@ def train(config: UnifiedTrainingConfig):
         print(f"     Quadrants: Q1=ANANDAMAYA | Q2=VIJNANAMAYA | Q3=ANNAMAYA | Q4=MANOMAYA")
         print(f"     Vritti: PRAMANA | VIPARYAYA | VIKALPA | NIDRA | SMRITI | PRAJNA")
 
-    # Kosha Phase Steering (Active Intervention)
+    # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
+    # Moved BEFORE Kosha: Ontology grounds structure early, Kosha witnesses later
+    onto_bridge = None
+    if config.enable_onto_bridge:
+        onto_bridge = create_ontological_bridge(hidden_dim=config.d_model, device=device)
+        layer_desc = {4: "Foundational Structure", 2: "Raw Embeddings", 6: "Semantic"}.get(config.onto_bridge_layer, "Custom")
+        print(f"\n  🌉 Ontological Bridge: ENABLED (Layer {config.onto_bridge_layer} = {layer_desc})")
+        print(f"     12D projection: hidden_dim → 12 Ontological Aspects")
+        print(f"     Lambda: {config.onto_bridge_lambda:.2f} | Diversity: {config.onto_bridge_diversity:.2f} | Pramāṇa: {config.onto_bridge_pramana:.2f}")
+        print(f"     Aspects: O1-O12 (Potential → Absolving)")
+        print(f"     ⚠️  FOUNDATIONAL - establishes ontological DNA early")
+
+    # Kosha Phase Steering (Active Intervention) - Layer 9 = O9_WITNESSES
     if config.enable_kosha_steering:
         print(f"\n  🎯 Kosha Phase Steering: ENABLED")
         print(f"     Force: {config.kosha_steering_force:.2f} (0=off, 1=full)")
         print(f"     Warmup: {config.kosha_steering_warmup} steps")
         print(f"     Target: Geometric Truth from atan2(t, r)")
-        layer_desc = {2: "Raw Embeddings", 4: "Grammar Forming", 6: "Semantic", 7: "Consolidation"}.get(config.kosha_steering_layer, "Custom")
+        layer_desc = {9: "O9_WITNESSES (Consciousness)", 4: "Grammar Forming", 2: "Raw Embeddings"}.get(config.kosha_steering_layer, "Custom")
         print(f"     Layer: {config.kosha_steering_layer} ({layer_desc})")
-        print(f"     ⚠️  ACTIVE INTERVENTION - will modify loss landscape")
-
-    # V9.7.0: Ontological Bridge (Layer 9)
-    onto_bridge = None
-    if config.enable_onto_bridge:
-        onto_bridge = create_ontological_bridge(hidden_dim=config.d_model, device=device)
-        print(f"\n  🌉 Ontological Bridge: ENABLED (Layer 9 = O9_WITNESSES)")
-        print(f"     12D projection: hidden_dim → 12 Ontological Aspects")
-        print(f"     Lambda: {config.onto_bridge_lambda:.2f} | Diversity: {config.onto_bridge_diversity:.2f} | Pramāṇa: {config.onto_bridge_pramana:.2f}")
-        print(f"     Aspects: O1-O12 (Potential → Absolving)")
-        print(f"     ⚠️  ACTIVE INTERVENTION - shapes Authority→Sensory transition")
+        print(f"     ⚠️  WITNESS POINT - consciousness/awareness alignment")
 
     print(f"\n{'='*70}")
     print("   STARTING TRAINING")
@@ -8878,12 +8883,13 @@ def train(config: UnifiedTrainingConfig):
                                         loss = loss + synthesis_loss
                                         csr_metrics['synthesis_loss'] = synthesis_loss.item()
 
-                        # V9.7.0: Ontological Bridge - Layer 9 (O9_WITNESSES) projection to 12D
-                        # This creates a "witness point" at the Authority→Sensory transition
-                        if onto_bridge is not None and len(layer_hidden_states) > 9:
+                        # V9.7.0: Ontological Bridge - Layer 4 (Foundational Structure) projection to 12D
+                        # Establishes ontological "DNA" early - 12 Aspects ground all subsequent processing
+                        onto_layer = config.onto_bridge_layer
+                        if onto_bridge is not None and len(layer_hidden_states) > onto_layer:
                             # DETACH to train only the bridge, not the main model
-                            layer_9_hidden = layer_hidden_states[9].detach()
-                            onto_repr, onto_metrics = onto_bridge(layer_9_hidden)
+                            onto_hidden = layer_hidden_states[onto_layer].detach()
+                            onto_repr, onto_metrics = onto_bridge(onto_hidden)
                             onto_loss, onto_loss_metrics = onto_bridge.compute_loss(
                                 onto_repr,
                                 lambda_diversity=config.onto_bridge_diversity,
@@ -8896,7 +8902,7 @@ def train(config: UnifiedTrainingConfig):
                             metrics['onto_bridge_loss'] = scaled_onto_loss.item()
                             metrics['onto_diversity'] = onto_metrics.get('onto_diversity', 0.0)
                             metrics['onto_pramana_corr'] = onto_metrics.get('onto_pramana_corr', 0.0)
-                            metrics['onto_o9_witness'] = onto_metrics.get('onto_o9_witness', 0.0)
+                            metrics['onto_bridge_layer'] = onto_layer
 
             # Initialize default guna values for first iteration
             # (actual values computed later in the loop, but needed here for evolutionary bridge)
@@ -10517,17 +10523,19 @@ def main():
                        help="Steering strength 0.0-1.0 (default: 0.15 = gentle nudge)")
     parser.add_argument("--kosha_steering_warmup", type=int, default=100,
                        help="Steps before steering activates (default: 100)")
-    parser.add_argument("--kosha_steering_layer", type=int, default=4,
-                       help="Layer for phase steering (4=grammar forming, 2=raw embeddings, default: 4)")
-    # V9.7.0: Ontological Bridge (Layer 9)
+    parser.add_argument("--kosha_steering_layer", type=int, default=9,
+                       help="Layer for phase steering (9=O9_WITNESSES consciousness, default: 9)")
+    # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
     parser.add_argument("--enable_onto_bridge", action="store_true",
-                       help="Enable 12D ontological projection at Layer 9 (Authority→Sensory transition)")
+                       help="Enable 12D ontological projection at Layer 4 (foundational grounding)")
     parser.add_argument("--onto_bridge_lambda", type=float, default=0.1,
                        help="Weight for ontological bridge loss (default: 0.1)")
     parser.add_argument("--onto_bridge_diversity", type=float, default=0.1,
                        help="Weight for diversity component - prevents dimension collapse (default: 0.1)")
     parser.add_argument("--onto_bridge_pramana", type=float, default=0.1,
                        help="Weight for Pramāṇa alignment - truth prioritization (default: 0.1)")
+    parser.add_argument("--onto_bridge_layer", type=int, default=4,
+                       help="Layer for ontological bridge (4=foundational structure, default: 4)")
     parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
     parser.add_argument("--save_every", type=int, default=1000,
@@ -10894,11 +10902,12 @@ def main():
         kosha_steering_force=args.kosha_steering_force,
         kosha_steering_warmup=args.kosha_steering_warmup,
         kosha_steering_layer=args.kosha_steering_layer,
-        # V9.7.0: Ontological Bridge (Layer 9)
+        # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
         enable_onto_bridge=args.enable_onto_bridge,
         onto_bridge_lambda=args.onto_bridge_lambda,
         onto_bridge_diversity=args.onto_bridge_diversity,
         onto_bridge_pramana=args.onto_bridge_pramana,
+        onto_bridge_layer=args.onto_bridge_layer,
         eval_every=args.eval_every,
         save_every=args.save_every,
         checkpoint_dir=args.checkpoint_dir,
