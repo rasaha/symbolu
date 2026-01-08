@@ -6942,28 +6942,59 @@ def load_data(config: UnifiedTrainingConfig, tokenizer) -> Tuple[DataLoader, Dat
     - wikitext103: WikiText-103 (static, ~100M tokens)
     - wikitext2: WikiText-2 (static, ~2M tokens)
     - fineweb: Streaming FineWeb/FineWeb-edu (uses dataset_name and dataset_subset)
+
+    V9.7.0: Implements tokenization caching for WikiText datasets.
+    First run tokenizes and saves to disk (~2-5 min).
+    Subsequent runs load from cache (<5 sec).
     """
     print(f"Loading {config.dataset} dataset...")
 
     if config.dataset in ["wikitext103", "wikitext2"]:
-        # Static WikiText datasets
-        if config.dataset == "wikitext103":
-            ds = load_dataset("wikitext", "wikitext-103-v1")
+        # V9.7.0: Check for cached tokenized data
+        cache_dir = Path("data_cache")
+        cache_dir.mkdir(exist_ok=True)
+
+        # Include tokenizer name in cache path to avoid mismatches
+        tokenizer_name = getattr(tokenizer, 'name_or_path', 'unknown').replace('/', '_')
+        cache_path = cache_dir / f"{config.dataset}_{tokenizer_name}.pt"
+
+        if cache_path.exists():
+            print(f"  📦 Loading cached tokenized data from {cache_path}...")
+            cache_start = time.time()
+            cached_data = torch.load(cache_path, weights_only=True)
+            train_tokens = cached_data['train']
+            val_tokens = cached_data['val']
+            cache_time = time.time() - cache_start
+            print(f"  ✅ Loaded {len(train_tokens):,} train + {len(val_tokens):,} val tokens in {cache_time:.1f}s")
         else:
-            ds = load_dataset("wikitext", "wikitext-2-v1")
+            print(f"  ⏳ No cache found. Tokenizing {config.dataset} (this only happens once)...")
+            tokenize_start = time.time()
 
-        def tokenize(split):
-            text = "\n".join(ds[split]["text"])
-            if hasattr(tokenizer, "encode"):
-                tokens = tokenizer.encode(text)
+            # Static WikiText datasets
+            if config.dataset == "wikitext103":
+                ds = load_dataset("wikitext", "wikitext-103-v1")
             else:
-                tokens = tokenizer(text)["input_ids"]
-            return torch.tensor(tokens, dtype=torch.long)
+                ds = load_dataset("wikitext", "wikitext-2-v1")
 
-        train_tokens = tokenize("train")
-        val_tokens = tokenize("validation")
+            def tokenize(split):
+                text = "\n".join(ds[split]["text"])
+                if hasattr(tokenizer, "encode"):
+                    tokens = tokenizer.encode(text)
+                else:
+                    tokens = tokenizer(text)["input_ids"]
+                return torch.tensor(tokens, dtype=torch.long)
 
-        print(f"Loaded {len(train_tokens):,} train tokens, {len(val_tokens):,} val tokens")
+            train_tokens = tokenize("train")
+            val_tokens = tokenize("validation")
+
+            tokenize_time = time.time() - tokenize_start
+            print(f"  ✅ Tokenized {len(train_tokens):,} train + {len(val_tokens):,} val tokens in {tokenize_time:.1f}s")
+
+            # Save to cache for next time
+            print(f"  💾 Saving tokenized cache to {cache_path}...")
+            torch.save({'train': train_tokens, 'val': val_tokens}, cache_path)
+            cache_size_mb = cache_path.stat().st_size / (1024 * 1024)
+            print(f"  ✅ Cache saved ({cache_size_mb:.1f} MB). Next startup will be <5s!")
 
         train_dataset = TextDataset(train_tokens, config.max_seq_len)
         val_dataset = TextDataset(val_tokens, config.max_seq_len)
