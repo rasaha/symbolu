@@ -71,6 +71,130 @@ except ImportError:
 
 
 # =============================================================================
+# 32D SOVEREIGN STATE - Principled Cognitive Architecture
+# =============================================================================
+# V9.8.0: Replaces arbitrary 124D (44 phonemes + 64 topics + 12 bhava + 4 dynamics)
+# with principled 32D grounded in consciousness physics.
+#
+# The 32D Sovereign State mapping:
+#   [0:12]  - 12 Bhavas (Ontological Aspects)
+#   [12:17] - 5 Koshas (Consciousness Sheaths)
+#   [17:22] - 5 Vrittis (Mental Modifications)
+#   [22:28] - 6 Gunas/Dynamics (Energy States)
+#   [28:32] - 4 Reserved (Void/Toroidal Feedback)
+#
+# Why this matters:
+#   - Old 124D: "Labeling the World" (arbitrary topics, premature phonemes)
+#   - New 32D: "Modeling Physics of Consciousness" (principled ontology)
+#   - CSR/Phonemes remain at Layer 7 where semantic word-level context exists
+
+SOVEREIGN_STATE_DIM = 32
+
+# Bhava indices [0:12] - Ontological Aspects
+BHAVA_NAMES = [
+    'POT',  # 0: Potential - latent possibility
+    'IDN',  # 1: Identity - self-recognition
+    'EXE',  # 2: Execution - action/manifestation
+    'STR',  # 3: Structure - form/organization
+    'COG',  # 4: Cognition - knowing/understanding
+    'AGY',  # 5: Agency - will/intention
+    'RSN',  # 6: Reason - logic/analysis
+    'PRP',  # 7: Purpose - meaning/direction
+    'WIT',  # 8: Witness - observation/awareness
+    'UNI',  # 9: Unity - integration/wholeness
+    'INT',  # 10: Intent - focused will
+    'ABS',  # 11: Absolute - transcendent ground
+]
+BHAVA_SLICE = slice(0, 12)
+
+# Kosha indices [12:17] - Consciousness Sheaths
+KOSHA_NAMES = [
+    'ANNA',    # 12: Annamaya - physical/food sheath
+    'PRANA',   # 13: Pranamaya - vital/energy sheath
+    'MANO',    # 14: Manomaya - mental/emotional sheath
+    'VIJNANA', # 15: Vijnanamaya - wisdom/intellect sheath
+    'ANANDA',  # 16: Anandamaya - bliss/causal sheath
+]
+KOSHA_SLICE = slice(12, 17)
+
+# Vritti indices [17:22] - Mental Modifications
+VRITTI_NAMES = [
+    'PRAMANA',   # 17: Valid cognition (correct knowledge)
+    'VIPARYAYA', # 18: Misconception (incorrect knowledge)
+    'VIKALPA',   # 19: Imagination (verbal construct)
+    'NIDRA',     # 20: Sleep (absence of content)
+    'SMRITI',    # 21: Memory (retention of experience)
+]
+VRITTI_SLICE = slice(17, 22)
+
+# Guna/Dynamics indices [22:28] - Energy States
+GUNA_NAMES = [
+    'SATTVA',   # 22: Clarity/harmony/balance
+    'RAJAS',    # 23: Activity/passion/change
+    'TAMAS',    # 24: Inertia/darkness/stability
+    'VELOCITY', # 25: Rate of state change
+    'ACCEL',    # 26: Acceleration of change
+    'STABLE',   # 27: Stability measure
+]
+GUNA_SLICE = slice(22, 28)
+
+# Reserved indices [28:32] - Void/Toroidal Feedback
+RESERVED_NAMES = [
+    'VOID_0',   # 28: Toroidal feedback channel 0
+    'VOID_1',   # 29: Toroidal feedback channel 1
+    'VOID_2',   # 30: Toroidal feedback channel 2
+    'VOID_3',   # 31: Toroidal feedback channel 3
+]
+RESERVED_SLICE = slice(28, 32)
+
+# Full state dimension names for diagnostics
+SOVEREIGN_STATE_NAMES = BHAVA_NAMES + KOSHA_NAMES + VRITTI_NAMES + GUNA_NAMES + RESERVED_NAMES
+
+
+def get_sovereign_state_summary(state: torch.Tensor) -> Dict[str, Any]:
+    """
+    Extract human-readable summary from 32D Sovereign State.
+
+    Args:
+        state: [B, 32] or [32] Sovereign State tensor
+
+    Returns:
+        Dict with dominant Bhava, active Kosha, Vritti state, Guna balance
+    """
+    if state.dim() == 1:
+        state = state.unsqueeze(0)
+
+    # Get dominant indices for each category
+    bhava_vals = state[:, BHAVA_SLICE]
+    kosha_vals = state[:, KOSHA_SLICE]
+    vritti_vals = state[:, VRITTI_SLICE]
+    guna_vals = state[:, GUNA_SLICE]
+
+    dominant_bhava_idx = bhava_vals.argmax(dim=-1)
+    active_kosha_idx = kosha_vals.argmax(dim=-1)
+    vritti_state_idx = vritti_vals.argmax(dim=-1)
+
+    # Guna balance (Sattva-Rajas-Tamas ratio)
+    guna_balance = F.softmax(guna_vals[:, :3], dim=-1)  # First 3 are S-R-T
+
+    return {
+        'dominant_bhava': BHAVA_NAMES[dominant_bhava_idx[0].item()],
+        'dominant_bhava_idx': dominant_bhava_idx[0].item(),
+        'bhava_activation': bhava_vals[0, dominant_bhava_idx[0]].item(),
+        'active_kosha': KOSHA_NAMES[active_kosha_idx[0].item()],
+        'active_kosha_idx': active_kosha_idx[0].item(),
+        'kosha_activation': kosha_vals[0, active_kosha_idx[0]].item(),
+        'vritti_state': VRITTI_NAMES[vritti_state_idx[0].item()],
+        'vritti_state_idx': vritti_state_idx[0].item(),
+        'vritti_activation': vritti_vals[0, vritti_state_idx[0]].item(),
+        'guna_sattva': guna_balance[0, 0].item(),
+        'guna_rajas': guna_balance[0, 1].item(),
+        'guna_tamas': guna_balance[0, 2].item(),
+        'velocity': guna_vals[0, 3].item() if guna_vals.shape[-1] > 3 else 0.0,
+    }
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -103,12 +227,21 @@ class TransformerConfig:
 
 class IntentPhaseProjector(nn.Module):
     """
-    Projects Ontological State Delta (ΔS) to phase rotation offsets.
+    Projects Sovereign State Delta (ΔS) to phase rotation offsets.
+
+    V9.8.0: Updated for 32D Sovereign State (was 124D CognitiveState).
 
     This is the bridge between Ontological understanding and Phase attention.
-    The Ontological model outputs a 124-dim CognitiveState delta representing
+    The Ontological model outputs a 32-dim Sovereign State delta representing
     how "understanding" changed. This projector converts that to phase offsets
     that rotate the Query phasors in Phase attention.
+
+    32D Sovereign State Structure:
+        [0:12]  - 12 Bhavas (Ontological Aspects)
+        [12:17] - 5 Koshas (Consciousness Sheaths)
+        [17:22] - 5 Vrittis (Mental Modifications)
+        [22:28] - 6 Gunas/Dynamics (Energy States)
+        [28:32] - 4 Reserved (Void/Toroidal Feedback)
 
     Theory (from ONTOLOGICAL_STATE_DELTA_DESIGN.md):
         z_lower' = z_lower × e^{iθ_higher}
@@ -126,7 +259,7 @@ class IntentPhaseProjector(nn.Module):
 
     def __init__(
         self,
-        state_dim: int = 124,      # CognitiveState dimension (44+64+12+4)
+        state_dim: int = SOVEREIGN_STATE_DIM,  # V9.8.0: 32D Sovereign State (was 124D)
         num_heads: int = 12,       # Number of attention heads
         head_dim: int = 64,        # Dimension per head
         project_per_head_dim: bool = False,  # If True, project to [H, D_h], else [H]
@@ -167,7 +300,7 @@ class IntentPhaseProjector(nn.Module):
         Convert state delta to phase offsets.
 
         Args:
-            delta_S: [B, state_dim] or [B, T, state_dim] - CognitiveState delta
+            delta_S: [B, 32] or [B, T, 32] - Sovereign State delta
 
         Returns:
             theta_intent: [B, H] or [B, H, D_h] or [B, T, H, D_h] - phase offsets
@@ -2326,14 +2459,27 @@ class OntologicalHybridTransformer(nn.Module):
     """
     Two-Tier AGI Architecture: Ontological (slow/semantic) + Hybrid (fast/generation).
 
+    V9.8.0: Uses 32D Sovereign State (was 124D CognitiveState).
+
+    32D Sovereign State Structure:
+        [0:12]  - 12 Bhavas (Ontological Aspects)
+        [12:17] - 5 Koshas (Consciousness Sheaths)
+        [17:22] - 5 Vrittis (Mental Modifications)
+        [22:28] - 6 Gunas/Dynamics (Energy States)
+        [28:32] - 4 Reserved (Void/Toroidal Feedback)
+
     This combines:
-    1. Ontological Layer: Tracks semantic state, outputs ΔS (understanding change)
+    1. Ontological Layer: Tracks 32D Sovereign State, outputs ΔS (understanding change)
     2. Hybrid Layer: Local + Phase attention, conditioned on ΔS via phase rotation
 
     Theory:
         - System 2 (Ontological): Slow, deliberate semantic reasoning
         - System 1 (Hybrid): Fast, automatic pattern completion
         - ΔS → Phase Rotation: Intent changes HOW tokens relate, not WHAT they are
+
+    Initialization:
+        - State projector biased toward O12_ABS (Absolute) and Annamaya (Physical)
+        - Represents "Absolute Potential" - pure awareness grounded in physical reality
 
     From ONTOLOGICAL_STATE_DELTA_DESIGN.md:
         "z_lower' = z_lower × e^{iθ_higher}"
@@ -2364,7 +2510,7 @@ class OntologicalHybridTransformer(nn.Module):
         alpha_local: float = 0.8,
         alpha_phase: float = 0.2,
         # Ontological params
-        state_dim: int = 124,  # CognitiveState dimension
+        state_dim: int = SOVEREIGN_STATE_DIM,  # V9.8.0: 32D Sovereign State (was 124D)
         project_per_head_dim: bool = False,  # Phase projection granularity
         tie_embeddings: bool = True,
         cosine_mode: str = "standard",
@@ -2391,15 +2537,21 @@ class OntologicalHybridTransformer(nn.Module):
             decay_gamma=decay_gamma,
         )
 
-        # State projector: hidden[768] → CognitiveState[124]
-        # (Import from experimental or define inline)
+        # State projector: hidden[embed_dim] → SovereignState[32]
+        # V9.8.0: Projects to principled 32D state space
         self.state_projector = nn.Sequential(
             nn.Linear(embed_dim, embed_dim // 2),
             nn.GELU(),
             nn.Linear(embed_dim // 2, state_dim),
         )
 
-        # Intent phase projector: ΔS[124] → θ[H] or θ[H, D_h]
+        # V9.8.0: Initialize state projector bias toward "Absolute Potential"
+        # - O12_ABS (index 11): Transcendent ground / pure awareness
+        # - Annamaya (index 12): Physical/grounded sheath
+        # This represents the starting state: awareness grounded in physical reality
+        self._init_absolute_potential_bias()
+
+        # Intent phase projector: ΔS[32] → θ[H] or θ[H, D_h]
         head_dim = embed_dim // num_heads
         self.intent_projector = IntentPhaseProjector(
             state_dim=state_dim,
@@ -2416,26 +2568,54 @@ class OntologicalHybridTransformer(nn.Module):
         # persistent=False excludes from state_dict (runtime state, not trained weights)
         self.register_buffer('prev_state', None, persistent=False)
 
+    def _init_absolute_potential_bias(self):
+        """
+        Initialize state projector to bias toward "Absolute Potential" state.
+
+        At step 0, the model should start in:
+        - O12_ABS (index 11): Absolute/transcendent awareness
+        - Annamaya (index 12): Physical/grounded reality
+
+        This represents pure potential grounded in physical existence.
+        """
+        with torch.no_grad():
+            # Get the final linear layer's bias
+            final_layer = self.state_projector[-1]
+            if hasattr(final_layer, 'bias') and final_layer.bias is not None:
+                # Start with small random bias
+                final_layer.bias.fill_(0.0)
+                # Boost O12_ABS (index 11) - Absolute/transcendent
+                if final_layer.bias.shape[0] > 11:
+                    final_layer.bias[11] = 1.0  # O12_ABS
+                # Boost Annamaya (index 12) - Physical grounding
+                if final_layer.bias.shape[0] > 12:
+                    final_layer.bias[12] = 0.8  # Annamaya
+                # Small boost to Pramana (index 17) - Valid cognition
+                if final_layer.bias.shape[0] > 17:
+                    final_layer.bias[17] = 0.3  # Pramana
+
     def compute_state_delta(
         self,
         hidden: torch.Tensor,
         reset_state: bool = False,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Compute CognitiveState and its delta from hidden states.
+        Compute 32D Sovereign State and its delta from hidden states.
+
+        V9.8.0: Updated for 32D Sovereign State.
 
         Args:
             hidden: [B, N, embed_dim] - hidden states from hybrid model
             reset_state: Reset prev_state (use at start of new sequence)
 
         Returns:
-            state: [B, state_dim] - current CognitiveState (pooled)
-            delta_S: [B, state_dim] - change from previous state
+            state: [B, 32] - current Sovereign State (pooled)
+            delta_S: [B, 32] - change from previous state
         """
         # Pool hidden states (mean over sequence)
         pooled = hidden.mean(dim=1)  # [B, embed_dim]
 
-        # Project to CognitiveState
+        # Project to Sovereign State
         state = self.state_projector(pooled)  # [B, state_dim]
 
         # Compute delta
@@ -2481,8 +2661,8 @@ class OntologicalHybridTransformer(nn.Module):
         Returns:
             Dict with:
             - 'logits': [B, N, V] output logits
-            - 'state': [B, state_dim] current CognitiveState
-            - 'delta_S': [B, state_dim] state delta
+            - 'state': [B, 32] current Sovereign State
+            - 'delta_S': [B, 32] state delta
             - 'intent_phase': [B, H] or [B, H, D_h] phase rotation applied
             - Plus any requested hidden states
         """
