@@ -686,6 +686,66 @@ Full evolutionary flow across layer transitions.
 - **csr_tau**: Lower = sharper gradients (0.07 is good default)
 - **csr_alignment_layer**: Use 2 for concept formation, avoid 11 (output)
 
+### CSR Tuning Guide
+
+#### What Each Parameter Does
+
+| Parameter | Plain English | Effect of Increasing |
+|-----------|---------------|---------------------|
+| `csr_lambda` | How much CSR loss contributes to total loss | Stronger phoneme-ontology alignment, may slow PPL improvement |
+| `csr_tau` | Temperature (sharpness of gradient signal) | Lower = sharper gradients, more decisive alignment |
+| `csr_projector_lr_scale` | How fast CSR↔Hidden projection adapts | Faster adaptation, may be less stable |
+| `csr_alignment_layer` | Which layer CSR aligns to | Layer 1 = fundamental, Layer 2 = concept, Layer 3+ = higher abstraction |
+| `csr_gradient_warmup_steps` | Steps before CSR gradients flow to model | Lower = earlier ontological influence |
+
+#### Strength Hierarchy
+
+```bash
+# Conservative (default) - Gentle ontological guidance
+--csr_lambda 0.1 --csr_tau 0.07 --csr_projector_lr_scale 0.1
+
+# Moderate - Balanced ontology vs perplexity
+--csr_lambda 0.2 --csr_tau 0.05 --csr_projector_lr_scale 0.2
+
+# Aggressive - Strong ontological shaping (may slow PPL)
+--csr_lambda 0.5 --csr_tau 0.03 --csr_projector_lr_scale 0.5
+```
+
+#### Gradient Amplification Reference
+
+| `csr_tau` | Amplification | Use Case |
+|-----------|---------------|----------|
+| `0.10` | 10x | Very gentle |
+| `0.07` | 14x | Default, balanced |
+| `0.05` | 20x | Moderate push |
+| `0.03` | 33x | Aggressive shaping |
+| `0.02` | 50x | Maximum (use with caution) |
+
+#### When to Increase CSR Influence
+
+| Symptom | Solution |
+|---------|----------|
+| Model learns grammar but no ontological structure | Increase `csr_lambda` to 0.2-0.3 |
+| CSR alignment too slow | Lower `csr_tau` to 0.05 |
+| Kosha steering not affecting embeddings | Increase `csr_projector_lr_scale` to 0.3 |
+| Want ontological shaping from step 1 | Set `csr_gradient_warmup_steps 0` |
+| PPL improving but Kosha phase stuck | Increase `csr_lambda` AND enable steering |
+
+#### Example: Strong CSR with Kosha Steering
+
+```bash
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --enable_csr \
+    --csr_lambda 0.3 \
+    --csr_tau 0.05 \
+    --csr_projector_lr_scale 0.3 \
+    --csr_gradient_warmup_steps 25 \
+    --enable_kosha_diagnostics --kosha_log_every 50 \
+    --enable_kosha_steering --kosha_steering_force 0.35 \
+    # ... other args
+```
+
 ---
 
 ## SGP (Stochastic Gradient Persistence)
