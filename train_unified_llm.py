@@ -8591,11 +8591,12 @@ def train(config: UnifiedTrainingConfig):
 
             # --- DEBUG: KOSHA STEERING HEARTBEAT ---
             # Shows steering is active on "in-between" steps (e.g., 810, 820, 830)
-            # This confirms continuous intervention, not just at logging intervals
+            # Only prints when steering IS active (non-zero) and once per global step
             if config.enable_kosha_steering and global_step % 100 != 0 and global_step % 10 == 0:
                 steer_val = kosha_steering_loss.item() if isinstance(kosha_steering_loss, torch.Tensor) else kosha_steering_loss
-                steer_active = "✓" if steer_val > 0 else "✗"
-                print(f"  🕵️ [STEER DEBUG Step {global_step}] Loss: {loss.item() * config.gradient_accumulation:.4f} | Steering: {steer_active} | Val: {steer_val:.6f}", flush=True)
+                # Only print if steering is actually active AND at end of accumulation
+                if steer_val > 0 and (accumulation_step + 1) % config.gradient_accumulation == 0:
+                    print(f"  🕵️ [STEER DEBUG Step {global_step}] Loss: {loss.item() * config.gradient_accumulation:.4f} | Steering: ✓ | Val: {steer_val:.6f}", flush=True)
             # --- END DEBUG ---
 
         # Backward pass
