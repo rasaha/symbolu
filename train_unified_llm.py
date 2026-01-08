@@ -8589,6 +8589,15 @@ def train(config: UnifiedTrainingConfig):
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
 
+            # --- DEBUG: KOSHA STEERING HEARTBEAT ---
+            # Shows steering is active on "in-between" steps (e.g., 810, 820, 830)
+            # This confirms continuous intervention, not just at logging intervals
+            if config.enable_kosha_steering and global_step % 100 != 0 and global_step % 10 == 0:
+                steer_val = kosha_steering_loss.item() if isinstance(kosha_steering_loss, torch.Tensor) else kosha_steering_loss
+                steer_active = "✓" if steer_val > 0 else "✗"
+                print(f"  🕵️ [STEER DEBUG Step {global_step}] Loss: {loss.item() * config.gradient_accumulation:.4f} | Steering: {steer_active} | Val: {steer_val:.6f}", flush=True)
+            # --- END DEBUG ---
+
         # Backward pass
         if scaler is not None:
             scaler.scale(loss).backward()
