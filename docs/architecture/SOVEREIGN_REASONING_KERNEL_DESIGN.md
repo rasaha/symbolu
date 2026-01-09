@@ -2178,38 +2178,11 @@ W(i) = w(i) / Σⱼ w(j)
 
 **Benefit:** Tokens prioritized are those that minimize L, effectively "locking" the model into its reasoned path.
 
-### 23.3 Implementation
+### 23.3 Implementation Reference
+
+The B1 Lagrangian is implemented as a method of the `SovereignReasoningKernel` class in **Section 26.1**. For the refined version with Sattvic Anchor alignment, see **Section 32**.
 
 ```python
-def calculate_b1_lagrangian(
-    self,
-    sf: torch.Tensor,
-    sb: torch.Tensor,
-    lambda_f: float = 1.0,
-    lambda_b: float = 1.0,
-    lambda_c: float = 0.5,
-) -> torch.Tensor:
-    """
-    Patent B1: Consistency Lagrangian.
-
-    Penalizes:
-      - Low forward score (linguistic incoherence)
-      - Low backward score (ontological misalignment)
-      - Forward-backward divergence (System 1/2 conflict)
-
-    Args:
-        sf: Forward feasibility score [0,1] - linguistic coherence
-        sb: Backward goal-achievement score [0,1] - ontological alignment
-
-    Returns:
-        Lagrangian loss value
-    """
-    term_f = lambda_f * (1 - sf) ** 2
-    term_b = lambda_b * (1 - sb) ** 2
-    term_c = lambda_c * (sf - sb) ** 2
-    return term_f + term_b + term_c
-
-
 def apply_consistency_weighting(
     self,
     logits: torch.Tensor,
