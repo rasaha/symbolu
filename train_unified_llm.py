@@ -9054,6 +9054,101 @@ def train(config: UnifiedTrainingConfig):
         hidden_state_extractor = HiddenStateExtractor(model, num_layers=12)
         print(f"  CSR Hidden State Extractor: ENABLED ({len(hidden_state_extractor.hooks)} hooks registered)")
 
+    # ==========================================================================
+    # V9.8.0: Sovereign Reasoning Kernel (SRK) Initialization
+    # Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
+    # ==========================================================================
+    srk = None
+    srk_loss_fn = None
+    srk_annealer = None
+    srk_phase_hook = None
+    srk_karma_state = None  # O12→O1 carryover buffer
+
+    if config.enable_srk and SRK_AVAILABLE:
+        # Get model dimensions
+        preset = MODEL_PRESETS.get(config.model_size, MODEL_PRESETS['small'])
+        model_dim = preset['embed_dim']
+        num_heads = preset['num_heads']
+        num_layers = preset['num_layers']
+
+        # Build SRKConfig from training config
+        srk_config = SRKConfig(
+            state_dim=SOVEREIGN_STATE_DIM,
+            hidden_dim=model_dim,
+            num_heads=num_heads,
+            dna_bridge_layer=config.srk_dna_bridge_layer,
+            csr_alignment_layer=config.srk_csr_alignment_layer,
+            witness_layer=config.srk_witness_layer,
+            synthesis_layer=config.srk_synthesis_layer,
+            enable_dna_bridge=config.srk_enable_dna_bridge,
+            enable_witness=config.srk_enable_witness,
+            enable_synthesis=config.srk_enable_synthesis,
+            enable_imr=config.srk_enable_imr,
+            isomorphism_threshold=config.srk_isomorphism_threshold,
+            karma_decay=config.srk_karma_decay,
+            enable_mauna=config.srk_enable_mauna,
+            mauna_confidence_threshold=config.srk_mauna_confidence_threshold,
+            mauna_consistency_threshold=config.srk_mauna_consistency_threshold,
+        )
+
+        # Create SRK instance
+        srk = SovereignReasoningKernel(srk_config).to(device)
+
+        # Create SRK Loss
+        srk_loss_config = SRKLossConfig(
+            lambda_f=config.srk_lambda_f,
+            lambda_b=config.srk_lambda_b,
+            lambda_c=config.srk_lambda_c,
+            lambda_coherence=config.srk_lambda_coherence,
+            lambda_entropy=config.srk_lambda_entropy,
+            lambda_task=config.srk_lambda_task,
+            enable_nidra_penalty=config.srk_enable_nidra_penalty,
+            nidra_penalty_weight=config.srk_nidra_penalty_weight,
+        )
+        srk_loss_fn = SRKLoss(srk_loss_config).to(device)
+
+        # Create SRK Annealer (Lambda Warmup)
+        srk_annealer = SovereignAnnealer(
+            total_steps=config.srk_total_steps,
+            warmup_steps=config.srk_warmup_steps,
+        )
+
+        # Create Phase Extraction Hook for Layer 7 (CSR alignment)
+        srk_phase_hook = PhaseExtractionHook(
+            target_layer=config.srk_csr_alignment_layer,
+            num_heads=num_heads,
+        )
+
+        # Register hook on model if not already using HiddenStateExtractor
+        # The hook will be called during forward pass to extract attention phases
+        if hidden_state_extractor is None:
+            hidden_state_extractor = HiddenStateExtractor(model, num_layers=num_layers)
+            print(f"  SRK Hidden State Extractor: ENABLED ({len(hidden_state_extractor.hooks)} hooks registered)")
+
+        # Initialize karma buffer (O12→O1 carryover)
+        srk_karma_state = torch.zeros(config.batch_size, SOVEREIGN_STATE_DIM, device=device)
+
+        print(f"\n  ╔══════════════════════════════════════════════════════════════════╗")
+        print(f"  ║  V9.8.0: SOVEREIGN REASONING KERNEL (SRK) ENABLED                ║")
+        print(f"  ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Layer Interventions:                                            ║")
+        print(f"  ║    L{config.srk_dna_bridge_layer}: DNA Bridge (Ontology)     {'ACTIVE' if config.srk_enable_dna_bridge else 'OFF':>6}                      ║")
+        print(f"  ║    L{config.srk_csr_alignment_layer}: Phase Hook (CSR)        ACTIVE                      ║")
+        print(f"  ║    L{config.srk_witness_layer}: Witness Arbitrator     {'ACTIVE' if config.srk_enable_witness else 'OFF':>6}                      ║")
+        print(f"  ║    L{config.srk_synthesis_layer}: Synthesis Gate         {'ACTIVE' if config.srk_enable_synthesis else 'OFF':>6}                      ║")
+        print(f"  ║  IMR (Logic Templates):           {'ACTIVE' if config.srk_enable_imr else 'OFF':>6}                      ║")
+        print(f"  ║  Mauna Protocol:                  {'ACTIVE' if config.srk_enable_mauna else 'OFF':>6}                      ║")
+        print(f"  ║  Karma Decay (O12→O1):            {config.srk_karma_decay:.2f}                        ║")
+        print(f"  ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Loss Configuration (B1/U2/S8):                                  ║")
+        print(f"  ║    λ_task={config.srk_lambda_task:.1f}  λ_c={config.srk_lambda_c:.1f}  λ_ent={config.srk_lambda_entropy:.1f}  λ_coh={config.srk_lambda_coherence:.1f}         ║")
+        print(f"  ║  Annealing: {config.srk_warmup_steps:,} warmup → {config.srk_total_steps:,} total steps          ║")
+        print(f"  ╚══════════════════════════════════════════════════════════════════╝\n")
+    elif config.enable_srk and not SRK_AVAILABLE:
+        print(f"\n  ⚠️  SRK REQUESTED but module not available!")
+        print(f"      Check: symbolu/sovereign/reasoning_kernel.py exists and imports correctly")
+        print(f"      Falling back to legacy training without SRK.\n")
+
     # Optimizer
     if config.use_8bit_optimizer:
         try:
@@ -9464,6 +9559,84 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     logits = outputs
                 loss, metrics = compute_phase_loss(logits, y, config)
+
+            # =================================================================
+            # V9.8.0: Sovereign Reasoning Kernel (SRK) Integration
+            # Reference: SOVEREIGN_REASONING_KERNEL_DESIGN.md Section 6.2
+            # =================================================================
+            srk_metrics = {}
+            if srk is not None and hidden_state_extractor is not None:
+                # Get hidden states from all layers
+                layer_hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
+
+                if layer_hidden_states is not None and len(layer_hidden_states) > 0:
+                    # Handle batch size changes (VRAM governor may resize)
+                    current_batch_size = x.shape[0]
+                    if srk_karma_state.shape[0] != current_batch_size:
+                        srk_karma_state = torch.zeros(current_batch_size, SOVEREIGN_STATE_DIM, device=device)
+
+                    # Extract hidden states for SRK processing
+                    # Use last layer hidden states for state computation
+                    final_hidden = layer_hidden_states[-1]  # [B, N, D]
+
+                    # Compute current 32D sovereign state from hidden states
+                    current_state = srk.compute_state_from_hidden(final_hidden)
+
+                    # SRK forward pass with layer interventions (diagnostic mode)
+                    # During training, SRK observes and computes losses but doesn't modify hiddens
+                    srk_result = srk.forward_pass(
+                        hidden_states=final_hidden,
+                        layer_idx=11,  # Use final layer for synthesis
+                        current_state=current_state,
+                        karma_state=srk_karma_state,
+                        task_type='factual',  # Default task type
+                    )
+                    srk_diagnostics = srk_result.get('diagnostics', {})
+
+                    # Update lambda values via annealer
+                    if srk_annealer is not None:
+                        annealed_lambdas = srk_annealer.get_lambdas(global_step)
+                        srk_loss_fn.config.lambda_f = annealed_lambdas['lambda_f']
+                        srk_loss_fn.config.lambda_b = annealed_lambdas['lambda_b']
+                        srk_loss_fn.config.lambda_c = annealed_lambdas['lambda_c']
+                        srk_loss_fn.config.lambda_entropy = annealed_lambdas['lambda_entropy']
+                        srk_loss_fn.config.lambda_coherence = annealed_lambdas['lambda_coherence']
+                        srk_diagnostics['annealer_phase'] = srk_annealer.get_phase_name(global_step)
+
+                    # Compute SRK loss (B1/U2/S8 patent formulas)
+                    srk_loss, srk_loss_metrics = srk_loss_fn(
+                        logits=logits,
+                        targets=y,
+                        hidden_states=final_hidden,
+                        karma_state=srk_karma_state,
+                        srk_diagnostics=srk_diagnostics,
+                        attention_phases=None,  # Phase extraction from hook if available
+                        mask=None,
+                    )
+
+                    # Replace or augment loss with SRK loss
+                    # SRK loss includes task loss (cross-entropy) + B1/U2/S8 terms
+                    loss = srk_loss  # SRK loss subsumes task loss
+
+                    # Update karma state for O12→O1 carryover (Toroidal Loop)
+                    with torch.no_grad():
+                        srk_karma_state = current_state.detach() * config.srk_karma_decay
+
+                    # Collect SRK metrics
+                    srk_metrics = srk_loss_metrics.copy()
+                    srk_metrics.update({
+                        'srk_state_norm': current_state.norm(dim=-1).mean().item(),
+                        'srk_karma_norm': srk_karma_state.norm(dim=-1).mean().item(),
+                    })
+                    srk_metrics.update({f'srk_{k}': v for k, v in srk_diagnostics.items() if isinstance(v, (int, float))})
+
+                    # Log SRK diagnostics periodically
+                    if global_step % config.log_every == 0 and global_step > 0:
+                        phase_name = srk_diagnostics.get('annealer_phase', 'UNKNOWN')
+                        print(f"  [SRK] Step {global_step} | Phase: {phase_name} | "
+                              f"L_total={srk_metrics.get('L_total', 0):.4f} | "
+                              f"L_B1={srk_metrics.get('L_lagrangian', 0):.4f} | "
+                              f"s_f={srk_metrics.get('s_f', 0):.3f} s_b={srk_metrics.get('s_b', 0):.3f}")
 
             # CSR Phoneme-Ontological Grounding Integration
             csr_metrics = {}

@@ -900,6 +900,46 @@ class SovereignReasoningKernel(nn.Module):
             return self.karma_state.expand(batch_size, -1)
         return self.karma_state
 
+    def compute_state_from_hidden(
+        self,
+        hidden_states: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Compute 32D Sovereign State from hidden states.
+
+        Args:
+            hidden_states: [B, N, D] hidden states from final layer
+
+        Returns:
+            state: [B, 32] sovereign state vector
+        """
+        # Pool hidden states (mean over sequence)
+        pooled = hidden_states.mean(dim=1)  # [B, D]
+
+        # Project to 32D state space
+        state = self.state_projector(pooled)  # [B, 32]
+
+        # Apply softmax normalization to each component group
+        # [0:12] Bhava, [12:17] Kosha, [17:22] Vritti, [22:28] Guna, [28:32] Reserved
+        state_normalized = torch.zeros_like(state)
+
+        # Bhava (12 values) - softmax for probability distribution
+        state_normalized[:, 0:12] = torch.softmax(state[:, 0:12], dim=-1)
+
+        # Kosha (5 values)
+        state_normalized[:, 12:17] = torch.softmax(state[:, 12:17], dim=-1)
+
+        # Vritti (5 values)
+        state_normalized[:, 17:22] = torch.softmax(state[:, 17:22], dim=-1)
+
+        # Guna (6 values)
+        state_normalized[:, 22:28] = torch.softmax(state[:, 22:28], dim=-1)
+
+        # Reserved (4 values) - sigmoid for independent flags
+        state_normalized[:, 28:32] = torch.sigmoid(state[:, 28:32])
+
+        return state_normalized
+
     def step_karma(self, final_state: torch.Tensor):
         """
         Toroidal Loop-back: Finalizes the 'Karma' for the next token.
@@ -925,8 +965,9 @@ class SovereignReasoningKernel(nn.Module):
         hidden_states: torch.Tensor,
         layer_idx: int,
         current_state: Optional[torch.Tensor] = None,
+        karma_state: Optional[torch.Tensor] = None,
         task_type: str = 'factual',
-    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
         Recursive Intelligence Routing.
 
@@ -936,11 +977,13 @@ class SovereignReasoningKernel(nn.Module):
             hidden_states: [B, N, D] from current layer
             layer_idx: Current layer index (0-11)
             current_state: [B, 32] current Sovereign State (optional)
+            karma_state: [B, 32] karma from previous step (O12→O1, optional)
             task_type: 'factual' | 'creative' | 'recall'
 
         Returns:
-            modified_hidden: [B, N, D] with intervention applied
-            diagnostics: Dict of telemetry
+            Dict containing:
+                - hidden_states: [B, N, D] with intervention applied
+                - diagnostics: Dict of telemetry
         """
         diagnostics = {
             'layer_idx': layer_idx,
@@ -949,8 +992,11 @@ class SovereignReasoningKernel(nn.Module):
 
         B = hidden_states.shape[0]
 
-        # Use karma if no current state provided
-        if current_state is None:
+        # Use provided karma_state, else internal karma, else compute from current state
+        if karma_state is not None:
+            # External karma provided (training mode)
+            pass  # Use current_state directly
+        elif current_state is None:
             current_state = self.get_karma(B)
 
         # --- LAYER 4: DNA GROUNDING ---
@@ -995,7 +1041,20 @@ class SovereignReasoningKernel(nn.Module):
                 hidden_states = self.mauna.apply_veto(hidden_states, current_state)
                 diagnostics['mauna_triggered'] = self.mauna.should_silence(current_state).any().item()
 
-        return hidden_states, diagnostics
+        # Add entropy delta to diagnostics for S8 stability constraint
+        if current_state is not None and karma_state is not None:
+            # Compute entropy change
+            current_entropy = -(current_state * torch.log(current_state.clamp(min=1e-8))).sum(dim=-1).mean()
+            karma_entropy = -(karma_state * torch.log(karma_state.clamp(min=1e-8))).sum(dim=-1).mean()
+            diagnostics['entropy_delta'] = (current_entropy - karma_entropy).item()
+        else:
+            diagnostics['entropy_delta'] = 0.0
+
+        return {
+            'hidden_states': hidden_states,
+            'diagnostics': diagnostics,
+            'current_state': current_state,
+        }
 
     def extract_state(self, hidden_states: torch.Tensor) -> torch.Tensor:
         """
