@@ -395,7 +395,6 @@ class PhaseJEPATransformer(nn.Module):
         )
         self.prediction_loss = JEPAPredictionLoss(
             vicreg_weight=config.vicreg_weight,
-            prediction_weight=config.prediction_weight,
             ortho_weight=config.orthogonality_weight,
         )
 
