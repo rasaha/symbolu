@@ -9780,8 +9780,9 @@ def train(config: UnifiedTrainingConfig):
                     })
                     srk_metrics.update({f'srk_{k}': v for k, v in srk_diagnostics.items() if isinstance(v, (int, float))})
 
-                    # Log SRK diagnostics periodically
-                    if global_step % config.log_every == 0 and global_step > 0:
+                    # Log SRK diagnostics periodically (only at end of accumulation to avoid duplicates)
+                    if (global_step % config.log_every == 0 and global_step > 0 and
+                        (accumulation_step + 1) % config.gradient_accumulation == 0):
                         phase_name = srk_diagnostics.get('annealer_phase', 'UNKNOWN')
                         print(f"  [SRK] Step {global_step} | Phase: {phase_name} | "
                               f"L_total={srk_metrics.get('L_total', 0):.4f} | "
@@ -9848,12 +9849,13 @@ def train(config: UnifiedTrainingConfig):
                         jepa_metrics['jepa_phase'] = progress.get('macro_phase', 'BODY')
                         jepa_metrics['jepa_k_steps'] = jepa_curriculum.get_k_steps()
 
-                    # Log phase transitions
-                    if phase_changed and new_phase:
+                    # Log phase transitions (only at end of accumulation)
+                    if phase_changed and new_phase and (accumulation_step + 1) % config.gradient_accumulation == 0:
                         print(f"\n  🔄 [JEPA] Phase Transition → {new_phase} at step {global_step}")
 
-                    # Log JEPA diagnostics periodically
-                    if global_step % config.log_every == 0 and global_step > 0:
+                    # Log JEPA diagnostics periodically (only at end of accumulation to avoid duplicates)
+                    if (global_step % config.log_every == 0 and global_step > 0 and
+                        (accumulation_step + 1) % config.gradient_accumulation == 0):
                         phase_str = jepa_metrics.get('jepa_phase', 'BODY')
                         print(f"  [JEPA] Step {global_step} | Phase: {phase_str} | "
                               f"Loss={jepa_metrics.get('jepa_loss', 0):.4f} | "
