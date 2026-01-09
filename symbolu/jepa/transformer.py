@@ -1044,16 +1044,19 @@ class PhaseJEPATransformer(nn.Module):
 
         Args:
             logits: [B, T, V] vocabulary logits
-            phase_rotation: [B, num_heads] or [B, T, num_heads]
+            phase_rotation: [B, num_heads] or [B, T_ctx, num_heads]
 
         Returns:
             Modulated logits [B, T, V] with gradient path to phase_rotation
         """
         # Compute a soft scaling factor from phase rotation
-        # Use mean phase across heads, apply sigmoid for smooth [0.5, 1.5] range
+        # Use mean across all dimensions for consistent scaling
+        # This handles shape mismatch between logits (full seq) and phase_rotation (context)
         if phase_rotation.dim() == 3:
-            phase_mean = phase_rotation.mean(dim=-1)  # [B, T]
+            # [B, T_ctx, num_heads] -> [B, 1] mean over time and heads
+            phase_mean = phase_rotation.mean(dim=(1, 2), keepdim=True).squeeze(-1)  # [B, 1]
         else:
+            # [B, num_heads] -> [B, 1]
             phase_mean = phase_rotation.mean(dim=-1, keepdim=True)  # [B, 1]
 
         # Normalize to near-identity scaling (0.98 to 1.02)
@@ -1061,10 +1064,7 @@ class PhaseJEPATransformer(nn.Module):
         scale = 1.0 + 0.02 * torch.tanh(phase_mean / math.pi)
 
         # Expand for broadcasting with logits [B, T, V]
-        if scale.dim() == 1:
-            scale = scale.unsqueeze(-1).unsqueeze(-1)  # [B, 1, 1]
-        elif scale.dim() == 2:
-            scale = scale.unsqueeze(-1)  # [B, T, 1]
+        scale = scale.unsqueeze(-1)  # [B, 1, 1]
 
         return logits * scale
 
@@ -1440,9 +1440,13 @@ class SovereignJEPA(nn.Module):
         should_generate_goal = (
             force_new_goal or
             self.current_goal.sum() == 0 or  # No current goal
-            self.current_goal_steps >= self.config.goal_persistence or  # Goal expired
-            mean_curiosity > self.mean_curiosity + 2 * self.std_curiosity  # Surprising event
+            self.current_goal_steps >= self.config.goal_persistence  # Goal expired
         )
+
+        # Check for surprising event (only if metacognition is enabled)
+        if self.config.enable_metacognition:
+            surprising_event = mean_curiosity > self.mean_curiosity + 2 * self.std_curiosity
+            should_generate_goal = should_generate_goal or surprising_event
 
         if should_generate_goal and self.jepa.goal_generator is not None:
             # Generate new goal from curiosity
