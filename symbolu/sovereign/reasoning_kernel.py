@@ -730,6 +730,394 @@ class VrittiGate(nn.Module):
 
 
 # =============================================================================
+# USER-ONTOLOGICAL MIRROR (UOM)
+# =============================================================================
+
+class UserOntologicalMirror(nn.Module):
+    """
+    User-Ontological Mirror: Detects user state and calculates optimal intervention.
+
+    The AGI becomes Self-Aware of its impact on the User.
+    The 32D state mirrors the User's psychological/cognitive state.
+
+    Implements design doc Section 12:
+    - Detect user's current state (distress, confusion, etc.)
+    - Calculate teleological vector (path to optimal state)
+    - Recommend intervention strategy (stabilize, reframe, direct action)
+
+    The Sattvic Anchor represents the ideal "Lucid, Clear, Helpful" state:
+    - O12 Absolving (Resolution): High
+    - INTELLECTUAL Kosha: High
+    - FACT Vritti: High
+    - LUCIDITY Guna: High
+    """
+
+    # Intervention strategies
+    STRATEGIES = [
+        'DIRECT_ACTION',        # User is stable, proceed with task
+        'STABILIZE_AND_REFRAME',  # User in distress, calm first
+        'CLARIFY',              # User confused, need more info
+        'VALIDATE',             # User needs confirmation
+        'REDIRECT',             # User off-topic, guide back
+    ]
+
+    def __init__(
+        self,
+        state_dim: int = SOVEREIGN_STATE_DIM,
+        hidden_dim: int = 768,
+        distress_threshold: float = 0.6,
+        confusion_threshold: float = 0.5,
+    ):
+        """
+        Initialize User-Ontological Mirror.
+
+        Args:
+            state_dim: Dimension of sovereign state (32)
+            hidden_dim: Transformer hidden dimension
+            distress_threshold: Threshold for detecting user distress
+            confusion_threshold: Threshold for detecting user confusion
+        """
+        super().__init__()
+        self.state_dim = state_dim
+        self.hidden_dim = hidden_dim
+        self.distress_threshold = distress_threshold
+        self.confusion_threshold = confusion_threshold
+
+        # Sattvic Anchor: The ideal user state
+        self.register_buffer('sattvic_anchor', self._create_sattvic_anchor())
+
+        # User state projector (optional - can use model's state directly)
+        self.user_projector = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.GELU(),
+            nn.Linear(hidden_dim // 2, state_dim),
+        )
+
+        # Task-specific anchors
+        self.register_buffer('factual_anchor', self._create_factual_anchor())
+        self.register_buffer('creative_anchor', self._create_creative_anchor())
+        self.register_buffer('analytical_anchor', self._create_analytical_anchor())
+
+    def _create_sattvic_anchor(self) -> torch.Tensor:
+        """Create the ideal Sattvic (Lucid/Clear) user state."""
+        anchor = torch.zeros(SOVEREIGN_STATE_DIM)
+        # Bhava: O12 Absolving (Resolution/Completion)
+        anchor[11] = 1.0   # O12_ABS
+        # Kosha: Intellectual (Pattern/Wisdom level)
+        anchor[15] = 0.8   # INTELLECTUAL
+        # Vritti: Fact (Valid Cognition)
+        anchor[17] = 0.9   # FACT
+        # Guna: Lucidity (Clarity/Balance)
+        anchor[22] = 1.0   # LUCIDITY
+        # Low Error/Imagination/Void
+        anchor[18] = 0.1   # ERROR (low)
+        anchor[19] = 0.2   # IMAGINATION (low for factual)
+        anchor[20] = 0.1   # VOID (low)
+        return anchor
+
+    def _create_factual_anchor(self) -> torch.Tensor:
+        """Anchor for factual/informational tasks."""
+        anchor = self._create_sattvic_anchor()
+        anchor[17] = 0.9   # High FACT
+        anchor[19] = 0.1   # Low IMAGINATION
+        return anchor
+
+    def _create_creative_anchor(self) -> torch.Tensor:
+        """Anchor for creative tasks."""
+        anchor = self._create_sattvic_anchor()
+        anchor[22] = 0.5   # Moderate LUCIDITY
+        anchor[19] = 0.6   # Higher IMAGINATION
+        anchor[23] = 0.4   # Some ACTIVITY
+        return anchor
+
+    def _create_analytical_anchor(self) -> torch.Tensor:
+        """Anchor for analytical/reasoning tasks."""
+        anchor = self._create_sattvic_anchor()
+        anchor[15] = 0.9   # High INTELLECTUAL
+        anchor[6] = 0.8    # O7_RSN (Reasoning)
+        anchor[23] = 0.4   # Moderate ACTIVITY (Rajas)
+        return anchor
+
+    def get_anchor_for_task(self, task_type: str) -> torch.Tensor:
+        """Get appropriate anchor for task type."""
+        if task_type == 'creative':
+            return self.creative_anchor
+        elif task_type == 'analytical':
+            return self.analytical_anchor
+        else:  # 'factual' or default
+            return self.factual_anchor
+
+    def detect_user_state(
+        self,
+        current_state: torch.Tensor,
+    ) -> Dict[str, Any]:
+        """
+        Analyze user's current psychological/cognitive state.
+
+        Args:
+            current_state: [B, 32] current Sovereign State
+
+        Returns:
+            Dict with detected states and scores
+        """
+        B = current_state.shape[0]
+
+        # Extract state components
+        bhavas = current_state[:, BHAVA_SLICE]      # [B, 12]
+        koshas = current_state[:, KOSHA_SLICE]      # [B, 5]
+        vrittis = current_state[:, VRITTI_SLICE]    # [B, 5]
+        gunas = current_state[:, GUNA_SLICE]        # [B, 6]
+
+        # Detect distress indicators
+        vital_high = koshas[:, 1] > 0.5     # VITAL (emotional reaction)
+        rajas_high = gunas[:, 1] > 0.6      # ACTIVITY (panic/agitation)
+        error_high = vrittis[:, 1] > 0.5    # ERROR (confusion/hallucination)
+        void_high = vrittis[:, 3] > 0.4     # VOID (dissociation)
+
+        # Compute aggregate scores
+        distress_score = (vital_high.float() * 0.3 +
+                         rajas_high.float() * 0.4 +
+                         error_high.float() * 0.3).mean()
+
+        confusion_score = (error_high.float() * 0.5 +
+                          koshas[:, 2].mean() * 0.3 +  # MENTAL (semantic confusion)
+                          void_high.float() * 0.2).mean()
+
+        # Determine user sheath (consciousness depth)
+        active_kosha_idx = koshas.mean(dim=0).argmax().item()
+        active_kosha = KOSHA_NAMES[active_kosha_idx]
+
+        # Determine user vritti (cognitive mode)
+        active_vritti_idx = vrittis.mean(dim=0).argmax().item()
+        active_vritti = VRITTI_NAMES[active_vritti_idx]
+
+        return {
+            'distress_score': distress_score.item(),
+            'confusion_score': confusion_score.item(),
+            'is_distressed': distress_score > self.distress_threshold,
+            'is_confused': confusion_score > self.confusion_threshold,
+            'active_kosha': active_kosha,
+            'active_vritti': active_vritti,
+            'vital_high': vital_high.any().item(),
+            'rajas_high': rajas_high.any().item(),
+            'error_high': error_high.any().item(),
+        }
+
+    def calculate_teleological_vector(
+        self,
+        current_state: torch.Tensor,
+        task_type: str = 'factual',
+    ) -> torch.Tensor:
+        """
+        Calculate the path from current state to ideal state.
+
+        ΔU = U_ideal - U_current
+
+        Args:
+            current_state: [B, 32] current state
+            task_type: 'factual' | 'creative' | 'analytical'
+
+        Returns:
+            teleological_delta: [B, 32] direction to steer
+        """
+        anchor = self.get_anchor_for_task(task_type)
+        # Expand anchor for batch
+        anchor_expanded = anchor.unsqueeze(0).expand_as(current_state)
+        return anchor_expanded - current_state
+
+    def recommend_intervention(
+        self,
+        current_state: torch.Tensor,
+        task_type: str = 'factual',
+    ) -> Tuple[torch.Tensor, str, Dict[str, Any]]:
+        """
+        Determine optimal intervention strategy.
+
+        Args:
+            current_state: [B, 32] current Sovereign State
+            task_type: 'factual' | 'creative' | 'analytical'
+
+        Returns:
+            target_state: [B, 32] state to steer toward
+            strategy: Intervention strategy name
+            diagnostics: Dict with analysis details
+        """
+        # Detect user state
+        user_analysis = self.detect_user_state(current_state)
+
+        # Get anchor for task
+        anchor = self.get_anchor_for_task(task_type)
+        anchor_expanded = anchor.unsqueeze(0).expand_as(current_state)
+
+        # Determine intervention strategy
+        if user_analysis['is_distressed'] and user_analysis['is_confused']:
+            strategy = 'STABILIZE_AND_REFRAME'
+            target_state = anchor_expanded  # Full reset to Sattvic
+        elif user_analysis['is_distressed']:
+            strategy = 'VALIDATE'
+            # Blend current state with anchor (gentler intervention)
+            target_state = 0.6 * anchor_expanded + 0.4 * current_state
+        elif user_analysis['is_confused']:
+            strategy = 'CLARIFY'
+            # Boost FACT vritti, reduce ERROR
+            target_state = current_state.clone()
+            target_state[:, 17] = torch.clamp(target_state[:, 17] + 0.3, max=1.0)  # FACT
+            target_state[:, 18] = torch.clamp(target_state[:, 18] - 0.3, min=0.0)  # ERROR
+        else:
+            strategy = 'DIRECT_ACTION'
+            target_state = current_state  # Continue as-is
+
+        diagnostics = {
+            **user_analysis,
+            'strategy': strategy,
+            'task_type': task_type,
+            'teleological_magnitude': (anchor_expanded - current_state).norm(dim=-1).mean().item(),
+        }
+
+        return target_state, strategy, diagnostics
+
+    def forward(
+        self,
+        current_state: torch.Tensor,
+        task_type: str = 'factual',
+    ) -> Dict[str, Any]:
+        """
+        Main forward pass: Mirror user and recommend intervention.
+
+        Args:
+            current_state: [B, 32] current Sovereign State
+            task_type: Task context
+
+        Returns:
+            Dict with target_state, strategy, and diagnostics
+        """
+        target_state, strategy, diagnostics = self.recommend_intervention(
+            current_state, task_type
+        )
+
+        return {
+            'target_state': target_state,
+            'strategy': strategy,
+            'diagnostics': diagnostics,
+            'teleological_vector': self.calculate_teleological_vector(current_state, task_type),
+        }
+
+
+class UOMDiagnosticsMonitor:
+    """
+    Tracks User-Ontological Mirror intervention effectiveness.
+
+    Measures: "Did my intervention reduce the user's bottleneck?"
+
+    Teleological Effectiveness (τ_eff):
+        τ_eff = ΔSattva + ΔPramana - ΔViparyaya
+
+    - τ_eff > 0: Model is successfully helping user
+    - τ_eff < 0: Model is increasing confusion
+    """
+
+    def __init__(self, history_size: int = 100):
+        """
+        Initialize UOM Diagnostics Monitor.
+
+        Args:
+            history_size: Maximum intervention history to keep
+        """
+        self.history: List[Dict[str, Any]] = []
+        self.history_size = history_size
+
+    def track_intervention(
+        self,
+        user_initial_state: torch.Tensor,
+        user_post_state: torch.Tensor,
+        intervention_type: str,
+    ) -> Dict[str, Any]:
+        """
+        Calculate intervention effectiveness.
+
+        Args:
+            user_initial_state: [32] state before intervention
+            user_post_state: [32] state after intervention
+            intervention_type: Strategy used
+
+        Returns:
+            Dict with effectiveness metrics
+        """
+        # Ensure 1D tensors
+        if user_initial_state.dim() > 1:
+            user_initial_state = user_initial_state.mean(dim=0)
+        if user_post_state.dim() > 1:
+            user_post_state = user_post_state.mean(dim=0)
+
+        # 1. Calculate Sattva Delta (Lucidity/Clarity gain)
+        delta_sattva = (user_post_state[22] - user_initial_state[22]).item()
+
+        # 2. Calculate Vritti Shift (Validity gain)
+        pramana_gain = (user_post_state[17] - user_initial_state[17]).item()  # FACT
+        viparyaya_reduction = (user_initial_state[18] - user_post_state[18]).item()  # ERROR
+        validity_gain = pramana_gain + viparyaya_reduction
+
+        # 3. Teleological Effectiveness
+        effectiveness = (delta_sattva * 0.6) + (validity_gain * 0.4)
+
+        # 4. Get active Kosha
+        kosha_activations = user_post_state[KOSHA_SLICE]
+        active_kosha_idx = kosha_activations.argmax().item()
+        active_kosha = KOSHA_NAMES[active_kosha_idx]
+
+        # Determine status
+        if effectiveness > 0.3:
+            status = 'HIGH'
+        elif effectiveness > 0:
+            status = 'MEDIUM'
+        else:
+            status = 'LOW'
+
+        result = {
+            'intervention': intervention_type,
+            'effectiveness': effectiveness,
+            'delta_sattva': delta_sattva,
+            'pramana_gain': pramana_gain,
+            'viparyaya_reduction': viparyaya_reduction,
+            'validity_gain': validity_gain,
+            'user_sheath': active_kosha,
+            'status': status,
+        }
+
+        # Add to history
+        self.history.append(result)
+        if len(self.history) > self.history_size:
+            self.history.pop(0)
+
+        return result
+
+    def get_summary(self) -> Dict[str, float]:
+        """Return aggregate effectiveness metrics."""
+        if not self.history:
+            return {
+                'avg_effectiveness': 0.0,
+                'success_rate': 0.0,
+                'total_interventions': 0,
+            }
+
+        effs = [h['effectiveness'] for h in self.history]
+        return {
+            'avg_effectiveness': sum(effs) / len(effs),
+            'success_rate': sum(1 for e in effs if e > 0) / len(effs),
+            'total_interventions': len(self.history),
+            'high_effectiveness_rate': sum(1 for h in self.history if h['status'] == 'HIGH') / len(self.history),
+        }
+
+    def get_recent_history(self, n: int = 10) -> List[Dict[str, Any]]:
+        """Get n most recent interventions."""
+        return self.history[-n:]
+
+    def reset(self):
+        """Clear intervention history."""
+        self.history.clear()
+
+
+# =============================================================================
 # WITNESS ARBITRATOR (Layer 9 - Domain Arbitration)
 # =============================================================================
 
