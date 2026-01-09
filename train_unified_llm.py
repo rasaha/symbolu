@@ -3329,13 +3329,15 @@ class VRAMGovernor:
             actions.append(f"   λ_B1 scaled: {sovereign_engine.config.lambda_b1 / (1 + compensation):.2f} → {sovereign_engine.config.lambda_b1:.2f} (noise compensation)")
 
         # Auto-scale gradient accumulation if batch gets too small
+        # V9.8.1: Use ceiling division to maintain effective batch size
         if self.enable_accumulation_scaling and new_batch < self.target_effective_batch:
-            new_accum = max(1, self.target_effective_batch // new_batch)
+            # Ceiling division: ensures effective batch >= target
+            new_accum = max(1, (self.target_effective_batch + new_batch - 1) // new_batch)
             if new_accum != self.accumulation_steps:
                 old_accum = self.accumulation_steps
                 self.accumulation_steps = new_accum
                 effective = new_batch * new_accum
-                actions.append(f"   Gradient accumulation: {old_accum} → {new_accum} (effective batch: {effective})")
+                actions.append(f"   📊 Gradient accumulation: {old_accum} → {new_accum} (effective batch: {effective})")
 
         mode = "EMERGENCY" if emergency else "RESIZE"
         actions.append(f"   🛠️  [{mode}] Batch: {old_batch} → {new_batch} | Total resizes: {self.resize_count}")
@@ -3359,11 +3361,14 @@ class VRAMGovernor:
             sovereign_engine.config.lambda_b1 /= (1.0 + reduction)
             actions.append(f"   λ_B1 relaxed: {old_b1:.2f} → {sovereign_engine.config.lambda_b1:.2f}")
 
-        # Adjust accumulation steps
+        # Adjust accumulation steps (V9.8.1: ceiling division)
         if self.enable_accumulation_scaling:
-            new_accum = max(1, self.target_effective_batch // new_batch)
+            new_accum = max(1, (self.target_effective_batch + new_batch - 1) // new_batch)
             if new_accum != self.accumulation_steps:
+                old_accum = self.accumulation_steps
                 self.accumulation_steps = new_accum
+                effective = new_batch * new_accum
+                actions.append(f"   📊 Gradient accumulation: {old_accum} → {new_accum} (effective batch: {effective})")
 
         # Check if fully recovered
         if new_batch >= self.initial_batch_size:
@@ -8984,7 +8989,8 @@ def train(config: UnifiedTrainingConfig):
         check_interval=10,
         b1_compensation_rate=0.20,
         enable_accumulation_scaling=True,
-        target_effective_batch=config.batch_size,
+        # V9.8.1: Target effective batch should include initial gradient accumulation
+        target_effective_batch=config.batch_size * config.gradient_accumulation,
     )
     recovery_threshold = config.vram_threshold - config.vram_recovery_buffer
     print(f"  VRAM Governor: ENABLED (reduce={config.vram_threshold:.0%}, recover={recovery_threshold:.0%})")
@@ -9162,6 +9168,8 @@ def train(config: UnifiedTrainingConfig):
 
         # Create SRK Loss
         srk_loss_config = SRKLossConfig(
+            hidden_dim=model_dim,  # Must match model's embed_dim
+            state_dim=SOVEREIGN_STATE_DIM,
             lambda_f=config.srk_lambda_f,
             lambda_b=config.srk_lambda_b,
             lambda_c=config.srk_lambda_c,
@@ -9229,6 +9237,12 @@ def train(config: UnifiedTrainingConfig):
         model_dim = preset['embed_dim']
         num_heads = preset['num_heads']
         num_layers = preset['num_layers']
+
+        # V9.8.1: Set model dimensions on config for JEPA to pick up
+        # Without this, JEPA defaults to 768 which fails for small model (512)
+        config.embed_dim = model_dim
+        config.num_heads = num_heads
+        config.num_layers = num_layers
 
         # Create JEPA transformer (wraps the existing model as context encoder)
         jepa_model = create_phase_jepa_transformer(
@@ -9944,6 +9958,18 @@ def train(config: UnifiedTrainingConfig):
                     # creating an indirect Sanskrit influence on the loss landscape.
                     # With both sides detached, CSR becomes monitor-only - no training signal flows.
                     csr_emb_for_loss = csr_emb.detach()
+                    csr_confidence_for_loss = csr_confidence.detach()
+
+                    # V9.8.1: Align sequence lengths if they differ
+                    # This can happen if model internally truncates sequences
+                    # Store aligned length for use with EntropySink/SynthesisGate too
+                    csr_aligned_seq_len = None
+                    if csr_hidden_for_loss.shape[1] != csr_emb_for_loss.shape[1]:
+                        min_len = min(csr_hidden_for_loss.shape[1], csr_emb_for_loss.shape[1])
+                        csr_aligned_seq_len = min_len
+                        csr_hidden_for_loss = csr_hidden_for_loss[:, :min_len, :]
+                        csr_emb_for_loss = csr_emb_for_loss[:, :min_len, :]
+                        csr_confidence_for_loss = csr_confidence_for_loss[:, :min_len, :]
 
                     # V9.7.0: Choose between Sparse (Whole-Word) and Dense (Per-Token) supervision
                     if config.csr_sparse_supervision:
@@ -9998,9 +10024,7 @@ def train(config: UnifiedTrainingConfig):
                         # Temperature sharpening: (1 - sim) / tau creates steep gradient landscape
                         # When alignment is poor (sim ≈ 0): loss = (1-0)/0.07 ≈ 14.3 → STRONG pressure
                         # When alignment is good (sim ≈ 0.9): loss = (1-0.9)/0.07 ≈ 1.4 → mild pressure
-                        # V9.6.9: Detach confidence to make CSR fully observational
-                        # Without this, gradient flows: loss → csr_alignment_loss → csr_confidence → confidence_head
-                        csr_confidence_for_loss = csr_confidence.detach()
+                        # V9.6.9/V9.8.1: csr_confidence_for_loss already detached and aligned above
                         csr_alignment_loss = ((1 - csr_similarity) / config.csr_tau) * csr_confidence_for_loss.squeeze(-1)
                         csr_loss = csr_alignment_loss.mean() * config.csr_lambda
 
@@ -10033,8 +10057,14 @@ def train(config: UnifiedTrainingConfig):
                         if csr_entropy_sink is not None:
                             # V9.6.6: DETACH to prevent gradient flow to token embeddings!
                             layer_0_hidden = layer_hidden_states[0].detach()
+                            # V9.8.1: Align csr_affinity to match hidden state sequence length
+                            csr_affinity_aligned = csr_affinity
+                            if csr_aligned_seq_len is not None and csr_affinity.shape[1] != layer_0_hidden.shape[1]:
+                                seq_len = min(csr_affinity.shape[1], layer_0_hidden.shape[1])
+                                csr_affinity_aligned = csr_affinity[:, :seq_len]
+                                layer_0_hidden = layer_0_hidden[:, :seq_len, :]
                             if layer_0_hidden.shape[-1] == csr_emb.shape[-1]:
-                                _, sink_metrics = csr_entropy_sink(layer_0_hidden, csr_affinity)
+                                _, sink_metrics = csr_entropy_sink(layer_0_hidden, csr_affinity_aligned)
                                 csr_metrics['entropy_sink_entropy'] = sink_metrics.get('entropy', 0.0)
                                 csr_metrics['entropy_sink_anchor'] = sink_metrics.get('anchor_strength', 0.0)
                                 # Note: With detach, this loss only trains EntropySink's projection,
@@ -10051,8 +10081,16 @@ def train(config: UnifiedTrainingConfig):
                         if csr_synthesis_gate is not None:
                             # V9.6.6: DETACH to prevent gradient flow through entire model!
                             layer_11_hidden = layer_hidden_states[11].detach()
-                            if layer_11_hidden.shape[-1] == csr_emb.shape[-1]:
-                                synthesized, gate_metrics = csr_synthesis_gate(layer_11_hidden, csr_emb, csr_affinity)
+                            # V9.8.1: Align csr_emb and csr_affinity to match hidden state sequence length
+                            csr_emb_aligned = csr_emb
+                            csr_affinity_aligned_11 = csr_affinity
+                            if csr_aligned_seq_len is not None and csr_emb.shape[1] != layer_11_hidden.shape[1]:
+                                seq_len = min(csr_emb.shape[1], layer_11_hidden.shape[1])
+                                csr_emb_aligned = csr_emb[:, :seq_len, :]
+                                csr_affinity_aligned_11 = csr_affinity[:, :seq_len]
+                                layer_11_hidden = layer_11_hidden[:, :seq_len, :]
+                            if layer_11_hidden.shape[-1] == csr_emb_aligned.shape[-1]:
+                                synthesized, gate_metrics = csr_synthesis_gate(layer_11_hidden, csr_emb_aligned, csr_affinity_aligned_11)
                                 csr_metrics['synthesis_gate_value'] = gate_metrics.get('gate_value', 0.0)
                                 csr_metrics['synthesis_coherence'] = gate_metrics.get('coherence', 0.0)
                                 # Note: With detach, this loss only trains SynthesisGate's projection,
