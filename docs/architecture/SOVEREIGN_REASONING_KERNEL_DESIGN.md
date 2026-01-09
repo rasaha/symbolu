@@ -3619,9 +3619,225 @@ The architecture satisfies the three Sovereign Invariants:
 
 ---
 
-*Document Version: 1.3.0 FINAL*
+## Appendix D: Architectural Clarifications & Errata
+
+This appendix documents clarifications to architectural questions and known issues identified during review.
+
+### D.1 Canonical 32D State Partition
+
+The **canonical partition** follows the **12-5-5-6-4** schema:
+
+| Index Range | Dimensions | Component | Description |
+|-------------|------------|-----------|-------------|
+| **[0:12]** | 12 | Bhavas | Functional Aspects (O1-O12) |
+| **[12:17]** | 5 | Koshas | Structural Depth Layers |
+| **[17:22]** | 5 | Vrittis | Reliability/Cognition Modes |
+| **[22:28]** | 6 | Gunas | System Dynamics (3 Primary + 3 Extended) |
+| **[28:32]** | 4 | Reserved | Toroidal Karma Carryover |
+
+**Note:** Any reference to "Extended Gunas" in code refers to internal sub-groupings within the [22:28] block, not a separate partition.
+
+### D.2 Layer Numbering Convention
+
+The system uses **0-indexing** relative to the computational graph:
+
+| Reference | Actual Position | Component |
+|-----------|-----------------|-----------|
+| Layer 0 | Pre-transformer | Sovereign Embedding (The "Seed") |
+| Layers 0-11 | Transformer blocks | `for layer_idx, layer in enumerate(self.layers)` |
+| Layer 4 | 5th transformer block | Ontological DNA Bridge |
+| Layer 7 | 8th transformer block | CSR Alignment / Phase Coherence |
+| Layer 9 | 10th transformer block | Witness Arbitrator |
+| Layer 11 | 12th (final) block | Synthesis Gate |
+| Layer 12 | Post-transformer | Toroidal Loop-back (O12→O1) |
+
+### D.3 IMR Memory Bank Persistence
+
+**Issue:** The `memory_bank: List[Tuple[str, torch.Tensor]]` is **not** automatically persisted by PyTorch's `state_dict`.
+
+**Solutions:**
+1. Manual serialization during checkpoint save/load
+2. Register as `nn.ParameterList` if templates are learnable
+3. For dynamic registration: implement **LRU Capacity Limiter** to prevent memory leaks
+
+**Current Design:** The 5 Universal Logic Templates are **pre-registered and fixed**, avoiding persistence issues.
+
+### D.4 Forward Score (sf) Correction
+
+**Issue:** The current `measure_forward_score` using `cosine_similarity(h_prev, h_next)` measures internal state stability, not linguistic fluency.
+
+**Correction:** To properly measure linguistic feasibility:
+
+```
+s_f = coherence(hidden_states) × P(token|context)
+```
+
+**Implementation Note:** Forward score should incorporate token probability (softmax output) to ensure tokens are both structurally stable AND grammatically likely.
+
+### D.5 Phase Extraction Compatibility
+
+**RoPE Compatibility:** The `PhaseAwareAttentionHead` is **highly compatible** with models using Rotary Positional Embeddings (RoPE) like LLaMA and Mistral, as RoPE explicitly uses phase rotation.
+
+**Implementation Requirement:** "Architectural Surgery" is required:
+- Cannot simply load weights into standard Hugging Face classes
+- Must wrap the attention mechanism to expose pre-softmax Q/K rotation values (θ)
+- The rotational component is already computed in RoPE; hook extracts it for USE optimization
+
+### D.6 Sattvic Anchor Design Philosophy
+
+**Purpose:** The Sattvic Anchor is a **Regularization Target**, not a hard constraint.
+
+**Gaming Prevention:** Anchor-gaming is prevented because:
+1. Model must still minimize `L_task` (Cross-Entropy)
+2. Minimizing distance to anchor while failing next-token prediction → massive `L_task` penalty
+3. The multi-objective loss balances Sattvic alignment with linguistic accuracy
+
+**Task-Dependent Anchors:**
+
+| Task Type | Anchor Modifications |
+|-----------|---------------------|
+| Factual | High Sattva (0.9), Low Vikalpa (0.1) |
+| Creative | Moderate Sattva (0.5), Higher Vikalpa (0.6) |
+| Analytical | High Vijnanamaya (0.9), Moderate Rajas (0.4) |
+
+**Note:** The `UserOntologicalMirror` can provide dynamic `target_state` based on detected task type.
+
+### D.7 Training Data Requirements
+
+**No Explicit 32D Labels Required.** The architecture bootstraps through:
+
+1. **Diverse Domain Coverage:** Dataset must span Math, Finance, Literature, Science, etc.
+2. **IMR Fixed Points:** The 5 pre-registered Logic Templates (Deduction, Induction, Abduction, Synthesis, Causal) act as "Ontological Fixed Points"
+3. **Self-Organization:** Latent space organizes around these fixed points during training
+4. **Curriculum (Optional):** Start with single-domain data, gradually introduce cross-domain examples
+
+### D.8 Karma Carryover Bug Fix
+
+**BUG IDENTIFIED:** The original snippet contains a critical batch-contamination bug.
+
+**Original (Incorrect):**
+```python
+karma = final_state[:, 28:32].mean(dim=0, keepdim=True)
+```
+
+**Issue:** `mean(dim=0)` collapses the batch dimension, mixing unrelated sequences.
+
+**Corrected:**
+```python
+# Option 1: Per-sequence karma (maintains batch dimension)
+karma = final_state[:, 28:32]  # [B, 4] - no averaging across batch
+
+# Option 2: Sequence-summarized karma (if using sequence pooling)
+karma = final_state[:, 28:32].mean(dim=1, keepdim=True)  # Average across reserved dims per sample
+```
+
+**Requirement:** Karma state must remain **per-sequence** `[B, 32]` to avoid cross-contamination in batched training.
+
+### D.9 Layer 9 Execution Order
+
+Within Layer 9, components execute in **Filter-then-Arbitrate** order:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    LAYER 9 EXECUTION                     │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  Step 1: SCC (Semantic Entropy)                         │
+│    → Check for hallucination/disorder                   │
+│    → If entropy > threshold: trigger Nidra Penalty      │
+│                                                          │
+│  Step 2: IMR (Isomorphism Detection)                    │
+│    → If stable: check for cross-domain logic matches    │
+│    → Inject structural bias if isomorphism found        │
+│                                                          │
+│  Step 3: Witness (Arbitration)                          │
+│    → Calculate Causal Priority from modified state      │
+│    → Steer phase based on arbitrated output             │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Note:** BCVF Lagrangian calculation occurs at **Layer 11 (Synthesis)**, not Layer 9.
+
+### D.10 Clarification Token Implementation
+
+**Vocabulary-Dependent:** Clarification tokens must be determined at runtime via tokenizer lookup.
+
+```python
+def initialize_clarification_tokens(self, tokenizer):
+    """
+    Lookup clarification phrase token IDs for Mauna Protocol.
+    Must be called during model initialization with the target tokenizer.
+    """
+    clarification_phrases = [
+        "Could you clarify",
+        "I want to understand",
+        "Before I respond",
+        "Let me make sure",
+    ]
+
+    token_ids = set()
+    for phrase in clarification_phrases:
+        ids = tokenizer.encode(phrase, add_special_tokens=False)
+        token_ids.update(ids)
+
+    self.clarification_tokens = torch.tensor(list(token_ids))
+```
+
+**Note:** This approach is language-dependent. Multilingual deployments require phrase translations.
+
+### D.11 Training vs Inference Code Paths
+
+Production implementation requires explicit `if self.training:` gates:
+
+| Component | Training | Inference |
+|-----------|----------|-----------|
+| Lambda Annealing | ✓ | ✗ |
+| Gradient Clipping | ✓ | ✗ |
+| Stability Constraint (S8) | ✓ | ✗ |
+| Mauna Protocol (Veto) | ✗ | ✓ |
+| Hard Rejection Sampling | ✗ | ✓ |
+| SRK Forward Pass | ✓ | ✓ |
+| IMR Detection | ✓ | ✓ |
+| Karma Tracking | ✓ | ✓ |
+
+**Implementation Pattern:**
+```python
+def forward(self, x, current_state):
+    # Always execute
+    diagnostics = self.srk_forward(x, current_state)
+
+    if self.training:
+        # Training-only components
+        lambdas = self.annealer.get_lambdas(self.current_step)
+        # ... gradient operations
+    else:
+        # Inference-only components
+        x, mauna_active = self.mauna_protocol(x, current_state)
+
+    return x, diagnostics
+```
+
+### D.12 Diagnostic Overhead Mitigation
+
+**Overhead Assessment:**
+- **Low:** Basic metrics (entropy, coherence) - O(B×N)
+- **High:** Integrated Information (Φ) - O(L²) pairwise correlations across layers
+
+**Mitigation Strategy:**
+
+| Flag | Diagnostics Enabled | Use Case |
+|------|---------------------|----------|
+| `--enable_uom_diagnostics=True` | All (including Φ) | Training, debugging |
+| `--enable_uom_diagnostics=False` | Minimal (entropy only) | Production inference |
+
+**Production Recommendation:** Set `--enable_uom_diagnostics=False` to bypass S6 (Integrated Information) and S8 (Stability Constraint) calculations during inference.
+
+---
+
+*Document Version: 1.4.0*
 *Created: 2026-01-09*
-*Updated: 2026-01-09 (V1.3.0 - Training Stability & Inference Safety)*
+*Updated: 2026-01-09 (V1.4.0 - Architectural Clarifications & Errata)*
 *Origin: Google Gemini Architecture Proposal + Saha Patents*
 *Integration: SymbolU Sovereign-1 Architecture*
 *Authors: SymbolU Development Team*
