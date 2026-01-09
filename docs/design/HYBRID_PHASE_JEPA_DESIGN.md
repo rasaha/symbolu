@@ -4435,10 +4435,10 @@ Based on this validation dialogue:
 | `JEPAPredictionLoss` | ✅ | `symbolu/jepa/losses.py:201` |
 | `CompositeJEPALoss` | ✅ | `symbolu/jepa/losses.py:299` |
 | `PhaseJEPATransformer` wrapper | ✅ | `symbolu/jepa/transformer.py:106` |
-| Phase 3 Gradient Bridge | ✅ | `symbolu/jepa/transformer.py:457-745` |
-| `intent_phase_projector` | ✅ | `symbolu/jepa/transformer.py:243-255` |
-| `forward_phase3()` | ✅ | `symbolu/jepa/transformer.py:491-679` |
-| `_apply_phase_modulation()` | ✅ | `symbolu/jepa/transformer.py:681-733` |
+| Phase 3 Gradient Bridge | ✅ | `symbolu/jepa/transformer.py:471-759` |
+| `intent_phase_projector` | ✅ | `symbolu/jepa/transformer.py:246-255` |
+| `forward_phase3()` | ✅ | `symbolu/jepa/transformer.py:505-693` |
+| `_apply_phase_modulation()` | ✅ | `symbolu/jepa/transformer.py:695-747` |
 | CLI arguments | ✅ | `train_unified_llm.py:11993-12059` |
 | Training loop integration | ✅ | `train_unified_llm.py:9770-9844` |
 | Unit tests | ✅ | `symbolu/jepa/tests/test_jepa.py` |
@@ -4625,7 +4625,7 @@ With Bridge (Working):
 
 #### Implementation Components
 
-1. **`intent_phase_projector`** (`transformer.py:243-255`):
+1. **`intent_phase_projector`** (`transformer.py:246-255`):
    ```python
    # Maps predicted state (32D) → phase rotation angles (num_heads)
    self.intent_phase_projector = nn.Sequential(
@@ -4637,7 +4637,7 @@ With Bridge (Working):
    # Initialized near-zero for stable training start
    ```
 
-2. **`compute_phase_rotation()`** (`transformer.py:457-489`):
+2. **`compute_phase_rotation()`** (`transformer.py:471-503`):
    ```python
    def compute_phase_rotation(self, s_pred):
        # CRITICAL: DO NOT detach s_pred - gradient bridge depends on it
@@ -4645,7 +4645,7 @@ With Bridge (Working):
        return theta * math.pi  # Scale to [-π, π]
    ```
 
-3. **`forward_phase3()`** (`transformer.py:491-679`):
+3. **`forward_phase3()`** (`transformer.py:505-693`):
    - Step 1: Context encoding → h_context
    - Step 2: State projection → s_context
    - Step 3: Prediction → s_pred (with gradients!)
@@ -4654,7 +4654,7 @@ With Bridge (Working):
    - Step 6: LM head → logits = lm_head(h_modulated)
    - Step 7: Compute L_nll (gradients flow through entire chain)
 
-4. **`_apply_phase_modulation()`** (`transformer.py:681-733`):
+4. **`_apply_phase_modulation()`** (`transformer.py:695-747`):
    ```python
    # Complex rotation per attention head
    h_real_rot = h_real * cos(θ) - h_imag * sin(θ)
