@@ -3329,13 +3329,15 @@ class VRAMGovernor:
             actions.append(f"   λ_B1 scaled: {sovereign_engine.config.lambda_b1 / (1 + compensation):.2f} → {sovereign_engine.config.lambda_b1:.2f} (noise compensation)")
 
         # Auto-scale gradient accumulation if batch gets too small
+        # V9.8.1: Use ceiling division to maintain effective batch size
         if self.enable_accumulation_scaling and new_batch < self.target_effective_batch:
-            new_accum = max(1, self.target_effective_batch // new_batch)
+            # Ceiling division: ensures effective batch >= target
+            new_accum = max(1, (self.target_effective_batch + new_batch - 1) // new_batch)
             if new_accum != self.accumulation_steps:
                 old_accum = self.accumulation_steps
                 self.accumulation_steps = new_accum
                 effective = new_batch * new_accum
-                actions.append(f"   Gradient accumulation: {old_accum} → {new_accum} (effective batch: {effective})")
+                actions.append(f"   📊 Gradient accumulation: {old_accum} → {new_accum} (effective batch: {effective})")
 
         mode = "EMERGENCY" if emergency else "RESIZE"
         actions.append(f"   🛠️  [{mode}] Batch: {old_batch} → {new_batch} | Total resizes: {self.resize_count}")
@@ -3359,11 +3361,14 @@ class VRAMGovernor:
             sovereign_engine.config.lambda_b1 /= (1.0 + reduction)
             actions.append(f"   λ_B1 relaxed: {old_b1:.2f} → {sovereign_engine.config.lambda_b1:.2f}")
 
-        # Adjust accumulation steps
+        # Adjust accumulation steps (V9.8.1: ceiling division)
         if self.enable_accumulation_scaling:
-            new_accum = max(1, self.target_effective_batch // new_batch)
+            new_accum = max(1, (self.target_effective_batch + new_batch - 1) // new_batch)
             if new_accum != self.accumulation_steps:
+                old_accum = self.accumulation_steps
                 self.accumulation_steps = new_accum
+                effective = new_batch * new_accum
+                actions.append(f"   📊 Gradient accumulation: {old_accum} → {new_accum} (effective batch: {effective})")
 
         # Check if fully recovered
         if new_batch >= self.initial_batch_size:
@@ -8984,7 +8989,8 @@ def train(config: UnifiedTrainingConfig):
         check_interval=10,
         b1_compensation_rate=0.20,
         enable_accumulation_scaling=True,
-        target_effective_batch=config.batch_size,
+        # V9.8.1: Target effective batch should include initial gradient accumulation
+        target_effective_batch=config.batch_size * config.gradient_accumulation,
     )
     recovery_threshold = config.vram_threshold - config.vram_recovery_buffer
     print(f"  VRAM Governor: ENABLED (reduce={config.vram_threshold:.0%}, recover={recovery_threshold:.0%})")
