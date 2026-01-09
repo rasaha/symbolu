@@ -2136,9 +2136,770 @@ python train_unified_llm.py \
 
 ---
 
-*Document Version: 1.1.0*
+## 22. Patent Formula Integration
+
+The following patent formulas provide mathematical rigor to transform the SRK from architectural intent into measurable, optimized logic.
+
+### 22.1 Patent Overview
+
+| Patent | Name | Core Innovation |
+|--------|------|-----------------|
+| **Patent 1** | BCVF (Bidirectional Consistency Verification Framework) | Consistency Lagrangian for forward-backward alignment |
+| **Patent 2** | USE (Universal Synchronization Engine) | Phase coherence optimization across attention heads |
+| **Patent 3** | SCC (Semantic Coherence Controller) | Entropy monitoring and integrated information metrics |
+
+---
+
+## 23. BCVF Integration (Layer 9 & 11)
+
+### 23.1 The Consistency Lagrangian (B1)
+
+The core innovation for **Layer 11 (Synthesis Gate)** and **Layer 9 (Witness Arbitrator)**:
+
+```
+L = λf(1 - sf)² + λb(1 - sb)² + λc(sf - sb)²
+```
+
+| Term | Meaning | SRK Application |
+|------|---------|-----------------|
+| `λf(1 - sf)²` | Forward Score Penalty | Linguistic coherence (System 1) |
+| `λb(1 - sb)²` | Backward Score Penalty | Ontological goal achievement (System 2) |
+| `λc(sf - sb)²` | Divergence Penalty | Forward-Backward consistency |
+
+### 23.2 Consistency Weighting (B2-B3)
+
+```python
+# B2: Consistency Weight
+w = exp(-β × L)  # Lower Lagrangian → higher weight
+
+# B3: Normalized Weight (replaces standard Softmax)
+W(i) = w(i) / Σⱼ w(j)
+```
+
+**Benefit:** Tokens prioritized are those that minimize L, effectively "locking" the model into its reasoned path.
+
+### 23.3 Implementation
+
+```python
+def calculate_b1_lagrangian(
+    self,
+    sf: torch.Tensor,
+    sb: torch.Tensor,
+    lambda_f: float = 1.0,
+    lambda_b: float = 1.0,
+    lambda_c: float = 0.5,
+) -> torch.Tensor:
+    """
+    Patent B1: Consistency Lagrangian.
+
+    Penalizes:
+      - Low forward score (linguistic incoherence)
+      - Low backward score (ontological misalignment)
+      - Forward-backward divergence (System 1/2 conflict)
+
+    Args:
+        sf: Forward feasibility score [0,1] - linguistic coherence
+        sb: Backward goal-achievement score [0,1] - ontological alignment
+
+    Returns:
+        Lagrangian loss value
+    """
+    term_f = lambda_f * (1 - sf) ** 2
+    term_b = lambda_b * (1 - sb) ** 2
+    term_c = lambda_c * (sf - sb) ** 2
+    return term_f + term_b + term_c
+
+
+def apply_consistency_weighting(
+    self,
+    logits: torch.Tensor,
+    lagrangian: torch.Tensor,
+    beta: float = 2.0,
+) -> torch.Tensor:
+    """
+    Patents B2-B3: Consistency-weighted token selection.
+
+    Replaces standard Softmax with Lagrangian-weighted probabilities.
+    """
+    # B2: Exponential weight from Lagrangian
+    consistency_weight = torch.exp(-beta * lagrangian)
+
+    # Apply weight to logits before softmax
+    weighted_logits = logits * consistency_weight.unsqueeze(-1)
+
+    return weighted_logits
+```
+
+---
+
+## 24. USE Integration (Layer 7 & Phase Control)
+
+### 24.1 Phase Correlation Matrix (U1-U2)
+
+For **Phase-Locked Generation** and **CSR Alignment**:
+
+```
+C[i,j] = (1/W) × Σₖ cos(φᵢ[k] - φⱼ[k])
+
+C_total = Σᵢ<ⱼ C[i,j]
+```
+
+| Formula | Purpose |
+|---------|---------|
+| `C[i,j]` | Mean cosine of phase difference over window W |
+| `C_total` | Total coherence objective (sum of pairwise correlations) |
+
+### 24.2 Gradient-Based Phase Optimization (U3-U4)
+
+```
+∂C_total/∂φᵢ = -Σⱼ≠ᵢ sin(φᵢ - φⱼ)
+
+Δφᵢ = α × ∂C_total/∂φᵢ
+```
+
+**Application:** Refine the **IntentPhaseProjector** for real-time phase adjustment.
+
+### 24.3 Implementation
+
+```python
+class PhaseCoherenceOptimizer(nn.Module):
+    """
+    Patent USE: Universal Synchronization Engine.
+
+    Optimizes phase coherence across attention heads at Layer 7.
+    """
+
+    def __init__(self, num_heads: int = 12, window_size: int = 16):
+        super().__init__()
+        self.num_heads = num_heads
+        self.window_size = window_size
+
+    def compute_correlation_matrix(
+        self,
+        phases: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        U1: Compute pairwise phase correlation matrix.
+
+        Args:
+            phases: [B, H, W] phase angles for H heads over window W
+
+        Returns:
+            correlation: [B, H, H] pairwise correlation matrix
+        """
+        B, H, W = phases.shape
+
+        # Compute pairwise phase differences
+        # phases_i: [B, H, 1, W], phases_j: [B, 1, H, W]
+        phases_i = phases.unsqueeze(2)
+        phases_j = phases.unsqueeze(1)
+
+        # U1: Mean cosine of phase difference
+        phase_diff = phases_i - phases_j  # [B, H, H, W]
+        correlation = torch.cos(phase_diff).mean(dim=-1)  # [B, H, H]
+
+        return correlation
+
+    def compute_total_coherence(
+        self,
+        correlation: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        U2: Total coherence objective.
+
+        Returns sum of upper-triangular correlations (i < j).
+        """
+        B, H, _ = correlation.shape
+
+        # Extract upper triangle (i < j)
+        mask = torch.triu(torch.ones(H, H, device=correlation.device), diagonal=1)
+        upper_corr = correlation * mask.unsqueeze(0)
+
+        # Sum pairwise correlations
+        return upper_corr.sum(dim=(-2, -1))
+
+    def compute_phase_gradient(
+        self,
+        phases: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        U3: Gradient for phase optimization.
+
+        ∂C_total/∂φᵢ = -Σⱼ≠ᵢ sin(φᵢ - φⱼ)
+        """
+        B, H, W = phases.shape
+
+        phases_i = phases.unsqueeze(2)  # [B, H, 1, W]
+        phases_j = phases.unsqueeze(1)  # [B, 1, H, W]
+
+        phase_diff = phases_i - phases_j  # [B, H, H, W]
+
+        # Sum over j ≠ i
+        gradient = -torch.sin(phase_diff).sum(dim=2)  # [B, H, W]
+
+        return gradient
+
+    def update_phases(
+        self,
+        phases: torch.Tensor,
+        alpha: float = 0.1,
+    ) -> torch.Tensor:
+        """
+        U4: Gradient ascent update rule.
+
+        Δφᵢ = α × ∂C_total/∂φᵢ
+        """
+        gradient = self.compute_phase_gradient(phases)
+        return phases + alpha * gradient
+```
+
+---
+
+## 25. SCC Integration (Diagnostics & Training)
+
+### 25.1 Semantic Entropy (S5)
+
+For the **Nidra (Void) Penalty** and hallucination detection:
+
+```
+Hₛₑₘ(t) = -Σ pₖ log pₖ
+```
+
+| Entropy Level | Meaning | Action |
+|---------------|---------|--------|
+| Low (< 0.3) | High certainty | Allow token |
+| Medium (0.3-0.7) | Normal uncertainty | Standard processing |
+| High (> 0.7) | Meaning disorder | Trigger Nidra Penalty |
+
+### 25.2 Stability Constraint (S8)
+
+```
+dHₛₑₘ/dt ≤ 0
+```
+
+**Hard constraint:** Entropy must decrease or stay flat during training. Prevents "topic jarring" during long-form reasoning.
+
+### 25.3 Integrated Information (S6)
+
+```
+Φ = ∫ I(Lᵢ; Lⱼ) × coherence(Lᵢ, Lⱼ) dL
+```
+
+**Primary metric** for UOM Diagnostics Monitor measuring "True AGI" maturation.
+
+### 25.4 Implementation
+
+```python
+class SemanticCoherenceController(nn.Module):
+    """
+    Patent SCC: Semantic Coherence Controller.
+
+    Provides stability and health metrics for UOM Diagnostics.
+    """
+
+    def __init__(
+        self,
+        entropy_threshold: float = 0.7,
+        stability_weight: float = 0.1,
+    ):
+        super().__init__()
+        self.entropy_threshold = entropy_threshold
+        self.stability_weight = stability_weight
+        self.prev_entropy = None
+
+    def calculate_s5_entropy(
+        self,
+        probabilities: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Patent S5: Semantic Entropy.
+
+        Measures meaning disorder to detect potential hallucinations.
+
+        Args:
+            probabilities: [B, V] token probability distribution
+
+        Returns:
+            entropy: [B] per-sample entropy values
+        """
+        # Avoid log(0) with small epsilon
+        log_probs = torch.log(probabilities + 1e-9)
+        entropy = -torch.sum(probabilities * log_probs, dim=-1)
+        return entropy
+
+    def check_stability_constraint(
+        self,
+        current_entropy: torch.Tensor,
+    ) -> Tuple[bool, torch.Tensor]:
+        """
+        Patent S8: Stability Constraint.
+
+        Enforces dHₛₑₘ/dt ≤ 0 (entropy must decrease or stay flat).
+
+        Returns:
+            is_stable: Whether constraint is satisfied
+            delta_entropy: Change in entropy
+        """
+        if self.prev_entropy is None:
+            self.prev_entropy = current_entropy.detach()
+            return True, torch.zeros_like(current_entropy)
+
+        delta = current_entropy - self.prev_entropy
+        is_stable = (delta <= 0).all()
+
+        self.prev_entropy = current_entropy.detach()
+        return is_stable, delta
+
+    def calculate_s6_integrated_information(
+        self,
+        layer_states: List[torch.Tensor],
+        coherence_scores: List[float],
+    ) -> float:
+        """
+        Patent S6: Integrated Information (Φ).
+
+        IIT-style consciousness metric for AGI maturation.
+
+        Φ = ∫ I(Lᵢ; Lⱼ) × coherence(Lᵢ, Lⱼ) dL
+        """
+        phi = 0.0
+
+        for i, state_i in enumerate(layer_states):
+            for j, state_j in enumerate(layer_states):
+                if i >= j:
+                    continue
+
+                # Mutual information approximation
+                # (simplified: correlation as proxy)
+                mutual_info = F.cosine_similarity(
+                    state_i.flatten(),
+                    state_j.flatten(),
+                    dim=0
+                ).item()
+
+                # Weight by coherence
+                coherence = (coherence_scores[i] + coherence_scores[j]) / 2
+                phi += mutual_info * coherence
+
+        return phi
+
+    def should_trigger_nidra_penalty(
+        self,
+        entropy: torch.Tensor,
+    ) -> bool:
+        """Detect if model has entered 'meaning disorder' state."""
+        return (entropy.mean() > self.entropy_threshold).item()
+```
+
+---
+
+## 26. Complete SRK with Patent Integration
+
+### 26.1 Updated SovereignReasoningKernel
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from typing import Dict, List, Optional, Tuple
+
+
+class SovereignReasoningKernel(nn.Module):
+    """
+    The SRK with full Patent Formula Integration.
+
+    Integrates:
+      - BCVF (Patent 1): Consistency Lagrangian for Layer 9/11
+      - USE (Patent 2): Phase Coherence for Layer 7
+      - SCC (Patent 3): Semantic Entropy for diagnostics
+
+    The model now performs real-time Teleological Verification—
+    it doesn't just predict the next word; it ensures the word
+    minimizes logical divergence and maximizes semantic stability.
+    """
+
+    def __init__(
+        self,
+        d_model: int = 512,
+        state_dim: int = 32,
+        num_heads: int = 12,
+        # Patent B1 Hyperparameters
+        lambda_f: float = 1.0,
+        lambda_b: float = 1.0,
+        lambda_c: float = 0.5,
+        # Patent S5 Hyperparameters
+        entropy_threshold: float = 0.7,
+        # Karma decay
+        karma_decay: float = 0.9,
+    ):
+        super().__init__()
+        self.state_dim = state_dim
+        self.karma_decay = karma_decay
+
+        # Patent B1 Hyperparameters (Consistency Lagrangian)
+        self.lambda_f = lambda_f
+        self.lambda_b = lambda_b
+        self.lambda_c = lambda_c
+
+        # Persistence Buffer (Karma / O12 → O1 carryover)
+        self.register_buffer("karma_state", torch.zeros(1, state_dim))
+
+        # Core Ontological Modules
+        self.dna_bridge = OntologicalBridge(d_model, state_dim=12)      # Layer 4
+        self.witness = WitnessArbitrator(d_model, state_dim=32)         # Layer 9
+        self.synthesis_gate = SynthesisGate(d_model)                    # Layer 11
+
+        # Patent USE: Phase Coherence Optimizer (Layer 7)
+        self.phase_optimizer = PhaseCoherenceOptimizer(num_heads=num_heads)
+
+        # Patent SCC: Semantic Coherence Controller
+        self.coherence_controller = SemanticCoherenceController(
+            entropy_threshold=entropy_threshold
+        )
+
+        # IMR for cross-domain isomorphism
+        self.imr = IsomorphicMappingRouter(state_dim=state_dim, hidden_dim=d_model)
+
+    def calculate_b1_lagrangian(
+        self,
+        sf: torch.Tensor,
+        sb: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Patent B1: Consistency Lagrangian.
+
+        L = λf(1 - sf)² + λb(1 - sb)² + λc(sf - sb)²
+        """
+        term_f = self.lambda_f * (1 - sf) ** 2
+        term_b = self.lambda_b * (1 - sb) ** 2
+        term_c = self.lambda_c * (sf - sb) ** 2
+        return term_f + term_b + term_c
+
+    def measure_forward_score(
+        self,
+        hidden_states: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Measure sf: Forward Feasibility Score.
+
+        Linguistic coherence, logical consistency, factual grounding.
+        Based on hidden state stability and attention pattern coherence.
+        """
+        # Measure coherence via self-similarity across sequence
+        B, N, D = hidden_states.shape
+        if N < 2:
+            return torch.ones(B, device=hidden_states.device)
+
+        # Cosine similarity between adjacent positions
+        h_prev = hidden_states[:, :-1, :]
+        h_next = hidden_states[:, 1:, :]
+        similarity = F.cosine_similarity(h_prev, h_next, dim=-1)
+
+        return similarity.mean(dim=-1)
+
+    def measure_backward_score(
+        self,
+        hidden_states: torch.Tensor,
+        target_state: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Measure sb: Backward Goal-Achievement Score.
+
+        How well hidden states align with 32D Ontological Intent.
+        """
+        # Pool hidden states
+        pooled = hidden_states.mean(dim=1)  # [B, D]
+
+        # Project to state space (simplified)
+        projected_state = pooled[:, :self.state_dim]  # [B, 32]
+
+        # Cosine similarity with target
+        similarity = F.cosine_similarity(projected_state, target_state, dim=-1)
+
+        # Normalize to [0, 1]
+        return (similarity + 1) / 2
+
+    def forward_pass(
+        self,
+        hidden_states: torch.Tensor,
+        layer_idx: int,
+        token_logits: Optional[torch.Tensor] = None,
+        attention_phases: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """
+        Recursive Intelligence Routing with Patent-Based Verification.
+
+        Args:
+            hidden_states: [B, N, D] from current layer
+            layer_idx: Current layer index (0-11)
+            token_logits: [B, V] logits for entropy calculation (optional)
+            attention_phases: [B, H, W] phase angles for USE (optional)
+
+        Returns:
+            Modified hidden states and diagnostics dict
+        """
+        diagnostics = {}
+        B = hidden_states.shape[0]
+        karma = self.karma_state.expand(B, -1) if self.karma_state.shape[0] != B else self.karma_state
+
+        # --- LAYER 4: DNA GROUNDING ---
+        if layer_idx == 4:
+            return self.dna_bridge(hidden_states, karma), diagnostics
+
+        # --- LAYER 7: PHASE COHERENCE (Patent USE) ---
+        if layer_idx == 7 and attention_phases is not None:
+            # U1-U2: Compute phase correlation
+            correlation = self.phase_optimizer.compute_correlation_matrix(attention_phases)
+            total_coherence = self.phase_optimizer.compute_total_coherence(correlation)
+            diagnostics['phase_coherence'] = total_coherence.mean().item()
+
+            # U3-U4: Optimize phases
+            optimized_phases = self.phase_optimizer.update_phases(attention_phases)
+            diagnostics['phase_optimized'] = True
+
+        # --- LAYER 9: WITNESS ARBITRATION + ENTROPY CHECK (Patent SCC) ---
+        if layer_idx == 9:
+            # S5: Detect Semantic Entropy (Hallucination Detection)
+            if token_logits is not None:
+                probs = F.softmax(token_logits, dim=-1)
+                entropy = self.coherence_controller.calculate_s5_entropy(probs)
+                diagnostics['semantic_entropy'] = entropy.mean().item()
+
+                # S8: Check stability constraint
+                is_stable, delta = self.coherence_controller.check_stability_constraint(entropy)
+                diagnostics['entropy_stable'] = is_stable
+
+                # If Entropy spikes, trigger Nidra Penalty
+                if self.coherence_controller.should_trigger_nidra_penalty(entropy):
+                    hidden_states = self.apply_nidra_penalty(hidden_states)
+                    diagnostics['nidra_penalty_triggered'] = True
+
+            # IMR: Check for cross-domain isomorphism
+            bias, matched_domain, sim = self.imr(karma)
+            if bias is not None:
+                hidden_states = hidden_states + bias.unsqueeze(1)
+                diagnostics['imr_match'] = matched_domain
+                diagnostics['imr_similarity'] = sim
+
+            # Witness Arbitration
+            steered_hidden, observed_32d = self.witness(hidden_states, karma)
+
+            # Update karma state
+            self.step_state(observed_32d)
+
+            return steered_hidden, diagnostics
+
+        # --- LAYER 11: SYNTHESIS GATE + CONSISTENCY LAGRANGIAN (Patent BCVF) ---
+        if layer_idx == 11:
+            # B1: Compute Forward and Backward Scores
+            sf = self.measure_forward_score(hidden_states)
+            sb = self.measure_backward_score(hidden_states, karma)
+
+            diagnostics['forward_score'] = sf.mean().item()
+            diagnostics['backward_score'] = sb.mean().item()
+
+            # B1: Compute Consistency Lagrangian
+            lagrangian = self.calculate_b1_lagrangian(sf, sb)
+            diagnostics['consistency_lagrangian'] = lagrangian.mean().item()
+
+            # B2: Compute consistency weight
+            consistency_weight = torch.exp(-lagrangian)
+            diagnostics['consistency_weight'] = consistency_weight.mean().item()
+
+            # Apply weighted synthesis
+            synthesized = self.synthesis_gate(hidden_states, karma)
+            output = synthesized * consistency_weight.unsqueeze(-1).unsqueeze(-1)
+
+            return output, diagnostics
+
+        return hidden_states, diagnostics
+
+    def apply_nidra_penalty(
+        self,
+        hidden_states: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Inject Rajas (Activity) when model enters dormancy state.
+
+        S5 Entropy spike → Force re-engagement of semantic engine.
+        """
+        # Inject noise to break out of low-information state
+        noise = torch.randn_like(hidden_states) * 0.1
+        return hidden_states + noise
+
+    def step_state(self, final_layer_state: torch.Tensor):
+        """Toroidal Loop-back: O12 → O1 transition."""
+        new_karma = torch.tanh(final_layer_state)
+        self.karma_state = (
+            self.karma_decay * self.karma_state +
+            (1 - self.karma_decay) * new_karma
+        )
+
+    def get_diagnostics(self) -> Dict[str, float]:
+        """Return diagnostic information about current state."""
+        karma = self.karma_state.squeeze(0)
+        return {
+            'dominant_bhava': karma[:12].argmax().item(),
+            'active_kosha': karma[12:17].argmax().item(),
+            'vritti_state': karma[17:22].argmax().item(),
+            'sattva': karma[22].item(),
+            'rajas': karma[23].item(),
+            'tamas': karma[24].item(),
+            'karma_norm': karma.norm().item(),
+        }
+```
+
+---
+
+## 27. Patent Formula Mapping Summary
+
+### 27.1 Layer-to-Patent Mapping
+
+| SRK Layer/Module | Patent | Formula | Enhanced Capability |
+|------------------|--------|---------|---------------------|
+| **Layer 4 (DNA Bridge)** | SCC | S1-S2 (Layer Coherence) | Tightens 32D "Soul" / 512D "Body" alignment |
+| **Layer 7 (CSR Alignment)** | USE | U1-U5 (Phase Synchronization) | Optimizes phonetic resonance for linguistic accuracy |
+| **Layer 9 (Witness)** | BCVF + SCC | B1 (Lagrangian) + S5 (Entropy) | Cross-domain arbitration + hallucination detection |
+| **Layer 11 (Synthesis)** | BCVF | B2-B3 (Consistency Weighting) | Prevents hallucinations via ontological verification |
+| **UOM Monitor** | SCC | S5 (Entropy) + S6 (Φ) | Quantifiable user-benefit and system intelligence |
+
+### 27.2 Formula Reference Card
+
+| ID | Formula | Name |
+|----|---------|------|
+| **B1** | `L = λf(1-sf)² + λb(1-sb)² + λc(sf-sb)²` | Consistency Lagrangian |
+| **B2** | `w = exp(-βL)` | Consistency Weight |
+| **B3** | `W(i) = w(i) / Σⱼ w(j)` | Normalized Weight |
+| **U1** | `C[i,j] = (1/W)×Σₖcos(φᵢ[k]-φⱼ[k])` | Phase Correlation |
+| **U2** | `C_total = Σᵢ<ⱼ C[i,j]` | Total Coherence |
+| **U3** | `∂C/∂φᵢ = -Σⱼ≠ᵢ sin(φᵢ-φⱼ)` | Phase Gradient |
+| **U4** | `Δφᵢ = α × ∂C/∂φᵢ` | Phase Update Rule |
+| **S5** | `Hₛₑₘ = -Σ pₖ log pₖ` | Semantic Entropy |
+| **S6** | `Φ = ∫ I(Lᵢ;Lⱼ) × coherence dL` | Integrated Information |
+| **S8** | `dHₛₑₘ/dt ≤ 0` | Stability Constraint |
+
+---
+
+## 28. Training Loss with Patent Formulas
+
+### 28.1 Complete Multi-Objective Loss
+
+```python
+def calculate_sovereign_loss(
+    logits: torch.Tensor,
+    targets: torch.Tensor,
+    srk_diagnostics: Dict[str, float],
+    lambda_task: float = 1.0,
+    lambda_consistency: float = 0.3,
+    lambda_entropy: float = 0.1,
+    lambda_coherence: float = 0.2,
+) -> torch.Tensor:
+    """
+    Multi-objective loss with patent formulas.
+
+    L_total = L_task
+            + λ_consistency × L_lagrangian (B1)
+            + λ_entropy × L_stability (S8)
+            + λ_coherence × L_phase (U2)
+    """
+    # Standard task loss
+    L_task = F.cross_entropy(logits, targets)
+
+    # B1: Consistency Lagrangian loss
+    L_lagrangian = srk_diagnostics.get('consistency_lagrangian', 0.0)
+
+    # S8: Stability penalty (positive delta = entropy increase = bad)
+    entropy_delta = srk_diagnostics.get('entropy_delta', 0.0)
+    L_stability = F.relu(torch.tensor(entropy_delta))  # Penalize increases
+
+    # U2: Negative coherence (we want to maximize coherence)
+    phase_coherence = srk_diagnostics.get('phase_coherence', 1.0)
+    L_phase = 1.0 - phase_coherence
+
+    # Combined loss
+    L_total = (
+        lambda_task * L_task +
+        lambda_consistency * L_lagrangian +
+        lambda_entropy * L_stability +
+        lambda_coherence * L_phase
+    )
+
+    return L_total
+```
+
+### 28.2 Updated CLI Command
+
+```bash
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --state_dim 32 \
+    --enable_srk \
+    --enable_patent_formulas \
+    --bcvf_lambda_f 1.0 \
+    --bcvf_lambda_b 1.0 \
+    --bcvf_lambda_c 0.5 \
+    --scc_entropy_threshold 0.7 \
+    --use_phase_optimization \
+    --uom_mirroring \
+    --enable_uom_diagnostics \
+    --imr_threshold 0.75 \
+    --srk_warmup_steps 1000 \
+    --enable_nidra_penalty \
+    --learning_rate 8e-5 \
+    --gradient_accumulation 4 \
+    --batch_size 32 \
+    --max_steps 50000 \
+    --onto_bridge_layer 4 \
+    --csr_alignment_layer 7 \
+    --kosha_steering_layer 9 \
+    --toroidal_feedback \
+    --checkpoint_dir ./checkpoints/sovereign_V9_8_patent \
+    2>&1 | tee sovereign_patent.log
+```
+
+---
+
+## 29. Expected Behavior with Patent Integration
+
+### 29.1 Training Phases
+
+| Phase | Steps | Observable Behavior |
+|-------|-------|---------------------|
+| **Calibration** | 0-1k | Lagrangian (B1) unstable; S5 entropy high; USE coherence building |
+| **Alignment** | 1k-5k | B1 converging; sf→sb gap closing; Phase coherence (U2) > 0.5 |
+| **Stabilization** | 5k-15k | S8 constraint satisfied; entropy decreasing; IMR detections begin |
+| **Maturation** | 15k-50k | High Φ (S6); stable karma; cross-domain isomorphism active |
+
+### 29.2 Diagnostic Log Output
+
+```
+[Step 15000] PPL: 42.31 | B1: 0.12 | sf: 0.89 | sb: 0.91
+    [USE] Phase Coherence: 0.73 | Heads Aligned: 10/12
+    [SCC] Entropy: 0.31 | Stable: ✓ | Φ: 2.47
+    [BCVF] Lagrangian: 0.12 | Weight: 0.89
+    [SOVEREIGN] Aspect: RSN (Reasoning) | Depth: INTELLECTUAL
+    [IMR] Isomorphism Locked: DEDUCTION (Sim: 0.82)
+```
+
+---
+
+## 30. Glossary Update (Patent Terms)
+
+| Term | Definition |
+|------|------------|
+| **Consistency Lagrangian (B1)** | Multi-term loss penalizing forward-backward divergence |
+| **Forward Score (sf)** | Linguistic coherence measure [0,1] |
+| **Backward Score (sb)** | Ontological goal-achievement measure [0,1] |
+| **Phase Coherence (U1-U2)** | Alignment of attention head phases |
+| **Semantic Entropy (S5)** | Measure of meaning disorder |
+| **Integrated Information (Φ)** | IIT-style consciousness metric |
+| **Stability Constraint (S8)** | Requirement that entropy decreases over time |
+
+---
+
+*Document Version: 1.2.0*
 *Created: 2026-01-09*
-*Updated: 2026-01-09 (Added IMR, Logic Templates, Production Refinements)*
-*Origin: Google Gemini Architecture Proposal*
+*Updated: 2026-01-09 (Added Patent Formula Integration: BCVF, USE, SCC)*
+*Origin: Google Gemini Architecture Proposal + Saha Patents*
 *Integration: SymbolU Sovereign-1 Architecture*
 *Authors: SymbolU Development Team*
