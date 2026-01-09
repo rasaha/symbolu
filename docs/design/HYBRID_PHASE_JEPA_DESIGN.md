@@ -20,7 +20,168 @@ The architecture predicts the **32D Sovereign State Delta (ΔS)** rather than ne
 
 ---
 
+## Architectural Evolution: From Ontological to Geometric
+
+This section documents the **logical lineage** from our existing Ontological Hybrid Model to the new Hybrid Phase-VL-JEPA. The key insight: **Phase Rotation** math developed for ontological reasoning transfers directly to geometric transformations.
+
+### Evolution Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                        ARCHITECTURAL EVOLUTION LINEAGE                                   │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  STAGE 1: THE FOUNDATION                                                                │
+│  ════════════════════════                                                               │
+│                                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
+│  │  PhaseAttention (symbolu/phase_transformer.py:333)                               │   │
+│  │  ─────────────────────────────────────────────────                               │   │
+│  │  • Complex-valued phasors: Q = a_q × e^{iφ_q}, K = a_k × e^{-iφ_k}              │   │
+│  │  • O(n) global attention via cumulative sums                                     │   │
+│  │  • Cosine similarity in phase space: cos(φ_q - φ_k)                             │   │
+│  │                                                                                   │   │
+│  │  ROLE IN NEW MODEL: "Long-Range Structure Engine"                                │   │
+│  │  → Captures global geometry (symmetry, lighting, spatial relationships)          │   │
+│  │  → What standard JEPAs miss with local-only attention                            │   │
+│  └─────────────────────────────────────────────────────────────────────────────────┘   │
+│                                         │                                                │
+│                                         ▼                                                │
+│  STAGE 2: THE STRUCTURE                                                                 │
+│  ═══════════════════════                                                                │
+│                                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
+│  │  HybridAttention (symbolu/phase_transformer.py:1637)                             │   │
+│  │  ───────────────────────────────────────────────────                             │   │
+│  │  • Splits channels: 75% Local (O(W²)) + 25% Global (O(n))                       │   │
+│  │  • Local: Texture, edges, fine details (grammar of vision)                       │   │
+│  │  • Global: Structure, layout, semantics (meaning of vision)                      │   │
+│  │                                                                                   │   │
+│  │  ROLE IN NEW MODEL: "JEPA Predictor Backbone"                                    │   │
+│  │  → Handles high-resolution patches efficiently                                   │   │
+│  │  → Pixel-perfect local details + global coherence                                │   │
+│  └─────────────────────────────────────────────────────────────────────────────────┘   │
+│                                         │                                                │
+│                                         ▼                                                │
+│  STAGE 3: THE LOGICAL BRIDGE                                                            │
+│  ═══════════════════════════                                                            │
+│                                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
+│  │  IntentPhaseProjector (symbolu/phase_transformer.py:228)                         │   │
+│  │  ───────────────────────────────────────────────────────                         │   │
+│  │                                                                                   │   │
+│  │  ORIGINAL (Ontological Model):                                                   │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────┐    │   │
+│  │  │  32D Sovereign State (ΔS) ──► IntentPhaseProjector ──► θ_intent          │    │   │
+│  │  │                                                                           │    │   │
+│  │  │  θ = tanh(W_proj @ ΔS) × π                                               │    │   │
+│  │  │                                                                           │    │   │
+│  │  │  PURPOSE: "Logic" rotates "Reasoning"                                    │    │   │
+│  │  │  • Same tokens, different meaning based on ontological state             │    │   │
+│  │  │  • O7_RSN (Reasoning) + O4_STR (Structure) = analytical mode             │    │   │
+│  │  └─────────────────────────────────────────────────────────────────────────┘    │   │
+│  │                                         ↓                                        │   │
+│  │                                   ADAPTATION                                     │   │
+│  │                                         ↓                                        │   │
+│  │  ADAPTED (VL-JEPA Model):                                                        │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────┐    │   │
+│  │  │  Text Embedding ──► TextPhaseProjector ──► θ_geometric                   │    │   │
+│  │  │                                                                           │    │   │
+│  │  │  θ = tanh(W_proj @ text_emb) × π                                         │    │   │
+│  │  │                                                                           │    │   │
+│  │  │  PURPOSE: "Text" rotates "Visual Phase Space"                            │    │   │
+│  │  │  • Same patches, different orientation based on text instruction         │    │   │
+│  │  │  • "Rotate 90°" + context patches = rotated target prediction            │    │   │
+│  │  └─────────────────────────────────────────────────────────────────────────┘    │   │
+│  │                                                                                   │   │
+│  │  THE KEY INSIGHT: The Phase Rotation math is IDENTICAL                           │   │
+│  │  Only the SOURCE of rotation changes: Ontology → Text                            │   │
+│  │                                                                                   │   │
+│  └─────────────────────────────────────────────────────────────────────────────────┘   │
+│                                         │                                                │
+│                                         ▼                                                │
+│  STAGE 4: THE DESTINATION                                                               │
+│  ════════════════════════                                                               │
+│                                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
+│  │  Hybrid Phase-VL-JEPA                                                            │   │
+│  │  ────────────────────────                                                        │   │
+│  │                                                                                   │   │
+│  │  THE PIVOT: Generative (Next-Token) → Predictive (Latent-Space)                 │   │
+│  │                                                                                   │   │
+│  │  OLD: Generate pixel/token → O(V) output, models noise                          │   │
+│  │  NEW: Predict representation → O(d) output, filters noise                        │   │
+│  │                                                                                   │   │
+│  │  MECHANISM: Phase-Rotated Prediction                                             │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────┐    │   │
+│  │  │                                                                           │    │   │
+│  │  │  Context Patches ────┬──► HybridPhaseBlock ──► Predicted Target          │    │   │
+│  │  │                      │         ↑                                          │    │   │
+│  │  │                      │    θ_geometric                                     │    │   │
+│  │  │                      │         │                                          │    │   │
+│  │  │  "Rotate 90°" ───────┴──► TextPhaseProjector                             │    │   │
+│  │  │                                                                           │    │   │
+│  │  │  The model doesn't generate missing pixels—                               │    │   │
+│  │  │  it ROTATES context patches into target space via phase shift             │    │   │
+│  │  │                                                                           │    │   │
+│  │  └─────────────────────────────────────────────────────────────────────────┘    │   │
+│  │                                                                                   │   │
+│  │  DATASET STRATEGY: Geometric Masking                                             │   │
+│  │  • Mask structural quadrants (not random patches)                               │   │
+│  │  • Force model to use Text Phase to "spin" context into target                  │   │
+│  │  • Native geometric transformation learning                                      │   │
+│  │                                                                                   │   │
+│  └─────────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### The Critical Mechanism Transfer
+
+The **Phase Rotation** operation is mathematically identical across both models:
+
+```python
+# ONTOLOGICAL MODEL (Language)
+# ─────────────────────────────
+# Intent from 32D Sovereign State rotates Query phases
+θ_intent = tanh(W_onto @ sovereign_state_delta) * π
+Q_rotated = a_q * e^{i(φ_q + θ_intent)}
+
+# VL-JEPA MODEL (Vision-Language)
+# ─────────────────────────────────
+# Intent from Text Embedding rotates Query phases
+θ_geometric = tanh(W_text @ text_embedding) * π
+Q_rotated = a_q * e^{i(φ_q + θ_geometric)}
+```
+
+**Same math. Different domains. One unified architecture.**
+
+| Aspect | Ontological Model | VL-JEPA Model |
+|--------|-------------------|---------------|
+| **Phase Source** | 32D Sovereign State (ΔS) | Text Embedding |
+| **Rotation Meaning** | Cognitive mode shift | Geometric transformation |
+| **Query Interpretation** | "Attend with this reasoning style" | "Attend with this spatial orientation" |
+| **Target** | Predict meaning transition | Predict visual patch |
+
+### Why This Works: Isomorphism
+
+The transfer works because **Phase Rotation** is a general-purpose **contextual transformation**:
+
+```
+ONTOLOGICAL:  "The door is open" + Intent="security" → Problem interpretation
+VL-JEPA:      [Image patches] + Text="rotated 90°" → Rotated representation
+
+Both are: Context + Phase Shift → Transformed Output
+```
+
+The architecture doesn't care WHAT generates the phase shift—only that it receives a rotation angle θ ∈ [-π, π] that transforms how queries attend to keys.
+
+---
+
 ## Table of Contents
+
+**Prelude: Architectural Lineage**
+- [Architectural Evolution: From Ontological to Geometric](#architectural-evolution-from-ontological-to-geometric)
 
 **Part I: Language Model (Phase-JEPA)**
 1. [Background: JEPA Principles](#1-background-jepa-principles)
@@ -41,6 +202,7 @@ The architecture predicts the **32D Sovereign State Delta (ΔS)** rather than ne
 14. [Complete Training System](#14-complete-training-system-spec-4) — *Spec 4*
 15. [Implementation Files Summary](#15-implementation-files-summary)
 16. [Quick Start Validation](#16-quick-start-validation)
+17. [Geometric Masking Training Loop](#17-geometric-masking-training-loop-complete)
 
 **Appendices**
 - [Appendix A: Theoretical Foundations](#appendix-a-theoretical-foundations)
@@ -1671,6 +1833,612 @@ print(f"Loss: {loss.item():.4f}")
 
 ---
 
+## 17. Geometric Masking Training Loop (Complete)
+
+This section provides the **production-ready training loop** that utilizes geometric masking to train the Phase-Rotated Predictor.
+
+### 17.1 Training Philosophy
+
+The training loop implements the core insight from Stage 3 (Logical Bridge):
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE-ROTATED PREDICTION TRAINING                                     │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  GOAL: Train the model to "spin" context patches into target orientation                │
+│                                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │   INPUT IMAGE                    MASKED IMAGE               PREDICTED TARGET       │  │
+│  │   ┌─────┬─────┐                 ┌─────┬─────┐              ┌─────┬─────┐          │  │
+│  │   │  A  │  B  │                 │  A  │  B  │              │  A  │  B  │          │  │
+│  │   ├─────┼─────┤  ──Mask──►     ├─────┼─────┤  ──Phase──► ├─────┼─────┤          │  │
+│  │   │  C  │  D  │                 │  C  │ ??? │     Rotate   │  C  │  D' │          │  │
+│  │   └─────┴─────┘                 └─────┴─────┘              └─────┴─────┘          │  │
+│  │                                                                                    │  │
+│  │   Teacher sees FULL             Student sees               Predictor uses         │  │
+│  │   image (A,B,C,D)               CONTEXT (A,B,C)            TEXT θ to rotate       │  │
+│  │                                                             context → target (D')  │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  KEY MECHANISM:                                                                          │
+│  • Text "The image is rotated 90°" → θ_geometric = π/2                                  │
+│  • Phase rotation: Q' = Q × e^{iθ}                                                      │
+│  • Rotated queries attend to keys as if spatially transformed                           │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 17.2 Complete Training Loop Implementation
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+import math
+import copy
+from typing import Dict, Tuple, Optional
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class GeometricMaskingTrainer:
+    """
+    Complete training loop for Phase-VL-JEPA with Geometric Masking.
+
+    This trainer implements the Phase-Rotated Prediction paradigm:
+    - Student encoder sees masked images
+    - Text provides geometric transformation hint
+    - Predictor uses Phase Rotation to "spin" context into target
+    - Teacher provides ground truth (EMA updated)
+    """
+
+    def __init__(
+        self,
+        model: 'PhaseVLJEPA_System',
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        config: 'TrainingConfig',
+    ):
+        self.model = model
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.config = config
+
+        # Optimizer with high weight decay (JEPA requirement)
+        self.optimizer = torch.optim.AdamW(
+            [p for p in model.parameters() if p.requires_grad],
+            lr=config.lr,
+            weight_decay=config.weight_decay,
+            betas=(0.9, 0.95)
+        )
+
+        # Learning rate scheduler with warmup
+        self.scheduler = self._create_scheduler()
+
+        # EMA decay schedule (ramps from 0.996 to 1.0)
+        self.ema_schedule = self._create_ema_schedule()
+
+        # Metrics tracking
+        self.metrics = {
+            'train_loss': [],
+            'val_loss': [],
+            'phase_alignment_score': [],
+            'reconstruction_mse': [],
+        }
+
+        self.global_step = 0
+        self.epoch = 0
+
+    def _create_scheduler(self):
+        """Cosine decay with linear warmup."""
+        def lr_lambda(step):
+            if step < self.config.warmup_steps:
+                return step / self.config.warmup_steps
+            progress = (step - self.config.warmup_steps) / (
+                self.config.total_steps - self.config.warmup_steps
+            )
+            return 0.5 * (1 + math.cos(math.pi * progress))
+
+        return torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda)
+
+    def _create_ema_schedule(self):
+        """EMA decay ramps from initial to 1.0."""
+        def ema_lambda(step):
+            progress = step / self.config.total_steps
+            return self.config.ema_decay_init + (1.0 - self.config.ema_decay_init) * progress
+        return ema_lambda
+
+    def training_step(self, batch: Tuple) -> Dict[str, torch.Tensor]:
+        """
+        Single training step with geometric masking.
+
+        Args:
+            batch: (images, masks, rotation_labels) from GeometricMaskCollator
+
+        Returns:
+            Dictionary of losses
+        """
+        images, masks, rotation_labels = batch
+        images = images.to(self.config.device)
+        masks = masks.to(self.config.device)
+        rotation_labels = rotation_labels.to(self.config.device)
+
+        B, C, H, W = images.shape
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 1: TEACHER FORWARD (Ground Truth)
+        # ═══════════════════════════════════════════════════════════════════
+        # Teacher sees FULL image - this is our target representation
+        with torch.no_grad():
+            target_latents = self.model.teacher_encoder(images)
+            # target_latents: [B, N_patches, D]
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 2: STUDENT FORWARD (Masked Context)
+        # ═══════════════════════════════════════════════════════════════════
+        # Student only sees unmasked patches
+        context_latents = self.model.student_encoder(images, mask=~masks)
+        # context_latents: [B, N_context, D]
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 3: TEXT → PHASE ROTATION (The Geometric Bridge)
+        # ═══════════════════════════════════════════════════════════════════
+        # Convert rotation labels to text prompts
+        text_prompts = self._rotation_to_text(rotation_labels)
+
+        # Encode text
+        text_tokens = self.model.tokenizer(
+            text_prompts,
+            return_tensors='pt',
+            padding=True
+        ).to(self.config.device)
+
+        text_embedding = self.model.text_encoder(**text_tokens).last_hidden_state[:, 0]
+        # text_embedding: [B, D_text]
+
+        # Project to Phase Angle θ ∈ [-π, π]
+        # THIS IS THE CRITICAL MECHANISM TRANSFER:
+        # Same math as IntentPhaseProjector, different source
+        theta_geometric = torch.tanh(
+            self.model.text_phase_projector(text_embedding)
+        ) * math.pi
+        # theta_geometric: [B, D_phase]
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 4: PHASE-ROTATED PREDICTION
+        # ═══════════════════════════════════════════════════════════════════
+        # Create learnable mask tokens for positions we need to predict
+        N_mask = masks.sum(dim=1).max().item()
+        mask_tokens = self.model.predictor.mask_token.expand(B, N_mask, -1)
+
+        # Get mask positions for positional encoding
+        mask_positions = self._get_mask_positions(masks)
+
+        # Predictor uses Phase Rotation to "spin" context into target
+        predicted_latents = self.model.predictor(
+            context_latents=context_latents,
+            mask_tokens=mask_tokens,
+            mask_positions=mask_positions,
+            text_phase_shift=theta_geometric,  # THE PHASE ROTATION
+        )
+        # predicted_latents: [B, N_mask, D]
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 5: LOSS COMPUTATION
+        # ═══════════════════════════════════════════════════════════════════
+        # Extract target representations for masked positions
+        target_masked = self._extract_masked_targets(target_latents, masks)
+        # target_masked: [B, N_mask, D]
+
+        # PhaseSyncLoss: Amplitude (L2) + Phase Alignment (Cosine)
+        loss_dict = self.model.loss_fn(predicted_latents, target_masked.detach())
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 6: BACKPROP & OPTIMIZATION
+        # ═══════════════════════════════════════════════════════════════════
+        total_loss = loss_dict['total']
+
+        self.optimizer.zero_grad()
+        total_loss.backward()
+
+        # Gradient clipping (essential for phase stability)
+        torch.nn.utils.clip_grad_norm_(
+            self.model.parameters(),
+            self.config.grad_clip
+        )
+
+        self.optimizer.step()
+        self.scheduler.step()
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 7: EMA UPDATE (Teacher follows Student slowly)
+        # ═══════════════════════════════════════════════════════════════════
+        ema_decay = self.ema_schedule(self.global_step)
+        self._update_teacher_ema(ema_decay)
+
+        self.global_step += 1
+
+        return {k: v.item() for k, v in loss_dict.items()}
+
+    def _rotation_to_text(self, rotation_labels: torch.Tensor) -> list:
+        """Convert rotation angles to natural language descriptions."""
+        PROMPTS = {
+            0.0: "The image is upright with no rotation",
+            1.57: "The image is rotated ninety degrees clockwise",
+            3.14: "The image is rotated one hundred eighty degrees",
+            4.71: "The image is rotated ninety degrees counter-clockwise",
+        }
+
+        texts = []
+        for r in rotation_labels:
+            r_val = r.item()
+            # Find closest rotation
+            closest = min(PROMPTS.keys(), key=lambda x: abs(x - r_val))
+            texts.append(PROMPTS[closest])
+
+        return texts
+
+    def _get_mask_positions(self, masks: torch.Tensor) -> torch.Tensor:
+        """Extract 2D positions of masked patches."""
+        B = masks.shape[0]
+        grid_size = int(math.sqrt(masks.shape[1]))
+
+        positions = []
+        for b in range(B):
+            mask_indices = masks[b].nonzero(as_tuple=False).squeeze(-1)
+            # Convert flat indices to 2D positions
+            row = mask_indices // grid_size
+            col = mask_indices % grid_size
+            pos = torch.stack([row, col], dim=-1).float()
+            positions.append(pos)
+
+        return torch.nn.utils.rnn.pad_sequence(positions, batch_first=True)
+
+    def _extract_masked_targets(
+        self,
+        target_latents: torch.Tensor,
+        masks: torch.Tensor
+    ) -> torch.Tensor:
+        """Extract target representations at masked positions."""
+        B, N, D = target_latents.shape
+        N_mask = masks.sum(dim=1).max().item()
+
+        extracted = torch.zeros(B, N_mask, D, device=target_latents.device)
+
+        for b in range(B):
+            mask_indices = masks[b].nonzero(as_tuple=False).squeeze(-1)
+            extracted[b, :len(mask_indices)] = target_latents[b, mask_indices]
+
+        return extracted
+
+    @torch.no_grad()
+    def _update_teacher_ema(self, decay: float):
+        """Update teacher encoder with EMA of student encoder."""
+        for s_param, t_param in zip(
+            self.model.student_encoder.parameters(),
+            self.model.teacher_encoder.parameters()
+        ):
+            t_param.data.mul_(decay).add_(s_param.data, alpha=(1 - decay))
+
+    def train_epoch(self) -> Dict[str, float]:
+        """Train for one epoch."""
+        self.model.train()
+        epoch_losses = []
+
+        for batch_idx, batch in enumerate(self.train_loader):
+            losses = self.training_step(batch)
+            epoch_losses.append(losses)
+
+            # Logging
+            if batch_idx % self.config.log_interval == 0:
+                logger.info(
+                    f"Epoch {self.epoch} | Step {batch_idx}/{len(self.train_loader)} | "
+                    f"Loss: {losses['total']:.4f} | "
+                    f"L2: {losses.get('l2', 0):.4f} | "
+                    f"Phase: {losses.get('phase', 0):.4f}"
+                )
+
+        # Aggregate epoch metrics
+        avg_losses = {
+            k: sum(d[k] for d in epoch_losses) / len(epoch_losses)
+            for k in epoch_losses[0].keys()
+        }
+
+        self.metrics['train_loss'].append(avg_losses['total'])
+        self.epoch += 1
+
+        return avg_losses
+
+    @torch.no_grad()
+    def evaluate(self) -> Dict[str, float]:
+        """Evaluate on validation set."""
+        self.model.eval()
+
+        pas_scores = []
+        mse_scores = []
+
+        for batch in self.val_loader:
+            images, masks, rotation_labels = batch
+            images = images.to(self.config.device)
+            masks = masks.to(self.config.device)
+            rotation_labels = rotation_labels.to(self.config.device)
+
+            # Teacher targets
+            target_latents = self.model.teacher_encoder(images)
+
+            # Student context
+            context_latents = self.model.student_encoder(images, mask=~masks)
+
+            # Text phase
+            text_prompts = self._rotation_to_text(rotation_labels)
+            text_tokens = self.model.tokenizer(
+                text_prompts, return_tensors='pt', padding=True
+            ).to(self.config.device)
+            text_emb = self.model.text_encoder(**text_tokens).last_hidden_state[:, 0]
+            theta = torch.tanh(self.model.text_phase_projector(text_emb)) * math.pi
+
+            # Predict
+            N_mask = masks.sum(dim=1).max().item()
+            mask_tokens = self.model.predictor.mask_token.expand(images.shape[0], N_mask, -1)
+            mask_positions = self._get_mask_positions(masks)
+
+            predicted = self.model.predictor(
+                context_latents, mask_tokens, mask_positions, theta
+            )
+
+            # Extract targets
+            target_masked = self._extract_masked_targets(target_latents, masks)
+
+            # Metrics
+            pas = self._compute_phase_alignment_score(predicted, target_masked)
+            mse = F.mse_loss(predicted, target_masked).item()
+
+            pas_scores.append(pas)
+            mse_scores.append(mse)
+
+        avg_pas = sum(pas_scores) / len(pas_scores)
+        avg_mse = sum(mse_scores) / len(mse_scores)
+
+        self.metrics['phase_alignment_score'].append(avg_pas)
+        self.metrics['reconstruction_mse'].append(avg_mse)
+
+        logger.info(f"Validation | PAS: {avg_pas:.4f} | MSE: {avg_mse:.4f}")
+
+        return {'phase_alignment_score': avg_pas, 'reconstruction_mse': avg_mse}
+
+    def _compute_phase_alignment_score(
+        self,
+        pred: torch.Tensor,
+        target: torch.Tensor
+    ) -> float:
+        """
+        Compute Phase Alignment Score (PAS).
+
+        PAS = mean(cos(φ_pred - φ_target))
+
+        Range: [-1, 1]
+        - 1.0: Perfect phase alignment
+        - 0.0: Random (no geometric understanding)
+        - <0: Anti-correlated
+        """
+        # View as complex numbers
+        pred_c = torch.view_as_complex(
+            pred.float().reshape(*pred.shape[:-1], -1, 2).contiguous()
+        )
+        target_c = torch.view_as_complex(
+            target.float().reshape(*target.shape[:-1], -1, 2).contiguous()
+        )
+
+        # Phase difference
+        delta_phi = pred_c.angle() - target_c.angle()
+
+        # Cosine of phase difference
+        pas = torch.cos(delta_phi).mean().item()
+
+        return pas
+
+    def train(self, num_epochs: int):
+        """Full training loop."""
+        logger.info(f"Starting training for {num_epochs} epochs")
+        logger.info(f"Total steps: {self.config.total_steps}")
+        logger.info(f"Warmup steps: {self.config.warmup_steps}")
+
+        best_pas = 0.0
+
+        for epoch in range(num_epochs):
+            # Train
+            train_losses = self.train_epoch()
+
+            # Evaluate
+            val_metrics = self.evaluate()
+
+            # Checkpointing
+            if val_metrics['phase_alignment_score'] > best_pas:
+                best_pas = val_metrics['phase_alignment_score']
+                self._save_checkpoint('best_model.pt')
+                logger.info(f"New best PAS: {best_pas:.4f}")
+
+            # Periodic checkpoint
+            if (epoch + 1) % self.config.save_interval == 0:
+                self._save_checkpoint(f'checkpoint_epoch_{epoch+1}.pt')
+
+            logger.info(
+                f"Epoch {epoch+1}/{num_epochs} | "
+                f"Train Loss: {train_losses['total']:.4f} | "
+                f"Val PAS: {val_metrics['phase_alignment_score']:.4f} | "
+                f"Val MSE: {val_metrics['reconstruction_mse']:.4f}"
+            )
+
+    def _save_checkpoint(self, filename: str):
+        """Save model checkpoint."""
+        torch.save({
+            'epoch': self.epoch,
+            'global_step': self.global_step,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': self.scheduler.state_dict(),
+            'metrics': self.metrics,
+        }, self.config.checkpoint_dir / filename)
+
+
+@dataclass
+class TrainingConfig:
+    """Configuration for geometric masking training."""
+
+    # Optimization
+    lr: float = 1e-4
+    weight_decay: float = 0.04
+    grad_clip: float = 1.0
+
+    # Scheduling
+    warmup_steps: int = 5000
+    total_steps: int = 100000
+
+    # EMA
+    ema_decay_init: float = 0.996
+
+    # Logging
+    log_interval: int = 100
+    save_interval: int = 10  # epochs
+
+    # Hardware
+    device: str = 'cuda'
+    checkpoint_dir: Path = Path('./checkpoints')
+```
+
+### 17.3 Training Script Entry Point
+
+```python
+#!/usr/bin/env python3
+"""
+train_phase_vl_jepa.py - Train Hybrid Phase-VL-JEPA with Geometric Masking
+
+Usage:
+    python train_phase_vl_jepa.py \
+        --dataset imagenet \
+        --batch_size 256 \
+        --epochs 100 \
+        --lr 1e-4 \
+        --weight_decay 0.04
+"""
+
+import argparse
+from pathlib import Path
+
+def main():
+    parser = argparse.ArgumentParser(description='Train Phase-VL-JEPA')
+    parser.add_argument('--dataset', type=str, default='cifar100')
+    parser.add_argument('--batch_size', type=int, default=256)
+    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--weight_decay', type=float, default=0.04)
+    parser.add_argument('--embed_dim', type=int, default=384)
+    parser.add_argument('--local_ratio', type=float, default=0.75)
+    args = parser.parse_args()
+
+    # 1. Create model components
+    vision_encoder = create_vision_encoder(args.embed_dim)
+    text_encoder = create_text_encoder()
+    predictor = PhaseVLJEPA(
+        depth=6,
+        embed_dim=args.embed_dim,
+        phase_dim=int(args.embed_dim * (1 - args.local_ratio))
+    )
+    loss_fn = PhaseSyncLoss(lambda_phase=0.5)
+
+    # 2. Create system
+    model = PhaseVLJEPA_System(
+        vision_encoder=vision_encoder,
+        text_encoder=text_encoder,
+        hybrid_predictor=predictor,
+        loss_fn=loss_fn,
+    )
+
+    # 3. Create data loaders with geometric masking
+    collator = GeometricMaskCollator(
+        input_size=224,
+        patch_size=16,
+        mask_ratio=0.6
+    )
+
+    train_loader, val_loader = create_dataloaders(
+        args.dataset,
+        args.batch_size,
+        collator
+    )
+
+    # 4. Create config
+    config = TrainingConfig(
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+        total_steps=len(train_loader) * args.epochs,
+        warmup_steps=len(train_loader) * 20,  # 20 epoch warmup
+    )
+
+    # 5. Train
+    trainer = GeometricMaskingTrainer(model, train_loader, val_loader, config)
+    trainer.train(args.epochs)
+
+    print("Training complete!")
+    print(f"Best PAS: {max(trainer.metrics['phase_alignment_score']):.4f}")
+
+
+if __name__ == '__main__':
+    main()
+```
+
+### 17.4 Training Progression Visualization
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                    EXPECTED TRAINING PROGRESSION                                         │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  PHASE 1: WARMUP (Epochs 1-20)                                                          │
+│  ════════════════════════════                                                           │
+│  • Phase logic aligns, loss decreases rapidly                                           │
+│  • PAS: 0.0 → 0.3                                                                       │
+│  • Model learns basic patch-to-patch relationships                                      │
+│                                                                                          │
+│  PHASE 2: GEOMETRIC LEARNING (Epochs 20-60)                                             │
+│  ═══════════════════════════════════════════                                            │
+│  • Text-to-phase mapping solidifies                                                     │
+│  • PAS: 0.3 → 0.6 (SUCCESS THRESHOLD)                                                   │
+│  • Model starts using text to guide spatial predictions                                 │
+│                                                                                          │
+│  PHASE 3: REFINEMENT (Epochs 60-100)                                                    │
+│  ═══════════════════════════════════                                                    │
+│  • Fine-grained geometric understanding                                                 │
+│  • PAS: 0.6 → 0.85+                                                                     │
+│  • Model achieves robust phase rotation for arbitrary angles                            │
+│                                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
+│  │                                                                                   │   │
+│  │  PAS │                                                            ●●●●●          │   │
+│  │      │                                              ●●●●●●●●●●●                   │   │
+│  │  0.8 │                                    ●●●●●●●●                                │   │
+│  │      │                          ●●●●●●●●                                          │   │
+│  │  0.6 │- - - - - - - - - -●●●●●- - - - - - - - - - - - - SUCCESS THRESHOLD        │   │
+│  │      │               ●●●●                                                         │   │
+│  │  0.4 │          ●●●●                                                              │   │
+│  │      │       ●●●                                                                  │   │
+│  │  0.2 │    ●●                                                                      │   │
+│  │      │  ●                                                                         │   │
+│  │  0.0 │●─────────────────────────────────────────────────────────────────────►    │   │
+│  │      0        20        40        60        80       100    Epochs                │   │
+│  │                                                                                   │   │
+│  └─────────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Appendix A: Theoretical Foundations
 
 ### A.1 JEPA as Contrastive-Free Learning
@@ -1740,6 +2508,8 @@ The architecture inherits Gemini's alignment properties:
 |---------|------|---------|
 | 1.0.0 | 2026-01-09 | Initial specification (Language Model focus) |
 | 1.1.0 | 2026-01-09 | Added Vision-Language extension (Spec 1-4 from Gemini notes) |
+| 1.2.0 | 2026-01-09 | Added Architectural Evolution lineage (Ontological → Geometric) |
+| 1.3.0 | 2026-01-09 | Added complete Geometric Masking Training Loop (§17) |
 
 ---
 
