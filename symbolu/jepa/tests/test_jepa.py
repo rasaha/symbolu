@@ -1028,5 +1028,330 @@ class TestPhase3GradientBridge:
         assert not model._phase3_mode
 
 
+class TestSelfMotivation:
+    """Tests for self-motivation / Sankalpa components."""
+
+    def test_goal_generator_output_shape(self):
+        """Test GoalGenerator produces correct output shape."""
+        from symbolu.jepa.transformer import GoalGenerator, SOVEREIGN_STATE_DIM
+
+        goal_gen = GoalGenerator(state_dim=SOVEREIGN_STATE_DIM)
+        batch_size = 4
+
+        # Test with 2D input
+        state = torch.randn(batch_size, SOVEREIGN_STATE_DIM)
+        curiosity = torch.rand(batch_size)
+        goal = goal_gen(state, curiosity, apply_momentum=False)
+
+        assert goal.shape == (batch_size, 4), f"Expected (4, 4), got {goal.shape}"
+
+        # Test with 3D input (sequence)
+        seq_len = 10
+        state_seq = torch.randn(batch_size, seq_len, SOVEREIGN_STATE_DIM)
+        curiosity_seq = torch.rand(batch_size, seq_len)
+        goal_seq = goal_gen(state_seq, curiosity_seq, apply_momentum=False)
+
+        assert goal_seq.shape == (batch_size, seq_len, 4)
+
+    def test_goal_generator_output_ranges(self):
+        """Test GoalGenerator outputs are in expected ranges."""
+        from symbolu.jepa.transformer import GoalGenerator, SOVEREIGN_STATE_DIM
+
+        goal_gen = GoalGenerator(state_dim=SOVEREIGN_STATE_DIM)
+        batch_size = 16
+
+        state = torch.randn(batch_size, SOVEREIGN_STATE_DIM)
+        curiosity = torch.rand(batch_size) * 2  # High curiosity
+
+        goal = goal_gen(state, curiosity, apply_momentum=False)
+
+        # Valence: [-1, 1] (Tanh)
+        assert (goal[:, 0] >= -1).all() and (goal[:, 0] <= 1).all(), \
+            f"Valence out of range: {goal[:, 0].min()}, {goal[:, 0].max()}"
+
+        # Urgency: [0, 1] (Sigmoid)
+        assert (goal[:, 1] >= 0).all() and (goal[:, 1] <= 1).all(), \
+            f"Urgency out of range: {goal[:, 1].min()}, {goal[:, 1].max()}"
+
+        # Complexity: [0, 1] (Sigmoid)
+        assert (goal[:, 2] >= 0).all() and (goal[:, 2] <= 1).all(), \
+            f"Complexity out of range: {goal[:, 2].min()}, {goal[:, 2].max()}"
+
+        # Source: [0, 1] (Sigmoid)
+        assert (goal[:, 3] >= 0).all() and (goal[:, 3] <= 1).all(), \
+            f"Source out of range: {goal[:, 3].min()}, {goal[:, 3].max()}"
+
+    def test_curiosity_driven_goal_source(self):
+        """Test get_curiosity_driven_goal forces source=1.0."""
+        from symbolu.jepa.transformer import GoalGenerator, SOVEREIGN_STATE_DIM
+
+        goal_gen = GoalGenerator(state_dim=SOVEREIGN_STATE_DIM)
+        state = torch.randn(4, SOVEREIGN_STATE_DIM)
+        curiosity = torch.rand(4)
+
+        goal = goal_gen.get_curiosity_driven_goal(state, curiosity)
+
+        # Source dimension should be 1.0 (internal)
+        assert (goal[:, 3] == 1.0).all(), \
+            f"Source should be 1.0 for curiosity-driven goal, got {goal[:, 3]}"
+
+    def test_curiosity_signal_computation(self):
+        """Test compute_curiosity_signal produces correct values."""
+        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+
+        class MockEncoder(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embed = nn.Embedding(100, 64)
+
+            def forward(self, input_ids, attention_mask=None):
+                return self.embed(input_ids)
+
+        config = PhaseJEPAConfig(embed_dim=64, vocab_size=100, state_dim=32)
+        model = PhaseJEPATransformer(config=config, context_encoder=MockEncoder())
+
+        # Test curiosity computation
+        s_pred = torch.randn(4, 32)
+        s_actual = torch.randn(4, 32)
+
+        curiosity = model.compute_curiosity_signal(s_pred, s_actual, normalize=True)
+
+        assert curiosity.shape == (4,)
+        assert (curiosity >= 0).all(), "Curiosity should be non-negative"
+
+        # Test zero prediction error gives zero curiosity
+        curiosity_zero = model.compute_curiosity_signal(s_pred, s_pred)
+        assert torch.allclose(curiosity_zero, torch.zeros_like(curiosity_zero), atol=1e-6)
+
+    def test_sankalpa_injection_extraction(self):
+        """Test inject_sankalpa and extract_sankalpa are inverses."""
+        from symbolu.jepa.transformer import (
+            PhaseJEPATransformer, PhaseJEPAConfig,
+            SANKALPA_START_DIM, SANKALPA_END_DIM,
+        )
+
+        class MockEncoder(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embed = nn.Embedding(100, 64)
+
+            def forward(self, input_ids, attention_mask=None):
+                return self.embed(input_ids)
+
+        config = PhaseJEPAConfig(embed_dim=64, vocab_size=100, state_dim=32)
+        model = PhaseJEPATransformer(config=config, context_encoder=MockEncoder())
+
+        # Create state and goal
+        state = torch.randn(4, 32)
+        goal = torch.tensor([[0.5, 0.7, 0.3, 1.0]] * 4)
+
+        # Inject and extract
+        modified = model.inject_sankalpa(state, goal)
+        extracted = model.extract_sankalpa(modified)
+
+        assert torch.allclose(extracted, goal), \
+            "Extracted goal should match injected goal"
+
+        # Original dimensions should be unchanged
+        original_dims = list(range(0, SANKALPA_START_DIM))
+        assert torch.allclose(modified[:, original_dims], state[:, original_dims]), \
+            "Non-Sankalpa dimensions should be unchanged"
+
+    def test_sovereign_jepa_autonomous_step(self):
+        """Test SovereignJEPA.autonomous_step produces expected outputs."""
+        from symbolu.jepa.transformer import (
+            SovereignJEPA, SovereignJEPAConfig, PhaseJEPAConfig,
+            PhaseJEPATransformer,
+        )
+
+        class MockEncoder(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embed = nn.Embedding(100, 64)
+
+            def forward(self, input_ids, attention_mask=None):
+                return self.embed(input_ids)
+
+        jepa_config = PhaseJEPAConfig(
+            embed_dim=64,
+            vocab_size=100,
+            state_dim=32,
+            enable_self_motivation=True,
+        )
+        jepa_model = PhaseJEPATransformer(
+            config=jepa_config,
+            context_encoder=MockEncoder(),
+        )
+
+        sovereign_config = SovereignJEPAConfig(
+            jepa_config=jepa_config,
+            enable_metacognition=True,
+        )
+        model = SovereignJEPA(
+            config=sovereign_config,
+            jepa_model=jepa_model,
+        )
+
+        # Run autonomous step
+        context_ids = torch.randint(0, 100, (2, 20))
+        outputs = model.autonomous_step(context_ids, force_new_goal=True)
+
+        # Check expected keys
+        assert 'curiosity' in outputs, "Should have curiosity"
+        assert 'goal' in outputs, "Should have goal"
+        assert 'goal_changed' in outputs, "Should have goal_changed"
+        assert 'autonomous_action' in outputs, "Should have autonomous_action"
+        assert 's_goal_directed' in outputs, "Should have s_goal_directed"
+
+        # Goal should be updated on first step with force_new_goal=True
+        assert outputs['goal_changed'] is True
+
+    def test_sovereign_jepa_goal_persistence(self):
+        """Test goal persists across multiple autonomous steps."""
+        from symbolu.jepa.transformer import (
+            SovereignJEPA, SovereignJEPAConfig, PhaseJEPAConfig,
+            PhaseJEPATransformer,
+        )
+
+        class MockEncoder(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embed = nn.Embedding(100, 64)
+
+            def forward(self, input_ids, attention_mask=None):
+                return self.embed(input_ids)
+
+        jepa_config = PhaseJEPAConfig(
+            embed_dim=64,
+            vocab_size=100,
+            state_dim=32,
+            enable_self_motivation=True,
+        )
+        jepa_model = PhaseJEPATransformer(
+            config=jepa_config,
+            context_encoder=MockEncoder(),
+        )
+
+        sovereign_config = SovereignJEPAConfig(
+            jepa_config=jepa_config,
+            goal_persistence=5,  # Goal persists for 5 steps
+            enable_metacognition=False,
+        )
+        model = SovereignJEPA(
+            config=sovereign_config,
+            jepa_model=jepa_model,
+        )
+
+        context_ids = torch.randint(0, 100, (2, 20))
+
+        # First step - force new goal
+        outputs1 = model.autonomous_step(context_ids, force_new_goal=True)
+        goal1 = outputs1['goal'].clone()
+
+        # Second step - goal should persist (not change)
+        outputs2 = model.autonomous_step(context_ids, force_new_goal=False)
+
+        # Goal shouldn't change until persistence expires
+        assert torch.allclose(outputs2['goal'], goal1), \
+            "Goal should persist across steps"
+
+    def test_autonomous_state_tracking(self):
+        """Test get_autonomous_state returns valid state."""
+        from symbolu.jepa.transformer import (
+            SovereignJEPA, SovereignJEPAConfig, PhaseJEPAConfig,
+            PhaseJEPATransformer,
+        )
+
+        class MockEncoder(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embed = nn.Embedding(100, 64)
+
+            def forward(self, input_ids, attention_mask=None):
+                return self.embed(input_ids)
+
+        jepa_config = PhaseJEPAConfig(
+            embed_dim=64,
+            vocab_size=100,
+            enable_self_motivation=True,
+        )
+        jepa_model = PhaseJEPATransformer(
+            config=jepa_config,
+            context_encoder=MockEncoder(),
+        )
+        model = SovereignJEPA(jepa_model=jepa_model)
+
+        context_ids = torch.randint(0, 100, (2, 20))
+        model.autonomous_step(context_ids, force_new_goal=True)
+
+        state = model.get_autonomous_state()
+
+        # Check all expected keys
+        expected_keys = [
+            'idle_steps', 'current_goal', 'goal_steps',
+            'total_autonomous_steps', 'mean_curiosity', 'std_curiosity',
+            'goal_valence', 'goal_urgency', 'goal_complexity', 'goal_source',
+        ]
+        for key in expected_keys:
+            assert key in state, f"Missing key: {key}"
+
+    def test_goal_generator_gradient_flow(self):
+        """Test gradients flow through goal generator."""
+        from symbolu.jepa.transformer import GoalGenerator, SOVEREIGN_STATE_DIM
+
+        goal_gen = GoalGenerator(state_dim=SOVEREIGN_STATE_DIM)
+
+        state = torch.randn(4, SOVEREIGN_STATE_DIM, requires_grad=True)
+        curiosity = torch.rand(4, requires_grad=True)
+
+        goal = goal_gen(state, curiosity, apply_momentum=False)
+
+        # Compute loss and backprop
+        loss = goal.sum()
+        loss.backward()
+
+        assert state.grad is not None, "Gradients should flow to state"
+        assert curiosity.grad is not None, "Gradients should flow to curiosity"
+
+    def test_describe_action_categories(self):
+        """Test _describe_action produces valid action descriptions."""
+        from symbolu.jepa.transformer import (
+            SovereignJEPA, SovereignJEPAConfig, PhaseJEPAConfig,
+            PhaseJEPATransformer,
+        )
+
+        class MockEncoder(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embed = nn.Embedding(100, 64)
+
+            def forward(self, input_ids, attention_mask=None):
+                return self.embed(input_ids)
+
+        jepa_config = PhaseJEPAConfig(
+            embed_dim=64,
+            vocab_size=100,
+            enable_self_motivation=True,
+        )
+        jepa_model = PhaseJEPATransformer(
+            config=jepa_config,
+            context_encoder=MockEncoder(),
+        )
+        model = SovereignJEPA(jepa_model=jepa_model)
+
+        # Test different goal scenarios
+        test_cases = [
+            (torch.tensor([0.5, 0.8, 0.3, 1.0]), 0.05, "PURSUE_POSITIVE"),
+            (torch.tensor([-0.5, 0.8, 0.3, 0.0]), 0.05, "AVOID_NEGATIVE"),
+            (torch.tensor([0.0, 0.5, 0.5, 1.0]), 0.05, "MAINTAIN"),
+            (torch.tensor([0.0, 0.5, 0.5, 1.0]), 0.5, "EXPLORE"),  # High curiosity
+        ]
+
+        for goal, curiosity, expected_action in test_cases:
+            action = model._describe_action(goal, curiosity)
+            assert expected_action in action, \
+                f"Expected '{expected_action}' in '{action}' for goal={goal}, curiosity={curiosity}"
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

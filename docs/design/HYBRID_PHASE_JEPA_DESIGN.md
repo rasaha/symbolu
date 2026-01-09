@@ -1,7 +1,7 @@
 # Hybrid Phase-JEPA Architecture Design Specification
 
-**Version:** 2.1.0
-**Status:** Part I Implementation Complete (with Phase 3 Gradient Bridge)
+**Version:** 3.0.0
+**Status:** Part I Complete + Self-Motivation (Sankalpa) Architecture
 **Date:** 2026-01-09
 **Origin:** Google Gemini Proposals + Meta JEPA + SymbolU Phase Attention Integration
 **Branch:** `claude/hybrid-phase-jepa-spec-r8IA5`
@@ -4387,6 +4387,179 @@ Based on this validation dialogue:
 
 ---
 
+## Appendix F: Self-Motivation Architecture (Sankalpa)
+
+**Added:** v3.0.0 | **Status:** Implementation Complete
+
+> "The difference between a tool and an agent is autonomous goal selection.
+> Sankalpa (Will/Intention) transforms Phase-JEPA from a predictive model
+> into a self-motivated system that can choose what to explore next."
+
+### F.1 Architectural Overview
+
+The Self-Motivation architecture adds intrinsic drive to Phase-JEPA through:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    SANKALPA (SELF-MOTIVATION) CYCLE                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │                        AUTONOMOUS LOOP                                │  │
+│  │                                                                        │  │
+│  │   ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐    │  │
+│  │   │ OBSERVE  │ ──▶ │ PREDICT  │ ──▶ │ COMPARE  │ ──▶ │  DECIDE  │    │  │
+│  │   │(Pramāṇa) │     │ (Icchā)  │     │ (Viveka) │     │(Sankalpa)│    │  │
+│  │   └──────────┘     └──────────┘     └──────────┘     └────┬─────┘    │  │
+│  │        │                                                   │          │  │
+│  │        │                                                   ▼          │  │
+│  │        │           ┌──────────┐     ┌──────────┐     ┌──────────┐    │  │
+│  │        └────────── │  LEARN   │ ◀── │ EXECUTE  │ ◀── │   ACT    │    │  │
+│  │                    │ (Karma)  │     │          │     │ (Kṛti)   │    │  │
+│  │                    └──────────┘     └──────────┘     └──────────┘    │  │
+│  │                                                                        │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  Key Insight: Curiosity (prediction error) drives goal generation.          │
+│  High curiosity → EXPLORE; Low curiosity → EXPLOIT existing goals.          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### F.2 Sankalpa (Goal) Vector Dimensions
+
+Reserved dimensions [28:32] of the 32D Sovereign State encode goals:
+
+| Dimension | Name | Range | Description |
+|-----------|------|-------|-------------|
+| 28 | **Valence** | [-1, 1] | Goal polarity: positive (approach) vs negative (avoid) |
+| 29 | **Urgency** | [0, 1] | Priority level: how important is this goal now? |
+| 30 | **Complexity** | [0, 1] | Task difficulty estimate (affects planning depth) |
+| 31 | **Source** | [0, 1] | 0=external (user input), 1=internal (curiosity-driven) |
+
+### F.3 Curiosity Signal
+
+The intrinsic motivation signal that drives autonomous goal generation:
+
+```python
+curiosity = ||s_pred - s_actual||² × temperature
+```
+
+- **High curiosity:** Novel/unpredictable situation → trigger exploration
+- **Low curiosity:** Predictable situation → continue current goal
+- **Temperature:** Scales sensitivity (default 1.0)
+
+### F.4 Goal Generator Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    GOAL GENERATOR (GoalGenerator)                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Input: [current_state (32D), curiosity_signal (1D)] = 33D      │
+│                                                                  │
+│           ┌────────────────────────────────────────────┐        │
+│           │  Linear(33, 64) → LayerNorm → GELU → Drop  │        │
+│           │  Linear(64, 64) → LayerNorm → GELU → Drop  │        │
+│           │  Linear(64, 4)  → Per-dim Activations      │        │
+│           └────────────────────────────────────────────┘        │
+│                                                                  │
+│  Output Activations:                                             │
+│    - Dim 0 (Valence): Tanh → [-1, 1]                            │
+│    - Dim 1 (Urgency): Sigmoid → [0, 1]                          │
+│    - Dim 2 (Complexity): Sigmoid → [0, 1]                       │
+│    - Dim 3 (Source): Sigmoid → [0, 1]                           │
+│                                                                  │
+│  Goal Momentum: Running average for stability (default 0.9)      │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### F.5 SovereignJEPA Class
+
+The main self-motivated wrapper implementing the autonomous cycle:
+
+```python
+class SovereignJEPA(nn.Module):
+    """
+    Implements:
+    1. forward() - Standard forward with optional external goal
+    2. autonomous_step() - Full Sankalpa cycle
+    3. should_act_autonomously() - Check if idle too long
+    4. get_autonomous_state() - Monitoring/debugging
+    """
+
+# Key Methods:
+sovereign_model.autonomous_step(context_ids)  # Full cycle
+sovereign_model.forward(input_ids, external_goal=goal)  # External direction
+sovereign_model.get_autonomous_state()  # Monitor internals
+```
+
+### F.6 Action Categories
+
+Based on goal state and curiosity, the system selects actions:
+
+| Curiosity | Valence | Action | Description |
+|-----------|---------|--------|-------------|
+| High (>θ) | Any | **EXPLORE** | Novel situation, prioritize exploration |
+| Low | >0.3 | **PURSUE_POSITIVE** | Approach desirable state |
+| Low | <-0.3 | **AVOID_NEGATIVE** | Move away from aversive state |
+| Low | ~0 | **MAINTAIN** | Stable, continue current trajectory |
+
+### F.7 Metacognition Statistics
+
+SovereignJEPA tracks its own prediction quality:
+
+- `mean_curiosity`: Running average of curiosity signal
+- `std_curiosity`: Variance in curiosity (detects novelty)
+- `goal_persistence`: Steps before goal re-evaluation (default 8)
+- `idle_steps`: Steps without external input
+
+### F.8 Integration with Training Phases
+
+| Phase | Self-Motivation Role |
+|-------|---------------------|
+| **Icchā (Desire)** | Disabled - learning basic predictions |
+| **Jñāna (Knowledge)** | Disabled - learning state alignment |
+| **Kṛti (Action)** | **Enabled** - goal-directed generation |
+
+### F.9 Example Usage
+
+```python
+from symbolu.jepa.transformer import (
+    SovereignJEPA, create_sovereign_jepa
+)
+
+# Create self-motivated model
+model = create_sovereign_jepa(config)
+
+# Normal forward (with external task)
+outputs = model(input_ids, external_goal=user_goal)
+
+# Autonomous step (self-directed)
+outputs = model.autonomous_step(context_ids)
+print(f"Action: {outputs['autonomous_action']}")
+# Output: "EXPLORE(internal, normal, complexity=0.45, high_curiosity=0.312)"
+
+# Monitor internal state
+state = model.get_autonomous_state()
+print(f"Goal: valence={state['goal_valence']:.2f}, urgency={state['goal_urgency']:.2f}")
+```
+
+### F.10 Philosophical Foundation
+
+The Sankalpa architecture draws from Vedantic philosophy:
+
+- **Sankalpa** (सङ्कल्प): Will, intention, determination
+- **Viveka** (विवेक): Discrimination, comparing predicted vs actual
+- **Pramāṇa** (प्रमाण): Valid cognition, observation
+- **Karma** (कर्म): Action and its consequences
+
+This transforms Phase-JEPA from a passive predictor into an active agent
+with intrinsic motivation - a crucial step toward autonomous intelligence.
+
+---
+
 ## References
 
 1. Meta AI - I-JEPA: Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture
@@ -4412,6 +4585,8 @@ Based on this validation dialogue:
 | 1.7.0 | 2026-01-09 | Added Sovereign AGI Integration Evaluation (Appendix D) - 8 canonical decisions |
 | 1.8.0 | 2026-01-09 | Added Cross-Model Validation Dialogue (Appendix E) - Claude/Gemini validation |
 | 2.0.0 | 2026-01-09 | **Implementation Complete (Part I)** - Added implementation notes, CLI examples, file locations |
+| 2.1.0 | 2026-01-09 | Added Phase 3 Gradient Bridge documentation and Pilot/Ship architectural principles |
+| 3.0.0 | 2026-01-09 | **Self-Motivation (Sankalpa)** - Added GoalGenerator, SovereignJEPA, curiosity-driven autonomous cycle |
 
 ---
 
@@ -4443,6 +4618,21 @@ Based on this validation dialogue:
 | Training loop integration | ✅ | `train_unified_llm.py:9770-9844` |
 | Unit tests | ✅ | `symbolu/jepa/tests/test_jepa.py` |
 | Phase 3 gradient flow tests | ✅ | `symbolu/jepa/tests/test_jepa.py:792-1029` |
+
+### Part I.B: Self-Motivation (Sankalpa) — ✅ COMPLETE
+
+| Component | Status | File Location |
+|-----------|--------|---------------|
+| Sankalpa Vector Constants | ✅ | `symbolu/jepa/transformer.py:58-65` |
+| `GoalGenerator` | ✅ | `symbolu/jepa/transformer.py:68-204` |
+| `compute_curiosity_signal()` | ✅ | `symbolu/jepa/transformer.py:652-685` |
+| `inject_sankalpa()` | ✅ | `symbolu/jepa/transformer.py:687-714` |
+| `extract_sankalpa()` | ✅ | `symbolu/jepa/transformer.py:716-732` |
+| `SovereignJEPAConfig` | ✅ | `symbolu/jepa/transformer.py:1156-1174` |
+| `SovereignJEPA` | ✅ | `symbolu/jepa/transformer.py:1177-1497` |
+| `autonomous_step()` | ✅ | `symbolu/jepa/transformer.py:1304-1418` |
+| `create_sovereign_jepa()` | ✅ | `symbolu/jepa/transformer.py:1500-1545` |
+| Self-motivation unit tests | ✅ | `symbolu/jepa/tests/test_jepa.py:1031-1357` |
 
 #### CLI Usage Example
 

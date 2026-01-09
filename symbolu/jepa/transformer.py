@@ -9,6 +9,14 @@ Components:
     - Target Encoder (EMA): Provides stable prediction targets
     - State Projector: Maps hidden states to 32D Sovereign State
     - Predictor: Phase-based state delta prediction
+    - GoalGenerator: Autonomous goal generation from curiosity (Sankalpa)
+    - SovereignJEPA: Self-motivated wrapper with autonomous cycle
+
+Sovereign State Reserved Dimensions (Sankalpa Vector) [28:32]:
+    - Dim 28: Goal Valence (positive/negative intent)
+    - Dim 29: Goal Urgency (priority level)
+    - Dim 30: Goal Complexity (task difficulty estimate)
+    - Dim 31: Goal Source (0=external, 1=internal/curiosity-driven)
 
 References:
     - HYBRID_PHASE_JEPA_DESIGN.md §3, §4, §5
@@ -45,6 +53,155 @@ try:
 except ImportError:
     DualSourcePhaseProjector = None
     GatedKarmaProjector = None
+
+
+# === Sankalpa (Will/Goal) Vector Constants ===
+# Reserved dimensions in 32D Sovereign State for autonomous goal encoding
+SANKALPA_START_DIM = 28
+SANKALPA_END_DIM = 32
+SANKALPA_DIM_VALENCE = 28    # Goal Valence: positive/negative intent [-1, 1]
+SANKALPA_DIM_URGENCY = 29    # Goal Urgency: priority level [0, 1]
+SANKALPA_DIM_COMPLEXITY = 30  # Goal Complexity: task difficulty [0, 1]
+SANKALPA_DIM_SOURCE = 31      # Goal Source: 0=external, 1=internal/curiosity
+
+
+class GoalGenerator(nn.Module):
+    """
+    Autonomous Goal Generator Module (Sankalpa Generator).
+
+    Takes current state and curiosity signal, outputs goal delta for
+    reserved dimensions [28:32] of Sovereign State.
+
+    The goal generator learns to propose goals that:
+    1. Maximize curiosity satisfaction (reduce prediction error over time)
+    2. Maintain goal coherence (don't flip goals rapidly)
+    3. Balance exploration vs exploitation
+
+    Architecture:
+        input: [current_state (32D), curiosity_signal (1D)] -> 33D
+        hidden: 64D with LayerNorm
+        output: goal_delta (4D) for dims [28:32]
+    """
+
+    def __init__(
+        self,
+        state_dim: int = SOVEREIGN_STATE_DIM,
+        hidden_dim: int = 64,
+        goal_dim: int = 4,  # Sankalpa vector size
+        dropout: float = 0.1,
+        goal_momentum: float = 0.9,  # Smoothing for goal stability
+    ):
+        super().__init__()
+        self.state_dim = state_dim
+        self.goal_dim = goal_dim
+        self.goal_momentum = goal_momentum
+
+        # Input: state (32D) + curiosity (1D) = 33D
+        self.goal_net = nn.Sequential(
+            nn.Linear(state_dim + 1, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, goal_dim),
+        )
+
+        # Output activations for each goal dimension
+        # Valence: Tanh -> [-1, 1]
+        # Urgency/Complexity/Source: Sigmoid -> [0, 1]
+
+        # Running average of goals for stability
+        self.register_buffer('running_goal', torch.zeros(goal_dim))
+        self.register_buffer('goal_count', torch.tensor(0, dtype=torch.long))
+
+        # Initialize near zero for gradual goal emergence
+        self._init_weights()
+
+    def _init_weights(self):
+        """Initialize with small weights for gradual goal emergence."""
+        for module in self.goal_net.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.normal_(module.weight, std=0.01)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+
+    def forward(
+        self,
+        current_state: torch.Tensor,
+        curiosity_signal: torch.Tensor,
+        apply_momentum: bool = True,
+    ) -> torch.Tensor:
+        """
+        Generate goal delta from state and curiosity.
+
+        Args:
+            current_state: Current Sovereign State [B, 32] or [B, T, 32]
+            curiosity_signal: Curiosity/prediction error [B] or [B, T]
+            apply_momentum: Whether to apply goal smoothing
+
+        Returns:
+            goal_delta: Goal vector update [B, 4] or [B, T, 4]
+        """
+        # Handle sequence dimension
+        if current_state.dim() == 3:
+            B, T, D = current_state.shape
+            state_flat = current_state.reshape(B * T, D)
+            curiosity_flat = curiosity_signal.reshape(B * T, 1)
+        else:
+            state_flat = current_state
+            curiosity_flat = curiosity_signal.unsqueeze(-1) if curiosity_signal.dim() == 1 else curiosity_signal
+
+        # Concatenate state and curiosity
+        goal_input = torch.cat([state_flat, curiosity_flat], dim=-1)
+
+        # Generate raw goal
+        raw_goal = self.goal_net(goal_input)
+
+        # Apply per-dimension activations
+        goal = torch.zeros_like(raw_goal)
+        goal[:, 0] = torch.tanh(raw_goal[:, 0])      # Valence [-1, 1]
+        goal[:, 1] = torch.sigmoid(raw_goal[:, 1])   # Urgency [0, 1]
+        goal[:, 2] = torch.sigmoid(raw_goal[:, 2])   # Complexity [0, 1]
+        goal[:, 3] = torch.sigmoid(raw_goal[:, 3])   # Source [0, 1]
+
+        # Apply momentum smoothing if enabled
+        if apply_momentum and self.training:
+            self.goal_count += 1
+            # Update running average
+            self.running_goal = (
+                self.goal_momentum * self.running_goal +
+                (1 - self.goal_momentum) * goal.mean(dim=0).detach()
+            )
+            # Blend with running average for stability
+            blend_factor = min(1.0, self.goal_count.item() / 100)  # Warm up
+            goal = blend_factor * goal + (1 - blend_factor) * self.running_goal.unsqueeze(0)
+
+        # Reshape back if needed
+        if current_state.dim() == 3:
+            goal = goal.reshape(B, T, self.goal_dim)
+
+        return goal
+
+    def get_curiosity_driven_goal(
+        self,
+        current_state: torch.Tensor,
+        curiosity_signal: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Generate a fully internal goal (Source=1.0) driven by curiosity.
+
+        This is used in the autonomous cycle when no external task is given.
+        """
+        goal = self.forward(current_state, curiosity_signal, apply_momentum=True)
+        # Force source dimension to 1.0 (internal)
+        if goal.dim() == 3:
+            goal[:, :, 3] = 1.0
+        else:
+            goal[:, 3] = 1.0
+        return goal
 
 
 @dataclass
@@ -101,6 +258,14 @@ class PhaseJEPAConfig:
     # SRK Integration
     enable_karma_injection: bool = False
     karma_gate_bias: float = 0.5
+
+    # Self-Motivation / Sankalpa Settings
+    enable_self_motivation: bool = False
+    curiosity_temperature: float = 1.0  # Scales curiosity signal
+    goal_generator_hidden: int = 64
+    goal_momentum: float = 0.9  # Smoothing for goal stability
+    curiosity_threshold: float = 0.1  # Minimum curiosity to trigger goal generation
+    autonomous_cycle_steps: int = 4  # Steps in autonomous observe→decide→act cycle
 
 
 class PhaseJEPATransformer(nn.Module):
@@ -239,6 +404,22 @@ class PhaseJEPATransformer(nn.Module):
             self.karma_gate = GatedKarmaProjector(state_dim=config.state_dim)
         else:
             self.karma_gate = None
+
+        # === Self-Motivation / Sankalpa (Goal Generator) ===
+        if config.enable_self_motivation:
+            self.goal_generator = GoalGenerator(
+                state_dim=config.state_dim,
+                hidden_dim=config.goal_generator_hidden,
+                goal_dim=SANKALPA_END_DIM - SANKALPA_START_DIM,  # 4D
+                dropout=config.dropout,
+                goal_momentum=config.goal_momentum,
+            )
+            self.curiosity_temperature = config.curiosity_temperature
+            self.curiosity_threshold = config.curiosity_threshold
+        else:
+            self.goal_generator = None
+            self.curiosity_temperature = 1.0
+            self.curiosity_threshold = 0.1
 
         # === Phase 3 (Kṛti) Gradient Bridge ===
         # Intent Phase Projector: Maps predicted state to phase rotation for generation
@@ -467,6 +648,88 @@ class PhaseJEPATransformer(nn.Module):
             'alignment': alignment_loss,
             'orthogonality': ortho_loss,
         }
+
+    def compute_curiosity_signal(
+        self,
+        s_pred: torch.Tensor,
+        s_actual: torch.Tensor,
+        normalize: bool = True,
+    ) -> torch.Tensor:
+        """
+        Compute curiosity signal as prediction error.
+
+        Curiosity = ||s_pred - s_actual||² (scaled by temperature)
+
+        This is the intrinsic motivation signal that drives autonomous
+        goal generation. High curiosity indicates novel/unpredictable
+        situations that warrant further exploration.
+
+        Args:
+            s_pred: Predicted state [B, 32] or [B, T, 32]
+            s_actual: Actual observed state [B, 32] or [B, T, 32]
+            normalize: Whether to normalize by state dimension
+
+        Returns:
+            curiosity: Scalar curiosity signal [B] or [B, T]
+        """
+        # Compute L2 prediction error
+        prediction_error = torch.norm(s_pred - s_actual, p=2, dim=-1)
+
+        # Normalize by sqrt(state_dim) if requested for scale invariance
+        if normalize:
+            prediction_error = prediction_error / math.sqrt(self.config.state_dim)
+
+        # Scale by temperature (higher temp = more sensitive to errors)
+        curiosity = prediction_error * self.curiosity_temperature
+
+        return curiosity
+
+    def inject_sankalpa(
+        self,
+        state: torch.Tensor,
+        goal: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Inject Sankalpa (goal) vector into reserved dimensions [28:32].
+
+        This modifies the state to encode the current goal/intent,
+        enabling goal-directed behavior.
+
+        Args:
+            state: Sovereign State [B, 32] or [B, T, 32]
+            goal: Sankalpa vector [B, 4] or [B, T, 4]
+
+        Returns:
+            Modified state with goal injected [B, 32] or [B, T, 32]
+        """
+        modified_state = state.clone()
+
+        if state.dim() == 3:
+            # Sequence of states
+            modified_state[:, :, SANKALPA_START_DIM:SANKALPA_END_DIM] = goal
+        else:
+            # Single state
+            modified_state[:, SANKALPA_START_DIM:SANKALPA_END_DIM] = goal
+
+        return modified_state
+
+    def extract_sankalpa(
+        self,
+        state: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Extract Sankalpa (goal) vector from state.
+
+        Args:
+            state: Sovereign State [B, 32] or [B, T, 32]
+
+        Returns:
+            Sankalpa vector [B, 4] or [B, T, 4]
+        """
+        if state.dim() == 3:
+            return state[:, :, SANKALPA_START_DIM:SANKALPA_END_DIM]
+        else:
+            return state[:, SANKALPA_START_DIM:SANKALPA_END_DIM]
 
     def compute_phase_rotation(
         self,
@@ -888,3 +1151,395 @@ def create_phase_jepa_transformer(
         model.set_curriculum(curriculum)
 
     return model
+
+
+@dataclass
+class SovereignJEPAConfig:
+    """Configuration for SovereignJEPA (self-motivated wrapper)."""
+
+    # Base JEPA config
+    jepa_config: Optional[PhaseJEPAConfig] = None
+
+    # Autonomous cycle settings
+    autonomous_cycle_steps: int = 4
+    curiosity_threshold: float = 0.1
+    max_idle_steps: int = 10  # Steps without external input before autonomous goal
+
+    # Goal generation settings
+    exploration_rate: float = 0.1  # Probability of random goal exploration
+    goal_persistence: int = 8  # Steps to maintain goal before re-evaluation
+
+    # Self-monitoring
+    enable_metacognition: bool = True  # Monitor own prediction quality
+    metacognition_window: int = 100  # Steps for running statistics
+
+
+class SovereignJEPA(nn.Module):
+    """
+    Self-Motivated JEPA Wrapper with Autonomous Goal Selection.
+
+    Implements the Sankalpa (Will/Intention) cycle for autonomous operation:
+
+    1. OBSERVE (Pramāṇa): Encode current context → s_context
+    2. PREDICT (Icchā): Generate predictions → s_pred
+    3. COMPARE (Viveka): Compute curiosity = ||s_pred - s_actual||²
+    4. DECIDE (Sankalpa): Generate/update goal based on curiosity
+    5. ACT (Kṛti): Execute goal-directed generation
+    6. LEARN (Karma): Update weights based on outcomes
+
+    The system can operate in two modes:
+    - External-directed: Goals come from user input (Source=0)
+    - Self-directed: Goals emerge from curiosity (Source=1)
+
+    Example:
+        >>> config = SovereignJEPAConfig(autonomous_cycle_steps=4)
+        >>> model = SovereignJEPA(config)
+        >>> # Autonomous step when idle
+        >>> outputs = model.autonomous_step(context_ids)
+        >>> # The model has generated its own goal and acted on it
+    """
+
+    def __init__(
+        self,
+        config: Optional[SovereignJEPAConfig] = None,
+        jepa_model: Optional[PhaseJEPATransformer] = None,
+        **kwargs,
+    ):
+        """
+        Initialize SovereignJEPA.
+
+        Args:
+            config: SovereignJEPAConfig instance
+            jepa_model: Optional pre-built PhaseJEPATransformer
+            **kwargs: Override config parameters
+        """
+        super().__init__()
+
+        # Build config
+        if config is None:
+            config = SovereignJEPAConfig(**kwargs)
+        self.config = config
+
+        # === Core JEPA Model ===
+        if jepa_model is not None:
+            self.jepa = jepa_model
+        else:
+            jepa_config = config.jepa_config or PhaseJEPAConfig(
+                enable_self_motivation=True,
+            )
+            # Ensure self-motivation is enabled
+            jepa_config.enable_self_motivation = True
+            self.jepa = PhaseJEPATransformer(config=jepa_config)
+
+        # === Autonomous Cycle State ===
+        self.register_buffer('idle_steps', torch.tensor(0, dtype=torch.long))
+        self.register_buffer('current_goal_steps', torch.tensor(0, dtype=torch.long))
+        self.register_buffer('total_autonomous_steps', torch.tensor(0, dtype=torch.long))
+
+        # Current goal (persists across steps)
+        self.register_buffer('current_goal', torch.zeros(4))  # Sankalpa vector
+
+        # === Metacognition Statistics ===
+        if config.enable_metacognition:
+            self.register_buffer(
+                'curiosity_history',
+                torch.zeros(config.metacognition_window),
+            )
+            self.register_buffer('curiosity_idx', torch.tensor(0, dtype=torch.long))
+            self.register_buffer('mean_curiosity', torch.tensor(0.0))
+            self.register_buffer('std_curiosity', torch.tensor(1.0))
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        labels: Optional[torch.Tensor] = None,
+        external_goal: Optional[torch.Tensor] = None,
+        **kwargs,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass with optional external goal injection.
+
+        If external_goal is provided, uses it. Otherwise, uses current
+        internally-generated goal.
+
+        Args:
+            input_ids: Token IDs [B, T]
+            attention_mask: Optional attention mask
+            labels: Target labels for NLL loss
+            external_goal: External Sankalpa vector [B, 4] (optional)
+            **kwargs: Additional arguments for JEPA forward
+
+        Returns:
+            JEPA outputs with goal information
+        """
+        # Reset idle counter on external input
+        self.idle_steps.zero_()
+
+        outputs = self.jepa(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            labels=labels,
+            **kwargs,
+        )
+
+        # Inject goal into predicted state if available
+        if external_goal is not None:
+            # External goal (Source=0)
+            goal = external_goal.clone()
+            goal[:, 3] = 0.0  # Mark as external source
+            outputs['s_pred'] = self.jepa.inject_sankalpa(outputs['s_pred'], goal)
+            outputs['goal'] = goal
+            outputs['goal_source'] = 'external'
+        elif self.current_goal.sum() != 0:
+            # Use current internal goal
+            B = input_ids.shape[0]
+            goal = self.current_goal.unsqueeze(0).expand(B, -1)
+            outputs['s_pred'] = self.jepa.inject_sankalpa(outputs['s_pred'], goal)
+            outputs['goal'] = goal
+            outputs['goal_source'] = 'internal'
+
+        return outputs
+
+    def autonomous_step(
+        self,
+        context_ids: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        force_new_goal: bool = False,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Autonomous cycle: Observe → Predict → Compare → Decide → Act.
+
+        This is the core self-motivation loop. When called without external
+        direction, the model:
+        1. Observes current context
+        2. Makes predictions about future states
+        3. Computes curiosity from prediction errors
+        4. Generates or updates its goal based on curiosity
+        5. Acts according to the goal
+
+        Args:
+            context_ids: Current context token IDs [B, T]
+            attention_mask: Optional attention mask
+            force_new_goal: Force generation of new goal regardless of persistence
+
+        Returns:
+            Dictionary containing:
+                - Standard JEPA outputs
+                - 'curiosity': Curiosity signal
+                - 'goal': Current/new goal vector
+                - 'goal_changed': Whether goal was updated
+                - 'autonomous_action': Description of decided action
+        """
+        B, T = context_ids.shape
+        outputs = {}
+
+        # === Step 1: OBSERVE (Pramāṇa) - Encode context ===
+        context_out = self.jepa(
+            context_ids,
+            attention_mask=attention_mask,
+            compute_loss=False,
+            return_states=True,
+        )
+        s_context = context_out['s_context']
+        s_pred = context_out['s_pred']
+        outputs.update(context_out)
+
+        # === Step 2: PREDICT (Icchā) - Already done in context_out ===
+        # s_pred contains the predicted future state
+
+        # === Step 3: COMPARE (Viveka) - Compute curiosity ===
+        # We need actual future state. In autonomous mode, we compare with
+        # our best estimate from the target encoder (self-supervised)
+        with torch.no_grad():
+            target_out = self.jepa.target_encoder(
+                context_ids,
+                attention_mask=attention_mask,
+            )
+            if isinstance(target_out, tuple):
+                h_target = target_out[0]
+            elif isinstance(target_out, dict):
+                h_target = target_out.get('hidden_states', target_out.get('last_hidden_state'))
+            else:
+                h_target = target_out
+            s_actual = self.jepa.target_state_projector(h_target)
+            # Use last position as "actual" future state estimate
+            s_actual = s_actual[:, -1, :]
+
+        curiosity = self.jepa.compute_curiosity_signal(s_pred, s_actual)
+        outputs['curiosity'] = curiosity
+
+        # Update metacognition statistics
+        if self.config.enable_metacognition:
+            self._update_curiosity_stats(curiosity.mean())
+
+        # === Step 4: DECIDE (Sankalpa) - Generate/update goal ===
+        goal_changed = False
+        mean_curiosity = curiosity.mean().item()
+
+        # Determine if we should generate new goal
+        should_generate_goal = (
+            force_new_goal or
+            self.current_goal.sum() == 0 or  # No current goal
+            self.current_goal_steps >= self.config.goal_persistence or  # Goal expired
+            mean_curiosity > self.mean_curiosity + 2 * self.std_curiosity  # Surprising event
+        )
+
+        if should_generate_goal and self.jepa.goal_generator is not None:
+            # Generate new goal from curiosity
+            new_goal = self.jepa.goal_generator.get_curiosity_driven_goal(
+                s_context[:, -1, :],  # Last context state
+                curiosity,
+            )
+            self.current_goal = new_goal.mean(dim=0).detach()
+            self.current_goal_steps.zero_()
+            goal_changed = True
+        else:
+            self.current_goal_steps += 1
+
+        outputs['goal'] = self.current_goal.unsqueeze(0).expand(B, -1)
+        outputs['goal_changed'] = goal_changed
+
+        # === Step 5: ACT (Kṛti) - Goal-directed state ===
+        # Inject goal into predicted state for action execution
+        s_goal_directed = self.jepa.inject_sankalpa(s_pred, outputs['goal'])
+        outputs['s_goal_directed'] = s_goal_directed
+
+        # Determine autonomous action based on goal valence and urgency
+        outputs['autonomous_action'] = self._describe_action(
+            self.current_goal,
+            mean_curiosity,
+        )
+
+        # Update counters
+        self.total_autonomous_steps += 1
+        self.idle_steps += 1
+
+        return outputs
+
+    def _update_curiosity_stats(self, curiosity_value: float):
+        """Update running statistics for metacognition."""
+        idx = self.curiosity_idx.item() % self.config.metacognition_window
+        self.curiosity_history[idx] = curiosity_value
+        self.curiosity_idx += 1
+
+        # Update mean and std after warmup
+        if self.curiosity_idx >= self.config.metacognition_window:
+            self.mean_curiosity = self.curiosity_history.mean()
+            self.std_curiosity = self.curiosity_history.std() + 1e-6
+
+    def _describe_action(
+        self,
+        goal: torch.Tensor,
+        curiosity: float,
+    ) -> str:
+        """
+        Describe the autonomous action based on goal state.
+
+        Returns human-readable description of what the system intends to do.
+        """
+        valence = goal[0].item()
+        urgency = goal[1].item()
+        complexity = goal[2].item()
+        source = goal[3].item()
+
+        source_str = "internal" if source > 0.5 else "external"
+
+        if curiosity > self.config.curiosity_threshold:
+            action = "EXPLORE"
+            detail = f"high_curiosity={curiosity:.3f}"
+        elif valence > 0.3:
+            action = "PURSUE_POSITIVE"
+            detail = f"valence={valence:.2f}"
+        elif valence < -0.3:
+            action = "AVOID_NEGATIVE"
+            detail = f"valence={valence:.2f}"
+        else:
+            action = "MAINTAIN"
+            detail = "stable_state"
+
+        urgency_str = "URGENT" if urgency > 0.7 else "normal" if urgency > 0.3 else "low_priority"
+
+        return f"{action}({source_str}, {urgency_str}, complexity={complexity:.2f}, {detail})"
+
+    def get_autonomous_state(self) -> Dict[str, any]:
+        """Get current autonomous operation state for monitoring."""
+        return {
+            'idle_steps': self.idle_steps.item(),
+            'current_goal': self.current_goal.tolist(),
+            'goal_steps': self.current_goal_steps.item(),
+            'total_autonomous_steps': self.total_autonomous_steps.item(),
+            'mean_curiosity': self.mean_curiosity.item(),
+            'std_curiosity': self.std_curiosity.item(),
+            'goal_valence': self.current_goal[0].item(),
+            'goal_urgency': self.current_goal[1].item(),
+            'goal_complexity': self.current_goal[2].item(),
+            'goal_source': 'internal' if self.current_goal[3].item() > 0.5 else 'external',
+        }
+
+    def should_act_autonomously(self) -> bool:
+        """Check if autonomous action should be taken."""
+        return (
+            self.idle_steps >= self.config.max_idle_steps and
+            self.jepa.goal_generator is not None
+        )
+
+    def reset_autonomous_state(self):
+        """Reset autonomous operation state."""
+        self.idle_steps.zero_()
+        self.current_goal_steps.zero_()
+        self.current_goal.zero_()
+
+    def state_dict(self, *args, **kwargs):
+        """Get state dict including autonomous state."""
+        state = super().state_dict(*args, **kwargs)
+        state['autonomous_state'] = self.get_autonomous_state()
+        return state
+
+
+def create_sovereign_jepa(
+    config,
+    jepa_model: Optional[PhaseJEPATransformer] = None,
+) -> SovereignJEPA:
+    """
+    Factory function to create SovereignJEPA with self-motivation.
+
+    Args:
+        config: Training config with sovereign JEPA settings
+        jepa_model: Optional pre-built PhaseJEPATransformer
+
+    Returns:
+        Configured SovereignJEPA instance
+    """
+    # Build JEPA config with self-motivation enabled
+    jepa_config = PhaseJEPAConfig(
+        vocab_size=getattr(config, 'vocab_size', 50257),
+        embed_dim=getattr(config, 'embed_dim', 768),
+        num_layers=getattr(config, 'num_layers', 12),
+        num_encoder_heads=getattr(config, 'num_heads', 12),
+        max_seq_len=getattr(config, 'max_seq_len', 2048),
+        dropout=getattr(config, 'dropout', 0.1),
+        state_dim=getattr(config, 'state_dim', SOVEREIGN_STATE_DIM),
+        # Enable self-motivation
+        enable_self_motivation=True,
+        curiosity_temperature=getattr(config, 'curiosity_temperature', 1.0),
+        goal_generator_hidden=getattr(config, 'goal_generator_hidden', 64),
+        goal_momentum=getattr(config, 'goal_momentum', 0.9),
+        curiosity_threshold=getattr(config, 'curiosity_threshold', 0.1),
+    )
+
+    sovereign_config = SovereignJEPAConfig(
+        jepa_config=jepa_config,
+        autonomous_cycle_steps=getattr(config, 'autonomous_cycle_steps', 4),
+        curiosity_threshold=getattr(config, 'curiosity_threshold', 0.1),
+        max_idle_steps=getattr(config, 'max_idle_steps', 10),
+        exploration_rate=getattr(config, 'exploration_rate', 0.1),
+        goal_persistence=getattr(config, 'goal_persistence', 8),
+        enable_metacognition=getattr(config, 'enable_metacognition', True),
+        metacognition_window=getattr(config, 'metacognition_window', 100),
+    )
+
+    return SovereignJEPA(
+        config=sovereign_config,
+        jepa_model=jepa_model,
+    )
