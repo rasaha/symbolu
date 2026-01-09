@@ -711,10 +711,16 @@ class PhaseJEPATransformer(nn.Module):
         modified_state = state.clone()
 
         if state.dim() == 3:
-            # Sequence of states
+            # Sequence of states [B, T, 32]
+            # If goal is 2D [B, 4], expand to [B, T, 4]
+            if goal.dim() == 2:
+                goal = goal.unsqueeze(1).expand(-1, state.size(1), -1)
             modified_state[:, :, SANKALPA_START_DIM:SANKALPA_END_DIM] = goal
         else:
-            # Single state
+            # Single state [B, 32]
+            # If goal is 3D, take last timestep
+            if goal.dim() == 3:
+                goal = goal[:, -1, :]
             modified_state[:, SANKALPA_START_DIM:SANKALPA_END_DIM] = goal
 
         return modified_state
@@ -892,10 +898,17 @@ class PhaseJEPATransformer(nn.Module):
                 h_modulated = self._apply_phase_modulation(h_full, phase_rotation)
                 logits = self.context_encoder.lm_head(h_modulated)
 
-        if isinstance(full_out, tuple) and len(full_out) > 1:
-            logits = full_out[1]
-        elif isinstance(full_out, dict):
-            logits = full_out.get('logits')
+        # Get logits from output if not already set
+        if logits is None:
+            if isinstance(full_out, tuple) and len(full_out) > 1:
+                logits = full_out[1]
+            elif isinstance(full_out, dict):
+                logits = full_out.get('logits')
+
+        # CRITICAL: Always apply phase modulation to logits for gradient bridge
+        # This ensures gradients flow: L_nll → logits → phase_rotation → s_pred → predictor
+        if logits is not None and phase_rotation is not None:
+            logits = self._modulate_logits_with_phase(logits, phase_rotation)
 
         outputs['logits'] = logits
 
@@ -1014,6 +1027,46 @@ class PhaseJEPATransformer(nn.Module):
         h_modulated = h_rotated.view(B, T, D)
 
         return h_modulated
+
+    def _modulate_logits_with_phase(
+        self,
+        logits: torch.Tensor,
+        phase_rotation: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Apply soft phase modulation to logits for gradient bridge.
+
+        This creates a differentiable connection from logits back through
+        phase_rotation → intent_phase_projector → s_pred → predictor.
+
+        The modulation is intentionally subtle (near-identity) to preserve
+        logit distribution while enabling gradient flow.
+
+        Args:
+            logits: [B, T, V] vocabulary logits
+            phase_rotation: [B, num_heads] or [B, T, num_heads]
+
+        Returns:
+            Modulated logits [B, T, V] with gradient path to phase_rotation
+        """
+        # Compute a soft scaling factor from phase rotation
+        # Use mean phase across heads, apply sigmoid for smooth [0.5, 1.5] range
+        if phase_rotation.dim() == 3:
+            phase_mean = phase_rotation.mean(dim=-1)  # [B, T]
+        else:
+            phase_mean = phase_rotation.mean(dim=-1, keepdim=True)  # [B, 1]
+
+        # Normalize to near-identity scaling (0.98 to 1.02)
+        # This preserves logit distribution while creating gradient path
+        scale = 1.0 + 0.02 * torch.tanh(phase_mean / math.pi)
+
+        # Expand for broadcasting with logits [B, T, V]
+        if scale.dim() == 1:
+            scale = scale.unsqueeze(-1).unsqueeze(-1)  # [B, 1, 1]
+        elif scale.dim() == 2:
+            scale = scale.unsqueeze(-1)  # [B, T, 1]
+
+        return logits * scale
 
     def set_phase3_mode(self, enabled: bool = True):
         """
