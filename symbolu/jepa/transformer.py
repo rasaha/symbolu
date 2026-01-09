@@ -520,7 +520,10 @@ class PhaseJEPATransformer(nn.Module):
                 outputs['logits'] = context_out[1] if context_out[1] is not None else None
         elif isinstance(context_out, dict):
             # Try multiple keys for hidden states (different encoders use different keys)
-            h_context = context_out.get('last_hidden_state') or context_out.get('hidden_states')
+            # NOTE: Can't use `or` with tensors - causes "Boolean value ambiguous" error
+            h_context = context_out.get('last_hidden_state')
+            if h_context is None:
+                h_context = context_out.get('hidden_states')
             if h_context is None:
                 # OntologicalHybridTransformer may need forward_hidden for raw hidden states
                 raise ValueError(
@@ -566,7 +569,9 @@ class PhaseJEPATransformer(nn.Module):
                 if isinstance(target_out, tuple):
                     h_target = target_out[0]
                 elif isinstance(target_out, dict):
-                    h_target = target_out.get('last_hidden_state') or target_out.get('hidden_states')
+                    h_target = target_out.get('last_hidden_state')
+                if h_target is None:
+                    h_target = target_out.get('hidden_states')
                 else:
                     h_target = target_out
 
@@ -866,7 +871,9 @@ class PhaseJEPATransformer(nn.Module):
         if isinstance(context_out, tuple):
             h_context = context_out[0]
         elif isinstance(context_out, dict):
-            h_context = context_out.get('last_hidden_state') or context_out.get('hidden_states')
+            h_context = context_out.get('last_hidden_state')
+            if h_context is None:
+                h_context = context_out.get('hidden_states')
         else:
             h_context = context_out
 
@@ -922,7 +929,9 @@ class PhaseJEPATransformer(nn.Module):
                 h_full = full_out[0]
                 logits = full_out[1] if len(full_out) > 1 else None
             elif isinstance(full_out, dict):
-                h_full = full_out.get('last_hidden_state') or full_out.get('hidden_states')
+                h_full = full_out.get('last_hidden_state')
+                if h_full is None:
+                    h_full = full_out.get('hidden_states')
                 logits = full_out.get('logits')
             else:
                 h_full = full_out
@@ -964,7 +973,9 @@ class PhaseJEPATransformer(nn.Module):
                 if isinstance(target_out, tuple):
                     h_target = target_out[0]
                 elif isinstance(target_out, dict):
-                    h_target = target_out.get('last_hidden_state') or target_out.get('hidden_states')
+                    h_target = target_out.get('last_hidden_state')
+                if h_target is None:
+                    h_target = target_out.get('hidden_states')
                 else:
                     h_target = target_out
                 s_target = self.target_state_projector(h_target)
@@ -1466,7 +1477,9 @@ class SovereignJEPA(nn.Module):
             if isinstance(target_out, tuple):
                 h_target = target_out[0]
             elif isinstance(target_out, dict):
-                h_target = target_out.get('last_hidden_state') or target_out.get('hidden_states')
+                h_target = target_out.get('last_hidden_state')
+                if h_target is None:
+                    h_target = target_out.get('hidden_states')
             else:
                 h_target = target_out
             s_actual = self.jepa.target_state_projector(h_target)

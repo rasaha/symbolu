@@ -9946,6 +9946,7 @@ def train(config: UnifiedTrainingConfig):
                     # creating an indirect Sanskrit influence on the loss landscape.
                     # With both sides detached, CSR becomes monitor-only - no training signal flows.
                     csr_emb_for_loss = csr_emb.detach()
+                    csr_confidence_for_loss = csr_confidence.detach()
 
                     # V9.8.1: Align sequence lengths if they differ
                     # This can happen if model internally truncates sequences
@@ -9953,6 +9954,7 @@ def train(config: UnifiedTrainingConfig):
                         min_len = min(csr_hidden_for_loss.shape[1], csr_emb_for_loss.shape[1])
                         csr_hidden_for_loss = csr_hidden_for_loss[:, :min_len, :]
                         csr_emb_for_loss = csr_emb_for_loss[:, :min_len, :]
+                        csr_confidence_for_loss = csr_confidence_for_loss[:, :min_len, :]
 
                     # V9.7.0: Choose between Sparse (Whole-Word) and Dense (Per-Token) supervision
                     if config.csr_sparse_supervision:
@@ -10007,9 +10009,7 @@ def train(config: UnifiedTrainingConfig):
                         # Temperature sharpening: (1 - sim) / tau creates steep gradient landscape
                         # When alignment is poor (sim ≈ 0): loss = (1-0)/0.07 ≈ 14.3 → STRONG pressure
                         # When alignment is good (sim ≈ 0.9): loss = (1-0.9)/0.07 ≈ 1.4 → mild pressure
-                        # V9.6.9: Detach confidence to make CSR fully observational
-                        # Without this, gradient flows: loss → csr_alignment_loss → csr_confidence → confidence_head
-                        csr_confidence_for_loss = csr_confidence.detach()
+                        # V9.6.9/V9.8.1: csr_confidence_for_loss already detached and aligned above
                         csr_alignment_loss = ((1 - csr_similarity) / config.csr_tau) * csr_confidence_for_loss.squeeze(-1)
                         csr_loss = csr_alignment_loss.mean() * config.csr_lambda
 
