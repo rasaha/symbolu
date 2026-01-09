@@ -205,6 +205,11 @@ The architecture doesn't care WHAT generates the phase shift—only that it rece
 17. [Geometric Masking Training Loop](#17-geometric-masking-training-loop-complete)
 18. [Patent-Enhanced Loss Functions (SovereignPatentLoss)](#18-patent-enhanced-loss-functions-sovereignpatentloss)
 
+**Part III: Operational Guide**
+19. [Operational Stability & Troubleshooting](#19-operational-stability--troubleshooting)
+20. [Production Inference Optimization](#20-production-inference-optimization)
+21. [Final Verification Checklist](#21-final-verification-checklist)
+
 **Appendices**
 - [Appendix A: Theoretical Foundations](#appendix-a-theoretical-foundations)
 - [Appendix B: Risk Analysis](#appendix-b-risk-analysis)
@@ -2728,6 +2733,462 @@ Track these metrics during training to ensure healthy optimization:
 
 ---
 
+## 19. Operational Stability & Troubleshooting
+
+Training complex-valued neural networks (CVNNs) and Phase-JEPAs requires specific stabilization tactics not found in standard ViT training manuals.
+
+### 19.1 The "Phase Wrapping" Hazard
+
+**Symptom:** Loss spikes suddenly; gradients explode.
+
+**Cause:** When a phase angle φ crosses from +π to −π, the derivative is discontinuous if calculated naively on the angle.
+
+**Fix:** The `PhaseSyncLoss` uses `1 − cos(φ_pred − φ_target)`, which is continuous. **DO NOT** use MSE on raw angles (`(φ_pred − φ_target)²`).
+
+**Implementation Constraint:** Always keep optimization in the **Phasor Domain** (complex numbers) or **Cartesian Domain** (`(Re, Im)`), never in the raw **Polar Domain** (angle scalars) for intermediate layers.
+
+### 19.2 Initialization Strategy (The "Cold Start" Problem)
+
+If phases are initialized to exactly 0, the "Global Structure" collapses. If random, it starts as noise.
+
+**Recommended Initialization:**
+
+| Parameter | Strategy | Rationale |
+|-----------|----------|-----------|
+| **Query/Key Phases** | Uniform `[-π, +π]` | Avoid degenerate zero-phase collapse |
+| **Amplitudes** | `σ(linear + bias)` with bias = `-2.0` | Start sigmoid ≈ 0.12 (low confidence), let model learn to attend |
+| **Predictor MLP (last layer)** | **Zero-initialized** | Forces predictor to start as Identity `f(x) = x` and learn deviations |
+
+```python
+# Initialization Example
+def init_phase_layers(module):
+    if hasattr(module, 'phase_proj'):
+        # Uniform phase initialization
+        nn.init.uniform_(module.phase_proj.weight, -math.pi, math.pi)
+    if hasattr(module, 'amp_proj'):
+        # Low-confidence amplitude start
+        nn.init.zeros_(module.amp_proj.weight)
+        nn.init.constant_(module.amp_proj.bias, -2.0)
+    if hasattr(module, 'delta_mlp'):
+        # Identity-start for predictor
+        nn.init.zeros_(module.delta_mlp[-1].weight)
+        nn.init.zeros_(module.delta_mlp[-1].bias)
+```
+
+### 19.3 Loss Balancing Heuristics
+
+The Multi-Objective Loss (Formula S3) has 4 competing terms. Use this balancing schedule:
+
+| Training Epoch | λ_task (JEPA) | λ_BCVF (Consistency) | λ_USE (Coherence) | λ_SCC (Entropy) | Rationale |
+|----------------|---------------|----------------------|-------------------|-----------------|-----------|
+| **0-5 (Warmup)** | 1.0 | 0.0 | 0.1 | 0.0 | Let the model learn to "see" (reconstruct) before governing it |
+| **5-20 (Structure)** | 1.0 | 0.1 | 0.5 | 0.0 | Enforce global phase structure (L_USE) once features exist |
+| **20+ (Governance)** | 1.0 | **1.0** | 0.5 | **0.1** | Turn on the SRK (B1, S5) to refine and arbitrate |
+
+```python
+class LossScheduler:
+    """Curriculum-based loss weight scheduling."""
+
+    def __init__(self):
+        self.schedules = {
+            'warmup':    {'task': 1.0, 'bcvf': 0.0, 'use': 0.1, 'scc': 0.0},
+            'structure': {'task': 1.0, 'bcvf': 0.1, 'use': 0.5, 'scc': 0.0},
+            'govern':    {'task': 1.0, 'bcvf': 1.0, 'use': 0.5, 'scc': 0.1},
+        }
+
+    def get_weights(self, epoch: int) -> dict:
+        if epoch < 5:
+            return self.schedules['warmup']
+        elif epoch < 20:
+            return self.schedules['structure']
+        else:
+            return self.schedules['govern']
+```
+
+### 19.4 Debugging "Phase Collapse"
+
+**Symptom:** `PAS` score stays near 1.0, but `Reconstruction MSE` is high.
+
+**Diagnosis:** The model has learned to predict φ = 0 for all patches (everything is zero phase).
+
+**Countermeasures:**
+
+1. **Increase VICReg Variance Loss** to force distribution spread
+2. **Increase Patent SCC Entropy Penalty** (`λ_SCC = 0.2+`)
+3. **Check amplitude initialization** — if amplitudes are too low, phases have no gradient signal
+
+```python
+# Phase Collapse Detection
+def detect_phase_collapse(pred_z: torch.Tensor, threshold: float = 0.1) -> bool:
+    """Returns True if phases have collapsed to near-zero variance."""
+    pred_c = torch.view_as_complex(pred_z.reshape(*pred_z.shape[:-1], -1, 2))
+    phase_std = pred_c.angle().std()
+    return phase_std < threshold
+```
+
+### 19.5 Gradient Monitoring
+
+Phase-based models can exhibit unusual gradient dynamics. Monitor these signals:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                         GRADIENT HEALTH INDICATORS                                       │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  HEALTHY:                                                                                │
+│  ════════                                                                                │
+│  grad_norm(phase_proj) ∈ [0.01, 5.0]                                                    │
+│  grad_norm(amp_proj) ∈ [0.01, 5.0]                                                      │
+│  grad_norm(text_phase_projector) ∈ [0.001, 1.0]                                         │
+│                                                                                          │
+│  UNHEALTHY:                                                                              │
+│  ══════════                                                                              │
+│  grad_norm > 10.0  →  Gradient explosion (reduce LR or clip)                            │
+│  grad_norm < 1e-6  →  Vanishing gradients (check activation functions)                  │
+│  grad_norm oscillating wildly  →  Phase wrapping (check loss formulation)               │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 20. Production Inference Optimization
+
+Implementing Phase-JEPA efficiently in production requires handling Complex Numbers on GPUs with care.
+
+### 20.1 "Real-View" Optimization
+
+PyTorch `complex64` can be slower than `float32` due to limited kernel optimization.
+
+**Optimization Strategy:** Store real and imaginary parts as adjacent channels in the last dimension: `[B, N, D, 2]`.
+
+```python
+class RealViewComplexOps:
+    """Efficient complex operations using real-valued tensors."""
+
+    @staticmethod
+    def multiply(z1: torch.Tensor, z2: torch.Tensor) -> torch.Tensor:
+        """Complex multiplication: (a+bi)(c+di) = (ac-bd) + (ad+bc)i
+
+        Args:
+            z1, z2: [B, N, D, 2] where [..., 0] = real, [..., 1] = imag
+        """
+        a, b = z1[..., 0], z1[..., 1]
+        c, d = z2[..., 0], z2[..., 1]
+        real = a * c - b * d
+        imag = a * d + b * c
+        return torch.stack([real, imag], dim=-1)
+
+    @staticmethod
+    def rotate(z: torch.Tensor, theta: torch.Tensor) -> torch.Tensor:
+        """Apply phase rotation: z × e^{iθ}
+
+        Args:
+            z: [B, N, D, 2] complex tensor in real-view
+            theta: [B, D] or [B, 1, D] rotation angles
+        """
+        cos_t = torch.cos(theta).unsqueeze(-1)  # [..., 1]
+        sin_t = torch.sin(theta).unsqueeze(-1)
+
+        real = z[..., 0:1] * cos_t - z[..., 1:2] * sin_t
+        imag = z[..., 0:1] * sin_t + z[..., 1:2] * cos_t
+        return torch.cat([real, imag], dim=-1)
+```
+
+### 20.2 RoPE Kernel Reuse
+
+The "Phase Rotation" operation is mathematically identical to Rotary Positional Embeddings (RoPE). You can reuse optimized RoPE kernels:
+
+```python
+# Leverage FlashAttention's optimized RoPE
+from flash_attn.layers.rotary import apply_rotary_emb
+
+def apply_text_phase_rotation(q: torch.Tensor, theta_geometric: torch.Tensor) -> torch.Tensor:
+    """Reuse RoPE kernel for text-conditioned phase rotation.
+
+    Args:
+        q: [B, N, H, D_head] query tensor
+        theta_geometric: [B, D_head//2] text-derived rotation angles
+
+    Note: RoPE applies rotation per consecutive pair of dimensions,
+          which aligns with our complex representation.
+    """
+    # Convert theta to RoPE format (cos, sin interleaved)
+    cos = torch.cos(theta_geometric).unsqueeze(1).unsqueeze(2)  # [B, 1, 1, D/2]
+    sin = torch.sin(theta_geometric).unsqueeze(1).unsqueeze(2)
+
+    return apply_rotary_emb(q, cos, sin)
+```
+
+### 20.3 The "Intent Cache" (Speedup)
+
+Since the Text Phase Shift (θ_geometric) depends only on the text prompt:
+
+```python
+class IntentCache:
+    """Pre-computed phase shifts for common geometric commands."""
+
+    def __init__(self, text_encoder: nn.Module, phase_projector: nn.Module):
+        self.text_encoder = text_encoder
+        self.phase_projector = phase_projector
+        self.cache = {}
+
+    def warmup(self, common_prompts: list[str]):
+        """Pre-compute phase shifts for common commands."""
+        with torch.no_grad():
+            for prompt in common_prompts:
+                tokens = self.tokenize(prompt)
+                text_emb = self.text_encoder(tokens)
+                theta = torch.tanh(self.phase_projector(text_emb)) * math.pi
+                self.cache[prompt] = theta.cpu()
+
+    def get_phase_shift(self, prompt: str, device: torch.device) -> torch.Tensor:
+        """Retrieve cached or compute phase shift."""
+        if prompt in self.cache:
+            return self.cache[prompt].to(device)
+
+        # Fallback to computation
+        with torch.no_grad():
+            tokens = self.tokenize(prompt)
+            text_emb = self.text_encoder(tokens)
+            return torch.tanh(self.phase_projector(text_emb)) * math.pi
+
+# Usage
+cache = IntentCache(text_encoder, phase_projector)
+cache.warmup([
+    "Rotate 90 degrees clockwise",
+    "Rotate 90 degrees counterclockwise",
+    "Rotate 180 degrees",
+    "Zoom in",
+    "Zoom out",
+    "Pan left",
+    "Pan right",
+    "Standard orientation",
+])
+```
+
+### 20.4 Mauna Protocol Integration (Safety)
+
+During inference, the `SovereignPatentLoss` diagnostics serve as a safety gate:
+
+```python
+class SafeInference:
+    """Production inference with Mauna (silence) protocol."""
+
+    def __init__(
+        self,
+        model: PhaseVLJEPA_System,
+        entropy_threshold: float = 0.85,
+        consistency_threshold: float = 0.2,
+    ):
+        self.model = model
+        self.entropy_threshold = entropy_threshold
+        self.consistency_threshold = consistency_threshold
+
+    def __call__(self, image: torch.Tensor, text: str) -> dict:
+        """Inference with safety checks."""
+        pred, diagnostics = self.model.predict_with_diagnostics(image, text)
+
+        # Mauna Check 1: Entropy too high (hallucination risk)
+        if diagnostics['entropy'] > self.entropy_threshold:
+            return {
+                'status': 'mauna',
+                'reason': 'high_entropy',
+                'message': 'Model uncertainty too high for reliable prediction',
+                'confidence': diagnostics['entropy'],
+            }
+
+        # Mauna Check 2: Consistency too low (logical contradiction)
+        if diagnostics['consistency_weight'] < self.consistency_threshold:
+            return {
+                'status': 'mauna',
+                'reason': 'low_consistency',
+                'message': 'Internal consistency check failed',
+                'confidence': diagnostics['consistency_weight'],
+            }
+
+        # Safe to return prediction
+        return {
+            'status': 'ok',
+            'prediction': pred,
+            'diagnostics': diagnostics,
+        }
+```
+
+### 20.5 Batch Inference Optimization
+
+For production throughput, batch multiple images with the same text command:
+
+```python
+def batch_inference(
+    model: PhaseVLJEPA_System,
+    images: list[torch.Tensor],
+    text: str,
+    intent_cache: IntentCache,
+) -> list[torch.Tensor]:
+    """Optimized batch inference with shared text phase."""
+
+    # 1. Get cached phase shift (O(1) lookup)
+    theta = intent_cache.get_phase_shift(text, images[0].device)
+
+    # 2. Batch images
+    batch = torch.stack(images)  # [B, C, H, W]
+
+    # 3. Expand theta for batch
+    theta_batch = theta.expand(len(images), -1)  # [B, D_phase]
+
+    # 4. Single forward pass
+    with torch.no_grad():
+        predictions = model(batch, theta_batch)
+
+    return predictions
+```
+
+---
+
+## 21. Final Verification Checklist
+
+Before launching the full training run, verify these critical items:
+
+### 21.1 Gradient & Autograd Checks
+
+- [ ] **Gradient Norm Check:** Gradients for `phase_proj` layers should not exceed 5.0
+- [ ] **Complex Autograd:** Ensure `loss.backward()` works through `torch.view_as_complex`
+- [ ] **No NaN/Inf:** Check for numerical instability in phase calculations
+
+```python
+def verify_gradients(model: nn.Module, sample_batch: tuple) -> bool:
+    """Verify gradient flow is healthy."""
+    images, masks, text_phases = sample_batch
+
+    model.zero_grad()
+    loss, _ = model.training_step({'images': images, 'masks': masks, 'text_phases': text_phases})
+    loss.backward()
+
+    for name, param in model.named_parameters():
+        if param.grad is not None:
+            grad_norm = param.grad.norm().item()
+            if grad_norm > 10.0:
+                print(f"WARNING: {name} grad_norm = {grad_norm:.2f} (too high)")
+                return False
+            if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
+                print(f"ERROR: {name} has NaN/Inf gradients")
+                return False
+
+    return True
+```
+
+### 21.2 Data Pipeline Checks
+
+- [ ] **Mask-Text Alignment:** Visualize one batch from `GeometricMaskCollator`. Does the "Text" match the "Mask"?
+- [ ] **Rotation Labels:** If text = "Rotated 90", is the mask actually challenging rotation?
+- [ ] **Batch Collation:** Verify masks and images are correctly paired
+
+```python
+def visualize_batch(collator: GeometricMaskCollator, dataset, num_samples: int = 4):
+    """Visual verification of data pipeline."""
+    import matplotlib.pyplot as plt
+
+    batch = [dataset[i] for i in range(num_samples)]
+    images, masks, rotations = collator(batch)
+
+    fig, axes = plt.subplots(num_samples, 2, figsize=(8, 4*num_samples))
+    for i in range(num_samples):
+        # Original image
+        axes[i, 0].imshow(images[i].permute(1, 2, 0))
+        axes[i, 0].set_title(f"Image {i}")
+
+        # Mask visualization
+        mask_2d = masks[i].reshape(14, 14)
+        axes[i, 1].imshow(mask_2d, cmap='gray')
+        axes[i, 1].set_title(f"Mask (rot={rotations[i]:.2f})")
+
+    plt.tight_layout()
+    plt.savefig('data_pipeline_check.png')
+    print("Saved data_pipeline_check.png")
+```
+
+### 21.3 EMA & Teacher Checks
+
+- [ ] **Teacher Weights Updating:** Verify teacher weights are changing (EMA decay isn't 1.0)
+- [ ] **Student-Teacher Divergence:** After N steps, teacher should differ from student
+
+```python
+def verify_ema_update(model: PhaseVLJEPA_System, steps: int = 100) -> bool:
+    """Verify EMA is actually updating teacher weights."""
+    # Snapshot teacher weights
+    initial_teacher = {k: v.clone() for k, v in model.teacher_encoder.state_dict().items()}
+
+    # Run training steps
+    for _ in range(steps):
+        model.training_step(get_dummy_batch())
+
+    # Compare
+    changed = 0
+    for k, v in model.teacher_encoder.state_dict().items():
+        if not torch.allclose(initial_teacher[k], v, atol=1e-6):
+            changed += 1
+
+    if changed == 0:
+        print("ERROR: Teacher weights unchanged after training (EMA decay = 1.0?)")
+        return False
+
+    print(f"OK: {changed} teacher parameter tensors updated via EMA")
+    return True
+```
+
+### 21.4 Loss Component Checks
+
+- [ ] **Individual Loss Terms:** Verify each loss component (L_task, L_BCVF, L_USE, L_SCC) is non-zero
+- [ ] **Loss Scale Balance:** No single term should dominate (>90% of total)
+
+```python
+def verify_loss_balance(diagnostics: dict) -> bool:
+    """Check that loss terms are balanced."""
+    total = sum(v for k, v in diagnostics.items() if k.startswith('L_'))
+
+    for key, value in diagnostics.items():
+        if key.startswith('L_') and total > 0:
+            ratio = value / total
+            if ratio > 0.9:
+                print(f"WARNING: {key} dominates loss ({ratio:.1%})")
+                return False
+
+    return True
+```
+
+### 21.5 Pre-Flight Summary
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                         PRE-TRAINING VERIFICATION CHECKLIST                              │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  CRITICAL (Must Pass):                                                                   │
+│  ═════════════════════                                                                   │
+│  [ ] Gradient flow through complex operations verified                                   │
+│  [ ] No NaN/Inf in forward pass                                                         │
+│  [ ] EMA teacher weights updating                                                        │
+│  [ ] Data pipeline text-mask alignment verified                                          │
+│                                                                                          │
+│  RECOMMENDED (Should Pass):                                                              │
+│  ══════════════════════════                                                              │
+│  [ ] Gradient norms < 5.0 for phase layers                                              │
+│  [ ] Loss terms balanced (no single term > 90%)                                          │
+│  [ ] Phase variance > 0.1 (no collapse)                                                  │
+│  [ ] Teacher-student weights diverging                                                   │
+│                                                                                          │
+│  OPTIONAL (Nice to Have):                                                                │
+│  ════════════════════════                                                                │
+│  [ ] Data pipeline visualization saved                                                   │
+│  [ ] Benchmark forward pass latency                                                      │
+│  [ ] Memory usage profiled                                                               │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Appendix A: Theoretical Foundations
 
 ### A.1 JEPA as Contrastive-Free Learning
@@ -2960,6 +3421,7 @@ The key enabler: **Both systems speak Phase Math**, making the integration seaml
 | 1.3.0 | 2026-01-09 | Added complete Geometric Masking Training Loop (§17) |
 | 1.4.0 | 2026-01-09 | Added Strategic Architecture Philosophy (Appendix C) |
 | 1.5.0 | 2026-01-09 | Added Patent-Enhanced Loss Functions (§18) - BCVF, USE, SCC integration |
+| 1.6.0 | 2026-01-09 | Added Operational Guide (§19-21) - Stability, Production, Verification |
 
 ---
 
@@ -2992,3 +3454,16 @@ The key enabler: **Both systems speak Phase Math**, making the integration seaml
 - [ ] Create vision encoder integration (ViT)
 - [ ] Small-scale validation on CIFAR-100/Tiny-ImageNet
 - [ ] Success criteria: PAS > 0.6 within 10 epochs
+
+### Part III: Operational & Production (§19-21)
+
+- [ ] Implement `init_phase_layers` initialization function
+- [ ] Implement `LossScheduler` for curriculum-based training
+- [ ] Add `detect_phase_collapse` diagnostic utility
+- [ ] Implement `RealViewComplexOps` for production efficiency
+- [ ] Implement `IntentCache` for inference speedup
+- [ ] Implement `SafeInference` with Mauna protocol
+- [ ] Create `verify_gradients` pre-flight check
+- [ ] Create `verify_ema_update` pre-flight check
+- [ ] Create `visualize_batch` debugging utility
+- [ ] Run full pre-training verification checklist
