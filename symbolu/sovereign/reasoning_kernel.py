@@ -124,6 +124,8 @@ class SRKConfig:
     enable_mauna: bool = False
     mauna_error_threshold: float = 0.9
     mauna_activity_threshold: float = 0.9
+    mauna_confidence_threshold: float = 0.6   # Minimum confidence for output
+    mauna_consistency_threshold: float = 0.5  # Minimum backward score consistency
 
     # OPB Dimension Locking (Ontological Persistence Buffer)
     enable_opb_locking: bool = True
