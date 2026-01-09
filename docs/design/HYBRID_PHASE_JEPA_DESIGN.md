@@ -1,7 +1,7 @@
 # Hybrid Phase-JEPA Architecture Design Specification
 
-**Version:** 2.0.0
-**Status:** Part I Implementation Complete
+**Version:** 2.1.0
+**Status:** Part I Implementation Complete (with Phase 3 Gradient Bridge)
 **Date:** 2026-01-09
 **Origin:** Google Gemini Proposals + Meta JEPA + SymbolU Phase Attention Integration
 **Branch:** `claude/hybrid-phase-jepa-spec-r8IA5`
@@ -4434,10 +4434,15 @@ Based on this validation dialogue:
 | `WeightedAlignmentLoss` | ✅ | `symbolu/jepa/losses.py:115` |
 | `JEPAPredictionLoss` | ✅ | `symbolu/jepa/losses.py:201` |
 | `CompositeJEPALoss` | ✅ | `symbolu/jepa/losses.py:299` |
-| `PhaseJEPATransformer` wrapper | ✅ | `symbolu/jepa/transformer.py:103` |
+| `PhaseJEPATransformer` wrapper | ✅ | `symbolu/jepa/transformer.py:106` |
+| Phase 3 Gradient Bridge | ✅ | `symbolu/jepa/transformer.py:457-745` |
+| `intent_phase_projector` | ✅ | `symbolu/jepa/transformer.py:243-255` |
+| `forward_phase3()` | ✅ | `symbolu/jepa/transformer.py:491-679` |
+| `_apply_phase_modulation()` | ✅ | `symbolu/jepa/transformer.py:681-733` |
 | CLI arguments | ✅ | `train_unified_llm.py:11993-12059` |
 | Training loop integration | ✅ | `train_unified_llm.py:9770-9844` |
 | Unit tests | ✅ | `symbolu/jepa/tests/test_jepa.py` |
+| Phase 3 gradient flow tests | ✅ | `symbolu/jepa/tests/test_jepa.py:792-1029` |
 
 #### CLI Usage Example
 
@@ -4601,6 +4606,143 @@ if jepa_model is not None and JEPA_AVAILABLE:
     # Update target encoder (EMA)
     jepa_model.training_step_update()
 ```
+
+### Phase 3 (Kṛti) Gradient Bridge
+
+**CRITICAL IMPLEMENTATION**: During Phase 3 (Kṛti/Action), gradients from the NLL loss must flow backwards through the Phase Rotation into the PhaseJEPAPredictor. This enables the predictor to learn from token generation errors.
+
+#### Why the Gradient Bridge Matters
+
+```
+Without Bridge (Broken):
+    L_nll → logits → (STOP) ← predictor learns nothing from token errors
+
+With Bridge (Working):
+    L_nll → logits → h_modulated → θ → s_pred → predictor
+
+    The predictor learns: "I set θ=45°, got 'Cat'. Should have been θ=90° for 'Dog'."
+```
+
+#### Implementation Components
+
+1. **`intent_phase_projector`** (`transformer.py:243-255`):
+   ```python
+   # Maps predicted state (32D) → phase rotation angles (num_heads)
+   self.intent_phase_projector = nn.Sequential(
+       nn.Linear(state_dim, state_dim * 2),
+       nn.GELU(),
+       nn.Linear(state_dim * 2, num_encoder_heads),
+       nn.Tanh(),  # Output in [-1, 1], scaled to [-π, π]
+   )
+   # Initialized near-zero for stable training start
+   ```
+
+2. **`compute_phase_rotation()`** (`transformer.py:457-489`):
+   ```python
+   def compute_phase_rotation(self, s_pred):
+       # CRITICAL: DO NOT detach s_pred - gradient bridge depends on it
+       theta = self.intent_phase_projector(s_pred)  # [B, num_heads]
+       return theta * math.pi  # Scale to [-π, π]
+   ```
+
+3. **`forward_phase3()`** (`transformer.py:491-679`):
+   - Step 1: Context encoding → h_context
+   - Step 2: State projection → s_context
+   - Step 3: Prediction → s_pred (with gradients!)
+   - Step 4: Phase rotation → θ = f(s_pred)
+   - Step 5: Apply modulation → h_modulated = rotate(h_full, θ)
+   - Step 6: LM head → logits = lm_head(h_modulated)
+   - Step 7: Compute L_nll (gradients flow through entire chain)
+
+4. **`_apply_phase_modulation()`** (`transformer.py:681-733`):
+   ```python
+   # Complex rotation per attention head
+   h_real_rot = h_real * cos(θ) - h_imag * sin(θ)
+   h_imag_rot = h_real * sin(θ) + h_imag * cos(θ)
+   ```
+
+#### Gradient Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 3 GRADIENT FLOW (Kṛti)                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  FORWARD PASS (solid arrows):                                               │
+│  ═══════════════════════════                                                │
+│                                                                              │
+│  input_ids ─► context_encoder ─► h_context ─► state_projector ─► s_context │
+│                                                                     │       │
+│                                                                     ▼       │
+│                                                               predictor     │
+│                                                                     │       │
+│                                                                     ▼       │
+│              ┌──────────────────────────────────────────────── s_pred      │
+│              │                                                              │
+│              │  intent_phase_projector (DIFFERENTIABLE!)                   │
+│              │                                                              │
+│              ▼                                                              │
+│              θ ─────────────────────────────────────┐                      │
+│                                                      │                      │
+│  input_ids ─► context_encoder ─► h_full ────────────┼─► _apply_phase_modulation
+│                                                      │            │         │
+│                                                      │            ▼         │
+│                                                      │       h_modulated    │
+│                                                      │            │         │
+│                                                      │            ▼         │
+│                                                      │        lm_head       │
+│                                                      │            │         │
+│                                                      │            ▼         │
+│                                                      │         logits       │
+│                                                      │            │         │
+│                                                      │            ▼         │
+│                                                      │    cross_entropy     │
+│                                                      │            │         │
+│                                                      │            ▼         │
+│                                                      │         L_nll       │
+│                                                                              │
+│  BACKWARD PASS (dashed arrows):                                             │
+│  ══════════════════════════════                                             │
+│                                                                              │
+│  L_nll ◄── logits ◄── h_modulated ◄── (θ, h_full)                          │
+│                             │                                               │
+│                             │ ∂L/∂θ (GRADIENT FLOWS HERE!)                 │
+│                             ▼                                               │
+│                     intent_phase_projector                                  │
+│                             │                                               │
+│                             │ ∂L/∂s_pred                                   │
+│                             ▼                                               │
+│                         predictor ◄── LEARNING!                            │
+│                             │                                               │
+│                             │ "I set θ=45°, got 'Cat'. Should be θ=90°"    │
+│                             ▼                                               │
+│                    predictor weights updated                                │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Enabling Phase 3 Mode
+
+```python
+# Method 1: Explicit toggle
+model.set_phase3_mode(True)
+outputs = model(input_ids, labels=labels)  # Auto-routes to forward_phase3
+
+# Method 2: Direct call
+outputs = model.forward_phase3(input_ids, labels=labels)
+
+# Method 3: Via curriculum (automatic during Union/Kṛti phase)
+model.curriculum.step()  # Triggers phase3_mode when entering Kṛti
+```
+
+#### Critical Implementation Rules
+
+1. **NEVER** call `.detach()` on `s_pred` in the Phase 3 path
+2. **NEVER** use `with torch.no_grad():` around the phase rotation computation
+3. **ALWAYS** verify gradient flow with the unit tests:
+   ```bash
+   pytest symbolu/jepa/tests/test_jepa.py::TestPhase3GradientBridge -v
+   ```
 
 ### Checkpoint Save/Load
 
