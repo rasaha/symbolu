@@ -690,6 +690,7 @@ class TestSovereignAnnealer:
             'WARMUP', 'SYSTEM_1', 'CALIBRATION', 'SYSTEM_2',
             'LINGUISTIC_FOUNDATION', 'REASONING_EMERGENCE',
             'ONTOLOGICAL_GROUNDING', 'INTEGRATION', 'REFINEMENT',
+            'STABILIZATION',
         ]
         assert early in valid_phases, f"Got early={early}"
         assert mid in valid_phases, f"Got mid={mid}"
