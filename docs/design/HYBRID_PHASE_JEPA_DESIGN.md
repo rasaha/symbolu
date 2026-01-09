@@ -203,6 +203,7 @@ The architecture doesn't care WHAT generates the phase shift—only that it rece
 15. [Implementation Files Summary](#15-implementation-files-summary)
 16. [Quick Start Validation](#16-quick-start-validation)
 17. [Geometric Masking Training Loop](#17-geometric-masking-training-loop-complete)
+18. [Patent-Enhanced Loss Functions (SovereignPatentLoss)](#18-patent-enhanced-loss-functions-sovereignpatentloss)
 
 **Appendices**
 - [Appendix A: Theoretical Foundations](#appendix-a-theoretical-foundations)
@@ -2440,6 +2441,293 @@ if __name__ == '__main__':
 
 ---
 
+## 18. Patent-Enhanced Loss Functions (SovereignPatentLoss)
+
+This section integrates the mathematical rigor from the SymbolU patents (BCVF, USE, SCC) into the Phase-VL-JEPA loss function, elevating the model from "functioning" to **"mathematically optimized."**
+
+### 18.1 Patent Integration Strategy
+
+| Patent | Formula | Application in Phase-VL-JEPA |
+|--------|---------|------------------------------|
+| **BCVF** | **B1 (Lagrangian)** | **"Truth" Loss:** Penalizes predictions that diverge from Text Phase Intent (s_b) or lack Visual Confidence (s_f) |
+| **USE** | **U2 (Total Coherence)** | **Global Synchronization:** Forces ALL patches to synchronize phases, acting as "gravity" holding image structure together |
+| **SCC** | **S5, S8 (Entropy)** | **Stability Constraint:** Monitors Phase Entropy—penalizes chaotic phases to prevent latent-space hallucinations |
+
+### 18.2 Mathematical Specification
+
+#### A. BCVF Integration (The Lagrangian Loss)
+
+Redefining scores for the JEPA context:
+
+**Forward Score (s_f)**: The **Confidence** of the prediction, measured by amplitude:
+$$s_f = \sigma(\text{mean}(|z_{\text{pred}}|))$$
+
+**Backward Score (s_b)**: The **Goal Alignment**, measured by phase alignment with text intent:
+$$s_b = \frac{1 + \cos(\phi_{\text{pred}} - \phi_{\text{target}})}{2}$$
+
+**Formula B1 (Consistency Lagrangian)**:
+$$\mathcal{L}_{\text{BCVF}} = \lambda_f (1 - s_f)^2 + \lambda_b (1 - s_b)^2 + \lambda_c (s_f - s_b)^2$$
+
+The three terms ensure:
+- High confidence (λ_f term)
+- Strong alignment (λ_b term)
+- Confidence-alignment balance (λ_c term)
+
+#### B. USE Integration (The Coherence Objective)
+
+**Formula U2 (Total Coherence)** across all latent patches:
+$$\mathcal{L}_{\text{USE}} = -\sum_{i,j} \cos(\phi_i - \phi_j) = -\text{Tr}(C)$$
+
+Where C is the **Correlation Matrix** from Formula U1:
+$$C_{ij} = \text{Re}(\hat{z}_i \cdot \hat{z}_j^*)$$
+
+Where $\hat{z} = z / |z|$ (normalized phasors).
+
+Minimizing negative sum maximizes global phase coherence.
+
+#### C. SCC Integration (The Entropy Constraint)
+
+**Formula S5 (Semantic Entropy)**:
+$$H_{\text{sem}} = -\sum_k p_k \log p_k$$
+
+Where $p_k = \text{softmax}(\phi)_k$ is the phase distribution.
+
+- **High entropy** = Random phase noise (hallucination risk)
+- **Low entropy** = Ordered geometric structure
+- **Target**: "Goldilocks zone" of meaningful representation
+
+**Formula S3 (Combined Loss)**:
+$$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{task}} + \lambda_{\text{BCVF}} \cdot \mathcal{L}_{\text{BCVF}} + \lambda_{\text{USE}} \cdot \mathcal{L}_{\text{USE}} + \lambda_{\text{SCC}} \cdot H_{\text{sem}}$$
+
+### 18.3 SovereignPatentLoss Implementation
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class SovereignPatentLoss(nn.Module):
+    """
+    Patent-enhanced loss implementing BCVF (B1), USE (U2), and SCC (S5) formulas.
+
+    Elevates Phase-VL-JEPA from "functioning" to "mathematically optimized":
+    - BCVF: Prevents "lazily confident" or "weakly accurate" predictions
+    - USE: Acts as "structural glue" for global phase coherence
+    - SCC: Fights collapse (zero entropy) and hallucination (max entropy)
+    """
+
+    def __init__(
+        self,
+        lambda_bcvf: float = 1.0,
+        lambda_use: float = 0.5,
+        lambda_scc: float = 0.1,
+        lambda_f: float = 1.0,  # BCVF: confidence weight
+        lambda_b: float = 1.0,  # BCVF: alignment weight
+        lambda_c: float = 0.5,  # BCVF: balance weight
+    ):
+        super().__init__()
+        self.lambda_bcvf = lambda_bcvf
+        self.lambda_use = lambda_use
+        self.lambda_scc = lambda_scc
+        self.lambda_f = lambda_f
+        self.lambda_b = lambda_b
+        self.lambda_c = lambda_c
+
+    def forward(
+        self,
+        pred_z: torch.Tensor,
+        target_z: torch.Tensor,
+        text_phase_shift: torch.Tensor,
+    ) -> tuple:
+        """
+        Compute patent-enhanced loss.
+
+        Args:
+            pred_z: Student prediction [B, N, D]
+            target_z: Teacher target [B, N, D]
+            text_phase_shift: Text-derived rotation command [B, D_phase]
+
+        Returns:
+            total_loss: Scalar loss
+            diagnostics: Dictionary of component losses and metrics
+        """
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 0: Complex Projection
+        # ═══════════════════════════════════════════════════════════════════
+        pred_c = torch.view_as_complex(
+            pred_z.float().reshape(*pred_z.shape[:-1], -1, 2).contiguous()
+        )
+        target_c = torch.view_as_complex(
+            target_z.float().reshape(*target_z.shape[:-1], -1, 2).contiguous()
+        )
+
+        pred_amp = pred_c.abs()
+        pred_phase = pred_c.angle()
+        target_phase = target_c.angle()
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 1: BCVF - Consistency Lagrangian (Formula B1)
+        # ═══════════════════════════════════════════════════════════════════
+        # Forward Score (s_f): Normalized Amplitude → Confidence
+        # High amplitude = high confidence feature
+        s_f = torch.sigmoid(pred_amp.mean(dim=-1))
+
+        # Backward Score (s_b): Phase Alignment → Goal Alignment
+        # Does predicted phase match target (which embodies text intent)?
+        phase_alignment = torch.cos(pred_phase - target_phase).mean(dim=-1)
+        s_b = (1.0 + phase_alignment) / 2.0  # Normalize to [0, 1]
+
+        # Formula B1: Consistency Lagrangian
+        term_f = self.lambda_f * (1 - s_f) ** 2  # Penalize low confidence
+        term_b = self.lambda_b * (1 - s_b) ** 2  # Penalize poor alignment
+        term_c = self.lambda_c * (s_f - s_b) ** 2  # Penalize imbalance
+        L_bcvf = (term_f + term_b + term_c).mean()
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 2: USE - Universal Synchronization (Formula U2)
+        # ═══════════════════════════════════════════════════════════════════
+        # Maximize pairwise cosine similarity of phases
+        # This forces "Global Structure" to be coherent
+
+        # Normalize to unit magnitude (phasors)
+        phasors = pred_c / (pred_amp + 1e-6)
+
+        # Correlation Matrix C[i,j] (Formula U1)
+        # Computed over patch dimension N
+        C = torch.matmul(phasors, phasors.conj().transpose(-2, -1)).real
+
+        # Formula U2: Sum of correlations (minimize negative to maximize)
+        L_use = -1.0 * C.mean()
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 3: SCC - Semantic Entropy (Formula S5)
+        # ═══════════════════════════════════════════════════════════════════
+        # H_sem = -Sum(p * log(p))
+        # High entropy = chaotic phases (hallucination)
+        # Low entropy = ordered structure
+
+        # Softmax over phase angles for pseudo-probability
+        probs = F.softmax(pred_phase, dim=-1)
+        log_probs = F.log_softmax(pred_phase, dim=-1)
+        H_sem = -(probs * log_probs).sum(dim=-1).mean()
+        L_scc = H_sem
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 4: Task Loss (Standard JEPA L2)
+        # ═══════════════════════════════════════════════════════════════════
+        L_task = F.mse_loss(pred_z, target_z)
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 5: Total Sovereign Loss (Formula S3)
+        # ═══════════════════════════════════════════════════════════════════
+        L_total = (
+            L_task
+            + self.lambda_bcvf * L_bcvf
+            + self.lambda_use * L_use
+            + self.lambda_scc * L_scc
+        )
+
+        diagnostics = {
+            'total': L_total.item(),
+            'task': L_task.item(),
+            'bcvf': L_bcvf.item(),
+            'use': L_use.item(),
+            'scc': L_scc.item(),
+            's_f': s_f.mean().item(),  # Confidence score
+            's_b': s_b.mean().item(),  # Alignment score
+            'entropy': H_sem.item(),   # Phase entropy
+        }
+
+        return L_total, diagnostics
+```
+
+### 18.4 Training Integration
+
+Update `GeometricMaskingTrainer.training_step()` to use the patent-enhanced loss:
+
+```python
+# In training_step():
+
+# ... (previous code: encode context, compute text phase)
+
+# Predict masked regions
+predicted_latents = self.model.predictor(
+    context_latents,
+    mask_tokens,
+    mask_positions,
+    text_phase_shift=theta_geometric,
+)
+
+# Extract targets
+target_masked = self._extract_masked_targets(target_latents, masks)
+
+# ═══════════════════════════════════════════════════════════════════════
+# PATENT-ENHANCED LOSS CALL
+# ═══════════════════════════════════════════════════════════════════════
+loss, diagnostics = self.model.loss_fn(
+    predicted_latents,
+    target_masked.detach(),
+    theta_geometric,  # Pass text phase for BCVF alignment check
+)
+
+# Log diagnostics for monitoring
+self.log_metrics(diagnostics)
+
+return loss
+```
+
+### 18.5 Why Patent Integration is Superior
+
+| Issue | Simple PhaseSyncLoss | SovereignPatentLoss |
+|-------|---------------------|---------------------|
+| **"Lazily Confident"** | Not detected | BCVF λ_c term catches s_f >> s_b |
+| **"Weakly Accurate"** | Not detected | BCVF λ_f term catches low amplitude |
+| **Global Incoherence** | Only local phase loss | USE U2 enforces global phase sync |
+| **Hallucination** | Unconstrained entropy | SCC S5 keeps entropy in "Goldilocks zone" |
+| **Collapse** | VICReg only | SCC also monitors for zero-entropy collapse |
+
+### 18.6 Hyperparameter Recommendations
+
+| Parameter | Value | Rationale |
+|-----------|-------|-----------|
+| `lambda_bcvf` | 1.0 | Primary constraint—match importance with task loss |
+| `lambda_use` | 0.5 | Secondary—global coherence regularization |
+| `lambda_scc` | 0.1 | Light touch—avoid over-constraining entropy |
+| `lambda_f` | 1.0 | Standard confidence penalty |
+| `lambda_b` | 1.0 | Standard alignment penalty |
+| `lambda_c` | 0.5 | Lighter balance constraint |
+
+### 18.7 Diagnostic Monitoring
+
+Track these metrics during training to ensure healthy optimization:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                    SOVEREIGN PATENT LOSS DIAGNOSTICS                                     │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  HEALTHY TRAINING INDICATORS:                                                           │
+│  ══════════════════════════════                                                         │
+│                                                                                          │
+│  s_f (Confidence): Should rise from ~0.5 → 0.8+ over training                          │
+│  s_b (Alignment):  Should rise from ~0.5 → 0.85+ over training                         │
+│  |s_f - s_b|:      Should stay < 0.15 (balance constraint working)                     │
+│  entropy:          Should stabilize in [0.3, 0.7] range (not 0 or max)                 │
+│                                                                                          │
+│  WARNING SIGNS:                                                                          │
+│  ══════════════                                                                         │
+│  s_f >> s_b:       Model is "lazily confident" (amplifying noise)                      │
+│  s_b >> s_f:       Model is "weakly accurate" (correct but uncertain)                  │
+│  entropy → 0:      Phase collapse (all patches identical)                               │
+│  entropy → max:    Chaotic hallucination (random phases)                               │
+│  L_use not decreasing: Global structure not forming                                     │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Appendix A: Theoretical Foundations
 
 ### A.1 JEPA as Contrastive-Free Learning
@@ -2671,6 +2959,7 @@ The key enabler: **Both systems speak Phase Math**, making the integration seaml
 | 1.2.0 | 2026-01-09 | Added Architectural Evolution lineage (Ontological → Geometric) |
 | 1.3.0 | 2026-01-09 | Added complete Geometric Masking Training Loop (§17) |
 | 1.4.0 | 2026-01-09 | Added Strategic Architecture Philosophy (Appendix C) |
+| 1.5.0 | 2026-01-09 | Added Patent-Enhanced Loss Functions (§18) - BCVF, USE, SCC integration |
 
 ---
 
@@ -2696,6 +2985,7 @@ The key enabler: **Both systems speak Phase Math**, making the integration seaml
 - [ ] Implement `PhaseAttention` with intent rotation (Spec 1 & 2)
 - [ ] Implement `GeometricMaskCollator` (Spec 3)
 - [ ] Implement `PhaseSyncLoss` (Spec 4)
+- [ ] Implement `SovereignPatentLoss` with BCVF, USE, SCC (§18)
 - [ ] Implement `PhaseVLJEPA_System` with EMA (Spec 4)
 - [ ] Implement `compute_phase_alignment_score` metric
 - [ ] Add rotation-to-text prompt mapping
