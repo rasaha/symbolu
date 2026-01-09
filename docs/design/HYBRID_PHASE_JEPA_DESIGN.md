@@ -22,6 +22,7 @@ The architecture predicts the **32D Sovereign State Delta (ΔS)** rather than ne
 
 ## Table of Contents
 
+**Part I: Language Model (Phase-JEPA)**
 1. [Background: JEPA Principles](#1-background-jepa-principles)
 2. [Architecture Overview](#2-architecture-overview)
 3. [Core Components](#3-core-components)
@@ -32,6 +33,18 @@ The architecture predicts the **32D Sovereign State Delta (ΔS)** rather than ne
 8. [Implementation Mapping](#8-implementation-mapping)
 9. [Complexity Analysis](#9-complexity-analysis)
 10. [Experimental Design](#10-experimental-design)
+
+**Part II: Vision-Language Extension (Phase-VL-JEPA)**
+11. [Vision-Language Extension (Phase-VL-JEPA)](#11-vision-language-extension-phase-vl-jepa) — *Spec 1 & 2*
+12. [Geometric Masking Pipeline](#12-geometric-masking-pipeline-spec-3) — *Spec 3*
+13. [Phase-Sync Loss Function](#13-phase-sync-loss-function-spec-4) — *Spec 4*
+14. [Complete Training System](#14-complete-training-system-spec-4) — *Spec 4*
+15. [Implementation Files Summary](#15-implementation-files-summary)
+16. [Quick Start Validation](#16-quick-start-validation)
+
+**Appendices**
+- [Appendix A: Theoretical Foundations](#appendix-a-theoretical-foundations)
+- [Appendix B: Risk Analysis](#appendix-b-risk-analysis)
 
 ---
 
@@ -1090,6 +1103,574 @@ Where: n = sequence length, d = hidden dim (768), w = window size (256), s = sta
 
 ---
 
+## 11. Vision-Language Extension (Phase-VL-JEPA)
+
+This section extends the Hybrid Phase-JEPA to the **Vision-Language** domain, enabling geometric understanding through phase-conditioned masking.
+
+### 11.1 Architecture Overview (Spec 1 & 2)
+
+The Phase-VL-JEPA uses text descriptions to condition visual prediction via phase rotation:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE-VL-JEPA ARCHITECTURE                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  VISION PATH                                                         │    │
+│  │                                                                       │    │
+│  │  Image ──► Patch Embed ──► Student Encoder ──► Context Latents       │    │
+│  │                 │              (Hybrid Phase)        │                │    │
+│  │                 │                                    │                │    │
+│  │            [Geometric Mask]                          ▼                │    │
+│  │                                              ┌──────────────┐         │    │
+│  │                                              │   PREDICTOR  │         │    │
+│  │  Image ──► Patch Embed ──► Teacher Encoder   │   (Phase +   │         │    │
+│  │              (Full)         (EMA, No Grad)   │    Text θ)   │         │    │
+│  │                 │                            └──────────────┘         │    │
+│  │                 ▼                                    │                │    │
+│  │          Target Latents ◄────────────────────────────┘                │    │
+│  │                              (Loss on masked regions)                 │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  TEXT PATH (Phase Conditioning)                                      │    │
+│  │                                                                       │    │
+│  │  "Rotated 90°" ──► Text Encoder ──► Phase Projector ──► θ_intent    │    │
+│  │                                          │                            │    │
+│  │                        θ = tanh(W·text_emb) × π                       │    │
+│  │                                          │                            │    │
+│  │                                          ▼                            │    │
+│  │                              Rotates Query Phases in Predictor        │    │
+│  │                                                                       │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 11.2 Hybrid Phase Block Implementation
+
+The core innovation splits processing into Local (texture) and Global (geometry) streams:
+
+```python
+class HybridPhaseBlock(nn.Module):
+    """
+    Hybrid block splitting channels into Local and Global streams.
+
+    - Local Stream (75%): O(W²) windowed attention for texture/detail
+    - Global Stream (25%): O(N) phase attention for geometry/structure
+    """
+
+    def __init__(self, dim, num_heads=12, local_ratio=0.75, window_size=16):
+        super().__init__()
+        self.local_dim = int(dim * local_ratio)
+        self.global_dim = dim - self.local_dim
+
+        # Local stream: Standard windowed attention
+        self.local_attn = WindowedQuadraticAttention(
+            self.local_dim,
+            int(num_heads * local_ratio),
+            window_size=window_size
+        )
+
+        # Global stream: Phase attention with intent rotation
+        self.global_attn = PhaseAttention(
+            self.global_dim,
+            int(num_heads * (1 - local_ratio))
+        )
+
+        self.norm1 = nn.LayerNorm(dim)
+        self.norm2 = nn.LayerNorm(dim)
+        self.mlp = nn.Sequential(
+            nn.Linear(dim, 4 * dim),
+            nn.GELU(),
+            nn.Linear(4 * dim, dim)
+        )
+
+    def forward(self, x, text_phase_shift=None):
+        """
+        Args:
+            x: Input patches [B, N, D]
+            text_phase_shift: Phase rotation from text [B, D_global] or [B, 1, H, D_h]
+        """
+        x_norm = self.norm1(x)
+
+        # Split into Local and Global streams
+        x_local = x_norm[..., :self.local_dim]
+        x_global = x_norm[..., self.local_dim:]
+
+        # Parallel processing
+        y_local = self.local_attn(x_local)
+        y_global = self.global_attn(x_global, intent_phase=text_phase_shift)
+
+        # Fuse streams
+        y = torch.cat([y_local, y_global], dim=-1)
+        x = x + y
+
+        return x + self.mlp(self.norm2(x))
+
+
+class WindowedQuadraticAttention(nn.Module):
+    """Standard O(W²) local attention for texture refinement."""
+
+    def __init__(self, dim, num_heads, window_size=16):
+        super().__init__()
+        self.dim = dim
+        self.num_heads = num_heads
+        self.head_dim = dim // num_heads
+        self.scale = self.head_dim ** -0.5
+        self.window_size = window_size
+
+        self.qkv = nn.Linear(dim, dim * 3)
+        self.proj = nn.Linear(dim, dim)
+
+    def forward(self, x):
+        B, N, C = x.shape
+
+        # Standard self-attention (production: use window partitioning)
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim)
+        qkv = qkv.permute(2, 0, 3, 1, 4)
+        q, k, v = qkv[0], qkv[1], qkv[2]
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+
+        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        return self.proj(x)
+```
+
+---
+
+## 12. Geometric Masking Pipeline (Spec 3)
+
+The data pipeline forces geometric learning through strategic masking patterns.
+
+### 12.1 GeometricMaskCollator
+
+```python
+class GeometricMaskCollator:
+    """
+    Creates geometric masking patterns to force spatial reasoning.
+
+    Strategies:
+    - Quadrant: Mask one quadrant, predict from others
+    - Rotation: Mask center, condition on rotation angle
+    - Random: Standard random patch masking
+    """
+
+    def __init__(self, input_size=224, patch_size=16, mask_ratio=0.6):
+        self.grid_size = input_size // patch_size  # e.g., 14x14
+        self.num_patches = self.grid_size ** 2      # e.g., 196
+        self.mask_ratio = mask_ratio
+
+    def __call__(self, batch):
+        """
+        Args:
+            batch: List of images [C, H, W]
+
+        Returns:
+            images: Stacked images [B, C, H, W]
+            masks: Boolean mask [B, N_patches] (True = masked/target)
+            rotation_labels: Rotation angles for text conditioning [B]
+        """
+        images = torch.stack(batch)
+        B = len(images)
+
+        masks = torch.zeros((B, self.num_patches), dtype=torch.bool)
+        rot_labels = []
+
+        for i in range(B):
+            strategy = random.choice(['quadrant', 'rotation', 'random'])
+
+            if strategy == 'quadrant':
+                mask = self._get_quadrant_mask()
+                rot = 0.0  # "No rotation"
+            elif strategy == 'rotation':
+                mask = self._get_center_mask()
+                rot = random.choice([0.0, 1.57, 3.14, 4.71])  # 0°, 90°, 180°, 270°
+            else:
+                mask = self._get_random_mask()
+                rot = 0.0
+
+            masks[i] = mask
+            rot_labels.append(rot)
+
+        return images, masks, torch.tensor(rot_labels)
+
+    def _get_quadrant_mask(self):
+        """Mask one random quadrant."""
+        mask = torch.zeros((self.grid_size, self.grid_size), dtype=torch.bool)
+        mid = self.grid_size // 2
+
+        quadrant = random.randint(0, 3)
+        if quadrant == 0:    # Top-Left
+            mask[:mid, :mid] = True
+        elif quadrant == 1:  # Top-Right
+            mask[:mid, mid:] = True
+        elif quadrant == 2:  # Bottom-Left
+            mask[mid:, :mid] = True
+        else:                # Bottom-Right
+            mask[mid:, mid:] = True
+
+        return mask.flatten()
+
+    def _get_center_mask(self):
+        """Mask center region for rotation prediction."""
+        mask = torch.zeros((self.grid_size, self.grid_size), dtype=torch.bool)
+        start = self.grid_size // 4
+        end = 3 * self.grid_size // 4
+        mask[start:end, start:end] = True
+        return mask.flatten()
+
+    def _get_random_mask(self):
+        """Standard random masking."""
+        mask = torch.zeros(self.num_patches, dtype=torch.bool)
+        num_mask = int(self.num_patches * self.mask_ratio)
+        idx = torch.randperm(self.num_patches)[:num_mask]
+        mask[idx] = True
+        return mask
+```
+
+### 12.2 Rotation-to-Text Mapping
+
+```python
+ROTATION_PROMPTS = {
+    0.0:  "The image is upright with no rotation",
+    1.57: "The image is rotated ninety degrees clockwise",
+    3.14: "The image is rotated one hundred eighty degrees",
+    4.71: "The image is rotated ninety degrees counter-clockwise",
+}
+
+def rotation_to_text(rotation_radians: float) -> str:
+    """Convert rotation angle to natural language description."""
+    return ROTATION_PROMPTS.get(rotation_radians, "The image has unknown rotation")
+```
+
+---
+
+## 13. Phase-Sync Loss Function (Spec 4)
+
+Custom loss combining amplitude matching and phase alignment.
+
+### 13.1 PhaseSyncLoss
+
+```python
+class PhaseSyncLoss(nn.Module):
+    """
+    Combined loss for Phase-VL-JEPA training.
+
+    Components:
+    - Amplitude Loss: Standard L2 (MSE) on representation magnitudes
+    - Phase Loss: Cosine distance on representation phases
+
+    The phase loss ensures geometric relationships are preserved.
+    """
+
+    def __init__(self, lambda_phase=0.5):
+        super().__init__()
+        self.lambda_phase = lambda_phase
+
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            pred: Predicted representations [B, N, D]
+            target: Target representations [B, N, D]
+
+        Returns:
+            Combined loss scalar
+        """
+        # 1. Amplitude Loss (Standard L2)
+        l2_loss = F.mse_loss(pred, target)
+
+        # 2. Phase Alignment Loss
+        # View representations as complex numbers (pair adjacent dimensions)
+        pred_c = torch.view_as_complex(
+            pred.float().reshape(*pred.shape[:-1], -1, 2).contiguous()
+        )
+        target_c = torch.view_as_complex(
+            target.float().reshape(*target.shape[:-1], -1, 2).contiguous()
+        )
+
+        # Phase difference
+        delta_phi = pred_c.angle() - target_c.angle()
+
+        # Cosine distance (1 - cos(Δφ)) penalizes phase misalignment
+        phase_loss = (1 - torch.cos(delta_phi)).mean()
+
+        return l2_loss + self.lambda_phase * phase_loss
+```
+
+### 13.2 Phase Alignment Score (PAS) Metric
+
+```python
+def compute_phase_alignment_score(pred: torch.Tensor, target: torch.Tensor) -> float:
+    """
+    Evaluation metric for geometric understanding.
+
+    PAS = mean(cos(φ_pred - φ_target))
+
+    - PAS ≈ 1.0: Perfect geometric understanding
+    - PAS ≈ 0.0: Random guessing (model ignores geometry)
+    - PAS < 0.0: Anti-correlated (systematic errors)
+    """
+    # Convert to complex
+    pred_c = torch.view_as_complex(
+        pred.float().reshape(*pred.shape[:-1], -1, 2).contiguous()
+    )
+    target_c = torch.view_as_complex(
+        target.float().reshape(*target.shape[:-1], -1, 2).contiguous()
+    )
+
+    # Phase alignment
+    delta_phi = pred_c.angle() - target_c.angle()
+    pas = torch.cos(delta_phi).mean().item()
+
+    return pas
+```
+
+---
+
+## 14. Complete Training System (Spec 4)
+
+### 14.1 PhaseVLJEPA_System
+
+```python
+class PhaseVLJEPA_System(nn.Module):
+    """
+    Complete training system for Phase-VL-JEPA.
+
+    Manages:
+    - Student encoder (gradient updated)
+    - Teacher encoder (EMA updated, no gradient)
+    - Text encoder (phase conditioning)
+    - Hybrid Phase Predictor
+    """
+
+    def __init__(
+        self,
+        vision_encoder,
+        text_encoder,
+        hybrid_predictor,
+        loss_fn,
+        ema_decay=0.996,
+        lr=1e-4,
+        weight_decay=0.04
+    ):
+        super().__init__()
+
+        # Student Components (Gradient Updated)
+        self.student_encoder = vision_encoder
+        self.text_encoder = text_encoder
+        self.predictor = hybrid_predictor
+
+        # Teacher Components (EMA Updated - No Gradient)
+        self.teacher_encoder = copy.deepcopy(vision_encoder)
+        for p in self.teacher_encoder.parameters():
+            p.requires_grad = False
+
+        self.loss_fn = loss_fn
+        self.ema_decay = ema_decay
+        self.lr = lr
+        self.weight_decay = weight_decay
+
+    @torch.no_grad()
+    def update_teacher_ema(self):
+        """Standard JEPA EMA update."""
+        for s_param, t_param in zip(
+            self.student_encoder.parameters(),
+            self.teacher_encoder.parameters()
+        ):
+            t_param.data.mul_(self.ema_decay).add_(
+                s_param.data, alpha=(1 - self.ema_decay)
+            )
+
+    def forward_teacher(self, images):
+        """Get ground truth latents from teacher (no gradient)."""
+        with torch.no_grad():
+            return self.teacher_encoder(images)
+
+    def training_step(self, batch):
+        """
+        Single training step.
+
+        Args:
+            batch: (images, masks, rotation_labels) from GeometricMaskCollator
+        """
+        images, masks, rotation_labels = batch
+
+        # 1. Teacher targets (full image)
+        target_latents = self.forward_teacher(images)
+
+        # 2. Student context (masked image)
+        context_latents = self.student_encoder(images, mask=masks)
+
+        # 3. Text phase conditioning
+        text_tokens = self.rotation_to_tokens(rotation_labels)
+        text_embedding = self.text_encoder(text_tokens)
+        phase_shift = torch.tanh(
+            self.text_encoder.phase_proj(text_embedding)
+        ) * math.pi
+
+        # 4. Predict masked regions
+        # Create learnable mask tokens for prediction targets
+        B, N_total, D = target_latents.shape
+        N_mask = masks.sum(dim=1).max().item()
+        mask_tokens = self.predictor.mask_token.expand(B, N_mask, -1)
+
+        predicted_latents = self.predictor(
+            context_latents,
+            mask_tokens,
+            text_phase_shift=phase_shift
+        )
+
+        # 5. Loss (only on masked regions)
+        loss = self.loss_fn(
+            predicted_latents[:, -N_mask:],  # Predictions for mask tokens
+            target_latents[masks.unsqueeze(-1).expand_as(target_latents)].view(B, N_mask, D)
+        )
+
+        # 6. EMA update
+        self.update_teacher_ema()
+
+        return loss
+
+    def rotation_to_tokens(self, rotation_labels):
+        """Convert rotation labels to text tokens."""
+        texts = [ROTATION_PROMPTS.get(r.item(), "") for r in rotation_labels]
+        # In production: use tokenizer
+        return texts
+
+    def configure_optimizers(self):
+        """JEPA requires high weight decay to prevent collapse."""
+        return torch.optim.AdamW(
+            [p for p in self.parameters() if p.requires_grad],
+            lr=self.lr,
+            weight_decay=self.weight_decay,
+            betas=(0.9, 0.95)
+        )
+```
+
+### 14.2 Hyperparameter Configuration
+
+| Parameter | Value | Rationale |
+|-----------|-------|-----------|
+| **Batch Size** | 256-512 | JEPAs need large batches for variance |
+| **Learning Rate** | 1e-4 | Lower than standard ViT to stabilize phase gradients |
+| **Weight Decay** | 0.04-0.1 | High - prevents collapse to zero-phase solution |
+| **EMA Decay** | 0.996 → 1.0 | Ramps up during training |
+| **Gradient Clipping** | 1.0 | Essential - phase shifts can cause gradient spikes |
+| **Warmup** | 20 epochs | Phase logic needs time to align |
+| **Local Ratio** | 0.75 | 75% channels for local, 25% for global phase |
+| **Window Size** | 16 | Local attention window |
+
+### 14.3 Evaluation Protocol
+
+```python
+def evaluate_phase_vl_jepa(model, val_loader):
+    """
+    Evaluation metrics for Phase-VL-JEPA.
+
+    1. Phase Alignment Score (PAS) - geometric understanding
+    2. Linear Probe Accuracy - representation quality
+    3. Reconstruction MSE - prediction accuracy
+    """
+    model.eval()
+    pas_scores = []
+    mse_scores = []
+
+    with torch.no_grad():
+        for images, masks, rot_labels in val_loader:
+            # Get predictions and targets
+            target = model.forward_teacher(images)
+            context = model.student_encoder(images, mask=masks)
+
+            text_emb = model.text_encoder(model.rotation_to_tokens(rot_labels))
+            phase = torch.tanh(model.text_encoder.phase_proj(text_emb)) * math.pi
+
+            pred = model.predictor(context, model.predictor.mask_token.expand(...), phase)
+
+            # Metrics
+            pas = compute_phase_alignment_score(pred, target[masks])
+            mse = F.mse_loss(pred, target[masks]).item()
+
+            pas_scores.append(pas)
+            mse_scores.append(mse)
+
+    return {
+        'phase_alignment_score': np.mean(pas_scores),
+        'reconstruction_mse': np.mean(mse_scores),
+    }
+```
+
+---
+
+## 15. Implementation Files Summary
+
+The complete Phase-VL-JEPA implementation consists of:
+
+| File | Purpose | Key Classes |
+|------|---------|-------------|
+| `hybrid_phase_block.py` | Core attention mechanisms | `HybridPhaseBlock`, `WindowedQuadraticAttention`, `PhaseAttention` |
+| `phase_jepa_model.py` | Predictor architecture | `PhaseVLJEPA`, `PhaseSyncLoss` |
+| `data_pipeline.py` | Geometric masking | `GeometricMaskCollator` |
+| `training_system.py` | Training orchestration | `PhaseVLJEPA_System` |
+
+### File Locations (Proposed)
+
+```
+symbolu/
+├── jepa/
+│   ├── __init__.py
+│   ├── hybrid_phase_block.py      # Spec 1 & 2
+│   ├── phase_jepa_model.py        # Spec 1 & 2
+│   ├── data_pipeline.py           # Spec 3
+│   ├── training_system.py         # Spec 4
+│   ├── losses.py                  # PhaseSyncLoss, VICReg
+│   ├── metrics.py                 # PAS, linear probe
+│   └── tests/
+│       ├── test_hybrid_block.py
+│       ├── test_predictor.py
+│       └── test_data_pipeline.py
+```
+
+---
+
+## 16. Quick Start Validation
+
+### 16.1 Smoke Test
+
+```python
+# Verify dimensions with small model
+from symbolu.jepa import PhaseVLJEPA_System, GeometricMaskCollator
+
+# Create dummy components
+vision_encoder = ViTSmall(patch_size=16, embed_dim=384)
+text_encoder = TextEncoder(embed_dim=384)
+predictor = PhaseVLJEPA(depth=4, embed_dim=384, phase_dim=96)
+loss_fn = PhaseSyncLoss(lambda_phase=0.5)
+
+system = PhaseVLJEPA_System(vision_encoder, text_encoder, predictor, loss_fn)
+
+# Random data
+images = torch.randn(4, 3, 224, 224)
+collator = GeometricMaskCollator()
+batch = collator([images[i] for i in range(4)])
+
+# Forward pass
+loss = system.training_step(batch)
+print(f"Loss: {loss.item():.4f}")
+```
+
+### 16.2 Success Criteria
+
+| Milestone | Metric | Target |
+|-----------|--------|--------|
+| **10 epochs** | PAS | > 0.6 |
+| **50 epochs** | Linear probe accuracy | > 50% (ImageNet) |
+| **100 epochs** | PAS | > 0.85 |
+
+---
+
 ## Appendix A: Theoretical Foundations
 
 ### A.1 JEPA as Contrastive-Free Learning
@@ -1157,11 +1738,14 @@ The architecture inherits Gemini's alignment properties:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0 | 2026-01-09 | Initial specification |
+| 1.0.0 | 2026-01-09 | Initial specification (Language Model focus) |
+| 1.1.0 | 2026-01-09 | Added Vision-Language extension (Spec 1-4 from Gemini notes) |
 
 ---
 
 ## Implementation Checklist
+
+### Part I: Language Model (Phase-JEPA)
 
 - [ ] Create `symbolu/jepa/` module directory
 - [ ] Implement `PhaseJEPAPredictor` class
@@ -1173,3 +1757,17 @@ The architecture inherits Gemini's alignment properties:
 - [ ] Create unit tests in `symbolu/jepa/tests/`
 - [ ] Add benchmark scripts
 - [ ] Document in main README
+
+### Part II: Vision-Language Extension (Phase-VL-JEPA)
+
+- [ ] Implement `HybridPhaseBlock` (Spec 1 & 2)
+- [ ] Implement `WindowedQuadraticAttention` (Spec 1 & 2)
+- [ ] Implement `PhaseAttention` with intent rotation (Spec 1 & 2)
+- [ ] Implement `GeometricMaskCollator` (Spec 3)
+- [ ] Implement `PhaseSyncLoss` (Spec 4)
+- [ ] Implement `PhaseVLJEPA_System` with EMA (Spec 4)
+- [ ] Implement `compute_phase_alignment_score` metric
+- [ ] Add rotation-to-text prompt mapping
+- [ ] Create vision encoder integration (ViT)
+- [ ] Small-scale validation on CIFAR-100/Tiny-ImageNet
+- [ ] Success criteria: PAS > 0.6 within 10 epochs
