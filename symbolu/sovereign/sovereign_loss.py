@@ -31,6 +31,10 @@ import torch.nn.functional as F
 class SovereignLossConfig:
     """Configuration for Sovereign Loss computation."""
 
+    # Model dimensions
+    hidden_dim: int = 768  # Model hidden dimension (must match model)
+    state_dim: int = 32    # Sovereign State dimension
+
     # B1: Consistency Lagrangian
     lambda_f: float = 1.0  # Forward score weight
     lambda_b: float = 1.0  # Backward score weight
@@ -235,7 +239,11 @@ class SovereignLoss(nn.Module):
         super().__init__()
         self.config = config or SovereignLossConfig()
 
-        self.backward_calculator = BackwardScoreCalculator()
+        # Pass model dimensions to calculators
+        self.backward_calculator = BackwardScoreCalculator(
+            hidden_dim=self.config.hidden_dim,
+            state_dim=self.config.state_dim,
+        )
         self.forward_calculator = ForwardScoreCalculator()
         self.coherence_calculator = PhaseCoherenceCalculator()
 

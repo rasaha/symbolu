@@ -9162,6 +9162,8 @@ def train(config: UnifiedTrainingConfig):
 
         # Create SRK Loss
         srk_loss_config = SRKLossConfig(
+            hidden_dim=model_dim,  # Must match model's embed_dim
+            state_dim=SOVEREIGN_STATE_DIM,
             lambda_f=config.srk_lambda_f,
             lambda_b=config.srk_lambda_b,
             lambda_c=config.srk_lambda_c,
