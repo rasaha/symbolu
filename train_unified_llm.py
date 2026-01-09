@@ -9232,6 +9232,12 @@ def train(config: UnifiedTrainingConfig):
         num_heads = preset['num_heads']
         num_layers = preset['num_layers']
 
+        # V9.8.1: Set model dimensions on config for JEPA to pick up
+        # Without this, JEPA defaults to 768 which fails for small model (512)
+        config.embed_dim = model_dim
+        config.num_heads = num_heads
+        config.num_layers = num_layers
+
         # Create JEPA transformer (wraps the existing model as context encoder)
         jepa_model = create_phase_jepa_transformer(
             config,
@@ -9950,8 +9956,11 @@ def train(config: UnifiedTrainingConfig):
 
                     # V9.8.1: Align sequence lengths if they differ
                     # This can happen if model internally truncates sequences
+                    # Store aligned length for use with EntropySink/SynthesisGate too
+                    csr_aligned_seq_len = None
                     if csr_hidden_for_loss.shape[1] != csr_emb_for_loss.shape[1]:
                         min_len = min(csr_hidden_for_loss.shape[1], csr_emb_for_loss.shape[1])
+                        csr_aligned_seq_len = min_len
                         csr_hidden_for_loss = csr_hidden_for_loss[:, :min_len, :]
                         csr_emb_for_loss = csr_emb_for_loss[:, :min_len, :]
                         csr_confidence_for_loss = csr_confidence_for_loss[:, :min_len, :]
@@ -10042,8 +10051,14 @@ def train(config: UnifiedTrainingConfig):
                         if csr_entropy_sink is not None:
                             # V9.6.6: DETACH to prevent gradient flow to token embeddings!
                             layer_0_hidden = layer_hidden_states[0].detach()
+                            # V9.8.1: Align csr_affinity to match hidden state sequence length
+                            csr_affinity_aligned = csr_affinity
+                            if csr_aligned_seq_len is not None and csr_affinity.shape[1] != layer_0_hidden.shape[1]:
+                                seq_len = min(csr_affinity.shape[1], layer_0_hidden.shape[1])
+                                csr_affinity_aligned = csr_affinity[:, :seq_len]
+                                layer_0_hidden = layer_0_hidden[:, :seq_len, :]
                             if layer_0_hidden.shape[-1] == csr_emb.shape[-1]:
-                                _, sink_metrics = csr_entropy_sink(layer_0_hidden, csr_affinity)
+                                _, sink_metrics = csr_entropy_sink(layer_0_hidden, csr_affinity_aligned)
                                 csr_metrics['entropy_sink_entropy'] = sink_metrics.get('entropy', 0.0)
                                 csr_metrics['entropy_sink_anchor'] = sink_metrics.get('anchor_strength', 0.0)
                                 # Note: With detach, this loss only trains EntropySink's projection,
@@ -10060,8 +10075,16 @@ def train(config: UnifiedTrainingConfig):
                         if csr_synthesis_gate is not None:
                             # V9.6.6: DETACH to prevent gradient flow through entire model!
                             layer_11_hidden = layer_hidden_states[11].detach()
-                            if layer_11_hidden.shape[-1] == csr_emb.shape[-1]:
-                                synthesized, gate_metrics = csr_synthesis_gate(layer_11_hidden, csr_emb, csr_affinity)
+                            # V9.8.1: Align csr_emb and csr_affinity to match hidden state sequence length
+                            csr_emb_aligned = csr_emb
+                            csr_affinity_aligned_11 = csr_affinity
+                            if csr_aligned_seq_len is not None and csr_emb.shape[1] != layer_11_hidden.shape[1]:
+                                seq_len = min(csr_emb.shape[1], layer_11_hidden.shape[1])
+                                csr_emb_aligned = csr_emb[:, :seq_len, :]
+                                csr_affinity_aligned_11 = csr_affinity[:, :seq_len]
+                                layer_11_hidden = layer_11_hidden[:, :seq_len, :]
+                            if layer_11_hidden.shape[-1] == csr_emb_aligned.shape[-1]:
+                                synthesized, gate_metrics = csr_synthesis_gate(layer_11_hidden, csr_emb_aligned, csr_affinity_aligned_11)
                                 csr_metrics['synthesis_gate_value'] = gate_metrics.get('gate_value', 0.0)
                                 csr_metrics['synthesis_coherence'] = gate_metrics.get('coherence', 0.0)
                                 # Note: With detach, this loss only trains SynthesisGate's projection,
