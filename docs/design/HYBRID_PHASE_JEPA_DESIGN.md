@@ -1,7 +1,7 @@
 # Hybrid Phase-JEPA Architecture Design Specification
 
-**Version:** 1.0.0
-**Status:** Architecture Specification
+**Version:** 2.0.0
+**Status:** Part I Implementation Complete
 **Date:** 2026-01-09
 **Origin:** Google Gemini Proposals + Meta JEPA + SymbolU Phase Attention Integration
 **Branch:** `claude/hybrid-phase-jepa-spec-r8IA5`
@@ -4411,21 +4411,223 @@ Based on this validation dialogue:
 | 1.6.0 | 2026-01-09 | Added Operational Guide (§19-21) - Stability, Production, Verification |
 | 1.7.0 | 2026-01-09 | Added Sovereign AGI Integration Evaluation (Appendix D) - 8 canonical decisions |
 | 1.8.0 | 2026-01-09 | Added Cross-Model Validation Dialogue (Appendix E) - Claude/Gemini validation |
+| 2.0.0 | 2026-01-09 | **Implementation Complete (Part I)** - Added implementation notes, CLI examples, file locations |
 
 ---
 
-## Implementation Checklist
+## Implementation Status
+
+> **Last Updated:** 2026-01-09
+> **Implementation Branch:** `claude/phase-attention-cosine-alternatives-0BRYY`
+
+### Part I: Language Model (Phase-JEPA) — ✅ COMPLETE
+
+| Component | Status | File Location |
+|-----------|--------|---------------|
+| Module directory | ✅ | `symbolu/jepa/` |
+| `PhaseJEPAPredictor` | ✅ | `symbolu/jepa/predictor.py:28` |
+| `VrittiValidatedPredictor` | ✅ | `symbolu/jepa/predictor.py:289` |
+| `TargetEncoder` with EMA | ✅ | `symbolu/jepa/target_encoder.py:56` |
+| `SovereignStateProjector` | ✅ | `symbolu/jepa/state_projector.py:33` |
+| `DeltaStateProjector` | ✅ | `symbolu/jepa/state_projector.py:168` |
+| `VICRegLoss` | ✅ | `symbolu/jepa/losses.py:27` |
+| `WeightedAlignmentLoss` | ✅ | `symbolu/jepa/losses.py:115` |
+| `JEPAPredictionLoss` | ✅ | `symbolu/jepa/losses.py:201` |
+| `CompositeJEPALoss` | ✅ | `symbolu/jepa/losses.py:299` |
+| `PhaseJEPATransformer` wrapper | ✅ | `symbolu/jepa/transformer.py:103` |
+| CLI arguments | ✅ | `train_unified_llm.py:11993-12059` |
+| Training loop integration | ✅ | `train_unified_llm.py:9770-9844` |
+| Unit tests | ✅ | `symbolu/jepa/tests/test_jepa.py` |
+
+#### CLI Usage Example
+
+```bash
+# Enable Phase-JEPA training
+python train_unified_llm.py \
+    --enable_jepa \
+    --jepa_hidden_dim 256 \
+    --jepa_prediction_steps 4 \
+    --jepa_cosine_mode complex \
+    --jepa_vicreg_weight 1.0 \
+    --jepa_alignment_weight 1.0 \
+    --jepa_bhava_weight 10.0 \
+    --jepa_target_momentum 0.996 \
+    --jepa_training_phase body \
+    --jepa_auto_phase_transition \
+    --dataset wikitext103 \
+    --max_steps 50000
+
+# Combined SRK + JEPA training (Union phase)
+python train_unified_llm.py \
+    --enable_srk \
+    --enable_jepa \
+    --jepa_training_phase union \
+    --jepa_enable_karma_injection \
+    --max_steps 100000
+```
+
+#### Unit Test Command
+
+```bash
+pytest symbolu/jepa/tests/test_jepa.py -v
+```
+
+### Curriculum Orchestrator — ✅ COMPLETE
+
+| Component | Status | File Location |
+|-----------|--------|---------------|
+| `TrainingCurriculumOrchestrator` | ✅ | `symbolu/jepa/curriculum.py:114` |
+| `LossScheduler` | ✅ | `symbolu/jepa/curriculum.py:340` |
+| `JEPAPhase` enum (DHYANA/SAMVADA/KRTI) | ✅ | `symbolu/jepa/curriculum.py:22` |
+| `MacroPhase` enum (BODY/SOUL/UNION) | ✅ | `symbolu/jepa/curriculum.py:29` |
+| `PhaseConfig` dataclass | ✅ | `symbolu/jepa/curriculum.py:35` |
+| State dict save/load | ✅ | `symbolu/jepa/curriculum.py:302-327` |
+
+#### Curriculum Phase Configuration
+
+```python
+# DHYANA (Meditation) - 20% of Body phase
+PhaseConfig(k_steps=1, variance_weight=2.0, freeze_predictor=True)
+
+# SAMVADA (Dialogue) - 75% of Body phase
+PhaseConfig(k_steps=4, variance_weight=1.0, ortho_weight=0.1)
+
+# KRTI (Action) - Union phase
+PhaseConfig(k_steps=4, nll_weight=0.5, alignment_weight=1.0, enable_opb_locking=True)
+```
+
+### Shared Components — ✅ COMPLETE
+
+| Component | Status | File Location |
+|-----------|--------|---------------|
+| `DualSourcePhaseProjector` | ✅ | `symbolu/common/projectors.py:23` |
+| `GatedKarmaProjector` | ✅ | `symbolu/common/projectors.py:151` |
+| `OPBDimensionLock.merge_external_observation()` | ✅ | `symbolu/sovereign/reasoning_kernel.py` |
+
+### Part II: Vision-Language Extension (Phase-VL-JEPA) — 🔲 PENDING
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| `HybridPhaseBlock` | 🔲 | Requires vision encoder integration |
+| `WindowedQuadraticAttention` | 🔲 | For high-resolution patches |
+| `GeometricMaskCollator` | 🔲 | For geometric transformation training |
+| `PhaseSyncLoss` | 🔲 | Cross-modal synchronization |
+| Vision encoder (ViT) integration | 🔲 | Future multimodal extension |
+
+### Part III: Operational & Production (§19-21) — 🔶 PARTIAL
+
+| Component | Status | File Location / Notes |
+|-----------|--------|----------------------|
+| `LossScheduler` | ✅ | `symbolu/jepa/curriculum.py:340` |
+| `init_phase_layers` | 🔲 | Use existing `_init_weights()` patterns |
+| `detect_phase_collapse` | 🔲 | Can leverage VICReg variance monitoring |
+| `RealViewComplexOps` | 🔲 | Production optimization |
+| `IntentCache` | 🔲 | Inference speedup |
+| `SafeInference` (Mauna protocol) | ✅ | Via SRK's Mauna Protocol |
+
+---
+
+## Implementation Notes
+
+### Module Structure
+
+```
+symbolu/jepa/
+├── __init__.py           # Package exports
+├── predictor.py          # PhaseJEPAPredictor, VrittiValidatedPredictor
+├── state_projector.py    # SovereignStateProjector, DeltaStateProjector
+├── target_encoder.py     # TargetEncoder with EMA
+├── losses.py             # VICRegLoss, WeightedAlignmentLoss, etc.
+├── curriculum.py         # TrainingCurriculumOrchestrator, LossScheduler
+├── transformer.py        # PhaseJEPATransformer wrapper
+└── tests/
+    └── test_jepa.py      # Comprehensive unit tests (~790 lines)
+
+symbolu/common/
+├── __init__.py           # Shared component exports
+└── projectors.py         # DualSourcePhaseProjector, GatedKarmaProjector
+```
+
+### Key Design Decisions Implemented
+
+1. **State Projector Architecture**: MLP with GELU activation (not simple linear), matching JEPA design:
+   ```python
+   nn.Sequential(
+       nn.Linear(hidden_dim, intermediate_dim),
+       nn.GELU(),
+       nn.Dropout(dropout),
+       nn.Linear(intermediate_dim, state_dim),
+   )
+   ```
+
+2. **Cosine Mode**: JEPA predictor uses `complex` mode (preserves full phasor information), while SRK uses `shifted` mode (ensures positive attention flow).
+
+3. **Per-Component Alignment Weights** (§6.2):
+   - Bhava [0:12]: weight=10.0 (Critical identity preservation)
+   - Kosha/Vritti [12:22]: weight=1.0 (Standard semantic components)
+   - Guna [22:32]: weight=0.1 (Loosely coupled dynamics)
+
+4. **Master/Sensor OPB Integration**: SRK holds Master OPB with dimension locking. JEPA is Sensor model that observes but doesn't lock. Integration via `merge_external_observation()`.
+
+5. **Additive Phase Composition** (§22.4):
+   ```python
+   θ_total = θ_text + θ_intent  # From phasor multiplication e^{iθ₁} × e^{iθ₂}
+   ```
+
+### Training Loop Integration
+
+JEPA is integrated into `train_unified_llm.py` after SRK processing:
+
+```python
+# train_unified_llm.py:9770-9844
+if jepa_model is not None and JEPA_AVAILABLE:
+    # Get karma state from SRK if available
+    external_karma = srk_karma_state if config.jepa_enable_karma_injection else None
+
+    # JEPA forward pass
+    jepa_output = jepa_model(input_ids=x, external_karma=external_karma, compute_loss=True)
+    jepa_loss = jepa_output.get('loss')
+
+    # Curriculum-aware weighting
+    if macro_phase == 'SOUL':
+        jepa_weight = 0.1  # Minimal during SRK-focused phase
+    elif macro_phase == 'UNION':
+        jepa_weight = 0.5  # Balanced
+    else:  # BODY
+        jepa_weight = 1.0  # Full JEPA
+
+    loss = loss + jepa_weight * jepa_loss
+
+    # Update target encoder (EMA)
+    jepa_model.training_step_update()
+```
+
+### Checkpoint Save/Load
+
+JEPA state is automatically saved with curriculum state:
+
+```python
+# PhaseJEPATransformer.state_dict() includes curriculum
+state = {
+    'model': model.state_dict(),  # Includes curriculum_state
+    'jepa_curriculum': curriculum.state_dict(),
+}
+```
+
+---
+
+## Original Implementation Checklist (Archived)
 
 ### Part I: Language Model (Phase-JEPA)
 
-- [ ] Create `symbolu/jepa/` module directory
-- [ ] Implement `PhaseJEPAPredictor` class
-- [ ] Implement `TargetEncoder` with EMA
-- [ ] Implement `SovereignStateProjector`
-- [ ] Implement VICReg loss functions
-- [ ] Extend `OntologicalHybridTransformer` with JEPA
-- [ ] Add CLI arguments to `train_unified_llm.py`
-- [ ] Create unit tests in `symbolu/jepa/tests/`
+- [x] Create `symbolu/jepa/` module directory
+- [x] Implement `PhaseJEPAPredictor` class
+- [x] Implement `TargetEncoder` with EMA
+- [x] Implement `SovereignStateProjector`
+- [x] Implement VICReg loss functions
+- [x] Extend `OntologicalHybridTransformer` with JEPA
+- [x] Add CLI arguments to `train_unified_llm.py`
+- [x] Create unit tests in `symbolu/jepa/tests/`
 - [ ] Add benchmark scripts
 - [ ] Document in main README
 
@@ -4447,7 +4649,7 @@ Based on this validation dialogue:
 ### Part III: Operational & Production (§19-21)
 
 - [ ] Implement `init_phase_layers` initialization function
-- [ ] Implement `LossScheduler` for curriculum-based training
+- [x] Implement `LossScheduler` for curriculum-based training
 - [ ] Add `detect_phase_collapse` diagnostic utility
 - [ ] Implement `RealViewComplexOps` for production efficiency
 - [ ] Implement `IntentCache` for inference speedup
