@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unified LLM Training Script V9.4.5
+Unified LLM Training Script V9.8.0
 ===================================
 
 Train SymbolU models with support for:
@@ -8,6 +8,7 @@ Train SymbolU models with support for:
 2. Phase Attention (O(n) complexity)
 3. Hybrid (Local + Phase attention)
 4. Gen 2: Hierarchical Complex Bhava (3-tier phase rotation)
+5. V9.8.0: Sovereign Reasoning Kernel (SRK) - Unified ontological intervention
 
 Now includes PIDv2 Governor from train_pid.py:
 - Dynamic SNR-Adjusted Kp
@@ -15,6 +16,15 @@ Now includes PIDv2 Governor from train_pid.py:
 - Handshake D-term Dampening
 - Stress Test Framework
 - V9.4.5: Friction Controller with Corrective Actions
+
+V9.8.0 SRK Features:
+- Centralized ontological intervention replacing scattered flags
+- Layer-specific interventions: L4 DNA Bridge, L7 Phase Hook, L9 Witness, L11 Synthesis
+- Isomorphic Mapping Router (IMR) with fixed logic templates
+- Consistency Lagrangian (B1), Phase Coherence (U2), Stability Constraint (S8)
+- Lambda annealing for training stability
+- Mauna Protocol for inference safety
+- Backward compatibility bridge for legacy flags
 
 Usage:
 ------
@@ -42,11 +52,15 @@ Usage:
     python train_unified_llm.py --model_type ontological_hybrid --model_size small \
         --dataset wikitext103 --max_steps 1000 --state_dim 32
 
+    # Train with Sovereign Reasoning Kernel (SRK) - V9.8.0
+    python train_unified_llm.py --model_type ontological_hybrid --model_size small \
+        --enable_srk --dataset wikitext103 --max_steps 50000
+
     # Stress Test (Trial by Fire)
     python train_unified_llm.py --stress_test --resume checkpoints/best.pt
 
 Author: SymbolU Team
-Date: December 2025
+Date: January 2026
 """
 
 import argparse
@@ -130,6 +144,23 @@ try:
 except ImportError as e:
     SOVEREIGN_AVAILABLE = False
     print(f"Warning: Sovereign-1 modules not available: {e}")
+
+# Import V9.8.0: Sovereign Reasoning Kernel (SRK)
+try:
+    from symbolu.sovereign import (
+        SRKConfig,
+        SovereignReasoningKernel,
+        SovereignEmbedding,
+        PhaseExtractionHook,
+        SRKLossConfig,
+        SRKLoss,
+        SovereignAnnealer,
+        TeleologicalOptimizer,
+    )
+    SRK_AVAILABLE = True
+except ImportError as e:
+    SRK_AVAILABLE = False
+    print(f"Warning: SRK modules not available: {e}")
 
 # Import Gen 2 models (Hierarchical Complex Bhava)
 try:
@@ -6784,6 +6815,40 @@ class UnifiedTrainingConfig:
     # Seed
     seed: int = 42
 
+    # ==========================================================================
+    # V9.8.0: Sovereign Reasoning Kernel (SRK) Configuration
+    # Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
+    # ==========================================================================
+    enable_srk: bool = False                 # Master toggle for SRK system
+    srk_hidden_dim: int = 768                # Hidden dimension for SRK projections
+    srk_dna_bridge_layer: int = 4            # Layer 4: DNA Bridge (foundational ontology)
+    srk_csr_alignment_layer: int = 7         # Layer 7: CSR Alignment (Phase Extraction Hook)
+    srk_witness_layer: int = 9               # Layer 9: Witness Arbitrator (consciousness)
+    srk_synthesis_layer: int = 11            # Layer 11: Synthesis Gate (output integration)
+    srk_enable_dna_bridge: bool = True       # Enable DNA Bridge at Layer 4
+    srk_enable_witness: bool = True          # Enable Witness Arbitrator at Layer 9
+    srk_enable_synthesis: bool = True        # Enable Synthesis Gate at Layer 11
+    srk_enable_imr: bool = True              # Enable Isomorphic Mapping Router
+    srk_isomorphism_threshold: float = 0.75  # Threshold for IMR template matching
+    srk_karma_decay: float = 0.9             # O12→O1 karma decay factor
+    srk_enable_mauna: bool = True            # Enable Mauna Protocol (inference safety)
+    srk_mauna_confidence_threshold: float = 0.6   # Minimum confidence for output
+    srk_mauna_consistency_threshold: float = 0.5  # Minimum backward score
+
+    # SRK Loss Configuration (B1/U2/S8 patent formulas)
+    srk_lambda_f: float = 1.0                # Forward score weight (linguistic)
+    srk_lambda_b: float = 1.0                # Backward score weight (ontological)
+    srk_lambda_c: float = 0.5                # Consistency divergence penalty (B1)
+    srk_lambda_coherence: float = 0.2        # Phase coherence weight (U2)
+    srk_lambda_entropy: float = 0.1          # Stability constraint weight (S8)
+    srk_lambda_task: float = 1.0             # Task loss weight (cross-entropy)
+    srk_enable_nidra_penalty: bool = True    # Penalize VOID/dormancy state
+    srk_nidra_penalty_weight: float = 0.05   # VOID penalty weight
+
+    # SRK Annealing (Lambda Warmup)
+    srk_total_steps: int = 50000             # Total training steps for annealing
+    srk_warmup_steps: int = 5000             # Steps for System 1 warmup phase
+
 
 # Model size presets
 MODEL_PRESETS = {
@@ -6812,6 +6877,158 @@ MODEL_PRESETS = {
         "ff_dim": 4096,
     },
 }
+
+
+# =============================================================================
+# V9.8.0: SRK BACKWARD COMPATIBILITY BRIDGE
+# =============================================================================
+# Maps legacy ontological intervention flags to unified SRK configuration.
+# Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md Appendix G
+#
+# Option (A) Implementation: Legacy flags become aliases that auto-enable SRK
+# and configure the appropriate SRK component.
+# =============================================================================
+
+def build_srk_config_from_legacy(args, config: 'UnifiedTrainingConfig') -> Tuple[Optional['SRKConfig'], List[str]]:
+    """
+    Build SRK configuration from legacy CLI flags with deprecation warnings.
+
+    This function implements the backward compatibility bridge described in
+    SOVEREIGN_REASONING_KERNEL_DESIGN.md Section 27 and Appendix G.
+
+    Legacy Flag → SRK Mapping:
+    - --enable_onto_bridge → srk.enable_dna_bridge (Layer 4)
+    - --enable_csr → srk.csr_alignment_layer (Layer 7)
+    - --enable_kosha_steering → srk.enable_witness (Layer 9)
+    - --enable_toroidal_bridge → srk.karma_decay (O12→O1)
+    - --enable_sovereign_loss → srk_loss.* (B1/U2/S8)
+
+    Args:
+        args: Parsed CLI arguments
+        config: UnifiedTrainingConfig (will be mutated)
+
+    Returns:
+        Tuple of (SRKConfig or None, list of deprecation warnings)
+    """
+    warnings = []
+
+    # Check if SRK is available
+    if not SRK_AVAILABLE:
+        if config.enable_srk:
+            warnings.append("WARNING: --enable_srk specified but SRK module not available. Ignoring.")
+        return None, warnings
+
+    # Auto-detect if legacy flags should trigger SRK
+    legacy_triggers = {
+        'enable_onto_bridge': getattr(args, 'enable_onto_bridge', False),
+        'enable_csr': getattr(args, 'enable_csr', True) and not getattr(args, 'disable_csr', False),
+        'enable_kosha_steering': getattr(args, 'enable_kosha_steering', False),
+        'enable_toroidal_bridge': getattr(args, 'enable_toroidal_bridge', False),
+        'enable_sovereign_loss': getattr(args, 'enable_sovereign_loss', False),
+    }
+
+    # Count active legacy flags
+    active_legacy = [k for k, v in legacy_triggers.items() if v]
+
+    # If --enable_srk is explicitly set, use it directly
+    if config.enable_srk:
+        srk_config = SRKConfig(
+            state_dim=SOVEREIGN_STATE_DIM,
+            hidden_dim=config.srk_hidden_dim,
+            num_heads=MODEL_PRESETS.get(config.model_size, {}).get('num_heads', 12),
+            dna_bridge_layer=config.srk_dna_bridge_layer,
+            csr_alignment_layer=config.srk_csr_alignment_layer,
+            witness_layer=config.srk_witness_layer,
+            synthesis_layer=config.srk_synthesis_layer,
+            enable_dna_bridge=config.srk_enable_dna_bridge,
+            enable_witness=config.srk_enable_witness,
+            enable_synthesis=config.srk_enable_synthesis,
+            enable_imr=config.srk_enable_imr,
+            isomorphism_threshold=config.srk_isomorphism_threshold,
+            karma_decay=config.srk_karma_decay,
+            enable_mauna=config.srk_enable_mauna,
+            mauna_confidence_threshold=config.srk_mauna_confidence_threshold,
+            mauna_consistency_threshold=config.srk_mauna_consistency_threshold,
+        )
+        return srk_config, warnings
+
+    # If legacy flags are active but --enable_srk not set, print migration warnings
+    if active_legacy:
+        warnings.append("=" * 70)
+        warnings.append("⚠️  LEGACY FLAG MIGRATION NOTICE (V9.8.0)")
+        warnings.append("=" * 70)
+        warnings.append("The following legacy flags are deprecated and map to SRK components:")
+        warnings.append("")
+
+        # Build SRK config from legacy flags
+        srk_config = SRKConfig(
+            state_dim=SOVEREIGN_STATE_DIM,
+            hidden_dim=config.srk_hidden_dim,
+            num_heads=MODEL_PRESETS.get(config.model_size, {}).get('num_heads', 12),
+        )
+
+        # --enable_onto_bridge → SRK Layer 4 (DNA Bridge)
+        if legacy_triggers['enable_onto_bridge']:
+            warnings.append(f"  --enable_onto_bridge → SRK Layer {config.onto_bridge_layer} (DNA Bridge)")
+            warnings.append(f"    Use: --enable_srk --srk_dna_bridge_layer={config.onto_bridge_layer}")
+            srk_config.enable_dna_bridge = True
+            srk_config.dna_bridge_layer = config.onto_bridge_layer
+            config.enable_srk = True
+
+        # --enable_csr → SRK Layer 7 (CSR Alignment / Phase Hook)
+        if legacy_triggers['enable_csr']:
+            warnings.append(f"  --enable_csr → SRK Layer {config.csr_alignment_layer} (Phase Extraction Hook)")
+            warnings.append(f"    Use: --enable_srk --srk_csr_alignment_layer={config.csr_alignment_layer}")
+            srk_config.csr_alignment_layer = config.csr_alignment_layer
+            config.enable_srk = True
+
+        # --enable_kosha_steering → SRK Layer 9 (Witness Arbitrator)
+        if legacy_triggers['enable_kosha_steering']:
+            warnings.append(f"  --enable_kosha_steering → SRK Layer {config.kosha_steering_layer} (Witness Arbitrator)")
+            warnings.append(f"    Use: --enable_srk --srk_witness_layer={config.kosha_steering_layer}")
+            srk_config.enable_witness = True
+            srk_config.witness_layer = config.kosha_steering_layer
+            config.enable_srk = True
+
+        # --enable_toroidal_bridge → SRK karma_decay (O12→O1)
+        if legacy_triggers['enable_toroidal_bridge']:
+            warnings.append(f"  --enable_toroidal_bridge → SRK O12→O1 Karma Loop")
+            warnings.append(f"    Use: --enable_srk --srk_karma_decay={config.srk_karma_decay}")
+            srk_config.karma_decay = config.srk_karma_decay
+            config.enable_srk = True
+
+        # --enable_sovereign_loss → SRK Loss (B1/U2/S8)
+        if legacy_triggers['enable_sovereign_loss']:
+            warnings.append(f"  --enable_sovereign_loss → SRK Loss Functions (B1/U2/S8)")
+            warnings.append(f"    Use: --enable_srk (loss is automatically enabled with SRK)")
+            config.enable_srk = True
+
+        warnings.append("")
+        warnings.append("To suppress this notice, use --enable_srk explicitly.")
+        warnings.append("Legacy flags will be removed in V10.0.0.")
+        warnings.append("=" * 70)
+
+        return srk_config, warnings
+
+    # No SRK or legacy flags active
+    return None, warnings
+
+
+def build_srk_loss_config(config: 'UnifiedTrainingConfig') -> Optional['SRKLossConfig']:
+    """Build SRK Loss configuration from UnifiedTrainingConfig."""
+    if not SRK_AVAILABLE or not config.enable_srk:
+        return None
+
+    return SRKLossConfig(
+        lambda_f=config.srk_lambda_f,
+        lambda_b=config.srk_lambda_b,
+        lambda_c=config.srk_lambda_c,
+        lambda_coherence=config.srk_lambda_coherence,
+        lambda_entropy=config.srk_lambda_entropy,
+        lambda_task=config.srk_lambda_task,
+        enable_nidra_penalty=config.srk_enable_nidra_penalty,
+        nidra_penalty_weight=config.srk_nidra_penalty_weight,
+    )
 
 
 # =============================================================================
@@ -11517,6 +11734,63 @@ def main():
     parser.add_argument("--friction_align_critical", type=float, default=-0.10,
                        help="Friction alignment critical threshold (default -0.10)")
 
+    # ==========================================================================
+    # V9.8.0: Sovereign Reasoning Kernel (SRK)
+    # Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
+    # ==========================================================================
+    parser.add_argument("--enable_srk", action="store_true",
+                       help="Enable Sovereign Reasoning Kernel (replaces scattered ontological flags)")
+    parser.add_argument("--srk_hidden_dim", type=int, default=768,
+                       help="Hidden dimension for SRK projections")
+    parser.add_argument("--srk_dna_bridge_layer", type=int, default=4,
+                       help="Layer for DNA Bridge (foundational ontology)")
+    parser.add_argument("--srk_csr_alignment_layer", type=int, default=7,
+                       help="Layer for CSR Alignment / Phase Extraction Hook")
+    parser.add_argument("--srk_witness_layer", type=int, default=9,
+                       help="Layer for Witness Arbitrator (consciousness)")
+    parser.add_argument("--srk_synthesis_layer", type=int, default=11,
+                       help="Layer for Synthesis Gate (output integration)")
+    parser.add_argument("--srk_disable_dna_bridge", action="store_true",
+                       help="Disable DNA Bridge at Layer 4")
+    parser.add_argument("--srk_disable_witness", action="store_true",
+                       help="Disable Witness Arbitrator at Layer 9")
+    parser.add_argument("--srk_disable_synthesis", action="store_true",
+                       help="Disable Synthesis Gate at Layer 11")
+    parser.add_argument("--srk_disable_imr", action="store_true",
+                       help="Disable Isomorphic Mapping Router")
+    parser.add_argument("--srk_isomorphism_threshold", type=float, default=0.75,
+                       help="Threshold for IMR template matching")
+    parser.add_argument("--srk_karma_decay", type=float, default=0.9,
+                       help="O12→O1 karma decay factor")
+    parser.add_argument("--srk_disable_mauna", action="store_true",
+                       help="Disable Mauna Protocol (inference safety)")
+    parser.add_argument("--srk_mauna_confidence_threshold", type=float, default=0.6,
+                       help="Minimum confidence for Mauna Protocol output")
+    parser.add_argument("--srk_mauna_consistency_threshold", type=float, default=0.5,
+                       help="Minimum backward score for Mauna Protocol")
+    # SRK Loss (B1/U2/S8)
+    parser.add_argument("--srk_lambda_f", type=float, default=1.0,
+                       help="SRK forward score weight (linguistic coherence)")
+    parser.add_argument("--srk_lambda_b", type=float, default=1.0,
+                       help="SRK backward score weight (ontological alignment)")
+    parser.add_argument("--srk_lambda_c", type=float, default=0.5,
+                       help="SRK consistency divergence penalty (B1)")
+    parser.add_argument("--srk_lambda_coherence", type=float, default=0.2,
+                       help="SRK phase coherence weight (U2)")
+    parser.add_argument("--srk_lambda_entropy", type=float, default=0.1,
+                       help="SRK stability constraint weight (S8)")
+    parser.add_argument("--srk_lambda_task", type=float, default=1.0,
+                       help="SRK task loss weight (cross-entropy)")
+    parser.add_argument("--srk_disable_nidra_penalty", action="store_true",
+                       help="Disable VOID/dormancy penalty")
+    parser.add_argument("--srk_nidra_penalty_weight", type=float, default=0.05,
+                       help="VOID penalty weight")
+    # SRK Annealing
+    parser.add_argument("--srk_total_steps", type=int, default=50000,
+                       help="Total training steps for SRK annealing")
+    parser.add_argument("--srk_warmup_steps", type=int, default=5000,
+                       help="Steps for System 1 warmup phase (Learn to Speak)")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -11758,7 +12032,40 @@ def main():
         friction_dom_high=args.friction_dom_high,
         friction_dom_low=args.friction_dom_low,
         friction_align_critical=args.friction_align_critical,
+        # V9.8.0: Sovereign Reasoning Kernel (SRK)
+        enable_srk=args.enable_srk,
+        srk_hidden_dim=args.srk_hidden_dim,
+        srk_dna_bridge_layer=args.srk_dna_bridge_layer,
+        srk_csr_alignment_layer=args.srk_csr_alignment_layer,
+        srk_witness_layer=args.srk_witness_layer,
+        srk_synthesis_layer=args.srk_synthesis_layer,
+        srk_enable_dna_bridge=not args.srk_disable_dna_bridge,
+        srk_enable_witness=not args.srk_disable_witness,
+        srk_enable_synthesis=not args.srk_disable_synthesis,
+        srk_enable_imr=not args.srk_disable_imr,
+        srk_isomorphism_threshold=args.srk_isomorphism_threshold,
+        srk_karma_decay=args.srk_karma_decay,
+        srk_enable_mauna=not args.srk_disable_mauna,
+        srk_mauna_confidence_threshold=args.srk_mauna_confidence_threshold,
+        srk_mauna_consistency_threshold=args.srk_mauna_consistency_threshold,
+        # SRK Loss
+        srk_lambda_f=args.srk_lambda_f,
+        srk_lambda_b=args.srk_lambda_b,
+        srk_lambda_c=args.srk_lambda_c,
+        srk_lambda_coherence=args.srk_lambda_coherence,
+        srk_lambda_entropy=args.srk_lambda_entropy,
+        srk_lambda_task=args.srk_lambda_task,
+        srk_enable_nidra_penalty=not args.srk_disable_nidra_penalty,
+        srk_nidra_penalty_weight=args.srk_nidra_penalty_weight,
+        # SRK Annealing
+        srk_total_steps=args.srk_total_steps,
+        srk_warmup_steps=args.srk_warmup_steps,
     )
+
+    # V9.8.0: Build SRK config from legacy flags (backward compatibility)
+    srk_config, srk_warnings = build_srk_config_from_legacy(args, config)
+    for warning in srk_warnings:
+        print(warning)
 
     # Train
     train(config)

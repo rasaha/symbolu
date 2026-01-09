@@ -122,6 +122,38 @@ from symbolu.sovereign.training import (
     run_stress_test,
 )
 
+# V9.8.0: Sovereign Reasoning Kernel (SRK)
+from symbolu.sovereign.reasoning_kernel import (
+    SRKConfig,
+    SovereignReasoningKernel,
+    SovereignEmbedding,
+    IsomorphicMappingRouter,
+    OntologicalBridge,
+    WitnessArbitrator,
+    SynthesisGate,
+    VrittiGate,
+    KoshaShiftController,
+    MaunaProtocol,
+    PhaseExtractionHook,
+    SOVEREIGN_STATE_DIM,
+    BHAVA_NAMES,
+    KOSHA_NAMES,
+    VRITTI_NAMES,
+    GUNA_NAMES,
+    create_logic_templates,
+)
+
+# V9.8.0: Sovereign Loss Functions
+from symbolu.sovereign.sovereign_loss import (
+    SovereignLossConfig as SRKLossConfig,
+    SovereignLoss as SRKLoss,
+    SovereignAnnealer,
+    TeleologicalOptimizer,
+    BackwardScoreCalculator,
+    ForwardScoreCalculator,
+    PhaseCoherenceCalculator,
+)
+
 __all__ = [
     # Phase 1: Loss
     'SovereignLoss',
@@ -189,6 +221,34 @@ __all__ = [
     'AuthorityStressTest',
     'StressTestResult',
     'run_stress_test',
+
+    # V9.8.0: Sovereign Reasoning Kernel (SRK)
+    'SRKConfig',
+    'SovereignReasoningKernel',
+    'SovereignEmbedding',
+    'IsomorphicMappingRouter',
+    'OntologicalBridge',
+    'WitnessArbitrator',
+    'SynthesisGate',
+    'VrittiGate',
+    'KoshaShiftController',
+    'MaunaProtocol',
+    'PhaseExtractionHook',
+    'SOVEREIGN_STATE_DIM',
+    'BHAVA_NAMES',
+    'KOSHA_NAMES',
+    'VRITTI_NAMES',
+    'GUNA_NAMES',
+    'create_logic_templates',
+
+    # V9.8.0: Sovereign Loss Functions
+    'SRKLossConfig',
+    'SRKLoss',
+    'SovereignAnnealer',
+    'TeleologicalOptimizer',
+    'BackwardScoreCalculator',
+    'ForwardScoreCalculator',
+    'PhaseCoherenceCalculator',
 ]
 
-__version__ = '4.0.0'
+__version__ = '9.8.0'

@@ -1,0 +1,1142 @@
+"""
+Sovereign Reasoning Kernel (SRK) - State-Persistent AGI Architecture
+=====================================================================
+
+Version: 9.8.0
+Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
+
+The SRK implements Recursive Ontological Intelligence (ROI) by managing
+the 32D Sovereign State across transformer layers. It transforms a
+forward-only predictor into a recursive reasoner.
+
+Components:
+- SRKConfig: Configuration dataclass
+- SovereignReasoningKernel: Main kernel with layer interventions
+- SovereignEmbedding: Layer 0 karma injection
+- IsomorphicMappingRouter (IMR): Cross-domain bridge detection
+- OntologicalBridge: Layer 4 DNA grounding
+- WitnessArbitrator: Layer 9 domain arbitration
+- SynthesisGate: Layer 11 final edit
+- VrittiGate: Epistemological witness for self-correction
+- KoshaShiftController: Depth-scaling through 5 consciousness layers
+
+The SRK ensures that when the model learns mathematical rigor (O7 Reasoning)
+in one domain, that same rigor is structurally preserved when switching
+to another domain via Isomorphic Mapping.
+"""
+
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple, Any
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import math
+
+
+# =============================================================================
+# 32D SOVEREIGN STATE CONSTANTS (from phase_transformer.py)
+# =============================================================================
+
+SOVEREIGN_STATE_DIM = 32
+
+# Bhava indices [0:12] - 12 Ontological Aspects
+BHAVA_NAMES = [
+    'POT', 'IDN', 'EXE', 'STR', 'COG', 'AGY',
+    'RSN', 'PRP', 'WIT', 'UNI', 'INT', 'ABS'
+]
+BHAVA_SLICE = slice(0, 12)
+
+# Sheath indices [12:17] - 5 Depth Layers
+KOSHA_NAMES = ['MATERIAL', 'VITAL', 'MENTAL', 'INTELLECTUAL', 'BLISSFUL']
+KOSHA_SLICE = slice(12, 17)
+
+# State indices [17:22] - 5 Reliability States
+VRITTI_NAMES = ['FACT', 'ERROR', 'IMAGINATION', 'VOID', 'MEMORY']
+VRITTI_SLICE = slice(17, 22)
+
+# Qualia indices [22:28] - 6 System Dynamics
+GUNA_NAMES = ['LUCIDITY', 'ACTIVITY', 'STABILITY', 'VELOCITY', 'ACCEL', 'STABLE']
+GUNA_SLICE = slice(22, 28)
+
+# Reserved indices [28:32] - Toroidal Feedback
+RESERVED_SLICE = slice(28, 32)
+
+
+# =============================================================================
+# SRK CONFIGURATION
+# =============================================================================
+
+@dataclass
+class SRKConfig:
+    """
+    Configuration for Sovereign Reasoning Kernel.
+
+    Encapsulates all SRK-related hyperparameters to prevent CLI pollution.
+    Can be serialized with checkpoints for reproducibility.
+    """
+
+    # Core dimensions
+    state_dim: int = SOVEREIGN_STATE_DIM
+    hidden_dim: int = 768
+    num_heads: int = 12
+
+    # Layer intervention points
+    dna_bridge_layer: int = 4      # Ontological grounding
+    csr_alignment_layer: int = 7   # Phoneme alignment / Phase extraction
+    witness_layer: int = 9         # Domain arbitration
+    synthesis_layer: int = 11      # Final edit
+
+    # Component toggles
+    enable_dna_bridge: bool = True
+    enable_witness: bool = True
+    enable_synthesis: bool = True
+    enable_imr: bool = True
+    enable_vritti_gate: bool = True
+    enable_kosha_shift: bool = True
+
+    # Isomorphic Mapping Router (IMR)
+    isomorphism_threshold: float = 0.75
+
+    # Karma / Toroidal Loop
+    karma_decay: float = 0.9
+    toroidal_feedback: bool = True
+
+    # DNA Bridge (Layer 4)
+    lambda_bridge: float = 0.1  # Strength of ontological correction
+
+    # Vritti Gate thresholds
+    vritti_fact_min: float = 0.3       # Minimum valid cognition for factual
+    vritti_error_max: float = 0.4      # Maximum error before rejection
+    vritti_imagination_max: float = 0.6  # Maximum imagination for non-creative
+    vritti_void_max: float = 0.2       # Maximum dormancy
+    vritti_memory_max: float = 0.8     # Allow high memory in recall tasks
+
+    # Kosha Shift
+    kosha_target: str = 'INTELLECTUAL'  # Target Kosha for reasoning
+    kosha_dampen_material: float = 0.5  # Dampen material during reasoning
+    kosha_boost_intellectual: float = 0.4  # Boost intellectual
+
+    # Synthesis Gate
+    tamas_threshold: float = 0.9  # Threshold for detecting entropy collapse
+
+    # Mauna Protocol (Inference Safety) - Stage 4
+    enable_mauna: bool = False
+    mauna_error_threshold: float = 0.9
+    mauna_activity_threshold: float = 0.9
+
+    # Training parameters
+    warmup_steps: int = 5000
+
+    def __post_init__(self):
+        """Validate configuration."""
+        assert self.state_dim == 32, "SRK requires 32D Sovereign State"
+        assert 0 < self.isomorphism_threshold <= 1.0
+        assert 0 < self.karma_decay <= 1.0
+
+
+# =============================================================================
+# IMR LOGIC TEMPLATES (Fixed Ontological Priors)
+# =============================================================================
+
+def create_logic_templates(device: torch.device = None) -> Dict[str, torch.Tensor]:
+    """
+    Create the 5 Sanskrit Logic Templates as fixed priors.
+
+    These are registered as buffers (non-learnable) to ensure the model
+    aligns TO these universals, not drifts them to match initialization.
+
+    Template Design:
+    - DEDUCTION: O7 (Reasoning) + O4 (Structure) + O12 (Absolute)
+    - INDUCTION: O7 (Reasoning) + O5 (Cognition) + O9 (Witnessing)
+    - ABDUCTION: O7 (Reasoning) + O8 (Purpose) + O6 (Agency)
+    - ANALOGY: O4 (Structure) + O10 (Unifying) + O11 (Integration)
+    - SYNTHESIS: O11 (Integration) + O12 (Absolute) + O8 (Purpose)
+    """
+    templates = {}
+
+    # DEDUCTION: Rigorous logical inference (Math, Proof)
+    # High: O7 (RSN), O4 (STR), O12 (ABS)
+    deduction = torch.zeros(12)
+    deduction[6] = 1.0   # O7_RSN: Reasoning
+    deduction[3] = 0.8   # O4_STR: Structure
+    deduction[11] = 0.9  # O12_ABS: Absolute
+    templates['DEDUCTION'] = deduction
+
+    # INDUCTION: Pattern recognition from examples
+    # High: O7 (RSN), O5 (COG), O9 (WIT)
+    induction = torch.zeros(12)
+    induction[6] = 0.9   # O7_RSN: Reasoning
+    induction[4] = 0.8   # O5_COG: Cognition
+    induction[8] = 0.7   # O9_WIT: Witnessing
+    templates['INDUCTION'] = induction
+
+    # ABDUCTION: Best explanation inference
+    # High: O7 (RSN), O8 (PRP), O6 (AGY)
+    abduction = torch.zeros(12)
+    abduction[6] = 0.8   # O7_RSN: Reasoning
+    abduction[7] = 0.9   # O8_PRP: Purpose
+    abduction[5] = 0.7   # O6_AGY: Agency
+    templates['ABDUCTION'] = abduction
+
+    # ANALOGY: Structural similarity mapping
+    # High: O4 (STR), O10 (UNI), O11 (INT)
+    analogy = torch.zeros(12)
+    analogy[3] = 0.9    # O4_STR: Structure
+    analogy[9] = 0.8    # O10_UNI: Unifying
+    analogy[10] = 0.7   # O11_INT: Integration
+    templates['ANALOGY'] = analogy
+
+    # SYNTHESIS: Integration of multiple perspectives
+    # High: O11 (INT), O12 (ABS), O8 (PRP)
+    synthesis = torch.zeros(12)
+    synthesis[10] = 0.9  # O11_INT: Integration
+    synthesis[11] = 0.8  # O12_ABS: Absolute
+    synthesis[7] = 0.7   # O8_PRP: Purpose
+    templates['SYNTHESIS'] = synthesis
+
+    if device is not None:
+        templates = {k: v.to(device) for k, v in templates.items()}
+
+    return templates
+
+
+# =============================================================================
+# ISOMORPHIC MAPPING ROUTER (IMR)
+# =============================================================================
+
+class IsomorphicMappingRouter(nn.Module):
+    """
+    Isomorphic Mapping Router - Cross-Domain Bridge Detection.
+
+    Identifies when Bhavas of different domains overlap, enabling
+    cross-domain reasoning transfer. For example, when mathematical
+    rigor (O7) learned in Math domain can be applied to Finance.
+
+    The 5 Logic Templates are fixed priors (register_buffer).
+    The bias_projector learns how strongly to apply each template.
+    """
+
+    def __init__(
+        self,
+        state_dim: int = 32,
+        hidden_dim: int = 768,
+        threshold: float = 0.75,
+    ):
+        super().__init__()
+        self.state_dim = state_dim
+        self.hidden_dim = hidden_dim
+        self.threshold = threshold
+
+        # Register fixed logic templates (non-learnable)
+        templates = create_logic_templates()
+        for name, template in templates.items():
+            self.register_buffer(f'template_{name.lower()}', template)
+
+        self.template_names = list(templates.keys())
+
+        # Learnable: How to project template bias into hidden space
+        self.bias_projector = nn.Linear(12, hidden_dim)
+
+        # Domain memory (runtime, not persisted in checkpoint)
+        self.domain_memory: List[Tuple[str, torch.Tensor]] = []
+
+    def detect_isomorphism(
+        self,
+        current_state: torch.Tensor,
+    ) -> Tuple[Optional[torch.Tensor], Optional[str]]:
+        """
+        Find structural overlaps between current state and logic templates.
+
+        Args:
+            current_state: [B, 32] current Sovereign State
+
+        Returns:
+            isomorphic_bias: [hidden_dim] bias to inject into attention (or None)
+            template_name: Name of matched template (or None)
+        """
+        # Extract Bhava activations [B, 12]
+        current_bhavas = current_state[:, BHAVA_SLICE]
+
+        # Average across batch for template matching
+        avg_bhavas = current_bhavas.mean(dim=0)  # [12]
+
+        best_match = None
+        best_similarity = 0.0
+        best_name = None
+
+        # Check each logic template
+        for name in self.template_names:
+            template = getattr(self, f'template_{name.lower()}')
+
+            # Cosine similarity
+            similarity = F.cosine_similarity(
+                avg_bhavas.unsqueeze(0),
+                template.unsqueeze(0),
+                dim=-1
+            ).item()
+
+            if similarity > self.threshold and similarity > best_similarity:
+                best_similarity = similarity
+                best_match = template
+                best_name = name
+
+        if best_match is not None:
+            # Project template to hidden space for attention bias
+            isomorphic_bias = self.bias_projector(best_match)
+            return isomorphic_bias, best_name
+
+        return None, None
+
+    def add_domain_memory(self, domain_name: str, bhava_pattern: torch.Tensor):
+        """Add a domain-state pair to runtime memory."""
+        self.domain_memory.append((domain_name, bhava_pattern.detach().clone()))
+
+    def clear_domain_memory(self):
+        """Clear runtime domain memory."""
+        self.domain_memory.clear()
+
+
+# =============================================================================
+# ONTOLOGICAL BRIDGE (Layer 4 - DNA Grounding)
+# =============================================================================
+
+class OntologicalBridge(nn.Module):
+    """
+    Layer 4: The Ontological DNA Bridge.
+
+    Performs first self-correction by forcing alignment with the 32D
+    Sovereign State. If Layers 0-3 have misinterpreted the prompt,
+    Layer 4 corrects toward ontological truth.
+
+    Projects 512D "Physical" thought to 12D "Ontological" Aspect,
+    computes error against target Bhavas, and re-injects correction.
+    """
+
+    def __init__(
+        self,
+        hidden_dim: int = 768,
+        state_dim: int = 12,  # Bhava dimension
+        lambda_bridge: float = 0.1,
+    ):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.state_dim = state_dim
+        self.lambda_bridge = lambda_bridge
+
+        # Project hidden → 12D ontological aspect
+        self.projector = nn.Linear(hidden_dim, state_dim)
+
+        # Re-inject correction → hidden
+        self.injector = nn.Linear(state_dim, hidden_dim)
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        sovereign_state: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Apply DNA grounding correction.
+
+        Args:
+            hidden_states: [B, N, D] from transformer
+            sovereign_state: [B, 32] current Sovereign State
+
+        Returns:
+            corrected_hidden: [B, N, D] with ontological correction applied
+        """
+        # 1. Observe: Current ontological aspect of the thought
+        observed_bhava = self.projector(hidden_states)  # [B, N, 12]
+
+        # 2. Target: Retrieve 12 Bhavas from 32D State
+        target_bhava = sovereign_state[:, BHAVA_SLICE]  # [B, 12]
+        target_bhava = target_bhava.unsqueeze(1)  # [B, 1, 12]
+
+        # 3. Calculate ontological tension (DNA pressure)
+        correction = self.injector(target_bhava - observed_bhava)  # [B, N, D]
+
+        # 4. Apply correction
+        return hidden_states + (self.lambda_bridge * correction)
+
+
+# =============================================================================
+# KOSHA SHIFT CONTROLLER (Depth Scaling)
+# =============================================================================
+
+class KoshaShiftController(nn.Module):
+    """
+    Kosha Steering at Layer 9 (Witnessing).
+
+    Forces state toward intellectual Kosha during reasoning, ensuring
+    the model spends adequate "internal compute" at the pattern level
+    before outputting tokens.
+
+    Implements the 5 Koshas (Sheaths):
+    - MATERIAL (0): Physicality/Syntax
+    - VITAL (1): Flow/Energy
+    - MENTAL (2): Semantics/Meaning
+    - INTELLECTUAL (3): Pattern/Wisdom
+    - BLISSFUL (4): Unity/Integration
+    """
+
+    KOSHA_INDICES = {
+        'MATERIAL': 12,
+        'VITAL': 13,
+        'MENTAL': 14,
+        'INTELLECTUAL': 15,
+        'BLISSFUL': 16,
+    }
+
+    def __init__(
+        self,
+        state_dim: int = 32,
+        target_kosha: str = 'INTELLECTUAL',
+        dampen_material: float = 0.5,
+        boost_target: float = 0.4,
+    ):
+        super().__init__()
+        self.state_dim = state_dim
+        self.target_kosha = target_kosha
+        self.dampen_material = dampen_material
+        self.boost_target = boost_target
+
+        self.target_idx = self.KOSHA_INDICES[target_kosha]
+        self.material_idx = self.KOSHA_INDICES['MATERIAL']
+
+    def escalate_to_intellect(self, state: torch.Tensor) -> torch.Tensor:
+        """
+        Shift state toward intellectual Kosha for pattern-level reasoning.
+
+        Args:
+            state: [B, 32] Sovereign State
+
+        Returns:
+            shifted_state: [B, 32] with Kosha shift applied
+        """
+        state = state.clone()
+
+        # Dampen material Kosha
+        state[:, self.material_idx] *= self.dampen_material
+
+        # Boost target Kosha (intellectual by default)
+        state[:, self.target_idx] = torch.clamp(
+            state[:, self.target_idx] + self.boost_target,
+            max=1.0
+        )
+
+        return state
+
+    def get_current_kosha(self, state: torch.Tensor) -> str:
+        """Get the dominant Kosha from state."""
+        kosha_activations = state[:, KOSHA_SLICE]  # [B, 5]
+        dominant_idx = kosha_activations.mean(dim=0).argmax().item()
+        return KOSHA_NAMES[dominant_idx]
+
+
+# =============================================================================
+# VRITTI GATE (Epistemological Witness)
+# =============================================================================
+
+class VrittiGate(nn.Module):
+    """
+    Epistemological witness for self-correction.
+
+    Monitors the 5 Vrittis (States) during reasoning:
+    - FACT (0): Verified Truth
+    - ERROR (1): Hallucination
+    - IMAGINATION (2): Conceptualization
+    - VOID (3): Null State
+    - MEMORY (4): Recall/Weights
+
+    Can reject tokens when ERROR spikes, forcing re-reasoning.
+    """
+
+    def __init__(
+        self,
+        state_dim: int = 32,
+        fact_min: float = 0.3,
+        error_max: float = 0.4,
+        imagination_max: float = 0.6,
+        void_max: float = 0.2,
+        memory_max: float = 0.8,
+    ):
+        super().__init__()
+        self.state_dim = state_dim
+
+        self.thresholds = {
+            'FACT': fact_min,
+            'ERROR': error_max,
+            'IMAGINATION': imagination_max,
+            'VOID': void_max,
+            'MEMORY': memory_max,
+        }
+
+    def should_reject_token(
+        self,
+        vritti_state: torch.Tensor,
+        task_type: str = 'factual',
+    ) -> torch.Tensor:
+        """
+        Check if current Vritti state indicates error.
+
+        Args:
+            vritti_state: [B, 5] Vritti activations
+            task_type: 'factual' | 'creative' | 'recall'
+
+        Returns:
+            should_reject: [B] boolean tensor
+        """
+        fact = vritti_state[:, 0]      # FACT
+        error = vritti_state[:, 1]     # ERROR
+        imagination = vritti_state[:, 2]  # IMAGINATION
+
+        if task_type == 'factual':
+            # Reject if error spikes or valid cognition drops
+            return (error > self.thresholds['ERROR']) | \
+                   (fact < self.thresholds['FACT'])
+
+        elif task_type == 'creative':
+            # Allow imagination, still reject pure error
+            return error > 0.7  # Higher tolerance
+
+        elif task_type == 'recall':
+            # Memory-heavy, allow high memory activation
+            return error > self.thresholds['ERROR']
+
+        return torch.zeros(vritti_state.shape[0], dtype=torch.bool,
+                          device=vritti_state.device)
+
+    def get_vritti_status(self, state: torch.Tensor) -> Dict[str, float]:
+        """Get current Vritti activations as dict."""
+        vritti = state[:, VRITTI_SLICE].mean(dim=0)  # [5]
+        return {name: vritti[i].item() for i, name in enumerate(VRITTI_NAMES)}
+
+
+# =============================================================================
+# WITNESS ARBITRATOR (Layer 9 - Domain Arbitration)
+# =============================================================================
+
+class WitnessArbitrator(nn.Module):
+    """
+    Layer 9: The Witness (Sakshi Logic).
+
+    Performs Cross-Domain Arbitration by instantiating parallel potential
+    states. Does not look at words - looks at CONSTRAINTS.
+
+    Steps:
+    1. Hypothesis Generation
+    2. Scoring (Explanatory Power)
+    3. Constraint Detection (Bottleneck)
+    4. Phase Steering
+    """
+
+    def __init__(
+        self,
+        hidden_dim: int = 768,
+        state_dim: int = 32,
+        constraint_threshold: float = 0.85,
+    ):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.state_dim = state_dim
+        self.constraint_threshold = constraint_threshold
+
+        # Project hidden → 32D state observation
+        self.witness_projector = nn.Linear(hidden_dim, state_dim)
+
+        # Kosha controller for steering
+        self.kosha_controller = KoshaShiftController(state_dim=state_dim)
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        current_state: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Cross-Domain Arbitration.
+
+        Args:
+            hidden_states: [B, N, D] from transformer
+            current_state: [B, 32] current Sovereign State
+
+        Returns:
+            steered_hidden: [B, N, D] with steering applied
+            observed_state: [B, 32] observed state from hidden
+        """
+        # 1. THE OBSERVER: Witness current thought
+        observed_state = self.witness_projector(hidden_states)  # [B, N, 32]
+        observed_state_avg = observed_state.mean(dim=1)  # [B, 32]
+
+        # 2. DOMAIN ARBITRATION: Vritti status check
+        vritti_scores = F.softmax(observed_state_avg[:, VRITTI_SLICE], dim=-1)
+
+        # 3. CONSTRAINT IDENTIFICATION: Find bottleneck dimension
+        state_diff = observed_state_avg - current_state
+        bottleneck_idx = torch.argmax(torch.abs(state_diff), dim=-1)
+
+        # 4. PHASE STEERING: Calculate causal priority
+        steering_force = self._calculate_causal_priority(observed_state_avg)
+
+        # Apply steering
+        steered_hidden = hidden_states * steering_force.unsqueeze(-1)
+
+        return steered_hidden, observed_state_avg
+
+    def _calculate_causal_priority(self, state: torch.Tensor) -> torch.Tensor:
+        """
+        Causal Prioritization: Constraint Severity > Timing > Logic.
+
+        Priority based on Kosha depth (Pain/Density).
+        """
+        # Use Kosha severity as priority
+        kosha_activations = state[:, KOSHA_SLICE]  # [B, 5]
+        severity = torch.max(kosha_activations, dim=-1).values  # [B]
+
+        return torch.sigmoid(severity).unsqueeze(-1)  # [B, 1]
+
+
+# =============================================================================
+# SYNTHESIS GATE (Layer 11 - Final Edit)
+# =============================================================================
+
+class SynthesisGate(nn.Module):
+    """
+    Layer 11: The Synthesis Gate.
+
+    Final filter ensuring output is Ontologically Coherent, not just
+    statistically likely.
+
+    Actions:
+    - Semantic Summation
+    - Repetition Suppression (Tamas detection)
+    - Final Quality Check (alignment)
+    """
+
+    def __init__(
+        self,
+        hidden_dim: int = 768,
+        tamas_threshold: float = 0.9,
+    ):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.tamas_threshold = tamas_threshold
+
+        # Evaluates the 'density' of the final thought
+        self.gate_projector = nn.Linear(hidden_dim, 1)
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        current_state: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Synthesis: Edit output to be coherent.
+
+        Args:
+            hidden_states: [B, N, D] final layer hidden states
+            current_state: [B, 32] current Sovereign State
+
+        Returns:
+            synthesized_hidden: [B, N, D] with quality gate applied
+        """
+        # 1. Detect entropy collapse (stuttering)
+        # Tamas is STABILITY (index 24 in 32D = index 2 in Guna slice)
+        tamas_score = current_state[:, 24]  # [B]
+
+        # 2. Inject lucidity pressure
+        lucidity_bias = torch.sigmoid(self.gate_projector(hidden_states))
+
+        # 3. If Tamas is high (frozen/looping), increase lucidity requirement
+        tamas_penalty = (tamas_score > self.tamas_threshold).float()
+        adjusted_bias = lucidity_bias * (1.0 - 0.5 * tamas_penalty.unsqueeze(-1).unsqueeze(-1))
+
+        return hidden_states * adjusted_bias
+
+
+# =============================================================================
+# SOVEREIGN EMBEDDING (Layer 0 - Karma Injection)
+# =============================================================================
+
+class SovereignEmbedding(nn.Module):
+    """
+    Layer 0: The Sovereign Seed.
+
+    Fuses 'What is being said' (Word) with 'Why it is being said' (Bhava/Kosha).
+    Implements the input pathway of the Toroidal Loop: Karma → Embedding.
+
+    Output: An Ontologically Grounded Embedding where every word carries
+    the reasoning consequence of previous thoughts.
+    """
+
+    def __init__(
+        self,
+        vocab_size: int,
+        embed_dim: int = 768,
+        state_dim: int = 32,
+    ):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.embed_dim = embed_dim
+        self.state_dim = state_dim
+
+        # Standard word embeddings
+        self.word_embeddings = nn.Embedding(vocab_size, embed_dim)
+
+        # Project 32D state → embed_dim for fusion
+        self.state_projector = nn.Linear(state_dim, embed_dim)
+
+        # Layer norm after fusion
+        self.norm = nn.LayerNorm(embed_dim)
+
+    def forward(
+        self,
+        token_ids: torch.Tensor,
+        prev_state_karma: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        The Ontological Stamp: Words are stamped with current state.
+
+        Args:
+            token_ids: [B, N] Token indices
+            prev_state_karma: [B, 32] Sovereign State from previous thought
+                             (O12 → O1 toroidal carryover)
+
+        Returns:
+            unified_vector: [B, N, D] Ontologically grounded embedding
+        """
+        # 1. Retrieve base physical meaning
+        physical_vector = self.word_embeddings(token_ids)  # [B, N, D]
+
+        # 2. Inject Ontological Intent (The 'Soul')
+        ontological_vector = self.state_projector(prev_state_karma)  # [B, D]
+
+        # 3. The Sovereign Fusion
+        # Ontology 'colors' the physics via broadcast addition
+        unified_vector = self.norm(
+            physical_vector + ontological_vector.unsqueeze(1)
+        )
+
+        return unified_vector
+
+
+# =============================================================================
+# MAUNA PROTOCOL (Inference Safety - Stage 4)
+# =============================================================================
+
+class MaunaProtocol(nn.Module):
+    """
+    The Mauna (Silence) Protocol - Inference Safety Veto.
+
+    Named after the Sanskrit concept of sacred silence, this module
+    gives the model the power to withhold output when any response
+    would be harmful.
+
+    Implemented as Layer 11 veto power that dampens outputs when:
+    - ERROR (Viparyaya) activation exceeds threshold
+    - ACTIVITY (Rajas) indicates panic/mania state
+
+    Stage 4 component - disabled by default during training.
+    """
+
+    def __init__(
+        self,
+        hidden_dim: int = 768,
+        error_threshold: float = 0.9,
+        activity_threshold: float = 0.9,
+    ):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.error_threshold = error_threshold
+        self.activity_threshold = activity_threshold
+
+        # Veto gate projector
+        self.veto_gate = nn.Linear(hidden_dim, 1)
+
+    def should_silence(self, state: torch.Tensor) -> torch.Tensor:
+        """
+        Check if silence is warranted.
+
+        Args:
+            state: [B, 32] Sovereign State
+
+        Returns:
+            silence_mask: [B] boolean tensor (True = should silence)
+        """
+        error = state[:, 18]      # ERROR (index 18 = VRITTI[1])
+        activity = state[:, 23]   # ACTIVITY (index 23 = GUNA[1])
+
+        return (error > self.error_threshold) | (activity > self.activity_threshold)
+
+    def apply_veto(
+        self,
+        hidden_states: torch.Tensor,
+        state: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Apply silence veto to hidden states.
+
+        Args:
+            hidden_states: [B, N, D] hidden states
+            state: [B, 32] Sovereign State
+
+        Returns:
+            vetoed_hidden: [B, N, D] with veto applied (dampened if silenced)
+        """
+        silence_mask = self.should_silence(state)  # [B]
+
+        # Dampen hidden states for silenced samples
+        dampen_factor = torch.where(
+            silence_mask.unsqueeze(-1).unsqueeze(-1),
+            torch.tensor(0.1, device=hidden_states.device),
+            torch.tensor(1.0, device=hidden_states.device),
+        )
+
+        return hidden_states * dampen_factor
+
+
+# =============================================================================
+# SOVEREIGN REASONING KERNEL (Main Class)
+# =============================================================================
+
+class SovereignReasoningKernel(nn.Module):
+    """
+    The SRK manages the 32D Sovereign State across Transformer layers.
+    Implements Recursive Ontological Intelligence (ROI).
+
+    Components:
+    - Persistence Buffer (Karma / O12 → O1 carryover)
+    - DNA Bridge (Layer 4)
+    - Witness Arbitrator (Layer 9)
+    - Synthesis Gate (Layer 11)
+    - IMR (Cross-domain detection)
+    - Vritti Gate (Self-correction)
+    - Kosha Controller (Depth scaling)
+
+    The SRK transforms a Forward-Only Predictor into a Recursive Reasoner.
+    """
+
+    def __init__(self, config: Optional[SRKConfig] = None):
+        super().__init__()
+        self.config = config or SRKConfig()
+
+        # Persistence Buffer (The 'Karma' / O12 → O1 carryover)
+        self.register_buffer(
+            'karma_state',
+            torch.zeros(1, self.config.state_dim)
+        )
+
+        # Initialize karma with Absolute Potential bias
+        self._init_karma_bias()
+
+        # Core Ontological Modules
+        self.dna_bridge = OntologicalBridge(
+            hidden_dim=self.config.hidden_dim,
+            state_dim=12,  # Bhava dimension
+            lambda_bridge=self.config.lambda_bridge,
+        )
+
+        self.witness = WitnessArbitrator(
+            hidden_dim=self.config.hidden_dim,
+            state_dim=self.config.state_dim,
+        )
+
+        self.synthesis_gate = SynthesisGate(
+            hidden_dim=self.config.hidden_dim,
+            tamas_threshold=self.config.tamas_threshold,
+        )
+
+        # Isomorphic Mapping Router
+        self.imr = IsomorphicMappingRouter(
+            state_dim=self.config.state_dim,
+            hidden_dim=self.config.hidden_dim,
+            threshold=self.config.isomorphism_threshold,
+        )
+
+        # Vritti Gate
+        self.vritti_gate = VrittiGate(
+            state_dim=self.config.state_dim,
+            fact_min=self.config.vritti_fact_min,
+            error_max=self.config.vritti_error_max,
+            imagination_max=self.config.vritti_imagination_max,
+            void_max=self.config.vritti_void_max,
+            memory_max=self.config.vritti_memory_max,
+        )
+
+        # Kosha Controller
+        self.kosha_controller = KoshaShiftController(
+            state_dim=self.config.state_dim,
+            target_kosha=self.config.kosha_target,
+            dampen_material=self.config.kosha_dampen_material,
+            boost_target=self.config.kosha_boost_intellectual,
+        )
+
+        # Mauna Protocol (Stage 4)
+        self.mauna = MaunaProtocol(
+            hidden_dim=self.config.hidden_dim,
+            error_threshold=self.config.mauna_error_threshold,
+            activity_threshold=self.config.mauna_activity_threshold,
+        )
+
+        # State projector for hidden → 32D extraction
+        self.state_projector = nn.Sequential(
+            nn.Linear(self.config.hidden_dim, self.config.hidden_dim // 2),
+            nn.GELU(),
+            nn.Linear(self.config.hidden_dim // 2, self.config.state_dim),
+        )
+
+    def _init_karma_bias(self):
+        """Initialize karma with Absolute Potential (O12_ABS + MATERIAL)."""
+        with torch.no_grad():
+            # O12_ABS (index 11): Absolute/transcendent
+            self.karma_state[0, 11] = 1.0
+            # MATERIAL (index 12): Physicality grounding
+            self.karma_state[0, 12] = 0.8
+            # FACT (index 17): Verified truth
+            self.karma_state[0, 17] = 0.3
+
+    def get_karma(self, batch_size: int = 1) -> torch.Tensor:
+        """Get karma state expanded for batch."""
+        if self.karma_state.shape[0] != batch_size:
+            return self.karma_state.expand(batch_size, -1)
+        return self.karma_state
+
+    def step_karma(self, final_state: torch.Tensor):
+        """
+        Toroidal Loop-back: Finalizes the 'Karma' for the next token.
+        Implements O12 → O1 transition.
+
+        Args:
+            final_state: [B, 32] final state from this reasoning step
+        """
+        if not self.config.toroidal_feedback:
+            return
+
+        # Non-linear compression
+        new_karma = torch.tanh(final_state.mean(dim=0, keepdim=True))
+
+        # Decay and blend (prevents runaway accumulation)
+        self.karma_state.data = (
+            self.config.karma_decay * self.karma_state.data +
+            (1 - self.config.karma_decay) * new_karma
+        )
+
+    def forward_pass(
+        self,
+        hidden_states: torch.Tensor,
+        layer_idx: int,
+        current_state: Optional[torch.Tensor] = None,
+        task_type: str = 'factual',
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        """
+        Recursive Intelligence Routing.
+
+        Determines which ontological intervention is required at each layer.
+
+        Args:
+            hidden_states: [B, N, D] from current layer
+            layer_idx: Current layer index (0-11)
+            current_state: [B, 32] current Sovereign State (optional)
+            task_type: 'factual' | 'creative' | 'recall'
+
+        Returns:
+            modified_hidden: [B, N, D] with intervention applied
+            diagnostics: Dict of telemetry
+        """
+        diagnostics = {
+            'layer_idx': layer_idx,
+            'intervention': None,
+        }
+
+        B = hidden_states.shape[0]
+
+        # Use karma if no current state provided
+        if current_state is None:
+            current_state = self.get_karma(B)
+
+        # --- LAYER 4: DNA GROUNDING ---
+        if layer_idx == self.config.dna_bridge_layer and self.config.enable_dna_bridge:
+            hidden_states = self.dna_bridge(hidden_states, current_state)
+            diagnostics['intervention'] = 'dna_bridge'
+
+            # Check for isomorphism
+            if self.config.enable_imr:
+                iso_bias, iso_name = self.imr.detect_isomorphism(current_state)
+                if iso_bias is not None:
+                    hidden_states = hidden_states + iso_bias.unsqueeze(0).unsqueeze(0)
+                    diagnostics['isomorphism'] = iso_name
+
+        # --- LAYER 9: THE WITNESS (ARBITRATION) ---
+        elif layer_idx == self.config.witness_layer and self.config.enable_witness:
+            # Kosha shift before witnessing
+            if self.config.enable_kosha_shift:
+                current_state = self.kosha_controller.escalate_to_intellect(current_state)
+
+            hidden_states, observed_state = self.witness(hidden_states, current_state)
+            diagnostics['intervention'] = 'witness'
+            diagnostics['observed_kosha'] = self.kosha_controller.get_current_kosha(observed_state)
+
+            # Update karma based on observation
+            self.step_karma(observed_state)
+
+            # Vritti Gate check
+            if self.config.enable_vritti_gate:
+                vritti_state = observed_state[:, VRITTI_SLICE]
+                should_reject = self.vritti_gate.should_reject_token(vritti_state, task_type)
+                diagnostics['vritti_rejection'] = should_reject.any().item()
+                diagnostics['vritti_status'] = self.vritti_gate.get_vritti_status(observed_state)
+
+        # --- LAYER 11: SYNTHESIS GATE (FINAL EDIT) ---
+        elif layer_idx == self.config.synthesis_layer and self.config.enable_synthesis:
+            hidden_states = self.synthesis_gate(hidden_states, current_state)
+            diagnostics['intervention'] = 'synthesis'
+
+            # Mauna Protocol (Stage 4 - inference safety)
+            if self.config.enable_mauna:
+                hidden_states = self.mauna.apply_veto(hidden_states, current_state)
+                diagnostics['mauna_triggered'] = self.mauna.should_silence(current_state).any().item()
+
+        return hidden_states, diagnostics
+
+    def extract_state(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        """
+        Extract 32D state from hidden states (output pathway).
+
+        Args:
+            hidden_states: [B, N, D] hidden states
+
+        Returns:
+            state: [B, 32] extracted Sovereign State
+        """
+        # Pool over sequence
+        pooled = hidden_states.mean(dim=1)  # [B, D]
+        return self.state_projector(pooled)  # [B, 32]
+
+    def get_diagnostics(self) -> Dict[str, Any]:
+        """Return diagnostic information about current kernel state."""
+        karma = self.karma_state.squeeze(0)
+
+        # Dominant Bhava
+        bhava_idx = karma[:12].argmax().item()
+
+        # Active Kosha
+        kosha_idx = karma[12:17].argmax().item()
+
+        # Vritti State
+        vritti_idx = karma[17:22].argmax().item()
+
+        return {
+            'dominant_bhava': BHAVA_NAMES[bhava_idx],
+            'active_kosha': KOSHA_NAMES[kosha_idx],
+            'vritti_state': VRITTI_NAMES[vritti_idx],
+            'lucidity': karma[22].item(),
+            'activity': karma[23].item(),
+            'stability': karma[24].item(),
+            'karma_norm': karma.norm().item(),
+        }
+
+    def reset_karma(self):
+        """Reset karma to initial Absolute Potential state."""
+        self.karma_state.zero_()
+        self._init_karma_bias()
+
+
+# =============================================================================
+# LAYER 7 PHASE EXTRACTION HOOK
+# =============================================================================
+
+class PhaseExtractionHook:
+    """
+    Forward hook for Layer 7 phase extraction.
+
+    Captures the rotational phase component from attention for the
+    Phase Coherence Optimizer (USE Patent U1-U2).
+
+    Non-invasive: Uses hooks instead of modifying attention class.
+    """
+
+    def __init__(self, layer_idx: int = 7):
+        self.layer_idx = layer_idx
+        self.captured_phases: Optional[torch.Tensor] = None
+        self.hook_handle: Optional[Any] = None
+
+    def hook_fn(self, module, input, output):
+        """
+        Hook function to capture attention phases.
+
+        Extracts phase information from Q-K interaction.
+        """
+        # output is typically (attn_output, attn_weights) or just attn_output
+        # We need access to Q and K before softmax
+        # This is a simplified version - full implementation requires
+        # custom attention that exposes Q, K
+
+        if hasattr(module, 'last_q') and hasattr(module, 'last_k'):
+            Q = module.last_q  # [B, H, N, D_h]
+            K = module.last_k  # [B, H, N, D_h]
+
+            # Compute phase from Q-K interaction
+            q_norm = F.normalize(Q, dim=-1)
+            k_norm = F.normalize(K, dim=-1)
+
+            cos_theta = torch.sum(q_norm * k_norm, dim=-1)  # [B, H, N]
+
+            # Estimate sin via orthogonal component
+            q_orth = q_norm - cos_theta.unsqueeze(-1) * k_norm
+            sin_theta = torch.norm(q_orth, dim=-1)
+
+            # Phase: θ = atan2(sin, cos)
+            self.captured_phases = torch.atan2(sin_theta, cos_theta)
+
+    def register(self, attention_module: nn.Module):
+        """Register hook on attention module."""
+        self.hook_handle = attention_module.register_forward_hook(self.hook_fn)
+
+    def remove(self):
+        """Remove hook."""
+        if self.hook_handle is not None:
+            self.hook_handle.remove()
+            self.hook_handle = None
+
+    def get_phases(self) -> Optional[torch.Tensor]:
+        """Get captured phases."""
+        return self.captured_phases
+
+    def clear(self):
+        """Clear captured phases."""
+        self.captured_phases = None
+
+
+# =============================================================================
+# EXPORTS
+# =============================================================================
+
+__all__ = [
+    # Config
+    'SRKConfig',
+
+    # Main Kernel
+    'SovereignReasoningKernel',
+
+    # Components
+    'SovereignEmbedding',
+    'IsomorphicMappingRouter',
+    'OntologicalBridge',
+    'WitnessArbitrator',
+    'SynthesisGate',
+    'VrittiGate',
+    'KoshaShiftController',
+    'MaunaProtocol',
+
+    # Hooks
+    'PhaseExtractionHook',
+
+    # Constants
+    'SOVEREIGN_STATE_DIM',
+    'BHAVA_NAMES',
+    'KOSHA_NAMES',
+    'VRITTI_NAMES',
+    'GUNA_NAMES',
+
+    # Utilities
+    'create_logic_templates',
+]
