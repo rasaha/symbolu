@@ -530,9 +530,19 @@ class PhaseJEPATransformer(nn.Module):
                     "Encoder returned dict without 'last_hidden_state' or 'hidden_states'. "
                     "Ensure encoder is called with return_last_hidden=True or provides hidden states."
                 )
+            # Handle case where hidden_states is a list (one per layer)
+            if isinstance(h_context, (list, tuple)):
+                h_context = h_context[-1]  # Use last layer
             outputs['logits'] = context_out.get('logits')
         else:
             h_context = context_out
+
+        # Ensure h_context is a tensor (not dict or other type)
+        if isinstance(h_context, dict):
+            # Some encoders nest hidden states in a dict
+            h_context = h_context.get('last_hidden_state') or h_context.get('hidden_states')
+            if isinstance(h_context, (list, tuple)):
+                h_context = h_context[-1]
 
         # Project to state space
         s_context = self.state_projector(h_context)  # [B, T_ctx, 32]
@@ -570,10 +580,18 @@ class PhaseJEPATransformer(nn.Module):
                     h_target = target_out[0]
                 elif isinstance(target_out, dict):
                     h_target = target_out.get('last_hidden_state')
-                if h_target is None:
-                    h_target = target_out.get('hidden_states')
+                    if h_target is None:
+                        h_target = target_out.get('hidden_states')
+                    if isinstance(h_target, (list, tuple)):
+                        h_target = h_target[-1]
                 else:
                     h_target = target_out
+
+                # Ensure h_target is a tensor
+                if isinstance(h_target, dict):
+                    h_target = h_target.get('last_hidden_state') or h_target.get('hidden_states')
+                    if isinstance(h_target, (list, tuple)):
+                        h_target = h_target[-1]
 
                 # Project to state space
                 s_target = self.target_state_projector(h_target)
@@ -874,8 +892,16 @@ class PhaseJEPATransformer(nn.Module):
             h_context = context_out.get('last_hidden_state')
             if h_context is None:
                 h_context = context_out.get('hidden_states')
+            if isinstance(h_context, (list, tuple)):
+                h_context = h_context[-1]
         else:
             h_context = context_out
+
+        # Ensure h_context is a tensor
+        if isinstance(h_context, dict):
+            h_context = h_context.get('last_hidden_state') or h_context.get('hidden_states')
+            if isinstance(h_context, (list, tuple)):
+                h_context = h_context[-1]
 
         # Project to state space
         s_context = self.state_projector(h_context)  # [B, T_ctx, 32]
@@ -974,10 +1000,19 @@ class PhaseJEPATransformer(nn.Module):
                     h_target = target_out[0]
                 elif isinstance(target_out, dict):
                     h_target = target_out.get('last_hidden_state')
-                if h_target is None:
-                    h_target = target_out.get('hidden_states')
+                    if h_target is None:
+                        h_target = target_out.get('hidden_states')
+                    if isinstance(h_target, (list, tuple)):
+                        h_target = h_target[-1]
                 else:
                     h_target = target_out
+
+                # Ensure h_target is a tensor
+                if isinstance(h_target, dict):
+                    h_target = h_target.get('last_hidden_state') or h_target.get('hidden_states')
+                    if isinstance(h_target, (list, tuple)):
+                        h_target = h_target[-1]
+
                 s_target = self.target_state_projector(h_target)
 
                 target_positions = list(range(context_len, min(context_len + k_steps, T)))
@@ -1480,8 +1515,17 @@ class SovereignJEPA(nn.Module):
                 h_target = target_out.get('last_hidden_state')
                 if h_target is None:
                     h_target = target_out.get('hidden_states')
+                if isinstance(h_target, (list, tuple)):
+                    h_target = h_target[-1]
             else:
                 h_target = target_out
+
+            # Ensure h_target is a tensor
+            if isinstance(h_target, dict):
+                h_target = h_target.get('last_hidden_state') or h_target.get('hidden_states')
+                if isinstance(h_target, (list, tuple)):
+                    h_target = h_target[-1]
+
             s_actual = self.jepa.target_state_projector(h_target)
             # Use last position as "actual" future state estimate
             s_actual = s_actual[:, -1, :]
