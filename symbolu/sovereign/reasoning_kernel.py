@@ -649,6 +649,67 @@ class OPBDimensionLock(nn.Module):
                 return 22 + i
         return None
 
+    def merge_external_observation(
+        self,
+        observed_state: torch.Tensor,
+        override_locks: bool = False,
+    ) -> torch.Tensor:
+        """
+        Merge external observation (e.g., from JEPA sensor) into Master OPB.
+
+        The SRK holds the Master OPB as the "Conscious Self" that persists.
+        JEPA provides perceptual observations that update unlocked dimensions.
+
+        Master/Sensor relationship:
+        - SRK (Master): Maintains reasoning continuity, holds locks
+        - JEPA (Sensor): Provides perceptual state updates
+
+        Args:
+            observed_state: [B, 32] State predicted by external sensor (JEPA)
+            override_locks: If True, sensor data can break existing locks (rare)
+
+        Returns:
+            final_state: [B, 32] Merged state respecting lock constraints
+        """
+        B = observed_state.shape[0]
+
+        # Expand current locked state for batch: [32] -> [B, 32]
+        current_state = self.locked_state.unsqueeze(0).expand(B, -1)
+
+        # Compute gate: How much of sensor data to accept?
+        # Use strength as inverse gate - high lock strength = low acceptance
+        acceptance = 1.0 - (self.lock_strength.unsqueeze(0) * self.blend_factor)
+        acceptance = acceptance.expand(B, -1)
+
+        # Blend: accept sensor data for unlocked dims, retain locked for locked dims
+        blended_state = acceptance * observed_state + (1 - acceptance) * current_state
+
+        # Enforce lock constraints (unless overridden)
+        if not override_locks:
+            # Where locked_mask is True, keep Master State
+            mask_expanded = self.locked_mask.unsqueeze(0).expand(B, -1)
+            final_state = torch.where(
+                mask_expanded,
+                current_state,  # Keep master for locked dims
+                blended_state   # Accept blend for unlocked dims
+            )
+        else:
+            # Override: accept sensor data even for locked dims
+            final_state = blended_state
+            # Update locks based on new observations
+            self.update_locks(final_state)
+
+        return final_state
+
+    def get_acceptance_mask(self) -> torch.Tensor:
+        """
+        Get current acceptance mask for external observations.
+
+        Returns:
+            acceptance: [32] tensor where 1.0 = fully accept, 0.0 = fully reject
+        """
+        return 1.0 - (self.lock_strength * self.blend_factor)
+
 
 # =============================================================================
 # VRITTI GATE (Epistemological Witness)

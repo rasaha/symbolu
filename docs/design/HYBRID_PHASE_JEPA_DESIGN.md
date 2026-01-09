@@ -1,7 +1,7 @@
 # Hybrid Phase-JEPA Architecture Design Specification
 
-**Version:** 1.0.0
-**Status:** Architecture Specification
+**Version:** 2.1.0
+**Status:** Part I Implementation Complete (with Phase 3 Gradient Bridge)
 **Date:** 2026-01-09
 **Origin:** Google Gemini Proposals + Meta JEPA + SymbolU Phase Attention Integration
 **Branch:** `claude/hybrid-phase-jepa-spec-r8IA5`
@@ -4411,21 +4411,463 @@ Based on this validation dialogue:
 | 1.6.0 | 2026-01-09 | Added Operational Guide (§19-21) - Stability, Production, Verification |
 | 1.7.0 | 2026-01-09 | Added Sovereign AGI Integration Evaluation (Appendix D) - 8 canonical decisions |
 | 1.8.0 | 2026-01-09 | Added Cross-Model Validation Dialogue (Appendix E) - Claude/Gemini validation |
+| 2.0.0 | 2026-01-09 | **Implementation Complete (Part I)** - Added implementation notes, CLI examples, file locations |
 
 ---
 
-## Implementation Checklist
+## Implementation Status
+
+> **Last Updated:** 2026-01-09
+> **Implementation Branch:** `claude/phase-attention-cosine-alternatives-0BRYY`
+
+### Part I: Language Model (Phase-JEPA) — ✅ COMPLETE
+
+| Component | Status | File Location |
+|-----------|--------|---------------|
+| Module directory | ✅ | `symbolu/jepa/` |
+| `PhaseJEPAPredictor` | ✅ | `symbolu/jepa/predictor.py:28` |
+| `VrittiValidatedPredictor` | ✅ | `symbolu/jepa/predictor.py:289` |
+| `TargetEncoder` with EMA | ✅ | `symbolu/jepa/target_encoder.py:56` |
+| `SovereignStateProjector` | ✅ | `symbolu/jepa/state_projector.py:33` |
+| `DeltaStateProjector` | ✅ | `symbolu/jepa/state_projector.py:168` |
+| `VICRegLoss` | ✅ | `symbolu/jepa/losses.py:27` |
+| `WeightedAlignmentLoss` | ✅ | `symbolu/jepa/losses.py:115` |
+| `JEPAPredictionLoss` | ✅ | `symbolu/jepa/losses.py:201` |
+| `CompositeJEPALoss` | ✅ | `symbolu/jepa/losses.py:299` |
+| `PhaseJEPATransformer` wrapper | ✅ | `symbolu/jepa/transformer.py:106` |
+| Phase 3 Gradient Bridge | ✅ | `symbolu/jepa/transformer.py:471-759` |
+| `intent_phase_projector` | ✅ | `symbolu/jepa/transformer.py:246-255` |
+| `forward_phase3()` | ✅ | `symbolu/jepa/transformer.py:505-693` |
+| `_apply_phase_modulation()` | ✅ | `symbolu/jepa/transformer.py:695-747` |
+| CLI arguments | ✅ | `train_unified_llm.py:11993-12059` |
+| Training loop integration | ✅ | `train_unified_llm.py:9770-9844` |
+| Unit tests | ✅ | `symbolu/jepa/tests/test_jepa.py` |
+| Phase 3 gradient flow tests | ✅ | `symbolu/jepa/tests/test_jepa.py:792-1029` |
+
+#### CLI Usage Example
+
+```bash
+# Enable Phase-JEPA training
+python train_unified_llm.py \
+    --enable_jepa \
+    --jepa_hidden_dim 256 \
+    --jepa_prediction_steps 4 \
+    --jepa_cosine_mode complex \
+    --jepa_vicreg_weight 1.0 \
+    --jepa_alignment_weight 1.0 \
+    --jepa_bhava_weight 10.0 \
+    --jepa_target_momentum 0.996 \
+    --jepa_training_phase body \
+    --jepa_auto_phase_transition \
+    --dataset wikitext103 \
+    --max_steps 50000
+
+# Combined SRK + JEPA training (Union phase)
+python train_unified_llm.py \
+    --enable_srk \
+    --enable_jepa \
+    --jepa_training_phase union \
+    --jepa_enable_karma_injection \
+    --max_steps 100000
+```
+
+#### Unit Test Command
+
+```bash
+pytest symbolu/jepa/tests/test_jepa.py -v
+```
+
+### Curriculum Orchestrator — ✅ COMPLETE
+
+| Component | Status | File Location |
+|-----------|--------|---------------|
+| `TrainingCurriculumOrchestrator` | ✅ | `symbolu/jepa/curriculum.py:114` |
+| `LossScheduler` | ✅ | `symbolu/jepa/curriculum.py:340` |
+| `JEPAPhase` enum (DHYANA/SAMVADA/KRTI) | ✅ | `symbolu/jepa/curriculum.py:22` |
+| `MacroPhase` enum (BODY/SOUL/UNION) | ✅ | `symbolu/jepa/curriculum.py:29` |
+| `PhaseConfig` dataclass | ✅ | `symbolu/jepa/curriculum.py:35` |
+| State dict save/load | ✅ | `symbolu/jepa/curriculum.py:302-327` |
+
+#### Curriculum Phase Configuration
+
+```python
+# DHYANA (Meditation) - 20% of Body phase
+PhaseConfig(k_steps=1, variance_weight=2.0, freeze_predictor=True)
+
+# SAMVADA (Dialogue) - 75% of Body phase
+PhaseConfig(k_steps=4, variance_weight=1.0, ortho_weight=0.1)
+
+# KRTI (Action) - Union phase
+PhaseConfig(k_steps=4, nll_weight=0.5, alignment_weight=1.0, enable_opb_locking=True)
+```
+
+### Shared Components — ✅ COMPLETE
+
+| Component | Status | File Location |
+|-----------|--------|---------------|
+| `DualSourcePhaseProjector` | ✅ | `symbolu/common/projectors.py:23` |
+| `GatedKarmaProjector` | ✅ | `symbolu/common/projectors.py:151` |
+| `OPBDimensionLock.merge_external_observation()` | ✅ | `symbolu/sovereign/reasoning_kernel.py` |
+
+### Part II: Vision-Language Extension (Phase-VL-JEPA) — 🔲 PENDING
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| `HybridPhaseBlock` | 🔲 | Requires vision encoder integration |
+| `WindowedQuadraticAttention` | 🔲 | For high-resolution patches |
+| `GeometricMaskCollator` | 🔲 | For geometric transformation training |
+| `PhaseSyncLoss` | 🔲 | Cross-modal synchronization |
+| Vision encoder (ViT) integration | 🔲 | Future multimodal extension |
+
+### Part III: Operational & Production (§19-21) — 🔶 PARTIAL
+
+| Component | Status | File Location / Notes |
+|-----------|--------|----------------------|
+| `LossScheduler` | ✅ | `symbolu/jepa/curriculum.py:340` |
+| `init_phase_layers` | 🔲 | Use existing `_init_weights()` patterns |
+| `detect_phase_collapse` | 🔲 | Can leverage VICReg variance monitoring |
+| `RealViewComplexOps` | 🔲 | Production optimization |
+| `IntentCache` | 🔲 | Inference speedup |
+| `SafeInference` (Mauna protocol) | ✅ | Via SRK's Mauna Protocol |
+
+---
+
+## Implementation Notes
+
+### Module Structure
+
+```
+symbolu/jepa/
+├── __init__.py           # Package exports
+├── predictor.py          # PhaseJEPAPredictor, VrittiValidatedPredictor
+├── state_projector.py    # SovereignStateProjector, DeltaStateProjector
+├── target_encoder.py     # TargetEncoder with EMA
+├── losses.py             # VICRegLoss, WeightedAlignmentLoss, etc.
+├── curriculum.py         # TrainingCurriculumOrchestrator, LossScheduler
+├── transformer.py        # PhaseJEPATransformer wrapper
+└── tests/
+    └── test_jepa.py      # Comprehensive unit tests (~790 lines)
+
+symbolu/common/
+├── __init__.py           # Shared component exports
+└── projectors.py         # DualSourcePhaseProjector, GatedKarmaProjector
+```
+
+### Key Design Decisions Implemented
+
+1. **State Projector Architecture**: MLP with GELU activation (not simple linear), matching JEPA design:
+   ```python
+   nn.Sequential(
+       nn.Linear(hidden_dim, intermediate_dim),
+       nn.GELU(),
+       nn.Dropout(dropout),
+       nn.Linear(intermediate_dim, state_dim),
+   )
+   ```
+
+2. **Cosine Mode**: JEPA predictor uses `complex` mode (preserves full phasor information), while SRK uses `shifted` mode (ensures positive attention flow).
+
+3. **Per-Component Alignment Weights** (§6.2):
+   - Bhava [0:12]: weight=10.0 (Critical identity preservation)
+   - Kosha/Vritti [12:22]: weight=1.0 (Standard semantic components)
+   - Guna [22:32]: weight=0.1 (Loosely coupled dynamics)
+
+4. **Master/Sensor OPB Integration**: SRK holds Master OPB with dimension locking. JEPA is Sensor model that observes but doesn't lock. Integration via `merge_external_observation()`.
+
+5. **Additive Phase Composition** (§22.4):
+   ```python
+   θ_total = θ_text + θ_intent  # From phasor multiplication e^{iθ₁} × e^{iθ₂}
+   ```
+
+### Training Loop Integration
+
+JEPA is integrated into `train_unified_llm.py` after SRK processing:
+
+```python
+# train_unified_llm.py:9770-9844
+if jepa_model is not None and JEPA_AVAILABLE:
+    # Get karma state from SRK if available
+    external_karma = srk_karma_state if config.jepa_enable_karma_injection else None
+
+    # JEPA forward pass
+    jepa_output = jepa_model(input_ids=x, external_karma=external_karma, compute_loss=True)
+    jepa_loss = jepa_output.get('loss')
+
+    # Curriculum-aware weighting
+    if macro_phase == 'SOUL':
+        jepa_weight = 0.1  # Minimal during SRK-focused phase
+    elif macro_phase == 'UNION':
+        jepa_weight = 0.5  # Balanced
+    else:  # BODY
+        jepa_weight = 1.0  # Full JEPA
+
+    loss = loss + jepa_weight * jepa_loss
+
+    # Update target encoder (EMA)
+    jepa_model.training_step_update()
+```
+
+### Phase 3 (Kṛti) Gradient Bridge
+
+**CRITICAL IMPLEMENTATION**: During Phase 3 (Kṛti/Action), gradients from the NLL loss must flow backwards through the Phase Rotation into the PhaseJEPAPredictor. This enables the predictor to learn from token generation errors.
+
+#### Why the Gradient Bridge Matters
+
+```
+Without Bridge (Broken):
+    L_nll → logits → (STOP) ← predictor learns nothing from token errors
+
+With Bridge (Working):
+    L_nll → logits → h_modulated → θ → s_pred → predictor
+
+    The predictor learns: "I set θ=45°, got 'Cat'. Should have been θ=90° for 'Dog'."
+```
+
+#### Implementation Components
+
+1. **`intent_phase_projector`** (`transformer.py:246-255`):
+   ```python
+   # Maps predicted state (32D) → phase rotation angles (num_heads)
+   self.intent_phase_projector = nn.Sequential(
+       nn.Linear(state_dim, state_dim * 2),
+       nn.GELU(),
+       nn.Linear(state_dim * 2, num_encoder_heads),
+       nn.Tanh(),  # Output in [-1, 1], scaled to [-π, π]
+   )
+   # Initialized near-zero for stable training start
+   ```
+
+2. **`compute_phase_rotation()`** (`transformer.py:471-503`):
+   ```python
+   def compute_phase_rotation(self, s_pred):
+       # CRITICAL: DO NOT detach s_pred - gradient bridge depends on it
+       theta = self.intent_phase_projector(s_pred)  # [B, num_heads]
+       return theta * math.pi  # Scale to [-π, π]
+   ```
+
+3. **`forward_phase3()`** (`transformer.py:505-693`):
+   - Step 1: Context encoding → h_context
+   - Step 2: State projection → s_context
+   - Step 3: Prediction → s_pred (with gradients!)
+   - Step 4: Phase rotation → θ = f(s_pred)
+   - Step 5: Apply modulation → h_modulated = rotate(h_full, θ)
+   - Step 6: LM head → logits = lm_head(h_modulated)
+   - Step 7: Compute L_nll (gradients flow through entire chain)
+
+4. **`_apply_phase_modulation()`** (`transformer.py:695-747`):
+   ```python
+   # Complex rotation per attention head
+   h_real_rot = h_real * cos(θ) - h_imag * sin(θ)
+   h_imag_rot = h_real * sin(θ) + h_imag * cos(θ)
+   ```
+
+#### Gradient Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 3 GRADIENT FLOW (Kṛti)                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  FORWARD PASS (solid arrows):                                               │
+│  ═══════════════════════════                                                │
+│                                                                              │
+│  input_ids ─► context_encoder ─► h_context ─► state_projector ─► s_context │
+│                                                                     │       │
+│                                                                     ▼       │
+│                                                               predictor     │
+│                                                                     │       │
+│                                                                     ▼       │
+│              ┌──────────────────────────────────────────────── s_pred      │
+│              │                                                              │
+│              │  intent_phase_projector (DIFFERENTIABLE!)                   │
+│              │                                                              │
+│              ▼                                                              │
+│              θ ─────────────────────────────────────┐                      │
+│                                                      │                      │
+│  input_ids ─► context_encoder ─► h_full ────────────┼─► _apply_phase_modulation
+│                                                      │            │         │
+│                                                      │            ▼         │
+│                                                      │       h_modulated    │
+│                                                      │            │         │
+│                                                      │            ▼         │
+│                                                      │        lm_head       │
+│                                                      │            │         │
+│                                                      │            ▼         │
+│                                                      │         logits       │
+│                                                      │            │         │
+│                                                      │            ▼         │
+│                                                      │    cross_entropy     │
+│                                                      │            │         │
+│                                                      │            ▼         │
+│                                                      │         L_nll       │
+│                                                                              │
+│  BACKWARD PASS (dashed arrows):                                             │
+│  ══════════════════════════════                                             │
+│                                                                              │
+│  L_nll ◄── logits ◄── h_modulated ◄── (θ, h_full)                          │
+│                             │                                               │
+│                             │ ∂L/∂θ (GRADIENT FLOWS HERE!)                 │
+│                             ▼                                               │
+│                     intent_phase_projector                                  │
+│                             │                                               │
+│                             │ ∂L/∂s_pred                                   │
+│                             ▼                                               │
+│                         predictor ◄── LEARNING!                            │
+│                             │                                               │
+│                             │ "I set θ=45°, got 'Cat'. Should be θ=90°"    │
+│                             ▼                                               │
+│                    predictor weights updated                                │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Enabling Phase 3 Mode
+
+```python
+# Method 1: Explicit toggle
+model.set_phase3_mode(True)
+outputs = model(input_ids, labels=labels)  # Auto-routes to forward_phase3
+
+# Method 2: Direct call
+outputs = model.forward_phase3(input_ids, labels=labels)
+
+# Method 3: Via curriculum (automatic during Union/Kṛti phase)
+model.curriculum.step()  # Triggers phase3_mode when entering Kṛti
+```
+
+#### Critical Implementation Rules
+
+1. **NEVER** call `.detach()` on `s_pred` in the Phase 3 path
+2. **NEVER** use `with torch.no_grad():` around the phase rotation computation
+3. **ALWAYS** verify gradient flow with the unit tests:
+   ```bash
+   pytest symbolu/jepa/tests/test_jepa.py::TestPhase3GradientBridge -v
+   ```
+
+### Architectural Principles: Pilot/Ship Metaphor
+
+The Phase-JEPA architecture implements a clear separation between **prediction** (the Pilot) and **generation** (the Ship).
+
+#### 1. JEPA as "Pilot" (Control System)
+
+The PhaseJEPAPredictor does NOT generate tokens. It calculates the **Flight Plan** (32D State Trajectory) and exerts control via **Phase Rotation** (θ_intent):
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    PILOT/SHIP ARCHITECTURE                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────────┐                                           │
+│  │  PhaseJEPAPredictor  │ ◄── The "PILOT"                       │
+│  │  (Control System)    │                                       │
+│  └──────────┬───────────┘                                       │
+│             │                                                    │
+│             │ Outputs: s_pred (32D State Trajectory)            │
+│             │          "The Flight Plan"                        │
+│             ▼                                                    │
+│  ┌──────────────────────┐                                       │
+│  │ intent_phase_projector │                                     │
+│  └──────────┬─────────────┘                                     │
+│             │                                                    │
+│             │ θ_intent = tanh(W @ s_pred) × π                   │
+│             │ "Steering Angle"                                  │
+│             ▼                                                    │
+│  ┌──────────────────────────────────────────────────────┐       │
+│  │              Transformer Layers                       │       │
+│  │              (The "SHIP")                             │ ◄──── │
+│  │                                                       │       │
+│  │  Q_rotated = Q × e^{iθ_intent}                       │       │
+│  │  "Attention tilted by steering angle"                │       │
+│  └──────────────────────────────────────────────────────┘       │
+│                                                                  │
+│  KEY: Predictor outputs θ (angles), NOT tokens                  │
+│       θ "steers" the Ship toward correct token sequence         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 2. "Conditional" Generation (Detachable LM Head)
+
+The system remains **non-generative** in its core reasoning loop (Phases 1 & 2). It only becomes "generative" when the LM Head is attached in Phase 3:
+
+```python
+# Phases 1 & 2: Pure state prediction (NON-GENERATIVE)
+# ─────────────────────────────────────────────────────
+model.set_phase3_mode(False)
+outputs = model(input_ids, compute_loss=True)
+# Returns: s_pred, delta_list, jepa_loss
+# NO tokens generated - purely logical simulation
+
+# Phase 3: Attach generation capability (GENERATIVE)
+# ───────────────────────────────────────────────────
+model.set_phase3_mode(True)
+outputs = model(input_ids, labels=labels)
+# Returns: s_pred, logits, nll_loss + jepa_loss
+# Now tokens are generated via h_modulated → lm_head
+```
+
+**Strategic Value**: Detach the LM head at any time to run purely logical simulations (predicting future states) without the computational cost of decoding tokens.
+
+#### 3. State ≠ Token (Modulator, Not Source)
+
+The 32D Sovereign State does **NOT** project directly to tokens. That would be an impossible bottleneck (compressing 50k vocab into 32 dims):
+
+```
+WRONG (Bottleneck - Impossible):
+┌─────────┐                    ┌─────────────┐
+│ State   │ ─────────────────► │ Token       │
+│ (32D)   │    direct proj     │ (50k vocab) │
+└─────────┘                    └─────────────┘
+    Impossible! Can't compress 50k choices into 32 dims
+
+
+CORRECT (Modulator Architecture - Implemented):
+┌─────────┐     ┌───────────┐     ┌─────────────┐     ┌─────────┐
+│ State   │ ──► │ θ_intent  │ ──► │ Hidden      │ ──► │ Token   │
+│ (32D)   │     │ (H dims)  │     │ (768D)      │     │ (50k)   │
+└─────────┘     └───────────┘     └─────────────┘     └─────────┘
+    │               │                   │                  │
+    │               │                   │                  │
+    ▼               ▼                   ▼                  ▼
+ "Intent"      "Steering"         "Modulated"        "Selected"
+              angle θ            representation       token
+```
+
+**Implementation** (`transformer.py:618-624`):
+```python
+# State acts as MODULATOR, not SOURCE
+h_modulated = self._apply_phase_modulation(h_full, phase_rotation)
+logits = self.context_encoder.lm_head(h_modulated)
+```
+
+The State controls **HOW** the 768D hidden states are rotated (via θ), which then determines which tokens are selected. The State is a **steering wheel**, not a direct mapping.
+
+### Checkpoint Save/Load
+
+JEPA state is automatically saved with curriculum state:
+
+```python
+# PhaseJEPATransformer.state_dict() includes curriculum
+state = {
+    'model': model.state_dict(),  # Includes curriculum_state
+    'jepa_curriculum': curriculum.state_dict(),
+}
+```
+
+---
+
+## Original Implementation Checklist (Archived)
 
 ### Part I: Language Model (Phase-JEPA)
 
-- [ ] Create `symbolu/jepa/` module directory
-- [ ] Implement `PhaseJEPAPredictor` class
-- [ ] Implement `TargetEncoder` with EMA
-- [ ] Implement `SovereignStateProjector`
-- [ ] Implement VICReg loss functions
-- [ ] Extend `OntologicalHybridTransformer` with JEPA
-- [ ] Add CLI arguments to `train_unified_llm.py`
-- [ ] Create unit tests in `symbolu/jepa/tests/`
+- [x] Create `symbolu/jepa/` module directory
+- [x] Implement `PhaseJEPAPredictor` class
+- [x] Implement `TargetEncoder` with EMA
+- [x] Implement `SovereignStateProjector`
+- [x] Implement VICReg loss functions
+- [x] Extend `OntologicalHybridTransformer` with JEPA
+- [x] Add CLI arguments to `train_unified_llm.py`
+- [x] Create unit tests in `symbolu/jepa/tests/`
 - [ ] Add benchmark scripts
 - [ ] Document in main README
 
@@ -4447,7 +4889,7 @@ Based on this validation dialogue:
 ### Part III: Operational & Production (§19-21)
 
 - [ ] Implement `init_phase_layers` initialization function
-- [ ] Implement `LossScheduler` for curriculum-based training
+- [x] Implement `LossScheduler` for curriculum-based training
 - [ ] Add `detect_phase_collapse` diagnostic utility
 - [ ] Implement `RealViewComplexOps` for production efficiency
 - [ ] Implement `IntentCache` for inference speedup
