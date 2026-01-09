@@ -9191,6 +9191,7 @@ def train(config: UnifiedTrainingConfig):
     resumed_drc_state = None
     resumed_sgp_state = None
     resumed_sattvic_state = None
+    resumed_srk_state = None
     if config.resume:
         resume_path = Path(config.resume)
         if resume_path.exists():
@@ -9208,6 +9209,7 @@ def train(config: UnifiedTrainingConfig):
             resumed_drc_state = resume_result.get("drc_state")
             resumed_sgp_state = resume_result.get("sgp_state")
             resumed_sattvic_state = resume_result.get("sattvic_state")
+            resumed_srk_state = resume_result.get("srk_state")
         else:
             print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
             print(f"      Starting training from scratch...")
@@ -9350,6 +9352,17 @@ def train(config: UnifiedTrainingConfig):
             sgp_controller.load_state(resumed_sgp_state)
         except Exception as e:
             print(f"    ⚠️  Could not restore SGP state: {e}")
+
+    # V9.8.0: Restore SRK state from checkpoint if available
+    if resumed_srk_state is not None and srk is not None:
+        try:
+            missing, _ = srk.load_checkpoint_state(resumed_srk_state, strict=False)
+            if missing:
+                print(f"    ℹ️  SRK: Re-initialized {len(missing)} components: {missing[:3]}...")
+            else:
+                print(f"    ✓ SRK state fully restored")
+        except Exception as e:
+            print(f"    ⚠️  Could not restore SRK state: {e}")
 
     # Mixed precision
     scaler = torch.amp.GradScaler('cuda') if config.mixed_precision != "none" else None
@@ -11104,6 +11117,7 @@ def train(config: UnifiedTrainingConfig):
                         drc_state=relaxation_controller.get_state() if relaxation_controller else None,
                         sgp_state=sgp_controller.get_state() if sgp_controller else None,
                         sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
+                        srk_state=srk.get_checkpoint_state() if srk else None,
                     )
                 print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
 
@@ -11139,6 +11153,7 @@ def train(config: UnifiedTrainingConfig):
                     drc_state=relaxation_controller.get_state() if relaxation_controller else None,
                     sgp_state=sgp_controller.get_state() if sgp_controller else None,
                     sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
+                    srk_state=srk.get_checkpoint_state() if srk else None,
                 )
                 print(f"  💾 Checkpoint saved: last.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
@@ -11153,6 +11168,7 @@ def train(config: UnifiedTrainingConfig):
         drc_state=relaxation_controller.get_state() if relaxation_controller else None,
         sgp_state=sgp_controller.get_state() if sgp_controller else None,
         sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
+        srk_state=srk.get_checkpoint_state() if srk else None,
     )
     # v2.7 Training State Tracker: Save final state
     if training_state_tracker is not None and training_state_tracker.enabled:
@@ -11252,8 +11268,9 @@ def save_checkpoint(
     drc_state: Optional[dict] = None,
     sgp_state: Optional[dict] = None,
     sattvic_state: Optional[dict] = None,
+    srk_state: Optional[dict] = None,
 ):
-    """Save training checkpoint with optional HGS/DRC/SGP/Sattvic state.
+    """Save training checkpoint with optional HGS/DRC/SGP/Sattvic/SRK state.
 
     For last.pt checkpoints, explicitly removes old file before saving new one
     to ensure clean replacement and avoid potential corruption.
@@ -11286,6 +11303,10 @@ def save_checkpoint(
     # Add Sattvic Controller state if provided
     if sattvic_state is not None:
         checkpoint["sattvic_state"] = sattvic_state
+
+    # V9.8.0: Add SRK state if provided
+    if srk_state is not None:
+        checkpoint["srk_state"] = srk_state
 
     # Explicitly remove old checkpoint before saving (especially for last.pt)
     # This ensures clean replacement and frees disk space before writing
@@ -11397,6 +11418,11 @@ def load_checkpoint(
     if "sattvic_state" in checkpoint:
         result["sattvic_state"] = checkpoint["sattvic_state"]
         print(f"    ✓ Sattvic Controller state available for restoration")
+
+    # V9.8.0: Return SRK state for restoration
+    if "srk_state" in checkpoint:
+        result["srk_state"] = checkpoint["srk_state"]
+        print(f"    ✓ SRK state available for restoration")
 
     print(f"    → Resuming from step {result['step']}, best_val_loss={result['best_val_loss']:.4f}")
 

@@ -1739,6 +1739,173 @@ class SovereignReasoningKernel(nn.Module):
         self.karma_state.zero_()
         self._init_karma_bias()
 
+    # =========================================================================
+    # CHECKPOINT SAVE/LOAD (Design Doc Appendix E.9)
+    # =========================================================================
+
+    def get_checkpoint_state(self) -> Dict[str, Any]:
+        """
+        Get SRK state for checkpoint saving.
+
+        Returns dict with all learnable parameters and runtime state.
+        Compatible with torch.save() and checkpoint integration.
+        """
+        checkpoint = {
+            # Version for migration compatibility
+            'srk_version': '9.8.0',
+            'state_dim': self.config.state_dim,
+            'hidden_dim': self.config.hidden_dim,
+
+            # Core karma state (for resuming training)
+            'karma_state': self.karma_state.clone(),
+
+            # OPB lock state (for preserving cross-domain reasoning)
+            'opb_locked_mask': self.opb_lock.locked_mask.clone(),
+            'opb_locked_state': self.opb_lock.locked_state.clone(),
+            'opb_lock_strength': self.opb_lock.lock_strength.clone(),
+
+            # Learnable module state dicts
+            'dna_bridge_state': self.dna_bridge.state_dict(),
+            'witness_state': self.witness.state_dict(),
+            'synthesis_gate_state': self.synthesis_gate.state_dict(),
+            'imr_state': self.imr.state_dict(),
+            'vritti_gate_state': self.vritti_gate.state_dict(),
+            'kosha_controller_state': self.kosha_controller.state_dict(),
+            'mauna_state': self.mauna.state_dict(),
+            'state_projector_state': self.state_projector.state_dict(),
+
+            # Config for validation
+            'config': {
+                'dna_bridge_layer': self.config.dna_bridge_layer,
+                'witness_layer': self.config.witness_layer,
+                'synthesis_layer': self.config.synthesis_layer,
+                'enable_opb_locking': self.config.enable_opb_locking,
+                'karma_decay': self.config.karma_decay,
+            },
+        }
+        return checkpoint
+
+    def load_checkpoint_state(
+        self,
+        checkpoint: Dict[str, Any],
+        strict: bool = False,
+    ) -> Tuple[List[str], List[str]]:
+        """
+        Load SRK state from checkpoint.
+
+        Args:
+            checkpoint: Dict from get_checkpoint_state() or torch.load()
+            strict: If True, raise on missing/unexpected keys
+
+        Returns:
+            Tuple of (missing_keys, unexpected_keys)
+        """
+        missing = []
+        unexpected = []
+
+        # Version check
+        ckpt_version = checkpoint.get('srk_version', 'unknown')
+        if ckpt_version != '9.8.0':
+            print(f"[SRK] Warning: Checkpoint version {ckpt_version} != 9.8.0")
+
+        # Dimension validation
+        ckpt_state_dim = checkpoint.get('state_dim', 32)
+        if ckpt_state_dim != self.config.state_dim:
+            raise ValueError(f"State dim mismatch: checkpoint={ckpt_state_dim}, model={self.config.state_dim}")
+
+        # Load karma state
+        if 'karma_state' in checkpoint:
+            self.karma_state.copy_(checkpoint['karma_state'])
+        else:
+            missing.append('karma_state')
+
+        # Load OPB lock state
+        if 'opb_locked_mask' in checkpoint:
+            self.opb_lock.locked_mask.copy_(checkpoint['opb_locked_mask'])
+            self.opb_lock.locked_state.copy_(checkpoint['opb_locked_state'])
+            self.opb_lock.lock_strength.copy_(checkpoint['opb_lock_strength'])
+        else:
+            missing.extend(['opb_locked_mask', 'opb_locked_state', 'opb_lock_strength'])
+
+        # Load module state dicts
+        module_mappings = [
+            ('dna_bridge_state', self.dna_bridge),
+            ('witness_state', self.witness),
+            ('synthesis_gate_state', self.synthesis_gate),
+            ('imr_state', self.imr),
+            ('vritti_gate_state', self.vritti_gate),
+            ('kosha_controller_state', self.kosha_controller),
+            ('mauna_state', self.mauna),
+            ('state_projector_state', self.state_projector),
+        ]
+
+        for key, module in module_mappings:
+            if key in checkpoint:
+                try:
+                    module.load_state_dict(checkpoint[key], strict=strict)
+                except Exception as e:
+                    if strict:
+                        raise
+                    print(f"[SRK] Warning loading {key}: {e}")
+                    missing.append(key)
+            else:
+                missing.append(key)
+
+        if strict and missing:
+            raise KeyError(f"Missing SRK checkpoint keys: {missing}")
+
+        return missing, unexpected
+
+    @classmethod
+    def from_checkpoint(
+        cls,
+        checkpoint_path: str,
+        config: Optional['SRKConfig'] = None,
+        device: torch.device = None,
+    ) -> 'SovereignReasoningKernel':
+        """
+        Create SRK instance from checkpoint file.
+
+        Args:
+            checkpoint_path: Path to checkpoint file
+            config: Optional config override (uses checkpoint config if None)
+            device: Target device
+
+        Returns:
+            Loaded SovereignReasoningKernel instance
+        """
+        checkpoint = torch.load(checkpoint_path, map_location=device or 'cpu')
+
+        # Handle nested checkpoint (from train_unified_llm.py)
+        if 'srk_state' in checkpoint:
+            srk_checkpoint = checkpoint['srk_state']
+        else:
+            srk_checkpoint = checkpoint
+
+        # Use checkpoint config if not provided
+        if config is None:
+            ckpt_config = srk_checkpoint.get('config', {})
+            config = SRKConfig(
+                hidden_dim=srk_checkpoint.get('hidden_dim', 768),
+                dna_bridge_layer=ckpt_config.get('dna_bridge_layer', 4),
+                witness_layer=ckpt_config.get('witness_layer', 9),
+                synthesis_layer=ckpt_config.get('synthesis_layer', 11),
+                enable_opb_locking=ckpt_config.get('enable_opb_locking', True),
+                karma_decay=ckpt_config.get('karma_decay', 0.9),
+            )
+
+        # Create instance
+        srk = cls(config)
+        if device:
+            srk = srk.to(device)
+
+        # Load state
+        missing, _ = srk.load_checkpoint_state(srk_checkpoint, strict=False)
+        if missing:
+            print(f"[SRK] Re-initialized: {missing}")
+
+        return srk
+
 
 # =============================================================================
 # LAYER 7 PHASE EXTRACTION HOOK
