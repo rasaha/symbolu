@@ -642,8 +642,8 @@ class PhaseJEPATransformer(nn.Module):
         return {
             'total': total_loss,
             'vicreg': vicreg_out['total'],
-            'variance': vicreg_out['std'],
-            'covariance': vicreg_out['cov'],
+            'variance': vicreg_out['variance'],
+            'covariance': vicreg_out['covariance'],
             'alignment': alignment_loss,
             'orthogonality': ortho_loss,
         }
@@ -671,6 +671,13 @@ class PhaseJEPATransformer(nn.Module):
         Returns:
             curiosity: Scalar curiosity signal [B] or [B, T]
         """
+        # Handle shape mismatches between s_pred and s_actual
+        # If s_pred is 3D [B, T, D] and s_actual is 2D [B, D], use last state from s_pred
+        if s_pred.dim() == 3 and s_actual.dim() == 2:
+            s_pred = s_pred[:, -1, :]  # Take last predicted state [B, D]
+        elif s_pred.dim() == 2 and s_actual.dim() == 3:
+            s_actual = s_actual[:, -1, :]  # Take last actual state [B, D]
+
         # Compute L2 prediction error
         prediction_error = torch.norm(s_pred - s_actual, p=2, dim=-1)
 

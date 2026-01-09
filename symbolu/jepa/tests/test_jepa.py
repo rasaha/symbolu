@@ -496,8 +496,9 @@ class TestJEPAIntegration:
         # Create mock target (shifted context)
         s_target = torch.roll(s_context, -1, dims=1)
 
-        # Compute loss
-        loss = loss_fn(s_pred, s_target)
+        # Compute loss (VICRegLoss expects 2D tensors [B, D])
+        # Use last state from sequences for comparison
+        loss = loss_fn(s_pred[:, -1, :], s_target[:, -1, :])
 
         assert loss.requires_grad
         assert not torch.isnan(loss)
