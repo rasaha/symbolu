@@ -5138,6 +5138,39 @@ class AdaptiveTrainingController:
         blocked = " BLOCKED" if self.boost_blocked else ""
         return f"AdaptLR:{current_lr:.2e}({lr_relative:.1f}x) vel:{velocity:+.1f}% [{plateau}] boosts:{self.boost_count} decays:{self.decay_count} emerg:{self.emergency_count}{blocked}"
 
+    def enforce_lr_bounds(self, global_step: int = 0) -> bool:
+        """
+        V9.8.3: Step-level LR safeguard - call EVERY training step.
+
+        This catches runaway LR from schedulers or restored checkpoints
+        that the validation-time update() method would miss.
+
+        Returns True if LR was clamped.
+        """
+        current_lr = self.optimizer.param_groups[0]['lr']
+        lr_relative = current_lr / self.base_lr
+
+        clamped = False
+
+        # Check upper bound
+        if lr_relative > self.max_lr_relative:
+            safe_lr = self.base_lr * self.max_lr_relative
+            for pg in self.optimizer.param_groups:
+                pg['lr'] = safe_lr
+            self.emergency_count += 1
+            self.boost_blocked = True
+            print(f"\n  🚨 [AdaptiveTraining] STEP {global_step} LR CLAMPED: {current_lr:.2e} → {safe_lr:.2e} (exceeded {self.max_lr_relative}x base)")
+            clamped = True
+
+        # Check lower bound
+        elif current_lr < self.lr_min:
+            for pg in self.optimizer.param_groups:
+                pg['lr'] = self.lr_min
+            print(f"\n  ⚠️ [AdaptiveTraining] STEP {global_step} LR FLOOR: {current_lr:.2e} → {self.lr_min:.2e}")
+            clamped = True
+
+        return clamped
+
     def get_telemetry(self) -> Dict[str, Any]:
         """Get telemetry for logging."""
         current_lr = self.optimizer.param_groups[0]['lr']
@@ -9568,6 +9601,19 @@ def train(config: UnifiedTrainingConfig):
             consecutive_spike_limit=config.adaptive_consecutive_spike_limit,
         )
 
+        # V9.8.3: Immediately enforce LR bounds after checkpoint restore
+        # This catches runaway LR from corrupted checkpoint state before training starts
+        if config.resume and not config.resume_weights_only:
+            current_lr = optimizer.param_groups[0]['lr']
+            max_allowed = config.learning_rate * config.adaptive_max_lr_relative
+            if current_lr > max_allowed:
+                print(f"\n  🚨 [V9.8.3] CHECKPOINT LR OVERRIDE: {current_lr:.2e} → {max_allowed:.2e}")
+                print(f"      Restored LR exceeded {config.adaptive_max_lr_relative}x base ({config.learning_rate:.2e})")
+                for pg in optimizer.param_groups:
+                    pg['lr'] = max_allowed
+                adaptive_controller.emergency_count += 1
+                adaptive_controller.boost_blocked = True
+
     # Restore HGS/DRC state from checkpoint if available
     if resumed_hgs_state is not None and gradient_scaler_hgs is not None:
         try:
@@ -10552,6 +10598,10 @@ def train(config: UnifiedTrainingConfig):
             # Update scheduler after warmup
             if global_step >= config.warmup_steps:
                 scheduler.step()
+
+            # V9.8.3: Enforce LR bounds EVERY STEP (catches scheduler/checkpoint runaway)
+            if adaptive_controller is not None:
+                adaptive_controller.enforce_lr_bounds(global_step)
 
             # Update alpha schedule for phase/hybrid models
             current_alpha = update_alpha_schedule(model, global_step, config)
