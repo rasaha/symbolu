@@ -125,6 +125,13 @@ class SRKConfig:
     mauna_error_threshold: float = 0.9
     mauna_activity_threshold: float = 0.9
 
+    # OPB Dimension Locking (Ontological Persistence Buffer)
+    enable_opb_locking: bool = True
+    opb_lock_threshold: float = 0.7    # Activation threshold to lock dimension
+    opb_unlock_threshold: float = 0.3  # Activation threshold to unlock dimension
+    opb_lock_decay: float = 0.95       # Per-step decay for locked dimensions (slow release)
+    opb_blend_factor: float = 0.6      # How much locked state influences new state
+
     # Training parameters
     warmup_steps: int = 5000
 
@@ -431,6 +438,216 @@ class KoshaShiftController(nn.Module):
         kosha_activations = state[:, KOSHA_SLICE]  # [B, 5]
         dominant_idx = kosha_activations.mean(dim=0).argmax().item()
         return KOSHA_NAMES[dominant_idx]
+
+
+# =============================================================================
+# OPB DIMENSION LOCKING (Ontological Persistence Buffer)
+# =============================================================================
+
+class OPBDimensionLock(nn.Module):
+    """
+    Ontological Persistence Buffer with Dimension Locking.
+
+    Preserves active ontological dimensions across tokens and domain switches.
+    When a dimension (e.g., O7 Reasoning) exceeds a threshold, it gets "locked"
+    and persists strongly until explicitly released.
+
+    This enables cross-domain reasoning transfer:
+    - Lock O7 (Reasoning) when doing math
+    - Switch to finance domain
+    - O7 lock carries mathematical rigor into financial analysis
+
+    Implements design doc Section 3.1:
+    - Dimension locking when activation > lock_threshold
+    - Slow decay for locked dimensions
+    - Blending of locked state with new state
+    """
+
+    def __init__(
+        self,
+        state_dim: int = SOVEREIGN_STATE_DIM,
+        lock_threshold: float = 0.7,
+        unlock_threshold: float = 0.3,
+        lock_decay: float = 0.95,
+        blend_factor: float = 0.6,
+    ):
+        """
+        Initialize OPB Dimension Lock.
+
+        Args:
+            state_dim: Dimension of state vector (32)
+            lock_threshold: Activation above this locks dimension
+            unlock_threshold: Activation below this unlocks dimension
+            lock_decay: Per-step decay for locked dimensions (0.95 = slow release)
+            blend_factor: How much locked state influences new state (0.6 = 60%)
+        """
+        super().__init__()
+        self.state_dim = state_dim
+        self.lock_threshold = lock_threshold
+        self.unlock_threshold = unlock_threshold
+        self.lock_decay = lock_decay
+        self.blend_factor = blend_factor
+
+        # Track locked dimensions: [state_dim] bool tensor
+        self.register_buffer('locked_mask', torch.zeros(state_dim, dtype=torch.bool))
+
+        # Store locked state values: [state_dim]
+        self.register_buffer('locked_state', torch.zeros(state_dim))
+
+        # Lock strength: decays over time for each dimension
+        self.register_buffer('lock_strength', torch.zeros(state_dim))
+
+    def update_locks(self, state: torch.Tensor) -> Dict[str, Any]:
+        """
+        Update dimension locks based on current state activations.
+
+        Args:
+            state: [B, 32] current Sovereign State
+
+        Returns:
+            Dict with lock statistics
+        """
+        # Average over batch for lock decisions
+        avg_state = state.mean(dim=0)  # [32]
+
+        diagnostics = {
+            'newly_locked': [],
+            'newly_unlocked': [],
+            'active_locks': 0,
+        }
+
+        # Check each dimension
+        for dim in range(self.state_dim):
+            activation = avg_state[dim].item()
+
+            if not self.locked_mask[dim]:
+                # Not locked - check if should lock
+                if activation > self.lock_threshold:
+                    self.locked_mask[dim] = True
+                    self.locked_state[dim] = activation
+                    self.lock_strength[dim] = 1.0
+                    diagnostics['newly_locked'].append(self._get_dim_name(dim))
+            else:
+                # Currently locked - check if should unlock
+                if activation < self.unlock_threshold and self.lock_strength[dim] < 0.3:
+                    self.locked_mask[dim] = False
+                    self.locked_state[dim] = 0.0
+                    self.lock_strength[dim] = 0.0
+                    diagnostics['newly_unlocked'].append(self._get_dim_name(dim))
+                else:
+                    # Decay lock strength
+                    self.lock_strength[dim] *= self.lock_decay
+                    # Update locked value with decay
+                    self.locked_state[dim] = max(
+                        activation,
+                        self.locked_state[dim] * self.lock_decay
+                    )
+
+        diagnostics['active_locks'] = self.locked_mask.sum().item()
+        return diagnostics
+
+    def apply_locks(self, state: torch.Tensor) -> torch.Tensor:
+        """
+        Apply locked dimensions to new state (blending).
+
+        Args:
+            state: [B, 32] new state to modify
+
+        Returns:
+            blended_state: [B, 32] with locked dimensions applied
+        """
+        if not self.locked_mask.any():
+            return state
+
+        # Expand locked state for batch: [32] -> [1, 32] -> [B, 32]
+        locked_expanded = self.locked_state.unsqueeze(0).expand_as(state)
+        strength_expanded = self.lock_strength.unsqueeze(0).expand_as(state)
+        mask_expanded = self.locked_mask.unsqueeze(0).expand_as(state)
+
+        # Blend: new_state = (1 - blend * strength) * state + blend * strength * locked
+        blend_weight = self.blend_factor * strength_expanded
+        blended = torch.where(
+            mask_expanded,
+            (1 - blend_weight) * state + blend_weight * locked_expanded,
+            state
+        )
+
+        return blended
+
+    def get_locked_dimensions(self) -> List[str]:
+        """Get list of currently locked dimension names."""
+        locked_dims = []
+        for dim in range(self.state_dim):
+            if self.locked_mask[dim]:
+                locked_dims.append(self._get_dim_name(dim))
+        return locked_dims
+
+    def get_lock_status(self) -> Dict[str, float]:
+        """Get lock status for all dimensions."""
+        status = {}
+        for dim in range(self.state_dim):
+            if self.locked_mask[dim]:
+                name = self._get_dim_name(dim)
+                status[name] = {
+                    'value': self.locked_state[dim].item(),
+                    'strength': self.lock_strength[dim].item(),
+                }
+        return status
+
+    def force_lock(self, dimension: str, value: float = 1.0):
+        """Manually lock a dimension (for testing or user control)."""
+        dim_idx = self._get_dim_index(dimension)
+        if dim_idx is not None:
+            self.locked_mask[dim_idx] = True
+            self.locked_state[dim_idx] = value
+            self.lock_strength[dim_idx] = 1.0
+
+    def force_unlock(self, dimension: str):
+        """Manually unlock a dimension."""
+        dim_idx = self._get_dim_index(dimension)
+        if dim_idx is not None:
+            self.locked_mask[dim_idx] = False
+            self.locked_state[dim_idx] = 0.0
+            self.lock_strength[dim_idx] = 0.0
+
+    def reset(self):
+        """Reset all locks."""
+        self.locked_mask.zero_()
+        self.locked_state.zero_()
+        self.lock_strength.zero_()
+
+    def _get_dim_name(self, dim: int) -> str:
+        """Get human-readable name for dimension index."""
+        if dim < 12:
+            return f"Bhava_{BHAVA_NAMES[dim]}"
+        elif dim < 17:
+            return f"Kosha_{KOSHA_NAMES[dim - 12]}"
+        elif dim < 22:
+            return f"Vritti_{VRITTI_NAMES[dim - 17]}"
+        elif dim < 28:
+            return f"Guna_{GUNA_NAMES[dim - 22]}"
+        else:
+            return f"Reserved_{dim - 28}"
+
+    def _get_dim_index(self, name: str) -> Optional[int]:
+        """Get dimension index from name."""
+        # Check Bhava names
+        for i, bhava in enumerate(BHAVA_NAMES):
+            if name.upper() in [bhava, f"O{i+1}", f"BHAVA_{bhava}"]:
+                return i
+        # Check Kosha names
+        for i, kosha in enumerate(KOSHA_NAMES):
+            if name.upper() in [kosha, f"KOSHA_{kosha}"]:
+                return 12 + i
+        # Check Vritti names
+        for i, vritti in enumerate(VRITTI_NAMES):
+            if name.upper() in [vritti, f"VRITTI_{vritti}"]:
+                return 17 + i
+        # Check Guna names
+        for i, guna in enumerate(GUNA_NAMES):
+            if name.upper() in [guna, f"GUNA_{guna}"]:
+                return 22 + i
+        return None
 
 
 # =============================================================================
@@ -877,6 +1094,15 @@ class SovereignReasoningKernel(nn.Module):
             activity_threshold=self.config.mauna_activity_threshold,
         )
 
+        # OPB Dimension Locking (Cross-domain reasoning persistence)
+        self.opb_lock = OPBDimensionLock(
+            state_dim=self.config.state_dim,
+            lock_threshold=self.config.opb_lock_threshold,
+            unlock_threshold=self.config.opb_unlock_threshold,
+            lock_decay=self.config.opb_lock_decay,
+            blend_factor=self.config.opb_blend_factor,
+        )
+
         # State projector for hidden → 32D extraction
         self.state_projector = nn.Sequential(
             nn.Linear(self.config.hidden_dim, self.config.hidden_dim // 2),
@@ -903,15 +1129,17 @@ class SovereignReasoningKernel(nn.Module):
     def compute_state_from_hidden(
         self,
         hidden_states: torch.Tensor,
+        apply_opb_locking: bool = True,
     ) -> torch.Tensor:
         """
         Compute 32D Sovereign State from hidden states.
 
         Args:
             hidden_states: [B, N, D] hidden states from final layer
+            apply_opb_locking: Whether to apply OPB dimension locking
 
         Returns:
-            state: [B, 32] sovereign state vector
+            state: [B, 32] sovereign state vector (with OPB locks applied if enabled)
         """
         # Pool hidden states (mean over sequence)
         pooled = hidden_states.mean(dim=1)  # [B, D]
@@ -938,7 +1166,23 @@ class SovereignReasoningKernel(nn.Module):
         # Reserved (4 values) - sigmoid for independent flags
         state_normalized[:, 28:32] = torch.sigmoid(state[:, 28:32])
 
+        # Apply OPB Dimension Locking (cross-domain reasoning persistence)
+        if apply_opb_locking and self.config.enable_opb_locking:
+            # Update locks based on current activations
+            self._opb_diagnostics = self.opb_lock.update_locks(state_normalized)
+
+            # Apply locked dimensions to blend with new state
+            state_normalized = self.opb_lock.apply_locks(state_normalized)
+
         return state_normalized
+
+    def get_opb_status(self) -> Dict[str, Any]:
+        """Get current OPB lock status for diagnostics."""
+        return {
+            'locked_dimensions': self.opb_lock.get_locked_dimensions(),
+            'lock_status': self.opb_lock.get_lock_status(),
+            'active_locks': self.opb_lock.locked_mask.sum().item(),
+        }
 
     def step_karma(self, final_state: torch.Tensor):
         """
@@ -1049,6 +1293,15 @@ class SovereignReasoningKernel(nn.Module):
             diagnostics['entropy_delta'] = (current_entropy - karma_entropy).item()
         else:
             diagnostics['entropy_delta'] = 0.0
+
+        # Add OPB lock status to diagnostics
+        if self.config.enable_opb_locking:
+            diagnostics['opb_active_locks'] = self.opb_lock.locked_mask.sum().item()
+            diagnostics['opb_locked_dims'] = self.opb_lock.get_locked_dimensions()
+            # Include last OPB update diagnostics if available
+            if hasattr(self, '_opb_diagnostics'):
+                diagnostics['opb_newly_locked'] = self._opb_diagnostics.get('newly_locked', [])
+                diagnostics['opb_newly_unlocked'] = self._opb_diagnostics.get('newly_unlocked', [])
 
         return {
             'hidden_states': hidden_states,
