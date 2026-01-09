@@ -1822,8 +1822,323 @@ This is the architecture of a system that recognizes a financial problem might b
 
 ---
 
-*Document Version: 1.0.0*
+---
+
+## 17. Production Refinements (Gemini Review)
+
+### 17.1 Stochastic Depth Warm-up (Stability)
+
+To prevent **Gradient Vanishing** during early training when the SRK intervenes at multiple layers:
+
+```python
+class SRKWarmupScheduler:
+    """Gradually increase SRK intervention strength during warm-up."""
+
+    def __init__(self, warmup_steps: int = 1000):
+        self.warmup_steps = warmup_steps
+        self.current_step = 0
+
+    def get_lambda(self) -> float:
+        """Returns current intervention strength λ ∈ [0, 1]."""
+        if self.current_step >= self.warmup_steps:
+            return 1.0
+        return self.current_step / self.warmup_steps
+
+    def step(self):
+        self.current_step += 1
+```
+
+**Usage:** For the first 1,000 steps, hidden states pass through unchanged (λ=0). Gradually increase λ to target values.
+
+### 17.2 Nidra (Void) Penalty
+
+If the model's 32D state collapses into **Nidra** (dormancy/filler), force a **Rajas** spike:
+
+```python
+def apply_nidra_penalty(self, state: torch.Tensor) -> torch.Tensor:
+    """Detect dormancy and inject activity to re-engage semantic engine."""
+    nidra_score = state[:, 20]  # Nidra dimension
+
+    if (nidra_score > 0.8).any():
+        # Model has "zoned out" - inject Rajas (Activity)
+        state = state.clone()
+        state[:, 23] = torch.clamp(state[:, 23] + 0.5, max=1.0)  # Boost Rajas
+        state[:, 20] = state[:, 20] * 0.3  # Dampen Nidra
+    return state
+```
+
+### 17.3 Cross-Domain "Aha!" Logging
+
+Add explicit logging for Isomorphism detection:
+
+```python
+def log_isomorphism(self, current_domain: str, matched_domain: str, similarity: float):
+    """Log when structural twin is detected across domains."""
+    print(f"[IMR] Isomorphism Locked: {current_domain}[O4] <-> {matched_domain}[O4] (Sim: {similarity:.2f})")
+```
+
+---
+
+## 18. Isomorphic Mapping Router (IMR) Implementation
+
+### 18.1 Complete IMR Module
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from typing import List, Optional, Tuple
+
+
+class IsomorphicMappingRouter(nn.Module):
+    """
+    Identifies shared structural logic between disparate domains.
+    Enables the model to apply Math-Rigor to Finance-Data.
+
+    The IMR is the "Relay" that connects structural truths to live inference.
+    It detects Bhava Overlap rather than word matching.
+    """
+
+    def __init__(
+        self,
+        state_dim: int = 32,
+        hidden_dim: int = 512,
+        threshold: float = 0.75,
+    ):
+        super().__init__()
+        self.state_dim = state_dim
+        self.threshold = threshold
+
+        # Memory Bank: List of (domain_name, bhava_tensor)
+        self.memory_bank: List[Tuple[str, torch.Tensor]] = []
+
+        # Projects the mapped 'Universal Logic' back into hidden space
+        self.bias_projector = nn.Linear(12, hidden_dim)
+
+    def register_domain_logic(self, domain_name: str, bhava_vector: torch.Tensor):
+        """
+        Stores a mastered ontological pattern (e.g., 'Formal Deduction').
+
+        Args:
+            domain_name: Human-readable name for the logic template
+            bhava_vector: 12D Bhava pattern representing the structural logic
+        """
+        # Ensure we only store the first 12 dimensions (Bhavas)
+        self.memory_bank.append((domain_name, bhava_vector[:12].detach()))
+
+    def forward(
+        self,
+        current_32d_state: torch.Tensor,
+    ) -> Tuple[Optional[torch.Tensor], Optional[str], float]:
+        """
+        Detects if the current thought matches a known logical structure.
+
+        Args:
+            current_32d_state: [B, 32] Current Sovereign State
+
+        Returns:
+            bias: [B, hidden_dim] Isomorphic bias to inject, or None
+            matched_domain: Name of matched template, or None
+            similarity: Confidence score of the match
+        """
+        if not self.memory_bank:
+            return None, None, 0.0
+
+        # Extract Current Bhava Pattern [Batch, 12]
+        current_bhavas = current_32d_state[:, :12]
+
+        # Search Memory for Isomorphism
+        best_match_vector = None
+        best_match_name = None
+        highest_sim = 0.0
+
+        for name, stored_bhavas in self.memory_bank:
+            # Calculate Structural Similarity
+            similarity = F.cosine_similarity(
+                current_bhavas,
+                stored_bhavas.unsqueeze(0).expand_as(current_bhavas),
+                dim=-1
+            ).mean()
+
+            if similarity > self.threshold and similarity > highest_sim:
+                highest_sim = similarity.item()
+                best_match_vector = stored_bhavas
+                best_match_name = name
+
+        # If a structural twin is found, inject the bias
+        if best_match_vector is not None:
+            # Project the stored 'Logic' into the current 'Thought'
+            bias = self.bias_projector(best_match_vector) * highest_sim
+            return bias, best_match_name, highest_sim
+
+        return None, None, 0.0
+```
+
+### 18.2 Integration with Layer 9 (Witness)
+
+```python
+def witness_step(self, x: torch.Tensor, state: torch.Tensor) -> torch.Tensor:
+    """Modified Layer 9 with IMR integration."""
+    # 1. Check for Cross-Domain Logic (IMR)
+    isomorphic_bias, matched_domain, sim = self.imr(state)
+
+    # 2. If found, add to hidden state before arbitration
+    if isomorphic_bias is not None:
+        x = x + isomorphic_bias.unsqueeze(1)
+        print(f"[IMR] Isomorphism Locked: Current <-> {matched_domain} (Sim: {sim:.2f})")
+
+    # 3. Proceed with standard Witness Arbitration
+    return self.witness(x, state)
+```
+
+---
+
+## 19. Universal Logic Templates (AGI Anchors)
+
+### 19.1 The 5 Primary Templates
+
+These "Pre-Mastered" ontological paths anchor the model's cross-domain reasoning:
+
+| Template | Sanskrit | Primary Bhavas | Cross-Domain Use Case |
+|----------|----------|----------------|----------------------|
+| **Formal Deduction** | Nigamana | O7+O4+O12 | Math proof rigor → Financial contract logic |
+| **Probabilistic Induction** | Anumana | O5+O3+O8 | Statistical sequence → Market trend analysis |
+| **Abductive Hypothesis** | Arthapatti | O8+O9+O1 | Inference to best explanation → Market anomaly diagnosis |
+| **Dialectical Synthesis** | Samanvaya | O10+O11+O2 | Reconciling contradictions → Bullish/Bearish balance |
+| **Causal Execution** | Satkaryavada | O3+O6+O4 | Algorithmic logic → Trade settlement |
+
+### 19.2 Pre-Registration Code
+
+```python
+def initialize_logic_templates(imr: IsomorphicMappingRouter):
+    """Prime the IMR with universal logic templates before training."""
+
+    # 1. Deduction (Formal Certainty - O4, O7, O12)
+    imr.register_domain_logic("DEDUCTION", torch.tensor([
+        0, 0, 0, 0.8, 0, 0, 1.0, 0, 0, 0, 0, 0.9
+    ]))
+
+    # 2. Induction (Pattern Recognition - O3, O5, O8)
+    imr.register_domain_logic("INDUCTION", torch.tensor([
+        0, 0, 0.7, 0, 0.9, 0, 0, 0.8, 0, 0, 0, 0
+    ]))
+
+    # 3. Abduction (Hypothesis Extraction - O1, O8, O9)
+    imr.register_domain_logic("ABDUCTION", torch.tensor([
+        0.6, 0, 0, 0, 0, 0, 0, 0.9, 0.8, 0, 0, 0
+    ]))
+
+    # 4. Synthesis (Contradiction Resolution - O2, O10, O11)
+    imr.register_domain_logic("SYNTHESIS", torch.tensor([
+        0, 0.7, 0, 0, 0, 0, 0, 0, 0, 1.0, 0.9, 0
+    ]))
+
+    # 5. Causal Execution (Algorithmic Logic - O3, O4, O6)
+    imr.register_domain_logic("CAUSAL", torch.tensor([
+        0, 0, 0.9, 0.8, 0, 1.0, 0, 0, 0, 0, 0, 0
+    ]))
+```
+
+### 19.3 Template Behavior
+
+| Input Domain | Detected Template | Applied Logic | Output Effect |
+|--------------|-------------------|---------------|---------------|
+| "Prove this theorem" | DEDUCTION | O7 Rigor Lock | Forces step-by-step validity |
+| "What's the trend?" | INDUCTION | O5 Pattern Lock | Applies statistical reasoning |
+| "Why did the market crash?" | ABDUCTION | O9 Witness Lock | Generates competing hypotheses |
+| "Bulls vs Bears?" | SYNTHESIS | O10 Unity Lock | Balances contradictory data |
+| "Execute the algorithm" | CAUSAL | O3 Execution Lock | Sequential impact tracking |
+
+---
+
+## 20. Final Production Configuration
+
+### 20.1 Complete Initialization
+
+```python
+from symbolu.sovereign import (
+    SovereignReasoningKernel,
+    IsomorphicMappingRouter,
+    UserOntologicalMirror,
+    UOMDiagnosticsMonitor,
+)
+
+def create_sovereign_model(base_model, d_model=512, state_dim=32):
+    """Initialize complete Sovereign AGI architecture."""
+
+    # 1. Create SRK with all components
+    srk = SovereignReasoningKernel(
+        d_model=d_model,
+        state_dim=state_dim,
+        isomorphism_threshold=0.75,
+        karma_decay=0.85,
+    )
+
+    # 2. Initialize IMR with logic templates
+    initialize_logic_templates(srk.imr)
+
+    # 3. Create User-Ontological Mirror
+    uom = UserOntologicalMirror(state_dim=state_dim)
+
+    # 4. Create Diagnostics Monitor
+    monitor = UOMDiagnosticsMonitor()
+
+    # 5. Wrap base model
+    return SRKEnhancedModel(
+        base_model=base_model,
+        srk=srk,
+        uom=uom,
+        monitor=monitor,
+        d_model=d_model,
+        state_dim=state_dim,
+    )
+```
+
+### 20.2 Production CLI Command
+
+```bash
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --state_dim 32 \
+    --enable_srk \
+    --uom_mirroring \
+    --enable_uom_diagnostics \
+    --imr_threshold 0.75 \
+    --srk_warmup_steps 1000 \
+    --enable_nidra_penalty \
+    --learning_rate 8e-5 \
+    --gradient_accumulation 4 \
+    --batch_size 32 \
+    --max_steps 50000 \
+    --onto_bridge_layer 4 \
+    --csr_alignment_layer 7 \
+    --kosha_steering_layer 9 \
+    --toroidal_feedback \
+    --checkpoint_dir ./checkpoints/sovereign_V9_7_final \
+    2>&1 | tee sovereign_master.log
+```
+
+---
+
+## 21. Glossary Update
+
+| Term | Definition |
+|------|------------|
+| **IMR** | Isomorphic Mapping Router - detects structural logic overlap across domains |
+| **Logic Template** | Pre-registered Bhava pattern representing a reasoning mode |
+| **Nigamana** | Sanskrit for Deduction - formal certainty logic |
+| **Anumana** | Sanskrit for Induction - pattern recognition logic |
+| **Arthapatti** | Sanskrit for Abduction - hypothesis extraction logic |
+| **Samanvaya** | Sanskrit for Synthesis - contradiction resolution logic |
+| **Satkaryavada** | Sanskrit for Causal - sequential impact logic |
+| **Nidra Penalty** | Injection of Rajas when model enters dormancy state |
+| **Stochastic Depth** | Gradual warm-up of SRK intervention strength |
+
+---
+
+*Document Version: 1.1.0*
 *Created: 2026-01-09*
+*Updated: 2026-01-09 (Added IMR, Logic Templates, Production Refinements)*
 *Origin: Google Gemini Architecture Proposal*
 *Integration: SymbolU Sovereign-1 Architecture*
 *Authors: SymbolU Development Team*
