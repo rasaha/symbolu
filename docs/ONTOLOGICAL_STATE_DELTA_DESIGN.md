@@ -9,6 +9,57 @@ A paradigm shift from token-centric to meaning-centric training, enabling theore
 
 ---
 
+## Implementation Status (V9.8.0)
+
+> **STATUS: ✅ FULLY IMPLEMENTED**
+>
+> All design components have been implemented and tested. This section provides quick references to implementations.
+
+### Quick Reference
+
+| Component | Implementation | Location |
+|-----------|----------------|----------|
+| 32D Sovereign State | `SovereignReasoningKernel` | `symbolu/sovereign/reasoning_kernel.py` |
+| Phase Rotation (ΔS→θ) | `IntentPhaseProjector` | `symbolu/phase_transformer.py:228` |
+| Two-Tier AGI Wrapper | `OntologicalHybridTransformer` | `symbolu/phase_transformer.py:2458` |
+| Layer Interventions | `DNABridge`, `PhaseHook`, `WitnessLayer` | `symbolu/sovereign/reasoning_kernel.py` |
+| Loss Functions (B1/U2/S8) | `SRKLoss` | `symbolu/sovereign/sovereign_loss.py` |
+| OPB Dimension Locking | `OPBDimensionLock` | `symbolu/sovereign/reasoning_kernel.py` |
+| User-Ontological Mirror | `UserOntologicalMirror` | `symbolu/sovereign/reasoning_kernel.py` |
+| Unit Tests | `test_srk.py` | `symbolu/sovereign/tests/test_srk.py` |
+
+### Validate Implementation
+
+```bash
+# Run all SRK unit tests
+pytest symbolu/sovereign/tests/test_srk.py -v
+
+# Run specific test class
+pytest symbolu/sovereign/tests/test_srk.py::TestSovereignReasoningKernel -v
+
+# Quick syntax check
+python -c "from symbolu.sovereign import SovereignReasoningKernel, SRKConfig; print('✓ SRK imports OK')"
+```
+
+### CLI Quick Start
+
+```bash
+# Train with SRK (Sovereign Reasoning Kernel)
+python train_unified_llm.py \
+    --model_type ontological \
+    --enable_srk \
+    --dataset wikitext103 \
+    --max_steps 1000
+
+# Train with OntologicalHybridTransformer (Two-Tier AGI)
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --state_dim 32 \
+    --dataset wikitext103
+```
+
+---
+
 ## Architecture Evolution
 
 ```
@@ -239,6 +290,27 @@ This is how consciousness works: same signal, context-dependent meaning.
 
 **V9.8.0 BREAKING CHANGE:** Replaced arbitrary 124D CognitiveState with principled 32D Sovereign State.
 
+> **📁 IMPLEMENTATION NOTES**
+>
+> **Primary Implementation:** `symbolu/sovereign/reasoning_kernel.py`
+>
+> **Constants defined:**
+> ```python
+> SOVEREIGN_STATE_DIM = 32
+> BHAVA_NAMES = ['POT', 'IDN', 'EXE', 'STR', 'COG', 'AGY', 'RSN', 'PRP', 'WIT', 'UNI', 'INT', 'ABS']
+> KOSHA_NAMES = ['ANNA', 'PRANA', 'MANO', 'VIJNANA', 'ANANDA']
+> VRITTI_NAMES = ['PRAMANA', 'VIPARYAYA', 'VIKALPA', 'NIDRA', 'SMRITI']
+> GUNA_NAMES = ['SATTVA', 'RAJAS', 'TAMAS', 'VELOCITY', 'ACCEL', 'STABLE']
+> ```
+>
+> **Usage:**
+> ```python
+> from symbolu.sovereign import SOVEREIGN_STATE_DIM, BHAVA_NAMES, KOSHA_NAMES
+> from symbolu.phase_transformer import get_sovereign_state_summary
+> ```
+>
+> **Unit Tests:** `pytest symbolu/sovereign/tests/test_srk.py::TestSRKConfig -v`
+
 ### Why the Change?
 
 ```
@@ -419,6 +491,38 @@ L = MSE(ΔS_pred, ΔS_actual)                    # State prediction
   + λ₃ · EntropyMismatch(S_{t+1})              # Uncertainty calibration
   + λ₄ · ConstraintViolation(S_{t+1})          # Illegal meaning jumps
 ```
+
+> **📁 IMPLEMENTATION NOTES: Sovereign Loss (V9.8.0)**
+>
+> **File:** `symbolu/sovereign/sovereign_loss.py`
+>
+> The design's Tier 3 loss is implemented as the **SRKLoss** with three primary terms:
+>
+> | Design Term | Implementation | Description |
+> |-------------|----------------|-------------|
+> | `OntologyTransitionLoss` | **B1: Consistency Lagrangian** | Forward-backward divergence via `BackwardScoreCalculator` |
+> | `CoherenceDrift` | **U2: Phase Coherence** | Attention head alignment via `PhaseCoherenceCalculator` |
+> | `EntropyMismatch` | **S8: Stability Constraint** | Entropy decrease requirement |
+> | `ConstraintViolation` | `BhavaTransitionPrior` | In `symbolu/sovereign/observer.py` |
+>
+> **Configuration:**
+> ```python
+> from symbolu.sovereign import SRKLossConfig, SRKLoss
+>
+> config = SRKLossConfig(
+>     lambda_f=1.0,           # B1: Forward score weight
+>     lambda_b=1.0,           # B1: Backward score weight
+>     lambda_c=0.5,           # B1: Divergence penalty
+>     lambda_coherence=0.2,   # U2: Phase coherence
+>     lambda_entropy=0.1,     # S8: Entropy stability
+>     enable_nidra_penalty=True,  # Dormancy penalty
+> )
+> loss_fn = SRKLoss(config)
+> ```
+>
+> **Lambda Warmup:** Use `SovereignAnnealer` to gradually increase lambda weights during training.
+>
+> **Unit Tests:** `pytest symbolu/sovereign/tests/test_srk.py::TestSovereignLoss -v`
 
 ---
 
@@ -617,24 +721,69 @@ python train_unified_llm.py \
 
 ---
 
-## File Structure (Updated)
+## File Structure (Updated V9.8.0)
 
 ```
 symbolu/
 ├── phase_transformer.py              # Phase Attention (O(n))
+│   ├── IntentPhaseProjector          # ΔS → θ projection (line 228)
+│   ├── PhaseAttentionLayer           # Intent-aware attention (line 326)
+│   ├── OntologicalHybridTransformer  # Two-Tier AGI wrapper (line 2458)
+│   ├── get_sovereign_state_summary() # Human-readable state (line 154)
+│   └── SOVEREIGN_STATE_DIM           # 32D constant
+│
+├── sovereign/                        # V9.8.0: Sovereign Reasoning Kernel
+│   ├── __init__.py                   # All exports (version 9.8.0)
+│   ├── reasoning_kernel.py           # Core SRK implementation
+│   │   ├── SRKConfig                 # Configuration dataclass
+│   │   ├── SovereignReasoningKernel  # Main kernel class
+│   │   ├── OPBDimensionLock          # Ontological Persistence Buffer
+│   │   ├── UserOntologicalMirror     # UOM for intervention
+│   │   ├── DNABridgeLayer            # Layer 4 intervention
+│   │   ├── PhaseExtractionHook       # Layer 7 intervention
+│   │   ├── WitnessArbitrator         # Layer 9 intervention
+│   │   └── SynthesisGate             # Layer 11 intervention
+│   ├── sovereign_loss.py             # B1/U2/S8 loss functions
+│   │   ├── SRKLossConfig
+│   │   ├── SRKLoss
+│   │   ├── SovereignAnnealer
+│   │   └── TeleologicalOptimizer
+│   ├── observer.py                   # BhavaTransitionPrior
+│   └── tests/
+│       ├── __init__.py
+│       └── test_srk.py               # Comprehensive unit tests (~800 lines)
+│
 ├── ontological/
 │   ├── symbolu12_bhava.py            # Gen 1: Flat Bhava (PRODUCTION)
 │   ├── bhava_relationships.py        # Vedic relationship logic
 │   ├── hierarchical_complex_bhava.py # Gen 2: Hierarchical Complex (EXPERIMENTAL)
 │   └── types.py                      # Layer names, indices
 │
-├── train_unified_llm.py              # Supports all architectures
-├── train_7b.py                       # Pure Phase 7B (no Bhava)
+├── train_unified_llm.py              # Supports all architectures + SRK
+│   └── SRK integration at lines 9057-9150 (init), 9563-9639 (forward)
 │
 └── docs/
     ├── STATE_DELTA_COGNITION_THEORY.md
     └── ONTOLOGICAL_STATE_DELTA_DESIGN.md (this file)
 ```
+
+> **📁 IMPLEMENTATION NOTES: Key File Locations**
+>
+> | Feature | File | Line |
+> |---------|------|------|
+> | SRK Config | `symbolu/sovereign/reasoning_kernel.py` | ~50 |
+> | SovereignReasoningKernel | `symbolu/sovereign/reasoning_kernel.py` | ~200 |
+> | OPB Dimension Locking | `symbolu/sovereign/reasoning_kernel.py` | ~800 |
+> | User-Ontological Mirror | `symbolu/sovereign/reasoning_kernel.py` | ~950 |
+> | SRK Loss Functions | `symbolu/sovereign/sovereign_loss.py` | ~222 |
+> | Training Loop Integration | `train_unified_llm.py` | ~9057 |
+> | Checkpoint Save/Load | `train_unified_llm.py` | ~8500 |
+>
+> **Verify structure:**
+> ```bash
+> ls -la symbolu/sovereign/
+> ls -la symbolu/sovereign/tests/
+> ```
 
 ---
 
@@ -1301,6 +1450,37 @@ Layer 9:  Kosha Steering      → Witness Consciousness (Reality/Time)
 State:    32D Sovereign       → Bhava/Kosha/Vritti/Guna (principled ontology)
 ```
 
+> **📁 IMPLEMENTATION NOTES: Layer Interventions**
+>
+> The layer architecture is implemented in `SovereignReasoningKernel`:
+>
+> | Layer | Class | Purpose | Config Parameter |
+> |-------|-------|---------|------------------|
+> | L4 | `DNABridgeLayer` | Ontological grounding | `dna_bridge_layer=4` |
+> | L7 | `PhaseExtractionHook` | Phase/CSR extraction | `phase_hook_layer=7` |
+> | L9 | `WitnessArbitrator` | Witness consciousness | `witness_layer=9` |
+> | L11 | `SynthesisGate` | Final integration | `synthesis_layer=11` |
+>
+> **Usage:**
+> ```python
+> from symbolu.sovereign import SRKConfig, SovereignReasoningKernel
+>
+> config = SRKConfig(
+>     hidden_dim=768,
+>     dna_bridge_layer=4,
+>     phase_hook_layer=7,
+>     witness_layer=9,
+>     synthesis_layer=11,
+>     enable_opb_locking=True,
+> )
+> srk = SovereignReasoningKernel(config)
+>
+> # Apply layer intervention
+> hidden = srk.apply_layer_intervention(hidden_states, layer_idx=7)
+> ```
+>
+> **Unit Tests:** `pytest symbolu/sovereign/tests/test_srk.py::TestSovereignReasoningKernel -v`
+
 ---
 
 ## OPERATIONAL: How State Delta Learns (V9.8.0)
@@ -1668,3 +1848,304 @@ Late (step 5000+):
     - intent_phase_std: ~0.2-0.5 (varied rotations)
     - loss: significantly better than baseline on long-range tasks
 ```
+
+---
+
+## IMPLEMENTATION: Advanced Features (V9.8.0)
+
+### OPB Dimension Locking
+
+**Purpose:** Preserve ontological dimensions when activation exceeds threshold, enabling cross-domain reasoning persistence.
+
+> **📁 IMPLEMENTATION NOTES**
+>
+> **File:** `symbolu/sovereign/reasoning_kernel.py` (class `OPBDimensionLock`)
+>
+> **How it works:**
+> 1. Monitor activation levels across 32D state
+> 2. When dimension exceeds `lock_threshold` (default 0.7), lock it
+> 3. Locked dimensions persist with decay (default 0.95)
+> 4. Unlock when activation falls below `unlock_threshold` (default 0.3)
+>
+> **Configuration:**
+> ```python
+> config = SRKConfig(
+>     enable_opb_locking=True,
+>     opb_lock_threshold=0.7,
+>     opb_unlock_threshold=0.3,
+>     opb_decay=0.95,
+>     opb_blend_factor=0.3,
+> )
+> ```
+>
+> **Unit Tests:** `pytest symbolu/sovereign/tests/test_srk.py::TestOPBDimensionLock -v`
+
+---
+
+### User-Ontological Mirror (UOM)
+
+**Purpose:** Detect user distress/confusion and recommend intervention strategies.
+
+> **📁 IMPLEMENTATION NOTES**
+>
+> **File:** `symbolu/sovereign/reasoning_kernel.py` (class `UserOntologicalMirror`)
+>
+> **Detection signals:**
+> - **Distress:** High RAJAS + low SATTVA + high VIPARYAYA
+> - **Confusion:** High VIKALPA + low PRAMANA + high entropy
+>
+> **Intervention strategies:**
+> | User State | Strategy | Action |
+> |------------|----------|--------|
+> | Distressed + Confused | `STABILIZE_AND_REFRAME` | Return to Sattvic anchor |
+> | Distressed only | `VALIDATE` | Acknowledge, reduce RAJAS |
+> | Confused only | `CLARIFY` | Boost PRAMANA, reduce VIKALPA |
+> | Neither | `DIRECT_ACTION` | Proceed normally |
+>
+> **Sattvic Anchor (ideal state):**
+> - O12_ABS (Absolute) = 0.8
+> - VIJNANA (Wisdom) = 0.7
+> - PRAMANA (Valid cognition) = 0.8
+> - SATTVA (Clarity) = 0.8
+>
+> **Usage:**
+> ```python
+> from symbolu.sovereign import UserOntologicalMirror
+>
+> uom = UserOntologicalMirror(state_dim=32)
+> target_state, strategy, diagnostics = uom.recommend_intervention(
+>     current_state, task_type='factual'
+> )
+> ```
+>
+> **Teleological Effectiveness:** Track with `UOMDiagnosticsMonitor`:
+> ```python
+> τ_eff = ΔSattva + ΔPramana - ΔViparyaya
+> ```
+>
+> **Unit Tests:** `pytest symbolu/sovereign/tests/test_srk.py::TestUserOntologicalMirror -v`
+
+---
+
+### Checkpoint Save/Load
+
+**Purpose:** Persist SRK state across training sessions.
+
+> **📁 IMPLEMENTATION NOTES**
+>
+> **Files:**
+> - `symbolu/sovereign/reasoning_kernel.py`: `get_checkpoint_state()`, `load_checkpoint_state()`, `from_checkpoint()`
+> - `train_unified_llm.py`: Integration in `save_checkpoint()` and `load_checkpoint()`
+>
+> **What is saved:**
+> - SRK version (9.8.0)
+> - Karma state (32D)
+> - OPB locked mask, state, and strength
+> - All layer module state dicts (DNA bridge, phase hook, witness, synthesis)
+> - IMR logic templates
+>
+> **Save checkpoint:**
+> ```python
+> srk_state = srk.get_checkpoint_state()
+> torch.save({
+>     'model_state_dict': model.state_dict(),
+>     'srk_state': srk_state,
+>     # ... other checkpoint data
+> }, 'checkpoint.pt')
+> ```
+>
+> **Load checkpoint:**
+> ```python
+> checkpoint = torch.load('checkpoint.pt')
+> srk.load_checkpoint_state(checkpoint['srk_state'], strict=False)
+> ```
+>
+> **Unit Tests:** `pytest symbolu/sovereign/tests/test_srk.py::TestCheckpoint -v`
+
+---
+
+### Training Loop Integration
+
+**Purpose:** Enable SRK in the unified training loop.
+
+> **📁 IMPLEMENTATION NOTES**
+>
+> **File:** `train_unified_llm.py`
+>
+> **CLI flags to enable SRK:**
+> ```bash
+> python train_unified_llm.py \
+>     --enable_srk \
+>     --srk_lambda_b1 1.0 \
+>     --srk_lambda_u2 0.2 \
+>     --srk_lambda_s8 0.1 \
+>     --srk_karma_decay 0.95 \
+>     --srk_warmup_steps 1000
+> ```
+>
+> **Backward Compatibility Bridge:**
+>
+> Legacy flags are auto-converted to SRK config with deprecation warnings:
+> ```bash
+> # Legacy (deprecated):
+> --enable_onto_bridge --onto_bridge_layer 4
+>
+> # Equivalent SRK:
+> --enable_srk  # (auto-enables DNA bridge at layer 4)
+> ```
+>
+> **Integration points:**
+> - **Initialization:** Lines 9057-9150 - SRK config, kernel, loss, annealer setup
+> - **Forward pass:** Lines 9563-9639 - State computation, loss calculation
+> - **Karma carryover:** `srk_karma_state = current_state.detach() * config.srk_karma_decay`
+>
+> **Key function:** `build_srk_config_from_legacy()` bridges old flags to new SRK config
+
+---
+
+## IMPLEMENTATION: Unit Test Reference
+
+### Running All SRK Tests
+
+```bash
+# All SRK tests
+pytest symbolu/sovereign/tests/test_srk.py -v
+
+# With coverage
+pytest symbolu/sovereign/tests/test_srk.py -v --cov=symbolu/sovereign
+
+# Quick smoke test
+python -c "
+from symbolu.sovereign import SRKConfig, SovereignReasoningKernel
+import torch
+config = SRKConfig(hidden_dim=768)
+srk = SovereignReasoningKernel(config)
+x = torch.randn(2, 128, 768)
+state = torch.randn(2, 32)
+out = srk.forward_pass(x, layer_idx=7, current_state=state, karma_state=state)
+print('✓ SRK forward pass OK')
+print(f'  Output keys: {list(out.keys())}')
+"
+```
+
+### Test Classes
+
+| Test Class | What it Tests |
+|------------|---------------|
+| `TestSRKConfig` | Config validation, dimension specs |
+| `TestSovereignReasoningKernel` | Initialization, forward pass, state computation |
+| `TestOPBDimensionLock` | Auto-lock, unlock, decay, blend mechanisms |
+| `TestUserOntologicalMirror` | Distress/confusion detection, intervention strategies |
+| `TestUOMDiagnosticsMonitor` | Teleological effectiveness tracking |
+| `TestCheckpoint` | Save/load cycle, state restoration |
+| `TestSovereignLoss` | B1/U2/S8 loss computation |
+| `TestSovereignAnnealer` | Lambda warmup phases |
+| `TestIsomorphicMappingRouter` | Logic template selection |
+| `TestSRKIntegration` | End-to-end forward pass |
+
+### Individual Test Examples
+
+```bash
+# Test OPB locking
+pytest symbolu/sovereign/tests/test_srk.py::TestOPBDimensionLock::test_auto_lock -v
+
+# Test UOM intervention
+pytest symbolu/sovereign/tests/test_srk.py::TestUserOntologicalMirror::test_recommend_intervention -v
+
+# Test checkpoint round-trip
+pytest symbolu/sovereign/tests/test_srk.py::TestCheckpoint::test_save_load_cycle -v
+```
+
+---
+
+## APPENDIX: Complete CLI Reference (V9.8.0)
+
+### SRK-Specific Arguments
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--enable_srk` | flag | False | Enable Sovereign Reasoning Kernel |
+| `--srk_lambda_b1` | float | 1.0 | B1 Consistency Lagrangian weight |
+| `--srk_lambda_u2` | float | 0.2 | U2 Phase Coherence weight |
+| `--srk_lambda_s8` | float | 0.1 | S8 Stability Constraint weight |
+| `--srk_karma_decay` | float | 0.95 | Karma state decay factor |
+| `--srk_warmup_steps` | int | 1000 | Lambda warmup steps |
+
+### Ontological Hybrid Arguments
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--model_type` | str | - | Set to `ontological_hybrid` for Two-Tier AGI |
+| `--state_dim` | int | 32 | Sovereign State dimension |
+| `--project_per_head_dim` | flag | False | Per-head-dim phase projection |
+| `--cosine_mode` | str | standard | Phase attention mode |
+| `--decay_gamma` | float | 1.0 | State decay factor |
+
+### Layer Intervention Arguments
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--enable_csr` | flag | False | Enable CSR at Layer 7 |
+| `--csr_alignment_layer` | int | 7 | CSR layer index |
+| `--enable_onto_bridge` | flag | False | Enable Ontological Bridge at Layer 4 |
+| `--onto_bridge_layer` | int | 4 | Bridge layer index |
+| `--enable_kosha_steering` | flag | False | Enable Kosha steering at Layer 9 |
+| `--kosha_steering_layer` | int | 9 | Kosha steering layer index |
+| `--kosha_steering_force` | float | 0.16 | Steering force magnitude |
+| `--kosha_steering_warmup` | int | 3000 | Warmup steps before steering |
+
+### Example Training Commands
+
+```bash
+# Minimal SRK training
+python train_unified_llm.py \
+    --model_type ontological \
+    --enable_srk \
+    --dataset wikitext103 \
+    --max_steps 5000
+
+# Full SRK with all features
+python train_unified_llm.py \
+    --model_type ontological \
+    --model_size small \
+    --enable_srk \
+    --srk_lambda_b1 1.0 \
+    --srk_lambda_u2 0.2 \
+    --srk_lambda_s8 0.1 \
+    --srk_karma_decay 0.95 \
+    --srk_warmup_steps 1000 \
+    --enable_csr \
+    --enable_onto_bridge \
+    --enable_kosha_steering \
+    --batch_size 32 \
+    --gradient_accumulation 4 \
+    --learning_rate 8e-5 \
+    --max_steps 50000 \
+    --checkpoint_dir ./checkpoints/srk_full
+
+# Two-Tier AGI (OntologicalHybridTransformer)
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --state_dim 32 \
+    --project_per_head_dim \
+    --dataset wikitext103 \
+    --max_steps 10000
+
+# Resume from checkpoint with SRK state
+python train_unified_llm.py \
+    --model_type ontological \
+    --enable_srk \
+    --resume ./checkpoints/srk_full/last.pt \
+    --max_steps 100000
+```
+
+---
+
+## Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 9.8.0 | 2024 | Full SRK implementation: OPB Locking, UOM, Checkpoints, Unit Tests |
+| 9.6.14 | 2024 | Phase Rotation Bridge (IntentPhaseProjector, OntologicalHybridTransformer) |
+| 9.6.0 | 2024 | 32D Sovereign State replaces 124D CognitiveState |
+| 9.0.0 | 2024 | Initial ontological state-delta design |
