@@ -2637,6 +2637,7 @@ class OntologicalHybridTransformer(nn.Module):
     def forward(
         self,
         input_ids: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
         return_hidden: bool = False,
         extract_layers: Optional[List[int]] = None,
         return_last_hidden: bool = False,
@@ -2652,6 +2653,7 @@ class OntologicalHybridTransformer(nn.Module):
 
         Args:
             input_ids: [B, N] token indices
+            attention_mask: [B, N] optional mask (1=attend, 0=ignore) - currently unused
             return_hidden: Return all hidden states
             extract_layers: Specific layers to extract
             return_last_hidden: Return final hidden state
