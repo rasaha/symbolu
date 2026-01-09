@@ -4744,6 +4744,104 @@ model.curriculum.step()  # Triggers phase3_mode when entering Kṛti
    pytest symbolu/jepa/tests/test_jepa.py::TestPhase3GradientBridge -v
    ```
 
+### Architectural Principles: Pilot/Ship Metaphor
+
+The Phase-JEPA architecture implements a clear separation between **prediction** (the Pilot) and **generation** (the Ship).
+
+#### 1. JEPA as "Pilot" (Control System)
+
+The PhaseJEPAPredictor does NOT generate tokens. It calculates the **Flight Plan** (32D State Trajectory) and exerts control via **Phase Rotation** (θ_intent):
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    PILOT/SHIP ARCHITECTURE                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────────┐                                           │
+│  │  PhaseJEPAPredictor  │ ◄── The "PILOT"                       │
+│  │  (Control System)    │                                       │
+│  └──────────┬───────────┘                                       │
+│             │                                                    │
+│             │ Outputs: s_pred (32D State Trajectory)            │
+│             │          "The Flight Plan"                        │
+│             ▼                                                    │
+│  ┌──────────────────────┐                                       │
+│  │ intent_phase_projector │                                     │
+│  └──────────┬─────────────┘                                     │
+│             │                                                    │
+│             │ θ_intent = tanh(W @ s_pred) × π                   │
+│             │ "Steering Angle"                                  │
+│             ▼                                                    │
+│  ┌──────────────────────────────────────────────────────┐       │
+│  │              Transformer Layers                       │       │
+│  │              (The "SHIP")                             │ ◄──── │
+│  │                                                       │       │
+│  │  Q_rotated = Q × e^{iθ_intent}                       │       │
+│  │  "Attention tilted by steering angle"                │       │
+│  └──────────────────────────────────────────────────────┘       │
+│                                                                  │
+│  KEY: Predictor outputs θ (angles), NOT tokens                  │
+│       θ "steers" the Ship toward correct token sequence         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 2. "Conditional" Generation (Detachable LM Head)
+
+The system remains **non-generative** in its core reasoning loop (Phases 1 & 2). It only becomes "generative" when the LM Head is attached in Phase 3:
+
+```python
+# Phases 1 & 2: Pure state prediction (NON-GENERATIVE)
+# ─────────────────────────────────────────────────────
+model.set_phase3_mode(False)
+outputs = model(input_ids, compute_loss=True)
+# Returns: s_pred, delta_list, jepa_loss
+# NO tokens generated - purely logical simulation
+
+# Phase 3: Attach generation capability (GENERATIVE)
+# ───────────────────────────────────────────────────
+model.set_phase3_mode(True)
+outputs = model(input_ids, labels=labels)
+# Returns: s_pred, logits, nll_loss + jepa_loss
+# Now tokens are generated via h_modulated → lm_head
+```
+
+**Strategic Value**: Detach the LM head at any time to run purely logical simulations (predicting future states) without the computational cost of decoding tokens.
+
+#### 3. State ≠ Token (Modulator, Not Source)
+
+The 32D Sovereign State does **NOT** project directly to tokens. That would be an impossible bottleneck (compressing 50k vocab into 32 dims):
+
+```
+WRONG (Bottleneck - Impossible):
+┌─────────┐                    ┌─────────────┐
+│ State   │ ─────────────────► │ Token       │
+│ (32D)   │    direct proj     │ (50k vocab) │
+└─────────┘                    └─────────────┘
+    Impossible! Can't compress 50k choices into 32 dims
+
+
+CORRECT (Modulator Architecture - Implemented):
+┌─────────┐     ┌───────────┐     ┌─────────────┐     ┌─────────┐
+│ State   │ ──► │ θ_intent  │ ──► │ Hidden      │ ──► │ Token   │
+│ (32D)   │     │ (H dims)  │     │ (768D)      │     │ (50k)   │
+└─────────┘     └───────────┘     └─────────────┘     └─────────┘
+    │               │                   │                  │
+    │               │                   │                  │
+    ▼               ▼                   ▼                  ▼
+ "Intent"      "Steering"         "Modulated"        "Selected"
+              angle θ            representation       token
+```
+
+**Implementation** (`transformer.py:618-624`):
+```python
+# State acts as MODULATOR, not SOURCE
+h_modulated = self._apply_phase_modulation(h_full, phase_rotation)
+logits = self.context_encoder.lm_head(h_modulated)
+```
+
+The State controls **HOW** the 768D hidden states are rotated (via θ), which then determines which tokens are selected. The State is a **steering wheel**, not a direct mapping.
+
 ### Checkpoint Save/Load
 
 JEPA state is automatically saved with curriculum state:
