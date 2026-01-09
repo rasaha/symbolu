@@ -4082,10 +4082,267 @@ def load_srk_checkpoint(model, checkpoint_path, strict=False):
 
 ---
 
-*Document Version: 1.5.0*
+## Appendix F: Validation Strategy & Calibration Schedule
+
+This appendix documents the **Strategic Pivot** from a single 50k training run to a phased calibration approach, addressing the empirical validation gap identified during architecture review.
+
+### F.1 Architectural Validation Status
+
+| Concern | Status | Resolution |
+|---------|--------|------------|
+| **Empirical Validation Gap** | Acknowledged | First run is **Exploratory**, proving a new theory rather than validating an existing one |
+| **Complexity Risk** | Critical | Adopt **Progressive Complexity** approach |
+| **Hardcoded Logic Templates** | Necessary Constraint | Fixed as **Ontological Seeds**; `bias_projector` learns application strength |
+| **Layer Intervention Points** | Heuristic | Based on standard mechanistic interpretability (not probing) |
+
+### F.2 Theoretical Basis for Layer Choices
+
+The layer intervention points (4, 7, 9, 11) are based on established transformer mechanistic interpretability patterns:
+
+| Layer Range | Cognitive Function | SRK Component |
+|-------------|-------------------|---------------|
+| **0-3** | Syntax, local patterns | (No intervention) |
+| **4-8** | Semantic aggregation | DNA Bridge (L4), CSR Alignment (L7) |
+| **9-12** | Task-specific output, safety | Witness (L9), Synthesis (L11) |
+
+**Note:** These are heuristics, not empirically validated for this specific architecture. The Diagnostics Monitor serves as the probe for validation.
+
+### F.3 Logic Template Design Philosophy
+
+**Question:** Why are IMR vectors hardcoded rather than learned?
+
+**Answer:** In a "Sovereign" system, logic is **imprinted**, not discovered.
+
+| Approach | Risk | Outcome |
+|----------|------|---------|
+| **Learned Templates** | Model finds statistical shortcuts | Pseudo-reasoning, not deduction |
+| **Fixed Templates** | Model aligns with rigorous logic | True structural reasoning |
+
+**Implementation:**
+- Logic Template Bhava vectors: **Fixed Priors** (non-learnable)
+- `bias_projector` weights: **Learnable** (how strongly to apply templates)
+
+```python
+# Fixed: The definition of "Deduction" (O7 + O4 + O12)
+DEDUCTION_TEMPLATE = torch.tensor([0, 0, 0, 0.8, 0, 0, 1.0, 0, 0, 0, 0, 0.9])
+
+# Learnable: How to project this into hidden space
+self.bias_projector = nn.Linear(12, hidden_dim)  # Trainable
+```
+
+### F.4 Baseline Comparisons
+
+| Baseline | Purpose |
+|----------|---------|
+| **Vanilla Transformer** | Same parameter count, standard training |
+| **Sovereign V9.8** | Full SRK architecture |
+
+**Success Metrics (Beyond Perplexity):**
+1. **S6 Integrated Information (Φ)** - Consciousness emergence
+2. **Cross-Domain Isomorphism Score** - IMR effectiveness
+3. **Teleological Effectiveness** - UOM user-benefit measure
+
+### F.5 The Calibration Schedule
+
+**Principle:** "Calibration before Manifestation" - Transform high-risk gamble into scientific ascent.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    4-STAGE CALIBRATION CYCLE                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  STAGE 1: Foundation (0-5k)                                             │
+│    Components: Base + OPB + Layer 0 Embedding                           │
+│    Goal: Prove Toroidal Loop doesn't destroy fluency                    │
+│    Metric: PPL ≈ baseline; Karma variance > 0                           │
+│                                                                          │
+│  STAGE 2: Structure (5k-15k)                                            │
+│    Add: DNA Bridge (L4) + CSR Alignment (L7) + Kosha Steering           │
+│    Goal: Validate DNA Grounding works                                   │
+│    Metric: Phase Coherence (U2) > 0.6                                   │
+│                                                                          │
+│  STAGE 3: Reasoner (15k-30k)                                            │
+│    Add: IMR + Witness (L9) + Synthesis (L11) + Patent Losses            │
+│    Goal: Enable Consistency Lagrangian                                  │
+│    Metric: sf ≈ sb; Logic Templates triggering in logs                  │
+│                                                                          │
+│  STAGE 4: Sovereign (30k-50k)                                           │
+│    Add: Mauna Protocol + UOM Mirror                                     │
+│    Goal: Full AGI behavior                                              │
+│    Metric: High Teleological Effectiveness                              │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### F.6 Stage-Specific Launch Commands
+
+#### Stage 1: Foundation Run (Steps 0-5,000)
+
+```bash
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --state_dim 32 \
+    --enable_srk \
+    --disable_imr \
+    --disable_patent_losses \
+    --disable_kosha_steering \
+    --disable_witness \
+    --disable_synthesis \
+    --learning_rate 1e-4 \
+    --max_steps 5000 \
+    --toroidal_feedback \
+    --checkpoint_dir ./checkpoints/sovereign_stage1_foundation \
+    2>&1 | tee stage1_calibration.log
+```
+
+**Success Criteria:**
+- [ ] Perplexity within 10% of vanilla baseline
+- [ ] Karma state vector shows non-zero variance
+- [ ] No NaN/Inf in state tensors
+- [ ] Training loss curve is stable (no oscillation)
+
+#### Stage 2: Structure Run (Steps 5,000-15,000)
+
+```bash
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --state_dim 32 \
+    --enable_srk \
+    --disable_imr \
+    --disable_patent_losses \
+    --enable_kosha_steering \
+    --onto_bridge_layer 4 \
+    --csr_alignment_layer 7 \
+    --learning_rate 8e-5 \
+    --max_steps 15000 \
+    --resume_from ./checkpoints/sovereign_stage1_foundation \
+    --checkpoint_dir ./checkpoints/sovereign_stage2_structure \
+    2>&1 | tee stage2_calibration.log
+```
+
+**Success Criteria:**
+- [ ] Phase Coherence (U2) > 0.6
+- [ ] Kosha distribution shows Vijnanamaya activation during reasoning
+- [ ] CSR alignment loss decreasing
+- [ ] No phonetic hallucinations in sample outputs
+
+#### Stage 3: Reasoner Run (Steps 15,000-30,000)
+
+```bash
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --state_dim 32 \
+    --enable_srk \
+    --enable_imr \
+    --imr_threshold 0.75 \
+    --enable_patent_formulas \
+    --bcvf_lambda_f 1.0 \
+    --bcvf_lambda_b 1.0 \
+    --bcvf_lambda_c 0.5 \
+    --scc_entropy_threshold 0.7 \
+    --enable_lambda_annealing \
+    --kosha_steering_layer 9 \
+    --learning_rate 5e-5 \
+    --max_steps 30000 \
+    --resume_from ./checkpoints/sovereign_stage2_structure \
+    --checkpoint_dir ./checkpoints/sovereign_stage3_reasoner \
+    2>&1 | tee stage3_calibration.log
+```
+
+**Success Criteria:**
+- [ ] Forward Score (sf) and Backward Score (sb) converging
+- [ ] Consistency Lagrangian (B1) < 0.3
+- [ ] Logic Template detections appearing in logs
+- [ ] IMR isomorphism matches > 20% of tokens
+
+#### Stage 4: Sovereign Run (Steps 30,000-50,000)
+
+```bash
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --state_dim 32 \
+    --enable_srk \
+    --enable_patent_formulas \
+    --enable_mauna_protocol \
+    --mauna_viparyaya_threshold 0.9 \
+    --mauna_rajas_threshold 0.9 \
+    --uom_mirroring \
+    --enable_uom_diagnostics \
+    --enable_teleological_optimizer \
+    --gradient_clip_consistency 1.0 \
+    --learning_rate 3e-5 \
+    --max_steps 50000 \
+    --resume_from ./checkpoints/sovereign_stage3_reasoner \
+    --checkpoint_dir ./checkpoints/sovereign_V9_8_final \
+    2>&1 | tee stage4_sovereign.log
+```
+
+**Success Criteria:**
+- [ ] Integrated Information (Φ) > 2.0
+- [ ] Teleological Effectiveness > 0.7
+- [ ] Mauna Protocol activations < 5% of inference
+- [ ] Cross-domain reasoning demonstrated on held-out domains
+
+### F.7 Stage Transition Gates
+
+Each stage must pass its success criteria before proceeding:
+
+| Transition | Gate Condition | Fallback Action |
+|------------|----------------|-----------------|
+| Stage 1 → 2 | PPL stable, Karma active | Reduce learning rate; extend Stage 1 |
+| Stage 2 → 3 | U2 > 0.6 | Tune CSR tau; check layer placement |
+| Stage 3 → 4 | sf ≈ sb, B1 < 0.3 | Adjust lambda annealing schedule |
+| Stage 4 → Deploy | Φ > 2.0, TE > 0.7 | Extended Stage 4 training |
+
+### F.8 Ablation Tracking
+
+Each stage serves as an ablation point:
+
+| Comparison | Measures |
+|------------|----------|
+| Stage 1 vs Vanilla | OPB contribution |
+| Stage 2 vs Stage 1 | DNA Bridge + CSR contribution |
+| Stage 3 vs Stage 2 | IMR + Patent Losses contribution |
+| Stage 4 vs Stage 3 | Mauna + UOM contribution |
+
+**Ablation Log Template:**
+```
+[ABLATION] Stage: 2 | Step: 10000
+  Baseline PPL: 45.2
+  Current PPL: 43.8 (-3.1%)
+  Phase Coherence: 0.67 (target: 0.6) ✓
+  Kosha[VIJNANA]: 0.72
+  Components Active: OPB, DNA, CSR, Kosha
+  Delta from Stage 1: +0.15 coherence, -1.4 PPL
+```
+
+### F.9 Risk Mitigation
+
+| Risk | Probability | Mitigation |
+|------|-------------|------------|
+| Stage 1 collapse | Low | OPB is minimal intervention |
+| Stage 2 instability | Medium | Lambda_bridge capped at 0.1 |
+| Stage 3 gradient conflict | High | Lambda annealing + gradient clipping |
+| Stage 4 Mauna over-trigger | Medium | Threshold tuning; disable if > 10% |
+
+### F.10 Timeline Estimate
+
+| Stage | Steps | Estimated Time (A100) |
+|-------|-------|----------------------|
+| Stage 1 | 5,000 | ~4 hours |
+| Stage 2 | 10,000 | ~8 hours |
+| Stage 3 | 15,000 | ~12 hours |
+| Stage 4 | 20,000 | ~16 hours |
+| **Total** | **50,000** | **~40 hours** |
+
+**Note:** Includes checkpoint saves and validation runs between stages.
+
+---
+
+*Document Version: 1.6.0 FINAL*
 *Created: 2026-01-09*
-*Updated: 2026-01-09 (V1.5.0 - Canonical Specifications)*
+*Updated: 2026-01-09 (V1.6.0 - Validation Strategy & Calibration Schedule)*
 *Origin: Google Gemini Architecture Proposal + Saha Patents*
 *Integration: SymbolU Sovereign-1 Architecture*
 *Authors: SymbolU Development Team*
-*Status: LAUNCH SEQUENCE AUTHORIZED - ALL GAPS RESOLVED*
+*Status: CALIBRATION SCHEDULE APPROVED - STAGE 1 READY*
