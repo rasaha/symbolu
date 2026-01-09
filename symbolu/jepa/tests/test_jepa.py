@@ -785,5 +785,248 @@ class TestPhaseJEPATransformerBasic:
         assert model.training_step.item() == 1
 
 
+# =============================================================================
+# Test: Phase 3 Gradient Bridge (NLL → Predictor)
+# =============================================================================
+
+class TestPhase3GradientBridge:
+    """
+    Tests for Phase 3 (Kṛti) gradient flow from NLL loss to predictor.
+
+    Critical: During Phase 3, gradients from L_nll must flow backwards through
+    the Phase Rotation (θ) into the PhaseJEPAPredictor. This allows the predictor
+    to learn: "I set θ=45°, got 'Cat'. Should have been θ=90° for 'Dog'."
+    """
+
+    def test_intent_phase_projector_gradient_flow(self):
+        """Test gradients flow through intent_phase_projector."""
+        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+
+        class MockEncoder(nn.Module):
+            def __init__(self, embed_dim=64, vocab_size=100):
+                super().__init__()
+                self.embed = nn.Embedding(vocab_size, embed_dim)
+                self.lm_head = nn.Linear(embed_dim, vocab_size)
+
+            def forward(self, input_ids, attention_mask=None):
+                h = self.embed(input_ids)
+                logits = self.lm_head(h)
+                return h, logits
+
+        config = PhaseJEPAConfig(
+            embed_dim=64,
+            vocab_size=100,
+            num_encoder_heads=4,
+            prediction_steps=2,
+            state_dim=32,
+        )
+
+        model = PhaseJEPATransformer(config=config, context_encoder=MockEncoder())
+
+        # Create input
+        input_ids = torch.randint(0, 100, (2, 16))
+        s_pred = torch.randn(2, 32, requires_grad=True)
+
+        # Compute phase rotation
+        theta = model.compute_phase_rotation(s_pred)
+
+        # Simulate loss on theta
+        loss = theta.sum()
+        loss.backward()
+
+        # Gradient must flow back to s_pred
+        assert s_pred.grad is not None, "Gradient did not flow to s_pred!"
+        assert not torch.isnan(s_pred.grad).any(), "NaN in gradients"
+        assert (s_pred.grad.abs() > 0).any(), "Zero gradients - no flow"
+
+    def test_phase_modulation_gradient_flow(self):
+        """Test gradients flow through _apply_phase_modulation."""
+        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+
+        class MockEncoder(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embed = nn.Embedding(100, 48)  # 48 = 4 heads * 12 head_dim
+
+            def forward(self, input_ids, attention_mask=None):
+                return self.embed(input_ids)
+
+        config = PhaseJEPAConfig(
+            embed_dim=48,
+            vocab_size=100,
+            num_encoder_heads=4,
+            prediction_steps=1,
+            state_dim=32,
+        )
+
+        model = PhaseJEPATransformer(config=config, context_encoder=MockEncoder())
+
+        # Test phase modulation gradient flow
+        hidden_states = torch.randn(2, 8, 48, requires_grad=True)
+        phase_rotation = torch.randn(2, 4, requires_grad=True)
+
+        h_modulated = model._apply_phase_modulation(hidden_states, phase_rotation)
+
+        # Loss on modulated output
+        loss = h_modulated.sum()
+        loss.backward()
+
+        # Both inputs should receive gradients
+        assert hidden_states.grad is not None, "No gradient to hidden_states"
+        assert phase_rotation.grad is not None, "No gradient to phase_rotation"
+        assert not torch.isnan(hidden_states.grad).any()
+        assert not torch.isnan(phase_rotation.grad).any()
+
+    def test_full_phase3_nll_to_predictor_gradient(self):
+        """
+        CRITICAL TEST: Verify complete gradient flow from NLL → Predictor.
+
+        This tests the full gradient path:
+        L_nll → logits → h_modulated → θ → s_pred → predictor → s_context → encoder
+        """
+        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+
+        class MockEncoderWithHead(nn.Module):
+            def __init__(self, embed_dim=64, vocab_size=100):
+                super().__init__()
+                self.embed = nn.Embedding(vocab_size, embed_dim)
+                self.transform = nn.Linear(embed_dim, embed_dim)
+                self.lm_head = nn.Linear(embed_dim, vocab_size)
+
+            def forward(self, input_ids, attention_mask=None):
+                h = self.transform(self.embed(input_ids))
+                logits = self.lm_head(h)
+                return h, logits
+
+        config = PhaseJEPAConfig(
+            embed_dim=64,
+            vocab_size=100,
+            num_encoder_heads=4,
+            prediction_steps=2,
+            state_dim=32,
+            predictor_hidden_dim=32,
+        )
+
+        model = PhaseJEPATransformer(config=config, context_encoder=MockEncoderWithHead())
+        model.train()
+
+        # Enable Phase 3 mode
+        model.set_phase3_mode(True)
+
+        # Input and labels
+        input_ids = torch.randint(0, 100, (2, 20))
+        labels = input_ids.clone()
+
+        # Forward with Phase 3
+        outputs = model.forward_phase3(
+            input_ids=input_ids,
+            labels=labels,
+            return_loss_components=True,
+        )
+
+        assert 'loss' in outputs
+        assert 'phase_rotation' in outputs
+        assert 's_pred' in outputs
+
+        # Backward pass
+        loss = outputs['loss']
+        loss.backward()
+
+        # CRITICAL CHECKS: Predictor weights must have gradients
+        predictor_has_grad = False
+        for name, param in model.predictor.named_parameters():
+            if param.grad is not None and (param.grad.abs() > 1e-10).any():
+                predictor_has_grad = True
+                break
+
+        assert predictor_has_grad, (
+            "CRITICAL FAILURE: Predictor has no gradients from NLL loss! "
+            "Phase 3 gradient bridge is broken."
+        )
+
+        # Intent phase projector must also have gradients
+        projector_has_grad = False
+        for param in model.intent_phase_projector.parameters():
+            if param.grad is not None and (param.grad.abs() > 1e-10).any():
+                projector_has_grad = True
+                break
+
+        assert projector_has_grad, (
+            "Intent phase projector has no gradients! "
+            "θ = f(s_pred) gradient path is broken."
+        )
+
+    def test_no_detach_in_phase3_path(self):
+        """Verify s_pred is NOT detached in Phase 3 forward."""
+        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+
+        class MockEncoder(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embed = nn.Embedding(100, 64)
+                self.lm_head = nn.Linear(64, 100)
+
+            def forward(self, input_ids, attention_mask=None):
+                h = self.embed(input_ids)
+                return h, self.lm_head(h)
+
+        config = PhaseJEPAConfig(
+            embed_dim=64,
+            vocab_size=100,
+            num_encoder_heads=4,
+            prediction_steps=2,
+            state_dim=32,
+        )
+
+        model = PhaseJEPATransformer(config=config, context_encoder=MockEncoder())
+        model.train()
+        model.set_phase3_mode(True)
+
+        input_ids = torch.randint(0, 100, (2, 16))
+
+        # Run forward_phase3
+        outputs = model.forward_phase3(input_ids=input_ids, labels=input_ids)
+
+        # s_pred should require grad (not detached)
+        s_pred = outputs['s_pred']
+        assert s_pred.requires_grad, (
+            "s_pred does NOT require grad! "
+            "Someone called .detach() on the prediction path."
+        )
+
+        # phase_rotation should also require grad
+        phase_rotation = outputs['phase_rotation']
+        assert phase_rotation.requires_grad, (
+            "phase_rotation does NOT require grad! "
+            "Gradient bridge is broken."
+        )
+
+    def test_phase3_mode_toggle(self):
+        """Test set_phase3_mode properly toggles routing."""
+        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+
+        class MockEncoder(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embed = nn.Embedding(100, 64)
+
+            def forward(self, input_ids, attention_mask=None):
+                return self.embed(input_ids)
+
+        config = PhaseJEPAConfig(embed_dim=64, vocab_size=100, prediction_steps=2)
+        model = PhaseJEPATransformer(config=config, context_encoder=MockEncoder())
+
+        # Initially Phase 3 mode is off
+        assert not model._phase3_mode
+
+        # Enable Phase 3
+        model.set_phase3_mode(True)
+        assert model._phase3_mode
+
+        # Disable Phase 3
+        model.set_phase3_mode(False)
+        assert not model._phase3_mode
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

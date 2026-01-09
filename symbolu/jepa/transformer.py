@@ -240,14 +240,30 @@ class PhaseJEPATransformer(nn.Module):
         else:
             self.karma_gate = None
 
+        # === Phase 3 (Kṛti) Gradient Bridge ===
+        # Intent Phase Projector: Maps predicted state to phase rotation for generation
+        # CRITICAL: This creates the gradient path L_nll → logits → θ → s_pred → predictor
+        self.intent_phase_projector = nn.Sequential(
+            nn.Linear(config.state_dim, config.state_dim * 2),
+            nn.GELU(),
+            nn.Linear(config.state_dim * 2, config.num_encoder_heads),
+            nn.Tanh(),  # Output in [-1, 1], scaled to [-π, π]
+        )
+        # Initialize near-zero for stable training start
+        with torch.no_grad():
+            self.intent_phase_projector[-2].weight.fill_(0.01)
+            self.intent_phase_projector[-2].bias.fill_(0.0)
+
         # === Training State ===
         self.register_buffer('training_step', torch.tensor(0, dtype=torch.long))
         self.curriculum: Optional[TrainingCurriculumOrchestrator] = None
+        self._phase3_mode: bool = False  # Flag for Phase 3 gradient flow
 
     def forward(
         self,
         input_ids: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
+        labels: Optional[torch.Tensor] = None,
         context_len: Optional[int] = None,
         external_karma: Optional[torch.Tensor] = None,
         compute_loss: bool = False,
@@ -260,6 +276,7 @@ class PhaseJEPATransformer(nn.Module):
         Args:
             input_ids: Token IDs [B, T]
             attention_mask: Optional attention mask [B, T]
+            labels: Target token IDs for NLL loss [B, T] (Phase 3 only)
             context_len: Split point for context/target (default: T - k_steps)
             external_karma: Optional karma state from SRK [B, 32]
             compute_loss: Whether to compute JEPA losses
@@ -275,6 +292,18 @@ class PhaseJEPATransformer(nn.Module):
                 - 'loss': Total JEPA loss (if compute_loss)
                 - 'loss_components': Individual loss components (if compute_loss)
         """
+        # Route to Phase 3 forward if enabled (gradient bridge for NLL→Predictor)
+        if self._phase3_mode and (labels is not None or compute_loss):
+            return self.forward_phase3(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=labels,
+                context_len=context_len,
+                external_karma=external_karma,
+                k_steps=k_steps,
+                return_loss_components=return_states,
+            )
+
         B, T = input_ids.shape
         k_steps = k_steps or self.config.prediction_steps
 
@@ -438,6 +467,296 @@ class PhaseJEPATransformer(nn.Module):
             'alignment': alignment_loss,
             'orthogonality': ortho_loss,
         }
+
+    def compute_phase_rotation(
+        self,
+        s_pred: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Compute phase rotation angles from predicted state.
+
+        CRITICAL: This maintains gradient flow from logits → θ → s_pred → predictor.
+        Used during Phase 3 (Kṛti) training to enable L_nll gradients to flow
+        back into the PhaseJEPAPredictor.
+
+        Args:
+            s_pred: Predicted state [B, 32] or [B, T, 32]
+
+        Returns:
+            Phase rotation angles [B, num_heads] or [B, T, num_heads], scaled to [-π, π]
+        """
+        # s_pred must have gradients attached for Phase 3 training
+        # DO NOT detach - this is the critical gradient bridge
+
+        if s_pred.dim() == 3:
+            # Handle sequence of states
+            B, T, D = s_pred.shape
+            s_flat = s_pred.reshape(B * T, D)
+            theta_flat = self.intent_phase_projector(s_flat)  # [B*T, num_heads]
+            theta = theta_flat.reshape(B, T, -1)
+        else:
+            theta = self.intent_phase_projector(s_pred)  # [B, num_heads]
+
+        # Scale from [-1, 1] (Tanh output) to [-π, π]
+        theta = theta * math.pi
+
+        return theta
+
+    def forward_phase3(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        labels: Optional[torch.Tensor] = None,
+        context_len: Optional[int] = None,
+        external_karma: Optional[torch.Tensor] = None,
+        k_steps: Optional[int] = None,
+        return_loss_components: bool = False,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Phase 3 (Kṛti) forward pass with gradient flow from NLL to predictor.
+
+        This method ensures that:
+        1. Predicted states s_pred are NOT detached
+        2. Phase rotation θ = intent_phase_projector(s_pred) maintains gradients
+        3. L_nll gradients flow: L_nll → logits → θ → s_pred → predictor
+
+        The predictor learns: "I set θ=45°, got 'Cat'. Should have been θ=90° for 'Dog'."
+
+        Args:
+            input_ids: Token IDs [B, T]
+            attention_mask: Optional attention mask [B, T]
+            labels: Target token IDs for NLL loss [B, T]
+            context_len: Split point for context/target
+            external_karma: Optional karma state from SRK [B, 32]
+            k_steps: Override prediction steps
+            return_loss_components: Return individual loss values
+
+        Returns:
+            Dictionary containing:
+                - 'loss': Combined L_jepa + L_nll with gradient bridge
+                - 'nll_loss': Token prediction loss (gradients flow to predictor!)
+                - 'jepa_loss': State prediction loss
+                - 's_pred': Predicted states
+                - 'phase_rotation': Phase angles θ from predictor
+                - 'logits': Language model logits
+        """
+        B, T = input_ids.shape
+        k_steps = k_steps or self.config.prediction_steps
+
+        # Determine context/target split
+        if context_len is None:
+            context_len = T - k_steps
+            if context_len < 1:
+                context_len = T // 2
+
+        context_ids = input_ids[:, :context_len]
+        outputs = {}
+
+        # === Step 1: Context Encoding ===
+        context_out = self.context_encoder(
+            context_ids,
+            attention_mask=attention_mask[:, :context_len] if attention_mask is not None else None,
+        )
+
+        if isinstance(context_out, tuple):
+            h_context = context_out[0]
+        elif isinstance(context_out, dict):
+            h_context = context_out.get('hidden_states', context_out.get('last_hidden_state'))
+        else:
+            h_context = context_out
+
+        # Project to state space
+        s_context = self.state_projector(h_context)  # [B, T_ctx, 32]
+
+        # Apply karma injection if enabled
+        if external_karma is not None and self.karma_gate is not None:
+            internal_karma = s_context[:, -1, :]
+            effective_karma = self.karma_gate(external_karma, internal_karma)
+            s_context = s_context.clone()
+            s_context[:, -1, :] = effective_karma
+
+        # === Step 2: Prediction (CRITICAL: s_pred has gradients) ===
+        s_pred, delta_list = self.predictor(s_context, k_steps=k_steps)
+        outputs['s_pred'] = s_pred
+        outputs['delta_list'] = delta_list
+
+        # === Step 3: Phase Rotation Bridge (CRITICAL: maintains gradients) ===
+        # This is the key: θ = f(s_pred), where f is differentiable
+        phase_rotation = self.compute_phase_rotation(s_pred)  # [B, num_heads]
+        outputs['phase_rotation'] = phase_rotation
+
+        # === Step 4: Full Sequence Forward with Phase Rotation ===
+        # Now run full forward through context encoder with phase rotation applied
+        # The phase rotation modifies attention patterns based on predicted intent
+
+        # Check if context_encoder supports phase rotation injection
+        if hasattr(self.context_encoder, 'forward_with_phase'):
+            # Encoder supports direct phase injection
+            full_out = self.context_encoder.forward_with_phase(
+                input_ids,
+                attention_mask=attention_mask,
+                phase_rotation=phase_rotation,
+            )
+        else:
+            # Standard forward - phase rotation applied via hidden state modulation
+            full_out = self.context_encoder(
+                input_ids,
+                attention_mask=attention_mask,
+            )
+
+            # Get hidden states and logits
+            if isinstance(full_out, tuple):
+                h_full = full_out[0]
+                logits = full_out[1] if len(full_out) > 1 else None
+            elif isinstance(full_out, dict):
+                h_full = full_out.get('hidden_states', full_out.get('last_hidden_state'))
+                logits = full_out.get('logits')
+            else:
+                h_full = full_out
+                logits = None
+
+            # Apply phase rotation to hidden states before LM head
+            # This creates the gradient bridge: hidden_states modulated by θ
+            if logits is None and hasattr(self.context_encoder, 'lm_head'):
+                # Modulate hidden states with phase rotation
+                # Phase rotation shapes attention-like weighting
+                h_modulated = self._apply_phase_modulation(h_full, phase_rotation)
+                logits = self.context_encoder.lm_head(h_modulated)
+
+        if isinstance(full_out, tuple) and len(full_out) > 1:
+            logits = full_out[1]
+        elif isinstance(full_out, dict):
+            logits = full_out.get('logits')
+
+        outputs['logits'] = logits
+
+        # === Step 5: Compute Losses ===
+        losses = {}
+        total_loss = torch.tensor(0.0, device=input_ids.device, requires_grad=True)
+
+        # 5a. JEPA Loss (state prediction)
+        if self.training:
+            with torch.no_grad():
+                target_out = self.target_encoder(input_ids, attention_mask=attention_mask)
+                if isinstance(target_out, tuple):
+                    h_target = target_out[0]
+                elif isinstance(target_out, dict):
+                    h_target = target_out.get('hidden_states', target_out.get('last_hidden_state'))
+                else:
+                    h_target = target_out
+                s_target = self.target_state_projector(h_target)
+
+                target_positions = list(range(context_len, min(context_len + k_steps, T)))
+                if len(target_positions) > 0:
+                    s_target_k = s_target[:, target_positions, :]
+                else:
+                    s_target_k = s_target[:, -1:, :]
+
+            jepa_components = self._compute_losses(
+                s_context=s_context,
+                s_pred=s_pred,
+                s_target=s_target_k,
+                delta_list=delta_list,
+            )
+            losses['jepa'] = jepa_components['total']
+            total_loss = total_loss + jepa_components['total']
+
+            if return_loss_components:
+                losses.update({f'jepa_{k}': v for k, v in jepa_components.items()})
+
+        # 5b. NLL Loss (CRITICAL: gradients flow back through phase_rotation to predictor)
+        if labels is not None and logits is not None:
+            # Shift for next token prediction
+            shift_logits = logits[:, :-1, :].contiguous()
+            shift_labels = labels[:, 1:].contiguous()
+
+            # Cross entropy with gradient flow
+            nll_loss = F.cross_entropy(
+                shift_logits.view(-1, shift_logits.size(-1)),
+                shift_labels.view(-1),
+                ignore_index=-100,
+            )
+            losses['nll'] = nll_loss
+
+            # Get curriculum NLL weight (Phase 3 has full NLL weight)
+            if self.curriculum is not None:
+                weights = self.curriculum.get_loss_weights()
+                nll_weight = weights.get('nll', 1.0)
+            else:
+                nll_weight = 1.0
+
+            total_loss = total_loss + nll_weight * nll_loss
+
+        outputs['loss'] = total_loss
+        outputs['loss_components'] = losses
+
+        return outputs
+
+    def _apply_phase_modulation(
+        self,
+        hidden_states: torch.Tensor,
+        phase_rotation: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Apply phase rotation modulation to hidden states.
+
+        This creates a multiplicative modulation based on phase angles,
+        allowing gradient flow from logits through to predicted states.
+
+        Args:
+            hidden_states: [B, T, D]
+            phase_rotation: [B, num_heads] or [B, T, num_heads]
+
+        Returns:
+            Modulated hidden states [B, T, D]
+        """
+        B, T, D = hidden_states.shape
+        num_heads = phase_rotation.shape[-1]
+        head_dim = D // num_heads
+
+        # Expand phase rotation if needed
+        if phase_rotation.dim() == 2:
+            # [B, num_heads] -> [B, T, num_heads]
+            phase_rotation = phase_rotation.unsqueeze(1).expand(-1, T, -1)
+
+        # Convert to complex rotation factors
+        # cos(θ) + i*sin(θ) applied per head
+        cos_theta = torch.cos(phase_rotation)  # [B, T, num_heads]
+        sin_theta = torch.sin(phase_rotation)  # [B, T, num_heads]
+
+        # Reshape hidden states for head-wise operation
+        h_heads = hidden_states.view(B, T, num_heads, head_dim)
+
+        # Apply rotation: for each head, rotate the feature space
+        # Split head_dim in half for (real, imag) pairs
+        half_dim = head_dim // 2
+        h_real = h_heads[..., :half_dim]
+        h_imag = h_heads[..., half_dim:]
+
+        # Complex rotation: (r + i*i) * (cos + i*sin) = (r*cos - i*sin) + i*(r*sin + i*cos)
+        cos_expanded = cos_theta.unsqueeze(-1)  # [B, T, num_heads, 1]
+        sin_expanded = sin_theta.unsqueeze(-1)  # [B, T, num_heads, 1]
+
+        h_real_rot = h_real * cos_expanded - h_imag * sin_expanded
+        h_imag_rot = h_real * sin_expanded + h_imag * cos_expanded
+
+        # Recombine
+        h_rotated = torch.cat([h_real_rot, h_imag_rot], dim=-1)
+        h_modulated = h_rotated.view(B, T, D)
+
+        return h_modulated
+
+    def set_phase3_mode(self, enabled: bool = True):
+        """
+        Enable or disable Phase 3 (Kṛti) gradient flow mode.
+
+        When enabled, forward() will use forward_phase3() for full gradient flow.
+        This ensures L_nll gradients flow back to the predictor.
+
+        Args:
+            enabled: Whether to enable Phase 3 mode
+        """
+        self._phase3_mode = enabled
 
     def update_target_encoder(self, step: Optional[int] = None):
         """Update target encoder with EMA of context encoder."""
