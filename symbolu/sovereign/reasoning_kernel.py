@@ -1984,8 +1984,15 @@ class PhaseExtractionHook:
     Non-invasive: Uses hooks instead of modifying attention class.
     """
 
-    def __init__(self, layer_idx: int = 7):
-        self.layer_idx = layer_idx
+    def __init__(
+        self,
+        layer_idx: int = 7,
+        target_layer: Optional[int] = None,
+        num_heads: int = 12,
+    ):
+        # Support both layer_idx and target_layer (for backward compat)
+        self.layer_idx = target_layer if target_layer is not None else layer_idx
+        self.num_heads = num_heads
         self.captured_phases: Optional[torch.Tensor] = None
         self.hook_handle: Optional[Any] = None
 
