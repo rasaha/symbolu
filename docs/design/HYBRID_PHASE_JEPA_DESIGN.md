@@ -215,6 +215,7 @@ The architecture doesn't care WHAT generates the phase shift—only that it rece
 - [Appendix B: Risk Analysis](#appendix-b-risk-analysis)
 - [Appendix C: Strategic Architecture Philosophy](#appendix-c-strategic-architecture-philosophy)
 - [Appendix D: Sovereign AGI Integration Evaluation](#appendix-d-sovereign-agi-integration-evaluation)
+- [Appendix E: Cross-Model Validation Dialogue](#appendix-e-cross-model-validation-dialogue)
 
 ---
 
@@ -3872,6 +3873,520 @@ Based on the decisions above, the implementation order is:
 
 ---
 
+## Appendix E: Cross-Model Validation Dialogue
+
+This appendix documents the validation dialogue between Claude (codebase validation) and Gemini (architectural decisions), ensuring implementation readiness.
+
+### E.1 Claude's Codebase Validation
+
+Claude validated Gemini's 8 canonical decisions against the existing SymbolU implementation:
+
+#### E.1.1 State Projector - ✅ Aligned
+
+**Gemini's Decision:** Independent weights, MLP architecture (Linear → GELU → Linear)
+
+**Current SRK Implementation:**
+```python
+# symbolu/sovereign/reasoning_kernel.py - simpler linear
+self.state_projector = nn.Linear(hidden_dim, SOVEREIGN_STATE_DIM)
+```
+
+**Action Needed:** Upgrade SRK's projector to match JEPA's MLP design:
+```python
+self.state_projector = nn.Sequential(
+    nn.Linear(hidden_dim, hidden_dim // 2),
+    nn.GELU(),
+    nn.Linear(hidden_dim // 2, SOVEREIGN_STATE_DIM),
+)
+```
+
+**Status:** No conflict - capacity upgrade, backward compatible via checkpoint migration.
+
+#### E.1.2 OPB Master/Sensor - ✅ Aligned with Extension
+
+**Gemini's Decision:** SRK holds Master OPB, JEPA is Sensor
+
+**Current OPB in SRK:**
+```python
+class OPBDimensionLock(nn.Module):
+    def update_locks(self, state: torch.Tensor) -> Dict[str, Any]:
+        # Per-dimension locking based on activation threshold
+```
+
+**Gap Identified:** Current OPB only handles internal state updates. Need to add:
+```python
+def merge_external_observation(self, observed_state: torch.Tensor, source: str = "jepa"):
+    """Merge external observation (JEPA perception) into Master OPB."""
+    # Gated merge: Master retains locked dims, accepts unlocked from sensor
+    merge_mask = ~self.locked_mask  # Only accept where not locked
+    self.locked_state = torch.where(
+        merge_mask,
+        observed_state.mean(dim=0),  # Accept sensor observation
+        self.locked_state             # Retain master state
+    )
+```
+
+#### E.1.3 Additive Phase Composition - ✅ Mathematically Sound
+
+**Gemini's Decision:** θ_total = θ_text + θ_intent
+
+**Current IntentPhaseProjector:**
+```python
+# symbolu/phase_transformer.py:298
+def forward(self, delta_S: torch.Tensor) -> torch.Tensor:
+    theta = self.phase_proj(delta_S)
+    theta = torch.tanh(theta) * 3.14159
+    return theta
+```
+
+**Current PhaseAttentionLayer application:**
+```python
+# symbolu/phase_transformer.py:528
+if intent_phase is not None:
+    phi_q = phi_q + intent_phase  # Already additive!
+```
+
+**Status:** No code change needed for addition itself. Need new `DualSourcePhaseProjector`.
+
+#### E.1.4 Cosine Mode Divergence - ✅ Already Supported
+
+**Gemini's Decision:** JEPA=complex, SRK=shifted
+
+**Current Implementation:**
+```python
+# symbolu/phase_transformer.py:383
+assert cosine_mode in ("standard", "shifted", "complex")
+self.cosine_mode = cosine_mode
+```
+
+**Status:** No code change needed - already parameterized per-instance.
+
+#### E.1.5 Training Curriculum - ⚠️ Needs Orchestration
+
+**Gemini's Decision:** Body → Soul → Union
+
+| Phase | Model | Data | Losses |
+|-------|-------|------|--------|
+| 1 (Body) | JEPA only | ImageNet/Video | VICReg |
+| 2 (Soul) | SRK only | Text | Patent (B1/U2/S8) |
+| 3 (Union) | Joint | Image-Text pairs | Force S_visual ≈ S_text |
+
+**Gap:** No training orchestrator exists. Need:
+- Phase detection logic
+- Loss weight scheduler per phase
+- Encoder freezing mechanism for Phase 3
+
+#### E.1.6 Loss Unification - ⚠️ Partial Implementation
+
+**Gemini's Decision:** L_total = L_Patent + L_VICReg + L_JEPA
+
+**Current SRK Loss (sovereign_loss.py):**
+- B1 (Consistency Lagrangian) ✅
+- U2 (Phase Coherence) ✅
+- S8 (Stability) ✅
+
+**Missing for JEPA:**
+- L_variance (VICReg) ❌
+- L_covariance (VICReg) ❌
+- L_jepa (MSE prediction) ❌
+- L_ortho (Volume preservation) ❌
+
+**Action:** Add VICReg losses to `symbolu/sovereign/sovereign_loss.py` or create `symbolu/jepa/losses.py`.
+
+#### E.1.7 Karma for Video - ✅ Implicit in Design
+
+**Gemini's Decision:** Predictor's autoregressive rollout IS karma
+
+**JEPA Design (from doc):**
+```python
+# Each step feeds forward
+s_current = s_context + delta_s  # Karma carryover
+```
+
+**Alignment with SRK:**
+```python
+# train_unified_llm.py:9639
+srk_karma_state = current_state.detach() * config.srk_karma_decay
+```
+
+**Status:** Minor adjustment - ensure both use same decay factor or make configurable.
+
+#### E.1.8 32D as Shared Space - ✅ Core Design Principle
+
+**Gemini's Decision:** 32D Sovereign State is the alignment bottleneck
+
+Both models project to:
+- `[0:12]` Bhavas - "Dog" = Identity Bhava
+- `[12:17]` Koshas - Physical (Annamaya) for visual, Mental (Manomaya) for abstract
+- `[17:22]` Vrittis - Pramana (valid cognition) when confident
+- `[22:28]` Gunas - Sattva high for clear perception
+- `[28:32]` Reserved - Toroidal feedback
+
+**Status:** No code change needed - this is architectural.
+
+### E.2 Claude's Remaining Questions
+
+Claude identified three open questions requiring Gemini's ruling:
+
+#### Q1: Phase 3 Alignment Loss
+
+How to enforce S_visual ≈ S_text?
+
+```python
+# Option A: MSE
+L_align = MSE(S_visual, S_text)
+
+# Option B: Cosine similarity
+L_align = 1 - cos_sim(S_visual, S_text)
+
+# Option C: Per-component weighted
+L_align = Σ w_i * MSE(S_visual[i], S_text[i])  # Higher weight on Bhavas
+```
+
+#### Q2: External Karma Injection Shape
+
+For `PhaseVLJEPA.forward(external_karma_state)`:
+- Should it be `[B, 32]` (single state) or `[B, T, 32]` (per-position)?
+- Should JEPA completely override or blend?
+
+#### Q3: Cosine Mode for Predictor
+
+The JEPA Predictor also uses phase attention. Should it use:
+- Same as encoder (`complex`)?
+- Different mode optimized for latent prediction?
+
+### E.3 Gemini's Final Rulings
+
+#### Ruling Q1: Phase 3 Alignment Loss
+
+**Verdict: Option C (Per-Component Weighted MSE)**
+
+**Rationale:** "Dog" (Vision) and "Dog" (Text) must share the same **Bhava (Identity)**, but they often have different **Gunas (Energy)**. An image of a dog is static (Tamasic); the word "Run!" is active (Rajasic). Enforcing Guna alignment would confuse the model.
+
+**Formula:**
+$$L_{align} = \sum_{i} w_i \cdot MSE(S_{visual}[i], S_{text}[i])$$
+
+**Weight Assignment:**
+| Component | Weight | Rationale |
+|-----------|--------|-----------|
+| w_bhava (dims 0-12) | **10.0** | Critical Identity |
+| w_kosha/vritti (dims 12-22) | **1.0** | Standard |
+| w_guna/karma (dims 22-32) | **0.1** | Loose coupling |
+
+```python
+class ComponentWeightedAlignmentLoss(nn.Module):
+    """Per-component weighted alignment for Phase 3 training."""
+
+    def __init__(self):
+        super().__init__()
+        # Weight vector for 32D state
+        weights = torch.ones(32)
+        weights[0:12] = 10.0   # Bhavas (Identity) - Critical
+        weights[12:22] = 1.0   # Koshas/Vrittis - Standard
+        weights[22:32] = 0.1   # Gunas/Karma - Loose coupling
+        self.register_buffer('weights', weights)
+
+    def forward(self, s_visual: torch.Tensor, s_text: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            s_visual: [B, 32] Visual sovereign state
+            s_text: [B, 32] Text sovereign state
+        """
+        diff = (s_visual - s_text) ** 2  # [B, 32]
+        weighted_diff = diff * self.weights  # [B, 32]
+        return weighted_diff.mean()
+```
+
+#### Ruling Q2: External Karma Injection Shape
+
+**Verdict: `[B, 32]` with Gated Blend**
+
+**Rationale:** The SRK operates on a single "Thought State" per sequence. Even if the video has temporal depth, the "Reasoning Karma" is a sequence-level summary. A gated blend allows the SRK to say "I see your visual input, but I am maintaining my own reasoning state."
+
+**Mechanism:**
+$$\text{karma}_{effective} = g \odot \text{karma}_{external} + (1-g) \odot \text{karma}_{internal}$$
+
+Where g = σ(W_gate · karma_external) is learned.
+
+```python
+class GatedKarmaInjector(nn.Module):
+    """Blends external karma from SRK with internal JEPA karma."""
+
+    def __init__(self, state_dim: int = 32):
+        super().__init__()
+        self.gate_proj = nn.Sequential(
+            nn.Linear(state_dim, state_dim),
+            nn.Sigmoid()
+        )
+
+    def forward(
+        self,
+        internal_karma: torch.Tensor,
+        external_karma: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Args:
+            internal_karma: [B, 32] JEPA's own karma state
+            external_karma: [B, 32] SRK's Master OPB state (optional)
+        """
+        if external_karma is None:
+            return internal_karma
+
+        # Learn how much to trust external vs internal
+        gate = self.gate_proj(external_karma)  # [B, 32]
+        effective_karma = gate * external_karma + (1 - gate) * internal_karma
+
+        return effective_karma
+```
+
+#### Ruling Q3: Cosine Mode for Predictor
+
+**Verdict: `complex` Mode (Overruling Claude's `standard` suggestion)**
+
+**Rationale:** This is a **Phase-JEPA**. The core hypothesis is that prediction happens via **Rotation** in latent space.
+
+| Mode | Formula | Issue |
+|------|---------|-------|
+| `standard` | cos(Δφ) | Discards directionality |
+| `complex` | [cos(Δφ), sin(Δφ)] | Preserves full phasor information |
+
+Using `standard` mode collapses the imaginary component too early, destroying the "Phase Physics" you built. The `complex` mode allows the MLP to learn "Rotate 90 degrees" natively by preserving both real and imaginary components.
+
+```python
+# Predictor MUST use complex mode
+predictor_attention = PhaseAttentionLayer(
+    dim=768,
+    num_heads=12,
+    cosine_mode="complex",  # Critical: Preserve phase physics
+)
+```
+
+### E.4 Gemini's Implementation Artifacts
+
+#### A. The Dual-Source Phase Projector
+
+**Location:** `symbolu/common/projectors.py`
+
+```python
+import torch
+import torch.nn as nn
+from symbolu.phase_transformer import IntentPhaseProjector
+
+
+class DualSourcePhaseProjector(nn.Module):
+    """
+    Combines Text-derived geometric rotation with State-derived intent rotation.
+    Implements: θ_total = θ_text + θ_intent
+    """
+
+    def __init__(self, text_dim: int, state_dim: int = 32, num_heads: int = 12):
+        super().__init__()
+        # Projectors for each source
+        self.text_proj = IntentPhaseProjector(state_dim=text_dim, num_heads=num_heads)
+        self.state_proj = IntentPhaseProjector(state_dim=state_dim, num_heads=num_heads)
+
+        # Learnable scalar to balance sources (optional, defaults to 1.0)
+        self.text_scale = nn.Parameter(torch.ones(1))
+        self.state_scale = nn.Parameter(torch.ones(1))
+
+    def forward(
+        self,
+        text_emb: torch.Tensor,
+        state_delta: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Args:
+            text_emb: [B, D_text] from Text Encoder
+            state_delta: [B, 32] from Sovereign State Delta
+
+        Returns:
+            theta_total: [B, 1, H, D_head] Combined rotation angle
+        """
+        # Calculate individual rotations (Output is [B, 1, H, D_head] via Tanh * PI)
+        theta_text = self.text_proj(text_emb)
+        theta_intent = self.state_proj(state_delta)
+
+        # Additive Phase Composition (Phasor multiplication logic)
+        theta_total = (self.text_scale * theta_text) + (self.state_scale * theta_intent)
+
+        return theta_total
+```
+
+#### B. OPB External Merge Logic
+
+**Location:** `symbolu/sovereign/opb.py`
+
+```python
+class OPBDimensionLock(nn.Module):
+    def __init__(self, state_dim: int = 32):
+        super().__init__()
+        self.register_buffer("locked_state", torch.zeros(state_dim))
+        self.register_buffer("locked_mask", torch.zeros(state_dim, dtype=torch.bool))
+
+        # Gating mechanism for external observations
+        self.sensor_gate = nn.Sequential(
+            nn.Linear(state_dim, state_dim),
+            nn.Sigmoid()
+        )
+
+    def merge_external_observation(
+        self,
+        observed_state: torch.Tensor,
+        override_locks: bool = False,
+    ) -> torch.Tensor:
+        """
+        Merge Sensor (JEPA) state into Master (SRK) buffer.
+
+        Args:
+            observed_state: [B, 32] State predicted by JEPA
+            override_locks: If True, sensor data breaks existing locks (Rare)
+        """
+        # 1. Calculate Gate: How much of the sensor data do we accept?
+        # "Is this observation strong enough to update my beliefs?"
+        gate = self.sensor_gate(observed_state)  # [B, 32]
+
+        # 2. Blend Observation with Current State (Non-locked dimensions)
+        current_state = self.locked_state.unsqueeze(0)  # [1, 32]
+        blended_state = gate * observed_state + (1 - gate) * current_state
+
+        # 3. Enforce Master Locks (Unless overridden)
+        if not override_locks:
+            # Where locked_mask is True, KEEP Master State. Elsewhere, use Blended.
+            final_state = torch.where(
+                self.locked_mask.unsqueeze(0),
+                self.locked_state.unsqueeze(0),
+                blended_state
+            )
+        else:
+            final_state = blended_state
+
+        return final_state
+```
+
+#### C. VICReg Loss Implementation
+
+**Location:** `symbolu/jepa/losses.py`
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class VICRegLoss(nn.Module):
+    """
+    Variance-Invariance-Covariance Regularization.
+    Prevents collapse in JEPA training without negative samples.
+    """
+
+    def __init__(self, sim_coeff: float = 25.0, std_coeff: float = 25.0, cov_coeff: float = 1.0):
+        super().__init__()
+        self.sim_coeff = sim_coeff
+        self.std_coeff = std_coeff
+        self.cov_coeff = cov_coeff
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x, y: [B, D] representations (predicted vs target)
+        """
+        batch_size, num_features = x.shape
+
+        # 1. Invariance Loss (MSE)
+        repr_loss = F.mse_loss(x, y)
+
+        # 2. Variance Loss (Hinge)
+        # Forces variance of each dimension to be at least 1 (prevents collapse to point)
+        std_x = torch.sqrt(x.var(dim=0) + 0.0001)
+        std_y = torch.sqrt(y.var(dim=0) + 0.0001)
+        std_loss = torch.mean(F.relu(1 - std_x)) / 2 + torch.mean(F.relu(1 - std_y)) / 2
+
+        # 3. Covariance Loss
+        # Decorrelates dimensions (prevents dimensions encoding same info)
+        x = x - x.mean(dim=0)
+        y = y - y.mean(dim=0)
+
+        cov_x = (x.T @ x) / (batch_size - 1)
+        cov_y = (y.T @ y) / (batch_size - 1)
+
+        # Sum of off-diagonal squares
+        cov_loss = (
+            self._off_diagonal(cov_x).pow_(2).sum().div(num_features)
+            + self._off_diagonal(cov_y).pow_(2).sum().div(num_features)
+        )
+
+        return (
+            self.sim_coeff * repr_loss
+            + self.std_coeff * std_loss
+            + self.cov_coeff * cov_loss
+        )
+
+    def _off_diagonal(self, x: torch.Tensor) -> torch.Tensor:
+        """Extract off-diagonal elements from square matrix."""
+        n, m = x.shape
+        assert n == m
+        return x.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()
+```
+
+### E.5 Final Implementation Checklist
+
+Based on this validation dialogue:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                    VALIDATED IMPLEMENTATION CHECKLIST                                    │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  IMMEDIATE (Pre-Training):                                                              │
+│  ═════════════════════════                                                              │
+│  [ ] Upgrade SRK state_projector to MLP (Linear → GELU → Linear)                       │
+│  [ ] Create symbolu/common/projectors.py with DualSourcePhaseProjector                 │
+│  [ ] Create symbolu/jepa/losses.py with VICRegLoss                                      │
+│  [ ] Add merge_external_observation() to OPBDimensionLock                              │
+│                                                                                          │
+│  PHASE 3 SPECIFIC:                                                                      │
+│  ═════════════════                                                                      │
+│  [ ] Implement ComponentWeightedAlignmentLoss                                           │
+│  [ ] Implement GatedKarmaInjector                                                       │
+│  [ ] Create training orchestrator with phase detection                                  │
+│  [ ] Implement encoder freezing mechanism                                               │
+│                                                                                          │
+│  CONFIGURATION:                                                                         │
+│  ══════════════                                                                         │
+│  [ ] Ensure JEPA Predictor uses cosine_mode="complex"                                  │
+│  [ ] Ensure SRK uses cosine_mode="shifted"                                             │
+│  [ ] Make karma_decay configurable (currently 0.9 in both)                             │
+│                                                                                          │
+│  INTEGRATION TESTS:                                                                     │
+│  ═════════════════                                                                      │
+│  [ ] Test DualSourcePhaseProjector output shapes                                        │
+│  [ ] Test OPB merge with locked vs unlocked dimensions                                  │
+│  [ ] Test GatedKarmaInjector blend ratios                                               │
+│  [ ] Verify VICReg prevents collapse on synthetic data                                  │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### E.6 Validation Summary
+
+| Aspect | Claude Status | Gemini Ruling | Final Status |
+|--------|---------------|---------------|--------------|
+| State Projector | ✅ Aligned | Upgrade to MLP | ✅ Ready |
+| OPB Integration | ⚠️ Gap | Add merge method | ✅ Decided |
+| Phase Composition | ✅ Sound | Use DualSourcePhaseProjector | ✅ Ready |
+| Cosine Mode | ✅ Supported | JEPA=complex, SRK=shifted | ✅ Ready |
+| Training Curriculum | ⚠️ Gap | Body → Soul → Union | ✅ Decided |
+| Loss Unification | ⚠️ Partial | Add VICReg | ✅ Decided |
+| Karma for Video | ✅ Implicit | Use GatedKarmaInjector | ✅ Ready |
+| 32D Shared Space | ✅ Architectural | No change needed | ✅ Ready |
+| Alignment Loss (Q1) | ❓ Open | Per-component weighted | ✅ Decided |
+| Karma Shape (Q2) | ❓ Open | [B, 32] with gated blend | ✅ Decided |
+| Predictor Mode (Q3) | ❓ Open | complex (overruled) | ✅ Decided |
+
+**Conclusion:** All gaps identified, all questions answered. Implementation cleared for execution.
+
+---
+
 ## References
 
 1. Meta AI - I-JEPA: Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture
@@ -3895,6 +4410,7 @@ Based on the decisions above, the implementation order is:
 | 1.5.0 | 2026-01-09 | Added Patent-Enhanced Loss Functions (§18) - BCVF, USE, SCC integration |
 | 1.6.0 | 2026-01-09 | Added Operational Guide (§19-21) - Stability, Production, Verification |
 | 1.7.0 | 2026-01-09 | Added Sovereign AGI Integration Evaluation (Appendix D) - 8 canonical decisions |
+| 1.8.0 | 2026-01-09 | Added Cross-Model Validation Dialogue (Appendix E) - Claude/Gemini validation |
 
 ---
 
