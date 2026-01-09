@@ -9947,6 +9947,13 @@ def train(config: UnifiedTrainingConfig):
                     # With both sides detached, CSR becomes monitor-only - no training signal flows.
                     csr_emb_for_loss = csr_emb.detach()
 
+                    # V9.8.1: Align sequence lengths if they differ
+                    # This can happen if model internally truncates sequences
+                    if csr_hidden_for_loss.shape[1] != csr_emb_for_loss.shape[1]:
+                        min_len = min(csr_hidden_for_loss.shape[1], csr_emb_for_loss.shape[1])
+                        csr_hidden_for_loss = csr_hidden_for_loss[:, :min_len, :]
+                        csr_emb_for_loss = csr_emb_for_loss[:, :min_len, :]
+
                     # V9.7.0: Choose between Sparse (Whole-Word) and Dense (Per-Token) supervision
                     if config.csr_sparse_supervision:
                         # =====================================================================

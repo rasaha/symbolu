@@ -499,10 +499,19 @@ class PhaseJEPATransformer(nn.Module):
         outputs = {}
 
         # === Context Path (Trainable) ===
-        context_out = self.context_encoder(
-            context_ids,
-            attention_mask=attention_mask[:, :context_len] if attention_mask is not None else None,
-        )
+        # Request last_hidden_state for OntologicalHybridTransformer compatibility
+        try:
+            context_out = self.context_encoder(
+                context_ids,
+                attention_mask=attention_mask[:, :context_len] if attention_mask is not None else None,
+                return_last_hidden=True,
+            )
+        except TypeError:
+            # Encoder doesn't support return_last_hidden kwarg
+            context_out = self.context_encoder(
+                context_ids,
+                attention_mask=attention_mask[:, :context_len] if attention_mask is not None else None,
+            )
 
         # Handle different encoder output formats
         if isinstance(context_out, tuple):
@@ -510,7 +519,14 @@ class PhaseJEPATransformer(nn.Module):
             if len(context_out) > 1:
                 outputs['logits'] = context_out[1] if context_out[1] is not None else None
         elif isinstance(context_out, dict):
-            h_context = context_out.get('hidden_states', context_out.get('last_hidden_state'))
+            # Try multiple keys for hidden states (different encoders use different keys)
+            h_context = context_out.get('last_hidden_state') or context_out.get('hidden_states')
+            if h_context is None:
+                # OntologicalHybridTransformer may need forward_hidden for raw hidden states
+                raise ValueError(
+                    "Encoder returned dict without 'last_hidden_state' or 'hidden_states'. "
+                    "Ensure encoder is called with return_last_hidden=True or provides hidden states."
+                )
             outputs['logits'] = context_out.get('logits')
         else:
             h_context = context_out
@@ -535,15 +551,22 @@ class PhaseJEPATransformer(nn.Module):
         # === Target Path (EMA, no gradients) ===
         if compute_loss:
             with torch.no_grad():
-                target_out = self.target_encoder(
-                    target_ids,
-                    attention_mask=attention_mask,
-                )
+                try:
+                    target_out = self.target_encoder(
+                        target_ids,
+                        attention_mask=attention_mask,
+                        return_last_hidden=True,
+                    )
+                except TypeError:
+                    target_out = self.target_encoder(
+                        target_ids,
+                        attention_mask=attention_mask,
+                    )
 
                 if isinstance(target_out, tuple):
                     h_target = target_out[0]
                 elif isinstance(target_out, dict):
-                    h_target = target_out.get('hidden_states', target_out.get('last_hidden_state'))
+                    h_target = target_out.get('last_hidden_state') or target_out.get('hidden_states')
                 else:
                     h_target = target_out
 
@@ -828,15 +851,22 @@ class PhaseJEPATransformer(nn.Module):
         outputs = {}
 
         # === Step 1: Context Encoding ===
-        context_out = self.context_encoder(
-            context_ids,
-            attention_mask=attention_mask[:, :context_len] if attention_mask is not None else None,
-        )
+        try:
+            context_out = self.context_encoder(
+                context_ids,
+                attention_mask=attention_mask[:, :context_len] if attention_mask is not None else None,
+                return_last_hidden=True,
+            )
+        except TypeError:
+            context_out = self.context_encoder(
+                context_ids,
+                attention_mask=attention_mask[:, :context_len] if attention_mask is not None else None,
+            )
 
         if isinstance(context_out, tuple):
             h_context = context_out[0]
         elif isinstance(context_out, dict):
-            h_context = context_out.get('hidden_states', context_out.get('last_hidden_state'))
+            h_context = context_out.get('last_hidden_state') or context_out.get('hidden_states')
         else:
             h_context = context_out
 
@@ -871,20 +901,28 @@ class PhaseJEPATransformer(nn.Module):
                 input_ids,
                 attention_mask=attention_mask,
                 phase_rotation=phase_rotation,
+                return_last_hidden=True,
             )
         else:
             # Standard forward - phase rotation applied via hidden state modulation
-            full_out = self.context_encoder(
-                input_ids,
-                attention_mask=attention_mask,
-            )
+            try:
+                full_out = self.context_encoder(
+                    input_ids,
+                    attention_mask=attention_mask,
+                    return_last_hidden=True,
+                )
+            except TypeError:
+                full_out = self.context_encoder(
+                    input_ids,
+                    attention_mask=attention_mask,
+                )
 
             # Get hidden states and logits
             if isinstance(full_out, tuple):
                 h_full = full_out[0]
                 logits = full_out[1] if len(full_out) > 1 else None
             elif isinstance(full_out, dict):
-                h_full = full_out.get('hidden_states', full_out.get('last_hidden_state'))
+                h_full = full_out.get('last_hidden_state') or full_out.get('hidden_states')
                 logits = full_out.get('logits')
             else:
                 h_full = full_out
@@ -919,11 +957,14 @@ class PhaseJEPATransformer(nn.Module):
         # 5a. JEPA Loss (state prediction)
         if self.training:
             with torch.no_grad():
-                target_out = self.target_encoder(input_ids, attention_mask=attention_mask)
+                try:
+                    target_out = self.target_encoder(input_ids, attention_mask=attention_mask, return_last_hidden=True)
+                except TypeError:
+                    target_out = self.target_encoder(input_ids, attention_mask=attention_mask)
                 if isinstance(target_out, tuple):
                     h_target = target_out[0]
                 elif isinstance(target_out, dict):
-                    h_target = target_out.get('hidden_states', target_out.get('last_hidden_state'))
+                    h_target = target_out.get('last_hidden_state') or target_out.get('hidden_states')
                 else:
                     h_target = target_out
                 s_target = self.target_state_projector(h_target)
@@ -1411,14 +1452,21 @@ class SovereignJEPA(nn.Module):
         # We need actual future state. In autonomous mode, we compare with
         # our best estimate from the target encoder (self-supervised)
         with torch.no_grad():
-            target_out = self.jepa.target_encoder(
-                context_ids,
-                attention_mask=attention_mask,
-            )
+            try:
+                target_out = self.jepa.target_encoder(
+                    context_ids,
+                    attention_mask=attention_mask,
+                    return_last_hidden=True,
+                )
+            except TypeError:
+                target_out = self.jepa.target_encoder(
+                    context_ids,
+                    attention_mask=attention_mask,
+                )
             if isinstance(target_out, tuple):
                 h_target = target_out[0]
             elif isinstance(target_out, dict):
-                h_target = target_out.get('hidden_states', target_out.get('last_hidden_state'))
+                h_target = target_out.get('last_hidden_state') or target_out.get('hidden_states')
             else:
                 h_target = target_out
             s_actual = self.jepa.target_state_projector(h_target)
