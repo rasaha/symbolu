@@ -162,6 +162,25 @@ except ImportError as e:
     SRK_AVAILABLE = False
     print(f"Warning: SRK modules not available: {e}")
 
+# Phase-JEPA: Joint Embedding Predictive Architecture
+try:
+    from symbolu.jepa import (
+        PhaseJEPATransformer,
+        PhaseJEPAConfig,
+        create_phase_jepa_transformer,
+        TrainingCurriculumOrchestrator,
+        LossScheduler,
+        create_curriculum_from_config,
+        VICRegLoss,
+        WeightedAlignmentLoss,
+        JEPAPhase,
+        MacroPhase,
+    )
+    JEPA_AVAILABLE = True
+except ImportError as e:
+    JEPA_AVAILABLE = False
+    print(f"Warning: Phase-JEPA modules not available: {e}")
+
 # Import Gen 2 models (Hierarchical Complex Bhava)
 try:
     from symbolu.ontological.symbolu12_gen2 import (
@@ -6855,6 +6874,47 @@ class UnifiedTrainingConfig:
     srk_total_steps: int = 50000             # Total training steps for annealing
     srk_warmup_steps: int = 5000             # Steps for System 1 warmup phase
 
+    # ==========================================================================
+    # Phase-JEPA: Joint Embedding Predictive Architecture Configuration
+    # Reference: docs/design/HYBRID_PHASE_JEPA_DESIGN.md
+    # ==========================================================================
+    enable_jepa: bool = False                # Master toggle for Phase-JEPA system
+    jepa_hidden_dim: int = 256               # Hidden dimension for JEPA predictor
+    jepa_prediction_steps: int = 4           # Number of k-step lookahead predictions
+    jepa_num_heads: int = 4                  # Number of attention heads in predictor
+    jepa_cosine_mode: str = "complex"        # Phase attention mode (complex/shifted/standard)
+
+    # JEPA Loss Weights
+    jepa_vicreg_weight: float = 1.0          # VICReg loss weight
+    jepa_alignment_weight: float = 1.0       # Alignment loss weight
+    jepa_prediction_weight: float = 0.5      # Prediction loss weight
+    jepa_orthogonality_weight: float = 0.01  # Orthogonality regularization
+
+    # JEPA Per-Component Alignment Weights
+    jepa_bhava_weight: float = 10.0          # Bhava (identity) component weight
+    jepa_semantic_weight: float = 1.0        # Kosha/Vritti (semantic) weight
+    jepa_guna_weight: float = 0.1            # Guna (loosely coupled) weight
+
+    # JEPA Target Encoder (EMA)
+    jepa_target_momentum: float = 0.996      # EMA momentum for target encoder
+    jepa_momentum_schedule: str = "cosine"   # constant/cosine/linear
+
+    # JEPA Training Curriculum (Body→Soul→Union)
+    jepa_training_phase: str = "body"        # Current phase: body/soul/union
+    jepa_phase_body_steps: int = 20000       # Steps for Body phase
+    jepa_phase_soul_steps: int = 30000       # Steps for Soul phase
+    jepa_auto_phase_transition: bool = False # Auto-transition phases
+
+    # JEPA Vritti Validation
+    jepa_enable_vritti_validation: bool = False  # Enable Vritti gate validation
+    jepa_viparyaya_threshold: float = 0.4    # Max error before damping
+    jepa_vikalpa_threshold: float = 0.6      # Max imagination (factual tasks)
+    jepa_damping_factor: float = 0.5         # Damping for rejected predictions
+
+    # JEPA-SRK Integration (Master/Sensor)
+    jepa_enable_karma_injection: bool = False  # Enable karma injection from SRK
+    jepa_karma_gate_bias: float = 0.5        # Initial gate bias (0=internal, 1=external)
+
 
 # Model size presets
 MODEL_PRESETS = {
@@ -9155,6 +9215,62 @@ def train(config: UnifiedTrainingConfig):
         print(f"      Check: symbolu/sovereign/reasoning_kernel.py exists and imports correctly")
         print(f"      Falling back to legacy training without SRK.\n")
 
+    # ==========================================================================
+    # Phase-JEPA: Joint Embedding Predictive Architecture Initialization
+    # Reference: docs/design/HYBRID_PHASE_JEPA_DESIGN.md
+    # ==========================================================================
+    jepa_model = None
+    jepa_curriculum = None
+    jepa_loss_scheduler = None
+
+    if config.enable_jepa and JEPA_AVAILABLE:
+        # Get model dimensions
+        preset = MODEL_PRESETS.get(config.model_size, MODEL_PRESETS['small'])
+        model_dim = preset['embed_dim']
+        num_heads = preset['num_heads']
+        num_layers = preset['num_layers']
+
+        # Create JEPA transformer (wraps the existing model as context encoder)
+        jepa_model = create_phase_jepa_transformer(
+            config,
+            context_encoder=model,  # Use existing model as encoder
+        ).to(device)
+
+        # Create curriculum orchestrator if auto-transition enabled
+        if config.jepa_auto_phase_transition:
+            jepa_curriculum = create_curriculum_from_config(config)
+            jepa_loss_scheduler = LossScheduler(jepa_curriculum)
+            jepa_model.set_curriculum(jepa_curriculum)
+
+        print(f"\n  ╔══════════════════════════════════════════════════════════════════╗")
+        print(f"  ║  PHASE-JEPA: Joint Embedding Predictive Architecture ENABLED     ║")
+        print(f"  ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Predictor Configuration:                                        ║")
+        print(f"  ║    Hidden Dim: {config.jepa_hidden_dim:4}    Heads: {config.jepa_num_heads}    k-Steps: {config.jepa_prediction_steps}             ║")
+        print(f"  ║    Cosine Mode: {config.jepa_cosine_mode:8}                                     ║")
+        print(f"  ║  Target Encoder:                                                 ║")
+        print(f"  ║    EMA Momentum: {config.jepa_target_momentum:.3f}    Schedule: {config.jepa_momentum_schedule:8}           ║")
+        print(f"  ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Loss Weights:                                                   ║")
+        print(f"  ║    VICReg: {config.jepa_vicreg_weight:.1f}  Align: {config.jepa_alignment_weight:.1f}  Pred: {config.jepa_prediction_weight:.1f}  Ortho: {config.jepa_orthogonality_weight:.2f}   ║")
+        print(f"  ║  Alignment Weights (Bhava/Semantic/Guna):                        ║")
+        print(f"  ║    {config.jepa_bhava_weight:.1f} / {config.jepa_semantic_weight:.1f} / {config.jepa_guna_weight:.1f}                                        ║")
+        print(f"  ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Training Curriculum:                                            ║")
+        print(f"  ║    Phase: {config.jepa_training_phase.upper():6}    Auto-Transition: {'ON ' if config.jepa_auto_phase_transition else 'OFF'}              ║")
+        print(f"  ║    Body Steps: {config.jepa_phase_body_steps:,}    Soul Steps: {config.jepa_phase_soul_steps:,}          ║")
+        if config.jepa_enable_vritti_validation:
+            print(f"  ║  Vritti Validation: ACTIVE                                       ║")
+            print(f"  ║    Viparyaya: {config.jepa_viparyaya_threshold:.2f}    Vikalpa: {config.jepa_vikalpa_threshold:.2f}                      ║")
+        if config.jepa_enable_karma_injection:
+            print(f"  ║  Karma Injection (SRK→JEPA): ACTIVE                             ║")
+        print(f"  ╚══════════════════════════════════════════════════════════════════╝\n")
+
+    elif config.enable_jepa and not JEPA_AVAILABLE:
+        print(f"\n  ⚠️  JEPA REQUESTED but module not available!")
+        print(f"      Check: symbolu/jepa/__init__.py exists and imports correctly")
+        print(f"      Falling back to training without JEPA.\n")
+
     # Optimizer
     if config.use_8bit_optimizer:
         try:
@@ -9657,6 +9773,82 @@ def train(config: UnifiedTrainingConfig):
                               f"L_total={srk_metrics.get('L_total', 0):.4f} | "
                               f"L_B1={srk_metrics.get('L_lagrangian', 0):.4f} | "
                               f"s_f={srk_metrics.get('s_f', 0):.3f} s_b={srk_metrics.get('s_b', 0):.3f}")
+
+            # Phase-JEPA: Joint Embedding Predictive Loss Integration
+            jepa_metrics = {}
+            if jepa_model is not None and JEPA_AVAILABLE:
+                try:
+                    # Get karma state from SRK if available (for karma injection)
+                    external_karma = srk_karma_state if (
+                        config.jepa_enable_karma_injection and srk_karma_state is not None
+                    ) else None
+
+                    # JEPA forward pass with loss computation
+                    jepa_output = jepa_model(
+                        input_ids=x,
+                        attention_mask=None,  # Full attention for JEPA
+                        external_karma=external_karma,
+                        compute_loss=True,
+                        return_states=False,
+                    )
+
+                    # Extract JEPA loss
+                    jepa_loss = jepa_output.get('loss', torch.tensor(0.0, device=device))
+                    jepa_loss_components = jepa_output.get('loss_components', {})
+
+                    # Get curriculum weight based on current phase
+                    if jepa_curriculum is not None:
+                        phase_progress = jepa_curriculum.get_progress()
+                        macro_phase = phase_progress.get('macro_phase', 'BODY')
+
+                        # During SOUL phase, reduce JEPA loss weight
+                        if macro_phase == 'SOUL':
+                            jepa_weight = 0.1  # Minimal JEPA during SRK-focused phase
+                        elif macro_phase == 'UNION':
+                            jepa_weight = 0.5  # Balanced during integration
+                        else:  # BODY
+                            jepa_weight = 1.0  # Full JEPA during perceptual learning
+
+                        jepa_loss = jepa_weight * jepa_loss
+                    else:
+                        jepa_weight = config.jepa_prediction_weight
+
+                    # Add JEPA loss to total loss
+                    loss = loss + jepa_weight * jepa_loss
+
+                    # Update target encoder (EMA)
+                    phase_changed, new_phase = jepa_model.training_step_update(
+                        metrics={'variance': jepa_loss_components.get('variance', 0.0)}
+                    )
+
+                    # Collect JEPA metrics
+                    jepa_metrics = {
+                        'jepa_loss': jepa_loss.item() if isinstance(jepa_loss, torch.Tensor) else jepa_loss,
+                        'jepa_vicreg': jepa_loss_components.get('vicreg', 0.0),
+                        'jepa_alignment': jepa_loss_components.get('alignment', 0.0),
+                        'jepa_ortho': jepa_loss_components.get('orthogonality', 0.0),
+                    }
+
+                    if jepa_curriculum is not None:
+                        progress = jepa_curriculum.get_progress()
+                        jepa_metrics['jepa_phase'] = progress.get('macro_phase', 'BODY')
+                        jepa_metrics['jepa_k_steps'] = jepa_curriculum.get_k_steps()
+
+                    # Log phase transitions
+                    if phase_changed and new_phase:
+                        print(f"\n  🔄 [JEPA] Phase Transition → {new_phase} at step {global_step}")
+
+                    # Log JEPA diagnostics periodically
+                    if global_step % config.log_every == 0 and global_step > 0:
+                        phase_str = jepa_metrics.get('jepa_phase', 'BODY')
+                        print(f"  [JEPA] Step {global_step} | Phase: {phase_str} | "
+                              f"Loss={jepa_metrics.get('jepa_loss', 0):.4f} | "
+                              f"VICReg={jepa_metrics.get('jepa_vicreg', 0):.4f} | "
+                              f"Align={jepa_metrics.get('jepa_alignment', 0):.4f}")
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  ⚠️ [JEPA] Error: {e}")
 
             # CSR Phoneme-Ontological Grounding Integration
             csr_metrics = {}
@@ -11999,6 +12191,74 @@ def main():
     parser.add_argument("--srk_warmup_steps", type=int, default=5000,
                        help="Steps for System 1 warmup phase (Learn to Speak)")
 
+    # ==========================================================================
+    # Phase-JEPA: Joint Embedding Predictive Architecture
+    # Reference: docs/design/HYBRID_PHASE_JEPA_DESIGN.md
+    # ==========================================================================
+    parser.add_argument("--enable_jepa", action="store_true",
+                       help="Enable Phase-JEPA training (Sensor model for perception)")
+    parser.add_argument("--jepa_hidden_dim", type=int, default=256,
+                       help="Hidden dimension for JEPA predictor MLP")
+    parser.add_argument("--jepa_prediction_steps", type=int, default=4,
+                       help="Number of k-step lookahead predictions")
+    parser.add_argument("--jepa_num_heads", type=int, default=4,
+                       help="Number of attention heads in JEPA predictor")
+    parser.add_argument("--jepa_cosine_mode", type=str, default="complex",
+                       choices=["standard", "shifted", "complex"],
+                       help="Phase attention cosine mode (complex preserves full phasor)")
+
+    # JEPA Loss Weights
+    parser.add_argument("--jepa_vicreg_weight", type=float, default=1.0,
+                       help="VICReg loss weight (prevents representation collapse)")
+    parser.add_argument("--jepa_alignment_weight", type=float, default=1.0,
+                       help="Alignment loss weight (matches predictor to target)")
+    parser.add_argument("--jepa_prediction_weight", type=float, default=0.5,
+                       help="Prediction loss weight (forward/backward consistency)")
+    parser.add_argument("--jepa_orthogonality_weight", type=float, default=0.01,
+                       help="Orthogonality regularization weight")
+
+    # JEPA Weighted Alignment (Per-Component)
+    parser.add_argument("--jepa_bhava_weight", type=float, default=10.0,
+                       help="Bhava (identity) component alignment weight")
+    parser.add_argument("--jepa_semantic_weight", type=float, default=1.0,
+                       help="Kosha/Vritti (semantic) component alignment weight")
+    parser.add_argument("--jepa_guna_weight", type=float, default=0.1,
+                       help="Guna (loosely coupled) component alignment weight")
+
+    # JEPA Target Encoder (EMA)
+    parser.add_argument("--jepa_target_momentum", type=float, default=0.996,
+                       help="EMA momentum for target encoder (higher = slower update)")
+    parser.add_argument("--jepa_momentum_schedule", type=str, default="cosine",
+                       choices=["constant", "cosine", "linear"],
+                       help="Momentum schedule (cosine anneals 0.996->1.0)")
+
+    # JEPA Training Curriculum (Body→Soul→Union)
+    parser.add_argument("--jepa_training_phase", type=str, default="body",
+                       choices=["body", "soul", "union"],
+                       help="Current training phase (body=JEPA, soul=SRK, union=joint)")
+    parser.add_argument("--jepa_phase_body_steps", type=int, default=20000,
+                       help="Steps for Body phase (JEPA perceptual learning)")
+    parser.add_argument("--jepa_phase_soul_steps", type=int, default=30000,
+                       help="Steps for Soul phase (SRK reasoning)")
+    parser.add_argument("--jepa_auto_phase_transition", action="store_true",
+                       help="Automatically transition phases based on step count")
+
+    # JEPA Vritti Validation
+    parser.add_argument("--jepa_enable_vritti_validation", action="store_true",
+                       help="Enable Vritti gate validation (rejects error-prone predictions)")
+    parser.add_argument("--jepa_viparyaya_threshold", type=float, default=0.4,
+                       help="Max error (Viparyaya) before damping predictions")
+    parser.add_argument("--jepa_vikalpa_threshold", type=float, default=0.6,
+                       help="Max imagination (Vikalpa) for factual tasks")
+    parser.add_argument("--jepa_damping_factor", type=float, default=0.5,
+                       help="How much to dampen rejected predictions")
+
+    # JEPA-SRK Integration (Master/Sensor)
+    parser.add_argument("--jepa_enable_karma_injection", action="store_true",
+                       help="Enable karma state injection from SRK (Master) to JEPA (Sensor)")
+    parser.add_argument("--jepa_karma_gate_bias", type=float, default=0.5,
+                       help="Initial gate bias for karma blending (0=internal, 1=external)")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -12269,6 +12529,37 @@ def main():
         # SRK Annealing
         srk_total_steps=args.srk_total_steps,
         srk_warmup_steps=args.srk_warmup_steps,
+        # Phase-JEPA Configuration
+        enable_jepa=args.enable_jepa,
+        jepa_hidden_dim=args.jepa_hidden_dim,
+        jepa_prediction_steps=args.jepa_prediction_steps,
+        jepa_num_heads=args.jepa_num_heads,
+        jepa_cosine_mode=args.jepa_cosine_mode,
+        # JEPA Loss Weights
+        jepa_vicreg_weight=args.jepa_vicreg_weight,
+        jepa_alignment_weight=args.jepa_alignment_weight,
+        jepa_prediction_weight=args.jepa_prediction_weight,
+        jepa_orthogonality_weight=args.jepa_orthogonality_weight,
+        # JEPA Per-Component Weights
+        jepa_bhava_weight=args.jepa_bhava_weight,
+        jepa_semantic_weight=args.jepa_semantic_weight,
+        jepa_guna_weight=args.jepa_guna_weight,
+        # JEPA Target Encoder
+        jepa_target_momentum=args.jepa_target_momentum,
+        jepa_momentum_schedule=args.jepa_momentum_schedule,
+        # JEPA Training Curriculum
+        jepa_training_phase=args.jepa_training_phase,
+        jepa_phase_body_steps=args.jepa_phase_body_steps,
+        jepa_phase_soul_steps=args.jepa_phase_soul_steps,
+        jepa_auto_phase_transition=args.jepa_auto_phase_transition,
+        # JEPA Vritti Validation
+        jepa_enable_vritti_validation=args.jepa_enable_vritti_validation,
+        jepa_viparyaya_threshold=args.jepa_viparyaya_threshold,
+        jepa_vikalpa_threshold=args.jepa_vikalpa_threshold,
+        jepa_damping_factor=args.jepa_damping_factor,
+        # JEPA-SRK Integration
+        jepa_enable_karma_injection=args.jepa_enable_karma_injection,
+        jepa_karma_gate_bias=args.jepa_karma_gate_bias,
     )
 
     # V9.8.0: Build SRK config from legacy flags (backward compatibility)

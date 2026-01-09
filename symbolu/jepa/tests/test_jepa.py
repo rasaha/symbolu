@@ -527,5 +527,263 @@ class TestJEPAIntegration:
         assert not torch.isnan(hidden.grad).any()
 
 
+# =============================================================================
+# Test: TrainingCurriculumOrchestrator
+# =============================================================================
+
+class TestCurriculumOrchestrator:
+    """Tests for TrainingCurriculumOrchestrator."""
+
+    @pytest.fixture
+    def orchestrator(self):
+        from symbolu.jepa.curriculum import TrainingCurriculumOrchestrator
+        return TrainingCurriculumOrchestrator(
+            total_steps=1000,
+            body_steps=200,
+            soul_steps=500,
+            auto_transition=True,
+        )
+
+    def test_initial_phase(self, orchestrator):
+        """Test initial phase is BODY."""
+        from symbolu.jepa.curriculum import MacroPhase
+        assert orchestrator.state.macro_phase == MacroPhase.BODY
+
+    def test_phase_transition_body_to_soul(self, orchestrator):
+        """Test automatic transition from BODY to SOUL."""
+        from symbolu.jepa.curriculum import MacroPhase
+
+        # Advance past body_steps (200)
+        for _ in range(201):
+            orchestrator.step()
+
+        assert orchestrator.state.macro_phase == MacroPhase.SOUL
+
+    def test_phase_transition_soul_to_union(self, orchestrator):
+        """Test automatic transition from SOUL to UNION."""
+        from symbolu.jepa.curriculum import MacroPhase
+
+        # Advance past soul_end (200 + 500 = 700)
+        for _ in range(701):
+            orchestrator.step()
+
+        assert orchestrator.state.macro_phase == MacroPhase.UNION
+
+    def test_get_loss_weights(self, orchestrator):
+        """Test loss weight retrieval."""
+        weights = orchestrator.get_loss_weights()
+        assert 'jepa' in weights
+        assert 'variance' in weights
+        assert 'alignment' in weights
+
+    def test_k_steps_by_phase(self, orchestrator):
+        """Test k_steps changes with JEPA micro-phase."""
+        from symbolu.jepa.curriculum import JEPAPhase
+
+        # Initially in DHYANA phase (k=1)
+        assert orchestrator.state.jepa_phase == JEPAPhase.DHYANA
+        assert orchestrator.get_k_steps() == 1
+
+    def test_progress_tracking(self, orchestrator):
+        """Test progress information."""
+        # Advance 100 steps
+        for _ in range(100):
+            orchestrator.step()
+
+        progress = orchestrator.get_progress()
+        assert progress['current_step'] == 100
+        assert progress['overall'] == pytest.approx(0.1, rel=0.1)
+
+    def test_state_dict_save_load(self, orchestrator):
+        """Test checkpoint save/load."""
+        # Advance and change state
+        for _ in range(250):
+            orchestrator.step()
+
+        # Save state
+        state_dict = orchestrator.state_dict()
+
+        # Create new orchestrator
+        from symbolu.jepa.curriculum import TrainingCurriculumOrchestrator
+        new_orchestrator = TrainingCurriculumOrchestrator(
+            total_steps=1000,
+            body_steps=200,
+            soul_steps=500,
+        )
+
+        # Load state
+        new_orchestrator.load_state_dict(state_dict)
+
+        assert new_orchestrator.state.current_step == 250
+        assert new_orchestrator.state.macro_phase == orchestrator.state.macro_phase
+
+    def test_force_phase_transition(self, orchestrator):
+        """Test manual phase transition."""
+        from symbolu.jepa.curriculum import MacroPhase
+
+        changed, new_phase = orchestrator.step(force_phase='union')
+        assert changed
+        assert new_phase == 'UNION'
+        assert orchestrator.state.macro_phase == MacroPhase.UNION
+
+
+# =============================================================================
+# Test: LossScheduler
+# =============================================================================
+
+class TestLossScheduler:
+    """Tests for LossScheduler smooth weight interpolation."""
+
+    def test_smooth_transition(self):
+        """Test smooth weight transition during phase change."""
+        from symbolu.jepa.curriculum import (
+            TrainingCurriculumOrchestrator,
+            LossScheduler,
+        )
+
+        orchestrator = TrainingCurriculumOrchestrator(
+            total_steps=1000,
+            body_steps=100,
+            soul_steps=400,
+            auto_transition=True,
+        )
+        scheduler = LossScheduler(orchestrator, transition_steps=50)
+
+        # Get initial weights
+        initial_weights = scheduler.get_weights()
+
+        # Advance to phase transition
+        for _ in range(101):
+            orchestrator.step()
+
+        # Weights should be transitioning
+        transitional_weights = scheduler.get_weights()
+        assert transitional_weights is not None
+
+
+# =============================================================================
+# Test: PhaseJEPATransformer (if HybridPhaseTransformer available)
+# =============================================================================
+
+class TestPhaseJEPATransformerBasic:
+    """Basic tests for PhaseJEPATransformer (mocked encoder)."""
+
+    def test_config_creation(self):
+        """Test PhaseJEPAConfig creation."""
+        from symbolu.jepa.transformer import PhaseJEPAConfig
+
+        config = PhaseJEPAConfig(
+            embed_dim=512,
+            prediction_steps=4,
+            target_momentum=0.996,
+        )
+        assert config.embed_dim == 512
+        assert config.prediction_steps == 4
+        assert config.target_momentum == 0.996
+
+    def test_transformer_with_mock_encoder(self):
+        """Test PhaseJEPATransformer with mock encoder."""
+        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+
+        # Create mock encoder
+        class MockEncoder(nn.Module):
+            def __init__(self, embed_dim=256):
+                super().__init__()
+                self.embed = nn.Embedding(1000, embed_dim)
+                self.layers = nn.TransformerEncoder(
+                    nn.TransformerEncoderLayer(embed_dim, 4, batch_first=True),
+                    num_layers=2,
+                )
+
+            def forward(self, input_ids, attention_mask=None):
+                x = self.embed(input_ids)
+                h = self.layers(x)
+                return h  # Return hidden states
+
+        config = PhaseJEPAConfig(
+            embed_dim=256,
+            vocab_size=1000,
+            prediction_steps=2,
+            predictor_hidden_dim=64,
+        )
+
+        encoder = MockEncoder(embed_dim=256)
+        model = PhaseJEPATransformer(config=config, context_encoder=encoder)
+
+        # Forward pass
+        input_ids = torch.randint(0, 1000, (2, 32))
+        outputs = model(input_ids, compute_loss=True)
+
+        assert 's_pred' in outputs
+        assert 'loss' in outputs
+        assert outputs['loss'].requires_grad
+
+    def test_target_encoder_update(self):
+        """Test target encoder EMA update."""
+        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+
+        class MockEncoder(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embed = nn.Embedding(100, 64)
+                self.linear = nn.Linear(64, 64)
+
+            def forward(self, input_ids, attention_mask=None):
+                return self.linear(self.embed(input_ids))
+
+        config = PhaseJEPAConfig(
+            embed_dim=64,
+            vocab_size=100,
+            prediction_steps=1,
+            target_momentum=0.9,  # Lower for visible changes
+        )
+
+        model = PhaseJEPATransformer(config=config, context_encoder=MockEncoder())
+
+        # Get target encoder weight before update
+        target_weight_before = model.target_encoder.encoder.linear.weight.clone()
+
+        # Modify context encoder
+        model.context_encoder.linear.weight.data += 0.1
+
+        # Update target encoder
+        model.update_target_encoder()
+
+        target_weight_after = model.target_encoder.encoder.linear.weight
+
+        # Weights should have moved (EMA update)
+        assert not torch.allclose(target_weight_before, target_weight_after)
+
+    def test_curriculum_integration(self):
+        """Test curriculum integration with transformer."""
+        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+        from symbolu.jepa.curriculum import TrainingCurriculumOrchestrator
+
+        class MockEncoder(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embed = nn.Embedding(100, 64)
+
+            def forward(self, input_ids, attention_mask=None):
+                return self.embed(input_ids)
+
+        config = PhaseJEPAConfig(embed_dim=64, vocab_size=100, prediction_steps=1)
+        model = PhaseJEPATransformer(config=config, context_encoder=MockEncoder())
+
+        curriculum = TrainingCurriculumOrchestrator(
+            total_steps=100,
+            body_steps=30,
+            soul_steps=40,
+        )
+        model.set_curriculum(curriculum)
+
+        assert model.curriculum is not None
+
+        # Training step should update curriculum
+        phase_changed, _ = model.training_step_update()
+
+        assert model.training_step.item() == 1
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

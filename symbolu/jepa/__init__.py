@@ -52,6 +52,24 @@ from symbolu.jepa.losses import (
     CompositeJEPALoss,
 )
 
+# Curriculum orchestrator
+from symbolu.jepa.curriculum import (
+    JEPAPhase,
+    MacroPhase,
+    PhaseConfig,
+    CurriculumState,
+    TrainingCurriculumOrchestrator,
+    LossScheduler,
+    create_curriculum_from_config,
+)
+
+# Transformer wrapper
+from symbolu.jepa.transformer import (
+    PhaseJEPAConfig,
+    PhaseJEPATransformer,
+    create_phase_jepa_transformer,
+)
+
 __all__ = [
     # Version
     '__version__',
@@ -76,4 +94,18 @@ __all__ = [
     'WeightedAlignmentLoss',
     'JEPAPredictionLoss',
     'CompositeJEPALoss',
+
+    # Curriculum
+    'JEPAPhase',
+    'MacroPhase',
+    'PhaseConfig',
+    'CurriculumState',
+    'TrainingCurriculumOrchestrator',
+    'LossScheduler',
+    'create_curriculum_from_config',
+
+    # Transformer
+    'PhaseJEPAConfig',
+    'PhaseJEPATransformer',
+    'create_phase_jepa_transformer',
 ]
