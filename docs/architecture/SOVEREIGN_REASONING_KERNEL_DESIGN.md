@@ -4339,10 +4339,649 @@ Each stage serves as an ablation point:
 
 ---
 
-*Document Version: 1.6.0 FINAL*
+## Appendix G: Implementation Decisions
+
+This appendix documents architectural decisions for bridging the design document to actual implementation, based on pre-implementation review.
+
+### G.1 Implementation Scope Estimate
+
+| Component | New Code | Effort | Priority |
+|-----------|----------|--------|----------|
+| `SovereignReasoningKernel` class | ~500 LOC | Medium | Stage 1 |
+| `IsomorphicMappingRouter` | ~200 LOC | Medium | Stage 3 |
+| `SovereignEmbedding` (Layer 0) | ~100 LOC | Low | Stage 1 |
+| `PhaseAwareAttentionHead` modification | ~150 LOC | High (invasive) | Stage 2 |
+| `SovereignAnnealer` | ~80 LOC | Low | Stage 3 |
+| `MaunaProtocol` | ~100 LOC | Low | Stage 4 |
+| Patent loss functions (B1, U2, S8) | ~200 LOC | Medium | Stage 3 |
+| CLI integration | ~100 LOC | Low | Stage 1 |
+| **Total** | **~1,400 LOC** | **High** | |
+
+### G.2 Layer Intervention: Replace vs Wrap
+
+**Decision:** **Replace & Centralize**
+
+The `SovereignReasoningKernel` (SRK) is the single source of truth for all ontological interventions. Scattered flags create state fragmentation.
+
+**Implementation Strategy:**
+
+1. **Deprecate** individual flags in `OntologicalHybridTransformer`:
+   - `enable_kosha_steering`
+   - `enable_onto_bridge`
+
+2. **Delegate** to SRK: The transformer's layer loop calls `srk.forward_pass(hidden_states, layer_idx)`
+
+3. **Migration:** Move existing logic from `onto_bridge` and `kosha_steering` into SRK sub-modules (`dna_bridge`, `witness`)
+
+```python
+# Before (scattered flags)
+class OntologicalHybridTransformer:
+    def forward(self, x):
+        for layer_idx, layer in enumerate(self.layers):
+            x = layer(x)
+            if self.enable_onto_bridge and layer_idx == 4:
+                x = self.onto_bridge(x)  # Fragmented
+            if self.enable_kosha_steering and layer_idx == 9:
+                x = self.kosha_steering(x)  # Fragmented
+
+# After (centralized SRK)
+class SRKEnhancedTransformer:
+    def forward(self, x):
+        for layer_idx, layer in enumerate(self.layers):
+            x = layer(x)
+            x, diagnostics = self.srk.forward_pass(x, layer_idx)  # Unified
+```
+
+### G.3 State Projector: Two Pathways (Toroidal Loop)
+
+**Decision:** **Yes, Two Distinct Pathways**
+
+This implements a **Closed-Loop System**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      TOROIDAL STATE LOOP                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  INPUT PATHWAY (Layer 0):                                               │
+│    SovereignEmbedding fuses token + prev_state_karma                    │
+│    → "Seeds" the reasoning intent                                       │
+│                                                                          │
+│  OUTPUT PATHWAY (Layer N):                                              │
+│    state_projector extracts new state from final hidden layers          │
+│    → Updates Karma for next token                                       │
+│                                                                          │
+│  ┌─────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────┐      │
+│  │  Karma  │───→│  Layer 0    │───→│  Layers     │───→│  Layer N │      │
+│  │  State  │    │  (Seed)     │    │  1 to N-1   │    │  (Extract)│      │
+│  └────▲────┘    └─────────────┘    └─────────────┘    └─────┬────┘      │
+│       │                                                       │          │
+│       └───────────────── Update ─────────────────────────────┘          │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### G.4 IMR Memory Bank Persistence
+
+**Decision:** **`register_buffer` (Fixed Anchors)**
+
+For V9.8, the 5 Logic Templates are **Fixed Ontological Priors**, not learned parameters.
+
+**Implementation:**
+```python
+class IsomorphicMappingRouter(nn.Module):
+    def __init__(self, state_dim=32, hidden_dim=512):
+        super().__init__()
+
+        # Fixed templates - saved with checkpoint, no gradient updates
+        self.register_buffer("deduction_template",
+            torch.tensor([0, 0, 0, 0.8, 0, 0, 1.0, 0, 0, 0, 0, 0.9]))
+        self.register_buffer("induction_template",
+            torch.tensor([0, 0, 0.7, 0, 0.9, 0, 0, 0.8, 0, 0, 0, 0]))
+        self.register_buffer("abduction_template",
+            torch.tensor([0.6, 0, 0, 0, 0, 0, 0, 0.9, 0.8, 0, 0, 0]))
+        self.register_buffer("synthesis_template",
+            torch.tensor([0, 0.7, 0, 0, 0, 0, 0, 0, 0, 1.0, 0.9, 0]))
+        self.register_buffer("causal_template",
+            torch.tensor([0, 0, 0.9, 0.8, 0, 1.0, 0, 0, 0, 0, 0, 0]))
+
+        # Learnable projection (how strongly to apply templates)
+        self.bias_projector = nn.Linear(12, hidden_dim)
+```
+
+**Rationale:** Model aligns *to* these universals; universals don't drift to match random initialization.
+
+### G.5 PhaseAwareAttentionHead Integration
+
+**Decision:** **Forward Hook at Layer 7 Only**
+
+Replacing entire attention class is invasive and breaks pre-trained weight loading.
+
+**Implementation Strategy:**
+
+1. Use **Forward Hook** on Layer 7's attention module
+2. Hook captures rotated Q/K tensors *before* Softmax
+3. Calculate phase correlation and pass to `PhaseCoherenceOptimizer`
+4. **Zero architectural changes** to base model weights
+
+```python
+class PhaseExtractionHook:
+    """Forward hook for Layer 7 phase extraction."""
+
+    def __init__(self, phase_optimizer):
+        self.phase_optimizer = phase_optimizer
+        self.captured_phases = None
+
+    def __call__(self, module, input, output):
+        """
+        Hook into attention forward pass.
+        Captures Q/K rotation for phase calculation.
+        """
+        # For RoPE models, Q and K are rotated before attention
+        # Extract the rotational component (phase)
+        if hasattr(module, 'rotary_emb'):
+            q, k = input[0], input[1]  # Query, Key before softmax
+
+            # Calculate phase from Q-K interaction
+            q_norm = F.normalize(q, dim=-1)
+            k_norm = F.normalize(k, dim=-1)
+            cos_theta = torch.sum(q_norm * k_norm, dim=-1)
+            phases = torch.acos(torch.clamp(cos_theta, -1, 1))
+
+            self.captured_phases = phases
+
+    def get_phases(self):
+        return self.captured_phases
+
+
+def attach_phase_hook(model, srk):
+    """Attach phase extraction hook to Layer 7."""
+    hook = PhaseExtractionHook(srk.phase_optimizer)
+    model.layers[7].self_attn.register_forward_hook(hook)
+    return hook
+```
+
+### G.6 Patent Formula Losses
+
+**Decision:** **Separate `SovereignLoss` Module**
+
+Keep SRK focused on *State Management* and *Intervention*. Do not clutter with loss calculation.
+
+**Implementation:**
+```python
+class SovereignLoss(nn.Module):
+    """
+    Calculates patent-based losses from SRK diagnostics.
+
+    Keeps loss logic separate from state management.
+    """
+
+    def __init__(
+        self,
+        lambda_consistency: float = 0.5,
+        lambda_entropy: float = 0.3,
+        lambda_coherence: float = 0.2,
+    ):
+        super().__init__()
+        self.lambda_consistency = lambda_consistency
+        self.lambda_entropy = lambda_entropy
+        self.lambda_coherence = lambda_coherence
+
+    def forward(
+        self,
+        task_loss: torch.Tensor,
+        srk_diagnostics: Dict[str, torch.Tensor],
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """
+        Compute total loss from task loss + patent constraints.
+
+        Args:
+            task_loss: Standard cross-entropy loss
+            srk_diagnostics: Dict from SRK forward pass containing:
+                - 'consistency_lagrangian': B1 value
+                - 'entropy_delta': S8 constraint
+                - 'phase_coherence': U2 value
+
+        Returns:
+            total_loss: Combined loss
+            loss_breakdown: Dict of individual loss components
+        """
+        # B1: Consistency Lagrangian
+        L_consistency = srk_diagnostics.get('consistency_lagrangian', 0.0)
+
+        # S8: Stability (penalize entropy increase)
+        entropy_delta = srk_diagnostics.get('entropy_delta', 0.0)
+        L_stability = F.relu(torch.tensor(entropy_delta))
+
+        # U2: Phase Coherence (maximize → minimize negative)
+        phase_coherence = srk_diagnostics.get('phase_coherence', 1.0)
+        L_phase = 1.0 - phase_coherence
+
+        # Combine
+        total_loss = (
+            task_loss +
+            self.lambda_consistency * L_consistency +
+            self.lambda_entropy * L_stability +
+            self.lambda_coherence * L_phase
+        )
+
+        return total_loss, {
+            'task': task_loss.item(),
+            'consistency': L_consistency if isinstance(L_consistency, float) else L_consistency.item(),
+            'stability': L_stability.item(),
+            'phase': L_phase if isinstance(L_phase, float) else L_phase,
+        }
+```
+
+**CLI Integration:**
+```bash
+python train_unified_llm.py \
+    --enable_patent_formulas \
+    --lambda_consistency 0.5 \
+    --lambda_entropy 0.3 \
+    --lambda_coherence 0.2
+```
+
+### G.7 CLI Flag Management
+
+**Decision:** **`SRKConfig` Dataclass**
+
+Do not pollute the main `args` namespace with 30+ SRK flags.
+
+**Implementation:**
+```python
+from dataclasses import dataclass, field
+from typing import Optional
+
+@dataclass
+class SRKConfig:
+    """Configuration for Sovereign Reasoning Kernel."""
+
+    # Core
+    state_dim: int = 32
+    enable_srk: bool = True
+
+    # IMR
+    isomorphism_threshold: float = 0.75
+    register_logic_templates: bool = True
+
+    # Patent BCVF
+    lambda_f: float = 1.0
+    lambda_b: float = 1.0
+    lambda_c: float = 0.5
+
+    # Patent USE
+    enable_phase_extraction: bool = True
+    phase_window_size: int = 16
+
+    # Patent SCC
+    entropy_threshold: float = 0.7
+
+    # Training
+    warmup_steps: int = 5000
+    enable_lambda_annealing: bool = True
+    karma_decay: float = 0.90
+
+    # Inference Safety
+    enable_mauna_protocol: bool = False
+    mauna_viparyaya_threshold: float = 0.9
+    mauna_rajas_threshold: float = 0.9
+
+    # Layer Placement
+    dna_bridge_layer: int = 4
+    csr_alignment_layer: int = 7
+    witness_layer: int = 9
+    synthesis_layer: int = 11
+
+    @classmethod
+    def from_args(cls, args) -> 'SRKConfig':
+        """Create config from argparse namespace."""
+        return cls(
+            state_dim=getattr(args, 'state_dim', 32),
+            enable_srk=getattr(args, 'enable_srk', True),
+            isomorphism_threshold=getattr(args, 'imr_threshold', 0.75),
+            # ... map all relevant args
+        )
+
+    def to_dict(self) -> dict:
+        """Serialize for logging/checkpointing."""
+        return {k: v for k, v in self.__dict__.items()}
+```
+
+### G.8 Backward Score Calculation
+
+**Decision:** **Target = Karma (Training) / Sattvic Anchor (Inference)**
+
+| Mode | Target State | Logic |
+|------|--------------|-------|
+| **Training** | `karma_state` | "Is current hidden state consistent with the Reasoning Chain I initiated?" |
+| **Inference** | `sattvic_anchor` | "Is output moving user toward clarity?" (via UOM) |
+
+**Implementation:**
+```python
+def calculate_backward_score(
+    self,
+    hidden_states: torch.Tensor,
+    karma_state: torch.Tensor,
+    user_state: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    """
+    Calculate sb: Backward Goal-Achievement Score.
+
+    Training: Measures alignment with reasoning chain (karma)
+    Inference: Measures alignment with user benefit (sattvic anchor)
+    """
+    # Pool hidden states to sequence representation
+    pooled = hidden_states.mean(dim=1)  # [B, D]
+
+    # Project to state space
+    projected_state = self.state_projector(pooled)  # [B, 32]
+
+    if self.training:
+        # Training: Target is reasoning consistency (karma)
+        target = karma_state
+    else:
+        # Inference: Target is user benefit (sattvic or UOM-modified)
+        if user_state is not None:
+            target = user_state  # UOM intervention
+        else:
+            target = self.sattvic_anchor  # Default optimal state
+
+    # Cosine similarity as alignment score
+    similarity = F.cosine_similarity(projected_state, target, dim=-1)
+
+    # Normalize to [0, 1]
+    return (similarity + 1) / 2
+```
+
+### G.9 Revised Implementation Checklist
+
+Based on implementation decisions, the execution order is:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    IMPLEMENTATION ORDER                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  1. Create SRKConfig dataclass                          [~50 LOC]       │
+│  2. Implement SovereignReasoningKernel (replace flags)  [~500 LOC]      │
+│  3. Implement SovereignLoss module                      [~200 LOC]      │
+│  4. Use register_buffer for IMR Templates               [~50 LOC]       │
+│  5. Implement Forward Hook for Layer 7 Phase            [~150 LOC]      │
+│  6. Update train_unified_llm.py CLI                     [~100 LOC]      │
+│  7. Implement SovereignAnnealer                         [~80 LOC]       │
+│  8. Implement MaunaProtocol (Stage 4)                   [~100 LOC]      │
+│                                                                          │
+│  Total: ~1,230 LOC                                                       │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### G.10 Integration Points Summary
+
+| Existing Component | Integration Action |
+|--------------------|-------------------|
+| `OntologicalHybridTransformer` | Deprecate `enable_onto_bridge`, `enable_kosha_steering`; delegate to SRK |
+| `state_projector` | Keep for output pathway; SRK handles input pathway |
+| `PIDGovernor` | Migrate Vritti logic to `VrittiGate` in SRK |
+| `HybridPhaseTransformer` | Add forward hook at Layer 7 for phase extraction |
+| `train_unified_llm.py` | Add `SRKConfig`, `SovereignLoss`, calibration stage flags |
+
+### G.11 Backward Compatibility Strategy
+
+**Decision:** **Option (A) - Compatibility Layer with Deprecation Warnings**
+
+Active training runs may use legacy flags:
+- `--enable_onto_bridge`
+- `--enable_kosha_steering`
+- `--enable_kosha_diagnostics`
+
+Breaking these would disrupt production experiments. Instead, implement a **Compatibility Bridge**.
+
+#### Rationale
+
+| Option | Description | Risk |
+|--------|-------------|------|
+| **(A) Aliases** | Keep flags, map to SRK components | Low - maintains stability |
+| (B) Hard Deprecate | Warning + fail | Medium - disrupts scripts |
+| (C) Remove | Breaking change | High - unacceptable |
+
+**Verdict:** Option (A) maintains operational stability while silently upgrading to SRK.
+
+#### Implementation: Compatibility Bridge
+
+```python
+def build_srk_config(args) -> SRKConfig:
+    """
+    Build SRK configuration with backward compatibility mapping.
+
+    Legacy flags are preserved as aliases that internally enable
+    corresponding SRK sub-components.
+    """
+    # 1. Initialize with defaults
+    config = SRKConfig(
+        state_dim=getattr(args, 'state_dim', 32),
+        enable_srk=getattr(args, 'enable_srk', False),
+    )
+
+    # 2. BACKWARD COMPATIBILITY MAPPING
+    # Legacy flags override/enable specific SRK modules
+
+    if getattr(args, 'enable_onto_bridge', False):
+        print("⚠️  WARNING: --enable_onto_bridge is deprecated.")
+        print("   Mapping to SRK Layer 4 (DNA Bridge) intervention.")
+        print("   Migrate to: --enable_srk")
+        args.enable_srk = True
+        config.enable_dna_bridge = True
+
+    if getattr(args, 'enable_kosha_steering', False):
+        print("⚠️  WARNING: --enable_kosha_steering is deprecated.")
+        print("   Mapping to SRK Layer 9 (Witness) intervention.")
+        print("   Migrate to: --enable_srk")
+        args.enable_srk = True
+        config.enable_witness = True
+
+    if getattr(args, 'enable_kosha_diagnostics', False):
+        print("⚠️  WARNING: --enable_kosha_diagnostics is deprecated.")
+        print("   Mapping to SRK diagnostics.")
+        print("   Migrate to: --enable_srk --enable_uom_diagnostics")
+        config.enable_diagnostics = True
+
+    # 3. DEFAULT BEHAVIOR
+    # If SRK is enabled but no specific modules flagged, enable ALL
+    if args.enable_srk:
+        if not any([
+            getattr(config, 'enable_dna_bridge', False),
+            getattr(config, 'enable_witness', False),
+            getattr(config, 'enable_synthesis', False),
+        ]):
+            # Standard V9.8 behavior: all components active
+            config.enable_dna_bridge = True
+            config.enable_witness = True
+            config.enable_synthesis = True
+            config.enable_csr_alignment = True
+
+    return config
+```
+
+#### Extended SRKConfig with Granular Toggles
+
+```python
+@dataclass
+class SRKConfig:
+    """Configuration for Sovereign Reasoning Kernel with granular control."""
+
+    # Core
+    state_dim: int = 32
+    enable_srk: bool = False
+
+    # Granular Component Toggles (for compatibility mapping)
+    enable_dna_bridge: bool = True      # Layer 4
+    enable_csr_alignment: bool = True   # Layer 7
+    enable_witness: bool = True         # Layer 9
+    enable_synthesis: bool = True       # Layer 11
+
+    # Diagnostics
+    enable_diagnostics: bool = False
+
+    # ... rest of config fields ...
+
+    def get_active_components(self) -> list:
+        """Return list of active SRK components for logging."""
+        components = []
+        if self.enable_dna_bridge:
+            components.append("DNA_Bridge(L4)")
+        if self.enable_csr_alignment:
+            components.append("CSR_Alignment(L7)")
+        if self.enable_witness:
+            components.append("Witness(L9)")
+        if self.enable_synthesis:
+            components.append("Synthesis(L11)")
+        return components
+```
+
+#### CLI Argument Preservation
+
+```python
+def add_srk_arguments(parser):
+    """Add SRK arguments with legacy compatibility."""
+
+    # New unified flag
+    parser.add_argument('--enable_srk', action='store_true',
+                        help='Enable Sovereign Reasoning Kernel (recommended)')
+
+    # Legacy flags (preserved for compatibility)
+    parser.add_argument('--enable_onto_bridge', action='store_true',
+                        help='[DEPRECATED] Use --enable_srk instead')
+    parser.add_argument('--enable_kosha_steering', action='store_true',
+                        help='[DEPRECATED] Use --enable_srk instead')
+    parser.add_argument('--enable_kosha_diagnostics', action='store_true',
+                        help='[DEPRECATED] Use --enable_srk --enable_uom_diagnostics instead')
+
+    return parser
+```
+
+#### Migration Timeline
+
+| Phase | Action | Duration |
+|-------|--------|----------|
+| **V9.8** | Compatibility layer active; warnings printed | Current |
+| **V9.9** | Warnings upgraded to deprecation notices | +1 release |
+| **V10.0** | Legacy flags removed; migration enforced | +2 releases |
+
+#### Logging Output Example
+
+```
+[SRK] Configuration loaded:
+  ⚠️  WARNING: --enable_onto_bridge is deprecated.
+     Mapping to SRK Layer 4 (DNA Bridge) intervention.
+     Migrate to: --enable_srk
+
+  Active Components: DNA_Bridge(L4), CSR_Alignment(L7), Witness(L9), Synthesis(L11)
+  State Dimension: 32
+  Karma Decay: 0.90
+  Compatibility Mode: LEGACY_FLAGS_DETECTED
+```
+
+### G.12 Compatibility Bridge Evaluation
+
+#### Assessment Summary
+
+The 3-step compatibility pattern is sound:
+
+| Step | Purpose | Assessment |
+|------|---------|------------|
+| 1. Initialize defaults | Start with `SRKConfig` defaults | Clean |
+| 2. Legacy flag mapping | Auto-enable SRK when legacy flags detected | Non-breaking migration |
+| 3. Validation fallback | If `--enable_srk` alone, enable all modules | Sensible default |
+
+#### Deprecation Warnings Assessment
+
+The `⚠️ WARNING` prints serve three purposes:
+1. **Visibility:** Users see the deprecation message
+2. **Continuity:** Scripts continue to work
+3. **Migration:** Creates natural migration path over time
+
+#### Enhancement: Path Logging
+
+Add logging to track initialization path for debugging:
+
+```python
+if args.enable_srk:
+    if legacy_flags_detected:
+        print("  [SRK] Initialized via legacy flag compatibility layer")
+    else:
+        print("  [SRK] Initialized via --enable_srk (V9.8 native)")
+```
+
+This helps debugging when users report issues.
+
+### G.13 Final Implementation Checklist
+
+All architectural questions resolved. Complete implementation scope:
+
+| # | Component | Status | LOC | Notes |
+|---|-----------|--------|-----|-------|
+| 1 | `SRKConfig` dataclass | **READY** | ~50 | Configuration encapsulation |
+| 2 | `SovereignReasoningKernel` class | **READY** | ~500 | Replaces scattered logic |
+| 3 | `SovereignEmbedding` (Layer 0) | **READY** | ~100 | Karma injection pathway |
+| 4 | Layer 7 Phase Hook | **READY** | ~80 | Forward hook, non-invasive |
+| 5 | `SovereignLoss` module | **READY** | ~200 | B1/U2/S8 patent losses |
+| 6 | `SovereignAnnealer` | **READY** | ~80 | Lambda warmup |
+| 7 | `MaunaProtocol` | **READY** | ~100 | Inference safety (Stage 4) |
+| 8 | Backward Compatibility Bridge | **READY** | ~40 | Option (A) mapping |
+| 9 | CLI integration | **READY** | ~50 | Alias mapping + SRKConfig |
+| 10 | IMR Logic Templates | **READY** | ~50 | 5 fixed `register_buffer` vectors |
+| | **TOTAL** | | **~1,250** | |
+
+### G.14 Architectural Decisions Summary
+
+All decisions finalized and documented:
+
+| Decision | Resolution | Section |
+|----------|------------|---------|
+| Replace vs Wrap | **Replace & Centralize** | G.2 |
+| State Pathways | **Two Pathways (Toroidal)** | G.3 |
+| IMR Templates | **Fixed `register_buffer`** | G.4 |
+| Phase Extraction | **Forward Hook at Layer 7** | G.5 |
+| Patent Losses | **Separate `SovereignLoss` Module** | G.6 |
+| CLI Management | **`SRKConfig` Dataclass** | G.7 |
+| Backward Score Target | **Karma (train) / Sattvic (infer)** | G.8 |
+| Legacy Flag Handling | **Option (A) Compatibility Layer** | G.11 |
+
+### G.15 Implementation Authorization
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    IMPLEMENTATION AUTHORIZATION                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Document Version: 1.7.1 FINAL                                          │
+│  Total Lines: 4,900+                                                     │
+│  Appendices: A through G (15 subsections)                               │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────┐    │
+│  │  ARCHITECTURAL DECISIONS        ████████████████████  COMPLETE │    │
+│  │  IMPLEMENTATION SCOPE            ████████████████████  DEFINED  │    │
+│  │  BACKWARD COMPATIBILITY          ████████████████████  RESOLVED │    │
+│  │  CALIBRATION SCHEDULE            ████████████████████  APPROVED │    │
+│  │  CANONICAL SPECIFICATIONS        ████████████████████  LOCKED   │    │
+│  └────────────────────────────────────────────────────────────────┘    │
+│                                                                          │
+│  STATUS: ✓ READY FOR IMPLEMENTATION                                     │
+│                                                                          │
+│  NEXT STEP: Begin Stage 1 (Foundation Run) implementation               │
+│             following 4-stage calibration schedule in Appendix F        │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+*Document Version: 1.7.1 FINAL*
 *Created: 2026-01-09*
-*Updated: 2026-01-09 (V1.6.0 - Validation Strategy & Calibration Schedule)*
+*Updated: 2026-01-09 (V1.7.1 - Implementation Authorization)*
 *Origin: Google Gemini Architecture Proposal + Saha Patents*
 *Integration: SymbolU Sovereign-1 Architecture*
 *Authors: SymbolU Development Team*
-*Status: CALIBRATION SCHEDULE APPROVED - STAGE 1 READY*
+*Status: ✓ ALL DECISIONS FINALIZED - IMPLEMENTATION AUTHORIZED*
