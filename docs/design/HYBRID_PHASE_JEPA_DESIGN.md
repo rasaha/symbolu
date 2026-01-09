@@ -214,6 +214,7 @@ The architecture doesn't care WHAT generates the phase shift—only that it rece
 - [Appendix A: Theoretical Foundations](#appendix-a-theoretical-foundations)
 - [Appendix B: Risk Analysis](#appendix-b-risk-analysis)
 - [Appendix C: Strategic Architecture Philosophy](#appendix-c-strategic-architecture-philosophy)
+- [Appendix D: Sovereign AGI Integration Evaluation](#appendix-d-sovereign-agi-integration-evaluation)
 
 ---
 
@@ -3400,6 +3401,477 @@ The key enabler: **Both systems speak Phase Math**, making the integration seaml
 
 ---
 
+## Appendix D: Sovereign AGI Integration Evaluation
+
+This appendix provides a comprehensive evaluation of how the Hybrid Phase-JEPA integrates with the Sovereign Reasoning Kernel (SRK), identifying gaps and providing canonical design decisions for production integration.
+
+### D.1 Understanding Summary
+
+The Phase-JEPA design proposes a parallel model that:
+
+- Predicts in latent space (32D Sovereign State) instead of token space
+- Uses the same Phase Rotation mechanism as Sovereign AGI, but driven by different sources
+- Targets Vision-Language understanding with geometric transformations
+
+### D.2 Key Architectural Pairing
+
+```
+┌──────────────────────────────────┐     ┌──────────────────────────────────┐
+│       SOVEREIGN AGI (SRK)        │     │       PHASE-JEPA (VL)            │
+├──────────────────────────────────┤     ├──────────────────────────────────┤
+│ Domain: Language/Reasoning       │     │ Domain: Vision-Language          │
+│ Phase Source: 32D Sovereign ΔS   │     │ Phase Source: Text Embedding     │
+│ Prediction: Next token           │     │ Prediction: Latent patches       │
+│ Output: Tokens (generative)      │     │ Output: Representations (JEPA)   │
+│ Complexity: O(n)                 │     │ Complexity: O(n)                 │
+└──────────────────────────────────┘     └──────────────────────────────────┘
+                    │                                     │
+                    └──────────── SHARED ─────────────────┘
+                              • Phase Rotation math
+                              • 32D State structure
+                              • OPB Dimension Locking
+                              • HybridAttention backbone
+```
+
+### D.3 Integration Questions & Canonical Decisions
+
+#### D.3.1 State Projector: Duplication vs Sharing
+
+**Question:** Should `SovereignStateProjector` (JEPA) and `compute_state_from_hidden` (SRK) share weights?
+
+**Current Implementations:**
+
+```python
+# SRK (symbolu/sovereign/reasoning_kernel.py)
+def compute_state_from_hidden(self, hidden_states, apply_opb_locking=True):
+    pooled = hidden_states.mean(dim=1)
+    state = self.state_projector(pooled)  # Simple linear projection
+    # Component-wise normalization...
+
+# JEPA (proposed)
+self.projector = nn.Sequential(
+    nn.Linear(hidden_dim, hidden_dim // 2),
+    nn.GELU(),
+    nn.Linear(hidden_dim // 2, SOVEREIGN_DIM),
+)
+```
+
+**Verdict: Independent Weights, Unified Architecture**
+
+| Aspect | Decision | Rationale |
+|--------|----------|-----------|
+| **Weights** | Independent | Input distributions differ fundamentally (Text 768D vs Visual 768D) |
+| **Architecture** | Unified MLP | Standardize both to `Linear → GELU → Linear` for higher capacity |
+| **Alignment** | Via Target Space | Both map to same 32D ontological schema (12 Bhavas + 5 Koshas + ...) |
+
+```python
+# Unified SovereignStateProjector (symbolu/common/projectors.py)
+class SovereignStateProjector(nn.Module):
+    """Unified projector architecture for both SRK and JEPA."""
+
+    def __init__(self, hidden_dim: int, state_dim: int = 32):
+        super().__init__()
+        self.projector = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.GELU(),
+            nn.Linear(hidden_dim // 2, state_dim),
+        )
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        pooled = hidden_states.mean(dim=1)
+        return self.projector(pooled)
+```
+
+#### D.3.2 OPB Integration Direction
+
+**Question:** How does cross-model OPB work?
+
+**Verdict: Master (SRK) / Sensor (JEPA) Relationship**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                         OPB SYNCHRONIZATION ARCHITECTURE                                  │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│    ┌─────────────────┐                              ┌─────────────────┐                 │
+│    │   PHASE-JEPA    │                              │      SRK        │                 │
+│    │   (Sensor)      │                              │    (Master)     │                 │
+│    └────────┬────────┘                              └────────┬────────┘                 │
+│             │                                                │                          │
+│             ▼                                                ▼                          │
+│    ┌─────────────────┐     Observation Feed          ┌─────────────────┐                │
+│    │ perceptual_state│ ─────────────────────────────►│   MASTER OPB    │                │
+│    │   (predicted)   │                               │                 │                │
+│    └─────────────────┘                               │  ┌───────────┐  │                │
+│                                                      │  │  Witness  │  │                │
+│                                                      │  │ (Layer 9) │  │                │
+│                                                      │  └─────┬─────┘  │                │
+│                                                      │        │        │                │
+│    ┌─────────────────┐     Karma Feedback            │        ▼        │                │
+│    │ external_karma  │◄──────────────────────────────│  updated_state  │                │
+│    │    _state       │                               │                 │                │
+│    └─────────────────┘                               └─────────────────┘                │
+│                                                                                          │
+│    SYNC LOGIC:                                                                          │
+│    1. JEPA predicts perceptual_state from video/images                                  │
+│    2. perceptual_state feeds into SRK Layer 9 (Witness) as Observation                  │
+│    3. Master OPB updates with merged perception + reasoning                             │
+│    4. Updated state feeds back to BOTH models as prev_state_karma                       │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+```python
+class PhaseVLJEPA_System(nn.Module):
+    def forward(
+        self,
+        images: torch.Tensor,
+        text: str,
+        external_karma_state: Optional[torch.Tensor] = None,  # From SRK Master OPB
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Args:
+            external_karma_state: Optional override from SRK's Master OPB
+                                  for joint inference synchronization
+        """
+        if external_karma_state is not None:
+            # Use SRK's state as karma (Master-Slave sync)
+            karma = external_karma_state
+        else:
+            # Use internal karma for standalone mode
+            karma = self.internal_karma_state
+
+        # ... rest of forward pass
+```
+
+#### D.3.3 Phase Rotation Source Compatibility
+
+**Question:** How do we combine `IntentPhase` (SRK) and `TextPhase` (JEPA)?
+
+| Model | Source | Dimension |
+|-------|--------|-----------|
+| Sovereign AGI | `IntentPhaseProjector(ΔS)` | 32D → [H] or [H, D_h] |
+| Phase-JEPA | `TextPhaseProjector(text_emb)` | text_dim → [H] or [H, D_h] |
+
+**Verdict: Additive Phase Modulation**
+
+**Physics:** Multiplying two phasors (e^{iθ₁} × e^{iθ₂}) equals adding their angles (e^{i(θ₁+θ₂)}).
+
+```python
+class DualSourcePhaseProjector(nn.Module):
+    """Combines phase rotations from text and state sources."""
+
+    def __init__(self, text_dim: int, state_dim: int, phase_dim: int):
+        super().__init__()
+        self.text_phase_proj = nn.Linear(text_dim, phase_dim)
+        self.state_phase_proj = nn.Linear(state_dim, phase_dim)
+
+    def forward(
+        self,
+        text_emb: torch.Tensor,
+        state_delta: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Returns combined phase rotation.
+
+        θ_text: Text-derived geometric rotation ("Rotate 90 degrees")
+        θ_state: State-derived cognitive rotation ("Analyze for errors")
+        θ_total: Combined rotation for both geometric AND cognitive conditioning
+        """
+        theta_text = torch.tanh(self.text_phase_proj(text_emb)) * math.pi
+
+        if state_delta is not None:
+            theta_state = torch.tanh(self.state_phase_proj(state_delta)) * math.pi
+            theta_total = theta_text + theta_state  # Additive composition
+        else:
+            theta_total = theta_text
+
+        return theta_total
+```
+
+**Effect:** The model attends to features that are *both* "Rotated 90 degrees" AND "Relevant to Error Analysis."
+
+#### D.3.4 Cosine Mode Alignment
+
+**Question:** Should SRK and JEPA share `cosine_mode`?
+
+**Verdict: Domain-Optimized (Divergent Modes Allowed)**
+
+| Model | Recommended Mode | Formula | Rationale |
+|-------|------------------|---------|-----------|
+| **JEPA (Vision)** | `complex` | Im(e^{iΔφ}) | Vision requires directionality (left vs right) |
+| **SRK (Language)** | `shifted` | (1 + cos(Δφ))/2 | Positive signal flow prevents gradient vanishing |
+
+```python
+# Vision-optimized JEPA
+jepa_attention = PhaseAttentionLayer(
+    dim=768,
+    num_heads=12,
+    cosine_mode="complex",  # Directional geometry
+)
+
+# Language-optimized SRK
+srk_attention = PhaseAttentionLayer(
+    dim=768,
+    num_heads=12,
+    cosine_mode="shifted",  # Positive flow
+)
+```
+
+#### D.3.5 Training Curriculum Sync
+
+**Question:** How to align the training schedules?
+
+**Verdict: The "Body then Soul" Schedule**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                         SEQUENTIAL TRAINING CURRICULUM                                    │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  PHASE 1: THE BODY (Vision)                                                             │
+│  ══════════════════════════                                                             │
+│  Train: Phase-JEPA on ImageNet/Video                                                    │
+│  Objective: Learn physics, geometry, 32D projection of visual concepts                 │
+│  Loss: VICReg (variance/covariance) + L_JEPA (MSE)                                      │
+│  Duration: ~100 epochs                                                                  │
+│                                                                                          │
+│                              ↓                                                          │
+│                                                                                          │
+│  PHASE 2: THE SOUL (Language)                                                           │
+│  ═══════════════════════════                                                            │
+│  Train: SRK on Text corpora                                                             │
+│  Objective: Learn ontology, logic, 32D projection of textual concepts                  │
+│  Loss: Patent losses (BCVF, USE, SCC) + LM loss                                         │
+│  Duration: ~100 epochs                                                                  │
+│                                                                                          │
+│                              ↓                                                          │
+│                                                                                          │
+│  PHASE 3: THE UNION (Multimodal)                                                        │
+│  ════════════════════════════                                                           │
+│  Train: Joint fine-tuning on paired Image-Text (LAION, etc.)                            │
+│  Objective: Force S_vision ≈ S_text for same concepts                                  │
+│  Strategy: Freeze encoders, train Alignment Head or fine-tune Projectors               │
+│  Loss: Contrastive alignment + combined patent losses                                   │
+│  Duration: ~50 epochs                                                                   │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### D.3.6 Loss Unification
+
+**Question:** Which losses to use for combined training?
+
+| JEPA-Specific | SRK-Specific | Purpose |
+|---------------|--------------|---------|
+| L_variance | - | Prevent dimension collapse |
+| L_covariance | - | Decorrelate dimensions |
+| L_ortho | - | Volume preservation |
+| L_jepa (MSE) | - | State prediction |
+| - | B1 (Consistency) | Forward-backward alignment |
+| - | U2 (Phase Coherence) | Attention head sync |
+| - | S8 (Stability) | Entropy decrease |
+
+**Verdict: Composite Loss Architecture**
+
+The Patent Losses (USE, SCC, BCVF) are universal constraints on *structure*, not domain. They apply to both.
+
+```python
+class UnifiedSovereignLoss(nn.Module):
+    """Composite loss for joint SRK + JEPA training."""
+
+    def __init__(
+        self,
+        lambda_jepa: float = 1.0,
+        lambda_vicreg: float = 0.1,
+        lambda_patent: float = 1.0,
+    ):
+        super().__init__()
+        self.lambda_jepa = lambda_jepa
+        self.lambda_vicreg = lambda_vicreg
+        self.lambda_patent = lambda_patent
+
+        self.vicreg_loss = VICRegLoss()
+        self.patent_loss = SovereignPatentLoss()
+
+    def forward(
+        self,
+        pred_z: torch.Tensor,
+        target_z: torch.Tensor,
+        text_phase: torch.Tensor,
+        is_jepa_path: bool = True,
+    ) -> torch.Tensor:
+        """
+        L_total = L_JEPA + λ_vicreg × L_VICReg + λ_patent × L_Patent
+
+        Args:
+            is_jepa_path: If True, include VICReg (prevents collapse without decoder)
+        """
+        # Base JEPA loss
+        L_jepa = F.mse_loss(pred_z, target_z)
+
+        # VICReg for JEPA path only (SRK has decoder)
+        if is_jepa_path:
+            L_vicreg = self.vicreg_loss(pred_z)
+        else:
+            L_vicreg = 0.0
+
+        # Patent losses (universal structure constraints)
+        L_patent, diagnostics = self.patent_loss(pred_z, target_z, text_phase)
+
+        L_total = (
+            self.lambda_jepa * L_jepa
+            + self.lambda_vicreg * L_vicreg
+            + self.lambda_patent * L_patent
+        )
+
+        return L_total, diagnostics
+```
+
+#### D.3.7 Karma State Carryover for Video
+
+**Question:** Does Phase-JEPA need karma carryover for video/sequential images?
+
+**Verdict: Yes, via the Predictor (Implicit Autoregression)**
+
+```python
+class VideoPhaseJEPA(nn.Module):
+    """Phase-JEPA with temporal karma for video sequences."""
+
+    def __init__(self, base_jepa: PhaseVLJEPA_System, karma_decay: float = 0.9):
+        super().__init__()
+        self.jepa = base_jepa
+        self.karma_decay = karma_decay
+        self.karma_state = None
+
+    def forward_sequence(
+        self,
+        video_frames: torch.Tensor,  # [B, T, C, H, W]
+        text: str,
+    ) -> list[torch.Tensor]:
+        """Process video with temporal karma carryover."""
+        B, T = video_frames.shape[:2]
+        predictions = []
+
+        for t in range(T):
+            frame = video_frames[:, t]
+
+            # Inject karma from previous frame
+            pred, state = self.jepa(
+                frame,
+                text,
+                external_karma_state=self.karma_state,
+            )
+
+            # Update karma with decay (matches SRK's update_buffer logic)
+            self.karma_state = torch.tanh(state.detach()) * self.karma_decay
+
+            predictions.append(pred)
+
+        return predictions
+
+    def reset_karma(self):
+        """Reset karma state (e.g., between videos)."""
+        self.karma_state = None
+```
+
+**Alignment:** The `tanh` compression matches SRK's `update_buffer` logic for consistent karma dynamics.
+
+#### D.3.8 Shared Embedding Space
+
+**Question:** How to align vision patches and text tokens into shared space?
+
+**Verdict: The 32D Sovereign State IS the Shared Space**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                         32D SOVEREIGN STATE AS SHARED EMBEDDING                          │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│    Vision Path                              Text Path                                   │
+│    ═══════════                              ═════════                                   │
+│                                                                                          │
+│    Image of "Dog"                           Text: "Dog"                                 │
+│         │                                        │                                      │
+│         ▼                                        ▼                                      │
+│    ViT Encoder                              Text Encoder                                │
+│    (768D patches)                           (768D hidden)                               │
+│         │                                        │                                      │
+│         ▼                                        ▼                                      │
+│    SovereignStateProjector              SovereignStateProjector                         │
+│    (Visual Instance)                    (Text Instance)                                 │
+│         │                                        │                                      │
+│         ▼                                        ▼                                      │
+│    ┌─────────────────────────────────────────────────────────────────┐                 │
+│    │                     32D SOVEREIGN STATE                          │                 │
+│    │                                                                  │                 │
+│    │  [Annamaya=0.8, Pranamaya=0.2, ..., Identity=0.9, ...]          │                 │
+│    │                                                                  │                 │
+│    │  ALIGNMENT TARGET: S_vision("Dog") ≈ S_text("Dog")              │                 │
+│    │                                                                  │                 │
+│    └─────────────────────────────────────────────────────────────────┘                 │
+│                                                                                          │
+│    KEY INSIGHT:                                                                         │
+│    We don't need to align 768D hidden states (hard).                                   │
+│    We only align 32D projections via shared ontological schema.                        │
+│    The SovereignStateProjector is the bottleneck that FORCES alignment.                │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### D.4 Readiness Assessment
+
+| Aspect | Status | Notes |
+|--------|--------|-------|
+| Phase Rotation Math | ✅ Ready | Identical mechanism transfers |
+| HybridAttention Backbone | ✅ Ready | Can reuse directly |
+| 32D State Structure | ✅ Ready | Same dimensions, same semantics |
+| State Projector | ✅ Decided | Independent weights, unified architecture |
+| OPB Cross-Model | ✅ Decided | Master (SRK) / Sensor (JEPA) sync |
+| Multi-Source Phase | ✅ Decided | Additive composition via DualSourcePhaseProjector |
+| Loss Unification | ✅ Decided | VICReg for JEPA + Patent for both |
+| Joint Training | ✅ Decided | Body → Soul → Union curriculum |
+| Karma for Video | ✅ Decided | Implicit autoregression with tanh compression |
+| Shared Embedding | ✅ Decided | 32D Sovereign State as bottleneck |
+
+### D.5 Implementation Priority
+
+Based on the decisions above, the implementation order is:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                         IMPLEMENTATION PRIORITY ORDER                                     │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  PRIORITY 1 (Foundation):                                                               │
+│  ══════════════════════                                                                 │
+│  [ ] Extract SovereignStateProjector to symbolu/common/projectors.py                   │
+│  [ ] Standardize both SRK and JEPA to use unified MLP architecture                     │
+│  [ ] Add external_karma_state parameter to PhaseVLJEPA_System                           │
+│                                                                                          │
+│  PRIORITY 2 (Integration):                                                              │
+│  ═════════════════════════                                                              │
+│  [ ] Implement DualSourcePhaseProjector for additive phase composition                 │
+│  [ ] Define MasterOPB class with bidirectional sync logic                              │
+│  [ ] Implement UnifiedSovereignLoss composite framework                                 │
+│                                                                                          │
+│  PRIORITY 3 (Extension):                                                                │
+│  ════════════════════════                                                               │
+│  [ ] Implement VideoPhaseJEPA with temporal karma                                       │
+│  [ ] Create SovereignJEPA wrapper for joint inference                                   │
+│  [ ] Add cosine_mode configuration per model instance                                   │
+│                                                                                          │
+│  PRIORITY 4 (Training):                                                                 │
+│  ══════════════════════                                                                 │
+│  [ ] Define Phase 1/2/3 training scripts                                               │
+│  [ ] Implement alignment loss for Phase 3 (Union)                                       │
+│  [ ] Create evaluation suite for cross-modal alignment                                  │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## References
 
 1. Meta AI - I-JEPA: Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture
@@ -3422,6 +3894,7 @@ The key enabler: **Both systems speak Phase Math**, making the integration seaml
 | 1.4.0 | 2026-01-09 | Added Strategic Architecture Philosophy (Appendix C) |
 | 1.5.0 | 2026-01-09 | Added Patent-Enhanced Loss Functions (§18) - BCVF, USE, SCC integration |
 | 1.6.0 | 2026-01-09 | Added Operational Guide (§19-21) - Stability, Production, Verification |
+| 1.7.0 | 2026-01-09 | Added Sovereign AGI Integration Evaluation (Appendix D) - 8 canonical decisions |
 
 ---
 
