@@ -4727,11 +4727,167 @@ Based on implementation decisions, the execution order is:
 | `HybridPhaseTransformer` | Add forward hook at Layer 7 for phase extraction |
 | `train_unified_llm.py` | Add `SRKConfig`, `SovereignLoss`, calibration stage flags |
 
+### G.11 Backward Compatibility Strategy
+
+**Decision:** **Option (A) - Compatibility Layer with Deprecation Warnings**
+
+Active training runs may use legacy flags:
+- `--enable_onto_bridge`
+- `--enable_kosha_steering`
+- `--enable_kosha_diagnostics`
+
+Breaking these would disrupt production experiments. Instead, implement a **Compatibility Bridge**.
+
+#### Rationale
+
+| Option | Description | Risk |
+|--------|-------------|------|
+| **(A) Aliases** | Keep flags, map to SRK components | Low - maintains stability |
+| (B) Hard Deprecate | Warning + fail | Medium - disrupts scripts |
+| (C) Remove | Breaking change | High - unacceptable |
+
+**Verdict:** Option (A) maintains operational stability while silently upgrading to SRK.
+
+#### Implementation: Compatibility Bridge
+
+```python
+def build_srk_config(args) -> SRKConfig:
+    """
+    Build SRK configuration with backward compatibility mapping.
+
+    Legacy flags are preserved as aliases that internally enable
+    corresponding SRK sub-components.
+    """
+    # 1. Initialize with defaults
+    config = SRKConfig(
+        state_dim=getattr(args, 'state_dim', 32),
+        enable_srk=getattr(args, 'enable_srk', False),
+    )
+
+    # 2. BACKWARD COMPATIBILITY MAPPING
+    # Legacy flags override/enable specific SRK modules
+
+    if getattr(args, 'enable_onto_bridge', False):
+        print("⚠️  WARNING: --enable_onto_bridge is deprecated.")
+        print("   Mapping to SRK Layer 4 (DNA Bridge) intervention.")
+        print("   Migrate to: --enable_srk")
+        args.enable_srk = True
+        config.enable_dna_bridge = True
+
+    if getattr(args, 'enable_kosha_steering', False):
+        print("⚠️  WARNING: --enable_kosha_steering is deprecated.")
+        print("   Mapping to SRK Layer 9 (Witness) intervention.")
+        print("   Migrate to: --enable_srk")
+        args.enable_srk = True
+        config.enable_witness = True
+
+    if getattr(args, 'enable_kosha_diagnostics', False):
+        print("⚠️  WARNING: --enable_kosha_diagnostics is deprecated.")
+        print("   Mapping to SRK diagnostics.")
+        print("   Migrate to: --enable_srk --enable_uom_diagnostics")
+        config.enable_diagnostics = True
+
+    # 3. DEFAULT BEHAVIOR
+    # If SRK is enabled but no specific modules flagged, enable ALL
+    if args.enable_srk:
+        if not any([
+            getattr(config, 'enable_dna_bridge', False),
+            getattr(config, 'enable_witness', False),
+            getattr(config, 'enable_synthesis', False),
+        ]):
+            # Standard V9.8 behavior: all components active
+            config.enable_dna_bridge = True
+            config.enable_witness = True
+            config.enable_synthesis = True
+            config.enable_csr_alignment = True
+
+    return config
+```
+
+#### Extended SRKConfig with Granular Toggles
+
+```python
+@dataclass
+class SRKConfig:
+    """Configuration for Sovereign Reasoning Kernel with granular control."""
+
+    # Core
+    state_dim: int = 32
+    enable_srk: bool = False
+
+    # Granular Component Toggles (for compatibility mapping)
+    enable_dna_bridge: bool = True      # Layer 4
+    enable_csr_alignment: bool = True   # Layer 7
+    enable_witness: bool = True         # Layer 9
+    enable_synthesis: bool = True       # Layer 11
+
+    # Diagnostics
+    enable_diagnostics: bool = False
+
+    # ... rest of config fields ...
+
+    def get_active_components(self) -> list:
+        """Return list of active SRK components for logging."""
+        components = []
+        if self.enable_dna_bridge:
+            components.append("DNA_Bridge(L4)")
+        if self.enable_csr_alignment:
+            components.append("CSR_Alignment(L7)")
+        if self.enable_witness:
+            components.append("Witness(L9)")
+        if self.enable_synthesis:
+            components.append("Synthesis(L11)")
+        return components
+```
+
+#### CLI Argument Preservation
+
+```python
+def add_srk_arguments(parser):
+    """Add SRK arguments with legacy compatibility."""
+
+    # New unified flag
+    parser.add_argument('--enable_srk', action='store_true',
+                        help='Enable Sovereign Reasoning Kernel (recommended)')
+
+    # Legacy flags (preserved for compatibility)
+    parser.add_argument('--enable_onto_bridge', action='store_true',
+                        help='[DEPRECATED] Use --enable_srk instead')
+    parser.add_argument('--enable_kosha_steering', action='store_true',
+                        help='[DEPRECATED] Use --enable_srk instead')
+    parser.add_argument('--enable_kosha_diagnostics', action='store_true',
+                        help='[DEPRECATED] Use --enable_srk --enable_uom_diagnostics instead')
+
+    return parser
+```
+
+#### Migration Timeline
+
+| Phase | Action | Duration |
+|-------|--------|----------|
+| **V9.8** | Compatibility layer active; warnings printed | Current |
+| **V9.9** | Warnings upgraded to deprecation notices | +1 release |
+| **V10.0** | Legacy flags removed; migration enforced | +2 releases |
+
+#### Logging Output Example
+
+```
+[SRK] Configuration loaded:
+  ⚠️  WARNING: --enable_onto_bridge is deprecated.
+     Mapping to SRK Layer 4 (DNA Bridge) intervention.
+     Migrate to: --enable_srk
+
+  Active Components: DNA_Bridge(L4), CSR_Alignment(L7), Witness(L9), Synthesis(L11)
+  State Dimension: 32
+  Karma Decay: 0.90
+  Compatibility Mode: LEGACY_FLAGS_DETECTED
+```
+
 ---
 
-*Document Version: 1.7.0*
+*Document Version: 1.7.1*
 *Created: 2026-01-09*
-*Updated: 2026-01-09 (V1.7.0 - Implementation Decisions)*
+*Updated: 2026-01-09 (V1.7.1 - Backward Compatibility Strategy)*
 *Origin: Google Gemini Architecture Proposal + Saha Patents*
 *Integration: SymbolU Sovereign-1 Architecture*
 *Authors: SymbolU Development Team*
