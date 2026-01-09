@@ -207,6 +207,7 @@ The architecture doesn't care WHAT generates the phase shift—only that it rece
 **Appendices**
 - [Appendix A: Theoretical Foundations](#appendix-a-theoretical-foundations)
 - [Appendix B: Risk Analysis](#appendix-b-risk-analysis)
+- [Appendix C: Strategic Architecture Philosophy](#appendix-c-strategic-architecture-philosophy)
 
 ---
 
@@ -2491,6 +2492,165 @@ The architecture inherits Gemini's alignment properties:
 
 ---
 
+## Appendix C: Strategic Architecture Philosophy
+
+This appendix captures the strategic rationale for the Hybrid Phase-VL-JEPA architecture and its relationship to the broader SymbolU system.
+
+### C.1 The "Body and Soul" Architecture
+
+The Phase-VL-JEPA is intentionally designed as the **"Perception Body"** that the **"Sovereign Soul"** (SRK) will eventually govern.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                    THE GRAND ARCHITECTURE: BODY + SOUL                                   │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
+│  │  PHASE-VL-JEPA ("The Body" / "The Observer")                                     │   │
+│  │  ═══════════════════════════════════════════                                     │   │
+│  │                                                                                   │   │
+│  │  PURPOSE: Provide the "World Model"                                              │   │
+│  │  • Understands geometry, physics, spatial relationships                          │   │
+│  │  • Learns by prediction (not generation)                                         │   │
+│  │  • Uses Phase Math for representation                                            │   │
+│  │                                                                                   │   │
+│  │  KAHNEMAN: System 1 (Fast, Intuitive, Parallel)                                  │   │
+│  │  • Instantly "sees" answers via prediction + phase-locking                       │   │
+│  │  • Handles 90% of workload (perception/retrieval)                                │   │
+│  │                                                                                   │   │
+│  └─────────────────────────────────────────────────────────────────────────────────┘   │
+│                                         ↕                                                │
+│                              SHARED LANGUAGE: Phase Math                                 │
+│                                         ↕                                                │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐   │
+│  │  SOVEREIGN REASONING KERNEL ("The Soul" / "The Judge")                           │   │
+│  │  ════════════════════════════════════════════════════                            │   │
+│  │                                                                                   │   │
+│  │  PURPOSE: Provide the "Executive Function"                                       │   │
+│  │  • Arbitrates decisions, checks constraints                                      │   │
+│  │  • Ensures logical and ethical consistency                                       │   │
+│  │  • Uses Phase Math (USE Formulas) for reasoning                                  │   │
+│  │                                                                                   │   │
+│  │  KAHNEMAN: System 2 (Slow, Deliberate, Arbitrating)                              │   │
+│  │  • Deliberately "checks" answers via Witness + Mauna Protocol                    │   │
+│  │  • Handles 10% that requires deep arbitration                                    │   │
+│  │                                                                                   │   │
+│  └─────────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                          │
+│  KEY INSIGHT: Both systems speak the SAME mathematical language (Phase Dynamics)        │
+│  This enables seamless future integration when SRK is re-attached to govern VL-JEPA    │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### C.2 Why Phase Math is Superior for Geometry
+
+Standard neural networks must learn geometric transformations via expensive matrix operations:
+
+```
+STANDARD MODEL (Matrix Multiplication):
+─────────────────────────────────────────
+"Rotate object 90°" requires:
+• Learning a rotation matrix R
+• Computing y = R @ x (O(n²) operation)
+• Training on thousands of rotation examples
+
+PHASE-VL-JEPA (Phase Addition):
+────────────────────────────────
+"Rotate object 90°" requires:
+• Adding θ = π/2 to phase angle
+• Computing y = x × e^{iθ} (O(n) operation)
+• Rotation is mathematically NATIVE—no learning required
+```
+
+**Strategic Advantage**: Phase-JEPA is expected to converge **2-3x faster** on geometric tasks because rotation is a trivial operation (phase addition) rather than a learned transformation (matrix multiplication).
+
+### C.3 Hallucination Resistance by Design
+
+The Phase-VL-JEPA is **Predictive, not Generative**:
+
+| Property | Generative Models | Predictive (Phase-VL-JEPA) |
+|----------|-------------------|----------------------------|
+| **Output** | Raw pixels/tokens | Latent representations |
+| **Failure Mode** | "Dreams up" invalid content | Predicts valid states only |
+| **Hallucination Risk** | High (unconstrained generation) | Low (representation constraints) |
+| **Speed** | Slow (autoregressive) | Fast (single forward pass) |
+
+**Why this matters**: A Generative model can "hallucinate" a dog with 5 legs. The Phase-VL-JEPA cannot—it predicts a valid representation in latent space, constrained by learned phase relationships.
+
+### C.4 The Conditioning Paradigm Shift
+
+The fundamental difference between standard VL-JEPA and Phase-VL-JEPA is HOW text conditions visual prediction:
+
+```
+STANDARD VL-JEPA ("Concatenation/Addition"):
+────────────────────────────────────────────
+Input = [Image_Patches] + [Text_Tokens]
+         ↓
+The model must LEARN to attend from image to text
+         ↓
+Struggles with explicit geometric commands ("rotate left")
+
+PHASE-VL-JEPA ("Rotation/Transformation"):
+────────────────────────────────────────────
+θ = TextEncoder(text) → Phase Angle
+         ↓
+Q' = Q × e^{iθ}  (Query phases ROTATED by text)
+         ↓
+Geometric conditioning is MATHEMATICAL, not learned
+```
+
+**Intuition**: Standard JEPA "staples" text to image and hopes the model figures it out. Phase-JEPA physically ROTATES the image representation to align with text semantics.
+
+### C.5 Layman Analogies
+
+**The Radio Tuning Analogy**:
+- Standard JEPA: Shouts the song title over the static and hopes you hear it
+- Phase-JEPA: Turns the dial to the right frequency—the song comes through clearly
+
+**The Potter's Wheel Analogy**:
+- Standard JEPA: Adds more clay (text) to the lump (image)
+- Phase-JEPA: Spins the wheel—the spin dynamics shape the clay into the target form
+
+**The Map Analogy**:
+- Standard JEPA: Staples "Go East" note to the map
+- Phase-JEPA: Rotates the map so East is straight ahead—no reading required
+
+### C.6 Future Integration: Sovereign-JEPA
+
+Once Phase-VL-JEPA is trained, the SRK can be re-attached as the "executive function":
+
+```python
+# Future Architecture: Sovereign-JEPA
+class SovereignJEPA(nn.Module):
+    def __init__(self):
+        # The "Body" - trained Phase-VL-JEPA
+        self.perception = PhaseVLJEPA_System.load("trained_vl_jepa.pt")
+
+        # The "Soul" - Sovereign Reasoning Kernel
+        self.srk = SovereignReasoningKernel()
+
+    def forward(self, image, text, user_state):
+        # 1. Perception: What does the model "see"?
+        latent = self.perception(image, text)
+
+        # 2. Governance: Should the model act on this?
+        decision = self.srk.arbitrate(
+            perception=latent,
+            user_state=user_state,  # Sattvic anchor
+        )
+
+        # 3. Output: Either action or Mauna (silence)
+        if decision.should_respond:
+            return self.decode(decision.action)
+        else:
+            return Mauna()  # Veto power exercised
+```
+
+The key enabler: **Both systems speak Phase Math**, making the integration seamless.
+
+---
+
 ## References
 
 1. Meta AI - I-JEPA: Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture
@@ -2510,6 +2670,7 @@ The architecture inherits Gemini's alignment properties:
 | 1.1.0 | 2026-01-09 | Added Vision-Language extension (Spec 1-4 from Gemini notes) |
 | 1.2.0 | 2026-01-09 | Added Architectural Evolution lineage (Ontological → Geometric) |
 | 1.3.0 | 2026-01-09 | Added complete Geometric Masking Training Loop (§17) |
+| 1.4.0 | 2026-01-09 | Added Strategic Architecture Philosophy (Appendix C) |
 
 ---
 
