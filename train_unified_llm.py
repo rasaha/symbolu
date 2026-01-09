@@ -2271,6 +2271,7 @@ class HierarchicalGradientScaler:
         enable_layerwise_alpha: bool = False,  # Enable per-layer alpha scaling
         alpha_output_scale: float = 0.5,       # Scale for output layers (last 3 sensory)
         alpha_reasoning_scale: float = 1.0,    # Scale for reasoning layers (first 3 sensory)
+        authority_floor: float = 1.0,          # Alpha floor for authority layers (1.0 = full gradients)
     ):
         self.model = model
         self.authority_layers = authority_layers
@@ -2285,6 +2286,7 @@ class HierarchicalGradientScaler:
         self.enable_layerwise_alpha = enable_layerwise_alpha
         self.alpha_output_scale = alpha_output_scale
         self.alpha_reasoning_scale = alpha_reasoning_scale
+        self.authority_floor = authority_floor
 
         self.current_step = 0
         self.hooks = []
@@ -2487,8 +2489,11 @@ class HierarchicalGradientScaler:
                     self._phase_grad_norms.append(grad_norm)
                     return scaled_grad
 
-                # Normal authority layers get full gradient
+                # Normal authority layers - apply authority_floor dampening
+                # authority_floor=1.0 means full gradients, 0.3 means 30% of gradients
                 self._authority_grad_norms.append(grad_norm)
+                if self.authority_floor < 1.0:
+                    return grad * self.authority_floor
                 return grad
 
         return hook
@@ -6643,6 +6648,7 @@ class UnifiedTrainingConfig:
     enable_layerwise_alpha: bool = True   # Enable per-layer alpha scaling
     alpha_output_scale: float = 0.5       # Scale for output layers 9-11 (α × 0.5 = more stable)
     alpha_reasoning_scale: float = 1.0    # Scale for reasoning layers 6-8 (α × 1.0 = more expressive)
+    authority_floor: float = 1.0          # Alpha floor for authority layers (1.0 = full gradients, 0.3 = 30% dampened)
 
     # Dynamic Relaxation: 9:3 → 6:6 transition
     enable_dynamic_relaxation: bool = True   # Enable automatic 9:3 → 6:6 transition
@@ -8915,6 +8921,7 @@ def train(config: UnifiedTrainingConfig):
             enable_layerwise_alpha=config.enable_layerwise_alpha,
             alpha_output_scale=config.alpha_output_scale,
             alpha_reasoning_scale=config.alpha_reasoning_scale,
+            authority_floor=config.authority_floor,
         )
         # Validate layer count matches configuration
         expected_layers = config.authority_layers + config.sensory_layers
@@ -11311,6 +11318,8 @@ def main():
                        help="Scale for output layers 9-11 (default 0.5 = more stable)")
     parser.add_argument("--alpha_reasoning_scale", type=float, default=1.0,
                        help="Scale for reasoning layers 6-8 (default 1.0 = more expressive)")
+    parser.add_argument("--authority_floor", type=float, default=1.0,
+                       help="Alpha floor for authority layers (1.0 = full gradients, 0.3 = dampen to 30%%)")
 
     # Dynamic Relaxation: 9:3 → 6:6 transition
     parser.add_argument("--enable_dynamic_relaxation", action="store_true", default=True,
@@ -11661,6 +11670,7 @@ def main():
         enable_layerwise_alpha=args.enable_layerwise_alpha and not args.disable_layerwise_alpha,
         alpha_output_scale=args.alpha_output_scale,
         alpha_reasoning_scale=args.alpha_reasoning_scale,
+        authority_floor=args.authority_floor,
         use_per_layer_clipping=args.use_per_layer_clipping,
         use_8bit_optimizer=args.use_8bit_optimizer,
         use_compile=args.use_compile and not args.no_compile,
