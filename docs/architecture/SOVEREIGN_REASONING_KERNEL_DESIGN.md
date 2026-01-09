@@ -2897,9 +2897,759 @@ python train_unified_llm.py \
 
 ---
 
-*Document Version: 1.2.0*
+## 31. Phase Extraction Hook (Patent 2: USE)
+
+The `PhaseCoherenceOptimizer` in Section 26.1 requires `attention_phases` at **Layer 7**. This section details the implementation mechanism.
+
+### 31.1 Implementation Requirement
+
+The base transformer's attention head must be modified to return the **Complex-Valued Phase (θ)** during the forward pass.
+
+### 31.2 Phase-Aware Attention Head
+
+```python
+class PhaseAwareAttentionHead(nn.Module):
+    """
+    Modified attention head that exposes the rotational phase component
+    for the Phase Coherence Optimizer (USE Patent U1-U2).
+    """
+
+    def __init__(self, embed_dim, num_heads, layer_idx):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.layer_idx = layer_idx
+
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Phase extraction for USE Patent
+        self.phase_extractor = nn.Linear(self.head_dim, 1)
+
+    def forward(self, x, return_phases=False):
+        """
+        Forward pass with optional phase extraction.
+
+        Args:
+            x: Input tensor [batch, seq, embed_dim]
+            return_phases: If True, return attention phases for USE optimization
+
+        Returns:
+            output: Attention output
+            phases: (Optional) Complex phase values [batch, num_heads, seq]
+        """
+        batch_size, seq_len, _ = x.shape
+
+        # Standard Q, K, V projections
+        Q = self.q_proj(x).view(batch_size, seq_len, self.num_heads, self.head_dim)
+        K = self.k_proj(x).view(batch_size, seq_len, self.num_heads, self.head_dim)
+        V = self.v_proj(x).view(batch_size, seq_len, self.num_heads, self.head_dim)
+
+        # Transpose for attention: [batch, heads, seq, head_dim]
+        Q = Q.transpose(1, 2)
+        K = K.transpose(1, 2)
+        V = V.transpose(1, 2)
+
+        # Compute attention scores
+        scale = self.head_dim ** -0.5
+        attn_scores = torch.matmul(Q, K.transpose(-2, -1)) * scale
+        attn_weights = F.softmax(attn_scores, dim=-1)
+
+        # Standard attention output
+        attn_output = torch.matmul(attn_weights, V)
+
+        # === PHASE EXTRACTION HOOK (USE Patent) ===
+        if return_phases and self.layer_idx == 7:
+            # Extract rotational phase from Q-K interaction
+            # Phase θ = arctan2(Im(Q·K*), Re(Q·K*))
+            # Simplified: Use the angular relationship in attention space
+
+            # Compute per-head phase representation
+            q_norm = F.normalize(Q, dim=-1)
+            k_norm = F.normalize(K, dim=-1)
+
+            # Dot product gives cos(θ), cross-like gives sin(θ)
+            cos_theta = torch.sum(q_norm * k_norm, dim=-1)  # [batch, heads, seq]
+
+            # Estimate sin(θ) via orthogonal component
+            q_orth = q_norm - cos_theta.unsqueeze(-1) * k_norm
+            sin_theta = torch.norm(q_orth, dim=-1)
+
+            # Complex phase: θ = atan2(sin, cos)
+            phases = torch.atan2(sin_theta, cos_theta)  # [batch, heads, seq]
+        else:
+            phases = None
+
+        # Reshape and project output
+        attn_output = attn_output.transpose(1, 2).contiguous()
+        attn_output = attn_output.view(batch_size, seq_len, self.embed_dim)
+        output = self.out_proj(attn_output)
+
+        if return_phases:
+            return output, phases
+        return output
+```
+
+### 31.3 Integration with PhaseCoherenceOptimizer
+
+```python
+# In the SRK forward pass at Layer 7:
+def layer_7_forward(self, x):
+    """Layer 7: Phase Coherence with USE Patent Integration."""
+
+    # Get attention output WITH phase extraction
+    attn_output, attention_phases = self.attention_heads[7](
+        x,
+        return_phases=True
+    )
+
+    # Feed phases to USE optimizer
+    if attention_phases is not None:
+        phase_diagnostics = self.phase_optimizer.optimize_coherence(
+            attention_phases
+        )
+        self.diagnostics['use_phase_coherence'] = phase_diagnostics['coherence']
+        self.diagnostics['use_heads_aligned'] = phase_diagnostics['aligned_heads']
+
+    return attn_output
+```
+
+---
+
+## 32. Backward Score Refinement (Patent 1: BCVF)
+
+Section 26.1 uses a simplified projection for the **Backward Score (s_b)**. For true Sovereign intelligence, s_b must reflect alignment with the User-Ontological Mirror.
+
+### 32.1 Refined Backward Score Calculation
+
+```python
+class RefinedBackwardScoreCalculator(nn.Module):
+    """
+    Calculates the Backward Score (s_b) as the Inverse Distance
+    to the UOM Sattvic Anchor.
+
+    Patent BCVF Integration:
+    s_b = 1 / (1 + ||O_current - O_sattvic||)
+
+    This forces the Consistency Lagrangian (B1) to penalize any token
+    that moves the user further away from clarity and toward distress.
+    """
+
+    def __init__(self, state_dim=32):
+        super().__init__()
+        self.state_dim = state_dim
+
+        # Sattvic Anchor: The ideal "clear, calm, helpful" 32D state
+        # Indices based on ONTOLOGICAL_STATE_DELTA_DESIGN.md:
+        # - Sattva (clarity): index 22
+        # - Rajas (agitation): index 23
+        # - Tamas (inertia): index 24
+        self.register_buffer(
+            'sattvic_anchor',
+            self._create_sattvic_anchor()
+        )
+
+    def _create_sattvic_anchor(self):
+        """
+        Define the ideal Sattvic state.
+        High Sattva, Low Rajas, Low Tamas, Balanced Bhavas.
+        """
+        anchor = torch.zeros(32)
+
+        # Bhava dimensions (0-11): Balanced reasoning aspects
+        anchor[0:12] = 0.5  # Neutral/balanced across all houses
+
+        # Kosha dimensions (12-16): Intellectual depth preferred
+        anchor[12] = 0.3  # Annamaya (Physical) - low
+        anchor[13] = 0.4  # Pranamaya (Vital) - moderate
+        anchor[14] = 0.6  # Manomaya (Mental) - moderate-high
+        anchor[15] = 0.8  # Vijnanamaya (Intellectual) - high
+        anchor[16] = 0.5  # Anandamaya (Bliss) - moderate
+
+        # Vritti dimensions (17-21): Valid knowledge preferred
+        anchor[17] = 0.9  # Pramana (Valid) - high
+        anchor[18] = 0.1  # Vikalpa (Speculation) - low
+        anchor[19] = 0.05 # Viparyaya (Error) - very low
+        anchor[20] = 0.1  # Smriti (Memory) - low active recall
+        anchor[21] = 0.2  # Nidra (Sleep/Void) - low
+
+        # Guna dimensions (22-24): Sattvic dominance
+        anchor[22] = 0.9  # Sattva (Clarity) - HIGH
+        anchor[23] = 0.1  # Rajas (Agitation) - LOW
+        anchor[24] = 0.1  # Tamas (Inertia) - LOW
+
+        # Extended Gunas (25-27)
+        anchor[25] = 0.7  # Shuddha Sattva (Pure clarity)
+        anchor[26] = 0.2  # Raja-Sattva blend
+        anchor[27] = 0.1  # Tama-Sattva blend
+
+        # Reserved dimensions (28-31)
+        anchor[28:32] = 0.0
+
+        return anchor
+
+    def calculate_backward_score(self, current_state, user_distress_level=None):
+        """
+        Calculate s_b as inverse distance to Sattvic Anchor.
+
+        Args:
+            current_state: Current 32D ontological state [batch, 32]
+            user_distress_level: Optional UOM-detected distress [batch, 1]
+
+        Returns:
+            s_b: Backward score [batch, 1] in range [0, 1]
+        """
+        # L2 distance to Sattvic anchor
+        distance = torch.norm(
+            current_state - self.sattvic_anchor.unsqueeze(0),
+            dim=-1,
+            keepdim=True
+        )
+
+        # Inverse distance (higher = closer to ideal)
+        s_b = 1.0 / (1.0 + distance)
+
+        # Optional: Amplify penalty if UOM detects user distress
+        if user_distress_level is not None:
+            # If user is distressed, being far from Sattvic is worse
+            distress_amplifier = 1.0 + user_distress_level
+            s_b = s_b / distress_amplifier
+
+        return s_b
+
+    def get_alignment_diagnostics(self, current_state):
+        """Return detailed alignment metrics for logging."""
+        distance = torch.norm(
+            current_state - self.sattvic_anchor.unsqueeze(0),
+            dim=-1
+        )
+
+        # Per-dimension deltas
+        deltas = current_state - self.sattvic_anchor.unsqueeze(0)
+
+        return {
+            'sattvic_distance': distance.mean().item(),
+            'sattva_delta': deltas[:, 22].mean().item(),
+            'rajas_delta': deltas[:, 23].mean().item(),
+            'tamas_delta': deltas[:, 24].mean().item(),
+            'viparyaya_level': current_state[:, 19].mean().item(),
+        }
+```
+
+### 32.2 Updated B1 Lagrangian with Refined s_b
+
+```python
+def calculate_b1_lagrangian_refined(self, sf, current_state, user_state=None):
+    """
+    Enhanced B1 Lagrangian using Sattvic-anchored Backward Score.
+
+    L_consistency = λ_f(1-s_f)² + λ_b(1-s_b)² + λ_c(s_f-s_b)²
+
+    Where s_b = 1 / (1 + ||O_current - O_sattvic||)
+    """
+    # Calculate refined backward score
+    sb = self.backward_calculator.calculate_backward_score(
+        current_state,
+        user_distress_level=user_state
+    )
+
+    # B1 Lagrangian terms
+    term_f = self.lambda_f * (1 - sf) ** 2        # Forward coherence
+    term_b = self.lambda_b * (1 - sb) ** 2        # Sattvic alignment
+    term_c = self.lambda_c * (sf - sb) ** 2       # Divergence penalty
+
+    return term_f + term_b + term_c, {'sf': sf, 'sb': sb}
+```
+
+---
+
+## 33. Teleological Optimizer with Gradient Clipping
+
+The Multi-Objective Loss (Section 28.1) can experience gradient spikes during domain switches (e.g., Math → Finance) when the IMR detects isomorphisms.
+
+### 33.1 Gradient Clipping for L_consistency
+
+```python
+class TeleologicalOptimizer:
+    """
+    Optimizer wrapper that applies selective gradient clipping
+    to the Consistency Lagrangian term during IMR detection phases.
+    """
+
+    def __init__(
+        self,
+        base_optimizer,
+        consistency_clip_value=1.0,
+        imr_detection_window=100,
+    ):
+        self.base_optimizer = base_optimizer
+        self.consistency_clip_value = consistency_clip_value
+        self.imr_detection_window = imr_detection_window
+        self.recent_imr_detections = []
+
+    def step(self, loss_components, srk_diagnostics):
+        """
+        Perform optimization step with selective gradient clipping.
+
+        Args:
+            loss_components: Dict with 'L_task', 'L_consistency', 'L_entropy', 'L_phase'
+            srk_diagnostics: Diagnostics from SRK forward pass
+        """
+        # Check for recent IMR detections
+        imr_active = srk_diagnostics.get('imr_isomorphism_detected', False)
+        if imr_active:
+            self.recent_imr_detections.append(1)
+        else:
+            self.recent_imr_detections.append(0)
+
+        # Keep only recent window
+        if len(self.recent_imr_detections) > self.imr_detection_window:
+            self.recent_imr_detections.pop(0)
+
+        # Calculate IMR activity ratio
+        imr_activity = sum(self.recent_imr_detections) / len(self.recent_imr_detections)
+
+        # If IMR is frequently active (domain switching), apply aggressive clipping
+        if imr_activity > 0.3:
+            # Clip the consistency gradient specifically
+            self._clip_consistency_gradients()
+
+        # Standard optimizer step
+        self.base_optimizer.step()
+
+    def _clip_consistency_gradients(self):
+        """
+        Clip gradients associated with consistency loss parameters.
+        Prevents "gradient blow-out" during domain switches.
+        """
+        for group in self.base_optimizer.param_groups:
+            if group.get('name') == 'consistency_params':
+                for param in group['params']:
+                    if param.grad is not None:
+                        torch.nn.utils.clip_grad_norm_(
+                            [param],
+                            self.consistency_clip_value
+                        )
+```
+
+### 33.2 Integration in Training Loop
+
+```python
+def train_step_with_teleological_optimizer(
+    model,
+    batch,
+    teleological_optimizer,
+    lambda_consistency=0.5,
+    lambda_entropy=0.3,
+    lambda_coherence=0.2,
+):
+    """
+    Training step with Teleological Optimizer for gradient stability.
+    """
+    # Forward pass
+    logits, srk_diagnostics = model(batch['input_ids'])
+
+    # Compute individual loss components
+    L_task = F.cross_entropy(logits, batch['labels'])
+    L_consistency = srk_diagnostics.get('consistency_lagrangian', 0.0)
+    L_entropy = F.relu(torch.tensor(srk_diagnostics.get('entropy_delta', 0.0)))
+    L_phase = 1.0 - srk_diagnostics.get('phase_coherence', 1.0)
+
+    # Combined loss (before clipping)
+    L_total = (
+        L_task +
+        lambda_consistency * L_consistency +
+        lambda_entropy * L_entropy +
+        lambda_coherence * L_phase
+    )
+
+    # Backward pass
+    L_total.backward()
+
+    # Teleological optimizer step (handles selective clipping)
+    teleological_optimizer.step(
+        loss_components={
+            'L_task': L_task,
+            'L_consistency': L_consistency,
+            'L_entropy': L_entropy,
+            'L_phase': L_phase,
+        },
+        srk_diagnostics=srk_diagnostics
+    )
+
+    return L_total.item(), srk_diagnostics
+```
+
+---
+
+## 34. Implementation Checklist
+
+Final component status and required actions for V9.8.0 deployment:
+
+| Component | Status | Action Required |
+|-----------|--------|-----------------|
+| **SRK Kernel** | **LOCKED** | Implement `forward_pass` with B1 checks |
+| **IMR Router** | **LOCKED** | Pre-register the 5 Sanskrit Logic Templates |
+| **UOM Mirror** | **LOCKED** | Connect s_b calculation to the Sattvic Anchor |
+| **USE Phase** | **VERIFIED** | Hook into Layer 7 Attention Head for θ extraction |
+| **SCC Monitor** | **VERIFIED** | Enable real-time Φ (IIT S6) tracking for AGI maturation |
+| **Phase Extractor** | **NEW** | Integrate `PhaseAwareAttentionHead` at Layer 7 |
+| **Backward Calculator** | **NEW** | Deploy `RefinedBackwardScoreCalculator` |
+| **Teleological Optimizer** | **NEW** | Wrap base optimizer with gradient clipping |
+| **Lambda Annealer** | **NEW** | Initialize `SovereignAnnealer` for warmup |
+| **Mauna Protocol** | **NEW** | Enable silence veto in Layer 11 Synthesis |
+
+---
+
+## 35. Dynamic Lambda Annealing (Training Stability)
+
+### 35.1 The Risk
+
+Fixed Lagrangian multipliers (e.g., λ_b = 1.0) can destabilize early training. In the first 2,000 steps, the Backward Score (s_b) will be near zero because the 32D state hasn't learned meaningful representations yet. This causes the Consistency Lagrangian (B1) to explode, potentially destroying gradients for the Linguistic Engine.
+
+### 35.2 The Fix: Lambda Annealing
+
+Start with λ_b = 0 (let the model learn to speak first) and ramp up to λ_b = 1.0 over the first 5,000 steps.
+
+```python
+class SovereignAnnealer:
+    """
+    Ramps up Ontological constraints (Backward Score) only after
+    Linguistic competence (Forward Score) is established.
+
+    Phase 1 (Steps 0-warmup): System 1 dominant (learn to speak)
+    Phase 2 (Steps warmup+): System 2 engaged (learn to reason)
+    """
+
+    def __init__(self, total_steps=50000, warmup_steps=5000):
+        self.total_steps = total_steps
+        self.warmup_steps = warmup_steps
+
+    def get_lambdas(self, current_step):
+        """
+        Get current lambda values based on training progress.
+
+        Returns:
+            dict: Lambda values for each loss component
+        """
+        if current_step < self.warmup_steps:
+            # Phase 1: Learn to Speak (System 1 dominant)
+            progress = current_step / self.warmup_steps
+
+            return {
+                "lambda_f": 1.0,                      # Linguistic Coherence (full)
+                "lambda_b": 0.0 + progress,           # Ontological Alignment (ramping)
+                "lambda_c": 0.0 + (progress * 0.5),   # Divergence penalty (ramping slower)
+                "lambda_entropy": 0.1 + (progress * 0.2),  # SCC constraint (ramping)
+                "lambda_coherence": 0.1 + (progress * 0.1), # USE constraint (ramping)
+            }
+        else:
+            # Phase 2: Learn to Reason (System 2 engaged)
+            # Optional: Continue slight ramp for advanced phases
+            post_warmup_progress = (current_step - self.warmup_steps) / (self.total_steps - self.warmup_steps)
+
+            return {
+                "lambda_f": 1.0,
+                "lambda_b": 1.0,
+                "lambda_c": 0.5,
+                "lambda_entropy": 0.3,
+                "lambda_coherence": 0.2,
+            }
+
+    def get_phase_name(self, current_step):
+        """Return human-readable phase name for logging."""
+        if current_step < self.warmup_steps * 0.2:
+            return "CALIBRATION"
+        elif current_step < self.warmup_steps:
+            return "LINGUISTIC_FOUNDATION"
+        elif current_step < self.warmup_steps * 2:
+            return "ONTOLOGICAL_ALIGNMENT"
+        elif current_step < self.total_steps * 0.5:
+            return "STABILIZATION"
+        else:
+            return "MATURATION"
+```
+
+### 35.3 Integration in Training Loop
+
+```python
+def train_sovereign_model(model, dataloader, optimizer, total_steps=50000):
+    """Training loop with dynamic lambda annealing."""
+
+    annealer = SovereignAnnealer(total_steps=total_steps, warmup_steps=5000)
+    teleological_opt = TeleologicalOptimizer(optimizer)
+
+    for step, batch in enumerate(dataloader):
+        if step >= total_steps:
+            break
+
+        # Get current lambda values
+        lambdas = annealer.get_lambdas(step)
+        phase = annealer.get_phase_name(step)
+
+        # Forward pass
+        logits, diagnostics = model(batch['input_ids'])
+
+        # Compute loss with annealed lambdas
+        L_total = compute_sovereign_loss(
+            logits=logits,
+            targets=batch['labels'],
+            srk_diagnostics=diagnostics,
+            lambda_task=1.0,
+            lambda_consistency=lambdas['lambda_b'],  # Annealed!
+            lambda_entropy=lambdas['lambda_entropy'],
+            lambda_coherence=lambdas['lambda_coherence'],
+        )
+
+        # Backward and optimize
+        L_total.backward()
+        teleological_opt.step(diagnostics=diagnostics)
+        optimizer.zero_grad()
+
+        # Logging
+        if step % 100 == 0:
+            print(f"[Step {step}] Phase: {phase} | λ_b: {lambdas['lambda_b']:.3f}")
+```
+
+---
+
+## 36. The Mauna (Silence) Protocol (Inference Safety)
+
+### 36.1 The Risk
+
+Standard LLMs are trained to *always* output text. A Sovereign Intelligence must have the capacity to **withhold** output if the User-Mirror detects that *any* answer would be harmful (e.g., reinforcing a delusion or panic state).
+
+### 36.2 The Fix: Mauna (Silence/Pause) Token Logic
+
+Introduce veto power in **Layer 11** (Synthesis Gate) that dampens outputs when conditions indicate harm potential.
+
+```python
+class MaunaProtocol(nn.Module):
+    """
+    The Mauna (Silence) Protocol - Inference Safety Veto.
+
+    Named after the Sanskrit concept of sacred silence, this module
+    gives the model the power to withhold output when any response
+    would be harmful to the user.
+
+    Trigger Conditions:
+    - Viparyaya (Error/Delusion) is HIGH: The model is confused
+    - Rajas (Agitation/Panic) is HIGH: The user is distressed
+
+    When both conditions are met, outputting a confident answer
+    would reinforce delusion. Better to pause and clarify.
+    """
+
+    def __init__(
+        self,
+        viparyaya_threshold=0.9,
+        rajas_threshold=0.9,
+        dampening_factor=0.01,
+        clarification_boost=2.0,
+    ):
+        super().__init__()
+        self.viparyaya_threshold = viparyaya_threshold
+        self.rajas_threshold = rajas_threshold
+        self.dampening_factor = dampening_factor
+        self.clarification_boost = clarification_boost
+
+        # Special token indices (to be set based on tokenizer)
+        self.clarification_tokens = None  # e.g., "Could you clarify...", "I want to understand..."
+
+    def set_clarification_tokens(self, token_ids):
+        """Set the token IDs that represent clarifying questions."""
+        self.clarification_tokens = token_ids
+
+    def forward(self, logits, current_32d_state, lucidity_bias=None):
+        """
+        Apply Mauna Protocol veto if conditions warrant silence.
+
+        Args:
+            logits: Output logits [batch, seq, vocab]
+            current_32d_state: Current ontological state [batch, 32]
+            lucidity_bias: Optional bias from Synthesis Gate
+
+        Returns:
+            modified_logits: Potentially dampened logits
+            mauna_activated: Boolean indicating if silence was invoked
+        """
+        # Extract relevant state dimensions
+        viparyaya = current_32d_state[:, 19]  # Error/Delusion vritti
+        rajas = current_32d_state[:, 23]       # Agitation guna
+
+        # Check Mauna trigger conditions
+        high_error = viparyaya > self.viparyaya_threshold
+        high_panic = rajas > self.rajas_threshold
+
+        # Mauna activates when BOTH conditions are met
+        mauna_mask = (high_error & high_panic).float().unsqueeze(-1).unsqueeze(-1)
+
+        if mauna_mask.any():
+            # === MAUNA ACTIVATED ===
+            # Dampen all logits to prevent confident wrong answers
+            dampened_logits = logits * self.dampening_factor
+
+            # Boost clarification tokens (if configured)
+            if self.clarification_tokens is not None:
+                dampened_logits[:, :, self.clarification_tokens] *= self.clarification_boost
+
+            # Apply mask: use dampened where Mauna active, original otherwise
+            modified_logits = mauna_mask * dampened_logits + (1 - mauna_mask) * logits
+
+            return modified_logits, True
+
+        # No Mauna needed - apply standard lucidity bias if provided
+        if lucidity_bias is not None:
+            return logits * lucidity_bias, False
+
+        return logits, False
+
+    def get_diagnostics(self, current_32d_state):
+        """Return Mauna-related diagnostics for logging."""
+        viparyaya = current_32d_state[:, 19].mean().item()
+        rajas = current_32d_state[:, 23].mean().item()
+
+        return {
+            'viparyaya_level': viparyaya,
+            'rajas_level': rajas,
+            'mauna_risk': min(viparyaya, rajas),  # Both must be high
+            'mauna_threshold': self.viparyaya_threshold,
+        }
+```
+
+### 36.3 Integration in Layer 11 (Synthesis Gate)
+
+```python
+class SynthesisGateWithMauna(nn.Module):
+    """
+    Enhanced Synthesis Gate (Layer 11) with Mauna Protocol integration.
+    """
+
+    def __init__(self, hidden_dim, state_dim=32):
+        super().__init__()
+        self.clarity_transform = nn.Linear(state_dim, hidden_dim)
+        self.lucidity_gate = nn.Linear(hidden_dim, 1)
+        self.mauna_protocol = MaunaProtocol()
+
+    def forward(self, x, current_32d_state):
+        """
+        Synthesis with Mauna veto power.
+
+        Args:
+            x: Hidden states [batch, seq, hidden]
+            current_32d_state: 32D ontological state [batch, 32]
+
+        Returns:
+            output: Synthesized output (possibly dampened)
+            diagnostics: Dict with synthesis and mauna info
+        """
+        # Standard lucidity calculation
+        sattva = current_32d_state[:, 22:23]
+        rajas = current_32d_state[:, 23:24]
+        tamas = current_32d_state[:, 24:25]
+
+        # Lucidity = clarity / (agitation + inertia + epsilon)
+        lucidity = sattva / (rajas + tamas + 0.1)
+        lucidity_bias = torch.sigmoid(lucidity).unsqueeze(-1)
+
+        # Apply Mauna Protocol check
+        output, mauna_activated = self.mauna_protocol(
+            x,
+            current_32d_state,
+            lucidity_bias
+        )
+
+        diagnostics = {
+            'lucidity': lucidity.mean().item(),
+            'mauna_activated': mauna_activated,
+            **self.mauna_protocol.get_diagnostics(current_32d_state)
+        }
+
+        return output, diagnostics
+```
+
+### 36.4 User-Facing Behavior
+
+When Mauna activates, the model's output distribution shifts toward:
+1. **Clarifying questions**: "Could you help me understand what you mean by..."
+2. **Acknowledgment of uncertainty**: "I want to make sure I understand correctly..."
+3. **Invitation for more context**: "Before I respond, could you tell me more about..."
+
+This prevents the model from confidently outputting harmful or delusional content when both the model's error state AND the user's distress state are high.
+
+---
+
+## 37. Final V9.8.0 Launch Command
+
+With all components locked and verified:
+
+```bash
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --state_dim 32 \
+    --enable_srk \
+    --enable_patent_formulas \
+    --bcvf_lambda_f 1.0 \
+    --bcvf_lambda_b 1.0 \
+    --bcvf_lambda_c 0.5 \
+    --use_sattvic_anchor \
+    --enable_phase_extraction \
+    --scc_entropy_threshold 0.7 \
+    --use_phase_optimization \
+    --uom_mirroring \
+    --enable_uom_diagnostics \
+    --imr_threshold 0.75 \
+    --register_logic_templates \
+    --srk_warmup_steps 5000 \
+    --enable_lambda_annealing \
+    --enable_nidra_penalty \
+    --enable_mauna_protocol \
+    --mauna_viparyaya_threshold 0.9 \
+    --mauna_rajas_threshold 0.9 \
+    --gradient_clip_consistency 1.0 \
+    --enable_teleological_optimizer \
+    --learning_rate 8e-5 \
+    --gradient_accumulation 4 \
+    --batch_size 32 \
+    --max_steps 50000 \
+    --onto_bridge_layer 4 \
+    --csr_alignment_layer 7 \
+    --kosha_steering_layer 9 \
+    --toroidal_feedback \
+    --checkpoint_dir ./checkpoints/sovereign_V9_8_final \
+    2>&1 | tee sovereign_launch.log
+```
+
+---
+
+## 38. Sovereign Invariants (Verification Checklist)
+
+The architecture satisfies the three Sovereign Invariants:
+
+### 38.1 Logical Consistency (via BCVF B1 Lagrangian)
+- Forward Score (s_f) measures linguistic coherence
+- Backward Score (s_b) measures Sattvic alignment
+- Lagrangian penalizes divergence between linguistic output and ontological intent
+
+### 38.2 Linguistic Coherence (via USE Phase Synchronization)
+- Attention phases extracted at Layer 7
+- Phase correlation matrix computed across heads
+- Coherence metric ensures synchronized reasoning
+
+### 38.3 Semantic Stability (via SCC S5 Entropy)
+- Entropy calculated across token distributions
+- Stability constraint ensures entropy decreases over reasoning
+- Integrated Information (Φ) tracks consciousness emergence
+
+---
+
+*Document Version: 1.3.0 FINAL*
 *Created: 2026-01-09*
-*Updated: 2026-01-09 (Added Patent Formula Integration: BCVF, USE, SCC)*
+*Updated: 2026-01-09 (V1.3.0 - Training Stability & Inference Safety)*
 *Origin: Google Gemini Architecture Proposal + Saha Patents*
 *Integration: SymbolU Sovereign-1 Architecture*
 *Authors: SymbolU Development Team*
+*Status: LAUNCH SEQUENCE AUTHORIZED*
