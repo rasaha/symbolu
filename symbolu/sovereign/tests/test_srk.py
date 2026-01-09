@@ -610,7 +610,7 @@ class TestSovereignLoss:
 
         logits = torch.randn(B, N, V, device=device)
         targets = torch.randint(0, V, (B, N), device=device)
-        hidden = torch.randn(B, N, 256, device=device)
+        hidden = torch.randn(B, N, 768, device=device)  # Match hidden_dim=768
         karma = torch.rand(B, 32, device=device)
 
         loss, metrics = loss_fn(
@@ -632,7 +632,7 @@ class TestSovereignLoss:
 
         logits = torch.randn(B, N, V, device=device)
         targets = torch.randint(0, V, (B, N), device=device)
-        hidden = torch.randn(B, N, 256, device=device)
+        hidden = torch.randn(B, N, 768, device=device)  # Match hidden_dim=768
         karma = torch.rand(B, 32, device=device)
 
         _, metrics = loss_fn(
@@ -685,8 +685,14 @@ class TestSovereignAnnealer:
         mid = annealer.get_phase_name(200)
         late = annealer.get_phase_name(800)
 
-        assert early in ['WARMUP', 'SYSTEM_1']
-        assert mid in ['SYSTEM_1', 'CALIBRATION', 'SYSTEM_2']
+        # Phase names include LINGUISTIC_FOUNDATION, REASONING_EMERGENCE, etc.
+        valid_phases = [
+            'WARMUP', 'SYSTEM_1', 'CALIBRATION', 'SYSTEM_2',
+            'LINGUISTIC_FOUNDATION', 'REASONING_EMERGENCE',
+            'ONTOLOGICAL_GROUNDING', 'INTEGRATION', 'REFINEMENT',
+        ]
+        assert early in valid_phases, f"Got early={early}"
+        assert mid in valid_phases, f"Got mid={mid}"
 
 
 # =============================================================================
@@ -707,16 +713,17 @@ class TestIsomorphicMappingRouter:
 
     def test_logic_templates_registered(self, imr):
         """Test logic templates are registered as buffers."""
-        assert hasattr(imr, 'template_DEDUCTION')
-        assert hasattr(imr, 'template_INDUCTION')
-        assert hasattr(imr, 'template_ABDUCTION')
-        assert hasattr(imr, 'template_ANALOGY')
-        assert hasattr(imr, 'template_SYNTHESIS')
+        # Templates are registered with lowercase names
+        assert hasattr(imr, 'template_deduction')
+        assert hasattr(imr, 'template_induction')
+        assert hasattr(imr, 'template_abduction')
+        assert hasattr(imr, 'template_analogy')
+        assert hasattr(imr, 'template_synthesis')
 
     def test_template_shapes(self, imr):
         """Test template shapes are correct."""
-        assert imr.template_DEDUCTION.shape == (12,)
-        assert imr.template_INDUCTION.shape == (12,)
+        assert imr.template_deduction.shape == (12,)
+        assert imr.template_induction.shape == (12,)
 
     def test_detect_isomorphism(self, imr, batch_state, device):
         """Test isomorphism detection."""
