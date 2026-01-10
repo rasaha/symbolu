@@ -7047,7 +7047,7 @@ class UnifiedTrainingConfig:
     # JEPA Dynamic Graduation (metric-based phase transitions)
     jepa_enable_dynamic_graduation: bool = True    # Enable threshold-based graduation
     jepa_graduation_loss_threshold: float = 20.0   # Graduate if JEPA loss < this
-    jepa_graduation_alignment_threshold: float = 72.0  # Graduate if alignment > this
+    jepa_graduation_alignment_threshold: float = 25.0  # V9.6.8: Was 72.0 - unrealistic, caused stuck BODY phase
 
     # JEPA Vritti Validation
     jepa_enable_vritti_validation: bool = False  # Enable Vritti gate validation
@@ -12493,8 +12493,8 @@ def main():
                        help="Enable metric-based graduation (graduate when loss < threshold)")
     parser.add_argument("--jepa_graduation_loss_threshold", type=float, default=20.0,
                        help="Graduate to Soul phase when JEPA loss falls below this")
-    parser.add_argument("--jepa_graduation_alignment_threshold", type=float, default=72.0,
-                       help="Graduate to Soul phase when alignment rises above this")
+    parser.add_argument("--jepa_graduation_alignment_threshold", type=float, default=25.0,
+                       help="Graduate to Soul phase when alignment rises above this (V9.6.8: was 72.0)")
 
     # JEPA Vritti Validation
     parser.add_argument("--jepa_enable_vritti_validation", action="store_true",

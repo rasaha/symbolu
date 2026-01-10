@@ -153,7 +153,7 @@ class TrainingCurriculumOrchestrator:
         callbacks: Optional[Dict[str, Callable]] = None,
         # Dynamic graduation thresholds
         graduation_loss_threshold: float = 20.0,      # Graduate if JEPA loss < this
-        graduation_alignment_threshold: float = 72.0,  # Graduate if alignment > this
+        graduation_alignment_threshold: float = 25.0,  # V9.6.8: Was 72.0 - unrealistic
         enable_dynamic_graduation: bool = True,        # Enable threshold-based graduation
     ):
         """
@@ -571,6 +571,6 @@ def create_curriculum_from_config(config) -> TrainingCurriculumOrchestrator:
         initial_phase=getattr(config, 'jepa_training_phase', 'body'),
         # Dynamic graduation thresholds
         graduation_loss_threshold=getattr(config, 'jepa_graduation_loss_threshold', 20.0),
-        graduation_alignment_threshold=getattr(config, 'jepa_graduation_alignment_threshold', 72.0),
+        graduation_alignment_threshold=getattr(config, 'jepa_graduation_alignment_threshold', 25.0),
         enable_dynamic_graduation=getattr(config, 'jepa_enable_dynamic_graduation', True),
     )
