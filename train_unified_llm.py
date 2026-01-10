@@ -8765,9 +8765,31 @@ def compute_sovereign_state_diagnostics(
         bhava_vals = state[0, BHAVA_SLICE].detach().cpu().tolist()
         result['bhava_activations'] = bhava_vals
 
+        # V9.6.8: Compute Bhava top-3 for "snap point" visibility
+        bhava_tensor = state[0, BHAVA_SLICE].detach().cpu()
+        sorted_bhava, sorted_idx = bhava_tensor.sort(descending=True)
+        result['bhava_top1_val'] = sorted_bhava[0].item()
+        result['bhava_top1_name'] = BHAVA_NAMES[sorted_idx[0].item()]
+        result['bhava_top2_val'] = sorted_bhava[1].item()
+        result['bhava_top2_name'] = BHAVA_NAMES[sorted_idx[1].item()]
+        result['bhava_top3_val'] = sorted_bhava[2].item()
+        result['bhava_top3_name'] = BHAVA_NAMES[sorted_idx[2].item()]
+        result['bhava_margin'] = (sorted_bhava[0] - sorted_bhava[1]).item()
+
         # Kosha activations [12:17]
         kosha_vals = state[0, KOSHA_SLICE].detach().cpu().tolist()
         result['kosha_activations'] = kosha_vals
+
+        # V9.6.8: Compute Kosha (Sheath) top-3
+        kosha_tensor = state[0, KOSHA_SLICE].detach().cpu()
+        sorted_kosha, sorted_kosha_idx = kosha_tensor.sort(descending=True)
+        result['kosha_top1_val'] = sorted_kosha[0].item()
+        result['kosha_top1_name'] = KOSHA_NAMES[sorted_kosha_idx[0].item()]
+        result['kosha_top2_val'] = sorted_kosha[1].item()
+        result['kosha_top2_name'] = KOSHA_NAMES[sorted_kosha_idx[1].item()]
+        result['kosha_top3_val'] = sorted_kosha[2].item()
+        result['kosha_top3_name'] = KOSHA_NAMES[sorted_kosha_idx[2].item()]
+        result['kosha_margin'] = (sorted_kosha[0] - sorted_kosha[1]).item()
 
         # Vritti activations [17:22]
         vritti_vals = state[0, VRITTI_SLICE].detach().cpu().tolist()
@@ -8793,11 +8815,27 @@ def format_sovereign_state_diagnostic(diag: Dict[str, Any]) -> str:
     Format 32D Sovereign State diagnostic for logging output.
 
     V9.8.0: Condensed single-line output (was 6 lines).
+    V9.6.8: Added top-3 Bhava/Kosha to visualize "snap point" proximity.
     Shows Bhava/Kosha/Vritti/Guna summary in compact form.
     """
-    # Main state summary
-    bhava = diag.get('dominant_bhava', 'ABS')
-    kosha = diag.get('active_kosha', 'MATERIAL')
+    # V9.6.8: Top-3 Bhava with probabilities
+    b1_name = diag.get('bhava_top1_name', diag.get('dominant_bhava', 'ABS'))
+    b1_val = diag.get('bhava_top1_val', 0.0)
+    b2_name = diag.get('bhava_top2_name', '???')
+    b2_val = diag.get('bhava_top2_val', 0.0)
+    b3_name = diag.get('bhava_top3_name', '???')
+    b3_val = diag.get('bhava_top3_val', 0.0)
+    bhava_margin = diag.get('bhava_margin', 0.0)
+
+    # V9.6.8: Top-3 Kosha (Sheath) with probabilities
+    k1_name = diag.get('kosha_top1_name', diag.get('active_kosha', 'ANNA'))
+    k1_val = diag.get('kosha_top1_val', 0.0)
+    k2_name = diag.get('kosha_top2_name', '???')
+    k2_val = diag.get('kosha_top2_val', 0.0)
+    k3_name = diag.get('kosha_top3_name', '???')
+    k3_val = diag.get('kosha_top3_val', 0.0)
+    kosha_margin = diag.get('kosha_margin', 0.0)
+
     vritti = diag.get('vritti_state', 'FACT')
     delta = diag.get('delta_magnitude', 0.0)
 
@@ -8806,10 +8844,26 @@ def format_sovereign_state_diagnostic(diag: Dict[str, Any]) -> str:
     activity = diag.get('guna_rajas', 0.33)
     stability = diag.get('guna_tamas', 0.33)
 
-    # Single line with all key info
+    # Format margin indicator: 🔴 (<5%), 🟡 (5-15%), 🟢 (>15%)
+    def margin_icon(m):
+        if m < 0.05:
+            return "🔴"  # Very close to snap
+        elif m < 0.15:
+            return "🟡"  # Moderate margin
+        return "🟢"  # Stable
+
+    # Shorten Kosha names for display
+    kosha_short = {'ANNA': 'ANN', 'PRANA': 'PRA', 'MANO': 'MAN', 'VIJNANA': 'VIJ', 'ANANDA': 'ANA'}
+
+    # Format: Bhava: IDN(45%)>RSN(30%)>COG(10%) 🟢
+    bhava_str = f"{b1_name}({b1_val:.0%})>{b2_name}({b2_val:.0%})>{b3_name}({b3_val:.0%})"
+    kosha_str = f"{kosha_short.get(k1_name, k1_name[:3])}({k1_val:.0%})>{kosha_short.get(k2_name, k2_name[:3])}({k2_val:.0%})"
+
+    # Two-line output for readability
     return (
-        f"    🔱 [32D] Bhava:{bhava} Sheath:{kosha} State:{vritti} | "
-        f"Qualia[L{lucidity:.0%}/A{activity:.0%}/S{stability:.0%}] Δ={delta:.2f}"
+        f"    🔱 [32D] Bhava:{bhava_str} {margin_icon(bhava_margin)} | "
+        f"Sheath:{kosha_str} {margin_icon(kosha_margin)} | Vritti:{vritti}\n"
+        f"           Qualia[L{lucidity:.0%}/A{activity:.0%}/S{stability:.0%}] Δ={delta:.2f}"
     )
 
 
