@@ -11839,7 +11839,27 @@ def load_checkpoint(
     if len(filtered_state) < len(model_state):
         removed = [k for k in model_state if k in runtime_buffers]
         print(f"    → Filtered runtime buffers: {removed}")
-    model.load_state_dict(filtered_state)
+
+    # V9.6.8: Migrate old state_projector (nn.Sequential) to new SovereignStateProjector format
+    # Old format: state_projector.0.weight, state_projector.2.weight (nn.Sequential indices)
+    # New format: state_projector.projector.0.weight, state_projector.projector.3.weight
+    old_projector_keys = [k for k in filtered_state if k.startswith("state_projector.") and ".projector." not in k and "layer_norm" not in k]
+    if old_projector_keys:
+        print(f"    → Migrating old state_projector format to SovereignStateProjector...")
+        migration_map = {
+            "state_projector.0.weight": "state_projector.projector.0.weight",
+            "state_projector.0.bias": "state_projector.projector.0.bias",
+            "state_projector.2.weight": "state_projector.projector.3.weight",
+            "state_projector.2.bias": "state_projector.projector.3.bias",
+        }
+        for old_key, new_key in migration_map.items():
+            if old_key in filtered_state:
+                filtered_state[new_key] = filtered_state.pop(old_key)
+                print(f"      {old_key} → {new_key}")
+        # New layer_norm weights will be initialized from model defaults (strict=False)
+        print(f"    ✓ Migration complete (layer_norm will use fresh initialization)")
+
+    model.load_state_dict(filtered_state, strict=False)
     print(f"    ✓ Model weights loaded")
 
     result = {
