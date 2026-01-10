@@ -589,7 +589,467 @@ loss = model_loss + memory_retrieval_loss  # Memory has no gradients!
 
 ---
 
-## Configuration
+## Step-by-Step Usage Guide
+
+This section provides a complete walkthrough from training to inference with episodic memory.
+
+### Pipeline Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           COMPLETE PIPELINE                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌───────────┐ │
+│  │   STEP 1    │     │   STEP 2    │     │   STEP 3    │     │  STEP 4   │ │
+│  │   Train     │────▶│   Build     │────▶│   Load      │────▶│ Generate  │ │
+│  │   Model     │     │   Memory    │     │   Both      │     │ with RAG  │ │
+│  └─────────────┘     └─────────────┘     └─────────────┘     └───────────┘ │
+│        │                   │                   │                   │        │
+│        ▼                   ▼                   ▼                   ▼        │
+│   GPU Training        CPU Indexing        Load Model         32D Gate      │
+│   WikiText-103        WikiText-103        + Memory           Decision      │
+│   32D Weights         384D Embeddings     to Device          + Retrieval   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Step 1: Train the 32D Ontological Hybrid Model
+
+**Script:** `train_unified_llm.py`
+
+```bash
+# Train the Sovereign Model (32D state space)
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --model_size small \
+    --enable_srk \
+    --state_dim 32 \
+    --dataset wikitext \
+    --epochs 10 \
+    --batch_size 8 \
+    --output_dir ./checkpoints/sovereign_v1
+```
+
+**Output:**
+```
+./checkpoints/sovereign_v1/
+  ├── model.pt              # Model weights
+  ├── tokenizer/            # Tokenizer files
+  ├── config.json           # Model configuration
+  └── training_log.json     # Training metrics
+```
+
+**What happens:**
+- Model learns language patterns from WikiText-103
+- 32D Sovereign State (Bhava/Kosha/Vritti/Guna) is trained
+- **No episodic memory involved** - pure weight-based learning
+
+---
+
+### Step 2: Build the Episodic Memory (Offline, One-Time)
+
+**Script:** `scripts/build_memory.py`
+
+```bash
+# AFTER training is complete, build the memory index
+# This runs on CPU, separate from training
+
+# Option A: Quick test with validation split (~5 min)
+python scripts/build_memory.py \
+    --split validation \
+    --output ./data/episodic_memory
+
+# Option B: Full corpus with train split (~30-60 min)
+python scripts/build_memory.py \
+    --split train \
+    --limit 100000 \
+    --output ./data/episodic_memory \
+    --chunk-size 500 \
+    --chunk-overlap 50
+```
+
+**Output:**
+```
+./data/episodic_memory/
+  ├── chroma.sqlite3        # ChromaDB database
+  └── [embedding files]     # 384D vectors
+```
+
+**What happens:**
+- Loads WikiText-103 from HuggingFace
+- Chunks text using sentence-transformers tokenizer
+- Embeds chunks with `all-MiniLM-L6-v2` (384D)
+- Stores in ChromaDB (persistent)
+- **Completely separate from model weights**
+
+> **Note:** You only run this ONCE. The memory persists to disk.
+
+---
+
+### Step 3: Load Model + Memory for Inference
+
+Create an inference script or use interactively:
+
+```python
+#!/usr/bin/env python3
+"""
+Inference script with Episodic Memory integration.
+Run AFTER training (Step 1) and memory building (Step 2).
+"""
+
+import torch
+import json
+from pathlib import Path
+
+# === Configuration ===
+CHECKPOINT_DIR = "./checkpoints/sovereign_v1"
+MEMORY_PATH = "./data/episodic_memory"
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+# === Step 3a: Load the trained Sovereign Model ===
+from symbolu.phase_transformer import OntologicalHybridTransformer
+from transformers import AutoTokenizer  # or your custom tokenizer
+
+def load_model_and_tokenizer(checkpoint_dir: str, device: str):
+    """Load the trained Sovereign Model."""
+
+    # Load config
+    with open(f"{checkpoint_dir}/config.json") as f:
+        config = json.load(f)
+
+    # Initialize model
+    model = OntologicalHybridTransformer(
+        vocab_size=config.get("vocab_size", 50257),
+        embed_dim=config.get("embed_dim", 768),
+        num_layers=config.get("num_layers", 12),
+        num_heads=config.get("num_heads", 12),
+        max_seq_len=config.get("max_seq_len", 2048),
+        state_dim=32,  # 32D Sovereign State
+    )
+
+    # Load weights
+    state_dict = torch.load(f"{checkpoint_dir}/model.pt", map_location=device)
+    model.load_state_dict(state_dict)
+    model.to(device)
+    model.eval()
+
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(f"{checkpoint_dir}/tokenizer")
+
+    print(f"✓ Model loaded: {sum(p.numel() for p in model.parameters()):,} parameters")
+    return model, tokenizer
+
+# === Step 3b: Load the Episodic Memory ===
+from symbolu.rag import EpisodicMemoryStore
+
+def load_memory(memory_path: str):
+    """Load the pre-built episodic memory."""
+    memory = EpisodicMemoryStore(persistence_path=memory_path)
+    print(f"✓ Memory loaded: {memory.count():,} chunks")
+    return memory
+
+# === Initialize everything ===
+model, tokenizer = load_model_and_tokenizer(CHECKPOINT_DIR, DEVICE)
+memory = load_memory(MEMORY_PATH)
+
+print(f"\n✓ Ready for inference with Episodic Memory on {DEVICE}!")
+```
+
+---
+
+### Step 4: Generate with Sovereign-Gated RAG
+
+```python
+# Continue from Step 3...
+
+from symbolu.inference_rag import generate_with_memory, get_state_description
+
+def run_inference(prompt: str):
+    """Run inference with automatic memory gating."""
+
+    result = generate_with_memory(
+        model=model,
+        tokenizer=tokenizer,
+        memory_store=memory,
+        prompt=prompt,
+        max_new_tokens=100,
+        temperature=0.7,
+        top_k=50,
+        n_retrieval_results=3,
+    )
+
+    # Display results
+    print(f"\n{'='*60}")
+    print(f"PROMPT: {prompt}")
+    print(f"{'='*60}")
+
+    # Show Sovereign State
+    if result['state_info']:
+        print(f"STATE: {get_state_description(result['state_info'])}")
+
+    # Show retrieval decision
+    print(f"RETRIEVAL: {result['retrieval_triggered']} ({result['retrieval_reason']})")
+
+    if result['retrieved_chunks']:
+        print(f"CHUNKS: {len(result['retrieved_chunks'])} retrieved")
+        for i, chunk in enumerate(result['retrieved_chunks'], 1):
+            print(f"  [{i}] Score={chunk['score']:.3f}: {chunk['text'][:80]}...")
+
+    if result['truncated']:
+        print(f"TRUNCATED: Yes (prompt={result['prompt_tokens']} tokens)")
+
+    print(f"\nRESPONSE: {result['text']}")
+    print(f"{'='*60}\n")
+
+    return result
+
+
+# === Example Usage ===
+if __name__ == "__main__":
+
+    # This should trigger retrieval (Bhava=COG or Kosha=INTELLECTUAL)
+    run_inference("What is the capital of France?")
+
+    # This might NOT trigger retrieval (Kosha=VITAL, creative mode)
+    run_inference("Write a poem about the ocean.")
+
+    # This should trigger retrieval (factual question)
+    run_inference("Who invented the telephone?")
+
+    # Interactive mode
+    print("\n--- Interactive Mode ---")
+    while True:
+        prompt = input("\nEnter prompt (or 'quit'): ").strip()
+        if prompt.lower() == 'quit':
+            break
+        run_inference(prompt)
+```
+
+---
+
+### What Happens at Inference Time (Detailed Flow)
+
+```
+User Prompt: "What year was the Eiffel Tower built?"
+                           │
+                           ▼
+            ┌──────────────────────────────┐
+            │  1. DIAGNOSTIC PASS          │
+            │     model.forward(prompt)    │
+            │     Extract 32D State        │
+            └──────────────┬───────────────┘
+                           │
+                           ▼
+            ┌──────────────────────────────┐
+            │  2. STATE EXTRACTION         │
+            │  Bhava[0:12]  → argmax = COG │ ← Knowledge-seeking
+            │  Kosha[12:17] → argmax = INT │ ← Intellectual mode
+            │  Vritti[17:22]→ argmax = MEM │ ← Memory recall
+            │  Entropy = 5.2               │ ← High uncertainty
+            └──────────────┬───────────────┘
+                           │
+                           ▼
+            ┌──────────────────────────────┐
+            │  3. GATE DECISION            │
+            │  IF Kosha=INTELLECTUAL  ✓    │
+            │  OR Bhava∈[COG,RSN]    ✓    │
+            │  OR Vritti=MEMORY      ?    │
+            │  OR (FACT+HighEntropy) ?    │
+            │  ───────────────────────    │
+            │  RESULT: RETRIEVE = TRUE    │
+            └──────────────┬───────────────┘
+                           │
+                           ▼
+            ┌──────────────────────────────┐
+            │  4. MEMORY RETRIEVAL         │
+            │  Query: "Eiffel Tower built" │
+            │  ───────────────────────     │
+            │  Chunk 1 (0.89): "The Eiffel │
+            │    Tower was completed in    │
+            │    1889 for the World's..."  │
+            │  Chunk 2 (0.76): "Gustave    │
+            │    Eiffel designed..."       │
+            └──────────────┬───────────────┘
+                           │
+                           ▼
+            ┌──────────────────────────────┐
+            │  5. CONTEXT TRUNCATION       │
+            │  Max context: 2048 tokens    │
+            │  Available: 1500 tokens      │
+            │  Chunk 1: 450 tokens ✓       │
+            │  Chunk 2: 380 tokens ✓       │
+            │  Total: 830 tokens (fits)    │
+            └──────────────┬───────────────┘
+                           │
+                           ▼
+            ┌──────────────────────────────┐
+            │  6. PROMPT AUGMENTATION      │
+            │  ─────────────────────────   │
+            │  Information:                │
+            │  [Chunk 1 text]              │
+            │  [Chunk 2 text]              │
+            │                              │
+            │  Based on the information... │
+            │  Question: What year was...  │
+            │  Answer:                     │
+            └──────────────┬───────────────┘
+                           │
+                           ▼
+            ┌──────────────────────────────┐
+            │  7. GENERATION               │
+            │  model.generate(augmented)   │
+            │  ─────────────────────────   │
+            │  Output: "The Eiffel Tower   │
+            │  was built in 1889."         │
+            └──────────────────────────────┘
+```
+
+---
+
+### When to Run Each Step
+
+| Step | When to Run | Duration | Resource | Output |
+|------|-------------|----------|----------|--------|
+| **1. Train Model** | Once (or when retraining) | Hours to days | GPU intensive | Model weights (32D) |
+| **2. Build Memory** | Once (after training) | 5-60 minutes | CPU only | ChromaDB (384D) |
+| **3. Load Both** | Every inference session | 10-30 seconds | GPU + disk | Model + memory in RAM |
+| **4. Generate** | Per prompt | 1-5 seconds | GPU | Generated text |
+
+---
+
+### Quick Reference Commands
+
+```bash
+# Step 1: Train (GPU, hours)
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --model_size small \
+    --enable_srk \
+    --state_dim 32
+
+# Step 2: Build Memory (CPU, minutes) - RUN ONCE
+python scripts/build_memory.py \
+    --split validation \
+    --output ./data/episodic_memory
+
+# Step 3 & 4: Inference (GPU, seconds per prompt)
+python scripts/inference_with_memory.py
+# Or use interactively in Python
+```
+
+---
+
+### Complete Inference Script
+
+Save this as `scripts/inference_with_memory.py`:
+
+```python
+#!/usr/bin/env python3
+"""
+Complete inference script with Episodic Memory.
+
+Usage:
+    python scripts/inference_with_memory.py --checkpoint ./checkpoints/sovereign_v1
+    python scripts/inference_with_memory.py --interactive
+"""
+
+import argparse
+import json
+import torch
+from pathlib import Path
+
+def main():
+    parser = argparse.ArgumentParser(description="Inference with Episodic Memory")
+    parser.add_argument("--checkpoint", type=str, default="./checkpoints/sovereign_v1")
+    parser.add_argument("--memory", type=str, default="./data/episodic_memory")
+    parser.add_argument("--prompt", type=str, default=None)
+    parser.add_argument("--interactive", action="store_true")
+    parser.add_argument("--max-tokens", type=int, default=100)
+    parser.add_argument("--temperature", type=float, default=0.7)
+    args = parser.parse_args()
+
+    # Determine device
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+
+    # Load model
+    from symbolu.phase_transformer import OntologicalHybridTransformer
+    from transformers import AutoTokenizer
+
+    with open(f"{args.checkpoint}/config.json") as f:
+        config = json.load(f)
+
+    model = OntologicalHybridTransformer(
+        vocab_size=config.get("vocab_size", 50257),
+        embed_dim=config.get("embed_dim", 768),
+        num_layers=config.get("num_layers", 12),
+        num_heads=config.get("num_heads", 12),
+        max_seq_len=config.get("max_seq_len", 2048),
+        state_dim=32,
+    )
+    model.load_state_dict(torch.load(f"{args.checkpoint}/model.pt", map_location=device))
+    model.to(device)
+    model.eval()
+
+    tokenizer = AutoTokenizer.from_pretrained(f"{args.checkpoint}/tokenizer")
+    print(f"✓ Model loaded")
+
+    # Load memory
+    from symbolu.rag import EpisodicMemoryStore
+    memory = EpisodicMemoryStore(persistence_path=args.memory)
+    print(f"✓ Memory loaded: {memory.count()} chunks")
+
+    # Import generation function
+    from symbolu.inference_rag import generate_with_memory, get_state_description
+
+    def generate(prompt: str):
+        result = generate_with_memory(
+            model=model,
+            tokenizer=tokenizer,
+            memory_store=memory,
+            prompt=prompt,
+            max_new_tokens=args.max_tokens,
+            temperature=args.temperature,
+        )
+
+        print(f"\n{'─'*50}")
+        if result['state_info']:
+            print(f"State: {get_state_description(result['state_info'])}")
+        print(f"Retrieval: {result['retrieval_triggered']} ({result['retrieval_reason']})")
+        if result['truncated']:
+            print(f"Truncated: Yes ({result['prompt_tokens']} tokens)")
+        print(f"{'─'*50}")
+        print(f"Response: {result['text']}")
+        return result
+
+    # Run
+    if args.prompt:
+        generate(args.prompt)
+    elif args.interactive:
+        print("\n=== Interactive Mode (type 'quit' to exit) ===")
+        while True:
+            prompt = input("\nPrompt: ").strip()
+            if prompt.lower() == 'quit':
+                break
+            if prompt:
+                generate(prompt)
+    else:
+        # Demo prompts
+        demos = [
+            "What is the capital of France?",
+            "Write a haiku about mountains.",
+            "Who discovered penicillin?",
+        ]
+        for prompt in demos:
+            print(f"\n>>> {prompt}")
+            generate(prompt)
+
+if __name__ == "__main__":
+    main()
+```
+
+---
 
 ### Environment Variables
 
