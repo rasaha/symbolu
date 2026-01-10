@@ -8766,8 +8766,10 @@ def compute_sovereign_state_diagnostics(
         result['bhava_activations'] = bhava_vals
 
         # V9.6.8: Compute Bhava top-3 for "snap point" visibility
+        # Apply softmax to get actual probabilities (raw values are pre-softmax)
         bhava_tensor = state[0, BHAVA_SLICE].detach().cpu()
-        sorted_bhava, sorted_idx = bhava_tensor.sort(descending=True)
+        bhava_probs = torch.softmax(bhava_tensor, dim=-1)
+        sorted_bhava, sorted_idx = bhava_probs.sort(descending=True)
         result['bhava_top1_val'] = sorted_bhava[0].item()
         result['bhava_top1_name'] = BHAVA_NAMES[sorted_idx[0].item()]
         result['bhava_top2_val'] = sorted_bhava[1].item()
@@ -8781,8 +8783,10 @@ def compute_sovereign_state_diagnostics(
         result['kosha_activations'] = kosha_vals
 
         # V9.6.8: Compute Kosha (Sheath) top-3
+        # Apply softmax to get actual probabilities (raw values are pre-softmax)
         kosha_tensor = state[0, KOSHA_SLICE].detach().cpu()
-        sorted_kosha, sorted_kosha_idx = kosha_tensor.sort(descending=True)
+        kosha_probs = torch.softmax(kosha_tensor, dim=-1)
+        sorted_kosha, sorted_kosha_idx = kosha_probs.sort(descending=True)
         result['kosha_top1_val'] = sorted_kosha[0].item()
         result['kosha_top1_name'] = KOSHA_NAMES[sorted_kosha_idx[0].item()]
         result['kosha_top2_val'] = sorted_kosha[1].item()
