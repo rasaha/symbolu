@@ -8856,8 +8856,9 @@ def format_sovereign_state_diagnostic(diag: Dict[str, Any]) -> str:
             return "🟡"  # Moderate margin
         return "🟢"  # Stable
 
-    # Shorten Kosha names for display
-    kosha_short = {'ANNA': 'ANN', 'PRANA': 'PRA', 'MANO': 'MAN', 'VIJNANA': 'VIJ', 'ANANDA': 'ANA'}
+    # Shorten Kosha names for display (using English meanings)
+    # ANNA=Physical, PRANA=Vital, MANO=Mental, VIJNANA=Intellect, ANANDA=Bliss
+    kosha_short = {'ANNA': 'PHY', 'PRANA': 'VIT', 'MANO': 'MEN', 'VIJNANA': 'INT', 'ANANDA': 'BLI'}
 
     # Format: Bhava: IDN(45%)>RSN(30%)>COG(10%) 🟢
     bhava_str = f"{b1_name}({b1_val:.0%})>{b2_name}({b2_val:.0%})>{b3_name}({b3_val:.0%})"
