@@ -4869,11 +4869,18 @@ class AdaptiveTrainingController:
         kp_max: float = 0.50,
         # Stability
         min_steps_between_adjustments: int = 200,
+        # V9.8.2: Safeguards to prevent runaway LR
+        max_lr_relative: float = 10.0,           # Max LR = base_lr * this (prevents runaway)
+        loss_spike_threshold: float = 5.0,       # % loss increase triggers emergency decay
+        grad_norm_spike_threshold: float = 100.0,  # Gradient norm above this triggers decay
+        emergency_decay_factor: float = 0.5,     # Aggressive decay for emergencies
+        consecutive_spike_limit: int = 3,        # After N consecutive spikes, halt boosts
     ):
         self.optimizer = optimizer
         self.base_lr = base_lr
         self.lr_min = lr_min
-        self.lr_max = lr_max
+        # V9.8.2: Clamp lr_max to max_lr_relative * base_lr
+        self.lr_max = min(lr_max, base_lr * max_lr_relative)
         self.lr_boost_factor = lr_boost_factor
         self.lr_decay_factor = lr_decay_factor
 
@@ -4891,23 +4898,35 @@ class AdaptiveTrainingController:
         self.min_steps_between_adjustments = min_steps_between_adjustments
         self.last_adjustment_step = 0
 
+        # V9.8.2: Safeguard parameters
+        self.max_lr_relative = max_lr_relative
+        self.loss_spike_threshold = loss_spike_threshold
+        self.grad_norm_spike_threshold = grad_norm_spike_threshold
+        self.emergency_decay_factor = emergency_decay_factor
+        self.consecutive_spike_limit = consecutive_spike_limit
+
         # History tracking
         self.val_ppl_history = []
         self.train_loss_history = []
         self.val_loss_history = []
         self.coherence_history = []
         self.adjustment_log = []
+        self.grad_norm_history = []  # V9.8.2: Track gradient norms
 
         # State
         self.current_lr_multiplier = 1.0
         self.boost_count = 0
         self.decay_count = 0
         self.plateau_count = 0
+        self.emergency_count = 0  # V9.8.2: Track emergency interventions
+        self.consecutive_spikes = 0  # V9.8.2: Track consecutive loss spikes
+        self.boost_blocked = False  # V9.8.2: Block boosts after too many spikes
 
         print(f"\n  [AdaptiveTraining] Controller initialized:")
-        print(f"    Base LR: {base_lr:.2e} (range: {lr_min:.2e} - {lr_max:.2e})")
+        print(f"    Base LR: {base_lr:.2e} (range: {lr_min:.2e} - {self.lr_max:.2e})")
         print(f"    Velocity thresholds: slow < {velocity_slow_threshold}%, spike > {velocity_spike_threshold}%")
         print(f"    Kp range: {kp_min} - {kp_max} (base: {kp_base})")
+        print(f"    V9.8.2 Safeguards: max_relative={max_lr_relative}x, loss_spike={loss_spike_threshold}%")
         print(f"    Plateau detection: {plateau_window} evals, {plateau_threshold}% threshold")
 
     def _compute_velocity(self) -> float:
@@ -4950,6 +4969,7 @@ class AdaptiveTrainingController:
         coherence: float,
         global_step: int,
         authority_controller=None,  # PIDv2 controller reference
+        grad_norm: float = None,  # V9.8.2: Optional gradient norm for monitoring
     ) -> Dict[str, Any]:
         """
         Update controller with current metrics and adjust hyperparameters.
@@ -4961,6 +4981,8 @@ class AdaptiveTrainingController:
         self.train_loss_history.append(train_loss)
         self.val_loss_history.append(val_loss)
         self.coherence_history.append(coherence)
+        if grad_norm is not None:
+            self.grad_norm_history.append(grad_norm)
 
         # Keep history bounded
         max_history = 50
@@ -4969,11 +4991,74 @@ class AdaptiveTrainingController:
             self.train_loss_history = self.train_loss_history[-max_history:]
             self.val_loss_history = self.val_loss_history[-max_history:]
             self.coherence_history = self.coherence_history[-max_history:]
+            self.grad_norm_history = self.grad_norm_history[-max_history:]
 
         adjustments = {"step": global_step, "actions": []}
+        current_lr = self.optimizer.param_groups[0]['lr']
 
-        # Check if we can make adjustments
+        # === V9.8.2: EMERGENCY BRAKE - Check for runaway LR ===
+        lr_relative = current_lr / self.base_lr
+        if lr_relative > self.max_lr_relative:
+            # LR has exceeded safe bounds - emergency clamp
+            safe_lr = self.base_lr * self.max_lr_relative
+            for pg in self.optimizer.param_groups:
+                pg['lr'] = safe_lr
+            self.emergency_count += 1
+            self.boost_blocked = True  # Block further boosts
+            adjustments["actions"].append(f"EMERGENCY_CLAMP: {current_lr:.2e}→{safe_lr:.2e} (>{self.max_lr_relative}x base)")
+            print(f"\n  🚨 [AdaptiveTraining] EMERGENCY CLAMP: {current_lr:.2e} → {safe_lr:.2e} (exceeded {self.max_lr_relative}x base LR)")
+            self.last_adjustment_step = global_step
+            current_lr = safe_lr
+
+        # === V9.8.2: Loss Spike Detection ===
+        loss_spike_detected = False
+        if len(self.val_loss_history) >= 2:
+            prev_loss = self.val_loss_history[-2]
+            curr_loss = self.val_loss_history[-1]
+            if prev_loss > 0:
+                loss_change_pct = ((curr_loss - prev_loss) / prev_loss) * 100
+                if loss_change_pct > self.loss_spike_threshold:
+                    loss_spike_detected = True
+                    self.consecutive_spikes += 1
+
+                    # Emergency decay on loss spike
+                    new_lr = max(self.lr_min, current_lr * self.emergency_decay_factor)
+                    if new_lr != current_lr:
+                        for pg in self.optimizer.param_groups:
+                            pg['lr'] = new_lr
+                        self.emergency_count += 1
+                        adjustments["actions"].append(f"LOSS_SPIKE_DECAY: {current_lr:.2e}→{new_lr:.2e} (loss +{loss_change_pct:.1f}%)")
+                        print(f"\n  🔥 [AdaptiveTraining] LOSS SPIKE DECAY: {current_lr:.2e} → {new_lr:.2e} (loss increased {loss_change_pct:.1f}%)")
+                        self.last_adjustment_step = global_step
+                        current_lr = new_lr
+
+                    # Block boosts after consecutive spikes
+                    if self.consecutive_spikes >= self.consecutive_spike_limit:
+                        self.boost_blocked = True
+                        print(f"  ⛔ [AdaptiveTraining] BOOST BLOCKED: {self.consecutive_spikes} consecutive loss spikes")
+                else:
+                    # Loss improved or stable - reset spike counter
+                    self.consecutive_spikes = 0
+                    if loss_change_pct < -2.0:  # Loss improving well
+                        self.boost_blocked = False  # Allow boosts again
+
+        # === V9.8.2: Gradient Norm Spike Detection ===
+        if grad_norm is not None and grad_norm > self.grad_norm_spike_threshold:
+            new_lr = max(self.lr_min, current_lr * self.emergency_decay_factor)
+            if new_lr != current_lr:
+                for pg in self.optimizer.param_groups:
+                    pg['lr'] = new_lr
+                self.emergency_count += 1
+                self.boost_blocked = True
+                adjustments["actions"].append(f"GRAD_SPIKE_DECAY: {current_lr:.2e}→{new_lr:.2e} (grad_norm={grad_norm:.1f})")
+                print(f"\n  💥 [AdaptiveTraining] GRAD SPIKE DECAY: {current_lr:.2e} → {new_lr:.2e} (grad_norm={grad_norm:.1f} > {self.grad_norm_spike_threshold})")
+                self.last_adjustment_step = global_step
+                current_lr = new_lr
+
+        # Check if we can make regular adjustments (skip if emergency just happened)
         if global_step - self.last_adjustment_step < self.min_steps_between_adjustments:
+            if adjustments["actions"]:
+                self.adjustment_log.append(adjustments)
             return adjustments
 
         velocity = self._compute_velocity()
@@ -4981,8 +5066,6 @@ class AdaptiveTrainingController:
         train_val_gap = self._compute_train_val_gap()
 
         # === LR Adaptation ===
-        current_lr = self.optimizer.param_groups[0]['lr']
-
         # Case 1: PPL spiking (unstable) → decay LR
         if velocity > self.velocity_spike_threshold:
             new_lr = max(self.lr_min, current_lr * self.lr_decay_factor)
@@ -4994,8 +5077,8 @@ class AdaptiveTrainingController:
                 print(f"\n  🔻 [AdaptiveTraining] LR DECAY: {current_lr:.2e} → {new_lr:.2e} (PPL spike: {velocity:+.1f}%)")
                 self.last_adjustment_step = global_step
 
-        # Case 2: Learning too slow or plateau → boost LR
-        elif velocity > self.velocity_slow_threshold or is_plateau:
+        # Case 2: Learning too slow or plateau → boost LR (V9.8.2: only if not blocked)
+        elif (velocity > self.velocity_slow_threshold or is_plateau) and not self.boost_blocked:
             if is_plateau:
                 self.plateau_count += 1
 
@@ -5009,6 +5092,10 @@ class AdaptiveTrainingController:
                 adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
                 print(f"\n  🔺 [AdaptiveTraining] LR BOOST: {current_lr:.2e} → {new_lr:.2e} ({reason})")
                 self.last_adjustment_step = global_step
+        elif self.boost_blocked and (velocity > self.velocity_slow_threshold or is_plateau):
+            # Log that boost was blocked
+            reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
+            print(f"\n  ⏸️  [AdaptiveTraining] LR BOOST BLOCKED ({reason}) - waiting for stable loss")
 
         # === Kp Adaptation (if PIDv2 controller provided) ===
         if authority_controller is not None and hasattr(authority_controller, 'Kp_min'):
@@ -5047,18 +5134,58 @@ class AdaptiveTrainingController:
         velocity = self._compute_velocity() if len(self.val_ppl_history) >= 2 else 0.0
         plateau = "PLATEAU" if self._detect_plateau() else "OK"
         current_lr = self.optimizer.param_groups[0]['lr']
-        return f"AdaptLR:{current_lr:.2e} vel:{velocity:+.1f}% [{plateau}] boosts:{self.boost_count} decays:{self.decay_count}"
+        lr_relative = current_lr / self.base_lr
+        blocked = " BLOCKED" if self.boost_blocked else ""
+        return f"AdaptLR:{current_lr:.2e}({lr_relative:.1f}x) vel:{velocity:+.1f}% [{plateau}] boosts:{self.boost_count} decays:{self.decay_count} emerg:{self.emergency_count}{blocked}"
+
+    def enforce_lr_bounds(self, global_step: int = 0) -> bool:
+        """
+        V9.8.3: Step-level LR safeguard - call EVERY training step.
+
+        This catches runaway LR from schedulers or restored checkpoints
+        that the validation-time update() method would miss.
+
+        Returns True if LR was clamped.
+        """
+        current_lr = self.optimizer.param_groups[0]['lr']
+        lr_relative = current_lr / self.base_lr
+
+        clamped = False
+
+        # Check upper bound
+        if lr_relative > self.max_lr_relative:
+            safe_lr = self.base_lr * self.max_lr_relative
+            for pg in self.optimizer.param_groups:
+                pg['lr'] = safe_lr
+            self.emergency_count += 1
+            self.boost_blocked = True
+            print(f"\n  🚨 [AdaptiveTraining] STEP {global_step} LR CLAMPED: {current_lr:.2e} → {safe_lr:.2e} (exceeded {self.max_lr_relative}x base)")
+            clamped = True
+
+        # Check lower bound
+        elif current_lr < self.lr_min:
+            for pg in self.optimizer.param_groups:
+                pg['lr'] = self.lr_min
+            print(f"\n  ⚠️ [AdaptiveTraining] STEP {global_step} LR FLOOR: {current_lr:.2e} → {self.lr_min:.2e}")
+            clamped = True
+
+        return clamped
 
     def get_telemetry(self) -> Dict[str, Any]:
         """Get telemetry for logging."""
+        current_lr = self.optimizer.param_groups[0]['lr']
         return {
-            "current_lr": self.optimizer.param_groups[0]['lr'],
+            "current_lr": current_lr,
+            "lr_relative": current_lr / self.base_lr,  # V9.8.2: Track relative LR
             "velocity": self._compute_velocity() if len(self.val_ppl_history) >= 2 else 0.0,
             "is_plateau": self._detect_plateau(),
             "train_val_gap": self._compute_train_val_gap(),
             "boost_count": self.boost_count,
             "decay_count": self.decay_count,
             "plateau_count": self.plateau_count,
+            "emergency_count": self.emergency_count,  # V9.8.2: Emergency interventions
+            "consecutive_spikes": self.consecutive_spikes,  # V9.8.2: Loss spike tracker
+            "boost_blocked": self.boost_blocked,  # V9.8.2: Whether boosts are blocked
             "adjustment_log": self.adjustment_log[-10:],  # Last 10 adjustments
         }
 
@@ -6803,6 +6930,12 @@ class UnifiedTrainingConfig:
     adaptive_plateau_window: int = 5         # Evals to check for plateau
     adaptive_plateau_threshold: float = 1.0  # Min improvement % to avoid plateau detection
     adaptive_min_interval: int = 200         # Min steps between adjustments
+    # V9.8.2: Safeguards to prevent runaway LR
+    adaptive_max_lr_relative: float = 10.0   # Max LR = base_lr * this (prevents runaway)
+    adaptive_loss_spike_threshold: float = 5.0  # % loss increase triggers emergency decay
+    adaptive_grad_norm_spike: float = 100.0  # Gradient norm above this triggers decay
+    adaptive_emergency_decay: float = 0.5    # Aggressive decay factor for emergencies
+    adaptive_consecutive_spike_limit: int = 3  # After N consecutive spikes, halt boosts
 
     # Auto Batch Sizing (VRAM-based startup probing)
     enable_auto_batch: bool = False          # Enable automatic batch size detection at startup
@@ -9460,7 +9593,26 @@ def train(config: UnifiedTrainingConfig):
             kp_min=config.pidv2_kp_min,
             kp_max=config.pidv2_kp_max,
             min_steps_between_adjustments=config.adaptive_min_interval,
+            # V9.8.2: Safeguards to prevent runaway LR
+            max_lr_relative=config.adaptive_max_lr_relative,
+            loss_spike_threshold=config.adaptive_loss_spike_threshold,
+            grad_norm_spike_threshold=config.adaptive_grad_norm_spike,
+            emergency_decay_factor=config.adaptive_emergency_decay,
+            consecutive_spike_limit=config.adaptive_consecutive_spike_limit,
         )
+
+        # V9.8.3: Immediately enforce LR bounds after checkpoint restore
+        # This catches runaway LR from corrupted checkpoint state before training starts
+        if config.resume and not config.resume_weights_only:
+            current_lr = optimizer.param_groups[0]['lr']
+            max_allowed = config.learning_rate * config.adaptive_max_lr_relative
+            if current_lr > max_allowed:
+                print(f"\n  🚨 [V9.8.3] CHECKPOINT LR OVERRIDE: {current_lr:.2e} → {max_allowed:.2e}")
+                print(f"      Restored LR exceeded {config.adaptive_max_lr_relative}x base ({config.learning_rate:.2e})")
+                for pg in optimizer.param_groups:
+                    pg['lr'] = max_allowed
+                adaptive_controller.emergency_count += 1
+                adaptive_controller.boost_blocked = True
 
     # Restore HGS/DRC state from checkpoint if available
     if resumed_hgs_state is not None and gradient_scaler_hgs is not None:
@@ -9780,8 +9932,9 @@ def train(config: UnifiedTrainingConfig):
                     })
                     srk_metrics.update({f'srk_{k}': v for k, v in srk_diagnostics.items() if isinstance(v, (int, float))})
 
-                    # Log SRK diagnostics periodically
-                    if global_step % config.log_every == 0 and global_step > 0:
+                    # Log SRK diagnostics periodically (only at end of accumulation to avoid duplicates)
+                    if (global_step % config.log_every == 0 and global_step > 0 and
+                        (accumulation_step + 1) % config.gradient_accumulation == 0):
                         phase_name = srk_diagnostics.get('annealer_phase', 'UNKNOWN')
                         print(f"  [SRK] Step {global_step} | Phase: {phase_name} | "
                               f"L_total={srk_metrics.get('L_total', 0):.4f} | "
@@ -9848,12 +10001,13 @@ def train(config: UnifiedTrainingConfig):
                         jepa_metrics['jepa_phase'] = progress.get('macro_phase', 'BODY')
                         jepa_metrics['jepa_k_steps'] = jepa_curriculum.get_k_steps()
 
-                    # Log phase transitions
-                    if phase_changed and new_phase:
+                    # Log phase transitions (only at end of accumulation)
+                    if phase_changed and new_phase and (accumulation_step + 1) % config.gradient_accumulation == 0:
                         print(f"\n  🔄 [JEPA] Phase Transition → {new_phase} at step {global_step}")
 
-                    # Log JEPA diagnostics periodically
-                    if global_step % config.log_every == 0 and global_step > 0:
+                    # Log JEPA diagnostics periodically (only at end of accumulation to avoid duplicates)
+                    if (global_step % config.log_every == 0 and global_step > 0 and
+                        (accumulation_step + 1) % config.gradient_accumulation == 0):
                         phase_str = jepa_metrics.get('jepa_phase', 'BODY')
                         print(f"  [JEPA] Step {global_step} | Phase: {phase_str} | "
                               f"Loss={jepa_metrics.get('jepa_loss', 0):.4f} | "
@@ -10444,6 +10598,10 @@ def train(config: UnifiedTrainingConfig):
             # Update scheduler after warmup
             if global_step >= config.warmup_steps:
                 scheduler.step()
+
+            # V9.8.3: Enforce LR bounds EVERY STEP (catches scheduler/checkpoint runaway)
+            if adaptive_controller is not None:
+                adaptive_controller.enforce_lr_bounds(global_step)
 
             # Update alpha schedule for phase/hybrid models
             current_alpha = update_alpha_schedule(model, global_step, config)
@@ -12151,6 +12309,17 @@ def main():
                        help="Minimum improvement (%) to avoid plateau detection")
     parser.add_argument("--adaptive_min_interval", type=int, default=200,
                        help="Minimum steps between adaptive adjustments")
+    # V9.8.2: Safeguards to prevent runaway LR
+    parser.add_argument("--adaptive_max_lr_relative", type=float, default=10.0,
+                       help="Max LR multiplier relative to base_lr (prevents runaway)")
+    parser.add_argument("--adaptive_loss_spike_threshold", type=float, default=5.0,
+                       help="Loss increase %% that triggers emergency LR decay")
+    parser.add_argument("--adaptive_grad_norm_spike", type=float, default=100.0,
+                       help="Gradient norm above this triggers emergency decay")
+    parser.add_argument("--adaptive_emergency_decay", type=float, default=0.5,
+                       help="Aggressive LR decay factor for emergencies")
+    parser.add_argument("--adaptive_consecutive_spike_limit", type=int, default=3,
+                       help="After N consecutive loss spikes, block LR boosts")
 
     # Auto Batch Sizing (VRAM-based startup probing)
     parser.add_argument("--enable_auto_batch", action="store_true",
@@ -12529,6 +12698,12 @@ def main():
         adaptive_plateau_window=args.adaptive_plateau_window,
         adaptive_plateau_threshold=args.adaptive_plateau_threshold,
         adaptive_min_interval=args.adaptive_min_interval,
+        # V9.8.2: Safeguards
+        adaptive_max_lr_relative=args.adaptive_max_lr_relative,
+        adaptive_loss_spike_threshold=args.adaptive_loss_spike_threshold,
+        adaptive_grad_norm_spike=args.adaptive_grad_norm_spike,
+        adaptive_emergency_decay=args.adaptive_emergency_decay,
+        adaptive_consecutive_spike_limit=args.adaptive_consecutive_spike_limit,
         # Auto Batch Sizing
         enable_auto_batch=args.enable_auto_batch,
         auto_batch_target_utilization=args.auto_batch_target_utilization,
