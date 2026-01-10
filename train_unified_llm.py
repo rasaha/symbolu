@@ -3182,8 +3182,8 @@ class VRAMGovernor:
         self,
         initial_batch_size: int = 32,
         min_batch_size: int = 4,
-        vram_threshold: float = 0.92,  # Trigger at 92% usage
-        vram_critical: float = 0.97,   # Emergency at 97%
+        vram_threshold: float = 0.95,  # Trigger at 95% usage
+        vram_critical: float = 0.98,   # Emergency at 98%
         vram_recovery_buffer: float = 0.12,  # Recovery when < (threshold - buffer)
         check_interval: int = 10,      # Check every N steps
         b1_compensation_rate: float = 0.20,  # 20% λ_B1 increase per reduction
@@ -6888,7 +6888,7 @@ class UnifiedTrainingConfig:
     # Training hyperparameters
     batch_size: int = 8
     gradient_accumulation: int = 1
-    vram_threshold: float = 0.92  # VRAM % to trigger batch reduction (0.92 = 92%)
+    vram_threshold: float = 0.95  # VRAM % to trigger batch reduction (0.95 = 95%)
     vram_recovery_buffer: float = 0.12  # Recovery when VRAM < (threshold - buffer)
     max_steps: int = 10000
     warmup_steps: int = 500
@@ -12264,8 +12264,8 @@ def main():
                        help="Batch size per GPU")
     parser.add_argument("--gradient_accumulation", type=int, default=1,
                        help="Gradient accumulation steps")
-    parser.add_argument("--vram_threshold", type=float, default=0.92,
-                       help="VRAM usage %% to trigger batch reduction (0.92=92%%, higher=more aggressive)")
+    parser.add_argument("--vram_threshold", type=float, default=0.95,
+                       help="VRAM usage %% to trigger batch reduction (0.95=95%%, higher=more aggressive)")
     parser.add_argument("--vram_recovery_buffer", type=float, default=0.12,
                        help="Recovery buffer: batch increases when VRAM < (threshold - buffer). 0.12=80%% recovery with 92%% threshold")
     parser.add_argument("--max_steps", type=int, default=10000,
