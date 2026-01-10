@@ -11843,8 +11843,10 @@ def load_checkpoint(
     # V9.6.8: Migrate old state_projector (nn.Sequential) to new SovereignStateProjector format
     # Old format: state_projector.0.weight, state_projector.2.weight (nn.Sequential indices)
     # New format: state_projector.projector.0.weight, state_projector.projector.3.weight
+    migrated = False
     old_projector_keys = [k for k in filtered_state if k.startswith("state_projector.") and ".projector." not in k and "layer_norm" not in k]
     if old_projector_keys:
+        migrated = True
         print(f"    → Migrating old state_projector format to SovereignStateProjector...")
         migration_map = {
             "state_projector.0.weight": "state_projector.projector.0.weight",
@@ -11870,6 +11872,11 @@ def load_checkpoint(
     if weights_only:
         print(f"    → Weights-only mode: Optimizer/Scheduler will start fresh")
         result["step"] = 0  # Start from step 0 with fresh optimizer
+        return result
+
+    # Skip optimizer/scheduler restore if architecture was migrated (param groups don't match)
+    if migrated:
+        print(f"    → Architecture migrated: Optimizer/Scheduler will start fresh")
         return result
 
     # Restore optimizer state
