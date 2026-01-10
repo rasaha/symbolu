@@ -7043,6 +7043,11 @@ class UnifiedTrainingConfig:
     jepa_phase_soul_steps: int = 30000       # Steps for Soul phase
     jepa_auto_phase_transition: bool = False # Auto-transition phases
 
+    # JEPA Dynamic Graduation (metric-based phase transitions)
+    jepa_enable_dynamic_graduation: bool = True    # Enable threshold-based graduation
+    jepa_graduation_loss_threshold: float = 20.0   # Graduate if JEPA loss < this
+    jepa_graduation_alignment_threshold: float = 72.0  # Graduate if alignment > this
+
     # JEPA Vritti Validation
     jepa_enable_vritti_validation: bool = False  # Enable Vritti gate validation
     jepa_viparyaya_threshold: float = 0.4    # Max error before damping
@@ -9406,6 +9411,9 @@ def train(config: UnifiedTrainingConfig):
         print(f"  ║  Training Curriculum:                                            ║")
         print(f"  ║    Phase: {config.jepa_training_phase.upper():6}    Auto-Transition: {'ON ' if config.jepa_auto_phase_transition else 'OFF'}              ║")
         print(f"  ║    Body Steps: {config.jepa_phase_body_steps:,}    Soul Steps: {config.jepa_phase_soul_steps:,}          ║")
+        if config.jepa_enable_dynamic_graduation and config.jepa_auto_phase_transition:
+            print(f"  ║  🎓 Dynamic Graduation: ENABLED                                   ║")
+            print(f"  ║    Loss < {config.jepa_graduation_loss_threshold:.1f}  AND  Alignment > {config.jepa_graduation_alignment_threshold:.1f}                  ║")
         if config.jepa_enable_vritti_validation:
             print(f"  ║  Vritti Validation: ACTIVE                                       ║")
             print(f"  ║    Viparyaya: {config.jepa_viparyaya_threshold:.2f}    Vikalpa: {config.jepa_vikalpa_threshold:.2f}                      ║")
@@ -9993,9 +10001,15 @@ def train(config: UnifiedTrainingConfig):
                     # Add JEPA loss to total loss
                     loss = loss + jepa_weight * jepa_loss
 
-                    # Update target encoder (EMA)
+                    # Update target encoder (EMA) and curriculum step
+                    # Pass jepa_loss and alignment for dynamic graduation
+                    jepa_loss_value = jepa_loss.item() if isinstance(jepa_loss, torch.Tensor) else jepa_loss
                     phase_changed, new_phase = jepa_model.training_step_update(
-                        metrics={'variance': jepa_loss_components.get('variance', 0.0)}
+                        metrics={
+                            'variance': jepa_loss_components.get('variance', 0.0),
+                            'jepa_loss': jepa_loss_value,
+                            'alignment': jepa_loss_components.get('alignment', 0.0),
+                        }
                     )
 
                     # Collect JEPA metrics
@@ -12473,6 +12487,14 @@ def main():
     parser.add_argument("--jepa_auto_phase_transition", action="store_true",
                        help="Automatically transition phases based on step count")
 
+    # JEPA Dynamic Graduation (metric-based phase transitions)
+    parser.add_argument("--jepa_enable_dynamic_graduation", action="store_true", default=True,
+                       help="Enable metric-based graduation (graduate when loss < threshold)")
+    parser.add_argument("--jepa_graduation_loss_threshold", type=float, default=20.0,
+                       help="Graduate to Soul phase when JEPA loss falls below this")
+    parser.add_argument("--jepa_graduation_alignment_threshold", type=float, default=72.0,
+                       help="Graduate to Soul phase when alignment rises above this")
+
     # JEPA Vritti Validation
     parser.add_argument("--jepa_enable_vritti_validation", action="store_true",
                        help="Enable Vritti gate validation (rejects error-prone predictions)")
@@ -12788,6 +12810,10 @@ def main():
         jepa_phase_body_steps=args.jepa_phase_body_steps,
         jepa_phase_soul_steps=args.jepa_phase_soul_steps,
         jepa_auto_phase_transition=args.jepa_auto_phase_transition,
+        # JEPA Dynamic Graduation
+        jepa_enable_dynamic_graduation=args.jepa_enable_dynamic_graduation,
+        jepa_graduation_loss_threshold=args.jepa_graduation_loss_threshold,
+        jepa_graduation_alignment_threshold=args.jepa_graduation_alignment_threshold,
         # JEPA Vritti Validation
         jepa_enable_vritti_validation=args.jepa_enable_vritti_validation,
         jepa_viparyaya_threshold=args.jepa_viparyaya_threshold,
