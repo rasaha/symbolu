@@ -5216,6 +5216,10 @@ class SovereignPhaseController:
     CSR causes a "semantic earthquake" at Layer 7. Kosha must wait for the
     dust to settle before defining "State of Reality" at Layer 9.
 
+    HYSTERESIS: Once a component engages, it stays engaged permanently.
+    This prevents bounce behavior from PPL fluctuations during training.
+    Components cannot disengage once they pass their PPL threshold.
+
     Usage:
         controller = SovereignPhaseController(config)
         # In training loop:
@@ -5252,7 +5256,9 @@ class SovereignPhaseController:
         self.kosha_csr_weight_threshold = kosha_csr_weight_threshold
         self.use_val_ppl = use_val_ppl
 
-        # State tracking
+        # State tracking - HYSTERESIS: once engaged, stay engaged
+        self.evoflow_engaged = False     # EvoFlow permanent engagement flag
+        self.toroidal_engaged = False    # Toroidal permanent engagement flag
         self.csr_engage_step = None      # Step when CSR first engaged
         self.kosha_engage_step = None    # Step when Kosha first engaged
         self.current_phase = self.PHASE_FOUNDATION
@@ -5291,18 +5297,25 @@ class SovereignPhaseController:
         }
 
         # Phase 1: EvoFlow (Internal Coherence)
+        # HYSTERESIS: Once engaged, stay engaged permanently
         if ppl < self.evoflow_ppl_threshold:
+            self.evoflow_engaged = True
+        if self.evoflow_engaged:
             weights['evoflow'] = 1.0
 
         # Phase 2: Toroidal (Global Feedback)
+        # HYSTERESIS: Once engaged, stay engaged permanently
         if ppl < self.toroidal_ppl_threshold:
+            self.toroidal_engaged = True
+        if self.toroidal_engaged:
             weights['toroidal'] = 1.0
 
         # Phase 3: CSR (Semantic Earthquake) - with linear warm-up
+        # HYSTERESIS: Once csr_engage_step is set, CSR stays engaged
         if ppl < self.csr_ppl_threshold:
             if self.csr_engage_step is None:
                 self.csr_engage_step = global_step
-
+        if self.csr_engage_step is not None:
             # Linear warm-up: 0.0 → 1.0 over csr_warmup_steps
             elapsed = global_step - self.csr_engage_step
             weights['csr'] = min(1.0, elapsed / self.csr_warmup_steps)
@@ -5311,9 +5324,11 @@ class SovereignPhaseController:
         # Only engages when:
         # 1. PPL < kosha_ppl_threshold
         # 2. CSR has warmed up past the threshold (earthquake settling)
+        # HYSTERESIS: Once kosha_engage_step is set, Kosha stays engaged
         if ppl < self.kosha_ppl_threshold and weights['csr'] >= self.kosha_csr_weight_threshold:
             if self.kosha_engage_step is None:
                 self.kosha_engage_step = global_step
+        if self.kosha_engage_step is not None:
             weights['kosha'] = 1.0
 
         # Update phase tracking
@@ -5377,6 +5392,12 @@ class SovereignPhaseController:
         """Get current controller status for logging/debugging."""
         return {
             'phase': self.current_phase,
+            'engaged': {
+                'evoflow': self.evoflow_engaged,
+                'toroidal': self.toroidal_engaged,
+                'csr': self.csr_engage_step is not None,
+                'kosha': self.kosha_engage_step is not None,
+            },
             'csr_engage_step': self.csr_engage_step,
             'kosha_engage_step': self.kosha_engage_step,
             'csr_warmup_progress': (
