@@ -11840,26 +11840,19 @@ def load_checkpoint(
         removed = [k for k in model_state if k in runtime_buffers]
         print(f"    → Filtered runtime buffers: {removed}")
 
-    # V9.6.8: Migrate old state_projector (nn.Sequential) to new SovereignStateProjector format
-    # Old format: state_projector.0.weight, state_projector.2.weight (nn.Sequential indices)
-    # New format: state_projector.projector.0.weight, state_projector.projector.3.weight
+    # V9.6.8: Handle old state_projector (nn.Sequential) → new SovereignStateProjector
+    # Old unconstrained weights produce extreme values that saturate softmax.
+    # Drop them entirely so SovereignStateProjector initializes with small weights.
     migrated = False
     old_projector_keys = [k for k in filtered_state if k.startswith("state_projector.") and ".projector." not in k and "layer_norm" not in k]
     if old_projector_keys:
         migrated = True
-        print(f"    → Migrating old state_projector format to SovereignStateProjector...")
-        migration_map = {
-            "state_projector.0.weight": "state_projector.projector.0.weight",
-            "state_projector.0.bias": "state_projector.projector.0.bias",
-            "state_projector.2.weight": "state_projector.projector.3.weight",
-            "state_projector.2.bias": "state_projector.projector.3.bias",
-        }
-        for old_key, new_key in migration_map.items():
-            if old_key in filtered_state:
-                filtered_state[new_key] = filtered_state.pop(old_key)
-                print(f"      {old_key} → {new_key}")
-        # New layer_norm weights will be initialized from model defaults (strict=False)
-        print(f"    ✓ Migration complete (layer_norm will use fresh initialization)")
+        print(f"    → Detected old state_projector format (unconstrained nn.Sequential)")
+        print(f"    → Dropping old weights to allow fresh SovereignStateProjector init")
+        for old_key in old_projector_keys:
+            del filtered_state[old_key]
+            print(f"      Dropped: {old_key}")
+        print(f"    ✓ state_projector will initialize fresh with proper normalization")
 
     model.load_state_dict(filtered_state, strict=False)
     print(f"    ✓ Model weights loaded")
