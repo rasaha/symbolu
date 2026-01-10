@@ -7029,8 +7029,9 @@ class UnifiedTrainingConfig:
     jepa_orthogonality_weight: float = 0.01  # Orthogonality regularization
 
     # JEPA Per-Component Alignment Weights
-    jepa_bhava_weight: float = 10.0          # Bhava (identity) component weight
-    jepa_semantic_weight: float = 1.0        # Kosha/Vritti (semantic) weight
+    # V9.6.8: Rebalanced to prevent Bhava mode collapse (was 10.0/1.0)
+    jepa_bhava_weight: float = 1.0           # Bhava (identity) - equal weight allows evolution
+    jepa_semantic_weight: float = 5.0        # Kosha/Vritti (semantic) - prioritized for coherence
     jepa_guna_weight: float = 0.1            # Guna (loosely coupled) weight
 
     # JEPA Target Encoder (EMA)
