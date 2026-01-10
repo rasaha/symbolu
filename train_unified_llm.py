@@ -5191,6 +5191,207 @@ class AdaptiveTrainingController:
 
 
 # =============================================================================
+# SOVEREIGN PHASE CONTROLLER (RSS): Rational Sovereign Sequence
+# =============================================================================
+
+class SovereignPhaseController:
+    """
+    Implements the Rational Sovereign Sequence (RSS) for staged engagement
+    of auxiliary gradient systems based on PPL thresholds.
+
+    The key insight: Layer dependencies require careful ordering.
+    - Layer 7 (CSR) feeds into Layer 9 (Kosha)
+    - If CSR is actively shifting Layer 7 semantics, Kosha learns "orphaned" mappings
+    - Solution: Stagger engagement so each layer stabilizes before the next builds on it
+
+    Engagement Order (SAFEST → RISKIEST):
+    1. EvoFlow   (PPL < 100) - Internal coherence, distributed gradients
+    2. Toroidal  (PPL < 60)  - Feedback loops need stable grammar
+    3. CSR       (PPL < 45)  - Semantic shift with linear warm-up (2500 steps)
+    4. Kosha     (PPL < 35)  - Only after CSR earthquake settles (weight > 0.5)
+
+    The "Stagger is the Secret" - CSR and Kosha must NOT engage together.
+    CSR causes a "semantic earthquake" at Layer 7. Kosha must wait for the
+    dust to settle before defining "State of Reality" at Layer 9.
+
+    Usage:
+        controller = SovereignPhaseController(config)
+        # In training loop:
+        weights = controller.get_gate_weights(current_ppl, global_step)
+        # Apply weights to auxiliary losses
+    """
+
+    # Phase names for logging
+    PHASE_FOUNDATION = "FOUNDATION"      # PPL > 100, only LM loss
+    PHASE_COHERENCE = "COHERENCE"        # PPL < 100, EvoFlow active
+    PHASE_FEEDBACK = "FEEDBACK"          # PPL < 60, Toroidal active
+    PHASE_ONTOLOGY = "ONTOLOGY"          # PPL < 45, CSR warming up
+    PHASE_SOVEREIGN = "SOVEREIGN"        # PPL < 35, Kosha active
+
+    def __init__(
+        self,
+        # PPL thresholds for engagement
+        evoflow_ppl_threshold: float = 100.0,
+        toroidal_ppl_threshold: float = 60.0,
+        csr_ppl_threshold: float = 45.0,
+        kosha_ppl_threshold: float = 35.0,
+        # Warm-up configuration
+        csr_warmup_steps: int = 2500,
+        kosha_csr_weight_threshold: float = 0.5,  # Kosha waits for CSR > 0.5
+        # Optional: use validation PPL (more stable) vs training PPL
+        use_val_ppl: bool = True,
+    ):
+        self.evoflow_ppl_threshold = evoflow_ppl_threshold
+        self.toroidal_ppl_threshold = toroidal_ppl_threshold
+        self.csr_ppl_threshold = csr_ppl_threshold
+        self.kosha_ppl_threshold = kosha_ppl_threshold
+
+        self.csr_warmup_steps = csr_warmup_steps
+        self.kosha_csr_weight_threshold = kosha_csr_weight_threshold
+        self.use_val_ppl = use_val_ppl
+
+        # State tracking
+        self.csr_engage_step = None      # Step when CSR first engaged
+        self.kosha_engage_step = None    # Step when Kosha first engaged
+        self.current_phase = self.PHASE_FOUNDATION
+
+        # Phase transition logging
+        self.phase_history = []
+        self._last_logged_phase = None
+
+    def get_gate_weights(
+        self,
+        current_ppl: float,
+        global_step: int,
+        val_ppl: Optional[float] = None,
+    ) -> Dict[str, float]:
+        """
+        Calculate dynamic weights for each auxiliary system based on PPL.
+
+        Args:
+            current_ppl: Current training PPL (from loss)
+            global_step: Current training step
+            val_ppl: Optional validation PPL (used if use_val_ppl=True)
+
+        Returns:
+            Dict with weights for: 'evoflow', 'toroidal', 'csr', 'kosha'
+            Weights range from 0.0 (detached) to 1.0 (fully engaged)
+        """
+        # Use validation PPL if available and configured
+        ppl = val_ppl if (self.use_val_ppl and val_ppl is not None) else current_ppl
+
+        # Initialize weights (all detached by default)
+        weights = {
+            'evoflow': 0.0,
+            'toroidal': 0.0,
+            'csr': 0.0,
+            'kosha': 0.0,
+        }
+
+        # Phase 1: EvoFlow (Internal Coherence)
+        if ppl < self.evoflow_ppl_threshold:
+            weights['evoflow'] = 1.0
+
+        # Phase 2: Toroidal (Global Feedback)
+        if ppl < self.toroidal_ppl_threshold:
+            weights['toroidal'] = 1.0
+
+        # Phase 3: CSR (Semantic Earthquake) - with linear warm-up
+        if ppl < self.csr_ppl_threshold:
+            if self.csr_engage_step is None:
+                self.csr_engage_step = global_step
+
+            # Linear warm-up: 0.0 → 1.0 over csr_warmup_steps
+            elapsed = global_step - self.csr_engage_step
+            weights['csr'] = min(1.0, elapsed / self.csr_warmup_steps)
+
+        # Phase 4: Kosha (Sovereign Synthesis)
+        # Only engages when:
+        # 1. PPL < kosha_ppl_threshold
+        # 2. CSR has warmed up past the threshold (earthquake settling)
+        if ppl < self.kosha_ppl_threshold and weights['csr'] >= self.kosha_csr_weight_threshold:
+            if self.kosha_engage_step is None:
+                self.kosha_engage_step = global_step
+            weights['kosha'] = 1.0
+
+        # Update phase tracking
+        self._update_phase(weights, ppl, global_step)
+
+        return weights
+
+    def _update_phase(self, weights: Dict[str, float], ppl: float, step: int):
+        """Update current phase and log transitions."""
+        # Determine current phase from weights
+        if weights['kosha'] > 0:
+            new_phase = self.PHASE_SOVEREIGN
+        elif weights['csr'] > 0:
+            new_phase = self.PHASE_ONTOLOGY
+        elif weights['toroidal'] > 0:
+            new_phase = self.PHASE_FEEDBACK
+        elif weights['evoflow'] > 0:
+            new_phase = self.PHASE_COHERENCE
+        else:
+            new_phase = self.PHASE_FOUNDATION
+
+        # Log phase transition
+        if new_phase != self.current_phase:
+            self.phase_history.append({
+                'step': step,
+                'ppl': ppl,
+                'from_phase': self.current_phase,
+                'to_phase': new_phase,
+                'weights': weights.copy(),
+            })
+            self.current_phase = new_phase
+
+    def get_phase_transition_message(self) -> Optional[str]:
+        """Get message for phase transition (call once per step for logging)."""
+        if self.current_phase != self._last_logged_phase:
+            self._last_logged_phase = self.current_phase
+
+            phase_icons = {
+                self.PHASE_FOUNDATION: "🏗️",
+                self.PHASE_COHERENCE: "🔄",
+                self.PHASE_FEEDBACK: "🌀",
+                self.PHASE_ONTOLOGY: "📜",
+                self.PHASE_SOVEREIGN: "👑",
+            }
+
+            phase_descriptions = {
+                self.PHASE_FOUNDATION: "Foundation (LM only)",
+                self.PHASE_COHERENCE: "Coherence (EvoFlow active)",
+                self.PHASE_FEEDBACK: "Feedback (Toroidal active)",
+                self.PHASE_ONTOLOGY: "Ontology (CSR warming up)",
+                self.PHASE_SOVEREIGN: "Sovereign (Full RSS active)",
+            }
+
+            icon = phase_icons.get(self.current_phase, "❓")
+            desc = phase_descriptions.get(self.current_phase, self.current_phase)
+
+            return f"{icon} [RSS] Phase Transition → {desc}"
+        return None
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get current controller status for logging/debugging."""
+        return {
+            'phase': self.current_phase,
+            'csr_engage_step': self.csr_engage_step,
+            'kosha_engage_step': self.kosha_engage_step,
+            'csr_warmup_progress': (
+                None if self.csr_engage_step is None
+                else "warming up"
+            ),
+            'phase_transitions': len(self.phase_history),
+            'thresholds': {
+                'evoflow': self.evoflow_ppl_threshold,
+                'toroidal': self.toroidal_ppl_threshold,
+                'csr': self.csr_ppl_threshold,
+                'kosha': self.kosha_ppl_threshold,
+            },
+        }
+
+
+# =============================================================================
 # DYNAMIC RELAXATION CONTROLLER: 9:3 → 6:6 TRANSITION
 # =============================================================================
 
@@ -6883,6 +7084,17 @@ class UnifiedTrainingConfig:
     evo_fluency_gate: bool = False           # Enable automatic EvoFlow gradient engagement
     evo_fluency_min_steps: int = 2000        # Minimum steps before engagement (warmup)
     evo_fluency_ppl_threshold: float = 100.0 # PPL threshold for "fluent" (engage when PPL < this)
+
+    # V9.8.0: RSS (Rational Sovereign Sequence) - Staged gradient engagement
+    # Replaces individual fluency gates with unified phase controller
+    # Key insight: Layer 7 (CSR) feeds Layer 9 (Kosha), so CSR must stabilize first
+    enable_rss: bool = False                 # Enable RSS phase controller
+    rss_evoflow_ppl: float = 100.0           # EvoFlow engages when PPL < this
+    rss_toroidal_ppl: float = 60.0           # Toroidal engages when PPL < this
+    rss_csr_ppl: float = 45.0                # CSR engages when PPL < this (with warmup)
+    rss_kosha_ppl: float = 35.0              # Kosha engages when PPL < this AND CSR > 50%
+    rss_csr_warmup_steps: int = 2500         # Steps for CSR to reach full strength (prevents 14x shock)
+    rss_use_val_ppl: bool = True             # Use validation PPL (more stable) vs training PPL
 
     # CSR Phoneme-Ontological Grounding
     enable_csr: bool = True                  # Enable CSR phoneme grounding
@@ -9887,6 +10099,24 @@ def train(config: UnifiedTrainingConfig):
     evo_fluency_engaged = False  # Once True, stays True (no disengagement)
     last_val_ppl = float('inf')  # Track validation PPL for fluency check
 
+    # V9.8.0: RSS (Rational Sovereign Sequence) Controller
+    rss_controller = None
+    if config.enable_rss:
+        rss_controller = SovereignPhaseController(
+            evoflow_ppl_threshold=config.rss_evoflow_ppl,
+            toroidal_ppl_threshold=config.rss_toroidal_ppl,
+            csr_ppl_threshold=config.rss_csr_ppl,
+            kosha_ppl_threshold=config.rss_kosha_ppl,
+            csr_warmup_steps=config.rss_csr_warmup_steps,
+            use_val_ppl=config.rss_use_val_ppl,
+        )
+        print(f"\n  👑 [RSS] Rational Sovereign Sequence ENABLED")
+        print(f"     ├─ EvoFlow:  PPL < {config.rss_evoflow_ppl}")
+        print(f"     ├─ Toroidal: PPL < {config.rss_toroidal_ppl}")
+        print(f"     ├─ CSR:      PPL < {config.rss_csr_ppl} (warmup: {config.rss_csr_warmup_steps} steps)")
+        print(f"     └─ Kosha:    PPL < {config.rss_kosha_ppl} (after CSR > 50%)")
+        print(f"     Using {'validation' if config.rss_use_val_ppl else 'training'} PPL for thresholds\n")
+
     while global_step < config.max_steps:
         # Get batch
         try:
@@ -9937,6 +10167,29 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     logits = outputs
                 loss, metrics = compute_phase_loss(logits, y, config)
+
+            # =================================================================
+            # V9.8.0: RSS (Rational Sovereign Sequence) Weight Calculation
+            # =================================================================
+            rss_weights = {'evoflow': 0.0, 'toroidal': 0.0, 'csr': 0.0, 'kosha': 0.0}
+            if rss_controller is not None:
+                # Calculate training PPL for this step
+                train_ppl = torch.exp(loss.detach()).item()
+                rss_weights = rss_controller.get_gate_weights(
+                    current_ppl=train_ppl,
+                    global_step=global_step,
+                    val_ppl=last_val_ppl if last_val_ppl < float('inf') else None,
+                )
+                # Log phase transitions
+                phase_msg = rss_controller.get_phase_transition_message()
+                if phase_msg:
+                    print(phase_msg)
+                # Store weights for metrics
+                metrics['rss_evoflow'] = rss_weights['evoflow']
+                metrics['rss_toroidal'] = rss_weights['toroidal']
+                metrics['rss_csr'] = rss_weights['csr']
+                metrics['rss_kosha'] = rss_weights['kosha']
+                metrics['rss_phase'] = rss_controller.current_phase
 
             # =================================================================
             # V9.8.0: Sovereign Reasoning Kernel (SRK) Integration
@@ -10264,6 +10517,11 @@ def train(config: UnifiedTrainingConfig):
                         csr_alignment_loss = ((1 - csr_similarity) / config.csr_tau) * csr_confidence_for_loss.squeeze(-1)
                         csr_loss = csr_alignment_loss.mean() * config.csr_lambda
 
+                        # V9.8.0: RSS scales CSR loss with linear warmup to prevent 14x gradient shock
+                        if config.enable_rss and rss_weights['csr'] > 0:
+                            csr_loss = csr_loss * rss_weights['csr']
+                            csr_metrics['rss_csr_weight'] = rss_weights['csr']
+
                         # V9.6.9: CSR loss is now purely observational (no gradients flow)
                         # We still track it for metrics, but it doesn't influence training
                         # The cross-entropy LM loss is the ONLY training signal
@@ -10382,15 +10640,29 @@ def train(config: UnifiedTrainingConfig):
                         hidden_states = outputs['last_hidden_state']
 
                 if hidden_states is not None:
+                    # V9.8.0: RSS controls Toroidal gradient engagement
+                    toroidal_should_engage = False
+                    if config.enable_rss:
+                        toroidal_should_engage = rss_weights['toroidal'] > 0
+
                     # Get O12 (harvest) - either last element of list or the tensor itself
                     if isinstance(hidden_states, (list, tuple)) and len(hidden_states) > 0:
-                        # V9.6.7: DETACH to prevent gradient flow to model!
-                        o12_state = hidden_states[-1].detach()  # Last layer = O12
-                        o1_state = hidden_states[0].detach() if len(hidden_states) > 1 else o12_state
+                        if toroidal_should_engage:
+                            # RSS engaged - let gradients flow
+                            o12_state = hidden_states[-1]
+                            o1_state = hidden_states[0] if len(hidden_states) > 1 else o12_state
+                        else:
+                            # V9.6.7: DETACH to prevent gradient flow to model!
+                            o12_state = hidden_states[-1].detach()
+                            o1_state = hidden_states[0].detach() if len(hidden_states) > 1 else o12_state
                     else:
-                        # V9.6.7: DETACH to prevent gradient flow!
-                        o12_state = hidden_states.detach()
-                        o1_state = hidden_states.detach()
+                        if toroidal_should_engage:
+                            o12_state = hidden_states
+                            o1_state = hidden_states
+                        else:
+                            # V9.6.7: DETACH to prevent gradient flow!
+                            o12_state = hidden_states.detach()
+                            o1_state = hidden_states.detach()
 
                     # Compute toroidal coherence if we have a prior seed
                     if toroidal_seed is not None:
@@ -10458,14 +10730,24 @@ def train(config: UnifiedTrainingConfig):
                 hidden_states = hidden_state_extractor.get_hidden_states(outputs, x)
 
                 if hidden_states is not None and len(hidden_states) > 0:
-                    # V9.7.0: EvoFlow Fluency Gate - check if gradients should be engaged
-                    if config.evo_fluency_gate and not evo_fluency_engaged:
-                        if global_step >= config.evo_fluency_min_steps and last_val_ppl < config.evo_fluency_ppl_threshold:
+                    # V9.8.0: RSS takes precedence over individual fluency gate
+                    evo_should_engage = False
+                    if config.enable_rss:
+                        # RSS mode: Use RSS weight for engagement decision
+                        evo_should_engage = rss_weights['evoflow'] > 0
+                        if evo_should_engage and not evo_fluency_engaged:
                             evo_fluency_engaged = True
-                            print(f"🚀 [FLUENCY GATE] EvoFlow Gradients ENGAGED! (Step {global_step}, PPL {last_val_ppl:.2f} < {config.evo_fluency_ppl_threshold})")
+                            print(f"🔄 [RSS] EvoFlow Gradients ENGAGED! (Phase: {rss_controller.current_phase})")
+                    else:
+                        # V9.7.0: Legacy EvoFlow Fluency Gate
+                        if config.evo_fluency_gate and not evo_fluency_engaged:
+                            if global_step >= config.evo_fluency_min_steps and last_val_ppl < config.evo_fluency_ppl_threshold:
+                                evo_fluency_engaged = True
+                                print(f"🚀 [FLUENCY GATE] EvoFlow Gradients ENGAGED! (Step {global_step}, PPL {last_val_ppl:.2f} < {config.evo_fluency_ppl_threshold})")
+                        evo_should_engage = config.evo_fluency_gate and evo_fluency_engaged
 
-                    # V9.6.7/V9.7.0: Conditionally detach hidden states
-                    if config.evo_fluency_gate and evo_fluency_engaged:
+                    # V9.6.7/V9.7.0/V9.8.0: Conditionally detach hidden states
+                    if evo_should_engage:
                         # Fluency achieved - let gradients flow to main model
                         hidden_states_detached = hidden_states  # No detach - gradients flow
                     else:
@@ -10521,7 +10803,12 @@ def train(config: UnifiedTrainingConfig):
             # Couples Entity State (Entropy/Gradients) to Representation (Embeddings)
             # =====================================================================
             kosha_steering_loss = 0.0
-            if config.enable_kosha_steering and global_step >= config.kosha_steering_warmup:
+            # V9.8.0: RSS controls Kosha engagement based on PPL thresholds
+            kosha_should_engage = config.enable_kosha_steering and global_step >= config.kosha_steering_warmup
+            if config.enable_rss:
+                # RSS mode: Only engage when RSS says so (after CSR settles)
+                kosha_should_engage = kosha_should_engage and rss_weights['kosha'] > 0
+            if kosha_should_engage:
                 try:
                     # Compute Reality (r) and Time (t) axes from current state
                     if config.model_type in ("ontological", "ontological_hybrid"):
@@ -11113,6 +11400,17 @@ def train(config: UnifiedTrainingConfig):
                 # V9.4.6: Log SNI activation
                 if metrics.get('sni_triggered', False):
                     log_msg += f"\n    --> [SNI] Low entropy ({metrics.get('onto_entropy', 0):.2f}) - injecting sensory noise"
+
+                # V9.8.0: Log RSS phase and weights
+                if rss_controller is not None:
+                    phase_icons = {
+                        'FOUNDATION': '🏗️', 'COHERENCE': '🔄', 'FEEDBACK': '🌀',
+                        'ONTOLOGY': '📜', 'SOVEREIGN': '👑'
+                    }
+                    phase = rss_controller.current_phase
+                    icon = phase_icons.get(phase, '❓')
+                    csr_pct = int(rss_weights['csr'] * 100)
+                    log_msg += f"\n    {icon} [RSS] Phase: {phase} | Evo:{int(rss_weights['evoflow']*100)}% Tor:{int(rss_weights['toroidal']*100)}% CSR:{csr_pct}% Kosh:{int(rss_weights['kosha']*100)}%"
 
                 print(log_msg, flush=True)  # V9.7.0: Flush for real-time output when piped to tee
 
@@ -12341,6 +12639,22 @@ def main():
     parser.add_argument("--evo_fluency_ppl_threshold", type=float, default=100.0,
                        help="PPL threshold for 'fluent' - engage EvoFlow when PPL < this")
 
+    # V9.8.0: RSS (Rational Sovereign Sequence) - Staged gradient engagement
+    parser.add_argument("--enable_rss", action="store_true",
+                       help="Enable RSS phase controller for staged gradient engagement")
+    parser.add_argument("--rss_evoflow_ppl", type=float, default=100.0,
+                       help="PPL threshold for EvoFlow engagement")
+    parser.add_argument("--rss_toroidal_ppl", type=float, default=60.0,
+                       help="PPL threshold for Toroidal engagement")
+    parser.add_argument("--rss_csr_ppl", type=float, default=45.0,
+                       help="PPL threshold for CSR engagement (with warmup)")
+    parser.add_argument("--rss_kosha_ppl", type=float, default=35.0,
+                       help="PPL threshold for Kosha engagement (after CSR settles)")
+    parser.add_argument("--rss_csr_warmup_steps", type=int, default=2500,
+                       help="Steps for CSR to reach full strength (prevents 14x shock)")
+    parser.add_argument("--rss_use_val_ppl", action="store_true", default=True,
+                       help="Use validation PPL for RSS thresholds (more stable)")
+
     # CSR Phoneme-Ontological Grounding
     parser.add_argument("--enable_csr", action="store_true", default=True,
                        help="Enable CSR phoneme grounding")
@@ -12784,6 +13098,14 @@ def main():
         evo_fluency_gate=args.evo_fluency_gate,
         evo_fluency_min_steps=args.evo_fluency_min_steps,
         evo_fluency_ppl_threshold=args.evo_fluency_ppl_threshold,
+        # V9.8.0: RSS (Rational Sovereign Sequence)
+        enable_rss=args.enable_rss,
+        rss_evoflow_ppl=args.rss_evoflow_ppl,
+        rss_toroidal_ppl=args.rss_toroidal_ppl,
+        rss_csr_ppl=args.rss_csr_ppl,
+        rss_kosha_ppl=args.rss_kosha_ppl,
+        rss_csr_warmup_steps=args.rss_csr_warmup_steps,
+        rss_use_val_ppl=args.rss_use_val_ppl,
         # CSR Phoneme-Ontological Grounding
         enable_csr=args.enable_csr and not args.disable_csr,
         csr_lambda=args.csr_lambda,
