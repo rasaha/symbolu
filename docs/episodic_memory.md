@@ -370,9 +370,15 @@ def generate_with_memory(
     min_retrieval_score: float = 0.0,
     force_retrieval: Optional[bool] = None,
     device: Optional[torch.device] = None,
+    max_context_length: Optional[int] = None,  # NEW: Override model's max length
 ) -> Dict[str, Any]:
     """
     Generate text with Sovereign-gated episodic memory retrieval.
+
+    Safety mechanisms:
+    - Context truncation respects model's max_position_embeddings
+    - Natural format for non-instruct models
+    - Graceful fallback on any errors
 
     Args:
         model: OntologicalHybridTransformer model
@@ -386,6 +392,7 @@ def generate_with_memory(
         min_retrieval_score: Minimum similarity score for retrieval
         force_retrieval: Override gate logic (True=always, False=never)
         device: Device for computation
+        max_context_length: Override model's max context length
 
     Returns:
         Dictionary with:
@@ -393,8 +400,10 @@ def generate_with_memory(
         - retrieval_triggered: Whether retrieval was triggered
         - retrieval_reason: Reason for decision
         - retrieved_chunks: List of chunks (if any)
-        - state_info: Sovereign state information
+        - state_info: Sovereign state information (or None if failed)
         - full_prompt: The actual prompt used
+        - truncated: Whether context was truncated
+        - prompt_tokens: Final prompt token count
     """
 ```
 
@@ -480,25 +489,48 @@ for prompt, result in zip(prompts, results):
 
 ### Context Injection Format
 
-When retrieval is triggered, the prompt is augmented as:
+When retrieval is triggered, the prompt is augmented using a **natural instruction format** (better for non-instruct models):
 
 ```
-[CONTEXT START]
-Source: WikiText-103 (Chunk 1)
+Information:
 The Eiffel Tower is a wrought-iron lattice tower on the Champ de Mars
 in Paris, France. It is named after the engineer Gustave Eiffel...
 
-Source: WikiText-103 (Chunk 2)
 Paris is the capital and most populous city of France, with an
 estimated population of 2,165,423 residents...
 
-Source: WikiText-103 (Chunk 3)
 France is a country in Western Europe with several overseas regions
 and territories...
-[CONTEXT END]
 
+Based on the information above, answer the question.
 Question: Where is the Eiffel Tower located?
 Answer:
+```
+
+> **Note:** We use natural language format instead of special tokens like `[CONTEXT START]` because non-instruct models haven't seen these tokens during training and may get confused.
+
+### Context Truncation (Safety Mechanism)
+
+The system automatically truncates context to fit within the model's context window:
+
+```python
+# Available space calculation:
+available_tokens = (
+    model.config.max_position_embeddings  # e.g., 2048
+    - prompt_template_tokens              # Template overhead
+    - max_new_tokens                      # Reserved for generation
+    - 50                                  # Safety buffer
+)
+
+# Chunks are added until space runs out
+# Partial chunks are truncated with "..." if meaningful space remains
+```
+
+**Result includes truncation info:**
+```python
+result = generate_with_memory(...)
+print(f"Truncated: {result['truncated']}")      # True if chunks were cut
+print(f"Prompt tokens: {result['prompt_tokens']}")  # Final prompt size
 ```
 
 ### Fallback Behavior
@@ -507,6 +539,7 @@ If retrieval is **not triggered** or **fails**:
 - No context block is injected
 - Pure generation proceeds with original prompt
 - `retrieval_triggered` is set to `False` in the result
+- Errors are logged but don't crash the system
 
 ---
 
@@ -695,6 +728,7 @@ from symbolu.inference_rag import (
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1.0 | 2024-01-10 | Added safety mechanisms: context truncation, natural format, error handling |
 | 1.0.0 | 2024-01-10 | Initial implementation |
 
 ---
