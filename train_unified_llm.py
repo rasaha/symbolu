@@ -9461,6 +9461,7 @@ def train(config: UnifiedTrainingConfig):
     resumed_sgp_state = None
     resumed_sattvic_state = None
     resumed_srk_state = None
+    resumed_scaler_state = None  # V9.8.1: AMP GradScaler state
     if config.resume:
         resume_path = Path(config.resume)
         if resume_path.exists():
@@ -9479,6 +9480,7 @@ def train(config: UnifiedTrainingConfig):
             resumed_sgp_state = resume_result.get("sgp_state")
             resumed_sattvic_state = resume_result.get("sattvic_state")
             resumed_srk_state = resume_result.get("srk_state")
+            resumed_scaler_state = resume_result.get("scaler_state")  # V9.8.1
         else:
             print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
             print(f"      Starting training from scratch...")
@@ -9656,6 +9658,14 @@ def train(config: UnifiedTrainingConfig):
     # Mixed precision
     scaler = torch.amp.GradScaler('cuda') if config.mixed_precision != "none" else None
     autocast_dtype = torch.bfloat16 if config.mixed_precision == "bf16" else torch.float16
+
+    # V9.8.1: Restore AMP GradScaler state from checkpoint if available
+    if resumed_scaler_state is not None and scaler is not None:
+        try:
+            scaler.load_state_dict(resumed_scaler_state)
+            print(f"    ✓ AMP GradScaler state restored from checkpoint")
+        except Exception as e:
+            print(f"    ⚠️  Could not restore AMP GradScaler state: {e}")
 
     # Training state (use resume_step if resuming from checkpoint)
     global_step = resume_step
@@ -11513,6 +11523,7 @@ def train(config: UnifiedTrainingConfig):
                         sgp_state=sgp_controller.get_state() if sgp_controller else None,
                         sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                         srk_state=srk.get_checkpoint_state() if srk else None,
+                        scaler_state=scaler.state_dict() if scaler else None,  # V9.8.1
                     )
                 print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
 
@@ -11549,6 +11560,7 @@ def train(config: UnifiedTrainingConfig):
                     sgp_state=sgp_controller.get_state() if sgp_controller else None,
                     sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                     srk_state=srk.get_checkpoint_state() if srk else None,
+                    scaler_state=scaler.state_dict() if scaler else None,  # V9.8.1
                 )
                 print(f"  💾 Checkpoint saved: last.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
@@ -11564,6 +11576,7 @@ def train(config: UnifiedTrainingConfig):
         sgp_state=sgp_controller.get_state() if sgp_controller else None,
         sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
         srk_state=srk.get_checkpoint_state() if srk else None,
+        scaler_state=scaler.state_dict() if scaler else None,  # V9.8.1
     )
     # v2.7 Training State Tracker: Save final state
     if training_state_tracker is not None and training_state_tracker.enabled:
@@ -11664,8 +11677,9 @@ def save_checkpoint(
     sgp_state: Optional[dict] = None,
     sattvic_state: Optional[dict] = None,
     srk_state: Optional[dict] = None,
+    scaler_state: Optional[dict] = None,
 ):
-    """Save training checkpoint with optional HGS/DRC/SGP/Sattvic/SRK state.
+    """Save training checkpoint with optional HGS/DRC/SGP/Sattvic/SRK/AMP scaler state.
 
     For last.pt checkpoints, explicitly removes old file before saving new one
     to ensure clean replacement and avoid potential corruption.
@@ -11702,6 +11716,10 @@ def save_checkpoint(
     # V9.8.0: Add SRK state if provided
     if srk_state is not None:
         checkpoint["srk_state"] = srk_state
+
+    # V9.8.1: Add AMP GradScaler state if provided
+    if scaler_state is not None:
+        checkpoint["scaler_state"] = scaler_state
 
     # Explicitly remove old checkpoint before saving (especially for last.pt)
     # This ensures clean replacement and frees disk space before writing
@@ -11818,6 +11836,11 @@ def load_checkpoint(
     if "srk_state" in checkpoint:
         result["srk_state"] = checkpoint["srk_state"]
         print(f"    ✓ SRK state available for restoration")
+
+    # V9.8.1: Return AMP GradScaler state for restoration
+    if "scaler_state" in checkpoint:
+        result["scaler_state"] = checkpoint["scaler_state"]
+        print(f"    ✓ AMP GradScaler state available for restoration")
 
     print(f"    → Resuming from step {result['step']}, best_val_loss={result['best_val_loss']:.4f}")
 
