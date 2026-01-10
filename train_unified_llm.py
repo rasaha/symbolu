@@ -3281,7 +3281,7 @@ class VRAMGovernor:
 
         # Check for high VRAM (warning threshold)
         elif usage > self.vram_threshold:
-            actions.append(f"⚠️  [VRAM ALERT] Usage at {usage:.1%} ({used_gb:.1f}GB/{total_gb:.1f}GB)")
+            actions.append(f"📊 [VRAM Governor] Adaptive resize: {usage:.1%} ({used_gb:.1f}GB/{total_gb:.1f}GB)")
 
             # Clear cache first
             torch.cuda.empty_cache()
@@ -3339,8 +3339,10 @@ class VRAMGovernor:
                 effective = new_batch * new_accum
                 actions.append(f"   📊 Gradient accumulation: {old_accum} → {new_accum} (effective batch: {effective})")
 
-        mode = "EMERGENCY" if emergency else "RESIZE"
-        actions.append(f"   🛠️  [{mode}] Batch: {old_batch} → {new_batch} | Total resizes: {self.resize_count}")
+        if emergency:
+            actions.append(f"   🚨 Emergency: Batch {old_batch} → {new_batch} | Resizes: {self.resize_count}")
+        else:
+            actions.append(f"   ✓ Adjusted: Batch {old_batch} → {new_batch} | Resizes: {self.resize_count}")
 
     def _apply_batch_increase(
         self,
