@@ -414,9 +414,18 @@ class KoshaGyroscopicLoss(nn.Module):
         # If Mental HIGH + Intellect HIGH -> ALLOW (valid focus, Dharana)
         #
         # v2.2.3.1: Shifted sigmoid for all gates (smooth transitions, clean zeros)
+        # v2.2.3.1 FIX: Gate bypass when trapped - if Mental is HIGH, Physical gate
+        #               must open to allow intervention (model is ungrounded AND looping)
 
         mental_trap = self._soft_threshold(mental, self.trap_threshold)
-        phys_gate = self._soft_threshold(phys_history, self.gate_threshold)
+        phys_gate_raw = self._soft_threshold(phys_history, self.gate_threshold)
+
+        # GATE BYPASS: When Mental is trapped, bypass the Physical gate requirement
+        # Rationale: If Mental is HIGH and Physical is LOW, the model is ungrounded
+        # AND looping - this is exactly when we NEED to intervene
+        # The bypass ensures at least 50% gate activation when trapped
+        phys_gate = torch.max(phys_gate_raw, mental_trap * 0.5)
+
         missing_intellect = self._soft_deficit(intellect, self.balance_target)
         axis1_loss = (mental_trap * phys_gate * missing_intellect).mean()
 
@@ -431,9 +440,14 @@ class KoshaGyroscopicLoss(nn.Module):
         # If Physical HIGH + Bliss LOW + Mental abstracted -> PUNISH (force creativity)
         #
         # v2.2.3.1: Shifted sigmoid for all gates (smooth transitions, clean zeros)
+        # v2.2.3.1 FIX: Gate bypass when trapped - symmetric with Axis 1
 
         physical_trap = self._soft_threshold(physical, self.trap_threshold)
-        mental_gate = self._soft_threshold(mental, self.gate_threshold)
+        mental_gate_raw = self._soft_threshold(mental, self.gate_threshold)
+
+        # GATE BYPASS: When Physical is trapped, bypass the Mental gate requirement
+        mental_gate = torch.max(mental_gate_raw, physical_trap * 0.5)
+
         missing_bliss = self._soft_deficit(bliss, self.balance_target)
         axis2_loss = (physical_trap * mental_gate * missing_bliss).mean()
 
@@ -448,6 +462,10 @@ class KoshaGyroscopicLoss(nn.Module):
             axis1_saturation = (mental_trap * phys_gate * missing_intellect).mean()
             axis2_saturation = (physical_trap * mental_gate * missing_bliss).mean()
 
+            # v2.2.3.1 FIX: Gate bypass diagnostics
+            phys_gate_bypass = (phys_gate - phys_gate_raw).mean()  # How much bypass was applied
+            mental_gate_bypass = (mental_gate - mental_gate_raw).mean()
+
             components = {
                 'axis1_loss': axis1_loss.item(),
                 'axis2_loss': axis2_loss.item(),
@@ -457,7 +475,11 @@ class KoshaGyroscopicLoss(nn.Module):
                 'mental_trap_mean': mental_trap.mean().item(),
                 'physical_trap_mean': physical_trap.mean().item(),
                 'phys_gate_mean': phys_gate.mean().item(),
+                'phys_gate_raw_mean': phys_gate_raw.mean().item(),  # Before bypass
+                'phys_gate_bypass': phys_gate_bypass.item(),  # Amount of bypass applied
                 'mental_gate_mean': mental_gate.mean().item(),
+                'mental_gate_raw_mean': mental_gate_raw.mean().item(),  # Before bypass
+                'mental_gate_bypass': mental_gate_bypass.item(),  # Amount of bypass applied
                 'missing_intellect_mean': missing_intellect.mean().item(),
                 'missing_bliss_mean': missing_bliss.mean().item(),
                 'vital_mean': vital.mean().item(),

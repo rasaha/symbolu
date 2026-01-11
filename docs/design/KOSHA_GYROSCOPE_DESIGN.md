@@ -1,7 +1,7 @@
 # Kosha Gyroscope: Homeostatic Self-Regulation System
 
-**Version:** 2.2.0
-**Status:** Design Complete, Refinements Documented
+**Version:** 2.2.3.1
+**Status:** Design Complete, Gate Bypass Fix Implemented
 **Date:** 2026-01-11
 **Origin:** Vedic Kosha Theory + Control Theory + Constitutional AI
 **Curriculum:** Instructor-Led (Gyroscope ON) → Self-Learning (Gyroscope OFF at PPL < 30)
@@ -1484,7 +1484,67 @@ if logger.capture_fluidity(step, tokens, kosha_states, loss_components):
 - `combined_saturation`: Max of both axes
 - `steepness`: Current damping steepness
 
-### 14.6 Version History
+### 14.6 Gate Bypass Fix
+
+**Problem Discovered**: During training, we observed that:
+- Rip rate: ~4500-5600 per 1k steps (very high)
+- Gyroscope Loss: 0.0000-0.0001 (essentially ZERO)
+
+**The Paradox**: Rips were being detected but the gyroscope wasn't penalizing.
+
+**Root Cause Analysis**: Physical gate was blocking when needed most.
+
+When Mental is HIGH, Physical tends to be LOW (negatively correlated):
+```
+Mental HIGH (looping) → Model is ungrounded → Physical LOW
+Physical LOW → phys_gate = sigmoid((physical - 0.30) * temp) ≈ 0
+phys_gate ≈ 0 → axis1_loss = (mental_trap * 0 * missing_intellect) = 0
+```
+
+The gate was designed to ensure Physical grounding before intervening, but this
+created a catch-22: when the model is most trapped (high Mental, low Physical),
+the gate blocks all intervention.
+
+**Solution: Mental-Triggered Gate Bypass**
+
+When Mental is trapped, bypass the Physical gate requirement:
+
+```python
+mental_trap = self._soft_threshold(mental, self.trap_threshold)
+phys_gate_raw = self._soft_threshold(phys_history, self.gate_threshold)
+
+# GATE BYPASS: When Mental is trapped, bypass the Physical gate requirement
+# Rationale: If Mental is HIGH and Physical is LOW, the model is ungrounded
+# AND looping - this is exactly when we NEED to intervene
+# The bypass ensures at least 50% gate activation when trapped
+phys_gate = torch.max(phys_gate_raw, mental_trap * 0.5)
+```
+
+**Symmetric Fix for Axis 2**:
+```python
+physical_trap = self._soft_threshold(physical, self.trap_threshold)
+mental_gate_raw = self._soft_threshold(mental, self.gate_threshold)
+
+# GATE BYPASS: When Physical is trapped, bypass the Mental gate requirement
+mental_gate = torch.max(mental_gate_raw, physical_trap * 0.5)
+```
+
+**Diagnostics Added**:
+- `phys_gate_raw_mean`: Gate value before bypass
+- `phys_gate_bypass`: Amount of bypass applied (phys_gate - phys_gate_raw)
+- `mental_gate_raw_mean`: Gate value before bypass
+- `mental_gate_bypass`: Amount of bypass applied
+
+**User's Insight** (preserved in design):
+> "Don't remove dampening and ReLU Ripping... they have a purpose—when mental
+> is dominant (dampening) makes blissful decreases. But ripping will make it
+> reverse that it becomes more physical. The real problem is physical gates
+> need to be open so that it becomes intellect."
+
+This insight correctly identified that both approaches serve different purposes,
+and the true fix was ensuring gates can open when intervention is needed.
+
+### 14.7 Version History
 
 | Version | Feature | Status |
 |---------|---------|--------|
@@ -1492,7 +1552,7 @@ if logger.capture_fluidity(step, tokens, kosha_states, loss_components):
 | v2.2.1 | Dynamic Weight Scheduler | Released |
 | v2.3.0 | Kosha-Vritti Resonance Map | Released |
 | v2.4.0 | Kosha Phase Corrector (Inference) | Released |
-| **v2.2.3.1** | **Soft-Threshold Damping** | **Current** |
+| **v2.2.3.1** | **Soft-Threshold Damping + Gate Bypass** | **Current** |
 
 ---
 
