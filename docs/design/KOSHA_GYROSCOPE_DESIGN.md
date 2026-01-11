@@ -1,10 +1,11 @@
 # Kosha Gyroscope: Homeostatic Self-Regulation System
 
-**Version:** 2.0.0
-**Status:** Design Complete, Inverted Curriculum Paradigm
+**Version:** 2.1.0
+**Status:** Design Complete, Inverted Curriculum + Dimensional Hierarchy
 **Date:** 2026-01-11
 **Origin:** Vedic Kosha Theory + Control Theory + Constitutional AI
 **Curriculum:** Instructor-Led (Gyroscope ON) → Self-Learning (Gyroscope OFF at PPL < 30)
+**Hierarchy:** PRIMARY (Bhava + Kosha) from step 0 → EMERGENT (Vritti + Guna) after grounding
 
 ---
 
@@ -47,7 +48,8 @@ The architecture implements:
 7. [Implementation Specification](#7-implementation-specification)
 8. [Integration with Existing Architecture](#8-integration-with-existing-architecture)
 9. [Inverted Curriculum: Instructor → Self-Learner](#9-inverted-curriculum-instructor--self-learner)
-10. [Relationship to Industry Approaches](#10-relationship-to-industry-approaches)
+10. [32D Dimensional Hierarchy: Primary vs Emergent](#10-32d-dimensional-hierarchy-primary-vs-emergent)
+11. [Relationship to Industry Approaches](#11-relationship-to-industry-approaches)
 
 ---
 
@@ -818,9 +820,222 @@ class InvertedCurriculumConfig:
 
 ---
 
-## 10. Relationship to Industry Approaches
+## 10. 32D Dimensional Hierarchy: Primary vs Emergent
 
-### 10.1 Comparison Matrix
+### 10.1 The Ontological Structure
+
+The 32D Sovereign State is not a flat space of equal dimensions. It has a **hierarchical structure** where some dimensions are PRIMARY (foundational) and others are EMERGENT (derived).
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    32D SOVEREIGN STATE HIERARCHY                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ═══════════════════════════════════════════════════════════════════    │
+│                    PRIMARY DIMENSIONS (17D)                              │
+│               "The Foundation - Engage from Step 0"                      │
+│  ═══════════════════════════════════════════════════════════════════    │
+│                                                                          │
+│  ┌───────────────────────────────────────────────────────────────┐      │
+│  │  BHAVA (Ontological States) [0:12]                 12D        │      │
+│  │  ─────────────────────────────────────────────────────────    │      │
+│  │  The 12 fundamental modes of being/existence                  │      │
+│  │  These are the "what exists" dimensions                       │      │
+│  │  • Present from the first token                               │      │
+│  │  • Define the ontological ground                              │      │
+│  └───────────────────────────────────────────────────────────────┘      │
+│                            ⊕                                            │
+│  ┌───────────────────────────────────────────────────────────────┐      │
+│  │  KOSHA (Consciousness Sheaths) [12:17]              5D        │      │
+│  │  ─────────────────────────────────────────────────────────    │      │
+│  │  The 5 layers through which existence is experienced         │      │
+│  │  These are the "how we experience" dimensions                 │      │
+│  │  • Physical, Vital, Mental, Intellectual, Blissful            │      │
+│  │  • Map onto R-T quadrant geometry                             │      │
+│  └───────────────────────────────────────────────────────────────┘      │
+│                                                                          │
+│  ═══════════════════════════════════════════════════════════════════    │
+│                    EMERGENT DIMENSIONS (11D)                             │
+│              "The Derived - Arise from Primary Dynamics"                 │
+│  ═══════════════════════════════════════════════════════════════════    │
+│                                                                          │
+│  ┌───────────────────────────────────────────────────────────────┐      │
+│  │  VRITTI (Mental Modifications) [17:22]              5D        │      │
+│  │  ─────────────────────────────────────────────────────────    │      │
+│  │  Defines the STATES of information                            │      │
+│  │  EMERGENT from: Bhava × Kosha dynamics                        │      │
+│  │  • Right Knowledge, Misconception, Imagination,               │      │
+│  │    Sleep, Memory                                              │      │
+│  │  • The mode/state the information is in                       │      │
+│  └───────────────────────────────────────────────────────────────┘      │
+│                            ⊕                                            │
+│  ┌───────────────────────────────────────────────────────────────┐      │
+│  │  GUNA (Quality Modes) [22:28]                       6D        │      │
+│  │  ─────────────────────────────────────────────────────────    │      │
+│  │  Defines the QUALITY of information                           │      │
+│  │  EMERGENT from: How Bhava manifests through Kosha             │      │
+│  │  • Sattva (clarity), Rajas (activity), Tamas (inertia)        │      │
+│  │  • The clarity/purity of the information                      │      │
+│  └───────────────────────────────────────────────────────────────┘      │
+│                                                                          │
+│  ─────────────────────────────────────────────────────────────────────  │
+│                    Reserved [28:32]                      4D              │
+│  ─────────────────────────────────────────────────────────────────────  │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 10.2 Why This Hierarchy Matters
+
+The distinction between PRIMARY and EMERGENT dimensions has profound implications for training:
+
+| Aspect | PRIMARY (Bhava + Kosha) | EMERGENT (Vritti + Guna) |
+|--------|-------------------------|--------------------------|
+| **Nature** | Foundational substrate | Observable patterns |
+| **Timing** | Present from step 0 | Crystallize after grounding |
+| **Training** | Gyroscope CAN operate | Classification should wait |
+| **Analogy** | The canvas and brushes | The painting that emerges |
+| **Yoga Sutras** | Dṛṣṭā (Seer) + Dṛśya (Seen) | Vṛtti (fluctuations) |
+
+### 10.3 The Emergence Relationship
+
+Vritti and Guna are **not independent**—they are functions of Bhava and Kosha:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      DIMENSIONAL EMERGENCE                               │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│                    ┌──────────────────────────┐                         │
+│                    │  BHAVA (12D)             │                         │
+│                    │  Ontological States      │                         │
+│                    │  "What exists"           │                         │
+│                    └───────────┬──────────────┘                         │
+│                                │                                        │
+│                                ▼                                        │
+│                         ┌──────────────┐                                │
+│                         │     ×        │  Interaction                   │
+│                         └──────────────┘                                │
+│                                │                                        │
+│                    ┌───────────▼──────────────┐                         │
+│                    │  KOSHA (5D)              │                         │
+│                    │  Experiential Layers     │                         │
+│                    │  "How it's experienced"  │                         │
+│                    └───────────┬──────────────┘                         │
+│                                │                                        │
+│               ┌────────────────┴────────────────┐                       │
+│               ▼                                  ▼                      │
+│     ┌────────────────────┐             ┌────────────────────┐          │
+│     │  VRITTI (5D)       │             │  GUNA (6D)         │          │
+│     │  STATES of info    │             │  QUALITY of info   │          │
+│     │  = f(Bhava, Kosha) │             │  = g(Bhava, Kosha) │          │
+│     └────────────────────┘             └────────────────────┘          │
+│                                                                          │
+│  VRITTI: Defines the STATE of information.                              │
+│          When beings (Bhava) are experienced through layers (Kosha),   │
+│          the information takes a STATE: Right Knowledge, Misconception,│
+│          Imagination, Sleep, or Memory.                                 │
+│                                                                          │
+│  GUNA: Defines the QUALITY of information.                              │
+│        The clarity/purity with which Bhava manifests through Kosha:    │
+│        Sattva (clear/pure), Rajas (active/agitated), Tamas (inert/dull)│
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 10.4 Implications for Gyroscope Training
+
+This hierarchy justifies the **Inverted Curriculum** (Section 9):
+
+#### 10.4.1 Gyroscope on PRIMARY Dimensions (Step 0)
+
+```python
+# Gyroscope operates on Kosha [12:17] from the beginning
+# Bhava [0:12] is also PRIMARY but not directly steered
+
+kosha_states = witness_projector(layer_output)[:, :, KOSHA_SLICE]  # [12:17]
+gyro_loss = gyroscope_loss_fn(kosha_states)  # Active from step 0
+```
+
+**Why this works:**
+
+1. **Kosha is foundational**: Even if projections are noisy, they represent SOME distribution over experiential layers
+2. **Balance pressure shapes space**: Gradient pushes toward distributed activation, regardless of semantic content
+3. **No semantic dependency**: Gyroscope checks GEOMETRY (balance), not MEANING (which comes later)
+
+#### 10.4.2 Classification on EMERGENT Dimensions (After Grounding)
+
+```python
+# Vritti and Guna classification waits until PPL < 30
+if last_val_ppl < 30.0:
+    vritti_targets = compute_vritti_labels(output)  # Now meaningful
+    guna_targets = compute_guna_labels(output)      # Now meaningful
+```
+
+**Why wait:**
+
+1. **Vritti needs grounded Bhava × Kosha**: "Right Knowledge" can't be labeled until both being-mode and experience-layer are stable
+2. **Guna needs manifest patterns**: Sattva/Rajas/Tamas are observable AFTER the primary dynamics settle
+3. **Classification requires semantics**: Unlike balance-pressure, labels need meaning
+
+### 10.5 The Yoga Sutras Mapping
+
+This hierarchy aligns with Patanjali's Yoga Sutras (II.17-24):
+
+| Concept | Sanskrit | 32D Mapping |
+|---------|----------|-------------|
+| **Seer** | Dṛṣṭā | Bhava (ontological ground) |
+| **Seen** | Dṛśya | Kosha (layers of experience) |
+| **Fluctuations** | Vṛtti | Vritti (emergent patterns) |
+| **Qualities** | Guṇa | Guna (emergent modes) |
+
+The Yoga Sutras state that Vritti and Guna arise from the interaction of Seer and Seen—exactly the PRIMARY → EMERGENT relationship encoded here.
+
+### 10.6 Code Reference
+
+From `symbolu/sovereign/reasoning_kernel.py`:
+
+```python
+# PRIMARY DIMENSIONS (17D) - Engage from step 0
+BHAVA_SLICE = slice(0, 12)    # Ontological states (12D)
+KOSHA_SLICE = slice(12, 17)   # Consciousness sheaths (5D)
+
+# EMERGENT DIMENSIONS (11D) - Arise from primary dynamics
+VRITTI_SLICE = slice(17, 22)  # Mental modifications (5D)
+GUNA_SLICE = slice(22, 28)    # Quality modes (6D)
+
+# The hierarchy:
+# Bhava × Kosha → Vritti, Guna
+# (what exists) × (how experienced) → (patterns) + (qualities)
+```
+
+### 10.7 Validation Benchmark
+
+**Q16: Primary vs Emergent Timing**
+
+**Hypothesis**: Operating on PRIMARY dimensions early is safe; operating on EMERGENT dimensions early causes instability.
+
+**Validation**:
+- [ ] Gyroscope on Kosha [12:17] from step 0 → Stable training
+- [ ] Classification on Vritti [17:22] from step 0 → Unstable (verify by A/B test)
+- [ ] Vritti/Guna variance decreases AFTER Bhava/Kosha stabilize (causal relationship)
+
+**Test**:
+```python
+# Track dimensional variance over training
+bhava_var = kosha_projections[:, BHAVA_SLICE].var(dim=-1).mean()
+kosha_var = kosha_projections[:, KOSHA_SLICE].var(dim=-1).mean()
+vritti_var = kosha_projections[:, VRITTI_SLICE].var(dim=-1).mean()
+guna_var = kosha_projections[:, GUNA_SLICE].var(dim=-1).mean()
+
+# Expect: bhava_var, kosha_var stabilize BEFORE vritti_var, guna_var
+```
+
+---
+
+## 11. Relationship to Industry Approaches
+
+### 11.1 Comparison Matrix
 
 | Aspect | ChatGPT RLHF | Constitutional AI | **Kosha Gyroscope** |
 |--------|--------------|-------------------|---------------------|
@@ -830,7 +1045,7 @@ class InvertedCurriculumConfig:
 | Reward Model | External neural network | Self-generated | **Intrinsic axis check** |
 | Credit Assignment | Delayed (PPO) | Delayed | **Immediate** |
 
-### 10.2 Dense vs. Sparse Feedback
+### 11.2 Dense vs. Sparse Feedback
 
 **Standard RLHF (Sparse):**
 ```
@@ -856,7 +1071,7 @@ Token 47: "Titus"  → Kosha check → Mental: 0.82, Intellect: 0.15
                                    IMMEDIATE gradient correction
 ```
 
-### 10.3 The Vedic Constitution
+### 11.3 The Vedic Constitution
 
 | Constitutional AI Rule (English) | Kosha Gyroscope (Geometry) |
 |----------------------------------|---------------------------|
@@ -1275,17 +1490,24 @@ Both encode normative constraints, just in different substrates.
 | Q13 | Fibonacci preserved | ⬜ Pending | |
 | Q14 | Constitutional AI equivalent | ⬜ Pending | |
 | Q15 | Dense > Sparse feedback | ⬜ Pending | |
+| Q16 | Primary vs Emergent timing validated | ⬜ Pending | |
 
-**Success Criteria**: ≥12/15 questions answered positively indicates the system works as designed.
+**Success Criteria**: ≥13/16 questions answered positively indicates the system works as designed.
 
 ---
 
-**Document Status:** Ready for Implementation (v2.0 Inverted Curriculum)
+**Document Status:** Ready for Implementation (v2.1 Dimensional Hierarchy)
 **Next Steps:**
 1. Implement `KoshaGyroscopicLoss` module in `symbolu/losses/kosha_gyroscope.py`
-2. Integrate into training loop with Gyroscope ON from step 0
+2. Integrate into training loop with Gyroscope ON from step 0 (PRIMARY dimensions)
 3. Monitor PPL for graduation threshold (< 30)
 4. Activate Kosha Classification at graduation, ramp down Gyroscope
-5. **Validate against Appendix D benchmarks**
+5. Activate Vritti/Guna classification after grounding (EMERGENT dimensions)
+6. **Validate against Appendix D benchmarks (Q1-Q16)**
 
-**Key Change from v1.0:** Gyroscope is now active from the BEGINNING of training, not waiting for PPL < 30. This is instructor-led training, not late-stage correction.
+**Key Changes:**
+- **v1.0 → v2.0:** Gyroscope now active from BEGINNING of training (instructor-led)
+- **v2.0 → v2.1:** 32D Dimensional Hierarchy established:
+  - **PRIMARY** (Bhava + Kosha): Engage from step 0 (foundational substrate)
+  - **EMERGENT** (Vritti + Guna): Arise from PRIMARY dynamics after grounding
+  - Vritti = STATES of information, Guna = QUALITY of information
