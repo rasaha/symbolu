@@ -145,6 +145,14 @@ except ImportError as e:
     SOVEREIGN_AVAILABLE = False
     print(f"Warning: Sovereign-1 modules not available: {e}")
 
+# Import GradientNormThrottle for training stability
+try:
+    from symbolu.training import GradientNormThrottle, clean_wikitext_artifacts
+    GRADIENT_THROTTLE_AVAILABLE = True
+except ImportError as e:
+    GRADIENT_THROTTLE_AVAILABLE = False
+    print(f"Warning: GradientNormThrottle not available: {e}")
+
 # Import V9.8.0: Sovereign Reasoning Kernel (SRK)
 try:
     from symbolu.sovereign import (
@@ -7218,8 +7226,11 @@ def run_quality_samples(
                 repetition_penalty=1.15,
                 no_repeat_ngram_size=3,
             )
-            # Clean up and truncate for display
-            generated = generated.strip().replace('\n', ' ')[:200]
+            # Clean up WikiText artifacts and truncate for display
+            generated = generated.strip().replace('\n', ' ')
+            if GRADIENT_THROTTLE_AVAILABLE:  # clean_wikitext_artifacts imported with throttle
+                generated = clean_wikitext_artifacts(generated)
+            generated = generated[:200]
 
             # Compute quality metrics
             metrics = compute_sample_metrics(generated)
@@ -9918,6 +9929,18 @@ def train(config: UnifiedTrainingConfig):
     )
     print(f"  Training Qualia: ENABLED (L/A/S tracking)")
 
+    # Gradient Norm Throttle (Physical Safety Layer)
+    # Reduces LR when gradient norms spike to prevent destructive weight updates
+    gradient_throttle = None
+    if GRADIENT_THROTTLE_AVAILABLE:
+        gradient_throttle = GradientNormThrottle(
+            ema_decay=0.99,           # Slow adaptation to gradient baseline
+            spike_threshold=2.0,       # Trigger if gradient > 2x average
+            min_factor=0.3,           # Never reduce LR below 30%
+            warmup_steps=config.warmup_steps,  # Skip throttling during warmup
+        )
+        print(f"  Gradient Throttle: ENABLED (spike>2x → LR×0.3 min)")
+
     # Toroidal Evolutionary Bridge (O12 → O1 Recursive Intelligence)
     evolutionary_bridge = None
     toroidal_loss_fn = None
@@ -11651,6 +11674,17 @@ def train(config: UnifiedTrainingConfig):
                 if p.grad is not None
             )
 
+            # Gradient Norm Throttle: Reduce LR on gradient spikes
+            # This physical safety layer prevents destructive weight updates
+            throttle_factor = 1.0
+            if gradient_throttle is not None:
+                throttle_factor, _ = gradient_throttle.step(
+                    model, optimizer, config.learning_rate,
+                    precomputed_norm=raw_grad_norm,
+                )
+                if throttle_factor < 1.0 and global_step % config.log_every == 0:
+                    print(f"  ⚡ [GRAD THROTTLE] norm={raw_grad_norm:.1f} | LR×{throttle_factor:.2f}")
+
             # Gradient clipping: per-layer or global
             if config.use_per_layer_clipping and gradient_scaler_hgs is not None:
                 # Clip authority and sensory layers separately to respect 9:3 design
@@ -12473,6 +12507,13 @@ def train(config: UnifiedTrainingConfig):
                             # Legacy: raw metrics without controller
                             tb_writer.add_scalar("ctrl/friction_alignment", friction_alignment, global_step)
                             tb_writer.add_scalar("ctrl/friction_dominance", friction_dominance, global_step)
+                        # Gradient Throttle metrics
+                        if gradient_throttle is not None:
+                            throttle_stats = gradient_throttle.get_stats()
+                            tb_writer.add_scalar("throttle/factor", throttle_stats['last_factor'], global_step)
+                            tb_writer.add_scalar("throttle/grad_norm", throttle_stats['last_grad_norm'], global_step)
+                            tb_writer.add_scalar("throttle/ema_norm", throttle_stats['ema_grad_norm'], global_step)
+                            tb_writer.add_scalar("throttle/events_total", throttle_stats['throttle_events'], global_step)
                         # Toroidal Bridge metrics
                         if evolutionary_bridge is not None:
                             tb_writer.add_scalar("toroid/coherence", toroidal_coherence, global_step)
