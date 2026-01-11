@@ -317,13 +317,7 @@ Unlike black-box embeddings, our 32D state provides **interpretable semantic dim
 
 **Purpose**: First self-correction point - forces alignment with semantic intent
 
-```python
-# Pseudocode for Layer 4 intervention
-observed_bhava = project_768D_to_12D(hidden_states)     # What model "is being"
-target_bhava = sovereign_state[0:12]                     # What it should be
-correction = target_bhava - observed_bhava               # Error signal
-hidden_states += λ_bridge × inject_12D_to_768D(correction)  # Gentle correction
-```
+**How it works**: Projects the model's internal 768D state down to 12D ontological aspects, compares against the target state, and gently corrects any drift.
 
 **Effect**: Detects when model drifts from intended reasoning mode (e.g., switches from analytical to creative mid-response)
 
@@ -402,22 +396,15 @@ Traditional transformers have no feedback mechanism - they generate tokens in op
 
 ### PID Governor: Precision Control
 
-The PID controller maintains semantic coherence by computing error between current and target states:
+The PID controller maintains semantic coherence using three control signals:
 
-```python
-# PID Control Loop
-error = 1.0 - cosine_similarity(current_state, target_state)
+| Control | Function | Effect |
+|---------|----------|--------|
+| **Proportional (P)** | Immediate error correction | Fast response to drift |
+| **Integral (I)** | Accumulated error over time | Eliminates steady-state errors |
+| **Derivative (D)** | Rate of change | Anticipates and dampens oscillations |
 
-P = Kp × error                    # Proportional: immediate correction
-I = Ki × (integral_error + error)  # Integral: accumulated drift
-D = Kd × (error - prev_error)      # Derivative: rate of change
-
-authority = clamp(1.0 - (P + I + D) / 2.0, 0, 1)
-
-# Gate semantic output based on authority
-if authority < threshold:
-    semantic_body *= dampening_factor  # Reduce confidence
-```
+The controller computes an **authority score** that gates the model's output - low authority means the model is uncertain and output confidence is reduced.
 
 ### Adaptive Control: Vritti-Based Tuning
 
@@ -435,14 +422,7 @@ The PID parameters **automatically adapt** based on detected cognitive state:
 
 ### Emergency Brake: Catastrophic Deviation Protection
 
-When error exceeds 0.9, a simplified PD controller triggers:
-
-```
-if error > 0.9:
-    hard_brake = True
-    semantic_output *= 0.01  # Near-zero output
-    # Forces model to "stop and reconsider"
-```
+When semantic error exceeds 90%, a hard brake triggers that reduces output to near-zero, forcing the model to "stop and reconsider" before generating potentially harmful content.
 
 ---
 
@@ -485,15 +465,9 @@ Every layer transition O(n)→O(n+1) represents an **evolutionary step** in the 
 
 The Vritti probabilities define **evolutionary pressure** on reasoning:
 
-```python
-# Evolutionary weight based on valid cognition gradient
-pramana_grad = vritti_probs[:, PRAMANA]  # Valid cognition
-viparyaya_grad = vritti_probs[:, VIPARYAYA]  # Error detection
-
-evolutionary_weight = max(0.1, (pramana_grad + viparyaya_grad + 1) / 2)
-
-# Higher weight = stronger pressure toward valid reasoning
-```
+- **Valid cognition (Pramana)** gradient drives toward correct outputs
+- **Error detection (Viparyaya)** gradient enables self-correction
+- Combined weight creates stronger pressure toward valid reasoning
 
 ---
 
@@ -622,18 +596,12 @@ Several companies are exploring hybrid attention mechanisms. Here's how SymbolU 
 
 #### 1. True O(n) vs Compressed O(n²)
 
-DeepSeek's MLA compresses KV cache but still computes O(n²) attention. SymbolU's Phase Attention is **mathematically O(n)**:
+| Approach | Attention Computation | KV Storage | True Complexity |
+|----------|----------------------|------------|-----------------|
+| **DeepSeek MLA** | O(n²) with compression | O(n) | Still quadratic compute |
+| **SymbolU Phase** | O(n) cumulative sums | O(n) | **True linear** |
 
-```
-DeepSeek MLA:
-  Attention = softmax(Q @ compress(K)^T) @ compress(V)
-  Complexity: Still O(n²) for attention, O(n) for KV storage
-
-SymbolU Phase:
-  Attention(i,j) = aᵢ × aⱼ × cos(φᵢ - φⱼ)
-  Output = Re(z̄ᵢ × cumsum(z × V))
-  Complexity: O(n) for both computation and storage
-```
+DeepSeek's MLA compresses KV cache but still computes O(n²) attention. SymbolU's Phase Attention achieves **true O(n)** for both computation and storage using complex-valued phasor representations.
 
 #### 2. Semantic State vs Token Prediction
 
