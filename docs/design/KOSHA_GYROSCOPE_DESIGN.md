@@ -933,11 +933,359 @@ Token 47: "Titus"  → Kosha check → Mental: 0.82, Intellect: 0.15
 
 ---
 
+## Appendix D: Open Questions and Validation Benchmarks
+
+This appendix documents uncertainties in the design. Each question becomes a **validation benchmark**—if the implementation successfully answers it, the system works as intended.
+
+### D.1 Architectural Questions
+
+#### Q1: Kosha Projector Learning
+
+**Question**: Does `witness_projector` learn meaningful representations when trained jointly with the Gyroscope?
+
+**Hypothesis**: The projector learns to map hidden states to Kosha dimensions that minimize Gyroscope loss. This creates a self-organizing system where projector and model co-evolve.
+
+**Validation Benchmark**:
+- [ ] After training, Kosha projections correlate with observable behaviors:
+  - High Mental → Token repetition patterns detected
+  - High Intellect → Logical/structured output detected
+  - High Bliss → Novel/creative tokens detected
+  - High Physical → Literal/factual content detected
+
+**How to Test**:
+```python
+# After PPL < 30, sample outputs and compute Kosha activations
+# Check if activations correlate with human-labeled output characteristics
+```
+
+---
+
+#### Q2: Gradient Flow Path
+
+**Question**: Does the Gyroscope gradient flow through `witness_projector` to the main model, or only train the projector?
+
+**Hypothesis**: Gradients should flow through to Layer 9 hidden states, shaping the model's internal representations.
+
+**Validation Benchmark**:
+- [ ] Verify gradient magnitude at Layer 9 increases when Gyroscope loss is high
+- [ ] Verify model weights (not just projector) change in response to Gyroscope loss
+
+**How to Test**:
+```python
+# Compute gradient norms before/after witness_projector
+# Verify: grad_norm(layer_9_weights) > 0 when gyro_loss > 0
+```
+
+---
+
+#### Q3: Vital (Pranamaya) Kosha Role
+
+**Question**: What is the role of Vital (index 1) in the R-T quadrant system? It's not mapped to any quadrant.
+
+**Hypothesis**: Vital represents the "energy" or "momentum" that enables transitions between quadrants. High Vital = active transition; Low Vital = stable state.
+
+**Validation Benchmark**:
+- [ ] During quadrant transitions (e.g., Mental → Intellect), Vital activation spikes
+- [ ] During stable states (model in one quadrant), Vital is low
+- [ ] Vital correlates with gradient magnitude (energy = rate of change)
+
+**How to Test**:
+```python
+# Log Vital activation alongside other Koshas
+# Check if Vital spikes precede quadrant changes
+```
+
+---
+
+### D.2 Training Dynamics Questions
+
+#### Q4: Noisy Projections at Start
+
+**Question**: Does applying Gyroscope loss on random/noisy projections (PPL > 100) help or hurt training?
+
+**Hypothesis**: It helps by preventing any dimension from dominating, even before semantics emerge. The model learns "balanced shape" before "meaningful content."
+
+**Validation Benchmark**:
+- [ ] Training with Gyroscope from step 0 converges faster than training without
+- [ ] Kosha variance is lower throughout training (no single dimension dominates)
+- [ ] Mode collapse events are reduced or eliminated
+
+**How to Test**:
+```python
+# A/B test: Train with Gyroscope ON vs OFF from step 0
+# Compare: PPL curves, Kosha variance, looping incidents
+```
+
+---
+
+#### Q5: Gate Behavior with Noise
+
+**Question**: Do the soft gates (Physical gate, Mental gate) produce meaningful behavior when inputs are noisy?
+
+**Hypothesis**: Random gate activations average out over batches, producing smooth aggregate pressure. Individual token decisions don't matter—the gradient mean does.
+
+**Validation Benchmark**:
+- [ ] Gate activation variance decreases as PPL decreases (gates become more deterministic)
+- [ ] Mean gate activation stabilizes to interpretable values
+- [ ] No pathological gate patterns (always 0 or always 1)
+
+**How to Test**:
+```python
+# Log gate activations per step
+# Compute: mean, std, histogram over training
+# Verify convergence to stable distribution
+```
+
+---
+
+#### Q6: Threshold Calibration
+
+**Question**: Are the default thresholds (trap=0.75, gate=0.30, target=0.25) appropriate, or do they need tuning?
+
+**Hypothesis**: These are starting points. Optimal values depend on model architecture and dataset.
+
+**Validation Benchmark**:
+- [ ] Looping incidents occur when Mental > 0.75 (threshold is correct)
+- [ ] Valid focus (Fibonacci, quotes) has Intellect > 0.30 (gate threshold is correct)
+- [ ] Healthy balance has opposite Kosha > 0.25 (target is correct)
+
+**How to Test**:
+```python
+# Collect labeled samples: {output, kosha_states, human_label: loop/valid}
+# Compute ROC curves for each threshold
+# Find optimal thresholds that maximize classification accuracy
+```
+
+---
+
+### D.3 Classification Questions
+
+#### Q7: Classification Targets Source
+
+**Question**: Where do `kosha_targets` come from for the classification loss at PPL < 30?
+
+**Possible Sources**:
+1. **Text characteristics**: Repetition count → Mental, novelty score → Bliss, fact density → Physical, logic markers → Intellect
+2. **Self-supervised**: Predict Kosha from hidden states, then enforce consistency
+3. **Contrastive**: Same text at different temperatures should have different Kosha profiles
+4. **Human labels**: Manual annotation of Kosha states (expensive)
+
+**Validation Benchmark**:
+- [ ] Classification loss converges (model learns to predict targets)
+- [ ] Predicted Koshas match targets with high accuracy (>80%)
+- [ ] Grounded Koshas improve downstream task performance
+
+**How to Test**:
+```python
+# Implement each target source
+# Compare: classification accuracy, downstream coherence, loop prevention
+```
+
+---
+
+#### Q8: Classification Timing
+
+**Question**: Is PPL < 30 the right threshold to engage classification, or should it be earlier/later?
+
+**Hypothesis**: PPL < 30 is when representations are stable enough for meaningful labels. Earlier = noise; Later = wasted opportunity.
+
+**Validation Benchmark**:
+- [ ] Kosha projection variance is low at PPL < 30 (stable representations)
+- [ ] Classification accuracy is high when engaged at PPL < 30
+- [ ] Engaging earlier (PPL < 50) reduces accuracy; later (PPL < 20) wastes steps
+
+**How to Test**:
+```python
+# Try classification engagement at PPL < 50, 30, 20, 10
+# Compare: classification accuracy, final model quality
+```
+
+---
+
+### D.4 Integration Questions
+
+#### Q9: Phase Steering Conflict
+
+**Question**: Can Phase Steering (R-T axis) and Kosha Gyroscope conflict?
+
+**Scenario**: Phase Steering says "steer toward angle θ" but Gyroscope says "reduce Mental."
+
+**Hypothesis**: They operate on different levels:
+- Phase Steering: Embedding geometry (phasor angles)
+- Gyroscope: Kosha projections (5D semantic space)
+
+They should be orthogonal, but may interact.
+
+**Validation Benchmark**:
+- [ ] When both are active, loss converges smoothly (no oscillation)
+- [ ] Disabling one doesn't cause the other to spike
+- [ ] Both losses reach low values simultaneously
+
+**How to Test**:
+```python
+# Train with: (a) both ON, (b) Gyroscope only, (c) Phase Steering only
+# Compare: loss curves, convergence speed, final quality
+```
+
+---
+
+#### Q10: Existing Controller Interaction
+
+**Question**: How does Kosha Gyroscope interact with `KoshaShiftController` and `SattvicController`?
+
+**Hypothesis**:
+- `KoshaShiftController`: Static boost (always Intellectual+) vs Gyroscope (reactive)—complementary
+- `SattvicController`: Entropy-based vs Gyroscope (Kosha-based)—different signals
+
+**Validation Benchmark**:
+- [ ] With all controllers ON, no conflicting gradients
+- [ ] Each controller activates at different times (SattvicController on entropy collapse, Gyroscope on Kosha saturation)
+- [ ] Removing any one controller degrades quality
+
+**How to Test**:
+```python
+# Ablation study: Full system vs remove each controller
+# Compare: loop incidents, coherence scores, PPL
+```
+
+---
+
+### D.5 Output Quality Questions
+
+#### Q11: Chain of Thought Emergence
+
+**Question**: Does the Vijnana Gate architecture naturally produce Chain of Thought reasoning?
+
+**Hypothesis**: The gate forces verification before expansion, which manifests as explicit reasoning steps in output.
+
+**Validation Benchmark**:
+- [ ] Model outputs show reasoning patterns ("First...", "Therefore...", "Let me check...")
+- [ ] These patterns correlate with Kosha transitions (Mental → Intellect → Bliss)
+- [ ] Reasoning quality improves over training
+
+**How to Test**:
+```python
+# Sample outputs at different training stages
+# Annotate: presence of reasoning markers
+# Correlate with Kosha activation sequences
+```
+
+---
+
+#### Q12: Looping Prevention
+
+**Question**: Does the Gyroscope actually prevent "Titus Titus Titus" style loops?
+
+**Hypothesis**: High Mental + Low Intellect triggers Gyroscope loss, forcing diversification.
+
+**Validation Benchmark**:
+- [ ] Loop incidents (3+ token repetition) decrease with Gyroscope ON
+- [ ] At loop onset, Gyroscope loss spikes
+- [ ] After Gyroscope correction, output diversifies
+
+**How to Test**:
+```python
+# Generate 1000 samples with/without Gyroscope
+# Count: loop incidents (3+ repetition)
+# Compare: incident rate, loop length
+```
+
+---
+
+#### Q13: Fibonacci Preservation
+
+**Question**: Does the Vijnana Gate correctly allow valid sequences like Fibonacci?
+
+**Hypothesis**: High Mental + High Intellect = valid focus (Dharana), no punishment.
+
+**Validation Benchmark**:
+- [ ] When prompted with "1, 1, 2, 3, 5...", model continues correctly
+- [ ] Kosha profile shows: Mental HIGH, Intellect HIGH
+- [ ] Gyroscope loss is LOW (gate blocks punishment)
+
+**How to Test**:
+```python
+# Prompt: "Continue the sequence: 1, 1, 2, 3, 5, "
+# Check: (a) correct continuation, (b) Kosha profile, (c) Gyroscope loss
+```
+
+---
+
+### D.6 Theoretical Questions
+
+#### Q14: Is This Really Constitutional AI?
+
+**Question**: Is the claim that Kosha Gyroscope is "Constitutional AI with Sacred Geometry" valid?
+
+**Hypothesis**: Yes, because:
+- Constitutional AI: Rules in English ("Be helpful") → Reward signal
+- Kosha Gyroscope: Rules in geometry (axis balance) → Gradient signal
+
+Both encode normative constraints, just in different substrates.
+
+**Validation Benchmark**:
+- [ ] Model trained with Gyroscope exhibits aligned behaviors (helpful, coherent)
+- [ ] These behaviors emerge without explicit English rules
+- [ ] Kosha geometry encodes behavioral norms implicitly
+
+**How to Test**:
+```python
+# Compare: Model with Gyroscope vs Model with RLHF
+# Evaluate: helpfulness, harmlessness, coherence
+# Check if Gyroscope achieves similar outcomes without explicit rules
+```
+
+---
+
+#### Q15: Dense vs Sparse Feedback Advantage
+
+**Question**: Does per-token feedback (Gyroscope) actually outperform end-of-sequence feedback (RLHF)?
+
+**Hypothesis**: Yes, because credit assignment is immediate, not delayed.
+
+**Validation Benchmark**:
+- [ ] Gyroscope model learns loop prevention faster than RLHF model
+- [ ] Gyroscope model requires fewer training steps for equivalent quality
+- [ ] Gyroscope model is more stable (lower loss variance)
+
+**How to Test**:
+```python
+# Train equivalent models: (a) Gyroscope (dense), (b) RLHF (sparse)
+# Compare: training steps to quality threshold, loss stability, final quality
+```
+
+---
+
+### D.7 Summary: Validation Checklist
+
+| # | Question | Status | Evidence |
+|---|----------|--------|----------|
+| Q1 | Projector learns meaningful representations | ⬜ Pending | |
+| Q2 | Gradients flow to main model | ⬜ Pending | |
+| Q3 | Vital Kosha role identified | ⬜ Pending | |
+| Q4 | Noisy early projections help | ⬜ Pending | |
+| Q5 | Gates behave well with noise | ⬜ Pending | |
+| Q6 | Thresholds are calibrated | ⬜ Pending | |
+| Q7 | Classification targets defined | ⬜ Pending | |
+| Q8 | Classification timing optimal | ⬜ Pending | |
+| Q9 | No Phase Steering conflict | ⬜ Pending | |
+| Q10 | Controller interactions healthy | ⬜ Pending | |
+| Q11 | Chain of Thought emerges | ⬜ Pending | |
+| Q12 | Loops prevented | ⬜ Pending | |
+| Q13 | Fibonacci preserved | ⬜ Pending | |
+| Q14 | Constitutional AI equivalent | ⬜ Pending | |
+| Q15 | Dense > Sparse feedback | ⬜ Pending | |
+
+**Success Criteria**: ≥12/15 questions answered positively indicates the system works as designed.
+
+---
+
 **Document Status:** Ready for Implementation (v2.0 Inverted Curriculum)
 **Next Steps:**
 1. Implement `KoshaGyroscopicLoss` module in `symbolu/losses/kosha_gyroscope.py`
 2. Integrate into training loop with Gyroscope ON from step 0
 3. Monitor PPL for graduation threshold (< 30)
 4. Activate Kosha Classification at graduation, ramp down Gyroscope
+5. **Validate against Appendix D benchmarks**
 
 **Key Change from v1.0:** Gyroscope is now active from the BEGINNING of training, not waiting for PPL < 30. This is instructor-led training, not late-stage correction.
