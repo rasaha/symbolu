@@ -1086,19 +1086,33 @@ Token 47: "Titus"  → Kosha check → Mental: 0.82, Intellect: 0.15
 
 ### 12.1 Theoretical Foundation
 
-In Vedic psychology, **Vrittis** (वृत्ति) are the "waves" or modifications of the mind. Patanjali's Yoga Sutras identify five Vrittis that represent distinct cognitive states. The critical insight is that each Vritti emerges as a **homeostatic attractor** of its corresponding Kosha.
+In Vedic psychology, **Vrittis** (वृत्ति) are the "waves" or modifications of the mind. Patanjali's Yoga Sutras identify five Vrittis that represent distinct cognitive states.
 
-> "The Vritti is not random—it is the natural resting state of its Kosha when that sheath dominates consciousness."
+**Critical Causal Insight**: Koshas are the **CAUSE**, Vrittis are the **EFFECT**.
 
-### 12.2 The Kosha-Vritti Mapping Matrix
+When a Kosha becomes **overactive**, it produces its corresponding Vritti as a consequence:
 
-| Kosha (Primary Layer) | Vritti (Emergent State) | Mathematical Definition | Role in 32D Logic |
-|----------------------|-------------------------|------------------------|-------------------|
-| **Annamaya** (Physical) | **Pramana** (Right Knowledge) | High 3-token Physical history + Low entropy | **The Ground**: Validated factual manifest state |
-| **Pranamaya** (Vital) | **Nidra** (Sleep/Inertia) | Low Vital energy + High Tamas (overactive → shutdown) | **The Void**: Homeostatic shutdown after energy spike |
-| **Manomaya** (Mental) | **Vikalpa** (Imagination) | High Mental saturation + Low Intellect | **The Loop**: Pattern matching without logical grounding |
-| **Vijnanamaya** (Intellect) | **Smriti** (Memory/Recall) | High Intellect gate + Physical grounding | **The Link**: Structural sequence preservation |
-| **Anandamaya** (Bliss) | **Viparyaya** (Misconception) | High Bliss + Low Physical grounding | **The Drift**: Creative expansion that loses external reality |
+```
+CAUSE                      EFFECT
+─────                      ──────
+Kosha (overactive)    →    Vritti (manifests)
+```
+
+This is why the **Kosha Gyroscope is an indirect method for balanced reasoning**: by maintaining Kosha homeostasis (preventing any Kosha from becoming overactive), we prevent the cascade into Vritti states. The Gyroscope doesn't target Vrittis directly—it addresses the root cause.
+
+> "The Vritti is not random—it is the natural consequence when its Kosha becomes overactive and dominates consciousness."
+
+### 12.2 The Kosha-Vritti Causal Mapping Matrix
+
+**Direction**: Kosha (CAUSE) → Vritti (EFFECT)
+
+| Kosha (Overactive Cause) | Vritti (Emergent Effect) | Trigger Condition | Consequence |
+|--------------------------|-------------------------|-------------------|-------------|
+| **Annamaya** (Physical) | **Pramana** (Right Knowledge) | Physical > 0.8, Low entropy | Excessive focus on sensory/factual data |
+| **Pranamaya** (Vital) | **Nidra** (Sleep/Inertia) | Vital spike then crash (overactive → shutdown) | System shutdown to prevent burnout |
+| **Manomaya** (Mental) | **Vikalpa** (Imagination) | Mental > 0.8, Intellect < 0.3 | Pattern loops without logical grounding |
+| **Vijnanamaya** (Intellect) | **Smriti** (Memory/Recall) | Intellect > 0.8 + Physical active | Over-reliance on structural recall |
+| **Anandamaya** (Bliss) | **Viparyaya** (Misconception) | Bliss > 0.8, Physical < 0.3 | Creative expansion loses external reality |
 
 ### 12.3 Key Insights
 
@@ -1131,6 +1145,24 @@ When the Gyroscope sees:
 - Low Intellect (Vijnanamaya) < 0.3
 
 It identifies the state as **Vikalpa** (pathological imagination) and triggers a "Reality Rip" to reach Bliss through proper channels.
+
+#### 12.3.4 The Gyroscope's Indirect Path to Balanced Reasoning
+
+The Kosha Gyroscope does NOT directly regulate logic or reasoning. Instead, it:
+
+1. **Prevents Kosha Overactivation**: Keeps all 5 Koshas within homeostatic bounds
+2. **Blocks Vritti Cascade**: By preventing overactive Koshas, Vrittis don't manifest
+3. **Creates Space for Intelligence**: With no dominant Vritti pattern, the model's Vijnanamaya (Intellect) can operate without distortion
+
+```
+Without Gyroscope:
+  Overactive Mental → Vikalpa (Imagination loops) → Distorted reasoning
+
+With Gyroscope:
+  Balanced Mental → No Vritti trigger → Clear intellect → Balanced reasoning
+```
+
+This is the **indirect method**: rather than telling the model HOW to reason, we create the conditions where balanced reasoning naturally emerges.
 
 ### 12.4 Vritti Resonance Loss Function
 
