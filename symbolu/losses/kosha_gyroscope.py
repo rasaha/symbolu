@@ -1998,3 +1998,385 @@ class InferenceGuardrail(nn.Module):
         # Combined score
         health = (balance_score * 0.4 + alignment_score * 0.4 + (1 - domination_penalty) * 0.2)
         return max(0.0, min(1.0, health))
+
+
+# =============================================================================
+# v2.3.3: SOVEREIGN STATE REGULARIZER - 32D Anti-Saturation
+# =============================================================================
+
+@dataclass
+class SovereignStateRegularizerConfig:
+    """
+    Configuration for 32D Sovereign State Regularizer (v2.3.3).
+
+    The Kosha Gyroscope operates on 5D projections, but the underlying 32D
+    Sovereign State can saturate (all dimensions → 100%) causing representation
+    collapse. This regularizer prevents saturation at the source.
+
+    Training Log Symptom:
+        🔱 [32D] ... Sheath:VIT(100%)>BLI(100%) 🔴
+
+    The 5D Gyroscope can't fix this because it operates on extracted projections.
+    This regularizer adds direct pressure to the 32D layer.
+
+    Components:
+    1. Anti-Saturation Loss: Penalizes dimensions approaching 0% or 100%
+    2. Variance Maintenance: Prevents all dimensions collapsing to same value
+    3. Decorrelation (optional): Encourages orthogonality between dimensions
+    4. Per-Component Targeting: Different regularization for Bhava/Kosha/Vritti/Guna
+    """
+
+    # === ANTI-SATURATION ===
+    # Penalizes dimensions that approach extreme values (0 or 1 for sigmoid)
+    anti_saturation_weight: float = 0.5       # Overall weight
+    saturation_threshold_high: float = 0.95   # Penalize above this (too hot)
+    saturation_threshold_low: float = 0.05    # Penalize below this (too cold)
+    saturation_margin: float = 0.15           # Soft margin for smooth penalty
+
+    # === VARIANCE MAINTENANCE (VICReg-style) ===
+    # Prevents dimensions from collapsing to same value
+    variance_weight: float = 0.2              # Weight for variance loss
+    target_std_kosha: float = 0.15            # Target std for Kosha dimensions
+    target_std_vritti: float = 0.15           # Target std for Vritti dimensions
+    target_std_guna: float = 0.20             # Target std for Guna dimensions
+
+    # === DECORRELATION (optional) ===
+    # Encourages orthogonality between dimensions
+    decorrelation_weight: float = 0.0         # 0 = disabled (often not needed)
+    decorrelation_groups: bool = True         # Apply within groups (Kosha, Vritti, etc.)
+
+    # === TARGETING ===
+    # Which 32D components to regularize
+    regularize_kosha: bool = True             # [12:17] - Most critical (VIT/BLI collapse)
+    regularize_vritti: bool = True            # [17:22] - Epistemological states
+    regularize_guna: bool = True              # [22:28] - Energy dynamics
+    regularize_bhava: bool = False            # [0:12] - Usually stable (softmax)
+
+    # === KOSHA-SPECIFIC OVERRIDES ===
+    # Per-Kosha penalty multipliers (0=no penalty, 1=full penalty)
+    kosha_weights: Tuple[float, float, float, float, float] = (
+        1.0,  # MATERIAL (Physical) - moderate
+        1.5,  # VITAL - HIGH (prone to saturation)
+        1.0,  # MENTAL - moderate
+        1.0,  # INTELLECTUAL - moderate
+        1.5,  # BLISSFUL - HIGH (prone to saturation)
+    )
+
+
+class SovereignStateRegularizer(nn.Module):
+    """
+    32D Sovereign State Regularizer (v2.3.3) - Prevents Sheath Collapse.
+
+    Problem: The 5D Kosha Gyroscope operates on extracted projections.
+    When the underlying 32D state has VIT(100%)/BLI(100%), the gyroscope
+    can't fix it because it only sees the 5D projection.
+
+    Solution: Add regularization directly to the 32D state layer:
+    1. Anti-Saturation: Soft penalty when dimensions approach 0% or 100%
+    2. Variance: VICReg-style penalty when dimensions collapse to same value
+    3. Decorrelation: Optional penalty for correlated dimensions
+
+    Usage:
+        regularizer = SovereignStateRegularizer()
+        sovereign_state = model.compute_sovereign_state(hidden_states)
+        reg_loss, reg_diag = regularizer(sovereign_state)
+        total_loss = ce_loss + gyroscope_loss + reg_loss
+
+    Design Rationale:
+    The Kosha dimensions (VITAL, BLISSFUL) saturate because:
+    1. Sigmoid activation has no competition (unlike softmax)
+    2. Model learns to push activations to extremes for confidence
+    3. Once saturated, gradient signal is weak (sigmoid derivative → 0)
+
+    This regularizer provides gradient signal BEFORE saturation occurs,
+    keeping dimensions in the "healthy gradient zone" of sigmoid.
+    """
+
+    # 32D State component slices
+    BHAVA_SLICE = slice(0, 12)
+    KOSHA_SLICE = slice(12, 17)
+    VRITTI_SLICE = slice(17, 22)
+    GUNA_SLICE = slice(22, 28)
+    RESERVED_SLICE = slice(28, 32)
+
+    # Kosha names for diagnostics
+    KOSHA_NAMES = ['MATERIAL', 'VITAL', 'MENTAL', 'INTELLECTUAL', 'BLISSFUL']
+
+    def __init__(self, config: Optional[SovereignStateRegularizerConfig] = None):
+        """
+        Initialize the Sovereign State Regularizer.
+
+        Args:
+            config: Configuration dataclass. Uses defaults if None.
+        """
+        super().__init__()
+        self.config = config or SovereignStateRegularizerConfig()
+
+        # Register Kosha weights as buffer for device compatibility
+        self.register_buffer(
+            'kosha_weights',
+            torch.tensor(self.config.kosha_weights, dtype=torch.float32)
+        )
+
+        # Tracking for diagnostics
+        self._last_diagnostics: Dict[str, Any] = {}
+
+    def _compute_anti_saturation_loss(
+        self,
+        activations: torch.Tensor,
+        weights: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Compute anti-saturation loss for a set of activations.
+
+        Uses smooth hinge loss that:
+        - Is zero when activation is in healthy range [low_thresh, high_thresh]
+        - Increases smoothly as activation approaches 0 or 1
+        - Has continuous gradients (no hard boundaries)
+
+        The penalty function:
+            penalty_high = softplus((activation - high_thresh) / margin)
+            penalty_low = softplus((low_thresh - activation) / margin)
+            total = penalty_high + penalty_low
+
+        Args:
+            activations: [B, D] or [B, S, D] activations in [0, 1]
+            weights: Optional per-dimension weights [D]
+
+        Returns:
+            Scalar anti-saturation loss
+        """
+        high_thresh = self.config.saturation_threshold_high
+        low_thresh = self.config.saturation_threshold_low
+        margin = self.config.saturation_margin
+
+        # Flatten to [N, D] if needed
+        if activations.dim() == 3:
+            B, S, D = activations.shape
+            activations = activations.reshape(B * S, D)
+
+        # Soft penalty for approaching 1 (too hot)
+        penalty_high = F.softplus((activations - high_thresh) / margin)
+
+        # Soft penalty for approaching 0 (too cold)
+        penalty_low = F.softplus((low_thresh - activations) / margin)
+
+        # Combined penalty
+        total_penalty = penalty_high + penalty_low
+
+        # Apply per-dimension weights if provided
+        if weights is not None:
+            weights = weights.unsqueeze(0).expand_as(total_penalty)
+            total_penalty = total_penalty * weights
+
+        return total_penalty.mean()
+
+    def _compute_variance_loss(
+        self,
+        activations: torch.Tensor,
+        target_std: float,
+    ) -> torch.Tensor:
+        """
+        Compute VICReg-style variance maintenance loss.
+
+        Penalizes when the standard deviation of activations falls below
+        the target. This prevents dimension collapse where all values
+        converge to the same number.
+
+        Formula:
+            L_var = sum_d max(0, target_std - std(x_d))^2
+
+        Args:
+            activations: [B, D] or [B, S, D] activations
+            target_std: Target standard deviation per dimension
+
+        Returns:
+            Scalar variance loss
+        """
+        # Flatten to [N, D]
+        if activations.dim() == 3:
+            B, S, D = activations.shape
+            activations = activations.reshape(B * S, D)
+
+        # Compute std for each dimension across samples
+        dim_std = activations.std(dim=0)
+
+        # Hinge loss: penalize when std < target
+        variance_loss = F.relu(target_std - dim_std).pow(2).mean()
+
+        return variance_loss
+
+    def _compute_decorrelation_loss(
+        self,
+        activations: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Compute decorrelation loss (off-diagonal penalty).
+
+        Encourages orthogonality between dimensions by penalizing
+        off-diagonal elements of the correlation matrix.
+
+        Args:
+            activations: [B, D] or [B, S, D] activations
+
+        Returns:
+            Scalar decorrelation loss
+        """
+        # Flatten to [N, D]
+        if activations.dim() == 3:
+            B, S, D = activations.shape
+            activations = activations.reshape(B * S, D)
+
+        N, D = activations.shape
+
+        # Center the activations
+        centered = activations - activations.mean(dim=0, keepdim=True)
+
+        # Compute correlation matrix
+        cov = (centered.T @ centered) / max(N - 1, 1)
+        std = activations.std(dim=0, keepdim=True) + 1e-8
+        corr = cov / (std.T @ std)
+
+        # Off-diagonal penalty (correlation between different dimensions)
+        eye = torch.eye(D, device=activations.device)
+        off_diag = corr * (1 - eye)
+
+        return off_diag.pow(2).sum() / max(D * (D - 1), 1)
+
+    def forward(
+        self,
+        sovereign_state: torch.Tensor,
+        return_components: bool = False,
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        """
+        Compute 32D Sovereign State regularization loss.
+
+        Args:
+            sovereign_state: [B, 32] or [B, S, 32] full 32D state
+            return_components: If True, return detailed component breakdown
+
+        Returns:
+            Tuple of (total_loss, diagnostics_dict)
+        """
+        diagnostics = {
+            'anti_saturation': {},
+            'variance': {},
+            'decorrelation': 0.0,
+            'total': 0.0,
+            'saturation_alerts': [],
+        }
+
+        total_loss = torch.tensor(0.0, device=sovereign_state.device)
+
+        # === KOSHA REGULARIZATION (Most Critical) ===
+        if self.config.regularize_kosha:
+            kosha = sovereign_state[..., self.KOSHA_SLICE]
+
+            # Anti-saturation with per-Kosha weights
+            kosha_sat_loss = self._compute_anti_saturation_loss(
+                kosha, weights=self.kosha_weights
+            )
+            diagnostics['anti_saturation']['kosha'] = kosha_sat_loss.item()
+            total_loss = total_loss + kosha_sat_loss * self.config.anti_saturation_weight
+
+            # Variance maintenance
+            kosha_var_loss = self._compute_variance_loss(
+                kosha, self.config.target_std_kosha
+            )
+            diagnostics['variance']['kosha'] = kosha_var_loss.item()
+            total_loss = total_loss + kosha_var_loss * self.config.variance_weight
+
+            # Check for saturation alerts
+            kosha_mean = kosha.mean(dim=0) if kosha.dim() == 2 else kosha.mean(dim=(0, 1))
+            for i, (name, val) in enumerate(zip(self.KOSHA_NAMES, kosha_mean.tolist())):
+                if val > self.config.saturation_threshold_high:
+                    diagnostics['saturation_alerts'].append(
+                        f"{name}({val:.0%})>HIGH"
+                    )
+                elif val < self.config.saturation_threshold_low:
+                    diagnostics['saturation_alerts'].append(
+                        f"{name}({val:.0%})<LOW"
+                    )
+
+            # Decorrelation (optional)
+            if self.config.decorrelation_weight > 0:
+                kosha_decorr = self._compute_decorrelation_loss(kosha)
+                diagnostics['decorrelation'] += kosha_decorr.item()
+                total_loss = total_loss + kosha_decorr * self.config.decorrelation_weight
+
+        # === VRITTI REGULARIZATION ===
+        if self.config.regularize_vritti:
+            vritti = sovereign_state[..., self.VRITTI_SLICE]
+
+            vritti_sat_loss = self._compute_anti_saturation_loss(vritti)
+            diagnostics['anti_saturation']['vritti'] = vritti_sat_loss.item()
+            total_loss = total_loss + vritti_sat_loss * self.config.anti_saturation_weight * 0.5
+
+            vritti_var_loss = self._compute_variance_loss(
+                vritti, self.config.target_std_vritti
+            )
+            diagnostics['variance']['vritti'] = vritti_var_loss.item()
+            total_loss = total_loss + vritti_var_loss * self.config.variance_weight * 0.5
+
+        # === GUNA REGULARIZATION ===
+        if self.config.regularize_guna:
+            guna = sovereign_state[..., self.GUNA_SLICE]
+
+            guna_sat_loss = self._compute_anti_saturation_loss(guna)
+            diagnostics['anti_saturation']['guna'] = guna_sat_loss.item()
+            total_loss = total_loss + guna_sat_loss * self.config.anti_saturation_weight * 0.3
+
+            guna_var_loss = self._compute_variance_loss(
+                guna, self.config.target_std_guna
+            )
+            diagnostics['variance']['guna'] = guna_var_loss.item()
+            total_loss = total_loss + guna_var_loss * self.config.variance_weight * 0.3
+
+        # === BHAVA REGULARIZATION (usually not needed - softmax normalized) ===
+        if self.config.regularize_bhava:
+            bhava = sovereign_state[..., self.BHAVA_SLICE]
+
+            bhava_sat_loss = self._compute_anti_saturation_loss(bhava)
+            diagnostics['anti_saturation']['bhava'] = bhava_sat_loss.item()
+            total_loss = total_loss + bhava_sat_loss * self.config.anti_saturation_weight * 0.2
+
+        diagnostics['total'] = total_loss.item()
+        self._last_diagnostics = diagnostics
+
+        if return_components:
+            return total_loss, diagnostics
+        return total_loss, diagnostics
+
+    def get_summary(self, sovereign_state: torch.Tensor) -> str:
+        """
+        Get a human-readable summary of 32D state health.
+
+        Args:
+            sovereign_state: [B, 32] current state
+
+        Returns:
+            String summary like "32D:VIT(95%)>BLI(92%) ⚠️"
+        """
+        kosha = sovereign_state[..., self.KOSHA_SLICE]
+        kosha_mean = kosha.mean(dim=0) if kosha.dim() == 2 else kosha.mean(dim=(0, 1))
+
+        parts = []
+        alerts = []
+        for i, (name, val) in enumerate(zip(self.KOSHA_NAMES, kosha_mean.tolist())):
+            short_name = name[:3]  # MAT, VIT, MEN, INT, BLI
+            if val > 0.9:
+                parts.append(f"{short_name}({val:.0%})")
+                alerts.append(short_name)
+            elif val > 0.75:
+                parts.append(f"{short_name}({val:.0%})")
+
+        if not parts:
+            return "32D:OK"
+
+        status = "🔴" if len(alerts) >= 2 else "⚠️" if alerts else "🟢"
+        return f"32D:{'>'.join(parts)} {status}"
+
+    @property
+    def last_diagnostics(self) -> Dict[str, Any]:
+        """Return diagnostics from last forward pass."""
+        return self._last_diagnostics

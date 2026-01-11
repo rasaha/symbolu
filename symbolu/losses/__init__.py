@@ -19,6 +19,9 @@ from symbolu.losses.kosha_gyroscope import (
     KoshaPhaseCorrector,
     KoshaPhaseCorrectorConfig,
     InferenceGuardrail,
+    # 32D State Regularization (v2.3.3)
+    SovereignStateRegularizer,
+    SovereignStateRegularizerConfig,
 )
 
 __all__ = [
@@ -31,4 +34,7 @@ __all__ = [
     'KoshaPhaseCorrector',
     'KoshaPhaseCorrectorConfig',
     'InferenceGuardrail',
+    # 32D State Regularization (v2.3.3)
+    'SovereignStateRegularizer',
+    'SovereignStateRegularizerConfig',
 ]

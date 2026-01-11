@@ -3692,3 +3692,178 @@ gyroscope/curr_push_weight     # Current (morphed) push weight
 6. **Use graduation**: Let the model graduate naturally when PPL stabilizes below 30.
 
 7. **Monitor domain transitions**: Healthy training shows smooth μ transitions, not rapid oscillation.
+
+
+## 20. 32D Sovereign State Regularizer (v2.3.3)
+
+### 20.1 The Problem: Sheath Collapse
+
+**Training Log Symptom:**
+```
+🔱 [32D] Bhava:UNI(100%)>EXE(0%)>COG(0%) 🟢 | Sheath:VIT(100%)>BLI(100%) 🔴 | Vritti:ERROR
+```
+
+The 5D Kosha Gyroscope operates on **extracted projections** from the 32D Sovereign State. When the underlying 32D state saturates (VIT→100%, BLI→100%), the gyroscope cannot fix it because:
+
+1. **Sigmoid Saturation**: With independent sigmoid activations (v2.2.5), each Kosha dimension can reach 100% independently
+2. **Weak Gradient Signal**: At sigmoid(x) ≈ 1.0, the derivative σ'(x) → 0, starving the learning process
+3. **Representation Collapse**: All Vital/Bliss outputs converge, destroying information diversity
+
+### 20.2 The Solution: Direct 32D Regularization
+
+v2.3.3 introduces the **SovereignStateRegularizer**—a direct loss applied to the 32D state layer before extraction:
+
+```
+                ┌─────────────────────────────┐
+                │   32D Sovereign State       │
+                │   [Bhava][Kosha][Vritti]...│
+                └───────────┬─────────────────┘
+                            │
+          ┌─────────────────┴─────────────────┐
+          │                                   │
+          ▼                                   ▼
+   ┌─────────────┐                   ┌─────────────────┐
+   │ 5D Kosha    │                   │ 32D Regularizer │ ← NEW (v2.3.3)
+   │ Gyroscope   │                   │ Anti-Saturation │
+   └─────────────┘                   │ + VICReg        │
+                                     └─────────────────┘
+```
+
+### 20.3 Components
+
+#### Anti-Saturation Loss
+
+Prevents dimensions from approaching 0% or 100%:
+
+```
+penalty_high = softplus((activation - 0.95) / margin)
+penalty_low  = softplus((0.05 - activation) / margin)
+L_sat = mean(penalty_high + penalty_low)
+```
+
+- **Smooth**: Uses softplus for continuous gradients
+- **Margin-based**: Only penalizes near extremes (0.05 and 0.95)
+- **Per-dimension weights**: VIT and BLI get 1.5× penalty (prone to saturation)
+
+#### Variance Maintenance (VICReg-style)
+
+Prevents all dimensions from collapsing to the same value:
+
+```
+L_var = mean(max(0, target_std - std(x_d))^2)
+```
+
+- **Hinge loss**: Only activates when std falls below target
+- **Per-group targets**: Kosha: 0.15, Vritti: 0.15, Guna: 0.20
+- **Maintains diversity**: Ensures each dimension contributes unique information
+
+### 20.4 Configuration
+
+```python
+@dataclass
+class SovereignStateRegularizerConfig:
+    # Anti-Saturation
+    anti_saturation_weight: float = 0.5       # Overall weight
+    saturation_threshold_high: float = 0.95   # Penalize above this
+    saturation_threshold_low: float = 0.05    # Penalize below this
+    saturation_margin: float = 0.15           # Soft margin
+
+    # Variance Maintenance
+    variance_weight: float = 0.2              # VICReg weight
+    target_std_kosha: float = 0.15            # Target std for Koshas
+    target_std_vritti: float = 0.15           # Target std for Vrittis
+    target_std_guna: float = 0.20             # Target std for Gunas
+
+    # Per-Kosha Weights
+    kosha_weights: Tuple = (
+        1.0,   # MATERIAL (Physical)
+        1.5,   # VITAL - HIGH (prone to saturation)
+        1.0,   # MENTAL
+        1.0,   # INTELLECTUAL
+        1.5,   # BLISSFUL - HIGH (prone to saturation)
+    )
+```
+
+### 20.5 CLI Arguments
+
+```bash
+# Enable 32D regularizer
+--enable_state_regularizer
+
+# Anti-saturation weight (default: 0.5)
+--state_reg_anti_sat_weight 0.5
+
+# Variance weight (default: 0.2)
+--state_reg_variance_weight 0.2
+
+# Saturation thresholds (default: 0.95 / 0.05)
+--state_reg_sat_thresh_high 0.95
+--state_reg_sat_thresh_low 0.05
+
+# Target Kosha std (default: 0.15)
+--state_reg_target_std_kosha 0.15
+
+# Per-Kosha weights for VIT and BLI (default: 1.5)
+--state_reg_vital_weight 1.5
+--state_reg_bliss_weight 1.5
+```
+
+### 20.6 Usage
+
+**Basic Usage (recommended for VIT/BLI collapse):**
+```bash
+python train_unified_llm.py \
+    --model_type ontological \
+    --enable_kosha_gyroscope \
+    --enable_state_regularizer \
+    ... other args
+```
+
+**Aggressive Anti-Saturation (severe collapse):**
+```bash
+python train_unified_llm.py \
+    --model_type ontological \
+    --enable_kosha_gyroscope \
+    --enable_state_regularizer \
+    --state_reg_anti_sat_weight 1.0 \
+    --state_reg_vital_weight 2.0 \
+    --state_reg_bliss_weight 2.0 \
+    ... other args
+```
+
+### 20.7 Diagnostics
+
+The regularizer logs the following metrics:
+
+```python
+# Core metrics
+state_reg/loss                 # Total regularization loss
+state_reg/anti_sat_kosha       # Anti-saturation loss for Koshas
+state_reg/variance_kosha       # Variance loss for Koshas
+state_reg/saturation_alerts    # List of saturated dimensions
+
+# Status line format
+"32D:VIT(95%)>BLI(92%) ⚠️"     # Warning: approaching saturation
+"32D:OK"                        # Healthy: no dimensions near extremes
+```
+
+### 20.8 When to Use
+
+| Symptom | 5D Gyroscope | 32D Regularizer |
+|---------|--------------|-----------------|
+| Kosha imbalance (one dominates) | ✓ | Not needed |
+| VIT→100% or BLI→100% collapse | Limited effect | **Required** |
+| All Koshas converging to same value | Partial | ✓ |
+| Vritti ERROR state | Not directly | ✓ (prevents upstream collapse) |
+| "Blissful Ignorance" | ✓ (ceiling) | ✓ (prevents ceiling bypass) |
+
+### 20.9 Version History Update
+
+| Version | Date | Changes |
+|---------|------|---------|
+| **2.3.3** | **2026-01-11** | **32D Sovereign State Regularizer (Anti-Saturation + VICReg)** |
+| 2.3.2 | 2026-01-11 | Reflexive Domain Morph (Token Heuristics + Kosha State) |
+| 2.3.0 | 2026-01-10 | Complete Harmonic Pentad with Floor/Ceiling |
+| 2.2.5 | 2026-01-09 | Geometric Expansion (Sigmoid + VICReg) |
+| 2.2.4 | 2026-01-08 | Three-Stage Hybrid Logic |
+| 2.2.1 | 2026-01-07 | Dynamic Weight Scheduler |

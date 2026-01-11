@@ -239,6 +239,8 @@ try:
         InvertedCurriculumController,
         VrittiResonanceLoss,
         VrittiResonanceConfig,
+        SovereignStateRegularizer,
+        SovereignStateRegularizerConfig,
     )
     from symbolu.monitors import (
         GraduationMonitor,
@@ -10740,6 +10742,34 @@ def train(config: UnifiedTrainingConfig):
         print(f"     Phase 1: Diagnostic logging only (Kosha-Vritti alignment)")
         print(f"     Phase 2: Loss active at λ=0.1 after PPL < {config.gyroscope_graduation_ppl}")
 
+    # v2.3.3: Initialize 32D Sovereign State Regularizer
+    state_regularizer = None
+    if getattr(config, 'enable_state_regularizer', False) and KOSHA_GYROSCOPE_AVAILABLE:
+        state_reg_config = SovereignStateRegularizerConfig(
+            anti_saturation_weight=getattr(config, 'state_reg_anti_sat_weight', 0.5),
+            variance_weight=getattr(config, 'state_reg_variance_weight', 0.2),
+            saturation_threshold_high=getattr(config, 'state_reg_sat_thresh_high', 0.95),
+            saturation_threshold_low=getattr(config, 'state_reg_sat_thresh_low', 0.05),
+            target_std_kosha=getattr(config, 'state_reg_target_std_kosha', 0.15),
+            kosha_weights=(
+                1.0,  # MATERIAL
+                getattr(config, 'state_reg_vital_weight', 1.5),  # VITAL
+                1.0,  # MENTAL
+                1.0,  # INTELLECTUAL
+                getattr(config, 'state_reg_bliss_weight', 1.5),  # BLISS
+            ),
+        )
+        state_regularizer = SovereignStateRegularizer(config=state_reg_config).to(device)
+        print(f"\n  ╔══════════════════════════════════════════════════════════════════╗")
+        print(f"  ║  32D STATE REGULARIZER v2.3.3: Anti-Saturation + VICReg         ║")
+        print(f"  ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Anti-Saturation: λ={state_reg_config.anti_saturation_weight:.1f}                                      ║")
+        print(f"  ║    High threshold: {state_reg_config.saturation_threshold_high:.0%} | Low threshold: {state_reg_config.saturation_threshold_low:.0%}             ║")
+        print(f"  ║  Variance Maintenance: λ={state_reg_config.variance_weight:.1f} (target σ={state_reg_config.target_std_kosha:.2f})              ║")
+        print(f"  ║  Kosha Weights: MAT×1.0 VIT×{state_reg_config.kosha_weights[1]:.1f} MEN×1.0 INT×1.0 BLI×{state_reg_config.kosha_weights[4]:.1f}  ║")
+        print(f"  ║  Target: Prevent Sheath:VIT(100%)>BLI(100%) collapse             ║")
+        print(f"  ╚══════════════════════════════════════════════════════════════════╝")
+
     elif config.enable_kosha_gyroscope and not KOSHA_GYROSCOPE_AVAILABLE:
         print(f"\n  ⚠️  KOSHA GYROSCOPE REQUESTED but module not available!")
         print(f"      Check: symbolu/losses/kosha_gyroscope.py exists and imports correctly")
@@ -11708,6 +11738,46 @@ def train(config: UnifiedTrainingConfig):
                 except Exception as e:
                     if global_step % 500 == 0:
                         print(f"  ⚠️ [KOSHA GYROSCOPE] Error: {e}")
+
+            # =====================================================================
+            # v2.3.3: 32D SOVEREIGN STATE REGULARIZER - Anti-Saturation
+            # Prevents VIT(100%)>BLI(100%) collapse in 32D space
+            # The 5D Gyroscope can't fix this - it operates on extracted projections
+            # =====================================================================
+            state_reg_loss = 0.0
+            if state_regularizer is not None:
+                try:
+                    # Get 32D sovereign state (already extracted for gyroscope above)
+                    sovereign_state_for_reg = None
+                    if config.model_type in ("ontological", "ontological_hybrid"):
+                        sovereign_state_for_reg = outputs.get('state', None) if isinstance(outputs, dict) else None
+
+                    if sovereign_state_for_reg is not None:
+                        # Compute regularization loss
+                        reg_loss, reg_diagnostics = state_regularizer(
+                            sovereign_state_for_reg,
+                            return_components=True,
+                        )
+                        state_reg_loss = reg_loss
+
+                        # Add to total loss
+                        loss = loss + state_reg_loss
+
+                        # Log regularizer metrics
+                        metrics['state_reg_loss'] = state_reg_loss.item()
+                        metrics['state_reg_anti_sat_kosha'] = reg_diagnostics.get('anti_saturation', {}).get('kosha', 0.0)
+                        metrics['state_reg_variance_kosha'] = reg_diagnostics.get('variance', {}).get('kosha', 0.0)
+                        metrics['state_reg_saturation_alerts'] = reg_diagnostics.get('saturation_alerts', [])
+
+                        # One-time log when regularizer activates
+                        if global_step == 1 and not hasattr(model, '_state_reg_logged'):
+                            model._state_reg_logged = True
+                            summary = state_regularizer.get_summary(sovereign_state_for_reg)
+                            print(f"\n  🛡️ [32D REGULARIZER] Active: {summary}")
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  ⚠️ [32D REGULARIZER] Error: {e}")
 
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
@@ -13517,6 +13587,24 @@ def main():
                        help="Enable Reality Rip diagnostic logging")
     parser.add_argument("--rip_logger_dir", type=str, default="diagnostics/rips",
                        help="Directory for rip event files")
+
+    # v2.3.3: 32D Sovereign State Regularizer
+    parser.add_argument("--enable_state_regularizer", action="store_true",
+                       help="Enable 32D Sovereign State anti-saturation regularizer")
+    parser.add_argument("--state_reg_anti_sat_weight", type=float, default=0.5,
+                       help="Weight for anti-saturation loss (prevents VIT/BLI → 100%%)")
+    parser.add_argument("--state_reg_variance_weight", type=float, default=0.2,
+                       help="Weight for VICReg variance maintenance")
+    parser.add_argument("--state_reg_sat_thresh_high", type=float, default=0.95,
+                       help="Penalize activations above this threshold")
+    parser.add_argument("--state_reg_sat_thresh_low", type=float, default=0.05,
+                       help="Penalize activations below this threshold")
+    parser.add_argument("--state_reg_target_std_kosha", type=float, default=0.15,
+                       help="Target std for Kosha dimensions")
+    parser.add_argument("--state_reg_vital_weight", type=float, default=1.5,
+                       help="Extra penalty multiplier for VITAL dimension")
+    parser.add_argument("--state_reg_bliss_weight", type=float, default=1.5,
+                       help="Extra penalty multiplier for BLISS dimension")
 
     # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
     parser.add_argument("--enable_onto_bridge", action="store_true",
