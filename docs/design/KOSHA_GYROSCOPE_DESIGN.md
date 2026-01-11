@@ -1,7 +1,7 @@
 # Kosha Gyroscope: Homeostatic Self-Regulation System
 
-**Version:** 2.1.0
-**Status:** Design Complete, Inverted Curriculum + Dimensional Hierarchy
+**Version:** 2.2.0
+**Status:** Design Complete, Refinements Documented
 **Date:** 2026-01-11
 **Origin:** Vedic Kosha Theory + Control Theory + Constitutional AI
 **Curriculum:** Instructor-Led (Gyroscope ON) → Self-Learning (Gyroscope OFF at PPL < 30)
@@ -1496,14 +1496,15 @@ Both encode normative constraints, just in different substrates.
 
 ---
 
-**Document Status:** Ready for Implementation (v2.1 Dimensional Hierarchy)
+**Document Status:** Ready for Implementation (v2.2 Refinements Documented)
 **Next Steps:**
-1. Implement `KoshaGyroscopicLoss` module in `symbolu/losses/kosha_gyroscope.py`
-2. Integrate into training loop with Gyroscope ON from step 0 (PRIMARY dimensions)
-3. Monitor PPL for graduation threshold (< 30)
-4. Activate Kosha Classification at graduation, ramp down Gyroscope
-5. Activate Vritti/Guna classification after grounding (EMERGENT dimensions)
-6. **Validate against Appendix D benchmarks (Q1-Q16)**
+1. Implement `KoshaGyroscopicLoss` module (v2.2.0) in `symbolu/losses/kosha_gyroscope.py`
+2. Implement `GraduationMonitor` in `symbolu/monitors/graduation_monitor.py`
+3. Implement `SovereignDiagnosticLogger` in `symbolu/diagnostics/rip_logger.py`
+4. Integrate into training loop with Gyroscope ON from step 0 (PRIMARY dimensions)
+5. Monitor PPL for graduation threshold (Mean < 30, σ < 1.5)
+6. Run Stress Test Suite (ST-01 through ST-06) at graduation
+7. **Validate against Appendix D + E benchmarks (Q1-Q20)**
 
 **Key Changes:**
 - **v1.0 → v2.0:** Gyroscope now active from BEGINNING of training (instructor-led)
@@ -1511,3 +1512,455 @@ Both encode normative constraints, just in different substrates.
   - **PRIMARY** (Bhava + Kosha): Engage from step 0 (foundational substrate)
   - **EMERGENT** (Vritti + Guna): Arise from PRIMARY dynamics after grounding
   - Vritti = STATES of information, Guna = QUALITY of information
+- **v2.1 → v2.2:** Proposed refinements documented (Appendix E):
+  - Vital Momentum: Pranamaya as gradient momentum scaler
+  - Temporal Grounding: Physical history over last 2-3 tokens
+  - Graduation Stability Variance: Tighter PPL threshold criteria
+  - Contrastive Divergence: Self-supervised classification targets
+  - Stress Test Suite and Diagnostic Logger
+
+---
+
+## Appendix E: Proposed Refinements (v2.2.0)
+
+This appendix documents proposed refinements to the Kosha Gyroscope based on design review. These are **not yet implemented** but represent the next evolution of the system.
+
+### E.1 Vital Momentum: The Missing Kosha
+
+#### E.1.1 The Problem
+
+The Vital (Pranamaya) Kosha at index [1] is not mapped to any R-T quadrant. It currently sits unused in the Gyroscope logic.
+
+#### E.1.2 The Solution: Gradient Momentum Scaler
+
+In Vedic theory, **Prana** is the energy that moves mind and matter. The Vital Kosha should act as a **dynamic gain multiplier** for the Gyroscope:
+
+| Vital State | Meaning | Gyroscope Behavior |
+|-------------|---------|-------------------|
+| **Low Vital** | Inertia, stagnation | Increase gain (pull harder to overcome) |
+| **High Vital** | Flow, momentum | Decrease gain (model already moving) |
+
+#### E.1.3 Proposed Implementation
+
+```python
+# Extract Vital (Energy/Momentum)
+vital = kosha_states[:, :, 1]  # Pranamaya
+
+# Low energy = Higher gain needed to shift state
+# High energy = Model is already in flow, subtle correction suffices
+momentum_scaler = 1.5 - vital.mean()  # Range: [0.5, 1.5]
+
+# Apply to final loss
+total_loss = (axis1_loss + axis2_loss) * self.gain * momentum_scaler
+```
+
+#### E.1.4 Validation Benchmark
+
+**Q17: Vital Momentum Effectiveness**
+
+- [ ] Low Vital correlates with stuck states (high token repetition)
+- [ ] High Vital correlates with generative flow (novel token sequences)
+- [ ] Dynamic gain adjustment reduces time-to-escape from loops
+- [ ] Vital shows rhythmic pulses aligned with sentence boundaries
+
+---
+
+### E.2 Temporal Grounding: The "Breath Before the Rip"
+
+#### E.2.1 The Problem
+
+The current Vijnana Gate checks if Physical (Annamaya) is active **now**. But a single-token check is too volatile—the model needs to have been grounded for a short period before it can safely transition.
+
+#### E.2.2 The Solution: Physical History Window
+
+Instead of checking `physical[t]`, check the **mean of the last 2-3 tokens**:
+
+```
+Transition Allowed IF:
+  Physical[t] > threshold       ← Current check (volatile)
+  Physical[t-2:t].mean() > threshold  ← Proposed (stable)
+```
+
+#### E.2.3 Proposed Implementation
+
+```python
+# Temporal Physical Grounding (Mean of last 3 tokens)
+# Uses 1D average pooling for efficiency
+if physical.shape[1] >= 3:
+    phys_history = F.avg_pool1d(
+        physical.unsqueeze(1),
+        kernel_size=3,
+        stride=1,
+        padding=1
+    ).squeeze(1)
+else:
+    phys_history = physical
+
+# Use phys_history instead of physical for gate check
+phys_gate = torch.sigmoid(
+    self.gate_temperature * (phys_history - self.gate_threshold)
+)
+```
+
+#### E.2.4 Rationale
+
+This ensures the model "takes a breath" of factual grounding before jumping from a loop into a new logical structure. The transition path becomes:
+
+```
+Mental (looping)
+  → Physical (2-3 tokens of grounding)
+    → Intellect (verified structure)
+      → Bliss (expansion)
+```
+
+#### E.2.5 Validation Benchmark
+
+**Q18: Temporal Grounding Stability**
+
+- [ ] Successful transitions show Physical activation in [t-2, t-1, t]
+- [ ] Failed transitions (premature jumps) lack Physical history
+- [ ] 3-token window reduces false-positive loop breaks
+- [ ] Fibonacci sequences remain intact (Physical + Intellect sustained)
+
+---
+
+### E.3 Graduation Stability Variance
+
+#### E.3.1 The Problem
+
+The current graduation threshold is simply `PPL < 30`. But PPL can temporarily dip below 30 due to an "easy" batch of data, triggering premature graduation.
+
+#### E.3.2 The Solution: Dual Criteria
+
+Graduation should require BOTH conditions:
+
+1. **Mean PPL < 30** over a stability window
+2. **PPL Standard Deviation < 1.5** (stability, not luck)
+
+#### E.3.3 Proposed Implementation
+
+```python
+class GraduationMonitor:
+    def __init__(
+        self,
+        target_ppl: float = 30.0,
+        stability_window: int = 10,  # Last N validation checks
+        variance_threshold: float = 1.5
+    ):
+        self.target_ppl = target_ppl
+        self.window_size = stability_window
+        self.var_threshold = variance_threshold
+        self.ppl_history = []
+        self.graduated = False
+
+    def check(self, val_ppl: float) -> bool:
+        """Returns True if graduation criteria met."""
+        self.ppl_history.append(val_ppl)
+
+        if len(self.ppl_history) > self.window_size:
+            self.ppl_history.pop(0)
+
+        if len(self.ppl_history) < self.window_size:
+            return False  # Not enough data
+
+        avg_ppl = np.mean(self.ppl_history)
+        std_ppl = np.std(self.ppl_history)
+
+        is_low_enough = avg_ppl <= self.target_ppl
+        is_stable_enough = std_ppl <= self.var_threshold
+
+        if is_low_enough and is_stable_enough and not self.graduated:
+            self.graduated = True
+            return True
+
+        return False
+```
+
+#### E.3.4 Graduation Ceremony Update
+
+```python
+# In training loop
+if graduation_monitor.check(last_val_ppl) and not graduated:
+    print(f"🎓 [GRADUATION] PPL Stable at {avg_ppl:.2f} (σ={std_ppl:.2f})")
+    print(f"   • Gyroscope: RAMPING DOWN (instructor stepping back)")
+    print(f"   • Classification: ENGAGING (student self-assessment)")
+    graduated = True
+```
+
+#### E.3.5 Validation Benchmark
+
+**Q19: Graduation Stability**
+
+- [ ] False graduations eliminated (no PPL spike after graduation)
+- [ ] Stability window (10 evals) is sufficient for confidence
+- [ ] σ < 1.5 correlates with stable Kosha projections
+- [ ] Post-graduation Kosha variance remains low
+
+---
+
+### E.4 Contrastive Divergence for Classification Targets
+
+#### E.4.1 The Problem
+
+Q7 in Appendix D asks: "Where do `kosha_targets` come from?"
+
+#### E.4.2 The Solution: Layer Divergence
+
+Use **Contrastive Divergence** between Layer 9 (The Witness) and Layer 12 (The Output):
+
+| Condition | Layer 9 (Witness) | Layer 12 (Output) | Diagnosis |
+|-----------|-------------------|-------------------|-----------|
+| **Valid Loop** | Coherent | Coherent | Dharana (focus) |
+| **Invalid Loop** | High entropy | Repetitive | Insanity (punish) |
+| **Hallucination** | Low confidence | High confidence | Delusion (punish) |
+
+#### E.4.3 Proposed Implementation
+
+```python
+def compute_loop_labels(layer_9_hidden, layer_12_hidden, tokens):
+    """
+    Self-supervised Kosha labeling via layer divergence.
+    """
+    # Compute entropy at Layer 9 (Witness)
+    witness_logits = witness_head(layer_9_hidden)
+    witness_entropy = -(F.softmax(witness_logits, dim=-1) *
+                        F.log_softmax(witness_logits, dim=-1)).sum(dim=-1)
+
+    # Detect token repetition at output
+    is_repeating = detect_token_repetition(tokens, window=3)
+
+    # Classification logic:
+    # High Witness Entropy + Repetition = Invalid Loop (Mental trap)
+    # Low Witness Entropy + Repetition = Valid Focus (Dharana)
+
+    invalid_loop_mask = (witness_entropy > 2.0) & is_repeating
+
+    # Generate Kosha targets
+    kosha_targets = torch.zeros_like(kosha_states)
+    kosha_targets[invalid_loop_mask, 2] = 1.0  # High Mental (trap)
+    kosha_targets[invalid_loop_mask, 3] = 0.0  # Low Intellect (missing)
+    kosha_targets[~invalid_loop_mask, 3] = 0.5  # Normal Intellect
+
+    return kosha_targets
+```
+
+#### E.4.4 Validation Benchmark
+
+**Q20: Contrastive Divergence Accuracy**
+
+- [ ] Layer 9 entropy correlates with loop invalidity
+- [ ] Self-supervised labels match human judgment (>85%)
+- [ ] Classification loss converges with self-generated labels
+- [ ] No external annotation required
+
+---
+
+### E.5 Stress Test Suite
+
+To verify the Kosha Gyroscope's transitions, use these engineered prompts:
+
+#### E.5.1 Test Prompts
+
+| Test ID | Category | Prompt | Expected Kosha State |
+|---------|----------|--------|---------------------|
+| **ST-01** | Logic Gate | "The sequence is 1, 1, 2, 3, 5, 8, 13, 21," | Mental HIGH + Intellect HIGH → No punishment (Dharana) |
+| **ST-02** | Recursive Trap | "The recursive definition of a recursive definition is that it is a" | Mental HIGH + Intellect LOW → Gyroscope fires, force Bliss |
+| **ST-03** | Manifest Ground | "The precise chemical composition of seawater includes" | Physical HIGH → Vijnana Gate verifies before expansion |
+| **ST-04** | Creative Expand | "Imagine a color that does not exist in our spectrum, it feels like" | Bliss HIGH → Vital Momentum sustains novel generation |
+| **ST-05** | Quote Recall | "To be or not to be, that is the" | Mental HIGH + Intellect HIGH → Allow (valid recall) |
+| **ST-06** | Pathological | "Buffalo buffalo Buffalo buffalo buffalo buffalo Buffalo buffalo" | Mental EXTREME → Force break despite grammatical validity |
+
+#### E.5.2 Expected Transitions
+
+```
+ST-02: Recursive Trap
+───────────────────────
+Step 1: "...is that it is a"
+        Mental: 0.85 ↑↑  (repetition detected)
+        Intellect: 0.12 ↓ (no logical structure)
+
+Step 2: Vijnana Gate Check
+        Physical History: [0.35, 0.42, 0.38] → Mean: 0.38
+        Gate: 0.38 > 0.30 → OPEN (grounded)
+
+Step 3: Gyroscope Loss Fires
+        axis1_loss = mental_trap × phys_gate × missing_intellect
+                   = 0.10 × 0.85 × 0.38 ≈ 0.032
+
+Step 4: Gradient Correction
+        Model shifts from Mental → Bliss quadrant
+        Next token: Novel expansion (not repetition)
+```
+
+---
+
+### E.6 Diagnostic Logger
+
+#### E.6.1 The Reality Rip Logger
+
+Captures the exact moment of forced transitions:
+
+```python
+class SovereignDiagnosticLogger:
+    """Logs high-intensity quadrant shifts (Reality Rips)."""
+
+    def __init__(self, log_dir: str = "diagnostics/rips"):
+        self.log_dir = log_dir
+        os.makedirs(log_dir, exist_ok=True)
+        self.rip_count = 0
+
+    def capture_rip(
+        self,
+        step: int,
+        tokens: List[int],
+        kosha_states: torch.Tensor,
+        loss_value: float
+    ) -> bool:
+        """
+        Captures state during forced transition.
+        Returns True if a rip was detected.
+        """
+        mental_vals = kosha_states[:, :, 2]
+        intellect_vals = kosha_states[:, :, 3]
+
+        # Detect 'Insanity' state: High Mental + Low Intellect
+        trapped_mask = (mental_vals > 0.8) & (intellect_vals < 0.2)
+
+        if trapped_mask.any():
+            self.rip_count += 1
+            rip_event = {
+                "step": step,
+                "rip_id": self.rip_count,
+                "loss": float(loss_value),
+                "mental_max": float(mental_vals.max()),
+                "intellect_min": float(intellect_vals.min()),
+                "sample_tokens": tokens[:20]
+            }
+
+            file_path = os.path.join(
+                self.log_dir,
+                f"rip_step_{step}_{self.rip_count}.json"
+            )
+            with open(file_path, "w") as f:
+                json.dump(rip_event, f, indent=4)
+
+            return True
+        return False
+```
+
+#### E.6.2 Rip Analysis Protocol
+
+When analyzing rip snapshots:
+
+1. **Pre-Rip**: Look for 3-5 identical tokens, Mental climbing toward 1.0
+2. **Vijnana Gate**: Verify Intellect remains flat (not Dharana)
+3. **The Rip**: Vital spikes as energy expended for transition
+4. **Post-Rip**: Next token is semantically related but structurally novel
+
+#### E.6.3 Health Metrics Over Training
+
+| Metric | Instructor Phase (PPL > 30) | Self-Learning Phase (PPL < 30) |
+|--------|----------------------------|-------------------------------|
+| Rip Frequency | High (external regulation) | Low (internalized balance) |
+| Vital Surges | Chaotic spikes | Rhythmic pulses |
+| Vritti Stability | Frequent ERROR | Consistent FACT/IMAGINATION |
+
+---
+
+### E.7 Refined KoshaGyroscopicLoss (v2.2.0)
+
+Incorporating all refinements:
+
+```python
+class KoshaGyroscopicLoss(nn.Module):
+    """
+    Vijnana-Gated Kosha Balance Loss (v2.2.0).
+
+    Refinements:
+    - Vital Momentum: Dynamic gain based on Pranamaya energy
+    - Temporal Grounding: Physical history over 3-token window
+    - Soft gates with temperature for differentiability
+    """
+
+    def __init__(
+        self,
+        trap_threshold: float = 0.75,
+        gate_threshold: float = 0.30,
+        balance_target: float = 0.25,
+        gate_temperature: float = 10.0,
+        gain: float = 2.0,
+        temporal_window: int = 3,
+    ):
+        super().__init__()
+        self.trap_threshold = trap_threshold
+        self.gate_threshold = gate_threshold
+        self.balance_target = balance_target
+        self.gate_temperature = gate_temperature
+        self.gain = gain
+        self.temporal_window = temporal_window
+
+    def forward(self, kosha_states: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            kosha_states: [batch, seq, 5] normalized to [0, 1]
+                         [Physical, Vital, Mental, Intellect, Blissful]
+
+        Returns:
+            Scalar loss value
+        """
+        physical  = kosha_states[:, :, 0]  # Annamaya (+,+)
+        vital     = kosha_states[:, :, 1]  # Pranamaya (energy)
+        mental    = kosha_states[:, :, 2]  # Manomaya (-,+)
+        intellect = kosha_states[:, :, 3]  # Vijnanamaya (+,-)
+        bliss     = kosha_states[:, :, 4]  # Anandamaya (-,-)
+
+        # === REFINEMENT 1: Temporal Grounding ===
+        # Check physical history, not just current token
+        if physical.shape[1] >= self.temporal_window:
+            phys_history = F.avg_pool1d(
+                physical.unsqueeze(1),
+                kernel_size=self.temporal_window,
+                stride=1,
+                padding=self.temporal_window // 2
+            ).squeeze(1)
+        else:
+            phys_history = physical
+
+        # === REFINEMENT 2: Vital Momentum ===
+        # Low energy = higher gain needed; High energy = subtle correction
+        momentum_scaler = 1.5 - vital.mean()  # Range: [0.5, 1.5]
+
+        # --- AXIS 1: Mental → Intellect (via Physical) ---
+        mental_trap = F.relu(mental - self.trap_threshold)
+        phys_gate = torch.sigmoid(
+            self.gate_temperature * (phys_history - self.gate_threshold)
+        )
+        missing_intellect = F.relu(self.balance_target - intellect)
+        axis1_loss = (mental_trap * phys_gate * missing_intellect).mean()
+
+        # --- AXIS 2: Physical → Blissful (via Mental) ---
+        physical_trap = F.relu(physical - self.trap_threshold)
+        mental_gate = torch.sigmoid(
+            self.gate_temperature * (mental - self.gate_threshold)
+        )
+        missing_bliss = F.relu(self.balance_target - bliss)
+        axis2_loss = (physical_trap * mental_gate * missing_bliss).mean()
+
+        # === Total Loss with Dynamic Gain ===
+        total_loss = (axis1_loss + axis2_loss) * self.gain * momentum_scaler
+
+        return total_loss
+```
+
+---
+
+### E.8 Updated Validation Checklist
+
+| # | Question | Status | Evidence |
+|---|----------|--------|----------|
+| Q17 | Vital Momentum effective | ⬜ Pending | |
+| Q18 | Temporal Grounding stable | ⬜ Pending | |
+| Q19 | Graduation Stability validated | ⬜ Pending | |
+| Q20 | Contrastive Divergence accurate | ⬜ Pending | |
+
+**Updated Success Criteria**: ≥16/20 questions answered positively indicates the system works as designed.
