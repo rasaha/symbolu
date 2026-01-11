@@ -7357,10 +7357,22 @@ class UnifiedTrainingConfig:
     gyroscope_ppl_ceiling: float = 100.0     # PPL above which gain stays at base
     gyroscope_target_ppl: float = 30.0       # PPL at which gain reaches max (disengage threshold)
     # Trap detection thresholds (v2.2.5: Golden Ratio φ for sigmoid mode)
-    gyroscope_trap_threshold: float = 0.618  # Kosha saturation point (Golden Ratio φ)
+    gyroscope_trap_threshold: float = 0.618  # Legacy: Kosha saturation point (Golden Ratio φ)
     gyroscope_gate_threshold: float = 0.30   # Minimum for gate activation
     gyroscope_balance_target: float = 0.25   # Required opposite activation
     gyroscope_gate_temperature: float = 10.0 # Softness of gate (higher = sharper)
+    # v2.2.5: Fibonacci Pentad - Per-Kosha thresholds based on ontological roles
+    # | Kosha     | Fib Level | Role       | Trigger Action                          |
+    # | Mental    | 38.2%     | Warning    | Engage Bliss Damper (Dilution)          |
+    # | Physical  | 38.2%     | Support    | Required to open the Vijnana Gate       |
+    # | Intellect | 50.0%     | Pivot      | Target range for "Right Knowledge"      |
+    # | Vital     | 78.6%     | Resistance | Trigger SGP Hammer (Reset Momentum)     |
+    # | Bliss     | 23.6%     | Spark      | If below, release Damping for creativity|
+    gyroscope_threshold_mental: float = 0.382     # Warning - engage Bliss Damper
+    gyroscope_threshold_physical: float = 0.382   # Support - required to open Vijnana Gate
+    gyroscope_threshold_intellect: float = 0.500  # Pivot - target for "Right Knowledge"
+    gyroscope_threshold_vital: float = 0.786      # Resistance - trigger momentum reset
+    gyroscope_threshold_bliss: float = 0.236      # Spark - below this, release damping
     # v2.2.4: Three-Stage Hybrid Logic (Damping + Gate + Rip)
     gyroscope_damper_steepness: float = 5.0  # Sigmoid steepness for Bliss/Physical damper
     gyroscope_gate_steepness: float = 5.0    # Sigmoid steepness for Physical/Mental gate
@@ -10547,8 +10559,15 @@ def train(config: UnifiedTrainingConfig):
     vritti_resonance = None  # v2.3.0: Kosha-Vritti Resonance Loss
 
     if config.enable_kosha_gyroscope and KOSHA_GYROSCOPE_AVAILABLE:
-        # Initialize KoshaGyroscopicLoss with Three-Stage Hybrid Logic (v2.2.4)
+        # Initialize KoshaGyroscopicLoss with Fibonacci Pentad (v2.2.5)
         kosha_gyroscope = KoshaGyroscopicLoss(
+            # v2.2.5: Fibonacci Pentad - Per-Kosha thresholds
+            threshold_mental=config.gyroscope_threshold_mental,
+            threshold_physical=config.gyroscope_threshold_physical,
+            threshold_intellect=config.gyroscope_threshold_intellect,
+            threshold_vital=config.gyroscope_threshold_vital,
+            threshold_bliss=config.gyroscope_threshold_bliss,
+            # Legacy thresholds (backward compatibility)
             trap_threshold=config.gyroscope_trap_threshold,
             gate_threshold=config.gyroscope_gate_threshold,
             balance_target=config.gyroscope_balance_target,
@@ -10581,6 +10600,13 @@ def train(config: UnifiedTrainingConfig):
             gyroscope_disengage_ppl=config.gyroscope_target_ppl,
             gyroscope_warmup_steps=config.gyroscope_warmup_steps,
             gain_rampdown_steps=config.gyroscope_rampdown_steps,
+            # v2.2.5: Fibonacci Pentad - Per-Kosha thresholds
+            threshold_mental=config.gyroscope_threshold_mental,
+            threshold_physical=config.gyroscope_threshold_physical,
+            threshold_intellect=config.gyroscope_threshold_intellect,
+            threshold_vital=config.gyroscope_threshold_vital,
+            threshold_bliss=config.gyroscope_threshold_bliss,
+            # Legacy thresholds
             trap_threshold=config.gyroscope_trap_threshold,
             gate_threshold=config.gyroscope_gate_threshold,
             balance_target=config.gyroscope_balance_target,
@@ -10605,13 +10631,15 @@ def train(config: UnifiedTrainingConfig):
             )
 
         print(f"\n  ╔══════════════════════════════════════════════════════════════════╗")
-        print(f"  ║  KOSHA GYROSCOPE v2.2.4: Three-Stage Hybrid Logic ENABLED        ║")
+        print(f"  ║  KOSHA GYROSCOPE v2.2.5: Fibonacci Pentad ENABLED               ║")
         print(f"  ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Fibonacci Pentad Thresholds (per-Kosha):                        ║")
+        print(f"  ║    Mental:    {config.gyroscope_threshold_mental:.1%} (Warning)   Physical: {config.gyroscope_threshold_physical:.1%} (Support)   ║")
+        print(f"  ║    Intellect: {config.gyroscope_threshold_intellect:.1%} (Pivot)    Vital:    {config.gyroscope_threshold_vital:.1%} (Resistance)║")
+        print(f"  ║    Bliss:     {config.gyroscope_threshold_bliss:.1%} (Spark)                                   ║")
         print(f"  ║  Dynamic Weight Scheduler:                                       ║")
         print(f"  ║    Base Gain: {config.gyroscope_base_gain:.2f} (PPL > {config.gyroscope_ppl_ceiling:.0f})                                ║")
         print(f"  ║    Max Gain:  {config.gyroscope_max_gain:.2f} (PPL → {config.gyroscope_target_ppl:.0f})                                 ║")
-        print(f"  ║  Trap Detection:                                                 ║")
-        print(f"  ║    Threshold: {config.gyroscope_trap_threshold:.2f}  Gate: {config.gyroscope_gate_threshold:.2f}  Balance: {config.gyroscope_balance_target:.2f}          ║")
         print(f"  ║  Three-Stage Hybrid Logic (v2.2.4):                             ║")
         print(f"  ║    Damper Steepness: {config.gyroscope_damper_steepness:.1f}  Gate Steepness: {config.gyroscope_gate_steepness:.1f}              ║")
         print(f"  ║    Rip Multiplier: {config.gyroscope_rip_multiplier:.1f} (circuit breaker strength)            ║")
@@ -13255,6 +13283,17 @@ def main():
                        help="Required opposite activation to avoid punishment")
     parser.add_argument("--gyroscope_gate_temperature", type=float, default=10.0,
                        help="Gate sigmoid temperature (higher = sharper)")
+    # v2.2.5: Fibonacci Pentad - Per-Kosha thresholds based on ontological roles
+    parser.add_argument("--gyroscope_threshold_mental", type=float, default=0.382,
+                       help="v2.2.5: Mental threshold (38.2%% Warning - engage Bliss Damper)")
+    parser.add_argument("--gyroscope_threshold_physical", type=float, default=0.382,
+                       help="v2.2.5: Physical threshold (38.2%% Support - required for Vijnana Gate)")
+    parser.add_argument("--gyroscope_threshold_intellect", type=float, default=0.500,
+                       help="v2.2.5: Intellect threshold (50.0%% Pivot - target for Right Knowledge)")
+    parser.add_argument("--gyroscope_threshold_vital", type=float, default=0.786,
+                       help="v2.2.5: Vital threshold (78.6%% Resistance - trigger momentum reset)")
+    parser.add_argument("--gyroscope_threshold_bliss", type=float, default=0.236,
+                       help="v2.2.5: Bliss threshold (23.6%% Spark - below releases damping)")
     # v2.2.4: Three-Stage Hybrid Logic (Damping + Gate + Rip)
     parser.add_argument("--gyroscope_damper_steepness", type=float, default=5.0,
                        help="v2.2.4: Sigmoid steepness for Bliss/Physical damper")
@@ -13853,6 +13892,12 @@ def main():
         gyroscope_gate_threshold=args.gyroscope_gate_threshold,
         gyroscope_balance_target=args.gyroscope_balance_target,
         gyroscope_gate_temperature=args.gyroscope_gate_temperature,
+        # v2.2.5: Fibonacci Pentad - Per-Kosha thresholds
+        gyroscope_threshold_mental=args.gyroscope_threshold_mental,
+        gyroscope_threshold_physical=args.gyroscope_threshold_physical,
+        gyroscope_threshold_intellect=args.gyroscope_threshold_intellect,
+        gyroscope_threshold_vital=args.gyroscope_threshold_vital,
+        gyroscope_threshold_bliss=args.gyroscope_threshold_bliss,
         # v2.2.4: Three-Stage Hybrid Logic
         gyroscope_damper_steepness=args.gyroscope_damper_steepness,
         gyroscope_gate_steepness=args.gyroscope_gate_steepness,

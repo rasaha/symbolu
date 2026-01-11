@@ -92,9 +92,27 @@ class KoshaGyroscopeConfig:
     # Warmup for initial gyroscope activation
     gyroscope_warmup_steps: int = 100        # Steps before gyroscope fully active
 
-    # Trap detection thresholds (v2.2.5: Golden Ratio design for sigmoid mode)
-    # With sigmoid Koshas, each sheath is independent [0, 1]
-    # trap_threshold=0.618 (φ) fires at golden ratio - natural equilibrium point
+    # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
+    # Per-Kosha thresholds based on Fibonacci retracement levels and ontological roles
+    # Each Kosha has its own threshold reflecting its unique function in consciousness
+    #
+    # Fibonacci Levels: 23.6%, 38.2%, 50.0%, 61.8%, 78.6%
+    #
+    # | Kosha     | Fib Level | Role       | Trigger Action                          |
+    # |-----------|-----------|------------|-----------------------------------------|
+    # | Mental    | 38.2%     | Warning    | Engage Bliss Damper (Dilution)          |
+    # | Physical  | 38.2%     | Support    | Required to open the Vijnana Gate       |
+    # | Intellect | 50.0%     | Pivot      | Target range for "Right Knowledge"      |
+    # | Vital     | 78.6%     | Resistance | Trigger SGP Hammer (Reset Momentum)     |
+    # | Bliss     | 23.6%     | Spark      | If below, release Damping for creativity|
+    #
+    threshold_mental: float = 0.382      # Warning level - engage Bliss Damper
+    threshold_physical: float = 0.382    # Support level - required to open Vijnana Gate
+    threshold_intellect: float = 0.500   # Pivot level - target for "Right Knowledge"
+    threshold_vital: float = 0.786       # Resistance level - trigger momentum reset
+    threshold_bliss: float = 0.236       # Spark level - below this, release damping
+
+    # Legacy: single trap_threshold (kept for backward compatibility)
     trap_threshold: float = 0.618        # Kosha saturation point (Golden Ratio φ)
     gate_threshold: float = 0.30         # Minimum for gate activation (Gemini v2.2.4)
     balance_target: float = 0.25         # Required opposite activation (Gemini v2.2.4)
@@ -193,6 +211,13 @@ class KoshaGyroscopicLoss(nn.Module):
 
     def __init__(
         self,
+        # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
+        threshold_mental: float = 0.382,     # Warning - engage Bliss Damper
+        threshold_physical: float = 0.382,   # Support - required to open Vijnana Gate
+        threshold_intellect: float = 0.500,  # Pivot - target for "Right Knowledge"
+        threshold_vital: float = 0.786,      # Resistance - trigger momentum reset
+        threshold_bliss: float = 0.236,      # Spark - below this, release damping
+        # Legacy thresholds (backward compatibility)
         trap_threshold: float = 0.618,  # v2.2.5: Golden Ratio φ (sigmoid mode)
         gate_threshold: float = 0.30,   # v2.2.5: Gemini's original (sigmoid mode)
         balance_target: float = 0.25,   # v2.2.5: Gemini's original (sigmoid mode)
@@ -251,6 +276,15 @@ class KoshaGyroscopicLoss(nn.Module):
             vital_momentum_range: (min, max) range for momentum scaler
         """
         super().__init__()
+
+        # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
+        self.threshold_mental = threshold_mental
+        self.threshold_physical = threshold_physical
+        self.threshold_intellect = threshold_intellect
+        self.threshold_vital = threshold_vital
+        self.threshold_bliss = threshold_bliss
+
+        # Legacy thresholds (backward compatibility)
         self.trap_threshold = trap_threshold
         self.gate_threshold = gate_threshold
         self.balance_target = balance_target
@@ -543,17 +577,31 @@ class KoshaGyroscopicLoss(nn.Module):
         #   If trapped + gate closed → ReLU shock forces re-grounding.
         #   This "smashes" the loop trajectory back to Physical quadrant.
 
+        # === FIBONACCI PENTAD LOGIC (v2.2.5) ===
+        # Each Kosha now has its own threshold based on its ontological role
+
         # Stage 1: BLISS DAMPER - dilutes creative expansion during Mental dominance
-        # When Mental > threshold, bliss_damper approaches 0, diluting Bliss influence
-        bliss_damper = 1.0 - torch.sigmoid((mental - self.trap_threshold) * self.damper_steepness)
+        # When Mental > threshold_mental (38.2%), bliss_damper approaches 0
+        bliss_damper = 1.0 - torch.sigmoid((mental - self.threshold_mental) * self.damper_steepness)
+
+        # BLISS SPARK RELEASE: If Bliss < threshold_bliss (23.6%), release damping for creativity
+        # This allows creative expansion when Bliss is starved
+        bliss_spark = (bliss < self.threshold_bliss).float()
+        bliss_damper = bliss_damper + bliss_spark * 0.5  # Partial release when Bliss is low
 
         # Stage 2: PHYSICAL GATE - strict prerequisite for Intellect (NO BYPASS!)
-        # Gate only opens when Physical history is above threshold
-        phys_gate = torch.sigmoid((phys_history - self.gate_threshold) * self.gate_steepness)
+        # Gate only opens when Physical history is above threshold_physical (38.2%)
+        phys_gate = torch.sigmoid((phys_history - self.threshold_physical) * self.gate_steepness)
+
+        # VITAL RESISTANCE: High Vital (>78.6%) dampens momentum (model is "overheating")
+        vital_resistance = torch.sigmoid((vital - self.threshold_vital) * self.gate_steepness)
+        # Apply resistance as momentum damper
+        vital_momentum_damper = 1.0 - vital_resistance * 0.5  # Max 50% reduction at high Vital
 
         # Stage 3: REALITY RIP - Hard ReLU for "circuit breaker" effect
         # Uses ReLU (not sigmoid) for discontinuous gradient shock
-        mental_trap = F.relu(mental - self.trap_threshold)
+        # Now uses threshold_mental (38.2%) - fires earlier than legacy 61.8%
+        mental_trap = F.relu(mental - self.threshold_mental)
 
         # Rip signal fires when trapped AND gate is CLOSED
         # This forces model back to Physical/Manifest quadrant
@@ -580,13 +628,16 @@ class KoshaGyroscopicLoss(nn.Module):
 
         # Stage 1: PHYSICAL DAMPER - dilutes grounding during Physical dominance
         # (Prevents over-grounding that blocks creativity)
-        physical_damper = 1.0 - torch.sigmoid((physical - self.trap_threshold) * self.damper_steepness)
+        # Uses threshold_physical (38.2%) from Fibonacci Pentad
+        physical_damper = 1.0 - torch.sigmoid((physical - self.threshold_physical) * self.damper_steepness)
 
         # Stage 2: MENTAL GATE - strict prerequisite for Bliss (NO BYPASS!)
-        mental_gate = torch.sigmoid((mental - self.gate_threshold) * self.gate_steepness)
+        # Uses threshold_mental (38.2%) for gate requirement
+        mental_gate = torch.sigmoid((mental - self.threshold_mental) * self.gate_steepness)
 
         # Stage 3: REALITY RIP - Hard ReLU for Physical trap
-        physical_trap = F.relu(physical - self.trap_threshold)
+        # Uses threshold_physical (38.2%) from Fibonacci Pentad
+        physical_trap = F.relu(physical - self.threshold_physical)
 
         # Rip signal fires when physically trapped AND mental gate is CLOSED
         rip_signal_axis2 = physical_trap * (1.0 - mental_gate)
@@ -613,7 +664,11 @@ class KoshaGyroscopicLoss(nn.Module):
         # Prevents sigmoid collapse where all Koshas converge to same value
         vicreg_variance_loss = self._compute_vicreg_variance_loss(kosha_states)
 
-        total_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler + vicreg_variance_loss
+        # === FIBONACCI PENTAD: Vital Resistance Dampening ===
+        # High Vital (>78.6%) dampens the loss to prevent "overheating"
+        vital_damper_scalar = vital_momentum_damper.mean()
+
+        total_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler * vital_damper_scalar + vicreg_variance_loss
 
         if return_components:
             # v2.2.4: Compute diagnostic metrics for Three-Stage Hybrid Logic
@@ -649,6 +704,16 @@ class KoshaGyroscopicLoss(nn.Module):
                 # v2.2.5 VICReg metrics
                 'vicreg_target_std': self.vicreg_target_std,
                 'vicreg_variance_weight': self.vicreg_variance_weight,
+
+                # v2.2.5 FIBONACCI PENTAD METRICS
+                'threshold_mental': self.threshold_mental,
+                'threshold_physical': self.threshold_physical,
+                'threshold_intellect': self.threshold_intellect,
+                'threshold_vital': self.threshold_vital,
+                'threshold_bliss': self.threshold_bliss,
+                'vital_resistance_mean': vital_resistance.mean().item(),
+                'vital_damper_scalar': vital_damper_scalar.item() if torch.is_tensor(vital_damper_scalar) else vital_damper_scalar,
+                'bliss_spark_mean': bliss_spark.mean().item(),
 
                 # v2.2.4 THREE-STAGE HYBRID METRICS
                 # Stage 1: Damper metrics
@@ -1111,14 +1176,32 @@ class KoshaPhaseCorrectorConfig:
     - Training: Indirect (loss gradients) → Model LEARNS balance
     - Inference: Direct (phase rotation) → Runtime GUARDRAILS
 
-    v2.2.5: Thresholds restored to Gemini's v2.2.4 design for sigmoid mode.
-    Koshas are now independent [0,1] activations (not softmax zero-sum).
+    v2.2.5 Fibonacci Pentad: Per-Kosha thresholds based on ontological roles.
+    Each Kosha has its own overactive threshold reflecting its unique function.
+    Koshas are independent [0,1] activations (not softmax zero-sum).
 
     Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 13
     """
 
-    # Imbalance detection thresholds (v2.2.5: Golden Ratio design for sigmoid mode)
-    overactive_threshold: float = 0.618  # Kosha > this triggers correction (Golden Ratio φ)
+    # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
+    # Per-Kosha overactive thresholds based on Fibonacci retracement levels
+    #
+    # | Kosha     | Fib Level | Role       | Inference Trigger                       |
+    # |-----------|-----------|------------|-----------------------------------------|
+    # | Mental    | 38.2%     | Warning    | Phase correct to Intellect/Physical    |
+    # | Physical  | 38.2%     | Support    | Allow - needed for grounding            |
+    # | Intellect | 50.0%     | Pivot      | Allow - balanced reasoning              |
+    # | Vital     | 78.6%     | Resistance | Phase correct to avoid overheating      |
+    # | Bliss     | 23.6%     | Spark      | Allow - creativity needs low threshold  |
+    #
+    overactive_mental: float = 0.382     # Mental > 38.2% triggers correction
+    overactive_physical: float = 0.618   # Physical > 61.8% - allow more grounding
+    overactive_intellect: float = 0.618  # Intellect > 61.8% - allow reasoning
+    overactive_vital: float = 0.786      # Vital > 78.6% triggers correction (overheating)
+    overactive_bliss: float = 0.618      # Bliss > 61.8% - allow creativity
+
+    # Legacy thresholds (backward compatibility)
+    overactive_threshold: float = 0.618  # Default fallback (Golden Ratio φ)
     underactive_threshold: float = 0.15  # Kosha < this is considered deficient
 
     # Correction strength
@@ -1218,7 +1301,14 @@ class KoshaPhaseCorrector(nn.Module):
         kosha_states: torch.Tensor,
     ) -> Tuple[bool, Optional[str], Dict[str, float]]:
         """
-        Detect if any Kosha is overactive.
+        Detect if any Kosha is overactive using Fibonacci Pentad thresholds.
+
+        v2.2.5: Each Kosha has its own threshold reflecting its ontological role:
+        - Mental: 38.2% (low - trigger correction early for loops)
+        - Physical: 61.8% (allow grounding)
+        - Intellect: 61.8% (allow reasoning)
+        - Vital: 78.6% (high - only correct when overheating)
+        - Bliss: 61.8% (allow creativity)
 
         Args:
             kosha_states: [B, 5] or [B, N, 5] Kosha activations
@@ -1240,16 +1330,29 @@ class KoshaPhaseCorrector(nn.Module):
             for i, name in enumerate(self.KOSHA_NAMES)
         }
 
-        # Find overactive Kosha
+        # Fibonacci Pentad: per-Kosha thresholds
+        # Kosha order: Physical(0), Vital(1), Mental(2), Intellect(3), Bliss(4)
+        threshold_map = {
+            'Physical': self.config.overactive_physical,
+            'Vital': self.config.overactive_vital,
+            'Mental': self.config.overactive_mental,
+            'Intellect': self.config.overactive_intellect,
+            'Bliss': self.config.overactive_bliss,
+        }
+
+        # Find overactive Kosha (check each against its own threshold)
         overactive_kosha = None
-        max_activation = 0.0
+        max_excess = 0.0  # How much activation exceeds threshold
 
         for i, name in enumerate(self.KOSHA_NAMES):
             activation = avg_koshas[i].item()
-            if activation > self.config.overactive_threshold:
-                if activation > max_activation:
-                    max_activation = activation
-                    overactive_kosha = name
+            threshold = threshold_map.get(name, self.config.overactive_threshold)
+            excess = activation - threshold
+
+            # Check if this Kosha exceeds its threshold AND is most urgent
+            if excess > 0 and excess > max_excess:
+                max_excess = excess
+                overactive_kosha = name
 
         is_imbalanced = overactive_kosha is not None
 
