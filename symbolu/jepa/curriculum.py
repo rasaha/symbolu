@@ -113,6 +113,11 @@ class CurriculumState:
     avg_prediction_error: float = 0.0
     phase_transitions: int = 0
 
+    # Dynamic graduation metrics (for threshold-based transitions)
+    avg_jepa_loss: float = float('inf')      # Rolling average JEPA loss
+    avg_alignment: float = 0.0               # Rolling average alignment score
+    graduation_trigger: str = ""             # What triggered graduation (for logging)
+
     def __post_init__(self):
         """Calculate phase boundaries."""
         # JEPA micro-phases (within Body macro-phase)
@@ -146,6 +151,10 @@ class TrainingCurriculumOrchestrator:
         auto_transition: bool = True,
         initial_phase: str = "body",
         callbacks: Optional[Dict[str, Callable]] = None,
+        # Dynamic graduation thresholds
+        graduation_loss_threshold: float = 20.0,      # Graduate if JEPA loss < this
+        graduation_alignment_threshold: float = 25.0,  # V9.6.8: Was 72.0 - unrealistic
+        enable_dynamic_graduation: bool = True,        # Enable threshold-based graduation
     ):
         """
         Initialize curriculum orchestrator.
@@ -157,12 +166,20 @@ class TrainingCurriculumOrchestrator:
             auto_transition: Automatically transition phases
             initial_phase: Starting macro-phase ('body', 'soul', 'union')
             callbacks: Optional callbacks for phase transitions
+            graduation_loss_threshold: JEPA loss must be below this to graduate early
+            graduation_alignment_threshold: Alignment must be above this to graduate early
+            enable_dynamic_graduation: Whether to enable metric-based graduation
         """
         self.total_steps = total_steps
         self.body_steps = body_steps
         self.soul_steps = soul_steps
         self.auto_transition = auto_transition
         self.callbacks = callbacks or {}
+
+        # Dynamic graduation settings
+        self.graduation_loss_threshold = graduation_loss_threshold
+        self.graduation_alignment_threshold = graduation_alignment_threshold
+        self.enable_dynamic_graduation = enable_dynamic_graduation
 
         # Initialize state
         self.state = CurriculumState(
@@ -189,6 +206,10 @@ class TrainingCurriculumOrchestrator:
 
         Args:
             metrics: Training metrics for adaptive transitions
+                - variance: VICReg variance component
+                - pred_error: Prediction error
+                - jepa_loss: Total JEPA loss (for dynamic graduation)
+                - alignment: Alignment score (for dynamic graduation)
             force_phase: Force transition to specific phase
 
         Returns:
@@ -207,6 +228,20 @@ class TrainingCurriculumOrchestrator:
                 0.9 * self.state.avg_prediction_error + 0.1 * metrics['pred_error']
             )
 
+        # Update dynamic graduation metrics (exponential moving average)
+        if 'jepa_loss' in metrics:
+            if self.state.avg_jepa_loss == float('inf'):
+                # First update: initialize with actual value
+                self.state.avg_jepa_loss = metrics['jepa_loss']
+            else:
+                self.state.avg_jepa_loss = (
+                    0.95 * self.state.avg_jepa_loss + 0.05 * metrics['jepa_loss']
+                )
+        if 'alignment' in metrics:
+            self.state.avg_alignment = (
+                0.95 * self.state.avg_alignment + 0.05 * metrics['alignment']
+            )
+
         # Check for forced phase transition
         if force_phase:
             return self._transition_to(force_phase)
@@ -218,12 +253,36 @@ class TrainingCurriculumOrchestrator:
         return False, None
 
     def _check_auto_transition(self) -> Tuple[bool, Optional[str]]:
-        """Check if automatic phase transition should occur."""
+        """Check if automatic phase transition should occur.
+
+        Implements two graduation pathways:
+        1. Dynamic Graduation: Metric-based (loss < threshold AND alignment > threshold)
+        2. Timeout Graduation: Step-based deadline (safety net)
+        """
         step = self.state.current_step
 
         # Macro-phase transitions
         if self.state.macro_phase == MacroPhase.BODY:
+            # 1. Dynamic Graduation (The "Smart" Logic)
+            # Check if model is ready to graduate based on metrics
+            if self.enable_dynamic_graduation and self.auto_transition:
+                loss_ready = self.state.avg_jepa_loss < self.graduation_loss_threshold
+                alignment_ready = self.state.avg_alignment > self.graduation_alignment_threshold
+
+                if loss_ready and alignment_ready:
+                    # Record what triggered graduation
+                    self.state.graduation_trigger = (
+                        f"Loss {self.state.avg_jepa_loss:.2f} < {self.graduation_loss_threshold} "
+                        f"AND Align {self.state.avg_alignment:.1f} > {self.graduation_alignment_threshold}"
+                    )
+                    print(f"\n  🎓 DYNAMIC GRADUATION TRIGGERED at Step {step}!")
+                    print(f"     └─ {self.state.graduation_trigger}")
+                    return self._transition_to('soul')
+
+            # 2. Timeout Graduation (Safety Net - Hard Deadline)
             if step >= self.state.body_end:
+                self.state.graduation_trigger = f"Timeout at step {step} (deadline: {self.state.body_end})"
+                print(f"\n  ⏰ TIMEOUT GRADUATION at Step {step} (deadline reached)")
                 return self._transition_to('soul')
 
             # JEPA micro-phase transitions within Body
@@ -384,11 +443,18 @@ class TrainingCurriculumOrchestrator:
             'avg_variance': self.state.avg_variance,
             'avg_prediction_error': self.state.avg_prediction_error,
             'phase_transitions': self.state.phase_transitions,
+            # Dynamic graduation metrics
+            'avg_jepa_loss': self.state.avg_jepa_loss,
+            'avg_alignment': self.state.avg_alignment,
+            'graduation_trigger': self.state.graduation_trigger,
             'config': {
                 'total_steps': self.total_steps,
                 'body_steps': self.body_steps,
                 'soul_steps': self.soul_steps,
                 'auto_transition': self.auto_transition,
+                'graduation_loss_threshold': self.graduation_loss_threshold,
+                'graduation_alignment_threshold': self.graduation_alignment_threshold,
+                'enable_dynamic_graduation': self.enable_dynamic_graduation,
             },
         }
 
@@ -400,6 +466,10 @@ class TrainingCurriculumOrchestrator:
         self.state.avg_variance = state_dict.get('avg_variance', 0.0)
         self.state.avg_prediction_error = state_dict.get('avg_prediction_error', 0.0)
         self.state.phase_transitions = state_dict.get('phase_transitions', 0)
+        # Dynamic graduation metrics
+        self.state.avg_jepa_loss = state_dict.get('avg_jepa_loss', float('inf'))
+        self.state.avg_alignment = state_dict.get('avg_alignment', 0.0)
+        self.state.graduation_trigger = state_dict.get('graduation_trigger', '')
 
 
 class LossScheduler:
@@ -499,4 +569,8 @@ def create_curriculum_from_config(config) -> TrainingCurriculumOrchestrator:
         soul_steps=getattr(config, 'jepa_phase_soul_steps', 30000),
         auto_transition=getattr(config, 'jepa_auto_phase_transition', False),
         initial_phase=getattr(config, 'jepa_training_phase', 'body'),
+        # Dynamic graduation thresholds
+        graduation_loss_threshold=getattr(config, 'jepa_graduation_loss_threshold', 20.0),
+        graduation_alignment_threshold=getattr(config, 'jepa_graduation_alignment_threshold', 25.0),
+        enable_dynamic_graduation=getattr(config, 'jepa_enable_dynamic_graduation', True),
     )

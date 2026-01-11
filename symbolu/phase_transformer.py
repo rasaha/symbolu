@@ -69,6 +69,13 @@ try:
 except ImportError:
     pass
 
+# V9.6.8: Import SovereignStateProjector for proper 32D state normalization
+try:
+    from symbolu.jepa.state_projector import SovereignStateProjector
+    SOVEREIGN_PROJECTOR_AVAILABLE = True
+except ImportError:
+    SOVEREIGN_PROJECTOR_AVAILABLE = False
+
 
 # =============================================================================
 # 32D SOVEREIGN STATE - Principled Cognitive Architecture
@@ -2538,18 +2545,26 @@ class OntologicalHybridTransformer(nn.Module):
         )
 
         # State projector: hidden[embed_dim] → SovereignState[32]
-        # V9.8.0: Projects to principled 32D state space
-        self.state_projector = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim // 2),
-            nn.GELU(),
-            nn.Linear(embed_dim // 2, state_dim),
-        )
-
-        # V9.8.0: Initialize state projector bias toward "Absolute Potential"
-        # - O12_ABS (index 11): Transcendent ground / pure awareness
-        # - Material (index 12): Physicality/Syntax sheath
-        # This represents the starting state: awareness grounded in physical reality
-        self._init_absolute_potential_bias()
+        # V9.6.8: Use SovereignStateProjector for proper normalization
+        # - Bhava/Kosha/Vritti: softmax normalized (probabilities)
+        # - Guna: sigmoid (0-1)
+        # - Reserved: tanh (-1 to 1)
+        if SOVEREIGN_PROJECTOR_AVAILABLE:
+            self.state_projector = SovereignStateProjector(
+                hidden_dim=embed_dim,
+                state_dim=state_dim,
+                intermediate_dim=embed_dim // 2,
+                dropout=0.1,
+                use_layer_norm=True,
+            )
+        else:
+            # Fallback to raw projection (not recommended)
+            self.state_projector = nn.Sequential(
+                nn.Linear(embed_dim, embed_dim // 2),
+                nn.GELU(),
+                nn.Linear(embed_dim // 2, state_dim),
+            )
+            self._init_absolute_potential_bias()
 
         # Intent phase projector: ΔS[32] → θ[H] or θ[H, D_h]
         head_dim = embed_dim // num_heads
