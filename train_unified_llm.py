@@ -5415,6 +5415,365 @@ class SovereignPhaseController:
 
 
 # =============================================================================
+# PPL-GATED CURRICULUM CONTROLLER: Phased Auxiliary Loss Introduction
+# =============================================================================
+
+class CurriculumController:
+    """
+    PPL-Gated Curriculum Learning Controller.
+
+    Automatically introduces auxiliary losses based on validation PPL thresholds.
+    This ensures the model learns coherent language generation BEFORE ontological
+    constraints are applied.
+
+    Phases:
+        1. FOUNDATION (PPL > 30): Pure cross-entropy, no auxiliary losses
+        2. REGULARIZATION (PPL 30-15): Light ontological regularization
+        3. GROUNDING (PPL 15-10): CSR and ontological bridge
+        4. SOVEREIGN (PPL < 10): Full auxiliary stack with balanced weights
+
+    Key Principle: LM loss always remains the dominant signal (≥50% of gradients).
+
+    Usage:
+        controller = CurriculumController(config)
+
+        # In training loop:
+        weights = controller.get_loss_weights(current_val_ppl)
+        loss = weights['lm'] * lm_loss + weights['bhava'] * bhava_loss + ...
+    """
+
+    # Phase constants
+    PHASE_FOUNDATION = "FOUNDATION"      # Pure LM
+    PHASE_REGULARIZATION = "REGULARIZATION"  # Light ontology
+    PHASE_GROUNDING = "GROUNDING"        # CSR + Bridge
+    PHASE_SOVEREIGN = "SOVEREIGN"        # Full stack
+
+    def __init__(
+        self,
+        # PPL thresholds for phase transitions
+        ppl_regularization: float = 30.0,  # Enter REGULARIZATION when PPL < this
+        ppl_grounding: float = 15.0,       # Enter GROUNDING when PPL < this
+        ppl_sovereign: float = 10.0,       # Enter SOVEREIGN when PPL < this
+        # Stability requirements
+        stability_window: int = 5,         # Consecutive evals below threshold
+        # Weight configurations per phase
+        foundation_weights: Optional[Dict[str, float]] = None,
+        regularization_weights: Optional[Dict[str, float]] = None,
+        grounding_weights: Optional[Dict[str, float]] = None,
+        sovereign_weights: Optional[Dict[str, float]] = None,
+        # Hysteresis to prevent oscillation
+        hysteresis: float = 1.5,           # Must exceed threshold by this to regress
+    ):
+        self.ppl_regularization = ppl_regularization
+        self.ppl_grounding = ppl_grounding
+        self.ppl_sovereign = ppl_sovereign
+        self.stability_window = stability_window
+        self.hysteresis = hysteresis
+
+        # Current state
+        self.current_phase = self.PHASE_FOUNDATION
+        self.phase_history: List[Tuple[int, str, float]] = []  # (step, phase, ppl)
+        self.ppl_history: List[float] = []
+        self.steps_in_phase = 0
+        self.phase_locked = False  # Prevent regression once SOVEREIGN reached
+
+        # Default weight configurations - LM always dominant
+        self.foundation_weights = foundation_weights or {
+            'lm': 1.0,
+            'bhava': 0.0,
+            'coherence': 0.0,
+            'b1_lambda': 0.0,
+            'mu_s3': 0.0,
+            'csr': 0.0,
+            'onto_bridge': 0.0,
+            'evo': 0.0,
+            'toroidal': 0.0,
+            'jepa': 0.0,
+            'kosha': 0.0,
+            'sovereign_r': 0.0,
+            'sovereign_s': 0.0,
+            'sovereign_c': 0.0,
+            'enable_srk': False,
+            'enable_csr': False,
+            'enable_jepa': False,
+            'enable_onto_bridge': False,
+            'enable_kosha_steering': False,
+            'enable_evolutionary_flow': False,
+            'enable_toroidal_bridge': False,
+        }
+
+        self.regularization_weights = regularization_weights or {
+            'lm': 1.0,
+            'bhava': 0.01,          # Very light
+            'coherence': 0.01,      # Very light
+            'b1_lambda': 0.0,
+            'mu_s3': 0.0,
+            'csr': 0.0,
+            'onto_bridge': 0.0,
+            'evo': 0.0,
+            'toroidal': 0.0,
+            'jepa': 0.0,
+            'kosha': 0.0,
+            'sovereign_r': 0.0,
+            'sovereign_s': 0.0,
+            'sovereign_c': 0.0,
+            'enable_srk': False,
+            'enable_csr': False,
+            'enable_jepa': False,
+            'enable_onto_bridge': False,
+            'enable_kosha_steering': False,
+            'enable_evolutionary_flow': False,
+            'enable_toroidal_bridge': False,
+        }
+
+        self.grounding_weights = grounding_weights or {
+            'lm': 1.0,
+            'bhava': 0.02,
+            'coherence': 0.02,
+            'b1_lambda': 0.0,
+            'mu_s3': 0.0,
+            'csr': 0.05,            # CSR activated
+            'onto_bridge': 0.05,    # Bridge activated
+            'evo': 0.0,
+            'toroidal': 0.0,
+            'jepa': 0.1,            # Light JEPA
+            'kosha': 0.0,
+            'sovereign_r': 0.0,
+            'sovereign_s': 0.0,
+            'sovereign_c': 0.0,
+            'enable_srk': False,
+            'enable_csr': True,
+            'enable_jepa': True,
+            'enable_onto_bridge': True,
+            'enable_kosha_steering': False,
+            'enable_evolutionary_flow': False,
+            'enable_toroidal_bridge': False,
+        }
+
+        self.sovereign_weights = sovereign_weights or {
+            'lm': 1.0,              # LM stays at 1.0
+            'bhava': 0.05,
+            'coherence': 0.03,
+            'b1_lambda': 0.1,       # Reduced from 0.5
+            'mu_s3': 0.05,          # Reduced from 0.2
+            'csr': 0.1,
+            'onto_bridge': 0.1,
+            'evo': 0.05,            # Light EvoFlow
+            'toroidal': 0.05,       # Light Toroidal
+            'jepa': 0.2,
+            'kosha': 0.1,
+            'sovereign_r': 0.5,     # Reduced from 5.0!
+            'sovereign_s': 0.2,     # Reduced from 2.0
+            'sovereign_c': 0.1,     # Reduced from 0.5
+            'enable_srk': True,
+            'enable_csr': True,
+            'enable_jepa': True,
+            'enable_onto_bridge': True,
+            'enable_kosha_steering': True,
+            'enable_evolutionary_flow': True,
+            'enable_toroidal_bridge': True,
+        }
+
+        # Weight lookup by phase
+        self.phase_weights = {
+            self.PHASE_FOUNDATION: self.foundation_weights,
+            self.PHASE_REGULARIZATION: self.regularization_weights,
+            self.PHASE_GROUNDING: self.grounding_weights,
+            self.PHASE_SOVEREIGN: self.sovereign_weights,
+        }
+
+    def update(self, val_ppl: float, global_step: int) -> Optional[str]:
+        """
+        Update controller with new validation PPL.
+
+        Args:
+            val_ppl: Current validation perplexity
+            global_step: Current training step
+
+        Returns:
+            Transition message if phase changed, None otherwise
+        """
+        self.ppl_history.append(val_ppl)
+        self.steps_in_phase += 1
+
+        # Keep history bounded
+        if len(self.ppl_history) > 100:
+            self.ppl_history = self.ppl_history[-100:]
+
+        # Check for phase transition
+        old_phase = self.current_phase
+        new_phase = self._determine_phase(val_ppl)
+
+        if new_phase != old_phase:
+            self.current_phase = new_phase
+            self.steps_in_phase = 0
+            self.phase_history.append((global_step, new_phase, val_ppl))
+
+            # Lock at SOVEREIGN to prevent regression
+            if new_phase == self.PHASE_SOVEREIGN:
+                self.phase_locked = True
+
+            return self._get_transition_message(old_phase, new_phase, val_ppl, global_step)
+
+        return None
+
+    def _determine_phase(self, val_ppl: float) -> str:
+        """Determine which phase we should be in based on PPL."""
+        # If locked at SOVEREIGN, stay there
+        if self.phase_locked:
+            return self.PHASE_SOVEREIGN
+
+        # Check stability (need consecutive evals below threshold)
+        recent_ppls = self.ppl_history[-self.stability_window:]
+        if len(recent_ppls) < self.stability_window:
+            # Not enough history, stay in current phase
+            return self.current_phase
+
+        avg_recent_ppl = sum(recent_ppls) / len(recent_ppls)
+
+        # Forward transitions (improving PPL)
+        if avg_recent_ppl < self.ppl_sovereign:
+            return self.PHASE_SOVEREIGN
+        elif avg_recent_ppl < self.ppl_grounding:
+            return self.PHASE_GROUNDING
+        elif avg_recent_ppl < self.ppl_regularization:
+            return self.PHASE_REGULARIZATION
+
+        # Backward transitions (worsening PPL) - with hysteresis
+        if self.current_phase == self.PHASE_SOVEREIGN:
+            if avg_recent_ppl > self.ppl_sovereign * self.hysteresis:
+                return self.PHASE_GROUNDING
+        elif self.current_phase == self.PHASE_GROUNDING:
+            if avg_recent_ppl > self.ppl_grounding * self.hysteresis:
+                return self.PHASE_REGULARIZATION
+        elif self.current_phase == self.PHASE_REGULARIZATION:
+            if avg_recent_ppl > self.ppl_regularization * self.hysteresis:
+                return self.PHASE_FOUNDATION
+
+        return self.current_phase
+
+    def get_loss_weights(self) -> Dict[str, float]:
+        """Get current loss weights based on phase."""
+        return self.phase_weights[self.current_phase].copy()
+
+    def get_config_overrides(self) -> Dict[str, Any]:
+        """
+        Get config overrides to apply for current phase.
+
+        Returns dict that can be used to update training config.
+        """
+        weights = self.get_loss_weights()
+        return {
+            'bhava_lambda': weights['bhava'],
+            'coherence_lambda': weights['coherence'],
+            'b1_lambda': weights['b1_lambda'],
+            'mu_s3': weights['mu_s3'],
+            'csr_lambda': weights['csr'],
+            'onto_bridge_lambda': weights['onto_bridge'],
+            'evo_lambda': weights['evo'],
+            'toroidal_lambda': weights['toroidal'],
+            'jepa_prediction_weight': weights['jepa'],
+            'kosha_steering_force': weights['kosha'],
+            'sovereign_weight_r': weights['sovereign_r'],
+            'sovereign_weight_s': weights['sovereign_s'],
+            'sovereign_weight_c': weights['sovereign_c'],
+            # Boolean enables
+            'enable_srk': weights['enable_srk'],
+            'enable_csr': weights['enable_csr'],
+            'enable_jepa': weights['enable_jepa'],
+            'enable_onto_bridge': weights['enable_onto_bridge'],
+            'enable_kosha_steering': weights['enable_kosha_steering'],
+            'enable_evolutionary_flow': weights['enable_evolutionary_flow'],
+            'enable_toroidal_bridge': weights['enable_toroidal_bridge'],
+        }
+
+    def should_enable(self, component: str) -> bool:
+        """Check if a specific component should be enabled in current phase."""
+        weights = self.get_loss_weights()
+        enable_key = f'enable_{component}'
+        if enable_key in weights:
+            return weights[enable_key]
+        # Fall back to checking weight > 0
+        return weights.get(component, 0.0) > 0.0
+
+    def _get_transition_message(
+        self,
+        old_phase: str,
+        new_phase: str,
+        ppl: float,
+        step: int
+    ) -> str:
+        """Generate human-readable transition message."""
+        phase_icons = {
+            self.PHASE_FOUNDATION: "📚",
+            self.PHASE_REGULARIZATION: "🔧",
+            self.PHASE_GROUNDING: "🌉",
+            self.PHASE_SOVEREIGN: "👑",
+        }
+
+        phase_descriptions = {
+            self.PHASE_FOUNDATION: "Pure LM (cross-entropy only)",
+            self.PHASE_REGULARIZATION: "Light Regularization (bhava + coherence)",
+            self.PHASE_GROUNDING: "Structural Grounding (CSR + Bridge + JEPA)",
+            self.PHASE_SOVEREIGN: "Full Sovereign (all systems active)",
+        }
+
+        icon = phase_icons.get(new_phase, "❓")
+        desc = phase_descriptions.get(new_phase, new_phase)
+        direction = "↗️" if self._phase_order(new_phase) > self._phase_order(old_phase) else "↘️"
+
+        weights = self.get_loss_weights()
+        active = [k for k, v in weights.items() if isinstance(v, bool) and v]
+
+        msg = f"\n{'='*70}\n"
+        msg += f"  {icon} [CURRICULUM] Phase Transition {direction}\n"
+        msg += f"{'='*70}\n"
+        msg += f"  Step {step} | Val PPL: {ppl:.2f}\n"
+        msg += f"  {old_phase} → {new_phase}\n"
+        msg += f"  {desc}\n"
+        if active:
+            msg += f"  Active: {', '.join(active)}\n"
+        msg += f"{'='*70}\n"
+
+        return msg
+
+    def _phase_order(self, phase: str) -> int:
+        """Get numeric order of phase for comparison."""
+        order = {
+            self.PHASE_FOUNDATION: 0,
+            self.PHASE_REGULARIZATION: 1,
+            self.PHASE_GROUNDING: 2,
+            self.PHASE_SOVEREIGN: 3,
+        }
+        return order.get(phase, -1)
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get current controller status for logging."""
+        weights = self.get_loss_weights()
+        return {
+            'phase': self.current_phase,
+            'steps_in_phase': self.steps_in_phase,
+            'phase_locked': self.phase_locked,
+            'recent_ppl': self.ppl_history[-1] if self.ppl_history else None,
+            'avg_recent_ppl': (
+                sum(self.ppl_history[-self.stability_window:]) /
+                min(len(self.ppl_history), self.stability_window)
+                if self.ppl_history else None
+            ),
+            'thresholds': {
+                'regularization': self.ppl_regularization,
+                'grounding': self.ppl_grounding,
+                'sovereign': self.ppl_sovereign,
+            },
+            'active_components': [
+                k.replace('enable_', '') for k, v in weights.items()
+                if isinstance(v, bool) and v
+            ],
+            'phase_history_count': len(self.phase_history),
+        }
+
+
+# =============================================================================
 # DYNAMIC RELAXATION CONTROLLER: 9:3 → 6:6 TRANSITION
 # =============================================================================
 
@@ -7118,6 +7477,15 @@ class UnifiedTrainingConfig:
     rss_kosha_ppl: float = 35.0              # Kosha engages when PPL < this AND CSR > 50%
     rss_csr_warmup_steps: int = 2500         # Steps for CSR to reach full strength (prevents 14x shock)
     rss_use_val_ppl: bool = True             # Use validation PPL (more stable) vs training PPL
+
+    # PPL-Gated Curriculum Learning - Phased auxiliary loss introduction
+    # Ensures model learns coherent generation BEFORE ontological constraints
+    enable_curriculum: bool = False           # Enable curriculum controller
+    curriculum_ppl_regularization: float = 30.0   # Enter REGULARIZATION when PPL < this
+    curriculum_ppl_grounding: float = 15.0        # Enter GROUNDING when PPL < this
+    curriculum_ppl_sovereign: float = 10.0        # Enter SOVEREIGN when PPL < this
+    curriculum_stability_window: int = 5          # Consecutive evals below threshold
+    curriculum_hysteresis: float = 1.5            # Prevent oscillation between phases
 
     # CSR Phoneme-Ontological Grounding
     enable_csr: bool = True                  # Enable CSR phoneme grounding
@@ -10140,6 +10508,27 @@ def train(config: UnifiedTrainingConfig):
         print(f"     └─ Kosha:    PPL < {config.rss_kosha_ppl} (after CSR > 50%)")
         print(f"     Using {'validation' if config.rss_use_val_ppl else 'training'} PPL for thresholds\n")
 
+    # PPL-Gated Curriculum Controller
+    curriculum_controller = None
+    if config.enable_curriculum:
+        curriculum_controller = CurriculumController(
+            ppl_regularization=config.curriculum_ppl_regularization,
+            ppl_grounding=config.curriculum_ppl_grounding,
+            ppl_sovereign=config.curriculum_ppl_sovereign,
+            stability_window=config.curriculum_stability_window,
+            hysteresis=config.curriculum_hysteresis,
+        )
+        print(f"\n  📚 [CURRICULUM] PPL-Gated Curriculum Learning ENABLED")
+        print(f"     Phase Transitions (based on Val PPL):")
+        print(f"     ├─ FOUNDATION:     PPL > {config.curriculum_ppl_regularization} (pure cross-entropy)")
+        print(f"     ├─ REGULARIZATION: PPL < {config.curriculum_ppl_regularization} (light bhava/coherence)")
+        print(f"     ├─ GROUNDING:      PPL < {config.curriculum_ppl_grounding} (CSR + Bridge + JEPA)")
+        print(f"     └─ SOVEREIGN:      PPL < {config.curriculum_ppl_sovereign} (full auxiliary stack)")
+        print(f"     Stability window: {config.curriculum_stability_window} evals")
+        print(f"     Hysteresis: {config.curriculum_hysteresis}x (prevents oscillation)")
+        print(f"\n     ⚠️  Starting in FOUNDATION phase - pure LM training")
+        print(f"     ⚠️  Auxiliary systems will engage automatically as PPL improves\n")
+
     while global_step < config.max_steps:
         # Get batch
         try:
@@ -11591,6 +11980,30 @@ def train(config: UnifiedTrainingConfig):
                 last_val_ppl = val_ppl  # V9.7.0: Update for EvoFlow Fluency Gate
                 current_coh = val_metrics.get('coherence', 0.75)
 
+                # Curriculum Controller Update - check for phase transitions
+                if curriculum_controller is not None:
+                    transition_msg = curriculum_controller.update(val_ppl, global_step)
+                    if transition_msg:
+                        print(transition_msg)
+                        # Apply config overrides for new phase
+                        overrides = curriculum_controller.get_config_overrides()
+                        for key, value in overrides.items():
+                            if hasattr(config, key):
+                                setattr(config, key, value)
+                        # Log new weights
+                        weights = curriculum_controller.get_loss_weights()
+                        active = [k for k, v in weights.items() if isinstance(v, bool) and v]
+                        print(f"  [CURRICULUM] Active systems: {', '.join(active) if active else 'None (pure LM)'}")
+                        print(f"  [CURRICULUM] Loss weights: bhava={weights['bhava']:.3f} csr={weights['csr']:.3f} "
+                              f"evo={weights['evo']:.3f} b1={weights['b1_lambda']:.3f}")
+
+                    # Log curriculum status periodically
+                    if global_step % (config.eval_every * 5) == 0:
+                        status = curriculum_controller.get_status()
+                        print(f"  📚 [CURRICULUM] Phase: {status['phase']} | "
+                              f"Avg PPL: {status['avg_recent_ppl']:.2f if status['avg_recent_ppl'] else 'N/A'} | "
+                              f"Steps in phase: {status['steps_in_phase']}")
+
                 # PIDv2 Controller Update (V9.4.4)
                 if authority_controller is not None:
                     old_A = authority_controller.A
@@ -12678,6 +13091,20 @@ def main():
     parser.add_argument("--rss_use_val_ppl", action="store_true", default=True,
                        help="Use validation PPL for RSS thresholds (more stable)")
 
+    # PPL-Gated Curriculum Learning - Phased auxiliary loss introduction
+    parser.add_argument("--enable_curriculum", action="store_true",
+                       help="Enable PPL-gated curriculum learning (phases: FOUNDATION→REGULARIZATION→GROUNDING→SOVEREIGN)")
+    parser.add_argument("--curriculum_ppl_regularization", type=float, default=30.0,
+                       help="PPL threshold to enter REGULARIZATION phase (light bhava/coherence)")
+    parser.add_argument("--curriculum_ppl_grounding", type=float, default=15.0,
+                       help="PPL threshold to enter GROUNDING phase (CSR + Bridge + JEPA)")
+    parser.add_argument("--curriculum_ppl_sovereign", type=float, default=10.0,
+                       help="PPL threshold to enter SOVEREIGN phase (full auxiliary stack)")
+    parser.add_argument("--curriculum_stability_window", type=int, default=5,
+                       help="Consecutive evals below threshold before phase transition")
+    parser.add_argument("--curriculum_hysteresis", type=float, default=1.5,
+                       help="PPL must exceed threshold * hysteresis to regress to earlier phase")
+
     # CSR Phoneme-Ontological Grounding
     parser.add_argument("--enable_csr", action="store_true", default=True,
                        help="Enable CSR phoneme grounding")
@@ -13129,6 +13556,13 @@ def main():
         rss_kosha_ppl=args.rss_kosha_ppl,
         rss_csr_warmup_steps=args.rss_csr_warmup_steps,
         rss_use_val_ppl=args.rss_use_val_ppl,
+        # PPL-Gated Curriculum Learning
+        enable_curriculum=args.enable_curriculum,
+        curriculum_ppl_regularization=args.curriculum_ppl_regularization,
+        curriculum_ppl_grounding=args.curriculum_ppl_grounding,
+        curriculum_ppl_sovereign=args.curriculum_ppl_sovereign,
+        curriculum_stability_window=args.curriculum_stability_window,
+        curriculum_hysteresis=args.curriculum_hysteresis,
         # CSR Phoneme-Ontological Grounding
         enable_csr=args.enable_csr and not args.disable_csr,
         csr_lambda=args.csr_lambda,
