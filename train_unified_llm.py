@@ -7361,7 +7361,11 @@ class UnifiedTrainingConfig:
     gyroscope_gate_threshold: float = 0.30   # Minimum for gate activation
     gyroscope_balance_target: float = 0.25   # Required opposite activation
     gyroscope_gate_temperature: float = 10.0 # Softness of gate (higher = sharper)
-    # v2.2.3.1: Soft-Threshold Damping
+    # v2.2.4: Three-Stage Hybrid Logic (Damping + Gate + Rip)
+    gyroscope_damper_steepness: float = 5.0  # Sigmoid steepness for Bliss/Physical damper
+    gyroscope_gate_steepness: float = 5.0    # Sigmoid steepness for Physical/Mental gate
+    gyroscope_rip_multiplier: float = 2.0    # Multiplier for Reality Rip signal (circuit breaker)
+    # Legacy: steepness (deprecated in v2.2.4, kept for backward compatibility)
     gyroscope_steepness: float = 5.0         # Soft-threshold steepness (2.0=fluid, 5.0=balanced, 10.0=sharp)
     # Refinements (v2.2.0)
     gyroscope_temporal_window: int = 3       # Physical history window size
@@ -10543,14 +10547,17 @@ def train(config: UnifiedTrainingConfig):
     vritti_resonance = None  # v2.3.0: Kosha-Vritti Resonance Loss
 
     if config.enable_kosha_gyroscope and KOSHA_GYROSCOPE_AVAILABLE:
-        # Initialize KoshaGyroscopicLoss with Soft-Threshold Damping (v2.2.3.1)
+        # Initialize KoshaGyroscopicLoss with Three-Stage Hybrid Logic (v2.2.4)
         kosha_gyroscope = KoshaGyroscopicLoss(
             trap_threshold=config.gyroscope_trap_threshold,
             gate_threshold=config.gyroscope_gate_threshold,
             balance_target=config.gyroscope_balance_target,
             gate_temperature=config.gyroscope_gate_temperature,
-            # Soft-Threshold Damping (v2.2.3.1)
-            steepness=config.gyroscope_steepness,
+            # v2.2.4: Three-Stage Hybrid Logic (Damping + Gate + Rip)
+            damper_steepness=config.gyroscope_damper_steepness,
+            gate_steepness=config.gyroscope_gate_steepness,
+            rip_multiplier=config.gyroscope_rip_multiplier,
+            steepness=config.gyroscope_steepness,  # Legacy, backward compat
             # Dynamic Weight Scheduler (v2.2.1)
             base_gain=config.gyroscope_base_gain,
             max_gain=config.gyroscope_max_gain,
@@ -10577,7 +10584,11 @@ def train(config: UnifiedTrainingConfig):
             trap_threshold=config.gyroscope_trap_threshold,
             gate_threshold=config.gyroscope_gate_threshold,
             balance_target=config.gyroscope_balance_target,
-            steepness=config.gyroscope_steepness,
+            # v2.2.4: Three-Stage Hybrid Logic
+            damper_steepness=config.gyroscope_damper_steepness,
+            gate_steepness=config.gyroscope_gate_steepness,
+            rip_multiplier=config.gyroscope_rip_multiplier,
+            steepness=config.gyroscope_steepness,  # Legacy
             base_gain=config.gyroscope_base_gain,
             max_gain=config.gyroscope_max_gain,
             ppl_ceiling=config.gyroscope_ppl_ceiling,
@@ -10594,15 +10605,16 @@ def train(config: UnifiedTrainingConfig):
             )
 
         print(f"\n  ╔══════════════════════════════════════════════════════════════════╗")
-        print(f"  ║  KOSHA GYROSCOPE v2.2.3.1: Soft-Threshold Damping ENABLED        ║")
+        print(f"  ║  KOSHA GYROSCOPE v2.2.4: Three-Stage Hybrid Logic ENABLED        ║")
         print(f"  ╠══════════════════════════════════════════════════════════════════╣")
         print(f"  ║  Dynamic Weight Scheduler:                                       ║")
         print(f"  ║    Base Gain: {config.gyroscope_base_gain:.2f} (PPL > {config.gyroscope_ppl_ceiling:.0f})                                ║")
         print(f"  ║    Max Gain:  {config.gyroscope_max_gain:.2f} (PPL → {config.gyroscope_target_ppl:.0f})                                 ║")
         print(f"  ║  Trap Detection:                                                 ║")
         print(f"  ║    Threshold: {config.gyroscope_trap_threshold:.2f}  Gate: {config.gyroscope_gate_threshold:.2f}  Balance: {config.gyroscope_balance_target:.2f}          ║")
-        print(f"  ║  Soft-Threshold Damping (v2.2.3.1):                              ║")
-        print(f"  ║    Steepness: {config.gyroscope_steepness:.1f} (2.0=fluid, 5.0=balanced, 10.0=sharp)       ║")
+        print(f"  ║  Three-Stage Hybrid Logic (v2.2.4):                             ║")
+        print(f"  ║    Damper Steepness: {config.gyroscope_damper_steepness:.1f}  Gate Steepness: {config.gyroscope_gate_steepness:.1f}              ║")
+        print(f"  ║    Rip Multiplier: {config.gyroscope_rip_multiplier:.1f} (circuit breaker strength)            ║")
         print(f"  ║  Refinements:                                                    ║")
         print(f"  ║    Temporal Window: {config.gyroscope_temporal_window}  Vital Momentum: {'ON' if config.gyroscope_vital_momentum else 'OFF'}              ║")
         print(f"  ║  Graduation Criteria:                                            ║")
@@ -13220,9 +13232,16 @@ def main():
                        help="Required opposite activation to avoid punishment")
     parser.add_argument("--gyroscope_gate_temperature", type=float, default=10.0,
                        help="Gate sigmoid temperature (higher = sharper)")
-    # v2.2.3.1: Soft-Threshold Damping
+    # v2.2.4: Three-Stage Hybrid Logic (Damping + Gate + Rip)
+    parser.add_argument("--gyroscope_damper_steepness", type=float, default=5.0,
+                       help="v2.2.4: Sigmoid steepness for Bliss/Physical damper")
+    parser.add_argument("--gyroscope_gate_steepness", type=float, default=5.0,
+                       help="v2.2.4: Sigmoid steepness for Physical/Mental gate")
+    parser.add_argument("--gyroscope_rip_multiplier", type=float, default=2.0,
+                       help="v2.2.4: Multiplier for Reality Rip signal (circuit breaker strength)")
+    # Legacy: steepness (deprecated in v2.2.4)
     parser.add_argument("--gyroscope_steepness", type=float, default=5.0,
-                       help="Soft-threshold steepness (v2.2.3.1): 2.0=fluid, 5.0=balanced, 10.0=sharp")
+                       help="[DEPRECATED] Use damper_steepness/gate_steepness instead")
     # Refinements
     parser.add_argument("--gyroscope_temporal_window", type=int, default=3,
                        help="Physical history window size for temporal grounding")
@@ -13811,7 +13830,11 @@ def main():
         gyroscope_gate_threshold=args.gyroscope_gate_threshold,
         gyroscope_balance_target=args.gyroscope_balance_target,
         gyroscope_gate_temperature=args.gyroscope_gate_temperature,
-        gyroscope_steepness=args.gyroscope_steepness,
+        # v2.2.4: Three-Stage Hybrid Logic
+        gyroscope_damper_steepness=args.gyroscope_damper_steepness,
+        gyroscope_gate_steepness=args.gyroscope_gate_steepness,
+        gyroscope_rip_multiplier=args.gyroscope_rip_multiplier,
+        gyroscope_steepness=args.gyroscope_steepness,  # Legacy, deprecated
         gyroscope_temporal_window=args.gyroscope_temporal_window,
         gyroscope_vital_momentum=args.gyroscope_vital_momentum and not args.disable_gyroscope_vital_momentum,
         gyroscope_warmup_steps=args.gyroscope_warmup_steps,
