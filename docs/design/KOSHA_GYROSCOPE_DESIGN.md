@@ -1,10 +1,10 @@
 # Kosha Gyroscope: Homeostatic Self-Regulation System
 
-**Version:** 1.0.0
-**Status:** Design Complete, Awaiting Phase 2 Deployment
+**Version:** 2.0.0
+**Status:** Design Complete, Inverted Curriculum Paradigm
 **Date:** 2026-01-11
 **Origin:** Vedic Kosha Theory + Control Theory + Constitutional AI
-**Activation Criterion:** PPL < 30 (Foundation Phase Complete)
+**Curriculum:** Instructor-Led (Gyroscope ON) → Self-Learning (Gyroscope OFF at PPL < 30)
 
 ---
 
@@ -23,6 +23,17 @@ The architecture implements:
 3. **Vijnana Gate**: Intellectual verification before state transitions
 4. **Dense Intrinsic Reward**: Per-token feedback (not sparse end-of-sequence RLHF)
 
+### Inverted Curriculum Paradigm (v2.0)
+
+> "The Gyroscope is the instructor. It teaches from the beginning, then steps back when the student can self-regulate."
+
+| Phase | PPL | Gyroscope | Kosha Classification | Role |
+|-------|-----|-----------|---------------------|------|
+| **Instructor-Led** | > 30 | **ACTIVE** | Disabled (noisy) | External regulation |
+| **Self-Learning** | < 30 | **DISENGAGED** | Enabled (grounded) | Internal regulation |
+
+**Key Insight**: You don't need accurate Kosha classification to apply balance pressure. The gradient pressure shapes the representation space from the start. Once representations stabilize (PPL < 30), classification grounds them, and the model self-regulates.
+
 ---
 
 ## Table of Contents
@@ -35,7 +46,7 @@ The architecture implements:
 6. [Mathematical Formulation](#6-mathematical-formulation)
 7. [Implementation Specification](#7-implementation-specification)
 8. [Integration with Existing Architecture](#8-integration-with-existing-architecture)
-9. [Activation Criteria and Phase 2 Deployment](#9-activation-criteria-and-phase-2-deployment)
+9. [Inverted Curriculum: Instructor → Self-Learner](#9-inverted-curriculum-instructor--self-learner)
 10. [Relationship to Industry Approaches](#10-relationship-to-industry-approaches)
 
 ---
@@ -463,12 +474,22 @@ symbolu/
 ```python
 @dataclass
 class KoshaGyroscopeConfig:
-    """Configuration for Kosha Gyroscope activation."""
+    """Configuration for Kosha Gyroscope with Inverted Curriculum."""
 
-    # Activation criteria
-    enable_gyroscope: bool = False
-    ppl_threshold: float = 30.0          # Only activate when PPL < this
-    warmup_steps: int = 1000             # Steps after PPL threshold before full activation
+    # === INVERTED CURRICULUM ===
+    # Gyroscope: Active from start, disengages when fluent
+    # Classification: Disabled at start, engages when fluent
+
+    # Gyroscope (Instructor) - ON from step 0
+    enable_gyroscope: bool = True
+    gyroscope_disengage_ppl: float = 30.0   # OFF when PPL drops below this
+
+    # Kosha Classification (Student) - OFF initially
+    enable_kosha_classification: bool = False
+    classification_engage_ppl: float = 30.0  # ON when PPL drops below this
+
+    # Warmup for initial gyroscope activation
+    gyroscope_warmup_steps: int = 100        # Steps before gyroscope fully active
 
     # Trap detection
     trap_threshold: float = 0.75         # Kosha saturation point
@@ -477,22 +498,23 @@ class KoshaGyroscopeConfig:
 
     # Loss scaling
     gain: float = 1.0                    # Base gain
-    gain_warmup_steps: int = 500         # Steps to ramp gain from 0 to full
+    gain_rampdown_steps: int = 500       # Steps to ramp gain to 0 at disengage
     gate_temperature: float = 10.0       # Softness of gate (higher = sharper)
 
     # Integration
     kosha_steering_layer: int = 9        # Layer to extract Kosha states from
 ```
 
-### 7.3 Training Loop Integration
+### 7.3 Training Loop Integration (Inverted Curriculum)
 
 ```python
 # In train_unified_llm.py
 
-# Initialize (once, at start)
+# Initialize: Gyroscope ON from start, Classification OFF
 gyroscope_config = KoshaGyroscopeConfig(
     enable_gyroscope=True,
-    ppl_threshold=30.0,
+    gyroscope_disengage_ppl=30.0,
+    classification_engage_ppl=30.0,
 )
 gyroscope_loss_fn = KoshaGyroscopicLoss(
     trap_threshold=gyroscope_config.trap_threshold,
@@ -501,15 +523,23 @@ gyroscope_loss_fn = KoshaGyroscopicLoss(
     gate_temperature=gyroscope_config.gate_temperature,
     gain=gyroscope_config.gain,
 )
-gyroscope_engaged = False
+
+# State tracking
+gyroscope_active = True           # Starts ON (instructor present)
+classification_active = False     # Starts OFF (student not ready)
+disengage_step = None
 
 # Inside training loop
-if gyroscope_config.enable_gyroscope and not gyroscope_engaged:
-    if global_step >= warmup_steps and last_val_ppl < gyroscope_config.ppl_threshold:
-        gyroscope_engaged = True
-        print(f"🌀 [KOSHA GYROSCOPE] Activated! (PPL {last_val_ppl:.2f} < {gyroscope_config.ppl_threshold})")
+# --- PHASE TRANSITION CHECK ---
+if gyroscope_active and last_val_ppl < gyroscope_config.gyroscope_disengage_ppl:
+    print(f"\n🎓 [GRADUATION] PPL {last_val_ppl:.2f} < {gyroscope_config.gyroscope_disengage_ppl}")
+    print(f"   • Kosha Gyroscope: DISENGAGING (instructor steps back)")
+    print(f"   • Kosha Classification: ENGAGING (student self-assesses)")
+    disengage_step = global_step
+    classification_active = True
 
-if gyroscope_engaged:
+# --- GYROSCOPE LOSS (Early Phase: Instructor Active) ---
+if gyroscope_active:
     # Extract Kosha states from Layer 9
     layer_9_output = hidden_states[gyroscope_config.kosha_steering_layer]
     kosha_states = witness_projector(layer_9_output)[:, :, KOSHA_SLICE]  # [B, N, 5]
@@ -517,16 +547,41 @@ if gyroscope_engaged:
     # Compute gyroscopic loss
     gyro_loss = gyroscope_loss_fn(kosha_states)
 
-    # Apply warmup scaling
-    steps_since_engage = global_step - gyroscope_engage_step
-    warmup_scale = min(1.0, steps_since_engage / gyroscope_config.gain_warmup_steps)
+    # Apply warmup scaling (ramp up at start)
+    warmup_scale = min(1.0, global_step / gyroscope_config.gyroscope_warmup_steps)
+
+    # Apply rampdown scaling (ramp down at disengage)
+    if disengage_step is not None:
+        steps_since_disengage = global_step - disengage_step
+        rampdown_scale = max(0.0, 1.0 - steps_since_disengage / gyroscope_config.gain_rampdown_steps)
+        if rampdown_scale <= 0.0:
+            gyroscope_active = False  # Fully disengaged
+            print(f"   • Kosha Gyroscope: FULLY DISENGAGED at step {global_step}")
+    else:
+        rampdown_scale = 1.0
 
     # Add to total loss
-    loss = loss + gyro_loss * warmup_scale
+    effective_scale = warmup_scale * rampdown_scale
+    loss = loss + gyro_loss * effective_scale
 
     # Log metrics
     metrics['gyroscope_loss'] = gyro_loss.item()
-    metrics['gyroscope_scale'] = warmup_scale
+    metrics['gyroscope_scale'] = effective_scale
+    metrics['gyroscope_active'] = True
+
+# --- CLASSIFICATION LOSS (Late Phase: Student Self-Assesses) ---
+if classification_active:
+    # Extract Kosha states from Layer 9
+    layer_9_output = hidden_states[gyroscope_config.kosha_steering_layer]
+    kosha_states = witness_projector(layer_9_output)[:, :, KOSHA_SLICE]  # [B, N, 5]
+
+    # Classification loss grounds Kosha labels in learned representations
+    kosha_class_loss = kosha_classification_loss_fn(kosha_states, kosha_targets)
+    loss = loss + kosha_class_loss
+
+    # Log metrics
+    metrics['kosha_classification_loss'] = kosha_class_loss.item()
+    metrics['classification_active'] = True
 ```
 
 ---
@@ -598,36 +653,167 @@ The Gyroscope does NOT conflict with existing systems because:
 
 ---
 
-## 9. Activation Criteria and Phase 2 Deployment
+## 9. Inverted Curriculum: Instructor → Self-Learner
 
-### 9.1 Why PPL < 30?
+### 9.1 The Paradigm Shift
 
-| PPL Range | Model State | Kosha Quality | Gyroscope Safe? |
-|-----------|-------------|---------------|-----------------|
-| > 100 | Gibberish | Noise | NO |
-| 50-100 | Broken sentences | Unstable | NO |
-| 30-50 | Basic coherence | Emerging | MAYBE |
-| **< 30** | **Fluent** | **Stable** | **YES** |
-| < 15 | Human-like | Refined | YES |
+**Original (Industry Standard) Approach:**
+```
+Phase 1: Train alone (no guidance)
+Phase 2: Apply RLHF/Gyroscope (late correction)
+```
 
-**Rationale**: The Kosha projector outputs are only meaningful when the model has learned stable representations. Before PPL 30, Kosha activations are noise.
+**Inverted (Kosha Gyroscope) Approach:**
+```
+Phase 1: Train WITH Gyroscope (instructor-led from start)
+Phase 2: Disengage Gyroscope, engage Classification (self-regulation)
+```
 
-### 9.2 Industry Precedent
+### 9.2 Why Invert?
 
-| System | Base PPL Before RL | Source |
-|--------|-------------------|--------|
-| GPT-3 → InstructGPT | ~20 (PTB benchmark) | OpenAI 2022 |
-| Llama 2 → Llama 2 Chat | ~15-20 | Meta 2023 |
-| **Symbolu Phase 1 → Phase 2** | **< 30** | This design |
+| Approach | Early Training | Late Training | Problem |
+|----------|---------------|---------------|---------|
+| **Standard** | No guidance | Fix collapse after it forms | Correction is harder than prevention |
+| **Inverted** | Gyroscope guides | Model self-regulates | Balance learned from start |
 
-### 9.3 Phase Transition Logic
+**Key Insight**: You don't need accurate Kosha CLASSIFICATION to apply balance PRESSURE.
+
+| What Gyroscope Needs | Early (PPL > 30) | Late (PPL < 30) |
+|---------------------|------------------|-----------------|
+| Accurate Kosha labels | NO | YES (Classification active) |
+| Balance gradient pressure | YES | NO (internalized) |
+| Role | External instructor | Model self-regulates |
+
+### 9.3 The Training Wheels Analogy
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     HUMAN DEVELOPMENT PARALLEL                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  INFANT (PPL > 100)          CHILD (PPL 30-100)       ADULT (PPL < 30) │
+│  ─────────────────           ─────────────────        ────────────────  │
+│                                                                          │
+│  • Cannot self-regulate      • Learning balance       • Self-regulates  │
+│  • Parent soothes            • Training wheels ON     • Training wheels │
+│    (external regulation)     • Instructor guides        OFF             │
+│  • Gyroscope: ACTIVE         • Gyroscope: ACTIVE      • Gyroscope: OFF  │
+│  • Classification: OFF       • Classification: OFF    • Classification: │
+│                                                          ON (grounded)  │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 9.4 The Timeline
+
+```
+                     INVERTED CURRICULUM TIMELINE
+
+  PPL 1000        PPL 100         PPL 30          PPL 15
+     │               │               │               │
+     ▼               ▼               ▼               ▼
+  ═══════════════════════════════════════════════════════════════
+  │      INSTRUCTOR-LED PHASE        │    SELF-LEARNING PHASE   │
+  ═══════════════════════════════════════════════════════════════
+                                     │
+  Gyroscope: ACTIVE ─────────────────┼──── RAMPDOWN ──── OFF
+                                     │
+  Classification: OFF ───────────────┼──── ENGAGE ────── ACTIVE
+                                     │
+                               ──────┼──────
+                              GRADUATION
+                               PPL < 30
+```
+
+### 9.5 What Happens at Each Phase
+
+#### Phase 1: Instructor-Led (PPL > 30)
+
+```
+Kosha Projections: [0.3, 0.1, 0.7, 0.2, 0.1]  ← NOISY (random at start)
+                              ↑
+                         Mental = 0.7
+
+Gyroscope: "Saturating toward single dimension. Apply balance pressure."
+
+Gradient: Forces weights to distribute across dimensions.
+
+Result: Model learns SHAPE of balance (not content yet).
+        The representation space is structured from the start.
+        No collapse can form because balance is enforced early.
+```
+
+#### Phase 2: Self-Learning (PPL < 30)
+
+```
+Kosha Projections: [0.25, 0.2, 0.3, 0.4, 0.35]  ← MEANINGFUL (grounded)
+                                    ↑
+                             Intellect = 0.4 (actually reflects reasoning)
+
+Classification: "Label this state. Ground Kosha names in representations."
+
+Gyroscope: DISENGAGING (rampdown over 500 steps).
+
+Result: Model can now say "I am in Intellectual mode" accurately.
+        Self-regulation is internalized. Instructor not needed.
+```
+
+### 9.6 Why This Is Superior
+
+| Metric | Standard (Late RLHF) | Inverted (Early Gyroscope) |
+|--------|---------------------|---------------------------|
+| Mode collapse | Must fix after forming | **Prevented from start** |
+| Training stability | May oscillate | **Smooth from beginning** |
+| Kosha grounding | Random at PPL < 30 | **Structured at PPL < 30** |
+| Final quality | Corrected model | **Inherently balanced model** |
+
+### 9.7 The Graduation Ceremony
+
+At PPL < 30, a phase transition occurs:
 
 ```python
-# Curriculum integration
-class MacroPhase(Enum):
-    BODY = auto()   # Foundation (PPL > 30)
-    SOUL = auto()   # Regularization (PPL < 30, Gyroscope active)
-    UNION = auto()  # Full integration
+if last_val_ppl < 30.0:
+    print("🎓 [GRADUATION] Model has achieved fluency!")
+    print("   • Kosha representations are now stable")
+    print("   • Gyroscope has taught the shape of balance")
+    print("   • Classification will now ground the labels")
+    print("   • The student becomes the master")
+```
+
+**What transfers at graduation:**
+1. **Gyroscope OFF**: Balance pressure no longer needed (internalized)
+2. **Classification ON**: Labels can now be grounded meaningfully
+3. **Self-regulation**: Model maintains balance through learned Kosha awareness
+
+### 9.8 Industry Comparison
+
+| System | Training Paradigm | When Regulation Applies |
+|--------|-------------------|------------------------|
+| GPT → InstructGPT | Pre-train → RLHF | Late (after fluency) |
+| Claude | Pre-train → Constitutional AI | Late (after fluency) |
+| **Kosha Gyroscope** | **Gyroscope → Classification** | **Early (from step 0)** |
+
+The Kosha Gyroscope is unique in applying regulation **from the beginning**, not as a late-stage correction.
+
+### 9.9 Configuration Summary
+
+```python
+@dataclass
+class InvertedCurriculumConfig:
+    """The inverted curriculum: Instructor → Self-Learner."""
+
+    # --- INSTRUCTOR PHASE (PPL > 30) ---
+    gyroscope_active_from_start: bool = True
+    gyroscope_disengage_ppl: float = 30.0
+    gyroscope_rampdown_steps: int = 500
+
+    # --- SELF-LEARNING PHASE (PPL < 30) ---
+    classification_engage_ppl: float = 30.0
+    classification_warmup_steps: int = 100
+
+    # The two phases are inverses:
+    # - Gyroscope: ON → OFF (external → internal)
+    # - Classification: OFF → ON (ungrounded → grounded)
 ```
 
 ---
@@ -747,5 +933,11 @@ Token 47: "Titus"  → Kosha check → Mental: 0.82, Intellect: 0.15
 
 ---
 
-**Document Status:** Ready for Implementation
-**Next Steps:** Wait for PPL < 30, then integrate per Section 7.3
+**Document Status:** Ready for Implementation (v2.0 Inverted Curriculum)
+**Next Steps:**
+1. Implement `KoshaGyroscopicLoss` module in `symbolu/losses/kosha_gyroscope.py`
+2. Integrate into training loop with Gyroscope ON from step 0
+3. Monitor PPL for graduation threshold (< 30)
+4. Activate Kosha Classification at graduation, ramp down Gyroscope
+
+**Key Change from v1.0:** Gyroscope is now active from the BEGINNING of training, not waiting for PPL < 30. This is instructor-led training, not late-stage correction.
