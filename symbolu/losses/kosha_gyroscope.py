@@ -1,15 +1,22 @@
 """
-Kosha Gyroscope: Homeostatic Self-Regulation Loss Module (v2.2.4)
+Kosha Gyroscope: Homeostatic Self-Regulation Loss Module (v2.2.4.1)
 
 This module implements the Vijnana-Gated Kosha Balance Loss, a homeostatic
 self-regulation mechanism that prevents pathological states (looping, fixation,
 mode collapse) by enforcing balance across the 5 Kosha (sheath) dimensions.
 
-Key Features (v2.2.4 - Three-Stage Hybrid Logic):
+Key Features (v2.2.4.1 - Softmax Threshold Calibration):
 - Bliss Damper (Sigmoid): Dilutes creative expansion during Mental dominance
 - Physical Gate (Strict): Prerequisites for Intellectual activation (no bypass)
 - Hard ReLU Rip: Reality Reversal when trapped with gate closed
 - Two-Path Loss: intellect_path + rip_signal for distinct behaviors
+- Softmax-calibrated thresholds: trap=0.35, gate=0.22, balance=0.18
+
+v2.2.4.1 Softmax Threshold Fix:
+- Kosha states are softmax-normalized (5 values summing to 1.0)
+- With uniform distribution, each Kosha = 0.20 (not 0.50)
+- Old threshold of 0.75 was NEVER triggered (impossible with softmax)
+- New threshold of 0.35 fires when a Kosha is 75% above uniform
 
 v2.2.4 "Pressure Relief Valve" Architecture:
 - Damping manages the "volume" of Mental state
@@ -22,6 +29,7 @@ Three-Stage Internal Process:
 3. Reality Rip (Reversal): Trap + Gate Closed → ReLU shock forces re-grounding
 
 Previous Versions:
+- v2.2.4: Three-Stage Hybrid Logic (incorrect thresholds for softmax)
 - v2.2.3.1: Soft-threshold damping (gate bypass approach - deprecated)
 - v2.2.1: Dynamic Weight Scheduler (PPL-based gain ramping - retained)
 
@@ -48,11 +56,17 @@ import torch.nn.functional as F
 
 @dataclass
 class KoshaGyroscopeConfig:
-    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.2.4).
+    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.2.4.1).
 
     The Inverted Curriculum paradigm:
     - Gyroscope: Active from start, disengages when fluent (PPL < 30)
     - Classification: Disabled at start, engages when fluent (PPL < 30)
+
+    v2.2.4.1 Softmax Threshold Calibration:
+    - Kosha states are softmax-normalized (5 values sum to 1.0)
+    - Uniform distribution = 0.20 per Kosha
+    - trap_threshold=0.35 fires at 75% above uniform
+    - Old threshold of 0.75 was unreachable with softmax
 
     v2.2.4 Three-Stage Hybrid Logic:
     1. Bliss Damper (Sigmoid): Dilutes creative expansion during Mental dominance
@@ -74,10 +88,12 @@ class KoshaGyroscopeConfig:
     # Warmup for initial gyroscope activation
     gyroscope_warmup_steps: int = 100        # Steps before gyroscope fully active
 
-    # Trap detection thresholds
-    trap_threshold: float = 0.75         # Kosha saturation point
-    gate_threshold: float = 0.30         # Minimum for gate activation
-    balance_target: float = 0.25         # Required opposite activation
+    # Trap detection thresholds (v2.2.4.1: calibrated for softmax normalization)
+    # With softmax over 5 Koshas, uniform distribution = 0.20 each
+    # "Dominant" Kosha = 0.35+ (75% above uniform), "Trapped" = 0.40+
+    trap_threshold: float = 0.35         # Kosha saturation point (softmax-calibrated)
+    gate_threshold: float = 0.22         # Minimum for gate activation (slightly above uniform)
+    balance_target: float = 0.18         # Required opposite activation (slightly below uniform)
 
     # === THREE-STAGE HYBRID LOGIC (v2.2.4) ===
     # Damper steepness controls how aggressively Bliss is diluted
@@ -112,7 +128,7 @@ class KoshaGyroscopeConfig:
 
 class KoshaGyroscopicLoss(nn.Module):
     """
-    Vijnana-Gated Kosha Balance Loss (v2.2.4) - Three-Stage Hybrid Logic.
+    Vijnana-Gated Kosha Balance Loss (v2.2.4.1) - Softmax-Calibrated Thresholds.
 
     Implements homeostatic regulation with the "Pressure Relief Valve" architecture:
     1. Bliss Damper (Sigmoid): Dilutes Bliss during Mental dominance
@@ -168,9 +184,9 @@ class KoshaGyroscopicLoss(nn.Module):
 
     def __init__(
         self,
-        trap_threshold: float = 0.75,
-        gate_threshold: float = 0.30,
-        balance_target: float = 0.25,
+        trap_threshold: float = 0.35,  # v2.2.4.1: softmax-calibrated (was 0.75)
+        gate_threshold: float = 0.22,  # v2.2.4.1: softmax-calibrated (was 0.30)
+        balance_target: float = 0.18,  # v2.2.4.1: softmax-calibrated (was 0.25)
         gate_temperature: float = 10.0,
         # Three-Stage Hybrid Logic (v2.2.4)
         damper_steepness: float = 5.0,
@@ -191,12 +207,21 @@ class KoshaGyroscopicLoss(nn.Module):
         vital_momentum_range: Tuple[float, float] = (0.5, 1.5),
     ):
         """
-        Initialize the Kosha Gyroscopic Loss (v2.2.4).
+        Initialize the Kosha Gyroscopic Loss (v2.2.4.1).
+
+        v2.2.4.1 Threshold Calibration for Softmax Normalization:
+        Kosha states are softmax-normalized (5 values summing to 1.0).
+        With uniform distribution, each Kosha = 0.20.
+        - "Dominant" = 0.35+ (75% above uniform)
+        - "Trapped" = 0.40+ (double uniform, severe imbalance)
 
         Args:
-            trap_threshold: Activation level above which a Kosha is "trapped"
-            gate_threshold: Minimum activation for gate to be considered open
-            balance_target: Target activation level for the opposite Kosha
+            trap_threshold: Activation level above which a Kosha is "trapped".
+                           Default 0.35 for softmax (was 0.75 for unnormalized).
+            gate_threshold: Minimum activation for gate to be considered open.
+                           Default 0.22 for softmax (slightly above uniform 0.20).
+            balance_target: Target activation level for the opposite Kosha.
+                           Default 0.18 for softmax (slightly below uniform).
             gate_temperature: Temperature for soft gate sigmoid (higher = sharper)
             damper_steepness: Sigmoid steepness for Bliss damper (v2.2.4)
                               Controls how aggressively Bliss is diluted during Mental dominance
@@ -1024,12 +1049,15 @@ class KoshaPhaseCorrectorConfig:
     - Training: Indirect (loss gradients) → Model LEARNS balance
     - Inference: Direct (phase rotation) → Runtime GUARDRAILS
 
+    v2.2.4.1: Thresholds calibrated for softmax-normalized Kosha states.
+    With 5 Koshas summing to 1.0, uniform = 0.20 each.
+
     Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 13
     """
 
-    # Imbalance detection thresholds
-    overactive_threshold: float = 0.75   # Kosha > this triggers correction
-    underactive_threshold: float = 0.15  # Kosha < this is considered deficient
+    # Imbalance detection thresholds (v2.2.4.1: softmax-calibrated)
+    overactive_threshold: float = 0.35   # Kosha > this triggers correction (was 0.75)
+    underactive_threshold: float = 0.12  # Kosha < this is considered deficient
 
     # Correction strength
     correction_strength: float = 0.3     # How much to rotate (0-1)
