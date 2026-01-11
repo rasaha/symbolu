@@ -11459,8 +11459,13 @@ def train(config: UnifiedTrainingConfig):
                             sovereign_state = outputs.get('state', None) if isinstance(outputs, dict) else None
                             if sovereign_state is not None:
                                 # Extract Kosha [12:17] from 32D sovereign state
-                                # Shape: [batch, seq, 32] -> [batch, seq, 5]
-                                kosha_states_for_gyro = sovereign_state[:, :, KOSHA_SLICE]
+                                # Handle both 2D [batch, 32] and 3D [batch, seq, 32] shapes
+                                if sovereign_state.dim() == 2:
+                                    # Shape: [batch, 32] -> [batch, 1, 5]
+                                    kosha_states_for_gyro = sovereign_state[:, KOSHA_SLICE].unsqueeze(1)
+                                else:
+                                    # Shape: [batch, seq, 32] -> [batch, seq, 5]
+                                    kosha_states_for_gyro = sovereign_state[:, :, KOSHA_SLICE]
 
                         if kosha_states_for_gyro is not None:
                             # Compute gyroscope loss with dynamic gain based on current PPL
