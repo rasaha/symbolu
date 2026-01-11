@@ -1,7 +1,7 @@
 # Kosha Gyroscope: Homeostatic Self-Regulation System
 
-**Version:** 2.2.4
-**Status:** Design Complete, Three-Stage Hybrid Logic Implemented
+**Version:** 2.2.5
+**Status:** Design Complete, Gradient Throttle + WikiText Cleaner Added
 **Date:** 2026-01-11
 **Origin:** Vedic Kosha Theory + Control Theory + Constitutional AI
 **Curriculum:** Instructor-Led (Gyroscope ON) → Self-Learning (Gyroscope OFF at PPL < 30)
@@ -50,6 +50,11 @@ The architecture implements:
 9. [Inverted Curriculum: Instructor → Self-Learner](#9-inverted-curriculum-instructor--self-learner)
 10. [32D Dimensional Hierarchy: Primary vs Emergent](#10-32d-dimensional-hierarchy-primary-vs-emergent)
 11. [Relationship to Industry Approaches](#11-relationship-to-industry-approaches)
+12. [Kosha-Vritti Resonance Map](#12-kosha-vritti-resonance-map-v230)
+13. [Kosha Phase Corrector](#13-kosha-phase-corrector---inference-time-guardrail-v240)
+14. [Soft-Threshold Damping](#14-soft-threshold-damping-v2231)
+15. [Three-Stage Hybrid Logic](#15-three-stage-hybrid-logic-v224)
+16. [Gradient Norm Throttle: Physical Safety Layer](#16-gradient-norm-throttle-physical-safety-layer-v225)
 
 ---
 
@@ -2806,3 +2811,204 @@ class KoshaGyroscopeConfigV221:
     graduation_stability_window: int = 10
     graduation_variance_threshold: float = 1.5
 ```
+
+---
+
+## 16. Gradient Norm Throttle: Physical Safety Layer (v2.2.5)
+
+### 16.1 The Problem: Gradient Explosions During Training
+
+While the Kosha Gyroscope regulates cognitive state balance, it operates on the **semantic level** (Kosha distributions). However, training instabilities can occur at the **physical level** - gradient explosions that cause destructive weight updates before the Gyroscope can respond.
+
+**Observed Symptoms:**
+- PPL spikes (e.g., 118 → 143 in single step)
+- VRAM critical events (99.3% usage)
+- Token repetition loops ("Caesar Caesar Caesar")
+- Batch size oscillations (32 → 36 → 28)
+
+These are **physical training failures**, not cognitive state imbalances.
+
+### 16.2 The Solution: Two-Layer Safety Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    TRAINING SAFETY STACK                     │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 2: KOSHA GYROSCOPE (Semantic)                        │
+│    - Regulates Kosha balance (Mental/Physical/Bliss/etc)    │
+│    - Operates on hidden state geometry                      │
+│    - Dense per-token feedback                               │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 1: GRADIENT THROTTLE (Physical) ← NEW                │
+│    - Monitors raw gradient L2 norm                          │
+│    - Reduces LR when gradients spike > 2x baseline          │
+│    - Prevents destructive weight updates                    │
+│    - Acts BEFORE optimizer.step()                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+The Gradient Throttle ensures the mathematical foundation (gradients) remains stable, allowing the Kosha Gyroscope to operate on a solid platform.
+
+### 16.3 GradientNormThrottle Implementation
+
+**Location:** `symbolu/training/trainers/gradient_throttle.py`
+
+```python
+class GradientNormThrottle:
+    """
+    Stabilizes training by reducing LR when gradient norms spike.
+    Acts as the physical safety layer for the Sovereign Architecture.
+    """
+    def __init__(
+        self,
+        ema_decay: float = 0.99,       # Slow adaptation to baseline
+        spike_threshold: float = 2.0,   # Trigger if norm > 2x average
+        min_factor: float = 0.3,        # Never reduce LR below 30%
+        warmup_steps: int = 100,        # Skip throttling during warmup
+    ):
+        self.ema_grad_norm = None
+        self.ema_decay = ema_decay
+        self.spike_threshold = spike_threshold
+        self.min_factor = min_factor
+        self.warmup_steps = warmup_steps
+
+    def step(self, model, optimizer, base_lr, precomputed_norm=None):
+        """
+        Check gradient norm and apply throttling if needed.
+
+        Returns:
+            (throttle_factor, current_grad_norm)
+        """
+        # Compute or reuse gradient norm
+        total_norm = precomputed_norm or self.compute_grad_norm(model)
+
+        # Initialize EMA on first step
+        if self.ema_grad_norm is None:
+            self.ema_grad_norm = total_norm
+            return 1.0, total_norm
+
+        # Detect spike
+        ratio = total_norm / (self.ema_grad_norm + 1e-8)
+
+        factor = 1.0
+        if ratio > self.spike_threshold:
+            # Throttle proportionally: 5x spike → 0.2x LR
+            factor = max(self.ema_grad_norm / total_norm, self.min_factor)
+
+        # Apply to optimizer
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = base_lr * factor
+
+        # Update EMA
+        self.ema_grad_norm = (
+            self.ema_decay * self.ema_grad_norm +
+            (1 - self.ema_decay) * total_norm
+        )
+
+        return factor, total_norm
+```
+
+### 16.4 Integration with Training Loop
+
+The throttle is injected after `loss.backward()` and before `optimizer.step()`:
+
+```python
+# In train_unified_llm.py
+
+# 1. Initialize (after other controllers)
+gradient_throttle = GradientNormThrottle(
+    ema_decay=0.99,
+    spike_threshold=2.0,
+    min_factor=0.3,
+    warmup_steps=config.warmup_steps,
+)
+
+# 2. In training loop, after loss.backward():
+raw_grad_norm = sum(p.grad.norm().item() for p in model.parameters() if p.grad is not None)
+
+# Apply throttle BEFORE gradient clipping
+throttle_factor, _ = gradient_throttle.step(
+    model, optimizer, config.learning_rate,
+    precomputed_norm=raw_grad_norm,
+)
+if throttle_factor < 1.0:
+    print(f"  ⚡ [GRAD THROTTLE] norm={raw_grad_norm:.1f} | LR×{throttle_factor:.2f}")
+
+# Then gradient clipping
+torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
+
+# Then optimizer.step()
+optimizer.step()
+```
+
+### 16.5 Interaction with Kosha Gyroscope
+
+| Scenario | Gradient Throttle | Kosha Gyroscope | Combined Effect |
+|----------|-------------------|-----------------|-----------------|
+| Normal training | LR×1.0 | Balance penalty | Standard learning |
+| Mental trap | LR×1.0 | Bliss injection | Cognitive rebalance |
+| Gradient spike | LR×0.3 | (reduced effect) | Physical stabilization first |
+| Spike + trap | LR×0.3 | Bliss injection (reduced) | Stabilize, then rebalance |
+
+**Key Principle:** Physical stability enables cognitive regulation. When gradients spike, the Gyroscope's gradients are also affected - throttling first ensures the Gyroscope can operate effectively.
+
+### 16.6 TensorBoard Metrics
+
+```python
+# Logged every eval step:
+tb_writer.add_scalar("throttle/factor", throttle_stats['last_factor'], global_step)
+tb_writer.add_scalar("throttle/grad_norm", throttle_stats['last_grad_norm'], global_step)
+tb_writer.add_scalar("throttle/ema_norm", throttle_stats['ema_grad_norm'], global_step)
+tb_writer.add_scalar("throttle/events_total", throttle_stats['throttle_events'], global_step)
+```
+
+### 16.7 WikiText Artifact Cleaner
+
+Also added in v2.2.5, the WikiText cleaner removes Moses tokenization artifacts from quality sample logs:
+
+**Location:** `symbolu/training/text_utils.py`
+
+```python
+def clean_wikitext_artifacts(text: str) -> str:
+    """
+    Clean Moses tokenization artifacts from WikiText-103.
+    - @-@ → - (hyphens)
+    - @.@ → . (periods)
+    - @,@ → , (commas)
+    """
+    text = re.sub(r'\s*@-@\s*', '-', text)
+    text = re.sub(r'\s*@\.@\s*', '.', text)
+    text = re.sub(r'\s*@,@\s*', ',', text)
+    return text
+```
+
+**Before:** `"1 @,@ 000 metres from the @-@ 100 year old"`
+**After:** `"1,000 metres from the-100 year old"`
+
+### 16.8 Configuration (v2.2.5)
+
+```python
+@dataclass
+class GradientThrottleConfig:
+    """Configuration for Gradient Norm Throttle."""
+
+    # === THROTTLE PARAMETERS ===
+    ema_decay: float = 0.99           # Slow adaptation (99% history retention)
+    spike_threshold: float = 2.0       # Trigger at 2x normal gradient
+    min_factor: float = 0.3            # Floor LR at 30%
+    warmup_steps: int = 100            # Skip during warmup
+
+    # === INTEGRATION ===
+    enabled: bool = True               # Auto-enabled when available
+```
+
+### 16.9 Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 2.2.5 | 2026-01-11 | Added GradientNormThrottle + WikiText cleaner |
+| 2.2.4 | 2026-01-10 | Three-Stage Hybrid Logic |
+| 2.2.3 | 2026-01-09 | Soft-Threshold Damping |
+| 2.2.1 | 2026-01-08 | Dynamic Weight Scheduler |
+| 2.2.0 | 2026-01-07 | Refinements (Vital Momentum, Temporal Grounding) |
+| 2.0.0 | 2026-01-05 | Inverted Curriculum + Vijnana Gate |
