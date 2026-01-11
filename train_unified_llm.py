@@ -7428,6 +7428,15 @@ class UnifiedTrainingConfig:
     # Diagnostic logging
     enable_rip_logger: bool = False          # Enable Reality Rip diagnostic logging
     rip_logger_dir: str = "diagnostics/rips" # Directory for rip event files
+    # v2.3.3: 32D Sovereign State Regularizer
+    enable_state_regularizer: bool = False   # Enable 32D anti-saturation regularizer
+    state_reg_anti_sat_weight: float = 0.5   # Weight for anti-saturation loss
+    state_reg_variance_weight: float = 0.2   # Weight for VICReg variance loss
+    state_reg_sat_thresh_high: float = 0.95  # Penalize above this (too hot)
+    state_reg_sat_thresh_low: float = 0.05   # Penalize below this (too cold)
+    state_reg_target_std_kosha: float = 0.15 # Target std for Kosha dimensions
+    state_reg_vital_weight: float = 1.5      # Extra penalty for VITAL (prone to saturation)
+    state_reg_bliss_weight: float = 1.5      # Extra penalty for BLISS (prone to saturation)
 
     # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
     enable_onto_bridge: bool = False         # Enable 12D ontological projection at Layer 4
@@ -10744,19 +10753,19 @@ def train(config: UnifiedTrainingConfig):
 
     # v2.3.3: Initialize 32D Sovereign State Regularizer
     state_regularizer = None
-    if getattr(config, 'enable_state_regularizer', False) and KOSHA_GYROSCOPE_AVAILABLE:
+    if config.enable_state_regularizer and KOSHA_GYROSCOPE_AVAILABLE:
         state_reg_config = SovereignStateRegularizerConfig(
-            anti_saturation_weight=getattr(config, 'state_reg_anti_sat_weight', 0.5),
-            variance_weight=getattr(config, 'state_reg_variance_weight', 0.2),
-            saturation_threshold_high=getattr(config, 'state_reg_sat_thresh_high', 0.95),
-            saturation_threshold_low=getattr(config, 'state_reg_sat_thresh_low', 0.05),
-            target_std_kosha=getattr(config, 'state_reg_target_std_kosha', 0.15),
+            anti_saturation_weight=config.state_reg_anti_sat_weight,
+            variance_weight=config.state_reg_variance_weight,
+            saturation_threshold_high=config.state_reg_sat_thresh_high,
+            saturation_threshold_low=config.state_reg_sat_thresh_low,
+            target_std_kosha=config.state_reg_target_std_kosha,
             kosha_weights=(
                 1.0,  # MATERIAL
-                getattr(config, 'state_reg_vital_weight', 1.5),  # VITAL
+                config.state_reg_vital_weight,  # VITAL
                 1.0,  # MENTAL
                 1.0,  # INTELLECTUAL
-                getattr(config, 'state_reg_bliss_weight', 1.5),  # BLISS
+                config.state_reg_bliss_weight,  # BLISS
             ),
         )
         state_regularizer = SovereignStateRegularizer(config=state_reg_config).to(device)
@@ -14202,6 +14211,15 @@ def main():
         gyroscope_graduation_window=args.gyroscope_graduation_window,
         enable_rip_logger=args.enable_rip_logger,
         rip_logger_dir=args.rip_logger_dir,
+        # v2.3.3: 32D Sovereign State Regularizer
+        enable_state_regularizer=args.enable_state_regularizer,
+        state_reg_anti_sat_weight=args.state_reg_anti_sat_weight,
+        state_reg_variance_weight=args.state_reg_variance_weight,
+        state_reg_sat_thresh_high=args.state_reg_sat_thresh_high,
+        state_reg_sat_thresh_low=args.state_reg_sat_thresh_low,
+        state_reg_target_std_kosha=args.state_reg_target_std_kosha,
+        state_reg_vital_weight=args.state_reg_vital_weight,
+        state_reg_bliss_weight=args.state_reg_bliss_weight,
         # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
         enable_onto_bridge=args.enable_onto_bridge,
         onto_bridge_lambda=args.onto_bridge_lambda,
