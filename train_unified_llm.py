@@ -12040,6 +12040,20 @@ def train(config: UnifiedTrainingConfig):
                     csr_pct = int(rss_weights['csr'] * 100)
                     log_msg += f"\n    {icon} [RSS] Phase: {phase} | Evo:{int(rss_weights['evoflow']*100)}% Tor:{int(rss_weights['toroidal']*100)}% CSR:{csr_pct}% Kosh:{int(rss_weights['kosha']*100)}%"
 
+                # v2.2.1: Kosha Gyroscope Status (Homeostatic Self-Regulation)
+                if kosha_gyroscope is not None and 'gyroscope_loss' in metrics:
+                    gyro_loss = metrics.get('gyroscope_loss', 0.0)
+                    gyro_gain = metrics.get('gyroscope_effective_gain', 0.0)
+                    gyro_scale = metrics.get('gyroscope_warmup_scale', 1.0)
+                    # Show graduation status
+                    if kosha_graduated:
+                        gyro_status = "🎓GRAD"
+                    elif gyro_scale < 1.0:
+                        gyro_status = f"⏳{gyro_scale*100:.0f}%"
+                    else:
+                        gyro_status = "⚖️ON"
+                    log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} | PPL→{config.gyroscope_target_ppl:.0f}"
+
                 print(log_msg, flush=True)  # V9.7.0: Flush for real-time output when piped to tee
 
                 # Kosha-Vritti Diagnostic System (Read-Only)
