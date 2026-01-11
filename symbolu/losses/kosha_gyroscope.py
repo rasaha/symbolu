@@ -59,18 +59,17 @@ import torch.nn.functional as F
 
 @dataclass
 class KoshaGyroscopeConfig:
-    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.2.5).
+    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.3.0).
 
     The Inverted Curriculum paradigm:
     - Gyroscope: Active from start, disengages when fluent (PPL < 30)
     - Classification: Disabled at start, engages when fluent (PPL < 30)
 
-    v2.2.5 Geometric Expansion (Sigmoid Mode):
-    - Koshas are INDEPENDENT sheaths via sigmoid (not softmax zero-sum)
-    - Each Kosha can reach [0, 1] independently
-    - Model can be HIGH Physical AND HIGH Intellectual simultaneously
-    - Trap threshold uses Golden Ratio φ=0.618 (natural equilibrium point)
-    - VICReg variance term prevents sigmoid collapse
+    v2.3.0 Complete Harmonic Pentad:
+    - Each Kosha has a Floor (Push) and Ceiling (Clamp) defining the Sattvic Band
+    - Deviations outside these bands trigger automated corrective forces
+    - Floor violations add loss pressure to push toward Sattvic band
+    - Ceiling violations reduce gain to clamp toward Sattvic band
 
     v2.2.4 Three-Stage Hybrid Logic:
     1. Bliss Damper (Sigmoid): Dilutes creative expansion during Mental dominance
@@ -92,25 +91,35 @@ class KoshaGyroscopeConfig:
     # Warmup for initial gyroscope activation
     gyroscope_warmup_steps: int = 100        # Steps before gyroscope fully active
 
-    # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
-    # Per-Kosha thresholds based on Fibonacci retracement levels and ontological roles
-    # Each Kosha has its own threshold reflecting its unique function in consciousness
-    #
-    # Fibonacci Levels: 23.6%, 38.2%, 50.0%, 61.8%, 78.6%
-    #
-    # | Kosha     | Fib Level | Role       | Trigger Action                          |
-    # |-----------|-----------|------------|-----------------------------------------|
-    # | Mental    | 38.2%     | Warning    | Engage Bliss Damper (Dilution)          |
-    # | Physical  | 38.2%     | Support    | Required to open the Vijnana Gate       |
-    # | Intellect | 50.0%     | Pivot      | Target range for "Right Knowledge"      |
-    # | Vital     | 78.6%     | Resistance | Trigger SGP Hammer (Reset Momentum)     |
-    # | Bliss     | 23.6%     | Spark      | If below, release Damping for creativity|
-    #
-    threshold_mental: float = 0.382      # Warning level - engage Bliss Damper
-    threshold_physical: float = 0.382    # Support level - required to open Vijnana Gate
-    threshold_intellect: float = 0.500   # Pivot level - target for "Right Knowledge"
-    threshold_vital: float = 0.786       # Resistance level - trigger momentum reset
-    threshold_bliss: float = 0.236       # Spark level - below this, release damping
+    # === v2.3.0: COMPLETE HARMONIC PENTAD ===
+    # Each Kosha has a Floor (Push) and Ceiling (Clamp) defining the Sattvic Band
+    # ┌───────────┬─────────────────────────┬─────────────────────┬─────────────────────────┐
+    # | Kosha     | Floor (Push)            | Sattvic Band        | Ceiling (Clamp)         |
+    # ├───────────┼─────────────────────────┼─────────────────────┼─────────────────────────┤
+    # | Mental    | 23.6%: Spark Abstraction| 23.6% - 38.2%       | 38.2%: Bliss Damper/Rip |
+    # | Physical  | 38.2%: Grounding Push   | 38.2% - 61.8%       | 61.8%: Data Trap        |
+    # | Intellect | 25.0%: Logic Pressure   | 25.0% - 61.8%       | 61.8%: Hubris Tax       |
+    # | Vital     | 23.6%: Wake-up Boost    | 23.6% - 78.6%       | 78.6%: Momentum Brake   |
+    # | Bliss     | 23.6%: Spark Creativity | 23.6% - 61.8%       | 61.8%: Delusion Tether  |
+    # └───────────┴─────────────────────────┴─────────────────────┴─────────────────────────┘
+    # Mental thresholds
+    floor_mental: float = 0.236         # Spark Abstraction - below this, push toward abstraction
+    ceiling_mental: float = 0.382       # Bliss Damper / Reality Rip
+    # Physical thresholds
+    floor_physical: float = 0.382       # Grounding Push - below this, push toward grounding
+    ceiling_physical: float = 0.618     # Data Trap - above this, dilute raw data copying
+    # Intellect thresholds
+    floor_intellect: float = 0.250      # Logic Pressure - below this, push toward reasoning
+    ceiling_intellect: float = 0.618    # Hubris Tax - above this, penalize over-intellectualization
+    # Vital thresholds
+    floor_vital: float = 0.236          # Wake-up Boost - below this, increase momentum
+    ceiling_vital: float = 0.786        # Momentum Brake - above this, dampen overheating
+    # Bliss thresholds
+    floor_bliss: float = 0.236          # Spark Creativity - below this, release damping
+    ceiling_bliss: float = 0.618        # Delusion Tether - above this, reduce gain
+    # Clamp/Push factors (how strongly to correct deviations)
+    floor_push_factor: float = 0.5      # Loss weight for floor violations
+    ceiling_clamp_factor: float = 0.5   # Gain reduction for ceiling violations
 
     # Legacy: single trap_threshold (kept for backward compatibility)
     trap_threshold: float = 0.618        # Kosha saturation point (Golden Ratio φ)
