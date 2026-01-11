@@ -51,10 +51,129 @@ References:
 
 from dataclasses import dataclass
 from typing import Optional, Tuple, Dict, Any
+import re
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+
+# =============================================================================
+# v2.3.2: DOMAIN DETECTOR - Zero-Training Heuristic Classification
+# =============================================================================
+
+class DomainDetector:
+    """
+    Zero-training domain detection using token-type heuristics.
+    No probe, no hidden states, no labeled data needed.
+
+    Returns a "morph factor" μ ∈ [0, 1]:
+    - μ = 0.0: Pure language mode (creative/prose)
+    - μ = 1.0: Pure logic mode (code/math)
+
+    The morph factor adjusts Sattvic Bands:
+    - Physical Floor: 38.2% → 50.0% as μ increases
+    - Bliss Ceiling: 61.8% → 38.2% as μ decreases
+    """
+
+    # Token patterns for domain detection
+    CODE_PATTERNS = {
+        '{', '}', '();', '[]', 'def ', 'class ', 'import ', 'return ',
+        'function', 'const ', 'let ', 'var ', '==', '!=', '&&', '||',
+        '#!/', '#include', 'public ', 'private ', '->', '=>', '::',
+        'if (', 'for (', 'while (', 'switch ', 'case ', 'break;',
+        'try:', 'except:', 'raise ', 'async ', 'await ', 'yield ',
+        '.py', '.js', '.ts', '.cpp', '.java', '.rs', '.go',
+    }
+
+    MATH_PATTERNS = {
+        '\\frac', '\\sum', '\\int', '\\sqrt', '\\pi', '\\theta',
+        '\\alpha', '\\beta', '\\gamma', '\\delta', '\\epsilon',
+        '\\infty', '\\partial', '\\nabla', '\\lim', '\\log', '\\exp',
+        '∑', '∫', '√', 'π', '∞', '≤', '≥', '≠', '∈', '∀', '∃',
+        '×', '÷', '±', '∂', '∇', '→', '⇒', '⇔', '∧', '∨', '¬',
+        'theorem', 'proof', 'lemma', 'corollary', 'Q.E.D.',
+    }
+
+    def __init__(self, ema_decay: float = 0.9):
+        """
+        Initialize domain detector with EMA smoothing.
+
+        Args:
+            ema_decay: Decay factor for exponential moving average.
+                      Higher = more smoothing, slower response.
+        """
+        self.ema_decay = ema_decay
+        self.ema_code = 0.0
+        self.ema_math = 0.0
+        self._last_domain = 'LANG'
+        self._last_morph = 0.0
+
+    def detect(self, text: str) -> Tuple[str, float]:
+        """
+        Detect domain from text and return (domain_label, morph_factor).
+
+        Args:
+            text: Input text to analyze
+
+        Returns:
+            Tuple of (domain_label, morph_factor):
+            - domain_label: 'LANG', 'MATH', or 'CODE'
+            - morph_factor: 0.0 (language) to 1.0 (logic)
+        """
+        if not text:
+            return self._last_domain, self._last_morph
+
+        # Count pattern matches
+        text_lower = text.lower()
+        code_score = sum(1 for p in self.CODE_PATTERNS if p.lower() in text_lower)
+        math_score = sum(1 for p in self.MATH_PATTERNS if p.lower() in text_lower)
+
+        # Additional heuristics
+        # Brackets/braces density (code indicator)
+        bracket_count = text.count('{') + text.count('}') + text.count('(') + text.count(')')
+        code_score += bracket_count / max(len(text) / 50, 1)
+
+        # Digit density (math indicator)
+        digit_count = sum(1 for c in text if c.isdigit())
+        math_score += digit_count / max(len(text) / 30, 1)
+
+        # Normalize by text length
+        text_len = max(len(text), 1)
+        code_density = code_score / (text_len / 100)
+        math_density = math_score / (text_len / 100)
+
+        # EMA smoothing (prevents oscillation)
+        self.ema_code = self.ema_decay * self.ema_code + (1 - self.ema_decay) * code_density
+        self.ema_math = self.ema_decay * self.ema_math + (1 - self.ema_decay) * math_density
+
+        # Determine domain and morph factor
+        logic_signal = self.ema_code + self.ema_math
+
+        if self.ema_code > 0.5:
+            domain = 'CODE'
+            morph = min(1.0, self.ema_code)
+        elif self.ema_math > 0.3:
+            domain = 'MATH'
+            morph = min(1.0, self.ema_math * 1.5)
+        else:
+            domain = 'LANG'
+            morph = max(0.0, logic_signal * 0.5)
+
+        # Clamp morph to [0, 1]
+        morph = max(0.0, min(1.0, morph))
+
+        self._last_domain = domain
+        self._last_morph = morph
+
+        return domain, morph
+
+    def reset(self):
+        """Reset EMA state."""
+        self.ema_code = 0.0
+        self.ema_math = 0.0
+        self._last_domain = 'LANG'
+        self._last_morph = 0.0
 
 
 @dataclass
@@ -120,6 +239,29 @@ class KoshaGyroscopeConfig:
     # Clamp/Push factors (how strongly to correct deviations)
     floor_push_factor: float = 0.5      # Loss weight for floor violations
     ceiling_clamp_factor: float = 0.5   # Gain reduction for ceiling violations
+
+    # === v2.3.2: REFLEXIVE DOMAIN MORPH ===
+    # Combines external signal (token heuristics) with internal signal (Kosha state)
+    # to create a morph factor μ ∈ [0, 1] that adjusts Sattvic Bands in real-time.
+    #
+    # μ = 0.0: Language Mode (creative/prose)
+    #   - Physical Floor: 38.2% (Fibonacci)
+    #   - Bliss Ceiling: 61.8% (φ Golden Ratio)
+    #   - Grounding Push: 3.0×
+    #
+    # μ = 1.0: Logic Mode (code/math)
+    #   - Physical Floor: 50.0% (Fibonacci Pivot)
+    #   - Bliss Ceiling: 38.2% (Fibonacci)
+    #   - Grounding Push: 5.0×
+    domain_morph_enabled: bool = True       # Enable reflexive domain morphing
+    domain_morph_ema_decay: float = 0.9     # EMA decay for token heuristics
+    domain_morph_internal_weight: float = 0.5  # Weight for internal (Kosha) signal
+    domain_morph_external_weight: float = 0.5  # Weight for external (token) signal
+    # Morph ranges for Physical Floor and Bliss Ceiling
+    domain_morph_phys_floor_range: Tuple[float, float] = (0.382, 0.500)  # 38.2% → 50.0%
+    domain_morph_bliss_ceil_range: Tuple[float, float] = (0.618, 0.382)  # 61.8% → 38.2%
+    # Morph range for Grounding Push priority
+    domain_morph_push_weight_range: Tuple[float, float] = (3.0, 5.0)     # 3.0× → 5.0×
 
     # Legacy: single trap_threshold (kept for backward compatibility)
     trap_threshold: float = 0.618        # Kosha saturation point (Golden Ratio φ)
@@ -265,9 +407,17 @@ class KoshaGyroscopicLoss(nn.Module):
         # VICReg variance regularization (v2.2.5)
         vicreg_variance_weight: float = 0.1,
         vicreg_target_std: float = 0.25,
+        # v2.3.2: Reflexive Domain Morph
+        domain_morph_enabled: bool = True,
+        domain_morph_ema_decay: float = 0.9,
+        domain_morph_internal_weight: float = 0.5,
+        domain_morph_external_weight: float = 0.5,
+        domain_morph_phys_floor_range: Tuple[float, float] = (0.382, 0.500),
+        domain_morph_bliss_ceil_range: Tuple[float, float] = (0.618, 0.382),
+        domain_morph_push_weight_range: Tuple[float, float] = (3.0, 5.0),
     ):
         """
-        Initialize the Kosha Gyroscopic Loss (v2.2.5).
+        Initialize the Kosha Gyroscopic Loss (v2.3.2).
 
         v2.2.5 Geometric Expansion (Sigmoid Mode):
         Koshas are now INDEPENDENT sheaths via sigmoid (not softmax zero-sum).
@@ -347,6 +497,19 @@ class KoshaGyroscopicLoss(nn.Module):
         # VICReg variance regularization (v2.2.5)
         self.vicreg_variance_weight = vicreg_variance_weight
         self.vicreg_target_std = vicreg_target_std
+
+        # v2.3.2: Reflexive Domain Morph
+        self.domain_morph_enabled = domain_morph_enabled
+        self.domain_morph_internal_weight = domain_morph_internal_weight
+        self.domain_morph_external_weight = domain_morph_external_weight
+        self.domain_morph_phys_floor_min, self.domain_morph_phys_floor_max = domain_morph_phys_floor_range
+        self.domain_morph_bliss_ceil_max, self.domain_morph_bliss_ceil_min = domain_morph_bliss_ceil_range
+        self.domain_morph_push_weight_min, self.domain_morph_push_weight_max = domain_morph_push_weight_range
+        # Create domain detector for external (token) signal
+        self.domain_detector = DomainDetector(ema_decay=domain_morph_ema_decay)
+        # Track current morph state for logging
+        self._current_morph = 0.0
+        self._current_domain = 'LANG'
 
         # Kosha indices in the 5D projection
         self.PHYSICAL_IDX = 0   # Annamaya (+,+)
@@ -551,14 +714,25 @@ class KoshaGyroscopicLoss(nn.Module):
         current_ppl: Optional[float] = None,
         return_components: bool = False,
         authority_factor: Optional[float] = None,
+        input_text: Optional[str] = None,
     ) -> torch.Tensor | Tuple[torch.Tensor, Dict[str, Any]]:
         """
-        Compute the Kosha Gyroscopic Loss.
+        Compute the Kosha Gyroscopic Loss (v2.3.2 Reflexive Domain Morph).
 
         The loss fires when:
         1. A Kosha is "trapped" (above trap_threshold)
         2. The grounding gate is open (adjacent Kosha above gate_threshold)
         3. The diagonal opposite is missing (below balance_target)
+
+        v2.3.2 Reflexive Domain Morph:
+        The Sattvic Bands are dynamically adjusted based on:
+        - External signal: Token heuristics (code/math patterns in input_text)
+        - Internal signal: Current Kosha state (Physical + Intellect saturation)
+
+        The morph factor μ ∈ [0, 1] adjusts:
+        - Physical Floor: 38.2% → 50.0% as μ increases
+        - Bliss Ceiling: 61.8% → 38.2% as μ increases
+        - Grounding Push: 3.0× → 5.0× as μ increases
 
         Args:
             kosha_states: [batch, seq, 5] Kosha activations normalized to [0, 1]
@@ -572,6 +746,8 @@ class KoshaGyroscopicLoss(nn.Module):
                              - 0.5 = half gain (PID backing off)
                              - None = no modulation (use PPL-based gain only)
                              This enables integration with --controller pidv2.
+            input_text: Optional text for domain detection (v2.3.2).
+                       If provided, enables external signal for domain morphing.
 
         Returns:
             If return_components=False: Scalar loss value
@@ -583,6 +759,62 @@ class KoshaGyroscopicLoss(nn.Module):
         mental = kosha_states[:, :, self.MENTAL_IDX]       # (-,+) Unmanifest, Past
         intellect = kosha_states[:, :, self.INTELLECT_IDX] # (+,-) Manifest, Future
         bliss = kosha_states[:, :, self.BLISS_IDX]         # (-,-) Unmanifest, Future
+
+        # =======================================================================
+        # v2.3.2: REFLEXIVE DOMAIN MORPH
+        # =======================================================================
+        # Compute morph factor μ from external (tokens) + internal (Kosha) signals.
+        # μ = 0.0: Language Mode | μ = 1.0: Logic Mode
+        #
+        # Morphed thresholds:
+        # - Physical Floor: 38.2% → 50.0% as μ increases
+        # - Bliss Ceiling: 61.8% → 38.2% as μ increases
+        # - Grounding Push: 3.0× → 5.0× as μ increases
+
+        if self.domain_morph_enabled:
+            # External signal: Token heuristics
+            if input_text is not None:
+                domain_label, external_morph = self.domain_detector.detect(input_text)
+            else:
+                domain_label = self._current_domain
+                external_morph = 0.0
+
+            # Internal signal: Kosha state (High Physical + Intellect = Logic Mode)
+            # When Physical and Intellect are both elevated, we're in "logic" territory
+            mean_phys = physical.mean().item()
+            mean_int = intellect.mean().item()
+            internal_morph = (mean_phys + mean_int) / 2.0
+            # Shift: Logic signal activates when internal > 0.4, saturates at 0.7
+            internal_morph = max(0.0, min(1.0, (internal_morph - 0.4) / 0.3))
+
+            # Combined morph factor (weighted average of external and internal)
+            morph = (
+                self.domain_morph_external_weight * external_morph +
+                self.domain_morph_internal_weight * internal_morph
+            ) / (self.domain_morph_external_weight + self.domain_morph_internal_weight)
+            morph = max(0.0, min(1.0, morph))
+
+            # Morphed thresholds (linear interpolation)
+            curr_phys_floor = self.domain_morph_phys_floor_min + morph * (
+                self.domain_morph_phys_floor_max - self.domain_morph_phys_floor_min
+            )
+            curr_bliss_ceil = self.domain_morph_bliss_ceil_max - morph * (
+                self.domain_morph_bliss_ceil_max - self.domain_morph_bliss_ceil_min
+            )
+            curr_push_weight = self.domain_morph_push_weight_min + morph * (
+                self.domain_morph_push_weight_max - self.domain_morph_push_weight_min
+            )
+
+            # Store for logging
+            self._current_morph = morph
+            self._current_domain = domain_label
+        else:
+            # No morphing - use base thresholds
+            curr_phys_floor = self.floor_physical
+            curr_bliss_ceil = self.ceiling_bliss
+            curr_push_weight = 3.0  # Default Physical push weight
+            morph = 0.0
+            domain_label = 'LANG'
 
         # === REFINEMENT 1: Temporal Grounding ===
         # Use Physical history, not just current token
@@ -618,20 +850,25 @@ class KoshaGyroscopicLoss(nn.Module):
 
         # === FLOOR VIOLATIONS: Push toward Sattvic Band ===
         # Priority weights per Gemini's Control Theory guidance:
-        # - Physical (Foundation): 3.0 (HIGH - must ground first)
+        # - Physical (Foundation): 3.0-5.0 (HIGH - morphed by domain)
         # - Intellect (Logic): 1.5 (MEDIUM)
         # - Mental (Insight): 1.0 (LOW)
         # - Bliss (Creativity): 1.0 (LOW)
         # - Vital: Uses momentum boost instead of loss
+        #
+        # v2.3.2: Physical Floor and Push Weight are MORPHED by domain:
+        # - Language Mode (μ=0): Floor=38.2%, Push=3.0×
+        # - Logic Mode (μ=1): Floor=50.0%, Push=5.0×
 
         # Mental Floor (23.6%): Spark Abstraction - push toward abstraction when too low
         mental_below_floor = F.relu(self.floor_mental - mental)
         mental_floor_loss = mental_below_floor.mean() * 1.0  # LOW priority
 
-        # Physical Floor (38.2%): Grounding Push - THE FOUNDATION
+        # Physical Floor (38.2%-50.0%): Grounding Push - THE FOUNDATION
+        # v2.3.2: Floor and push weight are morphed by domain
         # This is the most critical floor - model MUST ground before anything else
-        physical_below_floor = F.relu(self.floor_physical - physical)
-        physical_floor_loss = physical_below_floor.mean() * 3.0  # HIGH priority
+        physical_below_floor = F.relu(curr_phys_floor - physical)  # MORPHED floor
+        physical_floor_loss = physical_below_floor.mean() * curr_push_weight  # MORPHED weight
 
         # Intellect Floor (25.0%): Logic Pressure - push toward reasoning when too low
         intellect_below_floor = F.relu(self.floor_intellect - intellect)
@@ -688,10 +925,13 @@ class KoshaGyroscopicLoss(nn.Module):
         vital_momentum_damper = 1.0 - vital_resistance * 0.5  # Max 50% reduction at high Vital
         vital_ceiling_active = vital.mean() > self.ceiling_vital
 
-        # Bliss Ceiling (61.8%): Delusion Tether - reduce gain to force grounding
-        bliss_above_ceiling = F.relu(bliss - self.ceiling_bliss)
+        # Bliss Ceiling (61.8%-38.2%): Delusion Tether - reduce gain to force grounding
+        # v2.3.2: Ceiling is MORPHED by domain - tighter in Logic Mode
+        # - Language Mode (μ=0): Ceiling=61.8%
+        # - Logic Mode (μ=1): Ceiling=38.2%
+        bliss_above_ceiling = F.relu(bliss - curr_bliss_ceil)  # MORPHED ceiling
         bliss_delusion_loss = bliss_above_ceiling.mean()
-        bliss_ceiling_active = bliss.mean() > self.ceiling_bliss
+        bliss_ceiling_active = bliss.mean() > curr_bliss_ceil  # MORPHED check
 
         # Combined ceiling clamp scalar (multiplicative reduction)
         # Each ceiling violation compounds the gain reduction
@@ -706,8 +946,9 @@ class KoshaGyroscopicLoss(nn.Module):
         ceiling_clamp_scalar = self.ceiling_clamp_factor ** ceiling_violations_count
 
         # Floor violations count (for logging)
+        # v2.3.2: Physical floor uses MORPHED threshold
         mental_floor_active = mental.mean() < self.floor_mental
-        physical_floor_active = physical.mean() < self.floor_physical
+        physical_floor_active = physical.mean() < curr_phys_floor  # MORPHED
         intellect_floor_active = intellect.mean() < self.floor_intellect
         bliss_floor_active = bliss.mean() < self.floor_bliss
         floor_violations_count = (
@@ -719,8 +960,9 @@ class KoshaGyroscopicLoss(nn.Module):
         )
 
         # === AXIS 1: Mental -> Intellect (via Physical Gate) ===
-        # Physical Gate: Physical must be in Sattvic Band (38.2% - 61.8%) to open
-        phys_gate = torch.sigmoid((phys_history - self.floor_physical) * self.gate_steepness)
+        # Physical Gate: Physical must be in Sattvic Band (38.2%-50.0% to 61.8%) to open
+        # v2.3.2: Gate threshold uses MORPHED Physical Floor
+        phys_gate = torch.sigmoid((phys_history - curr_phys_floor) * self.gate_steepness)  # MORPHED
 
         # Rip signal fires when mentally trapped AND gate is CLOSED
         rip_signal = mental_trap * (1.0 - phys_gate)
@@ -845,6 +1087,14 @@ class KoshaGyroscopicLoss(nn.Module):
                 # VICReg metrics
                 'vicreg_target_std': self.vicreg_target_std,
                 'vicreg_variance_weight': self.vicreg_variance_weight,
+
+                # v2.3.2 REFLEXIVE DOMAIN MORPH metrics
+                'domain_morph_enabled': self.domain_morph_enabled,
+                'domain_label': domain_label,
+                'morph_factor': morph,
+                'curr_phys_floor': curr_phys_floor,
+                'curr_bliss_ceil': curr_bliss_ceil,
+                'curr_push_weight': curr_push_weight,
 
                 # Legacy compatibility
                 'vital_resistance_mean': vital_resistance.mean().item(),

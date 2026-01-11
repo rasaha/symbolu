@@ -7401,6 +7401,13 @@ class UnifiedTrainingConfig:
     # Clamp/Push factors (how strongly to correct deviations)
     gyroscope_floor_push_factor: float = 0.5      # Loss weight for floor violations
     gyroscope_ceiling_clamp_factor: float = 0.5   # Gain reduction for ceiling violations
+    # v2.3.2: Reflexive Domain Morph
+    # Combines external signal (token heuristics) with internal signal (Kosha state)
+    # to create a morph factor μ ∈ [0, 1] that adjusts Sattvic Bands in real-time.
+    gyroscope_domain_morph_enabled: bool = True   # Enable reflexive domain morphing
+    gyroscope_domain_morph_ema_decay: float = 0.9  # EMA decay for token heuristics
+    gyroscope_domain_morph_internal_weight: float = 0.5  # Weight for internal (Kosha) signal
+    gyroscope_domain_morph_external_weight: float = 0.5  # Weight for external (token) signal
     # v2.2.4: Three-Stage Hybrid Logic (Damping + Gate + Rip)
     gyroscope_damper_steepness: float = 5.0  # Sigmoid steepness for Bliss/Physical damper
     gyroscope_gate_steepness: float = 5.0    # Sigmoid steepness for Physical/Mental gate
@@ -10615,6 +10622,11 @@ def train(config: UnifiedTrainingConfig):
             # v2.3.0: Correction factors
             floor_push_factor=config.gyroscope_floor_push_factor,
             ceiling_clamp_factor=config.gyroscope_ceiling_clamp_factor,
+            # v2.3.2: Reflexive Domain Morph
+            domain_morph_enabled=config.gyroscope_domain_morph_enabled,
+            domain_morph_ema_decay=config.gyroscope_domain_morph_ema_decay,
+            domain_morph_internal_weight=config.gyroscope_domain_morph_internal_weight,
+            domain_morph_external_weight=config.gyroscope_domain_morph_external_weight,
             # Legacy thresholds (backward compatibility)
             trap_threshold=config.gyroscope_trap_threshold,
             gate_threshold=config.gyroscope_gate_threshold,
@@ -10661,6 +10673,11 @@ def train(config: UnifiedTrainingConfig):
             ceiling_bliss=config.gyroscope_ceiling_bliss,
             floor_push_factor=config.gyroscope_floor_push_factor,
             ceiling_clamp_factor=config.gyroscope_ceiling_clamp_factor,
+            # v2.3.2: Reflexive Domain Morph
+            domain_morph_enabled=config.gyroscope_domain_morph_enabled,
+            domain_morph_ema_decay=config.gyroscope_domain_morph_ema_decay,
+            domain_morph_internal_weight=config.gyroscope_domain_morph_internal_weight,
+            domain_morph_external_weight=config.gyroscope_domain_morph_external_weight,
             # Legacy thresholds
             trap_threshold=config.gyroscope_trap_threshold,
             gate_threshold=config.gyroscope_gate_threshold,
@@ -10686,15 +10703,18 @@ def train(config: UnifiedTrainingConfig):
             )
 
         print(f"\n  ╔══════════════════════════════════════════════════════════════════╗")
-        print(f"  ║  KOSHA GYROSCOPE v2.3.0: Complete Harmonic Pentad               ║")
+        print(f"  ║  KOSHA GYROSCOPE v2.3.2: Reflexive Domain Morph                 ║")
         print(f"  ╠══════════════════════════════════════════════════════════════════╣")
         print(f"  ║  Sattvic Bands (Floor → Ceiling):                               ║")
         print(f"  ║    Mental:    {config.gyroscope_floor_mental:.1%} → {config.gyroscope_ceiling_mental:.1%}  (Spark → Damper)          ║")
-        print(f"  ║    Physical:  {config.gyroscope_floor_physical:.1%} → {config.gyroscope_ceiling_physical:.1%}  (Ground → Trap)  ×3.0   ║")
+        print(f"  ║    Physical:  {config.gyroscope_floor_physical:.1%} → {config.gyroscope_ceiling_physical:.1%}  (Ground → Trap)  ×3-5   ║")
         print(f"  ║    Intellect: {config.gyroscope_floor_intellect:.1%} → {config.gyroscope_ceiling_intellect:.1%}  (Logic → Hubris) ×1.5  ║")
         print(f"  ║    Vital:     {config.gyroscope_floor_vital:.1%} → {config.gyroscope_ceiling_vital:.1%}  (Boost → Brake)          ║")
         print(f"  ║    Bliss:     {config.gyroscope_floor_bliss:.1%} → {config.gyroscope_ceiling_bliss:.1%}  (Spark → Tether)         ║")
         print(f"  ║  Correction: Floor Push×{config.gyroscope_floor_push_factor:.1f} | Ceiling Clamp×{config.gyroscope_ceiling_clamp_factor:.1f}           ║")
+        morph_status = "ENABLED" if config.gyroscope_domain_morph_enabled else "DISABLED"
+        print(f"  ║  Domain Morph: {morph_status} (EMA:{config.gyroscope_domain_morph_ema_decay:.1f})                       ║")
+        print(f"  ║    Internal:{config.gyroscope_domain_morph_internal_weight:.1f} | External:{config.gyroscope_domain_morph_external_weight:.1f} | Phys:38.2→50% | Bliss:61.8→38.2%║")
         print(f"  ║  Dynamic Weight Scheduler:                                       ║")
         print(f"  ║    Base Gain: {config.gyroscope_base_gain:.2f} (PPL > {config.gyroscope_ppl_ceiling:.0f})                                ║")
         print(f"  ║    Max Gain:  {config.gyroscope_max_gain:.2f} (PPL → {config.gyroscope_target_ppl:.0f})                                 ║")
@@ -11632,6 +11652,12 @@ def train(config: UnifiedTrainingConfig):
                             metrics['gyroscope_floor_push_loss'] = gyroscope_components.get('floor_push_loss', 0.0)
                             metrics['gyroscope_intellect_hubris_loss'] = gyroscope_components.get('intellect_hubris_loss', 0.0)
                             metrics['gyroscope_vital_momentum_boost'] = gyroscope_components.get('vital_momentum_boost', 1.0)
+                            # v2.3.2: Reflexive Domain Morph metrics
+                            metrics['gyroscope_domain_label'] = gyroscope_components.get('domain_label', 'LANG')
+                            metrics['gyroscope_morph_factor'] = gyroscope_components.get('morph_factor', 0.0)
+                            metrics['gyroscope_curr_phys_floor'] = gyroscope_components.get('curr_phys_floor', config.gyroscope_floor_physical)
+                            metrics['gyroscope_curr_bliss_ceil'] = gyroscope_components.get('curr_bliss_ceil', config.gyroscope_ceiling_bliss)
+                            metrics['gyroscope_curr_push_weight'] = gyroscope_components.get('curr_push_weight', 3.0)
 
                             # Capture Reality Rips for diagnostic logging
                             if kosha_rip_logger is not None:
@@ -12236,18 +12262,26 @@ def train(config: UnifiedTrainingConfig):
                         gyro_status = f"⏳{gyro_scale*100:.0f}%"
                     else:
                         gyro_status = "⚖️ON"
-                    # v2.3.0: Complete Harmonic Pentad - Show floors and ceilings
+                    # v2.3.2: Complete Harmonic Pentad with Reflexive Domain Morph
                     gyro_mental = metrics.get('gyroscope_mental_val', 0.0)
                     gyro_physical = metrics.get('gyroscope_physical_val', 0.0)
                     gyro_intellect = metrics.get('gyroscope_intellect_val', 0.0)
                     gyro_vital = metrics.get('gyroscope_vital_val', 0.0)
                     gyro_bliss = metrics.get('gyroscope_bliss_val', 0.0)
-                    # v2.3.0: Floor and Ceiling thresholds
+                    # v2.3.2: Domain Morph metrics
+                    domain_label = metrics.get('gyroscope_domain_label', 'LANG')
+                    morph_factor = metrics.get('gyroscope_morph_factor', 0.0)
+                    # v2.3.2: Use MORPHED thresholds for Physical Floor and Bliss Ceiling
+                    # These are dynamically adjusted based on domain detection
                     fl_m, cl_m = config.gyroscope_floor_mental, config.gyroscope_ceiling_mental
-                    fl_p, cl_p = config.gyroscope_floor_physical, config.gyroscope_ceiling_physical
+                    # Physical floor: base + morph * (max - base)
+                    fl_p = metrics.get('gyroscope_curr_phys_floor', config.gyroscope_floor_physical)
+                    cl_p = config.gyroscope_ceiling_physical
                     fl_i, cl_i = config.gyroscope_floor_intellect, config.gyroscope_ceiling_intellect
                     fl_v, cl_v = config.gyroscope_floor_vital, config.gyroscope_ceiling_vital
-                    fl_b, cl_b = config.gyroscope_floor_bliss, config.gyroscope_ceiling_bliss
+                    fl_b = config.gyroscope_floor_bliss
+                    # Bliss ceiling: base - morph * (base - min)
+                    cl_b = metrics.get('gyroscope_curr_bliss_ceil', config.gyroscope_ceiling_bliss)
                     # v2.3.0: Clamp status
                     ceiling_clamp = metrics.get('gyroscope_ceiling_clamp_scalar', 1.0)
                     floor_violations = metrics.get('gyroscope_floor_violations', 0)
@@ -12261,7 +12295,10 @@ def train(config: UnifiedTrainingConfig):
                             return f"{name}:{val:.0%}!"  # Above ceiling - clamp
                         else:
                             return f"{name}:{val:.0%}✓"  # In Sattvic band
+                    # v2.3.2: Include MODE indicator (LANG/MATH/CODE) and morph factor (μ)
+                    mode_indicator = f"MODE:{domain_label} (μ:{morph_factor:.0%})"
                     kosha_pentad = (
+                        f"{mode_indicator} | "
                         f"{kosha_fmt_v23(gyro_mental, fl_m, cl_m, 'M')} "
                         f"{kosha_fmt_v23(gyro_physical, fl_p, cl_p, 'P')} "
                         f"{kosha_fmt_v23(gyro_intellect, fl_i, cl_i, 'I')} "
@@ -13436,6 +13473,17 @@ def main():
                        help="v2.3.0: Loss weight for floor violations (push toward Sattvic)")
     parser.add_argument("--gyroscope_ceiling_clamp_factor", type=float, default=0.5,
                        help="v2.3.0: Gain reduction for ceiling violations (clamp toward Sattvic)")
+    # v2.3.2: Reflexive Domain Morph
+    parser.add_argument("--gyroscope_domain_morph_enabled", action="store_true", default=True,
+                       help="v2.3.2: Enable reflexive domain morphing (token heuristics + Kosha state)")
+    parser.add_argument("--disable_gyroscope_domain_morph", action="store_true",
+                       help="v2.3.2: Disable reflexive domain morphing")
+    parser.add_argument("--gyroscope_domain_morph_ema_decay", type=float, default=0.9,
+                       help="v2.3.2: EMA decay for token heuristics (0.9 = slow, 0.5 = fast)")
+    parser.add_argument("--gyroscope_domain_morph_internal_weight", type=float, default=0.5,
+                       help="v2.3.2: Weight for internal (Kosha state) signal")
+    parser.add_argument("--gyroscope_domain_morph_external_weight", type=float, default=0.5,
+                       help="v2.3.2: Weight for external (token heuristics) signal")
     # v2.2.4: Three-Stage Hybrid Logic (Damping + Gate + Rip)
     parser.add_argument("--gyroscope_damper_steepness", type=float, default=5.0,
                        help="v2.2.4: Sigmoid steepness for Bliss/Physical damper")
@@ -14047,6 +14095,11 @@ def main():
         gyroscope_ceiling_bliss=args.gyroscope_ceiling_bliss,
         gyroscope_floor_push_factor=args.gyroscope_floor_push_factor,
         gyroscope_ceiling_clamp_factor=args.gyroscope_ceiling_clamp_factor,
+        # v2.3.2: Reflexive Domain Morph
+        gyroscope_domain_morph_enabled=args.gyroscope_domain_morph_enabled and not args.disable_gyroscope_domain_morph,
+        gyroscope_domain_morph_ema_decay=args.gyroscope_domain_morph_ema_decay,
+        gyroscope_domain_morph_internal_weight=args.gyroscope_domain_morph_internal_weight,
+        gyroscope_domain_morph_external_weight=args.gyroscope_domain_morph_external_weight,
         # v2.2.4: Three-Stage Hybrid Logic
         gyroscope_damper_steepness=args.gyroscope_damper_steepness,
         gyroscope_gate_steepness=args.gyroscope_gate_steepness,

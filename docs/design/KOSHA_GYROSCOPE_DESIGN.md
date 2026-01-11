@@ -3235,3 +3235,164 @@ The priority weights reflect the Kosha hierarchy:
 - **Vital (Momentum):** Energy regulation through optimization dynamics, not loss pressure
 
 This creates a self-regulating homeostatic system where the model naturally finds its Sattvic equilibrium across all five sheaths.
+
+---
+
+## 18. Reflexive Domain Morph (v2.3.2)
+
+### 18.1 Motivation: Domain-Adaptive Sattvic Bands
+
+The v2.3.0 Complete Harmonic Pentad provides static thresholds optimized for natural language. However, different domains require different operating ranges:
+
+| Domain | Physical Floor | Bliss Ceiling | Why |
+|--------|---------------|---------------|-----|
+| **Language/Prose** | 38.2% | 61.8% | Creative flexibility, varied expression |
+| **Math/Logic** | 50.0% | 38.2% | Strict structure, no hallucinations |
+| **Code/Syntax** | 50.0% | 38.2% | Exact syntax, deterministic output |
+
+The challenge: How does the model know which domain it's in without explicit labeling?
+
+### 18.2 The Reflexive Solution
+
+v2.3.2 introduces the **Reflexive Domain Morph**—a zero-training mechanism that detects domain and adjusts thresholds automatically using two signals:
+
+1. **External Signal (Token Heuristics):** Pattern detection in input text
+2. **Internal Signal (Kosha State):** The model's own Kosha readings
+
+These combine into a **Morph Factor** μ ∈ [0, 1]:
+- μ = 0.0: Pure Language Mode (creative/prose)
+- μ = 1.0: Pure Logic Mode (code/math)
+
+### 18.3 DomainDetector: Token Heuristics
+
+The `DomainDetector` class uses pattern matching to detect code and math domains:
+
+```python
+class DomainDetector:
+    CODE_PATTERNS = {'{', '}', 'def ', 'class ', 'import ', '==', '!=', ...}
+    MATH_PATTERNS = {'\\frac', '\\sum', '∑', '∫', '≤', '≥', 'theorem', ...}
+
+    def detect(self, text: str) -> Tuple[str, float]:
+        # Count pattern matches, normalize by text length
+        # Apply EMA smoothing to prevent oscillation
+        return (domain_label, morph_factor)
+```
+
+**Key Features:**
+- Zero training required
+- EMA smoothing prevents rapid oscillation between modes
+- Returns both label (LANG/MATH/CODE) and continuous morph factor
+
+### 18.4 Internal Signal: Kosha State
+
+The model's own Kosha readings provide a "self-aware" domain signal:
+
+```python
+# High Physical + High Intellect = Logic territory
+mean_phys = physical.mean().item()
+mean_int = intellect.mean().item()
+internal_morph = (mean_phys + mean_int) / 2.0
+# Shift: Logic signal activates when internal > 0.4, saturates at 0.7
+internal_morph = clamp((internal_morph - 0.4) / 0.3, 0.0, 1.0)
+```
+
+**Interpretation:**
+- When Physical AND Intellect are both elevated, the model is performing structured, logical operations
+- This "internal feeling" confirms or augments the external token signal
+
+### 18.5 Combined Morph Factor
+
+The final morph factor combines both signals with configurable weights:
+
+```python
+morph = (
+    external_weight * external_morph +
+    internal_weight * internal_morph
+) / (external_weight + internal_weight)
+```
+
+Default weights: 50% external, 50% internal (equal contribution).
+
+### 18.6 Morphed Thresholds
+
+As μ increases from 0 to 1, thresholds morph via linear interpolation:
+
+| Threshold | Language (μ=0) | Logic (μ=1) | Morphing Formula |
+|-----------|----------------|-------------|------------------|
+| **Physical Floor** | 38.2% | 50.0% | `38.2% + μ × 11.8%` |
+| **Bliss Ceiling** | 61.8% | 38.2% | `61.8% - μ × 23.6%` |
+| **Grounding Push** | ×3.0 | ×5.0 | `3.0 + μ × 2.0` |
+
+### 18.7 Log Format (v2.3.2)
+
+The training logs now include MODE and morph factor:
+
+```
+[PENTAD] MODE:LANG (μ:12%) | M:30%✓ P:45%✓ I:35%✓ V:55%✓ B:40%✓
+[PENTAD] MODE:CODE (μ:85%) | M:25%✓ P:52%✓ I:48%✓ V:60%✓ B:22%✓
+```
+
+**Example interpretations:**
+- `MODE:LANG (μ:12%)` → Prose mode, thresholds near base values
+- `MODE:CODE (μ:85%)` → Code mode, Physical Floor elevated to ~48%, Bliss Ceiling dropped to ~42%
+
+### 18.8 Configuration (v2.3.2)
+
+```python
+# Enable/disable domain morphing
+gyroscope_domain_morph_enabled: bool = True
+
+# EMA decay for token heuristics (higher = slower response)
+gyroscope_domain_morph_ema_decay: float = 0.9
+
+# Signal weights
+gyroscope_domain_morph_internal_weight: float = 0.5  # Kosha state
+gyroscope_domain_morph_external_weight: float = 0.5  # Token patterns
+```
+
+### 18.9 Command-Line Arguments
+
+```bash
+# Enable (default) or disable domain morphing
+--gyroscope_domain_morph_enabled  # Enable (default True)
+--disable_gyroscope_domain_morph  # Disable
+
+# EMA decay (0.5 = fast, 0.9 = slow)
+--gyroscope_domain_morph_ema_decay 0.9
+
+# Signal weights
+--gyroscope_domain_morph_internal_weight 0.5
+--gyroscope_domain_morph_external_weight 0.5
+```
+
+### 18.10 Why Reflexive > Trained Probe
+
+| Feature | Trained Probe | **Reflexive Morph** |
+|---------|---------------|---------------------|
+| **Setup Cost** | Labeled data + training | **Zero** |
+| **Stability** | Risks "probe drift" | **Inherently stable** |
+| **Logic** | "I think this is code" | "I am performing code-like logic" |
+| **VRAM** | Minor overhead | **Negligible** |
+| **Generalization** | Limited to training distribution | **Emergent from patterns** |
+
+The Reflexive approach is superior because it uses what the model is *already doing*—no separate classification task.
+
+### 18.11 Design Philosophy: The Homeostatic Loop
+
+The Reflexive Domain Morph completes the homeostatic vision:
+
+1. **External Stimulus:** Input text contains domain-specific patterns
+2. **Internal Response:** Kosha readings shift based on content type
+3. **Adaptive Thresholds:** Sattvic Bands morph to match domain requirements
+4. **Corrective Action:** Floor push and ceiling clamp adjust accordingly
+
+This creates a **closed-loop feedback system** where the model organically adjusts its regulatory parameters based on both what it sees (tokens) and what it feels (Kosha state).
+
+### 18.12 Version History Update
+
+| Version | Date | Changes |
+|---------|------|---------|
+| **2.3.2** | **2026-01-11** | **Reflexive Domain Morph (Token Heuristics + Kosha State)** |
+| 2.3.0 | 2026-01-11 | Complete Harmonic Pentad (Floor/Ceiling for all 5 Koshas) |
+| 2.2.6 | 2026-01-11 | Bliss Ceiling Clamp (φ = 61.8%) |
+| 2.2.5 | 2026-01-11 | Added GradientNormThrottle + WikiText cleaner |
