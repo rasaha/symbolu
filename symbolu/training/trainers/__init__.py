@@ -14,6 +14,7 @@ from symbolu.training.trainers.router_trainer import (
     RouterTrainer,
     RouterTrainerConfig,
 )
+from symbolu.training.trainers.gradient_throttle import GradientNormThrottle
 
 __all__ = [
     "EmbeddingTrainer",
@@ -21,4 +22,5 @@ __all__ = [
     "TrainingMetrics",
     "RouterTrainer",
     "RouterTrainerConfig",
+    "GradientNormThrottle",
 ]
