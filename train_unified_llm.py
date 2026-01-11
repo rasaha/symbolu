@@ -11529,6 +11529,12 @@ def train(config: UnifiedTrainingConfig):
                             metrics['gyroscope_axis1_loss'] = gyroscope_components.get('axis1_loss', 0.0)
                             metrics['gyroscope_axis2_loss'] = gyroscope_components.get('axis2_loss', 0.0)
                             metrics['gyroscope_warmup_scale'] = warmup_scale
+                            # v2.2.4 diagnostic: trap detection values
+                            metrics['gyroscope_mental_trap'] = gyroscope_components.get('mental_trap_mean', 0.0)
+                            metrics['gyroscope_physical_trap'] = gyroscope_components.get('physical_trap_mean', 0.0)
+                            kosha_means = gyroscope_components.get('kosha_means', {})
+                            metrics['gyroscope_mental_val'] = kosha_means.get('mental', 0.0)
+                            metrics['gyroscope_physical_val'] = kosha_means.get('physical', 0.0)
 
                             # Capture Reality Rips for diagnostic logging
                             if kosha_rip_logger is not None:
@@ -12122,11 +12128,14 @@ def train(config: UnifiedTrainingConfig):
                         gyro_status = f"⏳{gyro_scale*100:.0f}%"
                     else:
                         gyro_status = "⚖️ON"
-                    # v2.2.4: Show PID authority factor when controller is active
+                    # v2.2.4: Show PID authority factor and trap diagnostics
+                    gyro_mental = metrics.get('gyroscope_mental_val', 0.0)
+                    gyro_physical = metrics.get('gyroscope_physical_val', 0.0)
+                    trap_thresh = config.gyroscope_trap_threshold
                     if authority_controller is not None:
-                        log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} (Base:{gyro_base_gain:.2f}×A:{gyro_auth:.2f}) | PPL→{config.gyroscope_target_ppl:.0f}"
+                        log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} (Base:{gyro_base_gain:.2f}×A:{gyro_auth:.2f}) | M:{gyro_mental:.0%} P:{gyro_physical:.0%} (trap>{trap_thresh:.0%})"
                     else:
-                        log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} | PPL→{config.gyroscope_target_ppl:.0f}"
+                        log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} | M:{gyro_mental:.0%} P:{gyro_physical:.0%} (trap>{trap_thresh:.0%})"
 
                 # v2.3.0: Vritti Resonance diagnostic logging (Phase 1 = read-only)
                 if vritti_resonance is not None and 'vritti_alignment' in metrics:
