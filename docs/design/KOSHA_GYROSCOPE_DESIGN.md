@@ -3006,9 +3006,232 @@ class GradientThrottleConfig:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **2.3.0** | **2026-01-11** | **Complete Harmonic Pentad (Floor/Ceiling for all 5 Koshas)** |
+| 2.2.6 | 2026-01-11 | Bliss Ceiling Clamp (φ = 61.8%) |
 | 2.2.5 | 2026-01-11 | Added GradientNormThrottle + WikiText cleaner |
 | 2.2.4 | 2026-01-10 | Three-Stage Hybrid Logic |
 | 2.2.3 | 2026-01-09 | Soft-Threshold Damping |
 | 2.2.1 | 2026-01-08 | Dynamic Weight Scheduler |
 | 2.2.0 | 2026-01-07 | Refinements (Vital Momentum, Temporal Grounding) |
 | 2.0.0 | 2026-01-05 | Inverted Curriculum + Vijnana Gate |
+
+---
+
+## 17. Complete Harmonic Pentad (v2.3.0)
+
+### 17.1 Motivation: The "Blissful Ignorance" Problem
+
+In v2.2.5, we observed Bliss consistently exceeding its 23.6% threshold (often at 40-60%), indicating the model was generating fluent but meaningless text—"blissful ignorance." The model learned to produce smooth, confident outputs without genuine understanding.
+
+v2.2.6 introduced a Bliss Ceiling Clamp at φ (61.8%), but this addressed only one Kosha. The Complete Harmonic Pentad extends this principle to ALL 5 Koshas with bidirectional regulation:
+
+- **Floor (Push):** When a Kosha falls BELOW its healthy range, add loss pressure to push it UP
+- **Ceiling (Clamp):** When a Kosha rises ABOVE its healthy range, reduce gain to clamp it DOWN
+
+### 17.2 The Sattvic Band Concept
+
+Each Kosha has a **Sattvic Band**—an optimal operating range where healthy learning occurs. Based on Fibonacci ratios:
+
+| Kosha | Floor | Ceiling | Sattvic Band | Priority |
+|-------|-------|---------|--------------|----------|
+| **Mental (M)** | 23.6% | 38.2% | Pattern recognition sweet spot | ×1.0 |
+| **Physical (P)** | 38.2% | 61.8% | Grounding foundation | ×3.0 (Foundation) |
+| **Intellect (I)** | 25.0% | 61.8% | Discriminative reasoning | ×1.5 (Hubris Tax) |
+| **Vital (V)** | 23.6% | 78.6% | Momentum/energy flow | Momentum Control |
+| **Bliss (B)** | 23.6% | 61.8% | Unified awareness | ×1.0 |
+
+### 17.3 Floor Actions (Push Mechanisms)
+
+When a Kosha falls BELOW its floor, we apply corrective pressure:
+
+#### Mental Floor (23.6%): Pattern Deficit Push
+```python
+mental_below_floor = F.relu(self.floor_mental - mental)
+mental_floor_loss = mental_below_floor.mean()  # Loss pressure to push UP
+```
+**Interpretation:** Low Mental indicates insufficient pattern recognition. Push to develop basic representational capacity.
+
+#### Physical Floor (38.2%): Grounding Foundation Push — THE FOUNDATION
+```python
+physical_below_floor = F.relu(self.floor_physical - physical)
+physical_floor_loss = physical_below_floor.mean() * 3.0  # HIGH priority (×3.0)
+```
+**Interpretation:** Physical is the foundation of the Kosha hierarchy. Without grounding, other Koshas cannot function properly. This gets the HIGHEST priority weight.
+
+#### Intellect Floor (25.0%): Reasoning Deficit Push — Hubris Tax
+```python
+intellect_below_floor = F.relu(self.floor_intellect - intellect)
+intellect_floor_loss = intellect_below_floor.mean() * 1.5  # Moderate priority (×1.5)
+```
+**Interpretation:** Low Intellect indicates superficial processing without discrimination. The "Hubris Tax" prevents the model from being overconfident without genuine understanding.
+
+#### Vital Floor (23.6%): Wake-up Momentum Boost
+```python
+vital_below_floor = F.relu(self.floor_vital - vital)
+vital_momentum_boost = torch.where(
+    vital_below_floor.mean() > 0,
+    torch.tensor(1.5),   # Boost momentum by 50%
+    torch.tensor(1.0)    # Normal momentum
+)
+```
+**Interpretation:** Low Vital indicates sluggish learning. Instead of loss pressure, we boost momentum to energize the optimization process.
+
+#### Bliss Floor (23.6%): Integration Deficit Push
+```python
+bliss_below_floor = F.relu(self.floor_bliss - bliss)
+bliss_floor_loss = bliss_below_floor.mean()  # Loss pressure to push UP
+```
+**Interpretation:** Low Bliss indicates fragmented processing without integration. Push to develop unified awareness.
+
+### 17.4 Ceiling Actions (Clamp Mechanisms)
+
+When a Kosha rises ABOVE its ceiling, we apply multiplicative damping:
+
+#### Mental Ceiling (38.2%): Pattern Trap Clamp
+Mental above 38.2% indicates over-reliance on memorized patterns. Clamp to encourage generalization.
+
+#### Physical Ceiling (61.8%): Over-Grounding Clamp
+Physical above 61.8% indicates excessive focus on literal/concrete representations. Clamp to allow abstract reasoning.
+
+#### Intellect Ceiling (61.8%): Over-Thinking Clamp
+Intellect above 61.8% indicates analysis paralysis or overthinking. Clamp to maintain practical coherence.
+
+#### Vital Ceiling (78.6%): Momentum Brake
+```python
+vital_above_ceiling = F.relu(vital - self.ceiling_vital)
+vital_momentum_brake = torch.where(
+    vital_above_ceiling.mean() > 0,
+    torch.tensor(0.5),   # Reduce momentum by 50%
+    torch.tensor(1.0)    # Normal momentum
+)
+```
+**Interpretation:** High Vital indicates chaotic, unstable optimization. Apply momentum brake to stabilize.
+
+#### Bliss Ceiling (61.8%): Blissful Ignorance Clamp
+Bliss above φ (61.8%) indicates "blissful ignorance"—fluent gibberish without substance. Clamp to ground outputs in meaning.
+
+### 17.5 Ceiling Clamp Scalar
+
+All ceiling violations contribute to a single multiplicative clamp:
+
+```python
+# Count total ceiling violations
+ceiling_violations = sum([
+    (mental > ceiling_mental).float(),
+    (physical > ceiling_physical).float(),
+    (intellect > ceiling_intellect).float(),
+    (vital > ceiling_vital).float(),
+    (bliss > ceiling_bliss).float()
+])
+
+# Multiplicative reduction: 0.5^N where N = number of violations
+ceiling_clamp_scalar = ceiling_clamp_factor ** ceiling_violations_count
+# 0 violations → 1.0 (full gain)
+# 1 violation  → 0.5 (half gain)
+# 2 violations → 0.25 (quarter gain)
+# etc.
+```
+
+### 17.6 Log Format (v2.3.0)
+
+The training logs show Kosha status with indicators:
+
+```
+[PENTAD] M:35%✓ P:45%✓ I:40%✓ V:50%✓ B:30%✓
+```
+
+| Symbol | Meaning |
+|--------|---------|
+| `✓` | In Sattvic Band (healthy) |
+| `_` | Below Floor (being pushed UP) |
+| `!` | Above Ceiling (being clamped DOWN) |
+
+**Example interpretations:**
+- `M:20%_` → Mental at 20%, below 23.6% floor, push active
+- `P:70%!` → Physical at 70%, above 61.8% ceiling, clamp active
+- `I:50%✓` → Intellect at 50%, within 25%-61.8% Sattvic band
+
+### 17.7 Configuration (v2.3.0)
+
+```python
+@dataclass
+class KoshaGyroscopeConfig:
+    """Configuration for Kosha Gyroscope v2.3.0."""
+
+    # === SATTVIC BANDS (Floor/Ceiling for each Kosha) ===
+
+    # Mental: Pattern recognition sweet spot
+    floor_mental: float = 0.236       # 23.6% (Fibonacci)
+    ceiling_mental: float = 0.382     # 38.2% (Fibonacci)
+
+    # Physical: Grounding foundation (THE FOUNDATION)
+    floor_physical: float = 0.382     # 38.2% (Fibonacci)
+    ceiling_physical: float = 0.618   # 61.8% (φ Golden Ratio)
+
+    # Intellect: Discriminative reasoning
+    floor_intellect: float = 0.250    # 25.0% (quarter point)
+    ceiling_intellect: float = 0.618  # 61.8% (φ Golden Ratio)
+
+    # Vital: Momentum/energy flow
+    floor_vital: float = 0.236        # 23.6% (Fibonacci)
+    ceiling_vital: float = 0.786      # 78.6% (Fibonacci)
+
+    # Bliss: Unified awareness
+    floor_bliss: float = 0.236        # 23.6% (Fibonacci)
+    ceiling_bliss: float = 0.618      # 61.8% (φ Golden Ratio)
+
+    # === CORRECTIVE FACTORS ===
+    floor_push_factor: float = 0.5    # Loss weight for floor violations
+    ceiling_clamp_factor: float = 0.5 # Multiplicative clamp per ceiling violation
+
+    # === PRIORITY WEIGHTS ===
+    # Physical: ×3.0 (Foundation)
+    # Intellect: ×1.5 (Hubris Tax)
+    # Others: ×1.0 (Standard)
+```
+
+### 17.8 Command-Line Arguments
+
+```bash
+# Floor thresholds
+--gyroscope-floor-mental 0.236
+--gyroscope-floor-physical 0.382
+--gyroscope-floor-intellect 0.250
+--gyroscope-floor-vital 0.236
+--gyroscope-floor-bliss 0.236
+
+# Ceiling thresholds
+--gyroscope-ceiling-mental 0.382
+--gyroscope-ceiling-physical 0.618
+--gyroscope-ceiling-intellect 0.618
+--gyroscope-ceiling-vital 0.786
+--gyroscope-ceiling-bliss 0.618
+
+# Corrective factors
+--gyroscope-floor-push-factor 0.5
+--gyroscope-ceiling-clamp-factor 0.5
+```
+
+### 17.9 Startup Banner
+
+```
+[GYRO] Kosha Gyroscope v2.3.0: Complete Harmonic Pentad
+       Sattvic Bands: M[23.6-38.2%] P[38.2-61.8%] I[25-61.8%] V[23.6-78.6%] B[23.6-61.8%]
+       Push Factor: 0.5 | Clamp Factor: 0.5
+       Priority: Physical(×3.0) Intellect(×1.5)
+```
+
+### 17.10 Design Philosophy
+
+The Complete Harmonic Pentad embodies the Yogic principle that each Kosha has its natural range:
+
+1. **Too Low (Tamas):** Sluggishness, deficiency, under-activation → Push UP with loss pressure
+2. **Sattvic Band (Sattva):** Balanced, healthy, optimal → No intervention
+3. **Too High (Rajas):** Over-activity, excess, instability → Clamp DOWN with gain reduction
+
+The priority weights reflect the Kosha hierarchy:
+- **Physical (×3.0):** The foundation must be stable before higher Koshas can develop
+- **Intellect (×1.5):** Prevents intellectual arrogance without grounding
+- **Vital (Momentum):** Energy regulation through optimization dynamics, not loss pressure
+
+This creates a self-regulating homeostatic system where the model naturally finds its Sattvic equilibrium across all five sheaths.
