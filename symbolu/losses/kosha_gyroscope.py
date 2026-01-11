@@ -1,15 +1,21 @@
 """
-Kosha Gyroscope: Homeostatic Self-Regulation Loss Module (v2.2.0)
+Kosha Gyroscope: Homeostatic Self-Regulation Loss Module (v2.2.1)
 
 This module implements the Vijnana-Gated Kosha Balance Loss, a homeostatic
 self-regulation mechanism that prevents pathological states (looping, fixation,
 mode collapse) by enforcing balance across the 5 Kosha (sheath) dimensions.
 
 Key Features:
+- Dynamic Weight Scheduler: PPL-based gain ramping (NEW in v2.2.1)
 - Vital Momentum: Dynamic gain based on Pranamaya energy
 - Temporal Grounding: Physical history over 3-token window
 - Vijnana Gate: Intellectual verification before state transitions
 - Diagonal Opposition: Mental <-> Intellect, Physical <-> Blissful
+
+v2.2.1 Dynamic Weight Scheduler:
+- base_gain (0.15): Gentle observation when PPL > 100
+- max_gain (3.0): Strict enforcement when PPL approaches 30
+- Prevents "Aphasia" (model afraid to repeat valid tokens early in training)
 
 R-T Quadrant Geometry:
 - Physical  (+,+): Manifest, Past
@@ -19,7 +25,7 @@ R-T Quadrant Geometry:
 - Vital: Energy/Momentum (not mapped to quadrant)
 
 References:
-- docs/design/KOSHA_GYROSCOPE_DESIGN.md v2.2.0
+- docs/design/KOSHA_GYROSCOPE_DESIGN.md v2.2.1
 - Taittiriya Upanishad (Pancha Kosha model)
 - Yoga Sutras of Patanjali (Dharana concept)
 """
@@ -34,11 +40,13 @@ import torch.nn.functional as F
 
 @dataclass
 class KoshaGyroscopeConfig:
-    """Configuration for Kosha Gyroscope with Inverted Curriculum.
+    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.2.1).
 
     The Inverted Curriculum paradigm:
     - Gyroscope: Active from start, disengages when fluent (PPL < 30)
     - Classification: Disabled at start, engages when fluent (PPL < 30)
+
+    v2.2.1 adds Dynamic Weight Scheduler to prevent "Aphasia" during early training.
     """
 
     # === INVERTED CURRICULUM ===
@@ -58,8 +66,14 @@ class KoshaGyroscopeConfig:
     gate_threshold: float = 0.30         # Minimum for gate activation
     balance_target: float = 0.25         # Required opposite activation
 
-    # Loss scaling
-    gain: float = 2.0                    # Base gain (increased for v2.2.0)
+    # === DYNAMIC WEIGHT SCHEDULER (v2.2.1) ===
+    base_gain: float = 0.15              # Gentle observation (PPL > 100)
+    max_gain: float = 3.0                # Strict enforcement (PPL -> 30)
+    ppl_ceiling: float = 100.0           # PPL above which gain stays at base
+    target_ppl: float = 30.0             # PPL at which gain reaches max
+
+    # Legacy: Static gain (deprecated, use base_gain/max_gain instead)
+    gain: float = 2.0                    # Fallback if dynamic gain disabled
     gain_rampdown_steps: int = 500       # Steps to ramp gain to 0 at disengage
     gate_temperature: float = 10.0       # Softness of gate (higher = sharper)
 
@@ -74,9 +88,10 @@ class KoshaGyroscopeConfig:
 
 class KoshaGyroscopicLoss(nn.Module):
     """
-    Vijnana-Gated Kosha Balance Loss (v2.2.0).
+    Vijnana-Gated Kosha Balance Loss (v2.2.1).
 
     Implements homeostatic regulation with:
+    - Dynamic Weight Scheduler: PPL-based gain ramping (NEW in v2.2.1)
     - Diagonal transitions: Mental <-> Intellect, Physical <-> Blissful
     - Vijnana Gate: Intellectual verification before state transitions
     - Vital Momentum: Dynamic gain based on Pranamaya energy
@@ -100,6 +115,11 @@ class KoshaGyroscopicLoss(nn.Module):
     Diagonal pairs are polar opposites:
     - Mental (looping) <-> Intellect (structure)
     - Physical (inertia) <-> Blissful (expansion)
+
+    Dynamic Weight Scheduler (v2.2.1):
+    - Phase A (PPL > 100): Gentle observation at base_gain (0.15)
+    - Phase B (PPL 100 -> 30): Linear ramp to max_gain (3.0)
+    - Phase C (PPL < 30): Gyroscope disengages, gain ramps to 0
     """
 
     def __init__(
@@ -108,7 +128,14 @@ class KoshaGyroscopicLoss(nn.Module):
         gate_threshold: float = 0.30,
         balance_target: float = 0.25,
         gate_temperature: float = 10.0,
-        gain: float = 2.0,
+        # Dynamic Weight Scheduler (v2.2.1)
+        base_gain: float = 0.15,
+        max_gain: float = 3.0,
+        ppl_ceiling: float = 100.0,
+        target_ppl: float = 30.0,
+        # Legacy static gain (fallback)
+        gain: Optional[float] = None,
+        # Refinements
         temporal_window: int = 3,
         vital_momentum_enabled: bool = True,
         vital_momentum_range: Tuple[float, float] = (0.5, 1.5),
@@ -121,7 +148,11 @@ class KoshaGyroscopicLoss(nn.Module):
             gate_threshold: Minimum activation for gate to be considered open
             balance_target: Target activation level for the opposite Kosha
             gate_temperature: Temperature for soft gate sigmoid (higher = sharper)
-            gain: Base multiplier for the loss
+            base_gain: Starting gain when PPL > ppl_ceiling (gentle observation)
+            max_gain: Maximum gain when PPL approaches target_ppl (strict enforcement)
+            ppl_ceiling: PPL above which gain stays at base_gain
+            target_ppl: PPL at which gain reaches max_gain
+            gain: Legacy static gain (deprecated, use base_gain/max_gain)
             temporal_window: Number of tokens to average for Physical history
             vital_momentum_enabled: Whether to use Vital for dynamic gain
             vital_momentum_range: (min, max) range for momentum scaler
@@ -131,7 +162,16 @@ class KoshaGyroscopicLoss(nn.Module):
         self.gate_threshold = gate_threshold
         self.balance_target = balance_target
         self.gate_temperature = gate_temperature
-        self.gain = gain
+
+        # Dynamic Weight Scheduler (v2.2.1)
+        self.base_gain = base_gain
+        self.max_gain = max_gain
+        self.ppl_ceiling = ppl_ceiling
+        self.target_ppl = target_ppl
+
+        # Legacy fallback
+        self._static_gain = gain if gain is not None else base_gain
+
         self.temporal_window = temporal_window
         self.vital_momentum_enabled = vital_momentum_enabled
         self.vital_min, self.vital_max = vital_momentum_range
@@ -208,9 +248,41 @@ class KoshaGyroscopicLoss(nn.Module):
 
         return momentum_scaler
 
+    def get_dynamic_gain(self, current_ppl: Optional[float] = None) -> float:
+        """
+        Compute dynamic gain based on current PPL (v2.2.1).
+
+        The gain ramps from base_gain to max_gain as PPL drops from
+        ppl_ceiling to target_ppl. This prevents "Aphasia" (model afraid
+        to repeat valid tokens) during early training.
+
+        Phase A (PPL > 100): Gentle observation at base_gain
+        Phase B (PPL 100 -> 30): Linear ramp to max_gain
+        Phase C (PPL < 30): Gain at max (but gyroscope should be disengaging)
+
+        Args:
+            current_ppl: Current validation perplexity. If None, returns base_gain.
+
+        Returns:
+            Dynamic gain value in range [base_gain, max_gain]
+        """
+        if current_ppl is None:
+            return self._static_gain
+
+        if current_ppl >= self.ppl_ceiling:
+            return self.base_gain
+
+        # Linear interpolation from base_gain to max_gain
+        # as PPL drops from ppl_ceiling to target_ppl
+        progress = (self.ppl_ceiling - current_ppl) / (self.ppl_ceiling - self.target_ppl)
+        progress = max(0.0, min(1.0, progress))
+
+        return self.base_gain + (progress * (self.max_gain - self.base_gain))
+
     def forward(
         self,
         kosha_states: torch.Tensor,
+        current_ppl: Optional[float] = None,
         return_components: bool = False
     ) -> torch.Tensor | Tuple[torch.Tensor, Dict[str, Any]]:
         """
@@ -224,6 +296,8 @@ class KoshaGyroscopicLoss(nn.Module):
         Args:
             kosha_states: [batch, seq, 5] Kosha activations normalized to [0, 1]
                          Indices: [Physical, Vital, Mental, Intellect, Blissful]
+            current_ppl: Current validation PPL for dynamic gain (v2.2.1).
+                        If None, uses static fallback gain.
             return_components: If True, also return diagnostic components
 
         Returns:
@@ -280,13 +354,17 @@ class KoshaGyroscopicLoss(nn.Module):
         missing_bliss = F.relu(self.balance_target - bliss)
         axis2_loss = (physical_trap * mental_gate * missing_bliss).mean()
 
-        # === Total Loss with Dynamic Gain ===
-        total_loss = (axis1_loss + axis2_loss) * self.gain * momentum_scaler
+        # === Total Loss with Dynamic Gain (v2.2.1) ===
+        # Get PPL-based dynamic gain
+        effective_gain = self.get_dynamic_gain(current_ppl)
+        total_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler
 
         if return_components:
             components = {
                 'axis1_loss': axis1_loss.item(),
                 'axis2_loss': axis2_loss.item(),
+                'effective_gain': effective_gain,
+                'current_ppl': current_ppl,
                 'momentum_scaler': momentum_scaler.item() if torch.is_tensor(momentum_scaler) else momentum_scaler,
                 'mental_trap_mean': mental_trap.mean().item(),
                 'physical_trap_mean': physical_trap.mean().item(),
