@@ -1,7 +1,7 @@
 # Kosha Gyroscope: Homeostatic Self-Regulation System
 
-**Version:** 2.2.5
-**Status:** Design Complete, Gradient Throttle + WikiText Cleaner Added
+**Version:** 2.3.4
+**Status:** Design Complete, Sequence Length Curriculum Added
 **Date:** 2026-01-11
 **Origin:** Vedic Kosha Theory + Control Theory + Constitutional AI
 **Curriculum:** Instructor-Led (Gyroscope ON) → Self-Learning (Gyroscope OFF at PPL < 30)
@@ -3861,9 +3861,144 @@ state_reg/saturation_alerts    # List of saturated dimensions
 
 | Version | Date | Changes |
 |---------|------|---------|
-| **2.3.3** | **2026-01-11** | **32D Sovereign State Regularizer (Anti-Saturation + VICReg)** |
+| **2.3.4** | **2026-01-11** | **Sequence Length Curriculum (Dynamic Ramping)** |
+| 2.3.3 | 2026-01-11 | 32D Sovereign State Regularizer (Anti-Saturation + VICReg) |
 | 2.3.2 | 2026-01-11 | Reflexive Domain Morph (Token Heuristics + Kosha State) |
 | 2.3.0 | 2026-01-10 | Complete Harmonic Pentad with Floor/Ceiling |
 | 2.2.5 | 2026-01-09 | Geometric Expansion (Sigmoid + VICReg) |
 | 2.2.4 | 2026-01-08 | Three-Stage Hybrid Logic |
 | 2.2.1 | 2026-01-07 | Dynamic Weight Scheduler |
+
+---
+
+## 21. Sequence Length Curriculum (v2.3.4)
+
+### 21.1 Problem Statement
+
+Training with long sequences from the start is inefficient:
+- **Slower updates**: Longer sequences = fewer batches per epoch
+- **VRAM pressure**: Long sequences consume more memory
+- **Gradient noise**: Early training doesn't benefit from long-range dependencies
+- **Syntax before semantics**: Grammar is learned from local context first
+
+### 21.2 Solution: Progressive Sequence Length Ramping
+
+Start with short sequences for fast syntax learning, then gradually increase to target length.
+
+```
+Step    0: seq_len = 256  (fast updates, grammar learning)
+Step 2500: seq_len = 640  (medium context, phrase structure)
+Step 5000: seq_len = 1024 (full context, long-range dependencies)
+```
+
+### 21.3 Benefits
+
+| Phase | Sequence Length | What's Learned | Tokens/sec |
+|-------|-----------------|----------------|------------|
+| Early | 256 | Word frequencies, basic syntax | HIGH |
+| Middle | 512-768 | Phrase structure, local coherence | MEDIUM |
+| Late | 1024+ | Long-range dependencies, discourse | LOWER |
+
+### 21.4 Implementation
+
+```python
+class SequenceLengthCurriculum:
+    def __init__(
+        self,
+        seq_len_start: int = 256,      # Starting sequence length
+        seq_len_end: int = 1024,       # Target sequence length
+        ramp_steps: int = 5000,        # Steps to reach full length
+        ramp_mode: str = "linear",     # "linear" or "exponential"
+        ppl_gate: float = 0.0,         # Only ramp when PPL < this (0 = step-based)
+    ):
+        ...
+
+    def get_seq_len(self, step: int, current_ppl: Optional[float] = None) -> int:
+        """Get current sequence length based on step and optionally PPL."""
+        if self.ramp_mode == "exponential":
+            # Faster early growth: 256 → 512 → 1024
+            ratio = self.seq_len_end / self.seq_len_start
+            new_seq_len = int(self.seq_len_start * (ratio ** progress))
+        else:
+            # Linear: 256 → 640 → 1024
+            new_seq_len = int(self.seq_len_start + (self.seq_len_end - self.seq_len_start) * progress)
+        return new_seq_len
+```
+
+### 21.5 Ramping Modes
+
+**Linear Mode** (default):
+```
+seq_len = start + (end - start) * (step / ramp_steps)
+
+Step 0:    256
+Step 2500: 640
+Step 5000: 1024
+```
+
+**Exponential Mode**:
+```
+seq_len = start * (end / start) ^ (step / ramp_steps)
+
+Step 0:    256
+Step 2500: 508  (faster early growth)
+Step 5000: 1024
+```
+
+### 21.6 PPL-Gated Ramping
+
+Optional: Only increase sequence length when PPL drops below a threshold.
+
+```python
+--seq_len_ppl_gate 200  # Only ramp when PPL < 200
+```
+
+This ensures the model has mastered current sequence length before extending.
+
+### 21.7 CLI Arguments
+
+```bash
+python train_unified_llm.py \
+    --enable_seq_curriculum \        # Enable sequence length ramping
+    --seq_len_start 256 \            # Starting sequence length
+    --seq_len_end 1024 \             # Target sequence length
+    --seq_len_ramp_steps 5000 \      # Steps to reach full length
+    --seq_len_ramp_mode linear \     # linear or exponential
+    --seq_len_ppl_gate 0.0           # PPL gate (0 = step-based only)
+```
+
+### 21.8 Dynamic Dataloader Reload
+
+When sequence length changes significantly (by 64+ tokens), the dataloader is automatically reloaded:
+
+```
+============================================================
+  📏 [SEQ CURRICULUM] Length Transition ↗️
+============================================================
+  Step 1000 | 256 → 320 tokens
+  Progress: 12.5% toward 1024
+  Mode: LINEAR
+============================================================
+  📏 [SEQ CURRICULUM] Reloading dataloader with seq_len=320...
+  ✅ Dataloader reloaded. Progress: 12.5%
+```
+
+### 21.9 Integration with Other Curricula
+
+The sequence length curriculum works alongside:
+- **PPL-Gated Curriculum** (auxiliary loss phases)
+- **Inverted Kosha Curriculum** (gyroscope engagement)
+
+Recommended order of engagement:
+1. **Sequence Length Curriculum**: Step 0 → 5000 (ramping)
+2. **Kosha Gyroscope**: PPL < 30 (disengages after grounding)
+3. **PPL-Gated Losses**: PPL thresholds (30 → 15 → 10)
+
+### 21.10 Expected Impact
+
+| Metric | Without Curriculum | With Curriculum |
+|--------|-------------------|-----------------|
+| Steps to PPL 100 | ~5000 | ~3000 |
+| Early Tok/s | 30,000 | 70,000+ |
+| VRAM Usage (early) | 70GB | 40GB |
+| Grammar Learning | Slow | Fast |
