@@ -11583,9 +11583,13 @@ def train(config: UnifiedTrainingConfig):
                             # v2.2.4 diagnostic: trap detection values
                             metrics['gyroscope_mental_trap'] = gyroscope_components.get('mental_trap_mean', 0.0)
                             metrics['gyroscope_physical_trap'] = gyroscope_components.get('physical_trap_mean', 0.0)
+                            # v2.2.5: Capture all 5 Kosha values for Fibonacci Pentad logging
                             kosha_means = gyroscope_components.get('kosha_means', {})
                             metrics['gyroscope_mental_val'] = kosha_means.get('mental', 0.0)
                             metrics['gyroscope_physical_val'] = kosha_means.get('physical', 0.0)
+                            metrics['gyroscope_intellect_val'] = kosha_means.get('intellect', 0.0)
+                            metrics['gyroscope_vital_val'] = kosha_means.get('vital', 0.0)
+                            metrics['gyroscope_bliss_val'] = kosha_means.get('bliss', 0.0)
 
                             # Capture Reality Rips for diagnostic logging
                             if kosha_rip_logger is not None:
@@ -12190,14 +12194,29 @@ def train(config: UnifiedTrainingConfig):
                         gyro_status = f"⏳{gyro_scale*100:.0f}%"
                     else:
                         gyro_status = "⚖️ON"
-                    # v2.2.4: Show PID authority factor and trap diagnostics
+                    # v2.2.5: Fibonacci Pentad - Show all 5 Koshas with per-Kosha thresholds
                     gyro_mental = metrics.get('gyroscope_mental_val', 0.0)
                     gyro_physical = metrics.get('gyroscope_physical_val', 0.0)
-                    trap_thresh = config.gyroscope_trap_threshold
+                    gyro_intellect = metrics.get('gyroscope_intellect_val', 0.0)
+                    gyro_vital = metrics.get('gyroscope_vital_val', 0.0)
+                    gyro_bliss = metrics.get('gyroscope_bliss_val', 0.0)
+                    # Fibonacci Pentad thresholds
+                    th_m = config.gyroscope_threshold_mental      # 38.2%
+                    th_p = config.gyroscope_threshold_physical    # 38.2%
+                    th_i = config.gyroscope_threshold_intellect   # 50.0%
+                    th_v = config.gyroscope_threshold_vital       # 78.6%
+                    th_b = config.gyroscope_threshold_bliss       # 23.6%
+                    # Format: Kosha%/Threshold% with indicator if exceeding
+                    def kosha_fmt(val, thresh, name):
+                        exceeded = "!" if val > thresh else ""
+                        return f"{name}:{val:.0%}/{thresh:.0%}{exceeded}"
+                    kosha_pentad = f"{kosha_fmt(gyro_mental, th_m, 'M')} {kosha_fmt(gyro_physical, th_p, 'P')} {kosha_fmt(gyro_intellect, th_i, 'I')} {kosha_fmt(gyro_vital, th_v, 'V')} {kosha_fmt(gyro_bliss, th_b, 'B')}"
                     if authority_controller is not None:
-                        log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} (Base:{gyro_base_gain:.2f}×A:{gyro_auth:.2f}) | M:{gyro_mental:.0%} P:{gyro_physical:.0%} (trap>{trap_thresh:.0%})"
+                        log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} (Base:{gyro_base_gain:.2f}×A:{gyro_auth:.2f})"
+                        log_msg += f"\n         [PENTAD] {kosha_pentad}"
                     else:
-                        log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} | M:{gyro_mental:.0%} P:{gyro_physical:.0%} (trap>{trap_thresh:.0%})"
+                        log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f}"
+                        log_msg += f"\n         [PENTAD] {kosha_pentad}"
 
                 # v2.3.0: Vritti Resonance diagnostic logging (Phase 1 = read-only)
                 if vritti_resonance is not None and 'vritti_alignment' in metrics:
