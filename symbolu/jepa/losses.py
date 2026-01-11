@@ -136,8 +136,8 @@ class WeightedAlignmentLoss(nn.Module):
 
     def __init__(
         self,
-        bhava_weight: float = 10.0,
-        semantic_weight: float = 1.0,
+        bhava_weight: float = 1.0,      # V9.6.8: Was 10.0 - caused mode collapse
+        semantic_weight: float = 5.0,   # V9.6.8: Was 1.0 - now prioritized
         guna_weight: float = 0.1,
         state_dim: int = 32,
     ):
