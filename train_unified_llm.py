@@ -5478,6 +5478,9 @@ class CurriculumController:
         self.phase_locked = False  # Prevent regression once SOVEREIGN reached
 
         # Default weight configurations - LM always dominant
+        # Note: use_sovereign_loss and enable_sovereign_loss control different loss paths:
+        # - use_sovereign_loss: Sovereign-1 hardened loss (Priority 2)
+        # - enable_sovereign_loss: Sovereign-Lagrangian B1/S3 (Priority 1)
         self.foundation_weights = foundation_weights or {
             'lm': 1.0,
             'bhava': 0.0,
@@ -5493,6 +5496,8 @@ class CurriculumController:
             'sovereign_r': 0.0,
             'sovereign_s': 0.0,
             'sovereign_c': 0.0,
+            'use_sovereign_loss': False,      # Disable Sovereign-1 loss
+            'enable_sovereign_loss': False,   # Disable Sovereign-Lagrangian loss
             'enable_srk': False,
             'enable_csr': False,
             'enable_jepa': False,
@@ -5517,6 +5522,8 @@ class CurriculumController:
             'sovereign_r': 0.0,
             'sovereign_s': 0.0,
             'sovereign_c': 0.0,
+            'use_sovereign_loss': False,      # Still disabled
+            'enable_sovereign_loss': False,
             'enable_srk': False,
             'enable_csr': False,
             'enable_jepa': False,
@@ -5541,6 +5548,8 @@ class CurriculumController:
             'sovereign_r': 0.0,
             'sovereign_s': 0.0,
             'sovereign_c': 0.0,
+            'use_sovereign_loss': False,      # Still disabled until SOVEREIGN
+            'enable_sovereign_loss': False,
             'enable_srk': False,
             'enable_csr': True,
             'enable_jepa': True,
@@ -5565,6 +5574,8 @@ class CurriculumController:
             'sovereign_r': 0.5,     # Reduced from 5.0!
             'sovereign_s': 0.2,     # Reduced from 2.0
             'sovereign_c': 0.1,     # Reduced from 0.5
+            'use_sovereign_loss': True,       # Enable in SOVEREIGN phase
+            'enable_sovereign_loss': False,   # Keep B1/S3 off (use Sovereign-1 instead)
             'enable_srk': True,
             'enable_csr': True,
             'enable_jepa': True,
@@ -5677,6 +5688,9 @@ class CurriculumController:
             'sovereign_weight_r': weights['sovereign_r'],
             'sovereign_weight_s': weights['sovereign_s'],
             'sovereign_weight_c': weights['sovereign_c'],
+            # Sovereign loss controls (critical for curriculum)
+            'use_sovereign_loss': weights['use_sovereign_loss'],
+            'enable_sovereign_loss': weights['enable_sovereign_loss'],
             # Boolean enables
             'enable_srk': weights['enable_srk'],
             'enable_csr': weights['enable_csr'],
