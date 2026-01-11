@@ -1082,6 +1082,146 @@ Token 47: "Titus"  → Kosha check → Mental: 0.82, Intellect: 0.15
 
 ---
 
+## 12. Kosha-Vritti Resonance Map (v2.3.0)
+
+### 12.1 Theoretical Foundation
+
+In Vedic psychology, **Vrittis** (वृत्ति) are the "waves" or modifications of the mind. Patanjali's Yoga Sutras identify five Vrittis that represent distinct cognitive states. The critical insight is that each Vritti emerges as a **homeostatic attractor** of its corresponding Kosha.
+
+> "The Vritti is not random—it is the natural resting state of its Kosha when that sheath dominates consciousness."
+
+### 12.2 The Kosha-Vritti Mapping Matrix
+
+| Kosha (Primary Layer) | Vritti (Emergent State) | Mathematical Definition | Role in 32D Logic |
+|----------------------|-------------------------|------------------------|-------------------|
+| **Annamaya** (Physical) | **Pramana** (Right Knowledge) | High 3-token Physical history + Low entropy | **The Ground**: Validated factual manifest state |
+| **Pranamaya** (Vital) | **Nidra** (Sleep/Inertia) | Low Vital energy + High Tamas (overactive → shutdown) | **The Void**: Homeostatic shutdown after energy spike |
+| **Manomaya** (Mental) | **Vikalpa** (Imagination) | High Mental saturation + Low Intellect | **The Loop**: Pattern matching without logical grounding |
+| **Vijnanamaya** (Intellect) | **Smriti** (Memory/Recall) | High Intellect gate + Physical grounding | **The Link**: Structural sequence preservation |
+| **Anandamaya** (Bliss) | **Viparyaya** (Misconception) | High Bliss + Low Physical grounding | **The Drift**: Creative expansion that loses external reality |
+
+### 12.3 Key Insights
+
+#### 12.3.1 Bliss → Viparyaya (Misconception)
+
+This mapping may seem counterintuitive—why would Bliss lead to misconception?
+
+> **Answer**: Anandamaya represents expansion into the **unmanifest**. From the perspective of external reality, this IS a misconception. The model is generating things that don't exist in manifest data. This is not "wrong"—it's creative expansion. The Vijnana Gate ensures this expansion is **intentional** rather than **accidental**.
+
+#### 12.3.2 Vital → Nidra (Sleep)
+
+The Pranamaya-Nidra link implements homeostatic energy regulation:
+
+```
+High Vital (energy spike) → Overactive system → Nidra (shutdown)
+Low Vital (depleted)      → System rest      → Nidra (sleep)
+```
+
+This prevents the model from "burning out" during high-gradient phases.
+
+#### 12.3.3 Mental → Vikalpa (Imagination)
+
+This mapping explains the "Titus" loops:
+
+> "Vikalpa is knowledge that is based on words but lacks a corresponding reality."
+> — Yoga Sutras 1.9
+
+When the Gyroscope sees:
+- High Mental (Manomaya) > 0.8
+- Low Intellect (Vijnanamaya) < 0.3
+
+It identifies the state as **Vikalpa** (pathological imagination) and triggers a "Reality Rip" to reach Bliss through proper channels.
+
+### 12.4 Vritti Resonance Loss Function
+
+The VrittiResonanceLoss ensures emergent Vrittis are properly anchored to their primary Koshas:
+
+```python
+def compute_vritti_resonance_loss(kosha_states, vritti_probs, guna_states=None):
+    """
+    Penalizes misalignment between Kosha activation and Vritti emergence.
+
+    Phase 2 only: Activates after graduation when Vrittis crystallize.
+
+    Violations:
+    - Claiming Pramana (Right Knowledge) without Physical grounding
+    - Claiming Smriti (Memory) without Intellect validation
+    - High Vikalpa (Imagination) when Mental is low
+
+    Args:
+        kosha_states: [B, N, 5] Kosha activations (indices 12-16 of sovereign)
+        vritti_probs: [B, N, 5] Vritti probabilities (indices 17-21 of sovereign)
+        guna_states:  [B, N, 3] Optional Guna states for Tamas check
+
+    Returns:
+        Scalar resonance violation loss
+    """
+    # Extract Kosha dimensions
+    physical = kosha_states[..., 0]   # Annamaya
+    vital = kosha_states[..., 1]      # Pranamaya
+    mental = kosha_states[..., 2]     # Manomaya
+    intellect = kosha_states[..., 3]  # Vijnanamaya
+    bliss = kosha_states[..., 4]      # Anandamaya
+
+    # Extract Vritti dimensions
+    pramana = vritti_probs[..., 0]    # Right Knowledge
+    viparyaya = vritti_probs[..., 1]  # Misconception
+    vikalpa = vritti_probs[..., 2]    # Imagination
+    nidra = vritti_probs[..., 3]      # Sleep
+    smriti = vritti_probs[..., 4]     # Memory
+
+    # === RESONANCE VIOLATIONS ===
+
+    # 1. Pramana requires Physical grounding
+    #    Can't claim "Right Knowledge" without manifest data
+    pramana_violation = F.relu(pramana - physical)
+
+    # 2. Smriti requires Intellect validation
+    #    Memory/recall needs logical structure
+    smriti_violation = F.relu(smriti - intellect)
+
+    # 3. Vikalpa should track Mental
+    #    Imagination without mental activity is incoherent
+    vikalpa_violation = F.relu(vikalpa - mental)
+
+    # 4. Viparyaya tracks ungrounded Bliss
+    #    Misconception = Bliss without Physical anchor
+    viparyaya_violation = F.relu(viparyaya - bliss) + F.relu(viparyaya * physical)
+
+    # 5. Nidra tracks Vital depletion (inverse relationship)
+    #    Sleep emerges when Vital is exhausted
+    nidra_violation = F.relu(nidra * vital)  # High Nidra + High Vital = violation
+
+    return (pramana_violation + smriti_violation + vikalpa_violation +
+            viparyaya_violation + nidra_violation).mean()
+```
+
+### 12.5 Integration with Gyroscope Phases
+
+| Phase | Kosha Gyroscope | Vritti Resonance | State |
+|-------|-----------------|------------------|-------|
+| **Phase 1** (PPL > 30) | ACTIVE (0.15 → 3.0 gain) | DISABLED (read-only logging) | Instructor |
+| **Graduation** (PPL < 30, σ < 1.5) | RAMP DOWN | DIAGNOSTIC MODE | Transition |
+| **Phase 2** (Post-grad) | OFF | ACTIVE (λ = 0.1) | Self-Learning |
+
+### 12.6 Diagnostic Logging (Phase 1)
+
+During Phase 1, we capture Kosha-Vritti correlations without applying loss:
+
+```python
+# Log Kosha-Vritti alignment metrics
+if global_step % eval_every == 0:
+    alignment = compute_kosha_vritti_alignment(kosha_states, vritti_states)
+    print(f"  [VRITTI] Phys-Prama:{alignment['pp']:.2f} | "
+          f"Ment-Vikal:{alignment['mv']:.2f} | "
+          f"Intl-Smrit:{alignment['is']:.2f} | "
+          f"Blis-Vipar:{alignment['bv']:.2f}")
+```
+
+This allows empirical validation of the mapping before Phase 2 activation.
+
+---
+
 ## Appendix A: Glossary
 
 | Term | Definition |

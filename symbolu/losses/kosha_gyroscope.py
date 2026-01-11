@@ -530,3 +530,251 @@ class InvertedCurriculumController:
             'graduated': self.graduated,
             'disengage_step': self.disengage_step,
         }
+
+
+# =============================================================================
+# Kosha-Vritti Resonance Loss (v2.3.0)
+# =============================================================================
+
+@dataclass
+class VrittiResonanceConfig:
+    """Configuration for Vritti Resonance Loss (Phase 2 only).
+
+    The Kosha-Vritti Mapping Matrix:
+    - Annamaya (Physical)   -> Pramana (Right Knowledge)
+    - Pranamaya (Vital)     -> Nidra (Sleep/Inertia)
+    - Manomaya (Mental)     -> Vikalpa (Imagination)
+    - Vijnanamaya (Intellect) -> Smriti (Memory)
+    - Anandamaya (Bliss)    -> Viparyaya (Misconception)
+    """
+
+    # Enable/disable individual resonance violations
+    enable_pramana_physical: bool = True   # Right Knowledge needs Physical grounding
+    enable_smriti_intellect: bool = True   # Memory needs Intellect validation
+    enable_vikalpa_mental: bool = True     # Imagination needs Mental activity
+    enable_viparyaya_bliss: bool = True    # Misconception tracks ungrounded Bliss
+    enable_nidra_vital: bool = True        # Sleep tracks Vital depletion
+
+    # Loss weighting
+    resonance_lambda: float = 0.1          # Weight for total resonance loss
+    pramana_weight: float = 1.0
+    smriti_weight: float = 1.0
+    vikalpa_weight: float = 1.0
+    viparyaya_weight: float = 0.5          # Lower weight - creative expansion is OK
+    nidra_weight: float = 0.5              # Lower weight - energy management
+
+    # Phase 2 only - don't activate until graduation
+    require_graduation: bool = True
+
+
+class VrittiResonanceLoss(nn.Module):
+    """
+    Kosha-Vritti Resonance Loss (v2.3.0).
+
+    Ensures emergent Vrittis are properly anchored to their primary Koshas.
+    This prevents the model from "mislabeling" its internal state—for example,
+    claiming Pramana (Right Knowledge) while actually in Vikalpa (Imagination Loop).
+
+    The Kosha-Vritti Mapping:
+    - Physical (Annamaya)   -> Pramana (Right Knowledge)
+    - Vital (Pranamaya)     -> Nidra (Sleep/Inertia) [inverse]
+    - Mental (Manomaya)     -> Vikalpa (Imagination)
+    - Intellect (Vijnanamaya) -> Smriti (Memory/Recall)
+    - Bliss (Anandamaya)    -> Viparyaya (Misconception)
+
+    Phase Integration:
+    - Phase 1 (PPL > 30): DISABLED (read-only logging)
+    - Phase 2 (PPL < 30): ACTIVE with resonance_lambda weight
+
+    Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 12
+    """
+
+    # Kosha indices (from 32D sovereign state [12:17])
+    PHYSICAL_IDX = 0    # Annamaya
+    VITAL_IDX = 1       # Pranamaya
+    MENTAL_IDX = 2      # Manomaya
+    INTELLECT_IDX = 3   # Vijnanamaya
+    BLISS_IDX = 4       # Anandamaya
+
+    # Vritti indices (from 32D sovereign state [17:22])
+    PRAMANA_IDX = 0     # Right Knowledge
+    VIPARYAYA_IDX = 1   # Misconception
+    VIKALPA_IDX = 2     # Imagination
+    NIDRA_IDX = 3       # Sleep
+    SMRITI_IDX = 4      # Memory
+
+    def __init__(
+        self,
+        config: Optional[VrittiResonanceConfig] = None,
+        resonance_lambda: float = 0.1,
+    ):
+        """
+        Initialize Vritti Resonance Loss.
+
+        Args:
+            config: Full configuration (overrides other args)
+            resonance_lambda: Weight for resonance loss (if config not provided)
+        """
+        super().__init__()
+
+        if config is not None:
+            self.config = config
+        else:
+            self.config = VrittiResonanceConfig(resonance_lambda=resonance_lambda)
+
+        self.active = not self.config.require_graduation  # Start inactive if Phase 2 only
+
+    def activate(self):
+        """Activate resonance loss (called at graduation)."""
+        self.active = True
+
+    def forward(
+        self,
+        kosha_states: torch.Tensor,
+        vritti_states: torch.Tensor,
+        return_components: bool = False
+    ) -> torch.Tensor | Tuple[torch.Tensor, Dict[str, Any]]:
+        """
+        Compute Vritti Resonance Loss.
+
+        Penalizes misalignment between Kosha activation and Vritti emergence.
+
+        Args:
+            kosha_states: [B, N, 5] or [B, 5] Kosha activations
+            vritti_states: [B, N, 5] or [B, 5] Vritti probabilities
+            return_components: If True, return diagnostic breakdown
+
+        Returns:
+            Scalar loss (0 if not active) or (loss, components_dict)
+        """
+        if not self.active:
+            if return_components:
+                return torch.tensor(0.0, device=kosha_states.device), {'active': False}
+            return torch.tensor(0.0, device=kosha_states.device)
+
+        # Handle both 2D and 3D tensors
+        if kosha_states.dim() == 2:
+            kosha_states = kosha_states.unsqueeze(1)
+        if vritti_states.dim() == 2:
+            vritti_states = vritti_states.unsqueeze(1)
+
+        # Extract Kosha dimensions
+        physical = kosha_states[..., self.PHYSICAL_IDX]
+        vital = kosha_states[..., self.VITAL_IDX]
+        mental = kosha_states[..., self.MENTAL_IDX]
+        intellect = kosha_states[..., self.INTELLECT_IDX]
+        bliss = kosha_states[..., self.BLISS_IDX]
+
+        # Extract Vritti dimensions
+        pramana = vritti_states[..., self.PRAMANA_IDX]
+        viparyaya = vritti_states[..., self.VIPARYAYA_IDX]
+        vikalpa = vritti_states[..., self.VIKALPA_IDX]
+        nidra = vritti_states[..., self.NIDRA_IDX]
+        smriti = vritti_states[..., self.SMRITI_IDX]
+
+        components = {'active': True}
+        total_loss = torch.tensor(0.0, device=kosha_states.device)
+
+        # === RESONANCE VIOLATIONS ===
+
+        # 1. Pramana (Right Knowledge) requires Physical grounding
+        #    Can't claim "Right Knowledge" without manifest data
+        if self.config.enable_pramana_physical:
+            pramana_violation = F.relu(pramana - physical).mean()
+            total_loss = total_loss + self.config.pramana_weight * pramana_violation
+            components['pramana_physical'] = pramana_violation.item()
+
+        # 2. Smriti (Memory) requires Intellect validation
+        #    Memory/recall needs logical structure
+        if self.config.enable_smriti_intellect:
+            smriti_violation = F.relu(smriti - intellect).mean()
+            total_loss = total_loss + self.config.smriti_weight * smriti_violation
+            components['smriti_intellect'] = smriti_violation.item()
+
+        # 3. Vikalpa (Imagination) should track Mental
+        #    Imagination without mental activity is incoherent
+        if self.config.enable_vikalpa_mental:
+            vikalpa_violation = F.relu(vikalpa - mental).mean()
+            total_loss = total_loss + self.config.vikalpa_weight * vikalpa_violation
+            components['vikalpa_mental'] = vikalpa_violation.item()
+
+        # 4. Viparyaya (Misconception) tracks ungrounded Bliss
+        #    Misconception = Bliss expanding without Physical anchor
+        if self.config.enable_viparyaya_bliss:
+            # Two conditions: Viparyaya without Bliss, OR Viparyaya with Physical (grounded != misconception)
+            viparyaya_violation = (
+                F.relu(viparyaya - bliss).mean() +
+                F.relu(viparyaya * physical).mean()  # Penalize grounded misconception
+            )
+            total_loss = total_loss + self.config.viparyaya_weight * viparyaya_violation
+            components['viparyaya_bliss'] = viparyaya_violation.item()
+
+        # 5. Nidra (Sleep) tracks Vital depletion (inverse relationship)
+        #    High Nidra + High Vital = violation (should be shutting down)
+        if self.config.enable_nidra_vital:
+            nidra_violation = F.relu(nidra * vital).mean()
+            total_loss = total_loss + self.config.nidra_weight * nidra_violation
+            components['nidra_vital'] = nidra_violation.item()
+
+        # Apply lambda scaling
+        total_loss = total_loss * self.config.resonance_lambda
+        components['total_loss'] = total_loss.item()
+
+        if return_components:
+            return total_loss, components
+        return total_loss
+
+    def compute_alignment_scores(
+        self,
+        kosha_states: torch.Tensor,
+        vritti_states: torch.Tensor
+    ) -> Dict[str, float]:
+        """
+        Compute Kosha-Vritti alignment scores for diagnostic logging.
+
+        Returns alignment in [0, 1] where 1 = perfect alignment.
+        This is the inverse of violation - high alignment = low violation.
+
+        Args:
+            kosha_states: [B, N, 5] or [B, 5] Kosha activations
+            vritti_states: [B, N, 5] or [B, 5] Vritti probabilities
+
+        Returns:
+            Dict of alignment scores for each Kosha-Vritti pair
+        """
+        # Handle both 2D and 3D tensors
+        if kosha_states.dim() == 2:
+            kosha_states = kosha_states.unsqueeze(1)
+        if vritti_states.dim() == 2:
+            vritti_states = vritti_states.unsqueeze(1)
+
+        # Extract dimensions
+        physical = kosha_states[..., self.PHYSICAL_IDX]
+        vital = kosha_states[..., self.VITAL_IDX]
+        mental = kosha_states[..., self.MENTAL_IDX]
+        intellect = kosha_states[..., self.INTELLECT_IDX]
+        bliss = kosha_states[..., self.BLISS_IDX]
+
+        pramana = vritti_states[..., self.PRAMANA_IDX]
+        viparyaya = vritti_states[..., self.VIPARYAYA_IDX]
+        vikalpa = vritti_states[..., self.VIKALPA_IDX]
+        nidra = vritti_states[..., self.NIDRA_IDX]
+        smriti = vritti_states[..., self.SMRITI_IDX]
+
+        # Compute correlations (alignment scores)
+        # Higher correlation = better alignment
+        def correlation(a: torch.Tensor, b: torch.Tensor) -> float:
+            a_flat = a.flatten()
+            b_flat = b.flatten()
+            if a_flat.std() < 1e-6 or b_flat.std() < 1e-6:
+                return 0.0
+            corr = torch.corrcoef(torch.stack([a_flat, b_flat]))[0, 1]
+            return corr.item() if not torch.isnan(corr) else 0.0
+
+        return {
+            'physical_pramana': correlation(physical, pramana),
+            'mental_vikalpa': correlation(mental, vikalpa),
+            'intellect_smriti': correlation(intellect, smriti),
+            'bliss_viparyaya': correlation(bliss, viparyaya),
+            'vital_nidra_inv': -correlation(vital, nidra),  # Inverse relationship
+        }

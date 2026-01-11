@@ -13,10 +13,14 @@ from symbolu.losses.kosha_gyroscope import (
     KoshaGyroscopicLoss,
     KoshaGyroscopeConfig,
     InvertedCurriculumController,
+    VrittiResonanceLoss,
+    VrittiResonanceConfig,
 )
 
 __all__ = [
     'KoshaGyroscopicLoss',
     'KoshaGyroscopeConfig',
     'InvertedCurriculumController',
+    'VrittiResonanceLoss',
+    'VrittiResonanceConfig',
 ]
