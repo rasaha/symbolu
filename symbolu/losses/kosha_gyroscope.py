@@ -1,16 +1,24 @@
 """
-Kosha Gyroscope: Homeostatic Self-Regulation Loss Module (v2.2.1)
+Kosha Gyroscope: Homeostatic Self-Regulation Loss Module (v2.2.3.1)
 
 This module implements the Vijnana-Gated Kosha Balance Loss, a homeostatic
 self-regulation mechanism that prevents pathological states (looping, fixation,
 mode collapse) by enforcing balance across the 5 Kosha (sheath) dimensions.
 
 Key Features:
-- Dynamic Weight Scheduler: PPL-based gain ramping (NEW in v2.2.1)
+- Soft-Threshold Damping: Shifted sigmoid gates eliminate "Reality Rips" (NEW in v2.2.3.1)
+- Dynamic Weight Scheduler: PPL-based gain ramping (v2.2.1)
 - Vital Momentum: Dynamic gain based on Pranamaya energy
 - Temporal Grounding: Physical history over 3-token window
 - Vijnana Gate: Intellectual verification before state transitions
 - Diagonal Opposition: Mental <-> Intellect, Physical <-> Blissful
+
+v2.2.3.1 Soft-Threshold Damping:
+- Replaces hard ReLU gates with shifted sigmoid for smooth gradient flow
+- Preserves "clean zero when healthy" property (unlike raw sigmoid)
+- steepness parameter (default 5.0) controls transition sharpness:
+  - Higher steepness (10.0): Sharper transitions, more like ReLU
+  - Lower steepness (2.0): Fluid transitions, maximum damping
 
 v2.2.1 Dynamic Weight Scheduler:
 - base_gain (0.15): Gentle observation when PPL > 100
@@ -25,7 +33,7 @@ R-T Quadrant Geometry:
 - Vital: Energy/Momentum (not mapped to quadrant)
 
 References:
-- docs/design/KOSHA_GYROSCOPE_DESIGN.md v2.2.1
+- docs/design/KOSHA_GYROSCOPE_DESIGN.md v2.2.3.1
 - Taittiriya Upanishad (Pancha Kosha model)
 - Yoga Sutras of Patanjali (Dharana concept)
 """
@@ -40,12 +48,13 @@ import torch.nn.functional as F
 
 @dataclass
 class KoshaGyroscopeConfig:
-    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.2.1).
+    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.2.3.1).
 
     The Inverted Curriculum paradigm:
     - Gyroscope: Active from start, disengages when fluent (PPL < 30)
     - Classification: Disabled at start, engages when fluent (PPL < 30)
 
+    v2.2.3.1 adds Soft-Threshold Damping to eliminate "Reality Rips".
     v2.2.1 adds Dynamic Weight Scheduler to prevent "Aphasia" during early training.
     """
 
@@ -65,6 +74,10 @@ class KoshaGyroscopeConfig:
     trap_threshold: float = 0.75         # Kosha saturation point
     gate_threshold: float = 0.30         # Minimum for gate activation
     balance_target: float = 0.25         # Required opposite activation
+
+    # === SOFT-THRESHOLD DAMPING (v2.2.3.1) ===
+    steepness: float = 5.0               # Transition sharpness (lower = more damping)
+                                         # 2.0 = fluid, 5.0 = balanced, 10.0 = sharp
 
     # === DYNAMIC WEIGHT SCHEDULER (v2.2.1) ===
     base_gain: float = 0.15              # Gentle observation (PPL > 100)
@@ -88,10 +101,11 @@ class KoshaGyroscopeConfig:
 
 class KoshaGyroscopicLoss(nn.Module):
     """
-    Vijnana-Gated Kosha Balance Loss (v2.2.1).
+    Vijnana-Gated Kosha Balance Loss (v2.2.3.1).
 
     Implements homeostatic regulation with:
-    - Dynamic Weight Scheduler: PPL-based gain ramping (NEW in v2.2.1)
+    - Soft-Threshold Damping: Shifted sigmoid gates (NEW in v2.2.3.1)
+    - Dynamic Weight Scheduler: PPL-based gain ramping (v2.2.1)
     - Diagonal transitions: Mental <-> Intellect, Physical <-> Blissful
     - Vijnana Gate: Intellectual verification before state transitions
     - Vital Momentum: Dynamic gain based on Pranamaya energy
@@ -116,6 +130,12 @@ class KoshaGyroscopicLoss(nn.Module):
     - Mental (looping) <-> Intellect (structure)
     - Physical (inertia) <-> Blissful (expansion)
 
+    Soft-Threshold Damping (v2.2.3.1):
+    - Replaces hard ReLU gates with shifted sigmoid for continuous gradients
+    - Eliminates "Reality Rips" (gradient explosions from simultaneous gate activation)
+    - steepness parameter controls transition sharpness (default 5.0)
+    - Preserves "clean zero when healthy" property via shifted sigmoid
+
     Dynamic Weight Scheduler (v2.2.1):
     - Phase A (PPL > 100): Gentle observation at base_gain (0.15)
     - Phase B (PPL 100 -> 30): Linear ramp to max_gain (3.0)
@@ -128,6 +148,8 @@ class KoshaGyroscopicLoss(nn.Module):
         gate_threshold: float = 0.30,
         balance_target: float = 0.25,
         gate_temperature: float = 10.0,
+        # Soft-Threshold Damping (v2.2.3.1)
+        steepness: float = 5.0,
         # Dynamic Weight Scheduler (v2.2.1)
         base_gain: float = 0.15,
         max_gain: float = 3.0,
@@ -148,6 +170,8 @@ class KoshaGyroscopicLoss(nn.Module):
             gate_threshold: Minimum activation for gate to be considered open
             balance_target: Target activation level for the opposite Kosha
             gate_temperature: Temperature for soft gate sigmoid (higher = sharper)
+            steepness: Transition sharpness for soft thresholds (v2.2.3.1)
+                       Lower = more damping (2.0 fluid), Higher = sharper (10.0 rip-like)
             base_gain: Starting gain when PPL > ppl_ceiling (gentle observation)
             max_gain: Maximum gain when PPL approaches target_ppl (strict enforcement)
             ppl_ceiling: PPL above which gain stays at base_gain
@@ -162,6 +186,9 @@ class KoshaGyroscopicLoss(nn.Module):
         self.gate_threshold = gate_threshold
         self.balance_target = balance_target
         self.gate_temperature = gate_temperature
+
+        # Soft-Threshold Damping (v2.2.3.1)
+        self.steepness = steepness
 
         # Dynamic Weight Scheduler (v2.2.1)
         self.base_gain = base_gain
@@ -248,6 +275,62 @@ class KoshaGyroscopicLoss(nn.Module):
 
         return momentum_scaler
 
+    def _soft_threshold(
+        self,
+        x: torch.Tensor,
+        threshold: float
+    ) -> torch.Tensor:
+        """
+        Soft threshold with shifted sigmoid (v2.2.3.1).
+
+        Provides smooth transition at threshold while preserving "clean zero"
+        property below threshold. Unlike raw sigmoid which outputs ~0.5 at
+        threshold and never reaches 0, this shifted version:
+        - Outputs 0 when x <= threshold
+        - Smoothly ramps to 1.0 as x exceeds threshold
+        - Has continuous gradients everywhere (no "Reality Rips")
+
+        The shift maps sigmoid(0) -> 0 instead of sigmoid(0) -> 0.5:
+            shifted = clamp(2.0 * (sigmoid(z) - 0.5), min=0)
+
+        Args:
+            x: Input tensor of activations
+            threshold: Activation level to detect crossing
+
+        Returns:
+            Soft threshold output in range [0, 1]
+        """
+        z = (x - threshold) * self.steepness
+        raw_sigmoid = torch.sigmoid(z)
+        # Shift: sigmoid(0)=0.5 -> 0, sigmoid(inf)=1.0 -> 1.0
+        # clamp ensures we don't go negative when x << threshold
+        return torch.clamp(2.0 * (raw_sigmoid - 0.5), min=0.0)
+
+    def _soft_deficit(
+        self,
+        x: torch.Tensor,
+        target: float
+    ) -> torch.Tensor:
+        """
+        Soft deficit detection with shifted sigmoid (v2.2.3.1).
+
+        Detects how far below target an activation is, with smooth transitions.
+        Like _soft_threshold but inverted:
+        - Outputs 0 when x >= target (no deficit)
+        - Smoothly ramps to 1.0 as x falls below target
+        - Has continuous gradients everywhere
+
+        Args:
+            x: Input tensor of activations
+            target: Target activation level
+
+        Returns:
+            Soft deficit output in range [0, 1]
+        """
+        z = (target - x) * self.steepness
+        raw_sigmoid = torch.sigmoid(z)
+        return torch.clamp(2.0 * (raw_sigmoid - 0.5), min=0.0)
+
     def get_dynamic_gain(self, current_ppl: Optional[float] = None) -> float:
         """
         Compute dynamic gain based on current PPL (v2.2.1).
@@ -329,12 +412,12 @@ class KoshaGyroscopicLoss(nn.Module):
         #
         # If Mental HIGH + Intellect LOW + Physical grounded -> PUNISH (break the loop)
         # If Mental HIGH + Intellect HIGH -> ALLOW (valid focus, Dharana)
+        #
+        # v2.2.3.1: Shifted sigmoid for all gates (smooth transitions, clean zeros)
 
-        mental_trap = F.relu(mental - self.trap_threshold)
-        phys_gate = torch.sigmoid(
-            self.gate_temperature * (phys_history - self.gate_threshold)
-        )
-        missing_intellect = F.relu(self.balance_target - intellect)
+        mental_trap = self._soft_threshold(mental, self.trap_threshold)
+        phys_gate = self._soft_threshold(phys_history, self.gate_threshold)
+        missing_intellect = self._soft_deficit(intellect, self.balance_target)
         axis1_loss = (mental_trap * phys_gate * missing_intellect).mean()
 
         # --- AXIS 2: Physical -> Blissful (via Mental) ---
@@ -346,12 +429,12 @@ class KoshaGyroscopicLoss(nn.Module):
         # - Mental Gate = check if model has abstracted the pattern
         #
         # If Physical HIGH + Bliss LOW + Mental abstracted -> PUNISH (force creativity)
+        #
+        # v2.2.3.1: Shifted sigmoid for all gates (smooth transitions, clean zeros)
 
-        physical_trap = F.relu(physical - self.trap_threshold)
-        mental_gate = torch.sigmoid(
-            self.gate_temperature * (mental - self.gate_threshold)
-        )
-        missing_bliss = F.relu(self.balance_target - bliss)
+        physical_trap = self._soft_threshold(physical, self.trap_threshold)
+        mental_gate = self._soft_threshold(mental, self.gate_threshold)
+        missing_bliss = self._soft_deficit(bliss, self.balance_target)
         axis2_loss = (physical_trap * mental_gate * missing_bliss).mean()
 
         # === Total Loss with Dynamic Gain (v2.2.1) ===
@@ -360,6 +443,11 @@ class KoshaGyroscopicLoss(nn.Module):
         total_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler
 
         if return_components:
+            # v2.2.3.1: Compute soft saturation level for diagnostics
+            # This measures how "activated" the combined gates are
+            axis1_saturation = (mental_trap * phys_gate * missing_intellect).mean()
+            axis2_saturation = (physical_trap * mental_gate * missing_bliss).mean()
+
             components = {
                 'axis1_loss': axis1_loss.item(),
                 'axis2_loss': axis2_loss.item(),
@@ -373,6 +461,10 @@ class KoshaGyroscopicLoss(nn.Module):
                 'missing_intellect_mean': missing_intellect.mean().item(),
                 'missing_bliss_mean': missing_bliss.mean().item(),
                 'vital_mean': vital.mean().item(),
+                # v2.2.3.1: Soft-threshold damping metrics
+                'steepness': self.steepness,
+                'axis1_saturation': axis1_saturation.item(),
+                'axis2_saturation': axis2_saturation.item(),
                 'kosha_means': {
                     'physical': physical.mean().item(),
                     'vital': vital.mean().item(),

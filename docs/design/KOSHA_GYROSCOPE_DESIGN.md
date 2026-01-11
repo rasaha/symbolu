@@ -1396,6 +1396,106 @@ When phase correction is applied during inference:
 
 ---
 
+## 14. Soft-Threshold Damping (v2.2.3.1)
+
+### 14.1 The Problem: Reality Rips
+
+In v2.2.1, the gyroscope used hard ReLU gates for trap detection:
+
+```python
+# v2.2.1: Hard ReLU gates
+mental_trap = F.relu(mental - 0.75)  # 0 until 0.75, then linear
+missing_intellect = F.relu(0.25 - intellect)  # 0 until below 0.25
+axis1_loss = (mental_trap * phys_gate * missing_intellect).mean()
+```
+
+**The Issue**: When multiple ReLU gates cross their thresholds simultaneously,
+the loss jumps from 0 to a non-zero value instantly. This creates:
+
+1. **Gradient Discontinuity**: Sharp corner in loss landscape
+2. **Reality Rips**: Violent over-corrections in embedding space
+3. **Hysteresis Buildup**: Pressure accumulates behind temporal gates, releases violently
+
+### 14.2 The Solution: Shifted Sigmoid
+
+v2.2.3.1 replaces all ReLU gates with **shifted sigmoid** functions:
+
+```python
+# v2.2.3.1: Shifted sigmoid (smooth but clean zeros)
+def _soft_threshold(self, x, threshold):
+    z = (x - threshold) * self.steepness
+    raw_sigmoid = torch.sigmoid(z)
+    return torch.clamp(2.0 * (raw_sigmoid - 0.5), min=0.0)
+```
+
+**Key Properties**:
+- **Below threshold**: Approaches 0 (clean zero when healthy)
+- **At threshold**: Exactly 0 (preserves ReLU semantics)
+- **Above threshold**: Smooth ramp to 1.0
+- **Everywhere**: Continuous gradients (no "rips")
+
+### 14.3 Steepness Parameter
+
+The `steepness` parameter controls transition sharpness:
+
+| Steepness | Behavior | Use Case |
+|-----------|----------|----------|
+| **2.0** | Fluid, very smooth transitions | Maximum damping, early training |
+| **5.0** | Balanced (default) | Standard operation |
+| **10.0** | Sharp, ReLU-like | Fast response, post-graduation |
+
+```bash
+# Training command with soft-threshold damping
+python train_unified_llm.py \
+    --enable_kosha_gyroscope \
+    --gyroscope_steepness 5.0  # Default, adjust for more/less damping
+```
+
+### 14.4 Mathematical Comparison
+
+**State Transition Analysis (Mental at trap threshold)**:
+
+| mental | ReLU output | Shifted Sigmoid (s=5.0) |
+|--------|-------------|-------------------------|
+| 0.50 | 0.000 | 0.000 |
+| 0.70 | 0.000 | 0.000 |
+| 0.75 | 0.000 | 0.000 |
+| 0.80 | 0.050 | 0.462 |
+| 0.90 | 0.150 | 0.817 |
+| 1.00 | 0.250 | 0.924 |
+
+The shifted sigmoid preserves:
+- **Clean zero** when healthy (unlike raw sigmoid which outputs ~0.22 at 0.50)
+- **Smooth transition** above threshold (unlike ReLU's sharp corner)
+
+### 14.5 Fluidity Events (Soft Diagnostics)
+
+v2.2.3.1 adds `FluidityEvent` for soft saturation tracking:
+
+```python
+# New diagnostic: capture_fluidity() instead of capture_rip()
+if logger.capture_fluidity(step, tokens, kosha_states, loss_components):
+    print(f"Soft saturation #{logger.fluidity_count} captured!")
+```
+
+**FluidityEvent Fields**:
+- `axis1_saturation`: Combined soft gate activation (Axis 1)
+- `axis2_saturation`: Combined soft gate activation (Axis 2)
+- `combined_saturation`: Max of both axes
+- `steepness`: Current damping steepness
+
+### 14.6 Version History
+
+| Version | Feature | Status |
+|---------|---------|--------|
+| v2.2.0 | Temporal Grounding, Vital Momentum | Released |
+| v2.2.1 | Dynamic Weight Scheduler | Released |
+| v2.3.0 | Kosha-Vritti Resonance Map | Released |
+| v2.4.0 | Kosha Phase Corrector (Inference) | Released |
+| **v2.2.3.1** | **Soft-Threshold Damping** | **Current** |
+
+---
+
 ## Appendix A: Glossary
 
 | Term | Definition |
