@@ -1,29 +1,29 @@
 """
-Kosha Gyroscope: Homeostatic Self-Regulation Loss Module (v2.2.3.1)
+Kosha Gyroscope: Homeostatic Self-Regulation Loss Module (v2.2.4)
 
 This module implements the Vijnana-Gated Kosha Balance Loss, a homeostatic
 self-regulation mechanism that prevents pathological states (looping, fixation,
 mode collapse) by enforcing balance across the 5 Kosha (sheath) dimensions.
 
-Key Features:
-- Soft-Threshold Damping: Shifted sigmoid gates eliminate "Reality Rips" (NEW in v2.2.3.1)
-- Dynamic Weight Scheduler: PPL-based gain ramping (v2.2.1)
-- Vital Momentum: Dynamic gain based on Pranamaya energy
-- Temporal Grounding: Physical history over 3-token window
-- Vijnana Gate: Intellectual verification before state transitions
-- Diagonal Opposition: Mental <-> Intellect, Physical <-> Blissful
+Key Features (v2.2.4 - Three-Stage Hybrid Logic):
+- Bliss Damper (Sigmoid): Dilutes creative expansion during Mental dominance
+- Physical Gate (Strict): Prerequisites for Intellectual activation (no bypass)
+- Hard ReLU Rip: Reality Reversal when trapped with gate closed
+- Two-Path Loss: intellect_path + rip_signal for distinct behaviors
 
-v2.2.3.1 Soft-Threshold Damping:
-- Replaces hard ReLU gates with shifted sigmoid for smooth gradient flow
-- Preserves "clean zero when healthy" property (unlike raw sigmoid)
-- steepness parameter (default 5.0) controls transition sharpness:
-  - Higher steepness (10.0): Sharper transitions, more like ReLU
-  - Lower steepness (2.0): Fluid transitions, maximum damping
+v2.2.4 "Pressure Relief Valve" Architecture:
+- Damping manages the "volume" of Mental state
+- Ripping acts as "pressure relief valve" forcing hard shift to Physical grounding
+- Model cannot "reason" in a vacuum - must be grounded in manifest data first
 
-v2.2.1 Dynamic Weight Scheduler:
-- base_gain (0.15): Gentle observation when PPL > 100
-- max_gain (3.0): Strict enforcement when PPL approaches 30
-- Prevents "Aphasia" (model afraid to repeat valid tokens early in training)
+Three-Stage Internal Process:
+1. Mental Dominance (Damper): High Mental → Blissful activation diluted
+2. Physical Gate (Prerequisite): Intellect blocked unless Physical history saturated
+3. Reality Rip (Reversal): Trap + Gate Closed → ReLU shock forces re-grounding
+
+Previous Versions:
+- v2.2.3.1: Soft-threshold damping (gate bypass approach - deprecated)
+- v2.2.1: Dynamic Weight Scheduler (PPL-based gain ramping - retained)
 
 R-T Quadrant Geometry:
 - Physical  (+,+): Manifest, Past
@@ -33,7 +33,7 @@ R-T Quadrant Geometry:
 - Vital: Energy/Momentum (not mapped to quadrant)
 
 References:
-- docs/design/KOSHA_GYROSCOPE_DESIGN.md v2.2.3.1
+- docs/design/KOSHA_GYROSCOPE_DESIGN.md v2.2.4
 - Taittiriya Upanishad (Pancha Kosha model)
 - Yoga Sutras of Patanjali (Dharana concept)
 """
@@ -48,14 +48,18 @@ import torch.nn.functional as F
 
 @dataclass
 class KoshaGyroscopeConfig:
-    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.2.3.1).
+    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.2.4).
 
     The Inverted Curriculum paradigm:
     - Gyroscope: Active from start, disengages when fluent (PPL < 30)
     - Classification: Disabled at start, engages when fluent (PPL < 30)
 
-    v2.2.3.1 adds Soft-Threshold Damping to eliminate "Reality Rips".
-    v2.2.1 adds Dynamic Weight Scheduler to prevent "Aphasia" during early training.
+    v2.2.4 Three-Stage Hybrid Logic:
+    1. Bliss Damper (Sigmoid): Dilutes creative expansion during Mental dominance
+    2. Physical Gate (Strict): Intellect requires Physical grounding (no bypass!)
+    3. Hard ReLU Rip: Reality Reversal when trapped + gate closed
+
+    v2.2.1 Dynamic Weight Scheduler retained for PPL-based gain ramping.
     """
 
     # === INVERTED CURRICULUM ===
@@ -75,9 +79,16 @@ class KoshaGyroscopeConfig:
     gate_threshold: float = 0.30         # Minimum for gate activation
     balance_target: float = 0.25         # Required opposite activation
 
-    # === SOFT-THRESHOLD DAMPING (v2.2.3.1) ===
-    steepness: float = 5.0               # Transition sharpness (lower = more damping)
-                                         # 2.0 = fluid, 5.0 = balanced, 10.0 = sharp
+    # === THREE-STAGE HYBRID LOGIC (v2.2.4) ===
+    # Damper steepness controls how aggressively Bliss is diluted
+    damper_steepness: float = 5.0        # Sigmoid steepness for bliss damper
+    # Gate steepness controls how sharp the Physical gate transition is
+    gate_steepness: float = 5.0          # Sigmoid steepness for gate
+    # Rip multiplier for Reality Reversal (hard shock when trapped + gate closed)
+    rip_multiplier: float = 2.0          # Multiplier for rip_signal loss
+
+    # Legacy: steepness (deprecated in v2.2.4, split into damper/gate steepness)
+    steepness: float = 5.0               # Kept for backward compatibility
 
     # === DYNAMIC WEIGHT SCHEDULER (v2.2.1) ===
     base_gain: float = 0.15              # Gentle observation (PPL > 100)
@@ -101,15 +112,12 @@ class KoshaGyroscopeConfig:
 
 class KoshaGyroscopicLoss(nn.Module):
     """
-    Vijnana-Gated Kosha Balance Loss (v2.2.3.1).
+    Vijnana-Gated Kosha Balance Loss (v2.2.4) - Three-Stage Hybrid Logic.
 
-    Implements homeostatic regulation with:
-    - Soft-Threshold Damping: Shifted sigmoid gates (NEW in v2.2.3.1)
-    - Dynamic Weight Scheduler: PPL-based gain ramping (v2.2.1)
-    - Diagonal transitions: Mental <-> Intellect, Physical <-> Blissful
-    - Vijnana Gate: Intellectual verification before state transitions
-    - Vital Momentum: Dynamic gain based on Pranamaya energy
-    - Temporal Grounding: Physical history over 3-token window
+    Implements homeostatic regulation with the "Pressure Relief Valve" architecture:
+    1. Bliss Damper (Sigmoid): Dilutes Bliss during Mental dominance
+    2. Physical Gate (Strict): Prerequisites for Intellect (no bypass!)
+    3. Hard ReLU Rip: Reality Reversal on pathological loops
 
     The loss enforces balance across the R-T quadrant geometry:
 
@@ -126,17 +134,33 @@ class KoshaGyroscopicLoss(nn.Module):
             |
         - (FUTURE)
 
-    Diagonal pairs are polar opposites:
-    - Mental (looping) <-> Intellect (structure)
-    - Physical (inertia) <-> Blissful (expansion)
+    v2.2.4 Three-Stage Internal Process:
 
-    Soft-Threshold Damping (v2.2.3.1):
-    - Replaces hard ReLU gates with shifted sigmoid for continuous gradients
-    - Eliminates "Reality Rips" (gradient explosions from simultaneous gate activation)
-    - steepness parameter controls transition sharpness (default 5.0)
-    - Preserves "clean zero when healthy" property via shifted sigmoid
+    Stage 1 - BLISS DAMPER (Mental Dominance Regulation):
+        As Manomaya (Mental) increases, Anandamaya (Bliss) is mathematically diluted.
+        This prevents the model from "hallucinating" or jumping to creative tangents
+        while caught in a pattern loop.
+        Formula: bliss_damper = 1.0 - sigmoid((mental - threshold) * steepness)
 
-    Dynamic Weight Scheduler (v2.2.1):
+    Stage 2 - PHYSICAL GATE (Intellectual Prerequisite):
+        Unlike v2.2.3.1's bypass approach, the gate is now a STRICT requirement.
+        Intellect remains "starved" of gradient flow unless Physical history is active.
+        This stops "fake reasoning" - model learns that expressing structure
+        requires providing factual grounding first.
+        Formula: phys_gate = sigmoid((phys_history - threshold) * steepness)
+
+    Stage 3 - REALITY RIP (Hard Reversal):
+        If model stays in high-Mental state without Physical gate opening,
+        the ReLU Rip fires. This creates a discontinuous gradient "shock"
+        that smashes the current latent trajectory and forces re-grounding.
+        Formula: rip_signal = mental_trap * (1.0 - phys_gate)
+
+    Two-Path Loss Architecture:
+        - intellect_path: Flows when gate is OPEN (grounded reasoning)
+        - rip_signal: Fires when gate is CLOSED (reality reversal)
+        Combined: axis1_loss = (intellect_path + rip_signal * rip_multiplier).mean()
+
+    Dynamic Weight Scheduler (v2.2.1 - retained):
     - Phase A (PPL > 100): Gentle observation at base_gain (0.15)
     - Phase B (PPL 100 -> 30): Linear ramp to max_gain (3.0)
     - Phase C (PPL < 30): Gyroscope disengages, gain ramps to 0
@@ -148,7 +172,11 @@ class KoshaGyroscopicLoss(nn.Module):
         gate_threshold: float = 0.30,
         balance_target: float = 0.25,
         gate_temperature: float = 10.0,
-        # Soft-Threshold Damping (v2.2.3.1)
+        # Three-Stage Hybrid Logic (v2.2.4)
+        damper_steepness: float = 5.0,
+        gate_steepness: float = 5.0,
+        rip_multiplier: float = 2.0,
+        # Legacy: steepness (deprecated, use damper_steepness/gate_steepness)
         steepness: float = 5.0,
         # Dynamic Weight Scheduler (v2.2.1)
         base_gain: float = 0.15,
@@ -163,15 +191,20 @@ class KoshaGyroscopicLoss(nn.Module):
         vital_momentum_range: Tuple[float, float] = (0.5, 1.5),
     ):
         """
-        Initialize the Kosha Gyroscopic Loss.
+        Initialize the Kosha Gyroscopic Loss (v2.2.4).
 
         Args:
             trap_threshold: Activation level above which a Kosha is "trapped"
             gate_threshold: Minimum activation for gate to be considered open
             balance_target: Target activation level for the opposite Kosha
             gate_temperature: Temperature for soft gate sigmoid (higher = sharper)
-            steepness: Transition sharpness for soft thresholds (v2.2.3.1)
-                       Lower = more damping (2.0 fluid), Higher = sharper (10.0 rip-like)
+            damper_steepness: Sigmoid steepness for Bliss damper (v2.2.4)
+                              Controls how aggressively Bliss is diluted during Mental dominance
+            gate_steepness: Sigmoid steepness for Physical gate (v2.2.4)
+                            Controls sharpness of the grounding prerequisite
+            rip_multiplier: Multiplier for Reality Rip signal (v2.2.4)
+                            Higher = stronger "circuit breaker" effect
+            steepness: Legacy parameter (deprecated, use damper_steepness/gate_steepness)
             base_gain: Starting gain when PPL > ppl_ceiling (gentle observation)
             max_gain: Maximum gain when PPL approaches target_ppl (strict enforcement)
             ppl_ceiling: PPL above which gain stays at base_gain
@@ -187,7 +220,12 @@ class KoshaGyroscopicLoss(nn.Module):
         self.balance_target = balance_target
         self.gate_temperature = gate_temperature
 
-        # Soft-Threshold Damping (v2.2.3.1)
+        # Three-Stage Hybrid Logic (v2.2.4)
+        self.damper_steepness = damper_steepness
+        self.gate_steepness = gate_steepness
+        self.rip_multiplier = rip_multiplier
+
+        # Legacy: steepness (fallback for backward compatibility)
         self.steepness = steepness
 
         # Dynamic Weight Scheduler (v2.2.1)
@@ -402,54 +440,78 @@ class KoshaGyroscopicLoss(nn.Module):
         # Dynamic gain based on energy level
         momentum_scaler = self._compute_vital_momentum(vital)
 
-        # --- AXIS 1: Mental -> Intellect (via Physical) ---
-        # Transition path: Mental (loop) -> Physical (ground) -> Intellect (structure)
+        # =======================================================================
+        # AXIS 1: Mental -> Intellect (via Physical) - v2.2.4 Three-Stage Hybrid
+        # =======================================================================
         #
-        # This axis handles the "Titus Titus Titus" problem:
-        # - High Mental = repetitive pattern detected
-        # - Low Intellect = no logical structure justifying the pattern
-        # - Physical Gate = check if model is grounded in manifest reality
+        # This axis handles the "Titus Titus Titus" problem with three mechanisms:
         #
-        # If Mental HIGH + Intellect LOW + Physical grounded -> PUNISH (break the loop)
-        # If Mental HIGH + Intellect HIGH -> ALLOW (valid focus, Dharana)
+        # STAGE 1 - BLISS DAMPER (Mental Dominance Regulation):
+        #   As Mental increases, Bliss is mathematically diluted.
+        #   Prevents "hallucinating" or jumping to creative tangents during loops.
         #
-        # v2.2.3.1: Shifted sigmoid for all gates (smooth transitions, clean zeros)
-        # v2.2.3.1 FIX: Gate bypass when trapped - if Mental is HIGH, Physical gate
-        #               must open to allow intervention (model is ungrounded AND looping)
-
-        mental_trap = self._soft_threshold(mental, self.trap_threshold)
-        phys_gate_raw = self._soft_threshold(phys_history, self.gate_threshold)
-
-        # GATE BYPASS: When Mental is trapped, bypass the Physical gate requirement
-        # Rationale: If Mental is HIGH and Physical is LOW, the model is ungrounded
-        # AND looping - this is exactly when we NEED to intervene
-        # The bypass ensures at least 50% gate activation when trapped
-        phys_gate = torch.max(phys_gate_raw, mental_trap * 0.5)
-
-        missing_intellect = self._soft_deficit(intellect, self.balance_target)
-        axis1_loss = (mental_trap * phys_gate * missing_intellect).mean()
-
-        # --- AXIS 2: Physical -> Blissful (via Mental) ---
-        # Transition path: Physical (inertia) -> Mental (abstraction) -> Bliss (expansion)
+        # STAGE 2 - PHYSICAL GATE (Intellectual Prerequisite):
+        #   Intellect is "starved" unless Physical history is active.
+        #   This is STRICT - no bypass! Model must ground before reasoning.
         #
-        # This axis handles the "just copying tokens" problem:
+        # STAGE 3 - REALITY RIP (Hard Reversal):
+        #   If trapped + gate closed → ReLU shock forces re-grounding.
+        #   This "smashes" the loop trajectory back to Physical quadrant.
+
+        # Stage 1: BLISS DAMPER - dilutes creative expansion during Mental dominance
+        # When Mental > threshold, bliss_damper approaches 0, diluting Bliss influence
+        bliss_damper = 1.0 - torch.sigmoid((mental - self.trap_threshold) * self.damper_steepness)
+
+        # Stage 2: PHYSICAL GATE - strict prerequisite for Intellect (NO BYPASS!)
+        # Gate only opens when Physical history is above threshold
+        phys_gate = torch.sigmoid((phys_history - self.gate_threshold) * self.gate_steepness)
+
+        # Stage 3: REALITY RIP - Hard ReLU for "circuit breaker" effect
+        # Uses ReLU (not sigmoid) for discontinuous gradient shock
+        mental_trap = F.relu(mental - self.trap_threshold)
+
+        # Rip signal fires when trapped AND gate is CLOSED
+        # This forces model back to Physical/Manifest quadrant
+        rip_signal = mental_trap * (1.0 - phys_gate)
+
+        # Intellectual path - only flows when gate is OPEN (grounded reasoning)
+        missing_intellect = F.relu(self.balance_target - intellect)
+        intellect_path = mental_trap * phys_gate * missing_intellect
+
+        # TWO-PATH LOSS: Grounded path + Reality reversal
+        # rip_signal gets multiplied by rip_multiplier for stronger "shock"
+        axis1_loss = (intellect_path + rip_signal * self.rip_multiplier).mean()
+
+        # =======================================================================
+        # AXIS 2: Physical -> Blissful (via Mental) - v2.2.4 Three-Stage Hybrid
+        # =======================================================================
+        #
+        # This axis handles the "just copying tokens" problem symmetrically:
         # - High Physical = raw data regurgitation
         # - Low Bliss = no creative expansion
         # - Mental Gate = check if model has abstracted the pattern
         #
-        # If Physical HIGH + Bliss LOW + Mental abstracted -> PUNISH (force creativity)
-        #
-        # v2.2.3.1: Shifted sigmoid for all gates (smooth transitions, clean zeros)
-        # v2.2.3.1 FIX: Gate bypass when trapped - symmetric with Axis 1
+        # Same three-stage logic applied to Physical → Bliss transition
 
-        physical_trap = self._soft_threshold(physical, self.trap_threshold)
-        mental_gate_raw = self._soft_threshold(mental, self.gate_threshold)
+        # Stage 1: PHYSICAL DAMPER - dilutes grounding during Physical dominance
+        # (Prevents over-grounding that blocks creativity)
+        physical_damper = 1.0 - torch.sigmoid((physical - self.trap_threshold) * self.damper_steepness)
 
-        # GATE BYPASS: When Physical is trapped, bypass the Mental gate requirement
-        mental_gate = torch.max(mental_gate_raw, physical_trap * 0.5)
+        # Stage 2: MENTAL GATE - strict prerequisite for Bliss (NO BYPASS!)
+        mental_gate = torch.sigmoid((mental - self.gate_threshold) * self.gate_steepness)
 
-        missing_bliss = self._soft_deficit(bliss, self.balance_target)
-        axis2_loss = (physical_trap * mental_gate * missing_bliss).mean()
+        # Stage 3: REALITY RIP - Hard ReLU for Physical trap
+        physical_trap = F.relu(physical - self.trap_threshold)
+
+        # Rip signal fires when physically trapped AND mental gate is CLOSED
+        rip_signal_axis2 = physical_trap * (1.0 - mental_gate)
+
+        # Bliss path - only flows when mental gate is OPEN (abstracted)
+        missing_bliss = F.relu(self.balance_target - bliss)
+        bliss_path = physical_trap * mental_gate * missing_bliss
+
+        # TWO-PATH LOSS: Abstracted path + Reality reversal
+        axis2_loss = (bliss_path + rip_signal_axis2 * self.rip_multiplier).mean()
 
         # === Total Loss with Dynamic Gain (v2.2.1) ===
         # Get PPL-based dynamic gain
@@ -457,36 +519,72 @@ class KoshaGyroscopicLoss(nn.Module):
         total_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler
 
         if return_components:
-            # v2.2.3.1: Compute soft saturation level for diagnostics
-            # This measures how "activated" the combined gates are
-            axis1_saturation = (mental_trap * phys_gate * missing_intellect).mean()
-            axis2_saturation = (physical_trap * mental_gate * missing_bliss).mean()
+            # v2.2.4: Compute diagnostic metrics for Three-Stage Hybrid Logic
 
-            # v2.2.3.1 FIX: Gate bypass diagnostics
-            phys_gate_bypass = (phys_gate - phys_gate_raw).mean()  # How much bypass was applied
-            mental_gate_bypass = (mental_gate - mental_gate_raw).mean()
+            # Rip signal metrics (Reality Reversal detection)
+            rip_signal_mean = rip_signal.mean().item()
+            rip_signal_max = rip_signal.max().item()
+            rip_signal_axis2_mean = rip_signal_axis2.mean().item()
+
+            # Damper metrics (Mental/Physical dominance regulation)
+            bliss_damper_mean = bliss_damper.mean().item()
+            physical_damper_mean = physical_damper.mean().item()
+
+            # Gate-locked detection (trapped with gate closed)
+            gate_locked_axis1 = ((mental_trap > 0) & (phys_gate < 0.5)).float().mean().item()
+            gate_locked_axis2 = ((physical_trap > 0) & (mental_gate < 0.5)).float().mean().item()
+
+            # Path flow metrics (which path is active)
+            intellect_path_mean = intellect_path.mean().item()
+            bliss_path_mean = bliss_path.mean().item()
 
             components = {
+                # Loss breakdown
                 'axis1_loss': axis1_loss.item(),
                 'axis2_loss': axis2_loss.item(),
                 'effective_gain': effective_gain,
                 'current_ppl': current_ppl,
                 'momentum_scaler': momentum_scaler.item() if torch.is_tensor(momentum_scaler) else momentum_scaler,
+
+                # v2.2.4 THREE-STAGE HYBRID METRICS
+                # Stage 1: Damper metrics
+                'bliss_damper_mean': bliss_damper_mean,
+                'physical_damper_mean': physical_damper_mean,
+
+                # Stage 2: Gate metrics (strict, no bypass)
+                'phys_gate_mean': phys_gate.mean().item(),
+                'mental_gate_mean': mental_gate.mean().item(),
+
+                # Stage 3: Rip signal metrics (Reality Reversal)
+                'rip_signal_mean': rip_signal_mean,
+                'rip_signal_max': rip_signal_max,
+                'rip_signal_axis2_mean': rip_signal_axis2_mean,
+
+                # Gate-locked states (trapped + gate closed = RIP firing)
+                'gate_locked_axis1': gate_locked_axis1,
+                'gate_locked_axis2': gate_locked_axis2,
+
+                # Path flow (grounded vs reversal)
+                'intellect_path_mean': intellect_path_mean,
+                'bliss_path_mean': bliss_path_mean,
+
+                # Trap detection (ReLU-based)
                 'mental_trap_mean': mental_trap.mean().item(),
                 'physical_trap_mean': physical_trap.mean().item(),
-                'phys_gate_mean': phys_gate.mean().item(),
-                'phys_gate_raw_mean': phys_gate_raw.mean().item(),  # Before bypass
-                'phys_gate_bypass': phys_gate_bypass.item(),  # Amount of bypass applied
-                'mental_gate_mean': mental_gate.mean().item(),
-                'mental_gate_raw_mean': mental_gate_raw.mean().item(),  # Before bypass
-                'mental_gate_bypass': mental_gate_bypass.item(),  # Amount of bypass applied
+
+                # Target deficit
                 'missing_intellect_mean': missing_intellect.mean().item(),
                 'missing_bliss_mean': missing_bliss.mean().item(),
+
+                # Energy level
                 'vital_mean': vital.mean().item(),
-                # v2.2.3.1: Soft-threshold damping metrics
-                'steepness': self.steepness,
-                'axis1_saturation': axis1_saturation.item(),
-                'axis2_saturation': axis2_saturation.item(),
+
+                # v2.2.4 config
+                'damper_steepness': self.damper_steepness,
+                'gate_steepness': self.gate_steepness,
+                'rip_multiplier': self.rip_multiplier,
+
+                # Kosha state summary
                 'kosha_means': {
                     'physical': physical.mean().item(),
                     'vital': vital.mean().item(),

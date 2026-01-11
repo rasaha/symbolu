@@ -1,7 +1,7 @@
 # Kosha Gyroscope: Homeostatic Self-Regulation System
 
-**Version:** 2.2.3.1
-**Status:** Design Complete, Gate Bypass Fix Implemented
+**Version:** 2.2.4
+**Status:** Design Complete, Three-Stage Hybrid Logic Implemented
 **Date:** 2026-01-11
 **Origin:** Vedic Kosha Theory + Control Theory + Constitutional AI
 **Curriculum:** Instructor-Led (Gyroscope ON) → Self-Learning (Gyroscope OFF at PPL < 30)
@@ -1544,7 +1544,7 @@ mental_gate = torch.max(mental_gate_raw, physical_trap * 0.5)
 This insight correctly identified that both approaches serve different purposes,
 and the true fix was ensuring gates can open when intervention is needed.
 
-### 14.7 Version History
+### 14.7 Version History (Section 14)
 
 | Version | Feature | Status |
 |---------|---------|--------|
@@ -1552,7 +1552,143 @@ and the true fix was ensuring gates can open when intervention is needed.
 | v2.2.1 | Dynamic Weight Scheduler | Released |
 | v2.3.0 | Kosha-Vritti Resonance Map | Released |
 | v2.4.0 | Kosha Phase Corrector (Inference) | Released |
-| **v2.2.3.1** | **Soft-Threshold Damping + Gate Bypass** | **Current** |
+| v2.2.3.1 | Soft-Threshold Damping + Gate Bypass | Superseded by v2.2.4 |
+
+---
+
+## 15. Three-Stage Hybrid Logic (v2.2.4)
+
+### 15.1 Architectural Philosophy: The Pressure Relief Valve
+
+v2.2.4 implements a "Pressure Relief Valve" architecture that supersedes v2.2.3.1's
+gate bypass approach. The key insight: **you cannot achieve discriminative wisdom
+(Intellect) if you are not firmly rooted in the manifest (Physical)**.
+
+The hybrid architecture treats the latent state as a pressurized system:
+- **Damping** manages the "volume" of Mental/Physical states
+- **Ripping** acts as the "pressure relief valve" forcing hard shifts to grounding
+
+### 15.2 The Three-Stage Internal Process
+
+#### Stage 1: BLISS DAMPER (Mental Dominance Regulation)
+
+As Manomaya (Mental) increases, Anandamaya (Bliss) is mathematically diluted:
+
+```python
+bliss_damper = 1.0 - torch.sigmoid((mental - trap_threshold) * damper_steepness)
+```
+
+**Purpose**: Prevents the model from "hallucinating" or jumping to creative tangents
+while caught in a pattern loop. Forces the model to deal with the loop rather than
+escaping into noise.
+
+#### Stage 2: PHYSICAL GATE (Intellectual Prerequisite)
+
+Unlike v2.2.3.1's bypass approach, the gate is a **STRICT requirement**:
+
+```python
+phys_gate = torch.sigmoid((phys_history - gate_threshold) * gate_steepness)
+```
+
+**Purpose**: Intellect remains "starved" of gradient flow unless Physical history is
+active. This stops "fake reasoning" - the model learns that expressing structure
+requires providing factual grounding first.
+
+#### Stage 3: REALITY RIP (Hard Reversal)
+
+Uses Hard ReLU for discontinuous gradient "shock":
+
+```python
+mental_trap = F.relu(mental - trap_threshold)
+rip_signal = mental_trap * (1.0 - phys_gate)
+```
+
+**Purpose**: If the model stays in a high-Mental state without the Physical gate
+opening, the ReLU Rip fires. This creates a gradient shock that "smashes" the
+current latent trajectory and forces re-grounding in the Physical/Manifest quadrant.
+
+### 15.3 Two-Path Loss Architecture
+
+The loss function has two distinct paths:
+
+```python
+# Intellectual path - flows when gate is OPEN (grounded reasoning)
+intellect_path = mental_trap * phys_gate * missing_intellect
+
+# Rip signal - fires when gate is CLOSED (reality reversal)
+rip_signal = mental_trap * (1.0 - phys_gate)
+
+# Combined with rip_multiplier for stronger "shock"
+axis1_loss = (intellect_path + rip_signal * rip_multiplier).mean()
+```
+
+| Path | Condition | Effect |
+|------|-----------|--------|
+| `intellect_path` | Gate OPEN | Grounded reasoning toward Intellect |
+| `rip_signal` | Gate CLOSED | Reality Reversal back to Physical |
+
+### 15.4 Why v2.2.4 Supersedes v2.2.3.1
+
+v2.2.3.1 tried to "bypass" the gate to force intellect, which risked creating a
+model that "reasons" without factual grounding—essentially a "dreaming" or
+"delusional" state.
+
+| Approach | v2.2.3.1 (Gate Bypass) | v2.2.4 (Hybrid Valve) |
+|----------|------------------------|----------------------|
+| **Goal** | Force intellect at all costs | Force **grounding** before intellect |
+| **Gate Behavior** | Bypass: "Push through" | Gate: "Ground first" |
+| **Failure Mode** | May cause "Delusional Reasoning" | Causes "Reality Reversal" |
+| **Bliss Control** | No explicit control | **Bliss Damper** reduces noise |
+| **Mathematical Nature** | Smooth throughout | Hybrid: Smooth Damping + Hard ReLU |
+
+### 15.5 PPL Strategy: Active from Step 0
+
+The v2.2.4 Hybrid Logic is active from Step 0, with the Dynamic Weight Scheduler
+controlling intensity:
+
+| PPL Range | Hybrid Logic | Gain | Primary Function |
+|-----------|--------------|------|------------------|
+| **> 100** | **ACTIVE** | **0.15** | Ontological Shaping (Preventing Collapse) |
+| **100 → 30** | **ACTIVE** | **0.15 → 3.0** | Reasoning Enforcement (CoT Grounding) |
+| **< 30** | **DISENGAGE** | **Decay → 0** | Graduation & Self-Learning |
+
+**Rationale**: By keeping the Hard Rip and Bliss Damper active from start, we teach
+the model the "Dharma" of its latent space while weights are still plastic.
+
+### 15.6 Diagnostic Metrics
+
+v2.2.4 tracks the following metrics:
+
+| Metric | Description |
+|--------|-------------|
+| `bliss_damper_mean` | How much Bliss is being diluted |
+| `physical_damper_mean` | How much Physical is being diluted (Axis 2) |
+| `rip_signal_mean` | Average Reality Reversal intensity |
+| `rip_signal_max` | Peak Rip signal (circuit breaker events) |
+| `gate_locked_axis1` | Proportion of trapped + gate closed (RIP firing) |
+| `gate_locked_axis2` | Same for Axis 2 |
+| `intellect_path_mean` | Grounded reasoning flow |
+| `bliss_path_mean` | Abstracted creativity flow |
+
+### 15.7 Configuration Parameters
+
+```python
+# v2.2.4 Three-Stage Hybrid Logic
+damper_steepness: float = 5.0    # Sigmoid steepness for dampers
+gate_steepness: float = 5.0      # Sigmoid steepness for gates
+rip_multiplier: float = 2.0      # Hard ReLU shock multiplier
+```
+
+### 15.8 Version History (Complete)
+
+| Version | Feature | Status |
+|---------|---------|--------|
+| v2.2.0 | Temporal Grounding, Vital Momentum | Released |
+| v2.2.1 | Dynamic Weight Scheduler | Released |
+| v2.2.3.1 | Soft-Threshold Damping + Gate Bypass | Superseded |
+| v2.3.0 | Kosha-Vritti Resonance Map | Released |
+| v2.4.0 | Kosha Phase Corrector (Inference) | Released |
+| **v2.2.4** | **Three-Stage Hybrid Logic (Damping + Gate + Rip)** | **Current** |
 
 ---
 
