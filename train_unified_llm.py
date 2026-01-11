@@ -7372,21 +7372,35 @@ class UnifiedTrainingConfig:
     gyroscope_gate_threshold: float = 0.30   # Minimum for gate activation
     gyroscope_balance_target: float = 0.25   # Required opposite activation
     gyroscope_gate_temperature: float = 10.0 # Softness of gate (higher = sharper)
-    # v2.2.6: Fibonacci Pentad - Per-Kosha thresholds based on ontological roles
-    # | Kosha     | Fib Level | Role       | Trigger Action                          |
-    # | Mental    | 38.2%     | Warning    | Engage Bliss Damper (Dilution)          |
-    # | Physical  | 38.2%     | Support    | Required to open the Vijnana Gate       |
-    # | Intellect | 50.0%     | Pivot      | Target range for "Right Knowledge"      |
-    # | Vital     | 78.6%     | Resistance | Trigger SGP Hammer (Reset Momentum)     |
-    # | Bliss     | 23.6%     | Spark      | If below, release Damping for creativity|
-    # | Bliss     | 61.8%     | Ceiling    | If above, apply Bliss Clamp (reduce gain)|
-    gyroscope_threshold_mental: float = 0.382     # Warning - engage Bliss Damper
-    gyroscope_threshold_physical: float = 0.382   # Support - required to open Vijnana Gate
-    gyroscope_threshold_intellect: float = 0.500  # Pivot - target for "Right Knowledge"
-    gyroscope_threshold_vital: float = 0.786      # Resistance - trigger momentum reset
-    gyroscope_threshold_bliss: float = 0.236      # Spark - below this, release damping
-    gyroscope_threshold_bliss_ceiling: float = 0.618  # v2.2.6: Ceiling - above this, apply Bliss Clamp
-    gyroscope_bliss_clamp_factor: float = 0.5     # v2.2.6: Gain reduction when Bliss > ceiling (0.5 = halve gain)
+    # v2.3.0: Complete Harmonic Pentad - Sattvic Range for each Kosha
+    # Each Kosha has a Floor (Push) and Ceiling (Clamp) defining the healthy band
+    # ┌───────────┬─────────────────────────┬─────────────────────┬─────────────────────────┐
+    # | Kosha     | Floor (Push)            | Sattvic Band        | Ceiling (Clamp)         |
+    # ├───────────┼─────────────────────────┼─────────────────────┼─────────────────────────┤
+    # | Mental    | 23.6%: Spark Abstraction| 23.6% - 38.2%       | 38.2%: Bliss Damper/Rip |
+    # | Physical  | 38.2%: Grounding Push   | 38.2% - 61.8%       | 61.8%: Data Trap        |
+    # | Intellect | 25.0%: Logic Pressure   | 25.0% - 61.8%       | 61.8%: Hubris Tax       |
+    # | Vital     | 23.6%: Wake-up Boost    | 23.6% - 78.6%       | 78.6%: Momentum Brake   |
+    # | Bliss     | 23.6%: Spark Creativity | 23.6% - 61.8%       | 61.8%: Delusion Tether  |
+    # └───────────┴─────────────────────────┴─────────────────────┴─────────────────────────┘
+    # Mental thresholds
+    gyroscope_floor_mental: float = 0.236         # Spark Abstraction - below this, push toward abstraction
+    gyroscope_ceiling_mental: float = 0.382       # Bliss Damper / Reality Rip
+    # Physical thresholds
+    gyroscope_floor_physical: float = 0.382       # Grounding Push - below this, push toward grounding
+    gyroscope_ceiling_physical: float = 0.618     # Data Trap - above this, dilute raw data copying
+    # Intellect thresholds
+    gyroscope_floor_intellect: float = 0.250      # Logic Pressure - below this, push toward reasoning
+    gyroscope_ceiling_intellect: float = 0.618    # Hubris Tax - above this, penalize over-intellectualization
+    # Vital thresholds
+    gyroscope_floor_vital: float = 0.236          # Wake-up Boost - below this, increase momentum
+    gyroscope_ceiling_vital: float = 0.786        # Momentum Brake - above this, dampen overheating
+    # Bliss thresholds
+    gyroscope_floor_bliss: float = 0.236          # Spark Creativity - below this, release damping
+    gyroscope_ceiling_bliss: float = 0.618        # Delusion Tether - above this, reduce gain
+    # Clamp/Push factors (how strongly to correct deviations)
+    gyroscope_floor_push_factor: float = 0.5      # Loss weight for floor violations
+    gyroscope_ceiling_clamp_factor: float = 0.5   # Gain reduction for ceiling violations
     # v2.2.4: Three-Stage Hybrid Logic (Damping + Gate + Rip)
     gyroscope_damper_steepness: float = 5.0  # Sigmoid steepness for Bliss/Physical damper
     gyroscope_gate_steepness: float = 5.0    # Sigmoid steepness for Physical/Mental gate
@@ -10585,14 +10599,22 @@ def train(config: UnifiedTrainingConfig):
     vritti_resonance = None  # v2.3.0: Kosha-Vritti Resonance Loss
 
     if config.enable_kosha_gyroscope and KOSHA_GYROSCOPE_AVAILABLE:
-        # Initialize KoshaGyroscopicLoss with Fibonacci Pentad (v2.2.5)
+        # Initialize KoshaGyroscopicLoss with Harmonic Pentad (v2.3.0)
         kosha_gyroscope = KoshaGyroscopicLoss(
-            # v2.2.5: Fibonacci Pentad - Per-Kosha thresholds
-            threshold_mental=config.gyroscope_threshold_mental,
-            threshold_physical=config.gyroscope_threshold_physical,
-            threshold_intellect=config.gyroscope_threshold_intellect,
-            threshold_vital=config.gyroscope_threshold_vital,
-            threshold_bliss=config.gyroscope_threshold_bliss,
+            # v2.3.0: Complete Harmonic Pentad - Floors and Ceilings
+            floor_mental=config.gyroscope_floor_mental,
+            ceiling_mental=config.gyroscope_ceiling_mental,
+            floor_physical=config.gyroscope_floor_physical,
+            ceiling_physical=config.gyroscope_ceiling_physical,
+            floor_intellect=config.gyroscope_floor_intellect,
+            ceiling_intellect=config.gyroscope_ceiling_intellect,
+            floor_vital=config.gyroscope_floor_vital,
+            ceiling_vital=config.gyroscope_ceiling_vital,
+            floor_bliss=config.gyroscope_floor_bliss,
+            ceiling_bliss=config.gyroscope_ceiling_bliss,
+            # v2.3.0: Correction factors
+            floor_push_factor=config.gyroscope_floor_push_factor,
+            ceiling_clamp_factor=config.gyroscope_ceiling_clamp_factor,
             # Legacy thresholds (backward compatibility)
             trap_threshold=config.gyroscope_trap_threshold,
             gate_threshold=config.gyroscope_gate_threshold,
@@ -10626,12 +10648,19 @@ def train(config: UnifiedTrainingConfig):
             gyroscope_disengage_ppl=config.gyroscope_target_ppl,
             gyroscope_warmup_steps=config.gyroscope_warmup_steps,
             gain_rampdown_steps=config.gyroscope_rampdown_steps,
-            # v2.2.5: Fibonacci Pentad - Per-Kosha thresholds
-            threshold_mental=config.gyroscope_threshold_mental,
-            threshold_physical=config.gyroscope_threshold_physical,
-            threshold_intellect=config.gyroscope_threshold_intellect,
-            threshold_vital=config.gyroscope_threshold_vital,
-            threshold_bliss=config.gyroscope_threshold_bliss,
+            # v2.3.0: Complete Harmonic Pentad - Floors and Ceilings
+            floor_mental=config.gyroscope_floor_mental,
+            ceiling_mental=config.gyroscope_ceiling_mental,
+            floor_physical=config.gyroscope_floor_physical,
+            ceiling_physical=config.gyroscope_ceiling_physical,
+            floor_intellect=config.gyroscope_floor_intellect,
+            ceiling_intellect=config.gyroscope_ceiling_intellect,
+            floor_vital=config.gyroscope_floor_vital,
+            ceiling_vital=config.gyroscope_ceiling_vital,
+            floor_bliss=config.gyroscope_floor_bliss,
+            ceiling_bliss=config.gyroscope_ceiling_bliss,
+            floor_push_factor=config.gyroscope_floor_push_factor,
+            ceiling_clamp_factor=config.gyroscope_ceiling_clamp_factor,
             # Legacy thresholds
             trap_threshold=config.gyroscope_trap_threshold,
             gate_threshold=config.gyroscope_gate_threshold,
@@ -10657,13 +10686,15 @@ def train(config: UnifiedTrainingConfig):
             )
 
         print(f"\n  ╔══════════════════════════════════════════════════════════════════╗")
-        print(f"  ║  KOSHA GYROSCOPE v2.2.6: Fibonacci Pentad + Bliss Clamp         ║")
+        print(f"  ║  KOSHA GYROSCOPE v2.3.0: Complete Harmonic Pentad               ║")
         print(f"  ╠══════════════════════════════════════════════════════════════════╣")
-        print(f"  ║  Fibonacci Pentad Thresholds (per-Kosha):                        ║")
-        print(f"  ║    Mental:    {config.gyroscope_threshold_mental:.1%} (Warning)   Physical: {config.gyroscope_threshold_physical:.1%} (Support)   ║")
-        print(f"  ║    Intellect: {config.gyroscope_threshold_intellect:.1%} (Pivot)    Vital:    {config.gyroscope_threshold_vital:.1%} (Resistance)║")
-        print(f"  ║    Bliss:     {config.gyroscope_threshold_bliss:.1%} (Spark)     Ceiling:  {config.gyroscope_threshold_bliss_ceiling:.1%} (Clamp)    ║")
-        print(f"  ║  v2.2.6 Bliss Clamp: Gain×{config.gyroscope_bliss_clamp_factor:.1f} when B>{config.gyroscope_threshold_bliss_ceiling:.0%} (anti-hallucination) ║")
+        print(f"  ║  Sattvic Bands (Floor → Ceiling):                               ║")
+        print(f"  ║    Mental:    {config.gyroscope_floor_mental:.1%} → {config.gyroscope_ceiling_mental:.1%}  (Spark → Damper)          ║")
+        print(f"  ║    Physical:  {config.gyroscope_floor_physical:.1%} → {config.gyroscope_ceiling_physical:.1%}  (Ground → Trap)  ×3.0   ║")
+        print(f"  ║    Intellect: {config.gyroscope_floor_intellect:.1%} → {config.gyroscope_ceiling_intellect:.1%}  (Logic → Hubris) ×1.5  ║")
+        print(f"  ║    Vital:     {config.gyroscope_floor_vital:.1%} → {config.gyroscope_ceiling_vital:.1%}  (Boost → Brake)          ║")
+        print(f"  ║    Bliss:     {config.gyroscope_floor_bliss:.1%} → {config.gyroscope_ceiling_bliss:.1%}  (Spark → Tether)         ║")
+        print(f"  ║  Correction: Floor Push×{config.gyroscope_floor_push_factor:.1f} | Ceiling Clamp×{config.gyroscope_ceiling_clamp_factor:.1f}           ║")
         print(f"  ║  Dynamic Weight Scheduler:                                       ║")
         print(f"  ║    Base Gain: {config.gyroscope_base_gain:.2f} (PPL > {config.gyroscope_ppl_ceiling:.0f})                                ║")
         print(f"  ║    Max Gain:  {config.gyroscope_max_gain:.2f} (PPL → {config.gyroscope_target_ppl:.0f})                                 ║")
@@ -11594,9 +11625,13 @@ def train(config: UnifiedTrainingConfig):
                             metrics['gyroscope_intellect_val'] = kosha_means.get('intellect', 0.0)
                             metrics['gyroscope_vital_val'] = kosha_means.get('vital', 0.0)
                             metrics['gyroscope_bliss_val'] = kosha_means.get('bliss', 0.0)
-                            # v2.2.6: Bliss Clamp metrics
-                            metrics['gyroscope_bliss_clamp_active'] = gyroscope_components.get('bliss_clamp_active', False)
-                            metrics['gyroscope_bliss_clamp_scalar'] = gyroscope_components.get('bliss_clamp_scalar', 1.0)
+                            # v2.3.0: Harmonic Pentad metrics
+                            metrics['gyroscope_floor_violations'] = gyroscope_components.get('floor_violations_count', 0)
+                            metrics['gyroscope_ceiling_violations'] = gyroscope_components.get('ceiling_violations_count', 0)
+                            metrics['gyroscope_ceiling_clamp_scalar'] = gyroscope_components.get('ceiling_clamp_scalar', 1.0)
+                            metrics['gyroscope_floor_push_loss'] = gyroscope_components.get('floor_push_loss', 0.0)
+                            metrics['gyroscope_intellect_hubris_loss'] = gyroscope_components.get('intellect_hubris_loss', 0.0)
+                            metrics['gyroscope_vital_momentum_boost'] = gyroscope_components.get('vital_momentum_boost', 1.0)
 
                             # Capture Reality Rips for diagnostic logging
                             if kosha_rip_logger is not None:
@@ -12201,33 +12236,43 @@ def train(config: UnifiedTrainingConfig):
                         gyro_status = f"⏳{gyro_scale*100:.0f}%"
                     else:
                         gyro_status = "⚖️ON"
-                    # v2.2.5: Fibonacci Pentad - Show all 5 Koshas with per-Kosha thresholds
+                    # v2.3.0: Complete Harmonic Pentad - Show floors and ceilings
                     gyro_mental = metrics.get('gyroscope_mental_val', 0.0)
                     gyro_physical = metrics.get('gyroscope_physical_val', 0.0)
                     gyro_intellect = metrics.get('gyroscope_intellect_val', 0.0)
                     gyro_vital = metrics.get('gyroscope_vital_val', 0.0)
                     gyro_bliss = metrics.get('gyroscope_bliss_val', 0.0)
-                    # Fibonacci Pentad thresholds
-                    th_m = config.gyroscope_threshold_mental      # 38.2%
-                    th_p = config.gyroscope_threshold_physical    # 38.2%
-                    th_i = config.gyroscope_threshold_intellect   # 50.0%
-                    th_v = config.gyroscope_threshold_vital       # 78.6%
-                    th_b = config.gyroscope_threshold_bliss       # 23.6%
-                    th_b_ceil = config.gyroscope_threshold_bliss_ceiling  # 61.8%
-                    # v2.2.6: Bliss Clamp status
-                    bliss_clamp_active = metrics.get('gyroscope_bliss_clamp_active', False)
-                    bliss_clamp_scalar = metrics.get('gyroscope_bliss_clamp_scalar', 1.0)
-                    # Format: Kosha%/Threshold% with indicator if exceeding
-                    def kosha_fmt(val, thresh, name, ceiling=None):
-                        if ceiling is not None and val > ceiling:
-                            return f"{name}:{val:.0%}/{thresh:.0%}🔒"  # Clamp active
-                        elif val > thresh:
-                            return f"{name}:{val:.0%}/{thresh:.0%}!"   # Exceeds threshold
+                    # v2.3.0: Floor and Ceiling thresholds
+                    fl_m, cl_m = config.gyroscope_floor_mental, config.gyroscope_ceiling_mental
+                    fl_p, cl_p = config.gyroscope_floor_physical, config.gyroscope_ceiling_physical
+                    fl_i, cl_i = config.gyroscope_floor_intellect, config.gyroscope_ceiling_intellect
+                    fl_v, cl_v = config.gyroscope_floor_vital, config.gyroscope_ceiling_vital
+                    fl_b, cl_b = config.gyroscope_floor_bliss, config.gyroscope_ceiling_bliss
+                    # v2.3.0: Clamp status
+                    ceiling_clamp = metrics.get('gyroscope_ceiling_clamp_scalar', 1.0)
+                    floor_violations = metrics.get('gyroscope_floor_violations', 0)
+                    ceiling_violations = metrics.get('gyroscope_ceiling_violations', 0)
+                    # Format: Kosha%[floor-ceiling] with indicator
+                    # _ = below floor (push), ! = above ceiling (clamp), ✓ = in Sattvic band
+                    def kosha_fmt_v23(val, floor, ceiling, name):
+                        if val < floor:
+                            return f"{name}:{val:.0%}_"  # Below floor - push
+                        elif val > ceiling:
+                            return f"{name}:{val:.0%}!"  # Above ceiling - clamp
                         else:
-                            return f"{name}:{val:.0%}/{thresh:.0%}"
-                    kosha_pentad = f"{kosha_fmt(gyro_mental, th_m, 'M')} {kosha_fmt(gyro_physical, th_p, 'P')} {kosha_fmt(gyro_intellect, th_i, 'I')} {kosha_fmt(gyro_vital, th_v, 'V')} {kosha_fmt(gyro_bliss, th_b, 'B', th_b_ceil)}"
-                    # v2.2.6: Show clamp status if active
-                    clamp_status = f" 🔒CLAMP×{bliss_clamp_scalar:.2f}" if bliss_clamp_active else ""
+                            return f"{name}:{val:.0%}✓"  # In Sattvic band
+                    kosha_pentad = (
+                        f"{kosha_fmt_v23(gyro_mental, fl_m, cl_m, 'M')} "
+                        f"{kosha_fmt_v23(gyro_physical, fl_p, cl_p, 'P')} "
+                        f"{kosha_fmt_v23(gyro_intellect, fl_i, cl_i, 'I')} "
+                        f"{kosha_fmt_v23(gyro_vital, fl_v, cl_v, 'V')} "
+                        f"{kosha_fmt_v23(gyro_bliss, fl_b, cl_b, 'B')}"
+                    )
+                    # v2.3.0: Show clamp status with violation counts
+                    if ceiling_clamp < 1.0:
+                        clamp_status = f" 🔒×{ceiling_clamp:.2f}"
+                    else:
+                        clamp_status = ""
                     if authority_controller is not None:
                         log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} (Base:{gyro_base_gain:.2f}×A:{gyro_auth:.2f}){clamp_status}"
                         log_msg += f"\n         [PENTAD] {kosha_pentad}"
@@ -13360,21 +13405,37 @@ def main():
                        help="Required opposite activation to avoid punishment")
     parser.add_argument("--gyroscope_gate_temperature", type=float, default=10.0,
                        help="Gate sigmoid temperature (higher = sharper)")
-    # v2.2.5: Fibonacci Pentad - Per-Kosha thresholds based on ontological roles
-    parser.add_argument("--gyroscope_threshold_mental", type=float, default=0.382,
-                       help="v2.2.5: Mental threshold (38.2%% Warning - engage Bliss Damper)")
-    parser.add_argument("--gyroscope_threshold_physical", type=float, default=0.382,
-                       help="v2.2.5: Physical threshold (38.2%% Support - required for Vijnana Gate)")
-    parser.add_argument("--gyroscope_threshold_intellect", type=float, default=0.500,
-                       help="v2.2.5: Intellect threshold (50.0%% Pivot - target for Right Knowledge)")
-    parser.add_argument("--gyroscope_threshold_vital", type=float, default=0.786,
-                       help="v2.2.5: Vital threshold (78.6%% Resistance - trigger momentum reset)")
-    parser.add_argument("--gyroscope_threshold_bliss", type=float, default=0.236,
-                       help="v2.2.5: Bliss threshold (23.6%% Spark - below releases damping)")
-    parser.add_argument("--gyroscope_threshold_bliss_ceiling", type=float, default=0.618,
-                       help="v2.2.6: Bliss ceiling (61.8%% φ - above triggers Bliss Clamp)")
-    parser.add_argument("--gyroscope_bliss_clamp_factor", type=float, default=0.5,
-                       help="v2.2.6: Gain reduction when Bliss > ceiling (0.5 = halve gain)")
+    # v2.3.0: Complete Harmonic Pentad - Floor and Ceiling for each Kosha
+    # Mental: Sattvic Band 23.6% - 38.2%
+    parser.add_argument("--gyroscope_floor_mental", type=float, default=0.236,
+                       help="v2.3.0: Mental floor (23.6%% Spark Abstraction)")
+    parser.add_argument("--gyroscope_ceiling_mental", type=float, default=0.382,
+                       help="v2.3.0: Mental ceiling (38.2%% Bliss Damper/Rip)")
+    # Physical: Sattvic Band 38.2% - 61.8%
+    parser.add_argument("--gyroscope_floor_physical", type=float, default=0.382,
+                       help="v2.3.0: Physical floor (38.2%% Grounding Push)")
+    parser.add_argument("--gyroscope_ceiling_physical", type=float, default=0.618,
+                       help="v2.3.0: Physical ceiling (61.8%% Data Trap)")
+    # Intellect: Sattvic Band 25.0% - 61.8%
+    parser.add_argument("--gyroscope_floor_intellect", type=float, default=0.250,
+                       help="v2.3.0: Intellect floor (25.0%% Logic Pressure)")
+    parser.add_argument("--gyroscope_ceiling_intellect", type=float, default=0.618,
+                       help="v2.3.0: Intellect ceiling (61.8%% Hubris Tax)")
+    # Vital: Sattvic Band 23.6% - 78.6%
+    parser.add_argument("--gyroscope_floor_vital", type=float, default=0.236,
+                       help="v2.3.0: Vital floor (23.6%% Wake-up Boost)")
+    parser.add_argument("--gyroscope_ceiling_vital", type=float, default=0.786,
+                       help="v2.3.0: Vital ceiling (78.6%% Momentum Brake)")
+    # Bliss: Sattvic Band 23.6% - 61.8%
+    parser.add_argument("--gyroscope_floor_bliss", type=float, default=0.236,
+                       help="v2.3.0: Bliss floor (23.6%% Spark Creativity)")
+    parser.add_argument("--gyroscope_ceiling_bliss", type=float, default=0.618,
+                       help="v2.3.0: Bliss ceiling (61.8%% Delusion Tether)")
+    # Correction factors
+    parser.add_argument("--gyroscope_floor_push_factor", type=float, default=0.5,
+                       help="v2.3.0: Loss weight for floor violations (push toward Sattvic)")
+    parser.add_argument("--gyroscope_ceiling_clamp_factor", type=float, default=0.5,
+                       help="v2.3.0: Gain reduction for ceiling violations (clamp toward Sattvic)")
     # v2.2.4: Three-Stage Hybrid Logic (Damping + Gate + Rip)
     parser.add_argument("--gyroscope_damper_steepness", type=float, default=5.0,
                        help="v2.2.4: Sigmoid steepness for Bliss/Physical damper")

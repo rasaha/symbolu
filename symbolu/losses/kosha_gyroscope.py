@@ -211,15 +211,26 @@ class KoshaGyroscopicLoss(nn.Module):
 
     def __init__(
         self,
-        # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
-        threshold_mental: float = 0.382,     # Warning - engage Bliss Damper
-        threshold_physical: float = 0.382,   # Support - required to open Vijnana Gate
-        threshold_intellect: float = 0.500,  # Pivot - target for "Right Knowledge"
-        threshold_vital: float = 0.786,      # Resistance - trigger momentum reset
-        threshold_bliss: float = 0.236,      # Spark - below this, release damping
-        # v2.2.6: Bliss Clamp (ceiling for "blissful ignorance")
-        threshold_bliss_ceiling: float = 0.618,  # Ceiling - above this, apply Bliss Clamp
-        bliss_clamp_factor: float = 0.5,         # Gain reduction when Bliss > ceiling (0.5 = halve)
+        # === v2.3.0: COMPLETE HARMONIC PENTAD ===
+        # Each Kosha has a Floor (Push) and Ceiling (Clamp) defining the Sattvic Band
+        # Mental: Sattvic Band 23.6% - 38.2%
+        floor_mental: float = 0.236,         # Spark Abstraction - push toward abstraction
+        ceiling_mental: float = 0.382,       # Bliss Damper / Reality Rip
+        # Physical: Sattvic Band 38.2% - 61.8%
+        floor_physical: float = 0.382,       # Grounding Push - push toward grounding
+        ceiling_physical: float = 0.618,     # Data Trap - dilute raw data copying
+        # Intellect: Sattvic Band 25.0% - 61.8%
+        floor_intellect: float = 0.250,      # Logic Pressure - push toward reasoning
+        ceiling_intellect: float = 0.618,    # Hubris Tax - penalize over-intellectualization
+        # Vital: Sattvic Band 23.6% - 78.6%
+        floor_vital: float = 0.236,          # Wake-up Boost - increase momentum
+        ceiling_vital: float = 0.786,        # Momentum Brake - dampen overheating
+        # Bliss: Sattvic Band 23.6% - 61.8%
+        floor_bliss: float = 0.236,          # Spark Creativity - release damping
+        ceiling_bliss: float = 0.618,        # Delusion Tether - reduce gain
+        # Correction factors
+        floor_push_factor: float = 0.5,      # Loss weight for floor violations
+        ceiling_clamp_factor: float = 0.5,   # Gain reduction for ceiling violations
         # Legacy thresholds (backward compatibility)
         trap_threshold: float = 0.618,  # v2.2.5: Golden Ratio φ (sigmoid mode)
         gate_threshold: float = 0.30,   # v2.2.5: Gemini's original (sigmoid mode)
@@ -280,15 +291,22 @@ class KoshaGyroscopicLoss(nn.Module):
         """
         super().__init__()
 
-        # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
-        self.threshold_mental = threshold_mental
-        self.threshold_physical = threshold_physical
-        self.threshold_intellect = threshold_intellect
-        self.threshold_vital = threshold_vital
-        self.threshold_bliss = threshold_bliss
-        # v2.2.6: Bliss Clamp
-        self.threshold_bliss_ceiling = threshold_bliss_ceiling
-        self.bliss_clamp_factor = bliss_clamp_factor
+        # === v2.3.0: COMPLETE HARMONIC PENTAD ===
+        # Floors (Push actions when below)
+        self.floor_mental = floor_mental
+        self.floor_physical = floor_physical
+        self.floor_intellect = floor_intellect
+        self.floor_vital = floor_vital
+        self.floor_bliss = floor_bliss
+        # Ceilings (Clamp actions when above)
+        self.ceiling_mental = ceiling_mental
+        self.ceiling_physical = ceiling_physical
+        self.ceiling_intellect = ceiling_intellect
+        self.ceiling_vital = ceiling_vital
+        self.ceiling_bliss = ceiling_bliss
+        # Correction factors
+        self.floor_push_factor = floor_push_factor
+        self.ceiling_clamp_factor = ceiling_clamp_factor
 
         # Legacy thresholds (backward compatibility)
         self.trap_threshold = trap_threshold
@@ -583,67 +601,131 @@ class KoshaGyroscopicLoss(nn.Module):
         #   If trapped + gate closed → ReLU shock forces re-grounding.
         #   This "smashes" the loop trajectory back to Physical quadrant.
 
-        # === FIBONACCI PENTAD LOGIC (v2.2.5) ===
-        # Each Kosha now has its own threshold based on its ontological role
+        # =======================================================================
+        # v2.3.0: COMPLETE HARMONIC PENTAD
+        # =======================================================================
+        # Each Kosha has a Floor (Push) and Ceiling (Clamp) defining the Sattvic Band
+        # Deviations outside these bands trigger automated corrective forces
 
-        # Stage 1: BLISS DAMPER - dilutes creative expansion during Mental dominance
-        # When Mental > threshold_mental (38.2%), bliss_damper approaches 0
-        bliss_damper = 1.0 - torch.sigmoid((mental - self.threshold_mental) * self.damper_steepness)
+        # === FLOOR VIOLATIONS: Push toward Sattvic Band ===
+        # Priority weights per Gemini's Control Theory guidance:
+        # - Physical (Foundation): 3.0 (HIGH - must ground first)
+        # - Intellect (Logic): 1.5 (MEDIUM)
+        # - Mental (Insight): 1.0 (LOW)
+        # - Bliss (Creativity): 1.0 (LOW)
+        # - Vital: Uses momentum boost instead of loss
 
-        # BLISS SPARK RELEASE: If Bliss < threshold_bliss (23.6%), release damping for creativity
-        # This allows creative expansion when Bliss is starved
-        bliss_spark = (bliss < self.threshold_bliss).float()
+        # Mental Floor (23.6%): Spark Abstraction - push toward abstraction when too low
+        mental_below_floor = F.relu(self.floor_mental - mental)
+        mental_floor_loss = mental_below_floor.mean() * 1.0  # LOW priority
+
+        # Physical Floor (38.2%): Grounding Push - THE FOUNDATION
+        # This is the most critical floor - model MUST ground before anything else
+        physical_below_floor = F.relu(self.floor_physical - physical)
+        physical_floor_loss = physical_below_floor.mean() * 3.0  # HIGH priority
+
+        # Intellect Floor (25.0%): Logic Pressure - push toward reasoning when too low
+        intellect_below_floor = F.relu(self.floor_intellect - intellect)
+        intellect_floor_loss = intellect_below_floor.mean() * 1.5  # MEDIUM priority
+
+        # Vital Floor (23.6%): Wake-up Boost - boost momentum when too low
+        # Vital uses MOMENTUM control, not loss pressure
+        vital_below_floor = F.relu(self.floor_vital - vital)
+        vital_floor_active = vital.mean() < self.floor_vital
+        # Per Gemini: Boost = 1.5 if vit < 0.236
+        vital_momentum_boost = torch.where(
+            vital_below_floor.mean() > 0,
+            torch.tensor(1.5),
+            torch.tensor(1.0)
+        )
+
+        # Bliss Floor (23.6%): Spark Creativity - release damping when too low
+        bliss_below_floor = F.relu(self.floor_bliss - bliss)
+        bliss_floor_loss = bliss_below_floor.mean() * 1.0  # LOW priority
+        bliss_spark = (bliss < self.floor_bliss).float()
+
+        # Combined floor push loss (weighted by priority)
+        floor_push_loss = (
+            mental_floor_loss +
+            physical_floor_loss +  # 3.0x weight already applied
+            intellect_floor_loss +  # 1.5x weight already applied
+            bliss_floor_loss
+        ) * self.floor_push_factor
+
+        # === CEILING VIOLATIONS: Clamp toward Sattvic Band ===
+        # Ceiling weights per Gemini's Control Theory guidance:
+        # - Intellect (Hubris Tax): 1.5 (MEDIUM - penalize over-intellectualization)
+        # - Others use sigmoid-based viscosity damping
+
+        # Mental Ceiling (38.2%): Bliss Damper / Reality Rip
+        bliss_damper = 1.0 - torch.sigmoid((mental - self.ceiling_mental) * self.damper_steepness)
         bliss_damper = bliss_damper + bliss_spark * 0.5  # Partial release when Bliss is low
+        mental_trap = F.relu(mental - self.ceiling_mental)
+        mental_ceiling_active = mental.mean() > self.ceiling_mental
 
-        # Stage 2: PHYSICAL GATE - strict prerequisite for Intellect (NO BYPASS!)
-        # Gate only opens when Physical history is above threshold_physical (38.2%)
-        phys_gate = torch.sigmoid((phys_history - self.threshold_physical) * self.gate_steepness)
+        # Physical Ceiling (61.8%): Data Trap - dilute raw data copying
+        physical_damper = 1.0 - torch.sigmoid((physical - self.ceiling_physical) * self.damper_steepness)
+        physical_trap = F.relu(physical - self.ceiling_physical)
+        physical_ceiling_active = physical.mean() > self.ceiling_physical
 
-        # VITAL RESISTANCE: High Vital (>78.6%) dampens momentum (model is "overheating")
-        vital_resistance = torch.sigmoid((vital - self.threshold_vital) * self.gate_steepness)
-        # Apply resistance as momentum damper
+        # Intellect Ceiling (61.8%): Hubris Tax - penalize over-intellectualization
+        # Per Gemini: L_i = ReLU(int - 0.618) * 1.5
+        intellect_above_ceiling = F.relu(intellect - self.ceiling_intellect)
+        intellect_hubris_loss = intellect_above_ceiling.mean() * 1.5  # MEDIUM priority
+        intellect_ceiling_active = intellect.mean() > self.ceiling_intellect
+
+        # Vital Ceiling (78.6%): Momentum Brake - dampen overheating
+        vital_resistance = torch.sigmoid((vital - self.ceiling_vital) * self.gate_steepness)
         vital_momentum_damper = 1.0 - vital_resistance * 0.5  # Max 50% reduction at high Vital
+        vital_ceiling_active = vital.mean() > self.ceiling_vital
 
-        # Stage 3: REALITY RIP - Hard ReLU for "circuit breaker" effect
-        # Uses ReLU (not sigmoid) for discontinuous gradient shock
-        # Now uses threshold_mental (38.2%) - fires earlier than legacy 61.8%
-        mental_trap = F.relu(mental - self.threshold_mental)
+        # Bliss Ceiling (61.8%): Delusion Tether - reduce gain to force grounding
+        bliss_above_ceiling = F.relu(bliss - self.ceiling_bliss)
+        bliss_delusion_loss = bliss_above_ceiling.mean()
+        bliss_ceiling_active = bliss.mean() > self.ceiling_bliss
 
-        # Rip signal fires when trapped AND gate is CLOSED
-        # This forces model back to Physical/Manifest quadrant
+        # Combined ceiling clamp scalar (multiplicative reduction)
+        # Each ceiling violation compounds the gain reduction
+        ceiling_violations_count = (
+            (1.0 if mental_ceiling_active else 0.0) +
+            (1.0 if physical_ceiling_active else 0.0) +
+            (1.0 if intellect_ceiling_active else 0.0) +
+            (1.0 if vital_ceiling_active else 0.0) +
+            (1.0 if bliss_ceiling_active else 0.0)
+        )
+        # Each violation reduces gain by ceiling_clamp_factor (compounding)
+        ceiling_clamp_scalar = self.ceiling_clamp_factor ** ceiling_violations_count
+
+        # Floor violations count (for logging)
+        mental_floor_active = mental.mean() < self.floor_mental
+        physical_floor_active = physical.mean() < self.floor_physical
+        intellect_floor_active = intellect.mean() < self.floor_intellect
+        bliss_floor_active = bliss.mean() < self.floor_bliss
+        floor_violations_count = (
+            (1.0 if mental_floor_active else 0.0) +
+            (1.0 if physical_floor_active else 0.0) +
+            (1.0 if intellect_floor_active else 0.0) +
+            (1.0 if vital_floor_active else 0.0) +
+            (1.0 if bliss_floor_active else 0.0)
+        )
+
+        # === AXIS 1: Mental -> Intellect (via Physical Gate) ===
+        # Physical Gate: Physical must be in Sattvic Band (38.2% - 61.8%) to open
+        phys_gate = torch.sigmoid((phys_history - self.floor_physical) * self.gate_steepness)
+
+        # Rip signal fires when mentally trapped AND gate is CLOSED
         rip_signal = mental_trap * (1.0 - phys_gate)
 
         # Intellectual path - only flows when gate is OPEN (grounded reasoning)
         missing_intellect = F.relu(self.balance_target - intellect)
         intellect_path = mental_trap * phys_gate * missing_intellect
 
-        # TWO-PATH LOSS: Grounded path + Reality reversal
-        # rip_signal gets multiplied by rip_multiplier for stronger "shock"
+        # Axis 1 Loss
         axis1_loss = (intellect_path + rip_signal * self.rip_multiplier).mean()
 
-        # =======================================================================
-        # AXIS 2: Physical -> Blissful (via Mental) - v2.2.4 Three-Stage Hybrid
-        # =======================================================================
-        #
-        # This axis handles the "just copying tokens" problem symmetrically:
-        # - High Physical = raw data regurgitation
-        # - Low Bliss = no creative expansion
-        # - Mental Gate = check if model has abstracted the pattern
-        #
-        # Same three-stage logic applied to Physical → Bliss transition
-
-        # Stage 1: PHYSICAL DAMPER - dilutes grounding during Physical dominance
-        # (Prevents over-grounding that blocks creativity)
-        # Uses threshold_physical (38.2%) from Fibonacci Pentad
-        physical_damper = 1.0 - torch.sigmoid((physical - self.threshold_physical) * self.damper_steepness)
-
-        # Stage 2: MENTAL GATE - strict prerequisite for Bliss (NO BYPASS!)
-        # Uses threshold_mental (38.2%) for gate requirement
-        mental_gate = torch.sigmoid((mental - self.threshold_mental) * self.gate_steepness)
-
-        # Stage 3: REALITY RIP - Hard ReLU for Physical trap
-        # Uses threshold_physical (38.2%) from Fibonacci Pentad
-        physical_trap = F.relu(physical - self.threshold_physical)
+        # === AXIS 2: Physical -> Bliss (via Mental Gate) ===
+        # Mental Gate: Mental must be in Sattvic Band (23.6% - 38.2%) to open
+        mental_gate = torch.sigmoid((mental - self.floor_mental) * self.gate_steepness)
 
         # Rip signal fires when physically trapped AND mental gate is CLOSED
         rip_signal_axis2 = physical_trap * (1.0 - mental_gate)
@@ -652,44 +734,39 @@ class KoshaGyroscopicLoss(nn.Module):
         missing_bliss = F.relu(self.balance_target - bliss)
         bliss_path = physical_trap * mental_gate * missing_bliss
 
-        # TWO-PATH LOSS: Abstracted path + Reality reversal
+        # Axis 2 Loss
         axis2_loss = (bliss_path + rip_signal_axis2 * self.rip_multiplier).mean()
 
-        # === Total Loss with Dynamic Gain (v2.2.1) + Authority Modulation (v2.2.4) ===
-        # Get PPL-based dynamic gain
+        # === Combined Momentum Scaler (Vital Floor Boost + Vital Ceiling Brake) ===
+        combined_vital_momentum = vital_momentum_damper * vital_momentum_boost
+
+        # === Total Loss with Dynamic Gain + Authority + Ceiling Clamp ===
         base_dynamic_gain = self.get_dynamic_gain(current_ppl)
 
         # Apply authority factor from PIDv2 controller if provided
-        # This enables real-time feedback control when --controller pidv2 is used
         if authority_factor is not None:
             effective_gain = base_dynamic_gain * authority_factor
         else:
             effective_gain = base_dynamic_gain
 
-        # === v2.2.6: BLISS CLAMP - Counter "Blissful Ignorance" ===
-        # When Bliss exceeds ceiling (61.8% φ), the model is generating fluent gibberish
-        # Apply gain reduction to force reliance on pure LM loss for grounding
-        bliss_mean = bliss.mean()
-        bliss_clamp_active = bliss_mean > self.threshold_bliss_ceiling
-        if bliss_clamp_active:
-            # Smooth sigmoid-based clamp: the higher above ceiling, the stronger the reduction
-            bliss_excess = bliss_mean - self.threshold_bliss_ceiling
-            # Clamp factor scales from 1.0 (at ceiling) to bliss_clamp_factor (at 1.0)
-            clamp_strength = torch.sigmoid(bliss_excess * 10.0)  # Steepness 10.0
-            bliss_clamp_scalar = 1.0 - clamp_strength * (1.0 - self.bliss_clamp_factor)
-            effective_gain = effective_gain * bliss_clamp_scalar.item()
-        else:
-            bliss_clamp_scalar = torch.tensor(1.0)
+        # Apply ceiling clamp (reduces gain when Koshas exceed ceilings)
+        effective_gain = effective_gain * ceiling_clamp_scalar
 
         # === VICReg Variance Regularization (v2.2.5) ===
         # Prevents sigmoid collapse where all Koshas converge to same value
         vicreg_variance_loss = self._compute_vicreg_variance_loss(kosha_states)
 
-        # === FIBONACCI PENTAD: Vital Resistance Dampening ===
-        # High Vital (>78.6%) dampens the loss to prevent "overheating"
-        vital_damper_scalar = vital_momentum_damper.mean()
+        # === v2.3.0: Combined Vital Momentum (Boost when low, Brake when high) ===
+        combined_vital_scalar = combined_vital_momentum.mean() if torch.is_tensor(combined_vital_momentum) else combined_vital_momentum
 
-        total_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler * vital_damper_scalar + vicreg_variance_loss
+        # === v2.3.0: TOTAL LOSS with Harmonic Pentad ===
+        # Components:
+        # 1. Axis losses (scaled by gain, momentum, vital)
+        # 2. Floor push loss (push koshas into Sattvic band)
+        # 3. Intellect hubris loss (penalize over-intellectualization)
+        # 4. VICReg variance loss (prevent sigmoid collapse)
+        axis_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler * combined_vital_scalar
+        total_loss = axis_loss + floor_push_loss + intellect_hubris_loss * effective_gain + vicreg_variance_loss
 
         if return_components:
             # v2.2.4: Compute diagnostic metrics for Three-Stage Hybrid Logic
@@ -715,28 +792,53 @@ class KoshaGyroscopicLoss(nn.Module):
                 # Loss breakdown
                 'axis1_loss': axis1_loss.item(),
                 'axis2_loss': axis2_loss.item(),
-                'vicreg_variance_loss': vicreg_variance_loss.item(),  # v2.2.5
+                'floor_push_loss': floor_push_loss.item() if torch.is_tensor(floor_push_loss) else floor_push_loss,
+                'intellect_hubris_loss': intellect_hubris_loss.item() if torch.is_tensor(intellect_hubris_loss) else intellect_hubris_loss,
+                'vicreg_variance_loss': vicreg_variance_loss.item(),
                 'effective_gain': effective_gain,
-                'base_dynamic_gain': base_dynamic_gain,  # PPL-only gain before authority
+                'base_dynamic_gain': base_dynamic_gain,
                 'authority_factor': authority_factor if authority_factor is not None else 1.0,
-                # v2.2.6: Bliss Clamp metrics
-                'bliss_clamp_active': bliss_clamp_active.item() if torch.is_tensor(bliss_clamp_active) else bliss_clamp_active,
-                'bliss_clamp_scalar': bliss_clamp_scalar.item() if torch.is_tensor(bliss_clamp_scalar) else bliss_clamp_scalar,
                 'current_ppl': current_ppl,
                 'momentum_scaler': momentum_scaler.item() if torch.is_tensor(momentum_scaler) else momentum_scaler,
 
-                # v2.2.5 VICReg metrics
+                # v2.3.0 HARMONIC PENTAD: Floor violations (below Sattvic band)
+                'floor_mental': self.floor_mental,
+                'floor_physical': self.floor_physical,
+                'floor_intellect': self.floor_intellect,
+                'floor_vital': self.floor_vital,
+                'floor_bliss': self.floor_bliss,
+                'mental_floor_active': mental_floor_active.item() if torch.is_tensor(mental_floor_active) else mental_floor_active,
+                'physical_floor_active': physical_floor_active.item() if torch.is_tensor(physical_floor_active) else physical_floor_active,
+                'intellect_floor_active': intellect_floor_active.item() if torch.is_tensor(intellect_floor_active) else intellect_floor_active,
+                'vital_floor_active': vital_floor_active.item() if torch.is_tensor(vital_floor_active) else vital_floor_active,
+                'bliss_floor_active': bliss_floor_active.item() if torch.is_tensor(bliss_floor_active) else bliss_floor_active,
+                'floor_violations_count': floor_violations_count,
+
+                # v2.3.0 HARMONIC PENTAD: Ceiling violations (above Sattvic band)
+                'ceiling_mental': self.ceiling_mental,
+                'ceiling_physical': self.ceiling_physical,
+                'ceiling_intellect': self.ceiling_intellect,
+                'ceiling_vital': self.ceiling_vital,
+                'ceiling_bliss': self.ceiling_bliss,
+                'mental_ceiling_active': mental_ceiling_active.item() if torch.is_tensor(mental_ceiling_active) else mental_ceiling_active,
+                'physical_ceiling_active': physical_ceiling_active.item() if torch.is_tensor(physical_ceiling_active) else physical_ceiling_active,
+                'intellect_ceiling_active': intellect_ceiling_active.item() if torch.is_tensor(intellect_ceiling_active) else intellect_ceiling_active,
+                'vital_ceiling_active': vital_ceiling_active.item() if torch.is_tensor(vital_ceiling_active) else vital_ceiling_active,
+                'bliss_ceiling_active': bliss_ceiling_active.item() if torch.is_tensor(bliss_ceiling_active) else bliss_ceiling_active,
+                'ceiling_violations_count': ceiling_violations_count,
+                'ceiling_clamp_scalar': ceiling_clamp_scalar,
+
+                # v2.3.0 Vital momentum (boost + brake combined)
+                'vital_momentum_boost': vital_momentum_boost.item() if torch.is_tensor(vital_momentum_boost) else vital_momentum_boost,
+                'vital_momentum_damper': vital_momentum_damper.mean().item() if torch.is_tensor(vital_momentum_damper) else vital_momentum_damper,
+                'combined_vital_scalar': combined_vital_scalar.item() if torch.is_tensor(combined_vital_scalar) else combined_vital_scalar,
+
+                # VICReg metrics
                 'vicreg_target_std': self.vicreg_target_std,
                 'vicreg_variance_weight': self.vicreg_variance_weight,
 
-                # v2.2.5 FIBONACCI PENTAD METRICS
-                'threshold_mental': self.threshold_mental,
-                'threshold_physical': self.threshold_physical,
-                'threshold_intellect': self.threshold_intellect,
-                'threshold_vital': self.threshold_vital,
-                'threshold_bliss': self.threshold_bliss,
+                # Legacy compatibility
                 'vital_resistance_mean': vital_resistance.mean().item(),
-                'vital_damper_scalar': vital_damper_scalar.item() if torch.is_tensor(vital_damper_scalar) else vital_damper_scalar,
                 'bliss_spark_mean': bliss_spark.mean().item(),
 
                 # v2.2.4 THREE-STAGE HYBRID METRICS
